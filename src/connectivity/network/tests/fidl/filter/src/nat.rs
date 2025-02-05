@@ -20,21 +20,20 @@ use netstack_testing_macros::netstack_test;
 use test_case::test_case;
 
 use crate::ip_hooks::{
-    Addrs, BoundSockets, ExpectedConnectivity, OriginalDestination, Ports, Realms, RouterTestIpExt,
-    SockAddrs, SocketType, TcpSocket, TestIpExt, TestNet, TestRealm, TestRouterNet, UdpSocket,
-    LOW_RULE_PRIORITY, MEDIUM_RULE_PRIORITY,
+    Addrs, BoundSockets, ExpectedConnectivity, IcmpSocket, OriginalDestination, Ports, Realms,
+    RouterTestIpExt, SockAddrs, SocketType, TcpSocket, TestIpExt, TestNet, TestRealm,
+    TestRouterNet, UdpSocket, LOW_RULE_PRIORITY, MEDIUM_RULE_PRIORITY,
 };
 
 fn local_type_name<T>() -> &'static str {
     std::any::type_name::<T>().split("::").last().unwrap()
 }
 
-// TODO(https://fxbug.dev/341128580): exercise ICMP once it can be NATed
-// correctly.
 #[netstack_test]
 #[variant(I, Ip)]
 #[test_case(PhantomData::<TcpSocket>; "tcp")]
 #[test_case(PhantomData::<UdpSocket>; "udp")]
+#[test_case(PhantomData::<IcmpSocket>; "icmp")]
 async fn redirect_ingress_no_assigned_address<I: TestIpExt, S: SocketType>(
     name: &str,
     _socket_type: PhantomData<S>,
@@ -88,12 +87,11 @@ async fn redirect_ingress_no_assigned_address<I: TestIpExt, S: SocketType>(
         .await;
 }
 
-// TODO(https://fxbug.dev/341128580): exercise ICMP once it can be NATed
-// correctly.
 #[netstack_test]
 #[variant(I, Ip)]
 #[test_case(PhantomData::<TcpSocket>; "tcp")]
 #[test_case(PhantomData::<UdpSocket>; "udp")]
+#[test_case(PhantomData::<IcmpSocket>; "icmp")]
 async fn masquerade_egress_no_assigned_address<I: TestIpExt, S: SocketType>(
     name: &str,
     _socket_type: PhantomData<S>,
@@ -255,14 +253,14 @@ fn different_ephemeral_port(port: u16) -> u16 {
     EPHEMERAL_RANGE.start() + (new_port % len)
 }
 
-// TODO(https://fxbug.dev/341128580): exercise ICMP once it can be NATed
-// correctly.
 #[netstack_test]
 #[variant(I, Ip)]
 #[test_case(PhantomData::<TcpSocket>, false; "tcp")]
 #[test_case(PhantomData::<UdpSocket>, false; "udp")]
 #[test_case(PhantomData::<TcpSocket>, true; "tcp to local port")]
 #[test_case(PhantomData::<UdpSocket>, true; "udp to local port")]
+// NB: ICMP does not allow selecting the redirect port range.
+#[test_case(PhantomData::<IcmpSocket>, false; "icmp")]
 async fn redirect_ingress<I: TestIpExt, S: SocketType>(
     name: &str,
     _socket_type: PhantomData<S>,
@@ -326,14 +324,15 @@ async fn redirect_ingress<I: TestIpExt, S: SocketType>(
         };
         std::net::SocketAddr::new(addr, port)
     };
-    let server_port = NonZeroU16::new(sock_addrs.server.port()).unwrap();
+    let dst_port = change_dst_port.then(|| {
+        let server_port = NonZeroU16::new(sock_addrs.server.port()).unwrap();
+        PortRange(server_port..=server_port)
+    });
     net.server
         .install_nat_rule::<I>(
             MEDIUM_RULE_PRIORITY,
             S::matcher::<I>(),
-            Action::Redirect {
-                dst_port: change_dst_port.then_some(PortRange(server_port..=server_port)),
-            },
+            Action::Redirect { dst_port },
         )
         .await;
 
@@ -353,14 +352,14 @@ async fn redirect_ingress<I: TestIpExt, S: SocketType>(
     .await;
 }
 
-// TODO(https://fxbug.dev/341128580): exercise ICMP once it can be NATed
-// correctly.
 #[netstack_test]
 #[variant(I, Ip)]
 #[test_case(PhantomData::<TcpSocket>, false; "tcp")]
 #[test_case(PhantomData::<UdpSocket>, false; "udp")]
 #[test_case(PhantomData::<TcpSocket>, true; "tcp to local port")]
 #[test_case(PhantomData::<UdpSocket>, true; "udp to local port")]
+// NB: ICMP does not allow selecting the redirect port range.
+#[test_case(PhantomData::<IcmpSocket>, false; "icmp")]
 async fn redirect_local_egress<I: TestIpExt, S: SocketType>(
     name: &str,
     _socket_type: PhantomData<S>,
@@ -409,15 +408,13 @@ async fn redirect_local_egress<I: TestIpExt, S: SocketType>(
         };
         std::net::SocketAddr::new(addr, port)
     };
-    let server_port = NonZeroU16::new(sock_addrs.server.port()).unwrap();
+
+    let dst_port = change_dst_port.then(|| {
+        let server_port = NonZeroU16::new(sock_addrs.server.port()).unwrap();
+        PortRange(server_port..=server_port)
+    });
     netstack
-        .install_nat_rule::<I>(
-            LOW_RULE_PRIORITY,
-            S::matcher::<I>(),
-            Action::Redirect {
-                dst_port: change_dst_port.then_some(PortRange(server_port..=server_port)),
-            },
-        )
+        .install_nat_rule::<I>(LOW_RULE_PRIORITY, S::matcher::<I>(), Action::Redirect { dst_port })
         .await;
 
     let _handles = S::run_test::<I>(
@@ -436,12 +433,11 @@ async fn redirect_local_egress<I: TestIpExt, S: SocketType>(
     .await;
 }
 
-// TODO(https://fxbug.dev/341128580): exercise ICMP once it can be NATed
-// correctly.
 #[netstack_test]
 #[variant(I, Ip)]
 #[test_case(PhantomData::<TcpSocket>; "tcp")]
 #[test_case(PhantomData::<UdpSocket>; "udp")]
+#[test_case(PhantomData::<IcmpSocket>; "icmp")]
 async fn masquerade<I: RouterTestIpExt, S: SocketType>(name: &str, _socket_type: PhantomData<S>) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let name = format!("{name}_{}", local_type_name::<S>().to_snake_case());
@@ -482,19 +478,24 @@ async fn masquerade<I: RouterTestIpExt, S: SocketType>(name: &str, _socket_type:
     .await;
 }
 
-// TODO(https://fxbug.dev/341128580): exercise ICMP once it can be NATed
-// correctly.
 #[netstack_test]
 #[variant(I, Ip)]
 #[test_case(PhantomData::<TcpSocket>, false; "tcp")]
 #[test_case(PhantomData::<UdpSocket>, false; "udp")]
 #[test_case(PhantomData::<UdpSocket>, true; "udp restrict to occupied port")]
 #[test_case(PhantomData::<TcpSocket>, true; "tcp restrict to occupied port")]
+// NB: Restricting the source port of ICMP sockets is not allowed, but we can
+// still run the test to ensure two way connectivity is ensured.
+#[test_case(PhantomData::<IcmpSocket>, false; "icmp")]
 async fn masquerade_rewrite_src_port<I: RouterTestIpExt, S: SocketType>(
     name: &str,
     _socket_type: PhantomData<S>,
     rewrite_to_conflicting_port: bool,
 ) {
+    if rewrite_to_conflicting_port {
+        assert!(S::SUPPORTS_NAT_PORT_RANGE, "socket type doesn't support test set up");
+    }
+
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let name = format!("{name}_{}", local_type_name::<S>().to_snake_case());
 
@@ -547,7 +548,10 @@ async fn masquerade_rewrite_src_port<I: RouterTestIpExt, S: SocketType>(
             )),
             ..S::matcher::<I>()
         },
-        Action::Masquerade { src_port: Some(PortRange(masquerade_src_port..=masquerade_src_port)) },
+        Action::Masquerade {
+            src_port: S::SUPPORTS_NAT_PORT_RANGE
+                .then_some(PortRange(masquerade_src_port..=masquerade_src_port)),
+        },
     )
     .await;
 
@@ -587,12 +591,11 @@ async fn masquerade_rewrite_src_port<I: RouterTestIpExt, S: SocketType>(
     .await;
 }
 
-// TODO(https://fxbug.dev/341128580): exercise ICMP once it can be NATed
-// correctly.
 #[netstack_test]
 #[variant(I, Ip)]
 #[test_case(PhantomData::<TcpSocket>; "tcp")]
 #[test_case(PhantomData::<UdpSocket>; "udp")]
+#[test_case(PhantomData::<IcmpSocket>; "icmp")]
 async fn implicit_snat_ports_of_locally_generated_traffic<I: RouterTestIpExt, S: SocketType>(
     name: &str,
     _socket_type: PhantomData<S>,

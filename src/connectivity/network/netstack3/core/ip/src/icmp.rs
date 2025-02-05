@@ -837,6 +837,11 @@ impl<
                     let req = *echo_request.message();
                     let code = echo_request.code();
                     let (local_ip, remote_ip) = (dst_ip, src_ip);
+                    debug!(
+                        "replying to ICMP echo request from {remote_ip}: id={}, seq={}",
+                        req.id(),
+                        req.seq()
+                    );
                     // TODO(joshlf): Do something if send_icmp_reply returns an
                     // error?
                     let _ = send_icmp_reply(
@@ -855,12 +860,18 @@ impl<
                         },
                     );
                 } else {
-                    trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Received echo request with an unspecified source address");
+                    trace!(
+                        "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: \
+                        Received echo request with an unspecified source address"
+                    );
                 }
             }
             Icmpv4Packet::EchoReply(echo_reply) => {
                 core_ctx.increment(|counters: &IcmpRxCounters<Ipv4>| &counters.echo_reply);
-                trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Received an EchoReply message");
+                trace!(
+                    "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: \
+                    Received an EchoReply message"
+                );
                 let parse_metadata = echo_reply.parse_metadata();
                 buffer.undo_parse(parse_metadata);
                 return <CC::EchoTransportContext
@@ -878,7 +889,10 @@ impl<
                 core_ctx.increment(|counters: &IcmpRxCounters<Ipv4>| &counters.timestamp_request);
                 if let Some(src_ip) = SpecifiedAddr::new(src_ip) {
                     if core_ctx.should_send_timestamp_reply() {
-                        trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Responding to Timestamp Request message");
+                        trace!(
+                            "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::\
+                            receive_ip_packet: Responding to Timestamp Request message"
+                        );
                         // We're supposed to respond with the time that we
                         // processed this message as measured in milliseconds
                         // since midnight UT. However, that would require that
@@ -926,21 +940,32 @@ impl<
                         );
                     } else {
                         trace!(
-                            "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Silently ignoring Timestamp Request message"
+                            "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::\
+                            receive_ip_packet: Silently ignoring Timestamp Request message"
                         );
                     }
                 } else {
-                    trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Received timestamp request with an unspecified source address");
+                    trace!(
+                        "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::\
+                        receive_ip_packet: Received timestamp request with an unspecified source \
+                        address"
+                    );
                 }
             }
             Icmpv4Packet::TimestampReply(_) => {
                 // TODO(joshlf): Support sending Timestamp Requests and
                 // receiving Timestamp Replies?
-                debug!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Received unsolicited Timestamp Reply message");
+                debug!(
+                    "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: \
+                    Received unsolicited Timestamp Reply message"
+                );
             }
             Icmpv4Packet::DestUnreachable(dest_unreachable) => {
                 core_ctx.increment(|counters: &IcmpRxCounters<Ipv4>| &counters.dest_unreachable);
-                trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Received a Destination Unreachable message");
+                trace!(
+                    "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: \
+                    Received a Destination Unreachable message"
+                );
 
                 if dest_unreachable.code() == Icmpv4DestUnreachableCode::FragmentationRequired {
                     if let Some(next_hop_mtu) = dest_unreachable.message().next_hop_mtu() {
@@ -992,7 +1017,11 @@ impl<
                             let total_len =
                                 u16::from_be_bytes(original_packet_buf[2..4].try_into().unwrap());
 
-                            trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Next-Hop MTU is 0 so using the next best PMTU value from {}", total_len);
+                            trace!(
+                                "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::\
+                                receive_ip_packet: Next-Hop MTU is 0 so using the next best PMTU \
+                                value from {total_len}"
+                            );
 
                             core_ctx.update_pmtu_next_lower(
                                 bindings_ctx,
@@ -1005,7 +1034,11 @@ impl<
                             // to send the original IP packet header + 64 bytes
                             // of the original IP packet's body so the node
                             // itself is already violating the RFC.
-                            trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Original packet buf is too small to get original packet len so ignoring");
+                            trace!(
+                                "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::\
+                                receive_ip_packet: Original packet buf is too small to get \
+                                original packet len so ignoring"
+                            );
                         }
                     }
                 }
@@ -1020,7 +1053,10 @@ impl<
             }
             Icmpv4Packet::TimeExceeded(time_exceeded) => {
                 core_ctx.increment(|counters: &IcmpRxCounters<Ipv4>| &counters.time_exceeded);
-                trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Received a Time Exceeded message");
+                trace!(
+                    "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: \
+                    Received a Time Exceeded message"
+                );
 
                 receive_icmpv4_error(
                     core_ctx,
@@ -1031,12 +1067,18 @@ impl<
                 );
             }
             // TODO(https://fxbug.dev/323400954): Support ICMP Redirect.
-            Icmpv4Packet::Redirect(_) => debug!(
-                "Unimplemented: <IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet::redirect"
-            ),
+            Icmpv4Packet::Redirect(_) => {
+                debug!(
+                    "Unimplemented: <IcmpIpTransportContext as IpTransportContext<Ipv4>>::\
+                    receive_ip_packet::redirect"
+                )
+            }
             Icmpv4Packet::ParameterProblem(parameter_problem) => {
                 core_ctx.increment(|counters: &IcmpRxCounters<Ipv4>| &counters.parameter_problem);
-                trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Received a Parameter Problem message");
+                trace!(
+                    "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: \
+                    Received a Parameter Problem message"
+                );
 
                 receive_icmpv4_error(
                     core_ctx,
@@ -1639,6 +1681,11 @@ impl<
                             let req = *echo_request.message();
                             let code = echo_request.code();
                             let (local_ip, remote_ip) = (dst_ip, src_ip);
+                            debug!(
+                                "replying to ICMP echo request from {remote_ip}: id={}, seq={}",
+                                req.id(),
+                                req.seq()
+                            );
                             // TODO(joshlf): Do something if send_icmp_reply returns an
                             // error?
                             let _ = send_icmp_reply(

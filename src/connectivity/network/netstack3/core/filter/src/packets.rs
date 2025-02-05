@@ -15,15 +15,18 @@ use packet::{
     ParseMetadata, ReusableBuffer, SerializeError, Serializer, SliceBufViewMut,
 };
 use packet_formats::icmp::mld::{
-    MulticastListenerDone, MulticastListenerReport, MulticastListenerReportV2,
+    MulticastListenerDone, MulticastListenerQuery, MulticastListenerQueryV2,
+    MulticastListenerReport, MulticastListenerReportV2,
 };
 use packet_formats::icmp::ndp::options::NdpOptionBuilder;
-use packet_formats::icmp::ndp::{NeighborAdvertisement, NeighborSolicitation, RouterSolicitation};
+use packet_formats::icmp::ndp::{
+    NeighborAdvertisement, NeighborSolicitation, Redirect, RouterAdvertisement, RouterSolicitation,
+};
 use packet_formats::icmp::{
     self, IcmpDestUnreachable, IcmpEchoReply, IcmpEchoRequest, IcmpPacketBuilder, IcmpPacketRaw,
     IcmpPacketTypeRaw as _, IcmpTimeExceeded, Icmpv4MessageType, Icmpv4PacketRaw,
-    Icmpv4ParameterProblem, Icmpv4TimestampReply, Icmpv6MessageType, Icmpv6PacketRaw,
-    Icmpv6PacketTooBig, Icmpv6ParameterProblem,
+    Icmpv4ParameterProblem, Icmpv4Redirect, Icmpv4TimestampReply, Icmpv4TimestampRequest,
+    Icmpv6MessageType, Icmpv6PacketRaw, Icmpv6PacketTooBig, Icmpv6ParameterProblem,
 };
 use packet_formats::igmp::messages::IgmpMembershipReportV3Builder;
 use packet_formats::igmp::{self, IgmpPacketBuilder};
@@ -911,11 +914,11 @@ impl<I: IpExt, Inner, M: IcmpMessage<I>> MaybeTransportPacketMut<I>
 
 impl<I: IpExt, M: IcmpMessage<I>> TransportPacketMut<I> for IcmpPacketBuilder<I, M> {
     fn set_src_port(&mut self, id: NonZeroU16) {
-        self.message_mut().set_src_port(id.get());
+        let _: u16 = self.message_mut().update_icmp_id(id.get());
     }
 
     fn set_dst_port(&mut self, id: NonZeroU16) {
-        self.message_mut().set_dst_port(id.get());
+        let _: u16 = self.message_mut().update_icmp_id(id.get());
     }
 
     fn update_pseudo_header_src_addr(&mut self, _old: I::Addr, new: I::Addr) {
@@ -929,25 +932,10 @@ impl<I: IpExt, M: IcmpMessage<I>> TransportPacketMut<I> for IcmpPacketBuilder<I,
 
 /// An ICMP message type that may allow for transport-layer packet inspection.
 pub trait IcmpMessage<I: IpExt>: icmp::IcmpMessage<I> + MaybeTransportPacket {
-    /// Set the notional source port of the ICMP message, which for ICMP Echo
-    /// Requests is the ID.
+    /// Sets the ICMP ID for the message, returning the previous value.
     ///
-    /// # Panics
-    ///
-    /// Panics if this is called on an ICMP message that does not support packet
-    /// rewriting (currently all non-echo message types), or on an ICMP echo
-    /// reply.
-    fn set_src_port(&mut self, id: u16);
-
-    /// Set the notional destination port of the ICMP message, which for ICMP
-    /// Echo Replies is the ID.
-    ///
-    /// # Panics
-    ///
-    /// Panics if this is called on an ICMP message that does not support packet
-    /// rewriting (currently all non-echo message types), or on an ICMP echo
-    /// request.
-    fn set_dst_port(&mut self, id: u16);
+    /// The ICMP ID is both the *src* AND *dst* ports for conntrack entries.
+    fn update_icmp_id(&mut self, id: u16) -> u16;
 }
 
 // TODO(https://fxbug.dev/341128580): connection tracking will probably want to
@@ -956,17 +944,15 @@ pub trait IcmpMessage<I: IpExt>: icmp::IcmpMessage<I> + MaybeTransportPacket {
 // way for conntrack to differentiate between the two.
 impl MaybeTransportPacket for IcmpEchoReply {
     fn transport_packet_data(&self) -> Option<TransportPacketData> {
-        Some(TransportPacketData::Generic { src_port: 0, dst_port: self.id() })
+        Some(TransportPacketData::Generic { src_port: self.id(), dst_port: self.id() })
     }
 }
 
 impl<I: IpExt> IcmpMessage<I> for IcmpEchoReply {
-    fn set_src_port(&mut self, _: u16) {
-        panic!("cannot set source port for ICMP echo reply")
-    }
-
-    fn set_dst_port(&mut self, id: u16) {
+    fn update_icmp_id(&mut self, id: u16) -> u16 {
+        let old = self.id();
         self.set_id(id);
+        old
     }
 }
 
@@ -976,17 +962,15 @@ impl<I: IpExt> IcmpMessage<I> for IcmpEchoReply {
 // way for conntrack to differentiate between the two.
 impl MaybeTransportPacket for IcmpEchoRequest {
     fn transport_packet_data(&self) -> Option<TransportPacketData> {
-        Some(TransportPacketData::Generic { src_port: self.id(), dst_port: 0 })
+        Some(TransportPacketData::Generic { src_port: self.id(), dst_port: self.id() })
     }
 }
 
 impl<I: IpExt> IcmpMessage<I> for IcmpEchoRequest {
-    fn set_src_port(&mut self, id: u16) {
+    fn update_icmp_id(&mut self, id: u16) -> u16 {
+        let old = self.id();
         self.set_id(id);
-    }
-
-    fn set_dst_port(&mut self, _: u16) {
-        panic!("cannot set destination port for ICMP echo request")
+        old
     }
 }
 
@@ -1000,11 +984,7 @@ macro_rules! unsupported_icmp_message_type {
 
         $(
             impl IcmpMessage<$ips> for $message {
-                fn set_src_port(&mut self, _: u16) {
-                    unreachable!("non-echo ICMP packets should never be rewritten")
-                }
-
-                fn set_dst_port(&mut self, _: u16) {
+                fn update_icmp_id(&mut self, _: u16) -> u16 {
                     unreachable!("non-echo ICMP packets should never be rewritten")
                 }
             }
@@ -1012,13 +992,19 @@ macro_rules! unsupported_icmp_message_type {
     };
 }
 
+unsupported_icmp_message_type!(Icmpv4TimestampRequest, Ipv4);
 unsupported_icmp_message_type!(Icmpv4TimestampReply, Ipv4);
+unsupported_icmp_message_type!(Icmpv4Redirect, Ipv4);
 unsupported_icmp_message_type!(NeighborSolicitation, Ipv6);
 unsupported_icmp_message_type!(NeighborAdvertisement, Ipv6);
 unsupported_icmp_message_type!(RouterSolicitation, Ipv6);
 unsupported_icmp_message_type!(MulticastListenerDone, Ipv6);
 unsupported_icmp_message_type!(MulticastListenerReport, Ipv6);
 unsupported_icmp_message_type!(MulticastListenerReportV2, Ipv6);
+unsupported_icmp_message_type!(MulticastListenerQuery, Ipv6);
+unsupported_icmp_message_type!(MulticastListenerQueryV2, Ipv6);
+unsupported_icmp_message_type!(RouterAdvertisement, Ipv6);
+unsupported_icmp_message_type!(Redirect, Ipv6);
 
 // Transport layer packet inspection is not currently supported for any ICMP
 // error message types.
@@ -1243,14 +1229,14 @@ fn parse_tcp_header<B: ParseBuffer, I: IpExt>(
 }
 
 fn parse_icmpv4_header<B: ParseBuffer>(mut body: B) -> Option<TransportPacketData> {
-    let (src_port, dst_port) = match icmp::peek_message_type(body.as_ref()).ok()? {
+    match icmp::peek_message_type(body.as_ref()).ok()? {
         Icmpv4MessageType::EchoRequest => {
             let packet = body.parse::<IcmpPacketRaw<Ipv4, _, IcmpEchoRequest>>().ok()?;
-            Some((packet.message().id(), 0))
+            packet.message().transport_packet_data()
         }
         Icmpv4MessageType::EchoReply => {
             let packet = body.parse::<IcmpPacketRaw<Ipv4, _, IcmpEchoReply>>().ok()?;
-            Some((0, packet.message().id()))
+            packet.message().transport_packet_data()
         }
         // TODO(https://fxbug.dev/328057704): parse packet contained in ICMP error
         // message payload so NAT can be applied to it.
@@ -1263,19 +1249,18 @@ fn parse_icmpv4_header<B: ParseBuffer>(mut body: B) -> Option<TransportPacketDat
         // ID.
         | Icmpv4MessageType::TimestampRequest
         | Icmpv4MessageType::TimestampReply => None,
-    }?;
-    Some(TransportPacketData::Generic { src_port, dst_port })
+    }
 }
 
 fn parse_icmpv6_header<B: ParseBuffer>(mut body: B) -> Option<TransportPacketData> {
-    let (src_port, dst_port) = match icmp::peek_message_type(body.as_ref()).ok()? {
+    match icmp::peek_message_type(body.as_ref()).ok()? {
         Icmpv6MessageType::EchoRequest => {
             let packet = body.parse::<IcmpPacketRaw<Ipv6, _, IcmpEchoRequest>>().ok()?;
-            Some((packet.message().id(), 0))
+            packet.message().transport_packet_data()
         }
         Icmpv6MessageType::EchoReply => {
             let packet = body.parse::<IcmpPacketRaw<Ipv6, _, IcmpEchoReply>>().ok()?;
-            Some((0, packet.message().id()))
+            packet.message().transport_packet_data()
         }
         // TODO(https://fxbug.dev/328057704): parse packet contained in ICMP error
         // message payload so NAT can be applied to it.
@@ -1292,8 +1277,7 @@ fn parse_icmpv6_header<B: ParseBuffer>(mut body: B) -> Option<TransportPacketDat
         | Icmpv6MessageType::MulticastListenerReport
         | Icmpv6MessageType::MulticastListenerDone
         | Icmpv6MessageType::MulticastListenerReportV2 => None,
-    }?;
-    Some(TransportPacketData::Generic { src_port, dst_port })
+    }
 }
 
 /// A transport header that has been parsed from a byte buffer and provides
@@ -1383,6 +1367,19 @@ impl<'a, I: IpExt> ParsedTransportHeaderMut<'a, I> {
     }
 }
 
+/// A helper trait to extract [`IcmpMessage`] impls from parsed ICMP messages.
+trait IcmpMessageImplHelper<I: IpExt> {
+    fn message_impl_mut(&mut self) -> &mut impl IcmpMessage<I>;
+}
+
+impl<I: IpExt, B: SplitByteSliceMut, M: IcmpMessage<I>> IcmpMessageImplHelper<I>
+    for IcmpPacketRaw<I, B, M>
+{
+    fn message_impl_mut(&mut self) -> &mut impl IcmpMessage<I> {
+        self.message_mut()
+    }
+}
+
 impl<'a, I: IpExt> TransportPacketMut<I> for ParsedTransportHeaderMut<'a, I> {
     fn set_src_port(&mut self, port: NonZeroU16) {
         match self {
@@ -1392,26 +1389,22 @@ impl<'a, I: IpExt> TransportPacketMut<I> for ParsedTransportHeaderMut<'a, I> {
                 I::map_ip::<_, ()>(
                     packet,
                     |packet| {
-                        use Icmpv4PacketRaw::*;
-                        match packet {
-                            EchoRequest(packet) => packet.set_id(port.get()),
-                            EchoReply(_) => panic!("cannot set source port for ICMP echo reply"),
-                            DestUnreachable(_) | Redirect(_) | TimeExceeded(_)
-                            | ParameterProblem(_) | TimestampRequest(_) | TimestampReply(_) => {
-                                unreachable!("non-echo ICMP packets should never be rewritten")
+                        packet_formats::icmpv4_dispatch!(
+                            packet: raw,
+                            p => {
+                                let old = p.message_impl_mut().update_icmp_id(port.get());
+                                p.update_checksum_header_field_u16(old, port.get())
                             }
-                        }
+                        );
                     },
                     |packet| {
-                        use Icmpv6PacketRaw::*;
-                        match packet {
-                            EchoRequest(packet) => packet.set_id(port.get()),
-                            EchoReply(_) => panic!("cannot set source port for ICMPv6 echo reply"),
-                            DestUnreachable(_) | PacketTooBig(_) | TimeExceeded(_)
-                            | ParameterProblem(_) | Ndp(_) | Mld(_) => {
-                                unreachable!("non-echo ICMPv6 packets should never be rewritten")
+                        packet_formats::icmpv6_dispatch!(
+                            packet: raw,
+                            p => {
+                                let old = p.message_impl_mut().update_icmp_id(port.get());
+                                p.update_checksum_header_field_u16(old, port.get())
                             }
-                        }
+                        );
                     },
                 );
             }
@@ -1426,30 +1419,22 @@ impl<'a, I: IpExt> TransportPacketMut<I> for ParsedTransportHeaderMut<'a, I> {
                 I::map_ip::<_, ()>(
                     packet,
                     |packet| {
-                        use Icmpv4PacketRaw::*;
-                        match packet {
-                            EchoReply(packet) => packet.set_id(port.get()),
-                            EchoRequest(_) => {
-                                panic!("cannot set destination port for ICMP echo request")
+                        packet_formats::icmpv4_dispatch!(
+                            packet:raw,
+                            p => {
+                                let old = p.message_impl_mut().update_icmp_id(port.get());
+                                p.update_checksum_header_field_u16(old, port.get())
                             }
-                            DestUnreachable(_) | Redirect(_) | TimeExceeded(_)
-                            | ParameterProblem(_) | TimestampRequest(_) | TimestampReply(_) => {
-                                unreachable!("non-echo ICMP packets should never be rewritten")
-                            }
-                        }
+                        );
                     },
                     |packet| {
-                        use Icmpv6PacketRaw::*;
-                        match packet {
-                            EchoReply(packet) => packet.set_id(port.get()),
-                            EchoRequest(_) => {
-                                panic!("cannot set destination port for ICMPv6 echo request")
+                        packet_formats::icmpv6_dispatch!(
+                            packet:raw,
+                            p => {
+                                let old = p.message_impl_mut().update_icmp_id(port.get());
+                                p.update_checksum_header_field_u16(old, port.get())
                             }
-                            DestUnreachable(_) | PacketTooBig(_) | TimeExceeded(_)
-                            | ParameterProblem(_) | Ndp(_) | Mld(_) => {
-                                unreachable!("non-echo ICMPv6 packets should never be rewritten")
-                            }
-                        }
+                        );
                     },
                 );
             }
@@ -2068,7 +2053,7 @@ mod tests {
                 TransportPacketData::Generic { src_port: SRC_PORT.get(), dst_port: DST_PORT.get() }
             }
             TransportPacketDataProtocol::IcmpEchoRequest => {
-                TransportPacketData::Generic { src_port: SRC_PORT.get(), dst_port: 0 }
+                TransportPacketData::Generic { src_port: SRC_PORT.get(), dst_port: SRC_PORT.get() }
             }
         };
 
@@ -2232,32 +2217,6 @@ mod tests {
             )
             .reply(/* recv_timestamp */ 0, /* tx_timestamp */ 0),
         ));
-        let Some(packet) = serializer.transport_packet_mut() else {
-            // We expect this method to always return Some, and this test is expected to
-            // panic, so *do not* panic in order to fail the test if this method returns
-            // None.
-            return;
-        };
-        packet.set_src_port(SRC_PORT_2);
-    }
-
-    #[ip_test(I)]
-    #[should_panic]
-    fn icmp_echo_request_set_dst_port_panics<I: TestIpExt>() {
-        let mut serializer = IcmpEchoRequest::make_serializer::<I>(I::SRC_IP, I::DST_IP);
-        let Some(packet) = serializer.transport_packet_mut() else {
-            // We expect this method to always return Some, and this test is expected to
-            // panic, so *do not* panic in order to fail the test if this method returns
-            // None.
-            return;
-        };
-        packet.set_dst_port(SRC_PORT_2);
-    }
-
-    #[ip_test(I)]
-    #[should_panic]
-    fn icmp_echo_reply_set_src_port_panics<I: TestIpExt>() {
-        let mut serializer = IcmpEchoReply::make_serializer::<I>(I::SRC_IP, I::DST_IP);
         let Some(packet) = serializer.transport_packet_mut() else {
             // We expect this method to always return Some, and this test is expected to
             // panic, so *do not* panic in order to fail the test if this method returns

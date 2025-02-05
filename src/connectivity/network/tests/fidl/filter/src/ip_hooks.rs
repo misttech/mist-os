@@ -17,7 +17,7 @@ use fidl_fuchsia_net_filter_ext::{
 use fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _};
 use futures::future::LocalBoxFuture;
 use futures::io::{AsyncReadExt as _, AsyncWriteExt as _};
-use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _};
+use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryFutureExt as _};
 use heck::SnakeCase as _;
 use log::info;
 use net_declare::fidl_subnet;
@@ -220,6 +220,8 @@ pub(crate) trait SocketType {
         sock_addrs: SockAddrs,
         expected_connectivity: ExpectedConnectivity,
     );
+
+    const SUPPORTS_NAT_PORT_RANGE: bool;
 }
 
 const CLIENT_PAYLOAD: &'static str = "hello from client";
@@ -285,6 +287,8 @@ impl SocketType for IrrelevantToTest {
         )
         .await;
     }
+
+    const SUPPORTS_NAT_PORT_RANGE: bool = true;
 }
 
 #[derive(Debug)]
@@ -533,6 +537,8 @@ impl SocketType for TcpSocket {
 
         futures::future::join(server_fut, client_fut).await;
     }
+
+    const SUPPORTS_NAT_PORT_RANGE: bool = true;
 }
 
 #[derive(Debug)]
@@ -699,19 +705,35 @@ impl SocketType for UdpSocket {
 
         futures::future::join(server_fut, client_fut).await;
     }
+
+    const SUPPORTS_NAT_PORT_RANGE: bool = true;
 }
 
 pub(crate) struct IcmpSocket;
 
+pub(crate) struct IcmpSocketAndSeq {
+    socket: fasync::net::DatagramSocket,
+    // Keep track of used sequence numbers to avoid sending messages with the
+    // same sequence.
+    seq: u16,
+}
+
+impl IcmpSocketAndSeq {
+    async fn new_bound(realm: &netemul::TestRealm<'_>, addr: std::net::SocketAddr) -> Self {
+        let socket = match addr {
+            std::net::SocketAddr::V4(_) => realm.icmp_socket::<Ipv4>().await,
+            std::net::SocketAddr::V6(_) => realm.icmp_socket::<Ipv6>().await,
+        }
+        .expect("create icmp socket");
+        socket.as_ref().bind(&addr.into()).expect("bind icmp socket");
+        Self { socket, seq: 0 }
+    }
+}
+
 impl SocketType for IcmpSocket {
-    // We do not bind the sockets up front as with TCP and UDP. This is because
-    // for those tests, the test may need to use information from the socket,
-    // such as the locally bound port, to create an appropriate filter. For
-    // ICMP, there is no port, and filtering is not done based on ICMP ID, so
-    // there is no requirement to bind the sockets up front.
-    type BoundClient = ();
+    type BoundClient = IcmpSocketAndSeq;
     type BoundServer = ();
-    type ConnectedClient = ();
+    type ConnectedClient = IcmpSocketAndSeq;
     type ConnectedServer = ();
 
     fn matcher<I: Ip>() -> Matchers {
@@ -725,7 +747,7 @@ impl SocketType for IcmpSocket {
     }
 
     async fn bind_sockets_to_ports(
-        _realms: Realms<'_>,
+        realms: Realms<'_>,
         addrs: Addrs,
         ports: Ports,
     ) -> (BoundSockets<Self>, SockAddrs) {
@@ -738,67 +760,95 @@ impl SocketType for IcmpSocket {
         let fnet_ext::IpAddress(server_addr) = server_addr.into();
         let server_addr = std::net::SocketAddr::new(server_addr, server_port);
 
-        let addrs = SockAddrs { client: client_addr, server: server_addr };
+        let client = IcmpSocketAndSeq::new_bound(&realms.client, client_addr).await;
 
-        (BoundSockets { client: (), server: () }, addrs)
+        let addrs = SockAddrs {
+            client: client
+                .socket
+                .local_addr()
+                .expect("get client addr")
+                .as_socket()
+                .expect("socket addr"),
+            server: server_addr,
+        };
+
+        (BoundSockets { client, server: () }, addrs)
     }
 
     async fn connect(
-        (): Self::BoundClient,
-        (): &mut Self::BoundServer,
+        client: Self::BoundClient,
+        _server: &mut Self::BoundServer,
         _sock_addrs: SockAddrs,
         _expected_connectivity: ExpectedConnectivity,
         _expected_original_dst: Option<OriginalDestination>,
     ) -> Option<ConnectedSockets<Self::ConnectedClient, Self::ConnectedServer>> {
-        Some(ConnectedSockets { client: (), server: () })
+        Some(ConnectedSockets { client, server: () })
     }
 
     async fn send_and_recv<I: ping::FuchsiaIpExt>(
-        realms: Realms<'_>,
+        _realms: Realms<'_>,
         connected: ConnectedSockets<&mut Self::ConnectedClient, &mut Self::ConnectedServer>,
         sock_addrs: SockAddrs,
         expected_connectivity: ExpectedConnectivity,
     ) {
-        let Realms { client, server } = realms;
-        let ConnectedSockets { client: (), server: () } = connected;
+        let ConnectedSockets { client, server: _ } = connected;
 
-        const SEQ: u16 = 1;
+        async fn ping_once<I: ping::IpExt>(socket: &mut IcmpSocketAndSeq, addr: I::SockAddr) {
+            let seq = socket.seq;
+            socket.seq += 1;
 
-        async fn expect_ping_timeout<I: ping::FuchsiaIpExt>(
-            realm: &netemul::TestRealm<'_>,
-            addr: I::SockAddr,
-        ) {
-            match realm
-                .ping_once::<I>(addr, SEQ)
-                .map_ok(Some)
-                .on_timeout(NEGATIVE_CHECK_TIMEOUT.after_now(), || Ok(None))
+            const MESSAGE: &'static str = "hello, world";
+            let (mut sink, stream) = ping::new_unicast_sink_and_stream::<
+                I,
+                _,
+                { MESSAGE.len() + ping::ICMP_HEADER_LEN },
+            >(&socket.socket, &addr, MESSAGE.as_bytes());
+
+            sink.send(seq).await.expect("send ping");
+            stream
+                .filter_map(|r| {
+                    let got = r.expect("ping error");
+                    // Ignore any old replies not matching our SEQ number.
+                    futures::future::ready((got == seq).then_some(()))
+                })
+                .next()
                 .await
-                .expect("send ping")
-            {
-                Some(()) => panic!("ping to {addr} unexpectedly succeeded"),
-                None => {}
-            }
+                .expect("ping stream ended unexpectedly");
         }
 
-        let SockAddrsIpSpecific::<I> { client: client_addr, server: server_addr } =
-            sock_addrs.into();
+        async fn expect_ping_timeout<I: ping::IpExt>(
+            socket: &mut IcmpSocketAndSeq,
+            addr: I::SockAddr,
+        ) {
+            ping_once::<I>(socket, addr)
+                .map(|()| panic!("pinged successfully unexpectedly"))
+                .on_timeout(NEGATIVE_CHECK_TIMEOUT.after_now(), || ())
+                .await;
+        }
+
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct SockAddrSpecific<I: ping::IpExt>(I::SockAddr);
+
+        let mut server_addr = sock_addrs.server;
+        server_addr.set_port(0);
+        let SockAddrSpecific(server_addr) = I::map_ip_out(
+            server_addr,
+            |a| SockAddrSpecific(assert_matches!(a, std::net::SocketAddr::V4(addr) => addr)),
+            |a| SockAddrSpecific(assert_matches!(a, std::net::SocketAddr::V6(addr) => addr)),
+        );
+
         match expected_connectivity {
             ExpectedConnectivity::None | ExpectedConnectivity::ClientToServerOnly => {
-                futures::future::join(
-                    expect_ping_timeout::<I>(client, server_addr),
-                    expect_ping_timeout::<I>(server, client_addr),
-                )
-                .await;
+                expect_ping_timeout::<I>(client, server_addr).await;
             }
             ExpectedConnectivity::TwoWay => {
-                futures::future::join(
-                    client.ping_once::<I>(server_addr, SEQ).map(|r| r.expect("ping")),
-                    server.ping_once::<I>(client_addr, SEQ).map(|r| r.expect("ping")),
-                )
-                .await;
+                ping_once::<I>(client, server_addr).await;
             }
         }
     }
+
+    const SUPPORTS_NAT_PORT_RANGE: bool = false;
 }
 
 #[derive(Clone, Copy)]
@@ -827,31 +877,6 @@ impl SockAddrs {
     pub(crate) fn server_ports(&self) -> Ports {
         let Self { client, server } = self;
         Ports { src: server.port(), dst: client.port() }
-    }
-}
-
-#[derive(GenericOverIp)]
-#[generic_over_ip(I, Ip)]
-struct SockAddrsIpSpecific<I: ping::IpExt> {
-    client: I::SockAddr,
-    server: I::SockAddr,
-}
-
-impl<I: ping::IpExt> From<SockAddrs> for SockAddrsIpSpecific<I> {
-    fn from(sock_addrs: SockAddrs) -> Self {
-        I::map_ip_out(
-            sock_addrs,
-            |SockAddrs { client, server }| {
-                let client = assert_matches!(client, std::net::SocketAddr::V4(addr) => addr);
-                let server = assert_matches!(server, std::net::SocketAddr::V4(addr) => addr);
-                SockAddrsIpSpecific { client, server }
-            },
-            |SockAddrs { client, server }| {
-                let client = assert_matches!(client, std::net::SocketAddr::V6(addr) => addr);
-                let server = assert_matches!(server, std::net::SocketAddr::V6(addr) => addr);
-                SockAddrsIpSpecific { client, server }
-            },
-        )
     }
 }
 

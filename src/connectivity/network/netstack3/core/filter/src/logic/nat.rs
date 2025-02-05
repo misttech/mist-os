@@ -849,7 +849,7 @@ where
     let Some((addr, cached_addr)) = N::redirect_addr(core_ctx, packet, interfaces.ingress) else {
         return Verdict::Drop.into();
     };
-    conn.reply_tuple_mut().src_addr = addr;
+    conn.rewrite_reply_src_addr(addr);
 
     let Some(range) = dst_port_range else {
         return Verdict::Accept(NatConfigurationResult::Result(ShouldNat::Yes(cached_addr))).into();
@@ -911,7 +911,7 @@ where
         );
         return Verdict::Drop;
     };
-    conn.reply_tuple_mut().dst_addr = addr.addr().addr();
+    conn.rewrite_reply_dst_addr(addr.addr().addr());
 
     // Rewrite the source port if necessary to avoid conflicting with existing
     // tracked connections.
@@ -956,7 +956,7 @@ where
     let (range, ensure_port_in_range) = if let Some(range) = src_port_range {
         (range, true)
     } else {
-        let reply_tuple = conn.reply_tuple_mut();
+        let reply_tuple = conn.reply_tuple();
         let Some(range) =
             similar_port_or_id_range(reply_tuple.protocol, reply_tuple.dst_port_or_id)
         else {
@@ -1029,13 +1029,13 @@ fn rewrite_reply_tuple_port<I: IpExt, BC: FilterBindingsContext, A: PartialEq>(
     // conflicts with another connection in the table, or if the port must be
     // rewritten to fall in the specified range.
     let current_port = match which_port {
-        ReplyTuplePort::Source => conn.reply_tuple_mut().src_port_or_id,
-        ReplyTuplePort::Destination => conn.reply_tuple_mut().dst_port_or_id,
+        ReplyTuplePort::Source => conn.reply_tuple().src_port_or_id,
+        ReplyTuplePort::Destination => conn.reply_tuple().dst_port_or_id,
     };
     let already_in_range = !ensure_port_in_range
         || NonZeroU16::new(current_port).map(|port| port_range.contains(&port)).unwrap_or(false);
     if already_in_range {
-        match table.get_shared_connection(conn.reply_tuple_mut()) {
+        match table.get_shared_connection(conn.reply_tuple()) {
             None => return Verdict::Accept(NatConfigurationResult::Result(ShouldNat::No)),
             Some(conflict) => match conflict_strategy {
                 ConflictStrategy::AdoptExisting => {
@@ -1065,18 +1065,16 @@ fn rewrite_reply_tuple_port<I: IpExt, BC: FilterBindingsContext, A: PartialEq>(
     let len = port_range.end().get() - port_range.start().get() + 1;
     let mut rng = bindings_ctx.rng();
     let start = rng.gen_range(port_range.start().get()..=port_range.end().get());
-    let reply_tuple = conn.reply_tuple_mut();
     for i in 0..core::cmp::min(MAX_ATTEMPTS, len) {
         // `offset` is <= the size of `port_range`, which is a range of `NonZerou16`, so
         // `port_range.start()` + `offset` is guaranteed to fit in a `NonZeroU16`.
         let offset = (start + i) % len;
         let new_port = port_range.start().checked_add(offset).unwrap();
-        let port_mut = match which_port {
-            ReplyTuplePort::Source => &mut reply_tuple.src_port_or_id,
-            ReplyTuplePort::Destination => &mut reply_tuple.dst_port_or_id,
+        match which_port {
+            ReplyTuplePort::Source => conn.rewrite_reply_src_port_or_id(new_port.get()),
+            ReplyTuplePort::Destination => conn.rewrite_reply_dst_port_or_id(new_port.get()),
         };
-        *port_mut = new_port.get();
-        if !table.contains_tuple(reply_tuple) {
+        if !table.contains_tuple(conn.reply_tuple()) {
             return Verdict::Accept(NatConfigurationResult::Result(ShouldNat::Yes(None)));
         }
     }
@@ -1980,7 +1978,7 @@ mod tests {
             verdict,
             Verdict::Accept(NatConfigurationResult::Result(ShouldNat::Yes(Some(_))))
         );
-        let reply_tuple = conn.reply_tuple_mut();
+        let reply_tuple = conn.reply_tuple();
         assert_eq!(reply_tuple.dst_addr, I::SRC_IP_2);
         assert_ne!(reply_tuple.dst_port_or_id, src_port);
         assert!(expected_range.contains(&reply_tuple.dst_port_or_id));
@@ -2105,7 +2103,7 @@ mod tests {
 
         // If the port is already in the specified range, rewriting should succeed and
         // be a no-op.
-        let pre_nat = conn.reply_tuple_mut().clone();
+        let pre_nat = conn.reply_tuple().clone();
         let result = rewrite_reply_tuple_port(
             &mut bindings_ctx,
             &table,
@@ -2121,7 +2119,7 @@ mod tests {
                 ShouldNat::<_, FakeWeakAddressId<Ipv4>>::No
             ))
         );
-        assert_eq!(conn.reply_tuple_mut(), &pre_nat);
+        assert_eq!(conn.reply_tuple(), &pre_nat);
     }
 
     #[test_case(ReplyTuplePort::Source)]
@@ -2135,7 +2133,7 @@ mod tests {
         // If there is no conflicting tuple in the table and we provide `false` for
         // `ensure_port_in_range` (as is done for implicit SNAT), then rewriting should
         // succeed and be a no-op, even if the port is not in the specified range,
-        let pre_nat = conn.reply_tuple_mut().clone();
+        let pre_nat = conn.reply_tuple().clone();
         const NEW_PORT: NonZeroU16 = LOCAL_PORT.checked_add(1).unwrap();
         let result = rewrite_reply_tuple_port(
             &mut bindings_ctx,
@@ -2152,7 +2150,7 @@ mod tests {
                 ShouldNat::<_, FakeWeakAddressId<Ipv4>>::No
             ))
         );
-        assert_eq!(conn.reply_tuple_mut(), &pre_nat);
+        assert_eq!(conn.reply_tuple(), &pre_nat);
     }
 
     #[test_case(ReplyTuplePort::Source)]
@@ -2181,7 +2179,7 @@ mod tests {
                 ShouldNat::<_, FakeWeakAddressId<Ipv4>>::Yes(None)
             ))
         );
-        assert_eq!(conn.reply_tuple_mut(), &tuple_with_port(which, NEW_PORT.get()));
+        assert_eq!(conn.reply_tuple(), &tuple_with_port(which, NEW_PORT.get()));
     }
 
     #[test_case(ReplyTuplePort::Source)]
@@ -2265,7 +2263,7 @@ mod tests {
                 ShouldNat::<_, FakeWeakAddressId<Ipv4>>::Yes(None)
             ))
         );
-        assert_eq!(conn.reply_tuple_mut(), &tuple_with_port(which, MIN_PORT.get()));
+        assert_eq!(conn.reply_tuple(), &tuple_with_port(which, MIN_PORT.get()));
     }
 
     #[test_case(ReplyTuplePort::Source)]

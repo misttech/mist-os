@@ -393,6 +393,11 @@ impl<BT: IcmpEchoBindingsTypes> DatagramSocketSpec for Icmp<BT> {
         let ConnIpAddr { local: (local_ip, id), remote: (remote_ip, ()) } = addr;
         let icmp_echo: packet_formats::icmp::IcmpPacketRaw<I, &[u8], IcmpEchoRequest> =
             body.parse()?;
+        debug!(
+            "preparing ICMP echo request {local_ip} to {remote_ip}: id={}, seq={}",
+            id,
+            icmp_echo.message().seq()
+        );
         let icmp_builder = IcmpPacketBuilder::<I, _>::new(
             local_ip.addr(),
             remote_ip.addr(),

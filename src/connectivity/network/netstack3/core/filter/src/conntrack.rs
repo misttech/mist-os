@@ -912,8 +912,50 @@ impl<I: IpExt, E, BT: FilterBindingsTypes> ConnectionExclusive<I, E, BT> {
         Arc::new(ConnectionShared { inner: self.inner, state: Mutex::new(self.state) })
     }
 
-    pub(crate) fn reply_tuple_mut(&mut self) -> &mut Tuple<I> {
-        &mut self.inner.reply_tuple
+    pub(crate) fn reply_tuple(&self) -> &Tuple<I> {
+        &self.inner.reply_tuple
+    }
+
+    pub(crate) fn rewrite_reply_dst_addr(&mut self, addr: I::Addr) {
+        self.inner.reply_tuple.dst_addr = addr;
+    }
+
+    pub(crate) fn rewrite_reply_src_addr(&mut self, addr: I::Addr) {
+        self.inner.reply_tuple.src_addr = addr;
+    }
+
+    pub(crate) fn rewrite_reply_src_port_or_id(&mut self, port_or_id: u16) {
+        self.inner.reply_tuple.src_port_or_id = port_or_id;
+        match self.inner.reply_tuple.protocol {
+            TransportProtocol::Icmp => {
+                // ICMP uses a single ID and conntrack keeps track of it in both
+                // ID fields. This makes it easier to keep a single logic to
+                // flip the direction. Hence we need to update the rest of the
+                // tuple.
+                //
+                // TODO(https://fxbug.dev/328064082): Probably needs revisiting
+                // as part of better support for ICMP request/response.
+                self.inner.reply_tuple.dst_port_or_id = port_or_id;
+            }
+            TransportProtocol::Tcp | TransportProtocol::Udp | TransportProtocol::Other(_) => {}
+        }
+    }
+
+    pub(crate) fn rewrite_reply_dst_port_or_id(&mut self, port_or_id: u16) {
+        self.inner.reply_tuple.dst_port_or_id = port_or_id;
+        match self.inner.reply_tuple.protocol {
+            TransportProtocol::Icmp => {
+                // ICMP uses a single ID and conntrack keeps track of it in both
+                // ID fields. This makes it easier to keep a single logic to
+                // flip the direction. Hence we need to update the rest of the
+                // tuple.
+                //
+                // TODO(https://fxbug.dev/328064082): Probably needs revisiting
+                // as part of better support for ICMP request/response.
+                self.inner.reply_tuple.src_port_or_id = port_or_id;
+            }
+            TransportProtocol::Tcp | TransportProtocol::Udp | TransportProtocol::Other(_) => {}
+        }
     }
 }
 

@@ -35,7 +35,7 @@ use core::{cmp, mem};
 use byteorder::{ByteOrder, NetworkEndian};
 use derivative::Derivative;
 use internet_checksum::Checksum;
-use net_types::ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 use packet::records::options::{Options, OptionsImpl};
 use packet::{
     AsFragmentedByteSlice, BufferView, FragmentedByteSlice, FragmentedBytesMut, FromRaw,
@@ -197,12 +197,27 @@ pub trait IcmpPacketTypeRaw<B: SplitByteSliceMut, I: Ip>:
 {
     /// Update the checksum to reflect an updated address in the pseudo header.
     fn update_checksum_pseudo_header_address(&mut self, old: I::Addr, new: I::Addr);
+
+    /// Update the checksum to reflect a field change in the header.
+    ///
+    /// It is the caller's responsibility to ensure the field is actually part
+    /// of an ICMP header for checksumming.
+    fn update_checksum_header_field<F: IntoBytes + Immutable>(&mut self, old: F, new: F);
+
+    /// Like [`IcmpPacketTypeRaw::update_checksum_header_field`], but takes
+    /// native endian u16s.
+    fn update_checksum_header_field_u16(&mut self, old: u16, new: u16) {
+        self.update_checksum_header_field(U16::new(old), U16::new(new))
+    }
 }
 
 impl<B: SplitByteSliceMut> IcmpPacketTypeRaw<B, Ipv4> for Icmpv4PacketRaw<B> {
-    /// Update the checksum to reflect an updated address in the pseudo header.
-    fn update_checksum_pseudo_header_address(&mut self, _: Ipv4Addr, _: Ipv4Addr) {
-        // ICMPv4 does not have a pseudo header.
+    fn update_checksum_pseudo_header_address(&mut self, old: Ipv4Addr, new: Ipv4Addr) {
+        crate::icmpv4_dispatch!(self: raw, p => p.update_checksum_pseudo_header_address(old, new))
+    }
+
+    fn update_checksum_header_field<F: IntoBytes + Immutable>(&mut self, old: F, new: F) {
+        crate::icmpv4_dispatch!(self: raw, p => p.update_checksum_header_field(old, new))
     }
 }
 
@@ -211,10 +226,33 @@ impl<I: IcmpIpExt, B: SplitByteSliceMut> GenericOverIp<I> for Icmpv4PacketRaw<B>
 }
 
 impl<B: SplitByteSliceMut> IcmpPacketTypeRaw<B, Ipv6> for Icmpv6PacketRaw<B> {
-    /// Update the checksum to reflect an updated address in the pseudo header.
     fn update_checksum_pseudo_header_address(&mut self, old: Ipv6Addr, new: Ipv6Addr) {
-        let checksum = &mut self.header_prefix_mut().checksum;
-        *checksum = internet_checksum::update(*checksum, old.bytes(), new.bytes());
+        crate::icmpv6_dispatch!(self: raw, p => p.update_checksum_pseudo_header_address(old, new))
+    }
+
+    fn update_checksum_header_field<F: IntoBytes + Immutable>(&mut self, old: F, new: F) {
+        crate::icmpv6_dispatch!(self: raw, p => p.update_checksum_header_field(old, new))
+    }
+}
+
+impl<I: IcmpIpExt, B: SplitByteSliceMut, M: IcmpMessage<I>> IcmpPacketTypeRaw<B, I>
+    for IcmpPacketRaw<I, B, M>
+{
+    fn update_checksum_pseudo_header_address(&mut self, old: I::Addr, new: I::Addr) {
+        match I::VERSION {
+            IpVersion::V4 => {
+                // ICMPv4 does not have a pseudo header.
+            }
+            IpVersion::V6 => {
+                let checksum = &mut self.header.prefix.checksum;
+                *checksum = internet_checksum::update(*checksum, old.bytes(), new.bytes());
+            }
+        }
+    }
+
+    fn update_checksum_header_field<F: IntoBytes + Immutable>(&mut self, old: F, new: F) {
+        let checksum = &mut self.header.prefix.checksum;
+        *checksum = internet_checksum::update(*checksum, old.as_bytes(), new.as_bytes());
     }
 }
 
@@ -436,28 +474,6 @@ impl<I: IcmpIpExt, B: SplitByteSliceMut, M: IcmpMessage<I>> IcmpPacketRaw<I, B, 
             self.header.prefix.checksum = original_checksum;
             false
         }
-    }
-}
-
-impl<I: IcmpIpExt, B: SplitByteSliceMut> IcmpPacketRaw<I, B, IcmpEchoRequest> {
-    /// Set the ID of the ICMP echo message.
-    pub fn set_id(&mut self, new: u16) {
-        let old = self.header.message.id_seq.id;
-        let new = U16::from(new);
-        self.header.message.id_seq.id = new;
-        self.header.prefix.checksum =
-            internet_checksum::update(self.header.prefix.checksum, old.as_bytes(), new.as_bytes());
-    }
-}
-
-impl<I: IcmpIpExt, B: SplitByteSliceMut> IcmpPacketRaw<I, B, IcmpEchoReply> {
-    /// Set the ID of the ICMP echo message.
-    pub fn set_id(&mut self, new: u16) {
-        let old = self.header.message.id_seq.id;
-        let new = U16::from(new);
-        self.header.message.id_seq.id = new;
-        self.header.prefix.checksum =
-            internet_checksum::update(self.header.prefix.checksum, old.as_bytes(), new.as_bytes());
     }
 }
 
