@@ -38,7 +38,7 @@ args: ## Set up build dir and arguments file
 .PHONY: args
 
 debug: args ## Set debug arguments
-	$(NOECHO)echo "is_debug = true" >> $(OUTPUT)/args.gn
+	$(NOECHO)echo "compilation_mode = \"debug\"" >> $(OUTPUT)/args.gn
 .PHONY: debug
 
 gdb: args ## Set debug arguments
