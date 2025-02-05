@@ -312,6 +312,29 @@ pub async fn open_file_checked(
     open_file(dir, flags, path).await.expect("open_file failed")
 }
 
+// Utility function to open a new node connection under |dir| using open3.
+pub async fn open3_file(
+    dir: &fio::DirectoryProxy,
+    flags: fio::Flags,
+    options: &fio::Options,
+    path: &str,
+) -> Result<fio::FileProxy, Error> {
+    let (proxy, server_end) = create_proxy::<fio::FileMarker>();
+    dir.open3(path, flags, options, server_end.into_channel())?;
+    let _: Vec<_> = proxy.query().await?;
+    Ok(proxy)
+}
+
+// Like |open3_file|, but asserts if the open call fails.
+pub async fn open3_file_checked(
+    dir: &fio::DirectoryProxy,
+    flags: fio::Flags,
+    options: &fio::Options,
+    path: &str,
+) -> fio::FileProxy {
+    open3_file(dir, flags, options, path).await.expect("open3_file failed")
+}
+
 // Utility function to open a new node connection under |dir|.
 pub async fn open_dir(
     dir: &fio::DirectoryProxy,

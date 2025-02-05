@@ -851,6 +851,60 @@ impl<S: HandleOwner> Directory<S> {
         Ok(handle)
     }
 
+    pub async fn create_child_unnamed_temporary_file<'a>(
+        &self,
+        transaction: &mut Transaction<'a>,
+    ) -> Result<DataObjectHandle<S>, Error> {
+        ensure!(!self.is_deleted(), FxfsError::Deleted);
+        let wrapping_key_id = self.wrapping_key_id.lock().unwrap().clone();
+        let handle = ObjectStore::create_object(
+            self.owner(),
+            transaction,
+            HandleOptions::default(),
+            None,
+            wrapping_key_id,
+        )
+        .await?;
+
+        // Copy project ID from self to the created file object.
+        let ObjectValue::Object { attributes: ObjectAttributes { project_id, .. }, .. } = self
+            .store()
+            .txn_get_object_mutation(&transaction, self.object_id())
+            .await
+            .unwrap()
+            .item
+            .value
+        else {
+            bail!(anyhow!(FxfsError::Inconsistent)
+                .context("Directory.create_child_file_with_options: expected mutation object"));
+        };
+
+        // Update the object mutation with parent's project ID.
+        let mut child_mutation = transaction
+            .get_object_mutation(
+                self.store().store_object_id(),
+                ObjectKey::object(handle.object_id()),
+            )
+            .unwrap()
+            .clone();
+        if let ObjectValue::Object {
+            attributes: ObjectAttributes { project_id: child_project_id, .. },
+            ..
+        } = &mut child_mutation.item.value
+        {
+            *child_project_id = project_id;
+        } else {
+            bail!(anyhow!(FxfsError::Inconsistent)
+                .context("Directory.create_child_file_with_options: expected file object"));
+        }
+        transaction.add(self.store().store_object_id(), Mutation::ObjectStore(child_mutation));
+
+        // Add object to graveyard - the object should be removed on remount.
+        self.store().add_to_graveyard(transaction, handle.object_id());
+
+        Ok(handle)
+    }
+
     pub async fn create_symlink(
         &self,
         transaction: &mut Transaction<'_>,

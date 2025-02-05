@@ -98,10 +98,7 @@ impl FxDirectory {
         mut path: Path,
         request: &ObjectRequest,
     ) -> Result<OpenedNode<dyn FxNode>, Error> {
-        if path.is_empty() {
-            if protocols.create_unnamed_temporary_in_directory_path() {
-                bail!(FxfsError::NotSupported)
-            }
+        if path.is_empty() && !protocols.create_unnamed_temporary_in_directory_path() {
             return Ok(OpenedNode::new(self.clone()));
         }
         let store = self.store();
@@ -111,7 +108,12 @@ impl FxDirectory {
             let last_segment = path.is_single_component();
             let current_dir =
                 current_node.into_any().downcast::<FxDirectory>().map_err(|_| FxfsError::NotDir)?;
-            let name = path.next().unwrap();
+            let name = path.next().unwrap_or_default();
+            // The only situation where we expect the name to be empty is when we are creating a
+            // temporary unnamed file.
+            if name.is_empty() && !protocols.create_unnamed_temporary_in_directory_path() {
+                bail!(FxfsError::InvalidArgs);
+            }
 
             // Create the transaction here if we might need to create the object so that we have a
             // lock in place.
@@ -119,50 +121,54 @@ impl FxDirectory {
                 store.store_object_id(),
                 current_dir.directory.object_id()
             )];
-            let transaction_or_guard =
-                if last_segment && protocols.creation_mode() != vfs::CreationMode::Never {
-                    if protocols.create_unnamed_temporary_in_directory_path() {
-                        bail!(FxfsError::NotSupported)
+            let create_object = match protocols.creation_mode() {
+                vfs::CreationMode::AllowExisting | vfs::CreationMode::Always => last_segment,
+                vfs::CreationMode::UnnamedTemporary
+                | vfs::CreationMode::UnlinkableUnnamedTemporary => name.is_empty(),
+                vfs::CreationMode::Never => false,
+            };
+            let transaction_or_guard = if create_object {
+                Left(fs.clone().new_transaction(keys, Options::default()).await?)
+            } else {
+                // When child objects are created, the object is created along with the
+                // directory entry in the same transaction, and so we need to hold a read lock
+                // over the lookup and open calls.
+                Right(fs.lock_manager().read_lock(keys).await)
+            };
+
+            let create_unnamed_temporary_file_in_this_segment =
+                create_object && protocols.create_unnamed_temporary_in_directory_path();
+            let child_descriptor = if create_unnamed_temporary_file_in_this_segment {
+                None
+            } else {
+                match self.directory.owner().dirent_cache().lookup(&(current_dir.object_id(), name))
+                {
+                    Some(node) => {
+                        let desc = node.object_descriptor();
+                        Some((node, desc))
                     }
-                    Left(fs.clone().new_transaction(keys, Options::default()).await?)
-                } else {
-                    // When child objects are created, the object is created along with the
-                    // directory entry in the same transaction, and so we need to hold a read lock
-                    // over the lookup and open calls.
-                    Right(fs.lock_manager().read_lock(keys).await)
-                };
+                    None => {
+                        if let Some((object_id, object_descriptor)) =
+                            current_dir.directory.lookup(name).await?
+                        {
+                            let child_node = self
+                                .volume()
+                                .get_or_load_node(
+                                    object_id,
+                                    object_descriptor.clone(),
+                                    Some(current_dir.clone()),
+                                )
+                                .await?;
 
-            let child_descriptor = match self
-                .directory
-                .owner()
-                .dirent_cache()
-                .lookup(&(current_dir.object_id(), name))
-            {
-                Some(node) => {
-                    let desc = node.object_descriptor();
-                    Some((node, desc))
-                }
-                None => {
-                    if let Some((object_id, object_descriptor)) =
-                        current_dir.directory.lookup(name).await?
-                    {
-                        let child_node = self
-                            .volume()
-                            .get_or_load_node(
-                                object_id,
-                                object_descriptor.clone(),
-                                Some(current_dir.clone()),
-                            )
-                            .await?;
-
-                        self.directory.owner().dirent_cache().insert(
-                            current_dir.object_id(),
-                            name.to_owned(),
-                            child_node.clone(),
-                        );
-                        Some((child_node, object_descriptor))
-                    } else {
-                        None
+                            self.directory.owner().dirent_cache().insert(
+                                current_dir.object_id(),
+                                name.to_owned(),
+                                child_node.clone(),
+                            );
+                            Some((child_node, object_descriptor))
+                        } else {
+                            None
+                        }
                     }
                 }
             };
@@ -211,14 +217,23 @@ impl FxDirectory {
                 }
                 None => {
                     if let Left(mut transaction) = transaction_or_guard {
-                        let new_node = current_dir
-                            .create_child(
-                                &mut transaction,
-                                name,
-                                protocols.create_directory(),
-                                request.create_attributes(),
-                            )
-                            .await?;
+                        let new_node = if create_unnamed_temporary_file_in_this_segment {
+                            current_dir
+                                .create_unnamed_temporary_file(
+                                    &mut transaction,
+                                    request.create_attributes(),
+                                )
+                                .await?
+                        } else {
+                            current_dir
+                                .create_child(
+                                    &mut transaction,
+                                    name,
+                                    protocols.create_directory(),
+                                    request.create_attributes(),
+                                )
+                                .await?
+                        };
                         let node = OpenedNode::new(new_node.clone());
                         if let GetResult::Placeholder(p) =
                             self.volume().cache().get_or_reserve(node.object_id()).await
@@ -270,6 +285,24 @@ impl FxDirectory {
             }
             Ok(file as Arc<dyn FxNode>)
         }
+    }
+
+    async fn create_unnamed_temporary_file(
+        self: &Arc<Self>,
+        transaction: &mut Transaction<'_>,
+        create_attributes: Option<&fio::MutableNodeAttributes>,
+    ) -> Result<Arc<dyn FxNode>, Error> {
+        let file = FxFile::new_unnamed_temporary(
+            self.directory.create_child_unnamed_temporary_file(transaction).await?,
+        );
+        if let Some(attrs) = create_attributes {
+            file.handle()
+                .uncached_handle()
+                .update_attributes(transaction, Some(&attrs), None)
+                .await?;
+        }
+
+        Ok(file as Arc<dyn FxNode>)
     }
 
     /// Called to indicate a file or directory was removed from this directory.
@@ -330,6 +363,43 @@ impl FxDirectory {
         store.adjust_refs(&mut transaction, source_id, 1).await.map_err(map_to_status)?;
         transaction
             .commit_with_callback(|_| self.did_add(&name, None))
+            .await
+            .map_err(map_to_status)?;
+        Ok(())
+    }
+
+    // Move graveyard object out from the graveyard and link it to this path. We only expect to do
+    // this when linking an unnamed temporary file for the first time.
+    pub(crate) async fn link_graveyard_object<F>(
+        &self,
+        mut transaction: Transaction<'_>,
+        name: &str,
+        source_id: u64,
+        kind: ObjectDescriptor,
+        transaction_callback: F,
+    ) -> Result<(), zx::Status>
+    where
+        F: FnOnce() + Send,
+    {
+        let store = self.store();
+        if self.is_deleted() {
+            return Err(zx::Status::ACCESS_DENIED);
+        }
+        if self.directory.lookup(&name).await.map_err(map_to_status)?.is_some() {
+            return Err(zx::Status::ALREADY_EXISTS);
+        }
+        // Move object out from the graveyard and place into record. As we are moving the object
+        // from one record to the other, the reference count should stay the same.
+        store.remove_from_graveyard(&mut transaction, source_id);
+        self.directory
+            .insert_child(&mut transaction, &name, source_id, kind.clone())
+            .await
+            .map_err(map_to_status)?;
+        transaction
+            .commit_with_callback(|_| {
+                transaction_callback();
+                self.did_add(&name, None);
+            })
             .await
             .map_err(map_to_status)?;
         Ok(())

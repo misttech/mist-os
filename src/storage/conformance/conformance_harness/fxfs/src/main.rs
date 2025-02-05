@@ -70,6 +70,7 @@ async fn run(mut stream: TestHarnessRequestStream, fixture: &TestFixture) -> Res
                     supports_truncate: true,
                     supports_modify_directory: true,
                     supports_mutable_file: true,
+                    supports_unnamed_temporary_file: true,
                     supported_attributes: fio::NodeAttributesQuery::PROTOCOLS
                         | fio::NodeAttributesQuery::ABILITIES
                         | fio::NodeAttributesQuery::CONTENT_SIZE
@@ -86,7 +87,6 @@ async fn run(mut stream: TestHarnessRequestStream, fixture: &TestFixture) -> Res
                         | fio::NodeAttributesQuery::CASEFOLD
                         | fio::NodeAttributesQuery::SELINUX_CONTEXT,
                     supports_services: false,
-                    supports_unnamed_temporary_file: false,
                 })?;
             }
             TestHarnessRequest::CreateDirectory {

@@ -1035,6 +1035,11 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
     ) -> Result<(), Status> {
         let target_name = parse_name(target_name).map_err(|_| Status::INVALID_ARGS)?;
 
+        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+        if !self.options.is_linkable {
+            return Err(Status::NOT_FOUND);
+        }
+
         if !self.options.rights.contains(
             fio::Operations::READ_BYTES
                 | fio::Operations::WRITE_BYTES
@@ -1356,7 +1361,9 @@ mod tests {
         assert_eq!(
             *events,
             vec![
-                FileOperation::Init { options: FileOptions { rights: RIGHTS_W, is_append: false } },
+                FileOperation::Init {
+                    options: FileOptions { rights: RIGHTS_W, is_append: false, is_linkable: true }
+                },
                 FileOperation::Truncate { length: 0 },
                 FileOperation::Sync,
             ]
@@ -1393,7 +1400,7 @@ mod tests {
             *events,
             vec![
                 FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_RW, is_append: false }
+                    options: FileOptions { rights: RIGHTS_RW, is_append: false, is_linkable: true }
                 },
                 FileOperation::ReadAt { offset: 0, count: 6 },
                 FileOperation::ReadAt { offset: 100, count: 5 },
@@ -1411,7 +1418,9 @@ mod tests {
         assert_eq!(
             *events,
             vec![
-                FileOperation::Init { options: FileOptions { rights: RIGHTS_R, is_append: false } },
+                FileOperation::Init {
+                    options: FileOptions { rights: RIGHTS_R, is_append: false, is_linkable: true }
+                },
                 FileOperation::Close {},
             ]
         );
@@ -1431,7 +1440,7 @@ mod tests {
             *events,
             vec![
                 FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_RW, is_append: false }
+                    options: FileOptions { rights: RIGHTS_RW, is_append: false, is_linkable: true }
                 },
                 FileOperation::Sync,
                 FileOperation::Close,
@@ -1450,7 +1459,9 @@ mod tests {
         assert_eq!(
             *events,
             vec![
-                FileOperation::Init { options: FileOptions { rights: RIGHTS_R, is_append: false } },
+                FileOperation::Init {
+                    options: FileOptions { rights: RIGHTS_R, is_append: false, is_linkable: true }
+                },
                 FileOperation::Sync,
                 FileOperation::Close,
             ]
@@ -1502,7 +1513,8 @@ mod tests {
                 FileOperation::Init {
                     options: FileOptions {
                         rights: fio::Operations::GET_ATTRIBUTES,
-                        is_append: false
+                        is_append: false,
+                        is_linkable: true
                     }
                 },
                 FileOperation::GetAttributes { query: fio::NodeAttributesQuery::all() }
@@ -1524,7 +1536,9 @@ mod tests {
         assert_eq!(
             *events,
             vec![
-                FileOperation::Init { options: FileOptions { rights: RIGHTS_R, is_append: false } },
+                FileOperation::Init {
+                    options: FileOptions { rights: RIGHTS_R, is_append: false, is_linkable: true }
+                },
                 #[cfg(target_os = "fuchsia")]
                 FileOperation::GetBackingMemory { flags: fio::VmoFlags::READ },
             ]
@@ -1549,7 +1563,11 @@ mod tests {
         assert_eq!(
             *events,
             vec![FileOperation::Init {
-                options: FileOptions { rights: fio::Operations::GET_ATTRIBUTES, is_append: false }
+                options: FileOptions {
+                    rights: fio::Operations::GET_ATTRIBUTES,
+                    is_append: false,
+                    is_linkable: true
+                }
             },]
         );
     }
@@ -1572,7 +1590,7 @@ mod tests {
         assert_eq!(
             *events,
             vec![FileOperation::Init {
-                options: FileOptions { rights: RIGHTS_R, is_append: false }
+                options: FileOptions { rights: RIGHTS_R, is_append: false, is_linkable: true }
             },]
         );
     }
@@ -1594,7 +1612,7 @@ mod tests {
             *events,
             vec![
                 FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_RW, is_append: false }
+                    options: FileOptions { rights: RIGHTS_RW, is_append: false, is_linkable: true }
                 },
                 FileOperation::Truncate { length: 0 }
             ]
@@ -1627,7 +1645,7 @@ mod tests {
         assert_eq!(
             *events,
             vec![FileOperation::Init {
-                options: FileOptions { rights: RIGHTS_RW, is_append: false },
+                options: FileOptions { rights: RIGHTS_RW, is_append: false, is_linkable: true },
             }]
         );
     }
@@ -1642,7 +1660,9 @@ mod tests {
         assert_eq!(
             *events,
             vec![
-                FileOperation::Init { options: FileOptions { rights: RIGHTS_R, is_append: false } },
+                FileOperation::Init {
+                    options: FileOptions { rights: RIGHTS_R, is_append: false, is_linkable: true }
+                },
                 FileOperation::ReadAt { offset: 0, count: 10 },
             ]
         );
@@ -1673,7 +1693,9 @@ mod tests {
         assert_eq!(
             *events,
             vec![
-                FileOperation::Init { options: FileOptions { rights: RIGHTS_R, is_append: false } },
+                FileOperation::Init {
+                    options: FileOptions { rights: RIGHTS_R, is_append: false, is_linkable: true }
+                },
                 FileOperation::ReadAt { offset: 10, count: 5 },
             ]
         );
@@ -1709,7 +1731,9 @@ mod tests {
         assert_eq!(
             *events,
             vec![
-                FileOperation::Init { options: FileOptions { rights: RIGHTS_R, is_append: false } },
+                FileOperation::Init {
+                    options: FileOptions { rights: RIGHTS_R, is_append: false, is_linkable: true }
+                },
                 FileOperation::ReadAt { offset: 10, count: 1 },
             ]
         );
@@ -1742,7 +1766,9 @@ mod tests {
         assert_eq!(
             *events,
             vec![
-                FileOperation::Init { options: FileOptions { rights: RIGHTS_R, is_append: false } },
+                FileOperation::Init {
+                    options: FileOptions { rights: RIGHTS_R, is_append: false, is_linkable: true }
+                },
                 FileOperation::ReadAt { offset: 8, count: 1 },
             ]
         );
@@ -1774,7 +1800,9 @@ mod tests {
         assert_eq!(
             *events,
             vec![
-                FileOperation::Init { options: FileOptions { rights: RIGHTS_R, is_append: false } },
+                FileOperation::Init {
+                    options: FileOptions { rights: RIGHTS_R, is_append: false, is_linkable: true }
+                },
                 FileOperation::GetSize, // for the seek
                 FileOperation::ReadAt { offset, count: 1 },
             ]
@@ -1802,7 +1830,9 @@ mod tests {
         assert_eq!(
             *events,
             vec![
-                FileOperation::Init { options: FileOptions { rights: RIGHTS_W, is_append: false } },
+                FileOperation::Init {
+                    options: FileOptions { rights: RIGHTS_W, is_append: false, is_linkable: true }
+                },
                 FileOperation::UpdateAttributes { attrs: attributes },
             ]
         );
@@ -1829,7 +1859,8 @@ mod tests {
                 FileOperation::Init {
                     options: FileOptions {
                         rights: fio::Operations::GET_ATTRIBUTES,
-                        is_append: false
+                        is_append: false,
+                        is_linkable: true
                     }
                 },
                 FileOperation::Sync
@@ -1845,7 +1876,9 @@ mod tests {
         assert_matches!(
             &events[..],
             [
-                FileOperation::Init { options: FileOptions { rights: RIGHTS_W, is_append: false } },
+                FileOperation::Init {
+                    options: FileOptions { rights: RIGHTS_W, is_append: false, is_linkable: true }
+                },
                 FileOperation::Truncate { length: 10 },
             ]
         );
@@ -1860,7 +1893,7 @@ mod tests {
         assert_eq!(
             *events,
             vec![FileOperation::Init {
-                options: FileOptions { rights: RIGHTS_R, is_append: false }
+                options: FileOptions { rights: RIGHTS_R, is_append: false, is_linkable: true }
             },]
         );
     }
@@ -1875,7 +1908,9 @@ mod tests {
         assert_matches!(
             &events[..],
             [
-                FileOperation::Init { options: FileOptions { rights: RIGHTS_W, is_append: false } },
+                FileOperation::Init {
+                    options: FileOptions { rights: RIGHTS_W, is_append: false, is_linkable: true }
+                },
                 FileOperation::WriteAt { offset: 0, .. },
             ]
         );
@@ -1896,7 +1931,7 @@ mod tests {
         assert_eq!(
             *events,
             vec![FileOperation::Init {
-                options: FileOptions { rights: RIGHTS_R, is_append: false }
+                options: FileOptions { rights: RIGHTS_R, is_append: false, is_linkable: true }
             },]
         );
     }
@@ -1911,7 +1946,9 @@ mod tests {
         assert_matches!(
             &events[..],
             [
-                FileOperation::Init { options: FileOptions { rights: RIGHTS_W, is_append: false } },
+                FileOperation::Init {
+                    options: FileOptions { rights: RIGHTS_W, is_append: false, is_linkable: true }
+                },
                 FileOperation::WriteAt { offset: 10, .. },
             ]
         );
@@ -2018,7 +2055,7 @@ mod tests {
             assert_eq!(
                 *events,
                 [FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_R, is_append: false }
+                    options: FileOptions { rights: RIGHTS_R, is_append: false, is_linkable: true }
                 },]
             );
         }
@@ -2045,7 +2082,7 @@ mod tests {
             assert_eq!(
                 *events,
                 [FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_R, is_append: false }
+                    options: FileOptions { rights: RIGHTS_R, is_append: false, is_linkable: true }
                 },]
             );
         }
@@ -2071,7 +2108,7 @@ mod tests {
             assert_eq!(
                 *events,
                 [FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_W, is_append: false }
+                    options: FileOptions { rights: RIGHTS_W, is_append: false, is_linkable: true }
                 },]
             );
         }
@@ -2099,7 +2136,7 @@ mod tests {
             assert_eq!(
                 *events,
                 [FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_W, is_append: false }
+                    options: FileOptions { rights: RIGHTS_W, is_append: false, is_linkable: true }
                 }]
             );
         }

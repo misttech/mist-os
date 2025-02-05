@@ -810,8 +810,8 @@ mod tests {
     use crate::fuchsia::pager::PagerBacked;
     use crate::fuchsia::profile::new_profile_state;
     use crate::fuchsia::testing::{
-        close_dir_checked, close_file_checked, open_dir, open_dir_checked, open_file,
-        open_file_checked, write_at, TestFixture,
+        close_dir_checked, close_file_checked, open3_file_checked, open_dir, open_dir_checked,
+        open_file, open_file_checked, write_at, TestFixture,
     };
     use crate::fuchsia::volume::{
         FxVolumeAndRoot, MemoryPressureConfig, MemoryPressureLevelConfig,
@@ -2057,6 +2057,29 @@ mod tests {
             .await;
             {
                 let node_id = file_proxy.get_attr().await.unwrap().1.id;
+                assert_eq!(
+                    project_proxy
+                        .get_for_node(node_id)
+                        .await
+                        .unwrap()
+                        .expect("Setting project on node"),
+                    PROJECT_ID
+                );
+            }
+
+            // An unnamed temporary file is created slightly differently to a regular file object.
+            // Just in case, check that it inherits project ID as well.
+            let tmpfile_proxy = open3_file_checked(
+                &subdir_proxy,
+                fio::Flags::PROTOCOL_FILE
+                    | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
+                    | fio::PERM_READABLE,
+                &fio::Options::default(),
+                ".",
+            )
+            .await;
+            {
+                let node_id = tmpfile_proxy.get_attr().await.unwrap().1.id;
                 assert_eq!(
                     project_proxy
                         .get_for_node(node_id)
