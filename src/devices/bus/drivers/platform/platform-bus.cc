@@ -252,17 +252,20 @@ void PlatformBus::NodeAdd(NodeAddRequestView request, fdf::Arena& arena,
 zx::result<> PlatformBus::NodeAddInternal(fhpb::Node& node) {
   auto result = ValidateResources(node);
   if (result.is_error()) {
+    zxlogf(ERROR, "Failed to validate resources: %s", result.status_string());
     return result.take_error();
   }
   std::unique_ptr<platform_bus::PlatformDevice> dev;
   auto status = PlatformDevice::Create(std::move(node), zxdev(), this, PlatformDevice::Isolated,
                                        inspector_.value(), &dev);
   if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to create platform device: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
   status = dev->Start();
   if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to start platform device: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
@@ -415,6 +418,7 @@ void PlatformBus::AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request, 
   if (fidl_spec.parents().has_value()) {
     auto result = AppendParentSpecs(composite_node_spec, fidl_spec.parents().value());
     if (result.is_error()) {
+      zxlogf(ERROR, "Failed to append parent specs: %s", result.status_string());
       completer.buffer(arena).ReplyError(result.status_value());
       return;
     }
@@ -433,6 +437,7 @@ void PlatformBus::AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request, 
   auto natural = fidl::ToNatural(request->node);
   auto valid = ValidateResources(natural);
   if (valid.is_error()) {
+    zxlogf(ERROR, "Failed to validate resources: %s", valid.status_string());
     completer.buffer(arena).ReplyError(valid.error_value());
     return;
   }
@@ -440,11 +445,13 @@ void PlatformBus::AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request, 
   status = PlatformDevice::Create(std::move(natural), zxdev(), this, PlatformDevice::Fragment,
                                   inspector_.value(), &dev);
   if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to create platform device: %s", zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
     return;
   }
   status = dev->Start();
   if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to start platform device: %s", zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
     return;
   }

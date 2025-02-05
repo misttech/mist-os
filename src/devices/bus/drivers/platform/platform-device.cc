@@ -451,7 +451,7 @@ zx_status_t PlatformDevice::Start() {
                 fidl::kIgnoreBindingClosure),
         }));
     if (result.is_error()) {
-      zxlogf(ERROR, "could not add service to outgoing directory: %s", result.status_string());
+      zxlogf(ERROR, "Failed to add platform device service: %s", result.status_string());
       return result.error_value();
     }
 
@@ -468,6 +468,7 @@ zx_status_t PlatformDevice::Start() {
       zx::result result =
           outgoing_.AddService<fuchsia_hardware_platform_bus::Service>(std::move(handler));
       if (result.is_error()) {
+        zxlogf(ERROR, "Failed to add platform bus service: %s", result.status_string());
         return result.error_value();
       }
 
@@ -493,13 +494,21 @@ zx_status_t PlatformDevice::Start() {
   // Setup the outgoing directory.
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (endpoints.is_error()) {
+    zxlogf(ERROR, "Failed to create endpoints: %s", endpoints.status_string());
     return endpoints.status_value();
   }
   if (zx::result result = outgoing_.Serve(std::move(endpoints->server)); result.is_error()) {
+    zxlogf(ERROR, "Failed to serve outgoing directory: %s", result.status_string());
     return result.error_value();
   }
   args.set_outgoing_dir(endpoints->client.TakeChannel());
-  return DdkAdd(args);
+
+  if (zx_status_t status = DdkAdd(args); status != ZX_OK) {
+    zxlogf(ERROR, "Failed to add device: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  return ZX_OK;
 }
 
 void PlatformDevice::DdkInit(ddk::InitTxn txn) {
@@ -507,6 +516,7 @@ void PlatformDevice::DdkInit(ddk::InitTxn txn) {
   for (size_t i = 0; i < metadata_count; i++) {
     const auto& metadata = node_.metadata().value()[i];
     if (!IsValid(metadata)) {
+      zxlogf(INFO, "Metadata at index %lu is invalid", i);
       txn.Reply(ZX_ERR_INTERNAL);
       return;
     }
@@ -528,6 +538,8 @@ void PlatformDevice::DdkInit(ddk::InitTxn txn) {
       zx_status_t status =
           DdkAddMetadata(metadata_type, metadata_data->data(), metadata_data->size());
       if (status != ZX_OK) {
+        zxlogf(INFO, "Failed to add metadata with ID %s: %s", metadata_id.value().c_str(),
+               zx_status_get_string(status));
         txn.Reply(status);
         return;
       }
@@ -541,6 +553,7 @@ void PlatformDevice::DdkInit(ddk::InitTxn txn) {
   for (size_t i = 0; i < boot_metadata_count; i++) {
     const auto& metadata = node_.boot_metadata().value()[i];
     if (!IsValid(metadata)) {
+      zxlogf(INFO, "Boot metadata at index %lu is invalid", i);
       txn.Reply(ZX_ERR_INTERNAL);
       return;
     }
@@ -557,7 +570,9 @@ void PlatformDevice::DdkInit(ddk::InitTxn txn) {
       // fuchsia.hardware.platform.device/Device::GetMetadata().
       status = DdkAddMetadata(metadata_zbi_type.value(), data->data(), data->size());
       if (status != ZX_OK) {
-        zxlogf(WARNING, "%s failed to add metadata for new device", __func__);
+        zxlogf(WARNING, "Failed to add boot metadata with ZBI type %d: %s",
+               metadata_zbi_type.value(), zx_status_get_string(status));
+        ;
       }
 
       metadata_.emplace(std::to_string(metadata_zbi_type.value()),
