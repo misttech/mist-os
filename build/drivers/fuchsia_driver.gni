@@ -75,6 +75,7 @@ template("_fuchsia_driver") {
                            "*",
                            [
                              "applicable_licenses",
+                             "legacy",
                              "test",
                              "visibility",
                            ])
@@ -115,6 +116,9 @@ template("_fuchsia_driver") {
     ldflags += [ "-Wl,--undefined-version" ]
 
     _version_script = "//build/drivers/fuchsia_driver.ld"
+    if (defined(invoker.legacy) && invoker.legacy) {
+      _version_script = "//build/drivers/fuchsia_driver_legacy.ld"
+    }
     ldflags += [ "-Wl,--version-script=" +
                  rebase_path(_version_script, root_build_dir) ]
     inputs += [ _version_script ]
