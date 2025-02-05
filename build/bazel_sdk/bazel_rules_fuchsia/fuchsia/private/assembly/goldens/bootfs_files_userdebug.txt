@@ -58,6 +58,7 @@ lib/libinspector.so
 lib/libramdevice-client.so
 lib/libre2.so
 lib/libssl.so
+lib/libstd-*
 lib/libsvc.so
 lib/libtrace-engine.so
 lib/libunwind.so.1

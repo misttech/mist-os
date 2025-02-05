@@ -21,13 +21,7 @@ _component_manager_bin = {
   with_unit_tests = true
   edition = "2021"
 
-  # Statically link rust standard library
-  # TODO(https://fxbug.dev/42163719): Dynamically link once security allowlist supports globs.
-  configs_to_add = [
-    "//build/config/fuchsia:static_rust_standard_library",
-    "//build/config/rust:bootfs",
-  ]
-  configs_to_remove = [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
+  configs_to_add = [ "//build/config/rust:bootfs" ]
 
   # As this is a large binary that uses many resources to compile (and takes minutes when LTO is
   # enabled, shift it to the large RBE worker pool)
@@ -286,8 +280,6 @@ _component_manager_bin = {
 rustc_binary("bin") {
   output_name = "component_manager"
   forward_variables_from(_component_manager_bin, "*")
-  configs += configs_to_remove
-  configs -= configs_to_remove
   configs += configs_to_add
   assert_no_deps += [
     # For tracing support, :bin_with_tracing is required
@@ -298,8 +290,6 @@ rustc_binary("bin") {
 rustc_binary("bin_with_tracing") {
   output_name = "component_manager_with_tracing"
   forward_variables_from(_component_manager_bin, "*")
-  configs += configs_to_remove
-  configs -= configs_to_remove
   configs += configs_to_add
   features = [ "tracing" ]
   deps += [

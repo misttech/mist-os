@@ -20,5 +20,6 @@ lib/libc++.so.2
 lib/libc++abi.so.1
 lib/libcrypto.so
 lib/libfdio.so
+lib/libstd-*
 lib/libtrace-engine.so
 lib/libunwind.so.1
