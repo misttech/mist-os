@@ -18,7 +18,7 @@ use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
     error, uapi, ABS_CNT, ABS_MT_POSITION_X, ABS_MT_POSITION_Y, ABS_MT_SLOT, ABS_MT_TRACKING_ID,
     BTN_MISC, BTN_TOUCH, FF_CNT, INPUT_PROP_CNT, INPUT_PROP_DIRECT, KEY_CNT, KEY_POWER, LED_CNT,
-    MSC_CNT, REL_CNT, SW_CNT,
+    MSC_CNT, REL_CNT, REL_WHEEL, SW_CNT,
 };
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -192,6 +192,12 @@ fn keyboard_position_attributes() -> BitSet<{ min_bytes(ABS_CNT) }> {
     BitSet::new()
 }
 
+fn mouse_wheel_attributes() -> BitSet<{ min_bytes(REL_CNT) }> {
+    let mut attrs = BitSet::new();
+    attrs.set(REL_WHEEL);
+    attrs
+}
+
 /// Makes a device name string from a name and device ID details.
 ///
 /// For practical reasons the device name should contain alphanumerics and `_`.
@@ -272,7 +278,7 @@ impl InputFile {
     ///
     /// # Parameters
     /// - `input_id`: device's bustype, vendor id, product id, and version.
-    /// - `inspect_status`: The inspect status for the parent device of "touch_input_file".
+    /// - `inspect_status`: The inspect status for the parent device of "keyboard_input_file".
     pub fn new_keyboard(input_id: uapi::input_id, node: Option<&fuchsia_inspect::Node>) -> Self {
         let device_name = get_device_name("starnix_buttons", &input_id);
         Self {
@@ -286,6 +292,37 @@ impl InputFile {
             supported_haptics: BitSet::new(),           // None supported
             supported_misc_features: BitSet::new(),     // None supported
             properties: keyboard_properties(),
+            mt_slot_axis_info: uapi::input_absinfo::default(),
+            mt_tracking_id_axis_info: uapi::input_absinfo::default(),
+            x_axis_info: uapi::input_absinfo::default(),
+            y_axis_info: uapi::input_absinfo::default(),
+            inner: Mutex::new(InputFileMutableState {
+                events: VecDeque::new(),
+                waiters: WaitQueue::default(),
+            }),
+            inspect_status: node.map(|n| Arc::new(InputFileStatus::new(n))),
+            device_name,
+        }
+    }
+
+    /// Creates an `InputFile` instance suitable for emulating a mouse wheel.
+    ///
+    /// # Parameters
+    /// - `input_id`: device's bustype, vendor id, product id, and version.
+    /// - `inspect_status`: The inspect status for the parent device of "mouse_input_file".
+    pub fn new_mouse(input_id: uapi::input_id, node: Option<&fuchsia_inspect::Node>) -> Self {
+        let device_name = get_device_name("starnix_mouse", &input_id);
+        Self {
+            driver_version: Self::DRIVER_VERSION,
+            input_id,
+            supported_keys: BitSet::new(), // None supported, scroll only
+            supported_position_attributes: BitSet::new(), // None supported, scroll only
+            supported_motion_attributes: mouse_wheel_attributes(),
+            supported_switches: BitSet::new(), // None supported
+            supported_leds: BitSet::new(),     // None supported
+            supported_haptics: BitSet::new(),  // None supported
+            supported_misc_features: BitSet::new(), // None supported
+            properties: BitSet::new(),         // None supported, scroll only
             mt_slot_axis_info: uapi::input_absinfo::default(),
             mt_tracking_id_axis_info: uapi::input_absinfo::default(),
             x_axis_info: uapi::input_absinfo::default(),

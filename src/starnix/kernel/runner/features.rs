@@ -19,7 +19,7 @@ use starnix_modules_gralloc::gralloc_device_init;
 use starnix_modules_input::uinput::register_uinput_device;
 use starnix_modules_input::{
     EventProxyMode, InputDevice, InputEventsRelay, DEFAULT_KEYBOARD_DEVICE_ID,
-    DEFAULT_TOUCH_DEVICE_ID,
+    DEFAULT_MOUSE_DEVICE_ID, DEFAULT_TOUCH_DEVICE_ID,
 };
 use starnix_modules_magma::magma_device_init;
 use starnix_modules_nanohub::nanohub_device_init;
@@ -314,6 +314,7 @@ pub fn run_container_features(
         let touch_device =
             InputDevice::new_touch(display_width, display_height, &kernel.inspect_node);
         let keyboard_device = InputDevice::new_keyboard(&kernel.inspect_node);
+        let mouse_device = InputDevice::new_mouse(&kernel.inspect_node);
 
         touch_device.clone().register(
             locked,
@@ -325,6 +326,7 @@ pub fn run_container_features(
             &kernel.kthreads.system_task(),
             DEFAULT_KEYBOARD_DEVICE_ID,
         );
+        mouse_device.register(locked, &kernel.kthreads.system_task(), DEFAULT_MOUSE_DEVICE_ID);
 
         let input_events_relay = InputEventsRelay::new();
         input_events_relay.start_relays(

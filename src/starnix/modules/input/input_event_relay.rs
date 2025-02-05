@@ -64,6 +64,7 @@ pub type DeviceId = u32;
 
 pub const DEFAULT_TOUCH_DEVICE_ID: DeviceId = 0;
 pub const DEFAULT_KEYBOARD_DEVICE_ID: DeviceId = 1;
+pub const DEFAULT_MOUSE_DEVICE_ID: DeviceId = 2;
 
 pub struct InputEventsRelay {
     devices: Mutex<HashMap<DeviceId, DeviceState>>,

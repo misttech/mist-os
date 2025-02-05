@@ -31,7 +31,10 @@ const FUCHSIA_TOUCH_PRODUCT_ID: u16 = 0x2;
 // May not be zero, see below.
 const FUCHSIA_KEYBOARD_PRODUCT_ID: u16 = 0x1;
 
-// Touch and keyboard input IDs should be distinct.
+// May not be zero, see below.
+const FUCHSIA_MOUSE_PRODUCT_ID: u16 = 0x3;
+
+// Touch, keyboard, and mouse input IDs should be distinct.
 // Per https://www.linuxjournal.com/article/6429, the bus type should be populated with a
 // sensible value, but other fields may not be.
 //
@@ -66,6 +69,15 @@ const KEYBOARD_INPUT_ID: input_id = input_id {
     version: 1,
 };
 
+const MOUSE_INPUT_ID: input_id = input_id {
+    bustype: BUS_VIRTUAL as u16,
+    // Make sure that vendor ID and product ID at least seem plausible.  See
+    // above for details.
+    vendor: FUCHSIA_VENDOR_ID,
+    product: FUCHSIA_MOUSE_PRODUCT_ID,
+    version: 1,
+};
+
 #[derive(Clone)]
 enum InputDeviceType {
     // A touch device, containing (display width, display height).
@@ -73,6 +85,9 @@ enum InputDeviceType {
 
     // A keyboard device.
     Keyboard,
+
+    // A mouse device.
+    Mouse,
 }
 
 /// An [`InputDeviceStatus`] is tied to an [`InputDeviceBinding`] and provides properties
@@ -201,6 +216,15 @@ impl InputDevice {
         })
     }
 
+    pub fn new_mouse(inspect_node: &fuchsia_inspect::Node) -> Arc<Self> {
+        let node = inspect_node.create_child("mouse_device");
+        Arc::new(InputDevice {
+            device_type: InputDeviceType::Mouse,
+            open_files: Default::default(),
+            inspect_status: Arc::new(InputDeviceStatus::new(node)),
+        })
+    }
+
     pub fn register<L>(
         self: Arc<Self>,
         locked: &mut Locked<'_, L>,
@@ -252,6 +276,16 @@ impl InputDevice {
                     .node
                     .create_child(format!("keyboard_file_{}", file_nodes.len()));
                 let file = Arc::new(InputFile::new_keyboard(KEYBOARD_INPUT_ID, Some(&child_node)));
+                file_nodes.push(child_node);
+                file
+            }
+            InputDeviceType::Mouse => {
+                let mut file_nodes = self.inspect_status.file_nodes.lock();
+                let child_node = self
+                    .inspect_status
+                    .node
+                    .create_child(format!("mouse_file_{}", file_nodes.len()));
+                let file = Arc::new(InputFile::new_mouse(MOUSE_INPUT_ID, Some(&child_node)));
                 file_nodes.push(child_node);
                 file
             }
