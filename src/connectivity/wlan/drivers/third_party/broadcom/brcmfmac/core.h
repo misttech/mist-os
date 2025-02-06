@@ -227,6 +227,7 @@ struct brcmf_if {
   int32_t bsscfgidx;
   uint8_t mac_addr[ETH_ALEN];
   uint8_t netif_stop;
+  uint8_t connection_id;
   fuchsia_wlan_fullmac::WlanFullmacImplConnectRequest connect_req;
   // Request for a roam attempt, populated if a roam is requested from above the driver.
   std::optional<fuchsia_wlan_fullmac::WlanFullmacImplRoamRequest> roam_req;

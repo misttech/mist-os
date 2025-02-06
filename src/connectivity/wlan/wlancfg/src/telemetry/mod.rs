@@ -599,7 +599,7 @@ struct ConnectedState {
     /// Time when the user manually initiates connecting to another network via the
     /// Policy ClientController::Connect FIDL call.
     new_connect_start_time: Option<fasync::MonotonicInstant>,
-    prev_counters: Option<fidl_fuchsia_wlan_stats::IfaceCounterStats>,
+    prev_connection_counters: Option<fidl_fuchsia_wlan_stats::ConnectionCounters>,
     multiple_bss_candidates: bool,
     ap_state: client::types::ApState,
     network_is_likely_hidden: bool,
@@ -1057,16 +1057,22 @@ impl Telemetry {
                     {
                         Ok(Ok(stats)) => {
                             *state.num_consecutive_get_counter_stats_failures.get_mut() = 0;
-                            if let Some(prev_counters) = state.prev_counters.as_ref() {
-                                diff_and_log_counters(
+                            if let (
+                                Some(prev_connection_counters),
+                                Some(current_connection_counters),
+                            ) = (
+                                state.prev_connection_counters.as_ref(),
+                                stats.connection_counters.as_ref(),
+                            ) {
+                                diff_and_log_connection_counters(
                                     &mut self.stats_logger,
-                                    prev_counters,
-                                    &stats,
+                                    prev_connection_counters,
+                                    current_connection_counters,
                                     duration,
                                 )
                                 .await;
                             }
-                            let _prev = state.prev_counters.replace(stats);
+                            state.prev_connection_counters = stats.connection_counters;
                         }
                         error => {
                             info!("Failed to get interface stats: {:?}", error);
@@ -1082,7 +1088,7 @@ impl Telemetry {
                                         .unwrap(),
                                 )
                                 .await;
-                            let _ = state.prev_counters.take();
+                            let _ = state.prev_connection_counters.take();
                         }
                     }
                 }
@@ -1272,7 +1278,7 @@ impl Telemetry {
                     self.connection_state = ConnectionState::Connected(ConnectedState {
                         iface_id,
                         new_connect_start_time: None,
-                        prev_counters: None,
+                        prev_connection_counters: None,
                         multiple_bss_candidates,
                         ap_state,
                         network_is_likely_hidden,
@@ -1320,7 +1326,7 @@ impl Telemetry {
                             self.connection_state = ConnectionState::Connected(ConnectedState {
                                 iface_id,
                                 new_connect_start_time: None,
-                                prev_counters: None,
+                                prev_connection_counters: None,
                                 multiple_bss_candidates: state.multiple_bss_candidates,
                                 ap_state,
                                 network_is_likely_hidden: state.network_is_likely_hidden,
@@ -1757,10 +1763,10 @@ const VERY_HIGH_PACKET_DROP_RATE_THRESHOLD: f64 = 0.05;
 
 const DEVICE_LOW_CONNECTION_SUCCESS_RATE_THRESHOLD: f64 = 0.1;
 
-async fn diff_and_log_counters(
+async fn diff_and_log_connection_counters(
     stats_logger: &mut StatsLogger,
-    prev: &fidl_fuchsia_wlan_stats::IfaceCounterStats,
-    current: &fidl_fuchsia_wlan_stats::IfaceCounterStats,
+    prev: &fidl_fuchsia_wlan_stats::ConnectionCounters,
+    current: &fidl_fuchsia_wlan_stats::ConnectionCounters,
     duration: zx::MonotonicDuration,
 ) {
     diff_and_log_rx_counters(stats_logger, prev, current, duration).await;
@@ -1769,8 +1775,8 @@ async fn diff_and_log_counters(
 
 async fn diff_and_log_rx_counters(
     stats_logger: &mut StatsLogger,
-    prev: &fidl_fuchsia_wlan_stats::IfaceCounterStats,
-    current: &fidl_fuchsia_wlan_stats::IfaceCounterStats,
+    prev: &fidl_fuchsia_wlan_stats::ConnectionCounters,
+    current: &fidl_fuchsia_wlan_stats::ConnectionCounters,
     duration: zx::MonotonicDuration,
 ) {
     let (current_rx_unicast_total, prev_rx_unicast_total) =
@@ -1808,8 +1814,8 @@ async fn diff_and_log_rx_counters(
 
 async fn diff_and_log_tx_counters(
     stats_logger: &mut StatsLogger,
-    prev: &fidl_fuchsia_wlan_stats::IfaceCounterStats,
-    current: &fidl_fuchsia_wlan_stats::IfaceCounterStats,
+    prev: &fidl_fuchsia_wlan_stats::ConnectionCounters,
+    current: &fidl_fuchsia_wlan_stats::ConnectionCounters,
     duration: zx::MonotonicDuration,
 ) {
     let (current_tx_total, prev_tx_total) = match (current.tx_total, prev.tx_total) {
@@ -4681,7 +4687,7 @@ mod tests {
 
             // The rest of the fields don't matter for this test case.
             new_connect_start_time: None,
-            prev_counters: None,
+            prev_connection_counters: None,
             multiple_bss_candidates: false,
             network_is_likely_hidden: false,
             last_signal_report: fasync::MonotonicInstant::now(),
@@ -5618,9 +5624,12 @@ mod tests {
         test_helper.set_counter_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                tx_total: Some(10 * seed),
-                tx_drop: Some(3 * seed),
-                ..fake_iface_counter_stats(seed)
+                connection_counters: Some(fidl_fuchsia_wlan_stats::ConnectionCounters {
+                    tx_total: Some(10 * seed),
+                    tx_drop: Some(3 * seed),
+                    ..fake_connection_counters(seed)
+                }),
+                ..Default::default()
             })
         }));
 
@@ -5657,9 +5666,12 @@ mod tests {
         test_helper.set_counter_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                rx_unicast_total: Some(10 * seed),
-                rx_unicast_drop: Some(3 * seed),
-                ..fake_iface_counter_stats(seed)
+                connection_counters: Some(fidl_fuchsia_wlan_stats::ConnectionCounters {
+                    rx_unicast_total: Some(10 * seed),
+                    rx_unicast_drop: Some(3 * seed),
+                    ..fake_connection_counters(seed)
+                }),
+                ..Default::default()
             })
         }));
 
@@ -5696,12 +5708,15 @@ mod tests {
         test_helper.set_counter_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                // 3% drop rate would be high, but not very high
-                rx_unicast_total: Some(100 * seed),
-                rx_unicast_drop: Some(3 * seed),
-                tx_total: Some(100 * seed),
-                tx_drop: Some(3 * seed),
-                ..fake_iface_counter_stats(seed)
+                connection_counters: Some(fidl_fuchsia_wlan_stats::ConnectionCounters {
+                    // 3% drop rate would be high, but not very high
+                    rx_unicast_total: Some(100 * seed),
+                    rx_unicast_drop: Some(3 * seed),
+                    tx_total: Some(100 * seed),
+                    tx_drop: Some(3 * seed),
+                    ..fake_connection_counters(seed)
+                }),
+                ..Default::default()
             })
         }));
 
@@ -5741,11 +5756,14 @@ mod tests {
                 - fasync::MonotonicInstant::from_nanos(0i64))
             .into_seconds() as u64;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                rx_unicast_total: Some(100 * seed),
-                rx_unicast_drop: Some(3 * seed),
-                tx_total: Some(10 * seed),
-                tx_drop: Some(2 * seed),
-                ..fake_iface_counter_stats(seed)
+                connection_counters: Some(fidl_fuchsia_wlan_stats::ConnectionCounters {
+                    rx_unicast_total: Some(100 * seed),
+                    rx_unicast_drop: Some(3 * seed),
+                    tx_total: Some(10 * seed),
+                    tx_drop: Some(2 * seed),
+                    ..fake_connection_counters(seed)
+                }),
+                ..Default::default()
             })
         }));
 
@@ -5781,8 +5799,11 @@ mod tests {
         test_helper.set_counter_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                rx_unicast_total: Some(10),
-                ..fake_iface_counter_stats(seed)
+                connection_counters: Some(fidl_fuchsia_wlan_stats::ConnectionCounters {
+                    rx_unicast_total: Some(10),
+                    ..fake_connection_counters(seed)
+                }),
+                ..Default::default()
             })
         }));
 
@@ -5819,8 +5840,11 @@ mod tests {
         test_helper.set_counter_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                rx_unicast_total: Some(10),
-                ..fake_iface_counter_stats(seed)
+                connection_counters: Some(fidl_fuchsia_wlan_stats::ConnectionCounters {
+                    rx_unicast_total: Some(10),
+                    ..fake_connection_counters(seed)
+                }),
+                ..Default::default()
             })
         }));
 
@@ -6092,30 +6116,33 @@ mod tests {
         test_helper.set_counter_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64 / 1_000_000_000;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                tx_total: Some(10 * seed),
-                // TX drop rate stops increasing at 1 hour + TELEMETRY_QUERY_INTERVAL mark.
-                // Because the first TELEMETRY_QUERY_INTERVAL doesn't count when
-                // computing counters, this leads to 3 hour of high TX drop rate.
-                tx_drop: Some(
-                    3 * min(
-                        seed,
-                        (zx::MonotonicDuration::from_hours(3) + TELEMETRY_QUERY_INTERVAL)
-                            .into_seconds() as u64,
+                connection_counters: Some(fidl_fuchsia_wlan_stats::ConnectionCounters {
+                    tx_total: Some(10 * seed),
+                    // TX drop rate stops increasing at 1 hour + TELEMETRY_QUERY_INTERVAL mark.
+                    // Because the first TELEMETRY_QUERY_INTERVAL doesn't count when
+                    // computing counters, this leads to 3 hour of high TX drop rate.
+                    tx_drop: Some(
+                        3 * min(
+                            seed,
+                            (zx::MonotonicDuration::from_hours(3) + TELEMETRY_QUERY_INTERVAL)
+                                .into_seconds() as u64,
+                        ),
                     ),
-                ),
-                // RX total stops increasing at 23 hour mark
-                rx_unicast_total: Some(
-                    10 * min(seed, zx::MonotonicDuration::from_hours(23).into_seconds() as u64),
-                ),
-                // RX drop rate stops increasing at 4 hour + TELEMETRY_QUERY_INTERVAL mark.
-                rx_unicast_drop: Some(
-                    3 * min(
-                        seed,
-                        (zx::MonotonicDuration::from_hours(4) + TELEMETRY_QUERY_INTERVAL)
-                            .into_seconds() as u64,
+                    // RX total stops increasing at 23 hour mark
+                    rx_unicast_total: Some(
+                        10 * min(seed, zx::MonotonicDuration::from_hours(23).into_seconds() as u64),
                     ),
-                ),
-                ..fake_iface_counter_stats(seed)
+                    // RX drop rate stops increasing at 4 hour + TELEMETRY_QUERY_INTERVAL mark.
+                    rx_unicast_drop: Some(
+                        3 * min(
+                            seed,
+                            (zx::MonotonicDuration::from_hours(4) + TELEMETRY_QUERY_INTERVAL)
+                                .into_seconds() as u64,
+                        ),
+                    ),
+                    ..fake_connection_counters(seed)
+                }),
+                ..Default::default()
             })
         }));
 
@@ -6297,30 +6324,36 @@ mod tests {
         test_helper.set_counter_stats_resp(Box::new(|| {
             let seed = fasync::MonotonicInstant::now().into_nanos() as u64 / 1_000_000_000;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
-                tx_total: Some(10 * seed),
-                // TX drop rate stops increasing at 10 min + TELEMETRY_QUERY_INTERVAL mark.
-                // Because the first TELEMETRY_QUERY_INTERVAL doesn't count when
-                // computing counters, this leads to 10 min of high TX drop rate.
-                tx_drop: Some(
-                    3 * min(
-                        seed,
-                        (zx::MonotonicDuration::from_minutes(10) + TELEMETRY_QUERY_INTERVAL)
-                            .into_seconds() as u64,
+                connection_counters: Some(fidl_fuchsia_wlan_stats::ConnectionCounters {
+                    tx_total: Some(10 * seed),
+                    // TX drop rate stops increasing at 10 min + TELEMETRY_QUERY_INTERVAL mark.
+                    // Because the first TELEMETRY_QUERY_INTERVAL doesn't count when
+                    // computing counters, this leads to 10 min of high TX drop rate.
+                    tx_drop: Some(
+                        3 * min(
+                            seed,
+                            (zx::MonotonicDuration::from_minutes(10) + TELEMETRY_QUERY_INTERVAL)
+                                .into_seconds() as u64,
+                        ),
                     ),
-                ),
-                // RX total stops increasing at 45 min mark
-                rx_unicast_total: Some(
-                    10 * min(seed, zx::MonotonicDuration::from_minutes(45).into_seconds() as u64),
-                ),
-                // RX drop rate stops increasing at 20 min + TELEMETRY_QUERY_INTERVAL mark.
-                rx_unicast_drop: Some(
-                    3 * min(
-                        seed,
-                        (zx::MonotonicDuration::from_minutes(20) + TELEMETRY_QUERY_INTERVAL)
-                            .into_seconds() as u64,
+                    // RX total stops increasing at 45 min mark
+                    rx_unicast_total: Some(
+                        10 * min(
+                            seed,
+                            zx::MonotonicDuration::from_minutes(45).into_seconds() as u64,
+                        ),
                     ),
-                ),
-                ..fake_iface_counter_stats(seed)
+                    // RX drop rate stops increasing at 20 min + TELEMETRY_QUERY_INTERVAL mark.
+                    rx_unicast_drop: Some(
+                        3 * min(
+                            seed,
+                            (zx::MonotonicDuration::from_minutes(20) + TELEMETRY_QUERY_INTERVAL)
+                                .into_seconds() as u64,
+                        ),
+                    ),
+                    ..fake_connection_counters(seed)
+                }),
+                ..Default::default()
             })
         }));
 
@@ -10035,7 +10068,10 @@ mod tests {
                         Some(get_resp) => get_resp(),
                         None => {
                             let seed = fasync::MonotonicInstant::now().into_nanos() as u64;
-                            Ok(fake_iface_counter_stats(seed))
+                            Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
+                                connection_counters: Some(fake_connection_counters(seed)),
+                                ..Default::default()
+                            })
                         }
                     };
                     responder
@@ -10218,8 +10254,9 @@ mod tests {
         (test_helper, test_fut)
     }
 
-    fn fake_iface_counter_stats(nth_req: u64) -> fidl_fuchsia_wlan_stats::IfaceCounterStats {
-        fidl_fuchsia_wlan_stats::IfaceCounterStats {
+    fn fake_connection_counters(nth_req: u64) -> fidl_fuchsia_wlan_stats::ConnectionCounters {
+        fidl_fuchsia_wlan_stats::ConnectionCounters {
+            connection_id: Some(1),
             rx_unicast_total: Some(nth_req),
             rx_unicast_drop: Some(0),
             rx_multicast: Some(2 * nth_req),

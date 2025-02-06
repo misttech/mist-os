@@ -85,13 +85,14 @@ impl ClientIfaceCountersLogger {
                         .await
                     {
                         Ok(Ok(stats)) => {
-                            if let fidl_stats::IfaceCounterStats {
+                            if let Some(fidl_stats::ConnectionCounters {
+                                connection_id: Some(_connection_id),
                                 rx_unicast_total: Some(rx_unicast_total),
                                 rx_unicast_drop: Some(rx_unicast_drop),
                                 tx_total: Some(tx_total),
                                 tx_drop: Some(tx_drop),
                                 ..
-                            } = stats
+                            }) = stats.connection_counters
                             {
                                 self.time_series_stats.log_rx_unicast_total(rx_unicast_total);
                                 self.time_series_stats.log_rx_unicast_drop(rx_unicast_drop);
@@ -201,11 +202,15 @@ mod tests {
         let is_connected = true;
         let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
         let counter_stats = fidl_stats::IfaceCounterStats {
-            rx_unicast_total: Some(100),
-            rx_unicast_drop: Some(5),
-            rx_multicast: Some(30),
-            tx_total: Some(50),
-            tx_drop: Some(2),
+            connection_counters: Some(fidl_stats::ConnectionCounters {
+                connection_id: Some(1),
+                rx_unicast_total: Some(100),
+                rx_unicast_drop: Some(5),
+                rx_multicast: Some(30),
+                tx_total: Some(50),
+                tx_drop: Some(2),
+                ..Default::default()
+            }),
             ..Default::default()
         };
         assert_eq!(

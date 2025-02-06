@@ -5251,7 +5251,8 @@ zx_status_t brcmf_if_get_iface_counter_stats(net_device* ndev,
   }
 
   if (!brcmf_test_bit(brcmf_vif_status_bit_t::CONNECTED, &ifp->vif->sme_state)) {
-    return ZX_ERR_NOT_CONNECTED;
+    *out_stats = fuchsia_wlan_stats::wire::IfaceCounterStats::Builder(arena).Build();
+    return ZX_OK;
   }
 
   brcmf_pktcnt_le pktcnt;
@@ -5267,13 +5268,18 @@ zx_status_t brcmf_if_get_iface_counter_stats(net_device* ndev,
   BRCMF_DBG(DATA, "Cntrs: rxgood:%d rxbad:%d txgood:%d txbad:%d rxocast:%d", pktcnt.rx_good_pkt,
             pktcnt.rx_bad_pkt, pktcnt.tx_good_pkt, pktcnt.tx_bad_pkt, pktcnt.rx_ocast_good_pkt);
 
-  *out_stats = fuchsia_wlan_stats::wire::IfaceCounterStats::Builder(arena)
-                   .rx_unicast_total(pktcnt.rx_good_pkt + pktcnt.rx_bad_pkt + ndev->stats.rx_errors)
-                   .rx_unicast_drop(pktcnt.rx_bad_pkt + ndev->stats.rx_errors)
-                   .rx_multicast(pktcnt.rx_ocast_good_pkt)
-                   .tx_total(pktcnt.tx_good_pkt + pktcnt.tx_bad_pkt + ndev->stats.tx_dropped)
-                   .tx_drop(pktcnt.tx_bad_pkt + ndev->stats.tx_dropped)
-                   .Build();
+  *out_stats =
+      fuchsia_wlan_stats::wire::IfaceCounterStats::Builder(arena)
+          .connection_counters(
+              fuchsia_wlan_stats::wire::ConnectionCounters::Builder(arena)
+                  .connection_id(ifp->connection_id)
+                  .rx_unicast_total(pktcnt.rx_good_pkt + pktcnt.rx_bad_pkt + ndev->stats.rx_errors)
+                  .rx_unicast_drop(pktcnt.rx_bad_pkt + ndev->stats.rx_errors)
+                  .rx_multicast(pktcnt.rx_ocast_good_pkt)
+                  .tx_total(pktcnt.tx_good_pkt + pktcnt.tx_bad_pkt + ndev->stats.tx_dropped)
+                  .tx_drop(pktcnt.tx_bad_pkt + ndev->stats.tx_dropped)
+                  .Build())
+          .Build();
   return ZX_OK;
 }
 
@@ -5553,6 +5559,7 @@ static zx_status_t brcmf_bss_roam_done(brcmf_if* ifp, brcmf_connect_status_t con
           break;
         }
         brcmf_set_bit(brcmf_vif_status_bit_t::CONNECTED, &ifp->vif->sme_state);
+        ifp->connection_id += 1;
         BRCMF_INFO("Roam succeeded");
         if (!brcmf_feat_is_enabled(ifp, BRCMF_FEAT_MFG)) {
           // Start the signal report timer
@@ -6251,6 +6258,7 @@ static zx_status_t brcmf_bss_connect_done(brcmf_if* ifp, brcmf_connect_status_t 
       case brcmf_connect_status_t::CONNECTED: {
         brcmf_get_assoc_ies(cfg, ifp);
         brcmf_set_bit(brcmf_vif_status_bit_t::CONNECTED, &ifp->vif->sme_state);
+        ifp->connection_id += 1;
         if (!brcmf_feat_is_enabled(ifp, BRCMF_FEAT_MFG)) {
           // Start the signal report timer
           cfg->connect_log_cnt = 0;

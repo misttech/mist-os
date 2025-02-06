@@ -493,7 +493,34 @@ void ConnectTest::GetIfaceHistogramStats(fuchsia_wlan_stats::wire::IfaceHistogra
   }
 }
 
-TEST_F(ConnectTest, GetIfaceCounterStatsTest) {
+// This test is to verify that GetIfaceCounterStats still returns a response even when the
+// client is not connected, just that `connection_counters` is not set.
+TEST_F(ConnectTest, GetIfaceCounterStatsTest_NotConnected) {
+  // Create our device instance
+  Init();
+
+  // Start up our fake AP
+  simulation::FakeAp ap(env_.get(), kDefaultBssid, kDefaultSsid, kDefaultChannel);
+  ap.EnableBeacon(zx::msec(100));
+  ap.SetAssocHandling(simulation::FakeAp::ASSOC_REFUSED);
+
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
+  fuchsia_wlan_stats::wire::IfaceCounterStats stats_1 = {};
+  fuchsia_wlan_stats::wire::IfaceCounterStats stats_2 = {};
+
+  env_->ScheduleNotification(std::bind(&ConnectTest::GetIfaceCounterStats, this, &stats_1),
+                             zx::msec(5));
+  env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
+  env_->ScheduleNotification(std::bind(&ConnectTest::GetIfaceCounterStats, this, &stats_2),
+                             zx::msec(30));
+
+  env_->Run(kTestDuration);
+
+  ASSERT_FALSE(stats_1.has_connection_counters());
+  ASSERT_FALSE(stats_2.has_connection_counters());
+}
+
+TEST_F(ConnectTest, GetIfaceCounterStatsTest_Connected) {
   // Create our device instance
   Init();
 
@@ -516,16 +543,55 @@ TEST_F(ConnectTest, GetIfaceCounterStatsTest) {
   const uint64_t fw_rx_multicast = 1;
   const uint64_t fw_tx_good = 3;
   const uint64_t fw_tx_bad = 2;
-  ASSERT_TRUE(stats.has_rx_unicast_total());
-  EXPECT_EQ(stats.rx_unicast_total(), fw_rx_good + fw_rx_bad);
-  ASSERT_TRUE(stats.has_rx_unicast_drop());
-  EXPECT_EQ(stats.rx_unicast_drop(), fw_rx_bad);
-  ASSERT_TRUE(stats.has_rx_multicast());
-  EXPECT_EQ(stats.rx_multicast(), fw_rx_multicast);
-  ASSERT_TRUE(stats.has_tx_total());
-  EXPECT_EQ(stats.tx_total(), fw_tx_good + fw_tx_bad);
-  ASSERT_TRUE(stats.has_tx_drop());
-  EXPECT_EQ(stats.tx_drop(), fw_tx_bad);
+  ASSERT_TRUE(stats.has_connection_counters());
+  auto connection_counters = stats.connection_counters();
+  ASSERT_TRUE(connection_counters.has_connection_id());
+  EXPECT_EQ(connection_counters.connection_id(), 1);
+  ASSERT_TRUE(connection_counters.has_rx_unicast_total());
+  EXPECT_EQ(connection_counters.rx_unicast_total(), fw_rx_good + fw_rx_bad);
+  ASSERT_TRUE(connection_counters.has_rx_unicast_drop());
+  EXPECT_EQ(connection_counters.rx_unicast_drop(), fw_rx_bad);
+  ASSERT_TRUE(connection_counters.has_rx_multicast());
+  EXPECT_EQ(connection_counters.rx_multicast(), fw_rx_multicast);
+  ASSERT_TRUE(connection_counters.has_tx_total());
+  EXPECT_EQ(connection_counters.tx_total(), fw_tx_good + fw_tx_bad);
+  ASSERT_TRUE(connection_counters.has_tx_drop());
+  EXPECT_EQ(connection_counters.tx_drop(), fw_tx_bad);
+}
+
+// Test that on a new connection, the connection ID returned by GetIfaceCounterStats is updated.
+TEST_F(ConnectTest, GetIfaceCounterStatsTest_Reconnected) {
+  // Create our device instance
+  Init();
+
+  // Start up our fake AP
+  simulation::FakeAp ap(env_.get(), kDefaultBssid, kDefaultSsid, kDefaultChannel);
+  aps_.push_back(&ap);
+
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
+  context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
+  fuchsia_wlan_stats::wire::IfaceCounterStats stats_1 = {};
+  fuchsia_wlan_stats::wire::IfaceCounterStats stats_2 = {};
+
+  env_->ScheduleNotification(std::bind(&ConnectTest::StartConnect, this), zx::msec(10));
+  env_->ScheduleNotification(std::bind(&ConnectTest::GetIfaceCounterStats, this, &stats_1),
+                             zx::msec(20));
+  env_->ScheduleNotification(std::bind(&ConnectTest::DisassocFromAp, this), zx::sec(2));
+  env_->ScheduleNotification(std::bind(&ConnectTest::StartReconnect, this), zx::sec(3));
+  env_->ScheduleNotification(std::bind(&ConnectTest::GetIfaceCounterStats, this, &stats_2),
+                             zx::sec(4));
+
+  env_->Run(kTestDuration);
+
+  ASSERT_TRUE(stats_1.has_connection_counters());
+  auto connection_counters_1 = stats_1.connection_counters();
+  ASSERT_TRUE(connection_counters_1.has_connection_id());
+  EXPECT_EQ(connection_counters_1.connection_id(), 1);
+
+  ASSERT_TRUE(stats_2.has_connection_counters());
+  auto connection_counters_2 = stats_2.connection_counters();
+  ASSERT_TRUE(connection_counters_2.has_connection_id());
+  EXPECT_EQ(connection_counters_2.connection_id(), 2);
 }
 
 TEST_F(ConnectTest, GetIfaceHistogramStatsTest) {
