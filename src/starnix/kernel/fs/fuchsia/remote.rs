@@ -270,9 +270,6 @@ impl RemoteFs {
         if !rights.contains(fio::PERM_WRITABLE) {
             options.flags |= MountFlags::RDONLY;
         }
-        // NOTE: This mount option exists for now to workaround selinux issues.  The `defcontext`
-        // option operates similarly to Linux's equivalent, but it's not exactly the same.  When our
-        // selinux support is further along, we might want to remove this mount option.
         let fs = FileSystem::new(
             kernel,
             CacheMode::Cached(CacheConfig::default()),
