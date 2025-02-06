@@ -41,6 +41,7 @@ async fn mount_user_volume(
     exposed_dir: ServerEnd<DirectoryMarker>,
     volumes_directory: &Arc<VolumesDirectory>,
     store_id: &mut Option<u64>,
+    inspect_node: &fuchsia_inspect::Node,
 ) -> Result<(), Error> {
     let remote_crypt = Arc::new(RemoteCrypt::new(crypt));
     let vol = match volumes_directory
@@ -61,15 +62,18 @@ async fn mount_user_volume(
     };
     *store_id = Some(vol.volume().store().store_object_id());
     volumes_directory.serve_volume(&vol, exposed_dir, false).context("failed to serve volume")?;
+    inspect_node.record_bool("mounted", true);
     Ok(())
 }
 
 async fn unmount_user_volume(
     volumes_directory: &Arc<VolumesDirectory>,
     store_id: &mut Option<u64>,
+    inspect_node: &fuchsia_inspect::Node,
 ) -> Result<(), Error> {
     if let Some(store_id) = store_id.take() {
         volumes_directory.lock().await.unmount(store_id).await.context("unmount failed")?;
+        inspect_node.record_bool("mounted", false);
         Ok(())
     } else {
         Err(anyhow!("tried to unmount a volume that was never mounted"))
@@ -79,6 +83,7 @@ async fn unmount_user_volume(
 async fn run(
     mut stream: StarnixVolumeProviderRequestStream,
     volumes_directory: Arc<VolumesDirectory>,
+    inspect_node: &fuchsia_inspect::Node,
 ) -> Result<(), Error> {
     let volumes_directory = volumes_directory.clone();
     let mut store_id = None;
@@ -86,23 +91,30 @@ async fn run(
         match request {
             StarnixVolumeProviderRequest::Mount { crypt, exposed_dir, responder } => {
                 log::info!("volume provider mount called");
-                let res =
-                    match mount_user_volume(crypt, exposed_dir, &volumes_directory, &mut store_id)
-                        .await
-                    {
-                        Ok(()) => Ok(()),
-                        Err(e) => {
-                            log::error!("volume provider service: mount failed: {:?}", e);
-                            Err(zx::Status::INTERNAL.into_raw())
-                        }
-                    };
+                let res = match mount_user_volume(
+                    crypt,
+                    exposed_dir,
+                    &volumes_directory,
+                    &mut store_id,
+                    inspect_node,
+                )
+                .await
+                {
+                    Ok(()) => Ok(()),
+                    Err(e) => {
+                        log::error!("volume provider service: mount failed: {:?}", e);
+                        Err(zx::Status::INTERNAL.into_raw())
+                    }
+                };
                 responder.send(res).unwrap_or_else(|e| {
                     log::error!("failed to send Mount response. error: {:?}", e);
                 });
             }
             StarnixVolumeProviderRequest::Unmount { responder } => {
                 log::info!("volume provider unmount called");
-                let res = match unmount_user_volume(&volumes_directory, &mut store_id).await {
+                let res = match unmount_user_volume(&volumes_directory, &mut store_id, inspect_node)
+                    .await
+                {
                     Ok(()) => Ok(()),
                     Err(e) => {
                         log::error!("volume provider service: unmount failed: {:?}", e);
@@ -125,6 +137,11 @@ async fn main() -> Result<(), Error> {
     // TODO(https://fxbug.dev/378744012): Make the size of FakeDevice configurable.
     let device = DeviceHolder::new(FakeDevice::new(393216, BLOCK_SIZE));
     let filesystem = FxFilesystem::new_empty(device).await.unwrap();
+
+    let inspector = fuchsia_inspect::component::inspector();
+    let _inspect_server_task =
+        inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
+    let inspect_node = inspector.root().create_child("starnix_volume");
 
     let crypt_management = connect_to_protocol::<CryptManagementMarker>()?;
     let wrapping_key_id_0 = [0; 16];
@@ -187,7 +204,8 @@ async fn main() -> Result<(), Error> {
     fs.dir("svc").add_fidl_service(StarnixVolumeProvider);
     fs.take_and_serve_directory_handle()?;
     fs.for_each_concurrent(None, |StarnixVolumeProvider(stream)| {
-        run(stream, volumes_directory.clone()).unwrap_or_else(|e| log::error!("{:?}", e))
+        run(stream, volumes_directory.clone(), &inspect_node)
+            .unwrap_or_else(|e| log::error!("{:?}", e))
     })
     .await;
 

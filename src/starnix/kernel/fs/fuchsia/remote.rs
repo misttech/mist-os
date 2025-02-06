@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::fs::fuchsia::remote_volume::RemoteVolume;
 use crate::fs::fuchsia::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline};
 use crate::fs::fuchsia::RemoteUnixDomainSocket;
 use crate::mm::memory::MemoryObject;
@@ -118,7 +119,11 @@ impl RemoteFs {
     /// This will panic if `fs`'s ops aren't `RemoteFs`, so this should only be called when this is
     /// known to be the case.
     fn from_fs(fs: &FileSystem) -> &RemoteFs {
-        fs.downcast_ops::<RemoteFs>().unwrap()
+        if let Some(remote_vol) = fs.downcast_ops::<RemoteVolume>() {
+            remote_vol.remotefs()
+        } else {
+            fs.downcast_ops::<RemoteFs>().unwrap()
+        }
     }
 }
 
@@ -219,15 +224,9 @@ impl FileSystemOps for RemoteFs {
 }
 
 impl RemoteFs {
-    pub fn new_fs(
-        kernel: &Arc<Kernel>,
-        root: zx::Channel,
-        mut options: FileSystemOptions,
-        rights: fio::Flags,
-    ) -> Result<FileSystemHandle, Errno> {
+    pub fn new(root: zx::Channel, server_end: zx::Channel) -> Result<RemoteFs, Errno> {
         // See if open3 works.  We assume that if open3 works on the root, it will work for all
         // descendent nodes in this filesystem.  At the time of writing, this is true for Fxfs.
-        let (client_end, server_end) = zx::Channel::create();
         let root_proxy = fio::DirectorySynchronousProxy::new(root);
         root_proxy
             .open3(
@@ -256,7 +255,17 @@ impl RemoteFs {
             && info
                 .map(|i| i.fs_type == fidl_fuchsia_fs::VfsType::Fxfs.into_primitive())
                 .unwrap_or(false);
+        Ok(RemoteFs { use_remote_ids, root_proxy })
+    }
 
+    pub fn new_fs(
+        kernel: &Arc<Kernel>,
+        root: zx::Channel,
+        mut options: FileSystemOptions,
+        rights: fio::Flags,
+    ) -> Result<FileSystemHandle, Errno> {
+        let (client_end, server_end) = zx::Channel::create();
+        let remotefs = RemoteFs::new(root, server_end)?;
         let mut attrs = zxio_node_attributes_t {
             has: zxio_node_attr_has_t { id: true, ..Default::default() },
             ..Default::default()
@@ -270,12 +279,9 @@ impl RemoteFs {
         if !rights.contains(fio::PERM_WRITABLE) {
             options.flags |= MountFlags::RDONLY;
         }
-        let fs = FileSystem::new(
-            kernel,
-            CacheMode::Cached(CacheConfig::default()),
-            RemoteFs { use_remote_ids, root_proxy },
-            options,
-        )?;
+        let use_remote_ids = remotefs.use_remote_ids;
+        let fs =
+            FileSystem::new(kernel, CacheMode::Cached(CacheConfig::default()), remotefs, options)?;
         let mut root_node = FsNode::new_root(remote_node);
         if use_remote_ids {
             root_node.node_id = node_id;
@@ -283,9 +289,13 @@ impl RemoteFs {
         fs.set_root_node(root_node);
         Ok(fs)
     }
+
+    pub fn use_remote_ids(&self) -> bool {
+        self.use_remote_ids
+    }
 }
 
-struct RemoteNode {
+pub struct RemoteNode {
     /// The underlying Zircon I/O object for this remote node.
     ///
     /// We delegate to the zxio library for actually doing I/O with remote
@@ -296,6 +306,12 @@ struct RemoteNode {
     /// The fuchsia.io rights for the dir handle. Subdirs will be opened with
     /// the same rights.
     rights: fio::Flags,
+}
+
+impl RemoteNode {
+    pub fn new(zxio: Arc<syncio::Zxio>, rights: fio::Flags) -> Self {
+        Self { zxio, rights }
+    }
 }
 
 /// Create a file handle from a zx::Handle.

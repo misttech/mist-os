@@ -466,8 +466,9 @@ impl Kernel {
     /// 2. Shut down individual ThreadGroups until only the init and system tasks remain
     /// 3. Repeat the above for the init task
     /// 4. Ensure this process is the only one running in the kernel job.
-    /// 5. Tell CF the container component has stopped
-    /// 6. Exit this process
+    /// 5. Unmounts the kernel's mounts' FileSystems.
+    /// 6. Tell CF the container component has stopped
+    /// 7. Exit this process
     ///
     /// If a ThreadGroup does not shut down on its own (including after SIGKILL), that phase of
     /// shutdown will hang. To gracefully shut down any further we need the other kernel processes
@@ -572,7 +573,10 @@ impl Kernel {
             futures::future::join_all(terminated_signals).await;
         }
 
-        // Step 5: Tell CF the container stopped.
+        // Step 5: Forcibly unmounts the mounts' FileSystems.
+        self.mounts.clear();
+
+        // Step 6: Tell CF the container stopped.
         log_debug!("all non-root processes killed, notifying CF container is stopped");
         if let Some(control_handle) = self.container_control_handle.lock().take() {
             log_debug!("Notifying CF that the container has stopped.");
@@ -588,7 +592,7 @@ impl Kernel {
             log_warn!("Shutdown invoked without a container controller control handle.");
         }
 
-        // Step 6: exiting this process.
+        // Step 7: exiting this process.
         log_info!("All tasks killed, exiting Starnix kernel root process.");
         std::process::exit(0);
     }

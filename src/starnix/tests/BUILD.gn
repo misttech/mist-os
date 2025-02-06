@@ -21,6 +21,7 @@ group("tests") {
     "memory_attribution:tests",
     "psi:tests",
     "reboot:tests",
+    "remotevol_shutdown:tests",
     "scheduler:tests",
     "suspend:tests",
     "syscalls:tests",

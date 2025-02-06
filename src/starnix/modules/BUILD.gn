@@ -36,7 +36,6 @@ rustc_library("modules") {
     "//src/starnix/modules/fuse",
     "//src/starnix/modules/loop",
     "//src/starnix/modules/overlayfs",
-    "//src/starnix/modules/remote-vol",
     "//src/starnix/modules/selinuxfs",
     "//src/starnix/modules/tracefs",
     "//src/starnix/modules/tun",

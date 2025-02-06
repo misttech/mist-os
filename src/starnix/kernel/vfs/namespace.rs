@@ -1730,6 +1730,17 @@ impl Mounts {
             }
         }
     }
+
+    /// Drain mounts. For each drained mount, force a FileSystem unmount.
+    // TODO(https://fxbug.dev/295073633): Graceful shutdown should try to first unmount the mounts
+    // and only force a FileSystem unmount on failure.
+    pub fn clear(&self) {
+        for (_dir_entry, mounts) in self.mounts.lock().drain() {
+            for mount in mounts {
+                mount.fs.force_unmount_ops();
+            }
+        }
+    }
 }
 
 /// A RAII object that unregisters a mount when dropped.

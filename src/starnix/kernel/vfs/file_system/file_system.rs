@@ -367,6 +367,13 @@ impl FileSystem {
         self.ops.exchange(self, current_task, node1, parent1, name1, node2, parent2, name2)
     }
 
+    /// Forces a FileSystem unmount.
+    // TODO(https://fxbug.dev/394694891): kernel shutdown should ideally unmount FileSystems via
+    // their drop impl, which should be triggered by Mount.unmount().
+    pub fn force_unmount_ops(&self) {
+        self.ops.unmount();
+    }
+
     /// Returns the `statfs` for this filesystem.
     ///
     /// Each `FileSystemOps` impl is expected to override this to return the specific statfs for
