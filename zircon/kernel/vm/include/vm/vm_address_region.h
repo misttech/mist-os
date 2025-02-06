@@ -1092,6 +1092,10 @@ class VmMapping final : public VmAddressRegionOrMapping,
                                                            ktl::move(func));
   }
 
+  // The maximum number of pages that a page fault can optimistically extend the fault to include.
+  // This is defined and exposed here for the purposes of unittests.
+  static constexpr uint64_t kPageFaultMaxOptimisticPages = 16;
+
  protected:
   ~VmMapping() override;
   friend fbl::RefPtr<VmMapping>;

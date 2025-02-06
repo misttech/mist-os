@@ -1530,14 +1530,14 @@ static bool vm_mapping_page_fault_optimisation_test() {
 
   AutoVmScannerDisable scanner_disable;
 
-  constexpr size_t alloc_size = 32 * PAGE_SIZE;
+  constexpr uint64_t kMaxOptPages = VmMapping::kPageFaultMaxOptimisticPages;
+
+  // Size the allocation of the VMO / mapping to be double the optimistic extension so we can
+  // validate that it is limited by the optimistic cap, not the size of the VMO.
+  constexpr size_t alloc_size = kMaxOptPages * 2 * PAGE_SIZE;
   static const uint8_t align_pow2 = log2_floor(alloc_size);
 
-  // This is duplicating a constant in VmMapping::PageFaultLocked. Optimisation will fault the
-  // minimum of 16 pages and the end of the VMO, protection range.
-  static const size_t max_opportunistic_pages = 16;
-
-  // 32 Page mapped & fully committed VMO.
+  // Mapped & fully committed VMO.
   fbl::RefPtr<VmObjectPaged> committed_vmo;
   ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, alloc_size, &committed_vmo));
 
@@ -1550,11 +1550,12 @@ static bool vm_mapping_page_fault_optimisation_test() {
   // Trigger a page fault on the first page in the VMO/Mapping.
   mapping->put(42);
 
-  // Optimisation will fault the minimum of 16 pages and the end of the VMO, protection
-  // range, mapping or page table. We have ensures that all of these will be > 16 in this case.
-  ASSERT_TRUE(verify_mapped_page_range(mapping->base(), alloc_size, max_opportunistic_pages));
+  // Optimisation will fault the minimum of kMaxOptPages pages and the end of the VMO, protection
+  // range, mapping or page table. We have ensured that all of these will be > kMaxOptPages in this
+  // case.
+  ASSERT_TRUE(verify_mapped_page_range(mapping->base(), alloc_size, kMaxOptPages));
 
-  // 32 Page mapped but not committed VMO.
+  // Mapped but not committed VMO.
   fbl::RefPtr<VmObjectPaged> uncommitted_vmo;
   ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, alloc_size, &uncommitted_vmo));
 
@@ -1568,7 +1569,7 @@ static bool vm_mapping_page_fault_optimisation_test() {
   // As the VMO is uncommitted, only the requested page should have been faulted.
   ASSERT_TRUE(verify_mapped_page_range(mapping2->base(), alloc_size, 1));
 
-  // 32 Page VMO with a single committed page.
+  // Single committed page.
   fbl::RefPtr<VmObjectPaged> onepage_committed_vmo;
   ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, alloc_size, &onepage_committed_vmo));
 
@@ -1584,7 +1585,8 @@ static bool vm_mapping_page_fault_optimisation_test() {
   // Only the requested page should have been faulted.
   ASSERT_TRUE(verify_mapped_page_range(mapping3->base(), alloc_size, 1));
 
-  // 32 Page VMO with a 4 committed pages.
+  // 4 committed pages.
+  static_assert(4 <= kMaxOptPages);
   fbl::RefPtr<VmObjectPaged> partially_committed_vmo;
   ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, alloc_size, &partially_committed_vmo));
 
@@ -1608,7 +1610,7 @@ static bool vm_mapping_page_fault_range_test() {
 
   AutoVmScannerDisable scanner_disable;
 
-  constexpr size_t kTestPages = 32;
+  constexpr size_t kTestPages = VmMapping::kPageFaultMaxOptimisticPages * 2;
   constexpr size_t kAllocSize = kTestPages * PAGE_SIZE;
   constexpr uint kReadFlags = VMM_PF_FLAG_USER;
   constexpr uint kWriteFlags = VMM_PF_FLAG_USER | VMM_PF_FLAG_WRITE;
@@ -1638,7 +1640,8 @@ static bool vm_mapping_page_fault_range_test() {
     EXPECT_OK(vmo->CommitRange(0, kAllocSize));
     EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, 0));
     EXPECT_OK(Thread::Current::SoftFaultInRange(mapping->base(), kReadFlags, PAGE_SIZE));
-    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, 16));
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize,
+                                         VmMapping::kPageFaultMaxOptimisticPages));
   }
 
   // Will map in pages that are not committed on read without allocating.

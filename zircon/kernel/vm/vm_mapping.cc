@@ -956,9 +956,6 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
 
   DEBUG_ASSERT(IS_PAGE_ALIGNED(va));
 
-  // Maximum number of pages the optimisation can extend the function to fault.
-  static constexpr uint64_t kMaxOptPages = 16;
-
   // Fault batch size when num_pages > 1.
   static constexpr uint64_t kBatchPages = 16;
 
@@ -1035,8 +1032,8 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
 
   // Number of opporturtunistic pages we can fault after the requested range. Currently, this is
   // only applied if faulting 1 page.
-  const size_t ceil_pages_with_opt =
-      ktl::min({kMaxOptPages, num_pt_pages, num_protection_range_pages, num_vmo_pages});
+  const size_t ceil_pages_with_opt = ktl::min(
+      {kPageFaultMaxOptimisticPages, num_pt_pages, num_protection_range_pages, num_vmo_pages});
   const size_t num_opt_pages =
       (num_requested_pages < ceil_pages_with_opt) ? ceil_pages_with_opt - num_requested_pages : 0;
 
@@ -1049,7 +1046,7 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
   // guaranteed the mappings will be updated.
   CurrentlyFaulting currently_faulting(this, vmo_offset, num_requested_pages * PAGE_SIZE);
 
-  static constexpr uint64_t coalescer_size = ktl::max(kMaxOptPages, kBatchPages);
+  static constexpr uint64_t coalescer_size = ktl::max(kPageFaultMaxOptimisticPages, kBatchPages);
 
   __UNINITIALIZED VmMappingCoalescer<coalescer_size> coalescer(
       this, va, range.mmu_flags, ArchVmAspace::ExistingEntryAction::Upgrade);
