@@ -134,9 +134,9 @@ template("ffx_plugin") {
       # and the default was changed to not in an IDK. Continue to treat those
       # as "partner", and use the "internal" marker for plugins not specifying
       # a category.
-      # TODO(https://fxbug.dev/330629017): For all uses of "not-yet-specified",
-      # either replace them with "partner" or remove them as appropriate. Then use
-      # invoker.sdk_category` directly in the individual targets to avoid
+      # TODO(https://fxbug.dev/314822328): For all uses of "not-yet-specified",
+      # either replace them with "partner" or remove them as appropriate. Then
+      # use invoker.sdk_category` directly in the individual targets to avoid
       # this refereence counting as a use for all of them.
       sdk_category = invoker.sdk_category
       if (sdk_category == "not-yet-specified") {
@@ -156,17 +156,19 @@ template("ffx_plugin") {
       category_marker = "//sdk/categories:marker-not-in-idk"
     }
 
-    args_deps = []
-    cmd_deps = []
-    p_deps = []
-    json_deps = []
+    args_target_additional_deps = []
+    suite_target_additional_deps = []
+
+    json_merge_sources = []
     json_merge_deps = []
 
     if (defined(invoker.plugin_deps)) {
+      cmd_deps = []
       foreach(d, invoker.plugin_deps) {
-        p_deps += [ d + "_suite" ]
+        suite_target_additional_deps += [ d + "_suite" ]
         cmd_deps += [ d + "_args" ]
-        json_deps += [ get_label_info(d, "target_out_dir") + "/config.json" ]
+        json_merge_sources +=
+            [ get_label_info(d, "target_out_dir") + "/config.json" ]
         json_merge_deps += [ get_label_info(d, "dir") + ":config.json" ]
       }
 
@@ -213,26 +215,25 @@ template("ffx_plugin") {
         forward_variables_from(_concurrent_jobs.vars, "*")
       }
 
-      args_deps += [ ":" + sub_cmd ]
-    } else {
-      not_needed([ "cmd_deps" ])
+      args_target_additional_deps += [ ":" + sub_cmd ]
+      suite_target_additional_deps += [ ":" + sub_cmd ]
     }
 
     args_target_name = crate_name + "_args"
 
     if (defined(invoker.config_data)) {
-      json_deps += invoker.config_data
+      json_merge_sources += invoker.config_data
     } else {
       empty = "$target_out_dir/empty.json"
       write_file(empty,
                  {
                  },
                  "json")
-      json_deps += [ empty ]
+      json_merge_sources += [ empty ]
     }
 
     json_merge("config.json") {
-      sources = json_deps
+      sources = json_merge_sources
       deps = json_merge_deps
       minify = true
     }
@@ -250,11 +251,10 @@ template("ffx_plugin") {
         source_root = "src/args.rs"
       }
 
+      deps = args_target_additional_deps
       if (defined(invoker.args_deps)) {
-        args_deps += invoker.args_deps
+        deps += invoker.args_deps
       }
-
-      deps = args_deps
 
       assert(
           defined(invoker.args_sources),
@@ -298,8 +298,6 @@ template("ffx_plugin") {
       tests_deps += [ ":" + args_target_name + "_test" ]
     }
 
-    lib_deps = [ ":" + args_target_name ]
-
     includes_execution = false
     if (defined(invoker.sources)) {
       if (defined(invoker.source_root)) {
@@ -316,6 +314,15 @@ template("ffx_plugin") {
     assert(
         includes_execution || !defined(invoker.source_root),
         "The path specified by `source_root` was not found in `sources`. Ensure it is included or do not specify `source_root`.")
+
+    # Adding `_plugins_rs_deps` as public_deps would not make the libraries in
+    # it available to the suite target, which depends on this library and
+    # compiles `plugins.rs`. Therefore, explicitly add the deps.
+    _plugins_rs_deps = [
+      ":${args_target_name}",
+      "//src/developer/ffx/lib/fho:lib",
+    ]
+    suite_target_additional_deps += _plugins_rs_deps
 
     plugins_name = crate_name + "_plugins"
     plugins(plugins_name) {
@@ -334,16 +341,6 @@ template("ffx_plugin") {
       # ensures this target is only depended on by another target in the
       # directory using this template, and the other rules in this template do
       # apply markers to those variables.
-    }
-
-    suite_deps = lib_deps + p_deps
-    suite_deps += [
-      ":" + args_target_name,
-      ":" + plugins_name,
-      "//src/developer/ffx/lib/fho:lib",
-    ]
-    if (defined(invoker.plugin_deps)) {
-      suite_deps += [ ":" + sub_cmd ]
     }
 
     if (includes_execution) {
@@ -368,10 +365,14 @@ template("ffx_plugin") {
         if (!defined(deps)) {
           deps = []
         }
-        deps += lib_deps + [ category_marker ]
+        deps += [
+          ":${args_target_name}",
+          category_marker,
+        ]
         assert_no_deps = disallowed_category_markers
       }
-      suite_deps += [ ":" + crate_name ]
+
+      suite_target_additional_deps += [ ":" + crate_name ]
 
       if (defined(invoker.with_unit_tests) && invoker.with_unit_tests) {
         tests_deps += [ ":" + crate_name + "_test" ]
@@ -387,7 +388,10 @@ template("ffx_plugin") {
       with_unit_tests = false
       disable_rustdoc = true
       sources = [ "$target_gen_dir/plugins.rs" ]
-      deps = suite_deps + [ category_marker ]
+      deps = [
+               ":${plugins_name}",
+               category_marker,
+             ] + suite_target_additional_deps
 
       forward_variables_from(invoker,
                              "*",
