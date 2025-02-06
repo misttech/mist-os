@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::logs::stored_message::StoredMessage;
 use diagnostics_data::Severity;
 use fuchsia_inspect::{IntProperty, Node, NumericProperty, Property, StringProperty, UintProperty};
 use fuchsia_inspect_derive::Inspect;
@@ -46,16 +45,15 @@ impl LogStreamStats {
         self.invalid.increment_bytes(bytes);
     }
 
-    pub fn ingest_message(&self, msg: &StoredMessage) {
-        self.last_timestamp.set(msg.timestamp().into_nanos());
-        self.total.count(msg);
-        match msg.severity() {
-            Severity::Trace => self.trace.count(msg),
-            Severity::Debug => self.debug.count(msg),
-            Severity::Info => self.info.count(msg),
-            Severity::Warn => self.warn.count(msg),
-            Severity::Error => self.error.count(msg),
-            Severity::Fatal => self.fatal.count(msg),
+    pub fn ingest_message(&self, bytes: usize, severity: Severity) {
+        self.total.count(bytes);
+        match severity {
+            Severity::Trace => self.trace.count(bytes),
+            Severity::Debug => self.debug.count(bytes),
+            Severity::Info => self.info.count(bytes),
+            Severity::Warn => self.warn.count(bytes),
+            Severity::Error => self.error.count(bytes),
+            Severity::Fatal => self.fatal.count(bytes),
         }
     }
 }
@@ -69,9 +67,9 @@ struct LogCounter {
 }
 
 impl LogCounter {
-    fn count(&self, msg: &StoredMessage) {
+    fn count(&self, bytes: usize) {
         self.number.add(1);
-        self.bytes.add(msg.size() as u64);
+        self.bytes.add(bytes as u64);
     }
 
     fn increment_bytes(&self, bytes: usize) {
