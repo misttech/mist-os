@@ -32,6 +32,7 @@ sdk_source_set("load-visitors") {
   deps = [
     ":registration",
     "default:default",
+    "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/incoming/cpp",
     "//sdk/lib/driver/logging/cpp",
   ]

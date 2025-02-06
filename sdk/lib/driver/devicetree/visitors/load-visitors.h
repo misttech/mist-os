@@ -16,6 +16,8 @@ namespace fdf_devicetree {
 // `/pkg/lib/visitors` directory. Instantiate all visitor objects and return a
 // registry of visitors which includes the default devicetree visitors.
 zx::result<std::unique_ptr<VisitorRegistry>> LoadVisitors(fdf::Namespace& incoming);
+zx::result<std::unique_ptr<VisitorRegistry>> LoadVisitors(
+    const std::optional<std::vector<fuchsia_driver_framework::NodeSymbol>>& symbols);
 
 }  // namespace fdf_devicetree
 
