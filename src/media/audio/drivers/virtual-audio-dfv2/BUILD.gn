@@ -20,6 +20,8 @@ group("tests") {
 
 source_set("common") {
   sources = [
+    "virtual-audio-composite.cc",
+    "virtual-audio-composite.h",
     "virtual-audio-dfv2.cc",
     "virtual-audio-dfv2.h",
   ]

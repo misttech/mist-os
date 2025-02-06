@@ -6,6 +6,8 @@
 
 #include <lib/driver/component/cpp/driver_export.h>
 
+#include "src/media/audio/drivers/virtual-audio-dfv2/virtual-audio-composite.h"
+
 namespace virtual_audio {
 
 zx::result<> VirtualAudio::Start() {
@@ -33,8 +35,16 @@ zx::result<> VirtualAudio::Start() {
 
 void VirtualAudio::GetDefaultConfiguration(GetDefaultConfigurationRequestView request,
                                            GetDefaultConfigurationCompleter::Sync& completer) {
-  // TODO(b/388880875): Implement logic.
-  completer.ReplyError(fuchsia_virtualaudio::Error::kNotSupported);
+  fidl::Arena arena;
+  switch (request->type) {
+    case fuchsia_virtualaudio::wire::DeviceType::kComposite:
+      completer.ReplySuccess(fidl::ToWire(arena, VirtualAudioComposite::GetDefaultConfig()));
+      return;
+    default:
+      FDF_LOG(ERROR, "Failed to get default configuration: Device type not supported");
+      completer.ReplyError(fuchsia_virtualaudio::Error::kNotSupported);
+      return;
+  }
 }
 
 void VirtualAudio::AddDevice(AddDeviceRequestView request, AddDeviceCompleter::Sync& completer) {
