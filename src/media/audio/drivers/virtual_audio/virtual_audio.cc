@@ -60,6 +60,7 @@ void VirtualAudio::DdkUnbind(ddk::UnbindTxn txn) {
 void VirtualAudio::DdkRelease() {
   // By now, all our lists should be empty and we release.
   ZX_ASSERT(devices_.empty());
+  delete this;
 }
 
 void VirtualAudio::GetDefaultConfiguration(GetDefaultConfigurationRequestView request,
