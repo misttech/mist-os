@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/driver/logging/cpp/logger.h>
+#include <lib/fit/result.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/sysmem-version/sysmem-version.h>
@@ -120,9 +121,31 @@ FakeDisplay::FakeDisplay(FakeDisplayDeviceConfig device_config,
     : display_engine_banjo_protocol_({&display_engine_protocol_ops_, this}),
       device_config_(device_config),
       sysmem_(std::move(sysmem_allocator)),
-      inspector_(std::move(inspector)) {}
+      inspector_(std::move(inspector)) {
+  ZX_DEBUG_ASSERT(sysmem_.is_valid());
+  InitializeSysmemClient();
 
-FakeDisplay::~FakeDisplay() { Deinitialize(); }
+  if (device_config_.periodic_vsync) {
+    vsync_thread_.emplace([](FakeDisplay* fake_display) { fake_display->VSyncThread(); }, this);
+  }
+  if (IsCaptureSupported()) {
+    capture_thread_.emplace([](FakeDisplay* fake_display) { fake_display->CaptureThread(); }, this);
+  }
+
+  RecordDisplayConfigToInspectRootNode();
+}
+
+FakeDisplay::~FakeDisplay() {
+  vsync_thread_shutdown_requested_.store(true, std::memory_order_relaxed);
+  capture_thread_shutdown_requested_.store(true, std::memory_order_relaxed);
+
+  if (vsync_thread_.has_value()) {
+    vsync_thread_->join();
+  }
+  if (capture_thread_.has_value()) {
+    capture_thread_->join();
+  }
+}
 
 zx_status_t FakeDisplay::DisplayEngineSetMinimumRgb(uint8_t minimum_rgb) {
   std::lock_guard capture_lock(capture_mutex_);
@@ -131,18 +154,20 @@ zx_status_t FakeDisplay::DisplayEngineSetMinimumRgb(uint8_t minimum_rgb) {
   return ZX_OK;
 }
 
-zx_status_t FakeDisplay::InitSysmemAllocatorClient() {
+void FakeDisplay::InitializeSysmemClient() {
   std::string debug_name = fxl::StringPrintf("fake-display[%lu]", fsl::GetCurrentProcessKoid());
   fuchsia_sysmem2::AllocatorSetDebugClientInfoRequest request;
   request.name() = debug_name;
   request.id() = fsl::GetCurrentProcessKoid();
-  auto set_debug_result = sysmem_->SetDebugClientInfo(std::move(request));
-  if (!set_debug_result.is_ok()) {
-    FDF_LOG(ERROR, "Cannot set sysmem allocator debug info: %s",
-            set_debug_result.error_value().status_string());
-    return set_debug_result.error_value().status();
+  fit::result<fidl::OneWayStatus> set_debug_status =
+      sysmem_->SetDebugClientInfo(std::move(request));
+  if (!set_debug_status.is_ok()) {
+    // Errors here mean that the FIDL transport was not set up correctly, and
+    // all future Sysmem client calls will fail. Crashing here exposes the
+    // failure early.
+    FDF_LOG(FATAL, "SetDebugClientInfo() FIDL call failed: %s",
+            set_debug_status.error_value().status_string());
   }
-  return ZX_OK;
 }
 
 void FakeDisplay::DisplayEngineSetListener(
@@ -693,19 +718,6 @@ zx_status_t FakeDisplay::DisplayEngineReleaseCapture(uint64_t capture_handle) {
   return ZX_OK;
 }
 
-zx_status_t FakeDisplay::InitializeCapture() {
-  {
-    std::lock_guard image_lock(image_mutex_);
-    current_image_to_capture_id_ = display::kInvalidDriverImageId;
-  }
-
-  if (IsCaptureSupported()) {
-    std::lock_guard capture_lock(capture_mutex_);
-    current_capture_target_image_id_ = display::kInvalidDriverCaptureImageId;
-  }
-  return ZX_OK;
-}
-
 bool FakeDisplay::IsCaptureSupported() const { return !device_config_.no_buffer_access; }
 
 void FakeDisplay::CaptureThread() {
@@ -877,54 +889,6 @@ void FakeDisplay::RecordDisplayConfigToInspectRootNode() {
     config_node.RecordBool("periodic_vsync", device_config_.periodic_vsync);
     config_node.RecordBool("no_buffer_access", device_config_.no_buffer_access);
   });
-}
-
-zx_status_t FakeDisplay::Initialize() {
-  ZX_DEBUG_ASSERT(!initialized_);
-
-  zx_status_t status = InitSysmemAllocatorClient();
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to initialize sysmem Allocator client: %s",
-            zx_status_get_string(status));
-    return status;
-  }
-
-  status = InitializeCapture();
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to initialize display capture: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  if (device_config_.periodic_vsync) {
-    vsync_thread_.emplace([](FakeDisplay* fake_display) { fake_display->VSyncThread(); }, this);
-  }
-  if (IsCaptureSupported()) {
-    capture_thread_.emplace([](FakeDisplay* fake_display) { fake_display->CaptureThread(); }, this);
-  }
-
-  RecordDisplayConfigToInspectRootNode();
-
-  initialized_ = true;
-
-  return ZX_OK;
-}
-
-void FakeDisplay::Deinitialize() {
-  if (!initialized_) {
-    return;
-  }
-
-  vsync_thread_shutdown_requested_.store(true, std::memory_order_relaxed);
-  capture_thread_shutdown_requested_.store(true, std::memory_order_relaxed);
-
-  if (vsync_thread_.has_value()) {
-    vsync_thread_->join();
-  }
-  if (capture_thread_.has_value()) {
-    capture_thread_->join();
-  }
-
-  initialized_ = false;
 }
 
 }  // namespace fake_display

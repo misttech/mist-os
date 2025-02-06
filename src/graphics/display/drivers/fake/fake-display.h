@@ -69,14 +69,6 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
 
   ~FakeDisplay();
 
-  // Initialization work that is not suitable for the constructor.
-  //
-  // Must be called exactly once for each FakeDisplay instance.
-  zx_status_t Initialize();
-
-  // This method is idempotent.
-  void Deinitialize();
-
   // DisplayEngineProtocol implementation:
   void DisplayEngineSetListener(const display_engine_listener_protocol_t* engine_listener);
   void DisplayEngineUnsetListener();
@@ -128,8 +120,6 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
  private:
   enum class BufferCollectionUsage : int32_t;
 
-  zx_status_t InitializeCapture();
-
   // The loop executed by the VSync thread.
   void VSyncThread() __TA_EXCLUDES(capture_mutex_, image_mutex_);
 
@@ -149,12 +139,8 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   // Dispatches an OnDisplayAdded() event to the Display Coordinator.
   void SendDisplayInformation() __TA_EXCLUDES(engine_listener_mutex_);
 
-  // Initializes the sysmem Allocator client used to import incoming buffer
-  // collection tokens.
-  //
-  // On success, returns ZX_OK and the sysmem allocator client will be open
-  // until the device is released.
-  zx_status_t InitSysmemAllocatorClient();
+  // Must be called exactly once before using the Sysmem client.
+  void InitializeSysmemClient();
 
   fuchsia_sysmem2::BufferCollectionConstraints CreateBufferCollectionConstraints(
       BufferCollectionUsage usage);
@@ -188,7 +174,7 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   // Checked by the Capture thread on every loop iteration.
   std::atomic_bool capture_thread_shutdown_requested_ = false;
 
-  // Accessed during initialization and destruction.
+  // Only accessed by the constructor and destructor.
   std::optional<std::thread> vsync_thread_;
   std::optional<std::thread> capture_thread_;
 
@@ -266,8 +252,6 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
       TA_GUARDED(engine_listener_mutex_);
 
   inspect::Inspector inspector_;
-
-  bool initialized_ = false;
 };
 
 }  // namespace fake_display
