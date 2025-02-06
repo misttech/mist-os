@@ -1444,13 +1444,9 @@ struct Thread : public ChainLockable {
     //
     // Calling any of these methods on a pure kernel thread (i.e. one without an associated
     // `ThreadDispatcher`) is a programming error.
-    static zx_status_t PageFault(vaddr_t va, uint flags) {
-      return Fault(FaultType::PageFault, va, flags);
-    }
-    static zx_status_t SoftFault(vaddr_t va, uint flags) {
-      return Fault(FaultType::SoftFault, va, flags);
-    }
-    static zx_status_t AccessedFault(vaddr_t va) { return Fault(FaultType::AccessedFault, va, 0); }
+    static zx_status_t PageFault(vaddr_t va, uint flags);
+    static zx_status_t SoftFault(vaddr_t va, uint flags);
+    static zx_status_t AccessedFault(vaddr_t va);
 
     // Generate a backtrace for the calling thread.
     //
@@ -1472,8 +1468,8 @@ struct Thread : public ChainLockable {
    private:
     // Handles a virtual memory fault in the address space that contains va. If there is no aspace
     // that contains va, or we don't have access to it, a ZX_ERR_NOT_FOUND is returned.
-    enum class FaultType : uint8_t { PageFault, SoftFault, AccessedFault };
-    static zx_status_t Fault(FaultType type, vaddr_t va, uint flags);
+    template <typename F>
+    static zx_status_t Fault(vaddr_t va, F resolve_fault);
   };  // struct Current;
 
   // Trait for the global Thread list.

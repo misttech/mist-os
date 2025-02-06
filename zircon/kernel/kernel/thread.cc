@@ -220,7 +220,8 @@ static void free_thread_resources(Thread* t) {
   }
 }
 
-zx_status_t Thread::Current::Fault(Thread::Current::FaultType type, vaddr_t va, uint flags) {
+template <typename F>
+zx_status_t Thread::Current::Fault(vaddr_t va, F resolve_fault) {
   if (is_kernel_address(va)) {
     // Kernel addresses should never fault.
     return ZX_ERR_NOT_FOUND;
@@ -244,17 +245,19 @@ zx_status_t Thread::Current::Fault(Thread::Current::FaultType type, vaddr_t va, 
   }
 
   // Call the appropriate fault function on the containing address space.
-  switch (type) {
-    case Thread::Current::FaultType::PageFault:
-      return containing_aspace->PageFault(va, flags);
-    case Thread::Current::FaultType::SoftFault:
-      return containing_aspace->SoftFault(va, flags);
-    case Thread::Current::FaultType::AccessedFault:
-      DEBUG_ASSERT(flags == 0);
-      return containing_aspace->AccessedFault(va);
-  }
-  // This should be unreachable, and is here mainly to satisfy GCC.
-  return ZX_ERR_NOT_FOUND;
+  return resolve_fault(containing_aspace);
+}
+
+zx_status_t Thread::Current::PageFault(vaddr_t va, uint flags) {
+  return Fault(va, [va, flags](VmAspace* aspace) { return aspace->PageFault(va, flags); });
+}
+
+zx_status_t Thread::Current::SoftFault(vaddr_t va, uint flags) {
+  return Fault(va, [va, flags](VmAspace* aspace) { return aspace->SoftFault(va, flags); });
+}
+
+zx_status_t Thread::Current::AccessedFault(vaddr_t va) {
+  return Fault(va, [va](VmAspace* aspace) { return aspace->AccessedFault(va); });
 }
 
 void Thread::Trampoline() {
