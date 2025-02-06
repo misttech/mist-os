@@ -270,17 +270,25 @@ zx_status_t Devnode::add_child(std::string_view name, std::optional<std::string_
          name.data());
     return ZX_ERR_ALREADY_EXISTS;
   }
-
-  // Export the device to its class directory.
-  if (class_name.has_value()) {
+  // Export the device to its class directory.  Only if the class name exists in class_names.h
+  if (class_name.has_value() && kClassNameToService.contains(class_name.value())) {
     zx::result<std::string> instance_name = devfs_.MakeInstanceName(class_name.value());
-    if (instance_name.is_ok()) {
+    ZX_ASSERT(
+        instance_name.is_ok());  // this would only return an error if we didn't have that class
+    const ServiceEntry& service_entry = kClassNameToService.at(class_name.value());
+    // Add dev/class/<class_name> entry:
+    if (service_entry.state == ServiceEntry::DEVFS_AND_SERVICE ||
+        service_entry.state == ServiceEntry::DEVFS_ONLY) {
       out_child.protocol_node().emplace(devfs_, *devfs_.get_class_entry(class_name.value()), target,
                                         instance_name.value());
+    }
+    // Add service entry:
+    if (service_entry.state == ServiceEntry::DEVFS_AND_SERVICE ||
+        service_entry.state == ServiceEntry::SERVICE_ONLY) {
       out_child.protocol_node()->TryAddService(class_name.value(), target, instance_name.value());
     }
   }
-
+  // Add entry into dev-topological path:
   out_child.topological_node().emplace(devfs_, children(), std::move(target), name);
 
   return ZX_OK;
