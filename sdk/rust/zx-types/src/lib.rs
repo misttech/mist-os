@@ -575,7 +575,8 @@ multiconst!(zx_rsrc_system_base_t, [
 
 // clock ids
 multiconst!(zx_clock_t, [
-    ZX_CLOCK_MONOTONIC    = 0;
+    ZX_CLOCK_MONOTONIC = 0;
+    ZX_CLOCK_BOOT      = 1;
 ]);
 
 // from //zircon/system/public/zircon/syscalls/clock.h
@@ -1819,6 +1820,20 @@ struct_decl_macro! {
 }
 
 zx_info_job_t!(zx_info_job_t);
+
+struct_decl_macro! {
+    #[repr(C)]
+    #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+    #[derive(zerocopy::FromBytes, zerocopy::IntoBytes, zerocopy::Immutable)]
+    pub struct <zx_info_timer_t> {
+        pub options: u32,
+        pub clock_id: zx_clock_t,
+        pub deadline: zx_time_t,
+        pub slack: zx_duration_t,
+    }
+}
+
+zx_info_timer_t!(zx_info_timer_t);
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
