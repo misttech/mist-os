@@ -1371,15 +1371,16 @@ fn label_from_mount_options_and_name(
 ) -> FileSystemLabel {
     // TODO: https://fxbug.dev/361297862 - Replace this workaround with more
     // general handling of these special Fuchsia filesystems.
-    let effective_name: &FsStr = if *fs_name == "remotefs" || *fs_name == "remote_bundle" {
-        track_stub!(
-            TODO("https://fxbug.dev/361297862"),
-            "Applying ext4 labeling configuration to remote filesystems"
-        );
-        "ext4".into()
-    } else {
-        fs_name
-    };
+    let effective_name: &FsStr =
+        if *fs_name == "remotefs" || *fs_name == "remote_bundle" || *fs_name == "remotevol" {
+            track_stub!(
+                TODO("https://fxbug.dev/361297862"),
+                "Applying ext4 labeling configuration to remote filesystems"
+            );
+            "ext4".into()
+        } else {
+            fs_name
+        };
     security_server.resolve_fs_label(effective_name.into(), mount_options)
 }
 
