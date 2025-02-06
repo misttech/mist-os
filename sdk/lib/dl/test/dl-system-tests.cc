@@ -56,7 +56,7 @@ fit::result<Error, void*> DlSystemTests::DlSym(void* module, const char* ref) {
   return fit::ok(result);
 }
 
-int DlSystemTests::DlIteratePhdr(DlIteratePhdrCallback callback, void* data) {
+int DlSystemTests::DlIteratePhdr(DlIteratePhdrCallback* callback, void* data) {
   return dl_iterate_phdr(callback, data);
 }
 

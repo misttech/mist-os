@@ -18,6 +18,8 @@
 
 namespace dl {
 
+using DlIteratePhdrCallback = int(dl_phdr_info*, size_t, void*);
+
 enum OpenSymbolScope : int {
   kLocal = RTLD_LOCAL,
   kGlobal = RTLD_GLOBAL,
@@ -139,6 +141,12 @@ class RuntimeDynamicLinker {
     return diag.ok(&root_module);
   }
 
+  // Create a `dl_phdr_info` for each module in `modules_` and pass it
+  // to the caller-supplied `callback`. Iteration ceases when `callback` returns
+  // a non-zero value. The result of the last callback function to run is
+  // returned to the caller.
+  int IteratePhdrInfo(DlIteratePhdrCallback* callback, void* data) const;
+
  private:
   // A The RuntimeDynamicLinker can only be created with RuntimeDynamicLinker::Create...).
   RuntimeDynamicLinker() = default;
@@ -170,6 +178,10 @@ class RuntimeDynamicLinker {
   // creation and passed to LinkinSessions to be able to detect TLS modules
   // during relocation.
   size_type max_static_tls_modid_ = 0;
+
+  // This is incremented every time a module is loaded into the system. This
+  // number only ever increases and includes startup modules.
+  size_t loaded_ = 0;
 };
 
 }  // namespace dl

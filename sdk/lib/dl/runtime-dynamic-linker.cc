@@ -7,6 +7,7 @@
 namespace dl {
 
 void RuntimeDynamicLinker::AddNewModules(ModuleList modules) {
+  loaded_ += modules.size();
   modules_.splice(modules_.end(), modules);
 }
 
@@ -109,6 +110,20 @@ std::unique_ptr<RuntimeDynamicLinker> RuntimeDynamicLinker::Create(const ld::abi
   }
 
   return result(std::move(dynamic_linker));
+}
+
+// TODO(https://fxbug.dev/382516279): This needs to handle synchronization
+// between locking the modules_ list and running the user callback outside
+// of any locks.
+int RuntimeDynamicLinker::IteratePhdrInfo(DlIteratePhdrCallback* callback, void* data) const {
+  for (const RuntimeModule& module : modules_) {
+    dl_phdr_info phdr_info = module.MakePhdrInfo(loaded_, loaded_ - modules_.size());
+    // A non-zero return value ends the iteration.
+    if (int result = callback(&phdr_info, sizeof(phdr_info), data); result != 0) {
+      return result;
+    }
+  }
+  return 0;
 }
 
 }  // namespace dl

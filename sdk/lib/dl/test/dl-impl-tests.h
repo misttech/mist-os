@@ -32,8 +32,6 @@ class DlImplTests : public Base {
   static constexpr bool kSupportsDynamicTls = false;
   // TODO(https://fxbug.dev/382529434): Have dlclose() run finalizers
   static constexpr bool kDlCloseCanRunFinalizers = false;
-  // TODO(https://fxbug.dev/338238626): Implement dl_iterate_phdr
-  static constexpr bool kProvidesDlIteratePhdr = false;
   // TODO(https://fxbug.dev/342028933): Have dlclose() unload modules
   static constexpr bool kDlCloseUnloadsModules = false;
 
@@ -83,9 +81,8 @@ class DlImplTests : public Base {
     return dynamic_linker_->LookupSymbol(*root, ref);
   }
 
-  int DlIteratePhdr(DlIteratePhdrCallback, void* data) {
-    ADD_FAILURE() << "TODO(https://fxbug.dev/338238626): implement dl_iterate_pdhr";
-    return -1;
+  int DlIteratePhdr(DlIteratePhdrCallback* callback, void* data) {
+    return dynamic_linker_->IteratePhdrInfo(callback, data);
   }
 
   // The `dynamic_linker_-> dtor will also destroy and unmap modules remaining in

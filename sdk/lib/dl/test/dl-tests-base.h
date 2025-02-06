@@ -56,15 +56,12 @@ class DlTestsBase : public ::testing::Test {
   // Whether the test fixture's dlclose function will unload the module.
   static constexpr bool kDlCloseUnloadsModules = true;
 
-  // Whether the test fixture's implementation provides dl_iterate_pdhr.
-  static constexpr bool kProvidesDlIteratePhdr = true;
-
   // Test fixtures are expected to provide definitions for the following API:
   fit::result<Error, void*> DlOpen(const char* file, int mode);
 
   fit::result<Error, void*> DlSym(void* module, const char* ref);
 
-  int DlIteratePhdr(DlIteratePhdrCallback, void* data);
+  int DlIteratePhdr(DlIteratePhdrCallback* callback, void* data);
 };
 
 }  // namespace dl::testing

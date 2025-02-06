@@ -5,6 +5,13 @@
 #ifndef LIB_DL_RUNTIME_MODULE_H_
 #define LIB_DL_RUNTIME_MODULE_H_
 
+// Avoid symbol conflict between <ld/abi/abi.h> and <link.h>
+#pragma push_macro("_r_debug")
+#undef _r_debug
+#define _r_debug not_using_system_r_debug
+#include <link.h>
+#pragma pop_macro("_r_debug")
+
 #include <lib/elfldltl/alloc-checker-container.h>
 #include <lib/elfldltl/soname.h>
 #include <lib/elfldltl/symbol.h>
@@ -29,7 +36,8 @@ class RuntimeModule;
 
 // A list of unique "permanent" RuntimeModule data structures used to represent
 // a loaded file in the system image.
-using ModuleList = fbl::DoublyLinkedList<std::unique_ptr<RuntimeModule>>;
+using ModuleList = fbl::DoublyLinkedList<std::unique_ptr<RuntimeModule>, fbl::DefaultObjectTag,
+                                         fbl::SizeOrder::Constant>;
 
 // Use an AllocCheckerContainer that supports fallible allocations; methods
 // return a boolean value to signify allocation success or failure.
@@ -189,6 +197,9 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   // Run only this module's init functions. This is called if this module is
   // loaded as a dependency to another module.
   void Initialize();
+
+  // Construct the `dl_phdr_info` for this module.
+  dl_phdr_info MakePhdrInfo(uint64_t global_loaded, uint64_t global_unloaded) const;
 
  private:
   // A RuntimeModule can only be created with Module::Create...).

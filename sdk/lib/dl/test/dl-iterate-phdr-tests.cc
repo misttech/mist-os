@@ -90,10 +90,6 @@ const PhdrInfoList gStartupPhdrInfo = GetStartupPhdrInfo();
 
 // Test that `dl_iterate_phdr` includes startup modules.
 TYPED_TEST(DlTests, DlIteratePhdrStartupModules) {
-  if constexpr (!TestFixture::kProvidesDlIteratePhdr) {
-    GTEST_SKIP() << "test requires dl_iterate_phdr";
-  }
-
   PhdrInfoList startup_info_list;
   EXPECT_EQ(this->DlIteratePhdr(CollectPhdrInfo, &startup_info_list), 0);
 
@@ -116,10 +112,6 @@ TYPED_TEST(DlTests, DlIteratePhdrStartupModules) {
 // `dl_iterate_phdr` output doesn't include the module
 TYPED_TEST(DlTests, DlIteratePhdrBasic) {
   const std::string kRet17File = TestModule("ret17");
-
-  if constexpr (!TestFixture::kProvidesDlIteratePhdr) {
-    GTEST_SKIP() << "test requires dl_iterate_phdr";
-  }
 
   // Record initial values to compare against during the test.
   PhdrInfoList initial_info_list;

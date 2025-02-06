@@ -4,6 +4,8 @@
 
 #include "runtime-module.h"
 
+#include <lib/ld/decoded-module.h>
+
 namespace dl {
 
 bool RuntimeModule::ReifyModuleTree(Diagnostics& diag) {
@@ -67,6 +69,25 @@ void RuntimeModule::Initialize() {
   }
   initialized_ = true;
   module().init.CallInit(load_bias());
+}
+
+dl_phdr_info RuntimeModule::MakePhdrInfo(uint64_t global_loaded, uint64_t global_unloaded) const {
+  // In practice module().phdrs.size() will never exceed this limit, and would
+  // cause a UBSan fatal error if it did. The corner case for this is if e_phnum
+  // is set to 0xffff (i.e. PT_XNUM). We statically assert here to ensure we
+  // don't run into this case.
+  static_assert(ld::kMaxPhdrs < std::numeric_limits<uint16_t>::max());
+  return {
+      .dlpi_addr = module().link_map.addr,
+      .dlpi_name = module().link_map.name.get(),
+      .dlpi_phdr = reinterpret_cast<const ElfW(Phdr)*>(module().phdrs.data()),
+      .dlpi_phnum = static_cast<uint16_t>(module().phdrs.size()),
+      .dlpi_adds = global_loaded,
+      .dlpi_subs = global_unloaded,
+      .dlpi_tls_modid = tls_module_id(),
+      // TODO(https://fxbug.dev/331421403): Include TLS data when supported.
+      .dlpi_tls_data = nullptr,
+  };
 }
 
 }  // namespace dl
