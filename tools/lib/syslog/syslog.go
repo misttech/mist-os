@@ -97,9 +97,11 @@ func (s *Syslogger) Stream(ctx, loggerCtx context.Context, output io.Writer) <-c
 		for {
 			var err error
 			if s.ffx != nil {
-				command := s.ffx.CommandWithTarget(cmd...)
-				command.Stdout = output
-				err = s.ffx.RunCommand(ctx, command)
+				command, err := s.ffx.CommandWithTarget(cmd...)
+				if err == nil {
+					command.Stdout = output
+					err = s.ffx.RunCommand(ctx, command)
+				}
 			} else if s.client != nil {
 				// Note: Fuchsia's log_listener does not write to stderr.
 				err = s.client.Run(ctx, cmd, output, nil)

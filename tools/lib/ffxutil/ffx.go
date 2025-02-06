@@ -324,39 +324,110 @@ func (f *FFXInstance) ConfigSet(ctx context.Context, key, value string) error {
 	return f.Run(ctx, "config", "set", key, value)
 }
 
-// Command returns an *exec.Cmd to run ffx with the provided args.
-func (f *FFXInstance) Command(args ...string) *exec.Cmd {
-	ffx_cmd := f.cmdBuilder.command(f.ffxPath, args)
-	return f.runner.Command(ffx_cmd, subprocess.RunOptions{
+func (f *FFXInstance) invoker(args []string) *ffxInvoker {
+	// By default, use the FFXInstance's stdout/stderr
+	return &ffxInvoker{ffx: f, args: args, stdout: f.stdout, stderr: f.stderr}
+}
+
+type ffxInvoker struct {
+	ffx           *FFXInstance
+	args          []string
+	target        string
+	timeout       *time.Duration
+	captureOutput bool
+	output        *bytes.Buffer
+	stdout        io.Writer
+	stderr        io.Writer
+}
+
+func (f *ffxInvoker) cmd() *exec.Cmd {
+	args := f.args
+	if f.target != "" {
+		args = append([]string{"--target", f.target}, args...)
+	}
+	ffx_cmd := f.ffx.cmdBuilder.command(f.ffx.ffxPath, args)
+	return f.ffx.runner.Command(ffx_cmd, subprocess.RunOptions{
 		Stdout: f.stdout,
 		Stderr: f.stderr,
 	})
 }
 
-// CommandWithTarget returns a Command to run with the associated target.
-func (f *FFXInstance) CommandWithTarget(args ...string) *exec.Cmd {
-	args = append([]string{"--target", f.target}, args...)
-	return f.Command(args...)
-}
-
-// RunWithTimeout runs ffx with the associated config and provided args.
-func (f *FFXInstance) RunWithTimeout(ctx context.Context, timeout time.Duration, args ...string) error {
-	cmd := f.Command(args...)
+// This function should only be invoked once in an ffxInvoker.
+// The proper idiom is to construct the ffxInvoker, then immediately
+// run (or use the `cmd()` method) without storing it
+func (f *ffxInvoker) run(ctx context.Context) error {
+	// By default, runs ffx commands with a 5 minute timeout.
+	var timeout time.Duration = 5 * time.Minute
+	if f.timeout != nil {
+		timeout = *f.timeout
+	}
 	if timeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
 	}
-	if err := f.runner.RunCommand(ctx, cmd); err != nil {
+	if f.captureOutput {
+		// Store the output in our buffer
+		var output bytes.Buffer
+		f.output = &output
+		stdout := io.MultiWriter(f.output, f.stdout)
+		f.stdout = stdout
+	}
+	cmd := f.cmd()
+	if err := f.ffx.runner.RunCommand(ctx, cmd); err != nil {
 		return fmt.Errorf("%s (%s): %w", constants.CommandFailedMsg, cmd.String(), err)
 	}
 	return nil
 }
 
+func (i *ffxInvoker) setTarget(target string) *ffxInvoker {
+	i.target = target
+	return i
+}
+
+func (i *ffxInvoker) setTimeout(timeout time.Duration) *ffxInvoker {
+	i.timeout = &timeout
+	return i
+}
+
+func (i *ffxInvoker) setCaptureOutput() *ffxInvoker {
+	i.captureOutput = true
+	return i
+}
+
+func (i *ffxInvoker) setStdout(stdout io.Writer) *ffxInvoker {
+	i.stdout = stdout
+	return i
+}
+
+func (i *ffxInvoker) setStderr(stderr io.Writer) *ffxInvoker {
+	i.stderr = stderr
+	return i
+}
+
+// Convenience API
+
+// Command returns an *exec.Cmd to run ffx with the provided args.
+func (f *FFXInstance) Command(args ...string) *exec.Cmd {
+	return f.invoker(args).cmd()
+}
+
+// CommandWithTarget returns a Command to run with the associated target.
+func (f *FFXInstance) CommandWithTarget(args ...string) (*exec.Cmd, error) {
+	if f.target == "" {
+		return nil, fmt.Errorf("no target is set")
+	}
+	return f.invoker(args).setTarget(f.target).cmd(), nil
+}
+
+// RunWithTimeout runs ffx with the associated config and provided args.
+func (f *FFXInstance) RunWithTimeout(ctx context.Context, timeout time.Duration, args ...string) error {
+	return f.invoker(args).setTimeout(timeout).run(ctx)
+}
+
 // Run runs ffx with the associated config and provided args.
 func (f *FFXInstance) Run(ctx context.Context, args ...string) error {
-	// By default, runs ffx commands with 5 minutes timeout.
-	return f.RunWithTimeout(ctx, 5*time.Minute, args...)
+	return f.invoker(args).run(ctx)
 }
 
 // RunCommand runs the given cmd with the FFXInstance's subprocess runner.
@@ -369,8 +440,7 @@ func (f *FFXInstance) RunWithTarget(ctx context.Context, args ...string) error {
 	if f.target == "" {
 		return fmt.Errorf("no target is set")
 	}
-	args = append([]string{"--target", f.target}, args...)
-	return f.Run(ctx, args...)
+	return f.invoker(args).setTarget(f.target).run(ctx)
 }
 
 // RunWithTargetAndTimeout runs ffx with the associated target and timeout.
@@ -378,22 +448,15 @@ func (f *FFXInstance) RunWithTargetAndTimeout(ctx context.Context, timeout time.
 	if f.target == "" {
 		return fmt.Errorf("no target is set")
 	}
-	args = append([]string{"--target", f.target}, args...)
-	return f.RunWithTimeout(ctx, timeout, args...)
+	return f.invoker(args).setTarget(f.target).setTimeout(timeout).run(ctx)
 }
 
 // RunAndGetOutput runs ffx with the provided args and returns the stdout.
 func (f *FFXInstance) RunAndGetOutput(ctx context.Context, args ...string) (string, error) {
-	origStdout := f.stdout
-	var output bytes.Buffer
-	f.stdout = io.MultiWriter(&output, origStdout)
-	defer func() {
-		f.stdout = origStdout
-	}()
-	if err := f.Run(ctx, args...); err != nil {
-		return strings.TrimSpace(output.String()), err
-	}
-	return strings.TrimSpace(output.String()), nil
+	i := f.invoker(args).setCaptureOutput()
+	err := i.run(ctx)
+	s := i.output.String()
+	return strings.TrimSpace(s), err
 }
 
 // WaitForDaemon tries a few times to check that the daemon is up
