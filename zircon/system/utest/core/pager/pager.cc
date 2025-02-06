@@ -568,9 +568,13 @@ VMO_VMAR_TEST(Pager, SuspendReadTest) {
 
   ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, 1, ZX_TIME_INFINITE));
 
+  // Make sure the thread is blocked before suspending.
+  ASSERT_TRUE(t.WaitForBlocked());
+
   t.SuspendSync();
   t.Resume();
 
+  // Make sure the thread is blocked on resume.
   ASSERT_TRUE(t.WaitForBlocked());
 
   ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, 1, ZX_TIME_INFINITE));
