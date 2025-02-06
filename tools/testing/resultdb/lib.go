@@ -282,8 +282,40 @@ func testDetailsToResultSink(tags []*resultpb.StringPair, testDetail *runtests.T
 		r.FailureReason = &resultpb.FailureReason{
 			PrimaryErrorMessage: testDetail.FailureReason,
 		}
+	} else if hasFailedTest(testDetail) {
+		r.FailureReason = &resultpb.FailureReason{
+			PrimaryErrorMessage: createDefaultTopLevelFailureReason(testDetail),
+		}
 	}
 	return &r, testsSkipped, nil
+}
+
+func hasFailedTest(topLevelTest *runtests.TestDetails) bool {
+	for _, testCase := range topLevelTest.Cases {
+		if testCase.Status == runtests.TestFailure {
+			return true
+		}
+	}
+	return false
+}
+
+func createDefaultTopLevelFailureReason(topLevelTest *runtests.TestDetails) string {
+	var builder strings.Builder
+	failedTestCaseCount := 0
+	for _, testCase := range topLevelTest.Cases {
+		if testCase.Status == runtests.TestFailure {
+			if builder.Len() > 0 {
+				builder.WriteString("\n")
+			}
+			builder.WriteString(fmt.Sprintf("%s: test case failed", testCase.CaseName))
+			failedTestCaseCount += 1
+		}
+	}
+	failureReason := builder.String()
+	if len(failureReason) > MAX_FAIL_REASON_SIZE_BYTES {
+		failureReason = fmt.Sprintf("%d test cases failed", failedTestCaseCount)
+	}
+	return failureReason
 }
 
 // determineExpected checks if a test result is expected.

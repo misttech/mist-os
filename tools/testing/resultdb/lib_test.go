@@ -54,13 +54,18 @@ func checkTagValue(t *testing.T, tags map[string]string, key, want string) {
 
 func TestSetTestDetailsToResultSink(t *testing.T) {
 	outputRoot := t.TempDir()
-	detail := createTestDetailWithTestCase(5, outputRoot)
+	detail := createTestDetailWithPassedAndFailedTestCase(5, 2, outputRoot)
 	extraTags := []*resultpb.StringPair{
 		{Key: "key1", Value: "value1"},
 	}
 	result, _, err := testDetailsToResultSink(extraTags, detail, outputRoot)
 	if err != nil {
 		t.Fatalf("Cannot parse test detail. got %s", err)
+	}
+
+	expectedTopLevelTestFailureReason := "bar_0: test case failed\nbar_1: test case failed"
+	if !(result.Status == resultpb.TestStatus_FAIL && result.FailureReason.PrimaryErrorMessage == expectedTopLevelTestFailureReason) {
+		t.Errorf("If a test failed, the top level test should have a failure reason with a list of the failed tests.\n The primary error message is %q.\n The expected failure reason is %q.", result.FailureReason.PrimaryErrorMessage, expectedTopLevelTestFailureReason)
 	}
 
 	tags := make(map[string]string)
@@ -82,7 +87,58 @@ func TestSetTestDetailsToResultSink(t *testing.T) {
 
 	checkTagValue(t, tags, "key1", "value1")
 	checkTagValue(t, tags, "gn_label", detail.GNLabel)
-	checkTagValue(t, tags, "test_case_count", "5")
+	checkTagValue(t, tags, "test_case_count", "7")
+	checkTagValue(t, tags, "affected", "false")
+
+	if len(result.Artifacts) != 2 {
+		t.Errorf("Got %d artifacts, want 2", len(result.Artifacts))
+	}
+	artifactNames := []string{}
+	for name := range result.Artifacts {
+		artifactNames = append(artifactNames, name)
+	}
+	sort.Strings(artifactNames)
+	if diff := cmp.Diff(artifactNames, []string{"dir-1_outputfile", "dir_2_outputfile"}); diff != "" {
+		t.Errorf("Diff in output files (-got +want):\n%s", diff)
+	}
+}
+
+func TestSetTestDetailsToResultSink_DefaultFailureReason_ExceedsMaxSize(t *testing.T) {
+	outputRoot := t.TempDir()
+	detail := createTestDetailWithPassedAndFailedTestCase(5, 200, outputRoot)
+	extraTags := []*resultpb.StringPair{
+		{Key: "key1", Value: "value1"},
+	}
+	result, _, err := testDetailsToResultSink(extraTags, detail, outputRoot)
+	if err != nil {
+		t.Fatalf("Cannot parse test detail. got %s", err)
+	}
+
+	expectedTopLevelTestFailureReason := "200 test cases failed"
+	if !(result.Status == resultpb.TestStatus_FAIL && result.FailureReason.PrimaryErrorMessage == expectedTopLevelTestFailureReason) {
+		t.Errorf("If a test failed, the top level test should have a failure reason with a list of the failed tests.\n The primary error message is %q.\n The expected failure reason is %q.", result.FailureReason.PrimaryErrorMessage, expectedTopLevelTestFailureReason)
+	}
+
+	tags := make(map[string]string)
+	for _, tag := range result.Tags {
+		tags[tag.Key] = tag.Value
+	}
+
+	if len(extraTags) != 1 {
+		t.Errorf("extraTags(%v) got mutated, this value should not be changed.", extraTags)
+	}
+	// We only expect 4 tags
+	// 1. gn_label:value
+	// 2. test_case_count:value
+	// 3. affected:value
+	// 4. key1:value1
+	if len(tags) != 4 {
+		t.Errorf("tags(%v) contains unexpected values.", tags)
+	}
+
+	checkTagValue(t, tags, "key1", "value1")
+	checkTagValue(t, tags, "gn_label", detail.GNLabel)
+	checkTagValue(t, tags, "test_case_count", "205")
 	checkTagValue(t, tags, "affected", "false")
 
 	if len(result.Artifacts) != 2 {
@@ -174,6 +230,53 @@ func createTestDetailWithTestCase(testCase int, outputRoot string) *runtests.Tes
 		GNLabel:              "some label",
 		OutputFiles:          []string{"dir-1/outputfile", "dir#2/outputfile"},
 		Result:               runtests.TestSuccess,
+		StartTime:            time.Now(),
+		DurationMillis:       39797,
+		IsTestingFailureMode: false,
+		Cases:                t,
+	}
+}
+
+func createTestDetailWithPassedAndFailedTestCase(passedTestCase int, failedTestCase int, outputRoot string) *runtests.TestDetails {
+	t := []runtests.TestCaseResult{}
+	if outputRoot != "" {
+		for _, f := range []string{"dir-1/outputfile", "dir#2/outputfile", "case/outputfile1", "case/outputfile2"} {
+			outputfile := filepath.Join(outputRoot, f)
+			os.MkdirAll(filepath.Dir(outputfile), os.ModePerm)
+			os.WriteFile(outputfile, []byte("output"), os.ModePerm)
+		}
+	}
+	for i := 0; i < passedTestCase; i++ {
+		t = append(t, runtests.TestCaseResult{
+			DisplayName: fmt.Sprintf("foo/bar_%d", i),
+			SuiteName:   "foo",
+			CaseName:    fmt.Sprintf("bar_%d", i),
+			Status:      runtests.TestSuccess,
+			Format:      "Rust",
+			OutputFiles: []string{"case/outputfile1", "case/outputfile2"},
+			Tags:        []build.TestTag{{"key1", "value1"}},
+		})
+	}
+	for i := 0; i < failedTestCase; i++ {
+		t = append(t, runtests.TestCaseResult{
+			DisplayName: fmt.Sprintf("foo/bar_%d", i),
+			SuiteName:   "foo",
+			CaseName:    fmt.Sprintf("bar_%d", i),
+			Status:      runtests.TestFailure,
+			Format:      "Rust",
+			OutputFiles: []string{"case/outputfile1", "case/outputfile2"},
+			Tags:        []build.TestTag{{"key1", "value1"}},
+		})
+	}
+	finalResult := runtests.TestSuccess
+	if failedTestCase > 0 {
+		finalResult = runtests.TestFailure
+	}
+	return &runtests.TestDetails{
+		Name:                 "foo",
+		GNLabel:              "some label",
+		OutputFiles:          []string{"dir-1/outputfile", "dir#2/outputfile"},
+		Result:               finalResult,
 		StartTime:            time.Now(),
 		DurationMillis:       39797,
 		IsTestingFailureMode: false,
