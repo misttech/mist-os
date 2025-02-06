@@ -236,9 +236,6 @@ zx_status_t Devnode::TryAddService(std::string_view class_name, Target target,
     return ZX_OK;  // If the class is not in the map, then we are not making it available.
   }
   auto& [key, service] = *name_iterator;
-  if (service.state == ServiceEntry::DEVFS_ONLY) {
-    return ZX_OK;
-  }
   std::string path = "svc/" + service.service_name + "/" + std::string(instance_name);
   component::AnyHandler handler = [passthrough = target](zx::channel channel) {
     (*passthrough->device_connect.get())(std::move(channel));
@@ -277,14 +274,12 @@ zx_status_t Devnode::add_child(std::string_view name, std::optional<std::string_
         instance_name.is_ok());  // this would only return an error if we didn't have that class
     const ServiceEntry& service_entry = kClassNameToService.at(class_name.value());
     // Add dev/class/<class_name> entry:
-    if (service_entry.state == ServiceEntry::DEVFS_AND_SERVICE ||
-        service_entry.state == ServiceEntry::DEVFS_ONLY) {
+    if (service_entry.state & ServiceEntry::kDevfs) {
       out_child.protocol_node().emplace(devfs_, *devfs_.get_class_entry(class_name.value()), target,
                                         instance_name.value());
     }
     // Add service entry:
-    if (service_entry.state == ServiceEntry::DEVFS_AND_SERVICE ||
-        service_entry.state == ServiceEntry::SERVICE_ONLY) {
+    if (service_entry.state & ServiceEntry::kService) {
       out_child.protocol_node()->TryAddService(class_name.value(), target, instance_name.value());
     }
   }
