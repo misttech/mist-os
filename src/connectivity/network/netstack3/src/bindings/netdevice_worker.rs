@@ -20,8 +20,9 @@ use netstack3_core::device::{
     PureIpDeviceReceiveFrameMetadata, PureIpWeakDeviceId, RecvEthernetFrameMeta,
 };
 use netstack3_core::ip::{
-    IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
-    SlaacConfigurationUpdate, TemporarySlaacAddressConfiguration,
+    IidGenerationConfiguration, IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
+    Ipv6DeviceConfigurationUpdate, SlaacConfigurationUpdate, StableSlaacAddressConfiguration,
+    TemporarySlaacAddressConfiguration,
 };
 use netstack3_core::routes::RawMetric;
 use netstack3_core::sync::RwLock as CoreRwLock;
@@ -488,6 +489,12 @@ impl DeviceHandler {
             }
         };
 
+        let iid_generation = if ctx.bindings_ctx().config.default_opaque_iids {
+            IidGenerationConfiguration::Opaque
+        } else {
+            IidGenerationConfiguration::Eui64
+        };
+
         // Do the rest of the work in a closure so we don't accidentally add
         // errors after the binding ID is already allocated. This part of the
         // function should be infallible.
@@ -603,7 +610,9 @@ impl DeviceHandler {
                             Ipv6DeviceConfiguration::DEFAULT_MAX_RTR_SOLICITATIONS,
                         )),
                         slaac_config: SlaacConfigurationUpdate {
-                            enable_stable_addresses: Some(true),
+                            stable_address_configuration: Some(
+                                StableSlaacAddressConfiguration::Enabled { iid_generation },
+                            ),
                             temporary_address_configuration: Some(
                                 TemporarySlaacAddressConfiguration::enabled_with_rfc_defaults(),
                             ),

@@ -1720,7 +1720,7 @@ impl Ipv4StateBuilder {
 /// A builder for IPv6 state.
 ///
 /// By default, opaque IIDs will not be used to generate stable SLAAC addresses.
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone)]
 pub struct Ipv6StateBuilder {
     icmp: Icmpv6StateBuilder,
     slaac_stable_secret_key: Option<IidSecret>,
@@ -1737,6 +1737,10 @@ impl Ipv6StateBuilder {
     }
 
     /// Builds the [`Ipv6State`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `slaac_stable_secret_key` has not been set.
     pub fn build<
         CC: CoreTimerContext<IpLayerTimerId, BC>,
         StrongDeviceId: StrongDeviceIdentifier,
@@ -1746,6 +1750,10 @@ impl Ipv6StateBuilder {
         bindings_ctx: &mut BC,
     ) -> Ipv6State<StrongDeviceId, BC> {
         let Ipv6StateBuilder { icmp, slaac_stable_secret_key } = self;
+
+        let slaac_stable_secret_key = slaac_stable_secret_key
+            .expect("stable SLAAC secret key was not provided to `Ipv6StateBuilder`");
+
         Ipv6State {
             inner: IpStateInner::new::<CC>(bindings_ctx),
             icmp: icmp.build(),
@@ -1753,6 +1761,18 @@ impl Ipv6StateBuilder {
             slaac_temp_secret_key: IidSecret::new_random(&mut bindings_ctx.rng()),
             slaac_stable_secret_key,
         }
+    }
+}
+
+impl Default for Ipv6StateBuilder {
+    fn default() -> Self {
+        #[cfg(any(test, feature = "testutils"))]
+        let slaac_stable_secret_key = Some(IidSecret::ALL_ONES);
+
+        #[cfg(not(any(test, feature = "testutils")))]
+        let slaac_stable_secret_key = None;
+
+        Self { icmp: Icmpv6StateBuilder::default(), slaac_stable_secret_key }
     }
 }
 
@@ -1797,7 +1817,7 @@ pub struct Ipv6State<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindings
     ///
     /// If `None`, opaque IIDs will not be used to generate stable SLAAC
     /// addresses.
-    pub slaac_stable_secret_key: Option<IidSecret>,
+    pub slaac_stable_secret_key: IidSecret,
 }
 
 impl<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>

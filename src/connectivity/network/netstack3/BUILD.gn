@@ -325,6 +325,15 @@ ns3_test_component("component-debug") {
   deps = [ ":bin-instrumented" ]
 }
 
+# Component with debugging instrumentation enabled and opaque IIDs disabled for
+# convenience in conformance testing.
+ns3_test_component("component-conformance") {
+  component_name = "netstack3-conformance"
+  manifest = "meta/netstack3_debug.cml"
+  config_values_source = "config/test-conformance.json5"
+  deps = [ ":bin-instrumented" ]
+}
+
 # Drop-in component with the name "netstack" rather than "netstack3."
 ns3_test_component("component-dropin") {
   component_name = "netstack"

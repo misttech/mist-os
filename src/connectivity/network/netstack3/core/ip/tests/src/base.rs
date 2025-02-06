@@ -59,7 +59,7 @@ use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_filter::{FilterIpContext, TransportProtocol};
 use netstack3_ip::device::{
     IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
-    SlaacConfigurationUpdate,
+    SlaacConfigurationUpdate, StableSlaacAddressConfiguration,
 };
 use netstack3_ip::multicast_forwarding::{
     MulticastRoute, MulticastRouteKey, MulticastRouteTarget, MulticastRouteTargets,
@@ -1277,7 +1277,9 @@ fn test_no_dispatch_non_ndp_packets_during_ndp_dad() {
                 dad_transmits: Some(NonZeroU16::new(1)),
                 // Auto-generate a link-local address.
                 slaac_config: SlaacConfigurationUpdate {
-                    enable_stable_addresses: Some(true),
+                    stable_address_configuration: Some(
+                        StableSlaacAddressConfiguration::ENABLED_WITH_EUI64,
+                    ),
                     ..Default::default()
                 },
                 ip_config: IpDeviceConfigurationUpdate {
@@ -1455,7 +1457,9 @@ fn test_receive_ip_packet_action() {
         Ipv6DeviceConfigurationUpdate {
             // Auto-generate a link-local address.
             slaac_config: SlaacConfigurationUpdate {
-                enable_stable_addresses: Some(true),
+                stable_address_configuration: Some(
+                    StableSlaacAddressConfiguration::ENABLED_WITH_EUI64,
+                ),
                 ..Default::default()
             },
             ..Default::default()
@@ -1606,7 +1610,9 @@ fn test_receive_ip_packet_action() {
                     dad_transmits: Some(NonZeroU16::new(1)),
                     // Auto-generate a link-local address.
                     slaac_config: SlaacConfigurationUpdate {
-                        enable_stable_addresses: Some(true),
+                        stable_address_configuration: Some(
+                            StableSlaacAddressConfiguration::ENABLED_WITH_EUI64,
+                        ),
                         ..Default::default()
                     },
                     ip_config: IpDeviceConfigurationUpdate {

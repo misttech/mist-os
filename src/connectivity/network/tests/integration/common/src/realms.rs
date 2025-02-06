@@ -7,6 +7,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
+use cm_rust::NativeIntoFidl as _;
 use fidl::endpoints::DiscoverableProtocolMarker as _;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_net_debug as fnet_debug,
@@ -711,6 +712,30 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
             },
         }
     }
+}
+
+/// Set the `opaque_iids` structured configuration value for Netstack3.
+pub fn set_netstack3_opaque_iids(netstack: &mut fnetemul::ChildDef, value: bool) {
+    const KEY: &str = "opaque_iids";
+    set_structured_config_value(netstack, KEY.to_owned(), cm_rust::ConfigValue::from(value));
+}
+
+/// Set the `suspend_enabled` structured configuration value for Netstack3.
+pub fn set_netstack3_suspend_enabled(netstack: &mut fnetemul::ChildDef, value: bool) {
+    const KEY: &str = "suspend_enabled";
+    set_structured_config_value(netstack, KEY.to_owned(), cm_rust::ConfigValue::from(value));
+}
+
+/// Set a structured configuration value for the provided component.
+fn set_structured_config_value(
+    component: &mut fnetemul::ChildDef,
+    key: String,
+    value: cm_rust::ConfigValue,
+) {
+    component
+        .config_values
+        .get_or_insert_default()
+        .push(fnetemul::ChildConfigValue { key, value: value.native_into_fidl() });
 }
 
 /// Abstraction for a Fuchsia component which offers network stack services.

@@ -30,7 +30,9 @@ use net_declare::{fidl_mac, fidl_subnet, net_ip_v4, net_ip_v6, std_ip_v4, std_ip
 use net_types::ethernet::Mac;
 use net_types::ip::{Ip, IpAddress, IpVersion, Ipv4, Ipv4Addr, Ipv6};
 use net_types::{AddrAndPortFormatter, Witness as _};
-use netstack_testing_common::realms::{Netstack3, TestSandboxExt as _};
+use netstack_testing_common::realms::{
+    KnownServiceProvider, Netstack3, NetstackVersion, TestSandboxExt as _,
+};
 use netstack_testing_common::{constants, get_inspect_data};
 use netstack_testing_macros::netstack_test;
 use packet::{ParseBuffer as _, Serializer as _};
@@ -47,7 +49,7 @@ use test_case::test_case;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter as fnet_filter,
     fidl_fuchsia_net_filter_ext as fnet_filter_ext,
-    fidl_fuchsia_net_multicast_admin as fnet_multicast_admin,
+    fidl_fuchsia_net_multicast_admin as fnet_multicast_admin, fidl_fuchsia_netemul as fnetemul,
     fidl_fuchsia_posix_socket as fposix_socket, fidl_fuchsia_posix_socket_raw as fposix_socket_raw,
 };
 
@@ -677,8 +679,13 @@ async fn inspect_multicast_routes(name: &str) {
 async fn inspect_devices(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
-    let realm =
-        sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create realm");
+
+    // Disable the use of opaque IIDs in SLAAC address generation so addresses are
+    // deterministic (based on the MAC address) and we can assert on them below.
+    let mut netstack: fnetemul::ChildDef =
+        KnownServiceProvider::Netstack(NetstackVersion::Netstack3).into();
+    netstack_testing_common::realms::set_netstack3_opaque_iids(&mut netstack, false);
+    let realm = sandbox.create_realm(name, [netstack]).expect("failed to create realm");
 
     // Install netdevice device so that non-Loopback device Inspect properties can be asserted upon.
     const NETDEV_NAME: &str = "test-eth";

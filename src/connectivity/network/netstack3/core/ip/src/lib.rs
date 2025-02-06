@@ -58,9 +58,10 @@ pub mod device {
         RTR_SOLICITATION_INTERVAL,
     };
     pub use crate::internal::device::slaac::{
-        InnerSlaacTimerId, SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses,
-        SlaacBindingsContext, SlaacConfigAndState, SlaacConfiguration, SlaacConfigurationUpdate,
-        SlaacContext, SlaacCounters, SlaacState, SlaacTimerId, TemporarySlaacAddressConfiguration,
+        IidGenerationConfiguration, InnerSlaacTimerId, SlaacAddressEntry, SlaacAddressEntryMut,
+        SlaacAddresses, SlaacBindingsContext, SlaacConfigAndState, SlaacConfiguration,
+        SlaacConfigurationUpdate, SlaacContext, SlaacCounters, SlaacState, SlaacTimerId,
+        StableSlaacAddressConfiguration, TemporarySlaacAddressConfiguration,
         SLAAC_MIN_REGEN_ADVANCE,
     };
     pub use crate::internal::device::state::{

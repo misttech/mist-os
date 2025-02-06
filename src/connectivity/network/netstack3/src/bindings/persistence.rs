@@ -65,11 +65,9 @@ impl State {
                 state
             }
             Err(e) => {
-                debug!("failed to load existing persisted state; generating new state: {e:?}");
+                debug!("failed to load existing persisted state; generating new state: {e}");
                 let state = Self::new(rng);
-                state
-                    .store()
-                    .unwrap_or_else(|e| warn!("failed to store new persisted state: {e:?}"));
+                state.store().unwrap_or_else(|e| warn!("failed to store new persisted state: {e}"));
 
                 info!("generated and stored new persisted state");
                 state

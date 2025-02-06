@@ -1382,7 +1382,7 @@ impl IntoFidl<fnet_interfaces_admin::SlaacConfiguration> for SlaacConfigurationU
     fn into_fidl(self) -> fnet_interfaces_admin::SlaacConfiguration {
         let SlaacConfigurationUpdate {
             temporary_address_configuration,
-            enable_stable_addresses: _,
+            stable_address_configuration: _,
         } = self;
         fnet_interfaces_admin::SlaacConfiguration {
             temporary_address: temporary_address_configuration.map(|config| config.is_enabled()),
@@ -1393,7 +1393,7 @@ impl IntoFidl<fnet_interfaces_admin::SlaacConfiguration> for SlaacConfigurationU
 
 impl IntoFidl<fnet_interfaces_admin::SlaacConfiguration> for SlaacConfiguration {
     fn into_fidl(self) -> fnet_interfaces_admin::SlaacConfiguration {
-        let SlaacConfiguration { enable_stable_addresses: _, temporary_address_configuration } =
+        let SlaacConfiguration { stable_address_configuration: _, temporary_address_configuration } =
             self;
         fnet_interfaces_admin::SlaacConfiguration {
             temporary_address: Some(temporary_address_configuration.is_enabled()),

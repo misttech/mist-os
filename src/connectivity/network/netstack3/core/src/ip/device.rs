@@ -649,6 +649,11 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
                 params.retrans_timer_or_default().get()
             },
         );
+        // We use the link-layer address to derive opaque IIDs for the interface, rather
+        // than the interface ID or name, because it is more stable. This does imply
+        // that we do not generate SLAAC addresses for interfaces without a link-layer
+        // address (e.g. loopback and pure IP devices); we could revisit this in the
+        // future if desired.
         let link_layer_addr = device::Ipv6DeviceContext::get_link_layer_addr(core_ctx, device_id);
 
         let config = Borrow::borrow(config);
@@ -659,6 +664,8 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
             ip_config: _,
         } = *config;
 
+        let stable_secret_key =
+            core_ctx.unlocked_access::<crate::lock_ordering::SlaacStableSecretKey>();
         let temp_secret_key =
             core_ctx.unlocked_access::<crate::lock_ordering::SlaacTempSecretKey>();
         let mut core_ctx_and_resource =
@@ -678,6 +685,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
                 retrans_timer,
                 link_layer_addr,
                 temp_secret_key: *temp_secret_key,
+                stable_secret_key: *stable_secret_key,
                 _marker: PhantomData,
             },
             &mut state,

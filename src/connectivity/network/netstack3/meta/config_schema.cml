@@ -11,5 +11,10 @@
         // framework and uses DEBUG severity logs. Used in netstack tests when
         // embedding a hermetic netstack.
         debug_logs: { type: "bool" },
+
+        /// Whether to use opaque IIDs by default when generating stable SLAAC
+        /// addresses. Note that this configuration can still be overridden on a
+        /// per-interface basis.
+        opaque_iids: { type: "bool" },
     },
 }

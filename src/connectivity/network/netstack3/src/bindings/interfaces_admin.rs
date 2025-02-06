@@ -213,7 +213,7 @@ async fn run_blackhole_interface(
                 dad_transmits: Some(None),
                 max_router_solicitations: Some(None),
                 slaac_config: SlaacConfigurationUpdate {
-                    enable_stable_addresses: Some(true),
+                    stable_address_configuration: None,
                     temporary_address_configuration: None,
                 },
                 ip_config,
@@ -1094,7 +1094,7 @@ fn set_configuration(
                     dad_transmits: dad_transmits.map(|v| NonZeroU16::new(v)),
                     slaac_config: SlaacConfigurationUpdate {
                         temporary_address_configuration,
-                        enable_stable_addresses: None,
+                        stable_address_configuration: None,
                     },
                     max_router_solicitations: None,
                     mld_mode,

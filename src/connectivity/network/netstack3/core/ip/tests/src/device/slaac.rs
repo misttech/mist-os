@@ -5,7 +5,6 @@
 use alloc::vec::Vec;
 
 use assert_matches::assert_matches;
-use net_types::ethernet::Mac;
 use net_types::ip::{Ipv6, Ipv6Addr, Mtu, Subnet};
 use net_types::{LinkLocalAddress as _, NonMappedAddr, Witness as _};
 use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
@@ -26,7 +25,8 @@ use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_ip::device::testutil::with_assigned_ipv6_addr_subnets;
 use netstack3_ip::device::{
     InnerSlaacTimerId, IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
-    SlaacConfigurationUpdate, TemporarySlaacAddressConfiguration, SLAAC_MIN_REGEN_ADVANCE,
+    SlaacConfigurationUpdate, StableSlaacAddressConfiguration, TemporarySlaacAddressConfiguration,
+    SLAAC_MIN_REGEN_ADVANCE,
 };
 use netstack3_ip::icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT;
 use netstack3_ip::{self as ip};
@@ -96,7 +96,9 @@ fn integration_remove_all_addresses_on_ipv6_disable() {
             &device_id,
             Ipv6DeviceConfigurationUpdate {
                 slaac_config: SlaacConfigurationUpdate {
-                    enable_stable_addresses: Some(true),
+                    stable_address_configuration: Some(
+                        StableSlaacAddressConfiguration::ENABLED_WITH_EUI64,
+                    ),
                     temporary_address_configuration: Some(
                         TemporarySlaacAddressConfiguration::Enabled {
                             temp_valid_lifetime: ONE_HOUR,
@@ -143,10 +145,8 @@ fn integration_remove_all_addresses_on_ipv6_disable() {
         ),
     );
 
-    let stable_addr_sub = ip::device::testutil::calculate_slaac_addr_sub(
-        SUBNET,
-        local_mac.to_eui64_with_magic(Mac::DEFAULT_EUI_MAGIC),
-    );
+    let stable_addr_sub =
+        ip::device::testutil::calculate_slaac_addr_sub(SUBNET, local_mac.to_eui64());
 
     let addrs = with_assigned_ipv6_addr_subnets(&mut ctx.core_ctx(), &device_id, |addrs| {
         addrs.filter(|a| !a.addr().is_link_local()).collect::<Vec<_>>()
@@ -262,7 +262,9 @@ fn no_link_local_address_for_interfaces_with_no_link_layer_addressing() {
                         ..Default::default()
                     },
                     slaac_config: SlaacConfigurationUpdate {
-                        enable_stable_addresses: Some(true),
+                        stable_address_configuration: Some(
+                            StableSlaacAddressConfiguration::ENABLED_WITH_EUI64,
+                        ),
                         ..Default::default()
                     },
                     ..Default::default()

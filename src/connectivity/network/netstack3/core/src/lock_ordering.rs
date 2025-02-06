@@ -164,6 +164,9 @@ pub enum RoutingMetric {}
 // Provides unlocked access to the secret key used to generate temporary SLAAC
 // addresses.
 pub enum SlaacTempSecretKey {}
+// Provides unlocked access to the secret key used to generate stable SLAAC
+// addresses.
+pub enum SlaacStableSecretKey {}
 
 pub struct IpDeviceConfiguration<I>(PhantomData<I>, Never);
 pub struct IpDeviceGmp<I>(PhantomData<I>, Never);

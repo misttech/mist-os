@@ -183,6 +183,7 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                         connectivity_config.network.netstack_thread_count.unwrap_or_default().get(),
                     )?
                     .field("debug_logs", false)?
+                    .field("opaque_iids", true)?
                     // Routed from fuchsia.power.SuspendEnabled capability.
                     //
                     // TODO(https://fxbug.dev/368386068): This should not be

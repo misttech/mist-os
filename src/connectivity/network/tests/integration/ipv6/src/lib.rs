@@ -78,11 +78,18 @@ const EXPECTED_ROUTER_SOLICITATION_INTERVAL: zx::MonotonicDuration =
 /// [RFC 7217]: https://tools.ietf.org/html/rfc7217#section-6
 const DAD_IDGEN_DELAY: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(1);
 
-async fn install_and_get_ipv6_addrs_for_endpoint<N: Netstack>(
+#[derive(Debug, PartialEq)]
+struct StableAddrs {
+    link_local: net_types::ip::Ipv6Addr,
+    global: net_types::ip::Ipv6Addr,
+}
+
+async fn install_and_get_stable_ipv6_addrs_for_endpoint<N: Netstack>(
     realm: &netemul::TestRealm<'_>,
     endpoint: &netemul::TestEndpoint<'_>,
+    fake_endpoint: &netemul::TestFakeEndpoint<'_>,
     name: &str,
-) -> Vec<fnet::Subnet> {
+) -> StableAddrs {
     let (id, control, _device_control) = endpoint
         .add_to_stack(
             realm,
@@ -92,6 +99,22 @@ async fn install_and_get_ipv6_addrs_for_endpoint<N: Netstack>(
         .expect("installing interface");
     let did_enable = control.enable().await.expect("calling enable").expect("enable failed");
     assert!(did_enable);
+
+    // Wait for a Router Solicitation.
+    wait_for_router_solicitation(&fake_endpoint).await;
+
+    // Send a Router Advertisement with information for a SLAAC prefix.
+    let options = [NdpOptionBuilder::PrefixInformation(PrefixInformation::new(
+        ipv6_consts::GLOBAL_PREFIX.prefix(),  /* prefix_length */
+        false,                                /* on_link_flag */
+        true,                                 /* autonomous_address_configuration_flag */
+        99999,                                /* valid_lifetime */
+        99999,                                /* preferred_lifetime */
+        ipv6_consts::GLOBAL_PREFIX.network(), /* prefix */
+    ))];
+    send_ra_with_router_lifetime(&fake_endpoint, 0, &options, ipv6_consts::LINK_LOCAL_ADDR)
+        .await
+        .expect("failed to send router advertisement");
 
     let interface_state = realm
         .connect_to_protocol::<fnet_interfaces::StateMarker>()
@@ -105,48 +128,48 @@ async fn install_and_get_ipv6_addrs_for_endpoint<N: Netstack>(
         .expect("creating interface event stream"),
         &mut state,
         |iface| {
-            let ipv6_addresses = iface
-                .properties
-                .addresses
-                .iter()
-                .filter_map(
-                    |fnet_interfaces_ext::Address {
-                         addr,
-                         valid_until: _,
-                         preferred_lifetime_info: _,
-                         assignment_state,
-                     }| {
-                        assert_eq!(
-                            *assignment_state,
-                            fnet_interfaces::AddressAssignmentState::Assigned
-                        );
-                        match addr.addr {
-                            fnet::IpAddress::Ipv6(fnet::Ipv6Address { .. }) => Some(addr),
-                            fnet::IpAddress::Ipv4(fnet::Ipv4Address { .. }) => None,
+            let (link_local, global) = iface.properties.addresses.iter().fold(
+                (None, None),
+                |(mut link_local, mut global),
+                 fnet_interfaces_ext::Address { addr, assignment_state, .. }| {
+                    assert_eq!(
+                        *assignment_state,
+                        fnet_interfaces::AddressAssignmentState::Assigned
+                    );
+                    let addr = match addr.addr {
+                        fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr }) => addr,
+                        fnet::IpAddress::Ipv4(fnet::Ipv4Address { .. }) => {
+                            return (link_local, global);
                         }
-                    },
-                )
-                .copied()
-                .collect::<Vec<_>>();
-            if ipv6_addresses.is_empty() {
-                None
-            } else {
-                Some(ipv6_addresses)
+                    };
+                    let v6_addr = net_types::ip::Ipv6Addr::from_bytes(addr);
+                    if v6_addr.is_unicast_link_local() {
+                        link_local = Some(v6_addr);
+                    } else if ipv6_consts::GLOBAL_PREFIX.contains(&v6_addr) {
+                        global = Some(v6_addr);
+                    }
+                    (link_local, global)
+                },
+            );
+            match (link_local, global) {
+                (Some(link_local), Some(global)) => Some(StableAddrs { link_local, global }),
+                _ => None,
             }
         },
     )
     .await
-    .expect("failed to observe interface addition");
+    .expect("failed to observe address generation");
 
     ipv6_addresses
 }
 
 /// Test that across netstack runs, a device will initially be assigned the same
-/// IPv6 addresses.
+/// stable IPv6 addresses (both link-local and global).
 #[netstack_test]
 #[variant(N, Netstack)]
-async fn consistent_initial_ipv6_addrs<N: Netstack>(name: &str) {
-    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+async fn consistent_initial_stable_ipv6_addrs<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let network = sandbox.create_network(name).await.expect("create network");
     let realm = sandbox
         .create_realm(
             name,
@@ -167,22 +190,22 @@ async fn consistent_initial_ipv6_addrs<N: Netstack>(name: &str) {
                 KnownServiceProvider::SecureStash,
             ],
         )
-        .expect("failed to create realm");
-    let endpoint = sandbox.create_endpoint(name).await.expect("failed to create endpoint");
-    let () = endpoint.set_link_up(true).await.expect("failed to set link up");
+        .expect("create realm");
+    let fake_ep = network.create_fake_endpoint().expect("create fake endpoint");
+    let endpoint = network.create_endpoint(name).await.expect("create endpoint");
+    endpoint.set_link_up(true).await.expect("set link up");
 
     // Make sure netstack uses the same addresses across runs for a device.
     let first_run_addrs =
-        install_and_get_ipv6_addrs_for_endpoint::<N>(&realm, &endpoint, name).await;
+        install_and_get_stable_ipv6_addrs_for_endpoint::<N>(&realm, &endpoint, &fake_ep, name)
+            .await;
 
     // Stop the netstack.
-    let () = realm
-        .stop_child_component(constants::netstack::COMPONENT_NAME)
-        .await
-        .expect("failed to stop netstack");
+    realm.stop_child_component(constants::netstack::COMPONENT_NAME).await.expect("stop netstack");
 
     let second_run_addrs =
-        install_and_get_ipv6_addrs_for_endpoint::<N>(&realm, &endpoint, name).await;
+        install_and_get_stable_ipv6_addrs_for_endpoint::<N>(&realm, &endpoint, &fake_ep, name)
+            .await;
     assert_eq!(first_run_addrs, second_run_addrs);
 }
 

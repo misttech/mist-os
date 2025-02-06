@@ -19,7 +19,7 @@ use bindings::{GlobalConfig, InspectPublisher, NetstackSeed, Service};
 /// Runs Netstack3.
 pub fn main() {
     let config = ns3_config::Config::take_from_startup_handle();
-    let ns3_config::Config { num_threads, debug_logs, suspend_enabled } = &config;
+    let ns3_config::Config { num_threads, debug_logs, opaque_iids, suspend_enabled } = &config;
     let num_threads = NonZeroU8::new(*num_threads).expect("invalid 0 thread count value");
     let mut executor = fuchsia_async::SendExecutor::new(num_threads.get().into());
 
@@ -88,7 +88,10 @@ pub fn main() {
         .add_fidl_service(Service::Verifier)
         .add_fidl_service(Service::HealthCheck);
 
-    let seed = NetstackSeed::new(GlobalConfig { suspend_enabled: *suspend_enabled });
+    let seed = NetstackSeed::new(GlobalConfig {
+        suspend_enabled: *suspend_enabled,
+        default_opaque_iids: *opaque_iids,
+    });
 
     let inspect_publisher = InspectPublisher::new();
     inspect_publisher

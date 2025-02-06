@@ -930,3 +930,17 @@ impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::SlaacTempSecretKey>
         &self.ipv6.slaac_temp_secret_key
     }
 }
+
+impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::SlaacStableSecretKey>
+    for StackState<BT>
+{
+    type Data = IidSecret;
+    type Guard<'l>
+        = &'l IidSecret
+    where
+        Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        &self.ipv6.slaac_stable_secret_key
+    }
+}

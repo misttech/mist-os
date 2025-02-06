@@ -354,6 +354,9 @@ const DEFAULT_INTERFACE_METRIC: u32 = 100;
 #[derive(Debug, Default)]
 pub(crate) struct GlobalConfig {
     pub(crate) suspend_enabled: bool,
+    /// Whether to configure interfaces with opaque IIDs by default. Note that the
+    /// IID generation method can still be overridden per-interface.
+    pub(crate) default_opaque_iids: bool,
 }
 
 pub(crate) struct BindingsCtxInner {
@@ -1178,7 +1181,7 @@ impl Netstack {
                     dad_transmits: Some(None),
                     max_router_solicitations: Some(None),
                     slaac_config: SlaacConfigurationUpdate {
-                        enable_stable_addresses: Some(true),
+                        stable_address_configuration: None,
                         temporary_address_configuration: None,
                     },
                     ip_config,

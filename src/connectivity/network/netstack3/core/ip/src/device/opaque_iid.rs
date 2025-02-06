@@ -22,6 +22,10 @@ impl IidSecret {
     #[cfg(any(test, feature = "testutils"))]
     pub const ALL_ONES: Self = Self([1u8; IID_SECRET_KEY_BYTES]);
 
+    /// A static secret for use in tests.
+    #[cfg(any(test, feature = "testutils"))]
+    pub const ALL_TWOS: Self = Self([2u8; IID_SECRET_KEY_BYTES]);
+
     /// Creates a new random secret with the provided `rng`.
     pub fn new_random<R: Rng>(rng: &mut R) -> Self {
         let mut bytes = [0u8; IID_SECRET_KEY_BYTES];
@@ -67,7 +71,7 @@ impl OpaqueIid {
     /// - `secret_key` corresponds to the "secret_key" argument
     ///
     /// Callers can set `nonce` = [`OpaqueIidNonce::Random(x)`] to pass in a
-    /// randomly-generated value. This guaranteese the caller similar privacy
+    /// randomly-generated value. This guarantees the caller similar privacy
     /// properties as the original algorithm specified in the RFC without requiring
     /// that they keep state in the form of a DAD count.
     ///
@@ -216,13 +220,10 @@ impl OpaqueIid {
 
 /// Describes the value being used as the nonce for [`OpaqueIid`].
 ///
-/// See the function documentation for more info.
+/// See the documentation on [`OpaqueIid::new`] for more info.
 #[derive(Copy, Clone, Debug)]
 #[allow(missing_docs)]
 pub enum OpaqueIidNonce {
-    // TODO(https://fxbug.dev/42148800): Remove cfg(test) when this is used
-    // to generate stable opaque identifiers.
-    #[cfg(test)]
     DadCounter(u8),
     Random(u64),
 }
@@ -230,7 +231,6 @@ pub enum OpaqueIidNonce {
 impl From<OpaqueIidNonce> for u64 {
     fn from(nonce: OpaqueIidNonce) -> Self {
         match nonce {
-            #[cfg(test)]
             OpaqueIidNonce::DadCounter(count) => count.into(),
             OpaqueIidNonce::Random(random) => random,
         }
@@ -382,8 +382,8 @@ mod tests {
 
     #[test]
     fn test_stable_outputs() {
-        // generate_opaque_interface_identifier guarantees that it provides a stable output across
-        // codebase versions. This test case asserts that, and should not be changed!
+        // `OpaqueIid` guarantees that it provides a stable output across codebase
+        // versions. This test case asserts that, and should not be changed!
         const PREFIX: Subnet<Ipv6Addr> = Ipv6::SITE_LOCAL_UNICAST_SUBNET;
         const NET_IFACE: &[u8] = &[0, 1, 2];
         const NET_ID: Option<&[u8]> = Some(&[3, 4, 5]);

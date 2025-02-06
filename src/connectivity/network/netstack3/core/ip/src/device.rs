@@ -25,7 +25,7 @@ use net_types::ip::{
     AddrSubnet, GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu,
     Subnet,
 };
-use net_types::{MulticastAddr, SpecifiedAddr, UnicastAddr, Witness};
+use net_types::{LinkLocalAddress as _, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness};
 use netstack3_base::{
     AnyDevice, AssignedAddrIpExt, CounterContext, DeferredResourceRemovalContext, DeviceIdContext,
     EventContext, ExistsError, HandleableTimer, Inspectable, Instant, InstantBindingsTypes,
@@ -1296,7 +1296,9 @@ fn disable_ipv6_device_with_config<
         })
         .into_iter()
         .for_each(|(addr_id, config)| {
-            if config == Some(Ipv6AddrConfig::SLAAC_LINK_LOCAL) {
+            if config
+                .is_some_and(|config| config.is_slaac() && addr_id.addr().addr().is_link_local())
+            {
                 del_ip_addr_inner_and_notify_handler(
                     core_ctx,
                     bindings_ctx,
@@ -1602,7 +1604,7 @@ pub fn add_ip_addr_subnet_with_config<
 
     if ip_enabled {
         // NB: We don't start DAD if the device is disabled. DAD will be
-        // performed when the device is enabled for all addressed.
+        // performed when the device is enabled for all addresses.
         DadHandler::start_duplicate_address_detection(core_ctx, bindings_ctx, device_id, &addr_id)
     }
 

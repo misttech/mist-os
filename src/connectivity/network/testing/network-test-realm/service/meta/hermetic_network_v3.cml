@@ -9,7 +9,7 @@
     children: [
         {
             name: "netstack",
-            url: "#meta/netstack3-debug.cm",
+            url: "#meta/netstack3-conformance.cm",
         },
 
         // TODO(https://fxbug.dev/42076541): This is transitional. Once the DHCP

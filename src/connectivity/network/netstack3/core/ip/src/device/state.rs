@@ -1078,6 +1078,7 @@ pub enum SlaacConfig<Instant> {
     Stable {
         /// The lifetime of the address.
         valid_until: Lifetime<Instant>,
+        // TODO(https://fxbug.dev/42148800): also keep track of DAD retry count.
     },
     /// The address is a temporary address, as specified by [RFC 8981].
     ///
@@ -1148,18 +1149,7 @@ impl<Instant> From<Ipv6AddrManualConfig<Instant>> for Ipv6AddrConfig<Instant> {
     }
 }
 
-impl<Instant: Copy> Ipv6AddrConfig<Instant> {
-    /// The configuration for a link-local address configured via SLAAC.
-    ///
-    /// Per [RFC 4862 Section 5.3]: "A link-local address has an infinite preferred and valid
-    /// lifetime; it is never timed out."
-    ///
-    /// [RFC 4862 Section 5.3]: https://tools.ietf.org/html/rfc4862#section-5.3
-    pub(crate) const SLAAC_LINK_LOCAL: Self = Self::Slaac(Ipv6AddrSlaacConfig {
-        inner: SlaacConfig::Stable { valid_until: Lifetime::Infinite },
-        preferred_lifetime: PreferredLifetime::Preferred(Lifetime::Infinite),
-    });
-
+impl<Instant: Copy + PartialEq> Ipv6AddrConfig<Instant> {
     /// The lifetime for which the address is valid.
     pub fn valid_until(&self) -> Lifetime<Instant> {
         match self {
@@ -1193,6 +1183,14 @@ impl<Instant: Copy> Ipv6AddrConfig<Instant> {
                 SlaacConfig::Temporary(_) => true,
             },
             Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { temporary, .. }) => *temporary,
+        }
+    }
+
+    /// Returns true if the address was configured via SLAAC.
+    pub fn is_slaac(&self) -> bool {
+        match self {
+            Ipv6AddrConfig::Slaac(_) => true,
+            Ipv6AddrConfig::Manual(_) => false,
         }
     }
 }
