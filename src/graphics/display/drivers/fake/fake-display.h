@@ -132,9 +132,11 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   int CaptureThread() __TA_EXCLUDES(capture_mutex_, image_mutex_);
 
   // Simulates a display capture, if a capture was requested.
-  //
-  // Returns an error if the capture failed in such a catastrophic failure.
   zx::result<> ServiceAnyCaptureRequest();
+
+  // Simulates a display capture for a single-layer image configuration.
+  static zx::result<> DoImageCapture(DisplayImageInfo& source_info,
+                                     CaptureImageInfo& destination_info);
 
   // Dispatches an OnCaptureComplete() event to the Display Coordinator.
   void SendCaptureComplete() __TA_EXCLUDES(engine_listener_mutex_);

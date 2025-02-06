@@ -720,7 +720,7 @@ int FakeDisplay::CaptureThread() {
     zx::result<> capture_result = ServiceAnyCaptureRequest();
     if (capture_result.is_error()) {
       // ServiceAnyCaptureRequest() has already logged the error.
-      return capture_result.status_value();
+      continue;
     }
   }
   return ZX_OK;
@@ -730,95 +730,114 @@ zx::result<> FakeDisplay::ServiceAnyCaptureRequest() {
   // `current_capture_target_image_` is a pointer to DisplayImageInfo stored in
   // `imported_captures_` (guarded by `capture_mutex_`). So `capture_mutex_`
   // must be locked while the capture image is being used.
-
   std::lock_guard capture_lock(capture_mutex_);
-  if ((current_capture_target_image_id_ != display::kInvalidDriverCaptureImageId) &&
-      ++capture_complete_signal_count_ >= kNumOfVsyncsForCapture) {
-    {
-      auto dst = imported_captures_.find(current_capture_target_image_id_);
+  if (current_capture_target_image_id_ == display::kInvalidDriverCaptureImageId) {
+    return zx::ok();
+  }
 
-      // `dst` should be always valid.
-      //
-      // The current capture target image is guaranteed to be valid in
-      // `imported_captures_` in StartCapture(), and can only be released
-      // (i.e. removed from `imported_captures_`) after the active capture
-      // is done.
-      ZX_DEBUG_ASSERT(dst.IsValid());
+  ++capture_complete_signal_count_;
+  if (capture_complete_signal_count_ < kNumOfVsyncsForCapture) {
+    return zx::ok();
+  }
 
-      // `current_image_to_capture_id_` is a key to DisplayImageInfo stored
-      // in `imported_images_` (guarded by `image_mutex_`). So `image_mutex_`
-      // must be locked while the source image is being used.
-      std::lock_guard image_lock(image_mutex_);
-      if (current_image_to_capture_id_ != display::kInvalidDriverImageId) {
-        // We have a valid image being displayed. Let's capture it.
-        auto src = imported_images_.find(current_image_to_capture_id_);
+  auto imported_captures_it = imported_captures_.find(current_capture_target_image_id_);
 
-        // `src` should be always valid.
-        //
-        // The "current image to capture" is guaranteed to be valid in
-        // `imported_images_` in ApplyConfig(), and can only be released
-        // (i.e. removed from `imported_images_`) after there's an vsync
-        // not containing the image anymore.
-        ZX_ASSERT(src.IsValid());
+  // The current capture target image is guaranteed to be valid in
+  // `imported_captures_` in StartCapture(), and can only be released
+  // (i.e. removed from `imported_captures_`) after the active capture
+  // is done.
+  ZX_ASSERT(imported_captures_it.IsValid());
+  CaptureImageInfo& capture_destination_info = *imported_captures_it;
 
-        if (src->metadata().pixel_format != dst->metadata().pixel_format) {
-          FDF_LOG(ERROR, "Trying to capture format=%u as format=%u\n",
-                  static_cast<uint32_t>(src->metadata().pixel_format),
-                  static_cast<uint32_t>(dst->metadata().pixel_format));
-          return zx::ok();
-        }
-        size_t src_vmo_size;
-        auto status = src->vmo().get_size(&src_vmo_size);
-        if (status != ZX_OK) {
-          FDF_LOG(ERROR, "Failed to get the size of the displayed image VMO: %s",
-                  zx_status_get_string(status));
-          return zx::ok();
-        }
-        size_t dst_vmo_size;
-        status = dst->vmo().get_size(&dst_vmo_size);
-        if (status != ZX_OK) {
-          FDF_LOG(ERROR, "Failed to get the size of the VMO for the captured image: %s",
-                  zx_status_get_string(status));
-          return zx::ok();
-        }
-        if (dst_vmo_size != src_vmo_size) {
-          FDF_LOG(ERROR,
-                  "Capture will fail; the displayed image VMO size %zu does not match the "
-                  "captured image VMO size %zu",
-                  src_vmo_size, dst_vmo_size);
-          return zx::ok();
-        }
-        fzl::VmoMapper mapped_src;
-        status = mapped_src.Map(src->vmo(), 0, src_vmo_size, ZX_VM_PERM_READ);
-        if (status != ZX_OK) {
-          FDF_LOG(ERROR, "Capture thread will exit; failed to map displayed image VMO: %s",
-                  zx_status_get_string(status));
-          return zx::error(status);
-        }
+  // `current_image_to_capture_id_` is a key to DisplayImageInfo stored
+  // in `imported_images_` (guarded by `image_mutex_`). So `image_mutex_`
+  // must be locked while the source image is being used.
+  std::lock_guard image_lock(image_mutex_);
+  if (current_image_to_capture_id_ != display::kInvalidDriverImageId) {
+    // We have a valid image being displayed. Let's capture it.
+    auto imported_images_it = imported_images_.find(current_image_to_capture_id_);
 
-        fzl::VmoMapper mapped_dst;
-        status = mapped_dst.Map(dst->vmo(), 0, dst_vmo_size, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
-        if (status != ZX_OK) {
-          FDF_LOG(ERROR, "Capture thread will exit; failed to map capture image VMO: %s",
-                  zx_status_get_string(status));
-          return zx::error(status);
-        }
-        if (src->metadata().coherency_domain == fuchsia_sysmem2::CoherencyDomain::kRam) {
-          zx_cache_flush(mapped_src.start(), src_vmo_size,
-                         ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
-        }
-        std::memcpy(mapped_dst.start(), mapped_src.start(), dst_vmo_size);
-        if (dst->metadata().coherency_domain == fuchsia_sysmem2::CoherencyDomain::kRam) {
-          zx_cache_flush(mapped_dst.start(), dst_vmo_size,
-                         ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
-        }
-      }
+    // The "current image to capture" is guaranteed to be valid in
+    // `imported_images_` in ApplyConfig(), and can only be released
+    // (i.e. removed from `imported_images_`) after there's an vsync
+    // not containing the image anymore.
+    ZX_ASSERT(imported_images_it.IsValid());
+    DisplayImageInfo& display_source_info = *imported_images_it;
+
+    zx::result<> image_capture_result =
+        DoImageCapture(display_source_info, capture_destination_info);
+    if (image_capture_result.is_error()) {
+      // DoImageCapture() has already logged the error.
+      return image_capture_result;
     }
+  }
 
-    SendCaptureComplete();
+  SendCaptureComplete();
 
-    current_capture_target_image_id_ = display::kInvalidDriverCaptureImageId;
-    capture_complete_signal_count_ = 0;
+  current_capture_target_image_id_ = display::kInvalidDriverCaptureImageId;
+  capture_complete_signal_count_ = 0;
+
+  return zx::ok();
+}
+
+// static
+zx::result<> FakeDisplay::DoImageCapture(DisplayImageInfo& source_info,
+                                         CaptureImageInfo& destination_info) {
+  if (source_info.metadata().pixel_format != destination_info.metadata().pixel_format) {
+    FDF_LOG(ERROR, "Capture will fail; trying to capture format=%u as format=%u\n",
+            static_cast<uint32_t>(source_info.metadata().pixel_format),
+            static_cast<uint32_t>(destination_info.metadata().pixel_format));
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  size_t source_vmo_size;
+  zx_status_t status = source_info.vmo().get_size(&source_vmo_size);
+  if (status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to get the size of the displayed image VMO: %s",
+            zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  size_t destination_vmo_size;
+  status = destination_info.vmo().get_size(&destination_vmo_size);
+  if (status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to get the size of the VMO for the captured image: %s",
+            zx_status_get_string(status));
+    return zx::error(status);
+  }
+  if (destination_vmo_size != source_vmo_size) {
+    FDF_LOG(ERROR,
+            "Capture will fail; the displayed image VMO size %zu does not match the "
+            "captured image VMO size %zu",
+            source_vmo_size, destination_vmo_size);
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  fzl::VmoMapper source_mapper;
+  status = source_mapper.Map(source_info.vmo(), 0, source_vmo_size, ZX_VM_PERM_READ);
+  if (status != ZX_OK) {
+    FDF_LOG(ERROR, "Capture will fail; failed to map displayed image VMO: %s",
+            zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  fzl::VmoMapper destination_mapper;
+  status = destination_mapper.Map(destination_info.vmo(), 0, destination_vmo_size,
+                                  ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
+  if (status != ZX_OK) {
+    FDF_LOG(ERROR, "Capture will fail; failed to map capture image VMO: %s",
+            zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  if (source_info.metadata().coherency_domain == fuchsia_sysmem2::CoherencyDomain::kRam) {
+    zx_cache_flush(source_mapper.start(), source_vmo_size,
+                   ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
+  }
+  std::memcpy(destination_mapper.start(), source_mapper.start(), destination_vmo_size);
+  if (destination_info.metadata().coherency_domain == fuchsia_sysmem2::CoherencyDomain::kRam) {
+    zx_cache_flush(destination_mapper.start(), destination_vmo_size,
+                   ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
   }
 
   return zx::ok();
