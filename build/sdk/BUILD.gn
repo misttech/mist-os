@@ -268,7 +268,7 @@ _partner_idk_versioned_shared_libraries_list = [
   "//sdk/lib/vfs/internal:vfs_internal",
   "//src/devices/bin/driver_runtime:driver_runtime",
   "//src/performance/memory/heapdump/instrumentation:instrumentation",
-  "//third_party/Vulkan-Loader:libvulkan",
+  "//third_party/Vulkan-Loader/src:libvulkan",
   "//zircon/system/ulib/syslog:syslog",
   "//zircon/system/ulib/trace-engine:trace-engine",
   "//zircon/system/ulib/trace-provider:trace-provider-so",

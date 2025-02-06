@@ -17,7 +17,7 @@ template("spinel_vk_target") {
   _spinel_vk_dir = "${_spinel_dir}/platforms/vk"
 
   # Location of Vulkan ecosystem repos.
-  _vulkan_header_dir = "//third_party/Vulkan-Headers"
+  _vulkan_header_dir = "//third_party/Vulkan-Headers/src"
 
   #
   # struct_sources
