@@ -731,7 +731,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8723774076320846705"`
+**Current value for `target_cpu = "arm64"`:** `"8723728773911362737"`
 
 From //out/not-default/args.gn:10
 
@@ -739,7 +739,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8723774076320846705"`
+**Current value for `target_cpu = "riscv64"`:** `"8723728773911362737"`
 
 From //out/not-default/args.gn:10
 
@@ -747,7 +747,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8723774076320846705"`
+**Current value for `target_cpu = "x64"`:** `"8723728773911362737"`
 
 From //out/not-default/args.gn:10
 
@@ -2426,7 +2426,7 @@ From //BUILD.gn:69
 
 ### dont_profile_source_files
 
-List of GN paths to source files to NOT instrument by `profile` variants.
+List of paths to source files to NOT instrument by `profile` variants.
 These take precedence over `profile_source_files`.
 
 **Current value (from the default):** `["//prebuilt/*"]`
@@ -5078,7 +5078,7 @@ From //build/images/args.gni:30
 
 ### profile_source_files
 
-List of GN paths to source files to be instrumented by `profile` variants.
+List of paths to source files to be instrumented by `profile` variants.
 
 **Current value (from the default):** `["//*"]`
 
@@ -5086,7 +5086,7 @@ From //build/config/profile/config.gni:10
 
 ### profile_source_files_list_files
 
-List GN path to files in Clang's `-fprofile-list` format describing files
+List of paths to files in Clang's `-fprofile-list` format describing files
 and functions to be instrumented by `profile` variants.
 
 **Current value (from the default):** `[]`
