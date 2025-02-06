@@ -1,7 +1,7 @@
 // Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::init_daemon_behavior;
+use crate::init_connection_behavior;
 use async_trait::async_trait;
 use errors::FfxError;
 use ffx_command_error::{FfxContext as _, Result};
@@ -30,7 +30,7 @@ impl From<ffx_fidl::TargetProxy> for TargetProxyHolder {
 impl TryFromEnv for TargetProxyHolder {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         if env.behavior().await.is_none() {
-            let b = init_daemon_behavior(env.environment_context()).await?;
+            let b = init_connection_behavior(env.environment_context()).await?;
             env.set_behavior(b.clone()).await;
         }
         match env.injector::<Self>().await?.target_factory().await.map_err(|e| {

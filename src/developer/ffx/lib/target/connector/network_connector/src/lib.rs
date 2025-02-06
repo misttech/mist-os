@@ -2,16 +2,39 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use async_lock::Mutex;
-use ffx_command_error::Result;
+use async_lock::{Mutex, MutexGuard};
+use ffx_command_error::{bug, user_error, Error, Result};
 use ffx_config::{EnvironmentContext, TryFromEnvContext};
-use ffx_target::{Connection, TargetConnector};
+use ffx_target::{Connection, ConnectionError, TargetConnector};
 use fho::DirectConnector;
 use futures::future::LocalBoxFuture;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use crate::connect_helper;
+async fn connect_helper<T: TryFromEnvContext + TargetConnector + 'static>(
+    env: &EnvironmentContext,
+    conn: &mut MutexGuard<'_, Option<Connection>>,
+) -> Result<()> {
+    match **conn {
+        Some(_) => Ok(()),
+        None => {
+            let overnet_connector = T::try_from_env_context(env).await?;
+            let c = match Connection::new(overnet_connector).await {
+                Ok(c) => Ok(c),
+                Err(ConnectionError::ConnectionStartError(cmd_info, error)) => {
+                    tracing::info!("connector encountered start error: {cmd_info}, '{error}'");
+                    Err(user_error!(
+                        "Unable to connect to device via {}: {error}",
+                        <T as TargetConnector>::CONNECTION_TYPE
+                    ))
+                }
+                Err(e) => Err(bug!("{e}")),
+            }?;
+            **conn = Some(c);
+            Ok(())
+        }
+    }
+}
 
 /// Encapsulates a connection to a single fuchsia device, using fdomain or
 /// overnet as the FIDL communication backend.
@@ -61,7 +84,7 @@ impl<T: TryFromEnvContext + TargetConnector + 'static> DirectConnector for Netwo
         Box::pin(async {
             let conn = self.connection.lock().await;
             if let Some(c) = (*conn).as_ref() {
-                crate::Error::User(c.wrap_connection_errors(e.into()))
+                Error::User(c.wrap_connection_errors(e.into()))
             } else {
                 e
             }

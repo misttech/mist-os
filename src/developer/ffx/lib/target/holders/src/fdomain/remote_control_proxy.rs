@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::init_daemon_behavior;
+use crate::init_connection_behavior;
 use async_trait::async_trait;
 use errors::FfxError;
 use fdomain_client::fidl::{
@@ -38,7 +38,7 @@ impl TryFromEnv for RemoteControlProxyHolder {
         let behavior = if let Some(behavior) = env.behavior().await {
             behavior
         } else {
-            let b = init_daemon_behavior(env.environment_context()).await?;
+            let b = init_connection_behavior(env.environment_context()).await?;
             env.set_behavior(b.clone()).await;
             b
         };

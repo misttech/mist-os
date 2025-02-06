@@ -124,6 +124,7 @@ mod test {
     use fdomain_fuchsia_developer_remotecontrol::{
         RemoteControlMarker, RemoteControlProxy, RemoteControlRequest,
     };
+    use ffx_config::environment::ExecutableKind;
     use fho::{FhoConnectionBehavior, FhoEnvironment, Format, TestBuffers, TryFromEnv};
     use futures::FutureExt;
     use serde_json::json;
@@ -180,7 +181,7 @@ mod test {
         buffers.into_stdout_str()
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_echo_with_no_text() -> Result<()> {
         let cmd = EchoCommand { text: None, repeat: false };
         let output = run_echo_test(cmd).await;
@@ -188,7 +189,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_echo_with_text() -> Result<()> {
         let cmd = EchoCommand { text: Some("test".to_string()), repeat: false };
         let output = run_echo_test(cmd).await;
@@ -196,7 +197,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_echo_with_machine() -> Result<()> {
         let client = fdomain_local::local_client(|| Err(fidl::Status::NOT_SUPPORTED));
         let fake_injector = FakeInjector {
@@ -235,5 +236,47 @@ mod test {
         let want = EchoMessage::Message("test".into());
         assert_eq!(json, json!(want));
         Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_direct_connection_behavior_in_strict() {
+        // This command will fail to run due to the lack of many flags, so this may become a bit of
+        // a thorn later depending on how `ffx-strict` behavior is implemented. For the time being,
+        // it's implemented here so as to be local to the command being tested.
+        let cmdline =
+            fho::FfxCommandLine::new(None, &["ffx", "--strict", "target", "echo"]).unwrap();
+        let context = cmdline.global.load_context(ExecutableKind::Test).unwrap();
+        assert!(
+            context.is_strict(),
+            "expected strict commandline to create strict environment context"
+        );
+        let fho_env = FhoEnvironment::new(&context, &cmdline);
+        let _tool = EchoTool::from_env(fho_env.clone(), EchoCommand { text: None, repeat: false })
+            .await
+            .unwrap();
+        assert!(matches!(
+            fho_env.behavior().await,
+            Some(FhoConnectionBehavior::DirectConnector(_))
+        ));
+    }
+
+    #[fuchsia::test]
+    async fn test_daemon_behavior_in_non_strict() {
+        // EVENTUALLY this will no longer be the default behavior, but we at least want to hit the
+        // correct code coverage to ensure we're able to swap between the two connectors.
+        let cmdline = fho::FfxCommandLine::new(None, &["ffx", "target", "echo"]).unwrap();
+        let context = cmdline.global.load_context(ExecutableKind::Test).unwrap();
+        assert!(
+            !context.is_strict(),
+            "expected non-strict commandline to create correct environment context"
+        );
+        let fho_env = FhoEnvironment::new(&context, &cmdline);
+        let _tool = EchoTool::from_env(fho_env.clone(), EchoCommand { text: None, repeat: false })
+            .await
+            .unwrap();
+        assert!(matches!(
+            fho_env.behavior().await,
+            Some(FhoConnectionBehavior::DaemonConnector(_))
+        ));
     }
 }
