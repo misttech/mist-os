@@ -272,6 +272,7 @@
                 "fuchsia.hardware.spmi.DebugService",
                 "fuchsia.hardware.suspend.SuspendService",
                 "fuchsia.power.broker.ElementInfoProviderService",
+                "fuchsia.storage.ftl.Service",
             ],
             from: "#bootstrap",
             to: "#core",

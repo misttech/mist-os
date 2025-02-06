@@ -419,6 +419,7 @@
                 "fuchsia.hardware.sockettunnel.Service",
                 "fuchsia.hardware.spmi.DebugService",
                 "fuchsia.hardware.suspend.SuspendService",
+                "fuchsia.storage.ftl.Service",
                 "fuchsia.sysinfo.Service",
             ],
             from: "#boot-drivers",

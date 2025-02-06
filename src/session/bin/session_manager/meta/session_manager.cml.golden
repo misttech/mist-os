@@ -448,6 +448,7 @@
                 // TODO: b/392629126. Evaluate routing driver FIDL through session_manager.
                 "fuchsia.hardware.gnss.Service",
                 "fuchsia.power.broker.ElementInfoProviderService",
+                "fuchsia.storage.ftl.Service",
             ],
             from: "parent",
             to: "#session",
