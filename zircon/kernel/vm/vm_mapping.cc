@@ -951,9 +951,6 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
       ("va", ktrace::Pointer{va}));
   canary_.Assert();
 
-  const size_t num_pages = additional_pages + 1;
-  DEBUG_ASSERT(num_pages > additional_pages);
-
   DEBUG_ASSERT(IS_PAGE_ALIGNED(va));
 
   // Fault batch size when num_pages > 1.
@@ -967,7 +964,7 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
 
   // Need to look up the mmu flags for this virtual address, as well as how large a region those
   // flags are for so we can cap the extra mappings we create.
-  MappingProtectionRanges::FlagsRange range =
+  const MappingProtectionRanges::FlagsRange range =
       ProtectRangesLocked().FlagsRangeAtAddr(base_, size_, va);
 
   // Build the mmu flags we need to have based on the page fault. This strategy of building the
@@ -1019,32 +1016,31 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
   const size_t num_protection_range_pages = (range.region_top - va) / PAGE_SIZE;
   const size_t num_vmo_pages = (vmo_size - vmo_offset) / PAGE_SIZE;
 
-  // Calculate the number of pages from va until the end of the page table, so we don't make extra
-  // page table allocations for opportunistic pages.
-  vaddr_t last_va = va + ((num_pages - 1) * PAGE_SIZE);
-  const uint64_t next_pt_base = ArchVmAspace::NextUserPageTableOffset(last_va);
-  const size_t num_pt_pages = (next_pt_base - va) / PAGE_SIZE;
-
-  // Number of requested pages, trimmed to protection range & VMO.
-  const size_t num_requested_pages =
-      ktl::min({num_pages, num_protection_range_pages, num_vmo_pages});
-  DEBUG_ASSERT(is_in_range_locked(va, num_requested_pages * PAGE_SIZE));
-
-  // Number of opporturtunistic pages we can fault after the requested range. Currently, this is
-  // only applied if faulting 1 page.
-  const size_t ceil_pages_with_opt = ktl::min(
-      {kPageFaultMaxOptimisticPages, num_pt_pages, num_protection_range_pages, num_vmo_pages});
-  const size_t num_opt_pages =
-      (num_requested_pages < ceil_pages_with_opt) ? ceil_pages_with_opt - num_requested_pages : 0;
-
   // Number of pages we're aiming to fault. If a range > 1 page is supplied, it is assumed the user
   // knows the appropriate range, so opportunistic pages will not be added.
-  const size_t num_fault_pages =
-      (num_pages == 1) ? num_requested_pages + num_opt_pages : num_requested_pages;
+  size_t num_fault_pages;
+  // Number of requested pages, trimmed to protection range & VMO.
+  size_t num_required_pages;
+  if (additional_pages == 0) {
+    // Calculate the number of pages from va until the end of the page table, so we don't make extra
+    // page table allocations for opportunistic pages.
+    const uint64_t next_pt_base = ArchVmAspace::NextUserPageTableOffset(va);
+    const size_t num_pt_pages = (next_pt_base - va) / PAGE_SIZE;
+    num_required_pages = 1;
+    // Number of opportunistic pages we can fault, including the required page.
+    num_fault_pages = ktl::min(
+        {kPageFaultMaxOptimisticPages, num_pt_pages, num_protection_range_pages, num_vmo_pages});
+  } else {
+    // Cap by requested pages
+    num_required_pages =
+        ktl::min({num_protection_range_pages, num_vmo_pages, additional_pages + 1});
+    num_fault_pages = num_required_pages;
+  }
+  DEBUG_ASSERT(num_required_pages > 0);
 
-  // Oppertunistic pages are not considered in currently_faulting optimisation, as it is not
+  // Opportunistic pages are not considered in currently_faulting optimisation, as it is not
   // guaranteed the mappings will be updated.
-  CurrentlyFaulting currently_faulting(this, vmo_offset, num_requested_pages * PAGE_SIZE);
+  CurrentlyFaulting currently_faulting(this, vmo_offset, num_required_pages * PAGE_SIZE);
 
   static constexpr uint64_t coalescer_size = ktl::max(kPageFaultMaxOptimisticPages, kBatchPages);
 
@@ -1067,10 +1063,10 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
 
     // Fault requested pages.
     uint64_t offset = 0;
-    for (; offset < (num_requested_pages * PAGE_SIZE); offset += PAGE_SIZE) {
+    for (; offset < (num_required_pages * PAGE_SIZE); offset += PAGE_SIZE) {
       uint curr_mmu_flags = range.mmu_flags;
 
-      uint num_curr_pages = static_cast<uint>(num_requested_pages - (offset / PAGE_SIZE));
+      uint num_curr_pages = static_cast<uint>(num_required_pages - (offset / PAGE_SIZE));
       __UNINITIALIZED zx::result<VmCowPages::LookupCursor::RequireResult> result =
           cursor->RequirePage(write, num_curr_pages, page_request);
       if (result.is_error()) {
@@ -1105,10 +1101,11 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
 
     // Fault opportunistic pages. If a range is supplied, it is assumed the user knows the
     // appropriate range, so opportunistic pages will not be fault.
-    if (num_fault_pages > num_requested_pages) {
+    if (additional_pages == 0) {
+      DEBUG_ASSERT(num_fault_pages > 0);
       // Check how much space the coalescer has for faulting additional pages.
-      size_t extra_pages = coalescer.ExtraPageCapacityFrom(last_va + PAGE_SIZE);
-      extra_pages = ktl::min(extra_pages, num_opt_pages);
+      size_t extra_pages = coalescer.ExtraPageCapacityFrom(va + PAGE_SIZE);
+      extra_pages = ktl::min(extra_pages, num_fault_pages - 1);
 
       // Acquire any additional pages, but only if they already exist as the user has not attempted
       // to use these pages yet.
