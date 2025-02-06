@@ -26,6 +26,16 @@ pub trait HandleDecoder: InternalHandleDecoder {
     fn handles_remaining(&mut self) -> usize;
 }
 
+impl<T: HandleDecoder> HandleDecoder for &mut T {
+    fn take_handle(&mut self) -> Result<Handle, DecodeError> {
+        T::take_handle(self)
+    }
+
+    fn handles_remaining(&mut self) -> usize {
+        T::handles_remaining(self)
+    }
+}
+
 /// An encoder which supports Zircon handles.
 pub trait HandleEncoder: InternalHandleEncoder {
     /// Pushes a handle into the encoder.
@@ -33,4 +43,14 @@ pub trait HandleEncoder: InternalHandleEncoder {
 
     /// Returns the number of handles added to the encoder.
     fn handles_pushed(&self) -> usize;
+}
+
+impl<T: HandleEncoder> HandleEncoder for &mut T {
+    fn push_handle(&mut self, handle: Handle) -> Result<(), EncodeError> {
+        T::push_handle(self, handle)
+    }
+
+    fn handles_pushed(&self) -> usize {
+        T::handles_pushed(self)
+    }
 }
