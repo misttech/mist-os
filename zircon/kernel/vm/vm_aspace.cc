@@ -581,14 +581,17 @@ zx_status_t VmAspace::PageFault(vaddr_t va, uint flags) {
   }
 
   VM_KTRACE_DURATION(2, "VmAspace::PageFault", ("va", va), ("flags", flags));
-  canary_.Assert();
-  LTRACEF("va %#" PRIxPTR ", flags %#x\n", va, flags);
-  DEBUG_ASSERT((flags & VMM_PF_FLAG_ACCESS) == 0);
 
   // With the original va logged in the traces can now convert to a page aligned address suitable
   // for passing to PageFaultLocked.
   va = ROUNDDOWN(va, PAGE_SIZE);
 
+  return PageFaultInternal(va, flags, 0);
+}
+
+zx_status_t VmAspace::PageFaultInternal(vaddr_t va, uint flags, size_t additional_pages) {
+  canary_.Assert();
+  DEBUG_ASSERT((flags & VMM_PF_FLAG_ACCESS) == 0);
   if (type_ == Type::GuestPhysical) {
     flags &= ~VMM_PF_FLAG_USER;
     flags |= VMM_PF_FLAG_GUEST;
@@ -625,7 +628,7 @@ zx_status_t VmAspace::PageFault(vaddr_t va, uint flags) {
       }
       DEBUG_ASSERT(last_fault_);
       AssertHeld(last_fault_->lock_ref());
-      status = last_fault_->PageFaultLocked(va, flags, &page_request);
+      status = last_fault_->PageFaultLocked(va, flags, additional_pages, &page_request);
     }
 
     if (status == ZX_ERR_SHOULD_WAIT) {
@@ -647,6 +650,30 @@ zx_status_t VmAspace::PageFault(vaddr_t va, uint flags) {
 zx_status_t VmAspace::SoftFault(vaddr_t va, uint flags) {
   // With the current implementation we can just reuse the internal PageFault mechanism.
   return PageFault(va, flags | VMM_PF_FLAG_SW_FAULT);
+}
+
+zx_status_t VmAspace::SoftFaultInRange(vaddr_t va, uint flags, size_t len) {
+  // If the fault was actually an access fault, handle that and return.
+  if (flags & VMM_PF_FLAG_ACCESS) {
+    // Assert that the translation bit is not set.
+    DEBUG_ASSERT((flags & VMM_PF_FLAG_NOT_PRESENT) == 0);
+    return AccessedFault(va);
+  }
+
+  VM_KTRACE_DURATION(2, "VmAspace::SoftFaultInRange", ("va", va), ("flags", flags), ("len", len));
+
+  DEBUG_ASSERT(len > 0);
+  uint64_t range_end;
+  bool overflow = add_overflow(va, len - 1, &range_end);
+  if (unlikely(overflow)) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+  DEBUG_ASSERT(va <= range_end);
+
+  const uint64_t va_page_base = ROUNDDOWN(va, PAGE_SIZE);
+  const uint64_t last_page_base = ROUNDDOWN(range_end, PAGE_SIZE);
+  const uint64_t extra_pages = (last_page_base - va_page_base) / PAGE_SIZE;
+  return PageFaultInternal(va_page_base, flags, extra_pages);
 }
 
 zx_status_t VmAspace::AccessedFault(vaddr_t va) {

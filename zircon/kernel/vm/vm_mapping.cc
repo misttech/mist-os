@@ -943,6 +943,7 @@ zx_status_t VmMapping::DestroyLocked() {
 }
 
 zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
+                                       const size_t additional_pages,
                                        MultiPageRequest* page_request) {
   VM_KTRACE_DURATION(
       2, "VmMapping::PageFault",
@@ -950,11 +951,8 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
       ("va", ktrace::Pointer{va}));
   canary_.Assert();
 
-  // Currently, PageFaultLocked only supports faulting a single page.
-  // TODO(https://fxbug.dev/380938506) expose num_pages argument to VmMapping::PageFaultLocked for
-  // use in VmAspace page fault functions. It will be the responsibility of the Aspace layer to
-  // calculate the fault range.
-  constexpr size_t num_pages = 1;
+  const size_t num_pages = additional_pages + 1;
+  DEBUG_ASSERT(num_pages > additional_pages);
 
   DEBUG_ASSERT(IS_PAGE_ALIGNED(va));
 

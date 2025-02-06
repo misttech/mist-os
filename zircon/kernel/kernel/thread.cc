@@ -256,6 +256,11 @@ zx_status_t Thread::Current::SoftFault(vaddr_t va, uint flags) {
   return Fault(va, [va, flags](VmAspace* aspace) { return aspace->SoftFault(va, flags); });
 }
 
+zx_status_t Thread::Current::SoftFaultInRange(vaddr_t va, uint flags, size_t len) {
+  return Fault(
+      va, [va, flags, len](VmAspace* aspace) { return aspace->SoftFaultInRange(va, flags, len); });
+}
+
 zx_status_t Thread::Current::AccessedFault(vaddr_t va) {
   return Fault(va, [va](VmAspace* aspace) { return aspace->AccessedFault(va); });
 }

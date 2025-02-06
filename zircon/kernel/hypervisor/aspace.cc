@@ -120,7 +120,7 @@ zx::result<> GuestPhysicalAspace::PageFault(zx_gpaddr_t guest_paddr) {
       if (mmu_flags & ARCH_MMU_FLAG_PERM_EXECUTE) {
         pf_flags |= VMM_PF_FLAG_INSTRUCTION;
       }
-      status = mapping->PageFaultLocked(guest_paddr, pf_flags, &page_request);
+      status = mapping->PageFaultLocked(guest_paddr, pf_flags, 0, &page_request);
     }
 
     if (status == ZX_ERR_SHOULD_WAIT) {

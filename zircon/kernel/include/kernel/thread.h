@@ -1446,6 +1446,7 @@ struct Thread : public ChainLockable {
     // `ThreadDispatcher`) is a programming error.
     static zx_status_t PageFault(vaddr_t va, uint flags);
     static zx_status_t SoftFault(vaddr_t va, uint flags);
+    static zx_status_t SoftFaultInRange(vaddr_t va, uint flags, size_t len);
     static zx_status_t AccessedFault(vaddr_t va);
 
     // Generate a backtrace for the calling thread.

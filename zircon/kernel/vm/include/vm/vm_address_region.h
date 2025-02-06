@@ -1019,11 +1019,18 @@ class VmMapping final : public VmAddressRegionOrMapping,
 
   void DumpLocked(uint depth, bool verbose) const TA_REQ(lock()) override;
 
-  // Page fault in an address within the mapping. The requested address must be paged aligned.
+  // Page fault in an address within the mapping. The requested address must be paged aligned. If
+  // |additional_pages| is non-zero, then up to that many additional pages may be resolved using the
+  // same |pf_flags|. It is not an error for the |additional_pages| to span beyond the mapping or
+  // underlying VMO, although the range will get truncated internally. As such only the page
+  // containing va is required to be resolved, and this method may return ZX_OK if any number,
+  // including zero, of the additional pages are resolved.
+  // As the |additional_pages| are resolved with the same |pf_flags| they may trigger copy-on-write
+  // or other allocations in the underlying VMO.
   // If this returns ZX_ERR_SHOULD_WAIT, then the caller should wait on |page_request|
   // and try again.
-  zx_status_t PageFaultLocked(vaddr_t va, uint pf_flags, MultiPageRequest* page_request)
-      TA_REQ(lock());
+  zx_status_t PageFaultLocked(vaddr_t va, uint pf_flags, size_t additional_pages,
+                              MultiPageRequest* page_request) TA_REQ(lock());
 
   // Apis intended for use by VmObject
 

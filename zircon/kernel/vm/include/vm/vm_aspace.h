@@ -183,6 +183,12 @@ class VmAspace : public fbl::DoublyLinkedListable<VmAspace*>, public fbl::RefCou
   //  * May be invoked spuriously in situations where the hardware mappings would have prevented a
   //    real PageFault from occurring.
   zx_status_t SoftFault(vaddr_t va, uint flags);
+  // Similar to SoftFault, but additionally takes a length indicating that the range of [va, va+len)
+  // is expected to be accessed with |flags| after resolving this fault. The aspace can take this
+  // range as a hint to attempt to preemptively avoid future faults.
+  // There are no alignment restrictions on |va| or |len|, although it is assumed that |len| is
+  // greater than zero.
+  zx_status_t SoftFaultInRange(vaddr_t va, uint flags, size_t len);
 
   // Generates an accessed flag fault against this aspace. This is a specialized version of
   // SoftFault that will only resolve a potential missing access flag and nothing else.
@@ -293,6 +299,9 @@ class VmAspace : public fbl::DoublyLinkedListable<VmAspace*>, public fbl::RefCou
   }
 
   fbl::RefPtr<VmAddressRegion> RootVmarLocked() TA_REQ(lock_);
+
+  // Internal helper for resolving page faults. Takes an aligned va.
+  zx_status_t PageFaultInternal(vaddr_t va, uint flags, size_t additional_pages);
 
   // magic
   fbl::Canary<fbl::magic("VMAS")> canary_;

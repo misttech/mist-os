@@ -1603,6 +1603,161 @@ static bool vm_mapping_page_fault_optimisation_test() {
   END_TEST;
 }
 
+static bool vm_mapping_page_fault_range_test() {
+  BEGIN_TEST;
+
+  AutoVmScannerDisable scanner_disable;
+
+  constexpr size_t kTestPages = 32;
+  constexpr size_t kAllocSize = kTestPages * PAGE_SIZE;
+  constexpr uint kReadFlags = VMM_PF_FLAG_USER;
+  constexpr uint kWriteFlags = VMM_PF_FLAG_USER | VMM_PF_FLAG_WRITE;
+  // Aligning the mapping is for when testing the optimistic fault handler to ensure that there are
+  // no spurious failures due to crossing a page table boundary.
+  static const uint8_t align_pow2 = log2_floor(kAllocSize);
+
+  fbl::RefPtr<VmObjectPaged> vmo;
+  ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kResizable, kAllocSize, &vmo));
+
+  ktl::unique_ptr<testing::UserMemory> mapping = testing::UserMemory::Create(vmo, 0, align_pow2);
+  ASSERT_NONNULL(mapping);
+
+  // Faulting even 1 additional page should prevent optimistic faulting.
+  {
+    // Decommit and recommit the VMO to ensure no page table mappings.
+    EXPECT_OK(vmo->DecommitRange(0, kAllocSize));
+    EXPECT_OK(vmo->CommitRange(0, kAllocSize));
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, 0));
+
+    // Fault a two page range should only give two pages.
+    EXPECT_OK(Thread::Current::SoftFaultInRange(mapping->base(), kReadFlags, PAGE_SIZE * 2));
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, 2));
+
+    // Reset and fault a single page to validate optimistic faulting would otherwise have happened.
+    EXPECT_OK(vmo->DecommitRange(0, kAllocSize));
+    EXPECT_OK(vmo->CommitRange(0, kAllocSize));
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, 0));
+    EXPECT_OK(Thread::Current::SoftFaultInRange(mapping->base(), kReadFlags, PAGE_SIZE));
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, 16));
+  }
+
+  // Will map in pages that are not committed on read without allocating.
+  {
+    // Start with one page committed.
+    EXPECT_OK(vmo->DecommitRange(0, kAllocSize));
+    EXPECT_OK(vmo->CommitRange(0, PAGE_SIZE));
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, 0));
+    EXPECT_TRUE(vmo->GetAttributedMemory() == make_private_attribution_counts(PAGE_SIZE, 0));
+
+    // Read faulting the range should map without allocating.
+    EXPECT_OK(Thread::Current::SoftFaultInRange(mapping->base(), kReadFlags, kAllocSize));
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, kTestPages));
+    EXPECT_TRUE(vmo->GetAttributedMemory() == make_private_attribution_counts(PAGE_SIZE, 0));
+  }
+
+  // Write faulting should cause allocations
+  {
+    // Start with one page committed.
+    EXPECT_OK(vmo->DecommitRange(0, kAllocSize));
+    EXPECT_OK(vmo->CommitRange(0, PAGE_SIZE));
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, 0));
+    EXPECT_TRUE(vmo->GetAttributedMemory() == make_private_attribution_counts(PAGE_SIZE, 0));
+
+    // Write faulting the range should both map and allocate the pages.
+    EXPECT_OK(Thread::Current::SoftFaultInRange(mapping->base(), kWriteFlags, kAllocSize));
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, kTestPages));
+    EXPECT_TRUE(vmo->GetAttributedMemory() == make_private_attribution_counts(kAllocSize, 0));
+  }
+
+  // Should not error if > VMO length.
+  {
+    EXPECT_OK(vmo->DecommitRange(0, kAllocSize));
+    // Shrink the VMO so that it is smaller than the mapping.
+    EXPECT_OK(vmo->Resize(kAllocSize / 2));
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, 0));
+
+    // Attempt to fault the entire mapping range, which is now larger than the VMO.
+    EXPECT_OK(Thread::Current::SoftFaultInRange(mapping->base(), kWriteFlags, kAllocSize));
+    // Only half should have been mapped and what is now the whole VMO should be committed.
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, kTestPages / 2));
+    EXPECT_TRUE(vmo->GetAttributedMemory() == make_private_attribution_counts(kAllocSize / 2, 0));
+
+    // Restore the VMO size.
+    EXPECT_OK(vmo->Resize(kAllocSize));
+  }
+
+  // Will respect protection boundaries.
+  {
+    EXPECT_OK(vmo->DecommitRange(0, kAllocSize));
+    // Remove write permissions from half the mapping.
+    EXPECT_OK(mapping->Protect(ARCH_MMU_FLAG_PERM_READ, kAllocSize / 2));
+
+    // Attempt to write fault the entire mapping.
+    EXPECT_OK(Thread::Current::SoftFaultInRange(mapping->base(), kWriteFlags, kAllocSize));
+    // Only the writable half should have been mapped and committed.
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, kTestPages / 2));
+    EXPECT_TRUE(vmo->GetAttributedMemory() == make_private_attribution_counts(kAllocSize / 2, 0));
+
+    // Reset protections.
+    EXPECT_OK(mapping->Protect(ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE));
+  }
+
+  // Will mark modified if even one writable page is mapped even if mapping aborts early due to an
+  // error.
+  {
+    // Create a pager backed VMO with one page committed and map it.
+    fbl::RefPtr<VmObjectPaged> paged_vmo;
+    ASSERT_OK(
+        make_partially_committed_pager_vmo(kTestPages, 1, false, false, true, nullptr, &paged_vmo));
+    ktl::unique_ptr<testing::UserMemory> paged_mapping = testing::UserMemory::Create(paged_vmo);
+
+    // Consume any existing modified flag.
+    zx_pager_vmo_stats_t stats;
+    EXPECT_OK(paged_vmo->QueryPagerVmoStats(true, &stats));
+    EXPECT_OK(paged_vmo->QueryPagerVmoStats(true, &stats));
+    EXPECT_EQ(stats.modified, 0u);
+
+    // Perform a fault that will have to generate a page request. To avoid blocking on the page
+    // request we must directly call the PageFaultLocked method instead of the VmAspace fault.
+    {
+      const vaddr_t base = paged_mapping->base();
+      Guard<CriticalMutex> guard{paged_mapping->mapping()->lock()};
+      MultiPageRequest page_request;
+      EXPECT_EQ(paged_mapping->mapping()->PageFaultLocked(base, kWriteFlags, kTestPages - 1,
+                                                          &page_request),
+                ZX_ERR_SHOULD_WAIT);
+    }
+
+    // The one previously committed page should have been mapped in and the VMO marked modified.
+    EXPECT_TRUE(verify_mapped_page_range(paged_mapping->base(), kAllocSize, 1));
+
+    EXPECT_OK(paged_vmo->QueryPagerVmoStats(true, &stats));
+    EXPECT_EQ(stats.modified, ZX_PAGER_VMO_STATS_MODIFIED);
+  }
+
+  // Read fault on copy-on-write hierarchy with some leaf pages will map both parent and child
+  // pages without committing extra pages into the child.
+  {
+    EXPECT_OK(vmo->CommitRange(0, kAllocSize));
+    // Create a snapshot with some committed pages and map it in.
+    fbl::RefPtr<VmObject> child_vmo;
+    ASSERT_OK(vmo->CreateClone(Resizability::NonResizable, SnapshotType::Full, 0, kAllocSize, true,
+                               &child_vmo));
+    EXPECT_OK(child_vmo->CommitRange(0, PAGE_SIZE));
+    EXPECT_OK(child_vmo->CommitRange(kAllocSize / 2, PAGE_SIZE));
+    ktl::unique_ptr<testing::UserMemory> child_mapping = testing::UserMemory::Create(child_vmo);
+
+    // Read fault the entire range. Everything should get mapped with the child's memory attribution
+    // being unchanged.
+    VmObject::AttributionCounts original_counts = child_vmo->GetAttributedMemory();
+    EXPECT_OK(Thread::Current::SoftFaultInRange(child_mapping->base(), kReadFlags, kAllocSize));
+    EXPECT_TRUE(verify_mapped_page_range(child_mapping->base(), kAllocSize, kTestPages));
+    EXPECT_TRUE(original_counts == child_vmo->GetAttributedMemory());
+  }
+
+  END_TEST;
+}
+
 static bool arch_noncontiguous_map() {
   BEGIN_TEST;
 
@@ -2659,6 +2814,7 @@ VM_UNITTEST(vm_mapping_attribution_map_unmap_test)
 VM_UNITTEST(vm_mapping_attribution_merge_test)
 VM_UNITTEST(vm_mapping_sparse_mapping_test)
 VM_UNITTEST(vm_mapping_page_fault_optimisation_test)
+VM_UNITTEST(vm_mapping_page_fault_range_test)
 VM_UNITTEST(arch_is_user_accessible_range)
 VM_UNITTEST(validate_user_address_range)
 VM_UNITTEST(arch_noncontiguous_map)
