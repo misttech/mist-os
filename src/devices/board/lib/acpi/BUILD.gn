@@ -4,8 +4,6 @@
 import("//build/components.gni")
 import("//build/test.gni")
 
-import("//src/devices/bus/drivers/pci/pci.gni")
-
 declare_args() {
   # If true, power on the Atlas camera at boot.
   # TODO(https://fxbug.dev/42162166): remove once we have a better way to manage ACPI device power.
@@ -111,6 +109,10 @@ source_set("acpi") {
     "irq-fragment.h",
     "manager.cc",
     "manager.h",
+    "pci.cc",
+    "pci.h",
+    "pci_irqs.cc",
+    "pciroot.cc",
     "power-resource.cc",
     "power-resource.h",
     "resources.cc",
@@ -118,15 +120,6 @@ source_set("acpi") {
   ]
 
   defines = []
-
-  if (platform_enable_user_pci) {
-    sources += [
-      "pci.cc",
-      "pci.h",
-      "pci_irqs.cc",
-      "pciroot.cc",
-    ]
-  }
 
   if (i_can_haz_atlas_camera) {
     defines += [ "ENABLE_ATLAS_CAMERA" ]
@@ -139,6 +132,9 @@ source_set("acpi") {
   # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
   # rather than builders.
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
+}
+
+source_set("acpi-pci") {
 }
 
 test("acpi-test") {
