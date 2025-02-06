@@ -1605,6 +1605,75 @@ static bool vm_mapping_page_fault_optimisation_test() {
   END_TEST;
 }
 
+// Validate that the page fault optimisation correctly respects page table boundaries.
+static bool vm_mapping_page_fault_optimization_pt_limit_test() {
+  BEGIN_TEST;
+
+  AutoVmScannerDisable scanner_disable;
+
+  constexpr size_t kMaxOptPages = VmMapping::kPageFaultMaxOptimisticPages;
+  // Size our top level vmar allocation to be two page tables in size, ensuring that we will both
+  // have a page table boundary crossing in the allocation, as well as some amount of allocation on
+  // either side of it.
+  constexpr size_t kPageTableSize = ArchVmAspace::NextUserPageTableOffset(0);
+  constexpr size_t kVmarSize = kPageTableSize * 2;
+  // Align our allocation on a page table boundary, ensuring we have 1 page table worth of space
+  // before and after our PT crossing point.
+  constexpr size_t kVmarAlign = log2_floor(kPageTableSize);
+  // Size the allocation of the VMO / mapping to be double the optimistic extension so we can
+  // validate that it is limited by the optimistic cap, not the size of the VMO.
+  constexpr size_t kMapSize = kMaxOptPages * 2 * PAGE_SIZE;
+
+  // Allocate our large top level vmar in root vmar of the current aspace.
+  fbl::RefPtr<VmAddressRegion> root_vmar = Thread::Current::active_aspace()->RootVmar();
+  fbl::RefPtr<VmAddressRegion> vmar;
+  ASSERT_OK(root_vmar->CreateSubVmar(0, kVmarSize, kVmarAlign,
+                                     VMAR_FLAG_CAN_MAP_READ | VMAR_FLAG_CAN_MAP_WRITE |
+                                         VMAR_FLAG_CAN_MAP_EXECUTE | VMAR_FLAG_CAN_MAP_SPECIFIC,
+                                     "unittest", &vmar));
+  auto cleanup_vmar = fit::defer([&] { vmar->Destroy(); });
+
+  const vaddr_t next_pt_base = ArchVmAspace::NextUserPageTableOffset(vmar->base());
+  // If our alignment was specified correctly the next pt should be exactly one pt from our base.
+  ASSERT_EQ(vmar->base() + kPageTableSize, next_pt_base);
+
+  // Try touching at different distances from the start of the next page table and validate that
+  // mappings are not added beyond it.
+  for (size_t page_offset = 0; page_offset <= kMaxOptPages + 1; page_offset++) {
+    // Create a subvmar at the correct offset that will precisely hold our mapping.
+    fbl::RefPtr<VmAddressRegion> sub_vmar;
+    const size_t offset = kPageTableSize - PAGE_SIZE * page_offset;
+    ASSERT_OK(vmar->CreateSubVmar(offset, kMapSize, 0,
+                                  VMAR_FLAG_CAN_MAP_READ | VMAR_FLAG_CAN_MAP_WRITE |
+                                      VMAR_FLAG_CAN_MAP_EXECUTE | VMAR_FLAG_SPECIFIC,
+                                  "unittest", &sub_vmar));
+    auto cleanup_sub_vmar = fit::defer([&] { sub_vmar->Destroy(); });
+
+    fbl::RefPtr<VmObjectPaged> committed_vmo;
+    ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, kMapSize, &committed_vmo));
+
+    ktl::unique_ptr<testing::UserMemory> mapping =
+        testing::UserMemory::CreateInVmar(committed_vmo, sub_vmar);
+    ASSERT_NONNULL(mapping);
+
+    committed_vmo->CommitRange(0, kMapSize);
+
+    // Trigger a page fault on the first page of the mapping.
+    mapping->put(42);
+
+    // We expect the number of pages that are mapped in to be clipped at the page table boundary,
+    // which would be |page_offset|. The two exceptions to this are if page_offset is greater than
+    // kMaxOptPages, in which case that becomes the cap, or if the page_offset is 0, in which case
+    // we are actually at the *start* of the next page table, and so kMaxOptPages should get mapped.
+    const size_t kExpectedPages =
+        page_offset == 0 ? kMaxOptPages : ktl::min(kMaxOptPages, page_offset);
+
+    ASSERT_TRUE(verify_mapped_page_range(mapping->base(), kMapSize, kExpectedPages));
+  }
+
+  END_TEST;
+}
+
 static bool vm_mapping_page_fault_range_test() {
   BEGIN_TEST;
 
@@ -2817,6 +2886,7 @@ VM_UNITTEST(vm_mapping_attribution_map_unmap_test)
 VM_UNITTEST(vm_mapping_attribution_merge_test)
 VM_UNITTEST(vm_mapping_sparse_mapping_test)
 VM_UNITTEST(vm_mapping_page_fault_optimisation_test)
+VM_UNITTEST(vm_mapping_page_fault_optimization_pt_limit_test)
 VM_UNITTEST(vm_mapping_page_fault_range_test)
 VM_UNITTEST(arch_is_user_accessible_range)
 VM_UNITTEST(validate_user_address_range)
