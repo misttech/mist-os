@@ -24,6 +24,12 @@
             to: "#testing",
         },
         {
+            protocol: "fuchsia.fshost.StarnixVolumeProvider",
+            from: "parent",
+            to: "#testing",
+            availability: "optional",
+        },
+        {
             protocol: [
                 "fuchsia.boot.ReadOnlyLog",
                 "fuchsia.boot.WriteOnlyLog",

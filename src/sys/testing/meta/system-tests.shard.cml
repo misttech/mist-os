@@ -41,6 +41,12 @@
             to: "#system-tests",
             scope: "#system-tests",
         },
+        {
+            protocol: "fuchsia.fshost.StarnixVolumeProvider",
+            from: "parent",
+            to: "#system-tests",
+            availability: "optional",
+        },
 
         // These capabilities are offered for use by certain non-hermetic tests.
         {

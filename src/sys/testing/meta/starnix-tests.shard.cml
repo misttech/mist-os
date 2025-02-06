@@ -41,6 +41,12 @@
             scope: "#starnix-tests",
         },
         {
+            protocol: "fuchsia.fshost.StarnixVolumeProvider",
+            from: "parent",
+            to: "#starnix-tests",
+            availability: "optional",
+        },
+        {
             protocol: [
                 "fuchsia.audio.device.ControlCreator",
                 "fuchsia.audio.device.Provider",
