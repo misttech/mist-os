@@ -9,7 +9,7 @@ import("//build/test.gni")
 sdk_source_set("cpp") {
   category = "partner"
   stable = true
-  sdk_name = "fake_mmio_reg_cpp"
+  sdk_name = "driver_fake_mmio_reg_cpp"
   include_base = "//sdk"
 
   sources = [

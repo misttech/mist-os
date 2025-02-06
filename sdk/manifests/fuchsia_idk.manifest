@@ -83,7 +83,7 @@ cc_source_library://pkg/driver_runtime_testing_cpp
 cc_source_library://pkg/driver_symbols
 cc_source_library://pkg/driver_testing_cpp
 cc_source_library://pkg/driver_testing_scoped_global_logger_cpp
-cc_source_library://pkg/fake_mmio_reg_cpp
+cc_source_library://pkg/driver_fake_mmio_reg_cpp
 cc_source_library://pkg/fidl
 cc_source_library://pkg/fidl_base
 cc_source_library://pkg/fidl_cpp
