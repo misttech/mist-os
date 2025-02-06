@@ -731,7 +731,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8723728773911362737"`
+**Current value for `target_cpu = "arm64"`:** `"8723683468169720817"`
 
 From //out/not-default/args.gn:10
 
@@ -739,7 +739,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8723728773911362737"`
+**Current value for `target_cpu = "riscv64"`:** `"8723683468169720817"`
 
 From //out/not-default/args.gn:10
 
@@ -747,7 +747,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8723728773911362737"`
+**Current value for `target_cpu = "x64"`:** `"8723683468169720817"`
 
 From //out/not-default/args.gn:10
 
@@ -2172,7 +2172,7 @@ From //build/images/custom_signing.gni:26
 
 **Current value (from the default):** `""`
 
-From //third_party/Vulkan-Loader/BUILD.gn:21
+From //third_party/Vulkan-Loader/src/BUILD.gn:21
 
 ### cxx_rbe_check
 
