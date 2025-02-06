@@ -33,6 +33,8 @@ class PDev {
 
   zx::result<fdf::MmioBuffer> MapMmio(
       uint32_t index, uint32_t cache_policy = ZX_CACHE_POLICY_UNCACHED_DEVICE) const;
+  zx::result<fdf::MmioBuffer> MapMmio(
+      cpp17::string_view name, uint32_t cache_policy = ZX_CACHE_POLICY_UNCACHED_DEVICE) const;
 
   template <typename FidlType>
   zx::result<FidlType> GetFidlMetadata(std::string_view metadata_id) const {
@@ -63,6 +65,7 @@ class PDev {
     zx::vmo vmo;
   };
   zx::result<MmioInfo> GetMmio(uint32_t index) const;
+  zx::result<MmioInfo> GetMmio(cpp17::string_view name) const;
 
   zx::result<zx::interrupt> GetInterrupt(uint32_t index, uint32_t flags = 0) const;
   zx::result<zx::interrupt> GetInterrupt(cpp17::string_view name, uint32_t flags = 0) const;

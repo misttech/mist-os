@@ -34,7 +34,11 @@ class FakePDev final : public fidl::WireServer<fuchsia_hardware_platform_device:
 
   using MetadataMap =
       std::unordered_map<std::string, std::vector<uint8_t>, StringHash, std::equal_to<>>;
-  using InterruptNamesMap = std::unordered_map<std::string, uint32_t, StringHash, std::equal_to<>>;
+  using ResourceNamesMap = std::unordered_map<std::string, uint32_t, StringHash, std::equal_to<>>;
+
+  // Use `ResourceNamesMap` instead.
+  // TODO(b/394855439): Remove type once no longer referenced.
+  using InterruptNamesMap = ResourceNamesMap;
 
   struct Config final {
     // If true, a bti will be generated lazily if it does not exist.
@@ -46,9 +50,20 @@ class FakePDev final : public fidl::WireServer<fuchsia_hardware_platform_device:
     // If true, an irq will be generated lazily if it does not exist.
     bool use_fake_irq = false;
 
+    // Key is the index of the mmio.
     std::map<uint32_t, Mmio> mmios;
+
+    // Maps the name of an mmio to the index of the mmio. The key is the name of the mmio and the
+    // value is the index of the mmio.
+    ResourceNamesMap mmio_names;
+
+    // Key is the index of the interrupt.
     std::map<uint32_t, zx::interrupt> irqs;
-    InterruptNamesMap irq_names;
+
+    // Maps the name of an interrupt to the index of the interrupt. The key is the name of the
+    // interrupt and the value is the index of the interrupt.
+    ResourceNamesMap irq_names;
+
     std::map<uint32_t, zx::bti> btis;
     std::map<uint32_t, zx::resource> smcs;
 
@@ -124,9 +139,13 @@ class FakePDev final : public fidl::WireServer<fuchsia_hardware_platform_device:
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
   zx::result<zx::interrupt> GetInterruptById(uint32_t index);
+  zx::result<fuchsia_hardware_platform_device::wire::Mmio> GetMmioById(uint32_t index,
+                                                                       fidl::AnyArena& arena);
 
   Config config_;
   fidl::ServerBindingGroup<fuchsia_hardware_platform_device::Device> binding_group_;
+
+  // Key is the ID of the metadata and value is the encoded metadata.
   MetadataMap metadata_;
 };
 

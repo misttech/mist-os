@@ -82,6 +82,7 @@ TEST(PDevTest, GetMmios) {
   constexpr uint32_t kMmioId = 5;
   constexpr zx_off_t kMmioOffset = 10;
   constexpr size_t kMmioSize = 11;
+  constexpr cpp17::string_view kMmioName = "test-name";
   std::map<uint32_t, fdf_fake::Mmio> mmios;
   {
     fdf::PDev::MmioInfo mmio{
@@ -91,20 +92,32 @@ TEST(PDevTest, GetMmios) {
     ASSERT_OK(zx::vmo::create(0, 0, &mmio.vmo));
     mmios[kMmioId] = std::move(mmio);
   }
+  fdf_fake::FakePDev::ResourceNamesMap mmio_names = {{std::string(kMmioName), kMmioId}};
 
   FakePDevWithThread infra;
-  zx::result client_channel = infra.Start({
-      .mmios = std::move(mmios),
-  });
+  zx::result client_channel =
+      infra.Start({.mmios = std::move(mmios), .mmio_names = std::move(mmio_names)});
   ASSERT_OK(client_channel);
 
   fdf::PDev pdev{std::move(client_channel.value())};
-  zx::result mmio = pdev.GetMmio(kMmioId);
-  ASSERT_OK(mmio.status_value());
-  ASSERT_EQ(kMmioOffset, mmio->offset);
-  ASSERT_EQ(kMmioSize, mmio->size);
 
-  ASSERT_EQ(ZX_ERR_NOT_FOUND, pdev.GetMmio(4).status_value());
+  // Verify that an mmio can be retrieved using its ID.
+  {
+    zx::result mmio = pdev.GetMmio(kMmioId);
+    ASSERT_OK(mmio.status_value());
+    ASSERT_EQ(kMmioOffset, mmio->offset);
+    ASSERT_EQ(kMmioSize, mmio->size);
+    ASSERT_EQ(ZX_ERR_NOT_FOUND, pdev.GetMmio(4).status_value());
+  }
+
+  // Verify that an mmio can be retrieved using its name.
+  {
+    zx::result mmio = pdev.GetMmio(kMmioName);
+    ASSERT_OK(mmio.status_value());
+    ASSERT_EQ(kMmioOffset, mmio->offset);
+    ASSERT_EQ(kMmioSize, mmio->size);
+    ASSERT_EQ(ZX_ERR_NOT_FOUND, pdev.GetMmio("unknown-name").status_value());
+  }
 }
 
 TEST(PDevTest, GetMmioBuffer) {
@@ -173,26 +186,6 @@ TEST(PDevTest, InvalidMmioHandle) {
 
 TEST(PDevTest, GetIrqs) {
   constexpr uint32_t kIrqId = 5;
-  std::map<uint32_t, zx::interrupt> irqs;
-  {
-    zx::interrupt irq;
-    ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq));
-    irqs[kIrqId] = std::move(irq);
-  }
-
-  FakePDevWithThread infra;
-  zx::result client_channel = infra.Start({
-      .irqs = std::move(irqs),
-  });
-  ASSERT_OK(client_channel);
-
-  fdf::PDev pdev{std::move(client_channel.value())};
-  ASSERT_OK(pdev.GetInterrupt(kIrqId, 0).status_value());
-  ASSERT_EQ(ZX_ERR_NOT_FOUND, pdev.GetInterrupt(4, 0).status_value());
-}
-
-TEST(PDevTest, GetIrqsByName) {
-  constexpr uint32_t kIrqId = 5;
   constexpr cpp17::string_view kIrqName = "test-name";
   std::map<uint32_t, zx::interrupt> irqs;
   {
@@ -200,15 +193,22 @@ TEST(PDevTest, GetIrqsByName) {
     ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq));
     irqs[kIrqId] = std::move(irq);
   }
-  fdf_fake::FakePDev::InterruptNamesMap irq_names;
-  irq_names.insert({std::string(kIrqName), kIrqId});
+  fdf_fake::FakePDev::ResourceNamesMap irq_names = {{std::string(kIrqName), kIrqId}};
 
   FakePDevWithThread infra;
-  zx::result client_channel =
-      infra.Start({.irqs = std::move(irqs), .irq_names = std::move(irq_names)});
+  zx::result client_channel = infra.Start({
+      .irqs = std::move(irqs),
+      .irq_names = std::move(irq_names),
+  });
   ASSERT_OK(client_channel);
 
   fdf::PDev pdev{std::move(client_channel.value())};
+
+  // Verify that an interrupt can be retrieved using its ID.
+  ASSERT_OK(pdev.GetInterrupt(kIrqId, 0).status_value());
+  ASSERT_EQ(ZX_ERR_NOT_FOUND, pdev.GetInterrupt(4, 0).status_value());
+
+  // Verify that an interrupt can be retrieved using its name.
   ASSERT_OK(pdev.GetInterrupt(kIrqName, 0).status_value());
   ASSERT_EQ(ZX_ERR_NOT_FOUND, pdev.GetInterrupt("unknown-name", 0).status_value());
 }

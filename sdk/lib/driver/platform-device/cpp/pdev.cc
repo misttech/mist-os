@@ -19,9 +19,39 @@ zx::result<fdf::MmioBuffer> PDev::MapMmio(uint32_t index, uint32_t cache_policy)
   return internal::PDevMakeMmioBufferWeak(*pdev_mmio, cache_policy);
 }
 
+zx::result<fdf::MmioBuffer> PDev::MapMmio(cpp17::string_view name, uint32_t cache_policy) const {
+  zx::result pdev_mmio = GetMmio(name);
+  if (pdev_mmio.is_error()) {
+    return pdev_mmio.take_error();
+  }
+  return internal::PDevMakeMmioBufferWeak(*pdev_mmio, cache_policy);
+}
+
 zx::result<PDev::MmioInfo> PDev::GetMmio(uint32_t index) const {
   fidl::WireResult<fuchsia_hardware_platform_device::Device::GetMmioById> result =
       pdev_->GetMmioById(index);
+  if (result.status() != ZX_OK) {
+    return zx::error(result.status());
+  }
+  if (!result->is_ok()) {
+    return zx::error(result->error_value());
+  }
+  MmioInfo out_mmio = {};
+  if (result->value()->has_offset()) {
+    out_mmio.offset = result->value()->offset();
+  }
+  if (result->value()->has_size()) {
+    out_mmio.size = result->value()->size();
+  }
+  if (result->value()->has_vmo()) {
+    out_mmio.vmo = std::move(result->value()->vmo());
+  }
+  return zx::ok(std::move(out_mmio));
+}
+
+zx::result<PDev::MmioInfo> PDev::GetMmio(cpp17::string_view name) const {
+  fidl::WireResult<fuchsia_hardware_platform_device::Device::GetMmioByName> result =
+      pdev_->GetMmioByName(fidl::StringView::FromExternal(name));
   if (result.status() != ZX_OK) {
     return zx::error(result.status());
   }
