@@ -85,6 +85,20 @@ enum RemoveResult<V: Clone> {
     Underflow(V),
 }
 
+/// Where to place the iteration cursor relative to the specified key.
+///
+/// This enum lets us distinguish between `Bound::Excluded` and `Bound::Included` when initializing
+/// an iterator for a range query. We use `At` and `After` instead of `Excluded` and `Included`
+/// because the cursor position we want for `Excluded` and `Included` depends on whether we are
+/// initializing the start or end bound of the iterator.
+enum CursorPosition {
+    /// Place the cursor on the index at which the key is stored.
+    At,
+
+    /// Place the cursor on the index after index at which the key is stored.
+    After,
+}
+
 impl<K, V, const N: usize> NodeLeaf<K, V, N>
 where
     K: Ord + Clone,
@@ -121,12 +135,15 @@ where
     fn find_key<'a>(
         self: &'a Arc<Self>,
         key: &K,
-        inclusive: bool,
+        position: CursorPosition,
         stack: &mut Vec<Cursor<'a, K, V, N>>,
     ) {
         match self.keys.binary_search(key) {
             Ok(i) => {
-                let i = if inclusive { i } else { i + 1 };
+                let i = match position {
+                    CursorPosition::At => i,
+                    CursorPosition::After => i + 1,
+                };
                 stack.push(Cursor { node: NodeRef::Leaf(self), index: i });
             }
             Err(i) => {
@@ -169,6 +186,7 @@ where
         }
     }
 
+    /// From the entry with the given key from this leaf node.
     fn remove(&mut self, key: &K) -> RemoveResult<V> {
         match self.keys.binary_search(key) {
             Ok(i) => {
@@ -200,6 +218,7 @@ where
     K: Ord + Clone,
     V: Clone,
 {
+    /// Create a child list that has no children.
     fn new_empty(&self) -> Self {
         match self {
             ChildList::Leaf(_) => ChildList::Leaf(ArrayVec::new()),
@@ -215,6 +234,7 @@ where
         }
     }
 
+    /// The number of gradchildren located at the child with the given index.
     fn size_at(&self, i: usize) -> usize {
         match self {
             ChildList::Leaf(children) => children[i].keys.len(),
@@ -222,6 +242,7 @@ where
         }
     }
 
+    /// Obtain the child located at the given index.
     fn get(&self, i: usize) -> Node<K, V, N> {
         match self {
             ChildList::Leaf(children) => Node::Leaf(children[i].clone()),
@@ -229,6 +250,7 @@ where
         }
     }
 
+    /// Get a reference to the child located at the given index.
     fn get_ref(&self, i: usize) -> NodeRef<'_, K, V, N> {
         match self {
             ChildList::Leaf(children) => NodeRef::Leaf(&children[i]),
@@ -246,6 +268,9 @@ where
         }
     }
 
+    /// Removes all the entries prior to the given index from the child list.
+    ///
+    /// The removed entries are returned in a new child list.
     fn split_off_front(&mut self, index: usize) -> Self {
         match self {
             ChildList::Leaf(children) => ChildList::Leaf(children.drain(..index).collect()),
@@ -275,6 +300,7 @@ where
         }
     }
 
+    /// Remove the child at the given index from the child list.
     fn remove(&mut self, index: usize) {
         match self {
             ChildList::Leaf(children) => {
@@ -286,6 +312,7 @@ where
         }
     }
 
+    /// Add the children from the given `ChildList` to this child list.
     fn extend(&mut self, other: &Self) {
         match (self, other) {
             (ChildList::Leaf(self_children), ChildList::Leaf(other_children)) => {
@@ -390,14 +417,14 @@ where
     fn find_key<'a>(
         self: &'a Arc<Self>,
         key: &K,
-        inclusive: bool,
+        position: CursorPosition,
         stack: &mut Vec<Cursor<'a, K, V, N>>,
     ) {
         let i = self.get_child_index(&key);
-        stack.push(Cursor { node: NodeRef::Internal(self), index: i + 1 });
+        stack.push(Cursor { node: NodeRef::Internal(self), index: i });
         match &self.children {
-            ChildList::Leaf(children) => children[i].find_key(key, inclusive, stack),
-            ChildList::Internal(children) => children[i].find_key(key, inclusive, stack),
+            ChildList::Leaf(children) => children[i].find_key(key, position, stack),
+            ChildList::Internal(children) => children[i].find_key(key, position, stack),
         }
     }
 
@@ -450,6 +477,11 @@ where
         }
     }
 
+    /// Determine whether to rebalance the child with the given index to the left or to the right.
+    ///
+    /// Given a choice, we will rebalance the child with its larger neighbor.
+    ///
+    /// The indices returned are always sequential.
     fn select_children_to_rebalance(&self, i: usize) -> (usize, usize) {
         if i == 0 {
             (i, i + 1)
@@ -468,6 +500,10 @@ where
         }
     }
 
+    /// Rebalance the child at the given index.
+    ///
+    /// If the child and its neighbor are sufficiently small, this function will merge them into a
+    /// single node.
     fn rebalance_child(&mut self, i: usize) {
         // Cannot rebalance if we have fewer than two children. This situation occurs only at the
         // root of the tree.
@@ -562,6 +598,7 @@ where
         }
     }
 
+    /// Remove the child with the given key from this subtree.
     fn remove(&mut self, key: &K) -> RemoveResult<V> {
         let i = self.get_child_index(&key);
         let result = match &mut self.children {
@@ -603,6 +640,14 @@ where
         match self {
             Node::Internal(node) => node.get(key),
             Node::Leaf(node) => node.get(key),
+        }
+    }
+
+    /// The number of children stored at this node.
+    fn len(&self) -> usize {
+        match self {
+            Node::Internal(node) => node.children.len(),
+            Node::Leaf(node) => node.keys.len(),
         }
     }
 
@@ -649,10 +694,15 @@ where
     }
 
     /// Find the given key in this node and record its position in the given stack.
-    fn find_key<'a>(&'a self, key: &K, inclusive: bool, stack: &mut Vec<Cursor<'a, K, V, N>>) {
+    fn find_key<'a>(
+        &'a self,
+        key: &K,
+        position: CursorPosition,
+        stack: &mut Vec<Cursor<'a, K, V, N>>,
+    ) {
         match self {
-            Node::Internal(node) => node.find_key(key, inclusive, stack),
-            Node::Leaf(node) => node.find_key(key, inclusive, stack),
+            Node::Internal(node) => node.find_key(key, position, stack),
+            Node::Leaf(node) => node.find_key(key, position, stack),
         }
     }
 }
@@ -667,16 +717,107 @@ enum NodeRef<'a, K: Ord + Clone, V: Clone, const N: usize> {
     Leaf(&'a Arc<NodeLeaf<K, V, N>>),
 }
 
+impl<'a, K, V, const N: usize> NodeRef<'a, K, V, N>
+where
+    K: Ord + Clone,
+    V: Clone,
+{
+    /// The number of children stored at this node.
+    fn len(&self) -> usize {
+        match self {
+            NodeRef::Internal(node) => node.children.len(),
+            NodeRef::Leaf(node) => node.keys.len(),
+        }
+    }
+}
+
+impl<'a, K, V, const N: usize> PartialEq for NodeRef<'a, K, V, N>
+where
+    K: Ord + Clone,
+    V: Clone,
+{
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (NodeRef::Internal(lhs), NodeRef::Internal(rhs)) => Arc::ptr_eq(lhs, rhs),
+            (NodeRef::Leaf(lhs), NodeRef::Leaf(rhs)) => Arc::ptr_eq(lhs, rhs),
+            _ => false,
+        }
+    }
+}
+
+/// A cursor into a tree node.
 #[derive(Debug)]
 struct Cursor<'a, K: Ord + Clone, V: Clone, const N: usize> {
+    /// The node pointed to by the cursor.
     node: NodeRef<'a, K, V, N>,
+
+    /// The index of the child within `node` pointed to by the cursor.
     index: usize,
 }
 
 /// An iterator over the key-value pairs stored in a CowMap.
 #[derive(Debug)]
 pub struct Iter<'a, K: Ord + Clone, V: Clone, const N: usize> {
-    stack: Vec<Cursor<'a, K, V, N>>,
+    /// The state of the forward iteration.
+    ///
+    /// Represents a stack of cursors into the tree. For internal nodes, the cursor points to the
+    /// child currently being iterated. For leaf nodes, the cursor points to the next entry to
+    /// enumerate.
+    forward: Vec<Cursor<'a, K, V, N>>,
+
+    /// The state of the backward iteration.
+    ///
+    /// Represents a stack of cursors into the tree. For internal nodes, the cursor points to the
+    /// child currently being iterated. For leaf nodes, the cursor points to the child that was
+    /// most recently iterated or just past the end of the entry list if no entries have been
+    /// enumerated from this leaf yet.
+    backward: Vec<Cursor<'a, K, V, N>>,
+}
+
+impl<'a, K, V, const N: usize> Iter<'a, K, V, N>
+where
+    K: Ord + Clone,
+    V: Clone,
+{
+    /// Whether the iterator is complete.
+    ///
+    /// Iteration stops when the forward and backward iterators meet.
+    fn is_done(&self) -> bool {
+        if let (Some(lhs), Some(rhs)) = (self.forward.last(), self.backward.last()) {
+            lhs.node == rhs.node && lhs.index == rhs.index
+        } else {
+            true
+        }
+    }
+
+    /// The cursor at the top of the forward stack.
+    fn forward_cursor(&mut self) -> Option<&mut Cursor<'a, K, V, N>> {
+        if self.is_done() {
+            None
+        } else {
+            self.forward.last_mut()
+        }
+    }
+
+    /// The cursor at the top of the backward stack.
+    fn backward_cursor(&mut self) -> Option<&mut Cursor<'a, K, V, N>> {
+        if self.is_done() {
+            None
+        } else {
+            self.backward.last_mut()
+        }
+    }
+
+    /// Pop the forward cursor stack.
+    ///
+    /// This function exists because we need to advance the cursor at the top of the forward stack
+    /// whenever we pop in order to proceed to the next child.
+    fn forward_pop(&mut self) {
+        self.forward.pop();
+        if let Some(cursor) = self.forward.last_mut() {
+            cursor.index += 1;
+        }
+    }
 }
 
 impl<'a, K, V, const N: usize> Iterator for Iter<'a, K, V, N>
@@ -687,7 +828,7 @@ where
     type Item = (&'a K, &'a V);
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(cursor) = self.stack.last_mut() {
+        while let Some(cursor) = self.forward_cursor() {
             match cursor.node {
                 NodeRef::Leaf(node) => {
                     if cursor.index < node.keys.len() {
@@ -696,16 +837,15 @@ where
                         cursor.index += 1;
                         return Some((key, value));
                     } else {
-                        self.stack.pop();
+                        self.forward_pop();
                     }
                 }
                 NodeRef::Internal(node) => {
                     if cursor.index < node.children.len() {
                         let child = node.children.get_ref(cursor.index);
-                        cursor.index += 1;
-                        self.stack.push(Cursor { node: child, index: 0 });
+                        self.forward.push(Cursor { node: child, index: 0 });
                     } else {
-                        self.stack.pop();
+                        self.forward_pop();
                     }
                 }
             }
@@ -714,42 +854,37 @@ where
     }
 }
 
-/// Iterator for a range of values in a CowMap.
-#[derive(Debug)]
-pub struct Range<'a, K: Ord + Clone, V: Clone, const N: usize> {
-    /// The underlying iterator for the map.
-    iter: Iter<'a, K, V, N>,
-
-    /// The bound at which to stop the iteration.
-    end_bound: Bound<K>,
-}
-
-impl<'a, K, V, const N: usize> Iterator for Range<'a, K, V, N>
+impl<'a, K, V, const N: usize> DoubleEndedIterator for Iter<'a, K, V, N>
 where
     K: Ord + Clone,
     V: Clone,
 {
-    type Item = (&'a K, &'a V);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let (key, value) = self.iter.next()?;
-        match &self.end_bound {
-            Bound::Unbounded => Some((key, value)),
-            Bound::Excluded(bound) => {
-                if key < bound {
-                    Some((key, value))
-                } else {
-                    None
+    fn next_back(&mut self) -> Option<Self::Item> {
+        while let Some(cursor) = self.backward_cursor() {
+            match cursor.node {
+                NodeRef::Leaf(node) => {
+                    if cursor.index > 0 {
+                        cursor.index -= 1;
+                        let key = &node.keys[cursor.index];
+                        let value = &node.values[cursor.index];
+                        return Some((key, value));
+                    } else {
+                        self.backward.pop();
+                    }
                 }
-            }
-            Bound::Included(bound) => {
-                if key <= bound {
-                    Some((key, value))
-                } else {
-                    None
+                NodeRef::Internal(node) => {
+                    if cursor.index > 0 {
+                        cursor.index -= 1;
+                        let child = node.children.get_ref(cursor.index);
+                        let index = child.len();
+                        self.backward.push(Cursor { node: child, index });
+                    } else {
+                        self.backward.pop();
+                    }
                 }
             }
         }
+        None
     }
 }
 
@@ -762,6 +897,10 @@ where
 /// least 2 for the map to function properly.
 #[derive(Clone, Debug)]
 pub struct CowMap<K: Ord + Clone, V: Clone, const N: usize> {
+    /// The root node of the tree.
+    ///
+    /// The root node is either a leaf of an internal node, depending on the number of entries in
+    /// the map.
     node: Node<K, V, N>,
 }
 
@@ -859,23 +998,47 @@ where
 
     /// Iterate through the keys and values stored in the map.
     pub fn iter(&self) -> Iter<'_, K, V, N> {
-        Iter { stack: vec![Cursor { node: self.node.as_ref(), index: 0 }] }
+        Iter {
+            forward: vec![Cursor { node: self.node.as_ref(), index: 0 }],
+            backward: vec![Cursor { node: self.node.as_ref(), index: self.node.len() }],
+        }
+    }
+
+    /// Create the cursor stack for the start bound of the given range.
+    fn find_start_bound(&self, bounds: &impl RangeBounds<K>) -> Vec<Cursor<'_, K, V, N>> {
+        let mut stack = vec![];
+        let (key, position) = match bounds.start_bound() {
+            Bound::Included(key) => (key, CursorPosition::At),
+            Bound::Excluded(key) => (key, CursorPosition::After),
+            Bound::Unbounded => {
+                stack.push(Cursor { node: self.node.as_ref(), index: 0 });
+                return stack;
+            }
+        };
+        self.node.find_key(key, position, &mut stack);
+        stack
+    }
+
+    /// Create teh cursor stack for the end bound of the given range.
+    fn find_end_bound(&self, bounds: &impl RangeBounds<K>) -> Vec<Cursor<'_, K, V, N>> {
+        let mut stack = vec![];
+        let (key, position) = match bounds.end_bound() {
+            Bound::Included(key) => (key, CursorPosition::After),
+            Bound::Excluded(key) => (key, CursorPosition::At),
+            Bound::Unbounded => {
+                stack.push(Cursor { node: self.node.as_ref(), index: self.node.len() });
+                return stack;
+            }
+        };
+        self.node.find_key(key, position, &mut stack);
+        stack
     }
 
     /// Iterate through the keys and values stored in the given range in the map.
-    pub fn range(&self, bounds: impl RangeBounds<K>) -> Range<'_, K, V, N> {
-        let mut range =
-            Range { iter: Iter { stack: vec![] }, end_bound: bounds.end_bound().cloned() };
-        let (key, inclusive) = match bounds.start_bound() {
-            Bound::Included(key) => (key, true),
-            Bound::Excluded(key) => (key, false),
-            Bound::Unbounded => {
-                range.iter.stack.push(Cursor { node: self.node.as_ref(), index: 0 });
-                return range;
-            }
-        };
-        self.node.find_key(key, inclusive, &mut range.iter.stack);
-        range
+    pub fn range(&self, bounds: impl RangeBounds<K>) -> Iter<'_, K, V, N> {
+        let forward = self.find_start_bound(&bounds);
+        let backward = self.find_end_bound(&bounds);
+        Iter { forward, backward }
     }
 
     /// The key and value stored in the map at the given key.
@@ -1365,6 +1528,142 @@ mod test {
             .range((Bound::Excluded(start), Bound::Included(end)))
             .map(|(&k, &v)| (k, v))
             .collect();
+
+        assert_eq!(range, expected);
+    }
+
+    #[test]
+    fn test_iter_backward() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+        map.insert(1, 1);
+        map.insert(2, 2);
+        map.insert(3, 3);
+        map.insert(4, 4);
+        map.insert(5, 5);
+
+        let mut iter = map.iter();
+        assert_eq!(iter.next_back(), Some((&5, &5)));
+        assert_eq!(iter.next_back(), Some((&4, &4)));
+        assert_eq!(iter.next_back(), Some((&3, &3)));
+        assert_eq!(iter.next_back(), Some((&2, &2)));
+        assert_eq!(iter.next_back(), Some((&1, &1)));
+        assert_eq!(iter.next_back(), None);
+    }
+
+    #[test]
+    fn test_iter_backward_large() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+
+        for i in 0..100 {
+            map.insert(i, i as i64 * 2);
+        }
+
+        let mut iter = map.iter();
+
+        for i in (0..100).rev() {
+            assert_eq!(iter.next_back(), Some((&i, &(i as i64 * 2))));
+        }
+        assert_eq!(iter.next_back(), None);
+    }
+
+    #[test]
+    fn test_iter_forward_and_backward_interleaved() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+        for i in 0..10 {
+            map.insert(i, i as i64);
+        }
+
+        let mut iter = map.iter();
+        assert_eq!(iter.next(), Some((&0, &0)));
+        assert_eq!(iter.next_back(), Some((&9, &9)));
+        assert_eq!(iter.next(), Some((&1, &1)));
+        assert_eq!(iter.next_back(), Some((&8, &8)));
+        assert_eq!(iter.next(), Some((&2, &2)));
+        assert_eq!(iter.next_back(), Some((&7, &7)));
+        assert_eq!(iter.next(), Some((&3, &3)));
+        assert_eq!(iter.next_back(), Some((&6, &6)));
+        assert_eq!(iter.next(), Some((&4, &4)));
+        assert_eq!(iter.next_back(), Some((&5, &5)));
+        assert_eq!(iter.next(), None);
+        assert_eq!(iter.next_back(), None);
+
+        // Test with odd number of elements
+        let mut map = CowMap::<u32, i64, 4>::default();
+        for i in 0..9 {
+            map.insert(i, i as i64);
+        }
+
+        let mut iter = map.iter();
+        assert_eq!(iter.next(), Some((&0, &0)));
+        assert_eq!(iter.next_back(), Some((&8, &8)));
+        assert_eq!(iter.next(), Some((&1, &1)));
+        assert_eq!(iter.next_back(), Some((&7, &7)));
+        assert_eq!(iter.next(), Some((&2, &2)));
+        assert_eq!(iter.next_back(), Some((&6, &6)));
+        assert_eq!(iter.next(), Some((&3, &3)));
+        assert_eq!(iter.next_back(), Some((&5, &5)));
+        assert_eq!(iter.next(), Some((&4, &4)));
+
+        assert_eq!(iter.next(), None);
+        assert_eq!(iter.next_back(), None);
+    }
+
+    #[test]
+    fn test_range_backward() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+        for i in 0..10 {
+            map.insert(i, i as i64);
+        }
+
+        let range: Vec<_> = map.range(3..7).rev().map(|(&k, &v)| (k, v)).collect();
+        assert_eq!(range, vec![(6, 6), (5, 5), (4, 4), (3, 3)]);
+
+        let range: Vec<_> = map.range(3..=7).rev().map(|(&k, &v)| (k, v)).collect();
+        assert_eq!(range, vec![(7, 7), (6, 6), (5, 5), (4, 4), (3, 3)]);
+    }
+
+    #[test]
+    fn test_range_backward_edge_cases() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+        for i in 0..10 {
+            map.insert(i, i as i64);
+        }
+
+        let range: Vec<_> = map.range(..0).rev().map(|(&k, &v)| (k, v)).collect();
+        assert!(range.is_empty());
+
+        let range: Vec<_> = map.range(10..).rev().map(|(&k, &v)| (k, v)).collect();
+        assert!(range.is_empty());
+
+        let range: Vec<_> = map.range(5..5).rev().map(|(&k, &v)| (k, v)).collect();
+        assert!(range.is_empty());
+    }
+
+    #[test]
+    fn test_range_backward_complex_tree() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+        // Create a more complex tree structure by interleaving insertions and removals.
+        for i in 0..100 {
+            map.insert(i, i as i64);
+        }
+        for i in 0..50 {
+            map.remove(&(i * 2));
+        }
+        for i in 0..25 {
+            map.insert(i + 100, (i + 100) as i64);
+        }
+
+        let range: Vec<_> = map.range(20..120).rev().map(|(&k, &v)| (k, v)).collect();
+        let mut expected = Vec::new();
+        for i in 21..100 {
+            if i % 2 != 0 {
+                expected.push((i, i as i64));
+            }
+        }
+        for i in 100..120 {
+            expected.push((i, i as i64));
+        }
+        expected.reverse(); // Reverse expected range since we iterate backward on the map.
 
         assert_eq!(range, expected);
     }
