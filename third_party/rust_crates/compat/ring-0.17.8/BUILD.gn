@@ -79,17 +79,12 @@ static_library("ring-core") {
   }
 
   if (current_cpu == "x64") {
-    # from "crypto/chacha/asm/chacha-x86_64.pl"
-    if (is_mac) {
-      sources += [ "$ring_crate/pregenerated/chacha-x86_64-macosx.S" ]
-    } else {
-      sources += [ "$ring_crate/pregenerated/chacha-x86_64-elf.S" ]
-    }
-
     sources += [ "$ring_crate/crypto/curve25519/curve25519_64_adx.c" ]
 
     foreach(asm_src,
             [
+              "chacha-x86_64",
+
               "aesni-x86_64",
               "vpaes-x86_64",
               "x86_64-mont",
@@ -97,18 +92,7 @@ static_library("ring-core") {
               "p256-x86_64-asm",
               "aesni-gcm-x86_64",
               "ghash-x86_64",
-            ]) {
-      if (is_mac) {
-        sources += [ "$ring_crate/pregenerated/$asm_src-macosx.S" ]
-      } else {
-        sources += [ "$ring_crate/pregenerated/$asm_src-elf.S" ]
-      }
-    }
 
-    sources += [ "$ring_crate/crypto/poly1305/poly1305_vec.c" ]
-
-    foreach(asm_src,
-            [
               "sha256-x86_64",
               "sha512-x86_64",
               "chacha20_poly1305_x86_64",
@@ -119,6 +103,8 @@ static_library("ring-core") {
         sources += [ "$ring_crate/pregenerated/$asm_src-elf.S" ]
       }
     }
+
+    sources += [ "$ring_crate/crypto/poly1305/poly1305_vec.c" ]
 
     sources += [
       "$ring_crate/third_party/fiat/asm/fiat_curve25519_adx_mul.S",
@@ -135,18 +121,7 @@ static_library("ring-core") {
             [
               "aesv8-armx",
               "ghashv8-armx",
-            ]) {
-      if (is_mac) {
-        sources += [ "$ring_crate/pregenerated/$asm_src-ios64.S" ]
-      } else {
-        sources += [ "$ring_crate/pregenerated/$asm_src-linux64.S" ]
-      }
-    }
-  }
 
-  if (current_cpu == "arm64") {
-    foreach(asm_src,
-            [
               "chacha-armv8",
               "chacha20_poly1305_armv8",
               "vpaes-armv8",
