@@ -23,6 +23,13 @@ group("disable_strict_sources_check_allowlist") {
   # paths in the skipAnalysisAllowlist in
   # //tools/integration/fint/should_build.go.
   visibility = []
+
+  # ...Actually, there is one class of exceptions not intended to be temporary.
+  # There are rust crates that are versioned with and live alongside
+  # third-party, non-Rust code. Trading off between maximal, declarative build
+  # hygiene and the ease of rolling such third party repos without breaking
+  # changes, we lean toward the latter.
+  visibility += [ "//third_party/boringssl/rust:*" ]
 }
 
 # NOTE: This target is used by "fx set --cargo-toml-gen ..." which
