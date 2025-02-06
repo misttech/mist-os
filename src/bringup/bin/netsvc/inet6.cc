@@ -123,7 +123,7 @@ mac_addr_t multicast_from_ip6(const ip6_addr_t& ip6) {
 #define MAC_TBL_BUCKETS 256
 #define MAC_TBL_ENTRIES 5
 struct ip6_to_mac_t {
-  zx_time_t last_used;  // A value of 0 indicates "unused".
+  zx_instant_mono_t last_used;  // A value of 0 indicates "unused".
   ip6_addr_t ip6;
   mac_addr_t mac;
 };
@@ -206,7 +206,7 @@ struct Ip6Stack {
 
     std::lock_guard lock(mac_cache_lock);
     ip6_to_mac_t* oldest_entry = &mac_lookup_tbl[key][0];
-    zx_time_t curr_time = zx_clock_get_monotonic();
+    zx_instant_mono_t curr_time = zx_clock_get_monotonic();
 
     for (size_t entry_ndx = 0; entry_ndx < MAC_TBL_ENTRIES; entry_ndx++) {
       ip6_to_mac_t* entry = &mac_lookup_tbl[key][entry_ndx];
