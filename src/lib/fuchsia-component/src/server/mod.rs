@@ -28,6 +28,7 @@ use vfs::name::Name;
 use vfs::path::Path;
 use vfs::remote::remote_dir;
 use vfs::service::endpoint;
+use vfs::ObjectRequest;
 use zx::MonotonicDuration;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -471,19 +472,27 @@ impl<ServiceObjTy: ServiceObjTrait> ServiceFs<ServiceObjTy> {
 
     /// When a connection is first made to the `ServiceFs` in the absence of a parent connection,
     /// it will be granted these rights.
-    fn base_connection_flags() -> fio::OpenFlags {
-        return fio::OpenFlags::RIGHT_READABLE
-            | fio::OpenFlags::RIGHT_WRITABLE
-            | fio::OpenFlags::RIGHT_EXECUTABLE;
+    const fn base_connection_flags() -> fio::Flags {
+        return fio::Flags::PROTOCOL_DIRECTORY
+            .union(fio::PERM_READABLE)
+            .union(fio::PERM_WRITABLE)
+            .union(fio::PERM_EXECUTABLE);
     }
 
     fn serve_connection_impl(&self, chan: fidl::endpoints::ServerEnd<fio::DirectoryMarker>) {
-        self.dir.clone().open(
-            self.scope.clone(),
-            Self::base_connection_flags(),
-            Path::dot(),
-            fidl::endpoints::ServerEnd::<fio::NodeMarker>::new(chan.into_channel()),
-        );
+        self.dir
+            .clone()
+            .open3(
+                self.scope.clone(),
+                Path::dot(),
+                Self::base_connection_flags(),
+                &mut ObjectRequest::new(
+                    Self::base_connection_flags(),
+                    &Default::default(),
+                    chan.into_channel(),
+                ),
+            )
+            .expect("failed to serve root ServiceFs connection");
     }
 
     /// Creates a protocol connector that can access the capabilities exposed by this ServiceFs.

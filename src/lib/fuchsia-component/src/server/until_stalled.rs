@@ -130,7 +130,7 @@ impl<ServiceObjTy: ServiceObjTrait> Stream for StallableServiceFs<ServiceObjTy> 
 }
 
 struct OutgoingConnector {
-    flags: fio::OpenFlags,
+    flags: fio::Flags,
     scope: ExecutionScope,
     dir: Arc<Simple>,
 }

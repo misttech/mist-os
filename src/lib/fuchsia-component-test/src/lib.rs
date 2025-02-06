@@ -2061,12 +2061,7 @@ impl ScopedInstance {
         server_end: zx::Channel,
     ) -> Result<(), anyhow::Error> {
         self.exposed_dir
-            .open(
-                fio::OpenFlags::NOT_DIRECTORY,
-                fio::ModeType::empty(),
-                protocol_name,
-                ServerEnd::new(server_end),
-            )
+            .open3(protocol_name, fio::Flags::PROTOCOL_SERVICE, &Default::default(), server_end)
             .map_err(Into::into)
     }
 
