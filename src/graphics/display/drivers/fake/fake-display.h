@@ -12,7 +12,6 @@
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/vmo.h>
-#include <threads.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
@@ -20,6 +19,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <mutex>
+#include <optional>
+#include <thread>
 #include <unordered_map>
 
 #include "src/graphics/display/drivers/fake/image-info.h"
@@ -128,8 +129,12 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   enum class BufferCollectionUsage : int32_t;
 
   zx_status_t InitializeCapture();
-  int VSyncThread();
-  int CaptureThread() __TA_EXCLUDES(capture_mutex_, image_mutex_);
+
+  // The loop executed by the VSync thread.
+  void VSyncThread() __TA_EXCLUDES(capture_mutex_, image_mutex_);
+
+  // The loop executed by the capture thread.
+  void CaptureThread() __TA_EXCLUDES(capture_mutex_, image_mutex_);
 
   // Simulates a display capture, if a capture was requested.
   zx::result<> ServiceAnyCaptureRequest();
@@ -177,13 +182,15 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
 
   FakeDisplayDeviceConfig device_config_;
 
-  std::atomic_bool vsync_shutdown_flag_ = false;
-  std::atomic_bool capture_shutdown_flag_ = false;
+  // Checked by the VSync thread on every loop iteration.
+  std::atomic_bool vsync_thread_shutdown_requested_ = false;
 
-  // Thread handles. Only used on the thread that starts/stops us.
-  bool vsync_thread_running_ = false;
-  thrd_t vsync_thread_;
-  thrd_t capture_thread_;
+  // Checked by the Capture thread on every loop iteration.
+  std::atomic_bool capture_thread_shutdown_requested_ = false;
+
+  // Accessed during initialization and destruction.
+  std::optional<std::thread> vsync_thread_;
+  std::optional<std::thread> capture_thread_;
 
   // Guards imported images and references to imported images.
   mutable std::mutex image_mutex_;

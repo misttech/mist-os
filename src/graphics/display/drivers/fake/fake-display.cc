@@ -708,22 +708,15 @@ zx_status_t FakeDisplay::InitializeCapture() {
 
 bool FakeDisplay::IsCaptureSupported() const { return !device_config_.no_buffer_access; }
 
-int FakeDisplay::CaptureThread() {
+void FakeDisplay::CaptureThread() {
   ZX_DEBUG_ASSERT(IsCaptureSupported());
 
-  while (true) {
-    zx::nanosleep(zx::deadline_after(zx::sec(1) / kRefreshRateFps));
-    if (capture_shutdown_flag_.load()) {
-      break;
-    }
+  while (!capture_thread_shutdown_requested_.load(std::memory_order_relaxed)) {
+    [[maybe_unused]] zx::result<> capture_result = ServiceAnyCaptureRequest();
+    // ServiceAnyCaptureRequest() has already logged the error.
 
-    zx::result<> capture_result = ServiceAnyCaptureRequest();
-    if (capture_result.is_error()) {
-      // ServiceAnyCaptureRequest() has already logged the error.
-      continue;
-    }
+    zx::nanosleep(zx::deadline_after(zx::sec(1) / kRefreshRateFps));
   }
-  return ZX_OK;
 }
 
 zx::result<> FakeDisplay::ServiceAnyCaptureRequest() {
@@ -851,15 +844,11 @@ void FakeDisplay::SendCaptureComplete() {
   engine_listener_client_.OnCaptureComplete();
 }
 
-int FakeDisplay::VSyncThread() {
-  while (true) {
-    zx::nanosleep(zx::deadline_after(zx::sec(1) / kRefreshRateFps));
-    if (vsync_shutdown_flag_.load()) {
-      break;
-    }
+void FakeDisplay::VSyncThread() {
+  while (!vsync_thread_shutdown_requested_.load(std::memory_order_relaxed)) {
     SendVsync();
+    zx::nanosleep(zx::deadline_after(zx::sec(1) / kRefreshRateFps));
   }
-  return ZX_OK;
 }
 
 void FakeDisplay::SendVsync() {
@@ -907,24 +896,10 @@ zx_status_t FakeDisplay::Initialize() {
   }
 
   if (device_config_.periodic_vsync) {
-    status = thrd_status_to_zx_status(thrd_create(
-        &vsync_thread_,
-        [](void* context) { return static_cast<FakeDisplay*>(context)->VSyncThread(); }, this));
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to create VSync thread: %s", zx_status_get_string(status));
-      return status;
-    }
-    vsync_thread_running_ = true;
+    vsync_thread_.emplace([](FakeDisplay* fake_display) { fake_display->VSyncThread(); }, this);
   }
-
   if (IsCaptureSupported()) {
-    status = thrd_status_to_zx_status(thrd_create(
-        &capture_thread_,
-        [](void* context) { return static_cast<FakeDisplay*>(context)->CaptureThread(); }, this));
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to not create image capture thread: %s", zx_status_get_string(status));
-      return status;
-    }
+    capture_thread_.emplace([](FakeDisplay* fake_display) { fake_display->CaptureThread(); }, this);
   }
 
   RecordDisplayConfigToInspectRootNode();
@@ -939,14 +914,14 @@ void FakeDisplay::Deinitialize() {
     return;
   }
 
-  vsync_shutdown_flag_.store(true);
-  if (vsync_thread_running_) {
-    // Ignore return value here in case the vsync_thread_ isn't running.
-    thrd_join(vsync_thread_, nullptr);
+  vsync_thread_shutdown_requested_.store(true, std::memory_order_relaxed);
+  capture_thread_shutdown_requested_.store(true, std::memory_order_relaxed);
+
+  if (vsync_thread_.has_value()) {
+    vsync_thread_->join();
   }
-  if (IsCaptureSupported()) {
-    capture_shutdown_flag_.store(true);
-    thrd_join(capture_thread_, nullptr);
+  if (capture_thread_.has_value()) {
+    capture_thread_->join();
   }
 
   initialized_ = false;
