@@ -164,7 +164,8 @@ where
             }
             Err(i) => {
                 if self.keys.len() == N {
-                    let middle = self.keys.len() / 2;
+                    let middle = N / 2;
+                    assert!(middle > 0);
                     let mut right = Self {
                         keys: self.keys.drain(middle..).collect(),
                         values: self.values.drain(middle..).collect(),
@@ -436,23 +437,27 @@ where
     fn insert_child(&mut self, i: usize, key: K, child: Node<K, V, N>) -> InsertResult<K, V, N> {
         let n = self.children.len();
         if n == N {
-            let middle = n / 2;
+            let middle = N / 2;
             assert!(middle > 0);
             let mut internal = Self {
                 keys: self.keys.drain(middle..).collect(),
                 children: self.children.split_off(middle),
             };
-            if i <= middle {
+            let split_key = self.keys.pop().unwrap();
+            if i < middle {
                 self.keys.insert(i, key);
                 self.children.insert(i + 1, child);
             } else {
                 internal.keys.insert(i - middle, key);
                 internal.children.insert(i - middle + 1, child);
             }
-            InsertResult::SplitInternal(self.keys.pop().unwrap(), Arc::new(internal))
+            debug_assert!(self.keys.len() + 1 == self.children.len());
+            debug_assert!(internal.keys.len() + 1 == internal.children.len());
+            InsertResult::SplitInternal(split_key, Arc::new(internal))
         } else {
             self.keys.insert(i, key);
             self.children.insert(i + 1, child);
+            debug_assert!(self.keys.len() + 1 == self.children.len());
             InsertResult::Inserted
         }
     }
@@ -556,7 +561,7 @@ where
                     left_node.keys.push(old_split_key.clone());
                     left_node.keys.extend(right_shared_node.keys.iter().cloned());
                     left_node.children.extend(&right_shared_node.children);
-                    assert!(left_node.keys.len() + 1 == left_node.children.len());
+                    debug_assert!(left_node.keys.len() + 1 == left_node.children.len());
                     self.keys.remove(left);
                     self.children.remove(right);
                 } else {
@@ -573,7 +578,7 @@ where
                             left_node.keys.pop().expect("must have moved at least one element");
 
                         left_node.children.extend(&right_node.children.split_off_front(move_count));
-                        assert!(left_node.keys.len() + 1 == left_node.children.len());
+                        debug_assert!(left_node.keys.len() + 1 == left_node.children.len());
                     } else {
                         // Move elements from left to right.
                         let mut it = left_node.keys.drain((split - 1)..);
@@ -588,8 +593,8 @@ where
                         children.extend(&left_node.children.split_off(split));
                         children.extend(&right_node.children);
                         right_node.children = children;
-                        assert!(left_node.keys.len() + 1 == left_node.children.len());
-                        assert!(right_node.keys.len() + 1 == right_node.children.len());
+                        debug_assert!(left_node.keys.len() + 1 == left_node.children.len());
+                        debug_assert!(right_node.keys.len() + 1 == right_node.children.len());
                     }
                     // Update the split key to reflect the new division between the nodes.
                     self.keys[left] = split_key;
@@ -1075,6 +1080,60 @@ mod test {
         assert!(map.get(&3).is_none());
         assert!(map.get(&30).is_none());
         assert_eq!(map.get(&12), Some(&43));
+    }
+
+    #[test]
+    fn test_split_leaf() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+
+        // Fill leaf node.
+        for i in 0..4 {
+            map.insert(i * 10 + 5, i as i64);
+        }
+
+        // Insert a new child in each position relative to the existing entries.
+        for i in 0..5 {
+            let mut map2 = map.clone();
+            let slot = i * 10;
+            map2.insert(slot, 100);
+
+            assert_eq!(map2.get(&slot), Some(&100));
+            assert_eq!(map2.get(&5), Some(&0));
+            assert_eq!(map2.get(&15), Some(&1));
+            assert_eq!(map2.get(&25), Some(&2));
+            assert_eq!(map2.get(&35), Some(&3));
+        }
+    }
+
+    #[test]
+    fn test_split_internal() {
+        let mut map = CowMap::<u32, i64, 4>::default();
+
+        // Create four leaf nodes that are half full.
+        for i in 0..8 {
+            map.insert(i * 100, i as i64);
+        }
+
+        // Insert a new child in each position relative to the existing leaf nodes.
+        for i in 0..4 {
+            let mut map2 = map.clone();
+            // The key for the smallest entry in leaf i.
+            let start = i * 200;
+
+            // Fill leaf i.
+            map2.insert(start + 10, 100);
+            map2.insert(start + 20, 200);
+
+            // Split leaf i.
+            map2.insert(start + 30, 300);
+
+            assert_eq!(map2.get(&(start + 10)), Some(&100));
+            assert_eq!(map2.get(&(start + 20)), Some(&200));
+            assert_eq!(map2.get(&(start + 30)), Some(&300));
+            for i in 0..8 {
+                assert_eq!(map.get(&(i * 100)), Some(&(i as i64)));
+            }
+        }
     }
 
     #[test]
