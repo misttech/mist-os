@@ -31,7 +31,7 @@ async fn main() -> Result<(), Error> {
         }
     };
 
-    let dev_dir = fuchsia_fs::directory::open_in_namespace(DEV_DIR, fuchsia_fs::OpenFlags::empty())
+    let dev_dir = fuchsia_fs::directory::open_in_namespace(DEV_DIR, fuchsia_fs::PERM_READABLE)
         .with_context(|| format!("failed to open {}", DEV_DIR))?;
 
     let emulator = Emulator::create_and_publish(dev_dir).await?;

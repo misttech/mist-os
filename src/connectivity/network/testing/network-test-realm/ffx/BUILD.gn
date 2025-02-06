@@ -19,7 +19,6 @@ ffx_plugin("ffx_net_test_realm") {
   ]
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.dhcpv6:fuchsia.net.dhcpv6_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",

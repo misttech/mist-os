@@ -87,7 +87,7 @@ mod tests {
     use vfs::directory::entry_container::Directory;
     use vfs::execution_scope::ExecutionScope;
     use vfs::path::Path;
-    use vfs::pseudo_directory;
+    use vfs::{pseudo_directory, ObjectRequest};
     use wlan_common::test_utils::ExpectWithin;
 
     #[fasync::run_singlethreaded(test)]
@@ -152,13 +152,15 @@ mod tests {
 
     fn serve_and_bind_vfs(vfs_dir: Arc<dyn Directory>, path: &'static str) {
         let (client, server) = fidl::endpoints::create_endpoints();
-        let scope = ExecutionScope::new();
-        vfs_dir.open(
-            scope.clone(),
-            fidl_fuchsia_io::OpenFlags::RIGHT_READABLE | fidl_fuchsia_io::OpenFlags::DIRECTORY,
-            Path::dot(),
-            fidl::endpoints::ServerEnd::new(server.into_channel()),
-        );
+        let flags = fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY;
+        vfs_dir
+            .open3(
+                ExecutionScope::new(),
+                Path::dot(),
+                flags,
+                &mut ObjectRequest::new(flags, &Default::default(), server.into_channel()),
+            )
+            .expect("failed to serve root directory");
 
         let ns = fdio::Namespace::installed().expect("failed to get installed namespace");
         ns.bind(path, client).expect("Failed to bind dev in namespace");

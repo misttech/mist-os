@@ -734,11 +734,17 @@ impl ManagedRealm {
                         })?;
                 }
                 ManagedRealmRequest::GetDevfs { devfs: server_end, control_handle: _ } => {
-                    let () = devfs.clone().open(
+                    let flags = fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY;
+                    // On errors `server_end` will be closed with an epitaph.
+                    let _ = devfs.clone().open3(
                         vfs::execution_scope::ExecutionScope::new(),
-                        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                         vfs::path::Path::dot(),
-                        server_end.into_channel().into(),
+                        flags,
+                        &mut vfs::ObjectRequest::new(
+                            flags,
+                            &Default::default(),
+                            server_end.into_channel(),
+                        ),
                     );
                 }
                 ManagedRealmRequest::AddDevice { path, device, responder } => {
@@ -922,16 +928,15 @@ impl ManagedRealm {
                     directory,
                     control_handle: _,
                 } => {
-                    let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY;
-
+                    let flags = fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY;
                     realm
                         .root
                         .get_exposed_dir()
-                        .open(
-                            flags,
-                            fio::ModeType::empty(),
+                        .open3(
                             &format!("{child_name}-diagnostics"),
-                            ServerEnd::new(directory.into_channel()),
+                            flags,
+                            &Default::default(),
+                            directory.into_channel(),
                         )
                         .context(format!("opening diagnostics dir for {child_name}"))?;
                 }
@@ -2686,11 +2691,11 @@ mod tests {
 
         let (network, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let () = devfs
-            .open(
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-                fio::ModeType::empty(),
+            .open3(
                 &ethernet_path,
-                server_end.into_channel().into(),
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                &Default::default(),
+                server_end.into_channel(),
             )
             .expect("calling open");
         let mut watcher = fvfs_watcher::Watcher::new(&network).await.expect("watcher creation");
