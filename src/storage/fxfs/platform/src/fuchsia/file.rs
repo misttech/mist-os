@@ -14,6 +14,7 @@ use anyhow::Error;
 use fidl_fuchsia_io as fio;
 use futures::future::BoxFuture;
 use fxfs::filesystem::{SyncOptions, MAX_FILE_SIZE};
+use fxfs::future_with_guard::FutureWithGuard;
 use fxfs::log::*;
 use fxfs::object_handle::{ObjectHandle, ReadObjectHandle};
 use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
@@ -240,10 +241,7 @@ impl FxFile {
                         )))
                         .await
                         .into_owned(fs);
-                    this.handle.owner().scope().spawn(async move {
-                        let _read_lock = read_lock;
-                        fut.await
-                    });
+                    this.handle.owner().scope().spawn(FutureWithGuard::new(read_lock, fut));
                 }
             }
         }

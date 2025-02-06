@@ -26,6 +26,7 @@ use futures::stream::{self, FusedStream, Stream};
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use fxfs::errors::FxfsError;
 use fxfs::filesystem::{self, SyncOptions};
+use fxfs::future_with_guard::FutureWithGuard;
 use fxfs::log::*;
 use fxfs::object_store::directory::Directory;
 use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
@@ -527,11 +528,7 @@ impl FxVolume {
 
     /// Spawns a short term task for the volume that includes a guard that will prevent termination.
     pub fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) {
-        let guard = self.scope().active_guard();
-        self.executor.spawn_detached(async move {
-            task.await;
-            std::mem::drop(guard);
-        });
+        self.executor.spawn_detached(FutureWithGuard::new(self.scope.active_guard(), task));
     }
 
     /// Tries to unwrap this volume.  If it fails, it will poison the volume so that when it is

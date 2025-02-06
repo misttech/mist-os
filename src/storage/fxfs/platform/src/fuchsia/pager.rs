@@ -9,6 +9,7 @@ use crate::fuchsia::profile::Recorder;
 use anyhow::Error;
 use bitflags::bitflags;
 use fuchsia_async as fasync;
+use fxfs::future_with_guard::FutureWithGuard;
 use fxfs::log::*;
 use fxfs::range::RangeExt;
 use fxfs::round::{round_down, round_up};
@@ -188,11 +189,7 @@ impl Pager {
 
     /// Spawns a short term task for the pager that includes a guard that will prevent termination.
     fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) {
-        let guard = self.scope.active_guard();
-        self.executor.spawn_detached(async move {
-            task.await;
-            std::mem::drop(guard);
-        });
+        self.executor.spawn_detached(FutureWithGuard::new(self.scope.active_guard(), task));
     }
 
     /// Set the current profile recorder, or set to None to not record.
