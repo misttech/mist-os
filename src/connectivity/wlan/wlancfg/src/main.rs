@@ -269,7 +269,7 @@ async fn run_all_futures() -> Result<(), Error> {
 
     // Cobalt 1.1
     let cobalt_1dot1_svc = connect_to_metrics_logger_factory().await?;
-    let cobalt_1dot1_proxy = match create_metrics_logger(&cobalt_1dot1_svc, None).await {
+    let cobalt_1dot1_proxy = match create_metrics_logger(&cobalt_1dot1_svc).await {
         Ok(proxy) => proxy,
         Err(e) => {
             warn!("Metrics logging is unavailable: {}", e);
@@ -287,15 +287,6 @@ async fn run_all_futures() -> Result<(), Error> {
     let (telemetry_sender, telemetry_fut) = serve_telemetry(
         monitor_svc.clone(),
         cobalt_1dot1_proxy,
-        Box::new(move |experiments| {
-            let cobalt_1dot1_svc = cobalt_1dot1_svc.clone();
-            async move {
-                create_metrics_logger(&cobalt_1dot1_svc, Some(experiments))
-                    .await
-                    .map_err(|e| format_err!("failed to update experiment ID: {}", e))
-            }
-            .boxed()
-        }),
         component::inspector().root().create_child("client_stats"),
         external_inspect_node.create_child("client_stats"),
         persistence_req_sender.clone(),

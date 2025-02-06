@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 mod convert;
-pub mod experiment;
 mod inspect_time_series;
 mod windowed_stats;
 
@@ -28,7 +27,6 @@ use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use fuchsia_inspect_contrib::{inspect_insert, inspect_log, make_inspect_loggable};
 use fuchsia_sync::Mutex;
 use futures::channel::{mpsc, oneshot};
-use futures::future::LocalBoxFuture;
 use futures::{select, Future, FutureExt, StreamExt};
 use ieee80211::OuiFmt;
 use log::{error, info, warn};
@@ -325,11 +323,6 @@ pub enum TelemetryEvent {
     StopAp {
         enabled_duration: zx::MonotonicDuration,
     },
-    /// Notify telemetry that its experiment group has changed and that a new metrics logger must
-    /// be created.
-    UpdateExperiment {
-        experiment: experiment::ExperimentUpdate,
-    },
     /// Notify telemetry of the result of a create iface request.
     IfaceCreationResult(Result<(), ()>),
     /// Notify telemetry of the result of destroying an interface.
@@ -493,15 +486,6 @@ pub enum TimeoutSource {
 
 pub type RecoveryOutcome = metrics::ConnectivityWlanMetricDimensionResult;
 
-pub type CreateMetricsLoggerFn = Box<
-    dyn Fn(
-        Vec<u32>,
-    ) -> LocalBoxFuture<
-        'static,
-        Result<fidl_fuchsia_metrics::MetricEventLoggerProxy, anyhow::Error>,
-    >,
->;
-
 /// Capacity of "first come, first serve" slots available to clients of
 /// the mpsc::Sender<TelemetryEvent>.
 const TELEMETRY_EVENT_BUFFER_SIZE: usize = 100;
@@ -516,7 +500,6 @@ const TELEMETRY_QUERY_INTERVAL: zx::MonotonicDuration = zx::MonotonicDuration::f
 pub fn serve_telemetry(
     monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
     cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
-    new_cobalt_1dot1_proxy: CreateMetricsLoggerFn,
     inspect_node: InspectNode,
     external_inspect_node: InspectNode,
     persistence_req_sender: auto_persist::PersistenceReqSender,
@@ -538,7 +521,6 @@ pub fn serve_telemetry(
             cloned_sender,
             monitor_svc_proxy,
             cobalt_1dot1_proxy,
-            new_cobalt_1dot1_proxy,
             inspect_node,
             external_inspect_node,
             persistence_req_sender,
@@ -936,7 +918,6 @@ const UNRESPONSIVE_FLAG_MIN_DURATION: zx::MonotonicDuration =
 
 pub struct Telemetry {
     monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
-    new_cobalt_1dot1_proxy: CreateMetricsLoggerFn,
     connection_state: ConnectionState,
     last_checked_connection_state: fasync::MonotonicInstant,
     stats_logger: StatsLogger,
@@ -951,9 +932,6 @@ pub struct Telemetry {
 
     // Auto-persistence on various client stats counters
     auto_persist_client_stats_counters: AutoPersist<()>,
-
-    // Storage for recalling what experiments are currently active.
-    experiments: experiment::Experiments,
 
     // For keeping track of how long client connections were enabled when turning client
     // connections on and off.
@@ -971,7 +949,6 @@ impl Telemetry {
         telemetry_sender: TelemetrySender,
         monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
         cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
-        new_cobalt_1dot1_proxy: CreateMetricsLoggerFn,
         inspect_node: InspectNode,
         external_inspect_node: InspectNode,
         persistence_req_sender: auto_persist::PersistenceReqSender,
@@ -991,7 +968,6 @@ impl Telemetry {
         );
         Self {
             monitor_svc_proxy,
-            new_cobalt_1dot1_proxy,
             connection_state: ConnectionState::Idle(IdleState { connect_start_time: None }),
             last_checked_connection_state: fasync::MonotonicInstant::now(),
             stats_logger,
@@ -1018,7 +994,6 @@ impl Telemetry {
                 "wlancfg-client-stats-counters",
                 persistence_req_sender,
             ),
-            experiments: experiment::Experiments::new(),
             last_enabled_client_connections: None,
             last_disabled_client_connections: None,
             defect_sender,
@@ -1515,19 +1490,6 @@ impl Telemetry {
                 // Any completed SME operation tells us the SME is operational.
                 self.report_sme_timeout_resolved().await;
             }
-            TelemetryEvent::UpdateExperiment { experiment } => {
-                self.experiments.update_experiment(experiment);
-                let active_experiments = self.experiments.get_experiment_ids();
-                let cobalt_1dot1_proxy =
-                    match (self.new_cobalt_1dot1_proxy)(active_experiments).await {
-                        Ok(proxy) => proxy,
-                        Err(e) => {
-                            warn!("{}", e);
-                            return;
-                        }
-                    };
-                self.stats_logger.replace_cobalt_proxy(cobalt_1dot1_proxy);
-            }
             TelemetryEvent::IfaceCreationResult(result) => {
                 self.stats_logger.log_iface_creation_result(result).await;
             }
@@ -1727,7 +1689,6 @@ pub async fn connect_to_metrics_logger_factory(
 // the caller.
 pub async fn create_metrics_logger(
     factory_proxy: &fidl_fuchsia_metrics::MetricEventLoggerFactoryProxy,
-    experiment_ids: Option<Vec<u32>>,
 ) -> Result<fidl_fuchsia_metrics::MetricEventLoggerProxy, Error> {
     let (cobalt_1dot1_proxy, cobalt_1dot1_server) =
         fidl::endpoints::create_proxy::<fidl_fuchsia_metrics::MetricEventLoggerMarker>();
@@ -1738,17 +1699,8 @@ pub async fn create_metrics_logger(
         ..Default::default()
     };
 
-    let experiment_ids = match experiment_ids {
-        Some(experiment_ids) => experiment_ids,
-        None => experiment::default_experiments(),
-    };
-
     let status = factory_proxy
-        .create_metric_event_logger_with_experiments(
-            &project_spec,
-            &experiment_ids,
-            cobalt_1dot1_server,
-        )
+        .create_metric_event_logger(&project_spec, cobalt_1dot1_server)
         .await
         .context("failed to create metrics event logger")?;
 
@@ -1907,15 +1859,6 @@ impl StatsLogger {
             _7d_counters_inspect_node,
             _time_series_inspect_node,
         }
-    }
-
-    /// Replace Cobalt proxy with a new one. Used when the Cobalt proxy instance has to
-    /// be recreated to update an experiment.
-    pub fn replace_cobalt_proxy(
-        &mut self,
-        cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
-    ) {
-        self.cobalt_1dot1_proxy = cobalt_1dot1_proxy;
     }
 
     async fn log_stat(&mut self, stat_op: StatOp) {
@@ -4489,7 +4432,6 @@ mod tests {
     };
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_metrics::{MetricEvent, MetricEventLoggerRequest, MetricEventPayload};
-    use fidl_fuchsia_wlan_common as fidl_common;
     use fuchsia_inspect::reader;
     use futures::stream::FusedStream;
     use futures::task::Poll;
@@ -4667,10 +4609,6 @@ mod tests {
             TelemetrySender::new(sender),
             monitor_svc_proxy,
             cobalt_1dot1_proxy.clone(),
-            Box::new(move |_experiments| {
-                let cobalt_1dot1_proxy = cobalt_1dot1_proxy.clone();
-                async move { Ok(cobalt_1dot1_proxy) }.boxed()
-            }),
             inspect_node,
             external_inspect_node,
             persistence_req_sender,
@@ -5035,33 +4973,6 @@ mod tests {
         let total_duration_sec: Vec<_> =
             time_series.lock().total_duration_sec.minutely_iter().copied().collect();
         assert_eq!(total_duration_sec, vec![30]);
-    }
-
-    /// This test is to verify that after a `TelemetryEvent::UpdateExperiment`,
-    /// the `1d_counters` and `7d_counters` in Inspect LazyNode are still valid,
-    /// ensuring that the regression from https://fxbug.dev/42071769 is not introduced
-    #[fuchsia::test]
-    fn test_counters_after_update_experiment() {
-        let (mut test_helper, mut test_fut) = setup_test();
-
-        test_helper.telemetry_sender.send(TelemetryEvent::UpdateExperiment {
-            experiment: experiment::ExperimentUpdate::Power(
-                fidl_common::PowerSaveType::PsModeLowPower,
-            ),
-        });
-        assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
-
-        test_helper.advance_by(zx::MonotonicDuration::from_minutes(1), test_fut.as_mut());
-        assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
-            stats: contains {
-                "1d_counters": contains {
-                    total_duration: zx::MonotonicDuration::from_minutes(1).into_nanos(),
-                },
-                "7d_counters": contains {
-                    total_duration: zx::MonotonicDuration::from_minutes(1).into_nanos(),
-                },
-            }
-        });
     }
 
     #[fuchsia::test]
@@ -8100,23 +8011,17 @@ mod tests {
         ApiFailure,
     }
 
-    #[test_case(None, CreateMetricsLoggerFailureMode::None)]
-    #[test_case(None, CreateMetricsLoggerFailureMode::FactoryRequest)]
-    #[test_case(None, CreateMetricsLoggerFailureMode::ApiFailure)]
-    #[test_case(Some(vec![123]), CreateMetricsLoggerFailureMode::None)]
-    #[test_case(Some(vec![123]), CreateMetricsLoggerFailureMode::FactoryRequest)]
-    #[test_case(Some(vec![123]), CreateMetricsLoggerFailureMode::ApiFailure)]
+    #[test_case(CreateMetricsLoggerFailureMode::None)]
+    #[test_case(CreateMetricsLoggerFailureMode::FactoryRequest)]
+    #[test_case(CreateMetricsLoggerFailureMode::ApiFailure)]
     #[fuchsia::test]
-    fn test_create_metrics_logger(
-        experiment_id: Option<Vec<u32>>,
-        failure_mode: CreateMetricsLoggerFailureMode,
-    ) {
+    fn test_create_metrics_logger(failure_mode: CreateMetricsLoggerFailureMode) {
         let mut exec = fasync::TestExecutor::new();
         let (factory_proxy, mut factory_stream) = fidl::endpoints::create_proxy_and_stream::<
             fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker,
         >();
 
-        let fut = create_metrics_logger(&factory_proxy, experiment_id.clone());
+        let fut = create_metrics_logger(&factory_proxy);
         let mut fut = pin!(fut);
 
         // First, test the case where the factory service cannot be reached and expect an error.
@@ -8130,26 +8035,18 @@ mod tests {
         // request future until stalled.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
-        // Depending on whether or not we specified an experiment ID, we expect different API
-        // requests.
         let request = exec.run_until_stalled(&mut factory_stream.next());
-        let expected_experiments = match experiment_id {
-            Some(experiment_ids) => experiment_ids,
-            None => experiment::default_experiments(),
-        };
         assert_variant!(
             request,
-            Poll::Ready(Some(Ok(fidl_fuchsia_metrics::MetricEventLoggerFactoryRequest::CreateMetricEventLoggerWithExperiments {
+            Poll::Ready(Some(Ok(fidl_fuchsia_metrics::MetricEventLoggerFactoryRequest::CreateMetricEventLogger {
                 project_spec: fidl_fuchsia_metrics::ProjectSpec {
                     customer_id: None,
                     project_id: Some(metrics::PROJECT_ID),
                     ..
                 },
-                experiment_ids,
                 responder,
                 ..
             }))) => {
-                assert_eq!(experiment_ids, expected_experiments);
                 match failure_mode {
                     CreateMetricsLoggerFailureMode::FactoryRequest => panic!("The factory request failure should have been handled already."),
                     CreateMetricsLoggerFailureMode::None => responder.send(Ok(())).expect("failed to send response"),
@@ -10225,10 +10122,6 @@ mod tests {
         let (telemetry_sender, test_fut) = serve_telemetry(
             monitor_svc_proxy,
             cobalt_1dot1_proxy.clone(),
-            Box::new(move |_experiments| {
-                let cobalt_1dot1_proxy = cobalt_1dot1_proxy.clone();
-                async move { Ok(cobalt_1dot1_proxy) }.boxed()
-            }),
             inspect_node,
             external_inspect_node.create_child("stats"),
             persistence_req_sender,
