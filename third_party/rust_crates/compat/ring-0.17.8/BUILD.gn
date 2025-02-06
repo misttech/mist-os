@@ -158,7 +158,7 @@ static_library("ring-core") {
               "sha512-armv8",
             ]) {
       if (is_mac) {
-        sources += [ "$ring_crate/pregenerated/$asm_src-macosx.S" ]
+        sources += [ "$ring_crate/pregenerated/$asm_src-ios64.S" ]
       } else {
         sources += [ "$ring_crate/pregenerated/$asm_src-linux64.S" ]
       }
