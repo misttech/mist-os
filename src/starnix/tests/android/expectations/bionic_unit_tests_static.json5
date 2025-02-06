@@ -189,6 +189,10 @@
 
                 // Causes a segfault.
                 "ifunc.hwcap",
+
+                // TODO(https://fxbug.dev/394662713): Started failing and blocking roller.
+                "sched.sched_getattr",
+                "sched.sched_setattr_failure",
             ],
         },
     ],
