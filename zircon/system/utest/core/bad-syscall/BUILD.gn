@@ -17,8 +17,4 @@ source_set("bad-syscall") {
     "//zircon/system/ulib/syscalls-headers",
     "//zircon/system/ulib/zxtest",
   ]
-
-  if (platform_enable_user_pci) {
-    defines = [ "ENABLE_USER_PCI" ]
-  }
 }

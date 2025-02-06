@@ -21,10 +21,6 @@ config("config") {
     ".",
   ]
 
-  if (platform_enable_user_pci) {
-    defines = [ "ENABLE_USER_PCI" ]
-  }
-
   cflags = [ "-Wno-null-pointer-arithmetic" ]
   cflags_c = [ "-fno-strict-aliasing" ]
 }

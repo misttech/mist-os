@@ -126,7 +126,6 @@ source_set("acpi") {
       "pci_irqs.cc",
       "pciroot.cc",
     ]
-    defines += [ "ENABLE_USER_PCI" ]
   }
 
   if (i_can_haz_atlas_camera) {

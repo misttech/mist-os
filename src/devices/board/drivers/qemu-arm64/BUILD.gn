@@ -49,7 +49,6 @@ fuchsia_cc_driver("qemu-arm64-driver") {
   ]
 
   if (platform_enable_user_pci) {
-    defines = [ "ENABLE_USER_PCI" ]
     sources -= [ "qemu-kpci.cc" ]
     sources += [ "qemu-pci.cc" ]
   }

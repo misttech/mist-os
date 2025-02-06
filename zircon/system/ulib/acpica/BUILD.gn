@@ -40,10 +40,6 @@ if (is_fuchsia) {
 
     defines = [ "_ALL_SOURCE" ]
 
-    if (platform_enable_user_pci) {
-      defines += [ "ENABLE_USER_PCI" ]
-    }
-
     if (acpica_debug_output) {
       defines += [ "ACPI_DEBUG_OUTPUT" ]
     }
