@@ -33,7 +33,7 @@
 namespace {
 
 constexpr bool kEnableRunloopTracing = false;
-constexpr bool kEnablePausingMonotonicClock = false;
+constexpr bool kEnablePausingMonotonicClock = true;
 
 constexpr const fxt::InternedString& ToInternedString(IdlePowerThread::State state) {
   using fxt::operator""_intern;
