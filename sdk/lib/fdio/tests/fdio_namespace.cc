@@ -20,6 +20,11 @@
 #include <fbl/unique_fd.h>
 #include <zxtest/zxtest.h>
 
+// TODO(https://fxbug.dev/376575307): Remove deprecation warning suppression when removing
+// fdio_ns_open.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
 namespace {
 
 TEST(NamespaceTest, CreateDestroy) {
@@ -410,3 +415,5 @@ TEST(NamespaceTest, LocalBinding) {
 }
 
 }  // namespace
+
+#pragma clang diagnostic push

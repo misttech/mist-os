@@ -10,6 +10,11 @@
 #include <fbl/unique_fd.h>
 #include <zxtest/zxtest.h>
 
+// TODO(https://fxbug.dev/376575307): Remove deprecation warning suppression when use of deprecated
+// fdio_open* functions are removed.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
 namespace {
 
 class DirectoryTest : public zxtest::Test {
@@ -318,3 +323,5 @@ TEST_F(DirectoryTest, Open3AtConsumesHandleOnFailure) {
 }
 
 }  // namespace
+
+#pragma clang diagnostic pop

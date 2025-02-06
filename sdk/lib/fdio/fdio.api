@@ -1,10 +1,10 @@
 {
-  "pkg/fdio/include/lib/fdio/directory.h": "c2b380afbc2db827f61a3babd5c8ceab",
+  "pkg/fdio/include/lib/fdio/directory.h": "2f2d455ce8c8f06ed33a5497f3e996e4",
   "pkg/fdio/include/lib/fdio/fd.h": "f1026aa38dc2f79032c0733f204d492f",
   "pkg/fdio/include/lib/fdio/fdio.h": "8b613ca829e0f309ef8f5de66815f655",
   "pkg/fdio/include/lib/fdio/io.h": "730d4df0496627fa60ff79777ea40d47",
   "pkg/fdio/include/lib/fdio/limits.h": "1a7820e84cfc3e672169277d64121530",
-  "pkg/fdio/include/lib/fdio/namespace.h": "bcf521f6cd022654d83349ec1cab1192",
+  "pkg/fdio/include/lib/fdio/namespace.h": "5477e61949a3a18cbb578909a50e6c34",
   "pkg/fdio/include/lib/fdio/spawn.h": "0ad1079ef484519acbe8c93ea427a07a",
   "pkg/fdio/include/lib/fdio/unsafe.h": "ea33049c1786741023b31b32a844176c",
   "pkg/fdio/include/lib/fdio/vfs.h": "5a95bbf5166e973a6aff91495c23a9f0",

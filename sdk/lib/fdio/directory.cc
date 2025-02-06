@@ -28,7 +28,15 @@ zx_status_t fdio_service_connect(const char* path, zx_handle_t request) {
 
 __EXPORT
 zx_status_t fdio_service_connect_at(zx_handle_t dir, const char* path, zx_handle_t request) {
+  // TODO(https://fxbug.dev/376575307): Migrate this to fdio_open3_at once we've ensured no more
+  // callers of this function are using privileged operations on directory connections.
+  //
+  // Some existing callers use this function to open a directory and then perform operations on it,
+  // which is not possible in io2 since we want to enforce rights on these operations.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   return fdio_open_at(dir, path, 0, request);
+#pragma clang diagnostic pop
 }
 
 __EXPORT
@@ -67,7 +75,10 @@ zx_status_t fdio_open(const char* path, uint32_t flags, zx_handle_t request) {
   if (zx_status_t status = fdio_ns_get_installed(&ns); status != ZX_OK) {
     return status;
   }
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
   return fdio_ns_open(ns, path, flags, handle.release());
+#pragma clang diagnostic pop
 }
 
 namespace fdio_internal {

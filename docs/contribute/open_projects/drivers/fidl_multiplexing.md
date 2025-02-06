@@ -70,7 +70,7 @@ file descriptor, or `fd`.
 Code that looks like the following will be very suspect:
 ```
 fbl::unique_fd fd;
-zx_status_t status = fdio_open(dev_path, 0, fd.reset_and_get_address());
+zx_status_t status = fdio_open3(dev_path, 0, fd.reset_and_get_address());
 ```
 
 This should be replaced with FIDL-oriented code:

@@ -300,8 +300,8 @@ You may add one of ianloic@, yifeit@ if need specific review from the FIDL team.
 
 ## Known pain-points identified during migration:
 
-* When converting `fdio_open(path, flags, server.release())`, there is no
-  type-safe alternative of `fdio_open`.
+* When converting `fdio_open3(path, flags, server.release())`, there is no
+  type-safe alternative of `fdio_open3`.
 * Converting between HLCPP and LLCPP endpoint types is tricky. We would like
   `fidl::ClientEnd<::my_thing::Protocol>` and
   `fidl::InterfaceHandle<my::thing::Protocol>` to easily convert into one
