@@ -505,6 +505,46 @@ multiconst!(zx_vcpu_state_topic_t, [
     ZX_VCPU_IO      = 1;
 ]);
 
+// From //zircon/system/public/zircon/features.h
+multiconst!(u32, [
+    ZX_FEATURE_KIND_CPU                        = 0;
+    ZX_FEATURE_KIND_HW_BREAKPOINT_COUNT        = 1;
+    ZX_FEATURE_KIND_HW_WATCHPOINT_COUNT        = 2;
+    ZX_FEATURE_KIND_ADDRESS_TAGGING            = 3;
+    ZX_FEATURE_KIND_VM                         = 4;
+]);
+
+// From //zircon/system/public/zircon/features.h
+multiconst!(u32, [
+    ZX_HAS_CPU_FEATURES                   = 1 << 0;
+
+    ZX_VM_FEATURE_CAN_MAP_XOM             = 1 << 0;
+
+    ZX_ARM64_FEATURE_ISA_FP               = 1 << 1;
+    ZX_ARM64_FEATURE_ISA_ASIMD            = 1 << 2;
+    ZX_ARM64_FEATURE_ISA_AES              = 1 << 3;
+    ZX_ARM64_FEATURE_ISA_PMULL            = 1 << 4;
+    ZX_ARM64_FEATURE_ISA_SHA1             = 1 << 5;
+    ZX_ARM64_FEATURE_ISA_SHA256           = 1 << 6;
+    ZX_ARM64_FEATURE_ISA_CRC32            = 1 << 7;
+    ZX_ARM64_FEATURE_ISA_ATOMICS          = 1 << 8;
+    ZX_ARM64_FEATURE_ISA_RDM              = 1 << 9;
+    ZX_ARM64_FEATURE_ISA_SHA3             = 1 << 10;
+    ZX_ARM64_FEATURE_ISA_SM3              = 1 << 11;
+    ZX_ARM64_FEATURE_ISA_SM4              = 1 << 12;
+    ZX_ARM64_FEATURE_ISA_DP               = 1 << 13;
+    ZX_ARM64_FEATURE_ISA_DPB              = 1 << 14;
+    ZX_ARM64_FEATURE_ISA_FHM              = 1 << 15;
+    ZX_ARM64_FEATURE_ISA_TS               = 1 << 16;
+    ZX_ARM64_FEATURE_ISA_RNDR             = 1 << 17;
+    ZX_ARM64_FEATURE_ISA_SHA512           = 1 << 18;
+    ZX_ARM64_FEATURE_ISA_I8MM             = 1 << 19;
+    ZX_ARM64_FEATURE_ISA_SVE              = 1 << 20;
+    ZX_ARM64_FEATURE_ISA_ARM32            = 1 << 21;
+    ZX_ARM64_FEATURE_ISA_SHA2             = 1 << 6;
+    ZX_ARM64_FEATURE_ADDRESS_TAGGING_TBI  = 1 << 0;
+]);
+
 // From //zircon/system/public/zircon/syscalls/resource.h
 multiconst!(zx_rsrc_kind_t, [
     ZX_RSRC_KIND_MMIO       = 0;
