@@ -52,7 +52,7 @@ const (
 
 type ffxCmdBuilder interface {
 	// Build an ffx command with appropriate additional arguments
-	command(ffxPath string, args []string) []string
+	command(ffxPath string, args []string, configs map[string]string) []string
 	// Store the configuration for future ffx invocations
 	setConfig(user, global map[string]any) error
 	// Return additional environment variables required by this runner
@@ -78,7 +78,20 @@ func newStdFfxCmdBuilder(
 	}
 }
 
-func (r *stdFfxCmdBuilder) command(ffxPath string, args []string) []string {
+func (r *stdFfxCmdBuilder) command(ffxPath string, args []string, configs map[string]string) []string {
+	if configs != nil {
+		var configElems []string
+		for key, value := range configs {
+			// TODO: Determine whether any of the configs we pass in
+			// need to be escaped -- specifically if any values contain
+			// "=" or ";", since those are parsed by ffx.
+			configElems = append(configElems, fmt.Sprintf("%s=%s", key, value))
+		}
+		configStr := strings.Join(configElems, ",")
+		if configStr != "" {
+			args = append([]string{"--config", configStr}, args...)
+		}
+	}
 	return append([]string{ffxPath, "--isolate-dir", r.isolateDir}, args...)
 }
 
@@ -333,6 +346,7 @@ type ffxInvoker struct {
 	ffx           *FFXInstance
 	args          []string
 	target        string
+	configs       map[string]string
 	timeout       *time.Duration
 	captureOutput bool
 	output        *bytes.Buffer
@@ -345,7 +359,7 @@ func (f *ffxInvoker) cmd() *exec.Cmd {
 	if f.target != "" {
 		args = append([]string{"--target", f.target}, args...)
 	}
-	ffx_cmd := f.ffx.cmdBuilder.command(f.ffx.ffxPath, args)
+	ffx_cmd := f.ffx.cmdBuilder.command(f.ffx.ffxPath, args, f.configs)
 	return f.ffx.runner.Command(ffx_cmd, subprocess.RunOptions{
 		Stdout: f.stdout,
 		Stderr: f.stderr,
@@ -382,6 +396,11 @@ func (f *ffxInvoker) run(ctx context.Context) error {
 
 func (i *ffxInvoker) setTarget(target string) *ffxInvoker {
 	i.target = target
+	return i
+}
+
+func (i *ffxInvoker) setConfigs(configs map[string]string) *ffxInvoker {
+	i.configs = configs
 	return i
 }
 
