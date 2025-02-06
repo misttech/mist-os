@@ -7,8 +7,11 @@ import logging
 import time
 
 from fuchsia_base_test import fuchsia_base_test
-from honeydew.interfaces.affordances.netstack import Netstack
-from honeydew.typing.netstack import InterfaceProperties, PortClass
+from honeydew.affordances.connectivity.netstack.netstack import Netstack
+from honeydew.affordances.connectivity.netstack.types import (
+    InterfaceProperties,
+    PortClass,
+)
 from mobly import signals
 
 # Time to wait for a WLAN interface to become available.

@@ -13,6 +13,7 @@ from antlion.controllers.ap_lib import hostapd_constants
 from mobly import asserts, signals, test_runner
 from wlan_base_test import wlan_base_test
 
+from honeydew.affordances.connectivity.netstack.types import PortClass
 from honeydew.affordances.connectivity.wlan.utils.types import (
     ClientStateSummary,
     ConnectionState,
@@ -25,7 +26,6 @@ from honeydew.affordances.connectivity.wlan.utils.types import (
     WlanClientState,
 )
 from honeydew.interfaces.device_classes import fuchsia_device
-from honeydew.typing.netstack import PortClass
 
 # Time to wait for a WLAN interface to become available.
 WLAN_INTERFACE_TIMEOUT = 30
