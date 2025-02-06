@@ -3175,6 +3175,7 @@ mod arch32 {
     use crate::vfs::{CurrentTask, FdNumber, FsNode};
     use linux_uapi::off_t;
     use starnix_sync::{Locked, Unlocked};
+    use starnix_syscalls::SyscallArg;
     use starnix_uapi::errors::Errno;
     use starnix_uapi::file_mode::FileMode;
     use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
@@ -3311,6 +3312,26 @@ mod arch32 {
             return error!(EINVAL);
         }
         super::sys_fstatfs(locked, current_task, fd, user_buf)
+    }
+
+    pub fn sys_arch32_pread64(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        fd: FdNumber,
+        address: UserAddress,
+        length: usize,
+        _: SyscallArg,
+        offset_low: off_t,
+        offset_high: off_t,
+    ) -> Result<usize, Errno> {
+        super::sys_pread64(
+            locked,
+            current_task,
+            fd,
+            address,
+            length,
+            offset_low | (offset_high << 32),
+        )
     }
 
     pub use super::sys_fstatat64 as sys_arch32_fstatat64;

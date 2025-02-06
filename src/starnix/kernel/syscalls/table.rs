@@ -172,8 +172,8 @@ pub fn dispatch_syscall(
         pub use crate::vfs::syscalls::{
             sys_arch32__llseek, sys_arch32_access, sys_arch32_dup2, sys_arch32_fstat64,
             sys_arch32_fstatat64, sys_arch32_fstatfs64, sys_arch32_mkdir, sys_arch32_open,
-            sys_arch32_readlink, sys_arch32_rmdir, sys_arch32_stat64, sys_arch32_unlink,
-            sys_close as sys_arch32_close, sys_dup as sys_arch32_dup,
+            sys_arch32_pread64, sys_arch32_readlink, sys_arch32_rmdir, sys_arch32_stat64,
+            sys_arch32_unlink, sys_close as sys_arch32_close, sys_dup as sys_arch32_dup,
             sys_faccessat as sys_arch32_faccessat, sys_fcntl as sys_arch32_fcntl64,
             sys_getcwd as sys_arch32_getcwd, sys_getdents64 as sys_arch32_getdents64,
             sys_ioctl as sys_arch32_ioctl, sys_lseek as sys_arch32_lseek,
@@ -248,6 +248,7 @@ pub fn dispatch_syscall(
             personality[1],
             pipe2[2],
             prctl[5],
+            pread64[6],
             prlimit64[4],
             pwritev[4],
             read[3],
