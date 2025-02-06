@@ -281,7 +281,12 @@ fn create_socket_ops(
             if socket_type == SocketType::Raw && !current_task.creds().has_capability(CAP_NET_RAW) {
                 error!(EPERM)
             } else {
-                Ok(Box::new(ZxioBackedSocket::new(domain, socket_type, protocol)?))
+                Ok(Box::new(ZxioBackedSocket::new(
+                    domain,
+                    socket_type,
+                    protocol,
+                    current_task.creds().uid,
+                )?))
             }
         }
         SocketDomain::Netlink => {
@@ -292,7 +297,12 @@ fn create_socket_ops(
             // Follow Linux, and require CAP_NET_RAW to create packet sockets.
             // See https://man7.org/linux/man-pages/man7/packet.7.html.
             if current_task.creds().has_capability(CAP_NET_RAW) {
-                Ok(Box::new(ZxioBackedSocket::new(domain, socket_type, protocol)?))
+                Ok(Box::new(ZxioBackedSocket::new(
+                    domain,
+                    socket_type,
+                    protocol,
+                    current_task.creds().uid,
+                )?))
             } else {
                 error!(EPERM)
             }
