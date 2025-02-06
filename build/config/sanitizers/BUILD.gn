@@ -160,6 +160,7 @@ sanitizer_extra_options("suppress-lsan.DO-NOT-USE-THIS") {
     "//src/settings/*",
     "//third_party/alacritty/alacritty_terminal/*",
     "//third_party/crashpad/src/*",
+    "//vendor/*",
     "//zircon/third_party/uapp/dash/*",
   ]
 
