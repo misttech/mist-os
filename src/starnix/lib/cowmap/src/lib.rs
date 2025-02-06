@@ -164,6 +164,13 @@ where
             }
             Err(i) => {
                 if self.keys.len() == N {
+                    if i == N {
+                        let mut keys = ArrayVec::new();
+                        let mut values = ArrayVec::new();
+                        keys.push(key.clone());
+                        values.push(value);
+                        return InsertResult::SplitLeaf(key, Arc::new(Self { keys, values }));
+                    }
                     let middle = N / 2;
                     assert!(middle > 0);
                     let mut right = Self {
@@ -437,6 +444,12 @@ where
     fn insert_child(&mut self, i: usize, key: K, child: Node<K, V, N>) -> InsertResult<K, V, N> {
         let n = self.children.len();
         if n == N {
+            if i == N {
+                let mut children = self.children.new_empty();
+                children.insert(0, child);
+                let right = Self { keys: ArrayVec::new(), children };
+                return InsertResult::SplitInternal(key, Arc::new(right));
+            }
             let middle = N / 2;
             assert!(middle > 0);
             let mut internal = Self {
