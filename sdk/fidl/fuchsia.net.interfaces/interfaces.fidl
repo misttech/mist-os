@@ -112,7 +112,6 @@ type Properties = table {
         ///
         /// Optional; may be omitted due to disinterest.
         2: valid_until zx.Time;
-        // TODO(https://fxbug.dev/42058987): Send this field to clients.
         /// Preferred lifetime information.
         ///
         /// Optional; may be omitted due to disinterest.
