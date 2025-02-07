@@ -138,7 +138,7 @@ pub fn dispatch_syscall(
     mod aarch64_arch32 {
         pub use crate::arch::syscalls::{sys_arch32_ARM_set_tls, sys_clone as sys_arch32_clone};
         pub use crate::mm::syscalls::{
-            sys_arch32_mmap2, sys_arch32_munmap, sys_arch32_set_robust_list,
+            sys_arch32_mmap2, sys_arch32_mremap, sys_arch32_munmap, sys_arch32_set_robust_list,
             sys_brk as sys_arch32_brk, sys_mprotect as sys_arch32_mprotect,
         };
         pub use crate::signals::syscalls::{
@@ -241,6 +241,7 @@ pub fn dispatch_syscall(
             mkdir[2],
             mmap2[6],
             mprotect[3],
+            mremap[5],
             munmap[2],
             open[3],
             openat[4],

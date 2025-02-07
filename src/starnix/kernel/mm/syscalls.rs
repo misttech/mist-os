@@ -730,6 +730,8 @@ mod arch32 {
         current_task.mm().ok_or_else(|| errno!(EINVAL))?.unmap(addr, length)?;
         Ok(())
     }
+
+    pub use super::sys_mremap as sys_arch32_mremap;
 }
 
 #[cfg(feature = "arch32")]
