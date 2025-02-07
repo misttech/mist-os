@@ -747,7 +747,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                             .get_key(
                                 self.object_id,
                                 store.crypt().ok_or_else(|| anyhow!("No crypt!"))?.as_ref(),
-                                store.get_keys(self.object_id),
+                                async || store.get_keys(self.object_id).await,
                                 key_id,
                             )
                             .await?
@@ -760,7 +760,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                             .get_fscrypt_key_if_present(
                                 self.object_id,
                                 store.crypt().ok_or_else(|| anyhow!("No crypt!"))?.as_ref(),
-                                store.get_keys(self.object_id),
+                                async || store.get_keys(self.object_id).await,
                             )
                             .await?,
                     )
@@ -795,7 +795,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                     .get_keys(
                         self.object_id,
                         crypt.as_ref(),
-                        &mut Some(async { Ok(wrapped_keys.clone()) }),
+                        &mut Some(async || Ok(wrapped_keys.clone())),
                         /* permanent= */ false,
                         /* force= */ false,
                     )
@@ -1903,7 +1903,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                         .get_keys(
                             object_id,
                             crypt.as_ref(),
-                            &mut Some(store.get_keys(object_id)),
+                            &mut Some(async || store.get_keys(object_id).await),
                             /* permanent= */ false,
                             /* force= */ false,
                         )

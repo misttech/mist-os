@@ -920,7 +920,7 @@ impl ObjectStore {
                 .get_keys(
                     obj_id,
                     crypt.as_ref(),
-                    &mut Some(store.get_keys(obj_id)),
+                    &mut Some(async || store.get_keys(obj_id).await),
                     /* permanent= */ true,
                     /* force= */ false,
                 )

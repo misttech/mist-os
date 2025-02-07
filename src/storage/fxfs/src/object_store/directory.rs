@@ -218,7 +218,9 @@ impl<S: HandleOwner> Directory<S> {
         let store = self.store();
         store
             .key_manager()
-            .get_fscrypt_key(object_id, store.crypt().unwrap().as_ref(), store.get_keys(object_id))
+            .get_fscrypt_key(object_id, store.crypt().unwrap().as_ref(), async || {
+                store.get_keys(object_id).await
+            })
             .await
     }
 
