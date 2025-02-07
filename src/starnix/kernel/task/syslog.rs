@@ -15,7 +15,7 @@ use starnix_uapi::vfs::FdEvents;
 use std::cmp;
 use std::collections::VecDeque;
 use std::io::{self, Write};
-use std::sync::{mpsc, Arc, OnceLock};
+use std::sync::{Arc, OnceLock};
 
 const BUFFER_SIZE: i32 = 1_049_000;
 
@@ -140,7 +140,7 @@ impl GrantedSyslog<'_> {
 #[derive(Debug)]
 pub struct LogSubscription {
     pending: Option<Vec<u8>>,
-    receiver: mpsc::Receiver<Result<Vec<u8>, Errno>>,
+    receiver: crossbeam_channel::Receiver<Result<Vec<u8>, Errno>>,
     waiters: Arc<WaitQueue>,
 }
 
@@ -189,17 +189,20 @@ impl LogSubscription {
         mode: fdiagnostics::StreamMode,
     ) -> Result<Self, Errno> {
         let iterator = LogIterator::new(mode)?;
-        let (snd, receiver) = mpsc::sync_channel(1);
+        let (snd, receiver) = crossbeam_channel::bounded(1);
         let waiters = Arc::new(WaitQueue::default());
         let waiters_clone = waiters.clone();
-        current_task.kernel().kthreads.spawner().spawn(move |_, _| {
+
+        current_task.kernel().kthreads.spawner().spawn(move |_, current_task| {
+            let snd = current_task.kernel().on_shutdown.wrap_channel_sender(snd);
             scopeguard::defer! {
                 waiters_clone.notify_fd_events(FdEvents::POLLHUP);
             };
             for log in iterator {
-                if snd.send(log).is_err() {
-                    break;
-                };
+                match snd.send(log) {
+                    Some(Ok(_)) => (),
+                    Some(Err(_)) | None => break,
+                }
                 waiters_clone.notify_fd_events(FdEvents::POLLIN);
             }
         });
@@ -217,9 +220,9 @@ impl LogSubscription {
             // An error happened attempting to get the next log.
             Ok(Err(err)) => Err(err),
             // The channel was closed and there's no more messages in the queue.
-            Err(mpsc::TryRecvError::Disconnected) => Ok(None),
+            Err(crossbeam_channel::TryRecvError::Disconnected) => Ok(None),
             // No messages available but the channel hasn't closed.
-            Err(mpsc::TryRecvError::Empty) => Err(errno!(EAGAIN)),
+            Err(crossbeam_channel::TryRecvError::Empty) => Err(errno!(EAGAIN)),
         }
     }
 }

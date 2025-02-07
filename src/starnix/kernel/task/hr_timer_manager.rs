@@ -2,6 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::on_shutdown::OnShutdownReceiverWrapper;
+use crate::power::{
+    clear_wake_proxy_signal, create_proxy_for_wake_events, set_wake_proxy_signal, OnWakeOps,
+};
+use crate::task::{CurrentTask, HandleWaitCanceler, TargetTime, WaitCanceler};
+use crate::vfs::timer::TimerOps;
+use crossbeam_channel::Sender;
 use fidl::endpoints::Proxy;
 use fuchsia_inspect::ArrayProperty;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
@@ -10,18 +17,10 @@ use starnix_logging::{log_debug, log_error, log_warn};
 use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, from_status_like_fdio};
+use std::collections::BinaryHeap;
+use std::sync::{Arc, OnceLock, Weak};
 use zx::{self as zx, AsHandleRef, HandleBased, HandleRef};
 use {fidl_fuchsia_time_alarms as fta, fuchsia_async as fasync};
-
-use std::collections::BinaryHeap;
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::sync::{Arc, OnceLock, Weak};
-
-use crate::power::{
-    clear_wake_proxy_signal, create_proxy_for_wake_events, set_wake_proxy_signal, OnWakeOps,
-};
-use crate::task::{CurrentTask, HandleWaitCanceler, TargetTime, WaitCanceler};
-use crate::vfs::timer::TimerOps;
 
 /// TODO(b/383062441): remove this special casing once Starnix hrtimer is fully
 /// migrated to multiplexed timer.
@@ -216,12 +215,13 @@ impl HrTimerManager {
         system_task: &CurrentTask,
         wake_channel_for_test: Option<zx::Channel>,
     ) -> Result<(), Errno> {
-        let (start_next_sender, start_next_receiver) = channel();
+        let (start_next_sender, start_next_receiver) = crossbeam_channel::unbounded();
         self.start_next_sender.set(start_next_sender).map_err(|_| errno!(EEXIST))?;
 
         let self_ref = self.clone();
         // Spawn a worker thread to register the HrTimer driver event and listen incoming
-        // `start_next` request
+        // `start_next` request. Can't use kthreads.spawn_executor here due to the future borrowing
+        // from system_task.
         system_task.kernel().kthreads.spawn(move |_, system_task| {
             let Ok(_device_proxy) = self_ref.check_connection() else {
                 log_warn!("worker thread failed due to no connection to wake alarms manager");
@@ -229,11 +229,15 @@ impl HrTimerManager {
             };
 
             let mut executor = fasync::LocalExecutor::new();
-            executor.run_singlethreaded(self_ref.watch_new_hrtimer_loop(
-                &system_task,
-                &start_next_receiver,
-                wake_channel_for_test,
-            ));
+            let start_next_receiver =
+                system_task.kernel().on_shutdown.wrap_channel(start_next_receiver);
+            let watch_timer_fut =
+                system_task.kernel().on_shutdown.wrap_future(self_ref.watch_new_hrtimer_loop(
+                    &system_task,
+                    &start_next_receiver,
+                    wake_channel_for_test,
+                ));
+            executor.run_singlethreaded(watch_timer_fut);
         });
 
         Ok(())
@@ -254,7 +258,7 @@ impl HrTimerManager {
     async fn watch_new_hrtimer_loop(
         self: &HrTimerManagerHandle,
         system_task: &CurrentTask,
-        start_next_receiver: &Receiver<()>,
+        start_next_receiver: &OnShutdownReceiverWrapper<()>,
         wake_channel_for_test: Option<zx::Channel>,
     ) {
         let wake_proxy = get_wake_proxy_internal(wake_channel_for_test);
@@ -270,13 +274,16 @@ impl HrTimerManager {
         let device_async_proxy =
             fta::WakeProxy::new(fidl::AsyncChannel::from_channel(device_channel));
 
-        while start_next_receiver
-            .recv()
-            .inspect_err(|_| {
-                log_error!("HrTimer manager worker thread failed to receive start signal.")
-            })
-            .is_ok()
-        {
+        loop {
+            match start_next_receiver.recv() {
+                Some(Err(_)) => {
+                    log_error!("HrTimer manager worker thread failed to receive start signal.");
+                    break;
+                }
+                Some(Ok(_)) => (),
+                None => break,
+            }
+
             let mut guard = self.lock();
             let Some(node) = guard.timer_heap.peek() else {
                 log_warn!("HrTimer manager worker thread woke up with an empty timer heap.");

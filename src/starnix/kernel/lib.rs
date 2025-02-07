@@ -18,6 +18,7 @@ pub mod loader;
 pub mod memory_attribution;
 pub mod mm;
 pub mod mutable_state;
+pub mod on_shutdown;
 pub mod power;
 pub mod security;
 pub mod signals;

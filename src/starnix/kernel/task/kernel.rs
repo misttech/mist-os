@@ -13,6 +13,7 @@ use crate::fs::nmfs::NetworkManagerHandle;
 use crate::fs::proc::SystemLimits;
 use crate::memory_attribution::MemoryAttributionManager;
 use crate::mm::{FutexTable, SharedFutexKey};
+use crate::on_shutdown::OnShutdown;
 use crate::power::SuspendResumeManagerHandle;
 use crate::security;
 use crate::task::{
@@ -299,6 +300,9 @@ pub struct Kernel {
     /// modules to expose directories into /proc/device-tree.
     pub procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>, &CurrentTask)>,
 
+    /// Coordinates kernel thread shutdown.
+    pub on_shutdown: OnShutdown,
+
     /// Whether this kernel is shutting down. When shutting down, new processes may not be spawned.
     shutting_down: AtomicBool,
 
@@ -342,6 +346,8 @@ impl InterfacesHandlerImpl {
 impl InterfacesHandler for InterfacesHandlerImpl {
     fn handle_new_link(&mut self, name: &str) {
         let name = name.to_owned();
+
+        // No need to listen to shutdown signals, this is a very short-running task.
         self.with_netstack_devices(move |current_task, devs, proc_fs, sys_fs| {
             devs.add_dev(current_task, &name, proc_fs, sys_fs)
         })
@@ -349,6 +355,8 @@ impl InterfacesHandler for InterfacesHandlerImpl {
 
     fn handle_deleted_link(&mut self, name: &str) {
         let name = name.to_owned();
+
+        // No need to listen to shutdown signals, this is a very short-running task.
         self.with_netstack_devices(move |_current_task, devs, _proc_fs, _sys_fs| {
             devs.remove_dev(&name)
         })
@@ -429,6 +437,7 @@ impl Kernel {
             procfs_device_tree_setup,
             shutting_down: AtomicBool::new(false),
             container_control_handle: Mutex::new(None),
+            on_shutdown: OnShutdown::new(),
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle
@@ -467,8 +476,9 @@ impl Kernel {
     /// 3. Repeat the above for the init task
     /// 4. Ensure this process is the only one running in the kernel job.
     /// 5. Unmounts the kernel's mounts' FileSystems.
-    /// 6. Tell CF the container component has stopped
-    /// 7. Exit this process
+    /// 6. Shut down and join on kthreads.
+    /// 7. Tell CF the container component has stopped
+    /// 8. Exit this process
     ///
     /// If a ThreadGroup does not shut down on its own (including after SIGKILL), that phase of
     /// shutdown will hang. To gracefully shut down any further we need the other kernel processes
@@ -576,8 +586,14 @@ impl Kernel {
         // Step 5: Forcibly unmounts the mounts' FileSystems.
         self.mounts.clear();
 
-        // Step 6: Tell CF the container stopped.
-        log_debug!("all non-root processes killed, notifying CF container is stopped");
+        // Step 6: Stop and join kthreads. Need to drop the memory attribution thread group notifier
+        // before trying to joing them because crossbeam channels don't support select() with a
+        // timeout.
+        log_debug!("shutting down kernel threads");
+        drop(self.pids.write().take_thread_group_notifier());
+        self.kthreads.shut_down();
+
+        // Step 7: Tell CF the container stopped.
         if let Some(control_handle) = self.container_control_handle.lock().take() {
             log_debug!("Notifying CF that the container has stopped.");
             control_handle
@@ -592,7 +608,7 @@ impl Kernel {
             log_warn!("Shutdown invoked without a container controller control handle.");
         }
 
-        // Step 7: exiting this process.
+        // Step 8: exiting this process.
         log_info!("All tasks killed, exiting Starnix kernel root process.");
         std::process::exit(0);
     }
@@ -642,8 +658,8 @@ impl Kernel {
         self.network_netlink.get_or_init(|| {
             let (network_netlink, network_netlink_async_worker) =
                 Netlink::new(InterfacesHandlerImpl(Arc::downgrade(self)));
-            self.kthreads.spawn(move |_, _| {
-                fasync::LocalExecutor::new().run_singlethreaded(network_netlink_async_worker);
+            self.kthreads.spawn_executor(move |_, _| async {
+                network_netlink_async_worker.await;
                 log_error!(tag = NETLINK_LOG_TAG; "Netlink async worker unexpectedly exited");
             });
             network_netlink

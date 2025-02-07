@@ -28,7 +28,6 @@ use starnix_modules_touch_power_policy::TouchPowerPolicyDevice;
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
-use std::sync::mpsc::channel;
 use std::sync::Arc;
 
 use {
@@ -345,7 +344,7 @@ pub fn run_container_features(
         register_uinput_device(locked, &kernel.kthreads.system_task(), input_events_relay);
 
         // Channel we use to inform the relay of changes to `touch_standby`
-        let (touch_standby_sender, touch_standby_receiver) = channel::<bool>();
+        let (touch_standby_sender, touch_standby_receiver) = crossbeam_channel::unbounded::<bool>();
         let touch_policy_device = TouchPowerPolicyDevice::new(touch_standby_sender);
         touch_policy_device.clone().register(locked, &kernel.kthreads.system_task());
         touch_policy_device.start_relay(&kernel, touch_standby_receiver);

@@ -44,7 +44,6 @@ rustc_library("input") {
     "//sdk/rust/zx",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",

@@ -70,11 +70,18 @@ impl KernelThreads {
     ///
     /// This function must be called before this object is used to spawn threads.
     pub fn init(&self, system_task: CurrentTask) -> Result<(), Errno> {
+        let weak_system_task = system_task.weak_task();
+        let on_shutdown = system_task.kernel().on_shutdown.clone();
         self.system_task.set(SystemTask::new(system_task)).map_err(|_| errno!(EEXIST))?;
         self.spawner
-            .set(DynamicThreadSpawner::new(2, self.system_task().weak_task()))
+            .set(DynamicThreadSpawner::new(2, weak_system_task, on_shutdown))
             .map_err(|_| errno!(EEXIST))?;
         Ok(())
+    }
+
+    /// Start shutting down kernel threads. New spawns on `self` will panic after this call.
+    pub fn shut_down(&self) {
+        self.spawner().shut_down();
     }
 
     /// Spawn an async task in the main async executor to await the given future.
@@ -82,19 +89,49 @@ impl KernelThreads {
     /// Use this function to run async tasks in the background. These tasks cannot block or else
     /// they will starve the main async executor.
     ///
-    /// Prefer this function to `spawn` for non-blocking work.
+    /// Prefer this method to `spawn` for non-blocking work.
     pub fn spawn_future(&self, future: impl Future<Output = ()> + 'static) {
         self.ehandle.spawn_local_detached(WrappedFuture(self.kernel.clone(), future));
     }
 
+    /// Spawn an async task in its own executor on its own thread.
+    ///
+    /// Use this function to run async tasks in the background that may need to block the executor
+    /// thread for synchronous work.
+    ///
+    /// Prefer this method to `spawn` for non-blocking work.
+    pub fn spawn_executor<Init, Fut>(&self, make_fut: Init)
+    where
+        Init: FnOnce(&mut Locked<'_, Unlocked>, &CurrentTask) -> Fut + Send + 'static,
+        Fut: Future<Output = ()>,
+    {
+        self.spawn(|locked, current_task| {
+            // Create the executor before running the `make_fut` in case it uses async FIDL types.
+            let mut exec = fuchsia_async::LocalExecutor::new();
+            let fut = make_fut(locked, current_task);
+            let wrapped = current_task.kernel().on_shutdown.wrap_future(fut);
+            exec.run_singlethreaded(wrapped);
+        });
+    }
+
     /// Spawn a thread in the main starnix process to run the given function.
     ///
-    /// Use this function to work in the background that involves blocking. Prefer `spawn_future`
-    /// for non-blocking work.
+    /// Use this function to run work in the background that involves blocking. Prefer
+    /// `KernelThreads::spawn_future` for non-blocking work.
     ///
     /// The threads spawned by this function come from the `spawner()` thread pool, which means
     /// they can be used either for long-lived work or for short-lived work. The thread pool keeps
     /// a few idle threads around to reduce the overhead for spawning threads for short-lived work.
+    ///
+    /// # Shutdown
+    ///
+    /// Tasks run on the threads spawned by this function must be prepared to exit when Starnix
+    /// shuts down. See the `OnShutdown` type available through the `Kernel` struct to receive a
+    /// notification that it should shut down.
+    ///
+    /// # Panics
+    ///
+    /// If called after `shut_down()` has been called.
     pub fn spawn<F>(&self, f: F)
     where
         F: FnOnce(&mut Locked<'_, Unlocked>, &CurrentTask) + Send + 'static,
@@ -213,5 +250,38 @@ impl<F: Future<Output = ()> + 'static> Future for WrappedFuture<F> {
                 .trigger_delayed_releaser(kernel.kthreads.unlocked_for_async().deref_mut());
         }
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::testing::spawn_kernel_and_run;
+
+    #[fuchsia::test]
+    async fn spawn_future_works() {
+        let (send_first, recv_first) = futures::channel::oneshot::channel();
+        let (send_second, recv_second) = futures::channel::oneshot::channel();
+        spawn_kernel_and_run(|_, current_task| {
+            current_task.kernel().kthreads.spawn_future(async move {
+                recv_first.await.unwrap();
+                send_second.send(()).unwrap();
+            });
+            send_first.send(()).unwrap();
+        });
+        recv_second.await.unwrap();
+    }
+
+    #[fuchsia::test]
+    async fn spawn_executor_works() {
+        let (send_first, recv_first) = futures::channel::oneshot::channel();
+        let (send_second, recv_second) = futures::channel::oneshot::channel();
+        spawn_kernel_and_run(|_, current_task| {
+            current_task.kernel().kthreads.spawn_executor(|_, _| async {
+                recv_first.await.unwrap();
+                send_second.send(()).unwrap();
+            });
+            send_first.send(()).unwrap();
+        });
+        recv_second.await.unwrap();
     }
 }

@@ -8,7 +8,8 @@ use crate::{
 };
 use fidl::endpoints::{ClientEnd, RequestStream};
 use fidl_fuchsia_ui_input3::{
-    KeyEventStatus, KeyboardListenerMarker, KeyboardListenerRequest, KeyboardSynchronousProxy,
+    KeyEventStatus, KeyboardListenerMarker, KeyboardListenerRequest, KeyboardListenerRequestStream,
+    KeyboardSynchronousProxy,
 };
 use fidl_fuchsia_ui_pointer::{
     TouchEvent as FidlTouchEvent, TouchPointerSample, TouchResponse as FidlTouchResponse,
@@ -23,9 +24,7 @@ use starnix_uapi::uapi;
 use starnix_uapi::vfs::FdEvents;
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Weak};
-use {
-    fidl_fuchsia_ui_policy as fuipolicy, fidl_fuchsia_ui_views as fuiviews, fuchsia_async as fasync,
-};
+use {fidl_fuchsia_ui_policy as fuipolicy, fidl_fuchsia_ui_views as fuiviews};
 
 #[derive(Clone, Copy)]
 pub enum EventProxyMode {
@@ -158,136 +157,155 @@ impl InputEventsRelay {
         device_inspect_status: Option<Arc<InputDeviceStatus>>,
     ) {
         let slf = self.clone();
-        kernel.kthreads.spawn(move |_lock_context, _current_task| {
-            fasync::LocalExecutor::new().run_singlethreaded(async {
-            let mut default_touch_device = DeviceState {
-                device_type: InputDeviceType::Touch(
-                    FuchsiaTouchEventToLinuxTouchEventConverter::create(),
-                ),
-                open_files: default_touch_device_opened_files,
-                inspect_status: device_inspect_status,
-            };
-            let (touch_source_proxy, resume_event) = match event_proxy_mode {
-                EventProxyMode::WakeContainer => {
-                    // Proxy the touch events through the Starnix runner. This allows touch events to
-                    // wake the container when it is suspended.
-                    let (touch_source_channel, resume_event) =
-                    create_proxy_for_wake_events(touch_source_client_end.into_channel(), "touch".to_string());
-                    (
-                        fuipointer::TouchSourceProxy::new(fidl::AsyncChannel::from_channel(
-                            touch_source_channel,
-                        )),
-                        Some(resume_event),
-                    )
-                }
-                EventProxyMode::None => (
-                    touch_source_client_end.into_proxy(),
-                    None,
-                ),
-            };
-            let mut previous_event_disposition = vec![];
-            loop {
-                // Create the future to watch for the the next input events, but don't execute
-                // it...
-                let watch_future = touch_source_proxy.watch(&previous_event_disposition);
-
-                // .. until the event that we passed to the runner has been cleared. This prevents
-                // the container from suspending between calls to `watch`.
-                resume_event.as_ref().map(clear_wake_proxy_signal);
-
-                match watch_future.await {
-                    Ok(touch_events) => {
-                        // TODO(https://fxbug.dev/365571169): record received event count by device,
-                        // and use `num_received_events` in another inspect node.
-                        let num_received_events: u64 = touch_events.len().try_into().unwrap();
-
-                        previous_event_disposition =
-                            touch_events.iter().map(make_response_for_fidl_event).collect();
-
-                        let mut num_ignored_events: u64 = 0;
-
-                        // 1 vec may contains events from different device.
-                        let (events_by_device, ignored_events) =
-                            group_touch_events_by_device_id(touch_events);
-                        num_ignored_events += ignored_events;
-
-                        for (device_id, events) in events_by_device {
-                            let mut devs = slf.devices.lock();
-
-                            let dev = devs.get_mut(&device_id).unwrap_or(&mut default_touch_device);
-
-                            let mut num_converted_events: u64 = 0;
-                            let mut num_unexpected_events: u64 = 0;
-                            let mut new_events: VecDeque<uapi::input_event> = VecDeque::new();
-
-                            let last_event_time_ns: i64;
-                            if let InputDeviceType::Touch(ref mut converter) = dev.device_type {
-                                let mut batch = converter.handle(events);
-                                new_events.append(&mut batch.events);
-                                num_converted_events += batch.count_converted_fidl_events;
-                                num_ignored_events += batch.count_ignored_fidl_events;
-                                num_unexpected_events += batch.count_unexpected_fidl_events;
-                                last_event_time_ns = batch.last_event_time_ns;
-                            } else {
-                                log_warn!("Non touch device received touch events: device_id = {}, device_type = {}", device_id, dev.device_type);
-                                continue;
-                            }
-
-                            if let Some(dev_inspect_status) = &dev.inspect_status {
-                                dev_inspect_status.count_total_received_events(num_received_events);
-                                dev_inspect_status.count_total_ignored_events(num_ignored_events);
-                                dev_inspect_status.count_total_unexpected_events(num_unexpected_events);
-                                dev_inspect_status.count_total_converted_events(num_converted_events);
-                                dev_inspect_status.count_total_generated_events(
-                                    new_events.len().try_into().unwrap(),
-                                    last_event_time_ns,
-                                );
-                            } else {
-                                log_warn!("unable to record inspect for device_id: {}, device_type: {}", device_id, dev.device_type);
-                            }
-
-                            dev.open_files.lock().retain(|f| {
-                                let Some(file) = f.upgrade() else {
-                                    log_warn!("Dropping input file for touch that failed to upgrade");
-                                    return false;
-                                };
-                                match &file.inspect_status {
-                                    Some(file_inspect_status) => {
-                                        file_inspect_status.count_received_events(num_received_events);
-                                        file_inspect_status.count_ignored_events(num_ignored_events);
-                                        file_inspect_status.count_unexpected_events(num_unexpected_events);
-                                        file_inspect_status.count_converted_events(num_converted_events);
-                                    }
-                                    None => {
-                                      log_warn!("unable to record inspect within the input file")
-                                    }
-                                }
-                                if !new_events.is_empty() {
-                                    // TODO(https://fxbug.dev/42075438): Reading from an `InputFile` should
-                                    // not provide access to events that occurred before the file was
-                                    // opened.
-                                    if let Some(file_inspect_status) = &file.inspect_status {
-                                        file_inspect_status.count_generated_events(
-                                            new_events.len().try_into().unwrap(),
-                                            last_event_time_ns
-                                        );
-                                    }
-                                    let mut inner = file.inner.lock();
-                                    inner.events.extend(new_events.clone());
-                                    inner.waiters.notify_fd_events(FdEvents::POLLIN);
-                                }
-
-                                true
-                            });
-                        }
-                    }
-                    Err(e) => {
-                        log_warn!("error {:?} reading from TouchSourceProxy; input is stopped", e);
-                        break;
-                    }
-                };
-            }});
+        kernel.kthreads.spawn_executor(move |_locked, _current_task| {
+            slf.run_touch_relay(
+                default_touch_device_opened_files,
+                device_inspect_status,
+                event_proxy_mode,
+                touch_source_client_end,
+            )
         });
+    }
+
+    async fn run_touch_relay(
+        self: Arc<Self>,
+        default_touch_device_opened_files: Arc<Mutex<Vec<Weak<InputFile>>>>,
+        device_inspect_status: Option<Arc<InputDeviceStatus>>,
+        event_proxy_mode: EventProxyMode,
+        touch_source_client_end: ClientEnd<fuipointer::TouchSourceMarker>,
+    ) {
+        let mut default_touch_device = DeviceState {
+            device_type: InputDeviceType::Touch(
+                FuchsiaTouchEventToLinuxTouchEventConverter::create(),
+            ),
+            open_files: default_touch_device_opened_files,
+            inspect_status: device_inspect_status,
+        };
+        let (touch_source_proxy, resume_event) = match event_proxy_mode {
+            EventProxyMode::WakeContainer => {
+                // Proxy the touch events through the Starnix runner. This allows touch events to
+                // wake the container when it is suspended.
+                let (touch_source_channel, resume_event) = create_proxy_for_wake_events(
+                    touch_source_client_end.into_channel(),
+                    "touch".to_string(),
+                );
+                (
+                    fuipointer::TouchSourceProxy::new(fidl::AsyncChannel::from_channel(
+                        touch_source_channel,
+                    )),
+                    Some(resume_event),
+                )
+            }
+            EventProxyMode::None => (touch_source_client_end.into_proxy(), None),
+        };
+        let mut previous_event_disposition = vec![];
+        loop {
+            // Create the future to watch for the the next input events, but don't execute
+            // it...
+            let watch_future = touch_source_proxy.watch(&previous_event_disposition);
+
+            // .. until the event that we passed to the runner has been cleared. This prevents
+            // the container from suspending between calls to `watch`.
+            resume_event.as_ref().map(clear_wake_proxy_signal);
+
+            match watch_future.await {
+                Ok(touch_events) => {
+                    // TODO(https://fxbug.dev/365571169): record received event count by device,
+                    // and use `num_received_events` in another inspect node.
+                    let num_received_events: u64 = touch_events.len().try_into().unwrap();
+
+                    previous_event_disposition =
+                        touch_events.iter().map(make_response_for_fidl_event).collect();
+
+                    let mut num_ignored_events: u64 = 0;
+
+                    // 1 vec may contains events from different device.
+                    let (events_by_device, ignored_events) =
+                        group_touch_events_by_device_id(touch_events);
+                    num_ignored_events += ignored_events;
+
+                    for (device_id, events) in events_by_device {
+                        let mut devs = self.devices.lock();
+
+                        let dev = devs.get_mut(&device_id).unwrap_or(&mut default_touch_device);
+
+                        let mut num_converted_events: u64 = 0;
+                        let mut num_unexpected_events: u64 = 0;
+                        let mut new_events: VecDeque<uapi::input_event> = VecDeque::new();
+
+                        let last_event_time_ns: i64;
+                        if let InputDeviceType::Touch(ref mut converter) = dev.device_type {
+                            let mut batch = converter.handle(events);
+                            new_events.append(&mut batch.events);
+                            num_converted_events += batch.count_converted_fidl_events;
+                            num_ignored_events += batch.count_ignored_fidl_events;
+                            num_unexpected_events += batch.count_unexpected_fidl_events;
+                            last_event_time_ns = batch.last_event_time_ns;
+                        } else {
+                            log_warn!("Non touch device received touch events: device_id = {}, device_type = {}", device_id, dev.device_type);
+                            continue;
+                        }
+
+                        if let Some(dev_inspect_status) = &dev.inspect_status {
+                            dev_inspect_status.count_total_received_events(num_received_events);
+                            dev_inspect_status.count_total_ignored_events(num_ignored_events);
+                            dev_inspect_status.count_total_unexpected_events(num_unexpected_events);
+                            dev_inspect_status.count_total_converted_events(num_converted_events);
+                            dev_inspect_status.count_total_generated_events(
+                                new_events.len().try_into().unwrap(),
+                                last_event_time_ns,
+                            );
+                        } else {
+                            log_warn!(
+                                "unable to record inspect for device_id: {}, device_type: {}",
+                                device_id,
+                                dev.device_type
+                            );
+                        }
+
+                        dev.open_files.lock().retain(|f| {
+                            let Some(file) = f.upgrade() else {
+                                log_warn!("Dropping input file for touch that failed to upgrade");
+                                return false;
+                            };
+                            match &file.inspect_status {
+                                Some(file_inspect_status) => {
+                                    file_inspect_status.count_received_events(num_received_events);
+                                    file_inspect_status.count_ignored_events(num_ignored_events);
+                                    file_inspect_status
+                                        .count_unexpected_events(num_unexpected_events);
+                                    file_inspect_status
+                                        .count_converted_events(num_converted_events);
+                                }
+                                None => {
+                                    log_warn!("unable to record inspect within the input file")
+                                }
+                            }
+                            if !new_events.is_empty() {
+                                // TODO(https://fxbug.dev/42075438): Reading from an `InputFile`
+                                // should not provide access to events that occurred before the file
+                                // was opened.
+                                if let Some(file_inspect_status) = &file.inspect_status {
+                                    file_inspect_status.count_generated_events(
+                                        new_events.len().try_into().unwrap(),
+                                        last_event_time_ns,
+                                    );
+                                }
+                                let mut inner = file.inner.lock();
+                                inner.events.extend(new_events.clone());
+                                inner.waiters.notify_fd_events(FdEvents::POLLIN);
+                            }
+
+                            true
+                        });
+                    }
+                }
+                Err(e) => {
+                    log_warn!("error {:?} reading from TouchSourceProxy; input is stopped", e);
+                    break;
+                }
+            };
+        }
     }
 
     fn start_keyboard_relay(
@@ -299,58 +317,63 @@ impl InputEventsRelay {
         device_inspect_status: Option<Arc<InputDeviceStatus>>,
     ) {
         let slf = self.clone();
-        kernel.kthreads.spawn(move |_lock_context, _current_task| {
-            fasync::LocalExecutor::new().run_singlethreaded(async {
-                let mut default_keyboard_device = DeviceState {
-                    device_type: InputDeviceType::Keyboard,
-                    open_files: default_keyboard_device_opened_files,
-                    inspect_status: device_inspect_status,
-                };
-                let (keyboard_listener, mut event_stream) =
-                    fidl::endpoints::create_request_stream::<KeyboardListenerMarker>();
-                if keyboard
-                    .add_listener(view_ref, keyboard_listener, zx::MonotonicInstant::INFINITE)
-                    .is_err()
-                {
-                    log_warn!("Could not register keyboard listener");
-                }
-                while let Some(Ok(request)) = event_stream.next().await {
-                    match request {
-                        KeyboardListenerRequest::OnKeyEvent { event, responder } => {
-                            let new_events = parse_fidl_keyboard_event_to_linux_input_event(&event);
+        kernel.kthreads.spawn_executor(move |_locked, _current_task| async move {
+            let default_keyboard_device = DeviceState {
+                device_type: InputDeviceType::Keyboard,
+                open_files: default_keyboard_device_opened_files,
+                inspect_status: device_inspect_status,
+            };
+            let (keyboard_listener, event_stream) =
+                fidl::endpoints::create_request_stream::<KeyboardListenerMarker>();
+            if keyboard
+                .add_listener(view_ref, keyboard_listener, zx::MonotonicInstant::INFINITE)
+                .is_err()
+            {
+                log_warn!("Could not register keyboard listener");
+            }
 
-                            let mut devs = slf.devices.lock();
+            slf.run_keyboard_relay(event_stream, default_keyboard_device).await;
+        })
+    }
 
-                            let dev = match event.device_id {
-                                Some(device_id) => {
-                                    devs.get_mut(&device_id).unwrap_or(&mut default_keyboard_device)
-                                }
-                                None => &default_keyboard_device,
-                            };
+    async fn run_keyboard_relay(
+        self: Arc<Self>,
+        mut event_stream: KeyboardListenerRequestStream,
+        mut default_keyboard_device: DeviceState,
+    ) {
+        while let Some(Ok(request)) = event_stream.next().await {
+            match request {
+                KeyboardListenerRequest::OnKeyEvent { event, responder } => {
+                    let new_events = parse_fidl_keyboard_event_to_linux_input_event(&event);
 
-                            dev.open_files.lock().retain(|f| {
-                                let Some(file) = f.upgrade() else {
-                                    log_warn!(
-                                        "Dropping input file for keyboard that failed to upgrade"
-                                    );
-                                    return false;
-                                };
-                                let mut inner = file.inner.lock();
+                    let mut devs = self.devices.lock();
 
-                                if !new_events.is_empty() {
-                                    inner.events.extend(new_events.clone());
-                                    inner.waiters.notify_fd_events(FdEvents::POLLIN);
-                                }
-
-                                true
-                            });
-
-                            responder.send(KeyEventStatus::Handled).expect("");
+                    let dev = match event.device_id {
+                        Some(device_id) => {
+                            devs.get_mut(&device_id).unwrap_or(&mut default_keyboard_device)
                         }
-                    }
+                        None => &default_keyboard_device,
+                    };
+
+                    dev.open_files.lock().retain(|f| {
+                        let Some(file) = f.upgrade() else {
+                            log_warn!("Dropping input file for keyboard that didn't upgrade");
+                            return false;
+                        };
+                        let mut inner = file.inner.lock();
+
+                        if !new_events.is_empty() {
+                            inner.events.extend(new_events.clone());
+                            inner.waiters.notify_fd_events(FdEvents::POLLIN);
+                        }
+
+                        true
+                    });
+
+                    responder.send(KeyEventStatus::Handled).expect("");
                 }
-            })
-        });
+            }
+        }
     }
 
     fn start_button_relay(
@@ -362,39 +385,38 @@ impl InputEventsRelay {
         device_inspect_status: Option<Arc<InputDeviceStatus>>,
     ) {
         let slf: Arc<InputEventsRelay> = self.clone();
-        kernel.kthreads.spawn(move |_lock_context, _current_task| {
-            fasync::LocalExecutor::new().run_singlethreaded(async {
-                let (remote_client, remote_server) =
-                    fidl::endpoints::create_endpoints::<fuipolicy::MediaButtonsListenerMarker>();
-                if let Err(e) =
-                    registry_proxy.register_listener(remote_client, zx::MonotonicInstant::INFINITE)
-                {
-                    log_warn!("Failed to register media buttons listener: {:?}", e);
-                    return;
-                }
+        kernel.kthreads.spawn_executor(move |_locked, _current_task| async move {
+            let (remote_client, remote_server) =
+                fidl::endpoints::create_endpoints::<fuipolicy::MediaButtonsListenerMarker>();
+            if let Err(e) =
+                registry_proxy.register_listener(remote_client, zx::MonotonicInstant::INFINITE)
+            {
+                log_warn!("Failed to register media buttons listener: {:?}", e);
+                return;
+            }
 
-                let (local_listener_stream, local_resume_event) = match event_proxy_mode {
-                    EventProxyMode::WakeContainer => {
-                        let (local_channel, local_resume_event) = create_proxy_for_wake_events(
-                            remote_server.into_channel(),
-                            "buttons".to_string(),
+            let (local_listener_stream, local_resume_event) = match event_proxy_mode {
+                EventProxyMode::WakeContainer => {
+                    let (local_channel, local_resume_event) = create_proxy_for_wake_events(
+                        remote_server.into_channel(),
+                        "buttons".to_string(),
+                    );
+                    let local_listener_stream =
+                        fuipolicy::MediaButtonsListenerRequestStream::from_channel(
+                            fidl::AsyncChannel::from_channel(local_channel),
                         );
-                        let local_listener_stream =
-                            fuipolicy::MediaButtonsListenerRequestStream::from_channel(
-                                fidl::AsyncChannel::from_channel(local_channel),
-                            );
-                        (local_listener_stream, Some(local_resume_event))
-                    }
-                    EventProxyMode::None => (remote_server.into_stream(), None),
-                };
-                slf.button_relay_loop(
-                    local_listener_stream,
-                    default_keyboard_device_opened_files,
-                    device_inspect_status,
-                    local_resume_event,
-                )
-                .await;
-            })
+                    (local_listener_stream, Some(local_resume_event))
+                }
+                EventProxyMode::None => (remote_server.into_stream(), None),
+            };
+
+            slf.button_relay_loop(
+                local_listener_stream,
+                default_keyboard_device_opened_files,
+                device_inspect_status,
+                local_resume_event,
+            )
+            .await;
         });
     }
 

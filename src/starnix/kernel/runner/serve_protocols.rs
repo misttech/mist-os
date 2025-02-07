@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use crate::Container;
-use anyhow::Error;
+use anyhow::{Context as _, Error};
 use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
-use fidl::AsHandleRef;
+use fidl::{AsHandleRef, AsyncSocket};
 use fuchsia_async::{
     DurationExt, {self as fasync},
 };
@@ -265,57 +265,97 @@ async fn connect_to_vsock(
     Ok(())
 }
 
+// Matches fuchsia.io.Transfer capacity, somewhat arbitrarily.
+const PTY_BUFFER_CAPACITY: usize = 8192;
+
 fn forward_to_pty(
     kernel: &Kernel,
     console_in: fidl::Socket,
     console_out: fidl::Socket,
     pty: FileHandle,
 ) -> Result<(), Error> {
-    // Matches fuchsia.io.Transfer capacity, somewhat arbitrarily.
-    const BUFFER_CAPACITY: usize = 8192;
-
-    let mut rx = fuchsia_async::Socket::from_socket(console_in);
-    let mut tx = fuchsia_async::Socket::from_socket(console_out);
+    let rx = fuchsia_async::Socket::from_socket(console_in);
+    let tx = fuchsia_async::Socket::from_socket(console_out);
     let pty_sink = pty.clone();
+    // Can't use spawn_executor here because current_task is captured by the future.
     kernel.kthreads.spawn({
         move |locked, current_task| {
-            let _result: Result<(), Error> =
-                fasync::LocalExecutor::new().run_singlethreaded(async {
-                    let mut buffer = vec![0u8; BUFFER_CAPACITY];
-                    loop {
-                        let bytes = rx.read(&mut buffer[..]).await?;
-                        if bytes == 0 {
-                            return Ok(());
-                        }
-                        pty_sink.write(
-                            locked,
-                            current_task,
-                            &mut VecInputBuffer::new(&buffer[..bytes]),
-                        )?;
-                    }
-                });
+            // This executor should not have other tasks spawned on it because a significant portion
+            // of its work depends on a blocking call.
+            fasync::LocalExecutor::new().run_singlethreaded(async {
+                let res = current_task
+                    .kernel()
+                    .on_shutdown
+                    .wrap_future(forward_rx_to_pty(locked, current_task, rx, pty_sink))
+                    .await;
+                log_warn!(res:?; "ending pty read loop");
+            });
         }
     });
 
     let pty_source = pty;
+    // Can't use spawn_executor here because current_task is captured by the future.
     kernel.kthreads.spawn({
-        move |mut locked, current_task| {
-            let _result: Result<(), Error> =
-                fasync::LocalExecutor::new().run_singlethreaded(async {
-                    let mut buffer = VecOutputBuffer::new(BUFFER_CAPACITY);
-                    loop {
-                        buffer.reset();
-                        let bytes = pty_source.read(&mut locked, current_task, &mut buffer)?;
-                        if bytes == 0 {
-                            return Ok(());
-                        }
-                        tx.write_all(buffer.data()).await?;
-                    }
-                });
+        move |locked, current_task| {
+            // This executor should not have other tasks spawned on it because a significant portion
+            // of its work depends on a blocking call.
+            fasync::LocalExecutor::new().run_singlethreaded(async {
+                let res = current_task
+                    .kernel()
+                    .on_shutdown
+                    .wrap_future(forward_pty_to_tx(locked, current_task, tx, pty_source))
+                    .await;
+                log_warn!(res:?; "pty write loop exited");
+            });
         }
     });
 
     Ok(())
+}
+
+async fn forward_rx_to_pty(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    mut rx: AsyncSocket,
+    pty_sink: FileHandle,
+) -> Result<(), anyhow::Error> {
+    let mut buffer = vec![0u8; PTY_BUFFER_CAPACITY];
+    loop {
+        let bytes = rx.read(&mut buffer[..]).await.context("reading from rx")?;
+        if bytes == 0 {
+            return Ok(());
+        }
+
+        // This is a blocking call that may prevent polling the shutdown future,
+        // but it will be interrupted when shutting down which will make it possible
+        // to observe the break below and service the shutdown future.
+        pty_sink
+            .write(locked, current_task, &mut VecInputBuffer::new(&buffer[..bytes]))
+            .context("writing to pty sink")?;
+    }
+}
+
+async fn forward_pty_to_tx(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    mut tx: AsyncSocket,
+    pty_source: FileHandle,
+) -> Result<(), anyhow::Error> {
+    let mut buffer = VecOutputBuffer::new(PTY_BUFFER_CAPACITY);
+    loop {
+        buffer.reset();
+
+        // This is a blocking call that may prevent polling the shutdown future,
+        // but it will be interrupted when shutting down which will make it possible
+        // to observe the break below and service the shutdown future.
+        let bytes =
+            pty_source.read(locked, current_task, &mut buffer).context("reading pty source")?;
+        if bytes == 0 {
+            return Ok(());
+        } else {
+            tx.write_all(buffer.data()).await.context("writing to tx")?;
+        }
+    }
 }
 
 pub async fn serve_graphical_presenter(
