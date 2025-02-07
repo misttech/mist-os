@@ -9,6 +9,11 @@
             environment: "#core-env",
             on_terminate: "reboot",
         },
+        {
+            name: "audio_core_pkg_config",
+            url: "fuchsia-pkg://fuchsia.com/audio_core#meta/audio_core_pkg_config.cm",
+            environment: "#core-env",
+        },
     ],
     use: [
         {
@@ -29,9 +34,8 @@
     offer: [
         {
             directory: "config-data",
-            from: "parent",
+            from: "#audio_core_pkg_config",
             to: "#audio_core",
-            subdir: "audio_core",
         },
         {
             directory: "dev-class",

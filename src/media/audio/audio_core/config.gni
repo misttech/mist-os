@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/config.gni")
+import("//build/dist/resource.gni")
 
 # Example:
 # ```
@@ -98,29 +98,21 @@ template("audio_core_config_test") {
 #       Type: string
 #
 template("audio_core_config") {
-  assert(defined(invoker.for_pkg))
   assert(defined(invoker.config))
   assert(defined(invoker.test_package_name))
 
-  # Add the config-data for the audio_core package.
-  config_data(target_name + "-config") {
-    forward_variables_from(invoker,
-                           [
-                             "testonly",
-                             "for_pkg",
-                           ])
+  not_needed(invoker, [ "for_pkg" ])
+
+  # Add the configuration data for the audio_core package.
+  resource(target_name + "-config") {
     sources = [ invoker.config ]
-    outputs = [ "audio_core_config.json" ]
+    outputs = "data/audio_core_config.json"
   }
+
   if (defined(invoker.policy)) {
-    config_data(target_name + "-policy") {
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "for_pkg",
-                             ])
-      sources = [ invoker.policy ]
-      outputs = [ "audio_policy.json" ]
+    resource(target_name + "-policy") {
+      sources = [ invoker.config ]
+      outputs = "data/audio_policy.json"
     }
   }
   group(target_name) {

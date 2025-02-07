@@ -43,7 +43,7 @@ template("audio_pipeline_benchmark") {
     contents += "          from: \"framework\","
     contents += "          rights: [ \"r*\" ],"
     contents += "          path: \"/config/data\","
-    contents += "          subdir: \"config-data-for-test\","
+    contents += "          subdir: \"data\","
     contents += "      },"
     contents += "  ],"
     contents += "}"
@@ -97,7 +97,7 @@ template("audio_pipeline_benchmark") {
 
   resource("${package_name}-config") {
     sources = invoker.config_files
-    outputs = [ "config-data-for-test/{{source_file_part}}" ]
+    outputs = [ "data/{{source_file_part}}" ]
     testonly = true
   }
 

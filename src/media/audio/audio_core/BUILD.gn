@@ -9,6 +9,10 @@ audio_core_package("audio_core") {
   package_deps = [ "//src/media/audio/effects/passthrough:audio_effects" ]
 }
 
+fuchsia_component("audio_core_pkg_config") {
+  manifest = "meta/audio_core_pkg_config.cml"
+}
+
 executable("audio_core_bin") {
   output_name = "audio_core"
   deps = [

@@ -72,8 +72,8 @@ std::shared_ptr<fidl::WireSharedClient<fuchsia_audio_mixer::Graph>> MakeGraphCli
       creator_client->Create(fuchsia_audio_mixer::wire::GraphCreatorCreateRequest::Builder(arena)
                                  .graph(std::move(graph_endpoints->server))
                                  .name(fidl::StringView::FromExternal("AudioCoreGraph"))
-                                 // TODO(https://fxbug.dev/42181009): set .fidl_deadline_profile() to the same
-                                 // profile used for the main FIDL thread (see main.cc)
+                                 // TODO(https://fxbug.dev/42181009): set .fidl_deadline_profile()
+                                 // to the same profile used for the main FIDL thread (see main.cc)
                                  .Build());
   if (!result.ok()) {
     FX_LOGS(FATAL) << "CreateGraph failed with status="
@@ -141,8 +141,9 @@ AudioCoreComponent::AudioCoreComponent(component::OutgoingDirectory& outgoing,
   // Connect to the mixer service.
   graph_client_ = MakeGraphClient(fidl_dispatcher);
 
-  // TODO(https://fxbug.dev/42181009): Create two graph threads by calling graph_client_->sync()->CreateThread
-  // twice: once for input devices + capturers, and once for output devices + renderers.
+  // TODO(https://fxbug.dev/42181009): Create two graph threads by calling
+  // graph_client_->sync()->CreateThread twice: once for input devices + capturers, and once for
+  // output devices + renderers.
 
   // Create objects.
   stream_volume_manager_ = std::make_shared<StreamVolumeManager>(fidl_dispatcher);
@@ -185,8 +186,8 @@ AudioCoreComponent::AudioCoreComponent(component::OutgoingDirectory& outgoing,
         fidl_thread_, std::move(server_end),
         {
             .creator = renderer_capturer_creator_,
-            // TODO(https://fxbug.dev/42181009): add ultrasound render and capture formats to process_config,
-            // then set the values below. For now these are placeholders.
+            // TODO(https://fxbug.dev/42181009): add ultrasound render and capture formats to
+            // process_config, then set the values below. For now these are placeholders.
             //
             // In audio_core/v1, these formats were computed lazily once the renderer or capturer
             // was routed to an actual device (at which point we could directly use the format from
