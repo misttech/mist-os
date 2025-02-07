@@ -963,6 +963,84 @@ def _generate_cc_prebuilt_library_build_rules(
     prebuilt_select = {}
     dist_select = {}
 
+    has_distlibs = False
+
+    # Process the arch directories first then the variants, so that the variants
+    # will override the arch directories when both are present.
+    # TODO(https://fxbug.dev/385406226): Remove the first two for loops once
+    # //sdk:bazel_internal_only_libs no longer contains any prebuilts.
+
+    # Process "binaries".
+
+    # add all supported architectures to the select, even if they are not available in the current SDK,
+    # so that SDKs for different architectures can be composed by a simple directory merge.
+    arch_list = process_context.constants.target_cpus
+    for arch in arch_list:
+        constraint = "@fuchsia_sdk//fuchsia/constraints:is_%s_api_HEAD" % (arch)
+        dist_select[constraint] = ["//%s/%s-HEAD:dist" % (relative_dir, arch)]
+        prebuilt_select[constraint] = [
+            "//%s/%s-HEAD:prebuilts" % (relative_dir, arch),
+        ]
+
+    for arch in arch_list:
+        head_dirname = "%s-HEAD" % (arch)
+        per_arch_build_file = build_file.dirname.get_child(
+            head_dirname,
+        ).get_child("BUILD.bazel")
+        ctx.file(per_arch_build_file, content = _header(), executable = False)
+
+        linklib = meta["binaries"][arch]["link"]
+        _merge_template(
+            ctx,
+            per_arch_build_file,
+            _sdk_template_path(runtime, "cc_prebuilt_library_linklib"),
+            {
+                "{{link_lib}}": _final_bazel_path(linklib),
+                "{{library_type}}": meta["format"],
+                "{{rules_fuchsia}}": process_context.rules_fuchsia,
+            },
+        )
+        process_context.files_to_copy[meta["_meta_sdk_root"]].append(linklib)
+
+        if "dist" in meta["binaries"][arch]:
+            has_distlibs = True
+            dist_lib = meta["binaries"][arch]["dist"]
+            process_context.files_to_copy[meta["_meta_sdk_root"]].append(
+                dist_lib,
+            )
+
+            debug_lib = meta["binaries"][arch].get("debug", dist_lib)
+            if debug_lib.startswith(".build-id/"):
+                _merge_template(
+                    ctx,
+                    per_arch_build_file,
+                    _sdk_template_path(runtime, "cc_prebuilt_library_distlib"),
+                    {
+                        "{{dist_lib}}": _final_bazel_path(dist_lib),
+                        "{{dist_path}}": meta["binaries"][arch]["dist_path"],
+                        "{{rules_fuchsia}}": process_context.rules_fuchsia,
+                    },
+                )
+            else:
+                _merge_template(
+                    ctx,
+                    per_arch_build_file,
+                    _sdk_template_path(
+                        runtime,
+                        "cc_prebuilt_library_distlib_unstripped",
+                    ),
+                    {
+                        "{{stripped_file}}": _final_bazel_path(dist_lib),
+                        "{{unstripped_file}}": _final_bazel_path(debug_lib),
+                        "{{dist_path}}": meta["binaries"][arch]["dist_path"],
+                        "{{rules_fuchsia}}": process_context.rules_fuchsia,
+                    },
+                )
+                if debug_lib != dist_lib:
+                    process_context.files_to_copy[meta["_meta_sdk_root"]].append(debug_lib)
+
+    # Process "variants".
+
     prebuilt_variants = []
     if "variants" in meta:
         for variant in meta["variants"]:
@@ -1054,74 +1132,7 @@ def _generate_cc_prebuilt_library_build_rules(
                 if debug_lib != dist_lib:
                     process_context.files_to_copy[meta["_meta_sdk_root"]].append(debug_lib)
 
-    # add all supported architectures to the select, even if they are not available in the current SDK,
-    # so that SDKs for different architectures can be composed by a simple directory merge.
-    arch_list = process_context.constants.target_cpus
-    for arch in arch_list:
-        constraint = "@fuchsia_sdk//fuchsia/constraints:is_%s_api_HEAD" % (arch)
-        dist_select[constraint] = ["//%s/%s-HEAD:dist" % (relative_dir, arch)]
-        prebuilt_select[constraint] = [
-            "//%s/%s-HEAD:prebuilts" % (relative_dir, arch),
-        ]
-
-    has_distlibs = False
-
-    for arch in arch_list:
-        head_dirname = "%s-HEAD" % (arch)
-        per_arch_build_file = build_file.dirname.get_child(
-            head_dirname,
-        ).get_child("BUILD.bazel")
-        ctx.file(per_arch_build_file, content = _header(), executable = False)
-
-        linklib = meta["binaries"][arch]["link"]
-        _merge_template(
-            ctx,
-            per_arch_build_file,
-            _sdk_template_path(runtime, "cc_prebuilt_library_linklib"),
-            {
-                "{{link_lib}}": _final_bazel_path(linklib),
-                "{{library_type}}": meta["format"],
-                "{{rules_fuchsia}}": process_context.rules_fuchsia,
-            },
-        )
-        process_context.files_to_copy[meta["_meta_sdk_root"]].append(linklib)
-
-        if "dist" in meta["binaries"][arch]:
-            has_distlibs = True
-            dist_lib = meta["binaries"][arch]["dist"]
-            process_context.files_to_copy[meta["_meta_sdk_root"]].append(
-                dist_lib,
-            )
-
-            debug_lib = meta["binaries"][arch].get("debug", dist_lib)
-            if debug_lib.startswith(".build-id/"):
-                _merge_template(
-                    ctx,
-                    per_arch_build_file,
-                    _sdk_template_path(runtime, "cc_prebuilt_library_distlib"),
-                    {
-                        "{{dist_lib}}": _final_bazel_path(dist_lib),
-                        "{{dist_path}}": meta["binaries"][arch]["dist_path"],
-                        "{{rules_fuchsia}}": process_context.rules_fuchsia,
-                    },
-                )
-            else:
-                _merge_template(
-                    ctx,
-                    per_arch_build_file,
-                    _sdk_template_path(
-                        runtime,
-                        "cc_prebuilt_library_distlib_unstripped",
-                    ),
-                    {
-                        "{{stripped_file}}": _final_bazel_path(dist_lib),
-                        "{{unstripped_file}}": _final_bazel_path(debug_lib),
-                        "{{dist_path}}": meta["binaries"][arch]["dist_path"],
-                        "{{rules_fuchsia}}": process_context.rules_fuchsia,
-                    },
-                )
-                if debug_lib != dist_lib:
-                    process_context.files_to_copy[meta["_meta_sdk_root"]].append(debug_lib)
+    # Apply the results.
 
     prebuilt_select_str = (
         "variant_select(" + _get_starlark_dict(runtime, prebuilt_select) + ")"
