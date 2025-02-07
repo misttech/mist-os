@@ -19,6 +19,7 @@
 
 #include <gtest/gtest.h>
 
+#include "src/connectivity/bluetooth/hci/vendor/broadcom/packets.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
 #include "src/storage/lib/vfs/cpp/vmo_file.h"
@@ -34,7 +35,7 @@ const std::vector<uint8_t> kFirmware = {
     0x01,        // parameter_total_size
     0x03         // payload
 };
-const char* kFirmwarePath = "BCM4345C5.hcd";
+const std::vector<std::string> kFirmwarePaths = {"BCM4345C5.hcd", "BCM4381A1.hcd"};
 
 const std::vector<uint8_t> kMacAddress = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05};
 
@@ -67,10 +68,19 @@ class FakeTransportDevice : public fdf::WireServer<fuchsia_hardware_serialimpl::
     });
   }
 
-  void SetCustomizedReply(std::vector<uint8_t> reply) { customized_reply_.emplace(reply); }
+  void SetCustomizedReply(std::vector<uint8_t> reply) {
+    customized_reply_.emplace(std::move(reply));
+  }
 
   // fhbt::HciTransport request handler implementations:
   void Send(SendRequest& request, SendCompleter::Sync& completer) override {
+    if (request.Which() == fhbt::SentPacket::Tag::kCommand) {
+      // The command opcode is the first two bytes.
+      std::vector<uint8_t>& packet = request.command().value();
+      uint16_t opcode = static_cast<uint16_t>(packet[1] << 8) | static_cast<uint16_t>(packet[0]);
+      received_opcodes_.insert(opcode);
+    }
+
     std::vector<uint8_t> reply;
 
     if (customized_reply_) {
@@ -98,11 +108,15 @@ class FakeTransportDevice : public fdf::WireServer<fuchsia_hardware_serialimpl::
     ZX_PANIC("Unknown method in HciTransport requests");
   }
 
+  void SetSerialPid(uint16_t serial_pid) { serial_pid_ = serial_pid; }
+
+  const std::unordered_set<uint16_t>& GetReceivedOpCodes() { return received_opcodes_; }
+
   // fuchsia_hardware_serialimpl::Device FIDL request handler implementation.
   void GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& completer) override {
     fuchsia_hardware_serial::wire::SerialPortInfo info = {
         .serial_class = fuchsia_hardware_serial::Class::kBluetoothHci,
-        .serial_pid = PDEV_PID_BCM43458,
+        .serial_pid = serial_pid_,
     };
 
     completer.buffer(arena).ReplySuccess(info);
@@ -140,6 +154,8 @@ class FakeTransportDevice : public fdf::WireServer<fuchsia_hardware_serialimpl::
 
  private:
   std::optional<std::vector<uint8_t>> customized_reply_;
+  uint16_t serial_pid_ = PDEV_PID_BCM43458;
+  std::unordered_set<uint16_t> received_opcodes_;
 
   fdf::ServerBindingGroup<fuchsia_hardware_serialimpl::Device> serial_binding_group_;
   fidl::ServerBindingGroup<fhbt::HciTransport> hci_transport_binding_group_;
@@ -175,7 +191,7 @@ class TestEnvironment : fdf_testing::Environment {
     return zx::ok();
   }
 
-  void AddFirmwareFile(const std::vector<uint8_t> firmware) {
+  void AddFirmwareFile(const std::vector<uint8_t>& firmware) {
     // Create vmo for firmware file.
     zx::vmo vmo;
     zx::vmo::create(4096, 0, &vmo);
@@ -185,10 +201,12 @@ class TestEnvironment : fdf_testing::Environment {
     //  Create firmware file, and add it to the "firmware" directory we added under pkg/lib.
     fbl::RefPtr<fs::VmoFile> firmware_file =
         fbl::MakeRefCounted<fs::VmoFile>(std::move(vmo), firmware.size());
-    ZX_ASSERT(firmware_dir_->AddEntry(kFirmwarePath, firmware_file) == ZX_OK);
+    for (const auto& path : kFirmwarePaths) {
+      ZX_ASSERT(firmware_dir_->AddEntry(path, firmware_file) == ZX_OK);
+    }
   }
 
-  zx_status_t SetMetadata(uint32_t name, const std::vector<uint8_t> data, const size_t size) {
+  zx_status_t SetMetadata(uint32_t name, const std::vector<uint8_t>& data, const size_t size) {
     // Serve metadata.
     return device_server_.AddMetadata(name, data.data(), size);
   }
@@ -343,6 +361,22 @@ TEST_F(BtHciBroadcomTest, ControllerReturnsBdaddrEventWithoutBdaddrParam) {
 
   // Initialization should still succeed (an error will be logged, but it's not fatal).
   ASSERT_TRUE(driver_test().StartDriver().is_ok());
+}
+
+TEST_F(BtHciBroadcomTest, SendsPowerCapWhenNeeded) {
+  SetMetadata();
+  //  Respond to SetInfo command with a controller needing PowerCap
+  driver_test().RunInEnvironmentTypeContext(
+      [](TestEnvironment& env) { env.transport_device_.SetSerialPid(PDEV_PID_BCM4381A1); });
+  // Ensure loading the firmware succeeds.
+  SetFirmware();
+
+  // Initialization should succeed
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
+
+  driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
+    ASSERT_TRUE(env.transport_device_.GetReceivedOpCodes().contains(kBcmSetPowerCapCmdOpCode));
+  });
 }
 
 TEST_F(BtHciBroadcomTest, VendorProtocolUnknownMethod) {

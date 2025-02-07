@@ -106,6 +106,52 @@ const HciCommandHeader kReadBdaddrCmd = {
     .parameter_total_size = 0,
 };
 
+// Set Max TX Power
+
+struct BcmSetPowerCapCmd {
+  HciCommandHeader header;
+  uint8_t sub_opcode;
+  uint16_t cmd_format_opcode;
+  uint8_t chain_0_power_limit_br;
+  uint8_t chain_0_power_limit_edr;
+  uint8_t chain_0_power_limit_ble;
+  uint8_t chain_1_power_limit_br;
+  uint8_t chain_1_power_limit_edr;
+  uint8_t chain_1_power_limit_ble;
+  uint8_t beamforming_cap[6];
+} __PACKED;
+
+constexpr uint16_t kBcmSetPowerCapCmdOpCode = 0xff00;
+constexpr uint8_t kBcmSetPowerCapSubOpCode = 0x01;
+constexpr uint16_t kBcmSetPowerCapCmdFormatOpCode = 0x0002;
+constexpr uint8_t kBcmSetPowerCmdParamSize = sizeof(BcmSetPowerCapCmd) - sizeof(HciCommandHeader);
+
+constexpr uint8_t kDefaultBrPowerCap = 72;
+constexpr uint8_t kDefaultEdrPowerCap = 60;
+constexpr uint8_t kDefaultBlePowerCap = 28;
+
+constexpr BcmSetPowerCapCmd kDefaultPowerCapCmd = {
+    .header = {.opcode = kBcmSetPowerCapCmdOpCode,
+               .parameter_total_size = kBcmSetPowerCmdParamSize},
+    .sub_opcode = kBcmSetPowerCapSubOpCode,
+    .cmd_format_opcode = kBcmSetPowerCapCmdFormatOpCode,
+    .chain_0_power_limit_br = kDefaultBrPowerCap,
+    .chain_0_power_limit_edr = kDefaultEdrPowerCap,
+    .chain_0_power_limit_ble = kDefaultBlePowerCap,
+    .chain_1_power_limit_br = kDefaultBrPowerCap,
+    .chain_1_power_limit_edr = kDefaultEdrPowerCap,
+    .chain_1_power_limit_ble = kDefaultBlePowerCap,
+    .beamforming_cap =
+        {
+            kDefaultBrPowerCap,
+            kDefaultEdrPowerCap,
+            kDefaultBlePowerCap,
+            kDefaultBrPowerCap,
+            kDefaultEdrPowerCap,
+            kDefaultBlePowerCap,
+        },
+};
+
 }  // namespace bt_hci_broadcom
 
 #endif  // SRC_CONNECTIVITY_BLUETOOTH_HCI_VENDOR_BROADCOM_PACKETS_H_
