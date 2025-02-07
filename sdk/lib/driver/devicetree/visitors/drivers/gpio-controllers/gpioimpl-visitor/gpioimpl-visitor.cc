@@ -545,11 +545,23 @@ zx::result<> GpioImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
               encoded_controller_metadata.error_value().FormatDescription().c_str());
       return zx::error(encoded_controller_metadata.error_value().status());
     }
-    fuchsia_hardware_platform_bus::Metadata controller_metadata = {{
-        .id = std::to_string(DEVICE_METADATA_GPIO_CONTROLLER),
-        .data = encoded_controller_metadata.value(),
-    }};
-    node.AddMetadata(std::move(controller_metadata));
+
+    // TODO(b/388305889): Remove once no longer retrieved.
+    {
+      fuchsia_hardware_platform_bus::Metadata controller_metadata = {{
+          .id = std::to_string(DEVICE_METADATA_GPIO_CONTROLLER),
+          .data = encoded_controller_metadata.value(),
+      }};
+      node.AddMetadata(std::move(controller_metadata));
+    }
+
+    {
+      fuchsia_hardware_platform_bus::Metadata controller_metadata = {{
+          .id = fuchsia_hardware_pinimpl::Metadata::kSerializableName,
+          .data = std::move(encoded_controller_metadata.value()),
+      }};
+      node.AddMetadata(std::move(controller_metadata));
+    }
     FDF_LOG(DEBUG, "Gpio metadata added to node '%s'", node.name().c_str());
   }
 

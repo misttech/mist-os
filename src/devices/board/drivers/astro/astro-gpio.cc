@@ -97,8 +97,13 @@ zx_status_t CreateTestGpioPlatformDevice(
   }
 
   std::vector<fpbus::Metadata> gpio_metadata{
+      // TODO(b/388305889): Remove once no longer retrieved.
       {{
           .id = std::to_string(DEVICE_METADATA_GPIO_CONTROLLER),
+          .data = encoded_metadata.value(),
+      }},
+      {{
+          .id = fuchsia_hardware_pinimpl::Metadata::kSerializableName,
           .data = std::move(encoded_metadata.value()),
       }},
   };
@@ -178,8 +183,13 @@ zx_status_t Astro::CreateGpioPlatformDevice() {
   }
 
   std::vector<fpbus::Metadata> gpio_metadata{
+      // TODO(b/388305889): Remove once no longer retrieved.
       {{
           .id = std::to_string(DEVICE_METADATA_GPIO_CONTROLLER),
+          .data = encoded_metadata.value(),
+      }},
+      {{
+          .id = fuchsia_hardware_pinimpl::Metadata::kSerializableName,
           .data = std::move(encoded_metadata.value()),
       }},
   };

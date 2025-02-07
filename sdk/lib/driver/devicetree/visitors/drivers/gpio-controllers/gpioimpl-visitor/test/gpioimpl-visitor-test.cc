@@ -62,113 +62,227 @@ TEST(GpioImplVisitorTest, TestGpiosProperty) {
 
       // Test metadata properties.
       ASSERT_TRUE(metadata);
-      ASSERT_EQ(1lu, metadata->size());
+      ASSERT_EQ(2lu, metadata->size());
+
+      // Controller metadata (legacy).
+      {
+        std::vector<uint8_t> metadata_blob = std::move(*(*metadata)[0].data());
+        fit::result controller_metadata =
+            fidl::Unpersist<fuchsia_hardware_pinimpl::Metadata>(metadata_blob);
+        ASSERT_TRUE(controller_metadata.is_ok());
+        ASSERT_TRUE(controller_metadata->controller_id());
+        gpioA_id = *controller_metadata->controller_id();
+
+        ASSERT_TRUE(controller_metadata->init_steps());
+        ASSERT_EQ((*controller_metadata).init_steps()->size(),
+                  6u /*from gpio hog*/ + 8u /*pincfg groups*/);
+
+        // GPIO Hog init steps.
+        const auto& init_steps = *controller_metadata->init_steps();
+        ASSERT_TRUE(init_steps[0].call());
+        ASSERT_EQ(init_steps[0].call()->pin(), static_cast<uint32_t>(HOG_PIN1));
+        ASSERT_EQ(init_steps[0].call()->call(),
+                  fuchsia_hardware_pinimpl::InitCall::WithPinConfig(
+                      {{.pull = static_cast<fuchsia_hardware_pin::Pull>(0)}}));
+        ASSERT_TRUE(init_steps[1].call());
+        ASSERT_EQ(init_steps[1].call()->pin(), static_cast<uint32_t>(HOG_PIN1));
+        ASSERT_EQ(init_steps[1].call()->call(), fuchsia_hardware_pinimpl::InitCall::WithBufferMode(
+                                                    fuchsia_hardware_gpio::BufferMode::kOutputLow));
+
+        ASSERT_TRUE(init_steps[2].call());
+        ASSERT_EQ(init_steps[2].call()->pin(), static_cast<uint32_t>(HOG_PIN2));
+        ASSERT_EQ(init_steps[2].call()->call(),
+                  fuchsia_hardware_pinimpl::InitCall::WithPinConfig(
+                      {{.pull = static_cast<fuchsia_hardware_pin::Pull>(HOG_PIN2_FLAG)}}));
+        ASSERT_TRUE(init_steps[3].call());
+        ASSERT_EQ(init_steps[3].call()->pin(), static_cast<uint32_t>(HOG_PIN2));
+        ASSERT_EQ(init_steps[3].call()->call(), fuchsia_hardware_pinimpl::InitCall::WithBufferMode(
+                                                    fuchsia_hardware_gpio::BufferMode::kInput));
+
+        ASSERT_TRUE(init_steps[4].call());
+        ASSERT_EQ(init_steps[4].call()->pin(), static_cast<uint32_t>(HOG_PIN3));
+        ASSERT_EQ(init_steps[4].call()->call(),
+                  fuchsia_hardware_pinimpl::InitCall::WithPinConfig(
+                      {{.pull = static_cast<fuchsia_hardware_pin::Pull>(HOG_PIN3_FLAG)}}));
+        ASSERT_TRUE(init_steps[5].call());
+        ASSERT_EQ(init_steps[5].call()->pin(), static_cast<uint32_t>(HOG_PIN3));
+        ASSERT_EQ(init_steps[5].call()->call(), fuchsia_hardware_pinimpl::InitCall::WithBufferMode(
+                                                    fuchsia_hardware_gpio::BufferMode::kInput));
+
+        // Pin controller config init steps.
+        ASSERT_TRUE(init_steps[6].call());
+        ASSERT_EQ(init_steps[6].call()->pin(), static_cast<uint32_t>(GROUP1_PIN1));
+        ASSERT_EQ(init_steps[6].call()->call(),
+                  fuchsia_hardware_pinimpl::InitCall::WithPinConfig({{
+                      .function = GROUP1_FUNCTION,
+                      .drive_strength_ua = GROUP1_DRIVE_STRENGTH,
+                      .drive_type = fuchsia_hardware_pin::DriveType::kOpenDrain,
+                  }}));
+
+        ASSERT_TRUE(init_steps[7].call());
+        ASSERT_EQ(init_steps[7].call()->pin(), static_cast<uint32_t>(GROUP1_PIN2));
+        ASSERT_EQ(init_steps[7].call()->call(),
+                  fuchsia_hardware_pinimpl::InitCall::WithPinConfig({{
+                      .function = GROUP1_FUNCTION,
+                      .drive_strength_ua = GROUP1_DRIVE_STRENGTH,
+                      .drive_type = fuchsia_hardware_pin::DriveType::kOpenDrain,
+                  }}));
+
+        ASSERT_TRUE(init_steps[8].call());
+        ASSERT_EQ(init_steps[8].call()->pin(), static_cast<uint32_t>(GROUP3_PIN1));
+        ASSERT_EQ(init_steps[8].call()->call(),
+                  fuchsia_hardware_pinimpl::InitCall::WithPinConfig({{
+                      .pull = fuchsia_hardware_pin::Pull::kNone,
+                      .drive_type = fuchsia_hardware_pin::DriveType::kOpenSource,
+                  }}));
+
+        ASSERT_TRUE(init_steps[9].call());
+        ASSERT_EQ(init_steps[9].call()->pin(), static_cast<uint32_t>(GROUP3_PIN1));
+        ASSERT_EQ(init_steps[9].call()->call(), fuchsia_hardware_pinimpl::InitCall::WithBufferMode(
+                                                    fuchsia_hardware_gpio::BufferMode::kInput));
+
+        ASSERT_TRUE(init_steps[10].call());
+        ASSERT_EQ(init_steps[10].call()->pin(), static_cast<uint32_t>(GROUP2_PIN1));
+        ASSERT_EQ(init_steps[10].call()->call(), fuchsia_hardware_pinimpl::InitCall::WithPinConfig(
+                                                     {{.power_source = GROUP2_POWER_SOURCE}}));
+
+        ASSERT_TRUE(init_steps[11].call());
+        ASSERT_EQ(init_steps[11].call()->pin(), static_cast<uint32_t>(GROUP2_PIN1));
+        ASSERT_EQ(init_steps[11].call()->call(),
+                  fuchsia_hardware_pinimpl::InitCall::WithBufferMode(
+                      fuchsia_hardware_gpio::BufferMode::kOutputLow));
+
+        ASSERT_TRUE(init_steps[12].call());
+        ASSERT_EQ(init_steps[12].call()->pin(), static_cast<uint32_t>(GROUP2_PIN2));
+        ASSERT_EQ(init_steps[12].call()->call(), fuchsia_hardware_pinimpl::InitCall::WithPinConfig(
+                                                     {{.power_source = GROUP2_POWER_SOURCE}}));
+
+        ASSERT_TRUE(init_steps[13].call());
+        ASSERT_EQ(init_steps[13].call()->pin(), static_cast<uint32_t>(GROUP2_PIN2));
+        ASSERT_EQ(init_steps[13].call()->call(),
+                  fuchsia_hardware_pinimpl::InitCall::WithBufferMode(
+                      fuchsia_hardware_gpio::BufferMode::kOutputLow));
+
+        // GPIO Hog init steps.
+        ASSERT_TRUE(controller_metadata->pins().has_value());
+        ASSERT_EQ((*controller_metadata).pins()->size(), 2lu);
+        std::span<fuchsia_hardware_pinimpl::Pin> gpio_pins = controller_metadata->pins().value();
+        ASSERT_EQ(gpio_pins.size(), 2lu);
+        EXPECT_EQ(gpio_pins[0].pin().value(), static_cast<uint32_t>(PIN1));
+        EXPECT_EQ(gpio_pins[0].name().value(), PIN1_NAME);
+        EXPECT_EQ(gpio_pins[1].pin().value(), static_cast<uint32_t>(PIN2));
+        EXPECT_EQ(gpio_pins[1].name().value(), PIN2_NAME);
+      }
 
       // Controller metadata.
-      std::vector<uint8_t> metadata_blob0 = std::move(*(*metadata)[0].data());
-      fit::result controller_metadata =
-          fidl::Unpersist<fuchsia_hardware_pinimpl::Metadata>(metadata_blob0);
-      ASSERT_TRUE(controller_metadata.is_ok());
-      ASSERT_TRUE(controller_metadata->controller_id());
-      gpioA_id = *controller_metadata->controller_id();
+      {
+        std::vector<uint8_t> metadata_blob = std::move(*(*metadata)[1].data());
+        fit::result controller_metadata =
+            fidl::Unpersist<fuchsia_hardware_pinimpl::Metadata>(metadata_blob);
+        ASSERT_TRUE(controller_metadata.is_ok());
+        ASSERT_TRUE(controller_metadata->controller_id());
+        gpioA_id = *controller_metadata->controller_id();
 
-      ASSERT_TRUE(controller_metadata->init_steps());
-      ASSERT_EQ((*controller_metadata).init_steps()->size(),
-                6u /*from gpio hog*/ + 8u /*pincfg groups*/);
+        ASSERT_TRUE(controller_metadata->init_steps());
+        ASSERT_EQ((*controller_metadata).init_steps()->size(),
+                  6u /*from gpio hog*/ + 8u /*pincfg groups*/);
 
-      // GPIO Hog init steps.
-      const auto& init_steps = *controller_metadata->init_steps();
-      ASSERT_TRUE(init_steps[0].call());
-      ASSERT_EQ(init_steps[0].call()->pin(), static_cast<uint32_t>(HOG_PIN1));
-      ASSERT_EQ(init_steps[0].call()->call(),
-                fuchsia_hardware_pinimpl::InitCall::WithPinConfig(
-                    {{.pull = static_cast<fuchsia_hardware_pin::Pull>(0)}}));
-      ASSERT_TRUE(init_steps[1].call());
-      ASSERT_EQ(init_steps[1].call()->pin(), static_cast<uint32_t>(HOG_PIN1));
-      ASSERT_EQ(init_steps[1].call()->call(), fuchsia_hardware_pinimpl::InitCall::WithBufferMode(
-                                                  fuchsia_hardware_gpio::BufferMode::kOutputLow));
+        // GPIO Hog init steps.
+        const auto& init_steps = *controller_metadata->init_steps();
+        ASSERT_TRUE(init_steps[0].call());
+        ASSERT_EQ(init_steps[0].call()->pin(), static_cast<uint32_t>(HOG_PIN1));
+        ASSERT_EQ(init_steps[0].call()->call(),
+                  fuchsia_hardware_pinimpl::InitCall::WithPinConfig(
+                      {{.pull = static_cast<fuchsia_hardware_pin::Pull>(0)}}));
+        ASSERT_TRUE(init_steps[1].call());
+        ASSERT_EQ(init_steps[1].call()->pin(), static_cast<uint32_t>(HOG_PIN1));
+        ASSERT_EQ(init_steps[1].call()->call(), fuchsia_hardware_pinimpl::InitCall::WithBufferMode(
+                                                    fuchsia_hardware_gpio::BufferMode::kOutputLow));
 
-      ASSERT_TRUE(init_steps[2].call());
-      ASSERT_EQ(init_steps[2].call()->pin(), static_cast<uint32_t>(HOG_PIN2));
-      ASSERT_EQ(init_steps[2].call()->call(),
-                fuchsia_hardware_pinimpl::InitCall::WithPinConfig(
-                    {{.pull = static_cast<fuchsia_hardware_pin::Pull>(HOG_PIN2_FLAG)}}));
-      ASSERT_TRUE(init_steps[3].call());
-      ASSERT_EQ(init_steps[3].call()->pin(), static_cast<uint32_t>(HOG_PIN2));
-      ASSERT_EQ(init_steps[3].call()->call(), fuchsia_hardware_pinimpl::InitCall::WithBufferMode(
-                                                  fuchsia_hardware_gpio::BufferMode::kInput));
+        ASSERT_TRUE(init_steps[2].call());
+        ASSERT_EQ(init_steps[2].call()->pin(), static_cast<uint32_t>(HOG_PIN2));
+        ASSERT_EQ(init_steps[2].call()->call(),
+                  fuchsia_hardware_pinimpl::InitCall::WithPinConfig(
+                      {{.pull = static_cast<fuchsia_hardware_pin::Pull>(HOG_PIN2_FLAG)}}));
+        ASSERT_TRUE(init_steps[3].call());
+        ASSERT_EQ(init_steps[3].call()->pin(), static_cast<uint32_t>(HOG_PIN2));
+        ASSERT_EQ(init_steps[3].call()->call(), fuchsia_hardware_pinimpl::InitCall::WithBufferMode(
+                                                    fuchsia_hardware_gpio::BufferMode::kInput));
 
-      ASSERT_TRUE(init_steps[4].call());
-      ASSERT_EQ(init_steps[4].call()->pin(), static_cast<uint32_t>(HOG_PIN3));
-      ASSERT_EQ(init_steps[4].call()->call(),
-                fuchsia_hardware_pinimpl::InitCall::WithPinConfig(
-                    {{.pull = static_cast<fuchsia_hardware_pin::Pull>(HOG_PIN3_FLAG)}}));
-      ASSERT_TRUE(init_steps[5].call());
-      ASSERT_EQ(init_steps[5].call()->pin(), static_cast<uint32_t>(HOG_PIN3));
-      ASSERT_EQ(init_steps[5].call()->call(), fuchsia_hardware_pinimpl::InitCall::WithBufferMode(
-                                                  fuchsia_hardware_gpio::BufferMode::kInput));
+        ASSERT_TRUE(init_steps[4].call());
+        ASSERT_EQ(init_steps[4].call()->pin(), static_cast<uint32_t>(HOG_PIN3));
+        ASSERT_EQ(init_steps[4].call()->call(),
+                  fuchsia_hardware_pinimpl::InitCall::WithPinConfig(
+                      {{.pull = static_cast<fuchsia_hardware_pin::Pull>(HOG_PIN3_FLAG)}}));
+        ASSERT_TRUE(init_steps[5].call());
+        ASSERT_EQ(init_steps[5].call()->pin(), static_cast<uint32_t>(HOG_PIN3));
+        ASSERT_EQ(init_steps[5].call()->call(), fuchsia_hardware_pinimpl::InitCall::WithBufferMode(
+                                                    fuchsia_hardware_gpio::BufferMode::kInput));
 
-      // Pin controller config init steps.
-      ASSERT_TRUE(init_steps[6].call());
-      ASSERT_EQ(init_steps[6].call()->pin(), static_cast<uint32_t>(GROUP1_PIN1));
-      ASSERT_EQ(init_steps[6].call()->call(),
-                fuchsia_hardware_pinimpl::InitCall::WithPinConfig({{
-                    .function = GROUP1_FUNCTION,
-                    .drive_strength_ua = GROUP1_DRIVE_STRENGTH,
-                    .drive_type = fuchsia_hardware_pin::DriveType::kOpenDrain,
-                }}));
+        // Pin controller config init steps.
+        ASSERT_TRUE(init_steps[6].call());
+        ASSERT_EQ(init_steps[6].call()->pin(), static_cast<uint32_t>(GROUP1_PIN1));
+        ASSERT_EQ(init_steps[6].call()->call(),
+                  fuchsia_hardware_pinimpl::InitCall::WithPinConfig({{
+                      .function = GROUP1_FUNCTION,
+                      .drive_strength_ua = GROUP1_DRIVE_STRENGTH,
+                      .drive_type = fuchsia_hardware_pin::DriveType::kOpenDrain,
+                  }}));
 
-      ASSERT_TRUE(init_steps[7].call());
-      ASSERT_EQ(init_steps[7].call()->pin(), static_cast<uint32_t>(GROUP1_PIN2));
-      ASSERT_EQ(init_steps[7].call()->call(),
-                fuchsia_hardware_pinimpl::InitCall::WithPinConfig({{
-                    .function = GROUP1_FUNCTION,
-                    .drive_strength_ua = GROUP1_DRIVE_STRENGTH,
-                    .drive_type = fuchsia_hardware_pin::DriveType::kOpenDrain,
-                }}));
+        ASSERT_TRUE(init_steps[7].call());
+        ASSERT_EQ(init_steps[7].call()->pin(), static_cast<uint32_t>(GROUP1_PIN2));
+        ASSERT_EQ(init_steps[7].call()->call(),
+                  fuchsia_hardware_pinimpl::InitCall::WithPinConfig({{
+                      .function = GROUP1_FUNCTION,
+                      .drive_strength_ua = GROUP1_DRIVE_STRENGTH,
+                      .drive_type = fuchsia_hardware_pin::DriveType::kOpenDrain,
+                  }}));
 
-      ASSERT_TRUE(init_steps[8].call());
-      ASSERT_EQ(init_steps[8].call()->pin(), static_cast<uint32_t>(GROUP3_PIN1));
-      ASSERT_EQ(init_steps[8].call()->call(),
-                fuchsia_hardware_pinimpl::InitCall::WithPinConfig({{
-                    .pull = fuchsia_hardware_pin::Pull::kNone,
-                    .drive_type = fuchsia_hardware_pin::DriveType::kOpenSource,
-                }}));
+        ASSERT_TRUE(init_steps[8].call());
+        ASSERT_EQ(init_steps[8].call()->pin(), static_cast<uint32_t>(GROUP3_PIN1));
+        ASSERT_EQ(init_steps[8].call()->call(),
+                  fuchsia_hardware_pinimpl::InitCall::WithPinConfig({{
+                      .pull = fuchsia_hardware_pin::Pull::kNone,
+                      .drive_type = fuchsia_hardware_pin::DriveType::kOpenSource,
+                  }}));
 
-      ASSERT_TRUE(init_steps[9].call());
-      ASSERT_EQ(init_steps[9].call()->pin(), static_cast<uint32_t>(GROUP3_PIN1));
-      ASSERT_EQ(init_steps[9].call()->call(), fuchsia_hardware_pinimpl::InitCall::WithBufferMode(
-                                                  fuchsia_hardware_gpio::BufferMode::kInput));
+        ASSERT_TRUE(init_steps[9].call());
+        ASSERT_EQ(init_steps[9].call()->pin(), static_cast<uint32_t>(GROUP3_PIN1));
+        ASSERT_EQ(init_steps[9].call()->call(), fuchsia_hardware_pinimpl::InitCall::WithBufferMode(
+                                                    fuchsia_hardware_gpio::BufferMode::kInput));
 
-      ASSERT_TRUE(init_steps[10].call());
-      ASSERT_EQ(init_steps[10].call()->pin(), static_cast<uint32_t>(GROUP2_PIN1));
-      ASSERT_EQ(init_steps[10].call()->call(), fuchsia_hardware_pinimpl::InitCall::WithPinConfig(
-                                                   {{.power_source = GROUP2_POWER_SOURCE}}));
+        ASSERT_TRUE(init_steps[10].call());
+        ASSERT_EQ(init_steps[10].call()->pin(), static_cast<uint32_t>(GROUP2_PIN1));
+        ASSERT_EQ(init_steps[10].call()->call(), fuchsia_hardware_pinimpl::InitCall::WithPinConfig(
+                                                     {{.power_source = GROUP2_POWER_SOURCE}}));
 
-      ASSERT_TRUE(init_steps[11].call());
-      ASSERT_EQ(init_steps[11].call()->pin(), static_cast<uint32_t>(GROUP2_PIN1));
-      ASSERT_EQ(init_steps[11].call()->call(), fuchsia_hardware_pinimpl::InitCall::WithBufferMode(
-                                                   fuchsia_hardware_gpio::BufferMode::kOutputLow));
+        ASSERT_TRUE(init_steps[11].call());
+        ASSERT_EQ(init_steps[11].call()->pin(), static_cast<uint32_t>(GROUP2_PIN1));
+        ASSERT_EQ(init_steps[11].call()->call(),
+                  fuchsia_hardware_pinimpl::InitCall::WithBufferMode(
+                      fuchsia_hardware_gpio::BufferMode::kOutputLow));
 
-      ASSERT_TRUE(init_steps[12].call());
-      ASSERT_EQ(init_steps[12].call()->pin(), static_cast<uint32_t>(GROUP2_PIN2));
-      ASSERT_EQ(init_steps[12].call()->call(), fuchsia_hardware_pinimpl::InitCall::WithPinConfig(
-                                                   {{.power_source = GROUP2_POWER_SOURCE}}));
+        ASSERT_TRUE(init_steps[12].call());
+        ASSERT_EQ(init_steps[12].call()->pin(), static_cast<uint32_t>(GROUP2_PIN2));
+        ASSERT_EQ(init_steps[12].call()->call(), fuchsia_hardware_pinimpl::InitCall::WithPinConfig(
+                                                     {{.power_source = GROUP2_POWER_SOURCE}}));
 
-      ASSERT_TRUE(init_steps[13].call());
-      ASSERT_EQ(init_steps[13].call()->pin(), static_cast<uint32_t>(GROUP2_PIN2));
-      ASSERT_EQ(init_steps[13].call()->call(), fuchsia_hardware_pinimpl::InitCall::WithBufferMode(
-                                                   fuchsia_hardware_gpio::BufferMode::kOutputLow));
+        ASSERT_TRUE(init_steps[13].call());
+        ASSERT_EQ(init_steps[13].call()->pin(), static_cast<uint32_t>(GROUP2_PIN2));
+        ASSERT_EQ(init_steps[13].call()->call(),
+                  fuchsia_hardware_pinimpl::InitCall::WithBufferMode(
+                      fuchsia_hardware_gpio::BufferMode::kOutputLow));
 
-      // GPIO Hog init steps.
-      ASSERT_TRUE(controller_metadata->pins().has_value());
-      ASSERT_EQ((*controller_metadata).pins()->size(), 2lu);
-      std::span<fuchsia_hardware_pinimpl::Pin> gpio_pins = controller_metadata->pins().value();
-      ASSERT_EQ(gpio_pins.size(), 2lu);
-      EXPECT_EQ(gpio_pins[0].pin().value(), static_cast<uint32_t>(PIN1));
-      EXPECT_EQ(gpio_pins[0].name().value(), PIN1_NAME);
-      EXPECT_EQ(gpio_pins[1].pin().value(), static_cast<uint32_t>(PIN2));
-      EXPECT_EQ(gpio_pins[1].name().value(), PIN2_NAME);
+        // GPIO Hog init steps.
+        ASSERT_TRUE(controller_metadata->pins().has_value());
+        ASSERT_EQ((*controller_metadata).pins()->size(), 2lu);
+        std::span<fuchsia_hardware_pinimpl::Pin> gpio_pins = controller_metadata->pins().value();
+        ASSERT_EQ(gpio_pins.size(), 2lu);
+        EXPECT_EQ(gpio_pins[0].pin().value(), static_cast<uint32_t>(PIN1));
+        EXPECT_EQ(gpio_pins[0].name().value(), PIN1_NAME);
+        EXPECT_EQ(gpio_pins[1].pin().value(), static_cast<uint32_t>(PIN2));
+        EXPECT_EQ(gpio_pins[1].name().value(), PIN2_NAME);
+      }
 
       node_tested_count++;
     }
@@ -180,27 +294,51 @@ TEST(GpioImplVisitorTest, TestGpiosProperty) {
 
       // Test metadata properties.
       ASSERT_TRUE(metadata);
-      ASSERT_EQ(1lu, metadata->size());
+      ASSERT_EQ(2lu, metadata->size());
+
+      // Controller metadata (legacy).
+      {
+        std::vector<uint8_t> metadata_blob = std::move(*(*metadata)[0].data());
+        fit::result controller_metadata =
+            fidl::Unpersist<fuchsia_hardware_pinimpl::Metadata>(metadata_blob);
+        ASSERT_TRUE(controller_metadata.is_ok());
+        ASSERT_TRUE(controller_metadata->controller_id());
+        gpioB_id = *controller_metadata->controller_id();
+
+        ASSERT_TRUE(controller_metadata->init_steps());
+        ASSERT_EQ((*controller_metadata).init_steps()->size(), 1u);
+
+        // Pin controller config init steps.
+        ASSERT_TRUE((*controller_metadata->init_steps())[0].call());
+        ASSERT_EQ((*controller_metadata->init_steps())[0].call()->pin(),
+                  static_cast<uint32_t>(GROUP4_PIN1));
+        ASSERT_EQ((*controller_metadata->init_steps())[0].call()->call(),
+                  fuchsia_hardware_pinimpl::InitCall::WithPinConfig(
+                      {{.pull = fuchsia_hardware_pin::Pull::kUp,
+                        .drive_type = fuchsia_hardware_pin::DriveType::kPushPull}}));
+      }
 
       // Controller metadata.
-      std::vector<uint8_t> metadata_blob0 = std::move(*(*metadata)[0].data());
-      fit::result controller_metadata =
-          fidl::Unpersist<fuchsia_hardware_pinimpl::Metadata>(metadata_blob0);
-      ASSERT_TRUE(controller_metadata.is_ok());
-      ASSERT_TRUE(controller_metadata->controller_id());
-      gpioB_id = *controller_metadata->controller_id();
+      {
+        std::vector<uint8_t> metadata_blob = std::move(*(*metadata)[1].data());
+        fit::result controller_metadata =
+            fidl::Unpersist<fuchsia_hardware_pinimpl::Metadata>(metadata_blob);
+        ASSERT_TRUE(controller_metadata.is_ok());
+        ASSERT_TRUE(controller_metadata->controller_id());
+        gpioB_id = *controller_metadata->controller_id();
 
-      ASSERT_TRUE(controller_metadata->init_steps());
-      ASSERT_EQ((*controller_metadata).init_steps()->size(), 1u);
+        ASSERT_TRUE(controller_metadata->init_steps());
+        ASSERT_EQ((*controller_metadata).init_steps()->size(), 1u);
 
-      // Pin controller config init steps.
-      ASSERT_TRUE((*controller_metadata->init_steps())[0].call());
-      ASSERT_EQ((*controller_metadata->init_steps())[0].call()->pin(),
-                static_cast<uint32_t>(GROUP4_PIN1));
-      ASSERT_EQ((*controller_metadata->init_steps())[0].call()->call(),
-                fuchsia_hardware_pinimpl::InitCall::WithPinConfig(
-                    {{.pull = fuchsia_hardware_pin::Pull::kUp,
-                      .drive_type = fuchsia_hardware_pin::DriveType::kPushPull}}));
+        // Pin controller config init steps.
+        ASSERT_TRUE((*controller_metadata->init_steps())[0].call());
+        ASSERT_EQ((*controller_metadata->init_steps())[0].call()->pin(),
+                  static_cast<uint32_t>(GROUP4_PIN1));
+        ASSERT_EQ((*controller_metadata->init_steps())[0].call()->call(),
+                  fuchsia_hardware_pinimpl::InitCall::WithPinConfig(
+                      {{.pull = fuchsia_hardware_pin::Pull::kUp,
+                        .drive_type = fuchsia_hardware_pin::DriveType::kPushPull}}));
+      }
       node_tested_count++;
     }
   }
