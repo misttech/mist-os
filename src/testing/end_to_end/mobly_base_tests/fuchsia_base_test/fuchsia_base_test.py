@@ -8,8 +8,10 @@ import logging
 import os
 
 from honeydew import errors
-from honeydew.auxiliary_devices import power_switch_dmc
-from honeydew.interfaces.auxiliary_devices import power_switch
+from honeydew.auxiliary_devices.power_switch import (
+    power_switch,
+    power_switch_using_dmc,
+)
 from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.typing import custom_types
 from mobly import base_test, signals, test_runner
@@ -404,13 +406,13 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
             fx_device: FuchsiaDevice object
         """
         try:
-            dmc_power_switch: power_switch_dmc.PowerSwitchDmc = (
-                power_switch_dmc.PowerSwitchDmc(
+            dmc_power_switch: power_switch_using_dmc.PowerSwitchUsingDmc = (
+                power_switch_using_dmc.PowerSwitchUsingDmc(
                     device_name=fx_device.device_name
                 )
             )
             fx_device.power_cycle(power_switch=dmc_power_switch, outlet=None)
-        except power_switch_dmc.PowerSwitchDmcError as err:
+        except power_switch_using_dmc.PowerSwitchDmcError as err:
             _LOGGER.warning(
                 "Unable to power cycle %s as test does not have access to DMC. "
                 "Aborting the test class...",

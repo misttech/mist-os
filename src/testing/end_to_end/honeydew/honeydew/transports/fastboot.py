@@ -14,7 +14,7 @@ from importlib import resources
 from typing import Any
 
 from honeydew import errors
-from honeydew.interfaces.auxiliary_devices import (
+from honeydew.auxiliary_devices.power_switch import (
     power_switch as power_switch_interface,
 )
 from honeydew.interfaces.device_classes import affordances_capable

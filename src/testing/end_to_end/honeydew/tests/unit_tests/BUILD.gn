@@ -23,7 +23,6 @@ group("tests") {
   if (host_os != "mac") {
     public_deps += [
       ":init_test($host_toolchain)",
-      "auxiliary_devices_tests:tests",
       "fuchsia_device_tests:tests",
       "transports_tests:tests",
       "typing_tests:tests",

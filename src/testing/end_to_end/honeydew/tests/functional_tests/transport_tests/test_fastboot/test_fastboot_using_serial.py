@@ -9,7 +9,10 @@ from fuchsia_base_test import fuchsia_base_test
 from mobly import asserts, test_runner
 
 from honeydew import errors
-from honeydew.auxiliary_devices import power_switch_dmc
+from honeydew.auxiliary_devices.power_switch import (
+    power_switch as power_switch_interface,
+)
+from honeydew.auxiliary_devices.power_switch import power_switch_using_dmc
 from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.interfaces.transports import serial as serial_transport
 
@@ -65,14 +68,14 @@ class FastbootUsingSerialTests(fuchsia_base_test.FuchsiaBaseTest):
         """Test case that puts the device in fastboot mode using serial, runs
         a command in fastboot mode and reboots the device back to fuchsia mode.
         """
-        power_switch: power_switch_dmc.PowerSwitchDmc
+        power_switch: power_switch_interface.PowerSwitch
         serial: serial_transport.Serial
 
         try:
-            power_switch = power_switch_dmc.PowerSwitchDmc(
+            power_switch = power_switch_using_dmc.PowerSwitchUsingDmc(
                 device_name=self.device.device_name
             )
-        except power_switch_dmc.PowerSwitchDmcError:
+        except power_switch_using_dmc.PowerSwitchDmcError:
             asserts.fail(
                 "PowerSwitchDmc is not available. This test can't be run."
             )

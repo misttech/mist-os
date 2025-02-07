@@ -99,13 +99,14 @@ python_library("honeydew_no_testonly") {
     "affordances/ui/user_input/user_input.py",
     "affordances/ui/user_input/user_input_using_fc.py",
     "auxiliary_devices/__init__.py",
+    "auxiliary_devices/power_switch/__init__.py",
+    "auxiliary_devices/power_switch/power_switch.py",
+    "auxiliary_devices/power_switch/power_switch_using_dmc.py",
     "auxiliary_devices/power_switch_dmc.py",
     "errors.py",
     "fuchsia_device/__init__.py",
     "fuchsia_device/fuchsia_device.py",
     "interfaces/__init__.py",
-    "interfaces/auxiliary_devices/__init__.py",
-    "interfaces/auxiliary_devices/power_switch.py",
     "interfaces/device_classes/__init__.py",
     "interfaces/device_classes/affordances_capable.py",
     "interfaces/device_classes/fuchsia_device.py",
@@ -233,6 +234,7 @@ group("unit_tests") {
       "honeydew/affordances/tracing/tests/unit_tests:tests",
       "honeydew/affordances/ui/screenshot/tests/unit_tests:tests",
       "honeydew/affordances/ui/user_input/tests/unit_tests:tests",
+      "honeydew/auxiliary_devices/power_switch/tests/unit_tests:tests",
       "tests/unit_tests:tests",
     ]
   }
@@ -258,6 +260,7 @@ group("functional_tests") {
       "honeydew/affordances/tracing/tests/functional_tests:tests",
       "honeydew/affordances/ui/screenshot/tests/functional_tests:tests",
       "honeydew/affordances/ui/user_input/tests/functional_tests:tests",
+      "honeydew/auxiliary_devices/power_switch/tests/functional_tests:tests",
       "tests/functional_tests:tests",
     ]
   }

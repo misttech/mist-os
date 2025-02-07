@@ -3,14 +3,13 @@
 # found in the LICENSE file.
 """PowerSwitch auxiliary device implementation using DMC."""
 
-# TODO(https://fxbug.dev/394695644): File will be deleted after antlion is updated to use new power_switch path
-
 import enum
 import logging
 import os
 import platform
 
 from honeydew import errors
+from honeydew.auxiliary_devices.power_switch import power_switch
 from honeydew.utils import host_shell
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -18,7 +17,7 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 DMC_PATH_KEY: str = "DMC_PATH"
 
 
-class PowerSwitchDmcError(Exception):
+class PowerSwitchDmcError(power_switch.PowerSwitchError):
     """Custom exception class for raising DMC related errors."""
 
 
@@ -30,7 +29,7 @@ class PowerState(enum.StrEnum):
     CYCLE = "cycle"
 
 
-class PowerSwitchDmc:
+class PowerSwitchUsingDmc(power_switch.PowerSwitch):
     """PowerSwitch auxiliary device implementation using DMC.
 
     Note: `PowerSwitchDmc` is implemented to do power off/on a Fuchsia device
@@ -119,4 +118,4 @@ class PowerSwitchDmc:
         try:
             host_shell.run(cmd=command)
         except errors.HostCmdError as err:
-            raise PowerSwitchDmcError(err) from err
+            raise power_switch.PowerSwitchError(err) from err

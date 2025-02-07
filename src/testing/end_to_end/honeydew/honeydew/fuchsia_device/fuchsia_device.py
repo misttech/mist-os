@@ -59,7 +59,7 @@ from honeydew.affordances.session import session, session_using_ffx
 from honeydew.affordances.tracing import tracing, tracing_using_fc
 from honeydew.affordances.ui.screenshot import screenshot, screenshot_using_ffx
 from honeydew.affordances.ui.user_input import user_input, user_input_using_fc
-from honeydew.interfaces.auxiliary_devices import (
+from honeydew.auxiliary_devices.power_switch import (
     power_switch as power_switch_interface,
 )
 from honeydew.interfaces.device_classes import affordances_capable

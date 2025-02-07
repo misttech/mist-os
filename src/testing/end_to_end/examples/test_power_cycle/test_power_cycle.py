@@ -7,15 +7,17 @@ import importlib
 import logging
 
 from fuchsia_base_test import fuchsia_base_test
-from honeydew.interfaces.auxiliary_devices import power_switch
+from honeydew.auxiliary_devices.power_switch import power_switch
 from honeydew.interfaces.device_classes import fuchsia_device
 from mobly import test_runner
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-_DMC_MODULE: str = "honeydew.auxiliary_devices.power_switch_dmc"
-_DMC_CLASS: str = "PowerSwitchDmc"
+_DMC_MODULE: str = (
+    "honeydew.auxiliary_devices.power_switch.power_switch_using_dmc"
+)
+_DMC_CLASS: str = "PowerSwitchUsingDmc"
 
 
 class PowerCycleTest(fuchsia_base_test.FuchsiaBaseTest):

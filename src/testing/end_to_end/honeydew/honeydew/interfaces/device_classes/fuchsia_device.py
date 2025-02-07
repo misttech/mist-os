@@ -24,7 +24,7 @@ from honeydew.affordances.session import session
 from honeydew.affordances.tracing import tracing
 from honeydew.affordances.ui.screenshot import screenshot
 from honeydew.affordances.ui.user_input import user_input
-from honeydew.interfaces.auxiliary_devices import (
+from honeydew.auxiliary_devices.power_switch import (
     power_switch as power_switch_interface,
 )
 from honeydew.interfaces.transports import fastboot as fastboot_transport

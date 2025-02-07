@@ -41,13 +41,13 @@ template("group_with_no_dir_target_deps") {
 group_with_no_dir_target_deps("core_x64_stable_tests") {
   testonly = true
   public_deps = [
-    "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:x64_emu_test($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test($host_toolchain)",
     "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test($host_toolchain)",
     "transport_tests/test_ffx:test_ffx_on_x64",
     "transport_tests/test_serial:serial_test($host_toolchain)",
     "//src/testing/end_to_end/honeydew/honeydew/affordances/tracing/tests/functional_tests:tracing_test($host_toolchain)",
+    "//src/testing/end_to_end/honeydew/honeydew/auxiliary_devices/power_switch/tests/functional_tests:power_switch_dmc_test($host_toolchain)",
   ]
 }
 
@@ -60,7 +60,6 @@ group_with_no_dir_target_deps("core_x64_unstable_tests") {
 group_with_no_dir_target_deps("workbench_x64_stable_tests") {
   testonly = true
   public_deps = [
-    "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:x64_emu_test($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:x64_nuc_test($host_toolchain)",
     "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test($host_toolchain)",
@@ -72,6 +71,7 @@ group_with_no_dir_target_deps("workbench_x64_stable_tests") {
     "//src/testing/end_to_end/honeydew/honeydew/affordances/tracing/tests/functional_tests:tracing_test($host_toolchain)",
     "//src/testing/end_to_end/honeydew/honeydew/affordances/ui/screenshot/tests/functional_tests:test_screenshot",
     "//src/testing/end_to_end/honeydew/honeydew/affordances/ui/user_input/tests/functional_tests:test_user_input",
+    "//src/testing/end_to_end/honeydew/honeydew/auxiliary_devices/power_switch/tests/functional_tests:power_switch_dmc_test($host_toolchain)",
   ]
 }
 
@@ -84,13 +84,13 @@ group_with_no_dir_target_deps("workbench_x64_unstable_tests") {
 group_with_no_dir_target_deps("core_vim3_stable_tests") {
   testonly = true
   public_deps = [
-    "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:vim3_test($host_toolchain)",
     "transport_tests/test_fastboot:fastboot_using_serial_test($host_toolchain)",
     "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test($host_toolchain)",
     "transport_tests/test_ffx:test_ffx_on_vim3",
     "transport_tests/test_serial:serial_test($host_toolchain)",
     "//src/testing/end_to_end/honeydew/honeydew/affordances/tracing/tests/functional_tests:tracing_test($host_toolchain)",
+    "//src/testing/end_to_end/honeydew/honeydew/auxiliary_devices/power_switch/tests/functional_tests:power_switch_dmc_test($host_toolchain)",
   ]
 }
 
@@ -104,7 +104,6 @@ group_with_no_dir_target_deps("core_vim3_unstable_tests") {
 group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
   testonly = true
   public_deps = [
-    "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:vim3_test($host_toolchain)",
     "transport_tests/test_fastboot:fastboot_using_serial_test($host_toolchain)",
     "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test($host_toolchain)",
@@ -116,6 +115,7 @@ group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
     "//src/testing/end_to_end/honeydew/honeydew/affordances/tracing/tests/functional_tests:tracing_test($host_toolchain)",
     "//src/testing/end_to_end/honeydew/honeydew/affordances/ui/screenshot/tests/functional_tests:test_screenshot",
     "//src/testing/end_to_end/honeydew/honeydew/affordances/ui/user_input/tests/functional_tests:test_user_input",
+    "//src/testing/end_to_end/honeydew/honeydew/auxiliary_devices/power_switch/tests/functional_tests:power_switch_dmc_test($host_toolchain)",
   ]
 }
 
@@ -132,13 +132,13 @@ group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
 group_with_no_dir_target_deps("starnix_arm64_stable_tests") {
   testonly = true
   public_deps = [
-    "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:vim3_test($host_toolchain)",
     "transport_tests/test_fastboot:fastboot_test($host_toolchain)",
     "transport_tests/test_fastboot:fastboot_using_serial_test($host_toolchain)",
     "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test($host_toolchain)",
     "transport_tests/test_serial:serial_test($host_toolchain)",
     "//src/testing/end_to_end/honeydew/honeydew/affordances/connectivity/netstack/tests/functional_tests:netstack_test($host_toolchain)",
+    "//src/testing/end_to_end/honeydew/honeydew/auxiliary_devices/power_switch/tests/functional_tests:power_switch_dmc_test($host_toolchain)",
   ]
 }
 
@@ -156,7 +156,6 @@ group_with_no_dir_target_deps("starnix_arm64_unstable_tests") {
 group_with_no_dir_target_deps("smart_display_nelson_stable_tests") {
   testonly = true
   public_deps = [
-    "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test($host_toolchain)",
     "fuchsia_device_tests/test_fuchsia_device:nelson_test($host_toolchain)",
     "transport_tests/test_fastboot:fastboot_test($host_toolchain)",
     "transport_tests/test_fastboot:fastboot_using_serial_test($host_toolchain)",
@@ -165,6 +164,7 @@ group_with_no_dir_target_deps("smart_display_nelson_stable_tests") {
     "//src/testing/end_to_end/honeydew/honeydew/affordances/location/tests/functional_tests:location_test($host_toolchain)",
     "//src/testing/end_to_end/honeydew/honeydew/affordances/session/tests/functional_tests:test_session",
     "//src/testing/end_to_end/honeydew/honeydew/affordances/ui/screenshot/tests/functional_tests:test_screenshot",
+    "//src/testing/end_to_end/honeydew/honeydew/auxiliary_devices/power_switch/tests/functional_tests:power_switch_dmc_test($host_toolchain)",
   ]
 }
 
@@ -182,8 +182,6 @@ group_with_no_dir_target_deps("smart_display_nelson_unstable_tests") {
 group("tests") {
   testonly = true
   public_deps = [
-    "affordance_tests:tests",
-    "auxiliary_device_tests:tests",
     "fuchsia_device_tests:tests",
     "transport_tests:tests",
   ]

@@ -5,7 +5,7 @@
 
 import abc
 
-from honeydew.interfaces.auxiliary_devices import (
+from honeydew.auxiliary_devices.power_switch import (
     power_switch as power_switch_interface,
 )
 from honeydew.interfaces.transports import serial as serial_interface
