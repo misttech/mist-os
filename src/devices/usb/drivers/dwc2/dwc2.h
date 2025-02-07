@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_USB_DRIVERS_DWC2_DWC2_H_
 #define SRC_DEVICES_USB_DRIVERS_DWC2_DWC2_H_
 
+#include <fidl/fuchsia.boot.metadata/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.usb.dci/cpp/fidl.h>
 #include <fuchsia/hardware/usb/dci/cpp/banjo.h>
 #include <fuchsia/hardware/usb/phy/cpp/banjo.h>
@@ -22,6 +23,7 @@
 #include <variant>
 
 #include <ddktl/device.h>
+#include <ddktl/metadata_server.h>
 #include <fbl/mutex.h>
 #include <usb/dwc2/metadata.h>
 #include <usb/request-cpp.h>
@@ -267,6 +269,9 @@ class Dwc2 : public Dwc2Type,
   async_dispatcher_t* dispatcher_;
   component::OutgoingDirectory outgoing_;
   fidl::ServerBindingGroup<fuchsia_hardware_usb_dci::UsbDci> bindings_;
+
+  ddk::MetadataServer<fuchsia_boot_metadata::MacAddressMetadata> mac_address_metadata_server_;
+  ddk::MetadataServer<fuchsia_boot_metadata::SerialNumberMetadata> serial_number_metadata_server_;
 };
 
 }  // namespace dwc2

@@ -18,6 +18,8 @@
     capabilities: [
         { protocol: "fuchsia.hardware.usb.endpoint.Endpoint" },
         { service: "fuchsia.hardware.usb.dci.UsbDciService" },
+        { service: "fuchsia.boot.metadata.MacAddressMetadata" },
+        { service: "fuchsia.boot.metadata.SerialNumberMetadata" },
     ],
     use: [
         {
@@ -38,6 +40,14 @@
         },
         {
             protocol: "fuchsia.hardware.usb.endpoint.Endpoint",
+            from: "self",
+        },
+        {
+            service: "fuchsia.boot.metadata.MacAddressMetadata",
+            from: "self",
+        },
+        {
+            service: "fuchsia.boot.metadata.SerialNumberMetadata",
             from: "self",
         },
     ],

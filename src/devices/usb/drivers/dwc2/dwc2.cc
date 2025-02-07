@@ -991,6 +991,54 @@ zx_status_t Dwc2::Init(const dwc2_config::Config& config) {
     pdev = fdf::PDev{std::move(result.value())};
   }
 
+  // Initialize mac address metadata server.
+  {
+    zx::result metadata = pdev.GetFidlMetadata<fuchsia_boot_metadata::MacAddressMetadata>(
+        fuchsia_boot_metadata::MacAddressMetadata::kSerializableName);
+    if (metadata.is_ok()) {
+      if (zx_status_t status = mac_address_metadata_server_.SetMetadata(metadata.value());
+          status != ZX_OK) {
+        zxlogf(ERROR, "Failed to set metadata for mac address metdadata server: %s",
+               zx_status_get_string(status));
+        return status;
+      }
+    } else if (metadata.status_value() == ZX_ERR_NOT_FOUND) {
+      zxlogf(DEBUG, "Not forwarding mac address: Metadata not found");
+    } else {
+      zxlogf(ERROR, "Failed to get mac address metadata: %s", metadata.status_string());
+      return metadata.status_value();
+    }
+  }
+  if (zx_status_t status = mac_address_metadata_server_.Serve(outgoing_, dispatcher_);
+      status != ZX_OK) {
+    zxlogf(ERROR, "Failed to serve mac address metadata: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  // Initialize serial number metadata server.
+  {
+    zx::result metadata = pdev.GetFidlMetadata<fuchsia_boot_metadata::SerialNumberMetadata>(
+        fuchsia_boot_metadata::SerialNumberMetadata::kSerializableName);
+    if (metadata.is_ok()) {
+      if (zx_status_t status = serial_number_metadata_server_.SetMetadata(metadata.value());
+          status != ZX_OK) {
+        zxlogf(ERROR, "Failed to set metadata for serial number metdadata server: %s",
+               zx_status_get_string(status));
+        return status;
+      }
+    } else if (metadata.status_value() == ZX_ERR_NOT_FOUND) {
+      zxlogf(DEBUG, "Not forwarding serial number: Metadata not found");
+    } else {
+      zxlogf(ERROR, "Failed to get serial number metadata: %s", metadata.status_string());
+      return metadata.status_value();
+    }
+  }
+  if (zx_status_t status = serial_number_metadata_server_.Serve(outgoing_, dispatcher_);
+      status != ZX_OK) {
+    zxlogf(ERROR, "Failed to serve serial number metadata: %s", zx_status_get_string(status));
+    return status;
+  }
+
   // USB PHY protocol is optional.
   auto phy = usb_phy::UsbPhyClient::Create(parent(), "dwc2-phy");
   if (phy.is_ok()) {
@@ -1072,10 +1120,14 @@ zx_status_t Dwc2::Init(const dwc2_config::Config& config) {
 
   std::array offers = {
       fdci::UsbDciService::Name,
+      ddk::MetadataServer<fuchsia_boot_metadata::MacAddressMetadata>::kFidlServiceName,
+      ddk::MetadataServer<fuchsia_boot_metadata::SerialNumberMetadata>::kFidlServiceName,
   };
   status = DdkAdd(ddk::DeviceAddArgs("dwc2")
                       .set_str_props(props)
+                      // TODO(b/373918767): Don't forward once no longer retrieved.
                       .forward_metadata(parent(), DEVICE_METADATA_MAC_ADDRESS)
+                      // TODO(b/373918767): Don't forward once no longer retrieved.
                       .forward_metadata(parent(), DEVICE_METADATA_SERIAL_NUMBER)
                       .set_fidl_service_offers(offers)
                       .set_outgoing_dir(endpoints->client.TakeChannel()));
