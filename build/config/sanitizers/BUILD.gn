@@ -148,6 +148,7 @@ sanitizer_extra_options("suppress-lsan.DO-NOT-USE-THIS") {
   visibility = [
     "//sdk/lib/driver/component/rust:*",
     "//src/cobalt/bin/system-metrics/*",
+    "//src/connectivity/lib/packet-formats:*",
     "//src/devices/usb/drivers/xhci/*",
     "//src/fonts/*",
     "//src/graphics/drivers/msd-vsi-vip/tests/integration/*",

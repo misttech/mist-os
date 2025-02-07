@@ -74,6 +74,10 @@ rustc_test("packet-formats_test") {
            "//third_party/rust_crates:test-case",
          ]
 
+  # TODO(https://fxbug.dev/394935218): Fix the leaks and remove this here and
+  # the visibility list for //build/config/sanitizers:suppress-lsan.DO-NOT-USE-THIS.
+  deps += [ "//build/config/sanitizers:suppress-lsan.DO-NOT-USE-THIS" ]
+
   sources = _common_sources
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
