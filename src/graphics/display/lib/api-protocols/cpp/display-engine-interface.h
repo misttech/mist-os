@@ -72,13 +72,19 @@ class DisplayEngineInterface {
       const display::ImageBufferUsage& image_buffer_usage,
       display::DriverBufferCollectionId buffer_collection_id) = 0;
 
-  virtual zx::result<> SetDisplayPower(display::DisplayId display_id, bool power_on) = 0;
+  // OOT drivers must use the default implementation for power management.
+  // The interface is not stabilized and will change.
+  virtual zx::result<> SetDisplayPower(display::DisplayId display_id, bool power_on);
 
-  virtual bool IsCaptureSupported() = 0;
-  virtual zx::result<> StartCapture(display::DriverCaptureImageId capture_image_id) = 0;
-  virtual zx::result<> ReleaseCapture(display::DriverCaptureImageId capture_image_id) = 0;
+  // OOT drivers must use the default implementation for the capture interface.
+  // The interface is not stabilized and will change.
+  virtual bool IsCaptureSupported();
+  virtual zx::result<> StartCapture(display::DriverCaptureImageId capture_image_id);
+  virtual zx::result<> ReleaseCapture(display::DriverCaptureImageId capture_image_id);
 
-  virtual zx::result<> SetMinimumRgb(uint8_t minimum_rgb) = 0;
+  // OOT drivers must use the default implementation for SetMinimumRgb().
+  // The interface is not stabilized and will change.
+  virtual zx::result<> SetMinimumRgb(uint8_t minimum_rgb);
 
  protected:
   // Destruction via base class pointer is not supported intentionally.

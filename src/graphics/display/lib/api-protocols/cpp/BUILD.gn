@@ -12,6 +12,7 @@ source_set("cpp") {
     "display-engine-events-banjo.cc",
     "display-engine-events-banjo.h",
     "display-engine-events-interface.h",
+    "display-engine-interface.cc",
     "display-engine-interface.h",
   ]
   deps = [
