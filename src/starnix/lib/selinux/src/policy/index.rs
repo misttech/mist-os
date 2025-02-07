@@ -457,13 +457,13 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         // Return first match. The `checkpolicy` tool will not compile a policy that has
         // multiple matches, so behavior on multiple matches is undefined.
         self.parsed_policy
-            .access_vectors()
+            .access_vector_rules()
             .iter()
-            .find(|access_vector| {
-                access_vector.is_type_transition()
-                    && access_vector.source_type() == source_type
-                    && access_vector.target_type() == target_type
-                    && access_vector.target_class() == class.id()
+            .find(|access_vector_rule| {
+                access_vector_rule.is_type_transition()
+                    && access_vector_rule.source_type() == source_type
+                    && access_vector_rule.target_type() == target_type
+                    && access_vector_rule.target_class() == class.id()
             })
             .map(|x| x.new_type().unwrap())
     }

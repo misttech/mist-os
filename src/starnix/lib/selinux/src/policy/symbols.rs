@@ -11,9 +11,9 @@ use super::parser::ParseStrategy;
 use super::security_context::{CategoryIterator, Level, SecurityContext};
 use super::{
     array_type, array_type_validate_deref_both, array_type_validate_deref_data,
-    array_type_validate_deref_metadata_data_vec, array_type_validate_deref_none_data_vec, Array,
-    CategoryId, ClassId, Counted, Parse, ParseSlice, RoleId, SensitivityId, TypeId, UserId,
-    Validate, ValidateArray,
+    array_type_validate_deref_metadata_data_vec, array_type_validate_deref_none_data_vec,
+    AccessVector, Array, CategoryId, ClassId, ClassPermissionId, Counted, Parse, ParseSlice,
+    RoleId, SensitivityId, TypeId, UserId, Validate, ValidateArray,
 };
 
 use anyhow::{anyhow, Context as _};
@@ -360,8 +360,9 @@ impl<PS: ParseStrategy> Permission<PS> {
         PS::deref_slice(&self.data)
     }
 
-    pub fn id(&self) -> u32 {
-        PS::deref(&self.metadata).id.get()
+    /// Returns the ID of this permission in the scope of its associated class.
+    pub fn id(&self) -> ClassPermissionId {
+        ClassPermissionId(NonZeroU32::new(PS::deref(&self.metadata).id.get()).unwrap())
     }
 }
 
@@ -422,14 +423,14 @@ pub(super) struct Constraint<PS: ParseStrategy>
 where
     ConstraintExpr<PS>: Debug + PartialEq,
 {
-    permission_mask: PS::Output<le::U32>,
+    access_vector: PS::Output<le::U32>,
     constraint_expr: ConstraintExpr<PS>,
 }
 
 impl<PS: ParseStrategy> Constraint<PS> {
     #[allow(dead_code)]
-    pub(super) fn permission_mask(&self) -> le::U32 {
-        *PS::deref(&self.permission_mask)
+    pub(super) fn access_vector(&self) -> AccessVector {
+        AccessVector((*PS::deref(&self.access_vector)).get())
     }
 
     #[allow(dead_code)]
@@ -448,9 +449,9 @@ where
         let tail = bytes;
 
         let num_bytes = tail.len();
-        let (permission_mask, tail) = PS::parse::<le::U32>(tail).ok_or_else(|| {
+        let (access_vector, tail) = PS::parse::<le::U32>(tail).ok_or_else(|| {
             Into::<anyhow::Error>::into(ParseError::MissingData {
-                type_name: "PermissionMask",
+                type_name: "AccessVector",
                 type_size: std::mem::size_of::<le::U32>(),
                 num_bytes,
             })
@@ -459,7 +460,7 @@ where
             .map_err(|error| error.into() as anyhow::Error)
             .context("parsing constraint expression")?;
 
-        Ok((Self { permission_mask, constraint_expr }, tail))
+        Ok((Self { access_vector, constraint_expr }, tail))
     }
 }
 
@@ -1946,7 +1947,7 @@ mod tests {
             ),
         ];
         for (i, constraint) in constraints.iter().enumerate() {
-            assert_eq!(constraint.permission_mask(), 1, "constraint {}", i);
+            assert_eq!(constraint.access_vector(), AccessVector(1), "constraint {}", i);
             let terms = constraint.constraint_expr().constraint_terms();
             assert_eq!(terms.len(), 1, "constraint {}", i);
             let term = &terms[0];
@@ -1971,7 +1972,7 @@ mod tests {
         let constraints = class.constraints();
         assert_eq!(constraints.len(), 1);
         let constraint = &constraints[0];
-        assert_eq!(constraint.permission_mask(), 1);
+        assert_eq!(constraint.access_vector(), AccessVector(1));
         let terms = constraint.constraint_expr().constraint_terms();
         assert_eq!(terms.len(), 8);
 

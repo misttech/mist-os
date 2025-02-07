@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use super::arrays::{
-    AccessVectors, ConditionalNodes, Context, DeprecatedFilenameTransitions, FilenameTransition,
-    FilenameTransitionList, FilenameTransitions, FsUses, GenericFsContexts, IPv6Nodes,
-    InfinitiBandEndPorts, InfinitiBandPartitionKeys, InitialSids, NamedContextPairs, Nodes, Ports,
-    RangeTransitions, RoleAllow, RoleAllows, RoleTransition, RoleTransitions, SimpleArray,
-    MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY,
+    AccessVectorRules, ConditionalNodes, Context, DeprecatedFilenameTransitions,
+    FilenameTransition, FilenameTransitionList, FilenameTransitions, FsUses, GenericFsContexts,
+    IPv6Nodes, InfinitiBandEndPorts, InfinitiBandPartitionKeys, InitialSids, NamedContextPairs,
+    Nodes, Ports, RangeTransitions, RoleAllow, RoleAllows, RoleTransition, RoleTransitions,
+    SimpleArray, MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY,
 };
 use super::error::{ParseError, QueryError, ValidateError};
 use super::extensible_bitmap::ExtensibleBitmap;
@@ -62,8 +62,8 @@ pub struct ParsedPolicy<PS: ParseStrategy> {
     sensitivities: SymbolList<PS, Sensitivity<PS>>,
     /// The set of categories referenced by this policy.
     categories: SymbolList<PS, Category<PS>>,
-    /// The set of access vectors referenced by this policy.
-    access_vectors: SimpleArray<PS, AccessVectors<PS>>,
+    /// The set of access vector rules referenced by this policy.
+    access_vector_rules: SimpleArray<PS, AccessVectorRules<PS>>,
     conditional_lists: SimpleArray<PS, ConditionalNodes<PS>>,
     /// The set of role transitions to apply when instantiating new objects.
     role_transitions: RoleTransitions<PS>,
@@ -136,29 +136,28 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         target_class: &Class<PS>,
         permission: &Permission<PS>,
     ) -> Result<bool, QueryError> {
-        let permission_id = permission.id();
-        let permission_bit = (1 as u32) << (permission_id - 1);
+        let permission_bit = AccessVector::from_class_permission_id(permission.id());
 
         let target_class_id = target_class.id();
 
-        for access_vector in self.access_vectors.data.iter() {
+        for access_vector_rule in self.access_vector_rules.data.iter() {
             // Concern ourselves only with explicit `allow [...];` policy statements.
-            if !access_vector.is_allow() {
+            if !access_vector_rule.is_allow() {
                 continue;
             }
 
             // Concern ourselves only with `allow [source-type] [target-type]:[class] [...];`
             // policy statements where `[class]` matches `target_class_id`.
-            if access_vector.target_class() != target_class_id {
+            if access_vector_rule.target_class() != target_class_id {
                 continue;
             }
 
             // Concern ourselves only with
             // `allow [source-type] [target-type]:[class] { [permissions] };` policy statements
             // where `permission_bit` refers to one of `[permissions]`.
-            match access_vector.permission_mask() {
-                Some(mask) => {
-                    if (mask.get() & permission_bit) == 0 {
+            match access_vector_rule.access_vector() {
+                Some(access_vector) => {
+                    if (access_vector & permission_bit) == AccessVector::NONE {
                         continue;
                     }
                 }
@@ -174,7 +173,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
             // `[source-type]` is associated with `source_type_id`.
             let source_attribute_bitmap: &ExtensibleBitmap<PS> =
                 &self.attribute_maps[(source_type.0.get() - 1) as usize];
-            if !source_attribute_bitmap.is_set(access_vector.source_type().0.get() - 1) {
+            if !source_attribute_bitmap.is_set(access_vector_rule.source_type().0.get() - 1) {
                 continue;
             }
 
@@ -182,16 +181,17 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
             // statements where `[target-type]` is associated with `target_type_id`.
             let target_attribute_bitmap: &ExtensibleBitmap<PS> =
                 &self.attribute_maps[(target_type.0.get() - 1) as usize];
-            if !target_attribute_bitmap.is_set(access_vector.target_type().0.get() - 1) {
+            if !target_attribute_bitmap.is_set(access_vector_rule.target_type().0.get() - 1) {
                 continue;
             }
 
-            // `access_vector` explicitly allows the source, target, permission in this query.
+            // `access_vector_rule` explicitly allows the source, target,
+            // permission in this query.
             return Ok(true);
         }
 
-        // Failed to find any explicit-allow access vector for this source, target, permission
-        // query.
+        // Failed to find any explicit-allow access vector rule for this source,
+        // target, permission query.
         Ok(false)
     }
 
@@ -238,20 +238,23 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         let mut computed_audit_allow = AccessVector::NONE;
         let mut computed_audit_deny = AccessVector::ALL;
 
-        for access_vector in self.access_vectors.data.iter() {
-            // Ignore `access_vector` entries not relayed to "allow" or audit statements.
-            // TODO: https://fxbug.dev/379657220 - Can an `access_vector` entry express e.g. both
-            // "audit" and "auditallow" at the same time?
-            if !access_vector.is_allow()
-                && !access_vector.is_auditallow()
-                && !access_vector.is_dontaudit()
+        for access_vector_rule in self.access_vector_rules.data.iter() {
+            // Ignore `access_vector_rule` entries not relayed to "allow" or
+            // audit statements.
+            //
+            // TODO: https://fxbug.dev/379657220 - Can an `access_vector_rule`
+            // entry express e.g. both "allow" and "auditallow" at the same
+            // time?
+            if !access_vector_rule.is_allow()
+                && !access_vector_rule.is_auditallow()
+                && !access_vector_rule.is_dontaudit()
             {
                 continue;
             }
 
             // Concern ourselves only with `allow [source-type] [target-type]:[class] [...];`
             // policy statements where `[class]` matches `target_class_id`.
-            if access_vector.target_class() != target_class_id {
+            if access_vector_rule.target_class() != target_class_id {
                 continue;
             }
 
@@ -264,7 +267,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
             // `[source-type]` is associated with `source_type_id`.
             let source_attribute_bitmap: &ExtensibleBitmap<PS> =
                 &self.attribute_maps[(source_type.0.get() - 1) as usize];
-            if !source_attribute_bitmap.is_set(access_vector.source_type().0.get() - 1) {
+            if !source_attribute_bitmap.is_set(access_vector_rule.source_type().0.get() - 1) {
                 continue;
             }
 
@@ -272,22 +275,22 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
             // statements where `[target-type]` is associated with `target_type_id`.
             let target_attribute_bitmap: &ExtensibleBitmap<PS> =
                 &self.attribute_maps[(target_type.0.get() - 1) as usize];
-            if !target_attribute_bitmap.is_set(access_vector.target_type().0.get() - 1) {
+            if !target_attribute_bitmap.is_set(access_vector_rule.target_type().0.get() - 1) {
                 continue;
             }
 
             // Multiple attributes may be associated with source/target types. Accumulate
             // explicitly allowed permissions into `computed_access_vector`.
-            if let Some(permission_mask) = access_vector.permission_mask() {
-                if access_vector.is_allow() {
-                    // `permission_mask` has bits set for each permission allowed by this rule.
-                    computed_access_vector |= AccessVector::from_raw(permission_mask.get());
-                } else if access_vector.is_auditallow() {
-                    // `permission_mask` has bits set for each permission to audit when allowed.
-                    computed_audit_allow |= AccessVector::from_raw(permission_mask.get());
-                } else if access_vector.is_dontaudit() {
-                    // `permission_mask` has bits cleared for each permission not to audit on denial.
-                    computed_audit_deny &= AccessVector::from_raw(permission_mask.get());
+            if let Some(access_vector) = access_vector_rule.access_vector() {
+                if access_vector_rule.is_allow() {
+                    // `access_vector` has bits set for each permission allowed by this rule.
+                    computed_access_vector |= access_vector;
+                } else if access_vector_rule.is_auditallow() {
+                    // `access_vector` has bits set for each permission to audit when allowed.
+                    computed_audit_allow |= access_vector;
+                } else if access_vector_rule.is_dontaudit() {
+                    // `access_vector` has bits cleared for each permission not to audit on denial.
+                    computed_audit_deny &= access_vector;
                 }
             }
         }
@@ -409,8 +412,8 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         &self.range_transitions.data
     }
 
-    pub(super) fn access_vectors(&self) -> &AccessVectors<PS> {
-        &self.access_vectors.data
+    pub(super) fn access_vector_rules(&self) -> &AccessVectorRules<PS> {
+        &self.access_vector_rules.data
     }
 
     pub(super) fn filename_transitions(&self) -> &[FilenameTransition<PS>] {
@@ -484,7 +487,7 @@ where
     SymbolList<PS, ConditionalBoolean<PS>>: Parse<PS>,
     SymbolList<PS, Sensitivity<PS>>: Parse<PS>,
     SymbolList<PS, Category<PS>>: Parse<PS>,
-    SimpleArray<PS, AccessVectors<PS>>: Parse<PS>,
+    SimpleArray<PS, AccessVectorRules<PS>>: Parse<PS>,
     SimpleArray<PS, ConditionalNodes<PS>>: Parse<PS>,
     RoleTransitions<PS>: Parse<PS>,
     RoleAllows<PS>: Parse<PS>,
@@ -566,9 +569,9 @@ where
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing categories")?;
 
-        let (access_vectors, tail) = SimpleArray::<PS, AccessVectors<PS>>::parse(tail)
+        let (access_vector_rules, tail) = SimpleArray::<PS, AccessVectorRules<PS>>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
-            .context("parsing access vectors")?;
+            .context("parsing access vector rules")?;
 
         let (conditional_lists, tail) = SimpleArray::<PS, ConditionalNodes<PS>>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
@@ -678,7 +681,7 @@ where
                 conditional_booleans,
                 sensitivities,
                 categories,
-                access_vectors,
+                access_vector_rules,
                 conditional_lists,
                 role_transitions,
                 role_allowlist,
@@ -754,10 +757,10 @@ impl<PS: ParseStrategy> Validate for ParsedPolicy<PS> {
             .validate()
             .map_err(Into::<anyhow::Error>::into)
             .context("validating categories")?;
-        self.access_vectors
+        self.access_vector_rules
             .validate()
             .map_err(Into::<anyhow::Error>::into)
-            .context("validating access_vectors")?;
+            .context("validating access_vector_rules")?;
         self.conditional_lists
             .validate()
             .map_err(Into::<anyhow::Error>::into)
@@ -879,8 +882,8 @@ impl<PS: ParseStrategy> Validate for ParsedPolicy<PS> {
         }
 
         // Validate that types output by access vector rules are defined.
-        for access_vector in &self.access_vectors.data {
-            if let Some(type_id) = access_vector.new_type() {
+        for access_vector_rule in &self.access_vector_rules.data {
+            if let Some(type_id) = access_vector_rule.new_type() {
                 validate_id(&type_ids, type_id, "new_type")?;
             }
         }

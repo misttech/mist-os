@@ -10,8 +10,8 @@ use super::extensible_bitmap::ExtensibleBitmap;
 use super::parser::ParseStrategy;
 use super::symbols::{MlsLevel, MlsRange};
 use super::{
-    array_type, array_type_validate_deref_both, Array, ClassId, Counted, Parse, RoleId, TypeId,
-    UserId, Validate, ValidateArray,
+    array_type, array_type_validate_deref_both, AccessVector, Array, ClassId, Counted, Parse,
+    RoleId, TypeId, UserId, Validate, ValidateArray,
 };
 
 use anyhow::Context as _;
@@ -22,21 +22,25 @@ use zerocopy::{little_endian as le, FromBytes, Immutable, KnownLayout, Unaligned
 pub(super) const EXTENDED_PERMISSIONS_IS_SPECIFIED_DRIVER_PERMISSIONS_MASK: u16 = 0x0700;
 pub(super) const MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY: u32 = 31;
 
-/// Mask for [`AccessVectorMetadata`] `access_vector_type` that indicates whether the access vector
-/// comes from an `allow [source] [target]:[class] { [permissions] };` policy statement.
-pub(super) const ACCESS_VECTOR_TYPE_ALLOW_MASK: u16 = 1;
+/// Value for [`AccessVectorRuleMetadata`] `access_vector_rule_type` that
+/// indicates that the access vector rule comes from an `allow [source]
+/// [target]:[class] { [permissions] };` policy statement.
+pub(super) const ACCESS_VECTOR_RULE_TYPE_ALLOW: u16 = 1;
 
-/// Mask for [`AccessVectorMetadata`] `access_vector_type` that indicates whether the access vector
-/// comes from an `auditallow [source] [target]:[class] { [permissions] };` policy statement.
-pub(super) const ACCESS_VECTOR_TYPE_AUDITALLOW_MASK: u16 = 2;
+/// Value for [`AccessVectorRuleMetadata`] `access_vector_rule_type` that
+/// indicates that the access vector rule comes from an `auditallow [source]
+/// [target]:[class] { [permissions] };` policy statement.
+pub(super) const ACCESS_VECTOR_RULE_TYPE_AUDITALLOW: u16 = 2;
 
-/// Mask for [`AccessVectorMetadata`] `access_vector_type` that indicates whether the access vector
-/// comes from a `dontaudit [source] [target]:[class] { [permissions] };` policy statement.
-pub(super) const ACCESS_VECTOR_TYPE_DONTAUDIT_MASK: u16 = 4;
+/// Value for [`AccessVectorRuleMetadata`] `access_vector_rule_type` that
+/// indicates that the access vector rule comes from a `dontaudit [source]
+/// [target]:[class] { [permissions] };` policy statement.
+pub(super) const ACCESS_VECTOR_RULE_TYPE_DONTAUDIT: u16 = 4;
 
-/// Mask for [`AccessVectorMetadata`] `access_vector_type` that indicates whether the access vector
-/// comes from an `type_transition [source] [target]:[class] [new_type];` policy statement.
-pub(super) const ACCESS_VECTOR_TYPE_TYPE_TRANSITION_MASK: u16 = 16;
+/// Value for [`AccessVectorRuleMetadata`] `access_vector_rule_type` that
+/// indicates that the access vector rule comes from a `type_transition
+/// [source] [target]:[class] [new_type];` policy statement.
+pub(super) const ACCESS_VECTOR_RULE_TYPE_TYPE_TRANSITION: u16 = 16;
 
 #[allow(type_alias_bounds)]
 pub(super) type SimpleArray<PS: ParseStrategy, T> = Array<PS, PS::Output<le::U32>, T>;
@@ -95,14 +99,14 @@ impl<PS: ParseStrategy> ValidateArray<ConditionalNodeMetadata, ConditionalNodeDa
 #[derive(Debug, PartialEq)]
 pub(super) struct ConditionalNode<PS: ParseStrategy> {
     items: ConditionalNodeItems<PS>,
-    true_list: SimpleArray<PS, AccessVectors<PS>>,
-    false_list: SimpleArray<PS, AccessVectors<PS>>,
+    true_list: SimpleArray<PS, AccessVectorRules<PS>>,
+    false_list: SimpleArray<PS, AccessVectorRules<PS>>,
 }
 
 impl<PS: ParseStrategy> Parse<PS> for ConditionalNode<PS>
 where
     ConditionalNodeItems<PS>: Parse<PS>,
-    SimpleArray<PS, AccessVectors<PS>>: Parse<PS>,
+    SimpleArray<PS, AccessVectorRules<PS>>: Parse<PS>,
 {
     type Error = anyhow::Error;
 
@@ -113,11 +117,11 @@ where
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing conditional node items")?;
 
-        let (true_list, tail) = SimpleArray::<PS, AccessVectors<PS>>::parse(tail)
+        let (true_list, tail) = SimpleArray::<PS, AccessVectorRules<PS>>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing conditional node true list")?;
 
-        let (false_list, tail) = SimpleArray::<PS, AccessVectors<PS>>::parse(tail)
+        let (false_list, tail) = SimpleArray::<PS, AccessVectorRules<PS>>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing conditional node false list")?;
 
@@ -163,75 +167,84 @@ impl Validate for [ConditionalNodeDatum] {
     }
 }
 
-pub(super) type AccessVectors<PS> = Vec<AccessVector<PS>>;
+/// The list of access control rules defined by policy statements of the
+/// following kinds:
+/// - `allow`, `dontaudit`, `auditallow`, and `neverallow`, which specify
+///   an access vector describing a permission set.
+/// - `type_transition`, which does not include an access vector.
+pub(super) type AccessVectorRules<PS> = Vec<AccessVectorRule<PS>>;
 
-impl<PS: ParseStrategy> Validate for AccessVectors<PS> {
+impl<PS: ParseStrategy> Validate for AccessVectorRules<PS> {
     type Error = anyhow::Error;
 
     fn validate(&self) -> Result<(), Self::Error> {
-        for access_vector in self {
-            access_vector.validate()?;
+        for access_vector_rule in self {
+            access_vector_rule.validate()?;
         }
         Ok(())
     }
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct AccessVector<PS: ParseStrategy> {
-    pub metadata: PS::Output<AccessVectorMetadata>,
+pub(super) struct AccessVectorRule<PS: ParseStrategy> {
+    pub metadata: PS::Output<AccessVectorRuleMetadata>,
     extended_permissions: ExtendedPermissions<PS>,
 }
 
-impl<PS: ParseStrategy> AccessVector<PS> {
-    /// Returns whether this access vector comes from an
+impl<PS: ParseStrategy> AccessVectorRule<PS> {
+    /// Returns whether this access vector rule comes from an
     /// `allow [source] [target]:[class] { [permissions] };` policy statement.
     pub fn is_allow(&self) -> bool {
         PS::deref(&self.metadata).is_allow()
     }
 
-    /// Returns whether this access vector comes from an
+    /// Returns whether this access vector rule comes from an
     /// `auditallow [source] [target]:[class] { [permissions] };` policy statement.
     pub fn is_auditallow(&self) -> bool {
         PS::deref(&self.metadata).is_auditallow()
     }
 
-    /// Returns whether this access vector comes from an
+    /// Returns whether this access vector rule comes from an
     /// `dontaudit [source] [target]:[class] { [permissions] };` policy statement.
     pub fn is_dontaudit(&self) -> bool {
         PS::deref(&self.metadata).is_dontaudit()
     }
 
-    /// Returns whether this access vector comes from a
+    /// Returns whether this access vector rule comes from a
     /// `type_transition [source] [target]:[class] [new_type];` policy statement.
     pub fn is_type_transition(&self) -> bool {
         PS::deref(&self.metadata).is_type_transition()
     }
 
-    /// Returns the source type id in this access vector. This id corresponds to the
-    /// [`super::symbols::Type`] `id()` of some type or attribute in the same policy.
+    /// Returns the source type id in this access vector rule. This id
+    /// corresponds to the [`super::symbols::Type`] `id()` of some type or
+    /// attribute in the same policy.
     pub fn source_type(&self) -> TypeId {
         TypeId(NonZeroU32::new(PS::deref(&self.metadata).source_type.into()).unwrap())
     }
 
-    /// Returns the target type id in this access vector. This id corresponds to the
-    /// [`super::symbols::Type`] `id()` of some type or attribute in the same policy.
+    /// Returns the target type id in this access vector rule. This id
+    /// corresponds to the [`super::symbols::Type`] `id()` of some type or
+    /// attribute in the same policy.
     pub fn target_type(&self) -> TypeId {
         TypeId(NonZeroU32::new(PS::deref(&self.metadata).target_type.into()).unwrap())
     }
 
-    /// Returns the target class id in this access vector. This id corresponds to the
-    /// [`super::symbols::Class`] `id()` of some class in the same policy.
-    /// Although the index is returned as a 32-bit value, the field itself is 16-bit
+    /// Returns the target class id in this access vector rule. This id
+    /// corresponds to the [`super::symbols::Class`] `id()` of some class in the
+    /// same policy. Although the index is returned as a 32-bit value, the field
+    /// itself is 16-bit
     pub fn target_class(&self) -> ClassId {
         ClassId(NonZeroU32::new(PS::deref(&self.metadata).class.into()).unwrap())
     }
 
-    /// A bit mask that corresponds to the permissions in this access vector. Permission bits are
-    /// specified using a [`super::symbols::Permission`] `id()` as follows:
-    /// `1 << (Permission::id() - 1)`.
-    pub fn permission_mask(&self) -> Option<le::U32> {
+    /// An access vector that corresponds to the permissions in this access
+    /// vector rule.
+    pub fn access_vector(&self) -> Option<AccessVector> {
         match &self.extended_permissions {
-            ExtendedPermissions::PermissionMask(mask) => Some(*PS::deref(mask)),
+            ExtendedPermissions::AccessVector(access_vector_raw) => {
+                Some(AccessVector((*PS::deref(access_vector_raw)).get()))
+            }
             _ => None,
         }
     }
@@ -248,7 +261,7 @@ impl<PS: ParseStrategy> AccessVector<PS> {
     }
 }
 
-impl<PS: ParseStrategy> Parse<PS> for AccessVector<PS> {
+impl<PS: ParseStrategy> Parse<PS> for AccessVectorRule<PS> {
     type Error = anyhow::Error;
 
     fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
@@ -256,14 +269,14 @@ impl<PS: ParseStrategy> Parse<PS> for AccessVector<PS> {
 
         let num_bytes = tail.len();
         let (metadata, tail) =
-            PS::parse::<AccessVectorMetadata>(tail).ok_or(ParseError::MissingData {
-                type_name: std::any::type_name::<AccessVectorMetadata>(),
-                type_size: std::mem::size_of::<AccessVectorMetadata>(),
+            PS::parse::<AccessVectorRuleMetadata>(tail).ok_or(ParseError::MissingData {
+                type_name: std::any::type_name::<AccessVectorRuleMetadata>(),
+                type_size: std::mem::size_of::<AccessVectorRuleMetadata>(),
                 num_bytes,
             })?;
 
-        let access_vector_type = PS::deref(&metadata).access_vector_type();
-        let (extended_permissions, tail) = if (access_vector_type
+        let access_vector_rule_type = PS::deref(&metadata).access_vector_rule_type();
+        let (extended_permissions, tail) = if (access_vector_rule_type
             & EXTENDED_PERMISSIONS_IS_SPECIFIED_DRIVER_PERMISSIONS_MASK)
             != 0
         {
@@ -279,14 +292,14 @@ impl<PS: ParseStrategy> Parse<PS> for AccessVector<PS> {
             let num_bytes = tail.len();
             let (extended_permissions, tail) =
                 PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
-                    type_name: "ExtendedPermissions::PermissionMask",
+                    type_name: "ExtendedPermissions::AccessVector",
                     type_size: std::mem::size_of::<le::U32>(),
                     num_bytes,
                 })?;
-            if (access_vector_type & ACCESS_VECTOR_TYPE_TYPE_TRANSITION_MASK) != 0 {
+            if (access_vector_rule_type & ACCESS_VECTOR_RULE_TYPE_TYPE_TRANSITION) != 0 {
                 (ExtendedPermissions::NewType(extended_permissions), tail)
             } else {
-                (ExtendedPermissions::PermissionMask(extended_permissions), tail)
+                (ExtendedPermissions::AccessVector(extended_permissions), tail)
             }
         };
 
@@ -294,7 +307,7 @@ impl<PS: ParseStrategy> Parse<PS> for AccessVector<PS> {
     }
 }
 
-impl<PS: ParseStrategy> Validate for AccessVector<PS> {
+impl<PS: ParseStrategy> Validate for AccessVectorRule<PS> {
     type Error = anyhow::Error;
 
     fn validate(&self) -> Result<(), Self::Error> {
@@ -308,49 +321,50 @@ impl<PS: ParseStrategy> Validate for AccessVector<PS> {
 
 #[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(super) struct AccessVectorMetadata {
+pub(super) struct AccessVectorRuleMetadata {
     source_type: le::U16,
     target_type: le::U16,
     class: le::U16,
-    access_vector_type: le::U16,
+    access_vector_rule_type: le::U16,
 }
 
-impl AccessVectorMetadata {
-    /// Returns the access vector type field that indicates the type of policy statement this
-    /// access vector comes from; for example `allow ...;`, `auditallow ...;`.
-    pub fn access_vector_type(&self) -> u16 {
-        self.access_vector_type.get()
+impl AccessVectorRuleMetadata {
+    /// Returns the access vector rule type field that indicates the type of
+    /// policy statement this access vector rule comes from; for example `allow
+    /// ...;`, `auditallow ...;`.
+    pub fn access_vector_rule_type(&self) -> u16 {
+        self.access_vector_rule_type.get()
     }
 
-    /// Returns whether this access vector comes from an
+    /// Returns whether this access vector rule comes from an
     /// `allow [source] [target]:[class] { [permissions] };` policy statement.
     pub fn is_allow(&self) -> bool {
-        (self.access_vector_type() & ACCESS_VECTOR_TYPE_ALLOW_MASK) != 0
+        (self.access_vector_rule_type() & ACCESS_VECTOR_RULE_TYPE_ALLOW) != 0
     }
 
-    /// Returns whether this access vector comes from an
+    /// Returns whether this access vector rule comes from an
     /// `auditallow [source] [target]:[class] { [permissions] };` policy statement.
     pub fn is_auditallow(&self) -> bool {
-        (self.access_vector_type() & ACCESS_VECTOR_TYPE_AUDITALLOW_MASK) != 0
+        (self.access_vector_rule_type() & ACCESS_VECTOR_RULE_TYPE_AUDITALLOW) != 0
     }
 
-    /// Returns whether this access vector comes from an
+    /// Returns whether this access vector rule comes from an
     /// `dontaudit [source] [target]:[class] { [permissions] };` policy statement.
     pub fn is_dontaudit(&self) -> bool {
-        (self.access_vector_type() & ACCESS_VECTOR_TYPE_DONTAUDIT_MASK) != 0
+        (self.access_vector_rule_type() & ACCESS_VECTOR_RULE_TYPE_DONTAUDIT) != 0
     }
 
-    /// Returns whether this access vector compes from a
+    /// Returns whether this access vector rule comes from a
     /// `type_transtion [source] [target]:[class] [new_type];` policy statement.
     pub fn is_type_transition(&self) -> bool {
-        (self.access_vector_type() & ACCESS_VECTOR_TYPE_TYPE_TRANSITION_MASK) != 0
+        (self.access_vector_rule_type() & ACCESS_VECTOR_RULE_TYPE_TYPE_TRANSITION) != 0
     }
 }
 
 #[derive(Debug, PartialEq)]
 pub(super) enum ExtendedPermissions<PS: ParseStrategy> {
     SpecifiedDriverPermissions(PS::Output<SpecifiedDriverPermissions>),
-    PermissionMask(PS::Output<le::U32>),
+    AccessVector(PS::Output<le::U32>),
     NewType(PS::Output<le::U32>),
 }
 

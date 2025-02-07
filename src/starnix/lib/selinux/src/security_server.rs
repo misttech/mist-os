@@ -11,7 +11,7 @@ use crate::policy::metadata::HandleUnknown;
 use crate::policy::parser::ByValue;
 use crate::policy::{
     parse_policy_by_value, AccessDecision, AccessVector, AccessVectorComputer, ClassId,
-    FsUseLabelAndType, FsUseType, Policy,
+    ClassPermissionId, FsUseLabelAndType, FsUseType, Policy,
 };
 use crate::sid_table::SidTable;
 use crate::sync::Mutex;
@@ -316,8 +316,13 @@ impl SecurityServer {
             .class_id)
     }
 
-    /// Returns the class identifier of a class, if it exists.
-    pub fn class_permissions_by_name(&self, name: &str) -> Result<Vec<(u32, Vec<u8>)>, ()> {
+    /// Returns the set of permissions associated with a class. Each permission
+    /// is represented as a tuple of the permission ID (in the scope of its
+    /// associated class) and the permission name.
+    pub fn class_permissions_by_name(
+        &self,
+        name: &str,
+    ) -> Result<Vec<(ClassPermissionId, Vec<u8>)>, ()> {
         let locked_state = self.state.lock();
         locked_state.expect_active_policy().parsed.find_class_permissions_by_name(name)
     }

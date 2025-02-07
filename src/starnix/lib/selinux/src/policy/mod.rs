@@ -25,7 +25,7 @@ use index::PolicyIndex;
 use metadata::HandleUnknown;
 use parsed_policy::ParsedPolicy;
 use parser::{ByRef, ByValue, ParseStrategy};
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 use std::num::{NonZeroU32, NonZeroU64};
 use std::ops::Deref;
@@ -64,6 +64,16 @@ pub struct ClassId(NonZeroU32);
 impl Into<u32> for ClassId {
     fn into(self) -> u32 {
         self.0.into()
+    }
+}
+
+/// Identifies a permission within a class.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub struct ClassPermissionId(NonZeroU32);
+
+impl Display for ClassPermissionId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -114,8 +124,8 @@ impl AccessVector {
     pub const NONE: AccessVector = AccessVector(0);
     pub const ALL: AccessVector = AccessVector(std::u32::MAX);
 
-    pub(super) fn from_raw(access_vector: u32) -> Self {
-        Self(access_vector)
+    pub(super) fn from_class_permission_id(id: ClassPermissionId) -> Self {
+        Self((1 as u32) << (id.0.get() - 1))
     }
 }
 
@@ -242,13 +252,14 @@ impl<PS: ParseStrategy> Policy<PS> {
         self.0.parsed_policy().type_by_name(name).map(|x| x.id())
     }
 
-    /// Returns the set of permissions for the given class, including both the explicitly owned permissions
-    /// and the inherited ones from common symbols. Each permission is a tuple of the permission identifier
-    /// and it's name.
+    /// Returns the set of permissions for the given class, including both the
+    /// explicitly owned permissions and the inherited ones from common symbols.
+    /// Each permission is a tuple of the permission identifier (in the scope of
+    /// the given class) and the permission name.
     pub fn find_class_permissions_by_name(
         &self,
         class_name: &str,
-    ) -> Result<Vec<(u32, Vec<u8>)>, ()> {
+    ) -> Result<Vec<(ClassPermissionId, Vec<u8>)>, ()> {
         let class = find_class_by_name(self.0.parsed_policy().classes(), class_name).ok_or(())?;
         let owned_permissions = class.permissions();
 
@@ -436,11 +447,7 @@ impl<PS: ParseStrategy> AccessVectorComputer for Policy<PS> {
         for permission in permissions {
             if let Some(permission_info) = self.0.permission(&permission.clone().into()) {
                 // Compute bit flag associated with permission.
-                // Use `permission.id() - 1` below because ids start at `1` to refer to the
-                // "shift `1` by 0 bits".
-                //
-                // id=1 => bits:0...001, id=2 => bits:0...010, etc.
-                access_vector |= AccessVector(1 << (permission_info.id() - 1));
+                access_vector |= AccessVector::from_class_permission_id(permission_info.id());
             } else {
                 // The permission is unknown so defer to the policy-define unknown handling behaviour.
                 if self.0.parsed_policy().handle_unknown() != HandleUnknown::Allow {
