@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include <bind/fuchsia/clock/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
 #include <fbl/auto_lock.h>
 #include <soc/aml-meson/aml-clk-common.h>
 
@@ -171,16 +172,6 @@ zx_status_t AmlClock::PopulateRegisterBlocks(uint32_t device_id, fdf::PDev& pdev
 }
 
 zx::result<> AmlClock::Start() {
-  // Initialize compat server.
-  {
-    zx::result<> result = compat_server_.Initialize(
-        incoming(), outgoing(), node_name(), kChildNodeName, compat::ForwardMetadata::None());
-    if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to initialize compat server: %s", result.status_string());
-      return result.take_error();
-    }
-  }
-
   // Get the platform device protocol and try to map all the MMIO regions.
   fdf::PDev pdev;
   {
@@ -345,10 +336,11 @@ zx_status_t AmlClock::InitChildNode() {
   auto properties = {
       fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_clock::BIND_PROTOCOL_IMPL)};
 
-  auto offers = compat_server_.CreateOffers2();
-  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_clockimpl::Service>());
-  offers.push_back(clock_ids_metadata_server_.MakeOffer());
-  offers.push_back(clock_init_metadata_server_.MakeOffer());
+  std::vector<fuchsia_driver_framework::Offer> offers = {
+      fdf::MakeOffer2<fuchsia_hardware_clockimpl::Service>(),
+      clock_ids_metadata_server_.MakeOffer(),
+      clock_init_metadata_server_.MakeOffer(),
+  };
 
   zx::result result = AddChild(kChildNodeName, devfs_add_args, properties, offers);
   if (result.is_error()) {
