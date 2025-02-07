@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::access_vector_cache::{Fixed, Locked, Query, DEFAULT_SHARED_SIZE};
+use crate::access_vector_cache::{FifoCache, Locked, Query};
 use crate::policy::{AccessVectorComputer, SELINUX_AVD_FLAGS_PERMISSIVE};
 use crate::security_server::SecurityServer;
 use crate::{ClassPermission, FileClass, NullessByteStr, Permission, SecurityId};
@@ -35,13 +35,13 @@ pub struct PermissionCheckResult {
 // TODO: https://fxbug.dev/362699811 - Revise the traits to avoid direct dependencies on `SecurityServer`.
 pub struct PermissionCheck<'a> {
     security_server: &'a SecurityServer,
-    access_vector_cache: &'a Locked<Fixed<Weak<SecurityServer>, DEFAULT_SHARED_SIZE>>,
+    access_vector_cache: &'a Locked<FifoCache<Weak<SecurityServer>>>,
 }
 
 impl<'a> PermissionCheck<'a> {
     pub(crate) fn new(
         security_server: &'a SecurityServer,
-        access_vector_cache: &'a Locked<Fixed<Weak<SecurityServer>, DEFAULT_SHARED_SIZE>>,
+        access_vector_cache: &'a Locked<FifoCache<Weak<SecurityServer>>>,
     ) -> Self {
         Self { security_server, access_vector_cache }
     }

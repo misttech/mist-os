@@ -67,6 +67,7 @@ rustc_library("selinux") {
   deps = [
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:bstr",
+    "//third_party/rust_crates:indexmap",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:zerocopy",
   ]
