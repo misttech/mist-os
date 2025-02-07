@@ -55,8 +55,9 @@ type EmuStartArgs struct {
 	// If using a custom config, all other fields below should be empty.
 	Config string
 
-	// TODO(https://fxbug.dev/329144967): Add more fields as necessary
-	// to provide as flags to `ffx emu start`.
+	// Extra args to `ffx emu` to be passed during emulator startup
+	ExtraEmuArgs []string
+
 	ProductBundle string
 	KernelArgs    []string
 	Accel         string
@@ -105,6 +106,7 @@ func (f *FFXInstance) EmuStartConsole(ctx context.Context, sdkRoot, name string,
 		return nil, err
 	}
 	args := []string{"emu", "start", "--console", "--net", "tap", "--name", name, "-H", "-s", "0"}
+	args = append(args, startArgs.ExtraEmuArgs...)
 	if startArgs.Config != "" {
 		args = append(args, "--config", startArgs.Config)
 	} else {
