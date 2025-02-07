@@ -9,9 +9,13 @@ bssl_sys_dir = "${boringssl_root}/rust/bssl-sys"
 bssl_sys_src = "${bssl_sys_dir}/src"
 bssl_crypto_dir = "${boringssl_root}/rust/bssl-crypto"
 
-# The default dependency should be with libboringssl as shared.
+# Defaults to a shared libboringssl for Fuchsia and a static for host.
 group("bssl-sys") {
-  public_deps = [ ":bssl-sys.shared" ]
+  if (is_fuchsia) {
+    public_deps = [ ":bssl-sys.shared" ]
+  } else if (is_host) {
+    public_deps = [ ":bssl-sys.static" ]
+  }
 }
 
 group("bssl-sys.shared") {
@@ -28,9 +32,13 @@ group("bssl-sys.static") {
   ]
 }
 
-# The default dependency should be with libboringssl as shared.
+# Defaults to a shared libboringssl for Fuchsia and a static for host.
 group("bssl-crypto") {
-  public_deps = [ ":bssl-crypto.shared" ]
+  if (is_fuchsia) {
+    public_deps = [ ":bssl-crypto.shared" ]
+  } else if (is_host) {
+    public_deps = [ ":bssl-crypto.static" ]
+  }
 }
 
 group("bssl-crypto.shared") {
