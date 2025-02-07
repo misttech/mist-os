@@ -70,10 +70,6 @@ constexpr display::DisplayId kDisplayId(1);
 
 constexpr int32_t kRefreshRateFps = 60;
 
-// Arbitrary slowdown for testing purposes
-// TODO(payamm): Randomizing the delay value is more value
-constexpr int64_t kNumOfVsyncsForCapture = 5;  // 5 * 16ms = 80ms
-
 display_mode_t CreateBanjoDisplayMode() {
   static constexpr int64_t kPixelClockFrequencyHz = int64_t{kWidth} * kHeight * kRefreshRateFps;
   static_assert(kPixelClockFrequencyHz >= 0);
@@ -752,11 +748,6 @@ zx::result<> FakeDisplay::ServiceAnyCaptureRequest() {
     return zx::ok();
   }
 
-  ++capture_complete_signal_count_;
-  if (capture_complete_signal_count_ < kNumOfVsyncsForCapture) {
-    return zx::ok();
-  }
-
   auto imported_captures_it = imported_captures_.find(current_capture_target_image_id_);
 
   ZX_ASSERT_MSG(imported_captures_it.IsValid(),
@@ -782,7 +773,6 @@ zx::result<> FakeDisplay::ServiceAnyCaptureRequest() {
   SendCaptureComplete();
 
   current_capture_target_image_id_ = display::kInvalidDriverCaptureImageId;
-  capture_complete_signal_count_ = 0;
 
   return zx::ok();
 }

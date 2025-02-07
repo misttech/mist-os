@@ -260,10 +260,6 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   display::DriverConfigStamp current_config_stamp_ __TA_GUARDED(mutex_) =
       display::kInvalidDriverConfigStamp;
 
-  // Capture complete is signaled at vsync time. This counter introduces a bit of delay
-  // for signal capture complete
-  uint64_t capture_complete_signal_count_ __TA_GUARDED(mutex_) = 0;
-
   // Minimum value of RGB channels, via the SetMinimumRgb() method.
   //
   // This is associated with the display capture lock so we have the option to
