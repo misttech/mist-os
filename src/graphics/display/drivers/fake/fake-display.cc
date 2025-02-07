@@ -364,8 +364,14 @@ void FakeDisplay::DisplayEngineReleaseImage(uint64_t image_handle) {
   display::DriverImageId driver_image_id = display::ToDriverImageId(image_handle);
 
   std::lock_guard image_lock(image_mutex_);
+
+  if (current_image_to_capture_id_ == driver_image_id) {
+    FDF_LOG(FATAL, "Cannot safely release an image used in currently applied configuration");
+    return;
+  }
+
   if (imported_images_.erase(driver_image_id) == nullptr) {
-    FDF_LOG(ERROR, "Failed to release display Image (handle %" PRIu64 ")", driver_image_id.value());
+    FDF_LOG(ERROR, "Image release request with unused handle: %" PRIu64, driver_image_id.value());
   }
 }
 
@@ -691,7 +697,8 @@ zx_status_t FakeDisplay::DisplayEngineStartCapture(uint64_t capture_handle) {
       display::ToDriverCaptureImageId(capture_handle);
   auto it = imported_captures_.find(driver_capture_image_id);
   if (it == imported_captures_.end()) {
-    // invalid handle
+    FDF_LOG(ERROR, "Capture start request with invalid handle: %" PRIu64,
+            driver_capture_image_id.value());
     return ZX_ERR_INVALID_ARGS;
   }
   current_capture_target_image_id_ = driver_capture_image_id;
@@ -703,16 +710,25 @@ zx_status_t FakeDisplay::DisplayEngineReleaseCapture(uint64_t capture_handle) {
   if (!IsCaptureSupported()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-
-  std::lock_guard capture_lock(capture_mutex_);
   display::DriverCaptureImageId driver_capture_image_id =
       display::ToDriverCaptureImageId(capture_handle);
+
+  std::lock_guard capture_lock(capture_mutex_);
+
   if (current_capture_target_image_id_ == driver_capture_image_id) {
-    return ZX_ERR_SHOULD_WAIT;
+    FDF_LOG(FATAL, "Refusing to release the target of an in-progress capture");
+
+    // TODO(https://fxrev.dev/394954078): The return code is not meaningful. It will be
+    // removed when the ReleaseCapture() error code is eliminated.
+    return ZX_ERR_NOT_SUPPORTED;
   }
 
   if (imported_captures_.erase(driver_capture_image_id) == nullptr) {
-    // invalid handle
+    FDF_LOG(ERROR, "Capture release request with unused handle: %" PRIu64,
+            driver_capture_image_id.value());
+
+    // TODO(https://fxrev.dev/394954078): The return code is not meaningful. It will be
+    // removed when the ReleaseCapture() error code is eliminated.
     return ZX_ERR_INVALID_ARGS;
   }
   return ZX_OK;
@@ -747,11 +763,8 @@ zx::result<> FakeDisplay::ServiceAnyCaptureRequest() {
 
   auto imported_captures_it = imported_captures_.find(current_capture_target_image_id_);
 
-  // The current capture target image is guaranteed to be valid in
-  // `imported_captures_` in StartCapture(), and can only be released
-  // (i.e. removed from `imported_captures_`) after the active capture
-  // is done.
-  ZX_ASSERT(imported_captures_it.IsValid());
+  ZX_ASSERT_MSG(imported_captures_it.IsValid(),
+                "Driver allowed releasing the target of an in-progress capture");
   CaptureImageInfo& capture_destination_info = *imported_captures_it;
 
   // `current_image_to_capture_id_` is a key to DisplayImageInfo stored
@@ -762,11 +775,8 @@ zx::result<> FakeDisplay::ServiceAnyCaptureRequest() {
     // We have a valid image being displayed. Let's capture it.
     auto imported_images_it = imported_images_.find(current_image_to_capture_id_);
 
-    // The "current image to capture" is guaranteed to be valid in
-    // `imported_images_` in ApplyConfig(), and can only be released
-    // (i.e. removed from `imported_images_`) after there's an vsync
-    // not containing the image anymore.
-    ZX_ASSERT(imported_images_it.IsValid());
+    ZX_ASSERT_MSG(imported_images_it.IsValid(),
+                  "Driver allowed releasing an image used in the currently applied configuration");
     DisplayImageInfo& display_source_info = *imported_images_it;
 
     zx::result<> image_capture_result =

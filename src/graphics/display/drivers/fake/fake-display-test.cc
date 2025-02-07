@@ -735,6 +735,27 @@ TEST_F(FakeDisplayRealSysmemTest, Capture) {
     }
   }
 
+  // Apply an empty configuration so the image can be released.
+  std::array<const display_config_t, kDisplayCount> kEmptyDisplayConfigs = {
+      display_config_t{
+          .display_id = display::ToBanjoDisplayId(kDisplayId),
+          .mode = {},
+
+          .cc_flags = 0u,
+          .cc_preoffsets = {},
+          .cc_coefficients = {},
+          .cc_postoffsets = {},
+
+          .layer_list = nullptr,
+          .layer_count = 0,
+      },
+  };
+  const display::DriverConfigStamp empty_config_stamp(2);
+  const config_stamp_t banjo_empty_config_stamp =
+      display::ToBanjoDriverConfigStamp(empty_config_stamp);
+  fake_display_stack_->display_engine().DisplayEngineApplyConfiguration(
+      kEmptyDisplayConfigs.data(), kEmptyDisplayConfigs.size(), &banjo_empty_config_stamp);
+
   // Release the image.
   // TODO(https://fxbug.dev/42079040): Consider adding RAII handles to release the
   // imported images and buffer collections.
