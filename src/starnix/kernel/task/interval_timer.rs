@@ -263,7 +263,7 @@ impl IntervalTimer {
         guard.interval = interval;
         guard.on_setting_changed();
 
-        let kernel_ref = current_task.kernel().clone();
+        let kernel_ref = current_task.kernel();
         let self_ref = self.clone();
         let thread_group = current_task.thread_group.weak_thread_group.clone();
         current_task.kernel().kthreads.spawn_future(async move {

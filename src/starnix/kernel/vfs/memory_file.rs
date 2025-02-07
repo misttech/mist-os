@@ -425,7 +425,8 @@ pub fn new_memfd(
     seals: SealFlags,
     flags: OpenFlags,
 ) -> Result<FileHandle, Errno> {
-    let fs = anon_fs(current_task.kernel());
+    let kernel = current_task.kernel();
+    let fs = anon_fs(&kernel);
     let node = fs.create_node(
         current_task,
         MemoryFileNode::new()?,

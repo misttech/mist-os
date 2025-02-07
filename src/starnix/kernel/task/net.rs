@@ -112,7 +112,8 @@ impl FsNodeOps for Arc<NetstackDevicesDirectory> {
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        let entries = current_task.kernel().netstack_devices.entries.lock();
+        let kernel = current_task.kernel();
+        let entries = kernel.netstack_devices.entries.lock();
         entries.get(name).and_then(self.dir_fn).map(Arc::clone).ok_or_else(|| {
             errno!(
                 ENOENT,
@@ -151,7 +152,8 @@ impl FileOps for NetstackDevicesDirectory {
 
         // Skip through the entries until the current offset is reached.
         // Subtract 2 from the offset to account for `.` and `..`.
-        let entries = current_task.kernel().netstack_devices.entries.lock();
+        let kernel = current_task.kernel();
+        let entries = kernel.netstack_devices.entries.lock();
         for (name, node) in entries.iter().skip(sink.offset() as usize - 2) {
             let Some(node) = (self.dir_fn)(node) else { continue };
             sink.add(

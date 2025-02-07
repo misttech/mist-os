@@ -29,6 +29,7 @@ use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{statfs, MAP_ANONYMOUS, MAP_PRIVATE, PROT_READ, PROT_WRITE};
 use std::ffi::CString;
 use std::mem::MaybeUninit;
+use std::ops::Deref;
 use std::sync::{mpsc, Arc};
 use zerocopy::{Immutable, IntoBytes};
 
@@ -58,7 +59,7 @@ fn create_pkgfs(kernel: &Arc<Kernel>) -> FileSystemHandle {
 /// for this use case, please consider adding one that follows the new pattern of actually running
 /// the test on the spawned task.
 pub fn create_kernel_task_and_unlocked_with_pkgfs<'l>(
-) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
+) -> (impl Deref<Target = Arc<Kernel>>, AutoReleasableTask, Locked<'l, Unlocked>) {
     create_kernel_task_and_unlocked_with_fs(create_pkgfs)
 }
 
@@ -71,7 +72,7 @@ pub fn create_kernel_task_and_unlocked_with_pkgfs<'l>(
 /// Please use `spawn_kernel_and_run` instead. If there isn't a variant of `spawn_kernel_and_run`
 /// for this use case, please consider adding one that follows the new pattern of actually running
 /// the test on the spawned task.
-pub fn create_kernel_and_task() -> (Arc<Kernel>, AutoReleasableTask) {
+pub fn create_kernel_and_task() -> (impl Deref<Target = Arc<Kernel>>, AutoReleasableTask) {
     let (kernel, task, _) = create_kernel_task_and_unlocked();
     (kernel, task)
 }
@@ -150,26 +151,31 @@ where
 /// for this use case, please consider adding one that follows the new pattern of actually running
 /// the test on the spawned task.
 pub fn create_kernel_task_and_unlocked<'l>(
-) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
+) -> (impl Deref<Target = Arc<Kernel>>, AutoReleasableTask, Locked<'l, Unlocked>) {
     create_kernel_task_and_unlocked_with_fs(TmpFs::new_fs)
 }
 
 fn create_test_kernel(
     _locked: &mut Locked<'_, Unlocked>,
     security_server: Option<Arc<SecurityServer>>,
-) -> Arc<Kernel> {
-    Kernel::new(
-        b"".into(),
-        Default::default(),
-        ContainerNamespace::new(),
-        None,
-        None,
-        fuchsia_inspect::Node::default(),
-        None,
-        security::testing::kernel_state(security_server),
-        Vec::new(),
+) -> impl Deref<Target = Arc<Kernel>> {
+    // NOTE: this means we won't actually run Kernel::drop during unit tests which use this helper.
+    // It's quite difficult to get the teardown ordering correct with the API of these test helpers,
+    // which is yet another reason to prefer the `spawn_kernel_*` functions in this module.
+    std::mem::ManuallyDrop::new(
+        Kernel::new(
+            b"".into(),
+            Default::default(),
+            ContainerNamespace::new(),
+            None,
+            None,
+            fuchsia_inspect::Node::default(),
+            None,
+            security::testing::kernel_state(security_server),
+            Vec::new(),
+        )
+        .expect("failed to create kernel"),
     )
-    .expect("failed to create kernel")
 }
 
 fn create_test_fs_context(
@@ -219,7 +225,7 @@ fn create_test_init_task(
 
 fn create_kernel_task_and_unlocked_with_fs<'l>(
     create_fs: impl FnOnce(&Arc<Kernel>) -> FileSystemHandle,
-) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
+) -> (impl Deref<Target = Arc<Kernel>>, AutoReleasableTask, Locked<'l, Unlocked>) {
     let mut locked = unsafe { Unlocked::new() };
     let kernel = create_test_kernel(&mut locked, None);
     let fs = create_fs(&kernel);

@@ -116,7 +116,7 @@ impl SeLinuxFs {
             .ok_or_else(|| errno!(ENODEV, "selinuxfs"))?;
 
         let kernel = current_task.kernel();
-        let fs = FileSystem::new(kernel, CacheMode::Permanent, SeLinuxFs, options)?;
+        let fs = FileSystem::new(&kernel, CacheMode::Permanent, SeLinuxFs, options)?;
         let mut dir = StaticDirectoryBuilder::new(&fs);
 
         // Read-only files & directories, exposing SELinux internal state.

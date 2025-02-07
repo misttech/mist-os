@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![recursion_limit = "256"]
+
 use ext4_read_only::parser::{Parser as ExtParser, XattrMap as ExtXattrMap};
 use ext4_read_only::readers::VmoReader;
 use ext4_read_only::structs::{EntryType, INode, ROOT_INODE_NUM};
@@ -92,12 +94,8 @@ impl ExtFilesystem {
         let pager = Arc::new(Pager::new(vmo, parser.block_size().map_err(|e| errno!(EIO, e))?)?);
         let fs = Self { parser, pager: pager.clone() };
         let ops = ExtDirectory { inner: Arc::new(ExtNode::new(&fs, ROOT_INODE_NUM)?) };
-        let fs = FileSystem::new(
-            current_task.kernel(),
-            CacheMode::Cached(CacheConfig::default()),
-            fs,
-            options,
-        )?;
+        let kernel = current_task.kernel();
+        let fs = FileSystem::new(&kernel, CacheMode::Cached(CacheConfig::default()), fs, options)?;
         let mut root = FsNode::new_root(ops);
         root.node_id = ROOT_INODE_NUM as ino_t;
         fs.set_root_node(root);

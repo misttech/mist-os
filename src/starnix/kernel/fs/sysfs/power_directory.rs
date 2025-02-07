@@ -39,7 +39,7 @@ pub fn sysfs_power_directory(current_task: &CurrentTask, dir: &mut StaticDirecto
             dir.entry(
                 current_task,
                 "success",
-                create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
+                create_bytes_file_with_handler(Arc::downgrade(&kernel), |kernel| {
                     kernel.suspend_resume_manager.suspend_stats().success_count.to_string()
                 }),
                 read_only_file_mode,
@@ -47,7 +47,7 @@ pub fn sysfs_power_directory(current_task: &CurrentTask, dir: &mut StaticDirecto
             dir.entry(
                 current_task,
                 "fail",
-                create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
+                create_bytes_file_with_handler(Arc::downgrade(&kernel), |kernel| {
                     kernel.suspend_resume_manager.suspend_stats().fail_count.to_string()
                 }),
                 read_only_file_mode,
@@ -55,7 +55,7 @@ pub fn sysfs_power_directory(current_task: &CurrentTask, dir: &mut StaticDirecto
             dir.entry(
                 current_task,
                 "last_failed_dev",
-                create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
+                create_bytes_file_with_handler(Arc::downgrade(&kernel), |kernel| {
                     kernel
                         .suspend_resume_manager
                         .suspend_stats()
@@ -67,7 +67,7 @@ pub fn sysfs_power_directory(current_task: &CurrentTask, dir: &mut StaticDirecto
             dir.entry(
                 current_task,
                 "last_failed_errno",
-                create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
+                create_bytes_file_with_handler(Arc::downgrade(&kernel), |kernel| {
                     kernel
                         .suspend_resume_manager
                         .suspend_stats()

@@ -1440,8 +1440,8 @@ pub fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
 }
 
 pub(super) fn selinuxfs_init_null(current_task: &CurrentTask, null_file_handle: &FileHandle) {
-    let kernel_state = current_task
-        .kernel()
+    let kernel = current_task.kernel();
+    let kernel_state = kernel
         .security_state
         .state
         .as_ref()
@@ -1462,7 +1462,8 @@ pub(super) fn selinuxfs_policy_loaded<L>(
 ) where
     L: LockEqualOrBefore<FileOpsCore>,
 {
-    let kernel_state = current_task.kernel().security_state.state.as_ref().unwrap();
+    let kernel = current_task.kernel();
+    let kernel_state = kernel.security_state.state.as_ref().unwrap();
 
     // Invoke `file_system_resolve_security()` on all pre-existing `FileSystem`s.
     // No new `FileSystem`s should be added to `pending_file_systems` after policy load.

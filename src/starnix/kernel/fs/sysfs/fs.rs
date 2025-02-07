@@ -46,8 +46,9 @@ impl FileSystemOps for SysFs {
 impl SysFs {
     pub fn new_fs(current_task: &CurrentTask, options: FileSystemOptions) -> FileSystemHandle {
         let kernel = current_task.kernel();
-        let fs = FileSystem::new(kernel, CacheMode::Cached(CacheConfig::default()), SysFs, options)
-            .expect("sysfs constructed with valid options");
+        let fs =
+            FileSystem::new(&kernel, CacheMode::Cached(CacheConfig::default()), SysFs, options)
+                .expect("sysfs constructed with valid options");
         let mut dir = StaticDirectoryBuilder::new(&fs);
         let dir_mode = mode!(IFDIR, 0o755);
         dir.subdir(current_task, "fs", 0o755, |dir| {

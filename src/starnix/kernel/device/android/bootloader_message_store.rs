@@ -97,7 +97,7 @@ pub fn android_bootloader_message_store_init(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
 ) {
-    let kernel = current_task.kernel().clone();
+    let kernel = current_task.kernel();
     current_task.kernel().remote_block_device_registry.on_device_added(Box::new(
         move |name, _minor, device| {
             if name == "misc" {

@@ -84,7 +84,8 @@ pub fn create_test_executable(
     current_task: &CurrentTask,
     security_context: &[u8],
 ) -> NamespaceNode {
-    let security_server = &current_task.kernel().security_state.state.as_ref().unwrap().server;
+    let kernel = current_task.kernel();
+    let security_server = &kernel.security_state.state.as_ref().unwrap().server;
     let fscreate_sid = security_server.security_context_to_sid(security_context.into()).unwrap();
     let scoped_fs_create = scoped_fs_create(current_task, fscreate_sid);
     let namespace_node = current_task

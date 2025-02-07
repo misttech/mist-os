@@ -118,7 +118,7 @@ impl ProcDirectory {
             ),
             "swaps".into() => fs.create_node(
                 current_task,
-                SwapsFile::new_node(kernel),
+                SwapsFile::new_node(&kernel),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
             "sys".into() => sysctl_directory(current_task, fs),
@@ -130,7 +130,7 @@ impl ProcDirectory {
             ),
             "loadavg".into() => fs.create_node(
                 current_task,
-                LoadavgFile::new_node(kernel),
+                LoadavgFile::new_node(&kernel),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
             "config.gz".into() => fs.create_node(
@@ -140,7 +140,7 @@ impl ProcDirectory {
             ),
             "sysrq-trigger".into() => fs.create_node(
                 current_task,
-                SysRqNode::new(kernel),
+                SysRqNode::new(&kernel),
                 // This file is normally writable only by root.
                 // (https://man7.org/linux/man-pages/man5/proc.5.html)
                 FsNodeInfo::new_factory(mode!(IFREG, 0o200), FsCred::root()),
@@ -392,7 +392,8 @@ impl FileOps for ProcKmsgFile {
         events: FdEvents,
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        let syslog = current_task.kernel().syslog.access(current_task).ok()?;
+        let kernel = current_task.kernel();
+        let syslog = kernel.syslog.access(current_task).ok()?;
         Some(syslog.wait(waiter, events, handler))
     }
 
@@ -402,7 +403,8 @@ impl FileOps for ProcKmsgFile {
         _file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
-        let syslog = current_task.kernel().syslog.access(current_task)?;
+        let kernel = current_task.kernel();
+        let syslog = kernel.syslog.access(current_task)?;
         let mut events = FdEvents::empty();
         if syslog.size_unread()? > 0 {
             events |= FdEvents::POLLIN;
@@ -418,7 +420,8 @@ impl FileOps for ProcKmsgFile {
         _offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        let syslog = current_task.kernel().syslog.access(current_task)?;
+        let kernel = current_task.kernel();
+        let syslog = kernel.syslog.access(current_task)?;
         file.blocking_op(locked, current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, |_| {
             let bytes_written = syslog.read(data)?;
             Ok(bytes_written as usize)

@@ -349,7 +349,7 @@ pub fn run_container_features(
         touch_policy_device.clone().register(locked, &kernel.kthreads.system_task());
         touch_policy_device.start_relay(&kernel, touch_standby_receiver);
 
-        kernel.framebuffer.start_server(kernel, None).expect("Failed to start framebuffer server");
+        kernel.framebuffer.start_server(&kernel, None).expect("Failed to start framebuffer server");
     }
     if features.gralloc {
         // The virtgralloc0 device allows vulkan_selector to indicate to gralloc
@@ -370,7 +370,7 @@ pub fn run_container_features(
         gpu_device_init(locked, system_task);
     }
     if let Some(socket_path) = features.perfetto.clone() {
-        start_perfetto_consumer_thread(kernel, socket_path)
+        start_perfetto_consumer_thread(&kernel, socket_path)
             .context("Failed to start perfetto consumer thread")?;
     }
     if features.self_profile {
@@ -392,7 +392,7 @@ pub fn run_container_features(
         remote_block_device_init(locked, system_task);
     }
     if features.network_manager {
-        if let Err(e) = kernel.network_manager.init(kernel) {
+        if let Err(e) = kernel.network_manager.init(&kernel) {
             log_error!("Network manager initialization failed: ({e:?})");
         }
     }

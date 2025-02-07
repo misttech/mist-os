@@ -32,7 +32,7 @@ pub const DEFAULT_LRU_CAPACITY: usize = 32;
 
 /// A file system that can be mounted in a namespace.
 pub struct FileSystem {
-    pub kernel: Weak<Kernel>,
+    kernel: Weak<Kernel>,
     root: OnceLock<DirEntryHandle>,
     next_node_id: AtomicU64Counter,
     ops: Box<dyn FileSystemOps>,
@@ -165,6 +165,11 @@ impl FileSystem {
         security::file_system_post_init_security(kernel, &file_system);
 
         Ok(file_system)
+    }
+
+    #[track_caller]
+    pub fn kernel(&self) -> Arc<Kernel> {
+        self.kernel.upgrade().expect("cleanup code requiring Kernel must run in Kernel::shutdown")
     }
 
     pub fn set_root(self: &FileSystemHandle, root: impl FsNodeOps) {

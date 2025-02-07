@@ -19,7 +19,7 @@ use netlink_packet_utils::{DecodeError, Emitable as _};
 use starnix_sync::{FileOpsCore, Locked, Mutex};
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use zerocopy::{FromBytes, IntoBytes};
 
 use crate::device::kobject::{Device, KObjectBased, UEventAction, UEventContext};
@@ -534,7 +534,7 @@ impl SocketOps for BaseNetlinkSocket {
 
 /// Socket implementation for the NETLINK_KOBJECT_UEVENT family of netlink sockets.
 struct UEventNetlinkSocket {
-    kernel: Arc<Kernel>,
+    kernel: Weak<Kernel>,
     inner: Arc<Mutex<NetlinkSocketInner>>,
     device_listener_key: Mutex<Option<DeviceListenerKey>>,
 }
@@ -543,7 +543,7 @@ impl UEventNetlinkSocket {
     #[allow(clippy::let_and_return)]
     pub fn new(kernel: &Arc<Kernel>) -> Self {
         let result = Self {
-            kernel: Arc::clone(kernel),
+            kernel: Arc::downgrade(kernel),
             inner: Arc::new(Mutex::new(NetlinkSocketInner {
                 family: NetlinkFamily::KobjectUevent,
                 messages: MessageQueue::new(SOCKET_DEFAULT_SIZE),
@@ -574,7 +574,13 @@ impl UEventNetlinkSocket {
         std::mem::drop(state);
         let mut key_state = self.device_listener_key.lock();
         if key_state.is_none() {
-            *key_state = Some(self.kernel.device_registry.register_listener(self.inner.clone()));
+            *key_state = Some(
+                self.kernel
+                    .upgrade()
+                    .expect("kernel can't have dropped")
+                    .device_registry
+                    .register_listener(self.inner.clone()),
+            );
         }
     }
 }
@@ -664,7 +670,7 @@ impl SocketOps for UEventNetlinkSocket {
     fn close(&self, _socket: &Socket) {
         let id = self.device_listener_key.lock().take();
         if let Some(id) = id {
-            self.kernel.device_registry.unregister_listener(&id);
+            self.kernel.upgrade().unwrap().device_registry.unregister_listener(&id);
         }
     }
 

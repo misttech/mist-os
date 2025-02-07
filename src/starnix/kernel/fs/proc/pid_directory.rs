@@ -653,7 +653,8 @@ impl FsNodeOps for TaskListDirectory {
         if !thread_group.read().contains_task(tid) {
             return error!(ENOENT);
         }
-        let pid_state = thread_group.kernel.pids.read();
+        let kernel = thread_group.kernel();
+        let pid_state = kernel.pids.read();
         let weak_task = pid_state.get_task(tid);
         let task = weak_task.upgrade().ok_or_else(|| errno!(ENOENT))?;
         Ok(tid_directory(current_task, &node.fs(), &task))

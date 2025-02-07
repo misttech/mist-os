@@ -439,8 +439,9 @@ mod test {
             fidl::endpoints::create_request_stream::<TouchSourceMarker>();
 
         let relay = input_event_relay::InputEventsRelay::new();
+        let kernel = current_task.kernel();
         relay.start_relays(
-            current_task.kernel(),
+            &kernel,
             EventProxyMode::None,
             touch_source_client_end,
             keyboard_proxy,
@@ -483,8 +484,9 @@ mod test {
             fuchsia_scenic::ViewRefPair::new().expect("Failed to create ViewRefPair");
 
         let relay = input_event_relay::InputEventsRelay::new();
+        let kernel = current_task.kernel();
         relay.start_relays(
-            current_task.kernel(),
+            &kernel,
             EventProxyMode::None,
             touch_source_client_end,
             keyboard_proxy,

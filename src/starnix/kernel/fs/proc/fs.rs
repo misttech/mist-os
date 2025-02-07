@@ -53,7 +53,7 @@ impl ProcFs {
     /// Creates a new instance of `ProcFs` for the given `kernel`.
     pub fn new_fs(current_task: &CurrentTask, options: FileSystemOptions) -> FileSystemHandle {
         let kernel = current_task.kernel();
-        let fs = FileSystem::new(kernel, CacheMode::Uncached, Arc::new(ProcFs), options)
+        let fs = FileSystem::new(&kernel, CacheMode::Uncached, Arc::new(ProcFs), options)
             .expect("procfs constructed with valid options");
         fs.set_root(ProcDirectory::new(current_task, &fs));
         fs

@@ -427,7 +427,7 @@ where
 
     let thread_group = ThreadGroup::new(
         locked,
-        kernel.clone(),
+        Arc::downgrade(&kernel),
         process,
         parent,
         pid,

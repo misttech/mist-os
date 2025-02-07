@@ -4,7 +4,9 @@
 
 use crate::mm::memory::MemoryObject;
 use crate::mm::{ProtectionFlags, PAGE_SIZE};
-use crate::task::{CurrentTask, EventHandler, SignalHandler, SignalHandlerInner, Task, Waiter};
+use crate::task::{
+    CurrentTask, EventHandler, Kernel, SignalHandler, SignalHandlerInner, Task, Waiter,
+};
 use futures::channel::oneshot;
 use starnix_logging::log_error;
 use starnix_sync::{InterruptibleEvent, Locked, Mutex, Unlocked};
@@ -15,6 +17,7 @@ use starnix_uapi::{errno, error, FUTEX_BITSET_MATCH_ANY, FUTEX_TID_MASK, FUTEX_W
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
 use std::hash::Hash;
+use std::ops::Deref;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Weak};
 
@@ -471,7 +474,9 @@ pub trait FutexKey: Sized + Ord + Hash + Clone {
         perms: ProtectionFlags,
     ) -> Result<(FutexOperand, Self), Errno>;
 
-    fn get_table_from_task(task: &Task) -> Result<&FutexTable<Self>, Errno>;
+    fn get_table_from_task(
+        task: &Task,
+    ) -> Result<impl Deref<Target = FutexTable<Self>> + 'static, Errno>;
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq, Ord, PartialOrd)]
@@ -495,8 +500,17 @@ impl FutexKey for PrivateFutexKey {
         Ok((FutexOperand { memory, offset }, key))
     }
 
-    fn get_table_from_task(task: &Task) -> Result<&FutexTable<Self>, Errno> {
-        Ok(&task.mm().ok_or_else(|| errno!(EINVAL))?.futex)
+    fn get_table_from_task(
+        task: &Task,
+    ) -> Result<impl Deref<Target = FutexTable<Self>> + 'static, Errno> {
+        struct Derefer(Arc<crate::mm::MemoryManager>);
+        impl Deref for Derefer {
+            type Target = FutexTable<PrivateFutexKey>;
+            fn deref(&self) -> &Self::Target {
+                &self.0.futex
+            }
+        }
+        Ok(Derefer(task.mm().ok_or_else(|| errno!(EINVAL))?.clone()))
     }
 }
 
@@ -524,8 +538,17 @@ impl FutexKey for SharedFutexKey {
         Ok((FutexOperand { memory, offset }, key))
     }
 
-    fn get_table_from_task(task: &Task) -> Result<&FutexTable<Self>, Errno> {
-        Ok(&task.kernel().shared_futexes)
+    fn get_table_from_task(
+        task: &Task,
+    ) -> Result<impl Deref<Target = FutexTable<Self>> + 'static, Errno> {
+        struct Derefer(Arc<Kernel>);
+        impl Deref for Derefer {
+            type Target = FutexTable<SharedFutexKey>;
+            fn deref(&self) -> &Self::Target {
+                &self.0.shared_futexes
+            }
+        }
+        Ok(Derefer(task.kernel()))
     }
 }
 

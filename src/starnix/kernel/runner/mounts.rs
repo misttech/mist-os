@@ -52,14 +52,15 @@ impl MountAction {
         let (spec, options) = MountSpec::parse(spec)?;
         let rights = fio::PERM_READABLE | fio::PERM_EXECUTABLE;
 
+        let kernel = current_task.kernel();
         let fs = match spec.fs_type.as_slice() {
             // The remote_bundle file system is available only via the mounts declaration in CML.
-            b"remote_bundle" => RemoteBundle::new_fs(current_task.kernel(), pkg, options, rights)?,
+            b"remote_bundle" => RemoteBundle::new_fs(&kernel, pkg, options, rights)?,
 
             // When used in a mounts declaration in CML, remotefs is relative to the pkg directory,
             // which is different than when remotefs is used with the mount() syscall. In that case,
             // remotefs is relative to the data directory.
-            b"remotefs" => create_remotefs_filesystem(current_task.kernel(), pkg, options, rights)?,
+            b"remotefs" => create_remotefs_filesystem(&kernel, pkg, options, rights)?,
             _ => current_task.create_filesystem(locked, spec.fs_type.as_ref(), options)?,
         };
 

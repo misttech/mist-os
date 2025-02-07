@@ -46,7 +46,7 @@ pub fn serve_file_at(
     current_task: &CurrentTask,
     file: &FileObject,
 ) -> Result<execution_scope::ExecutionScope, Errno> {
-    let kernel = current_task.kernel().clone();
+    let kernel = current_task.kernel();
     let scope = execution_scope::ExecutionScope::new();
     current_task.kernel().kthreads.spawn_future({
         let file = file.weak_handle.upgrade().unwrap();

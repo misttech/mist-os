@@ -444,7 +444,7 @@ fn pipe_fs(
         .expando
         .get_or_init(|| {
             PipeFsHandle(
-                FileSystem::new(kernel, CacheMode::Uncached, PipeFs, FileSystemOptions::default())
+                FileSystem::new(&kernel, CacheMode::Uncached, PipeFs, FileSystemOptions::default())
                     .expect("pipefs constructed with valid options"),
             )
         })

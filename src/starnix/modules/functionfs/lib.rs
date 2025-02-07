@@ -220,7 +220,8 @@ impl FunctionFs {
             0
         };
 
-        let fs = FileSystem::new(current_task.kernel(), CacheMode::Uncached, FunctionFs, options)?;
+        let kernel = current_task.kernel();
+        let fs = FileSystem::new(&kernel, CacheMode::Uncached, FunctionFs, options)?;
 
         let mut root = FsNode::new_root_with_properties(FunctionFsRootDir::default(), |info| {
             info.ino = ROOT_NODE_ID;

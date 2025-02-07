@@ -1178,11 +1178,11 @@ impl BytesFileOps for SeccompActionsLogged {
         if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
             return error!(EPERM);
         }
-        SeccompAction::set_actions_logged(current_task.kernel(), &data)?;
+        SeccompAction::set_actions_logged(&current_task.kernel(), &data)?;
         Ok(())
     }
     fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        Ok(SeccompAction::get_actions_logged(current_task.kernel()).into())
+        Ok(SeccompAction::get_actions_logged(&current_task.kernel()).into())
     }
 }
 
@@ -1199,11 +1199,11 @@ impl BytesFileOps for PtraceYamaScope {
         if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
             return error!(EPERM);
         }
-        ptrace_set_scope(current_task.kernel(), &data)?;
+        ptrace_set_scope(&current_task.kernel(), &data)?;
         Ok(())
     }
     fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        Ok(ptrace_get_scope(current_task.kernel()).into())
+        Ok(ptrace_get_scope(&current_task.kernel()).into())
     }
 }
 

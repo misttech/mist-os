@@ -269,7 +269,7 @@ impl BpfFs {
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let kernel = current_task.kernel();
-        let fs = FileSystem::new(kernel, CacheMode::Permanent, BpfFs, options)?;
+        let fs = FileSystem::new(&kernel, CacheMode::Permanent, BpfFs, options)?;
         let node = FsNode::new_root_with_properties(BpfFsDir::new(), |info| {
             info.mode |= FileMode::ISVTX;
         });

@@ -1012,7 +1012,7 @@ pub fn ptrace_attach_from_state(
     ptrace_state: PtraceCoreState,
 ) -> Result<(), Errno> {
     {
-        let weak_init = tracee_task.thread_group.kernel.pids.read().get_task(ptrace_state.pid);
+        let weak_init = tracee_task.thread_group.kernel().pids.read().get_task(ptrace_state.pid);
         let tracer_task = weak_init.upgrade().ok_or_else(|| errno!(ESRCH))?;
         do_attach(
             &tracer_task.thread_group,
@@ -1049,7 +1049,8 @@ pub fn ptrace_traceme(current_task: &mut CurrentTask) -> Result<SyscallResult, E
         let parent = parent.upgrade();
         // TODO: Move this check into `do_attach()` so that there is a single `ptrace_access_check(tracer, tracee)`?
         {
-            let pids = current_task.kernel().pids.read();
+            let kernel = current_task.kernel();
+            let pids = kernel.pids.read();
             let parent_task = pids.get_task(parent.leader);
             security::ptrace_traceme(
                 current_task,

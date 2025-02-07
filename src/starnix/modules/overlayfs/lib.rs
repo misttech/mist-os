@@ -1176,12 +1176,8 @@ impl OverlayStack {
 
         let stack = Arc::new(OverlayStack { lower_fs, upper_fs, work });
         let root_node = OverlayNode::new(stack.clone(), Some(lower), Some(upper), None);
-        let fs = FileSystem::new(
-            current_task.kernel(),
-            CacheMode::Uncached,
-            OverlayFs { stack },
-            options,
-        )?;
+        let kernel = current_task.kernel();
+        let fs = FileSystem::new(&kernel, CacheMode::Uncached, OverlayFs { stack }, options)?;
         fs.set_root(OverlayNodeOps { node: root_node });
         Ok(fs)
     }

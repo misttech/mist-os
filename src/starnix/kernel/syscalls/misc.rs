@@ -55,7 +55,8 @@ pub fn do_uname(
         init_array(&mut result.release, KERNEL_RELEASE.as_bytes());
     }
 
-    let version = current_task.kernel().build_version.get_or_try_init(|| {
+    let kernel = current_task.kernel();
+    let version = kernel.build_version.get_or_try_init(|| {
         let proxy =
             connect_to_protocol_sync::<buildinfo::ProviderMarker>().map_err(|_| errno!(ENOENT))?;
         let buildinfo = proxy.get_build_info(zx::MonotonicInstant::INFINITE).map_err(|e| {
@@ -295,7 +296,7 @@ pub fn sys_reboot(
                 }
                 Err(e) => {
                     return panic_or_error(
-                        current_task.kernel(),
+                        &current_task.kernel(),
                         errno!(EINVAL, format!("Failed to power off, status: {e}")),
                     )
                 }
@@ -315,7 +316,7 @@ pub fn sys_reboot(
                     }
                     Err(e) => {
                         return panic_or_error(
-                            current_task.kernel(),
+                            &current_task.kernel(),
                             errno!(EINVAL, format!("Failed to reboot, status: {e}")),
                         )
                     }
@@ -347,7 +348,7 @@ pub fn sys_reboot(
                                     }
                                     Err(e) => {
                                         return panic_or_error(
-                                            current_task.kernel(),
+                                            &current_task.kernel(),
                                             errno!(
                                                 EINVAL,
                                                 format!("Failed to reboot for FDR, status: {e}")
@@ -389,7 +390,7 @@ pub fn sys_reboot(
                 }
                 Err(e) => {
                     return panic_or_error(
-                        current_task.kernel(),
+                        &current_task.kernel(),
                         errno!(EINVAL, format!("Failed to reboot, status: {e}")),
                     )
                 }

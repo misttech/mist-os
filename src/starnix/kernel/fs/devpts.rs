@@ -62,7 +62,7 @@ pub fn dev_pts_fs(
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
-    ensure_devpts(current_task.kernel(), options)
+    ensure_devpts(&current_task.kernel(), options)
 }
 
 fn ensure_devpts(
@@ -302,7 +302,7 @@ impl DeviceOps for Arc<DevPtsDevice> {
             DeviceType::PTMX => {
                 let terminal = self.state.get_next_terminal(current_task)?;
                 let dev_pts_root =
-                    ensure_devpts(current_task.kernel(), Default::default())?.root().clone();
+                    ensure_devpts(&current_task.kernel(), Default::default())?.root().clone();
 
                 Ok(Box::new(DevPtmxFile::new(dev_pts_root, terminal)))
             }
@@ -319,7 +319,7 @@ impl DeviceOps for Arc<DevPtsDevice> {
                 if let Some(controlling_terminal) = controlling_terminal {
                     if controlling_terminal.is_main {
                         let dev_pts_root =
-                            ensure_devpts(current_task.kernel(), Default::default())?
+                            ensure_devpts(&current_task.kernel(), Default::default())?
                                 .root()
                                 .clone();
                         Ok(Box::new(DevPtmxFile::new(dev_pts_root, controlling_terminal.terminal)))
