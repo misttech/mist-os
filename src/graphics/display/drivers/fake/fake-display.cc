@@ -148,7 +148,7 @@ FakeDisplay::~FakeDisplay() {
 }
 
 zx_status_t FakeDisplay::DisplayEngineSetMinimumRgb(uint8_t minimum_rgb) {
-  std::lock_guard capture_lock(capture_mutex_);
+  std::lock_guard lock(mutex_);
 
   clamp_rgb_value_ = minimum_rgb;
   return ZX_OK;
@@ -159,6 +159,8 @@ void FakeDisplay::InitializeSysmemClient() {
   fuchsia_sysmem2::AllocatorSetDebugClientInfoRequest request;
   request.name() = debug_name;
   request.id() = fsl::GetCurrentProcessKoid();
+
+  std::lock_guard lock(mutex_);
   fit::result<fidl::OneWayStatus> set_debug_status =
       sysmem_->SetDebugClientInfo(std::move(request));
   if (!set_debug_status.is_ok()) {
@@ -198,9 +200,10 @@ void FakeDisplay::DisplayEngineUnsetListener() {
 
 zx::result<display::DriverImageId> FakeDisplay::ImportVmoImageForTesting(zx::vmo vmo,
                                                                          size_t offset) {
-  std::lock_guard image_lock(image_mutex_);
+  std::lock_guard lock(mutex_);
 
   display::DriverImageId driver_image_id = next_imported_display_driver_image_id_++;
+
   // Image metadata for testing only and may not reflect the actual image
   // buffer format.
   ImageMetadata display_image_metadata = {
@@ -232,6 +235,9 @@ zx_status_t FakeDisplay::DisplayEngineImportBufferCollection(
     uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+
+  std::lock_guard lock(mutex_);
+
   if (buffer_collections_.find(driver_buffer_collection_id) != buffer_collections_.end()) {
     FDF_LOG(ERROR, "Buffer Collection (id=%lu) already exists",
             driver_buffer_collection_id.value());
@@ -261,6 +267,9 @@ zx_status_t FakeDisplay::DisplayEngineReleaseBufferCollection(
     uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+
+  std::lock_guard lock(mutex_);
+
   if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
     FDF_LOG(ERROR, "Cannot release buffer collection %lu: buffer collection doesn't exist",
             driver_buffer_collection_id.value());
@@ -275,6 +284,9 @@ zx_status_t FakeDisplay::DisplayEngineImportImage(const image_metadata_t* image_
                                                   uint32_t index, uint64_t* out_image_handle) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+
+  std::lock_guard lock(mutex_);
+
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
     FDF_LOG(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)",
@@ -340,7 +352,6 @@ zx_status_t FakeDisplay::DisplayEngineImportImage(const image_metadata_t* image_
   // (IsCaptureSupported() is true), we should perform a check to ensure that
   // the display images should not be of "inaccessible" coherency domain.
 
-  std::lock_guard image_lock(image_mutex_);
   display::DriverImageId driver_image_id = next_imported_display_driver_image_id_++;
   ImageMetadata display_image_metadata = {
       .pixel_format =
@@ -363,7 +374,7 @@ zx_status_t FakeDisplay::DisplayEngineImportImage(const image_metadata_t* image_
 void FakeDisplay::DisplayEngineReleaseImage(uint64_t image_handle) {
   display::DriverImageId driver_image_id = display::ToDriverImageId(image_handle);
 
-  std::lock_guard image_lock(image_mutex_);
+  std::lock_guard lock(mutex_);
 
   if (current_image_to_capture_id_ == driver_image_id) {
     FDF_LOG(FATAL, "Cannot safely release an image used in currently applied configuration");
@@ -442,36 +453,18 @@ void FakeDisplay::DisplayEngineApplyConfiguration(const display_config_t* displa
                                                   const config_stamp_t* banjo_config_stamp) {
   ZX_DEBUG_ASSERT(display_configs);
   ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
-  {
-    std::lock_guard image_lock(image_mutex_);
-    if (display_count == 1 && display_configs[0].layer_count) {
-      // Only support one display.
-      current_image_to_capture_id_ =
-          display::ToDriverImageId(display_configs[0].layer_list[0].image_handle);
-    } else {
-      current_image_to_capture_id_ = display::kInvalidDriverImageId;
-    }
+  const display::DriverConfigStamp config_stamp = display::ToDriverConfigStamp(*banjo_config_stamp);
+
+  std::lock_guard lock(mutex_);
+  if (display_count == 1 && display_configs[0].layer_count) {
+    // Only support one display.
+    current_image_to_capture_id_ =
+        display::ToDriverImageId(display_configs[0].layer_list[0].image_handle);
+  } else {
+    current_image_to_capture_id_ = display::kInvalidDriverImageId;
   }
 
-  // The `current_config_stamp_` is stored by ApplyConfiguration() on the
-  // display coordinator's controller loop thread, and loaded only by the
-  // driver Vsync thread to notify coordinator for a new frame being displayed.
-  // After that, captures will be triggered on the controller loop thread by
-  // StartCapture(), which is synchronized with the capture thread (via mutex).
-  //
-  // Thus, for `current_config_stamp_`, there's no need for acquire-release
-  // memory model (to synchronize `current_image_to_capture_` changes between
-  // controller loop thread and Vsync thread), and relaxed memory order should
-  // be sufficient to guarantee that both value changes in ApplyConfiguration()
-  // will be visible to the capture thread for captures triggered after the
-  // Vsync with this config stamp.
-  //
-  // As long as a client requests a capture after it sees the Vsync event of a
-  // given config, the captured contents can only be contents applied no earlier
-  // than that config (which can be that config itself, or a config applied
-  // after that config).
-  const display::DriverConfigStamp config_stamp = display::ToDriverConfigStamp(*banjo_config_stamp);
-  current_config_stamp_.store(config_stamp, std::memory_order_relaxed);
+  current_config_stamp_ = config_stamp;
 }
 
 enum class FakeDisplay::BufferCollectionUsage {
@@ -575,6 +568,9 @@ zx_status_t FakeDisplay::DisplayEngineSetBufferCollectionConstraints(
     const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+
+  std::lock_guard lock(mutex_);
+
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
     FDF_LOG(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)",
@@ -611,6 +607,9 @@ zx_status_t FakeDisplay::DisplayEngineImportImageForCapture(
 
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
+
+  std::lock_guard lock(mutex_);
+
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
     FDF_LOG(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)",
@@ -656,8 +655,6 @@ zx_status_t FakeDisplay::DisplayEngineImportImageForCapture(
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  std::lock_guard capture_lock(capture_mutex_);
-
   // TODO(https://fxbug.dev/42079320): Capture target images should not be of
   // "inaccessible" coherency domain. We should add a check here.
   display::DriverCaptureImageId driver_capture_image_id = next_imported_driver_capture_image_id_++;
@@ -687,8 +684,10 @@ zx_status_t FakeDisplay::DisplayEngineStartCapture(uint64_t capture_handle) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  std::lock_guard capture_lock(capture_mutex_);
+  std::lock_guard lock(mutex_);
+
   if (current_capture_target_image_id_ != display::kInvalidDriverCaptureImageId) {
+    FDF_LOG(ERROR, "Capture start request declined while a capture is already in-progress");
     return ZX_ERR_SHOULD_WAIT;
   }
 
@@ -701,8 +700,8 @@ zx_status_t FakeDisplay::DisplayEngineStartCapture(uint64_t capture_handle) {
             driver_capture_image_id.value());
     return ZX_ERR_INVALID_ARGS;
   }
-  current_capture_target_image_id_ = driver_capture_image_id;
 
+  current_capture_target_image_id_ = driver_capture_image_id;
   return ZX_OK;
 }
 
@@ -713,7 +712,7 @@ zx_status_t FakeDisplay::DisplayEngineReleaseCapture(uint64_t capture_handle) {
   display::DriverCaptureImageId driver_capture_image_id =
       display::ToDriverCaptureImageId(capture_handle);
 
-  std::lock_guard capture_lock(capture_mutex_);
+  std::lock_guard lock(mutex_);
 
   if (current_capture_target_image_id_ == driver_capture_image_id) {
     FDF_LOG(FATAL, "Refusing to release the target of an in-progress capture");
@@ -748,10 +747,7 @@ void FakeDisplay::CaptureThread() {
 }
 
 zx::result<> FakeDisplay::ServiceAnyCaptureRequest() {
-  // `current_capture_target_image_` is a pointer to DisplayImageInfo stored in
-  // `imported_captures_` (guarded by `capture_mutex_`). So `capture_mutex_`
-  // must be locked while the capture image is being used.
-  std::lock_guard capture_lock(capture_mutex_);
+  std::lock_guard lock(mutex_);
   if (current_capture_target_image_id_ == display::kInvalidDriverCaptureImageId) {
     return zx::ok();
   }
@@ -767,10 +763,6 @@ zx::result<> FakeDisplay::ServiceAnyCaptureRequest() {
                 "Driver allowed releasing the target of an in-progress capture");
   CaptureImageInfo& capture_destination_info = *imported_captures_it;
 
-  // `current_image_to_capture_id_` is a key to DisplayImageInfo stored
-  // in `imported_images_` (guarded by `image_mutex_`). So `image_mutex_`
-  // must be locked while the source image is being used.
-  std::lock_guard image_lock(image_mutex_);
   if (current_image_to_capture_id_ != display::kInvalidDriverImageId) {
     // We have a valid image being displayed. Let's capture it.
     auto imported_images_it = imported_images_.find(current_image_to_capture_id_);
@@ -874,19 +866,22 @@ void FakeDisplay::VSyncThread() {
 }
 
 void FakeDisplay::SendVsync() {
-  // See the discussion in `DisplayEngineApplyConfiguration()` about
-  // the reason we use relaxed memory order here.
-  const display::DriverConfigStamp current_config_stamp =
-      current_config_stamp_.load(std::memory_order_relaxed);
-  const config_stamp_t banjo_current_config_stamp =
-      display::ToBanjoDriverConfigStamp(current_config_stamp);
+  display::DriverConfigStamp vsync_config_stamp;
+  {
+    std::lock_guard lock(mutex_);
+    vsync_config_stamp = current_config_stamp_;
+  }
+  const config_stamp_t banjo_vsync_config_stamp =
+      display::ToBanjoDriverConfigStamp(vsync_config_stamp);
+
+  zx_instant_mono_t banjo_vsync_timestamp = zx_clock_get_monotonic();
 
   std::lock_guard engine_listener_lock(engine_listener_mutex_);
   if (!engine_listener_client_.is_valid()) {
     return;
   }
-  engine_listener_client_.OnDisplayVsync(ToBanjoDisplayId(kDisplayId), zx_clock_get_monotonic(),
-                                         &banjo_current_config_stamp);
+  engine_listener_client_.OnDisplayVsync(ToBanjoDisplayId(kDisplayId), banjo_vsync_timestamp,
+                                         &banjo_vsync_config_stamp);
 }
 
 void FakeDisplay::RecordDisplayConfigToInspectRootNode() {

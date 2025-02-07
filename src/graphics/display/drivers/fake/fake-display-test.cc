@@ -74,7 +74,7 @@ class FakeDisplayTest : public testing::Test {
 
 TEST_F(FakeDisplayTest, Inspect) {
   fpromise::result<inspect::Hierarchy> read_result =
-      inspect::ReadFromVmo(fake_display_stack_->display_engine().inspector().DuplicateVmo());
+      inspect::ReadFromVmo(fake_display_stack_->display_engine().DuplicateInspectorVmoForTesting());
   ASSERT_TRUE(read_result.is_ok());
 
   const inspect::Hierarchy& hierarchy = read_result.value();
