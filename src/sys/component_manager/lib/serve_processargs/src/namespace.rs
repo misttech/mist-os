@@ -516,7 +516,7 @@ mod tests {
         let dir_proxy = dir_proxy.into_proxy();
         let (_, server_end) = endpoints::create_endpoints::<fio::NodeMarker>();
         dir_proxy
-            .open3(
+            .open(
                 "foo",
                 fio::Flags::PROTOCOL_DIRECTORY | rights,
                 &fio::Options::default(),
@@ -597,7 +597,7 @@ mod tests {
         // Try to open as executable. Should fail (ACCESS_DENIED)
         let (node, server_end) = endpoints::create_endpoints::<fio::NodeMarker>();
         dir_proxy
-            .open3(
+            .open(
                 "foo",
                 fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_EXECUTABLE,
                 &fio::Options::default(),
@@ -614,7 +614,7 @@ mod tests {
         // Try to open as read-only. Should succeed.
         let (_, server_end) = endpoints::create_endpoints::<fio::NodeMarker>();
         dir_proxy
-            .open3(
+            .open(
                 "foo",
                 fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE,
                 &fio::Options::default(),

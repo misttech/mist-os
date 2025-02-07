@@ -425,9 +425,9 @@ TEST_F(ConnectionTest, NegotiateProtocol) {
   {
     auto [dir_client, dir_server] = fidl::Endpoints<fio::Node>::Create();
     ASSERT_EQ(fidl::WireCall(root.client)
-                  ->Open(fio::OpenFlags::kRightReadable | fio::OpenFlags::kDescribe |
-                             fio::OpenFlags::kDirectory,
-                         {}, fidl::StringView("file_or_dir"), std::move(dir_server))
+                  ->DeprecatedOpen(fio::OpenFlags::kRightReadable | fio::OpenFlags::kDescribe |
+                                       fio::OpenFlags::kDirectory,
+                                   {}, fidl::StringView("file_or_dir"), std::move(dir_server))
                   .status(),
               ZX_OK);
     zx::result<fio::wire::NodeInfoDeprecated> dir_info = GetOnOpenResponse(dir_client);
@@ -448,9 +448,9 @@ TEST_F(ConnectionTest, NegotiateProtocol) {
     // Connect to polymorphic node as a file, by passing |kOpenFlagNotDirectory|.
     auto [file_client, file_server] = fidl::Endpoints<fio::Node>::Create();
     ASSERT_EQ(fidl::WireCall(root.client)
-                  ->Open(fio::OpenFlags::kRightReadable | fio::OpenFlags::kDescribe |
-                             fio::OpenFlags::kNotDirectory,
-                         {}, fidl::StringView("file_or_dir"), std::move(file_server))
+                  ->DeprecatedOpen(fio::OpenFlags::kRightReadable | fio::OpenFlags::kDescribe |
+                                       fio::OpenFlags::kNotDirectory,
+                                   {}, fidl::StringView("file_or_dir"), std::move(file_server))
                   .status(),
               ZX_OK);
     zx::result<fio::wire::NodeInfoDeprecated> file_info = GetOnOpenResponse(file_client);
@@ -471,8 +471,8 @@ TEST_F(ConnectionTest, NegotiateProtocol) {
     // Connect to polymorphic node as a node reference, by passing |kNodeReference|.
     auto [node_client, node_server] = fidl::Endpoints<fio::Node>::Create();
     ASSERT_EQ(fidl::WireCall(root.client)
-                  ->Open(fio::OpenFlags::kNodeReference | fio::OpenFlags::kDescribe, {},
-                         fidl::StringView("file_or_dir"), std::move(node_server))
+                  ->DeprecatedOpen(fio::OpenFlags::kNodeReference | fio::OpenFlags::kDescribe, {},
+                                   fidl::StringView("file_or_dir"), std::move(node_server))
                   .status(),
               ZX_OK);
     zx::result<fio::wire::NodeInfoDeprecated> node_info = GetOnOpenResponse(node_client);
@@ -502,9 +502,9 @@ TEST_F(ConnectionTest, NegotiateProtocolOpen3) {
     zx::result dc = fidl::CreateEndpoints<fio::Node>();
     ASSERT_EQ(dc.status_value(), ZX_OK);
     ASSERT_EQ(fidl::WireCall(root.client)
-                  ->Open3(fidl::StringView("file_or_dir"),
-                          fio::Flags::kProtocolDirectory | fio::Flags::kFlagSendRepresentation, {},
-                          dc->server.TakeChannel())
+                  ->Open(fidl::StringView("file_or_dir"),
+                         fio::Flags::kProtocolDirectory | fio::Flags::kFlagSendRepresentation, {},
+                         dc->server.TakeChannel())
                   .status(),
               ZX_OK);
     zx::result<fio::Representation> dir_info = GetOnRepresentation(dc->client);
@@ -517,9 +517,9 @@ TEST_F(ConnectionTest, NegotiateProtocolOpen3) {
     zx::result fc = fidl::CreateEndpoints<fio::Node>();
     ASSERT_EQ(fc.status_value(), ZX_OK);
     ASSERT_EQ(fidl::WireCall(root.client)
-                  ->Open3(fidl::StringView("file_or_dir"),
-                          fio::Flags::kProtocolFile | fio::Flags::kFlagSendRepresentation, {},
-                          fc->server.TakeChannel())
+                  ->Open(fidl::StringView("file_or_dir"),
+                         fio::Flags::kProtocolFile | fio::Flags::kFlagSendRepresentation, {},
+                         fc->server.TakeChannel())
                   .status(),
               ZX_OK);
     zx::result<fio::Representation> file_info = GetOnRepresentation(fc->client);
@@ -540,11 +540,11 @@ TEST_F(ConnectionTest, PrevalidateFlagsOpenFailure) {
   zx::result dc = fidl::CreateEndpoints<fio::Node>();
   ASSERT_EQ(dc.status_value(), ZX_OK);
   // Ensure that invalid flag combination returns INVALID_ARGS.
-  ASSERT_EQ(
-      fidl::WireCall(root.client)
-          ->Open(kInvalidFlagCombo, {}, fidl::StringView("file_or_dir"), std::move(dc->server))
-          .status(),
-      ZX_OK);
+  ASSERT_EQ(fidl::WireCall(root.client)
+                ->DeprecatedOpen(kInvalidFlagCombo, {}, fidl::StringView("file_or_dir"),
+                                 std::move(dc->server))
+                .status(),
+            ZX_OK);
   ASSERT_EQ(GetOnOpenResponse(dc->client).status_value(), ZX_ERR_INVALID_ARGS);
 }
 
@@ -557,10 +557,10 @@ TEST_F(ConnectionTest, ValidateRights) {
     zx::result fc = fidl::CreateEndpoints<fio::Node>();
     ASSERT_EQ(fc.status_value(), ZX_OK);
     ASSERT_EQ(fidl::WireCall(root.client)
-                  ->Open3(fidl::StringView("file_or_dir"),
-                          fio::Flags::kFlagSendRepresentation | fio::Flags::kProtocolFile |
-                              fio::Flags::kPermExecute,
-                          {}, fc->server.TakeChannel())
+                  ->Open(fidl::StringView("file_or_dir"),
+                         fio::Flags::kFlagSendRepresentation | fio::Flags::kProtocolFile |
+                             fio::Flags::kPermExecute,
+                         {}, fc->server.TakeChannel())
                   .status(),
               ZX_OK);
     zx::result<fio::Representation> file_info = GetOnRepresentation(fc->client);
@@ -579,10 +579,10 @@ TEST_F(ConnectionTest, ValidateRightsReadonly) {
     zx::result fc = fidl::CreateEndpoints<fio::Node>();
     ASSERT_EQ(fc.status_value(), ZX_OK);
     ASSERT_EQ(fidl::WireCall(root.client)
-                  ->Open3(fidl::StringView("file_or_dir"),
-                          fio::Flags::kFlagSendRepresentation | fio::Flags::kProtocolFile |
-                              fio::Flags::kPermWrite,
-                          {}, fc->server.TakeChannel())
+                  ->Open(fidl::StringView("file_or_dir"),
+                         fio::Flags::kFlagSendRepresentation | fio::Flags::kProtocolFile |
+                             fio::Flags::kPermWrite,
+                         {}, fc->server.TakeChannel())
                   .status(),
               ZX_OK);
     zx::result<fio::Representation> file_info = GetOnRepresentation(fc->client);
@@ -594,10 +594,10 @@ TEST_F(ConnectionTest, ValidateRightsReadonly) {
     zx::result fc = fidl::CreateEndpoints<fio::Node>();
     ASSERT_EQ(fc.status_value(), ZX_OK);
     ASSERT_EQ(fidl::WireCall(root.client)
-                  ->Open3(fidl::StringView("file_or_dir"),
-                          fio::Flags::kFlagSendRepresentation | fio::Flags::kProtocolDirectory |
-                              fio::Flags::kPermGetAttributes | fio::Flags::kPermInheritWrite,
-                          {}, fc->server.TakeChannel())
+                  ->Open(fidl::StringView("file_or_dir"),
+                         fio::Flags::kFlagSendRepresentation | fio::Flags::kProtocolDirectory |
+                             fio::Flags::kPermGetAttributes | fio::Flags::kPermInheritWrite,
+                         {}, fc->server.TakeChannel())
                   .status(),
               ZX_OK);
     zx::result<fio::Representation> dir_info = GetOnRepresentation(fc->client);
@@ -671,8 +671,9 @@ TEST_F(ConnectionClosingTest, ClosingChannelImpliesClosingNode) {
     zx::result fc = fidl::CreateEndpoints<fio::Node>();
     ASSERT_EQ(fc.status_value(), ZX_OK);
     ASSERT_EQ(fidl::WireCall(root.client)
-                  ->Open(fio::OpenFlags::kRightReadable, {},
-                         fidl::StringView("count_outstanding_open_vnode"), std::move(fc->server))
+                  ->DeprecatedOpen(fio::OpenFlags::kRightReadable, {},
+                                   fidl::StringView("count_outstanding_open_vnode"),
+                                   std::move(fc->server))
                   .status(),
               ZX_OK);
     clients.push_back(std::move(fc->client));

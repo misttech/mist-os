@@ -58,8 +58,13 @@ constexpr zx::result<std::tuple<fio::Rights, fio::Rights>> ValidateRequestRights
   return zx::ok(std::tuple{requested_rights & parent_rights, optional_rights & parent_rights});
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void ForwardRequestToRemote(fio::wire::DirectoryOpenRequest* request, Vfs::Open2Result open_result,
+                            fio::Rights parent_rights) {
+#else
 void ForwardRequestToRemote(fio::wire::DirectoryOpen3Request* request, Vfs::Open2Result open_result,
                             fio::Rights parent_rights) {
+#endif
   ZX_DEBUG_ASSERT(open_result.vnode()->IsRemote());
   // Update the request path to point only to the remaining segment.
   request->path = fidl::StringView::FromExternal(open_result.path());
@@ -200,7 +205,13 @@ void DirectoryConnection::SetFlags(SetFlagsRequestView, SetFlagsCompleter::Sync&
   completer.Reply(ZX_ERR_NOT_SUPPORTED);
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void DirectoryConnection::DeprecatedOpen(DeprecatedOpenRequestView request,
+                                         DeprecatedOpenCompleter::Sync& completer) {
+#else
 void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& completer) {
+
+#endif
   // TODO(https://fxbug.dev/346585458): This operation should require the TRAVERSE right.
   zx_status_t status = [&]() -> zx_status_t {
     std::string_view path(request->path.data(), request->path.size());
@@ -213,11 +224,11 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
     }
     zx::result open_options = VnodeConnectionOptions::FromOpen1Flags(flags);
     if (open_options.is_error()) {
-      FS_PRETTY_TRACE_DEBUG("[DirectoryOpen] invalid flags: ", request->flags,
+      FS_PRETTY_TRACE_DEBUG("[DirectoryDeprecatedOpen] invalid flags: ", request->flags,
                             ", path: ", request->path);
       return open_options.error_value();
     }
-    FS_PRETTY_TRACE_DEBUG("[DirectoryOpen] our rights ", rights(),
+    FS_PRETTY_TRACE_DEBUG("[DirectoryDeprecatedOpen] our rights ", rights(),
                           ", incoming options: ", *open_options, ", path: ", path);
     // The POSIX compatibility flags allow the child directory connection to inherit the writable
     // and executable rights.  If there exists a directory without the corresponding right along
@@ -252,9 +263,9 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
           if constexpr (std::is_same_v<ResultT, Vfs::OpenResult::Error>) {
             return result;
           } else if constexpr (std::is_same_v<ResultT, Vfs::OpenResult::Remote>) {
-            result.vnode->OpenRemote(open_options->ToIoV1Flags(), {},
-                                     fidl::StringView::FromExternal(result.path),
-                                     std::move(request->object));
+            result.vnode->DeprecatedOpenRemote(open_options->ToIoV1Flags(), {},
+                                               fidl::StringView::FromExternal(result.path),
+                                               std::move(request->object));
             return ZX_OK;
           } else if constexpr (std::is_same_v<ResultT, Vfs::OpenResult::Ok>) {
             return fs->ServeDeprecated(result.vnode, request->object.TakeChannel(), result.options);
@@ -276,9 +287,12 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
   }
 }
 
-void DirectoryConnection::Open3(fuchsia_io::wire::DirectoryOpen3Request* request,
-                                Open3Completer::Sync& completer) {
-  FS_PRETTY_TRACE_DEBUG("[DirectoryConnection::Open3] our rights: ", rights(), ", path: '",
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& completer) {
+#else
+void DirectoryConnection::Open3(Open3RequestView request, Open3Completer::Sync& completer) {
+#endif
+  FS_PRETTY_TRACE_DEBUG("[DirectoryConnection::Open] our rights: ", rights(), ", path: '",
                         request->path, "', flags: ", request->flags, "options: ", request->options);
   // Attempt to open/create the target vnode, and serve a connection to it.
   zx::result handled = [&]() -> zx::result<> {
@@ -303,7 +317,7 @@ void DirectoryConnection::Open3(fuchsia_io::wire::DirectoryOpen3Request* request
     std::string_view path(request->path.data(), request->path.size());
     zx::result open_result = fs->Open3(vnode(), path, request->flags, &request->options, rights);
     if (open_result.is_error()) {
-      FS_PRETTY_TRACE_DEBUG("[DirectoryConnection::Open3] Vfs::Open3 failed: ",
+      FS_PRETTY_TRACE_DEBUG("[DirectoryConnection::Open] Vfs::Open3 failed: ",
                             open_result.status_string());
       return open_result.take_error();
     }
@@ -328,7 +342,7 @@ void DirectoryConnection::Open3(fuchsia_io::wire::DirectoryOpen3Request* request
   // On any errors above, the object request channel should remain usable, so that we can close it
   // with the corresponding error epitaph.
   if (handled.is_error()) {
-    FS_PRETTY_TRACE_DEBUG("[DirectoryConnection::Open3] Error: ", handled.status_string());
+    FS_PRETTY_TRACE_DEBUG("[DirectoryConnection::Open] Error: ", handled.status_string());
     if (request->object.is_valid()) {
       fidl::ServerEnd<fio::Node>{std::move(request->object)}.Close(handled.error_value());
     }

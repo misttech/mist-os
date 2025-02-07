@@ -56,14 +56,20 @@ zx_status_t Vnode::GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) {
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-void Vnode::OpenRemote(fuchsia_io::OpenFlags, fuchsia_io::ModeType, fidl::StringView,
-                       fidl::ServerEnd<fuchsia_io::Node>) const {
+void Vnode::DeprecatedOpenRemote(fuchsia_io::OpenFlags, fuchsia_io::ModeType, fidl::StringView,
+                                 fidl::ServerEnd<fuchsia_io::Node>) const {
   ZX_PANIC("OpenRemote should only be called on remote nodes!");
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void Vnode::OpenRemote(fuchsia_io::wire::DirectoryOpenRequest request) const {
+  ZX_PANIC("OpenRemote should only be called on remote nodes!");
+}
+#else
 void Vnode::OpenRemote(fuchsia_io::wire::DirectoryOpen3Request request) const {
   ZX_PANIC("OpenRemote should only be called on remote nodes!");
 }
+#endif
 
 std::shared_ptr<file_lock::FileLock> Vnode::GetVnodeFileLock() {
   std::lock_guard lock_access(gLockAccess);

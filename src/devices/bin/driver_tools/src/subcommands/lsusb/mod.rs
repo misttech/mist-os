@@ -10,7 +10,7 @@ use fidl_fuchsia_io as fio;
 
 pub async fn lsusb(cmd: LsusbCommand, dev: &fio::DirectoryProxy) -> Result<()> {
     let (client, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-    let () = dev.open(
+    let () = dev.deprecated_open(
         fio::OpenFlags::DIRECTORY,
         fio::ModeType::empty(),
         &"class/usb-device",

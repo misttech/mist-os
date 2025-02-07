@@ -198,9 +198,10 @@ impl NonMetaStorage for fio::DirectoryProxy {
         _scope: ExecutionScope,
         server_end: ServerEnd<fio::NodeMarker>,
     ) -> Result<(), NonMetaStorageError> {
-        self.open(flags, fio::ModeType::empty(), blob.to_string().as_str(), server_end).map_err(
-            |e| NonMetaStorageError::OpenBlob(fuchsia_fs::node::OpenError::SendOpenRequest(e)),
-        )
+        self.deprecated_open(flags, fio::ModeType::empty(), blob.to_string().as_str(), server_end)
+            .map_err(|e| {
+                NonMetaStorageError::OpenBlob(fuchsia_fs::node::OpenError::SendOpenRequest(e))
+            })
     }
 
     fn open3(
@@ -211,7 +212,7 @@ impl NonMetaStorage for fio::DirectoryProxy {
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), zx::Status> {
         // If the FIDL call passes, errors will be communicated via the `object_request` channel.
-        self.open3(
+        self.open(
             blob.to_string().as_str(),
             flags,
             &object_request.options(),

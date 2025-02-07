@@ -91,9 +91,15 @@ zx_status_t open_at_deprecated(fidl::UnownedClientEnd<fio::Directory> directory,
     return ZX_ERR_UNAVAILABLE;
   }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  return fidl::WireCall(directory)
+      ->DeprecatedOpen(flags, {}, fidl::StringView::FromExternal(path), std::move(request))
+      .status();
+#else
   return fidl::WireCall(directory)
       ->Open(flags, {}, fidl::StringView::FromExternal(path), std::move(request))
       .status();
+#endif
 }
 
 zx_status_t open_at(fidl::UnownedClientEnd<fio::Directory> directory, std::string_view path,
@@ -102,9 +108,15 @@ zx_status_t open_at(fidl::UnownedClientEnd<fio::Directory> directory, std::strin
     return ZX_ERR_UNAVAILABLE;
   }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  return fidl::WireCall(directory)
+      ->Open(fidl::StringView::FromExternal(path), flags, {}, std::move(object))
+      .status();
+#else
   return fidl::WireCall(directory)
       ->Open3(fidl::StringView::FromExternal(path), flags, {}, std::move(object))
       .status();
+#endif
 }
 
 }  // namespace fdio_internal

@@ -32,7 +32,7 @@ async fn create_directory_with_create_if_absent_flag() {
 
     let (client, server) = create_proxy::<fio::NodeMarker>();
 
-    dir.open(
+    dir.deprecated_open(
         fio::OpenFlags::CREATE_IF_ABSENT
             | fio::OpenFlags::CREATE
             | fio::OpenFlags::DESCRIBE

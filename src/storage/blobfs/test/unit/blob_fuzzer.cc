@@ -50,7 +50,7 @@ fidl::ClientEnd<fuchsia_io::Directory> ServeOutgoingDirectory(ComponentRunner& r
 fidl::ClientEnd<fuchsia_io::Directory> GetRootDirectory(
     fidl::ClientEnd<fuchsia_io::Directory>& outgoing) {
   auto root_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  auto status = fidl::WireCall(outgoing)->Open(
+  auto status = fidl::WireCall(outgoing)->DeprecatedOpen(
       fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kRightWritable |
           fuchsia_io::wire::OpenFlags::kDirectory,
       {}, "root", fidl::ServerEnd<fuchsia_io::Node>(root_endpoints.server.TakeChannel()));

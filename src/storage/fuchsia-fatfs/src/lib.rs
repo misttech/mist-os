@@ -229,7 +229,7 @@ mod tests {
                             let (proxy, server_end) =
                                 fidl::endpoints::create_proxy::<fio::NodeMarker>();
                             remote
-                                .open(
+                                .deprecated_open(
                                     fio::OpenFlags::RIGHT_READABLE,
                                     fio::ModeType::empty(),
                                     name,

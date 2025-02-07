@@ -299,7 +299,7 @@ impl TestFixture {
         self.realm
             .root
             .get_exposed_dir()
-            .open3(dir, flags, &fio::Options::default(), server.into_channel())
+            .open(dir, flags, &fio::Options::default(), server.into_channel())
             .expect("open failed");
         dev
     }
@@ -325,12 +325,7 @@ impl TestFixture {
             let (blob, server_end) = create_proxy::<fio::FileMarker>();
             let path = &format!("{}", expected_blob_hash);
             self.dir("blob", fio::PERM_READABLE)
-                .open3(
-                    path,
-                    fio::PERM_READABLE,
-                    &fio::Options::default(),
-                    server_end.into_channel(),
-                )
+                .open(path, fio::PERM_READABLE, &fio::Options::default(), server_end.into_channel())
                 .expect("open failed");
             blob.query().await.expect("open file failed");
         }
@@ -341,7 +336,7 @@ impl TestFixture {
     pub async fn check_test_data_file(&self) {
         let (file, server) = create_proxy::<fio::NodeMarker>();
         self.dir("data", fio::PERM_READABLE)
-            .open3(".testdata", fio::PERM_READABLE, &fio::Options::default(), server.into_channel())
+            .open(".testdata", fio::PERM_READABLE, &fio::Options::default(), server.into_channel())
             .expect("open failed");
         file.get_attr().await.expect("get_attr failed");
 
@@ -369,7 +364,7 @@ impl TestFixture {
     pub async fn check_test_data_file_absent(&self) {
         let (file, server) = create_proxy::<fio::NodeMarker>();
         self.dir("data", fio::PERM_READABLE)
-            .open3(".testdata", fio::PERM_READABLE, &fio::Options::default(), server.into_channel())
+            .open(".testdata", fio::PERM_READABLE, &fio::Options::default(), server.into_channel())
             .expect("open failed");
         file.get_attr().await.expect_err(".testdata should be absent");
     }

@@ -397,7 +397,7 @@ mod tests {
         assert_eq!(reason, StartReason::OutgoingDirectory);
 
         let mut outgoing = escrow.outgoing_dir.into_stream();
-        let dir_entry = outgoing.next().await.unwrap().unwrap().into_open().unwrap();
+        let dir_entry = outgoing.next().await.unwrap().unwrap().into_deprecated_open().unwrap();
         assert_eq!(dir_entry.2, "foo");
 
         drop(actor);
@@ -431,7 +431,7 @@ mod tests {
         assert_matches!(TestExecutor::poll_until_stalled(&mut next_start).await, Poll::Pending);
 
         let mut outgoing = escrow.unwrap().outgoing_dir.into_stream();
-        let open = outgoing.next().await.unwrap().unwrap().into_open().unwrap();
+        let open = outgoing.next().await.unwrap().unwrap().into_deprecated_open().unwrap();
         assert_eq!(open.2, "foo");
 
         drop(actor);
@@ -546,7 +546,7 @@ mod tests {
             Ok(())
         );
         let mut outgoing = escrow.unwrap().outgoing_dir.into_stream();
-        let open = outgoing.next().await.unwrap().unwrap().into_open().unwrap();
+        let open = outgoing.next().await.unwrap().unwrap().into_deprecated_open().unwrap();
         assert_eq!(open.2, "bar");
 
         drop(actor);
@@ -641,7 +641,7 @@ mod tests {
             .unwrap();
 
         let mut outgoing = escrow.unwrap().outgoing_dir.into_stream();
-        let open = outgoing.next().await.unwrap().unwrap().into_open().unwrap();
+        let open = outgoing.next().await.unwrap().unwrap().into_deprecated_open().unwrap();
         assert_eq!(open.2, "foo");
 
         drop(actor);

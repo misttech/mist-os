@@ -693,7 +693,7 @@ mod tests {
             let (volumes_dir_proxy, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             client
-                .open(
+                .deprecated_open(
                     fio::OpenFlags::RIGHT_READABLE,
                     fio::ModeType::empty(),
                     "volumes",

@@ -273,7 +273,7 @@ impl Filesystem {
             .map_err(Status::from_raw)?;
 
         let (root_dir, server_end) = create_endpoints::<fio::NodeMarker>();
-        exposed_dir.open(
+        exposed_dir.deprecated_open(
             fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::POSIX_EXECUTABLE
                 | fio::OpenFlags::POSIX_WRITABLE,
@@ -685,7 +685,7 @@ impl ServingMultiVolumeFilesystem {
         exposed_dir: fio::DirectoryProxy,
     ) -> Result<&mut ServingVolume, Error> {
         let (root_dir, server_end) = create_endpoints::<fio::NodeMarker>();
-        exposed_dir.open(
+        exposed_dir.deprecated_open(
             fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::POSIX_EXECUTABLE
                 | fio::OpenFlags::POSIX_WRITABLE,

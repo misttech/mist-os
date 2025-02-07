@@ -185,7 +185,7 @@ zx::result<fbl::unique_fd> ReopenDirectoryAsReadOnly(fbl::unique_fd dir_fd) {
   fdio_cpp::FdioCaller fdio_caller(std::move(dir_fd));
   auto [client, server] = fidl::Endpoints<fio::Directory>::Create();
   auto dir = fdio_caller.borrow_as<fio::Directory>();
-  auto open_result = fidl::WireCall(dir)->Open3(
+  auto open_result = fidl::WireCall(dir)->Open(
       ".", fio::kPermReadable | fio::Flags::kProtocolDirectory, {}, server.TakeChannel());
   if (open_result.status() != ZX_OK) {
     return zx::error(open_result.status());

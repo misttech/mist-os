@@ -77,8 +77,8 @@ void ConnectToVirtualAudio(component_testing::RealmRoot& root,
                            fidl::SynchronousInterfacePtr<fuchsia::virtualaudio::Control>& out) {
   // Connect to dev.
   fidl::InterfaceHandle<fuchsia::io::Directory> dev;
-  ASSERT_EQ(root.component().exposed()->Open3("dev-topological", fuchsia::io::PERM_READABLE, {},
-                                              dev.NewRequest().TakeChannel()),
+  ASSERT_EQ(root.component().exposed()->Open("dev-topological", fuchsia::io::PERM_READABLE, {},
+                                             dev.NewRequest().TakeChannel()),
             ZX_OK);
   fbl::unique_fd dev_fd;
   ASSERT_EQ(fdio_fd_create(dev.TakeChannel().release(), dev_fd.reset_and_get_address()), ZX_OK);

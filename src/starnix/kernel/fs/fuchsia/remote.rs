@@ -229,7 +229,7 @@ impl RemoteFs {
         // descendent nodes in this filesystem.  At the time of writing, this is true for Fxfs.
         let root_proxy = fio::DirectorySynchronousProxy::new(root);
         root_proxy
-            .open3(
+            .open(
                 ".",
                 fio::Flags::PROTOCOL_DIRECTORY
                     | fio::PERM_READABLE

@@ -41,8 +41,8 @@ fidl_message_header_t TxnHeader(uint64_t ordinal) {
 
 // To use no more stack space than needed for the request, this is specifically
 // initialized with the exact constant path string that will be needed.
-struct alignas(FIDL_ALIGNMENT) fuchsia_io_DirectoryOpenRequestForDebugdata {
-  fuchsia_io_DirectoryOpenRequestForDebugdata() {
+struct alignas(FIDL_ALIGNMENT) fuchsia_io_DirectoryDeprecatedOpenRequestForDebugdata {
+  fuchsia_io_DirectoryDeprecatedOpenRequestForDebugdata() {
     fuchsia_debugdata_Publisher_Name.copy(path_buffer.data(), path_buffer.size());
   }
 
@@ -87,7 +87,7 @@ zx::result<> SendMessage(zx::unowned_channel client_end, const Request& request,
 
 zx::result<> fuchsia_io_DirectoryOpen_fuchsia_debugdata_Publisher(  //
     zx::unowned_channel client_end, zx::channel server_end) {
-  return SendMessage(client_end->borrow(), fuchsia_io_DirectoryOpenRequestForDebugdata{},
+  return SendMessage(client_end->borrow(), fuchsia_io_DirectoryDeprecatedOpenRequestForDebugdata{},
                      std::array{server_end.release()});
 }
 

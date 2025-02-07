@@ -138,14 +138,14 @@ zx::result<fidl::InterfaceHandle<fuchsia::hardware::block::Block>> GetFxfsPartit
   }
   auto [device_client, device_server] = *std::move(device_endpoints);
   flags |= fio::OpenFlags::kBlockDevice;
-  // TODO(https://fxbug.dev/42054266): Consider using io2 for the Open() call.
+  // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
   auto device_open_result =
       fidl::WireCall(dir_client)
-          ->Open(flags, {}, fidl::StringView::FromExternal(image_path.filename().c_str()),
-                 std::move(device_server));
+          ->DeprecatedOpen(flags, {}, fidl::StringView::FromExternal(image_path.filename().c_str()),
+                           std::move(device_server));
   if (!device_open_result.ok()) {
     FX_PLOGS(ERROR, device_open_result.status())
-        << "WireCall->Open(image.path) as Fxfs block device failed";
+        << "WireCall->DeprecatedOpen(image.path) as Fxfs block device failed";
     return zx::error(device_open_result.status());
   }
 

@@ -347,7 +347,7 @@ async fn connect_to_service_in_exposed_dir<T: DiscoverableProtocolMarker>(
     realm.open_directory(moniker, fsys2::OpenDirType::ExposedDir, server_end).await.unwrap()?;
     let (service, server_end) = fidl::endpoints::create_proxy::<T>();
     exposed_dir
-        .open3(
+        .open(
             T::PROTOCOL_NAME,
             fio::Flags::PROTOCOL_SERVICE,
             &Default::default(),

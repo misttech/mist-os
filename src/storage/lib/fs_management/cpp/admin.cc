@@ -22,10 +22,11 @@ __EXPORT
 zx::result<fidl::ClientEnd<fuchsia_io::Directory>> FsRootHandle(
     fidl::UnownedClientEnd<fuchsia_io::Directory> export_root, fuchsia_io::wire::OpenFlags flags) {
   auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-
+  // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
   const fidl::Status result =
       fidl::WireCall(export_root)
-          ->Open(flags, {}, "root", fidl::ServerEnd<fuchsia_io::Node>(server.TakeChannel()));
+          ->DeprecatedOpen(flags, {}, "root",
+                           fidl::ServerEnd<fuchsia_io::Node>(server.TakeChannel()));
   if (!result.ok()) {
     return zx::error(result.status());
   }

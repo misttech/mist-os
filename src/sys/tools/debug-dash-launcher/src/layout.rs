@@ -132,7 +132,7 @@ async fn inject_process_launcher_and_resolver(svc_dir: fio::DirectoryProxy) -> f
             endpoint(move |_, channel| {
                 let server_end = channel.into_zx_channel().into();
                 svc_dir
-                    .open(
+                    .deprecated_open(
                         fio::OpenFlags::NOT_DIRECTORY,
                         fio::ModeType::empty(),
                         &protocol_name,

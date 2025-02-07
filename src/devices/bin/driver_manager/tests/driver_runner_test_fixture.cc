@@ -654,10 +654,11 @@ DriverRunnerTestBase::StartDriverResult DriverRunnerTestBase::StartSecondDriver(
 void TestDirectory::Bind(fidl::ServerEnd<fio::Directory> request) {
   bindings_.AddBinding(dispatcher_, std::move(request), this, fidl::kIgnoreBindingClosure);
 }
-void TestDirectory::Open(OpenRequest& request, OpenCompleter::Sync& completer) {
+void TestDirectory::DeprecatedOpen(DeprecatedOpenRequest& request,
+                                   DeprecatedOpenCompleter::Sync& completer) {
   open_handler_(request.path(), std::move(request.object()));
 }
-void TestDirectory::Open3(Open3Request& request, Open3Completer::Sync& completer) {
+void TestDirectory::Open(OpenRequest& request, OpenCompleter::Sync& completer) {
   open_handler_(request.path(), fidl::ServerEnd<fio::Node>(std::move(request.object())));
 }
 void TestDirectory::handle_unknown_method(fidl::UnknownMethodMetadata<fio::Directory>,
@@ -762,9 +763,10 @@ fidl::WireClient<fuchsia_device::Controller> DriverRunnerTestBase::ConnectToDevi
   auto controller_endpoints = fidl::Endpoints<fuchsia_device::Controller>::Create();
 
   auto device_controller_path = std::string(child_name) + "/device_controller";
-  EXPECT_EQ(dev->Open(fuchsia_io::OpenFlags::kNotDirectory, {},
-                      fidl::StringView::FromExternal(device_controller_path),
-                      fidl::ServerEnd<fuchsia_io::Node>(controller_endpoints.server.TakeChannel()))
+  EXPECT_EQ(dev->DeprecatedOpen(
+                   fuchsia_io::OpenFlags::kNotDirectory, {},
+                   fidl::StringView::FromExternal(device_controller_path),
+                   fidl::ServerEnd<fuchsia_io::Node>(controller_endpoints.server.TakeChannel()))
                 .status(),
             ZX_OK);
   EXPECT_TRUE(RunLoopUntilIdle());

@@ -73,7 +73,7 @@ impl Realm {
         let (realm_client, server_end) =
             fidl::endpoints::create_endpoints::<fcomponent::RealmMarker>();
         let server_end = ServerEnd::new(server_end.into_channel());
-        self.exposed_dir.open(
+        self.exposed_dir.deprecated_open(
             fio::OpenFlags::empty(),
             fio::ModeType::empty(),
             fcomponent::RealmMarker::PROTOCOL_NAME,

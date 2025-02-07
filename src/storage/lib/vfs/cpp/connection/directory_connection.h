@@ -88,9 +88,15 @@ class DirectoryConnection final : public Connection,
   // |fuchsia.io/Directory| operations.
   //
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
   void Open(OpenRequestView request, OpenCompleter::Sync& completer) final;
-  void Open3(fuchsia_io::wire::DirectoryOpen3Request* request,
-             Open3Completer::Sync& completer) final;
+  void DeprecatedOpen(DeprecatedOpenRequestView request,
+                      DeprecatedOpenCompleter::Sync& completer) final;
+#else
+  void Open(OpenRequestView request, OpenCompleter::Sync& completer) final;
+  void Open3(Open3RequestView request, Open3Completer::Sync& completer) final;
+#endif
+
   void Unlink(UnlinkRequestView request, UnlinkCompleter::Sync& completer) final;
   void ReadDirents(ReadDirentsRequestView request, ReadDirentsCompleter::Sync& completer) final;
   void Rewind(RewindCompleter::Sync& completer) final;

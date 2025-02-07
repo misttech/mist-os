@@ -79,18 +79,12 @@ pub async fn handle_package_directory_stream(
 ) {
     async move {
         let (package_contents_dir_proxy, package_contents_dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-        backing_dir_proxy
-            .open3(
-                PACKAGE_CONTENTS_PATH,
-                fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE,
-                &fio::Options::default(),
-                package_contents_dir_server_end.into_channel(),
-            )
+        backing_dir_proxy.open(PACKAGE_CONTENTS_PATH, fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE, &fio::Options::default(), package_contents_dir_server_end.into_channel())
             .unwrap();
 
         while let Some(req) = stream.next().await {
             match req.unwrap() {
-                fio::DirectoryRequest::Open { flags, mode, path, object, control_handle: _ } => {
+                fio::DirectoryRequest::DeprecatedOpen { flags, mode, path, object, control_handle: _ } => {
                     // If the client is trying to read the meta directory _as a file_, redirect them
                     // to the file which actually holds the merkle for the purposes of these tests.
                     // Otherwise, redirect to the real package contents.
@@ -102,12 +96,12 @@ pub async fn handle_package_directory_stream(
                     }
 
                     if should_redirect_request_to_merkle_file(&path, flags) {
-                        backing_dir_proxy.open(flags, mode, &path, object).unwrap();
+                        backing_dir_proxy.deprecated_open(flags, mode, &path, object).unwrap();
                     } else {
-                        package_contents_dir_proxy.open(flags, mode, &path, object).unwrap();
+                        package_contents_dir_proxy.deprecated_open(flags, mode, &path, object).unwrap();
                     }
                 }
-                fio::DirectoryRequest::Open3 { path, flags, options, object, control_handle: _ } => {
+                fio::DirectoryRequest::Open { path, flags, options, object, control_handle: _ } => {
                     // If the client is trying to read the meta directory as a file, redirect them
                     // to the file which actually holds the merkle for the purposes of these tests.
                     // Otherwise, redirect to the real package contents.
@@ -121,9 +115,9 @@ pub async fn handle_package_directory_stream(
 
                     if path == "meta" && open_meta_as_file {
                         // Should redirect request to merkle file
-                        backing_dir_proxy.open3(&path, flags, &options, object).expect("open3 wire call failed.");
+                        backing_dir_proxy.open(&path, flags, &options, object).expect("open3 wire call failed.");
                     } else {
-                        package_contents_dir_proxy.open3(&path, flags, &options, object).expect("open3 wire call failed.");
+                        package_contents_dir_proxy.open(&path, flags, &options, object).expect("open3 wire call failed.");
                     }
                 }
                 fio::DirectoryRequest::ReadDirents { max_bytes, responder } => {

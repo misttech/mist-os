@@ -1151,7 +1151,7 @@ impl Component {
             let (svc_proxy, svc_server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             outgoing_dir.add_entry("svc", vfs::remote::remote_dir(svc_proxy))?;
-            exposed_dir.open3(
+            exposed_dir.open(
                 ".",
                 fio::PERM_READABLE
                     | fio::Flags::PERM_INHERIT_EXECUTE
@@ -1162,7 +1162,7 @@ impl Component {
             let (root_proxy, root_server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             outgoing_dir.add_entry("root", vfs::remote::remote_dir(root_proxy))?;
-            exposed_dir.open3(
+            exposed_dir.open(
                 "root",
                 fio::PERM_READABLE
                     | fio::Flags::PERM_INHERIT_EXECUTE

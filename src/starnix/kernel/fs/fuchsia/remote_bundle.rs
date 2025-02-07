@@ -57,12 +57,12 @@ impl RemoteBundle {
         let (root, server_end) = fidl::endpoints::create_sync_proxy::<fio::DirectoryMarker>();
         let path =
             std::str::from_utf8(&options.source).map_err(|_| anyhow!("Source path is not utf8"))?;
-        base.open3(path, rights, &Default::default(), server_end.into_channel())
+        base.open(path, rights, &Default::default(), server_end.into_channel())
             .map_err(|e| anyhow!("Failed to open root: {}", e))?;
 
         let metadata = {
             let (file, server_end) = fidl::endpoints::create_endpoints::<fio::FileMarker>();
-            root.open3(
+            root.open(
                 "metadata.v1",
                 fio::PERM_READABLE,
                 &Default::default(),
@@ -425,7 +425,7 @@ impl FsNodeOps for DirectoryObject {
                 let (file, server_end) = fidl::endpoints::create_sync_proxy::<fio::FileMarker>();
                 bundle
                     .root
-                    .open3(
+                    .open(
                         &format!("{inode_num}"),
                         bundle.rights,
                         &Default::default(),

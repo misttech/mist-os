@@ -32,7 +32,7 @@ async fn open_service() {
     for flags in [fio::Flags::empty(), fio::Flags::PROTOCOL_SERVICE] {
         let (echo_proxy, echo_server) = create_proxy::<EchoMarker>();
         svc_dir
-            .open3(
+            .open(
                 EchoMarker::PROTOCOL_NAME,
                 flags,
                 &Default::default(),
@@ -115,7 +115,7 @@ async fn open_deprecated_service() {
     let svc_dir = harness.open_service_directory().await;
     let (echo_proxy, echo_server) = create_proxy::<EchoMarker>();
     svc_dir
-        .open(
+        .deprecated_open(
             fio::OpenFlags::empty(),
             fio::ModeType::empty(),
             EchoMarker::PROTOCOL_NAME,
@@ -136,7 +136,7 @@ async fn open_deprecated_service_node_reference() {
     let svc_dir = harness.open_service_directory().await;
     let (echo_proxy, echo_server) = create_proxy::<fio::NodeMarker>();
     svc_dir
-        .open(
+        .deprecated_open(
             fio::OpenFlags::NODE_REFERENCE,
             fio::ModeType::empty(),
             EchoMarker::PROTOCOL_NAME,

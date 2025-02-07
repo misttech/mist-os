@@ -78,9 +78,9 @@ TEST(ServiceProxyDirTest, Simple) {
   // First check the service served directly by the proxy.
   {
     auto [client, server] = fidl::Endpoints<fio::Node>::Create();
-
+    // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
     ASSERT_OK(fidl::WireCall(proxy_client)
-                  ->Open({}, {}, fidl::StringView(kProxyEchoString), std::move(server))
+                  ->DeprecatedOpen({}, {}, fidl::StringView(kProxyEchoString), std::move(server))
                   .status());
 
     const fidl::WireResult result =
@@ -94,9 +94,9 @@ TEST(ServiceProxyDirTest, Simple) {
   // Second check the service that's being proxied by the proxy.
   {
     auto [client, server] = fidl::Endpoints<fio::Node>::Create();
-
+    // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
     ASSERT_OK(fidl::WireCall(proxy_client)
-                  ->Open({}, {}, fidl::StringView(kEchoString), std::move(server))
+                  ->DeprecatedOpen({}, {}, fidl::StringView(kEchoString), std::move(server))
                   .status());
 
     const fidl::WireResult result =

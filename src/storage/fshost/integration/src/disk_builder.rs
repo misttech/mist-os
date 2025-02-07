@@ -212,7 +212,12 @@ pub async fn write_test_blob(
     let flags =
         fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
     blob_volume_root
-        .open(flags, fio::ModeType::empty(), &name, ServerEnd::new(server_end.into_channel()))
+        .deprecated_open(
+            flags,
+            fio::ModeType::empty(),
+            &name,
+            ServerEnd::new(server_end.into_channel()),
+        )
         .expect("open failed");
     let _: Vec<_> = blob.query().await.expect("open file failed");
 

@@ -821,7 +821,7 @@ impl VolumesDirectory {
 
 #[cfg(test)]
 mod tests {
-    use crate::fuchsia::testing::open_file_checked;
+    use crate::fuchsia::testing::deprecated_open_file_checked;
     use crate::fuchsia::volumes_directory::VolumesDirectory;
     use fidl::endpoints::{create_proxy, create_request_stream, ServerEnd};
     use fidl_fuchsia_fs::AdminMarker;
@@ -924,7 +924,7 @@ mod tests {
                 ServerEnd::new(server_end.into_channel()),
             );
 
-            let f = open_file_checked(
+            let f = deprecated_open_file_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_WRITABLE
@@ -1254,7 +1254,7 @@ mod tests {
                     .expect("mount (fidl) failed")
                     .expect("mount failed");
 
-                open_file_checked(
+                deprecated_open_file_checked(
                     &dir_proxy,
                     fio::OpenFlags::RIGHT_READABLE
                         | fio::OpenFlags::RIGHT_WRITABLE
@@ -1606,7 +1606,7 @@ mod tests {
             let (root_proxy, root_server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             volume_dir_proxy
-                .open(
+                .deprecated_open(
                     fio::OpenFlags::RIGHT_READABLE
                         | fio::OpenFlags::RIGHT_WRITABLE
                         | fio::OpenFlags::DIRECTORY,
@@ -1616,7 +1616,7 @@ mod tests {
                 )
                 .expect("Failed to open volume root");
 
-            let file_proxy = open_file_checked(
+            let file_proxy = deprecated_open_file_checked(
                 &root_proxy,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE

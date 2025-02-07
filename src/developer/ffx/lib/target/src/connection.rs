@@ -121,7 +121,7 @@ impl Connection {
         let (proxy, server_end) = fdomain.create_proxy::<FDRemoteControlMarker>();
         let ns = fdomain.namespace().await.map_err(|e| ConnectionError::InternalError(e.into()))?;
         let ns = fio::DirectoryProxy::new(ns);
-        ns.open3(
+        ns.open(
             FDRemoteControlMarker::PROTOCOL_NAME,
             fio::Flags::PROTOCOL_SERVICE,
             &fio::Options::default(),
@@ -167,7 +167,7 @@ impl Connection {
 
         Ok(fdomain_local::local_client(move || {
             let (client, server) = fidl::endpoints::create_endpoints();
-            if let Err(error) = toolbox.open3(
+            if let Err(error) = toolbox.open(
                 ".",
                 fio_f::Flags::PROTOCOL_DIRECTORY,
                 &fio_f::Options::default(),

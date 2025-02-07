@@ -37,8 +37,8 @@ class MetadataTest : public gtest::TestLoopFixture {
     // Connect to /dev directory.
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_EQ(endpoints.status_value(), ZX_OK);
-    ASSERT_EQ(realm_->component().exposed()->Open3("dev-topological", fuchsia::io::PERM_READABLE,
-                                                   {}, endpoints->server.TakeChannel()),
+    ASSERT_EQ(realm_->component().exposed()->Open("dev-topological", fuchsia::io::PERM_READABLE, {},
+                                                  endpoints->server.TakeChannel()),
               ZX_OK);
     ASSERT_EQ(fdio_fd_create(endpoints->client.TakeChannel().release(), &dev_fd_), ZX_OK);
 

@@ -50,11 +50,12 @@ zx_status_t RebindBlockDevice(DeviceRef* device) {
   // We need to create a DirWatcher to wait for the block device's child to disappear.
   fdio_cpp::UnownedFdioCaller caller(device->devfs_root_fd());
   auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
   const fidl::OneWayStatus status =
       fidl::WireCall(caller.directory())
-          ->Open(fuchsia_io::OpenFlags::kDirectory, {},
-                 fidl::StringView::FromExternal(device->path()),
-                 fidl::ServerEnd<fuchsia_io::Node>(server_end.TakeChannel()));
+          ->DeprecatedOpen(fuchsia_io::OpenFlags::kDirectory, {},
+                           fidl::StringView::FromExternal(device->path()),
+                           fidl::ServerEnd<fuchsia_io::Node>(server_end.TakeChannel()));
   EXPECT_OK(status);
   if (!status.ok()) {
     return status.status();

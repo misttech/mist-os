@@ -1182,7 +1182,8 @@ mod tests {
     use crate::fuchsia::node::FxNode;
     use crate::fuchsia::pager::{default_page_in, PageInRange, PagerPacketReceiverRegistration};
     use crate::fuchsia::testing::{
-        close_dir_checked, close_file_checked, open_file_checked, TestFixture, TestFixtureOptions,
+        close_dir_checked, close_file_checked, deprecated_open_file_checked, TestFixture,
+        TestFixtureOptions,
     };
     use crate::fuchsia::volume::FxVolumeAndRoot;
     use anyhow::bail;
@@ -1319,7 +1320,7 @@ mod tests {
         .await;
         let root = open_volume(&volume);
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1369,7 +1370,7 @@ mod tests {
         .await;
         let root = open_volume(&volume);
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
@@ -1414,7 +1415,7 @@ mod tests {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1486,7 +1487,7 @@ mod tests {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1530,7 +1531,7 @@ mod tests {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1574,7 +1575,7 @@ mod tests {
         .await;
         let root = open_volume(&volume);
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
@@ -1613,7 +1614,7 @@ mod tests {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1789,7 +1790,7 @@ mod tests {
         .await;
         let root = open_volume(&volume);
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
@@ -1837,7 +1838,7 @@ mod tests {
         .await;
         let root = open_volume(&volume);
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
@@ -1887,7 +1888,7 @@ mod tests {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
@@ -1897,7 +1898,7 @@ mod tests {
         file.resize(page_size).await.unwrap().map_err(zx::ok).unwrap();
         close_file_checked(file).await;
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
@@ -1915,7 +1916,7 @@ mod tests {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -2006,7 +2007,7 @@ mod tests {
         let fixture = TestFixture::new_unencrypted().await;
         for i in 1..100 {
             let file_name = format!("file {}", i);
-            let file1 = open_file_checked(
+            let file1 = deprecated_open_file_checked(
                 fixture.root(),
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -2015,7 +2016,7 @@ mod tests {
                 &file_name,
             )
             .await;
-            let file2 = open_file_checked(
+            let file2 = deprecated_open_file_checked(
                 fixture.root(),
                 fio::OpenFlags::RIGHT_READABLE
                     | fio::OpenFlags::RIGHT_WRITABLE
@@ -2082,7 +2083,7 @@ mod tests {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -2137,7 +2138,7 @@ mod tests {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -2394,7 +2395,7 @@ mod tests {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -2444,7 +2445,7 @@ mod tests {
     async fn test_file_allocate() {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -2472,7 +2473,7 @@ mod tests {
     async fn test_file_allocate_empty() {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -2520,7 +2521,7 @@ mod tests {
     async fn test_file_allocate_write() {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -2548,7 +2549,7 @@ mod tests {
     async fn test_file_allocate_write_mixed() {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -2581,7 +2582,7 @@ mod tests {
     async fn test_file_allocate_write_disk_full() {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -2643,7 +2644,7 @@ mod tests {
             let root = fixture.root();
 
             {
-                let file = open_file_checked(
+                let file = deprecated_open_file_checked(
                     &root,
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
@@ -2675,7 +2676,7 @@ mod tests {
         .await;
         let root = fixture.root();
 
-        let filler_file = open_file_checked(
+        let filler_file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -2694,7 +2695,7 @@ mod tests {
             }
         }
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE
@@ -2749,7 +2750,7 @@ mod tests {
     async fn test_file_allocate_write_restart() {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -2837,7 +2838,7 @@ mod tests {
 
         let fixture = TestFixture::new_with_device(device).await;
         let root = fixture.root();
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE
@@ -2882,7 +2883,7 @@ mod tests {
     async fn test_truncate_allocated_file() {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -2937,7 +2938,7 @@ mod tests {
     async fn test_allocate_unaligned() {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -2986,7 +2987,7 @@ mod tests {
         // is updated, any data between the old and new size is properly zeroed.
         let fixture = TestFixture::new().await;
         let root = fixture.root();
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -3045,7 +3046,7 @@ mod tests {
     async fn test_truncate_allocated_file_unaligned() {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -3100,7 +3101,7 @@ mod tests {
     async fn test_complete_truncate_allocated_file() {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -3155,7 +3156,7 @@ mod tests {
     async fn test_allocate_truncate_allocate() {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -3188,7 +3189,7 @@ mod tests {
     async fn test_allocate_existing_data_no_sync() {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -3239,7 +3240,7 @@ mod tests {
     async fn test_write_to_previously_allocated_range_between_flushes() {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -3271,7 +3272,7 @@ mod tests {
     async fn test_truncate_then_allocate_between_syncs() {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE

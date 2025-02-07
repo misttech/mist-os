@@ -72,8 +72,8 @@ void FdioTest::TearDown() {
   fdio_cpp::UnownedFdioCaller outgoing_dir(outgoing_dir_fd_);
   auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
   ASSERT_EQ(fidl::WireCall(outgoing_dir.directory())
-                ->Open(fuchsia_io::OpenFlags(0), {}, "svc",
-                       fidl::ServerEnd<fuchsia_io::Node>(endpoints.server.TakeChannel()))
+                ->DeprecatedOpen(fuchsia_io::OpenFlags(0), {}, "svc",
+                                 fidl::ServerEnd<fuchsia_io::Node>(endpoints.server.TakeChannel()))
                 .status(),
             ZX_OK);
   auto admin_client = component::ConnectAt<fuchsia_fs::Admin>(endpoints.client);

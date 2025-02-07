@@ -341,7 +341,7 @@ int main(int argv, char** argc) {
                                          fio::Flags::kFlagSendRepresentation;
     const fidl::Status result =
         fidl::WireCall(fidl::UnownedClientEnd<fuchsia_io::Directory>(flat->handle[i]))
-            ->Open3(".", kFlags, {}, server_end.TakeChannel());
+            ->Open(".", kFlags, {}, server_end.TakeChannel());
     if (!result.ok()) {
       FX_PLOGS(ERROR, result.status()) << "failed to reopen '" << path << "'";
       continue;

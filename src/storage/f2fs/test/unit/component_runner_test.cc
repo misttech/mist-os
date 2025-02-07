@@ -52,7 +52,8 @@ class F2fsComponentRunnerTest : public testing::Test {
 
   fidl::ClientEnd<fuchsia_io::Directory> GetSvcDir() const {
     auto svc_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
-    auto status = fidl::WireCall(root_)->Open(
+    // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
+    auto status = fidl::WireCall(root_)->DeprecatedOpen(
         fuchsia_io::wire::OpenFlags::kDirectory, {}, "svc",
         fidl::ServerEnd<fuchsia_io::Node>(svc_endpoints.server.TakeChannel()));
     EXPECT_EQ(status.status(), ZX_OK);
@@ -61,7 +62,8 @@ class F2fsComponentRunnerTest : public testing::Test {
 
   fidl::ClientEnd<fuchsia_io::Directory> GetRootDir() const {
     auto root_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
-    auto status = fidl::WireCall(root_)->Open(
+    // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
+    auto status = fidl::WireCall(root_)->DeprecatedOpen(
         fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kRightWritable |
             fuchsia_io::wire::OpenFlags::kDirectory,
         {}, "root", fidl::ServerEnd<fuchsia_io::Node>(root_endpoints.server.TakeChannel()));

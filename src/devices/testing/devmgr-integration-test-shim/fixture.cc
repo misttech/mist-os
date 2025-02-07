@@ -91,7 +91,7 @@ zx::result<IsolatedDevmgr> IsolatedDevmgr::Create(devmgr_launcher::Args args,
 
   // Connect to dev.
   fidl::InterfaceHandle<fuchsia::io::Directory> dev;
-  if (zx_status_t status = devmgr.realm_->component().exposed()->Open3(
+  if (zx_status_t status = devmgr.realm_->component().exposed()->Open(
           "dev-topological", fuchsia::io::PERM_READABLE, {}, dev.NewRequest().TakeChannel());
       status != ZX_OK) {
     return zx::error(status);

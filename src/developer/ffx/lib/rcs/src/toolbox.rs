@@ -65,7 +65,7 @@ pub async fn open_toolbox(rcs: &RemoteControlProxy) -> Result<fio::DirectoryProx
     .await?;
 
     let (ret, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-    namespace_dir.open3(
+    namespace_dir.open(
         "svc",
         fio::Flags::PROTOCOL_DIRECTORY,
         &fio::Options::default(),

@@ -5,5 +5,5 @@
 # TODO(https://fxbug.dev/384759360): Remove when out-of-tree clients have migrated.
 declare_args() {
   # Temporary variable used to transition Open3 -> Open, and Open1 -> DeprecatedOpen.
-  open3_rename_complete = false
+  open3_rename_complete = true
 }

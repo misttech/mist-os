@@ -87,6 +87,14 @@ impl<T: GetRemoteDir> RemoteLike for T {
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
         flags.to_object_request(server_end).handle(|object_request| {
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            let _ = self.get_remote_dir()?.deprecated_open(
+                flags,
+                fio::ModeType::empty(),
+                path.as_ref(),
+                object_request.take().into_server_end(),
+            );
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             let _ = self.get_remote_dir()?.open(
                 flags,
                 fio::ModeType::empty(),
@@ -106,6 +114,14 @@ impl<T: GetRemoteDir> RemoteLike for T {
     ) -> Result<(), Status> {
         // There is nowhere to propagate any errors since we take the `object_request`. This is okay
         // as the channel will be dropped and closed if the wire call fails.
+        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        let _ = self.get_remote_dir()?.open(
+            path.as_ref(),
+            flags,
+            &object_request.options(),
+            object_request.take().into_channel(),
+        );
+        #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
         let _ = self.get_remote_dir()?.open3(
             path.as_ref(),
             flags,

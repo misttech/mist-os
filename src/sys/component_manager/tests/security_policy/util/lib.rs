@@ -61,7 +61,7 @@ pub async fn start_policy_test(
         .unwrap();
     let (realm, server_end) = create_proxy::<fcomponent::RealmMarker>();
     exposed_dir
-        .open3(
+        .open(
             fcomponent::RealmMarker::DEBUG_NAME,
             fio::Flags::PROTOCOL_SERVICE,
             &Default::default(),

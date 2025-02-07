@@ -340,14 +340,14 @@ impl RamdiskClient {
         match self {
             Self::V1 { .. } => {
                 let block_dir = self.as_dir().ok_or_else(|| anyhow!("directory is invalid"))?;
-                Ok(block_dir.open3(
+                Ok(block_dir.open(
                     ".",
                     fio::Flags::empty(),
                     &fio::Options::default(),
                     server_end.into_channel(),
                 )?)
             }
-            Self::V2 { outgoing, .. } => Ok(outgoing.open3(
+            Self::V2 { outgoing, .. } => Ok(outgoing.open(
                 &format!("svc/{}", fvolume::VolumeMarker::PROTOCOL_NAME),
                 fio::Flags::empty(),
                 &fio::Options::default(),

@@ -292,13 +292,40 @@ pub async fn close_dir_checked(dir: fio::DirectoryProxy) {
 }
 
 // Utility function to open a new node connection under |dir|.
-pub async fn open_file(
+pub async fn deprecated_open_file(
     dir: &fio::DirectoryProxy,
     flags: fio::OpenFlags,
     path: &str,
 ) -> Result<fio::FileProxy, Error> {
     let (proxy, server_end) = create_proxy::<fio::FileMarker>();
-    dir.open(flags, fio::ModeType::empty(), path, ServerEnd::new(server_end.into_channel()))?;
+    dir.deprecated_open(
+        flags,
+        fio::ModeType::empty(),
+        path,
+        ServerEnd::new(server_end.into_channel()),
+    )?;
+    let _: Vec<_> = proxy.query().await?;
+    Ok(proxy)
+}
+
+// Like |deprecated_open_file|, but asserts if the open call fails.
+pub async fn deprecated_open_file_checked(
+    dir: &fio::DirectoryProxy,
+    flags: fio::OpenFlags,
+    path: &str,
+) -> fio::FileProxy {
+    deprecated_open_file(dir, flags, path).await.expect("deprecated_open_file failed")
+}
+
+// Utility function to open a new node connection under |dir| using open.
+pub async fn open_file(
+    dir: &fio::DirectoryProxy,
+    flags: fio::Flags,
+    options: &fio::Options,
+    path: &str,
+) -> Result<fio::FileProxy, Error> {
+    let (proxy, server_end) = create_proxy::<fio::FileMarker>();
+    dir.open(path, flags, options, server_end.into_channel())?;
     let _: Vec<_> = proxy.query().await?;
     Ok(proxy)
 }
@@ -306,75 +333,58 @@ pub async fn open_file(
 // Like |open_file|, but asserts if the open call fails.
 pub async fn open_file_checked(
     dir: &fio::DirectoryProxy,
-    flags: fio::OpenFlags,
-    path: &str,
-) -> fio::FileProxy {
-    open_file(dir, flags, path).await.expect("open_file failed")
-}
-
-// Utility function to open a new node connection under |dir| using open3.
-pub async fn open3_file(
-    dir: &fio::DirectoryProxy,
-    flags: fio::Flags,
-    options: &fio::Options,
-    path: &str,
-) -> Result<fio::FileProxy, Error> {
-    let (proxy, server_end) = create_proxy::<fio::FileMarker>();
-    dir.open3(path, flags, options, server_end.into_channel())?;
-    let _: Vec<_> = proxy.query().await?;
-    Ok(proxy)
-}
-
-// Like |open3_file|, but asserts if the open call fails.
-pub async fn open3_file_checked(
-    dir: &fio::DirectoryProxy,
     flags: fio::Flags,
     options: &fio::Options,
     path: &str,
 ) -> fio::FileProxy {
-    open3_file(dir, flags, options, path).await.expect("open3_file failed")
+    open_file(dir, flags, options, path).await.expect("open_file failed")
 }
 
 // Utility function to open a new node connection under |dir|.
-pub async fn open_dir(
+pub async fn deprecated_open_dir(
     dir: &fio::DirectoryProxy,
     flags: fio::OpenFlags,
     path: &str,
 ) -> Result<fio::DirectoryProxy, Error> {
     let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
-    dir.open(flags, fio::ModeType::empty(), path, ServerEnd::new(server_end.into_channel()))?;
+    dir.deprecated_open(
+        flags,
+        fio::ModeType::empty(),
+        path,
+        ServerEnd::new(server_end.into_channel()),
+    )?;
     let _: Vec<_> = proxy.query().await?;
     Ok(proxy)
 }
 
 // Like |open_dir|, but asserts if the open call fails.
-pub async fn open_dir_checked(
+pub async fn deprecated_open_dir_checked(
     dir: &fio::DirectoryProxy,
     flags: fio::OpenFlags,
     path: &str,
 ) -> fio::DirectoryProxy {
-    open_dir(dir, flags, path).await.expect("open_dir failed")
+    deprecated_open_dir(dir, flags, path).await.expect("deprecated_open_dir failed")
 }
 
-pub async fn open3_dir(
+pub async fn open_dir(
     dir: &fio::DirectoryProxy,
     flags: fio::Flags,
     options: &fio::Options,
     path: &str,
 ) -> Result<fio::DirectoryProxy, Error> {
     let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
-    dir.open3(path, flags, options, server_end.into_channel())?;
+    dir.open(path, flags, options, server_end.into_channel())?;
     let _: Vec<_> = proxy.query().await?;
     Ok(proxy)
 }
 
-pub async fn open3_dir_checked(
+pub async fn open_dir_checked(
     dir: &fio::DirectoryProxy,
     flags: fio::Flags,
     options: &fio::Options,
     path: &str,
 ) -> fio::DirectoryProxy {
-    open3_dir(dir, flags, options, path).await.expect("open3_dir failed")
+    open_dir(dir, flags, options, path).await.expect("open_dir failed")
 }
 
 /// Utility function to write to an `FxFile`.

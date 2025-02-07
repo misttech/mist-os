@@ -108,7 +108,7 @@ async fn watch_dir_existing_file_create_does_not_generate_new_event() {
     );
     {
         let (client, server) = create_proxy::<fio::NodeMarker>();
-        dir.open(
+        dir.deprecated_open(
             fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE | fio::OpenFlags::DESCRIBE,
             fio::ModeType::empty(),
             "foo",

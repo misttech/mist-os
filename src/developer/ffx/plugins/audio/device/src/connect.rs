@@ -20,7 +20,7 @@ fn connect_to_named_protocol_at_dir_root<P: fidl::endpoints::ProtocolMarker>(
 ) -> Result<P::Proxy> {
     let (proxy, server_end) = create_proxy::<P>();
     directory
-        .open(
+        .deprecated_open(
             fio::OpenFlags::empty(),
             fio::ModeType::empty(),
             path,

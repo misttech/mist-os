@@ -74,7 +74,7 @@ pub enum FSError {
     FSRootNotHandle,
     #[error("'$fs_root' is not a directory")]
     FSRootNotDirectory,
-    #[error("Opening path {0} yielded an OnOpen event, which is not a correct response to Open3")]
+    #[error("Opening path {0} yielded an OnOpen event, which is not a correct response to Open")]
     UnexpectedOnOpenEvent(String),
     #[error("Opening path {0} yielded an event with ordinal {1} before OnRepresentation")]
     UnexpectedEventInsteadOfRepresentation(String, u64),
@@ -455,13 +455,13 @@ impl InterpreterInner {
             self.lib_namespace(),
             0,
             fio::DIRECTORY_PROTOCOL_NAME,
-            "Open3",
+            "Open",
             request,
         )
         .map_err(|e| {
             MessageError::EncodeRequestFailed(
                 fio::DIRECTORY_PROTOCOL_NAME.to_owned(),
-                "Open3".to_owned(),
+                "Open".to_owned(),
                 Arc::new(e),
             )
         })?;

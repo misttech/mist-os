@@ -807,8 +807,9 @@ mod tests {
     use crate::fuchsia::pager::PagerBacked;
     use crate::fuchsia::profile::new_profile_state;
     use crate::fuchsia::testing::{
-        close_dir_checked, close_file_checked, open3_file_checked, open_dir, open_dir_checked,
-        open_file, open_file_checked, write_at, TestFixture,
+        close_dir_checked, close_file_checked, deprecated_open_dir, deprecated_open_dir_checked,
+        deprecated_open_file, deprecated_open_file_checked, open_file_checked, write_at,
+        TestFixture,
     };
     use crate::fuchsia::volume::{
         FxVolumeAndRoot, MemoryPressureConfig, MemoryPressureLevelConfig,
@@ -845,7 +846,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let src = open_dir_checked(
+        let src = deprecated_open_dir_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -855,7 +856,7 @@ mod tests {
         )
         .await;
 
-        let dst = open_dir_checked(
+        let dst = deprecated_open_dir_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -865,7 +866,7 @@ mod tests {
         )
         .await;
 
-        let f = open_file_checked(
+        let f = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY,
             "foo/a",
@@ -881,7 +882,7 @@ mod tests {
             .expect("rename failed");
 
         assert_eq!(
-            open_file(&root, fio::OpenFlags::NOT_DIRECTORY, "foo/a")
+            deprecated_open_file(&root, fio::OpenFlags::NOT_DIRECTORY, "foo/a")
                 .await
                 .expect_err("Open succeeded")
                 .root_cause()
@@ -889,7 +890,7 @@ mod tests {
                 .expect("No status"),
             &Status::NOT_FOUND,
         );
-        let f = open_file_checked(&root, fio::OpenFlags::NOT_DIRECTORY, "bar/b").await;
+        let f = deprecated_open_file_checked(&root, fio::OpenFlags::NOT_DIRECTORY, "bar/b").await;
         close_file_checked(f).await;
 
         close_dir_checked(dst).await;
@@ -903,7 +904,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let src = open_dir_checked(
+        let src = deprecated_open_dir_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -913,7 +914,7 @@ mod tests {
         )
         .await;
 
-        let f = open_file_checked(
+        let f = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY,
             "foo/a",
@@ -929,7 +930,7 @@ mod tests {
             .expect("rename failed");
 
         assert_eq!(
-            open_file(&root, fio::OpenFlags::NOT_DIRECTORY, "foo/a")
+            deprecated_open_file(&root, fio::OpenFlags::NOT_DIRECTORY, "foo/a")
                 .await
                 .expect_err("Open succeeded")
                 .root_cause()
@@ -937,7 +938,7 @@ mod tests {
                 .expect("No status"),
             &Status::NOT_FOUND,
         );
-        let f = open_file_checked(&root, fio::OpenFlags::NOT_DIRECTORY, "foo/b").await;
+        let f = deprecated_open_file_checked(&root, fio::OpenFlags::NOT_DIRECTORY, "foo/b").await;
         close_file_checked(f).await;
 
         close_dir_checked(src).await;
@@ -950,7 +951,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let src = open_dir_checked(
+        let src = deprecated_open_dir_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -960,7 +961,7 @@ mod tests {
         )
         .await;
 
-        let dst = open_dir_checked(
+        let dst = deprecated_open_dir_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -971,7 +972,7 @@ mod tests {
         .await;
 
         // The src file is non-empty.
-        let src_file = open_file_checked(
+        let src_file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::NOT_DIRECTORY,
             "foo/a",
@@ -982,7 +983,7 @@ mod tests {
         close_file_checked(src_file).await;
 
         // The dst file is empty (so we can distinguish it).
-        let f = open_file_checked(
+        let f = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY,
             "bar/b",
@@ -998,7 +999,7 @@ mod tests {
             .expect("rename failed");
 
         assert_eq!(
-            open_file(&root, fio::OpenFlags::NOT_DIRECTORY, "foo/a")
+            deprecated_open_file(&root, fio::OpenFlags::NOT_DIRECTORY, "foo/a")
                 .await
                 .expect_err("Open succeeded")
                 .root_cause()
@@ -1006,7 +1007,7 @@ mod tests {
                 .expect("No status"),
             &Status::NOT_FOUND,
         );
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             "bar/b",
@@ -1027,7 +1028,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let src = open_dir_checked(
+        let src = deprecated_open_dir_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1037,7 +1038,7 @@ mod tests {
         )
         .await;
 
-        let dst = open_dir_checked(
+        let dst = deprecated_open_dir_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1048,19 +1049,24 @@ mod tests {
         .await;
 
         // The src dir is non-empty.
-        open_dir_checked(
+        deprecated_open_dir_checked(
             &root,
             fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
             "foo/a",
         )
         .await;
-        open_file_checked(
+        deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY,
             "foo/a/file",
         )
         .await;
-        open_dir_checked(&root, fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY, "bar/b").await;
+        deprecated_open_dir_checked(
+            &root,
+            fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY,
+            "bar/b",
+        )
+        .await;
 
         let (status, dst_token) = dst.get_token().await.expect("FIDL call failed");
         Status::ok(status).expect("get_token failed");
@@ -1070,7 +1076,7 @@ mod tests {
             .expect("rename failed");
 
         assert_eq!(
-            open_dir(&root, fio::OpenFlags::DIRECTORY, "foo/a")
+            deprecated_open_dir(&root, fio::OpenFlags::DIRECTORY, "foo/a")
                 .await
                 .expect_err("Open succeeded")
                 .root_cause()
@@ -1078,7 +1084,8 @@ mod tests {
                 .expect("No status"),
             &Status::NOT_FOUND,
         );
-        let f = open_file_checked(&root, fio::OpenFlags::NOT_DIRECTORY, "bar/b/file").await;
+        let f =
+            deprecated_open_file_checked(&root, fio::OpenFlags::NOT_DIRECTORY, "bar/b/file").await;
         close_file_checked(f).await;
 
         close_dir_checked(dst).await;
@@ -1473,7 +1480,7 @@ mod tests {
                 let (root_proxy, root_server_end) =
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volume_dir_proxy
-                    .open(
+                    .deprecated_open(
                         fio::OpenFlags::RIGHT_READABLE
                             | fio::OpenFlags::RIGHT_WRITABLE
                             | fio::OpenFlags::DIRECTORY,
@@ -1483,7 +1490,7 @@ mod tests {
                     )
                     .expect("Failed to open volume root");
 
-                open_file_checked(
+                deprecated_open_file_checked(
                     &root_proxy,
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
@@ -1702,7 +1709,7 @@ mod tests {
                 let (root_proxy, root_server_end) =
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volume_dir_proxy
-                    .open(
+                    .deprecated_open(
                         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
                         fio::ModeType::empty(),
                         "root",
@@ -1710,7 +1717,7 @@ mod tests {
                     )
                     .expect("Failed to open volume root");
 
-                open_file_checked(
+                deprecated_open_file_checked(
                     &root_proxy,
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
@@ -1816,7 +1823,7 @@ mod tests {
                 let (root_proxy, root_server_end) =
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volume_dir_proxy
-                    .open(
+                    .deprecated_open(
                         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
                         fio::ModeType::empty(),
                         "root",
@@ -1859,7 +1866,7 @@ mod tests {
                 assert_eq!(nodes, 0);
             }
 
-            let file_proxy = open_file_checked(
+            let file_proxy = deprecated_open_file_checked(
                 &root_proxy,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -1996,7 +2003,7 @@ mod tests {
                 let (root_proxy, root_server_end) =
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volume_dir_proxy
-                    .open(
+                    .deprecated_open(
                         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
                         fio::ModeType::empty(),
                         "root",
@@ -2004,7 +2011,7 @@ mod tests {
                     )
                     .expect("Failed to open volume root");
 
-                open_dir_checked(
+                deprecated_open_dir_checked(
                     &root_proxy,
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
@@ -2023,7 +2030,7 @@ mod tests {
                     .expect("Setting project on node");
             }
 
-            let subdir_proxy = open_dir_checked(
+            let subdir_proxy = deprecated_open_dir_checked(
                 &dir_proxy,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -2044,7 +2051,7 @@ mod tests {
                 );
             }
 
-            let file_proxy = open_file_checked(
+            let file_proxy = deprecated_open_file_checked(
                 &subdir_proxy,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -2066,7 +2073,7 @@ mod tests {
 
             // An unnamed temporary file is created slightly differently to a regular file object.
             // Just in case, check that it inherits project ID as well.
-            let tmpfile_proxy = open3_file_checked(
+            let tmpfile_proxy = open_file_checked(
                 &subdir_proxy,
                 fio::Flags::PROTOCOL_FILE
                     | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
@@ -2156,7 +2163,7 @@ mod tests {
                 let (root_proxy, root_server_end) =
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
                 volume_dir_proxy
-                    .open(
+                    .deprecated_open(
                         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
                         fio::ModeType::empty(),
                         "root",
@@ -2164,7 +2171,7 @@ mod tests {
                     )
                     .expect("Failed to open volume root");
 
-                open_file_checked(
+                deprecated_open_file_checked(
                     &root_proxy,
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
@@ -2507,9 +2514,12 @@ mod tests {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
-        let f =
-            open_file_checked(&root, fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY, "foo")
-                .await;
+        let f = deprecated_open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY,
+            "foo",
+        )
+        .await;
         close_file_checked(f).await;
 
         fixture.close().await;

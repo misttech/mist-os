@@ -65,7 +65,7 @@ impl RealmProxy for RealmInstanceProxy {
         self.0
             .root
             .get_exposed_dir()
-            .open(
+            .deprecated_open(
                 fio::OpenFlags::DIRECTORY,
                 fio::ModeType::empty(),
                 service,
@@ -86,7 +86,7 @@ impl RealmProxy for RealmInstanceProxy {
         self.0
             .root
             .get_exposed_dir()
-            .open(
+            .deprecated_open(
                 fio::OpenFlags::DIRECTORY,
                 fio::ModeType::empty(),
                 format!("{service}/{instance}").as_str(),

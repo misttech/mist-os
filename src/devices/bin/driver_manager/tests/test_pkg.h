@@ -62,13 +62,13 @@ class TestDirectory : public fuchsia::io::testing::Directory_TestBase {
   void SetOpen3Handler(Open3Handler open3_handler) { open3_handler_ = std::move(open3_handler); }
 
  private:
-  void Open(fuchsia::io::OpenFlags flags, fuchsia::io::ModeType mode, std::string path,
-            fidl::InterfaceRequest<fuchsia::io::Node> object) override {
+  void DeprecatedOpen(fuchsia::io::OpenFlags flags, fuchsia::io::ModeType mode, std::string path,
+                      fidl::InterfaceRequest<fuchsia::io::Node> object) override {
     open_handler_(flags, std::move(path), std::move(object));
   }
 
-  void Open3(std::string path, fuchsia::io::Flags flags, fuchsia::io::Options mode,
-             zx::channel object) override {
+  void Open(std::string path, fuchsia::io::Flags flags, fuchsia::io::Options mode,
+            zx::channel object) override {
     open3_handler_(flags, path, std::move(object));
   }
 

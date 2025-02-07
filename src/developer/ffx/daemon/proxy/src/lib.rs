@@ -350,7 +350,7 @@ impl Injector for Injection {
             fdomain_client::fidl::ClientEnd::<fio_fdomain::DirectoryMarker>::new(namespace)
                 .into_proxy();
         let (proxy, server_end) = fdomain.create_proxy::<FRemoteControlMarker>();
-        namespace.open3(
+        namespace.open(
             FRemoteControlMarker::PROTOCOL_NAME,
             fio_fdomain::Flags::PROTOCOL_SERVICE,
             &fio_fdomain::Options::default(),

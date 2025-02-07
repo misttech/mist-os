@@ -62,7 +62,7 @@ impl MemfsInstance {
 
         let (root_dir, server_end) = fidl::endpoints::create_endpoints();
         exposed_dir
-            .open(
+            .deprecated_open(
                 fio::OpenFlags::RIGHT_READABLE
                     | fio::OpenFlags::POSIX_EXECUTABLE
                     | fio::OpenFlags::POSIX_WRITABLE,

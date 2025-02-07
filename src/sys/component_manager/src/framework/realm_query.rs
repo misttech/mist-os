@@ -454,16 +454,33 @@ async fn open_deprecated(
                 .ok_or(fsys::OpenError::InstanceNotRunning)?
                 .runtime_dir()
                 .ok_or(fsys::OpenError::NoSuchDir)?;
-            dir.open(flags, mode, path, object).map_err(|_| fsys::OpenError::FidlError)
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            let result = dir
+                .deprecated_open(flags, mode, path, object)
+                .map_err(|_| fsys::OpenError::FidlError);
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            let result =
+                dir.open(flags, mode, path, object).map_err(|_| fsys::OpenError::FidlError);
+
+            result
         }
         fsys::OpenDirType::PackageDir => {
             let mut state = instance.lock_state().await;
             match state.get_resolved_state_mut() {
                 Some(r) => {
                     let pkg = r.package().ok_or(fsys::OpenError::NoSuchDir)?;
-                    pkg.package_dir
+                    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                    let result = pkg
+                        .package_dir
+                        .deprecated_open(flags, mode, path, object)
+                        .map_err(|_| fsys::OpenError::FidlError);
+                    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+                    let result = pkg
+                        .package_dir
                         .open(flags, mode, path, object)
-                        .map_err(|_| fsys::OpenError::FidlError)
+                        .map_err(|_| fsys::OpenError::FidlError);
+
+                    result
                 }
                 None => Err(fsys::OpenError::InstanceNotResolved),
             }
@@ -552,7 +569,7 @@ async fn open_directory(
                 .runtime_dir()
                 .ok_or(fsys::OpenError::NoSuchDir)?;
             runtime_dir
-                .open3(path.as_ref(), FLAGS, &Default::default(), request.into_channel())
+                .open(path.as_ref(), FLAGS, &Default::default(), request.into_channel())
                 .map_err(|_| fsys::OpenError::FidlError)
         }
         fsys::OpenDirType::PackageDir => {
@@ -561,7 +578,7 @@ async fn open_directory(
                 state.get_resolved_state().ok_or(fsys::OpenError::InstanceNotResolved)?;
             let package_dir = &resolved.package().ok_or(fsys::OpenError::NoSuchDir)?.package_dir;
             package_dir
-                .open3(path.as_ref(), FLAGS, &Default::default(), request.into_channel())
+                .open(path.as_ref(), FLAGS, &Default::default(), request.into_channel())
                 .map_err(|_| fsys::OpenError::FidlError)
         }
         fsys::OpenDirType::ExposedDir => {

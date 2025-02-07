@@ -52,7 +52,7 @@ zx::result<BusLauncher> BusLauncher::Create() {
 
   // Open dev.
   auto [dev_client, dev_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  zx_status_t status = realm.component().exposed()->Open3(
+  zx_status_t status = realm.component().exposed()->Open(
       "dev-topological", fuchsia::io::PERM_READABLE, {}, dev_server.TakeChannel());
   if (status != ZX_OK) {
     std::cerr << "Failed to open dev-topological: " << zx_status_get_string(status) << '\n';

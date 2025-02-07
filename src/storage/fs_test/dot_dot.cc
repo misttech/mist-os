@@ -102,9 +102,10 @@ TEST_P(DotDotTest, RawOpenDotDirectoryCreate) {
 
   // Opening with kOpenFlagCreate should succeed.
   auto endpoints = fidl::Endpoints<fio::Node>::Create();
-
-  auto result = fidl::WireCall(caller.borrow_as<fio::Directory>())
-                    ->Open(fio::wire::OpenFlags::kRightReadable |
+  // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
+  auto result =
+      fidl::WireCall(caller.borrow_as<fio::Directory>())
+          ->DeprecatedOpen(fio::wire::OpenFlags::kRightReadable |
                                fio::wire::OpenFlags::kRightWritable | fio::wire::OpenFlags::kCreate,
                            {}, fidl::StringView("."), std::move(endpoints.server));
   ASSERT_EQ(result.status(), ZX_OK);
@@ -123,12 +124,13 @@ TEST_P(DotDotTest, RawOpenDotDirectoryCreateIfAbsent) {
 
   // Opening with kOpenFlagCreateIfAbsent should fail.
   auto endpoints = fidl::Endpoints<fio::Node>::Create();
-
-  auto result =
-      fidl::WireCall(caller.borrow_as<fio::Directory>())
-          ->Open(fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightWritable |
-                     fio::wire::OpenFlags::kCreate | fio::wire::OpenFlags::kCreateIfAbsent,
-                 {}, fidl::StringView("."), std::move(endpoints.server));
+  // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
+  auto result = fidl::WireCall(caller.borrow_as<fio::Directory>())
+                    ->DeprecatedOpen(fio::wire::OpenFlags::kRightReadable |
+                                         fio::wire::OpenFlags::kRightWritable |
+                                         fio::wire::OpenFlags::kCreate |
+                                         fio::wire::OpenFlags::kCreateIfAbsent,
+                                     {}, fidl::StringView("."), std::move(endpoints.server));
   ASSERT_EQ(result.status(), ZX_OK);
 
   const fidl::WireResult close_result = fidl::WireCall(endpoints.client)->Close();

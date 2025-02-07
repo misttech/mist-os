@@ -1130,10 +1130,18 @@ class Directory : public Remote<fio::Directory> {
       open_options = options_builder.Build();
     }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+    const fidl::Status result =
+        client()->Open(fidl::StringView::FromExternal(path, path_len),
+                       fio::Flags::kFlagSendRepresentation | fio::Flags{flags}, open_options,
+                       std::move(server_end));
+
+#else
     const fidl::Status result =
         client()->Open3(fidl::StringView::FromExternal(path, path_len),
                         fio::Flags::kFlagSendRepresentation | fio::Flags{flags}, open_options,
                         std::move(server_end));
+#endif
 
     if (!result.ok()) {
       return result.status();

@@ -670,7 +670,7 @@ mod tests {
         let request = exec.run_singlethreaded(&mut stream.try_next()).unwrap().unwrap();
         assert_matches!(
             &request,
-            fio::DirectoryRequest::Open3 { path, flags, .. }
+            fio::DirectoryRequest::Open { path, flags, .. }
             if path == "abc" && *flags == flags_for_abc
         );
 

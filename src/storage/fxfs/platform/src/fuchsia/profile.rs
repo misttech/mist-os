@@ -639,7 +639,7 @@ mod tests {
     use crate::fuchsia::fxblob::BlobDirectory;
     use crate::fuchsia::node::FxNode;
     use crate::fuchsia::pager::PagerBacked;
-    use crate::fuchsia::testing::{open_file_checked, TestFixture, TestFixtureOptions};
+    use crate::fuchsia::testing::{deprecated_open_file_checked, TestFixture, TestFixtureOptions};
     use crate::fuchsia::volume::FxVolume;
     use anyhow::Error;
     use async_trait::async_trait;
@@ -749,7 +749,7 @@ mod tests {
             .expect("Creating new_file")
             .object_id();
         transaction.commit().await.unwrap();
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             fixture.root(),
             OpenFlags::RIGHT_WRITABLE | OpenFlags::RIGHT_READABLE | OpenFlags::NOT_DIRECTORY,
             name,

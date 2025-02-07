@@ -36,7 +36,7 @@ class TestDirectoryServer : public zxio_tests::TestDirectoryServerBase {
     completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size()));
   }
 
-  void Open3(Open3RequestView request, Open3Completer::Sync& completer) final {
+  void Open(OpenRequestView request, OpenCompleter::Sync& completer) final {
     constexpr fio::Flags kExpectedFlags =
         fio::Flags::kPermRead | fio::Flags::kFlagSendRepresentation;
     if (request->flags != kExpectedFlags) {
@@ -188,7 +188,7 @@ TEST_F(Directory, Attr) {
   EXPECT_EQ(ZXIO_OBJECT_TYPE_DIR, attr.object_type);
 }
 
-TEST_F(Directory, Open3) {
+TEST_F(Directory, Open) {
   fio::Flags flags = fio::Flags::kPermRead;
   zxio_node_attributes_t attrs = {};
   attrs.has.protocols = true;
@@ -214,7 +214,7 @@ TEST_F(Directory, Open3) {
   ASSERT_OK(zxio_close(file, /*should_wait=*/true));
 }
 
-TEST_F(Directory, Open3CreateAttrs) {
+TEST_F(Directory, OpenCreateAttrs) {
   fio::Flags flags = fio::Flags::kPermRead;
   zxio_node_attributes_t attrs = {};
   attrs.modification_time = 1234;
@@ -228,7 +228,7 @@ TEST_F(Directory, Open3CreateAttrs) {
   ASSERT_OK(zxio_close(file, /*should_wait=*/true));
 }
 
-TEST_F(Directory, Open3NoOptions) {
+TEST_F(Directory, OpenNoOptions) {
   // Should succeed to call zxio_open3 with options not provided.
   fio::Flags flags = fio::Flags::kPermRead;
   zxio_storage_t file_storage;

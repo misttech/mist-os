@@ -49,7 +49,7 @@ class BlobfsComponentRunnerTest : public testing::Test {
 
   fidl::ClientEnd<fuchsia_io::Directory> GetSvcDir() const {
     auto svc_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
-    auto status = fidl::WireCall(root_)->Open(
+    auto status = fidl::WireCall(root_)->DeprecatedOpen(
         fuchsia_io::wire::OpenFlags::kDirectory, {}, "svc",
         fidl::ServerEnd<fuchsia_io::Node>(svc_endpoints.server.TakeChannel()));
     ZX_ASSERT(status.status() == ZX_OK);
@@ -58,7 +58,7 @@ class BlobfsComponentRunnerTest : public testing::Test {
 
   fidl::ClientEnd<fuchsia_io::Directory> GetRootDir() const {
     auto root_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
-    auto status = fidl::WireCall(root_)->Open(
+    auto status = fidl::WireCall(root_)->DeprecatedOpen(
         fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kRightWritable |
             fuchsia_io::wire::OpenFlags::kDirectory,
         {}, "root", fidl::ServerEnd<fuchsia_io::Node>(root_endpoints.server.TakeChannel()));

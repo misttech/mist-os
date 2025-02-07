@@ -173,8 +173,8 @@ zx::result<fidl::ClientEnd<fuchsia_io::Node>> OpenObjectInDirectory(
   // Create temporary channel ends to make FIDL call
   auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Node>::Create();
 
-  auto result = fidl::WireCall(root)->Open(flags, {}, fidl::StringView::FromExternal(path),
-                                           std::move(server_end));
+  auto result = fidl::WireCall(root)->DeprecatedOpen(
+      flags, {}, fidl::StringView::FromExternal(path), std::move(server_end));
   if (!result.ok()) {
     LOG(ERROR, "could not call fuchsia.io.Directory/Open (status: %s)", result.status_string());
     return zx::error(result.status());

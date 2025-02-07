@@ -80,9 +80,11 @@ TEST(VmofileTests, test_vmofile_basic) {
 
   zx::result node_endpoints = fidl::CreateEndpoints<fio::Node>();
   ASSERT_OK(node_endpoints.status_value());
-  auto open_result = fidl::WireCall(directory_endpoints.client)
-                         ->Open(fio::wire::OpenFlags::kRightReadable, {},
-                                fidl::StringView("greeting"), std::move(node_endpoints->server));
+  // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
+  auto open_result =
+      fidl::WireCall(directory_endpoints.client)
+          ->DeprecatedOpen(fio::wire::OpenFlags::kRightReadable, {}, fidl::StringView("greeting"),
+                           std::move(node_endpoints->server));
   ASSERT_OK(open_result.status());
   fidl::ClientEnd<fio::File> file(node_endpoints->client.TakeChannel());
 
@@ -182,10 +184,12 @@ TEST(VmofileTests, test_vmofile_exec) {
 
   zx::result node_endpoints = fidl::CreateEndpoints<fio::Node>();
   ASSERT_OK(node_endpoints.status_value());
+  // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
   auto open_result =
       fidl::WireCall(directory_endpoints.client)
-          ->Open(fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightExecutable, {},
-                 fidl::StringView("read_exec"), std::move(node_endpoints->server));
+          ->DeprecatedOpen(
+              fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightExecutable, {},
+              fidl::StringView("read_exec"), std::move(node_endpoints->server));
   ASSERT_OK(open_result.status());
   fidl::ClientEnd<fio::File> file(node_endpoints->client.TakeChannel());
 

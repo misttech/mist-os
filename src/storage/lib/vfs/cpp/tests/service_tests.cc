@@ -133,9 +133,10 @@ TEST(Service, ServiceNodeIsNotDirectory) {
 
   auto open_result =
       fidl::WireCall(root.client)
-          ->Open(fio::wire::OpenFlags::kDescribe | fio::wire::OpenFlags::kDirectory |
-                     fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightWritable,
-                 {}, fidl::StringView("abc"), std::move(abc->server));
+          ->DeprecatedOpen(fio::wire::OpenFlags::kDescribe | fio::wire::OpenFlags::kDirectory |
+                               fio::wire::OpenFlags::kRightReadable |
+                               fio::wire::OpenFlags::kRightWritable,
+                           {}, fidl::StringView("abc"), std::move(abc->server));
   EXPECT_EQ(open_result.status(), ZX_OK);
   class EventHandler : public fidl::testing::WireSyncEventHandlerTestBase<fio::Node> {
    public:
@@ -180,8 +181,8 @@ TEST(Service, OpeningServiceWithNodeReferenceFlag) {
   loop.StartThread();
 
   ASSERT_EQ(fidl::WireCall(root.client)
-                ->Open(fio::wire::OpenFlags::kNodeReference, {}, fidl::StringView("abc"),
-                       std::move(abc->server))
+                ->DeprecatedOpen(fio::wire::OpenFlags::kNodeReference, {}, fidl::StringView("abc"),
+                                 std::move(abc->server))
                 .status(),
             ZX_OK);
 

@@ -174,7 +174,7 @@ impl StorageAdmin {
                         instance_id.as_ref(),
                     )
                     .await?;
-                    dir_proxy.open(flags, mode, ".", object)?;
+                    dir_proxy.deprecated_open(flags, mode, ".", object)?;
                 }
                 fsys::StorageAdminRequest::OpenStorage { relative_moniker, object, responder } => {
                     let fut = async {

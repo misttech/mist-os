@@ -727,8 +727,8 @@ impl GetVmo for FxFile {
 #[cfg(test)]
 mod tests {
     use crate::fuchsia::testing::{
-        close_file_checked, open3_dir_checked, open3_file, open3_file_checked, open_file,
-        open_file_checked, TestFixture, TestFixtureOptions,
+        close_file_checked, deprecated_open_file, deprecated_open_file_checked, open_dir_checked,
+        open_file, open_file_checked, TestFixture, TestFixtureOptions,
     };
     use anyhow::format_err;
     use fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions};
@@ -750,7 +750,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
@@ -788,7 +788,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -848,7 +848,7 @@ mod tests {
             let fixture = TestFixture::new().await;
             let root = fixture.root();
 
-            let file = open_file_checked(
+            let file = deprecated_open_file_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -883,7 +883,7 @@ mod tests {
         .await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
@@ -927,7 +927,7 @@ mod tests {
             .await;
             let root = fixture.root();
 
-            let file = open_file_checked(
+            let file = deprecated_open_file_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -961,7 +961,7 @@ mod tests {
         .await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
@@ -1002,7 +1002,9 @@ mod tests {
             } else {
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE
             };
-            let file = open_file_checked(&root, flags | fio::OpenFlags::NOT_DIRECTORY, "foo").await;
+            let file =
+                deprecated_open_file_checked(&root, flags | fio::OpenFlags::NOT_DIRECTORY, "foo")
+                    .await;
 
             if i == 0 {
                 let _: u64 = file
@@ -1039,7 +1041,7 @@ mod tests {
         let inputs = vec!["hello, ", "world!"];
         let expected_output = "hello, world!";
         for input in inputs {
-            let file = open_file_checked(
+            let file = deprecated_open_file_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -1060,7 +1062,7 @@ mod tests {
             close_file_checked(file).await;
         }
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
@@ -1089,7 +1091,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1181,7 +1183,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1254,7 +1256,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1330,7 +1332,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1418,7 +1420,7 @@ mod tests {
             fasync::Task::spawn(async move {
                 let root = fixture1.root();
                 while !done1.load(atomic::Ordering::Relaxed) {
-                    let file = open_file_checked(
+                    let file = deprecated_open_file_checked(
                         &root,
                         fio::OpenFlags::CREATE
                             | fio::OpenFlags::RIGHT_READABLE
@@ -1438,7 +1440,7 @@ mod tests {
             fasync::Task::spawn(async move {
                 let root = fixture2.root();
                 while !done2.load(atomic::Ordering::Relaxed) {
-                    let file = open_file_checked(
+                    let file = deprecated_open_file_checked(
                         &root,
                         fio::OpenFlags::CREATE
                             | fio::OpenFlags::RIGHT_READABLE
@@ -1458,7 +1460,7 @@ mod tests {
             fasync::Task::spawn(async move {
                 let root = fixture3.root();
                 for _ in 0..300 {
-                    let file = open_file_checked(
+                    let file = deprecated_open_file_checked(
                         &root,
                         fio::OpenFlags::CREATE
                             | fio::OpenFlags::RIGHT_READABLE
@@ -1488,7 +1490,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1532,7 +1534,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1575,7 +1577,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1611,7 +1613,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1654,7 +1656,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1750,7 +1752,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1783,7 +1785,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1848,7 +1850,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1900,15 +1902,23 @@ mod tests {
             .expect_err("resize succeeded on fsverity-enabled file");
 
         // Ensure that new writable handles can't be created
-        open_file(&root, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE, "foo")
-            .await
-            .expect_err("open writable succeeded on fsverity-enabled file");
+        deprecated_open_file(
+            &root,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            "foo",
+        )
+        .await
+        .expect_err("open writable succeeded on fsverity-enabled file");
 
         // Close the file and ensure that it cannot be reopened for writing
         close_file_checked(file).await;
-        open_file(&root, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE, "foo")
-            .await
-            .expect_err("open writable succeeded on fsverity-enabled file");
+        deprecated_open_file(
+            &root,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            "foo",
+        )
+        .await
+        .expect_err("open writable succeeded on fsverity-enabled file");
 
         // Reopen the filesystem and ensure that the file can't be opened for writing
         let device = fixture.close().await;
@@ -1926,9 +1936,13 @@ mod tests {
         .await;
 
         let root = fixture.root();
-        open_file(&root, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE, "foo")
-            .await
-            .expect_err("open writable succeeded on fsverity-enabled file");
+        deprecated_open_file(
+            &root,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            "foo",
+        )
+        .await
+        .expect_err("open writable succeeded on fsverity-enabled file");
 
         fixture.close().await;
     }
@@ -1943,7 +1957,7 @@ mod tests {
             let fixture = TestFixture::new().await;
             let root = fixture.root();
 
-            let file = open_file_checked(
+            let file = deprecated_open_file_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -1990,7 +2004,7 @@ mod tests {
         .await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
@@ -2016,7 +2030,7 @@ mod tests {
             let fixture = TestFixture::new().await;
             let root = fixture.root();
 
-            let file = open_file_checked(
+            let file = deprecated_open_file_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -2065,7 +2079,7 @@ mod tests {
         .await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
@@ -2092,7 +2106,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -2136,7 +2150,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -2201,7 +2215,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let tmpfile = open3_file_checked(
+        let tmpfile = open_file_checked(
             &root,
             fio::Flags::PROTOCOL_FILE
                 | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
@@ -2232,7 +2246,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let tmpfile = open3_file_checked(
+        let tmpfile = open_file_checked(
             &root,
             fio::Flags::PROTOCOL_FILE
                 | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
@@ -2285,7 +2299,7 @@ mod tests {
             let fixture = TestFixture::new().await;
             let root = fixture.root();
 
-            let tmpfile = open3_file_checked(
+            let tmpfile = open_file_checked(
                 &root,
                 fio::Flags::PROTOCOL_FILE
                     | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
@@ -2345,7 +2359,7 @@ mod tests {
             let fixture = TestFixture::new().await;
             let root = fixture.root();
 
-            let tmpfile = open3_file_checked(
+            let tmpfile = open_file_checked(
                 &root,
                 fio::Flags::PROTOCOL_FILE
                     | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
@@ -2401,7 +2415,7 @@ mod tests {
 
         // FILE1 was unlinked, so we should not be able to open a connection to it.
         assert_eq!(
-            open3_file(
+            open_file(
                 &root,
                 fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
                 &fio::Options::default(),
@@ -2417,7 +2431,7 @@ mod tests {
 
         // The temporary unnamed file was linked to FILE2. We should find the same contents written
         // to it.
-        let permanent_file = open3_file_checked(
+        let permanent_file = open_file_checked(
             &root,
             fio::Flags::PROTOCOL_FILE | fio::PERM_READABLE,
             &fio::Options::default(),
@@ -2445,7 +2459,7 @@ mod tests {
 
         // Set up encrypted directory
         let crypt = fixture.crypt().unwrap();
-        let encrypted_directory = open3_dir_checked(
+        let encrypted_directory = open_dir_checked(
             &root,
             fio::Flags::FLAG_MAYBE_CREATE
                 | fio::Flags::PROTOCOL_DIRECTORY
@@ -2468,7 +2482,7 @@ mod tests {
             .expect("update_attributes failed");
 
         // Create a temporary unnamed file in that directory, it should have the same wrapping key.
-        let encryped_tmpfile = open3_file_checked(
+        let encryped_tmpfile = open_file_checked(
             &encrypted_directory,
             fio::Flags::PROTOCOL_FILE
                 | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
@@ -2496,7 +2510,7 @@ mod tests {
             .expect("link_into wire message failed")
             .expect("link_into failed");
 
-        let unencryped_tmpfile = open3_file_checked(
+        let unencryped_tmpfile = open_file_checked(
             &root,
             fio::Flags::PROTOCOL_FILE
                 | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
@@ -2535,7 +2549,7 @@ mod tests {
 
         // Set up encrypted directory
         let crypt = fixture.crypt().unwrap();
-        let encrypted_directory = open3_dir_checked(
+        let encrypted_directory = open_dir_checked(
             &root,
             fio::Flags::FLAG_MAYBE_CREATE
                 | fio::Flags::PROTOCOL_DIRECTORY
@@ -2562,7 +2576,7 @@ mod tests {
 
         // Open unnamed temporary file in a locked directory and should return (key) NOT_FOUND.
         assert_eq!(
-            open3_file(
+            open_file(
                 &encrypted_directory,
                 fio::Flags::PROTOCOL_FILE
                     | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
@@ -2587,7 +2601,7 @@ mod tests {
         let root = fixture.root();
 
         for i in 1..100 {
-            let tmpfile = open3_file_checked(
+            let tmpfile = open_file_checked(
                 &root,
                 fio::Flags::PROTOCOL_FILE
                     | fio::Flags::FLAG_CREATE_AS_UNNAMED_TEMPORARY
@@ -2608,7 +2622,7 @@ mod tests {
 
             // Get the open connection to the sub directory which we would attempt to link the
             // unnamed temporary file into.
-            let sub_dir = open3_dir_checked(
+            let sub_dir = open_dir_checked(
                 &root,
                 fio::Flags::PROTOCOL_DIRECTORY
                     | fio::PERM_READABLE

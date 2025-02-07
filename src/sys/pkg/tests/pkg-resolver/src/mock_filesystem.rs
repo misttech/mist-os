@@ -28,7 +28,7 @@ fn handle_directory_request_stream(
 
 async fn handle_directory_request(req: fio::DirectoryRequest, open_counts: OpenCounter) {
     match req {
-        fio::DirectoryRequest::Open {
+        fio::DirectoryRequest::DeprecatedOpen {
             flags,
             mode: _mode,
             path,
@@ -40,7 +40,7 @@ async fn handle_directory_request(req: fio::DirectoryRequest, open_counts: OpenC
             }
             *open_counts.lock().entry(path).or_insert(0) += 1;
         }
-        fio::DirectoryRequest::Open3 {
+        fio::DirectoryRequest::Open {
             path,
             flags,
             options,

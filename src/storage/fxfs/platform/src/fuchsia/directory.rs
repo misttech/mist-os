@@ -1065,8 +1065,9 @@ mod tests {
     use crate::directory::FxDirectory;
     use crate::file::FxFile;
     use crate::fuchsia::testing::{
-        close_dir_checked, close_file_checked, open3_dir, open3_dir_checked, open_dir,
-        open_dir_checked, open_file, open_file_checked, TestFixture, TestFixtureOptions,
+        close_dir_checked, close_file_checked, deprecated_open_dir, deprecated_open_dir_checked,
+        deprecated_open_file, deprecated_open_file_checked, open_dir, open_dir_checked,
+        TestFixture, TestFixtureOptions,
     };
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_proxy, ClientEnd, Proxy, ServerEnd};
@@ -1119,7 +1120,8 @@ mod tests {
             } else {
                 fio::OpenFlags::RIGHT_READABLE
             };
-            let dir = open_dir_checked(&root, flags | fio::OpenFlags::DIRECTORY, "foo").await;
+            let dir =
+                deprecated_open_dir_checked(&root, flags | fio::OpenFlags::DIRECTORY, "foo").await;
             close_dir_checked(dir).await;
 
             device = fixture.close().await;
@@ -1132,12 +1134,16 @@ mod tests {
         let root = fixture.root();
 
         assert_eq!(
-            open_file(&root, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY, "foo")
-                .await
-                .expect_err("Open succeeded")
-                .root_cause()
-                .downcast_ref::<zx::Status>()
-                .expect("No status"),
+            deprecated_open_file(
+                &root,
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
+                "foo"
+            )
+            .await
+            .expect_err("Open succeeded")
+            .root_cause()
+            .downcast_ref::<zx::Status>()
+            .expect("No status"),
             &zx::Status::NOT_FOUND,
         );
 
@@ -1149,7 +1155,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let f = open_file_checked(
+        let f = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
@@ -1157,7 +1163,7 @@ mod tests {
         .await;
         close_file_checked(f).await;
 
-        let f = open_file_checked(
+        let f = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
@@ -1173,7 +1179,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let d = open_dir_checked(
+        let d = deprecated_open_dir_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1184,7 +1190,7 @@ mod tests {
         .await;
         close_dir_checked(d).await;
 
-        let d = open_dir_checked(
+        let d = deprecated_open_dir_checked(
             &root,
             fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             "foo/bar",
@@ -1192,7 +1198,7 @@ mod tests {
         .await;
         close_dir_checked(d).await;
 
-        let d = open_dir_checked(
+        let d = deprecated_open_dir_checked(
             &root,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             "foo/bar",
@@ -1208,7 +1214,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let f = open_file_checked(
+        let f = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::CREATE_IF_ABSENT
@@ -1220,7 +1226,7 @@ mod tests {
         close_file_checked(f).await;
 
         assert_eq!(
-            open_file(
+            deprecated_open_file(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::CREATE_IF_ABSENT
@@ -1244,7 +1250,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1278,17 +1284,21 @@ mod tests {
             .expect("unlink failed");
 
         assert_eq!(
-            open_file(&root, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY, "foo")
-                .await
-                .expect_err("Open succeeded")
-                .root_cause()
-                .downcast_ref::<zx::Status>()
-                .expect("No status"),
+            deprecated_open_file(
+                &root,
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
+                "foo"
+            )
+            .await
+            .expect_err("Open succeeded")
+            .root_cause()
+            .downcast_ref::<zx::Status>()
+            .expect("No status"),
             &zx::Status::NOT_FOUND,
         );
 
         // Create another file so we can verify that the extents were actually freed.
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1309,7 +1319,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1326,12 +1336,16 @@ mod tests {
             .expect("unlink failed");
 
         assert_eq!(
-            open_file(&root, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY, "foo")
-                .await
-                .expect_err("Open succeeded")
-                .root_cause()
-                .downcast_ref::<zx::Status>()
-                .expect("No status"),
+            deprecated_open_file(
+                &root,
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
+                "foo"
+            )
+            .await
+            .expect_err("Open succeeded")
+            .root_cause()
+            .downcast_ref::<zx::Status>()
+            .expect("No status"),
             &zx::Status::NOT_FOUND,
         );
 
@@ -1343,7 +1357,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1363,12 +1377,16 @@ mod tests {
 
         // The child should immediately appear unlinked...
         assert_eq!(
-            open_file(&root, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY, "foo")
-                .await
-                .expect_err("Open succeeded")
-                .root_cause()
-                .downcast_ref::<zx::Status>()
-                .expect("No status"),
+            deprecated_open_file(
+                &root,
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
+                "foo"
+            )
+            .await
+            .expect_err("Open succeeded")
+            .root_cause()
+            .downcast_ref::<zx::Status>()
+            .expect("No status"),
             &zx::Status::NOT_FOUND,
         );
 
@@ -1390,7 +1408,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let dir = open_dir_checked(
+        let dir = deprecated_open_dir_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1399,7 +1417,7 @@ mod tests {
             "foo",
         )
         .await;
-        let f = open_file_checked(
+        let f = deprecated_open_file_checked(
             &dir,
             fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             "bar",
@@ -1436,7 +1454,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let dir = open_dir_checked(
+        let dir = deprecated_open_dir_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1452,7 +1470,7 @@ mod tests {
             .expect("unlink failed");
 
         assert_eq!(
-            open_file(
+            deprecated_open_file(
                 &dir,
                 fio::OpenFlags::RIGHT_READABLE
                     | fio::OpenFlags::CREATE
@@ -1480,7 +1498,7 @@ mod tests {
         const PARENT: &str = "foo";
         const CHILD: &str = "bar";
         const GRANDCHILD: &str = "baz";
-        open_dir_checked(
+        deprecated_open_dir_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1491,7 +1509,7 @@ mod tests {
         .await;
 
         let open_parent = || async {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::RIGHT_READABLE
                     | fio::OpenFlags::RIGHT_WRITABLE
@@ -1508,7 +1526,7 @@ mod tests {
         //  - In one task, try to unlink foo/bar/.
         //  - In another task, try to add a file foo/bar/baz.
         for _ in 0..100 {
-            let d = open_dir_checked(
+            let d = deprecated_open_dir_checked(
                 &parent,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -1538,7 +1556,7 @@ mod tests {
 
             let parent = open_parent().await;
             let writer = fasync::Task::spawn(async move {
-                let child_or = open_dir(
+                let child_or = deprecated_open_dir(
                     &parent,
                     fio::OpenFlags::RIGHT_READABLE
                         | fio::OpenFlags::RIGHT_WRITABLE
@@ -1557,7 +1575,7 @@ mod tests {
                 }
                 let child = child_or.unwrap();
                 let _: Vec<_> = child.query().await.expect("query failed");
-                match open_file(
+                match deprecated_open_file(
                     &child,
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
@@ -1603,7 +1621,7 @@ mod tests {
         let root = fixture.root();
 
         let open_dir = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -1616,7 +1634,7 @@ mod tests {
 
         let files = ["eenie", "meenie", "minie", "moe"];
         for file in &files {
-            let file = open_file_checked(
+            let file = deprecated_open_file_checked(
                 parent.as_ref(),
                 fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY,
                 file,
@@ -1626,7 +1644,7 @@ mod tests {
         }
         let dirs = ["fee", "fi", "fo", "fum"];
         for dir in &dirs {
-            let dir = open_dir_checked(
+            let dir = deprecated_open_dir_checked(
                 parent.as_ref(),
                 fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY,
                 dir,
@@ -1685,7 +1703,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let parent = open_dir_checked(
+        let parent = deprecated_open_dir_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -1697,7 +1715,7 @@ mod tests {
 
         let files = ["a", "b"];
         for file in &files {
-            let file = open_file_checked(
+            let file = deprecated_open_file_checked(
                 &parent,
                 fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY,
                 file,
@@ -1747,7 +1765,7 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -1769,7 +1787,7 @@ mod tests {
             .expect("FIDL call failed")
             .map_err(zx::ok)
             .expect("update_attributes failed");
-        let dir = open_dir_checked(
+        let dir = deprecated_open_dir_checked(
             parent.as_ref(),
             fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
             "fee",
@@ -1788,8 +1806,12 @@ mod tests {
         .expect("Failed to make FIDL call")
         .expect("Failed to set xattr with create");
 
-        let subdir =
-            open_dir_checked(&dir, fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY, "fo").await;
+        let subdir = deprecated_open_dir_checked(
+            &dir,
+            fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY,
+            "fo",
+        )
+        .await;
         close_dir_checked(dir).await;
         close_dir_checked(subdir).await;
         close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
@@ -1797,7 +1819,7 @@ mod tests {
         let new_fixture = TestFixture::new_with_device(device).await;
         let root = new_fixture.root();
         let open_dir = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 "foo",
@@ -1830,7 +1852,12 @@ mod tests {
         }
 
         let encrypted_dir = Arc::new(
-            open_dir_checked(parent.as_ref(), fio::OpenFlags::DIRECTORY, &encrypted_name).await,
+            deprecated_open_dir_checked(
+                parent.as_ref(),
+                fio::OpenFlags::DIRECTORY,
+                &encrypted_name,
+            )
+            .await,
         );
 
         assert_eq!(
@@ -1862,7 +1889,7 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -1884,7 +1911,7 @@ mod tests {
             .expect("FIDL call failed")
             .map_err(zx::ok)
             .expect("update_attributes failed");
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             parent.as_ref(),
             fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::NOT_DIRECTORY,
             "fee",
@@ -1913,7 +1940,7 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = new_fixture.crypt().unwrap();
         let root = new_fixture.root();
         let open_dir = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 "foo",
@@ -1946,8 +1973,12 @@ mod tests {
         }
 
         let encrypted_file = Arc::new(
-            open_file_checked(parent.as_ref(), fio::OpenFlags::NOT_DIRECTORY, &encrypted_name)
-                .await,
+            deprecated_open_file_checked(
+                parent.as_ref(),
+                fio::OpenFlags::NOT_DIRECTORY,
+                &encrypted_name,
+            )
+            .await,
         );
 
         assert_eq!(
@@ -1964,7 +1995,7 @@ mod tests {
         crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
 
         let file = Arc::new(
-            open_file_checked(
+            deprecated_open_file_checked(
                 parent.as_ref(),
                 fio::OpenFlags::NOT_DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
                 "fee",
@@ -1984,7 +2015,7 @@ mod tests {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
         let open_dir = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -2015,7 +2046,7 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -2050,15 +2081,19 @@ mod tests {
             .expect("FIDL call failed")
             .map_err(zx::ok)
             .expect("update_attributes failed");
-        let dir = open_dir_checked(
+        let dir = deprecated_open_dir_checked(
             parent.as_ref(),
             fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
             "fee",
         )
         .await;
 
-        let subdir =
-            open_dir_checked(&dir, fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY, "fo").await;
+        let subdir = deprecated_open_dir_checked(
+            &dir,
+            fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY,
+            "fo",
+        )
+        .await;
         close_dir_checked(dir).await;
         close_dir_checked(subdir).await;
         close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
@@ -2066,7 +2101,7 @@ mod tests {
         let new_fixture = TestFixture::new_with_device(device).await;
         let root = new_fixture.root();
         let open_dir = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 "foo",
@@ -2108,7 +2143,12 @@ mod tests {
         }
 
         let encrypted_dir = Arc::new(
-            open_dir_checked(parent.as_ref(), fio::OpenFlags::DIRECTORY, &encrypted_name).await,
+            deprecated_open_dir_checked(
+                parent.as_ref(),
+                fio::OpenFlags::DIRECTORY,
+                &encrypted_name,
+            )
+            .await,
         );
 
         let encrypted_subdir_entries = readdir(Arc::clone(&encrypted_dir)).await;
@@ -2131,7 +2171,7 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -2157,7 +2197,7 @@ mod tests {
         // Need enough entries such that multiple read_dirents calls are required to drain all the
         // entries.
         for i in 0..300 {
-            let dir = open_dir_checked(
+            let dir = deprecated_open_dir_checked(
                 parent.as_ref(),
                 fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
                 &format!("plaintext_{}", i),
@@ -2172,7 +2212,7 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = new_fixture.crypt().unwrap();
         let root = new_fixture.root();
         let open_dir = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 "foo",
@@ -2221,7 +2261,7 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -2243,15 +2283,19 @@ mod tests {
             .expect("FIDL call failed")
             .map_err(zx::ok)
             .expect("update_attributes failed");
-        let dir = open_dir_checked(
+        let dir = deprecated_open_dir_checked(
             parent.as_ref(),
             fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
             "fee",
         )
         .await;
 
-        let subdir =
-            open_dir_checked(&dir, fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY, "fo").await;
+        let subdir = deprecated_open_dir_checked(
+            &dir,
+            fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY,
+            "fo",
+        )
+        .await;
         close_dir_checked(dir).await;
         close_dir_checked(subdir).await;
 
@@ -2279,7 +2323,7 @@ mod tests {
         let new_fixture = TestFixture::new_with_device(device).await;
         let root = new_fixture.root();
         let open_dir = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 "foo",
@@ -2300,7 +2344,12 @@ mod tests {
         }
 
         let encrypted_dir = Arc::new(
-            open_dir_checked(parent.as_ref(), fio::OpenFlags::DIRECTORY, &encrypted_name).await,
+            deprecated_open_dir_checked(
+                parent.as_ref(),
+                fio::OpenFlags::DIRECTORY,
+                &encrypted_name,
+            )
+            .await,
         );
 
         let encrypted_subdir_entries = readdir(Arc::clone(&encrypted_dir)).await;
@@ -2323,7 +2372,7 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir_1 = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -2336,7 +2385,7 @@ mod tests {
         let parent_1: Arc<fio::DirectoryProxy> = Arc::new(open_dir_1().await);
 
         let open_dir_2 = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -2367,7 +2416,8 @@ mod tests {
             .expect("FIDL call failed")
             .map_err(zx::ok)
             .expect("update_attributes failed");
-        let file = open_file_checked(parent_1.as_ref(), fio::OpenFlags::CREATE, "fee").await;
+        let file =
+            deprecated_open_file_checked(parent_1.as_ref(), fio::OpenFlags::CREATE, "fee").await;
 
         close_file_checked(file).await;
         close_dir_checked(Arc::try_unwrap(parent_1).unwrap()).await;
@@ -2377,7 +2427,7 @@ mod tests {
         let new_fixture = TestFixture::new_with_device(device).await;
         let root = new_fixture.root();
         let open_dir_1 = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::RIGHT_READABLE
                     | fio::OpenFlags::RIGHT_WRITABLE
@@ -2388,7 +2438,7 @@ mod tests {
         let parent_1: Arc<fio::DirectoryProxy> = Arc::new(open_dir_1().await);
 
         let open_dir_2 = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::RIGHT_READABLE
                     | fio::OpenFlags::RIGHT_WRITABLE
@@ -2444,7 +2494,7 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir_1 = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -2457,7 +2507,7 @@ mod tests {
         let parent_1: Arc<fio::DirectoryProxy> = Arc::new(open_dir_1().await);
 
         let open_dir_2 = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -2492,7 +2542,8 @@ mod tests {
             .expect("FIDL call failed")
             .map_err(zx::ok)
             .expect("update_attributes failed");
-        let file = open_file_checked(parent_1.as_ref(), fio::OpenFlags::CREATE, "fee").await;
+        let file =
+            deprecated_open_file_checked(parent_1.as_ref(), fio::OpenFlags::CREATE, "fee").await;
 
         close_file_checked(file).await;
 
@@ -2517,7 +2568,7 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir_1 = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -2530,7 +2581,7 @@ mod tests {
         let parent_1: Arc<fio::DirectoryProxy> = Arc::new(open_dir_1().await);
 
         let open_dir_2 = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -2554,7 +2605,8 @@ mod tests {
             .map_err(zx::ok)
             .expect("update_attributes failed");
 
-        let file = open_file_checked(parent_2.as_ref(), fio::OpenFlags::CREATE, "fee").await;
+        let file =
+            deprecated_open_file_checked(parent_2.as_ref(), fio::OpenFlags::CREATE, "fee").await;
 
         close_file_checked(file).await;
 
@@ -2579,7 +2631,7 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir_1 = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -2592,7 +2644,7 @@ mod tests {
         let parent_1: Arc<fio::DirectoryProxy> = Arc::new(open_dir_1().await);
 
         let open_dir_2 = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -2614,7 +2666,7 @@ mod tests {
             .expect("FIDL call failed")
             .map_err(zx::ok)
             .expect("update_attributes failed");
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             parent_1.as_ref(),
             fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE,
             "fee",
@@ -2635,7 +2687,7 @@ mod tests {
         let new_fixture = TestFixture::new_with_device(device).await;
         let root = new_fixture.root();
         let open_dir_1 = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::RIGHT_READABLE
                     | fio::OpenFlags::RIGHT_WRITABLE
@@ -2646,7 +2698,7 @@ mod tests {
         let parent_1: Arc<fio::DirectoryProxy> = Arc::new(open_dir_1().await);
 
         let open_dir_2 = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::RIGHT_READABLE
                     | fio::OpenFlags::RIGHT_WRITABLE
@@ -2691,8 +2743,12 @@ mod tests {
             zx::Status::OK.into_raw()
         );
 
-        let file =
-            open_file_checked(parent_2.as_ref(), fio::OpenFlags::RIGHT_READABLE, "file_2").await;
+        let file = deprecated_open_file_checked(
+            parent_2.as_ref(),
+            fio::OpenFlags::RIGHT_READABLE,
+            "file_2",
+        )
+        .await;
         let (mutable_attributes, _immutable_attributes) = file
             .get_attributes(
                 fio::NodeAttributesQuery::CONTENT_SIZE
@@ -2726,7 +2782,7 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -2752,7 +2808,7 @@ mod tests {
         for _ in 0..100 {
             let one_char = || CHARSET[rand::thread_rng().gen_range(0..CHARSET.len())] as char;
             let filename: String = std::iter::repeat_with(one_char).take(100).collect();
-            let dir = open_dir_checked(
+            let dir = deprecated_open_dir_checked(
                 parent.as_ref(),
                 fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
                 &filename,
@@ -2778,7 +2834,7 @@ mod tests {
         let new_fixture = TestFixture::new_with_device(device).await;
         let root = new_fixture.root();
         let open_dir = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 "foo",
@@ -2807,7 +2863,7 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -2829,7 +2885,7 @@ mod tests {
             .map_err(zx::ok)
             .expect("update_attributes failed");
 
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             parent.as_ref(),
             fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY,
             "file",
@@ -2843,7 +2899,7 @@ mod tests {
         let new_fixture = TestFixture::new_with_device(device).await;
         let root = new_fixture.root();
         let open_dir = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 "foo",
@@ -2867,9 +2923,12 @@ mod tests {
             }
         }
 
-        let file =
-            open_file_checked(parent.as_ref(), fio::OpenFlags::NOT_DIRECTORY, &encrypted_name)
-                .await;
+        let file = deprecated_open_file_checked(
+            parent.as_ref(),
+            fio::OpenFlags::NOT_DIRECTORY,
+            &encrypted_name,
+        )
+        .await;
         let (_mutable_attributes, _immutable_attributes) = file
             .get_attributes(
                 fio::NodeAttributesQuery::CONTENT_SIZE
@@ -2892,7 +2951,7 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -2914,7 +2973,7 @@ mod tests {
             .expect("FIDL call failed")
             .map_err(zx::ok)
             .expect("update_attributes failed");
-        let dir = open_dir_checked(
+        let dir = deprecated_open_dir_checked(
             parent.as_ref(),
             fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
             "fee",
@@ -2927,7 +2986,7 @@ mod tests {
         let new_fixture = TestFixture::new_with_device(device).await;
         let root = new_fixture.root();
         let open_dir = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::RIGHT_READABLE
                     | fio::OpenFlags::RIGHT_WRITABLE
@@ -2989,7 +3048,7 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -3011,7 +3070,7 @@ mod tests {
             .expect("FIDL call failed")
             .map_err(zx::ok)
             .expect("update_attributes failed");
-        let dir = open_dir_checked(
+        let dir = deprecated_open_dir_checked(
             parent.as_ref(),
             fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
             "fee",
@@ -3025,7 +3084,7 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = new_fixture.crypt().unwrap();
         let root = new_fixture.root();
         let open_dir = || {
-            open_dir_checked(
+            deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::RIGHT_READABLE
                     | fio::OpenFlags::RIGHT_WRITABLE
@@ -3076,7 +3135,9 @@ mod tests {
             .expect("FIDL call failed")
             .expect("rename should fail on a locked directory");
 
-        let _dir = open_dir_checked(parent.as_ref(), fio::OpenFlags::DIRECTORY, "new_fee").await;
+        let _dir =
+            deprecated_open_dir_checked(parent.as_ref(), fio::OpenFlags::DIRECTORY, "new_fee")
+                .await;
         close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
         new_fixture.close().await;
     }
@@ -3086,7 +3147,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let dir = open_dir_checked(
+        let dir = deprecated_open_dir_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -3150,7 +3211,7 @@ mod tests {
                 .expect("create_symlink failed");
 
             let (proxy, server_end) = create_proxy::<fio::SymlinkMarker>();
-            root.open(
+            root.deprecated_open(
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
                 fio::ModeType::empty(),
                 "symlink",
@@ -3195,7 +3256,7 @@ mod tests {
                 .expect("unlink failed");
 
             // Rename over the first symlink.
-            open_file_checked(
+            deprecated_open_file_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -3231,7 +3292,7 @@ mod tests {
         {
             let root = fixture.root();
 
-            let inner = open_dir_checked(
+            let inner = deprecated_open_dir_checked(
                 root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -3240,7 +3301,7 @@ mod tests {
                 "bar",
             )
             .await;
-            let inner2 = open_dir_checked(
+            let inner2 = deprecated_open_dir_checked(
                 &inner,
                 fio::OpenFlags::RIGHT_READABLE
                     | fio::OpenFlags::RIGHT_WRITABLE
@@ -3249,7 +3310,7 @@ mod tests {
             )
             .await;
 
-            let file = open_file_checked(
+            let file = deprecated_open_file_checked(
                 &inner,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -3264,7 +3325,7 @@ mod tests {
             );
             close_file_checked(file).await;
 
-            let file = open_file_checked(
+            let file = deprecated_open_file_checked(
                 &inner,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -3336,7 +3397,7 @@ mod tests {
 
         // Ensure that the file contents can be read back. If a race in object management happens
         // it may resurrect the object in the tree, but the extents will all still be missing.
-        let file = open_file_checked(
+        let file = deprecated_open_file_checked(
             fixture.root(),
             fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE
@@ -3364,7 +3425,7 @@ mod tests {
 
             async fn open_symlink(root: &fio::DirectoryProxy, path: &str) -> fio::SymlinkProxy {
                 let (proxy, server_end) = create_proxy::<fio::SymlinkMarker>();
-                root.open(
+                root.deprecated_open(
                     fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
                     fio::ModeType::empty(),
                     path,
@@ -3452,7 +3513,7 @@ mod tests {
         {
             let root = fixture.root();
 
-            let dir = open_dir_checked(
+            let dir = deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -3493,7 +3554,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let file = open_dir_checked(
+        let file = deprecated_open_dir_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -3589,7 +3650,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let dir = open_dir_checked(
+        let dir = deprecated_open_dir_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -3658,7 +3719,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         {
             let root = fixture.root();
-            let dir = open_dir_checked(
+            let dir = deprecated_open_dir_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -3988,7 +4049,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let dir = open_dir_checked(
+        let dir = deprecated_open_dir_checked(
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
@@ -4039,7 +4100,7 @@ mod tests {
             ..Default::default()
         };
         let (node, server_end) = create_proxy::<fio::NodeMarker>();
-        root_dir.open3(path, flags, &options, server_end.into_channel()).expect("Reopening node");
+        root_dir.open(path, flags, &options, server_end.into_channel()).expect("Reopening node");
         let repr = node
             .take_event_stream()
             .next()
@@ -4083,7 +4144,7 @@ mod tests {
                 };
                 let (node, server_end) = create_proxy::<fio::NodeMarker>();
                 root_dir
-                    .open3(path, flags, &options, server_end.into_channel())
+                    .open(path, flags, &options, server_end.into_channel())
                     .expect("Creating node");
                 // Check event stream to allow the creation to complete.
                 assert!(node
@@ -4206,9 +4267,12 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let dir =
-            open_dir_checked(&root, fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY, "foo")
-                .await;
+        let dir = deprecated_open_dir_checked(
+            &root,
+            fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY,
+            "foo",
+        )
+        .await;
 
         root.unlink("foo", &fio::UnlinkOptions::default())
             .await
@@ -4216,7 +4280,7 @@ mod tests {
             .expect("unlink failed");
 
         assert_eq!(
-            open_dir(&root, fio::OpenFlags::DIRECTORY, "foo")
+            deprecated_open_dir(&root, fio::OpenFlags::DIRECTORY, "foo")
                 .await
                 .expect_err("Open succeeded")
                 .root_cause()
@@ -4225,7 +4289,7 @@ mod tests {
             &zx::Status::NOT_FOUND,
         );
 
-        open_dir_checked(&dir, fio::OpenFlags::DIRECTORY, ".").await;
+        deprecated_open_dir_checked(&dir, fio::OpenFlags::DIRECTORY, ".").await;
 
         fixture.close().await;
     }
@@ -4237,8 +4301,12 @@ mod tests {
 
         const PATH: &str = "foo";
 
-        let dir =
-            open_dir_checked(&root, fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY, PATH).await;
+        let dir = deprecated_open_dir_checked(
+            &root,
+            fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY,
+            PATH,
+        )
+        .await;
 
         root.unlink(PATH, &fio::UnlinkOptions::default())
             .await
@@ -4246,21 +4314,21 @@ mod tests {
             .expect("unlink failed");
 
         assert_eq!(
-            open3_dir(
+            open_dir(
                 &root,
                 fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_SEND_REPRESENTATION,
                 &fio::Options::default(),
                 PATH
             )
             .await
-            .expect_err("Open3 succeeded unexpectedly")
+            .expect_err("Open succeeded unexpectedly")
             .root_cause()
             .downcast_ref::<zx::Status>()
             .expect("No status"),
             &zx::Status::NOT_FOUND,
         );
 
-        open3_dir_checked(
+        open_dir_checked(
             &dir,
             fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_SEND_REPRESENTATION,
             &fio::Options::default(),

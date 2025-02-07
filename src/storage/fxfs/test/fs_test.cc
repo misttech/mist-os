@@ -61,11 +61,13 @@ TEST_P(DeviceTest, TestWriteThenRead) {
 
   // Re-open file as block device i.e. using OpenFlag.BLOCK_DEVICE.
   fdio_cpp::FdioCaller caller(fs().GetRootFd());
+  // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
   ASSERT_EQ(fidl::WireCall(caller.directory())
-                ->Open(fuchsia_io::wire::OpenFlags::kRightReadable |
-                           fuchsia_io::wire::OpenFlags::kRightWritable |
-                           fuchsia_io::wire::OpenFlags::kBlockDevice,
-                       {}, "block_device", fidl::ServerEnd<fuchsia_io::Node>(server.TakeChannel()))
+                ->DeprecatedOpen(fuchsia_io::wire::OpenFlags::kRightReadable |
+                                     fuchsia_io::wire::OpenFlags::kRightWritable |
+                                     fuchsia_io::wire::OpenFlags::kBlockDevice,
+                                 {}, "block_device",
+                                 fidl::ServerEnd<fuchsia_io::Node>(server.TakeChannel()))
                 .status(),
             ZX_OK);
 
@@ -126,11 +128,13 @@ TEST_P(DeviceTest, TestGroupWritesThenReads) {
   auto [client, server] = fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
 
   fdio_cpp::FdioCaller caller(fs().GetRootFd());
+  // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
   ASSERT_EQ(fidl::WireCall(caller.directory())
-                ->Open(fuchsia_io::wire::OpenFlags::kRightReadable |
-                           fuchsia_io::wire::OpenFlags::kRightWritable |
-                           fuchsia_io::wire::OpenFlags::kBlockDevice,
-                       {}, "block_device", fidl::ServerEnd<fuchsia_io::Node>(server.TakeChannel()))
+                ->DeprecatedOpen(fuchsia_io::wire::OpenFlags::kRightReadable |
+                                     fuchsia_io::wire::OpenFlags::kRightWritable |
+                                     fuchsia_io::wire::OpenFlags::kBlockDevice,
+                                 {}, "block_device",
+                                 fidl::ServerEnd<fuchsia_io::Node>(server.TakeChannel()))
                 .status(),
             ZX_OK);
 
@@ -213,11 +217,13 @@ TEST_P(DeviceTest, TestWriteThenFlushThenRead) {
   auto [client, server] = fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
 
   fdio_cpp::FdioCaller caller(fs().GetRootFd());
+  // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
   ASSERT_EQ(fidl::WireCall(caller.directory())
-                ->Open(fuchsia_io::wire::OpenFlags::kRightReadable |
-                           fuchsia_io::wire::OpenFlags::kRightWritable |
-                           fuchsia_io::wire::OpenFlags::kBlockDevice,
-                       {}, "block_device", fidl::ServerEnd<fuchsia_io::Node>(server.TakeChannel()))
+                ->DeprecatedOpen(fuchsia_io::wire::OpenFlags::kRightReadable |
+                                     fuchsia_io::wire::OpenFlags::kRightWritable |
+                                     fuchsia_io::wire::OpenFlags::kBlockDevice,
+                                 {}, "block_device",
+                                 fidl::ServerEnd<fuchsia_io::Node>(server.TakeChannel()))
                 .status(),
             ZX_OK);
 
@@ -273,11 +279,13 @@ TEST_P(DeviceTest, TestInvalidGroupRequests) {
   auto [client, server] = fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
 
   fdio_cpp::FdioCaller caller(fs().GetRootFd());
+  // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
   ASSERT_EQ(fidl::WireCall(caller.directory())
-                ->Open(fuchsia_io::wire::OpenFlags::kRightReadable |
-                           fuchsia_io::wire::OpenFlags::kRightWritable |
-                           fuchsia_io::wire::OpenFlags::kBlockDevice,
-                       {}, "block_device", fidl::ServerEnd<fuchsia_io::Node>(server.TakeChannel()))
+                ->DeprecatedOpen(fuchsia_io::wire::OpenFlags::kRightReadable |
+                                     fuchsia_io::wire::OpenFlags::kRightWritable |
+                                     fuchsia_io::wire::OpenFlags::kBlockDevice,
+                                 {}, "block_device",
+                                 fidl::ServerEnd<fuchsia_io::Node>(server.TakeChannel()))
                 .status(),
             ZX_OK);
 

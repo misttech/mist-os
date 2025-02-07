@@ -163,7 +163,7 @@ func (c *Context) ConnectToProtocolAtPath(path string, r fidl.ServiceRequest) er
 }
 
 func (c *Connector) ConnectToProtocolAtPath(path string, r fidl.ServiceRequest) error {
-	return c.serviceRoot.Open3(
+	return c.serviceRoot.Open(
 		context.Background(),
 		path,
 		io.FlagsProtocolService,

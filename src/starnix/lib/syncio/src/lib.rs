@@ -1534,7 +1534,7 @@ fn directory_open(
     let flags = flags | fio::Flags::FLAG_SEND_REPRESENTATION;
 
     let (client_end, server_end) = zx::Channel::create();
-    directory.open3(path, flags, &Default::default(), server_end).map_err(|_| zx::Status::IO)?;
+    directory.open(path, flags, &Default::default(), server_end).map_err(|_| zx::Status::IO)?;
     let node = fio::NodeSynchronousProxy::new(client_end);
 
     match node.wait_for_event(deadline).map_err(|_| zx::Status::IO)? {
@@ -1633,7 +1633,7 @@ pub fn directory_open_async(
 
     let (proxy, server_end) = fidl::endpoints::create_sync_proxy::<fio::DirectoryMarker>();
     directory
-        .open3(path, flags, &Default::default(), server_end.into_channel())
+        .open(path, flags, &Default::default(), server_end.into_channel())
         .map_err(|_| zx::Status::IO)?;
     Ok(proxy)
 }

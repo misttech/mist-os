@@ -200,16 +200,16 @@ TEST_F(BuiltinSemanticTest, CloneFd) {
   ASSERT_EQ(inferred_handle_info->fd(), 2);
 }
 
-// Check Directory::Open3: request.object = handle / request.path
+// Check Directory::Open: request.object = handle / request.path
 TEST_F(BuiltinSemanticTest, Open) {
-  // Checks that Directory::Open3 exists in fuchsia.io.
+  // Checks that Directory::Open exists in fuchsia.io.
   Library* library = library_loader_.GetLibraryFromName("fuchsia.io");
   ASSERT_NE(library, nullptr);
   library->DecodeTypes();
   Protocol* protocol = nullptr;
   library->GetProtocolByName("fuchsia.io/Directory", &protocol);
   ASSERT_NE(protocol, nullptr);
-  ProtocolMethod* method = protocol->GetMethodByName("Open3");
+  ProtocolMethod* method = protocol->GetMethodByName("Open");
   ASSERT_NE(method, nullptr);
   // Checks that the builtin semantic is defined for Open.
   ASSERT_NE(method->semantic(), nullptr);
@@ -232,16 +232,16 @@ TEST_F(BuiltinSemanticTest, Open) {
   ASSERT_EQ(inferred_handle_info->path(), "/svc/fuchsia.io.Directory");
 }
 
-// Check short display of Directory::Open3.
+// Check short display of Directory::Open.
 TEST_F(BuiltinSemanticTest, OpenShortDisplay) {
-  // Checks that Directory::Open3 exists in fuchsia.io.
+  // Checks that Directory::Open exists in fuchsia.io.
   Library* library = library_loader_.GetLibraryFromName("fuchsia.io");
   ASSERT_NE(library, nullptr);
   library->DecodeTypes();
   Protocol* protocol = nullptr;
   library->GetProtocolByName("fuchsia.io/Directory", &protocol);
   ASSERT_NE(protocol, nullptr);
-  ProtocolMethod* method = protocol->GetMethodByName("Open3");
+  ProtocolMethod* method = protocol->GetMethodByName("Open");
   ASSERT_NE(method, nullptr);
   // Checks that the short display is defined for Open.
   ASSERT_NE(method->short_display(), nullptr);

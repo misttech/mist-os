@@ -932,7 +932,7 @@ impl ManagedRealm {
                     realm
                         .root
                         .get_exposed_dir()
-                        .open3(
+                        .open(
                             &format!("{child_name}-diagnostics"),
                             flags,
                             &Default::default(),
@@ -2691,7 +2691,7 @@ mod tests {
 
         let (network, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let () = devfs
-            .open3(
+            .open(
                 &ethernet_path,
                 fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
                 &Default::default(),

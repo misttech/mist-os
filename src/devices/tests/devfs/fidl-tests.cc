@@ -24,7 +24,7 @@ namespace fio = fuchsia_io;
 void FidlOpenValidator(const fidl::ClientEnd<fio::Directory>& directory, const char* path,
                        zx::result<fio::wire::NodeInfoDeprecated::Tag> expected) {
   auto endpoints = fidl::Endpoints<fio::Node>::Create();
-  const fidl::Status result = fidl::WireCall(directory)->Open(
+  const fidl::Status result = fidl::WireCall(directory)->DeprecatedOpen(
       fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kDescribe, {},
       fidl::StringView::FromExternal(path), std::move(endpoints.server));
   ASSERT_OK(result.status());

@@ -112,7 +112,7 @@ impl OpenArgs for fio::OpenFlags {
         path: &str,
         object_request: vfs::ObjectRequestRef<'_>,
     ) {
-        let _ = proxy.open(
+        let _ = proxy.deprecated_open(
             *self,
             fio::ModeType::empty(),
             path,
@@ -128,7 +128,7 @@ impl OpenArgs for fio::Flags {
         path: &str,
         object_request: vfs::ObjectRequestRef<'_>,
     ) {
-        let _ = proxy.open3(
+        let _ = proxy.open(
             path,
             *self,
             &object_request.options(),
@@ -603,7 +603,7 @@ mod test {
                         );
                         let moniker = Moniker::parse_str(&moniker).unwrap().to_string();
                         if let Some(dir) = dirs.get(&(moniker, dir_type)) {
-                            dir.open(flags, mode, &path, object).unwrap();
+                            dir.deprecated_open(flags, mode, &path, object).unwrap();
                             responder.send(Ok(())).unwrap();
                         } else {
                             responder.send(Err(sys2::OpenError::NoSuchDir)).unwrap();

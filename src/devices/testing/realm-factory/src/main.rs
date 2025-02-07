@@ -309,7 +309,7 @@ async fn create_realm(options: RealmOptions) -> Result<RealmInstance, Error> {
     realm.driver_test_realm_start(start_args).await?;
     // Connect dev-class.
     if let Some(dev_class) = options.dev_class {
-        realm.root.get_exposed_dir().open3(
+        realm.root.get_exposed_dir().open(
             "dev-class",
             fidl_fuchsia_io::PERM_READABLE | fidl_fuchsia_io::Flags::PROTOCOL_DIRECTORY,
             &Default::default(),
@@ -319,7 +319,7 @@ async fn create_realm(options: RealmOptions) -> Result<RealmInstance, Error> {
 
     // Connect dev-topological.
     if let Some(dev_topological) = options.dev_topological {
-        realm.root.get_exposed_dir().open3(
+        realm.root.get_exposed_dir().open(
             "dev-topological",
             fidl_fuchsia_io::PERM_READABLE | fidl_fuchsia_io::Flags::PROTOCOL_DIRECTORY,
             &Default::default(),

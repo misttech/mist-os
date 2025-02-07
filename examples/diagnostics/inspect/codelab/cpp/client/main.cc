@@ -51,9 +51,9 @@ int main(int argc, char** argv) {
       fuchsia::component::decl::ChildRef{.name = "reverser"}, exposed_dir.NewRequest(), &result));
 
   fuchsia::examples::inspect::ReverserSyncPtr reverser;
-  status = zx::make_result(exposed_dir->Open3(fuchsia::examples::inspect::Reverser::Name_,
-                                              fuchsia::io::Flags::PROTOCOL_SERVICE, {},
-                                              reverser.NewRequest().TakeChannel()));
+  status = zx::make_result(exposed_dir->Open(fuchsia::examples::inspect::Reverser::Name_,
+                                             fuchsia::io::Flags::PROTOCOL_SERVICE, {},
+                                             reverser.NewRequest().TakeChannel()));
   if (status.is_error()) {
     FX_LOGS(ERROR) << "Unable to connect to reverser: " << status.status_string();
     return status.status_value();
@@ -66,9 +66,9 @@ int main(int argc, char** argv) {
   status = zx::make_result(
       realm->OpenExposedDir(fuchsia::component::decl::ChildRef{.name = "fizzbuzz"},
                             fizzbuzz_exposed_dir.NewRequest(), &result_open_fizzbuzz));
-  status = zx::make_result(fizzbuzz_exposed_dir->Open3(fuchsia::component::Binder::Name_,
-                                                       fuchsia::io::Flags::PROTOCOL_SERVICE, {},
-                                                       binder.NewRequest().TakeChannel()));
+  status = zx::make_result(fizzbuzz_exposed_dir->Open(fuchsia::component::Binder::Name_,
+                                                      fuchsia::io::Flags::PROTOCOL_SERVICE, {},
+                                                      binder.NewRequest().TakeChannel()));
   if (status.is_error()) {
     FX_LOGS(ERROR) << "Unable to connect to Binder (for FizzBuzz): " << status.status_string();
     return status.status_value();

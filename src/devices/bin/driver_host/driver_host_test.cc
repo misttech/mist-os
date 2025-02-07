@@ -92,13 +92,12 @@ class TestDirectory : public fio::testing::Directory_TestBase {
   void SetOpen3Handler(Open3Handler open3_handler) { open3_handler_ = std::move(open3_handler); }
 
  private:
-  void Open(fio::OpenFlags flags, fio::ModeType mode, std::string path,
-            fidl::InterfaceRequest<fio::Node> object) override {
+  void DeprecatedOpen(fio::OpenFlags flags, fio::ModeType mode, std::string path,
+                      fidl::InterfaceRequest<fio::Node> object) override {
     open_handler_(flags, std::move(path), std::move(object));
   }
 
-  void Open3(std::string path, fio::Flags flags, fio::Options options,
-             zx::channel object) override {
+  void Open(std::string path, fio::Flags flags, fio::Options options, zx::channel object) override {
     open3_handler_(flags, path, std::move(object));
   }
 

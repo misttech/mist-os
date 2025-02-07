@@ -70,7 +70,7 @@ async fn open_blob(
     let server_end = ServerEnd::new(server_end.into_channel());
 
     flags |= fio::OpenFlags::DESCRIBE;
-    blobfs.open(flags, fio::ModeType::empty(), merkle, server_end).expect("open blob");
+    blobfs.deprecated_open(flags, fio::ModeType::empty(), merkle, server_end).expect("open blob");
 
     let mut events = file.take_event_stream();
     let event = match events

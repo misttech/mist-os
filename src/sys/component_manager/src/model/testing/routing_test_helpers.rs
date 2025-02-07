@@ -1049,7 +1049,7 @@ pub mod capability_util {
         let flags =
             fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY;
         let res = async {
-            dir_proxy.open(
+            dir_proxy.deprecated_open(
                 flags,
                 fio::ModeType::empty(),
                 "hippos",

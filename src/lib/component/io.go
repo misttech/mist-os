@@ -378,7 +378,7 @@ func (*directoryState) RemoveExtendedAttribute(fidl.Context, []uint8) (io.NodeRe
 
 const dot = "."
 
-func (dirState *directoryState) Open(ctx fidl.Context, flags io.OpenFlags, mode io.ModeType, path string, req io.NodeWithCtxInterfaceRequest) error {
+func (dirState *directoryState) DeprecatedOpen(ctx fidl.Context, flags io.OpenFlags, mode io.ModeType, path string, req io.NodeWithCtxInterfaceRequest) error {
 	if path == dot {
 		return dirState.addConnectionDeprecated(flags, mode, req)
 	}
@@ -395,7 +395,7 @@ func (dirState *directoryState) Open(ctx fidl.Context, flags io.OpenFlags, mode 
 			}
 			defer cleanup()
 			if dir, ok := proxy.(io.DirectoryWithCtx); ok {
-				return dir.Open(ctx, flags, mode, path[i+len(slash):], req)
+				return dir.DeprecatedOpen(ctx, flags, mode, path[i+len(slash):], req)
 			}
 			return respondDeprecated(flags, req, &zx.Error{Status: zx.ErrNotDir}, node)
 		}
@@ -406,7 +406,7 @@ func (dirState *directoryState) Open(ctx fidl.Context, flags io.OpenFlags, mode 
 	return respondDeprecated(flags, req, &zx.Error{Status: zx.ErrNotFound}, dirState)
 }
 
-func (dirState *directoryState) Open3(ctx fidl.Context, path string, flags io.Flags, options io.Options, channel zx.Channel) error {
+func (dirState *directoryState) Open(ctx fidl.Context, path string, flags io.Flags, options io.Options, channel zx.Channel) error {
 	if path == dot {
 		return dirState.addConnection(flags, channel)
 	}
@@ -423,7 +423,7 @@ func (dirState *directoryState) Open3(ctx fidl.Context, path string, flags io.Fl
 			}
 			defer cleanup()
 			if dir, ok := proxy.(io.DirectoryWithCtx); ok {
-				return dir.Open3(ctx, path[i+len(slash):], flags, options, channel)
+				return dir.Open(ctx, path[i+len(slash):], flags, options, channel)
 			}
 			return CloseWithEpitaph(channel, zx.ErrNotDir)
 		}

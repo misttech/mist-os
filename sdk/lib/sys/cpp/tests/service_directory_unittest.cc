@@ -19,13 +19,15 @@ TEST(ServiceDirectoryTest, Control) {
   sys::ServiceDirectory directory(std::move(svc_client));
 
   fidl::InterfaceHandle<test::placeholders::Echo> echo;
-  EXPECT_EQ(ZX_OK, directory.Connect(echo.NewRequest()));
+  ASSERT_EQ(ZX_OK, directory.Connect(echo.NewRequest()));
 
   fidl::IncomingMessageBuffer buffer;
   auto message = buffer.CreateEmptyIncomingMessage();
   message.Read(svc_server.get(), 0);
 
-  EXPECT_EQ(fidl::internal::WireOrdinal<fio::Directory::Open>::value, message.ordinal());
+  // TODO(https://fxbug.dev/377971588): This library uses `fdio_service_connect_at`, which still
+  // uses io1's DeprecatedOpen function. This test will need to be updated when that is fixed.
+  ASSERT_EQ(fidl::internal::WireOrdinal<fio::Directory::DeprecatedOpen>::value, message.ordinal());
 }
 
 TEST(ServiceDirectoryTest, CreateWithRequest) {
@@ -34,13 +36,15 @@ TEST(ServiceDirectoryTest, CreateWithRequest) {
   auto directory = sys::ServiceDirectory::CreateWithRequest(&svc_server);
 
   fidl::InterfaceHandle<test::placeholders::Echo> echo;
-  EXPECT_EQ(ZX_OK, directory->Connect(echo.NewRequest()));
+  ASSERT_EQ(ZX_OK, directory->Connect(echo.NewRequest()));
 
   fidl::IncomingMessageBuffer buffer;
   auto message = buffer.CreateEmptyIncomingMessage();
   message.Read(svc_server.get(), 0);
 
-  EXPECT_EQ(fidl::internal::WireOrdinal<fio::Directory::Open>::value, message.ordinal());
+  // TODO(https://fxbug.dev/377971588): This library uses `fdio_service_connect_at`, which still
+  // uses io1's DeprecatedOpen function. This test will need to be updated when that is fixed.
+  ASSERT_EQ(fidl::internal::WireOrdinal<fio::Directory::DeprecatedOpen>::value, message.ordinal());
 }
 
 TEST(ServiceDirectoryTest, Clone) {
@@ -49,20 +53,20 @@ TEST(ServiceDirectoryTest, Clone) {
   auto directory = sys::ServiceDirectory::CreateWithRequest(&svc_server);
 
   fidl::InterfaceHandle<test::placeholders::Echo> echo;
-  EXPECT_TRUE(directory->CloneChannel().is_valid());
+  ASSERT_TRUE(directory->CloneChannel().is_valid());
 
   fidl::IncomingMessageBuffer buffer;
   auto message = buffer.CreateEmptyIncomingMessage();
   message.Read(svc_server.get(), 0);
 
-  EXPECT_EQ(fidl::internal::WireOrdinal<fio::Directory::Clone>::value, message.ordinal());
+  ASSERT_EQ(fidl::internal::WireOrdinal<fio::Directory::Clone>::value, message.ordinal());
 }
 
 TEST(ServiceDirectoryTest, Invalid) {
   sys::ServiceDirectory directory((zx::channel()));
 
   fidl::InterfaceHandle<test::placeholders::Echo> echo;
-  EXPECT_EQ(ZX_ERR_UNAVAILABLE, directory.Connect(echo.NewRequest()));
+  ASSERT_EQ(ZX_ERR_UNAVAILABLE, directory.Connect(echo.NewRequest()));
 }
 
 TEST(ServiceDirectoryTest, AccessDenied) {
@@ -74,5 +78,5 @@ TEST(ServiceDirectoryTest, AccessDenied) {
   sys::ServiceDirectory directory(std::move(svc_client));
 
   fidl::InterfaceHandle<test::placeholders::Echo> echo;
-  EXPECT_EQ(ZX_ERR_ACCESS_DENIED, directory.Connect(echo.NewRequest()));
+  ASSERT_EQ(ZX_ERR_ACCESS_DENIED, directory.Connect(echo.NewRequest()));
 }

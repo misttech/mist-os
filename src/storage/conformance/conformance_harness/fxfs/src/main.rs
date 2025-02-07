@@ -11,7 +11,7 @@ use fidl_fuchsia_io_test::{
 };
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
-use fxfs_testing::{open_dir, open_file, TestFixture};
+use fxfs_testing::{deprecated_open_dir, deprecated_open_file, TestFixture};
 use log::error;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -32,13 +32,14 @@ async fn add_entries(
                 io_test::DirectoryEntry::Directory(io_test::Directory {
                     name, entries, ..
                 }) => {
-                    let new_dir = open_dir(&dest, FLAGS | fio::OpenFlags::DIRECTORY, &name)
-                        .await
-                        .context(format!("failed to create directory {name}"))?;
+                    let new_dir =
+                        deprecated_open_dir(&dest, FLAGS | fio::OpenFlags::DIRECTORY, &name)
+                            .await
+                            .context(format!("failed to create directory {name}"))?;
                     queue.push((new_dir, entries));
                 }
                 io_test::DirectoryEntry::File(io_test::File { name, contents, .. }) => {
-                    let file = open_file(&dest, FLAGS, &name)
+                    let file = deprecated_open_file(&dest, FLAGS, &name)
                         .await
                         .context(format!("failed to create file {name}"))?;
                     if !contents.is_empty() {
@@ -96,7 +97,7 @@ async fn run(mut stream: TestHarnessRequestStream, fixture: &TestFixture) -> Res
                 control_handle: _,
             } => {
                 let counter = COUNTER.fetch_add(1, Ordering::SeqCst);
-                let dir = open_dir(
+                let dir = deprecated_open_dir(
                     fixture.root(),
                     FLAGS | fio::OpenFlags::DIRECTORY,
                     &format!("test.{}", counter),
@@ -106,7 +107,7 @@ async fn run(mut stream: TestHarnessRequestStream, fixture: &TestFixture) -> Res
                 add_entries(fuchsia_fs::directory::clone(&dir).expect("clone failed"), contents)
                     .await
                     .expect("add_entries failed");
-                dir.open3(".", flags, &Default::default(), object_request.into_channel().into())
+                dir.open(".", flags, &Default::default(), object_request.into_channel().into())
                     .unwrap();
             }
             TestHarnessRequest::OpenServiceDirectory { responder: _ } => {

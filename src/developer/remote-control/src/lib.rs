@@ -333,11 +333,16 @@ impl RemoteControlService {
         })
         .await?;
 
-        dir.open(fio::OpenFlags::RIGHT_READABLE, fio::ModeType::empty(), "svc", server_end.into())
-            .map_err(|err| {
-                error!(err:?; "error opening svc dir in toolbox");
-                rcs::ConnectCapabilityError::CapabilityConnectFailed
-            })?;
+        dir.deprecated_open(
+            fio::OpenFlags::RIGHT_READABLE,
+            fio::ModeType::empty(),
+            "svc",
+            server_end.into(),
+        )
+        .map_err(|err| {
+            error!(err:?; "error opening svc dir in toolbox");
+            rcs::ConnectCapabilityError::CapabilityConnectFailed
+        })?;
         Ok(())
     }
 }
@@ -384,7 +389,7 @@ async fn connect_to_capability_in_dir(
     check_entry_exists(dir, capability_name).await?;
 
     // Connect to the capability
-    dir.open(
+    dir.deprecated_open(
         io::OpenFlags::empty(),
         io::ModeType::empty(),
         capability_name,

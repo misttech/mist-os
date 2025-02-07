@@ -344,7 +344,7 @@ async fn read_file(dir: &fio::DirectoryProxy, path: &str) -> Result<Vec<u8>, Ver
     let (file, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
 
     let flags = fio::Flags::FLAG_SEND_REPRESENTATION | fio::PERM_READABLE;
-    dir.open3(path, flags, &fio::Options::default(), server_end.into_channel())
+    dir.open(path, flags, &fio::Options::default(), server_end.into_channel())
         .expect("open3 request failed to send");
 
     let mut events = file.take_event_stream();

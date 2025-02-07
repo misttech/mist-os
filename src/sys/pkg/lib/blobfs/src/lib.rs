@@ -292,7 +292,7 @@ impl Client {
             let () = open_blob_with_reader(reader.clone(), *blob, scope, flags, object_request);
             Ok(())
         } else {
-            self.dir.open(flags, fio::ModeType::empty(), &blob.to_string(), server_end)
+            self.dir.deprecated_open(flags, fio::ModeType::empty(), &blob.to_string(), server_end)
         }
     }
 
@@ -321,7 +321,7 @@ impl Client {
         } else {
             let _: Result<(), ()> = self
                 .dir
-                .open3(
+                .open(
                     &blob.to_string(),
                     flags,
                     &object_request.options(),

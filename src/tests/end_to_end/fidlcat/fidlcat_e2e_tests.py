@@ -402,7 +402,7 @@ class FidlcatE2eTests(unittest.TestCase):
   startup Vmar:7ab3d41f(vmar-root)
 
   startup Channel:4eb3d2ab(dir:/svc)
-      21320.052636 write request  fuchsia.io/Directory.Open(".")
+      21320.052636 write request  fuchsia.io/Directory.DeprecatedOpen(".")
         -> Channel:fdd3d09f(channel:1)
 
   startup Channel:8db3d62f(dir:/pkg)
@@ -436,12 +436,12 @@ class FidlcatE2eTests(unittest.TestCase):
   Channel:c633d2db(channel:0)
     linked to Channel:fdd3d09f(channel:1)
     created by zx_channel_create
-    closed by Channel:4eb3d2ab(dir:/svc) sending fuchsia.io/Directory.Open
+    closed by Channel:4eb3d2ab(dir:/svc) sending fuchsia.io/Directory.DeprecatedOpen
 
   Channel:fdd3d09f(channel:1)
     linked to Channel:c633d2db(channel:0)
     created by zx_channel_create
-      21320.136348 write request  fuchsia.io/Directory.Open("test.placeholders.Echo")
+      21320.136348 write request  fuchsia.io/Directory.DeprecatedOpen("test.placeholders.Echo")
         -> Channel:7663d53b(channel:2)
     closed by zx_handle_close
 
@@ -456,7 +456,7 @@ class FidlcatE2eTests(unittest.TestCase):
   Channel:7063d25b(channel:3)
     linked to Channel:7663d53b(channel:2)
     created by zx_channel_create
-    closed by Channel:fdd3d09f(channel:1) sending fuchsia.io/Directory.Open
+    closed by Channel:fdd3d09f(channel:1) sending fuchsia.io/Directory.DeprecatedOpen
 
   Channel:31c3d79b()
     created by Channel:2f53d2bb(directory-request:/) receiving fuchsia.io/Node.DeprecatedClone
@@ -471,14 +471,14 @@ class FidlcatE2eTests(unittest.TestCase):
   startup Vmar:da0c2e4b(vmar-root)
 
   startup Channel:5e0c228f(dir:/svc)
-      21320.611044 write request  fuchsia.io/Directory.Open(".")
+      21320.611044 write request  fuchsia.io/Directory.DeprecatedOpen(".")
         -> Channel:d75c352b(channel:5)
 
   startup Channel:c75c3537(dir:/pkg)
 
   startup Channel:dedc3503(directory-request:/)
       21320.679108 read  request  fuchsia.io/Node.DeprecatedClone
-      21320.814595 read  request  fuchsia.io/Directory.Open("svc/test.placeholders.Echo")
+      21320.814595 read  request  fuchsia.io/Directory.DeprecatedOpen("svc/test.placeholders.Echo")
         -> Channel:60dc2bb3()
 
   startup Clock:8efc2deb()
@@ -502,7 +502,7 @@ class FidlcatE2eTests(unittest.TestCase):
   Channel:f2ec2f3b(channel:4)
     linked to Channel:d75c352b(channel:5)
     created by zx_channel_create
-    closed by Channel:5e0c228f(dir:/svc) sending fuchsia.io/Directory.Open
+    closed by Channel:5e0c228f(dir:/svc) sending fuchsia.io/Directory.DeprecatedOpen
 
   Channel:d75c352b(channel:5)
     linked to Channel:f2ec2f3b(channel:4)
@@ -514,7 +514,7 @@ class FidlcatE2eTests(unittest.TestCase):
 
   Channel:60dc2bb3()
     linked to Channel:7663d53b(channel:2) in process echo_client.cm:1934080
-    created by Channel:dedc3503(directory-request:/) receiving fuchsia.io/Directory.Open
+    created by Channel:dedc3503(directory-request:/) receiving fuchsia.io/Directory.DeprecatedOpen
       21320.901025 read  request  test.placeholders/Echo.EchoString
       21320.992007 write response test.placeholders/Echo.EchoString
     closed by zx_handle_close
@@ -530,10 +530,10 @@ class FidlcatE2eTests(unittest.TestCase):
             """\
 --------------------------------------------------------------------------------echo_client.cm 1934080: 5 events
   fuchsia.io/Directory: 2 events
-    Open: 2 events
-      21320.052636 write request  fuchsia.io/Directory.Open(Channel:4eb3d2ab(dir:/svc), ".")
+    DeprecatedOpen: 2 events
+      21320.052636 write request  fuchsia.io/Directory.DeprecatedOpen(Channel:4eb3d2ab(dir:/svc), ".")
         -> Channel:fdd3d09f(channel:1)
-      21320.136348 write request  fuchsia.io/Directory.Open(Channel:fdd3d09f(channel:1), "test.placeholders.Echo")
+      21320.136348 write request  fuchsia.io/Directory.DeprecatedOpen(Channel:fdd3d09f(channel:1), "test.placeholders.Echo")
         -> Channel:7663d53b(channel:2)
 
   test.placeholders/Echo: 2 events
@@ -547,10 +547,10 @@ class FidlcatE2eTests(unittest.TestCase):
 
 --------------------------------------------------------------------------------echo_server.cm 1934409: 5 events
   fuchsia.io/Directory: 2 events
-    Open: 2 events
-      21320.611044 write request  fuchsia.io/Directory.Open(Channel:5e0c228f(dir:/svc), ".")
+    DeprecatedOpen: 2 events
+      21320.611044 write request  fuchsia.io/Directory.DeprecatedOpen(Channel:5e0c228f(dir:/svc), ".")
         -> Channel:d75c352b(channel:5)
-      21320.814595 read  request  fuchsia.io/Directory.Open(Channel:dedc3503(directory-request:/), "svc/test.placeholders.Echo")
+      21320.814595 read  request  fuchsia.io/Directory.DeprecatedOpen(Channel:dedc3503(directory-request:/), "svc/test.placeholders.Echo")
         -> Channel:60dc2bb3()
 
   test.placeholders/Echo: 2 events

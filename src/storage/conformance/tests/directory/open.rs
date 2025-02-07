@@ -17,8 +17,13 @@ async fn open_dir_without_describe_flag() {
         assert_eq!(dir_flags & fio::OpenFlags::DESCRIBE, fio::OpenFlags::empty());
         let (client, server) = create_proxy::<fio::NodeMarker>();
 
-        dir.open(dir_flags | fio::OpenFlags::DIRECTORY, fio::ModeType::empty(), ".", server)
-            .expect("Cannot open directory");
+        dir.deprecated_open(
+            dir_flags | fio::OpenFlags::DIRECTORY,
+            fio::ModeType::empty(),
+            ".",
+            server,
+        )
+        .expect("Cannot open directory");
 
         assert_on_open_not_received(&client).await;
     }
@@ -34,7 +39,7 @@ async fn open_file_without_describe_flag() {
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
         let (client, server) = create_proxy::<fio::NodeMarker>();
 
-        dir.open(
+        dir.deprecated_open(
             file_flags | fio::OpenFlags::NOT_DIRECTORY,
             fio::ModeType::empty(),
             TEST_FILE,
@@ -52,8 +57,13 @@ async fn open1_epitaph_no_describe() {
     let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
 
     let (client, server) = create_proxy::<fio::NodeMarker>();
-    dir.open(fio::OpenFlags::RIGHT_READABLE, fio::ModeType::empty(), "does_not_exist", server)
-        .expect("Open should not fail!");
+    dir.deprecated_open(
+        fio::OpenFlags::RIGHT_READABLE,
+        fio::ModeType::empty(),
+        "does_not_exist",
+        server,
+    )
+    .expect("Open should not fail!");
     // Since Open1 is asynchronous, we need to invoke another method on the channel to check that
     // opening failed.
     let e = client
@@ -182,7 +192,7 @@ async fn open_dir_with_sufficient_rights() {
 
     for dir_flags in harness.dir_rights.combinations_deprecated() {
         let (client, server) = create_proxy::<fio::NodeMarker>();
-        dir.open(
+        dir.deprecated_open(
             dir_flags | fio::OpenFlags::DESCRIBE | fio::OpenFlags::DIRECTORY,
             fio::ModeType::empty(),
             ".",
@@ -206,7 +216,7 @@ async fn open_dir_with_insufficient_rights() {
             continue;
         }
         let (client, server) = create_proxy::<fio::NodeMarker>();
-        dir.open(
+        dir.deprecated_open(
             dir_flags | fio::OpenFlags::DESCRIBE | fio::OpenFlags::DIRECTORY,
             fio::ModeType::empty(),
             ".",
@@ -234,7 +244,7 @@ async fn open_child_dir_with_same_rights() {
         // Open child directory with same flags as parent.
         let (child_dir_client, child_dir_server) = create_proxy::<fio::NodeMarker>();
         parent_dir
-            .open(
+            .deprecated_open(
                 dir_flags | fio::OpenFlags::DESCRIBE | fio::OpenFlags::DIRECTORY,
                 fio::ModeType::empty(),
                 "child",
@@ -265,7 +275,7 @@ async fn open_child_dir_with_extra_rights() {
     // Opening child as writable should fail.
     let (child_dir_client, child_dir_server) = create_proxy::<fio::NodeMarker>();
     parent_dir
-        .open(
+        .deprecated_open(
             fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DESCRIBE | fio::OpenFlags::DIRECTORY,
             fio::ModeType::empty(),
             "child",
@@ -292,7 +302,7 @@ async fn open_child_dir_with_posix_flags() {
 
         let (child_dir_client, child_dir_server) = create_proxy::<fio::NodeMarker>();
         parent_dir
-            .open(
+            .deprecated_open(
                 readable
                     | fio::OpenFlags::POSIX_WRITABLE
                     | fio::OpenFlags::POSIX_EXECUTABLE
@@ -363,7 +373,7 @@ async fn open_file_with_extra_rights() {
             let (client, server) = create_proxy::<fio::NodeMarker>();
 
             dir_proxy
-                .open(
+                .deprecated_open(
                     *file_flags | fio::OpenFlags::DESCRIBE | fio::OpenFlags::NOT_DIRECTORY,
                     fio::ModeType::empty(),
                     TEST_FILE,

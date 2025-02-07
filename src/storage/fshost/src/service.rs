@@ -256,7 +256,7 @@ async fn wipe_storage_fxblob(
         .await
         .context("making blob volume")?;
     clone_onto(blob_volume.root(), blobfs_root)?;
-    blob_volume.exposed_dir().open(
+    blob_volume.exposed_dir().deprecated_open(
         fio::OpenFlags::empty(),
         fio::ModeType::empty(),
         "svc/fuchsia.fxfs.BlobCreator",

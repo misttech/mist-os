@@ -463,7 +463,7 @@ impl BlockServer {
 
 #[cfg(test)]
 mod tests {
-    use crate::fuchsia::testing::{open_file_checked, TestFixture};
+    use crate::fuchsia::testing::{deprecated_open_file_checked, TestFixture};
     use block_client::{BlockClient, RemoteBlockClient, VmoId};
     use fidl::endpoints::{ClientEnd, ServerEnd};
     use fidl_fuchsia_hardware_block::BlockMarker;
@@ -480,7 +480,7 @@ mod tests {
         fn connect_volume(&self) -> Result<ClientEnd<VolumeMarker>, anyhow::Error> {
             let (client, server) = fidl::endpoints::create_endpoints::<VolumeMarker>();
             self.0
-                .open(
+                .deprecated_open(
                     fio::OpenFlags::RIGHT_READABLE
                         | fio::OpenFlags::RIGHT_WRITABLE
                         | fio::OpenFlags::BLOCK_DEVICE,
@@ -498,7 +498,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let connector = {
             let root = fixture.root();
-            let file = open_file_checked(
+            let file = deprecated_open_file_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
@@ -550,7 +550,7 @@ mod tests {
             },
             async {
                 let root = fixture.root();
-                root.open(
+                root.deprecated_open(
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
                         | fio::OpenFlags::RIGHT_WRITABLE
@@ -584,7 +584,7 @@ mod tests {
             },
             async {
                 let root = fixture.root();
-                root.open(
+                root.deprecated_open(
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
                         | fio::OpenFlags::RIGHT_WRITABLE
@@ -644,7 +644,7 @@ mod tests {
             },
             async {
                 let root = fixture.root();
-                root.open(
+                root.deprecated_open(
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
                         | fio::OpenFlags::RIGHT_WRITABLE
@@ -674,7 +674,7 @@ mod tests {
             },
             async {
                 let root = fixture.root();
-                root.open(
+                root.deprecated_open(
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
                         | fio::OpenFlags::RIGHT_WRITABLE
@@ -708,7 +708,7 @@ mod tests {
             },
             async {
                 let root = fixture.root();
-                let file = open_file_checked(
+                let file = deprecated_open_file_checked(
                     &root,
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
@@ -730,7 +730,7 @@ mod tests {
                     .map_err(zx::Status::from_raw)
                     .expect("close error");
 
-                root.open(
+                root.deprecated_open(
                     fio::OpenFlags::RIGHT_READABLE
                         | fio::OpenFlags::RIGHT_WRITABLE
                         | fio::OpenFlags::BLOCK_DEVICE,
@@ -749,7 +749,7 @@ mod tests {
         let fixture = TestFixture::new().await;
         let connector = {
             let root = fixture.root();
-            let file = open_file_checked(
+            let file = deprecated_open_file_checked(
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
