@@ -3,15 +3,14 @@
 // found in the LICENSE file.
 
 use crate::metrics::analytics_command;
-use crate::{return_user_error, user_error, Error, FfxContext, MetricsSession, Result};
+use crate::{Format, MetricsSession};
 use argh::{ArgsInfo, FromArgs};
 use camino::Utf8PathBuf;
-use ffx_command_error::bug;
+use ffx_command_error::{bug, return_user_error, user_error, Error, FfxContext as _, Result};
 use ffx_config::environment::ExecutableKind;
 use ffx_config::logging::LogDestination;
 use ffx_config::{AssertNoEnvError, EnvironmentContext, FfxConfigBacked};
 use ffx_metrics::{enhanced_analytics, sanitize};
-use ffx_writer::Format;
 use std::collections::HashMap;
 use std::fmt::Write;
 use std::os::unix::process::ExitStatusExt;
@@ -529,7 +528,7 @@ impl Ffx {
                 }
                 "--machine" => {
                     if let Some(val) = argv_iter.next() {
-                        if let Ok(fmt) = ffx_writer::Format::from_str(val) {
+                        if let Ok(fmt) = Format::from_str(val) {
                             return_val.machine = Some(fmt);
                         }
                     }

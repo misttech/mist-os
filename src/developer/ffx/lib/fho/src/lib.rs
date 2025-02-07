@@ -26,14 +26,14 @@ pub use connector::{DirectConnector, MockDirectConnector};
 
 // Re-expose the Error, Result, and FfxContext types from ffx_command
 // so you don't have to pull both in all the time.
-//
-// FfxCommandLine is being re-exported so that, if they so choose, subtools can self-test without
-// having to import the ffx_command crate (which should not be importable directly due to
-// visibility rules).
-pub use ffx_command::{
-    bug, exit_with_code, return_bug, return_user_error, user_error, Error, FfxCommandLine,
-    FfxContext, NonFatalError, Result,
+pub use ffx_command_error::{
+    bug, exit_with_code, return_bug, return_user_error, user_error, Error, FfxContext,
+    NonFatalError, Result,
 };
+
+// FfxCommandLine is being re-exported so that, it can easily be used by the derive macros for
+// subtools.
+pub use ffx_command::FfxCommandLine;
 
 // Re-expose the ffx_writer::Writer as the 'simple writer'
 pub use ffx_writer::{

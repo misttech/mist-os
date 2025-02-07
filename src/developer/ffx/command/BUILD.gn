@@ -4,6 +4,8 @@
 
 import("//build/rust/rustc_library.gni")
 
+# TODO(b/394964930): Enable assert for ffx_command is host only
+# assert(is_host, "ffx_command is for host tools only.")
 rustc_library("lib") {
   name = "ffx_command"
   version = "0.1.0"
@@ -13,6 +15,9 @@ rustc_library("lib") {
   visibility = [
     ":*",
     "//src/developer/ffx/frontends/*",
+
+    # Writer reuses the Format enum. Maybe there is a better place?
+    "//src/developer/ffx/lib/writer:*",
 
     # TODO(b/386792198) Move ToolSuite to internal crate.
     "//src/developer/ffx/lib/fho:*",
@@ -40,7 +45,6 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/metrics:lib",
     "//src/developer/ffx/lib/netext:lib",
     "//src/developer/ffx/lib/timeout:lib",
-    "//src/developer/ffx/lib/writer:lib",
     "//src/lib/analytics/rust:lib",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",

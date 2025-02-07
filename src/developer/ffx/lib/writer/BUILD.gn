@@ -4,6 +4,9 @@
 
 import("//build/rust/rustc_library.gni")
 
+# TODO(b/394964930): Enable host-only assert
+# assert(is_host, "ffx writer is for host tools only")
+
 rustc_library("lib") {
   name = "ffx_writer"
   version = "0.1.0"
@@ -27,6 +30,9 @@ rustc_library("lib") {
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:valico",
   ]
+  if (is_host) {
+    deps += [ "//src/developer/ffx/command:lib" ]
+  }
 }
 
 group("tests") {

@@ -34,6 +34,25 @@ pub use metrics::{analytics_command, send_enhanced_analytics, MetricsSession};
 pub use subcommand::ExternalSubToolSuite;
 pub use tools::{FfxToolInfo, FfxToolSource, ToolRunner, ToolSuite};
 
+/// The valid formats possible to output for machine consumption.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Format {
+    Json,
+    JsonPretty,
+}
+
+impl std::str::FromStr for Format {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_ref() {
+            "json-pretty" => Ok(Format::JsonPretty),
+            "json" | "j" => Ok(Format::Json),
+            other => Err(user_error!("Invalid format name: {other}")),
+        }
+    }
+}
+
 fn stamp_file(stamp: &Option<String>) -> Result<Option<File>> {
     let Some(stamp) = stamp else { return Ok(None) };
     File::create(stamp)
@@ -110,8 +129,8 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
         // for all subcommands.
         let args = tools.get_args_info().await?;
         let output = match cmd.global.machine.unwrap() {
-            ffx_writer::Format::Json => serde_json::to_string(&args),
-            ffx_writer::Format::JsonPretty => serde_json::to_string_pretty(&args),
+            Format::Json => serde_json::to_string(&args),
+            Format::JsonPretty => serde_json::to_string_pretty(&args),
         };
         println!("{}", output.bug_context("Error serializing args")?);
         return Ok(ExitStatus::from_raw(0));
@@ -162,8 +181,8 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
                             .unwrap_or(info);
                     }
                     let output = match machine_format {
-                        ffx_writer::Format::Json => serde_json::to_string(&info),
-                        ffx_writer::Format::JsonPretty => serde_json::to_string_pretty(&info),
+                        Format::Json => serde_json::to_string(&info),
+                        Format::JsonPretty => serde_json::to_string_pretty(&info),
                     };
                     println!("{}", output.bug_context("Error serializing args")?);
                     return Ok(ExitStatus::from_raw(0));
@@ -269,7 +288,7 @@ pub async fn exit(res: Result<ExitStatus>, should_format: bool) -> ! {
 /// look through the command line args for `--machine <format>`
 /// and --help or help or -h. This is used to indicate the
 /// JSON arg info should be returned.
-fn find_machine_and_help(cmd: &FfxCommandLine) -> Option<ffx_writer::Format> {
+fn find_machine_and_help(cmd: &FfxCommandLine) -> Option<Format> {
     if cmd.subcmd_iter().any(|c| c == "help" || c == "--help" || c == "-h") {
         cmd.global.machine
     } else {

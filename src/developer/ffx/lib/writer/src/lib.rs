@@ -14,6 +14,18 @@ pub use test_buffer::*;
 pub use tool_io::*;
 pub use verified_machine_writer::*;
 
+// Re-export Format
+#[cfg(not(target_os = "fuchsia"))]
+pub use ffx_command::Format;
+
+// TODO(wilkinsonclay): Always use ffx_command::Format;
+#[cfg(target_os = "fuchsia")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Format {
+    Json,
+    JsonPretty,
+}
+
 #[derive(thiserror::Error, Debug)]
 #[error("Error while presenting output")]
 pub enum Error {
@@ -30,25 +42,6 @@ pub enum Error {
 }
 
 type Result<O, E = Error> = std::result::Result<O, E>;
-
-/// The valid formats possible to output for machine consumption.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Format {
-    Json,
-    JsonPretty,
-}
-
-impl std::str::FromStr for Format {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_ref() {
-            "json-pretty" => Ok(Format::JsonPretty),
-            "json" | "j" => Ok(Format::Json),
-            other => Err(Error::InvalidFormat(other.to_owned())),
-        }
-    }
-}
 
 impl From<Error> for ffx_command_error::Error {
     fn from(error: Error) -> Self {
