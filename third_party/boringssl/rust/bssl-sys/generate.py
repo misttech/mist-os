@@ -35,6 +35,10 @@ bindgen.raw_lines = RAW_LINES
 # generate `#![allow(...)]` directives.
 bindgen.generate_allows = False
 
+# There are third-party dependents of bssl-sys that don't expect padding
+# fields.
+bindgen.explicit_padding = False
+
 # The remaining options mirror what's specified in
 # //third_party/boringssl/src/rust/bssl-sys/CMakeLists.txt
 bindgen.include_dirs = [ BORINGSSL_INCLUDE_DIR ]

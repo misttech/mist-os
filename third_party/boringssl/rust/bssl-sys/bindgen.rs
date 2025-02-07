@@ -5034,7 +5034,7 @@ pub type wchar_t = ::core::ffi::c_int;
 #[derive(Debug, Copy, Clone)]
 pub struct max_align_t {
     pub __clang_max_align_nonce1: ::core::ffi::c_longlong,
-    pub __bindgen_padding_0: [u8; 8usize],
+    pub __bindgen_padding_0: u64,
     pub __clang_max_align_nonce2: u128,
 }
 pub type __u_char = ::core::ffi::c_uchar;
@@ -5358,7 +5358,6 @@ pub struct __pthread_rwlock_arch_t {
     pub __pad1: [::core::ffi::c_uchar; 7usize],
     pub __pad2: ::core::ffi::c_ulong,
     pub __flags: ::core::ffi::c_uint,
-    pub __bindgen_padding_0: [u8; 4usize],
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -5464,7 +5463,6 @@ pub struct random_data {
     pub rand_type: ::core::ffi::c_int,
     pub rand_deg: ::core::ffi::c_int,
     pub rand_sep: ::core::ffi::c_int,
-    pub __bindgen_padding_0: [u8; 4usize],
     pub end_ptr: *mut i32,
 }
 unsafe extern "C" {
@@ -6395,7 +6393,6 @@ pub struct tm {
     pub tm_wday: ::core::ffi::c_int,
     pub tm_yday: ::core::ffi::c_int,
     pub tm_isdst: ::core::ffi::c_int,
-    pub __bindgen_padding_0: [u8; 4usize],
     pub tm_gmtoff: ::core::ffi::c_long,
     pub tm_zone: *const ::core::ffi::c_char,
 }
@@ -6609,7 +6606,6 @@ pub type _IO_lock_t = ::core::ffi::c_void;
 #[derive(Debug, Copy, Clone)]
 pub struct _IO_FILE {
     pub _flags: ::core::ffi::c_int,
-    pub __bindgen_padding_0: [u8; 4usize],
     pub _IO_read_ptr: *mut ::core::ffi::c_char,
     pub _IO_read_end: *mut ::core::ffi::c_char,
     pub _IO_read_base: *mut ::core::ffi::c_char,
@@ -6629,7 +6625,6 @@ pub struct _IO_FILE {
     pub _cur_column: ::core::ffi::c_ushort,
     pub _vtable_offset: ::core::ffi::c_schar,
     pub _shortbuf: [::core::ffi::c_char; 1usize],
-    pub __bindgen_padding_1: [u8; 4usize],
     pub _lock: *mut _IO_lock_t,
     pub _offset: __off64_t,
     pub _codecvt: *mut _IO_codecvt,
@@ -7687,7 +7682,6 @@ unsafe extern "C" {
 #[derive(Debug, Copy, Clone)]
 pub struct CRYPTO_dynlock {
     pub references: ::core::ffi::c_int,
-    pub __bindgen_padding_0: [u8; 4usize],
     pub data: *mut CRYPTO_dynlock_value,
 }
 unsafe extern "C" {
@@ -8257,7 +8251,6 @@ unsafe extern "C" {
 #[derive(Debug, Copy, Clone)]
 pub struct bio_method_st {
     pub type_: ::core::ffi::c_int,
-    pub __bindgen_padding_0: [u8; 4usize],
     pub name: *const ::core::ffi::c_char,
     pub bwrite: ::core::option::Option<
         unsafe extern "C" fn(
@@ -9882,7 +9875,6 @@ unsafe extern "C" {
 #[derive(Copy, Clone)]
 pub struct asn1_type_st {
     pub type_: ::core::ffi::c_int,
-    pub __bindgen_padding_0: [u8; 4usize],
     pub value: asn1_type_st__bindgen_ty_1,
 }
 #[repr(C)]
@@ -10151,7 +10143,6 @@ pub type ASN1_MUST_BE_NULL = asn1_must_be_null_st;
 #[derive(Debug, Copy, Clone)]
 pub struct ASN1_ADB_st {
     pub flags: u32,
-    pub __bindgen_padding_0: [u8; 4usize],
     pub offset: ::core::ffi::c_ulong,
     pub unused: *mut ASN1_MUST_BE_NULL,
     pub tbl: *const ASN1_ADB_TABLE,
@@ -10163,14 +10154,12 @@ pub struct ASN1_ADB_st {
 #[derive(Debug, Copy, Clone)]
 pub struct ASN1_ADB_TABLE_st {
     pub value: ::core::ffi::c_int,
-    pub __bindgen_padding_0: [u8; 4usize],
     pub tt: ASN1_TEMPLATE,
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct ASN1_ITEM_st {
     pub itype: ::core::ffi::c_char,
-    pub __bindgen_padding_0: [u8; 3usize],
     pub utype: ::core::ffi::c_int,
     pub templates: *const ASN1_TEMPLATE,
     pub tcount: ::core::ffi::c_long,
@@ -10194,7 +10183,6 @@ pub struct ASN1_AUX_st {
     pub ref_offset: ::core::ffi::c_int,
     pub asn1_cb: ASN1_aux_cb,
     pub enc_offset: ::core::ffi::c_int,
-    pub __bindgen_padding_0: [u8; 4usize],
 }
 pub type ASN1_AUX = ASN1_AUX_st;
 unsafe extern "C" {
@@ -10293,7 +10281,6 @@ pub struct evp_encode_ctx_st {
     pub data: [u8; 48usize],
     pub eof_seen: ::core::ffi::c_char,
     pub error_encountered: ::core::ffi::c_char,
-    pub __bindgen_padding_0: [u8; 2usize],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -10564,7 +10551,6 @@ pub struct cbb_buffer_st {
     pub cap: usize,
         pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
     pub __bindgen_padding_0: [u8; 7usize],
-    pub __bindgen_padding_1: [u8; 7usize],
 }
 impl cbb_buffer_st {
     #[inline]
@@ -10657,8 +10643,7 @@ pub struct cbb_child_st {
     pub offset: usize,
     pub pending_len_len: u8,
         pub _bitfield_1: __BindgenBitfieldUnit<[u8; 1usize]>,
-    pub __bindgen_padding_0: [u8; 6usize],
-    pub __bindgen_padding_1: [u16; 3usize],
+    pub __bindgen_padding_0: [u16; 3usize],
 }
 impl cbb_child_st {
     #[inline]
@@ -10711,7 +10696,6 @@ impl cbb_child_st {
 pub struct cbb_st {
     pub child: *mut CBB,
     pub is_child: ::core::ffi::c_char,
-    pub __bindgen_padding_0: [u8; 7usize],
     pub u: cbb_st__bindgen_ty_1,
 }
 #[repr(C)]
@@ -11307,7 +11291,6 @@ pub struct evp_cipher_ctx_st {
     pub final_used: ::core::ffi::c_int,
     pub final_: [u8; 32usize],
     pub poisoned: ::core::ffi::c_int,
-    pub __bindgen_padding_0: [u8; 4usize],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -12940,7 +12923,6 @@ unsafe extern "C" {
 #[derive(Debug, Copy, Clone)]
 pub struct EC_builtin_curve {
     pub nid: ::core::ffi::c_int,
-    pub __bindgen_padding_0: [u8; 4usize],
     pub comment: *const ::core::ffi::c_char,
 }
 unsafe extern "C" {
@@ -12987,7 +12969,6 @@ unsafe extern "C" {
 pub struct openssl_method_common_st {
     pub references: ::core::ffi::c_int,
     pub is_static: ::core::ffi::c_char,
-    pub __bindgen_padding_0: [u8; 3usize],
 }
 unsafe extern "C" {
     pub fn EC_KEY_new() -> *mut EC_KEY;
@@ -13151,7 +13132,6 @@ pub struct ecdsa_method_st {
         ) -> ::core::ffi::c_int,
     >,
     pub flags: ::core::ffi::c_int,
-    pub __bindgen_padding_0: [u8; 4usize],
 }
 unsafe extern "C" {
     pub fn EC_KEY_set_asn1_flag(key: *mut EC_KEY, flag: ::core::ffi::c_int);
@@ -13390,7 +13370,6 @@ pub struct evp_aead_ctx_st {
     pub aead: *const EVP_AEAD,
     pub state: evp_aead_ctx_st_state,
     pub tag_len: u8,
-    pub __bindgen_padding_0: [u8; 7usize],
 }
 unsafe extern "C" {
     pub fn EVP_AEAD_CTX_zero(ctx: *mut EVP_AEAD_CTX);
@@ -14585,7 +14564,6 @@ pub struct evp_hpke_ctx_st {
     pub exporter_secret: [u8; 64usize],
     pub seq: u64,
     pub is_sender: ::core::ffi::c_int,
-    pub __bindgen_padding_0: [u8; 4usize],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -15520,7 +15498,6 @@ pub struct rsa_meth_st {
         ) -> ::core::ffi::c_int,
     >,
     pub flags: ::core::ffi::c_int,
-    pub __bindgen_padding_0: [u8; 4usize],
 }
 pub type sk_X509_free_func = ::core::option::Option<unsafe extern "C" fn(arg1: *mut X509)>;
 pub type sk_X509_copy_func =
@@ -16728,7 +16705,6 @@ pub type EDIPARTYNAME = EDIPartyName_st;
 #[derive(Copy, Clone)]
 pub struct GENERAL_NAME_st {
     pub type_: ::core::ffi::c_int,
-    pub __bindgen_padding_0: [u8; 4usize],
     pub d: GENERAL_NAME_st__bindgen_ty_1,
 }
 #[repr(C)]
@@ -17719,7 +17695,6 @@ pub struct X509_info_st {
     pub x_pkey: *mut X509_PKEY,
     pub enc_cipher: EVP_CIPHER_INFO,
     pub enc_len: ::core::ffi::c_int,
-    pub __bindgen_padding_0: [u8; 4usize],
     pub enc_data: *mut ::core::ffi::c_char,
 }
 #[repr(C)]
@@ -17750,7 +17725,6 @@ unsafe extern "C" {
 #[derive(Debug, Copy, Clone)]
 pub struct v3_ext_ctx {
     pub flags: ::core::ffi::c_int,
-    pub __bindgen_padding_0: [u8; 4usize],
     pub issuer_cert: *const X509,
     pub subject_cert: *const X509,
     pub subject_req: *const X509_REQ,
@@ -17999,7 +17973,6 @@ pub struct x509_trust_st {
     >,
     pub name: *mut ::core::ffi::c_char,
     pub arg1: ::core::ffi::c_int,
-    pub __bindgen_padding_0: [u8; 4usize],
     pub arg2: *mut ::core::ffi::c_void,
 }
 #[repr(C)]
@@ -18574,7 +18547,6 @@ pub type sk_X509V3_EXT_METHOD_delete_if_func = ::core::option::Option<
 #[derive(Debug, Copy, Clone)]
 pub struct BASIC_CONSTRAINTS_st {
     pub ca: ::core::ffi::c_int,
-    pub __bindgen_padding_0: [u8; 4usize],
     pub pathlen: *mut ASN1_INTEGER,
 }
 #[repr(C)]
@@ -18612,7 +18584,6 @@ pub type EXTENDED_KEY_USAGE = stack_st_ASN1_OBJECT;
 #[derive(Copy, Clone)]
 pub struct DIST_POINT_NAME_st {
     pub type_: ::core::ffi::c_int,
-    pub __bindgen_padding_0: [u8; 4usize],
     pub name: DIST_POINT_NAME_st__bindgen_ty_1,
     pub dpname: *mut X509_NAME,
 }
@@ -18822,7 +18793,6 @@ pub struct x509_purpose_st {
     pub purpose: ::core::ffi::c_int,
     pub trust: ::core::ffi::c_int,
     pub flags: ::core::ffi::c_int,
-    pub __bindgen_padding_0: [u8; 4usize],
     pub check_purpose: ::core::option::Option<
         unsafe extern "C" fn(
             arg1: *const x509_purpose_st,
@@ -22495,7 +22465,6 @@ pub struct ssl_early_callback_ctx {
     pub client_hello: *const u8,
     pub client_hello_len: usize,
     pub version: u16,
-    pub __bindgen_padding_0: [u8; 6usize],
     pub random: *const u8,
     pub random_len: usize,
     pub session_id: *const u8,
@@ -22956,7 +22925,6 @@ unsafe extern "C" {
 #[derive(Debug, Copy, Clone)]
 pub struct ssl_comp_st {
     pub id: ::core::ffi::c_int,
-    pub __bindgen_padding_0: [u8; 4usize],
     pub name: *const ::core::ffi::c_char,
     pub method: *mut ::core::ffi::c_char,
 }
