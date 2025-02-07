@@ -18,6 +18,7 @@
 
 // MAC Address for Ethernet, Wifi, Bluetooth, etc.
 // Content: uint8_t[] (variable length based on type of MAC address)
+// TODO(b/373918767): Remove once no longer used.
 #define DEVICE_METADATA_MAC_ADDRESS 0x43414D6D  // mMAC
 static_assert(DEVICE_METADATA_MAC_ADDRESS == ZBI_TYPE_DRV_MAC_ADDRESS, "");
 
@@ -33,6 +34,7 @@ static_assert(DEVICE_METADATA_PARTITION_MAP == ZBI_TYPE_DRV_PARTITION_MAP, "");
 // type: usb_mode_t
 #define DEVICE_METADATA_USB_MODE 0x4D425355  // USBM
 
+// TODO(b/373918767): Remove once no longer used.
 #define DEVICE_METADATA_SERIAL_NUMBER 0x4e4c5253  // SRLN
 static_assert(DEVICE_METADATA_SERIAL_NUMBER == ZBI_TYPE_SERIAL_NUMBER, "");
 

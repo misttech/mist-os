@@ -11,6 +11,7 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zircon-internal/align.h>
 
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
@@ -42,7 +43,7 @@ namespace fpbus = fuchsia_hardware_platform_bus;
 
 static const std::vector<fpbus::BootMetadata> wifi_boot_metadata{
     {{
-        .zbi_type = DEVICE_METADATA_MAC_ADDRESS,
+        .zbi_type = ZBI_TYPE_DRV_MAC_ADDRESS,
         .zbi_extra = MACADDR_WIFI,
     }},
 };
