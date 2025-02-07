@@ -22,16 +22,6 @@
     offer: [
         {
             // TODO: This should only be present in debugging configurations.
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [
-                "#binder-proxy",
-                "#ta-manager",
-                "#ta-manager-config",
-            ],
-        },
-        {
-            // TODO: This should only be present in debugging configurations.
             dictionary: "diagnostics",
             from: "parent",
             to: [

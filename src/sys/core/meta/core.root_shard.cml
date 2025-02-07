@@ -169,7 +169,6 @@
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
                 "fuchsia.logger.Log",
-                "fuchsia.logger.LogSink",
                 "fuchsia.paver.Paver",
                 "fuchsia.pkg.PackageCache",
                 "fuchsia.pkg.PackageResolver-base",

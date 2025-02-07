@@ -11,10 +11,12 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.kernel.PowerResource",
-                "fuchsia.logger.LogSink",
-            ],
+            protocol: [ "fuchsia.kernel.PowerResource" ],
+            from: "parent",
+            to: [ "#thermd" ],
+        },
+        {
+            dictionary: "diagnostics",
             from: "parent",
             to: [ "#thermd" ],
         },

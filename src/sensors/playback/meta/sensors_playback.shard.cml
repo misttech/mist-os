@@ -21,7 +21,7 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
+            dictionary: "diagnostics",
             from: "parent",
             to: [ "#sensors_playback" ],
         },

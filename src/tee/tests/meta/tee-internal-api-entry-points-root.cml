@@ -19,17 +19,12 @@
             to: "#test-suite",
         },
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
+            dictionary: "diagnostics",
             from: "parent",
             to: [
                 "#tee-internal-api-entry-points",
                 "#test-suite",
             ],
-        },
-        {
-            dictionary: "diagnostics",
-            from: "parent",
-            to: "all",
         },
         {
             directory: "pkg",

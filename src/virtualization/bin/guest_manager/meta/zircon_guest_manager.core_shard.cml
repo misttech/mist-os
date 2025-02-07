@@ -21,7 +21,6 @@
             protocol: [
                 "fuchsia.kernel.HypervisorResource",
                 "fuchsia.kernel.VmexResource",
-                "fuchsia.logger.LogSink",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysinfo.SysInfo",
             ],
@@ -42,6 +41,11 @@
             to: "#zircon-guest-manager",
             dependency: "weak",
             source_availability: "unknown", // may not be available on all products
+        },
+        {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "#zircon-guest-manager",
         },
         {
             protocol: [ "fuchsia.media.Audio" ],

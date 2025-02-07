@@ -15,11 +15,6 @@
             to: "#sysinfo",
         },
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "#archivist",
-            to: "#sysinfo",
-        },
-        {
             dictionary: "diagnostics",
             from: "self",
             to: "#sysinfo",

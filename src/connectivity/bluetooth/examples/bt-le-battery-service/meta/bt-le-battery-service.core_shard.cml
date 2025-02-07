@@ -12,11 +12,6 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [ "#bt-le-battery-service" ],
-        },
-        {
             protocol: [ "fuchsia.bluetooth.gatt2.Server" ],
             from: "#bluetooth-core",
             to: [ "#bt-le-battery-service" ],
@@ -24,6 +19,11 @@
         {
             protocol: [ "fuchsia.power.battery.BatteryManager" ],
             from: "#battery_manager",
+            to: [ "#bt-le-battery-service" ],
+        },
+        {
+            dictionary: "diagnostics",
+            from: "parent",
             to: [ "#bt-le-battery-service" ],
         },
     ],

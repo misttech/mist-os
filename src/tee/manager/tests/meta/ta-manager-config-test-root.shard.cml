@@ -37,15 +37,10 @@
         {
             dictionary: "diagnostics",
             from: "parent",
-            to: "all",
-        },
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
             to: [
                 "#ta",
                 "#ta-manager",
-                "#test-config", // XXX - why is this required?
+                "#test-config",
                 "#test-suite",
             ],
         },

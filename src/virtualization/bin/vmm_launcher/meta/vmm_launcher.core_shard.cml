@@ -21,10 +21,14 @@
             protocol: [
                 "fuchsia.kernel.HypervisorResource",
                 "fuchsia.kernel.VmexResource",
-                "fuchsia.logger.LogSink",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysinfo.SysInfo",
             ],
+            from: "parent",
+            to: "#vmm_launcher",
+        },
+        {
+            dictionary: "diagnostics",
             from: "parent",
             to: "#vmm_launcher",
         },

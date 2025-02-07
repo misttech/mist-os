@@ -12,7 +12,7 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
+            dictionary: "diagnostics",
             from: "parent",
             to: "#auto-brightness",
         },

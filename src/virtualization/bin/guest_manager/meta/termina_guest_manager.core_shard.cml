@@ -31,10 +31,14 @@
             protocol: [
                 "fuchsia.kernel.HypervisorResource",
                 "fuchsia.kernel.VmexResource",
-                "fuchsia.logger.LogSink",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysinfo.SysInfo",
             ],
+            from: "parent",
+            to: "#termina-guest-manager",
+        },
+        {
+            dictionary: "diagnostics",
             from: "parent",
             to: "#termina-guest-manager",
         },

@@ -12,13 +12,13 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
+            protocol: [ "fuchsia.bluetooth.le.Central" ],
+            from: "#bluetooth-core",
             to: [ "#bt-le-battery-monitor" ],
         },
         {
-            protocol: [ "fuchsia.bluetooth.le.Central" ],
-            from: "#bluetooth-core",
+            dictionary: "diagnostics",
+            from: "parent",
             to: [ "#bt-le-battery-monitor" ],
         },
     ],

@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "inspect/offer.shard.cml" ],
     children: [
         {
             name: "pkg_cache_integration_test",
@@ -13,7 +12,6 @@
         {
             protocol: [
                 "fuchsia.diagnostics.ArchiveAccessor",
-                "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
                 "fuchsia.tracing.provider.Registry",
             ],

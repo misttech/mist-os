@@ -11,16 +11,16 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [ "#bt-hfp-hands-free" ],
-        },
-        {
             directory: "dev-class",
             from: "parent",
             as: "dev-dai",
             to: [ "#bt-hfp-hands-free" ],
             subdir: "dai",
+        },
+        {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: [ "#bt-hfp-hands-free" ],
         },
         {
             protocol: [ "fuchsia.media.AudioDeviceEnumerator" ],

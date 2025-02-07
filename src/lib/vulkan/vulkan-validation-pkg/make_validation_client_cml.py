@@ -44,11 +44,6 @@ def main() -> int:
         ],
         offer: [
             {
-                protocol: [ "fuchsia.logger.LogSink" ],
-                from: "parent",
-                to: "#validation-server",
-            },
-            {
                 dictionary: "diagnostics",
                 from: "parent",
                 to: "#validation-server",

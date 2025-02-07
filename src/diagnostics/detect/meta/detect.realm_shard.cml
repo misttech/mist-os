@@ -11,11 +11,6 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: "#detect",
-        },
-        {
             dictionary: "diagnostics",
             from: "parent",
             to: "#detect",

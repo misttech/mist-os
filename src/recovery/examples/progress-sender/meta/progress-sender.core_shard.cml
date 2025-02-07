@@ -15,9 +15,12 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.logger.LogSink",
+            dictionary: "diagnostics",
             from: "parent",
-            to: "#progress-sender",
+            to: [
+                "#progress-sender",
+                "#progress-ui",
+            ],
         },
         {
             protocol: "fuchsia.recovery.ui.ProgressRenderer",

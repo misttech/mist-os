@@ -17,11 +17,6 @@
             subdir: "vsock",
         },
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "#archivist",
-            to: "#vsock",
-        },
-        {
             dictionary: "diagnostics",
             from: "self",
             to: [ "#vsock" ],
