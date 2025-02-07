@@ -69,6 +69,14 @@ class OvernetUsb : public fdf::DriverBase,
   zx_status_t UsbFunctionInterfaceSetInterface(uint8_t interface, uint8_t alt_setting);
 
  private:
+  // Configures the device's endpoints and sets the device state to Ready, if it's in the
+  // Unconfigured state.
+  zx_status_t ConfigureEndpoints();
+
+  // Disables the device's endpoints, cancels any outstanding requests, and moves the device
+  // into the Unconfigured state if it's not already there.
+  zx_status_t UnconfigureEndpoints();
+
   // Called whenever the socket from RCS is readable. Reads data out of the socket and places it
   // into bulk IN requests.
   void HandleSocketReadable(async_dispatcher_t*, async::WaitBase*, zx_status_t status,
