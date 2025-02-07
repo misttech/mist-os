@@ -5,7 +5,6 @@
 #include "aml-clk.h"
 
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
-#include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <string.h>
@@ -174,11 +173,8 @@ zx_status_t AmlClock::PopulateRegisterBlocks(uint32_t device_id, fdf::PDev& pdev
 zx::result<> AmlClock::Start() {
   // Initialize compat server.
   {
-    // TODO(b/373903133): Don't forward clock ID's using the legacy method once it is no longer
-    // used.
-    zx::result<> result =
-        compat_server_.Initialize(incoming(), outgoing(), node_name(), kChildNodeName,
-                                  compat::ForwardMetadata::Some({DEVICE_METADATA_CLOCK_IDS}));
+    zx::result<> result = compat_server_.Initialize(
+        incoming(), outgoing(), node_name(), kChildNodeName, compat::ForwardMetadata::None());
     if (result.is_error()) {
       FDF_LOG(ERROR, "Failed to initialize compat server: %s", result.status_string());
       return result.take_error();

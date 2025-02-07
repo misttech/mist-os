@@ -18,7 +18,6 @@
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/hardware/clock/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
-#include <ddk/metadata/clock.h>
 #include <gtest/gtest.h>
 
 #include "dts/clock.h"
@@ -62,25 +61,15 @@ TEST(ClockImplVisitorTest, TestClocksProperty) {
       // Test metadata properties.
       ASSERT_TRUE(metadata);
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-      ASSERT_EQ(3lu, metadata->size());
-#else
       ASSERT_EQ(2lu, metadata->size());
+#else
+      ASSERT_EQ(1lu, metadata->size());
 #endif
 
-      // ID metadata
-      std::vector<uint8_t> metadata_blob_1 = std::move(*(*metadata)[0].data());
-      auto metadata_start = reinterpret_cast<clock_id_t*>(metadata_blob_1.data());
-      std::vector<clock_id_t> clock_ids(
-          metadata_start, metadata_start + (metadata_blob_1.size() / sizeof(clock_id_t)));
-      ASSERT_EQ(clock_ids.size(), 3lu);
-      EXPECT_EQ(clock_ids[0].clock_id, static_cast<uint32_t>(CLK_ID1));
-      EXPECT_EQ(clock_ids[1].clock_id, static_cast<uint32_t>(CLK_ID2));
-      EXPECT_EQ(clock_ids[2].clock_id, static_cast<uint32_t>(CLK_ID6));
-
       // Init steps metadata
-      std::vector<uint8_t> metadata_blob_2 = std::move(*(*metadata)[1].data());
+      std::vector<uint8_t> metadata_blob_1 = std::move(*(*metadata)[0].data());
       fit::result init_steps =
-          fidl::Unpersist<fuchsia_hardware_clockimpl::InitMetadata>(cpp20::span(metadata_blob_2));
+          fidl::Unpersist<fuchsia_hardware_clockimpl::InitMetadata>(cpp20::span(metadata_blob_1));
       ASSERT_TRUE(init_steps.is_ok());
       // Steps expected - Disable for CLK_ID3, SetInput as CLK_ID5, Enable for CLK_ID3
       ASSERT_EQ(init_steps->steps().size(), 3lu);
@@ -96,11 +85,11 @@ TEST(ClockImplVisitorTest, TestClocksProperty) {
                 fuchsia_hardware_clockimpl::InitCall::Tag::kEnable);
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-      // Clock ID's metadata
-      std::vector<uint8_t> metadata_blob_3 = std::move(*(*metadata)[2].data());
+      // Clock IDs metadata
+      std::vector<uint8_t> metadata_blob_2 = std::move(*(*metadata)[1].data());
       fit::result clock_ids_metadata =
           fidl::Unpersist<fuchsia_hardware_clockimpl::ClockIdsMetadata>(
-              cpp20::span(metadata_blob_3));
+              cpp20::span(metadata_blob_2));
       const auto& clock_ids2 = clock_ids_metadata->clock_ids();
       ASSERT_TRUE(clock_ids2.has_value());
       ASSERT_EQ(clock_ids2.value().size(), 3lu);

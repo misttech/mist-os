@@ -7,10 +7,8 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
-#include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 
-#include <ddk/metadata/clock.h>
 #include <soc/aml-meson/g12b-clk.h>
 #include <soc/aml-t931/t931-hw.h>
 
@@ -32,23 +30,6 @@ static const std::vector<fpbus::Mmio> clk_mmios{
         .base = T931_MSR_CLK_BASE,
         .length = T931_MSR_CLK_LENGTH,
     }},
-};
-
-// TODO(b/373903133): Remove once no longer referenced.
-static const clock_id_t kClockIds[] = {
-    // For Camera Sensor.
-    {g12b_clk::G12B_CLK_CAM_INCK_24M},
-    // For cpu driver.
-    {g12b_clk::G12B_CLK_SYS_PLL_DIV16},
-    {g12b_clk::G12B_CLK_SYS_CPU_CLK_DIV16},
-    {g12b_clk::G12B_CLK_SYS_PLLB_DIV16},
-    {g12b_clk::G12B_CLK_SYS_CPUB_CLK_DIV16},
-    {g12b_clk::CLK_SYS_CPU_BIG_CLK},
-    {g12b_clk::CLK_SYS_CPU_LITTLE_CLK},
-    // For video decoder/encoder
-    {g12b_clk::G12B_CLK_DOS_GCLK_VDEC},
-    {g12b_clk::G12B_CLK_DOS_GCLK_HCODEC},
-    {g12b_clk::G12B_CLK_DOS},
 };
 
 zx_status_t Sherlock::ClkInit() {
@@ -99,13 +80,6 @@ zx_status_t Sherlock::ClkInit() {
           .data = encoded_clock_ids_metadata.value(),
       }},
 #endif
-      // TODO(b/373903133): Remove once no longer referenced.
-      {{
-          .id = std::to_string(DEVICE_METADATA_CLOCK_IDS),
-          .data = std::vector<uint8_t>(
-              reinterpret_cast<const uint8_t*>(&kClockIds),
-              reinterpret_cast<const uint8_t*>(&kClockIds) + sizeof(kClockIds)),
-      }},
       {{
           .id = fuchsia_hardware_clockimpl::wire::InitMetadata::kSerializableName,
           .data = std::move(encoded_clock_init_metadata.value()),

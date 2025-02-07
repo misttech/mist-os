@@ -4,7 +4,6 @@
 
 #include "vim3_clk.h"
 
-#include <lib/ddk/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
@@ -107,11 +106,8 @@ zx::result<> Vim3Clock::Start() {
 
   // Initialize our compat server.
   {
-    // TODO(b/373903133): Don't forward clock ID's using the legacy method once it is no longer
-    // used.
-    zx::result<> result =
-        compat_server_.Initialize(incoming(), outgoing(), node_name(), child_name,
-                                  compat::ForwardMetadata::Some({DEVICE_METADATA_CLOCK_IDS}));
+    zx::result<> result = compat_server_.Initialize(incoming(), outgoing(), node_name(), child_name,
+                                                    compat::ForwardMetadata::None());
     if (result.is_error()) {
       return result.take_error();
     }

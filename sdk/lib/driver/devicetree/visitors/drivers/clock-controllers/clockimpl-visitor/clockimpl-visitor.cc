@@ -5,7 +5,6 @@
 #include "clockimpl-visitor.h"
 
 #include <fidl/fuchsia.hardware.clockimpl/cpp/fidl.h>
-#include <lib/ddk/metadata.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/devicetree/visitors/registration.h>
@@ -21,7 +20,6 @@
 #include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/hardware/clock/cpp/bind.h>
-#include <ddk/metadata/clock.h>
 
 namespace clock_impl_dt {
 
@@ -226,9 +224,6 @@ zx::result<> ClockImplVisitor::ParseReferenceChild(fdf_devicetree::Node& child,
   FDF_LOG(DEBUG, "Clock ID added - ID 0x%x name '%s' to controller '%s'", cells.id(),
           clock_name ? std::string(*clock_name).c_str() : "<anonymous>", parent.name().c_str());
 
-  controller.clock_ids_metadata_legacy.insert(
-      controller.clock_ids_metadata_legacy.end(), reinterpret_cast<const uint8_t*>(&clock_id),
-      reinterpret_cast<const uint8_t*>(&clock_id) + sizeof(uint32_t));
   auto& clock_ids = controller.clock_ids_metadata.clock_ids();
   if (!clock_ids.has_value()) {
     clock_ids.emplace(std::vector<uint32_t>{});
@@ -296,16 +291,6 @@ zx::result<> ClockImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
       FDF_LOG(INFO, "Clock controller '%s' is not being used. Not adding any metadata for it.",
               node.name().c_str());
       return zx::ok();
-    }
-
-    if (!controller->second.clock_ids_metadata_legacy.empty()) {
-      fuchsia_hardware_platform_bus::Metadata id_metadata = {{
-          .id = std::to_string(DEVICE_METADATA_CLOCK_IDS),
-          .data = controller->second.clock_ids_metadata_legacy,
-      }};
-      node.AddMetadata(std::move(id_metadata));
-
-      FDF_LOG(DEBUG, "Clock ID's legacy metadata added to node '%s'", node.name().c_str());
     }
 
     if (!controller->second.init_metadata.steps().empty()) {
