@@ -28,10 +28,10 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS};
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::{
-    errno, error, pid_t, rusage, sigaction_t, sigaltstack, timespec, MINSIGSTKSZ, P_ALL, P_PGID,
-    P_PID, P_PIDFD, SFD_CLOEXEC, SFD_NONBLOCK, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SI_MAX_SIZE,
-    SI_TKILL, SI_USER, SS_AUTODISARM, SS_DISABLE, SS_ONSTACK, WCONTINUED, WEXITED, WNOHANG,
-    WNOWAIT, WSTOPPED, WUNTRACED, __WALL, __WCLONE,
+    errno, error, pid_t, rusage, sigaltstack, timespec, MINSIGSTKSZ, P_ALL, P_PGID, P_PID, P_PIDFD,
+    SFD_CLOEXEC, SFD_NONBLOCK, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SI_MAX_SIZE, SI_TKILL, SI_USER,
+    SS_AUTODISARM, SS_DISABLE, SS_ONSTACK, WCONTINUED, WEXITED, WNOHANG, WNOWAIT, WSTOPPED,
+    WUNTRACED, __WALL, __WCLONE,
 };
 use static_assertions::const_assert_eq;
 use zerocopy::FromBytes;
@@ -39,12 +39,14 @@ use zerocopy::FromBytes;
 // Rust will let us do this cast in a const assignment but not in a const generic constraint.
 const SI_MAX_SIZE_AS_USIZE: usize = SI_MAX_SIZE as usize;
 
+type SigActionPtr = MultiArchUserRef<uapi::sigaction_t, uapi::arch32::sigaction_t>;
+
 pub fn sys_rt_sigaction(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     signum: UncheckedSignal,
-    user_action: UserRef<sigaction_t>,
-    user_old_action: UserRef<sigaction_t>,
+    user_action: SigActionPtr,
+    user_old_action: SigActionPtr,
     sigset_size: usize,
 ) -> Result<(), Errno> {
     if sigset_size != std::mem::size_of::<SigSet>() {
@@ -61,7 +63,7 @@ pub fn sys_rt_sigaction(
             return error!(EINVAL);
         }
 
-        let signal_action = current_task.read_object(user_action)?;
+        let signal_action = current_task.read_multi_arch_object(user_action)?;
         Some(signal_action)
     } else {
         None
@@ -75,7 +77,7 @@ pub fn sys_rt_sigaction(
     };
 
     if !user_old_action.is_null() {
-        current_task.write_object(user_old_action, &old_action)?;
+        current_task.write_multi_arch_object(user_old_action, old_action)?;
     }
 
     Ok(())
@@ -871,7 +873,9 @@ fn negate_pid(pid: pid_t) -> Result<pid_t, Errno> {
 // Syscalls for arch32 usage
 #[cfg(feature = "arch32")]
 mod arch32 {
-    pub use super::sys_sigaltstack as sys_arch32_sigaltstack;
+    pub use super::{
+        sys_rt_sigaction as sys_arch32_rt_sigaction, sys_sigaltstack as sys_arch32_sigaltstack,
+    };
 }
 
 #[cfg(feature = "arch32")]
@@ -892,7 +896,7 @@ mod tests {
         SIGCHLD, SIGHUP, SIGINT, SIGIO, SIGKILL, SIGRTMIN, SIGSEGV, SIGSTOP, SIGTERM, SIGTRAP,
         SIGUSR1,
     };
-    use starnix_uapi::{uaddr, uid_t, SI_QUEUE};
+    use starnix_uapi::{sigaction_t, uaddr, uid_t, SI_QUEUE};
     use zerocopy::IntoBytes;
 
     #[cfg(target_arch = "x86_64")]
@@ -1391,8 +1395,8 @@ mod tests {
                 &current_task,
                 UncheckedSignal::from(SIGKILL),
                 // The signal is only checked when the action is set (i.e., action is non-null).
-                UserRef::<sigaction_t>::new(UserAddress::from(10)),
-                UserRef::<sigaction_t>::default(),
+                UserRef::<sigaction_t>::new(UserAddress::from(10)).into(),
+                UserRef::<sigaction_t>::default().into(),
                 std::mem::size_of::<SigSet>(),
             ),
             error!(EINVAL)
@@ -1403,8 +1407,8 @@ mod tests {
                 &current_task,
                 UncheckedSignal::from(SIGSTOP),
                 // The signal is only checked when the action is set (i.e., action is non-null).
-                UserRef::<sigaction_t>::new(UserAddress::from(10)),
-                UserRef::<sigaction_t>::default(),
+                UserRef::<sigaction_t>::new(UserAddress::from(10)).into(),
+                UserRef::<sigaction_t>::default().into(),
                 std::mem::size_of::<SigSet>(),
             ),
             error!(EINVAL)
@@ -1415,8 +1419,8 @@ mod tests {
                 &current_task,
                 UncheckedSignal::from(Signal::NUM_SIGNALS + 1),
                 // The signal is only checked when the action is set (i.e., action is non-null).
-                UserRef::<sigaction_t>::new(UserAddress::from(10)),
-                UserRef::<sigaction_t>::default(),
+                UserRef::<sigaction_t>::new(UserAddress::from(10)).into(),
+                UserRef::<sigaction_t>::default().into(),
                 std::mem::size_of::<SigSet>(),
             ),
             error!(EINVAL)
@@ -1444,8 +1448,8 @@ mod tests {
                 &mut locked,
                 &current_task,
                 UncheckedSignal::from(SIGHUP),
-                UserRef::<sigaction_t>::default(),
-                old_action_ref,
+                UserRef::<sigaction_t>::default().into(),
+                old_action_ref.into(),
                 std::mem::size_of::<SigSet>()
             ),
             Ok(())
@@ -1473,8 +1477,8 @@ mod tests {
                 &mut locked,
                 &current_task,
                 UncheckedSignal::from(SIGINT),
-                set_action_ref,
-                UserRef::<sigaction_t>::default(),
+                set_action_ref.into(),
+                UserRef::<sigaction_t>::default().into(),
                 std::mem::size_of::<SigSet>(),
             ),
             Ok(())

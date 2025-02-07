@@ -125,3 +125,26 @@ impl TryFrom<crate::statfs> for crate::arch32::statfs64 {
         })
     }
 }
+
+impl From<crate::arch32::__kernel_sigaction> for crate::__kernel_sigaction {
+    fn from(sigaction: crate::arch32::__kernel_sigaction) -> Self {
+        Self {
+            sa_handler: sigaction.sa_handler.into(),
+            sa_mask: crate::sigset_t { sig: [sigaction.sa_mask.into()] },
+            sa_flags: sigaction.sa_flags.into(),
+            sa_restorer: sigaction.sa_restorer.into(),
+        }
+    }
+}
+
+impl TryFrom<crate::__kernel_sigaction> for crate::arch32::__kernel_sigaction {
+    type Error = ();
+    fn try_from(sigaction: crate::__kernel_sigaction) -> Result<Self, ()> {
+        Ok(Self {
+            sa_handler: sigaction.sa_handler.try_into().map_err(|_| ())?,
+            sa_mask: sigaction.sa_mask.sig[0].try_into().map_err(|_| ())?,
+            sa_flags: sigaction.sa_flags.try_into().map_err(|_| ())?,
+            sa_restorer: sigaction.sa_restorer.try_into().map_err(|_| ())?,
+        })
+    }
+}
