@@ -7,7 +7,6 @@
 // https://fxbug.dev/390458405 - HALs implemented via "remote_binder" fail "entrypoint" checks.
 todo_deny https://fxbug.dev/390458405 hal_wifi_supplicant_default vendor_file file
 todo_deny https://fxbug.dev/390458405 hal_wifi_default vendor_file file
-todo_deny https://fxbug.dev/390458405 update_engine vendor_file file
 todo_deny https://fxbug.dev/390458405 hal_fuchsia_network_provider_default vendor_file file
 todo_deny https://fxbug.dev/390458405 hal_audio_default vendor_file file
 todo_deny https://fxbug.dev/390458405 hal_bluetooth_default vendor_file file
