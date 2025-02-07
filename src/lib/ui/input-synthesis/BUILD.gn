@@ -55,30 +55,6 @@ rustc_library("input-synthesis") {
   ]
 }
 
-rustc_binary("input-synthesis-bin") {
-  output_name = "input_synthesis_bin"
-  testonly = true
-  edition = "2021"
-  deps = [
-    ":input-synthesis",
-    ":test.inputsynthesis_rust",
-    "//src/lib/fuchsia",
-    "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-component",
-    "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:log",
-  ]
-
-  sources = [ "src/main.rs" ]
-}
-
-fuchsia_component("input-synthesis-component") {
-  testonly = true
-  manifest = "meta/input-synthesis.cml"
-  deps = [ ":input-synthesis-bin" ]
-}
-
 fuchsia_unittest_package("input-synthesis-tests") {
   deps = [ ":input-synthesis_test" ]
 }
