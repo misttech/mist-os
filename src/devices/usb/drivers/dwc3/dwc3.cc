@@ -88,6 +88,8 @@ zx::result<> Dwc3::Start() {
 
   auto offers = compat_.CreateOffers2();
   offers.push_back(fdf::MakeOffer2<fdci::UsbDciService>());
+  offers.push_back(mac_address_metadata_server_.MakeOffer());
+  offers.push_back(serial_number_metadata_server_.MakeOffer());
 
   auto child = AddChild(name(), props, offers);
   if (child.is_error()) {
@@ -110,6 +112,54 @@ zx_status_t Dwc3::AcquirePDevResources() {
   if (!pdev_.is_valid()) {
     FDF_LOG(ERROR, "Could not get platform device protocol");
     return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  // Initialize mac address metadata server.
+  {
+    zx::result metadata = pdev_.GetFidlMetadata<fuchsia_boot_metadata::MacAddressMetadata>(
+        fuchsia_boot_metadata::MacAddressMetadata::kSerializableName);
+    if (metadata.is_ok()) {
+      if (zx::result result = mac_address_metadata_server_.SetMetadata(metadata.value());
+          result.is_error()) {
+        FDF_LOG(ERROR, "Failed to set metadata for mac address metdadata server: %s",
+                result.status_string());
+        return result.status_value();
+      }
+    } else if (metadata.status_value() == ZX_ERR_NOT_FOUND) {
+      FDF_LOG(DEBUG, "Not forwarding mac address: Metadata not found");
+    } else {
+      FDF_LOG(ERROR, "Failed to get mac address metadata: %s", metadata.status_string());
+      return metadata.status_value();
+    }
+  }
+  if (zx::result result = mac_address_metadata_server_.Serve(*outgoing(), dispatcher());
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to serve mac address metadata: %s", result.status_string());
+    return result.status_value();
+  }
+
+  // Initialize serial number metadata server.
+  {
+    zx::result metadata = pdev_.GetFidlMetadata<fuchsia_boot_metadata::SerialNumberMetadata>(
+        fuchsia_boot_metadata::SerialNumberMetadata::kSerializableName);
+    if (metadata.is_ok()) {
+      if (zx::result result = serial_number_metadata_server_.SetMetadata(metadata.value());
+          result.is_error()) {
+        FDF_LOG(ERROR, "Failed to set metadata for serial number metdadata server: %s",
+                result.status_string());
+        return result.status_value();
+      }
+    } else if (metadata.status_value() == ZX_ERR_NOT_FOUND) {
+      FDF_LOG(DEBUG, "Not forwarding serial number: Metadata not found");
+    } else {
+      FDF_LOG(ERROR, "Failed to get serial number metadata: %s", metadata.status_string());
+      return metadata.status_value();
+    }
+  }
+  if (zx::result result = serial_number_metadata_server_.Serve(*outgoing(), dispatcher());
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to serve serial number metadata: %s", result.status_string());
+    return result.status_value();
   }
 
   auto mmio = pdev_.MapMmio(0);

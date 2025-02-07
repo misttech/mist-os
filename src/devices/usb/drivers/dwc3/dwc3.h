@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_USB_DRIVERS_DWC3_DWC3_H_
 #define SRC_DEVICES_USB_DRIVERS_DWC3_DWC3_H_
 
+#include <fidl/fuchsia.boot.metadata/cpp/fidl.h>
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.usb.dci/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.usb.descriptor/cpp/wire.h>
@@ -13,6 +14,7 @@
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/logging/cpp/logger.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 #include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/mmio/mmio.h>
 #include <lib/sync/cpp/completion.h>
@@ -525,6 +527,11 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
   fidl::SyncClient<fuchsia_driver_framework::NodeController> child_;
 
   compat::SyncInitializedDeviceServer compat_;
+
+  fdf_metadata::MetadataServer<fuchsia_boot_metadata::MacAddressMetadata>
+      mac_address_metadata_server_;
+  fdf_metadata::MetadataServer<fuchsia_boot_metadata::SerialNumberMetadata>
+      serial_number_metadata_server_;
 };
 
 }  // namespace dwc3
