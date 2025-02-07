@@ -6143,7 +6143,6 @@ mod test {
     fn delayed_ack(mut state: State<FakeInstant, RingBuffer, RingBuffer, ()>) {
         let mut clock = FakeInstantCtx::default();
         let counters = TcpCountersInner::default();
-        // TODO(https://fxbug.dev/42075191): Enable delayed ack by default.
         let socket_options = SocketOptions { delayed_ack: true, ..SocketOptions::default() };
         assert_eq!(
             state.on_segment::<_, ClientlessBufferProvider>(
@@ -6223,7 +6222,6 @@ mod test {
     fn immediate_ack_if_out_of_order_or_fin() {
         let clock = FakeInstantCtx::default();
         let counters = TcpCountersInner::default();
-        // TODO(https://fxbug.dev/42075191): Enable delayed ack by default.
         let socket_options = SocketOptions { delayed_ack: true, ..SocketOptions::default() };
         let mut state: State<_, _, _, ()> = State::Established(Established {
             snd: Send {
