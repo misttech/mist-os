@@ -69,4 +69,4 @@ redirects:
 
 # Starnix
 - from: /docs/go/troubleshoot-adb-connect
-  to: /docs/development/starnix/troubleshooting-ffx-starnix-adb-connect.md
+  to: /docs/development/starnix/troubleshooting_ffx_starnix_adb_connect.md
