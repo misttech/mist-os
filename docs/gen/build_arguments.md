@@ -731,7 +731,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8723683468169720817"`
+**Current value for `target_cpu = "arm64"`:** `"8723638157315328529"`
 
 From //out/not-default/args.gn:10
 
@@ -739,7 +739,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8723683468169720817"`
+**Current value for `target_cpu = "riscv64"`:** `"8723638157315328529"`
 
 From //out/not-default/args.gn:10
 
@@ -747,7 +747,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8723683468169720817"`
+**Current value for `target_cpu = "x64"`:** `"8723638157315328529"`
 
 From //out/not-default/args.gn:10
 
@@ -3315,7 +3315,7 @@ TODO(https://fxbug.dev/42162166): remove once we have a better way to manage ACP
 
 **Current value (from the default):** `false`
 
-From //src/devices/board/lib/acpi/BUILD.gn:12
+From //src/devices/board/lib/acpi/BUILD.gn:10
 
 ### ice_detection
 
