@@ -32,7 +32,7 @@ class Metrics {
 
   // Allow monitor to update the memory bandwidth readings
   // once a second to metrics
-  void NextMemoryBandwidthReading(uint64_t reading, zx_time_t ts);
+  void NextMemoryBandwidthReading(uint64_t reading, zx_instant_boot_t ts);
 
   // Reader side must use the exact name to read from Inspect.
   // Design doc in go/fuchsia-metrics-to-inspect-design.
@@ -51,10 +51,11 @@ class Metrics {
   void WriteDigestToInspect(const memory::Digest& digest);
   static void AddKmemEvents(const zx_info_kmem_stats_t& kmem,
                             std::vector<fuchsia_metrics::MetricEvent>* events);
-  static void AddKmemEventsWithUptime(const zx_info_kmem_stats_t& kmem, zx_time_t capture_time,
+  static void AddKmemEventsWithUptime(const zx_info_kmem_stats_t& kmem,
+                                      zx_instant_boot_t capture_time,
                                       std::vector<fuchsia_metrics::MetricEvent>* events);
   static cobalt_registry::MemoryLeakMigratedMetricDimensionTimeSinceBoot GetUpTimeEventCode(
-      zx_time_t capture_time);
+      zx_instant_boot_t capture_time);
 
   zx::duration poll_frequency_;
   async_dispatcher_t* dispatcher_;

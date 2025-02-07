@@ -21,7 +21,7 @@ using cobalt_registry::MemoryMigratedMetricDimensionBucket;
 using TimeSinceBoot = cobalt_registry::MemoryLeakMigratedMetricDimensionTimeSinceBoot;
 
 namespace {
-const std::map<zx_duration_t, TimeSinceBoot> UptimeLevelMap = {
+const std::map<zx_duration_boot_t, TimeSinceBoot> UptimeLevelMap = {
     {zx_duration_from_min(1), TimeSinceBoot::Up},
     {zx_duration_from_min(30), TimeSinceBoot::UpOneMinute},
     {zx_duration_from_hour(1), TimeSinceBoot::UpThirtyMinutes},
@@ -177,7 +177,7 @@ void Metrics::AddKmemEvents(const zx_info_kmem_stats_t& kmem,
 // TODO(https://fxbug.dev/42113456): Refactor this when dedup enum is availble in generated
 // cobalt config source code.
 void Metrics::AddKmemEventsWithUptime(const zx_info_kmem_stats_t& kmem,
-                                      const zx_time_t capture_time,
+                                      const zx_instant_boot_t capture_time,
                                       std::vector<fuchsia_metrics::MetricEvent>* events) {
   TRACE_DURATION("memory_monitor", "Metrics::AddKmemEventsWithUptime");
   using Breakdown = cobalt_registry::MemoryLeakMigratedMetricDimensionGeneralBreakdown;
@@ -199,8 +199,8 @@ void Metrics::AddKmemEventsWithUptime(const zx_info_kmem_stats_t& kmem,
   events->push_back(make_event(Breakdown::OtherBytes, kmem.other_bytes));
 }
 
-TimeSinceBoot Metrics::GetUpTimeEventCode(const zx_time_t capture_time) {
-  zx_duration_t uptime = zx_duration_from_nsec(capture_time);
+TimeSinceBoot Metrics::GetUpTimeEventCode(const zx_instant_boot_t capture_time) {
+  zx_duration_boot_t uptime = zx_duration_from_nsec(capture_time);
   for (auto const& map : UptimeLevelMap) {
     if (uptime < map.first) {
       return map.second;
@@ -209,7 +209,7 @@ TimeSinceBoot Metrics::GetUpTimeEventCode(const zx_time_t capture_time) {
   return TimeSinceBoot::UpSixDays;
 }
 
-void Metrics::NextMemoryBandwidthReading(uint64_t reading, zx_time_t ts) {
+void Metrics::NextMemoryBandwidthReading(uint64_t reading, zx_instant_boot_t ts) {
   inspect_memory_bandwidth_.Set(memory_bandwidth_index_, reading);
   inspect_memory_bandwidth_timestamp_.Set(ts);
   if (++memory_bandwidth_index_ >= kMemoryBandwidthArraySize)

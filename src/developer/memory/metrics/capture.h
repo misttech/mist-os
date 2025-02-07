@@ -158,7 +158,7 @@ class OS {
   virtual ~OS() = default;
   virtual zx_status_t GetKernelStats(fidl::WireSyncClient<fuchsia_kernel::Stats>* stats_client) = 0;
   virtual zx_handle_t ProcessSelf() = 0;
-  virtual zx_time_t GetMonotonic() = 0;
+  virtual zx_instant_boot_t GetBoot() = 0;
   virtual zx_status_t GetProcesses(
       fit::function<zx_status_t(int /* depth */, zx::handle /* handle */, zx_koid_t /* koid */,
                                 zx_koid_t /* parent_koid */)>
@@ -186,7 +186,7 @@ class Capture {
  public:
   static const std::vector<std::string> kDefaultRootedVmoNames;
 
-  zx_time_t time() const { return time_; }
+  zx_instant_boot_t time() const { return time_; }
   const zx_info_kmem_stats_t& kmem() const { return kmem_; }
   const std::optional<zx_info_kmem_stats_extended_t>& kmem_extended() const {
     return kmem_extended_;
@@ -204,7 +204,7 @@ class Capture {
   const Vmo& vmo_for_koid(zx_koid_t koid) const { return koid_to_vmo_.at(koid); }
 
  private:
-  zx_time_t time_;
+  zx_instant_boot_t time_;
   zx_info_kmem_stats_t kmem_ = {};
   std::optional<zx_info_kmem_stats_extended_t> kmem_extended_;
   std::optional<zx_info_kmem_stats_compression_t> kmem_compression_;

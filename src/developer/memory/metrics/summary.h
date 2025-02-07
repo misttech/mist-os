@@ -83,14 +83,14 @@ class Summary {
   static const std::vector<NameMatch> kNameMatches;
 
   void SortProcessSummaries();
-  zx_time_t time() const { return time_; }
+  zx_instant_boot_t time() const { return time_; }
   const zx_info_kmem_stats_t& kstats() const { return kstats_; }
   const std::vector<ProcessSummary>& process_summaries() const { return process_summaries_; }
 
  private:
   void Init(const Capture& capture, Namer* namer,
             const std::unordered_set<zx_koid_t>& undigested_vmos);
-  zx_time_t time_;
+  zx_instant_boot_t time_;
   zx_info_kmem_stats_t kstats_;
   std::vector<ProcessSummary> process_summaries_;
 };

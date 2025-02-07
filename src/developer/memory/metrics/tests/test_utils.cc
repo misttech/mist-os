@@ -29,7 +29,7 @@ zx_status_t MockOS::GetKernelStats(fidl::WireSyncClient<fuchsia_kernel::Stats>* 
 
 zx_handle_t MockOS::ProcessSelf() { return TestUtils::kSelfHandle; }
 
-zx_time_t MockOS::GetMonotonic() { return clock_; }
+zx_instant_boot_t MockOS::GetBoot() { return clock_; }
 
 zx_status_t MockOS::GetProcesses(
     fit::function<zx_status_t(int, zx::handle, zx_koid_t, zx_koid_t)> cb) {

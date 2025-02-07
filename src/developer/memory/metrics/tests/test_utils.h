@@ -17,7 +17,7 @@
 namespace memory {
 
 struct CaptureTemplate {
-  zx_time_t time;
+  zx_instant_boot_t time;
   zx_info_kmem_stats_t kmem = {};
   zx_info_kmem_stats_extended_t kmem_extended = {};
   std::vector<zx_info_vmo_t> vmos;
@@ -83,7 +83,7 @@ class MockOS : public OS {
 
   zx_handle_t ProcessSelf() override;
 
-  zx_time_t GetMonotonic() override;
+  zx_instant_boot_t GetBoot() override;
 
   zx_status_t GetProcesses(
       fit::function<zx_status_t(int, zx::handle, zx_koid_t, zx_koid_t)> cb) override;
@@ -108,7 +108,7 @@ class MockOS : public OS {
 
   OsResponses responses_;
   uint32_t i_get_property_;
-  zx_time_t clock_;
+  zx_instant_boot_t clock_;
 };
 
 class TestUtils {
