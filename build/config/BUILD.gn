@@ -865,11 +865,7 @@ config("Wno-bitfield-conversion") {
 
 config("Wno-vla-cxx-extension") {
   if (!is_gcc) {
-    cflags_cc = [
-      # TODO(https://fxbug.dev/42084851): Remove -Wno-unknown-warning-option after the next Clang roll.
-      "-Wno-unknown-warning-option",
-      "-Wno-vla-cxx-extension",
-    ]
+    cflags_cc = [ "-Wno-vla-cxx-extension" ]
   }
   visibility = [
     "//sdk/lib/fdio:*",
