@@ -24,9 +24,9 @@ Timer::~Timer() {
   }
 }
 
-zx_status_t Timer::StartPeriodic(zx_duration_t interval) { return Start(interval, true); }
+zx_status_t Timer::StartPeriodic(zx_duration_mono_t interval) { return Start(interval, true); }
 
-zx_status_t Timer::StartOneshot(zx_duration_t delay) { return Start(delay, false); }
+zx_status_t Timer::StartOneshot(zx_duration_mono_t delay) { return Start(delay, false); }
 
 zx_status_t Timer::Stop() {
   // Make sure Start/Stop cannot be called from multiple threads at once. Doing so would open up
@@ -70,7 +70,7 @@ zx_status_t Timer::Stop() {
   return ZX_OK;
 }
 
-zx_status_t Timer::Start(zx_duration_t interval, bool periodic) {
+zx_status_t Timer::Start(zx_duration_mono_t interval, bool periodic) {
   if (interval < 0) {
     // Negative intervals and delays don't really make sense.
     return ZX_ERR_INVALID_ARGS;
@@ -79,7 +79,7 @@ zx_status_t Timer::Start(zx_duration_t interval, bool periodic) {
   // Calculate the deadline at this point to make sure that we get as close to the requested
   // interval as possible. Acquiring the locks might block for a while, causing timer drift if we
   // calculate the deadline when posting the task.
-  zx_time_t deadline = async_now(dispatcher_) + interval;
+  zx_instant_mono_t deadline = async_now(dispatcher_) + interval;
 
   // Make sure Start/Stop cannot be called from multiple threads at once. Doing so would open up
   // for race conditions for the section below where we have to unlock handler_mutex_ and wait for
