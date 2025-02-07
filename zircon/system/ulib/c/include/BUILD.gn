@@ -31,7 +31,7 @@ import("libc_headers.gni")
 # llvm-libc roll to complete.  Finally, the flag must be set back to false
 # along with rebuilding with `update_goldens=true` in `args.gn` to update the
 # API summary files for the SDK, for a change that go through API review.
-llvm_libc_soft_transition = true  # TODO(https://fxbug.dev/394839723)
+llvm_libc_soft_transition = false
 
 # Generated headers go into this directory, always the same in every toolchain.
 gen_dir =
