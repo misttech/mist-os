@@ -28,6 +28,10 @@
             url: "fuchsia-pkg://fuchsia.com/gtest-runner#meta/gtest-runner.cm",
         },
         {
+            name: "zxtest_runner",
+            url: "fuchsia-pkg://fuchsia.com/zxtest-runner#meta/zxtest-runner.cm",
+        },
+        {
             name: "gunit_runner",
             url: "fuchsia-pkg://fuchsia.com/gunit-runner#meta/gunit-runner.cm",
         },
@@ -63,6 +67,7 @@
                 "#rust_test_create_raw_processes_runner",
                 "#rust_test_next_vdso_runner",
                 "#rust_test_runner",
+                "#zxtest_runner",
             ],
         },
         {
@@ -79,6 +84,7 @@
                 "#rust_test_create_raw_processes_runner",
                 "#rust_test_next_vdso_runner",
                 "#rust_test_runner",
+                "#zxtest_runner",
             ],
         },
         {
@@ -95,6 +101,7 @@
                 "#rust_test_create_raw_processes_runner",
                 "#rust_test_next_vdso_runner",
                 "#rust_test_runner",
+                "#zxtest_runner",
             ],
         },
         {
@@ -111,6 +118,7 @@
                 "#rust_test_create_raw_processes_runner",
                 "#rust_test_next_vdso_runner",
                 "#rust_test_runner",
+                "#zxtest_runner",
             ],
         },
         {
@@ -123,6 +131,7 @@
                 "#rust_test_create_raw_processes_runner",
                 "#rust_test_next_vdso_runner",
                 "#rust_test_runner",
+                "#zxtest_runner",
             ],
         },
     ],

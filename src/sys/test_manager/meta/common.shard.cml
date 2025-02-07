@@ -53,6 +53,10 @@
             url: "gunit-runner#meta/gunit-runner.cm",
         },
         {
+            name: "zxtest_runner",
+            url: "zxtest-runner#meta/zxtest-runner.cm",
+        },
+        {
             name: "lib_loader_cache",
             url: "lib_loader_runner_cache#meta/lib_loader_runner_cache.cm",
         },
@@ -321,6 +325,7 @@
                 "#rust_test_next_vdso_runner",
                 "#rust_test_runner",
                 "#starnix_unit_test_runner",
+                "#zxtest_runner",
             ],
         },
         {
@@ -340,6 +345,7 @@
                 "#rust_test_next_vdso_runner",
                 "#rust_test_runner",
                 "#starnix_unit_test_runner",
+                "#zxtest_runner",
             ],
         },
         {
@@ -390,6 +396,7 @@
                 "#rust_test_next_vdso_runner",
                 "#rust_test_runner",
                 "#starnix_unit_test_runner",
+                "#zxtest_runner",
             ],
         },
         {

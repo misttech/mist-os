@@ -27,9 +27,20 @@ use test_runners_lib::elf::{
 use test_runners_lib::errors::*;
 use test_runners_lib::launch;
 use test_runners_lib::logs::{LogError, LogStreamReader, LoggerStream, SocketLogWriter};
-use {fidl_fuchsia_io as fio, fidl_fuchsia_process as fproc, fuchsia_async as fasync};
+use zx::HandleBased;
+use {
+    fidl_fuchsia_io as fio, fidl_fuchsia_process as fproc, fuchsia_async as fasync,
+    fuchsia_runtime as runtime,
+};
 
 const DYNAMIC_SKIP_RESULT: &str = "SKIPPED";
+
+lazy_static! {
+    static ref NEXT_VDSO: zx::Handle = {
+        runtime::take_startup_handle(runtime::HandleInfo::new(runtime::HandleType::VdsoVmo, 0))
+            .expect("failed to take next vDSO handle")
+    };
+}
 
 /// Implements `fuchsia.test.Suite` and runs provided test.
 pub struct TestServer {
@@ -47,6 +58,9 @@ pub struct TestServer {
 
     /// Cache to store enumerated tests.
     tests_future_container: MemoizedFutureContainer<EnumeratedTestCases, EnumerationError>,
+
+    /// If set, pass the incoming vDSO to created children.
+    duplicate_vdso_for_children: bool,
 }
 
 static PARALLEL_DEFAULT: u16 = 1;
@@ -179,7 +193,13 @@ impl TestServer {
             output_dir_name: output_dir_name,
             output_dir_parent_path: output_dir_parent_path,
             tests_future_container: Arc::new(Mutex::new(None)),
+            duplicate_vdso_for_children: false,
         }
+    }
+
+    pub fn with_duplicate_vdso_for_children(mut self, value: bool) -> Self {
+        self.duplicate_vdso_for_children = value;
+        self
     }
 
     /// Retrieves and memoizes the full list of tests from the test binary.
@@ -312,7 +332,14 @@ impl TestServer {
         // Load bearing to hold job guard.
         let (process, _job, stdout_logger, stderr_logger) =
             match launch_component_process_separate_std_handles::<RunTestError>(
-                &component, names, args,
+                &component,
+                names,
+                args,
+                if self.duplicate_vdso_for_children {
+                    VDSOMode::Duplicate
+                } else {
+                    VDSOMode::Default
+                },
             )
             .await
             {
@@ -529,11 +556,17 @@ async fn get_tests(
     parse_test_cases(result_str)
 }
 
+enum VDSOMode {
+    Duplicate,
+    Default,
+}
+
 /// Convenience wrapper around [`launch::launch_process`].
 async fn launch_component_process_separate_std_handles<E>(
     component: &Component,
     names: Vec<fproc::NameInfo>,
     args: Vec<String>,
+    vdso_mode: VDSOMode,
 ) -> Result<(zx::Process, launch::ScopedJob, LoggerStream, LoggerStream), E>
 where
     E: From<NamespaceError> + From<launch::LaunchError> + From<ComponentError>,
@@ -541,6 +574,16 @@ where
     let (client, loader) = fidl::endpoints::create_endpoints();
     component.loader_service(loader);
     let executable_vmo = Some(component.executable_vmo()?);
+
+    let handle_infos = match vdso_mode {
+        VDSOMode::Duplicate => Some(vec![fproc::HandleInfo {
+            handle: (*NEXT_VDSO)
+                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                .map_err(launch::LaunchError::DuplicateVdso)?,
+            id: runtime::HandleInfo::new(runtime::HandleType::VdsoVmo, 0).as_raw(),
+        }]),
+        VDSOMode::Default => None,
+    };
 
     Ok(launch::launch_process_with_separate_std_handles(launch::LaunchProcessArgs {
         bin_path: &component.binary,
@@ -550,7 +593,7 @@ where
         args: Some(args),
         name_infos: Some(names),
         environs: component.environ.clone(),
-        handle_infos: None,
+        handle_infos,
         loader_proxy_chan: Some(client.into_channel()),
         executable_vmo,
         options: component.options,

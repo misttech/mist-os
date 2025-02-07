@@ -27,8 +27,19 @@ async fn main() -> Result<(), anyhow::Error> {
     main_impl().await
 }
 
+#[derive(argh::FromArgs, Debug, Clone)]
+/// runner for gtest binaries
+struct Args {
+    #[argh(switch)]
+    /// if set, give each child test a duplicate of the incoming vDSO.
+    /// this is necessary for tests that expect the "next vDSO"
+    duplicate_vdso_for_children: bool,
+}
+
 async fn main_impl() -> Result<(), anyhow::Error> {
     info!("started");
+
+    let args = argh::from_env::<Args>();
     // We will divide this directory up and pass to  tests as /test_result so that they can write
     // their json output
     let path = Path::new("/data/test_data");
@@ -37,9 +48,10 @@ async fn main_impl() -> Result<(), anyhow::Error> {
 
     let mut fs = ServiceFs::new_local();
     fs.dir("svc").add_fidl_service(move |stream| {
-        fasync::Task::local(
-            async move { start_runner(stream).await.expect("failed to start runner.") },
-        )
+        let args = args.clone();
+        fasync::Task::local(async move {
+            start_runner(stream, args).await.expect("failed to start runner.")
+        })
         .detach();
     });
     fs.take_and_serve_directory_handle()?;
@@ -56,7 +68,9 @@ pub enum RunnerError {
 
 async fn start_runner(
     mut stream: fcrunner::ComponentRunnerRequestStream,
+    args: Args,
 ) -> Result<(), RunnerError> {
+    let duplicate_vdso_for_children = args.duplicate_vdso_for_children;
     while let Some(event) = stream.try_next().await.map_err(RunnerError::RequestRead)? {
         match event {
             fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
@@ -64,7 +78,10 @@ async fn start_runner(
                 if let Err(e) = elf::start_component(
                     start_info,
                     controller,
-                    get_new_test_server,
+                    move || {
+                        get_new_test_server()
+                            .with_duplicate_vdso_for_children(duplicate_vdso_for_children)
+                    },
                     TestServer::validate_args,
                 )
                 .await
