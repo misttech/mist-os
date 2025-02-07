@@ -25,6 +25,14 @@ group("bssl-sys.shared") {
   ]
 }
 
+# Avoids a dynamic dependency on libssl, which some clients do not need.
+group("bssl-sys.shared-no-ssl") {
+  public_deps = [
+    ":bssl-sys.lib",
+    "//third_party/boringssl:crypto-shared",
+  ]
+}
+
 group("bssl-sys.static") {
   public_deps = [
     ":bssl-sys.lib",
