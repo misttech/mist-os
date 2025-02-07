@@ -60,7 +60,10 @@
         {
             protocol: [ "fuchsia.scheduler.RoleManager" ],
             from: "parent",
-            to: "#tmpfs",
+            to: [
+                "#fs-collection",
+                "#tmpfs",
+            ],
             availability: "optional",
         },
     ],

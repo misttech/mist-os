@@ -25,7 +25,10 @@
             to: "#realm_builder",
         },
         {
-            protocol: "fuchsia.kernel.VmexResource",
+            protocol: [
+                "fuchsia.kernel.VmexResource",
+                "fuchsia.scheduler.RoleManager",
+            ],
             from: "void",
             to: "#fs-collection",
             availability: "optional",
