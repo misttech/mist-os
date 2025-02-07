@@ -14,10 +14,10 @@ pub mod filesystem;
 pub mod format;
 pub mod partition;
 
+use crate::filesystem::BlockConnector;
 use fidl_fuchsia_fs_startup::{
     CompressionAlgorithm, EvictionPolicyOverride, FormatOptions, StartOptions,
 };
-
 use std::convert::From;
 use std::sync::Arc;
 
@@ -161,8 +161,8 @@ pub struct Blobfs {
 
 impl Blobfs {
     /// Manages a block device using the default configuration.
-    pub fn new(block_device: fidl_fuchsia_device::ControllerProxy) -> filesystem::Filesystem {
-        filesystem::Filesystem::new(block_device, Self::default())
+    pub fn new<B: BlockConnector + 'static>(block_connector: B) -> filesystem::Filesystem {
+        filesystem::Filesystem::new(block_connector, Self::default())
     }
 
     /// Launch blobfs, with the default configuration, as a dynamic child in the fs-collection.
@@ -236,8 +236,8 @@ pub struct Minfs {
 
 impl Minfs {
     /// Manages a block device using the default configuration.
-    pub fn new(block_device: fidl_fuchsia_device::ControllerProxy) -> filesystem::Filesystem {
-        filesystem::Filesystem::new(block_device, Self::default())
+    pub fn new<B: BlockConnector + 'static>(block_connector: B) -> filesystem::Filesystem {
+        filesystem::Filesystem::new(block_connector, Self::default())
     }
 
     /// Launch minfs, with the default configuration, as a dynamic child in the fs-collection.
@@ -304,8 +304,8 @@ impl Default for Fxfs {
 
 impl Fxfs {
     /// Manages a block device using the default configuration.
-    pub fn new(block_device: fidl_fuchsia_device::ControllerProxy) -> filesystem::Filesystem {
-        filesystem::Filesystem::new(block_device, Self::default())
+    pub fn new<B: BlockConnector + 'static>(block_connector: B) -> filesystem::Filesystem {
+        filesystem::Filesystem::new(block_connector, Self::default())
     }
 
     /// Launch Fxfs, with the default configuration, as a dynamic child in the fs-collection.
@@ -356,8 +356,8 @@ pub struct F2fs {
 
 impl F2fs {
     /// Manages a block device using the default configuration.
-    pub fn new(block_device: fidl_fuchsia_device::ControllerProxy) -> filesystem::Filesystem {
-        filesystem::Filesystem::new(block_device, Self::default())
+    pub fn new<B: BlockConnector + 'static>(block_connector: B) -> filesystem::Filesystem {
+        filesystem::Filesystem::new(block_connector, Self::default())
     }
 
     /// Launch f2fs, with the default configuration, as a dynamic child in the fs-collection.
@@ -412,8 +412,8 @@ impl Default for Fvm {
 
 impl Fvm {
     /// Manages a block device using the default configuration.
-    pub fn new(block_device: fidl_fuchsia_device::ControllerProxy) -> filesystem::Filesystem {
-        filesystem::Filesystem::new(block_device, Self::default())
+    pub fn new<B: BlockConnector + 'static>(block_connector: B) -> filesystem::Filesystem {
+        filesystem::Filesystem::new(block_connector, Self::default())
     }
 
     /// Launch Fvm, with the default configuration, as a dynamic child in the fs-collection.
@@ -469,8 +469,8 @@ impl Default for Gpt {
 
 impl Gpt {
     /// Manages a block device using the default configuration.
-    pub fn new(block_device: fidl_fuchsia_device::ControllerProxy) -> filesystem::Filesystem {
-        filesystem::Filesystem::new(block_device, Self::default())
+    pub fn new<B: BlockConnector + 'static>(block_connector: B) -> filesystem::Filesystem {
+        filesystem::Filesystem::new(block_connector, Self::default())
     }
 
     /// Launch Gpt, with the default configuration, as a dynamic child in the fs-collection.
