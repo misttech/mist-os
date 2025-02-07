@@ -33,11 +33,13 @@ sdk_source_set("load-visitors") {
     ":registration",
     "default:default",
     "//sdk/lib/driver/component/cpp",
-    "//sdk/lib/driver/incoming/cpp",
     "//sdk/lib/driver/logging/cpp",
   ]
 
-  public_deps = [ ":registry" ]
+  public_deps = [
+    ":registry",
+    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
+  ]
 }
 
 sdk_source_set("driver-visitor") {

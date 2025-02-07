@@ -6,7 +6,7 @@
 #define LIB_DRIVER_DEVICETREE_VISITORS_LOAD_VISITORS_H_
 
 #include <lib/driver/devicetree/visitors/registry.h>
-#include <lib/driver/incoming/cpp/namespace.h>
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 
 #include <memory>
 
@@ -15,7 +15,6 @@ namespace fdf_devicetree {
 // Find all devicetree visitor shared libraries under the incoming namespace's
 // `/pkg/lib/visitors` directory. Instantiate all visitor objects and return a
 // registry of visitors which includes the default devicetree visitors.
-zx::result<std::unique_ptr<VisitorRegistry>> LoadVisitors(fdf::Namespace& incoming);
 zx::result<std::unique_ptr<VisitorRegistry>> LoadVisitors(
     const std::optional<std::vector<fuchsia_driver_framework::NodeSymbol>>& symbols);
 
