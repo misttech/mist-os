@@ -4,7 +4,6 @@
 
 use std::ops::Range;
 
-use inspect_stubs::track_stub;
 use tee_internal::binding::{
     TEE_Result, TEE_ERROR_ACCESS_DENIED, TEE_MEMORY_ACCESS_ANY_OWNER, TEE_MEMORY_ACCESS_READ,
     TEE_MEMORY_ACCESS_WRITE, TEE_SUCCESS,
@@ -102,34 +101,38 @@ fn vmar_flags_from_access_flags(access_flags: u32) -> zx::VmarFlagsExtended {
     flags
 }
 
-fn range_contains(map_range: &Range<usize>, start: usize, end: usize) -> bool {
-    map_range.contains(&start) && (start == end || map_range.contains(&(end - 1)))
+fn range_contains(contain: &Range<usize>, check: &Range<usize>) -> bool {
+    check.is_empty() || contain.contains(&check.start) && (contain.contains(&(check.end - 1)))
 }
 
-pub fn check_memory_access_rights(access_flags: u32, start: usize, size: usize) -> TEE_Result {
+pub fn check_memory_access_rights(
+    access_flags: u32,
+    start: usize,
+    size: usize,
+    mapped_param_ranges: &Vec<Range<usize>>,
+) -> TEE_Result {
     let end = match start.checked_add(size) {
         Some(end) => end,
         None => return TEE_ERROR_ACCESS_DENIED,
     };
+    let check_range = start..end;
     let required_mmu_flags = vmar_flags_from_access_flags(access_flags);
 
-    if access_flags & TEE_MEMORY_ACCESS_ANY_OWNER == 0 {
-        // Once we support mapping memory that is shared with less trusted
-        // components such as the REE then when this flag is not set we need to
-        // verify that the checked range is not within such a shared memory
-        // mapping such as one created for a MEMREF parameter.
-        track_stub!(
-            TODO("https://fxbug.dev/384584494"),
-            "TEE_MEMORY_ACCESS_ANY_OWNER not implemented in TEE_CheckMemoryAccessRights"
-        );
-    }
+    let check_for_exclusive_access = access_flags & TEE_MEMORY_ACCESS_ANY_OWNER == 0;
     let maps = fuchsia_runtime::vmar_root_self().info_maps_vec().unwrap();
     for map in maps {
         if let Some(details) = map.details().as_mapping() {
             let map_range = map.base..map.base + map.size;
-            if range_contains(&map_range, start, end)
+            if range_contains(&map_range, &check_range)
                 && details.mmu_flags.contains(required_mmu_flags)
             {
+                if check_for_exclusive_access {
+                    for range in mapped_param_ranges {
+                        if range_contains(range, &check_range) {
+                            return TEE_ERROR_ACCESS_DENIED;
+                        }
+                    }
+                }
                 return TEE_SUCCESS;
             }
         }
@@ -280,5 +283,24 @@ mod test {
         assert_eq!(mem_compare(b_ptr, a_ptr, 1), 1);
         assert_eq!(mem_compare(b_ptr, c_ptr, 2), 0);
         assert_eq!(mem_compare(b_ptr, c_ptr, 3), -1);
+    }
+
+    #[fuchsia::test]
+    fn test_range_contains() {
+        let empty_range = 0..0;
+        assert_eq!(range_contains(&empty_range, &(0..0)), true);
+        assert_eq!(range_contains(&empty_range, &(1..1)), true);
+
+        let range = 1..5;
+        // Fits range exactly.
+        assert_eq!(range_contains(&range, &(1..5)), true);
+        // Too long.
+        assert_eq!(range_contains(&range, &(1..6)), false);
+        // Starts too early.
+        assert_eq!(range_contains(&range, &(0..5)), false);
+        // Empty length outside the range.
+        assert_eq!(range_contains(&range, &(0..0)), true);
+        // Empty length inside the range.
+        assert_eq!(range_contains(&range, &(2..2)), true);
     }
 }

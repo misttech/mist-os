@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use std::cell::RefCell;
+use std::ops::Range;
 
 use crate::crypto::Operations;
 use crate::props::Properties;
@@ -15,6 +16,7 @@ pub struct Context {
     pub properties: Properties,
     pub storage: Storage,
     pub operations: Operations,
+    pub mapped_param_ranges: Vec<Range<usize>>,
 }
 
 // The TA entry points are FFI calls that are expected to call back into the
@@ -48,10 +50,11 @@ impl Context {
             properties: Properties::new(),
             storage: Storage::new(),
             operations: Operations::new(),
+            mapped_param_ranges: vec![],
         }
     }
 
     pub fn cleanup_after_call(&mut self) {
-        // TODO: Clean up any contextual information related to the current call stack.
+        self.mapped_param_ranges.clear();
     }
 }

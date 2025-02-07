@@ -37,8 +37,9 @@ where
     F: FnOnce(tee_internal::ParamTypes, &mut [tee_internal::Param; 4]) -> TeeResult<R>,
 {
     let (tee_result, return_params) = {
-        let (mut adapter, param_types) =
-            context::with_current_mut(|_context| ParamAdapter::from_fidl(parameter_set))?;
+        let (mut adapter, param_types) = context::with_current_mut(|context| {
+            ParamAdapter::from_fidl(parameter_set, &mut context.mapped_param_ranges)
+        })?;
         let tee_result = entry_point(param_types, adapter.tee_params_mut());
         context::with_current_mut(|context| context.cleanup_after_call());
         (tee_result, adapter.export_to_fidl()?)
