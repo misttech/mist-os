@@ -167,6 +167,9 @@ dl_clone_loader_service
 _dl_debug_addr
 dlinfo
 dlopen
+dlopen_vmo
+dl_set_loader_service
+dlsym
 __dn_comp
 dn_comp
 __dn_expand
