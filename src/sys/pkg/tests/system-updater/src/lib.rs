@@ -157,11 +157,6 @@ impl TestEnvBuilder {
         self
     }
 
-    fn history(mut self, history: serde_json::Value) -> Self {
-        self.history = Some(history);
-        self
-    }
-
     fn system_image_hash(mut self, system_image: fuchsia_hash::Hash) -> Self {
         assert_eq!(self.system_image_hash, None);
         self.system_image_hash = Some(system_image);
@@ -479,10 +474,6 @@ struct TestEnv {
 }
 
 impl TestEnv {
-    async fn new() -> Self {
-        Self::builder().build().await
-    }
-
     fn builder() -> TestEnvBuilder {
         TestEnvBuilder::new()
     }

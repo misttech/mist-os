@@ -165,9 +165,7 @@ impl MockUpdateInstallerService {
                         .push(CapturedUpdateInstallerRequest::CancelUpdate { attempt_id });
                     responder.send(Ok(())).unwrap();
                 }
-                InstallerRequest::GetLastUpdateResult { .. }
-                | InstallerRequest::GetUpdateResult { .. }
-                | InstallerRequest::MonitorUpdate { .. } => {
+                InstallerRequest::MonitorUpdate { .. } => {
                     panic!("unexpected request: {req:?}");
                 }
             }

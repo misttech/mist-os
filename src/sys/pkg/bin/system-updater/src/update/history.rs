@@ -54,19 +54,6 @@ pub struct UpdateAttempt {
 }
 
 impl UpdateAttempt {
-    fn attempt_id(&self) -> &str {
-        &self.attempt_id
-    }
-    fn update_url(&self) -> &AbsolutePackageUrl {
-        &self.update_url
-    }
-    fn options(&self) -> &Options {
-        &self.options
-    }
-    fn state(&self) -> &State {
-        &self.state
-    }
-
     fn write_to_inspect(&self, node: &inspect::Node) {
         // This destructure exists to use the compiler to guarantee we are writing all the
         // UpdateAttempt fields to inspect.
@@ -103,18 +90,6 @@ impl UpdateAttempt {
         node.record_child("state", |n| {
             state.write_to_inspect(n);
         })
-    }
-}
-
-impl From<&UpdateAttempt> for fidl_fuchsia_update_installer::UpdateResult {
-    fn from(attempt: &UpdateAttempt) -> Self {
-        Self {
-            attempt_id: Some(attempt.attempt_id().to_string()),
-            url: Some(fidl_fuchsia_pkg::PackageUrl { url: attempt.update_url().to_string() }),
-            options: Some(attempt.options().into()),
-            state: Some(attempt.state().clone().into()),
-            ..Default::default()
-        }
     }
 }
 
@@ -300,14 +275,6 @@ impl UpdateHistory {
                 writer(bytes).await
             }
         }
-    }
-
-    pub fn last_update_attempt(&self) -> Option<&UpdateAttempt> {
-        self.update_attempts.front()
-    }
-
-    pub fn update_attempt(&self, attempt_id: String) -> Option<&UpdateAttempt> {
-        self.update_attempts.iter().find(|attempt| attempt.attempt_id == attempt_id)
     }
 }
 
@@ -1165,91 +1132,5 @@ mod tests {
         };
 
         assert_eq!(history.attempts_for(&Version::for_hash("old"), &Version::for_hash("new")), 1);
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn last_update_attempt() {
-        let first_attempt = UpdateAttempt {
-            attempt_id: "0".to_owned(),
-            source_version: Version::for_hash("old"),
-            target_version: Version::for_hash("new"),
-            options: Options {
-                initiator: Initiator::User,
-                allow_attach_to_existing_attempt: false,
-                should_write_recovery: true,
-            },
-            update_url: "fuchsia-pkg://fuchsia.test/first-attempt".parse().unwrap(),
-            start_time: SystemTime::UNIX_EPOCH + Duration::from_nanos(42),
-            state: make_reboot_state(),
-        };
-        let second_attempt = UpdateAttempt {
-            attempt_id: "1".to_owned(),
-            source_version: Version::for_hash("old"),
-            target_version: Version::for_hash("new2"),
-            options: Options {
-                initiator: Initiator::User,
-                allow_attach_to_existing_attempt: false,
-                should_write_recovery: true,
-            },
-            update_url: "fuchsia-pkg://fuchsia.test/second-attempt".parse().unwrap(),
-            start_time: SystemTime::UNIX_EPOCH + Duration::from_nanos(42),
-            state: make_reboot_state(),
-        };
-        let mut history = UpdateHistory::default();
-
-        history.record_update_attempt(first_attempt);
-        history.record_update_attempt(second_attempt.clone());
-
-        assert_eq!(history.last_update_attempt(), Some(&second_attempt));
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn update_attempt() {
-        let attempt_foo = UpdateAttempt {
-            attempt_id: "foo".to_owned(),
-            source_version: Version::for_hash("old"),
-            target_version: Version::for_hash("new"),
-            options: Options {
-                initiator: Initiator::User,
-                allow_attach_to_existing_attempt: false,
-                should_write_recovery: true,
-            },
-            update_url: "fuchsia-pkg://fuchsia.test/first-attempt".parse().unwrap(),
-            start_time: SystemTime::UNIX_EPOCH + Duration::from_nanos(42),
-            state: make_reboot_state(),
-        };
-        let attempt_bar = UpdateAttempt {
-            attempt_id: "bar".to_owned(),
-            source_version: Version::for_hash("old"),
-            target_version: Version::for_hash("new2"),
-            options: Options {
-                initiator: Initiator::User,
-                allow_attach_to_existing_attempt: false,
-                should_write_recovery: true,
-            },
-            update_url: "fuchsia-pkg://fuchsia.test/second-attempt".parse().unwrap(),
-            start_time: SystemTime::UNIX_EPOCH + Duration::from_nanos(42),
-            state: make_reboot_state(),
-        };
-        let mut history = UpdateHistory::default();
-
-        history.record_update_attempt(attempt_foo.clone());
-        history.record_update_attempt(attempt_bar);
-
-        assert_eq!(history.update_attempt("foo".to_owned()), Some(&attempt_foo));
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn last_update_attempt_none() {
-        let history = UpdateHistory::default();
-
-        assert_eq!(history.last_update_attempt(), None);
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn update_attempt_none() {
-        let history = UpdateHistory::default();
-
-        assert_eq!(history.update_attempt("foo".to_owned()), None);
     }
 }

@@ -41,7 +41,7 @@ pub(super) use environment::{
     SystemInfo,
 };
 pub(super) use genutil::GeneratorExt;
-pub(super) use history::{UpdateAttempt, UpdateHistory};
+pub(super) use history::UpdateHistory;
 pub(super) use reboot::{ControlRequest, RebootController};
 pub(super) use resolver::ResolveError;
 
