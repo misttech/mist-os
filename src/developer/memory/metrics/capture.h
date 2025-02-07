@@ -57,14 +57,6 @@ struct FractionalBytes {
     return *this;
   }
   FractionalBytes& operator/=(const uint64_t& other) {
-    // Handle fractions set to `Fraction::Max()` as sentinels indicating "invalid fraction".
-    // TODO(https://fxbug.dev/338300808): Remove this logic once we always generate fractional
-    // bytes from attribution codepaths.
-    if (fractional == Fraction::Max()) {
-      integral /= other;
-      return *this;
-    }
-
     // Input fraction must always be <1 to guard against overflow.
     // If this is true, the sum of fractions must be <1:
     // The sum is:
@@ -89,16 +81,6 @@ struct FractionalBytes {
     return ret;
   }
   FractionalBytes& operator+=(const FractionalBytes& other) {
-    // Handle fractions set to `Fraction::Max()` as sentinels indicating "invalid fraction".
-    // TODO(https://fxbug.dev/338300808): Remove this logic once we always generate fractional
-    // bytes from attribution codepaths.
-    if (fractional == Fraction::Max() || other.fractional == Fraction::Max()) {
-      fractional = Fraction::Max();
-      [[maybe_unused]] bool overflow = __builtin_add_overflow(integral, other.integral, &integral);
-      FX_DCHECK(!overflow);
-      return *this;
-    }
-
     // Input fractions must always be <1 to guard against overflow.
     // If the fractional sum is >=1, then roll that overflow byte into the integral part.
     FX_DCHECK(fractional < kOneByte);
@@ -148,30 +130,15 @@ struct Process {
 struct Vmo {
   explicit Vmo(const zx_info_vmo_t& v)
       : koid(v.koid), parent_koid(v.parent_koid), allocated_bytes(v.size_bytes) {
-    // Fractional byte values will be `Max` unless the kernel is exposing its new attribution model.
-    //
     // Use the kernel's PSS value (i.e. `committed_scaled_bytes`) as it properly accounts for
     // copy-on-write sharing.
-    // Otherwise use the existing "RSS" value and rely on the behavior in Summary that attributes
-    // clone parents to the clone's process.
-    // TODO(https://fxbug.dev/issues/338300808): Remove this check once the kernel's new
-    // attribution behavior is the default.
-    const bool using_new_kernel_behavior =
-        v.committed_fractional_scaled_bytes != FractionalBytes::Fraction::Max().raw_value();
-    if (using_new_kernel_behavior) {
-      // TODO(b/377993710): Rename to committed_scaled_bytes.
-      committed_bytes = FractionalBytes{
-          .integral = v.committed_scaled_bytes,
-          .fractional = FractionalBytes::Fraction::FromRaw(v.committed_fractional_scaled_bytes)};
-      populated_bytes = FractionalBytes{
-          .integral = v.populated_scaled_bytes,
-          .fractional = FractionalBytes::Fraction::FromRaw(v.populated_fractional_scaled_bytes)};
-    } else {
-      committed_bytes = FractionalBytes{.integral = v.committed_bytes,
-                                        .fractional = FractionalBytes::Fraction::Max()};
-      populated_bytes = FractionalBytes{.integral = v.populated_bytes,
-                                        .fractional = FractionalBytes::Fraction::Max()};
-    }
+    // TODO(b/377993710): Rename to committed_scaled_bytes.
+    committed_bytes = FractionalBytes{
+        .integral = v.committed_scaled_bytes,
+        .fractional = FractionalBytes::Fraction::FromRaw(v.committed_fractional_scaled_bytes)};
+    populated_bytes = FractionalBytes{
+        .integral = v.populated_scaled_bytes,
+        .fractional = FractionalBytes::Fraction::FromRaw(v.populated_fractional_scaled_bytes)};
     strncpy(name, v.name, sizeof(name));
   }
   zx_koid_t koid;

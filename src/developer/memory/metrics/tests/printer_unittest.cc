@@ -90,8 +90,8 @@ TEST_F(PrinterUnitTest, PrintCapture) {
                                                .size_bytes = 300,
                                                .parent_koid = 100,
                                                .committed_bytes = 200,
-                                               .committed_scaled_bytes = 0,
-                                               .committed_fractional_scaled_bytes = UINT64_MAX,
+                                               .committed_scaled_bytes = 200,
+                                               .committed_fractional_scaled_bytes = 0,
                                            },
                                        },
                                    .processes =
@@ -204,8 +204,8 @@ TEST_F(PrinterUnitTest, PrintCaptureAndBucketConfig) {
                                                .size_bytes = 300,
                                                .parent_koid = 100,
                                                .committed_bytes = 200,
-                                               .committed_scaled_bytes = 0,
-                                               .committed_fractional_scaled_bytes = UINT64_MAX,
+                                               .committed_scaled_bytes = 200,
+                                               .committed_fractional_scaled_bytes = 0,
                                            },
                                        },
                                    .processes =
@@ -344,7 +344,7 @@ TEST_F(PrinterUnitTest, PrintSummaryPROCESS) {
                                    .vmos = {{.koid = 1,
                                              .name = "v1",
                                              .committed_bytes = 1024,
-                                             .committed_fractional_scaled_bytes = UINT64_MAX}},
+                                             .committed_scaled_bytes = 1024}},
                                    .processes = {{.koid = 100, .name = "p1", .vmos = {1}}},
                                });
 
@@ -379,7 +379,7 @@ TEST_F(PrinterUnitTest, PrintSummaryVMO) {
                                    .vmos = {{.koid = 1,
                                              .name = "v1",
                                              .committed_bytes = 1024,
-                                             .committed_fractional_scaled_bytes = UINT64_MAX}},
+                                             .committed_scaled_bytes = 1024}},
                                    .processes = {{.koid = 100, .name = "p1", .vmos = {1}}},
                                });
 
@@ -412,15 +412,15 @@ TEST_F(PrinterUnitTest, PrintSummaryVMOShared) {
                                            {.koid = 1,
                                             .name = "v1",
                                             .committed_bytes = 1024,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
+                                            .committed_scaled_bytes = 1024},
                                            {.koid = 2,
                                             .name = "v2",
                                             .committed_bytes = 2ul * 1024,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
+                                            .committed_scaled_bytes = 2ul * 1024},
                                            {.koid = 3,
                                             .name = "v3",
                                             .committed_bytes = 3ul * 1024,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
+                                            .committed_scaled_bytes = 3ul * 1024},
                                        },
                                    .processes =
                                        {
@@ -448,20 +448,19 @@ TEST_F(PrinterUnitTest, PrintSummaryVMOShared) {
 
 TEST_F(PrinterUnitTest, OutputSummarySingle) {
   Capture c;
-  TestUtils::CreateCapture(&c, {
-                                   .time = 1234L * 1000000000L,
-                                   .vmos =
-                                       {
-                                           {.koid = 1,
-                                            .name = "v1",
-                                            .committed_bytes = 100,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                       },
-                                   .processes =
-                                       {
-                                           {.koid = 100, .name = "p1", .vmos = {1}},
-                                       },
-                               });
+  TestUtils::CreateCapture(
+      &c,
+      {
+          .time = 1234L * 1000000000L,
+          .vmos =
+              {
+                  {.koid = 1, .name = "v1", .committed_bytes = 100, .committed_scaled_bytes = 100},
+              },
+          .processes =
+              {
+                  {.koid = 100, .name = "p1", .vmos = {1}},
+              },
+      });
   Summary s(c);
 
   std::ostringstream oss;
@@ -518,25 +517,21 @@ TEST_F(PrinterUnitTest, OutputSummaryKernel) {
 
 TEST_F(PrinterUnitTest, OutputSummaryDouble) {
   Capture c;
-  TestUtils::CreateCapture(&c, {
-                                   .time = 1234L * 1000000000L,
-                                   .vmos =
-                                       {
-                                           {.koid = 1,
-                                            .name = "v1",
-                                            .committed_bytes = 100,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                           {.koid = 2,
-                                            .name = "v2",
-                                            .committed_bytes = 200,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                       },
-                                   .processes =
-                                       {
-                                           {.koid = 100, .name = "p1", .vmos = {1}},
-                                           {.koid = 200, .name = "p2", .vmos = {2}},
-                                       },
-                               });
+  TestUtils::CreateCapture(
+      &c,
+      {
+          .time = 1234L * 1000000000L,
+          .vmos =
+              {
+                  {.koid = 1, .name = "v1", .committed_bytes = 100, .committed_scaled_bytes = 100},
+                  {.koid = 2, .name = "v2", .committed_bytes = 200, .committed_scaled_bytes = 200},
+              },
+          .processes =
+              {
+                  {.koid = 100, .name = "p1", .vmos = {1}},
+                  {.koid = 200, .name = "p2", .vmos = {2}},
+              },
+      });
   Summary s(c);
 
   std::ostringstream oss;
@@ -564,37 +559,24 @@ TEST_F(PrinterUnitTest, OutputSummaryDouble) {
 
 TEST_F(PrinterUnitTest, OutputSummaryShared) {
   Capture c;
-  TestUtils::CreateCapture(&c, {
-                                   .time = 1234L * 1000000000L,
-                                   .vmos =
-                                       {
-                                           {.koid = 1,
-                                            .name = "v1",
-                                            .committed_bytes = 100,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                           {.koid = 2,
-                                            .name = "v1",
-                                            .committed_bytes = 100,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                           {.koid = 3,
-                                            .name = "v1",
-                                            .committed_bytes = 100,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                           {.koid = 4,
-                                            .name = "v2",
-                                            .committed_bytes = 100,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                           {.koid = 5,
-                                            .name = "v3",
-                                            .committed_bytes = 200,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                       },
-                                   .processes =
-                                       {
-                                           {.koid = 100, .name = "p1", .vmos = {1, 2, 4}},
-                                           {.koid = 200, .name = "p2", .vmos = {2, 3, 5}},
-                                       },
-                               });
+  TestUtils::CreateCapture(
+      &c,
+      {
+          .time = 1234L * 1000000000L,
+          .vmos =
+              {
+                  {.koid = 1, .name = "v1", .committed_bytes = 100, .committed_scaled_bytes = 100},
+                  {.koid = 2, .name = "v1", .committed_bytes = 100, .committed_scaled_bytes = 100},
+                  {.koid = 3, .name = "v1", .committed_bytes = 100, .committed_scaled_bytes = 100},
+                  {.koid = 4, .name = "v2", .committed_bytes = 100, .committed_scaled_bytes = 100},
+                  {.koid = 5, .name = "v3", .committed_bytes = 200, .committed_scaled_bytes = 200},
+              },
+          .processes =
+              {
+                  {.koid = 100, .name = "p1", .vmos = {1, 2, 4}},
+                  {.koid = 200, .name = "p2", .vmos = {2, 3, 5}},
+              },
+      });
   Summary s(c);
 
   std::ostringstream oss;
@@ -625,35 +607,28 @@ TEST_F(PrinterUnitTest, OutputSummaryShared) {
 TEST_F(PrinterUnitTest, PrintDigest) {
   // Test kernel stats.
   Capture c;
-  TestUtils::CreateCapture(&c, {
-                                   .kmem =
-                                       {
-                                           .total_bytes = 1000,
-                                           .free_bytes = 100,
-                                           .wired_bytes = 10,
-                                           .vmo_bytes = 700,
-                                       },
-                                   .vmos =
-                                       {
-                                           {.koid = 1,
-                                            .name = "a1",
-                                            .committed_bytes = 100,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                           {.koid = 2,
-                                            .name = "b1",
-                                            .committed_bytes = 200,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                           {.koid = 3,
-                                            .name = "c1",
-                                            .committed_bytes = 300,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                       },
-                                   .processes =
-                                       {
-                                           {.koid = 1, .name = "p1", .vmos = {1}},
-                                           {.koid = 2, .name = "q1", .vmos = {2}},
-                                       },
-                               });
+  TestUtils::CreateCapture(
+      &c,
+      {
+          .kmem =
+              {
+                  .total_bytes = 1000,
+                  .free_bytes = 100,
+                  .wired_bytes = 10,
+                  .vmo_bytes = 700,
+              },
+          .vmos =
+              {
+                  {.koid = 1, .name = "a1", .committed_bytes = 100, .committed_scaled_bytes = 100},
+                  {.koid = 2, .name = "b1", .committed_bytes = 200, .committed_scaled_bytes = 200},
+                  {.koid = 3, .name = "c1", .committed_bytes = 300, .committed_scaled_bytes = 300},
+              },
+          .processes =
+              {
+                  {.koid = 1, .name = "p1", .vmos = {1}},
+                  {.koid = 2, .name = "q1", .vmos = {2}},
+              },
+      });
   Digester digester({{"A", ".*", "a.*"}, {"B", ".*", "b.*"}});
   Digest d(c, &digester);
   std::ostringstream oss;
@@ -668,48 +643,41 @@ TEST_F(PrinterUnitTest, PrintDigest) {
 TEST_F(PrinterUnitTest, OutputDigest) {
   // Test kernel stats.
   Capture c;
-  TestUtils::CreateCapture(&c, {
-                                   .time = 1234L * 1000000000L,
-                                   .kmem =
-                                       {
-                                           .total_bytes = 1000,
-                                           .free_bytes = 100,
-                                           .wired_bytes = 10,
-                                           .vmo_bytes = 700,
-                                       },
-                                   .kmem_extended =
-                                       {
-                                           .total_bytes = 1000,
-                                           .free_bytes = 100,
-                                           .wired_bytes = 10,
-                                           .vmo_bytes = 700,
-                                           .vmo_pager_total_bytes = 300,
-                                           .vmo_pager_newest_bytes = 50,
-                                           .vmo_pager_oldest_bytes = 150,
-                                           .vmo_discardable_locked_bytes = 60,
-                                           .vmo_discardable_unlocked_bytes = 40,
-                                       },
-                                   .vmos =
-                                       {
-                                           {.koid = 1,
-                                            .name = "a1",
-                                            .committed_bytes = 100,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                           {.koid = 2,
-                                            .name = "b1",
-                                            .committed_bytes = 200,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                           {.koid = 3,
-                                            .name = "c1",
-                                            .committed_bytes = 300,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                       },
-                                   .processes =
-                                       {
-                                           {.koid = 1, .name = "p1", .vmos = {1}},
-                                           {.koid = 2, .name = "q1", .vmos = {2}},
-                                       },
-                               });
+  TestUtils::CreateCapture(
+      &c,
+      {
+          .time = 1234L * 1000000000L,
+          .kmem =
+              {
+                  .total_bytes = 1000,
+                  .free_bytes = 100,
+                  .wired_bytes = 10,
+                  .vmo_bytes = 700,
+              },
+          .kmem_extended =
+              {
+                  .total_bytes = 1000,
+                  .free_bytes = 100,
+                  .wired_bytes = 10,
+                  .vmo_bytes = 700,
+                  .vmo_pager_total_bytes = 300,
+                  .vmo_pager_newest_bytes = 50,
+                  .vmo_pager_oldest_bytes = 150,
+                  .vmo_discardable_locked_bytes = 60,
+                  .vmo_discardable_unlocked_bytes = 40,
+              },
+          .vmos =
+              {
+                  {.koid = 1, .name = "a1", .committed_bytes = 100, .committed_scaled_bytes = 100},
+                  {.koid = 2, .name = "b1", .committed_bytes = 200, .committed_scaled_bytes = 200},
+                  {.koid = 3, .name = "c1", .committed_bytes = 300, .committed_scaled_bytes = 300},
+              },
+          .processes =
+              {
+                  {.koid = 1, .name = "p1", .vmos = {1}},
+                  {.koid = 2, .name = "q1", .vmos = {2}},
+              },
+      });
   Digester digester({{"A", ".*", "a.*"}, {"B", ".*", "b.*"}});
   Digest d(c, &digester);
   std::ostringstream oss;

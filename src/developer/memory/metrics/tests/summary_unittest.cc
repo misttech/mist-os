@@ -17,19 +17,18 @@ using SummaryUnitTest = testing::Test;
 TEST_F(SummaryUnitTest, Single) {
   // One process, one vmo.
   Capture c;
-  TestUtils::CreateCapture(&c, {
-                                   .vmos =
-                                       {
-                                           {.koid = 1,
-                                            .name = "v1",
-                                            .committed_bytes = 100,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                       },
-                                   .processes =
-                                       {
-                                           {.koid = 2, .name = "p1", .vmos = {1}},
-                                       },
-                               });
+  TestUtils::CreateCapture(
+      &c,
+      {
+          .vmos =
+              {
+                  {.koid = 1, .name = "v1", .committed_bytes = 100, .committed_scaled_bytes = 100},
+              },
+          .processes =
+              {
+                  {.koid = 2, .name = "p1", .vmos = {1}},
+              },
+      });
   Summary s(c);
   auto process_summaries = TestUtils::GetProcessSummaries(s);
   ASSERT_EQ(2U, process_summaries.size());
@@ -53,23 +52,19 @@ TEST_F(SummaryUnitTest, Single) {
 TEST_F(SummaryUnitTest, TwoVmos) {
   // One process, two vmos with same name.
   Capture c;
-  TestUtils::CreateCapture(&c, {
-                                   .vmos =
-                                       {
-                                           {.koid = 1,
-                                            .name = "v1",
-                                            .committed_bytes = 100,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                           {.koid = 2,
-                                            .name = "v1",
-                                            .committed_bytes = 100,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                       },
-                                   .processes =
-                                       {
-                                           {.koid = 2, .name = "p1", .vmos = {1, 2}},
-                                       },
-                               });
+  TestUtils::CreateCapture(
+      &c,
+      {
+          .vmos =
+              {
+                  {.koid = 1, .name = "v1", .committed_bytes = 100, .committed_scaled_bytes = 100},
+                  {.koid = 2, .name = "v1", .committed_bytes = 100, .committed_scaled_bytes = 100},
+              },
+          .processes =
+              {
+                  {.koid = 2, .name = "p1", .vmos = {1, 2}},
+              },
+      });
   Summary s(c);
   auto process_summaries = TestUtils::GetProcessSummaries(s);
   ASSERT_EQ(2U, process_summaries.size());
@@ -93,20 +88,16 @@ TEST_F(SummaryUnitTest, TwoVmos) {
 TEST_F(SummaryUnitTest, TwoVmoNames) {
   // One process, two vmos with different names.
   Capture c;
-  TestUtils::CreateCapture(&c, {
-                                   .vmos =
-                                       {
-                                           {.koid = 1,
-                                            .name = "v1",
-                                            .committed_bytes = 100,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                           {.koid = 2,
-                                            .name = "v2",
-                                            .committed_bytes = 100,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                       },
-                                   .processes = {{.koid = 2, .name = "p1", .vmos = {1, 2}}},
-                               });
+  TestUtils::CreateCapture(
+      &c,
+      {
+          .vmos =
+              {
+                  {.koid = 1, .name = "v1", .committed_bytes = 100, .committed_scaled_bytes = 100},
+                  {.koid = 2, .name = "v2", .committed_bytes = 100, .committed_scaled_bytes = 100},
+              },
+          .processes = {{.koid = 2, .name = "p1", .vmos = {1, 2}}},
+      });
   Summary s(c);
   auto process_summaries = TestUtils::GetProcessSummaries(s);
   ASSERT_EQ(2U, process_summaries.size());
@@ -132,23 +123,23 @@ TEST_F(SummaryUnitTest, TwoVmoNames) {
 }
 
 TEST_F(SummaryUnitTest, Parent) {
-  // One process, two vmos with different names, one is child.
+  // One process, two vmos with different names, one is child. Only the child should be reported,
+  // as the pages shared with its parent already appear in _scaled_bytes values.
   Capture c;
-  TestUtils::CreateCapture(&c, {
-                                   .vmos =
-                                       {
-                                           {.koid = 1,
-                                            .name = "v1",
-                                            .committed_bytes = 100,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                           {.koid = 2,
-                                            .name = "v2",
-                                            .parent_koid = 1,
-                                            .committed_bytes = 100,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                       },
-                                   .processes = {{.koid = 2, .name = "p1", .vmos = {2}}},
-                               });
+  TestUtils::CreateCapture(
+      &c,
+      {
+          .vmos =
+              {
+                  {.koid = 1, .name = "v1", .committed_bytes = 100, .committed_scaled_bytes = 100},
+                  {.koid = 2,
+                   .name = "v2",
+                   .parent_koid = 1,
+                   .committed_bytes = 100,
+                   .committed_scaled_bytes = 100},
+              },
+          .processes = {{.koid = 2, .name = "p1", .vmos = {2}}},
+      });
   Summary s(c);
   auto process_summaries = TestUtils::GetProcessSummaries(s);
   ASSERT_EQ(2U, process_summaries.size());
@@ -158,15 +149,11 @@ TEST_F(SummaryUnitTest, Parent) {
   EXPECT_EQ(2U, ps.koid());
   EXPECT_STREQ("p1", ps.name().c_str());
   Sizes sizes = ps.sizes();
-  EXPECT_EQ(200U, sizes.private_bytes.integral);
-  EXPECT_EQ(200U, sizes.scaled_bytes.integral);
-  EXPECT_EQ(200U, sizes.total_bytes.integral);
-
-  EXPECT_EQ(2U, ps.name_to_sizes().size());
-  sizes = ps.GetSizes("v1");
   EXPECT_EQ(100U, sizes.private_bytes.integral);
   EXPECT_EQ(100U, sizes.scaled_bytes.integral);
   EXPECT_EQ(100U, sizes.total_bytes.integral);
+
+  EXPECT_EQ(1U, ps.name_to_sizes().size());
   sizes = ps.GetSizes("v2");
   EXPECT_EQ(100U, sizes.private_bytes.integral);
   EXPECT_EQ(100U, sizes.scaled_bytes.integral);
@@ -176,21 +163,16 @@ TEST_F(SummaryUnitTest, Parent) {
 TEST_F(SummaryUnitTest, TwoProcesses) {
   // Two processes, with different vmos.
   Capture c;
-  TestUtils::CreateCapture(&c, {.vmos =
-                                    {
-                                        {.koid = 1,
-                                         .name = "v1",
-                                         .committed_bytes = 100,
-                                         .committed_fractional_scaled_bytes = UINT64_MAX},
-                                        {.koid = 2,
-                                         .name = "v2",
-                                         .committed_bytes = 100,
-                                         .committed_fractional_scaled_bytes = UINT64_MAX},
-                                    },
-                                .processes = {
-                                    {.koid = 2, .name = "p1", .vmos = {1}},
-                                    {.koid = 3, .name = "p2", .vmos = {2}},
-                                }});
+  TestUtils::CreateCapture(
+      &c, {.vmos =
+               {
+                   {.koid = 1, .name = "v1", .committed_bytes = 100, .committed_scaled_bytes = 100},
+                   {.koid = 2, .name = "v2", .committed_bytes = 100, .committed_scaled_bytes = 100},
+               },
+           .processes = {
+               {.koid = 2, .name = "p1", .vmos = {1}},
+               {.koid = 3, .name = "p2", .vmos = {2}},
+           }});
   Summary s(c);
   auto process_summaries = TestUtils::GetProcessSummaries(s);
   ASSERT_EQ(3U, process_summaries.size());
@@ -228,17 +210,15 @@ TEST_F(SummaryUnitTest, TwoProcesses) {
 TEST_F(SummaryUnitTest, TwoProcessesShared) {
   // Two processes, with same vmos.
   Capture c;
-  TestUtils::CreateCapture(&c, {.vmos =
-                                    {
-                                        {.koid = 1,
-                                         .name = "v1",
-                                         .committed_bytes = 100,
-                                         .committed_fractional_scaled_bytes = UINT64_MAX},
-                                    },
-                                .processes = {
-                                    {.koid = 2, .name = "p1", .vmos = {1}},
-                                    {.koid = 3, .name = "p2", .vmos = {1}},
-                                }});
+  TestUtils::CreateCapture(
+      &c, {.vmos =
+               {
+                   {.koid = 1, .name = "v1", .committed_bytes = 100, .committed_scaled_bytes = 100},
+               },
+           .processes = {
+               {.koid = 2, .name = "p1", .vmos = {1}},
+               {.koid = 3, .name = "p2", .vmos = {1}},
+           }});
   Summary s(c);
   auto process_summaries = TestUtils::GetProcessSummaries(s);
   ASSERT_EQ(3U, process_summaries.size());
@@ -274,24 +254,24 @@ TEST_F(SummaryUnitTest, TwoProcessesShared) {
 }
 
 TEST_F(SummaryUnitTest, TwoProcessesChild) {
-  // Two processes, with one vmo shared through parantage.
+  // Two processes, with one vmo shared through parantage. In the new kernel page attribution
+  // model, scaled_bytes values already take into account ancestor VMOs, which thus should not be
+  // summed up by memory monitor.
   Capture c;
-  TestUtils::CreateCapture(&c, {.vmos =
-                                    {
-                                        {.koid = 1,
-                                         .name = "v1",
-                                         .committed_bytes = 100,
-                                         .committed_fractional_scaled_bytes = UINT64_MAX},
-                                        {.koid = 2,
-                                         .name = "v2",
-                                         .parent_koid = 1,
-                                         .committed_bytes = 100,
-                                         .committed_fractional_scaled_bytes = UINT64_MAX},
-                                    },
-                                .processes = {
-                                    {.koid = 2, .name = "p1", .vmos = {1}},
-                                    {.koid = 3, .name = "p2", .vmos = {2}},
-                                }});
+  TestUtils::CreateCapture(
+      &c, {.vmos =
+               {
+                   {.koid = 1, .name = "v1", .committed_bytes = 100, .committed_scaled_bytes = 100},
+                   {.koid = 2,
+                    .name = "v2",
+                    .parent_koid = 1,
+                    .committed_bytes = 200,
+                    .committed_scaled_bytes = 200},
+               },
+           .processes = {
+               {.koid = 2, .name = "p1", .vmos = {1}},
+               {.koid = 3, .name = "p2", .vmos = {2}},
+           }});
   Summary s(c);
   auto process_summaries = TestUtils::GetProcessSummaries(s);
   ASSERT_EQ(3U, process_summaries.size());
@@ -301,33 +281,29 @@ TEST_F(SummaryUnitTest, TwoProcessesChild) {
   EXPECT_EQ(2U, ps.koid());
   EXPECT_STREQ("p1", ps.name().c_str());
   Sizes sizes = ps.sizes();
-  EXPECT_EQ(0U, sizes.private_bytes.integral);
-  EXPECT_EQ(50U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U, sizes.scaled_bytes.integral);
   EXPECT_EQ(100U, sizes.total_bytes.integral);
 
   EXPECT_EQ(1U, ps.name_to_sizes().size());
   sizes = ps.GetSizes("v1");
-  EXPECT_EQ(0U, sizes.private_bytes.integral);
-  EXPECT_EQ(50U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U, sizes.scaled_bytes.integral);
   EXPECT_EQ(100U, sizes.total_bytes.integral);
 
   ps = process_summaries.at(2);
   EXPECT_EQ(3U, ps.koid());
   EXPECT_STREQ("p2", ps.name().c_str());
   sizes = ps.sizes();
-  EXPECT_EQ(100U, sizes.private_bytes.integral);
-  EXPECT_EQ(150U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(200U, sizes.private_bytes.integral);
+  EXPECT_EQ(200U, sizes.scaled_bytes.integral);
   EXPECT_EQ(200U, sizes.total_bytes.integral);
 
-  EXPECT_EQ(2U, ps.name_to_sizes().size());
-  sizes = ps.GetSizes("v1");
-  EXPECT_EQ(0U, sizes.private_bytes.integral);
-  EXPECT_EQ(50U, sizes.scaled_bytes.integral);
-  EXPECT_EQ(100U, sizes.total_bytes.integral);
+  EXPECT_EQ(1U, ps.name_to_sizes().size());
   sizes = ps.GetSizes("v2");
-  EXPECT_EQ(100U, sizes.private_bytes.integral);
-  EXPECT_EQ(100U, sizes.scaled_bytes.integral);
-  EXPECT_EQ(100U, sizes.total_bytes.integral);
+  EXPECT_EQ(200U, sizes.private_bytes.integral);
+  EXPECT_EQ(200U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(200U, sizes.total_bytes.integral);
 }
 
 TEST_F(SummaryUnitTest, MissingParent) {
@@ -339,7 +315,7 @@ TEST_F(SummaryUnitTest, MissingParent) {
                                          .name = "v2",
                                          .parent_koid = 1,
                                          .committed_bytes = 100,
-                                         .committed_fractional_scaled_bytes = UINT64_MAX},
+                                         .committed_scaled_bytes = 100},
                                     },
                                 .processes = {
                                     {.koid = 2, .name = "p1", .vmos = {2}},
@@ -417,23 +393,22 @@ TEST_F(SummaryUnitTest, KernelVmo) {
   // Test kernel that kernel vmo memory that isn't found in
   // user space vmos is listed under the kernel.
   Capture c;
-  TestUtils::CreateCapture(&c, {
-                                   .kmem =
-                                       {
-                                           .vmo_bytes = 110,
-                                       },
-                                   .vmos =
-                                       {
-                                           {.koid = 1,
-                                            .name = "v1",
-                                            .committed_bytes = 100,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                       },
-                                   .processes =
-                                       {
-                                           {.koid = 2, .name = "p1", .vmos = {1}},
-                                       },
-                               });
+  TestUtils::CreateCapture(
+      &c,
+      {
+          .kmem =
+              {
+                  .vmo_bytes = 110,
+              },
+          .vmos =
+              {
+                  {.koid = 1, .name = "v1", .committed_bytes = 100, .committed_scaled_bytes = 100},
+              },
+          .processes =
+              {
+                  {.koid = 2, .name = "p1", .vmos = {1}},
+              },
+      });
   Summary s(c);
   auto process_summaries = TestUtils::GetProcessSummaries(s);
   ASSERT_EQ(2U, process_summaries.size());
@@ -455,81 +430,79 @@ TEST_F(SummaryUnitTest, NameMatch) {
   // One process, two vmos with same name.
   Capture c;
   TestUtils::CreateCapture(
-      &c, {
-              .vmos =
-                  {
-                      {.koid = 1,
-                       .name = "blob-12a",
-                       .committed_bytes = 100,
-                       .committed_fractional_scaled_bytes = UINT64_MAX},
-                      {.koid = 2,
-                       .name = "ld.so.1-internal-heap",
-                       .committed_bytes = 100,
-                       .committed_fractional_scaled_bytes = UINT64_MAX},
-                      {.koid = 3,
-                       .name = "blob-de",
-                       .committed_bytes = 100,
-                       .committed_fractional_scaled_bytes = UINT64_MAX},
-                      {.koid = 4,
-                       .name = "pthread_t:0x59853000/TLS=0x548",
-                       .committed_bytes = 100,
-                       .committed_fractional_scaled_bytes = UINT64_MAX},
-                      {.koid = 5,
-                       .name = "thrd_t:0x59853000/TLS=0x548",
-                       .committed_bytes = 100,
-                       .committed_fractional_scaled_bytes = UINT64_MAX},
-                      {.koid = 6,
-                       .name = "data:libfoo.so",
-                       .committed_bytes = 100,
-                       .committed_fractional_scaled_bytes = UINT64_MAX},
-                      {.koid = 7,
-                       .name = "",
-                       .committed_bytes = 100,
-                       .committed_fractional_scaled_bytes = UINT64_MAX},
-                      {.koid = 8,
-                       .name = "scudo:primary",
-                       .committed_bytes = 100,
-                       .committed_fractional_scaled_bytes = UINT64_MAX},
-                      {.koid = 9,
-                       .name = "scudo:secondary",
-                       .committed_bytes = 100,
-                       .committed_fractional_scaled_bytes = UINT64_MAX},
-                      {.koid = 10,
-                       .name = "foo",
-                       .committed_bytes = 100,
-                       .committed_fractional_scaled_bytes = UINT64_MAX},
-                      {.koid = 11,
-                       .name = "initial-thread",
-                       .committed_bytes = 100,
-                       .committed_fractional_scaled_bytes = UINT64_MAX},
-                      {.koid = 12,
-                       .name = "libfoo.so.1",
-                       .committed_bytes = 100,
-                       .committed_fractional_scaled_bytes = UINT64_MAX},
-                      {.koid = 13,
-                       .name = "stack: msg of 123",
-                       .committed_bytes = 100,
-                       .committed_fractional_scaled_bytes = UINT64_MAX},
-                      {.koid = 14,
-                       .name = "inactive-blob-123",
-                       .committed_bytes = 100,
-                       .committed_fractional_scaled_bytes = UINT64_MAX},
-                      {.koid = 15,
-                       .name = "bss456:foobar",
-                       .committed_bytes = 100,
-                       .committed_fractional_scaled_bytes = UINT64_MAX},
-                      {.koid = 16,
-                       .name = "relro:foobar",
-                       .committed_bytes = 100,
-                       .committed_fractional_scaled_bytes = UINT64_MAX},
-                  },
-              .processes =
-                  {
-                      {.koid = 2,
-                       .name = "p1",
-                       .vmos = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}},
-                  },
-          });
+      &c,
+      {
+          .vmos =
+              {
+                  {.koid = 1,
+                   .name = "blob-12a",
+                   .committed_bytes = 100,
+                   .committed_scaled_bytes = 100},
+                  {.koid = 2,
+                   .name = "ld.so.1-internal-heap",
+                   .committed_bytes = 100,
+                   .committed_scaled_bytes = 100},
+                  {.koid = 3,
+                   .name = "blob-de",
+                   .committed_bytes = 100,
+                   .committed_scaled_bytes = 100},
+                  {.koid = 4,
+                   .name = "pthread_t:0x59853000/TLS=0x548",
+                   .committed_bytes = 100,
+                   .committed_scaled_bytes = 100},
+                  {.koid = 5,
+                   .name = "thrd_t:0x59853000/TLS=0x548",
+                   .committed_bytes = 100,
+                   .committed_scaled_bytes = 100},
+                  {.koid = 6,
+                   .name = "data:libfoo.so",
+                   .committed_bytes = 100,
+                   .committed_scaled_bytes = 100},
+                  {.koid = 7, .name = "", .committed_bytes = 100, .committed_scaled_bytes = 100},
+                  {.koid = 8,
+                   .name = "scudo:primary",
+                   .committed_bytes = 100,
+                   .committed_scaled_bytes = 100},
+                  {.koid = 9,
+                   .name = "scudo:secondary",
+                   .committed_bytes = 100,
+                   .committed_scaled_bytes = 100},
+                  {.koid = 10,
+                   .name = "foo",
+                   .committed_bytes = 100,
+                   .committed_scaled_bytes = 100},
+                  {.koid = 11,
+                   .name = "initial-thread",
+                   .committed_bytes = 100,
+                   .committed_scaled_bytes = 100},
+                  {.koid = 12,
+                   .name = "libfoo.so.1",
+                   .committed_bytes = 100,
+                   .committed_scaled_bytes = 100},
+                  {.koid = 13,
+                   .name = "stack: msg of 123",
+                   .committed_bytes = 100,
+                   .committed_scaled_bytes = 100},
+                  {.koid = 14,
+                   .name = "inactive-blob-123",
+                   .committed_bytes = 100,
+                   .committed_scaled_bytes = 100},
+                  {.koid = 15,
+                   .name = "bss456:foobar",
+                   .committed_bytes = 100,
+                   .committed_scaled_bytes = 100},
+                  {.koid = 16,
+                   .name = "relro:foobar",
+                   .committed_bytes = 100,
+                   .committed_scaled_bytes = 100},
+              },
+          .processes =
+              {
+                  {.koid = 2,
+                   .name = "p1",
+                   .vmos = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}},
+              },
+      });
   Summary s(c, Summary::kNameMatches);
   auto process_summaries = TestUtils::GetProcessSummaries(s);
   ASSERT_EQ(2U, process_summaries.size());
@@ -558,20 +531,16 @@ TEST_F(SummaryUnitTest, NameMatch) {
 TEST_F(SummaryUnitTest, AllUndigested) {
   // One process, two vmos with different names.
   Capture c;
-  TestUtils::CreateCapture(&c, {
-                                   .vmos =
-                                       {
-                                           {.koid = 1,
-                                            .name = "v1",
-                                            .committed_bytes = 100,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                           {.koid = 2,
-                                            .name = "v2",
-                                            .committed_bytes = 100,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                       },
-                                   .processes = {{.koid = 2, .name = "p1", .vmos = {1, 2}}},
-                               });
+  TestUtils::CreateCapture(
+      &c,
+      {
+          .vmos =
+              {
+                  {.koid = 1, .name = "v1", .committed_bytes = 100, .committed_scaled_bytes = 100},
+                  {.koid = 2, .name = "v2", .committed_bytes = 100, .committed_scaled_bytes = 100},
+              },
+          .processes = {{.koid = 2, .name = "p1", .vmos = {1, 2}}},
+      });
   Namer namer({});
   Summary s(c, &namer, {1, 2});
   auto process_summaries = TestUtils::GetProcessSummaries(s);
@@ -600,20 +569,16 @@ TEST_F(SummaryUnitTest, AllUndigested) {
 TEST_F(SummaryUnitTest, OneUndigested) {
   // One process, two vmos with different names.
   Capture c;
-  TestUtils::CreateCapture(&c, {
-                                   .vmos =
-                                       {
-                                           {.koid = 1,
-                                            .name = "v1",
-                                            .committed_bytes = 100,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                           {.koid = 2,
-                                            .name = "v2",
-                                            .committed_bytes = 100,
-                                            .committed_fractional_scaled_bytes = UINT64_MAX},
-                                       },
-                                   .processes = {{.koid = 2, .name = "p1", .vmos = {1, 2}}},
-                               });
+  TestUtils::CreateCapture(
+      &c,
+      {
+          .vmos =
+              {
+                  {.koid = 1, .name = "v1", .committed_bytes = 100, .committed_scaled_bytes = 100},
+                  {.koid = 2, .name = "v2", .committed_bytes = 100, .committed_scaled_bytes = 100},
+              },
+          .processes = {{.koid = 2, .name = "p1", .vmos = {1, 2}}},
+      });
 
   Namer namer({});
   Summary s(c, &namer, {1});
@@ -639,21 +604,16 @@ TEST_F(SummaryUnitTest, OneUndigested) {
 TEST_F(SummaryUnitTest, TwoProcessesOneUndigested) {
   // Two processes, with different vmos.
   Capture c;
-  TestUtils::CreateCapture(&c, {.vmos =
-                                    {
-                                        {.koid = 1,
-                                         .name = "v1",
-                                         .committed_bytes = 100,
-                                         .committed_fractional_scaled_bytes = UINT64_MAX},
-                                        {.koid = 2,
-                                         .name = "v2",
-                                         .committed_bytes = 100,
-                                         .committed_fractional_scaled_bytes = UINT64_MAX},
-                                    },
-                                .processes = {
-                                    {.koid = 2, .name = "p1", .vmos = {1}},
-                                    {.koid = 3, .name = "p2", .vmos = {2}},
-                                }});
+  TestUtils::CreateCapture(
+      &c, {.vmos =
+               {
+                   {.koid = 1, .name = "v1", .committed_bytes = 100, .committed_scaled_bytes = 100},
+                   {.koid = 2, .name = "v2", .committed_bytes = 100, .committed_scaled_bytes = 100},
+               },
+           .processes = {
+               {.koid = 2, .name = "p1", .vmos = {1}},
+               {.koid = 3, .name = "p2", .vmos = {2}},
+           }});
   Namer namer({});
   Summary s(c, &namer, {1});
   auto process_summaries = TestUtils::GetProcessSummaries(s);
@@ -678,87 +638,62 @@ TEST_F(SummaryUnitTest, TwoProcessesOneUndigested) {
 TEST_F(SummaryUnitTest, Pools) {
   // One process, two vmos with same name.
   Capture c;
-  TestUtils::CreateCapture(&c, {.vmos =
-                                    {
-                                        {.koid = 1,
-                                         .name = "SysmemContiguousPool",
-                                         .committed_bytes = 400,
-                                         .committed_fractional_scaled_bytes = UINT64_MAX},
-                                        {.koid = 2,
-                                         .name = "ContiguousChild",
-                                         .size_bytes = 300,
-                                         .parent_koid = 1,
-                                         .committed_fractional_scaled_bytes = UINT64_MAX},
-                                        {.koid = 3,
-                                         .name = "ContiguousGrandchild",
-                                         .size_bytes = 100,
-                                         .parent_koid = 2,
-                                         .committed_fractional_scaled_bytes = UINT64_MAX},
-                                        {.koid = 4,
-                                         .name = "ContiguousGrandchild",
-                                         .size_bytes = 50,
-                                         .parent_koid = 2,
-                                         .committed_fractional_scaled_bytes = UINT64_MAX},
-                                        {.koid = 5,
-                                         .name = "Sysmem-core",
-                                         .committed_bytes = 50,
-                                         .committed_fractional_scaled_bytes = UINT64_MAX},
-                                        {.koid = 6,
-                                         .name = "CoreChild",
-                                         .size_bytes = 50,
-                                         .parent_koid = 5,
-                                         .committed_fractional_scaled_bytes = UINT64_MAX},
-                                    },
-                                .processes =
-                                    {
-                                        {.koid = 10, .name = "p1", .vmos = {1, 2, 5}},
-                                        {.koid = 20, .name = "p2", .vmos = {3}},
-                                        {.koid = 30, .name = "p3", .vmos = {4}},
-                                        {.koid = 40, .name = "p4", .vmos = {6}},
-                                    },
-                                .rooted_vmo_names = Capture::kDefaultRootedVmoNames});
+  TestUtils::CreateCapture(
+      &c, {.vmos =
+               {
+                   {.koid = 1,
+                    .name = "SysmemContiguousPool",
+                    .committed_bytes = 400,
+                    .committed_scaled_bytes = 400},
+                   {.koid = 2, .name = "ContiguousChild", .size_bytes = 300, .parent_koid = 1},
+                   {.koid = 3, .name = "ContiguousGrandchild", .size_bytes = 100, .parent_koid = 2},
+                   {.koid = 4, .name = "ContiguousGrandchild", .size_bytes = 50, .parent_koid = 2},
+                   {.koid = 5,
+                    .name = "Sysmem-core",
+                    .committed_bytes = 50,
+                    .committed_scaled_bytes = 50},
+                   {.koid = 6, .name = "CoreChild", .size_bytes = 50, .parent_koid = 5},
+               },
+           .processes =
+               {
+                   {.koid = 10, .name = "p1", .vmos = {1, 2, 5}},
+                   {.koid = 20, .name = "p2", .vmos = {3}},
+                   {.koid = 30, .name = "p3", .vmos = {4}},
+                   {.koid = 40, .name = "p4", .vmos = {6}},
+               },
+           .rooted_vmo_names = Capture::kDefaultRootedVmoNames});
   Summary s(c, Summary::kNameMatches);
   auto process_summaries = TestUtils::GetProcessSummaries(s);
   ASSERT_EQ(5U, process_summaries.size());
 
   // Skip kernel summary.
-  // SysmemContiguousPool will be left with 100 bytes, shared by all three processes.
-  // ContiguousChild will be left with 150 bytes, shared by all three processes.
+  // SysmemContiguousPool will be left with 100 bytes.
+  // ContiguousChild will be left with 150 bytes.
   // p2 will have a private ContiguousGrandchild VMO of 100 bytes.
   // p3 will have a private ContiguousGrandchild VMO of 50 bytes.
   ProcessSummary ps = process_summaries.at(1);
   EXPECT_EQ(10U, ps.koid());
   Sizes sizes = ps.sizes();
-  EXPECT_EQ(0U, sizes.private_bytes.integral);
-  EXPECT_EQ(250U / 3, sizes.scaled_bytes.integral);
+  EXPECT_EQ(250U, sizes.private_bytes.integral);
+  EXPECT_EQ(250U, sizes.scaled_bytes.integral);
   EXPECT_EQ(250U, sizes.total_bytes.integral);
 
   sizes = ps.GetSizes("SysmemContiguousPool");
-  EXPECT_EQ(0U, sizes.private_bytes.integral);
-  EXPECT_EQ(100U / 3, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.private_bytes.integral);
+  EXPECT_EQ(100U, sizes.scaled_bytes.integral);
   EXPECT_EQ(100U, sizes.total_bytes.integral);
 
   sizes = ps.GetSizes("ContiguousChild");
-  EXPECT_EQ(0U, sizes.private_bytes.integral);
-  EXPECT_EQ(150U / 3, sizes.scaled_bytes.integral);
+  EXPECT_EQ(150U, sizes.private_bytes.integral);
+  EXPECT_EQ(150U, sizes.scaled_bytes.integral);
   EXPECT_EQ(150U, sizes.total_bytes.integral);
 
   ps = process_summaries.at(2);
   EXPECT_EQ(20U, ps.koid());
   sizes = ps.sizes();
   EXPECT_EQ(100U, sizes.private_bytes.integral);
-  EXPECT_EQ(100U + 250U / 3, sizes.scaled_bytes.integral);
-  EXPECT_EQ(100U + 250U, sizes.total_bytes.integral);
-
-  sizes = ps.GetSizes("SysmemContiguousPool");
-  EXPECT_EQ(0U, sizes.private_bytes.integral);
-  EXPECT_EQ(100U / 3, sizes.scaled_bytes.integral);
+  EXPECT_EQ(100U, sizes.scaled_bytes.integral);
   EXPECT_EQ(100U, sizes.total_bytes.integral);
-
-  sizes = ps.GetSizes("ContiguousChild");
-  EXPECT_EQ(0U, sizes.private_bytes.integral);
-  EXPECT_EQ(150U / 3, sizes.scaled_bytes.integral);
-  EXPECT_EQ(150U, sizes.total_bytes.integral);
 
   sizes = ps.GetSizes("ContiguousGrandchild");
   EXPECT_EQ(100U, sizes.private_bytes.integral);
@@ -769,18 +704,8 @@ TEST_F(SummaryUnitTest, Pools) {
   EXPECT_EQ(30U, ps.koid());
   sizes = ps.sizes();
   EXPECT_EQ(50U, sizes.private_bytes.integral);
-  EXPECT_EQ(50U + 250U / 3, sizes.scaled_bytes.integral);
-  EXPECT_EQ(50U + 250U, sizes.total_bytes.integral);
-
-  sizes = ps.GetSizes("SysmemContiguousPool");
-  EXPECT_EQ(0U, sizes.private_bytes.integral);
-  EXPECT_EQ(100U / 3, sizes.scaled_bytes.integral);
-  EXPECT_EQ(100U, sizes.total_bytes.integral);
-
-  sizes = ps.GetSizes("ContiguousChild");
-  EXPECT_EQ(0U, sizes.private_bytes.integral);
-  EXPECT_EQ(150U / 3, sizes.scaled_bytes.integral);
-  EXPECT_EQ(150U, sizes.total_bytes.integral);
+  EXPECT_EQ(50U, sizes.scaled_bytes.integral);
+  EXPECT_EQ(50U, sizes.total_bytes.integral);
 
   sizes = ps.GetSizes("ContiguousGrandchild");
   EXPECT_EQ(50U, sizes.private_bytes.integral);

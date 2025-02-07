@@ -18,20 +18,18 @@ using WatcherUnitTest = gtest::RealLoopFixture;
 TEST_F(WatcherUnitTest, Initial) {
   // Confirms the basic case, that we get an initial high water memory
   // mark, and that we get the process and vmo details.
-  CaptureSupplier cs({{
-                          .kmem = {.free_bytes = 100},
-                      },
-                      {.kmem = {.free_bytes = 100},
-                       .vmos =
-                           {
-                               {.koid = 1,
-                                .name = "v1",
-                                .committed_bytes = 101,
-                                .committed_fractional_scaled_bytes = UINT64_MAX},
-                           },
-                       .processes = {
-                           {.koid = 2, .name = "p1", .vmos = {1}},
-                       }}});
+  CaptureSupplier cs(
+      {{
+           .kmem = {.free_bytes = 100},
+       },
+       {.kmem = {.free_bytes = 100},
+        .vmos =
+            {
+                {.koid = 1, .name = "v1", .committed_bytes = 101, .committed_scaled_bytes = 101},
+            },
+        .processes = {
+            {.koid = 2, .name = "p1", .vmos = {1}},
+        }}});
   std::vector<Capture> high_waters;
   Watcher w(
       zx::duration(ZX_MSEC(1)), 100, dispatcher(),

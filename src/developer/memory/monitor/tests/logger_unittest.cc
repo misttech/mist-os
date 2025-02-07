@@ -22,35 +22,28 @@ using inspect::testing::NodeMatches;
 class LoggerInspectTest : public gtest::TestLoopFixture {};
 
 zx_status_t GetCapture(Capture* capture) {
-  TestUtils::CreateCapture(capture, {
-                                        .kmem =
-                                            {
-                                                .total_bytes = 1000,
-                                                .free_bytes = 100,
-                                                .wired_bytes = 10,
-                                                .vmo_bytes = 700,
-                                            },
-                                        .vmos =
-                                            {
-                                                {.koid = 1,
-                                                 .name = "a1",
-                                                 .committed_bytes = 100,
-                                                 .committed_fractional_scaled_bytes = UINT64_MAX},
-                                                {.koid = 2,
-                                                 .name = "b1",
-                                                 .committed_bytes = 200,
-                                                 .committed_fractional_scaled_bytes = UINT64_MAX},
-                                                {.koid = 3,
-                                                 .name = "c1",
-                                                 .committed_bytes = 300,
-                                                 .committed_fractional_scaled_bytes = UINT64_MAX},
-                                            },
-                                        .processes =
-                                            {
-                                                {.koid = 1, .name = "p1", .vmos = {1}},
-                                                {.koid = 2, .name = "q1", .vmos = {2}},
-                                            },
-                                    });
+  TestUtils::CreateCapture(
+      capture,
+      {
+          .kmem =
+              {
+                  .total_bytes = 1000,
+                  .free_bytes = 100,
+                  .wired_bytes = 10,
+                  .vmo_bytes = 700,
+              },
+          .vmos =
+              {
+                  {.koid = 1, .name = "a1", .committed_bytes = 100, .committed_scaled_bytes = 100},
+                  {.koid = 2, .name = "b1", .committed_bytes = 200, .committed_scaled_bytes = 200},
+                  {.koid = 3, .name = "c1", .committed_bytes = 300, .committed_scaled_bytes = 300},
+              },
+          .processes =
+              {
+                  {.koid = 1, .name = "p1", .vmos = {1}},
+                  {.koid = 2, .name = "q1", .vmos = {2}},
+              },
+      });
   return {};
 }
 void GetDigest(const Capture& capture, Digest* digest) {

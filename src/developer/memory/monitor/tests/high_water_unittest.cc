@@ -41,20 +41,18 @@ class HighWaterUnitTest : public gtest::RealLoopFixture {
 };
 
 TEST_F(HighWaterUnitTest, Basic) {
-  CaptureSupplier cs({{
-                          .kmem = {.free_bytes = 100},
-                      },
-                      {.kmem = {.free_bytes = 100},
-                       .vmos =
-                           {
-                               {.koid = 1,
-                                .name = "v1",
-                                .committed_bytes = 101,
-                                .committed_fractional_scaled_bytes = UINT64_MAX},
-                           },
-                       .processes = {
-                           {.koid = 2, .name = "p1", .vmos = {1}},
-                       }}});
+  CaptureSupplier cs(
+      {{
+           .kmem = {.free_bytes = 100},
+       },
+       {.kmem = {.free_bytes = 100},
+        .vmos =
+            {
+                {.koid = 1, .name = "v1", .committed_bytes = 101, .committed_scaled_bytes = 101},
+            },
+        .processes = {
+            {.koid = 2, .name = "p1", .vmos = {1}},
+        }}});
   ASSERT_FALSE(files::IsFileAt(dir_fd(), "latest.txt"));
   HighWater hw(
       dir_path(), zx::msec(10), 100, dispatcher(),
@@ -77,20 +75,18 @@ TEST_F(HighWaterUnitTest, RunTwice) {
   ASSERT_FALSE(files::IsFileAt(dir_fd(), "previous_digest.txt"));
   ASSERT_FALSE(files::IsFileAt(dir_fd(), "latest_digest.txt"));
   {
-    CaptureSupplier cs({{
-                            .kmem = {.free_bytes = 100},
-                        },
-                        {.kmem = {.free_bytes = 100},
-                         .vmos =
-                             {
-                                 {.koid = 1,
-                                  .name = "v1",
-                                  .committed_bytes = 101,
-                                  .committed_fractional_scaled_bytes = UINT64_MAX},
-                             },
-                         .processes = {
-                             {.koid = 2, .name = "p1", .vmos = {1}},
-                         }}});
+    CaptureSupplier cs(
+        {{
+             .kmem = {.free_bytes = 100},
+         },
+         {.kmem = {.free_bytes = 100},
+          .vmos =
+              {
+                  {.koid = 1, .name = "v1", .committed_bytes = 101, .committed_scaled_bytes = 101},
+              },
+          .processes = {
+              {.koid = 2, .name = "p1", .vmos = {1}},
+          }}});
     HighWater hw(
         dir_path(), zx::msec(10), 100, dispatcher(),
         [&cs](Capture* c, CaptureLevel l) { return cs.GetCapture(c, l); },
@@ -103,20 +99,18 @@ TEST_F(HighWaterUnitTest, RunTwice) {
   EXPECT_FALSE(files::IsFileAt(dir_fd(), "previous.txt"));
   EXPECT_FALSE(files::IsFileAt(dir_fd(), "previous_digest.txt"));
   {
-    CaptureSupplier cs({{
-                            .kmem = {.free_bytes = 100},
-                        },
-                        {.kmem = {.free_bytes = 100},
-                         .vmos =
-                             {
-                                 {.koid = 1,
-                                  .name = "v1",
-                                  .committed_bytes = 101,
-                                  .committed_fractional_scaled_bytes = UINT64_MAX},
-                             },
-                         .processes = {
-                             {.koid = 2, .name = "p1", .vmos = {1}},
-                         }}});
+    CaptureSupplier cs(
+        {{
+             .kmem = {.free_bytes = 100},
+         },
+         {.kmem = {.free_bytes = 100},
+          .vmos =
+              {
+                  {.koid = 1, .name = "v1", .committed_bytes = 101, .committed_scaled_bytes = 101},
+              },
+          .processes = {
+              {.koid = 2, .name = "p1", .vmos = {1}},
+          }}});
     HighWater hw(
         dir_path(), zx::msec(10), 100, dispatcher(),
         [&cs](Capture* c, CaptureLevel l) { return cs.GetCapture(c, l); },
