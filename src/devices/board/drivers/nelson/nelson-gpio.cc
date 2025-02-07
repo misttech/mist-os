@@ -10,7 +10,6 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 
-#include <ddk/metadata/gpio.h>
 #include <soc/aml-s905d3/s905d3-gpio.h>
 #include <soc/aml-s905d3/s905d3-hw.h>
 
@@ -19,6 +18,13 @@
 
 // uncomment to disable LED blinky test
 // #define GPIO_TEST
+
+#define DECL_GPIO_PIN(x)     \
+  {                          \
+    {                        \
+      .pin = (x), .name = #x \
+    }                        \
+  }
 
 namespace {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -80,7 +86,7 @@ zx_status_t CreateGpioHPlatformDevice(
   // The GPIO H device won't be able to provide interrupts for the pins it exposes, so
   // GPIO_SOC_SELINA_IRQ_OUT must be be exposed by the main GPIO device (see the list of pins above)
   // instead of this one.
-  const gpio_pin_t kGpioHPins[] = {
+  const std::vector<fuchsia_hardware_pinimpl::Pin> kGpioHPins = {
       DECL_GPIO_PIN(GPIO_SOC_SELINA_RESET), DECL_GPIO_PIN(GPIO_SOC_SPI_B_MOSI),
       DECL_GPIO_PIN(GPIO_SOC_SPI_B_MISO),   DECL_GPIO_PIN(GPIO_SOC_SPI_B_SS0),
       DECL_GPIO_PIN(GPIO_SOC_SPI_B_SCLK),   DECL_GPIO_PIN(GPIO_SOC_SELINA_OSC_EN)};
@@ -94,12 +100,19 @@ zx_status_t CreateGpioHPlatformDevice(
     return role_metadata.error_value().status();
   }
 
+  fuchsia_hardware_pinimpl::Metadata pin_metadata{{.pins = kGpioHPins}};
+
+  fit::result encoded_pin_metadata = fidl::Persist(pin_metadata);
+  if (!encoded_pin_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to encode GPIO init metadata: %s",
+           encoded_pin_metadata.error_value().FormatDescription().c_str());
+    return encoded_pin_metadata.error_value().status();
+  }
+
   std::vector<fpbus::Metadata> gpio_h_metadata{
       {{
-          .id = std::to_string(DEVICE_METADATA_GPIO_PINS),
-          .data = std::vector<uint8_t>(
-              reinterpret_cast<const uint8_t*>(&kGpioHPins),
-              reinterpret_cast<const uint8_t*>(&kGpioHPins) + sizeof(kGpioHPins)),
+          .id = std::to_string(DEVICE_METADATA_GPIO_CONTROLLER),
+          .data = std::move(encoded_pin_metadata.value()),
       }},
       {{
           .id = std::to_string(DEVICE_METADATA_SCHEDULER_ROLE_NAME),
@@ -114,7 +127,7 @@ zx_status_t CreateGpioHPlatformDevice(
       .did = PDEV_DID_AMLOGIC_GPIO,
       .instance_id = 1,
       .mmio = kGpioMmios,
-      .metadata = gpio_h_metadata,
+      .metadata = std::move(gpio_h_metadata),
   }};
 
   fidl::Arena<> fidl_arena;
@@ -134,35 +147,42 @@ zx_status_t CreateGpioHPlatformDevice(
 
 zx_status_t CreateGpioCPlatformDevice(
     fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
-  const gpio_pin_t kGpioCPins[] = {
+  const std::vector<fuchsia_hardware_pinimpl::Pin> kGpioCPins = {
       DECL_GPIO_PIN(GPIO_SOC_SPI_A_MISO),
       DECL_GPIO_PIN(GPIO_SOC_SPI_A_MOSI),
       DECL_GPIO_PIN(GPIO_SOC_SPI_A_SCLK),
       DECL_GPIO_PIN(GPIO_SOC_SPI_A_SS0),
   };
 
-  const std::vector<fpbus::Metadata> kGpioCMetadata{
+  const fuchsia_hardware_pinimpl::Metadata kMetadata{{.pins = kGpioCPins}};
+
+  fit::result encoded_metadata = fidl::Persist(kMetadata);
+  if (!encoded_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to encode GPIO init metadata: %s",
+           encoded_metadata.error_value().FormatDescription().c_str());
+    return encoded_metadata.error_value().status();
+  }
+
+  std::vector<fpbus::Metadata> gpio_c_metadata{
       {{
-          .id = std::to_string(DEVICE_METADATA_GPIO_PINS),
-          .data = std::vector<uint8_t>(
-              reinterpret_cast<const uint8_t*>(&kGpioCPins),
-              reinterpret_cast<const uint8_t*>(&kGpioCPins) + sizeof(kGpioCPins)),
+          .id = std::to_string(DEVICE_METADATA_GPIO_CONTROLLER),
+          .data = std::move(encoded_metadata.value()),
       }},
   };
 
-  const fpbus::Node kGpioCDev{{
+  fpbus::Node gpio_c_dev{{
       .name = "gpio-c",
       .vid = PDEV_VID_AMLOGIC,
       .pid = PDEV_PID_AMLOGIC_S905D3,
       .did = PDEV_DID_AMLOGIC_GPIO,
       .instance_id = 2,
       .mmio = kGpioMmios,
-      .metadata = kGpioCMetadata,
+      .metadata = std::move(gpio_c_metadata),
   }};
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('GPIO');
-  auto result = pbus.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, kGpioCDev));
+  auto result = pbus.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, gpio_c_dev));
   if (!result.ok()) {
     zxlogf(ERROR, "Failed to send NodeAdd request: %s", result.FormatDescription().data());
     return result.status();
@@ -178,19 +198,26 @@ zx_status_t CreateGpioCPlatformDevice(
 #ifdef GPIO_TEST
 zx_status_t CreateTestGpioPlatformDevice(
     fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
-  const gpio_pin_t kTestGpioPins[] = {
+  const std::vector<fuchsia_hardware_pinimpl::Pin> kTestGpioPins{
       // SYS_LED
       DECL_GPIO_PIN(GPIO_AMBER_LED_PWM),
       // JTAG Adapter Pin
       DECL_GPIO_PIN(GPIO_SOC_JTAG_TCK),
   };
 
-  const std::vector<fpbus::Metadata> kGpioMetadata{
+  const fuchsia_hardware_pinimpl::Metadata kMetadata{{.pins = kTestGpioPins}};
+
+  fit::result encoded_metadata = fidl::Persist(kMetadata);
+  if (!encoded_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to encode GPIO init metadata: %s",
+           encoded_metadata.error_value().FormatDescription().c_str());
+    return encoded_metadata.error_value().status();
+  }
+
+  std::vector<fpbus::Metadata> gpio_metadata{
       {{
-          .id = std::to_string(DEVICE_METADATA_GPIO_PINS),
-          .data = std::vector<uint8_t>(
-              reinterpret_cast<const uint8_t*>(&kTestGpioPins),
-              reinterpret_cast<const uint8_t*>(&kTestGpioPins) + sizeof(kTestGpioPins)),
+          .id = std::to_string(DEVICE_METADATA_GPIO_CONTROLLER),
+          .data = std::move(encoded_metadata.value()),
       }},
   };
 
@@ -199,7 +226,7 @@ zx_status_t CreateTestGpioPlatformDevice(
       .vid = PDEV_VID_GENERIC,
       .pid = PDEV_PID_GENERIC,
       .did = PDEV_DID_GPIO_TEST,
-      .metadata = kGpioMetadata,
+      .metadata = std::move(gpio_metadata),
   }};
 
   fidl::Arena<> fidl_arena;
@@ -228,7 +255,7 @@ zx_status_t Nelson::CreateGpioPlatformDevice() {
   // accesses to the interrupt registers, so C and H bank GPIOs that are used for interrupts must be
   // exposed by the main device (only GPIO_SOC_SELINA_IRQ_OUT and GPIO_TH_SOC_INT). All pins can be
   // used in calls from the board driver, regardless of bank.
-  const gpio_pin_t kGpioPins[] = {
+  const std::vector<fuchsia_hardware_pinimpl::Pin> kGpioPins = {
       DECL_GPIO_PIN(GPIO_INRUSH_EN_SOC),
       DECL_GPIO_PIN(GPIO_SOC_I2S_SCLK),
       DECL_GPIO_PIN(GPIO_SOC_I2S_FS),
@@ -318,7 +345,8 @@ zx_status_t Nelson::CreateGpioPlatformDevice() {
 
   // Enable mute LED so it will be controlled by mute switch.
   gpio_init_steps_.push_back(GpioOutput(GPIO_AMBER_LED_PWM, true));
-  fuchsia_hardware_pinimpl::Metadata metadata{{.init_steps = std::move(gpio_init_steps_)}};
+  fuchsia_hardware_pinimpl::Metadata metadata{
+      {.init_steps = std::move(gpio_init_steps_), .pins = kGpioPins}};
   gpio_init_steps_.clear();
 
   fit::result encoded_metadata = fidl::Persist(metadata);
@@ -330,14 +358,8 @@ zx_status_t Nelson::CreateGpioPlatformDevice() {
 
   std::vector<fpbus::Metadata> gpio_metadata{
       {{
-          .id = std::to_string(DEVICE_METADATA_GPIO_PINS),
-          .data = std::vector<uint8_t>(
-              reinterpret_cast<const uint8_t*>(&kGpioPins),
-              reinterpret_cast<const uint8_t*>(&kGpioPins) + sizeof(kGpioPins)),
-      }},
-      {{
           .id = std::to_string(DEVICE_METADATA_GPIO_CONTROLLER),
-          .data = encoded_metadata.value(),
+          .data = std::move(encoded_metadata.value()),
       }},
   };
 
@@ -347,7 +369,7 @@ zx_status_t Nelson::CreateGpioPlatformDevice() {
                         .did = PDEV_DID_AMLOGIC_GPIO,
                         .mmio = kGpioMmios,
                         .irq = kGpioIrqs,
-                        .metadata = gpio_metadata}};
+                        .metadata = std::move(gpio_metadata)}};
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('GPIO');

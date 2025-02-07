@@ -50,7 +50,6 @@ test("gpioimpl-visitor-test-bin") {
     "//sdk/lib/driver/devicetree/visitors/default/mmio",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
-    "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/fxl/test:gtest_main",
   ]
 }

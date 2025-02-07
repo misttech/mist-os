@@ -102,7 +102,7 @@ zx_status_t TestGpioDevice::Create(zx_device_t* parent) {
 
   std::array<const char*, 1> service_offers{fuchsia_hardware_pinimpl::Service::Name};
   status = dev->DdkAdd(ddk::DeviceAddArgs("test-gpio")
-                           .forward_metadata(parent, DEVICE_METADATA_GPIO_PINS)
+                           .forward_metadata(parent, DEVICE_METADATA_GPIO_CONTROLLER)
                            .set_runtime_service_offers(service_offers)
                            .set_outgoing_dir(directory_endpoints->client.TakeChannel()));
   if (status != ZX_OK) {

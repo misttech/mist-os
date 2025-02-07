@@ -329,18 +329,27 @@ void GpioRootDevice::Start(fdf::StartCompleter completer) {
 
   fidl::Arena arena;
 
-  zx::result decoded = compat::GetMetadata<fuchsia_hardware_pinimpl::Metadata>(
-      incoming(), DEVICE_METADATA_GPIO_CONTROLLER);
-  if (decoded.is_error()) {
-    if (decoded.status_value() == ZX_ERR_NOT_FOUND) {
-      FDF_LOG(INFO, "No gpio controller metadata provided. Assuming controller id = 0.");
+  std::optional<fuchsia_hardware_pinimpl::Metadata> metadata;
+  {
+    zx::result result = compat::GetMetadata<fuchsia_hardware_pinimpl::Metadata>(
+        incoming(), DEVICE_METADATA_GPIO_CONTROLLER);
+    if (result.is_error()) {
+      if (result.status_value() == ZX_ERR_NOT_FOUND) {
+        FDF_LOG(INFO, "No gpio metadata provided");
+      } else {
+        FDF_LOG(ERROR, "Failed to decode metadata: %s", result.status_string());
+        completer(result.take_error());
+        return;
+      }
     } else {
-      FDF_LOG(ERROR, "Failed to decode metadata: %s", decoded.status_string());
-      completer(decoded.take_error());
-      return;
+      metadata.emplace(std::move(result.value()));
     }
-  } else if (decoded->controller_id().has_value()) {
-    controller_id = decoded->controller_id().value();
+  }
+
+  if (metadata.has_value() && metadata->controller_id().has_value()) {
+    controller_id = metadata->controller_id().value();
+  } else {
+    FDF_LOG(INFO, "No controller ID provided. Assuming controller ID = 0");
   }
 
   zx::result scheduler_role = compat::GetMetadata<fuchsia_scheduler::RoleName>(
@@ -374,12 +383,13 @@ void GpioRootDevice::Start(fdf::StartCompleter completer) {
         *std::move(pinimpl_fidl_client), fidl_dispatcher()->get(),
         fidl::ObserveTeardown(fit::bind_member<&GpioRootDevice::ClientTeardownHandler>(this)));
 
-    if (decoded.is_ok() && decoded->init_steps().has_value() && !decoded->init_steps()->empty()) {
+    if (metadata.has_value() && metadata->init_steps().has_value() &&
+        !metadata->init_steps()->empty()) {
       // Process init metadata while we are still the exclusive owner of the GPIO client.
-      init_device_ = GpioInitDevice::Create(decoded->init_steps().value(), node().borrow(),
+      init_device_ = GpioInitDevice::Create(metadata->init_steps().value(), node().borrow(),
                                             logger(), controller_id, pinimpl_);
     } else {
-      FDF_LOG(INFO, "No init metadata provided");
+      FDF_LOG(INFO, "No init steps provided");
     }
   }
 
@@ -391,33 +401,44 @@ void GpioRootDevice::Start(fdf::StartCompleter completer) {
   }
   node_ = *std::move(node);
 
-  zx::result pins = compat::GetMetadataArray<gpio_pin_t>(incoming(), DEVICE_METADATA_GPIO_PINS);
-  if (pins.is_error()) {
-    if (pins.status_value() == ZX_ERR_NOT_FOUND) {
-      FDF_LOG(INFO, "No pins metadata provided");
-    } else {
-      FDF_LOG(ERROR, "Failed to get metadata array: %s", pins.status_string());
-      completer(pins.take_error());
-      return;
-    }
+  if (!metadata.has_value() || !metadata->pins().has_value()) {
+    FDF_LOG(INFO, "No gpio pins provided");
     completer(zx::ok());
-  } else {
-    // Make sure that the list of GPIO pins has no duplicates.
-    auto gpio_cmp_lt = [](gpio_pin_t& lhs, gpio_pin_t& rhs) { return lhs.pin < rhs.pin; };
-    auto gpio_cmp_eq = [](gpio_pin_t& lhs, gpio_pin_t& rhs) { return lhs.pin == rhs.pin; };
-    std::sort(pins.value().begin(), pins.value().end(), gpio_cmp_lt);
-    auto result = std::adjacent_find(pins.value().begin(), pins.value().end(), gpio_cmp_eq);
-    if (result != pins.value().end()) {
-      FDF_LOG(ERROR, "gpio pin '%d' was published more than once", result->pin);
-      completer(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+  auto pins = std::move(metadata->pins().value());
+  for (size_t i = 0; i < pins.size(); ++i) {
+    const auto& pin = pins[i];
+    if (!pin.name().has_value()) {
+      FDF_LOG(ERROR, "Pin %lu missing name", i);
+      completer(zx::error(ZX_ERR_INTERNAL));
       return;
     }
-
-    async::PostTask(fidl_dispatcher()->async_dispatcher(),
-                    [=, pins = *std::move(pins), completer = std::move(completer)]() mutable {
-                      CreatePinDevices(controller_id, pins, std::move(completer));
-                    });
+    if (!pin.pin().has_value()) {
+      FDF_LOG(ERROR, "Pin %lu missing pin", i);
+      completer(zx::error(ZX_ERR_INTERNAL));
+      return;
+    }
   }
+  // Make sure that the list of GPIO pins has no duplicates.
+  auto gpio_cmp_lt = [](fuchsia_hardware_pinimpl::Pin& lhs, fuchsia_hardware_pinimpl::Pin& rhs) {
+    return lhs.pin() < rhs.pin();
+  };
+  auto gpio_cmp_eq = [](fuchsia_hardware_pinimpl::Pin& lhs, fuchsia_hardware_pinimpl::Pin& rhs) {
+    return lhs.pin() == rhs.pin();
+  };
+  std::sort(pins.begin(), pins.end(), gpio_cmp_lt);
+  auto result = std::adjacent_find(pins.begin(), pins.end(), gpio_cmp_eq);
+  if (result != pins.end()) {
+    FDF_LOG(ERROR, "gpio pin '%d' was published more than once", result->pin().value());
+    completer(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+
+  async::PostTask(fidl_dispatcher()->async_dispatcher(),
+                  [=, pins = std::move(pins), completer = std::move(completer)]() mutable {
+                    CreatePinDevices(controller_id, pins, std::move(completer));
+                  });
 }
 
 void GpioRootDevice::PrepareStop(fdf::PrepareStopCompleter completer) {
@@ -427,12 +448,12 @@ void GpioRootDevice::PrepareStop(fdf::PrepareStopCompleter completer) {
 }
 
 void GpioRootDevice::CreatePinDevices(const uint32_t controller_id,
-                                      const std::vector<gpio_pin_t>& pins,
+                                      std::span<fuchsia_hardware_pinimpl::Pin> pins,
                                       fdf::StartCompleter completer) {
   for (const auto& pin : pins) {
     fbl::AllocChecker ac;
-    children_.emplace_back(new (&ac)
-                               GpioDevice(pinimpl_.Clone(), pin.pin, controller_id, pin.name));
+    children_.emplace_back(new (&ac) GpioDevice(pinimpl_.Clone(), pin.pin().value(), controller_id,
+                                                pin.name().value()));
     if (!ac.check()) {
       completer(zx::error(ZX_ERR_NO_MEMORY));
       return;
@@ -484,8 +505,8 @@ std::unique_ptr<GpioInitDevice> GpioInitDevice::Create(
   std::unique_ptr device = std::make_unique<GpioInitDevice>();
   if (ConfigureGpios(init_steps, pinimpl) != ZX_OK) {
     // Return without adding the init device if some GPIOs could not be configured. This will
-    // prevent all drivers that depend on the initial state from binding, which should make it more
-    // obvious that something has gone wrong.
+    // prevent all drivers that depend on the initial state from binding, which should make it
+    // more obvious that something has gone wrong.
     return {};
   }
 

@@ -367,7 +367,6 @@ library_headers("ddk-metadata-headers") {
     "ddk/metadata/camera.h",
     "ddk/metadata/clock.h",
     "ddk/metadata/display.h",
-    "ddk/metadata/gpio.h",
     "ddk/metadata/nand.h",
     "ddk/metadata/test.h",
   ]

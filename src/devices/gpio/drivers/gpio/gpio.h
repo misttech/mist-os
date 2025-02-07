@@ -17,7 +17,6 @@
 #include <string>
 #include <string_view>
 
-#include <ddk/metadata/gpio.h>
 #include <fbl/intrusive_double_list.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
@@ -176,7 +175,7 @@ class GpioRootDevice : public fdf::DriverBase {
   //     3. Add GpioDevice nodes on fidl_dispatcher_.
 
   // Must be run on the FIDL dispatcher.
-  void CreatePinDevices(uint32_t controller_id, const std::vector<gpio_pin_t>& pins,
+  void CreatePinDevices(uint32_t controller_id, std::span<fuchsia_hardware_pinimpl::Pin> pins,
                         fdf::StartCompleter completer);
 
   // Must be run on the driver dispatcher.

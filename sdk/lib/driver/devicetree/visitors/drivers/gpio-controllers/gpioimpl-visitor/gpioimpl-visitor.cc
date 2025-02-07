@@ -497,21 +497,23 @@ zx::result<> GpioImplVisitor::ParseReferenceChild(fdf_devicetree::Node& child,
   }
 
   auto cells = GpioCells(specifiers);
-  gpio_pin_t pin;
-  pin.pin = cells.pin();
-  strncpy(pin.name, reference_name.c_str(), sizeof(pin.name));
+  fuchsia_hardware_pinimpl::Pin pin{{
+      .pin = cells.pin(),
+      .name = reference_name,
+  }};
 
   FDF_LOG(DEBUG, "Gpio pin added - pin 0x%x name '%s' to controller '%s'", cells.pin(),
           reference_name.c_str(), parent.name().c_str());
 
   // Insert if the pin is not already present.
-  auto it = std::find_if(controller.gpio_pins_metadata.begin(), controller.gpio_pins_metadata.end(),
-                         [&pin](const gpio_pin_t& entry) { return entry.pin == pin.pin; });
-  if (it == controller.gpio_pins_metadata.end()) {
-    controller.gpio_pins_metadata.push_back(pin);
+  auto it = std::find_if(
+      controller.metadata.pins()->begin(), controller.metadata.pins()->end(),
+      [&pin](const fuchsia_hardware_pinimpl::Pin& entry) { return entry.pin() == pin.pin(); });
+  if (it == controller.metadata.pins()->end()) {
+    controller.metadata.pins()->push_back(pin);
   }
 
-  return AddChildNodeSpec(child, pin.pin, parent.id(), reference_name);
+  return AddChildNodeSpec(child, pin.pin().value(), parent.id(), reference_name);
 }
 
 zx::result<> GpioImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
@@ -532,6 +534,9 @@ zx::result<> GpioImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
     if (!controller->second.metadata.init_steps()->empty()) {
       metadata.init_steps() = *std::move(controller->second.metadata.init_steps());
     }
+    if (!controller->second.metadata.pins()->empty()) {
+      metadata.pins() = *std::move(controller->second.metadata.pins());
+    }
 
     const fit::result encoded_controller_metadata = fidl::Persist(metadata);
     if (!encoded_controller_metadata.is_ok()) {
@@ -545,19 +550,7 @@ zx::result<> GpioImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
         .data = encoded_controller_metadata.value(),
     }};
     node.AddMetadata(std::move(controller_metadata));
-    FDF_LOG(DEBUG, "Gpio controller metadata added to node '%s'", node.name().c_str());
-  }
-
-  if (!controller->second.gpio_pins_metadata.empty()) {
-    fuchsia_hardware_platform_bus::Metadata pin_metadata = {{
-        .id = std::to_string(DEVICE_METADATA_GPIO_PINS),
-        .data = std::vector<uint8_t>(
-            reinterpret_cast<const uint8_t*>(controller->second.gpio_pins_metadata.data()),
-            reinterpret_cast<const uint8_t*>(controller->second.gpio_pins_metadata.data()) +
-                (controller->second.gpio_pins_metadata.size() * sizeof(gpio_pin_t))),
-    }};
-    node.AddMetadata(std::move(pin_metadata));
-    FDF_LOG(DEBUG, "Gpio pins metadata added to node '%s'", node.name().c_str());
+    FDF_LOG(DEBUG, "Gpio metadata added to node '%s'", node.name().c_str());
   }
 
   return zx::ok();

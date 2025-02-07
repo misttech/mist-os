@@ -70,8 +70,8 @@ void AmlGpioDriver::Start(fdf::StartCompleter completer) {
 
         OnCompatServerInitialized(std::move(completer));
       },
-      compat::ForwardMetadata::Some({DEVICE_METADATA_GPIO_PINS, DEVICE_METADATA_GPIO_CONTROLLER,
-                                     DEVICE_METADATA_SCHEDULER_ROLE_NAME}));
+      compat::ForwardMetadata::Some(
+          {DEVICE_METADATA_GPIO_CONTROLLER, DEVICE_METADATA_SCHEDULER_ROLE_NAME}));
 }
 
 void AmlGpioDriver::OnCompatServerInitialized(fdf::StartCompleter completer) {

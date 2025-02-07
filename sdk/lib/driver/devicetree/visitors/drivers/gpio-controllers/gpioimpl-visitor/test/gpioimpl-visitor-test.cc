@@ -18,7 +18,6 @@
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
-#include <ddk/metadata/gpio.h>
 #include <gtest/gtest.h>
 
 #include "dts/gpio.h"
@@ -63,7 +62,7 @@ TEST(GpioImplVisitorTest, TestGpiosProperty) {
 
       // Test metadata properties.
       ASSERT_TRUE(metadata);
-      ASSERT_EQ(2lu, metadata->size());
+      ASSERT_EQ(1lu, metadata->size());
 
       // Controller metadata.
       std::vector<uint8_t> metadata_blob0 = std::move(*(*metadata)[0].data());
@@ -161,16 +160,15 @@ TEST(GpioImplVisitorTest, TestGpiosProperty) {
       ASSERT_EQ(init_steps[13].call()->call(), fuchsia_hardware_pinimpl::InitCall::WithBufferMode(
                                                    fuchsia_hardware_gpio::BufferMode::kOutputLow));
 
-      // Pin metadata.
-      std::vector<uint8_t> metadata_blob2 = std::move(*(*metadata)[1].data());
-      auto metadata_start = reinterpret_cast<gpio_pin_t*>(metadata_blob2.data());
-      std::vector<gpio_pin_t> gpio_pins(
-          metadata_start, metadata_start + (metadata_blob2.size() / sizeof(gpio_pin_t)));
+      // GPIO Hog init steps.
+      ASSERT_TRUE(controller_metadata->pins().has_value());
+      ASSERT_EQ((*controller_metadata).pins()->size(), 2lu);
+      std::span<fuchsia_hardware_pinimpl::Pin> gpio_pins = controller_metadata->pins().value();
       ASSERT_EQ(gpio_pins.size(), 2lu);
-      EXPECT_EQ(gpio_pins[0].pin, static_cast<uint32_t>(PIN1));
-      EXPECT_EQ(strcmp(gpio_pins[0].name, PIN1_NAME), 0);
-      EXPECT_EQ(gpio_pins[1].pin, static_cast<uint32_t>(PIN2));
-      EXPECT_EQ(strcmp(gpio_pins[1].name, PIN2_NAME), 0);
+      EXPECT_EQ(gpio_pins[0].pin().value(), static_cast<uint32_t>(PIN1));
+      EXPECT_EQ(gpio_pins[0].name().value(), PIN1_NAME);
+      EXPECT_EQ(gpio_pins[1].pin().value(), static_cast<uint32_t>(PIN2));
+      EXPECT_EQ(gpio_pins[1].name().value(), PIN2_NAME);
 
       node_tested_count++;
     }
