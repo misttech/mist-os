@@ -1390,4 +1390,21 @@ TEST(Mmap, HintedAddressTooLow) {
   ASSERT_EQ(munmap(addr, page_size), 0);
 }
 
+TEST(Madvise, MadvRemoveZeroesMemory) {
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  std::vector<char> test_data(page_size, 'a');
+  std::vector<char> zero_data(page_size, '\0');
+
+  int fd = SAFE_SYSCALL(test_helper::MemFdCreate("madv_remove", 0));
+  SAFE_SYSCALL(write(fd, test_data.data(), test_data.size()));
+
+  void* addr = mmap(nullptr, page_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  ASSERT_NE(addr, MAP_FAILED);
+  close(fd);
+
+  EXPECT_THAT(madvise(addr, page_size, MADV_REMOVE), SyscallSucceeds());
+  EXPECT_EQ(memcmp(addr, zero_data.data(), zero_data.size()), 0);
+  SAFE_SYSCALL(munmap(addr, page_size));
+}
+
 }  // namespace
