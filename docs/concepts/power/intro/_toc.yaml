@@ -7,7 +7,7 @@
 # team as reviewer.
 toc:
   - title: An introduction to Power Framework
-    path: /docs/concepts/power/intro/intro.md
+    path: /docs/concepts/power/intro/README.md
     step_group: powerframeworkintro
   - title: Basic suspend prevention
     path: /docs/concepts/power/intro/basic_suspend_prevention.md
