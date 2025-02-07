@@ -108,7 +108,7 @@ func NewContextFromStartupInfo() *Context {
 	// NB: The trailing period is required because empty paths are invalid:
 	//
 	// https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.io/directory.fidl;l=197-201;drc=469b24f881dbc73b8adbfdedfd2867c15802d7a7
-	if err := fdio.ServiceConnect("/svc/.", zx.Handle(r.Channel)); err != nil {
+	if err := fdio.OpenNode("/svc/.", uint64(io.PermReadable), zx.Handle(r.Channel)); err != nil {
 		panic(err)
 	}
 	c := &Context{
