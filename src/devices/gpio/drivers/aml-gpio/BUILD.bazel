@@ -26,21 +26,22 @@ fuchsia_driver_bind_bytecode(
     ],
 )
 
-fuchsia_cc_driver(
-    name = "aml-gpio-driver",
+cc_library(
+    name = "common",
     srcs = [
         "a1-blocks.h",
         "a113-blocks.h",
         "a5-blocks.h",
         "aml-gpio.cc",
-        "aml-gpio.h",
         "s905d2-blocks.h",
+    ],
+    hdrs = [
+        "aml-gpio.h",
     ],
     defines = [
         "ZX_ASSERT_LEVEL=2",
         "_ALL_SOURCE",
     ],
-    output_name = "aml-gpio",
     deps = [
         "//sdk/lib/driver/compat/cpp",
         "//src/devices/lib/amlogic",
@@ -57,6 +58,14 @@ fuchsia_cc_driver(
         "@fuchsia_sdk//pkg/mmio",
         "@fuchsia_sdk//pkg/trace",
         "@fuchsia_sdk//pkg/zx",
+    ],
+)
+
+fuchsia_cc_driver(
+    name = "aml-gpio-driver",
+    output_name = "aml-gpio",
+    deps = [
+        ":common",
     ],
 )
 
@@ -85,38 +94,20 @@ fuchsia_package(
 fuchsia_cc_test(
     name = "aml-gpio-test-bin",
     srcs = [
-        "a1-blocks.h",
-        "a113-blocks.h",
-        "a5-blocks.h",
-        "aml-gpio.cc",
-        "aml-gpio.h",
         "aml-gpio-test.cc",
-        "s905d2-blocks.h",
     ],
     # TODO(b/322398374) Remove this copts
     copts = [
         "-Wno-vla-cxx-extension",
     ],
     deps = [
-        "//sdk/lib/driver/compat/cpp",
-        "//src/devices/lib/amlogic",
-        "//src/lib/ddk:ddk_metadata",
+        ":common",
         "//zircon/system/ulib/ddk-platform-defs",
         "//zircon/system/ulib/fzl",
-        "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
-        "@fuchsia_sdk//fidl/fuchsia.hardware.pinimpl:fuchsia.hardware.pinimpl_bindlib_cc",
-        "@fuchsia_sdk//fidl/fuchsia.hardware.pinimpl:fuchsia.hardware.pinimpl_cpp",
-        "@fuchsia_sdk//fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
-        "@fuchsia_sdk//fidl/fuchsia.logger:fuchsia.logger_cpp",
-        "@fuchsia_sdk//pkg/async",
-        "@fuchsia_sdk//pkg/driver_component_cpp",
         "@fuchsia_sdk//pkg/driver_runtime_cpp",
         "@fuchsia_sdk//pkg/driver_testing_cpp",
         "@fuchsia_sdk//pkg/fit-promise",
-        "@fuchsia_sdk//pkg/mmio",
-        "@fuchsia_sdk//pkg/trace",
-        "@fuchsia_sdk//pkg/zx",
         "@internal_sdk//pkg/mock-mmio-reg",
     ],
 )
