@@ -5987,24 +5987,18 @@ pub type __sighandler_t = __signalfn_t;
 pub type __restorefn_t = crate::uaddr32;
 pub type __sigrestore_t = __restorefn_t;
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 pub struct __kernel_sigaction {
-    pub _u: __kernel_sigaction__bindgen_ty_1,
+    pub sa_handler: __sighandler_t,
     pub sa_mask: sigset_t,
     pub sa_flags: crate::types::arch32::c_ulong,
     pub sa_restorer: crate::uaddr32,
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 pub union __kernel_sigaction__bindgen_ty_1 {
     pub _sa_handler: __sighandler_t,
-    pub _sa_sigaction: ::std::option::Option<
-        unsafe extern "C" fn(
-            arg1: crate::types::arch32::c_int,
-            arg2: crate::uref32<siginfo>,
-            arg3: crate::uaddr32,
-        ),
-    >,
+    pub _sa_sigaction: crate::uaddr32,
 }
 impl Default for __kernel_sigaction__bindgen_ty_1 {
     fn default() -> Self {
