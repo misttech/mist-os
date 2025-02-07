@@ -22,9 +22,6 @@ todo_deny https://fxbug.dev/390458405 hal_power_default vendor_file file
 todo_deny https://fxbug.dev/390458405 hal_sensors_default vendor_file file
 todo_deny https://fxbug.dev/390458405 hal_thermal_default vendor_file file
 
-// https://fxbug.dev/391136582 - fxlogcat is not correctly labeled.
-todo_deny https://fxbug.dev/391136582 logpersist system_file file
-
 // https://fxbug.dev/392857781 - Some HAL tests/pre-run steps are launched with bad labels.
 todo_deny https://fxbug.dev/392857781 init system_file file
 todo_deny https://fxbug.dev/392857781 init vendor_file file
