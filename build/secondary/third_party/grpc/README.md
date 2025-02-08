@@ -37,6 +37,7 @@ Steps to upgrade to a new version of GRPC, all relative to this directory:
    mv $FUCHSIA_DIR/third_party/grpc/BUILD.fuchsia.gn BUILD.gn
    fx gn format --in-place BUILD.gn
    git -C $FUCHSIA_DIR/third_party/grpc submodule deinit --all
+   cp BUILD.gn $FUCHSIA_DIR/third_party/grpc/BUILD.gn
    ```
 
 [Chromium]: https://source.chromium.org/chromium/chromium/src/+/main:third_party/grpc/README.chromium

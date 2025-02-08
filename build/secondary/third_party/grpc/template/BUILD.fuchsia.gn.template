@@ -37,6 +37,9 @@
     import("//build/config/android/rules.gni")
   }
 
+  # WARNING: This config is public and applies to many targets that are first
+  # party code. Keep this config to a minimum and do not disable any compiler
+  # warnings here.
   config("grpc_config") {
     include_dirs = [
       "./include",
@@ -129,7 +132,7 @@
 
   template("grpc_so") {
     if (grpc_use_static_linking) {
-      source_set(target_name) {
+      static_library(target_name) {
         forward_variables_from(invoker, "*")
       }
     } else {
@@ -504,7 +507,7 @@
       (sources, repeated1, repeated2, repeated3, repeated4) = find_repeated(sources)
       extra_configs = [':grpc_config_private']
       extra_stuff = []
-      target_type = 'source_set'
+      target_type = 'static_library'
       if not is_host:
         extra_stuff = get_extra_stuff()
       deps = get_deps_from_target(lib)
@@ -553,7 +556,7 @@
       sources = gn_sort(sources)
       sources = get_commented_sources(sources)
     %>\
-  ${indent}source_set("${name}") {
+  ${indent}static_library("${name}") {
     % if sources:
   ${indent}  sources = [
       % for src in sources:
@@ -615,8 +618,8 @@
   ${indent}  configs += [
   ${indent}    "//third_party/protobuf:protobuf_config",
   ${indent}    ":grpc_config_private",
+  ${indent}    ":grpc_config",
   ${indent}  ]
-  ${indent}  public_configs = [ ":grpc_config" ]
   ${indent}}
   </%def><%!
   %>\
@@ -630,7 +633,7 @@
     ]
   }
 
-  source_set("cares") {
+  static_library("cares") {
     sources = [
       "./third_party/cares/ares_build.h",
     ]
@@ -672,4 +675,3 @@
       ]
     }
   }
-

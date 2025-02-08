@@ -1,7 +1,7 @@
-diff --git b/build/secondary/third_party/grpc/template/BUILD.fuchsia.gn.template a/build/secondary/third_party/grpc/template/BUILD.fuchsia.gn.template
-index 591db79aaf6..1b6a2f5f979 100644
---- b/build/secondary/third_party/grpc/template/BUILD.fuchsia.gn.template
-+++ a/build/secondary/third_party/grpc/template/BUILD.fuchsia.gn.template
+diff --git a/build/secondary/third_party/grpc/template/BUILD.fuchsia.gn.template b/build/secondary/third_party/grpc/template/BUILD.fuchsia.gn.template
+index 2ff55896c87..f3f6615b1a0 100644
+--- a/build/secondary/third_party/grpc/template/BUILD.fuchsia.gn.template
++++ b/build/secondary/third_party/grpc/template/BUILD.fuchsia.gn.template
 @@ -3,11 +3,15 @@
    <%doc>
    Header piece
@@ -35,7 +35,7 @@ index 591db79aaf6..1b6a2f5f979 100644
    if (is_android) {
      import("//build/config/android/config.gni")
      import("//build/config/android/rules.gni")
-@@ -32,11 +41,13 @@
+@@ -35,11 +44,13 @@
      include_dirs = [
        "./include",
        ".",
@@ -51,7 +51,7 @@ index 591db79aaf6..1b6a2f5f979 100644
        "//third_party/abseil-cpp",
      ]
  
-@@ -86,13 +97,28 @@
+@@ -89,13 +100,28 @@
      cflags = [
        "-Wno-c++98-compat-extra-semi",
        "-Wno-deprecated-copy",
@@ -80,7 +80,16 @@ index 591db79aaf6..1b6a2f5f979 100644
      ]
  
      # TODO(b/260740023): Remove when gRPC has CFI checks enabled.
-@@ -220,10 +246,6 @@
+@@ -106,7 +132,7 @@
+ 
+   template("grpc_so") {
+     if (grpc_use_static_linking) {
+-      source_set(target_name) {
++      static_library(target_name) {
+         forward_variables_from(invoker, "*")
+       }
+     } else {
+@@ -223,10 +249,6 @@
          out_sources.append('# gRPC memcpy wrapping logic isn\'t useful here.')
          out_sources.append('# See https://crbug.com/661171')
          out_sources.append('# "{}",'.format(s))
@@ -91,7 +100,7 @@ index 591db79aaf6..1b6a2f5f979 100644
        elif s == './src/core/lib/matchers/matchers.cc':
          # matchers are disabled to reduce binary size
          out_sources.append('# "{}",'.format(s))
-@@ -253,11 +275,23 @@
+@@ -256,11 +278,23 @@
        deps.add("//third_party/zlib")
      add_absl = False
      add_boring_ssl = False
@@ -115,7 +124,7 @@ index 591db79aaf6..1b6a2f5f979 100644
        elif d.startswith(("//", ":")):
          deps.add(d)
        else:
-@@ -266,6 +300,14 @@
+@@ -269,6 +303,14 @@
        deps.add("//third_party/abseil-cpp:absl")
      if add_boring_ssl:
        deps.add("//third_party/boringssl",)
@@ -130,7 +139,7 @@ index 591db79aaf6..1b6a2f5f979 100644
      return list(deps)
  
    # Get dependencies for a list of sources.
-@@ -301,16 +343,9 @@
+@@ -304,16 +346,9 @@
  
  
    def strip_sources(sources):
@@ -148,7 +157,7 @@ index 591db79aaf6..1b6a2f5f979 100644
              and not re.match("./src/core/ext/filters/client_channel/resolver/xds/.*",f)
              and not re.match("./src/core/ext/xds/.*",f)
              ]
-@@ -329,7 +364,7 @@
+@@ -332,7 +367,7 @@
      return lib.name in main_libs
  
    def wanted_lib(lib):
@@ -157,7 +166,25 @@ index 591db79aaf6..1b6a2f5f979 100644
      return lib.build in ("all", "protoc") and lib.get("name", "") in wanted_libs
  
    def wanted_binary(tgt):
-@@ -536,6 +571,7 @@
+@@ -472,7 +507,7 @@
+       (sources, repeated1, repeated2, repeated3, repeated4) = find_repeated(sources)
+       extra_configs = [':grpc_config_private']
+       extra_stuff = []
+-      target_type = 'source_set'
++      target_type = 'static_library'
+       if not is_host:
+         extra_stuff = get_extra_stuff()
+       deps = get_deps_from_target(lib)
+@@ -521,7 +556,7 @@
+       sources = gn_sort(sources)
+       sources = get_commented_sources(sources)
+     %>\
+-  ${indent}source_set("${name}") {
++  ${indent}static_library("${name}") {
+     % if sources:
+   ${indent}  sources = [
+       % for src in sources:
+@@ -539,6 +574,7 @@
      % endif
    ${indent}  public_configs = [
    ${indent}    ":grpc_config",
@@ -165,11 +192,12 @@ index 591db79aaf6..1b6a2f5f979 100644
    ${indent}  ]
      % if extra_configs:
    ${indent}  configs += [
-@@ -578,6 +614,7 @@
-   ${indent}  ]
-   ${indent}  configs += [
-   ${indent}    "//third_party/protobuf:protobuf_config",
-+  ${indent}    ":grpc_config_private",
-   ${indent}  ]
-   ${indent}  public_configs = [ ":grpc_config" ]
-   ${indent}}
+@@ -597,7 +633,7 @@
+     ]
+   }
+ 
+-  source_set("cares") {
++  static_library("cares") {
+     sources = [
+       "./third_party/cares/ares_build.h",
+     ]

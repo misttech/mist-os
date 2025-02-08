@@ -32,6 +32,9 @@ if (is_android) {
   import("//build/config/android/rules.gni")
 }
 
+# WARNING: This config is public and applies to many targets that are first
+# party code. Keep this config to a minimum and do not disable any compiler
+# warnings here.
 config("grpc_config") {
   include_dirs = [
     "./include",
@@ -124,7 +127,7 @@ config("grpc_config_private") {
 
 template("grpc_so") {
   if (grpc_use_static_linking) {
-    source_set(target_name) {
+    static_library(target_name) {
       forward_variables_from(invoker, "*")
     }
   } else {
@@ -144,14 +147,13 @@ grpc_so("grpc++") {
     ":grpc++_repeated2",
     ":grpc++_repeated3",
     ":grpc++_repeated4",
-    "//build/validate:non_production_tag",
   ]
   public_deps = [ ":grpc++_h" ]
 }
 
 # GN doesn't like .cc files with the same base name in the same target.
 # Moving them to another target.
-source_set("grpc++_h") {
+static_library("grpc++_h") {
   sources = [
     "./include/grpc++/alarm.h",
     "./include/grpc++/channel.h",
@@ -1476,7 +1478,7 @@ source_set("grpc++_h") {
   }
 }
 
-source_set("grpc++_cc") {
+static_library("grpc++_cc") {
   sources = [
     "./src/core/ext/filters/backend_metrics/backend_metric_filter.cc",
     "./src/core/ext/filters/census/grpc_context.cc",
@@ -2288,7 +2290,7 @@ source_set("grpc++_cc") {
   }
 }
 
-source_set("grpc++_repeated1") {
+static_library("grpc++_repeated1") {
   sources = [
     "./src/core/ext/upb-gen/envoy/data/accesslog/v3/accesslog.upb_minitable.c",
     "./src/core/ext/upb-gen/envoy/extensions/clusters/aggregate/v3/cluster.upb_minitable.c",
@@ -2395,7 +2397,7 @@ source_set("grpc++_repeated1") {
     configs += [ "//build/config/gcc:symbol_visibility_default" ]
   }
 }
-source_set("grpc++_repeated2") {
+static_library("grpc++_repeated2") {
   sources = [
     "./src/core/ext/upb-gen/envoy/extensions/transport_sockets/tls/v3/common.upb_minitable.c",
     "./src/core/ext/upb-gen/xds/annotations/v3/status.upb_minitable.c",
@@ -2437,7 +2439,7 @@ source_set("grpc++_repeated2") {
     configs += [ "//build/config/gcc:symbol_visibility_default" ]
   }
 }
-source_set("grpc++_repeated3") {
+static_library("grpc++_repeated3") {
   sources = [
     "./src/core/lib/gpr/posix/log.cc",
     "./src/core/lib/gpr/windows/cpu.cc",
@@ -2470,7 +2472,7 @@ source_set("grpc++_repeated3") {
     configs += [ "//build/config/gcc:symbol_visibility_default" ]
   }
 }
-source_set("grpc++_repeated4") {
+static_library("grpc++_repeated4") {
   sources = [ "./src/core/lib/gpr/windows/log.cc" ]
 
   deps = [
@@ -2499,7 +2501,7 @@ source_set("grpc++_repeated4") {
   }
 }
 
-source_set("address_sorting") {
+static_library("address_sorting") {
   sources = [
     "./third_party/address_sorting/address_sorting.c",
     "./third_party/address_sorting/address_sorting_internal.h",
@@ -2520,7 +2522,7 @@ source_set("address_sorting") {
   }
 }
 
-source_set("upb") {
+static_library("upb") {
   sources = [
     "./third_party/upb/upb/base/descriptor_constants.h",
     "./third_party/upb/upb/base/status.c",
@@ -2599,10 +2601,8 @@ static_library("upb_collections_lib") {
     "./third_party/upb/upb/mini_table/internal/extension.h",
     "./third_party/upb/upb/mini_table/internal/field.h",
     "./third_party/upb/upb/mini_table/internal/file.h",
-    "./third_party/upb/upb/mini_table/internal/message.c",
     "./third_party/upb/upb/mini_table/internal/message.h",
     "./third_party/upb/upb/mini_table/internal/sub.h",
-    "./third_party/upb/upb/mini_table/message.c",
     "./third_party/upb/upb/mini_table/message.h",
     "./third_party/upb/upb/mini_table/sub.h",
     "./third_party/upb/upb/port/atomic.h",
@@ -2611,6 +2611,42 @@ static_library("upb_collections_lib") {
     "./third_party/upb/upb/port/vsnprintf_compat.h",
   ]
 
+  deps = [
+    ":upb_collections_lib_repeated1",
+    ":upb_collections_lib_repeated2",
+  ]
+  public_configs = [
+    ":grpc_config",
+    "//build/config:suppress_iterator_warnings",
+  ]
+  configs += [ ":grpc_config_private" ]
+  visibility = [ "./*" ]
+  if (!grpc_use_static_linking) {
+    configs -= [ "//build/config/gcc:symbol_visibility_hidden" ]
+    configs += [ "//build/config/gcc:symbol_visibility_default" ]
+  }
+}
+
+# GN doesn't like .cc files with the same base name in the same target.
+# Moving them to another target.
+static_library("upb_collections_lib_repeated1") {
+  sources = [ "./third_party/upb/upb/mini_table/internal/message.c" ]
+  public_configs = [
+    ":grpc_config",
+    "//build/config:suppress_iterator_warnings",
+  ]
+  configs += [ ":grpc_config_private" ]
+  visibility = [ "./*" ]
+  if (!grpc_use_static_linking) {
+    configs -= [ "//build/config/gcc:symbol_visibility_hidden" ]
+    configs += [ "//build/config/gcc:symbol_visibility_default" ]
+  }
+}
+
+# There are some .cc files that are in multiple places. GN doesn't like
+# that. Moving them to another target.
+static_library("upb_collections_lib_repeated2") {
+  sources = [ "./third_party/upb/upb/mini_table/message.c" ]
   public_configs = [
     ":grpc_config",
     "//build/config:suppress_iterator_warnings",
@@ -2678,12 +2714,10 @@ static_library("upb_json_lib") {
     "./third_party/upb/upb/message/value.h",
     "./third_party/upb/upb/mini_descriptor/build_enum.c",
     "./third_party/upb/upb/mini_descriptor/build_enum.h",
-    "./third_party/upb/upb/mini_descriptor/decode.c",
     "./third_party/upb/upb/mini_descriptor/decode.h",
     "./third_party/upb/upb/mini_descriptor/internal/base92.c",
     "./third_party/upb/upb/mini_descriptor/internal/base92.h",
     "./third_party/upb/upb/mini_descriptor/internal/decoder.h",
-    "./third_party/upb/upb/mini_descriptor/internal/encode.c",
     "./third_party/upb/upb/mini_descriptor/internal/encode.h",
     "./third_party/upb/upb/mini_descriptor/internal/encode.hpp",
     "./third_party/upb/upb/mini_descriptor/internal/modifiers.h",
@@ -2700,10 +2734,8 @@ static_library("upb_json_lib") {
     "./third_party/upb/upb/mini_table/internal/extension.h",
     "./third_party/upb/upb/mini_table/internal/field.h",
     "./third_party/upb/upb/mini_table/internal/file.h",
-    "./third_party/upb/upb/mini_table/internal/message.c",
     "./third_party/upb/upb/mini_table/internal/message.h",
     "./third_party/upb/upb/mini_table/internal/sub.h",
-    "./third_party/upb/upb/mini_table/message.c",
     "./third_party/upb/upb/mini_table/message.h",
     "./third_party/upb/upb/mini_table/sub.h",
     "./third_party/upb/upb/port/atomic.h",
@@ -2747,7 +2779,6 @@ static_library("upb_json_lib") {
     "./third_party/upb/upb/reflection/internal/service_def.h",
     "./third_party/upb/upb/reflection/internal/strdup2.c",
     "./third_party/upb/upb/reflection/internal/strdup2.h",
-    "./third_party/upb/upb/reflection/message.c",
     "./third_party/upb/upb/reflection/message.h",
     "./third_party/upb/upb/reflection/message.hpp",
     "./third_party/upb/upb/reflection/message_def.c",
@@ -2760,11 +2791,9 @@ static_library("upb_json_lib") {
     "./third_party/upb/upb/reflection/oneof_def.h",
     "./third_party/upb/upb/reflection/service_def.c",
     "./third_party/upb/upb/reflection/service_def.h",
-    "./third_party/upb/upb/wire/decode.c",
     "./third_party/upb/upb/wire/decode.h",
     "./third_party/upb/upb/wire/decode_fast.c",
     "./third_party/upb/upb/wire/decode_fast.h",
-    "./third_party/upb/upb/wire/encode.c",
     "./third_party/upb/upb/wire/encode.h",
     "./third_party/upb/upb/wire/eps_copy_input_stream.c",
     "./third_party/upb/upb/wire/eps_copy_input_stream.h",
@@ -2775,6 +2804,73 @@ static_library("upb_json_lib") {
     "./third_party/upb/upb/wire/reader.h",
     "./third_party/upb/upb/wire/types.h",
   ]
+
+  deps = [
+    ":upb_json_lib_repeated1",
+    ":upb_json_lib_repeated2",
+    ":upb_json_lib_repeated3",
+    ":utf8_range_lib",
+  ]
+  public_configs = [
+    ":grpc_config",
+    "//build/config:suppress_iterator_warnings",
+  ]
+  configs += [ ":grpc_config_private" ]
+  visibility = [ "./*" ]
+  if (!grpc_use_static_linking) {
+    configs -= [ "//build/config/gcc:symbol_visibility_hidden" ]
+    configs += [ "//build/config/gcc:symbol_visibility_default" ]
+  }
+}
+
+# GN doesn't like .cc files with the same base name in the same target.
+# Moving them to another target.
+static_library("upb_json_lib_repeated1") {
+  sources = [
+    "./third_party/upb/upb/mini_descriptor/decode.c",
+    "./third_party/upb/upb/mini_descriptor/internal/encode.c",
+    "./third_party/upb/upb/mini_table/internal/message.c",
+  ]
+
+  deps = [ ":utf8_range_lib" ]
+  public_configs = [
+    ":grpc_config",
+    "//build/config:suppress_iterator_warnings",
+  ]
+  configs += [ ":grpc_config_private" ]
+  visibility = [ "./*" ]
+  if (!grpc_use_static_linking) {
+    configs -= [ "//build/config/gcc:symbol_visibility_hidden" ]
+    configs += [ "//build/config/gcc:symbol_visibility_default" ]
+  }
+}
+
+# There are some .cc files that are in multiple places. GN doesn't like
+# that. Moving them to another target.
+static_library("upb_json_lib_repeated2") {
+  sources = [
+    "./third_party/upb/upb/mini_table/message.c",
+    "./third_party/upb/upb/wire/decode.c",
+    "./third_party/upb/upb/wire/encode.c",
+  ]
+
+  deps = [ ":utf8_range_lib" ]
+  public_configs = [
+    ":grpc_config",
+    "//build/config:suppress_iterator_warnings",
+  ]
+  configs += [ ":grpc_config_private" ]
+  visibility = [ "./*" ]
+  if (!grpc_use_static_linking) {
+    configs -= [ "//build/config/gcc:symbol_visibility_hidden" ]
+    configs += [ "//build/config/gcc:symbol_visibility_default" ]
+  }
+}
+
+# There are some .cc files that are in multiple places. GN doesn't like
+# that. Moving them to another target.
+static_library("upb_json_lib_repeated3") {
+  sources = [ "./third_party/upb/upb/reflection/message.c" ]
 
   deps = [ ":utf8_range_lib" ]
   public_configs = [
@@ -2862,10 +2958,8 @@ static_library("upb_textformat_lib") {
     "./third_party/upb/upb/mini_table/internal/extension.h",
     "./third_party/upb/upb/mini_table/internal/field.h",
     "./third_party/upb/upb/mini_table/internal/file.h",
-    "./third_party/upb/upb/mini_table/internal/message.c",
     "./third_party/upb/upb/mini_table/internal/message.h",
     "./third_party/upb/upb/mini_table/internal/sub.h",
-    "./third_party/upb/upb/mini_table/message.c",
     "./third_party/upb/upb/mini_table/message.h",
     "./third_party/upb/upb/mini_table/sub.h",
     "./third_party/upb/upb/port/atomic.h",
@@ -2909,7 +3003,6 @@ static_library("upb_textformat_lib") {
     "./third_party/upb/upb/reflection/internal/service_def.h",
     "./third_party/upb/upb/reflection/internal/strdup2.c",
     "./third_party/upb/upb/reflection/internal/strdup2.h",
-    "./third_party/upb/upb/reflection/message.c",
     "./third_party/upb/upb/reflection/message.h",
     "./third_party/upb/upb/reflection/message.hpp",
     "./third_party/upb/upb/reflection/message_def.c",
@@ -2922,13 +3015,10 @@ static_library("upb_textformat_lib") {
     "./third_party/upb/upb/reflection/oneof_def.h",
     "./third_party/upb/upb/reflection/service_def.c",
     "./third_party/upb/upb/reflection/service_def.h",
-    "./third_party/upb/upb/text/encode.c",
     "./third_party/upb/upb/text/encode.h",
-    "./third_party/upb/upb/wire/decode.c",
     "./third_party/upb/upb/wire/decode.h",
     "./third_party/upb/upb/wire/decode_fast.c",
     "./third_party/upb/upb/wire/decode_fast.h",
-    "./third_party/upb/upb/wire/encode.c",
     "./third_party/upb/upb/wire/encode.h",
     "./third_party/upb/upb/wire/eps_copy_input_stream.c",
     "./third_party/upb/upb/wire/eps_copy_input_stream.h",
@@ -2938,6 +3028,33 @@ static_library("upb_textformat_lib") {
     "./third_party/upb/upb/wire/reader.c",
     "./third_party/upb/upb/wire/reader.h",
     "./third_party/upb/upb/wire/types.h",
+  ]
+
+  deps = [
+    ":upb_textformat_lib_repeated1",
+    ":upb_textformat_lib_repeated2",
+    ":upb_textformat_lib_repeated3",
+    ":utf8_range_lib",
+  ]
+  public_configs = [
+    ":grpc_config",
+    "//build/config:suppress_iterator_warnings",
+  ]
+  configs += [ ":grpc_config_private" ]
+  visibility = [ "./*" ]
+  if (!grpc_use_static_linking) {
+    configs -= [ "//build/config/gcc:symbol_visibility_hidden" ]
+    configs += [ "//build/config/gcc:symbol_visibility_default" ]
+  }
+}
+
+# GN doesn't like .cc files with the same base name in the same target.
+# Moving them to another target.
+static_library("upb_textformat_lib_repeated1") {
+  sources = [
+    "./third_party/upb/upb/mini_table/internal/message.c",
+    "./third_party/upb/upb/text/encode.c",
+    "./third_party/upb/upb/wire/decode.c",
   ]
 
   deps = [ ":utf8_range_lib" ]
@@ -2953,7 +3070,46 @@ static_library("upb_textformat_lib") {
   }
 }
 
-source_set("utf8_range_lib") {
+# There are some .cc files that are in multiple places. GN doesn't like
+# that. Moving them to another target.
+static_library("upb_textformat_lib_repeated2") {
+  sources = [
+    "./third_party/upb/upb/mini_table/message.c",
+    "./third_party/upb/upb/wire/encode.c",
+  ]
+
+  deps = [ ":utf8_range_lib" ]
+  public_configs = [
+    ":grpc_config",
+    "//build/config:suppress_iterator_warnings",
+  ]
+  configs += [ ":grpc_config_private" ]
+  visibility = [ "./*" ]
+  if (!grpc_use_static_linking) {
+    configs -= [ "//build/config/gcc:symbol_visibility_hidden" ]
+    configs += [ "//build/config/gcc:symbol_visibility_default" ]
+  }
+}
+
+# There are some .cc files that are in multiple places. GN doesn't like
+# that. Moving them to another target.
+static_library("upb_textformat_lib_repeated3") {
+  sources = [ "./third_party/upb/upb/reflection/message.c" ]
+
+  deps = [ ":utf8_range_lib" ]
+  public_configs = [
+    ":grpc_config",
+    "//build/config:suppress_iterator_warnings",
+  ]
+  configs += [ ":grpc_config_private" ]
+  visibility = [ "./*" ]
+  if (!grpc_use_static_linking) {
+    configs -= [ "//build/config/gcc:symbol_visibility_hidden" ]
+    configs += [ "//build/config/gcc:symbol_visibility_default" ]
+  }
+}
+
+static_library("utf8_range_lib") {
   sources = [
     "./third_party/utf8_range/naive.c",
     "./third_party/utf8_range/range2-neon.c",
@@ -2974,7 +3130,7 @@ source_set("utf8_range_lib") {
 
 # Only compile the plugin for the host architecture.
 if (current_toolchain == host_toolchain) {
-  source_set("grpc_plugin_support") {
+  static_library("grpc_plugin_support") {
     sources = [
       "./include/grpc++/impl/codegen/config_protobuf.h",
       "./include/grpcpp/impl/codegen/config_protobuf.h",
@@ -3030,8 +3186,8 @@ if (current_toolchain == host_toolchain) {
     configs += [
       "//third_party/protobuf:protobuf_config",
       ":grpc_config_private",
+      ":grpc_config",
     ]
-    public_configs = [ ":grpc_config" ]
   }
 }
 
@@ -3042,7 +3198,7 @@ config("cares_config") {
   ]
 }
 
-source_set("cares") {
+static_library("cares") {
   sources = [ "./third_party/cares/ares_build.h" ]
 
   if (enable_grpc_ares) {
