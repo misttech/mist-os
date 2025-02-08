@@ -355,6 +355,8 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
             test.command_line(),
             [
                 "fx",
+                "--dir",
+                "/out/fuchsia",
                 "ffx",
                 "test",
                 "run",
@@ -408,7 +410,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
         )
 
         command_line = test.command_line()
-        self.assertEquals(["bin/test_component_wrapper.sh"], command_line)
+        self.assertEquals(["./bin/test_component_wrapper.sh"], command_line)
         env = test.environment()
         assert env is not None
         # TODO: Add environment checking when added.

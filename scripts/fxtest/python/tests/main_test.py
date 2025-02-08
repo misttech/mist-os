@@ -1179,7 +1179,13 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                     self.assertIsNone(log_entry.warning)
                 self.assertEqual(artifact_path, artifact_root)
 
-                # Using the output log file, we should still see an error getting the path because the directory will not be present.
+                # Path gets created automatically.
+                self.assertTrue(os.path.isdir(artifact_root))
+
+                # Delete the artifact directory, checking what happens when it does not exist.
+                shutil.rmtree(artifact_root)
+
+                # Using the output log file, we should see an error getting the path because the directory will not be present.
                 stderr = io.StringIO()
                 with contextlib.redirect_stderr(stderr):
                     ret = main.do_process_previous(
