@@ -95,6 +95,8 @@ mod frameset_tests {
 
     #[test]
     #[should_panic]
+    // TODO(https://fxbug.dev/42169733): LeakSanitizer flags leaks caused by panic.
+    #[cfg_attr(feature = "variant_asan", ignore)]
     fn test_double_prepare() {
         let mut fs = FrameSet::new_with_range(IMAGE_RANGE);
 
@@ -104,6 +106,8 @@ mod frameset_tests {
 
     #[test]
     #[should_panic]
+    // TODO(https://fxbug.dev/42169733): LeakSanitizer flags leaks caused by panic.
+    #[cfg_attr(feature = "variant_asan", ignore)]
     fn test_not_presented() {
         let mut fs = FrameSet::new_with_range(IMAGE_RANGE);
         fs.mark_done_presenting(100);
@@ -111,6 +115,8 @@ mod frameset_tests {
 
     #[test]
     #[should_panic]
+    // TODO(https://fxbug.dev/42169733): LeakSanitizer flags leaks caused by panic.
+    #[cfg_attr(feature = "variant_asan", ignore)]
     fn test_already_presented() {
         let mut fs = FrameSet::new_with_range(IMAGE_RANGE);
         fs.mark_presented(100);
