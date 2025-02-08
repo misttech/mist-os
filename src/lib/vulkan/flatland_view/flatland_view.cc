@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.ui.app/cpp/fidl.h>
 #include <fidl/fuchsia.ui.composition/cpp/fidl.h>
 #include <fidl/fuchsia.ui.views/cpp/fidl.h>
-#include <lib/async/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/syslog/cpp/macros.h>
@@ -29,8 +28,10 @@ const fuchsia_ui_composition::ContentId kViewport = {1};
 // static
 std::unique_ptr<FlatlandView> FlatlandView::Create(
     fidl::UnownedClientEnd<fuchsia_io::Directory> service_directory,
-    fuchsia_ui_views::ViewCreationToken view_creation_token, ResizeCallback resize_callback) {
-  auto view = std::make_unique<FlatlandView>(std::move(resize_callback));
+    fuchsia_ui_views::ViewCreationToken view_creation_token, ResizeCallback resize_callback,
+    async_dispatcher_t* dispatcher) {
+  ZX_DEBUG_ASSERT(dispatcher != nullptr);
+  auto view = std::make_unique<FlatlandView>(std::move(resize_callback), dispatcher);
   if (!view)
     return nullptr;
   if (!view->Init(service_directory, std::move(view_creation_token)))
@@ -38,8 +39,10 @@ std::unique_ptr<FlatlandView> FlatlandView::Create(
   return view;
 }
 
-FlatlandView::FlatlandView(ResizeCallback resize_callback)
-    : resize_callback_(std::move(resize_callback)) {}
+FlatlandView::FlatlandView(ResizeCallback resize_callback, async_dispatcher_t* dispatcher)
+    : resize_callback_(std::move(resize_callback)), dispatcher_(dispatcher) {
+  ZX_DEBUG_ASSERT(dispatcher != nullptr);
+}
 
 bool FlatlandView::Init(fidl::UnownedClientEnd<fuchsia_io::Directory> service_directory,
                         fuchsia_ui_views::ViewCreationToken view_creation_token) {
@@ -51,7 +54,7 @@ bool FlatlandView::Init(fidl::UnownedClientEnd<fuchsia_io::Directory> service_di
   }
   fidl::ClientEnd<fuchsia_ui_composition::Flatland> flatland_client =
       std::move(connect_result).value();
-  flatland_.Bind(std::move(flatland_client), async_get_default_dispatcher(),
+  flatland_.Bind(std::move(flatland_client), dispatcher_,
                  /*event_handler=*/this);
   fit::result<fidl::OneWayError> set_debug_name_result = flatland_->SetDebugName({{.name = kTag}});
   if (set_debug_name_result.is_error()) {
@@ -89,8 +92,7 @@ bool FlatlandView::Init(fidl::UnownedClientEnd<fuchsia_io::Directory> service_di
     return false;
   }
 
-  parent_viewport_watcher_.Bind(std::move(parent_viewport_watcher_client),
-                                async_get_default_dispatcher());
+  parent_viewport_watcher_.Bind(std::move(parent_viewport_watcher_client), dispatcher_);
   parent_viewport_watcher_->GetLayout().Then(
       [this](fidl::Result<fuchsia_ui_composition::ParentViewportWatcher::GetLayout>& result) {
         if (result.is_error()) {
@@ -196,8 +198,11 @@ void FlatlandView::OnNextFrameBegin(
   }
 }
 
-FlatlandViewProviderService::FlatlandViewProviderService(CreateView2Callback create_view_callback)
-    : create_view_callback_(std::move(create_view_callback)) {}
+FlatlandViewProviderService::FlatlandViewProviderService(CreateView2Callback create_view_callback,
+                                                         async_dispatcher_t* dispatcher)
+    : create_view_callback_(std::move(create_view_callback)), dispatcher_(dispatcher) {
+  ZX_DEBUG_ASSERT(dispatcher != nullptr);
+}
 
 void FlatlandViewProviderService::CreateViewWithViewRef(
     CreateViewWithViewRefRequest& request, CreateViewWithViewRefCompleter::Sync& completer) {
@@ -211,6 +216,5 @@ void FlatlandViewProviderService::CreateView2(CreateView2Request& request,
 
 void FlatlandViewProviderService::HandleViewProviderRequest(
     fidl::ServerEnd<fuchsia_ui_app::ViewProvider> server_end) {
-  bindings_.AddBinding(async_get_default_dispatcher(), std::move(server_end), this,
-                       fidl::kIgnoreBindingClosure);
+  bindings_.AddBinding(dispatcher_, std::move(server_end), this, fidl::kIgnoreBindingClosure);
 }

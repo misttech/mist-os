@@ -4,7 +4,6 @@
 
 #include <fidl/fuchsia.ui.composition/cpp/fidl.h>
 #include <fidl/fuchsia.ui.composition/cpp/test_base.h>
-#include <lib/async/default.h>
 #include <lib/component/incoming/cpp/constants.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdio/directory.h>
@@ -25,6 +24,11 @@ constexpr uint32_t kHeight = 50;
 class FakeFlatland : public fidl::testing::TestBase<fuchsia_ui_composition::Flatland>,
                      public fidl::testing::TestBase<fuchsia_ui_composition::ParentViewportWatcher> {
  public:
+  // `dispatcher` must be non-null.
+  explicit FakeFlatland(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {
+    ZX_DEBUG_ASSERT(dispatcher != nullptr);
+  }
+
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {}
 
   fidl::ProtocolHandler<fuchsia_ui_composition::Flatland> GetHandler(
@@ -37,7 +41,7 @@ class FakeFlatland : public fidl::testing::TestBase<fuchsia_ui_composition::Flat
 
   // `fuchsia_ui_composition::Flatland`:
   void CreateView2(CreateView2Request& request, CreateView2Completer::Sync& completer) override {
-    parent_viewport_watcher_bindings_.AddBinding(async_get_default_dispatcher(),
+    parent_viewport_watcher_bindings_.AddBinding(dispatcher_,
                                                  std::move(request.parent_viewport_watcher()), this,
                                                  fidl::kIgnoreBindingClosure);
   }
@@ -54,6 +58,8 @@ class FakeFlatland : public fidl::testing::TestBase<fuchsia_ui_composition::Flat
   fidl::ServerBindingGroup<fuchsia_ui_composition::Flatland> flatland_bindings_;
   fidl::ServerBindingGroup<fuchsia_ui_composition::ParentViewportWatcher>
       parent_viewport_watcher_bindings_;
+
+  async_dispatcher_t* const dispatcher_;
 };
 
 }  // namespace
@@ -62,7 +68,7 @@ class FlatlandViewTest : public gtest::TestLoopFixture {
  public:
   void SetUp() override {
     TestLoopFixture::SetUp();
-    fake_flatland_ = std::make_unique<FakeFlatland>();
+    fake_flatland_ = std::make_unique<FakeFlatland>(dispatcher());
 
     zx::result<> add_protocol_result =
         flatland_outgoing_.AddUnmanagedProtocol<fuchsia_ui_composition::Flatland>(
@@ -103,7 +109,7 @@ TEST_F(FlatlandViewTest, Initialize) {
 
   auto [view_token, viewport_token] = scenic::cpp::ViewCreationTokenPair::New();
   auto view = FlatlandView::Create(view_incoming_.borrow(), std::move(view_token),
-                                   std::move(resize_callback));
+                                   std::move(resize_callback), dispatcher());
   ASSERT_TRUE(view);
 
   EXPECT_EQ(0.0, width_);

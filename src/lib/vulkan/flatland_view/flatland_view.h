@@ -21,11 +21,18 @@ class FlatlandView : public fidl::AsyncEventHandler<fuchsia_ui_composition::Flat
  public:
   using ResizeCallback = fit::function<void(uint32_t width, uint32_t height)>;
 
+  // Creates and initializes a `FlatlandView` instance.
+  //
+  // `dispatcher` must be non-null.
   static std::unique_ptr<FlatlandView> Create(
       fidl::UnownedClientEnd<fuchsia_io::Directory> service_directory,
-      fuchsia_ui_views::ViewCreationToken view_creation_token, ResizeCallback resize_callback);
+      fuchsia_ui_views::ViewCreationToken view_creation_token, ResizeCallback resize_callback,
+      async_dispatcher_t* dispatcher);
 
-  explicit FlatlandView(ResizeCallback resize_callback);
+  // Production code must use the `Create()` factory method.
+  //
+  // `dispatcher` must be non-null.
+  explicit FlatlandView(ResizeCallback resize_callback, async_dispatcher_t* dispatcher);
 
   fuchsia_ui_views::ViewCreationToken TakeChildViewCreationToken() {
     FX_DCHECK(child_view_creation_token_.value().is_valid());
@@ -56,6 +63,8 @@ class FlatlandView : public fidl::AsyncEventHandler<fuchsia_ui_composition::Flat
   int64_t present_credits_ = 1;
   bool pending_present_ = false;
 
+  async_dispatcher_t* const dispatcher_;
+
   friend class FlatlandViewTest;
 };
 
@@ -63,7 +72,9 @@ class FlatlandViewProviderService : public fidl::Server<fuchsia_ui_app::ViewProv
  public:
   using CreateView2Callback = fit::function<void(fuchsia_ui_app::CreateView2Args args)>;
 
-  explicit FlatlandViewProviderService(CreateView2Callback create_view_callback);
+  // `dispatcher` must be non-null.
+  explicit FlatlandViewProviderService(CreateView2Callback create_view_callback,
+                                       async_dispatcher_t* dispatcher);
 
   // fuchsia::ui::app::ViewProvider methods.
   void CreateViewWithViewRef(CreateViewWithViewRefRequest& request,
@@ -75,6 +86,8 @@ class FlatlandViewProviderService : public fidl::Server<fuchsia_ui_app::ViewProv
  private:
   CreateView2Callback create_view_callback_;
   fidl::ServerBindingGroup<fuchsia_ui_app::ViewProvider> bindings_;
+
+  async_dispatcher_t* const dispatcher_;
 };
 
 #endif  // SRC_LIB_VULKAN_FLATLAND_VIEW_FLATLAND_VIEW_H_
