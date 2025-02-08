@@ -436,6 +436,10 @@ func environmentName(env build.Environment) string {
 	} else if env.VirtualDeviceSpec.Name != "" {
 		addToken(env.VirtualDeviceSpec.Name)
 	}
+	if env.GptUefiDisk.Name != "" {
+		addToken("uefi")
+		addToken(env.GptUefiDisk.Name)
+	}
 	return strings.Join(tokens, "-")
 }
 

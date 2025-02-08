@@ -196,6 +196,23 @@ if (allowed_device_types == []) {
 #             constructing a unique name for the shard that runs with this env.
 #             By default, it will use the name specified above.
 #
+#       gpt_uefi_disk (optional)
+#         [scope] Info about the creation of full system GPT disks with UEFI support.
+#         If provided, the emulator will start with a single flat file containing a full GPT
+#         partitioned disk with the ABR partitioning scheme Fuchsia is using.
+#
+#           name (required)
+#             [string] The name of the key config. This can be chosen arbitrarily, its purpose is
+#             to easily differentiate between different test scenarios by looking at the shard name.
+#
+#           vbmeta_key_path (required)
+#             [string] The path to a certificate (PEM file) to be used to sign the vbmeta.
+#             There is no default, the path has to be specified explicitly.
+#
+#           vbmeta_key_metadata_path (required)
+#             [string] The path to the metadata file (bin file) accompanying the certificate.
+#             There is no default, the path has to be specified explicitly.
+#
 #       tags (optional)
 #         [list of strings] keys on which tests may be grouped. Tests with
 #         given tags will be run (1) together, and (2) only with support from

@@ -115,6 +115,9 @@ type Environment struct {
 	// VirtualDeviceSpec specifies the virtual device spec to use if targeting an emulator.
 	VirtualDeviceSpec VirtualDeviceSpecInfo `json:"virtual_device_spec,omitempty"`
 
+	// GptUefiDisk specifies whether to run the emulator tests with full GPT/UEFI system disks.
+	GptUefiDisk GptUefiDiskInfo `json:"gpt_uefi_disk,omitempty"`
+
 	// Tags are keys given to an environment on which the testsharder may filter.
 	Tags []string `json:"tags,omitempty"`
 
@@ -162,4 +165,10 @@ func (ds DimensionSet) Pool() string {
 type VirtualDeviceSpecInfo struct {
 	Name    string `json:"name"`
 	EnvName string `json:"env_name,omitempty"`
+}
+
+type GptUefiDiskInfo struct {
+	Name                  string `json:"name"`
+	VbmetaKeyPath         string `json:"vbmeta_key_path"`
+	VbmetaKeyMetadataPath string `json:"vbmeta_key_metadata_path"`
 }
