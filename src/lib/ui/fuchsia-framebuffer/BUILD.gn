@@ -24,6 +24,7 @@ rustc_library("fuchsia-framebuffer") {
   ]
   test_deps = [
     "//src/devices/bind/fuchsia.sysmem.heap:fuchsia.sysmem.heap_rust",
+    "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:futures",
   ]
@@ -36,4 +37,10 @@ rustc_library("fuchsia-framebuffer") {
 
 fuchsia_unittest_package("fuchsia-framebuffer-tests") {
   deps = [ ":fuchsia-framebuffer_test" ]
+
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }

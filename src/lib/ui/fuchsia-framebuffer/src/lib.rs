@@ -93,10 +93,8 @@ mod frameset_tests {
 
     const IMAGE_RANGE: Range<ImageId> = 200..202;
 
-    #[test]
+    #[fuchsia::test]
     #[should_panic]
-    // TODO(https://fxbug.dev/42169733): LeakSanitizer flags leaks caused by panic.
-    #[cfg_attr(feature = "variant_asan", ignore)]
     fn test_double_prepare() {
         let mut fs = FrameSet::new_with_range(IMAGE_RANGE);
 
@@ -104,26 +102,22 @@ mod frameset_tests {
         fs.mark_prepared(200);
     }
 
-    #[test]
+    #[fuchsia::test]
     #[should_panic]
-    // TODO(https://fxbug.dev/42169733): LeakSanitizer flags leaks caused by panic.
-    #[cfg_attr(feature = "variant_asan", ignore)]
     fn test_not_presented() {
         let mut fs = FrameSet::new_with_range(IMAGE_RANGE);
         fs.mark_done_presenting(100);
     }
 
-    #[test]
+    #[fuchsia::test]
     #[should_panic]
-    // TODO(https://fxbug.dev/42169733): LeakSanitizer flags leaks caused by panic.
-    #[cfg_attr(feature = "variant_asan", ignore)]
     fn test_already_presented() {
         let mut fs = FrameSet::new_with_range(IMAGE_RANGE);
         fs.mark_presented(100);
         fs.mark_presented(100);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_basic_use() {
         let mut fs = FrameSet::new_with_range(IMAGE_RANGE);
         let avail = fs.get_available_image();
