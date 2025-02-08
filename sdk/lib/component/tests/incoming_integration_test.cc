@@ -141,12 +141,13 @@ TEST_F(IncomingTest, ConnectsToAggregatedServiceInNamespace) {
     realm.Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
     RunLoopUntil([&]() { return complete; });
   });
-  // Here we expect 2 calls to the servers:
-  // The client component runs a watcher:
+  // Here we expect 4 calls to the servers:
+  // The client component runs a watcher with the default constructor:
   //  sees instance "default" and calls EchoString (1)
   //  sees instance "alternate" and calls EchoString (2)
   // Then the client gets the idle callback and stops.
-  RunLoopUntil([&called]() { return called >= 2; });
+  // The the client does runs again with a manually set service root, making 2 more calls.
+  RunLoopUntil([&called]() { return called >= 4; });
 }
 
 }  // namespace

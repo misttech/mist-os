@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fidl.service.test/cpp/fidl.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/component/incoming/cpp/service_member_watcher.h>
 #include <lib/syslog/cpp/macros.h>
@@ -40,8 +41,7 @@ zx::result<> CheckInstance(zx::result<fidl::ClientEnd<Echo>> result,
   return zx::ok();
 }
 
-zx_status_t TestSyncServiceMemberWatcher() {
-  component::SyncServiceMemberWatcher<EchoService::Foo> watcher;
+zx_status_t GetInstances(component::SyncServiceMemberWatcher<EchoService::Foo>& watcher) {
   {
     zx::result result = CheckInstance(watcher.GetNextInstance(true));
     if (result.is_error()) {
@@ -66,8 +66,22 @@ zx_status_t TestSyncServiceMemberWatcher() {
   return ZX_OK;
 }
 
+zx_status_t TestSyncServiceMemberWatcher() {
+  component::SyncServiceMemberWatcher<EchoService::Foo> watcher;
+  return GetInstances(watcher);
+}
+
+zx_status_t TestSyncServiceMemberWatcherSetServiceRoot() {
+  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> svc_dir = component::OpenServiceRoot();
+  ZX_ASSERT(svc_dir.is_ok());
+  component::SyncServiceMemberWatcher<EchoService::Foo> watcher(svc_dir->borrow());
+  return GetInstances(watcher);
+}
+
 int main(int argc, const char** argv) {
   FX_LOGS(INFO) << "Starting EchoService watcher client";
 
-  return TestSyncServiceMemberWatcher();
+  zx_status_t s1 = TestSyncServiceMemberWatcher();
+  zx_status_t s2 = TestSyncServiceMemberWatcherSetServiceRoot();
+  return s1 || s2;
 }

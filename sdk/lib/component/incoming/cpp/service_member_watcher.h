@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.unknown/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/incoming/cpp/constants.h>
+#include <lib/component/incoming/cpp/directory.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/component/incoming/cpp/service_watcher.h>
@@ -70,7 +71,11 @@ class ServiceMemberWatcher {
     return zx::make_result(service_watcher_.Cancel());
   }
 
-  ServiceMemberWatcher() = default;
+  // For tests, the service root can be set manually
+  explicit ServiceMemberWatcher(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root)
+      : svc_dir_(svc_root) {}
+  ServiceMemberWatcher()
+      : default_svc_dir_(OpenServiceRoot().value()), svc_dir_(default_svc_dir_.borrow()) {}
   // Begins asynchronously waiting for service instances using the given dispatcher.
   //
   // Waits for services in the incoming service directory: /svc/ServiceMember::ServiceName
@@ -92,9 +97,13 @@ class ServiceMemberWatcher {
     ZX_ASSERT(client_callback_ == nullptr);
     client_callback_ = std::move(callback);
     idle_callback_ = std::move(idle_callback);
+    auto service_directory_result = OpenDirectoryAt(svc_dir_, ServiceMember::ServiceName);
+    if (service_directory_result.is_error()) {
+      return service_directory_result.take_error();
+    }
     return zx::make_result(service_watcher_.Begin(
-        ServiceMember::ServiceName, fit::bind_member<&ServiceMemberWatcher::OnWatchedEvent>(this),
-        dispatcher));
+        std::move(service_directory_result.value()),
+        fit::bind_member<&ServiceMemberWatcher::OnWatchedEvent>(this), dispatcher));
   }
 
  private:
@@ -106,11 +115,9 @@ class ServiceMemberWatcher {
     if (event == fuchsia_io::wire::WatchEvent::kRemoved || instance.size() < 2) {
       return;
     }
-    auto svc_dir = OpenServiceRoot();
-    ZX_ASSERT(svc_dir.is_ok());
 
     zx::result<fidl::ClientEnd<typename ServiceMember::ProtocolType>> client_result =
-        ConnectAtMember<ServiceMember>(svc_dir.value(), instance);
+        ConnectAtMember<ServiceMember>(svc_dir_, instance);
     // This should not fail, since the directory just gave us the instance.
     ZX_ASSERT(client_result.is_ok());
     client_callback_(std::move(client_result.value()));
@@ -118,6 +125,9 @@ class ServiceMemberWatcher {
 
   ClientCallback client_callback_;
   IdleCallback idle_callback_;
+  // for default initialization we hold ownership of the client_end.
+  fidl::ClientEnd<fuchsia_io::Directory> default_svc_dir_;
+  fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir_;
   component::ServiceWatcher service_watcher_;
 };
 
@@ -132,7 +142,9 @@ class SyncServiceMemberWatcher final : public ServiceMemberWatcher<ServiceMember
 
  public:
   using Protocol = typename ServiceMember::ProtocolType;
-  SyncServiceMemberWatcher() = default;
+  explicit SyncServiceMemberWatcher(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root)
+      : ServiceMemberWatcher<ServiceMember>(svc_root) {}
+  SyncServiceMemberWatcher() : ServiceMemberWatcher<ServiceMember>() {}
 
   // Sequentially query for service instances at /svc/ServiceMember::ServiceName
   //
