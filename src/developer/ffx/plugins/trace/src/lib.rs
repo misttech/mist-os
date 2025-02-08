@@ -13,14 +13,17 @@ use fidl_fuchsia_tracing::{BufferingMode, KnownCategory};
 use fidl_fuchsia_tracing_controller::{
     ProviderInfo, ProviderSpec, ProviderStats, ProvisionerProxy, TraceConfig,
 };
-use flyweights::FlyStr;
 use futures::future::{BoxFuture, FutureExt};
-use fxt::{Arg, ArgValue, RawArg, RawArgValue, RawEventRecord, SessionParser, StringRef};
+use fxt::{
+    Arg, ArgValue, ParseError, RawArg, RawArgValue, RawEventRecord, SessionParser, StringRef,
+    TraceRecord,
+};
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeSet, HashMap};
+use std::fs::File;
 use std::future::Future;
 use std::io::{stdin, LineWriter, Stdin, Write};
 use std::path::{Component, PathBuf};
@@ -30,6 +33,8 @@ use term_grid::Grid;
 #[cfg_attr(test, allow(unused))]
 use termion::terminal_size;
 use termion::{color, style};
+
+static ORDINAL_ARG_NAME: &str = "ordinal";
 
 // This is to make the schema make sense as this plugin can output one of these based on the
 // subcommand. An alternative is to break this one plugin into multiple plugins each with their own
@@ -202,6 +207,80 @@ impl<'a> LineWaiter<'a> for Stdin {
         } else {
             async move {}.boxed()
         }
+    }
+}
+
+struct TraceProcessor {
+    parser: SessionParser<std::io::Cursor<Vec<u8>>>,
+    symbolizer: Option<Symbolizer>,
+    event_per_category_counter: Option<CategoryCounter>,
+}
+
+impl TraceProcessor {
+    fn new(trace_file: String) -> Result<Self> {
+        let content = match std::fs::read(&trace_file) {
+            Ok(content) => content,
+            Err(e) => ffx_bail!("Failed to read the trace file: {}", e),
+        };
+
+        let parser = SessionParser::new(std::io::Cursor::new(content));
+
+        Ok(Self { parser, symbolizer: None, event_per_category_counter: None })
+    }
+
+    fn with_symbolizer(&mut self, outfile: &str, context: &EnvironmentContext) {
+        self.symbolizer = Some(Symbolizer::new(outfile, &context));
+    }
+
+    fn with_category_check(&mut self, input_categories: Vec<String>) {
+        self.event_per_category_counter = Some(CategoryCounter::new(input_categories));
+    }
+
+    fn check_record(&mut self, record: Result<TraceRecord, ParseError>) -> Result<()> {
+        if let Some(event_per_category_counter) = &mut self.event_per_category_counter {
+            event_per_category_counter.increment_category(&record);
+        }
+
+        if let Some(symbolizer) = &mut self.symbolizer {
+            let parsed_bytes = self.parser.parsed_bytes().to_owned();
+            symbolizer.symbolize_and_write_record(record, parsed_bytes)?;
+        }
+
+        Ok(())
+    }
+
+    fn run(mut self) -> Result<Vec<String>> {
+        let mut warning_list = Vec::new();
+        match self.parser.next() {
+            Some(record) => self.check_record(record)?,
+            None => {
+                if let Some(event_per_category_counter) = &mut self.event_per_category_counter {
+                    ffx_bail!(
+                        "{}WARNING: The trace file is empty. Please verify that the input categories are valid. Input categories are: {:?}.{}",
+                        color::Fg(color::Yellow),
+                        event_per_category_counter.category_counter.keys(),
+                        style::Reset
+                    );
+                }
+            }
+        }
+
+        while let Some(record) = self.parser.next() {
+            self.check_record(record)?;
+        }
+
+        if let Some(event_per_category_counter) = &mut self.event_per_category_counter {
+            let invalid_category_list = event_per_category_counter.get_invalid_category_list();
+            if !invalid_category_list.is_empty() {
+                warning_list.push(format!(
+                "{}WARNING: Categories {:?} were manually specified, but not found in the resulting trace. Check the spelling of your categories or the status of your trace provider{}",
+                color::Fg(color::Yellow),
+                invalid_category_list,
+                style::Reset
+            ));
+            }
+        }
+        Ok(warning_list)
     }
 }
 
@@ -427,31 +506,38 @@ pub fn symbolize_fidl_call<'a>(bytes: &[u8], ordinal: u64, method: &'a str) -> R
     raw_event_record.serialize().map_err(|e| anyhow!(e))
 }
 
-fn symbolize_trace_file(
-    trace_file: String,
-    outfile: String,
-    ctx: &EnvironmentContext,
-) -> Result<()> {
-    let content = std::fs::read(trace_file)?;
-    let mut parser = SessionParser::new(std::io::Cursor::new(content));
-    let output = std::fs::File::create(outfile)?;
-    let mut output = LineWriter::new(output);
+struct Symbolizer {
+    output_file: LineWriter<File>,
+    ord_map: HashMap<u64, String>,
+}
 
-    let (ord_map, _) = generate_symbolization_map(ir_files_list(ctx).unwrap_or_default());
-    let ordinal_arg_name = FlyStr::from("ordinal");
-    while let Some(record) = parser.next() {
-        let mut parsed_bytes = parser.parsed_bytes().to_owned();
-        output.write_all(match record {
+impl Symbolizer {
+    fn new(outfile: &str, context: &EnvironmentContext) -> Self {
+        let file = std::fs::File::create(outfile).unwrap();
+        let output_file = LineWriter::new(file);
+        let (ord_map, _) = generate_symbolization_map(ir_files_list(context).unwrap_or_default());
+
+        Self { output_file: output_file, ord_map: ord_map }
+    }
+
+    fn symbolize_and_write_record(
+        &mut self,
+        record: Result<TraceRecord, ParseError>,
+        parsed_bytes: Vec<u8>,
+    ) -> Result<()> {
+        let mut parsed_bytes = parsed_bytes;
+        self.output_file.write_all(match record {
             Ok(fxt::TraceRecord::Event(fxt::EventRecord { category, args, .. }))
                 if category.as_str() == "kernel:ipc" =>
             {
                 for arg in args {
                     match arg {
                         Arg { name, value: ArgValue::Unsigned64(ord) }
-                            if name == ordinal_arg_name && ord_map.contains_key(&ord) =>
+                            if name.as_str() == ORDINAL_ARG_NAME
+                                && self.ord_map.contains_key(&ord) =>
                         {
                             parsed_bytes =
-                                symbolize_fidl_call(&parsed_bytes, ord, ord_map[&ord].as_str())
+                                symbolize_fidl_call(&parsed_bytes, ord, self.ord_map[&ord].as_str())
                                     .unwrap_or(parsed_bytes)
                         }
                         _ => continue,
@@ -461,8 +547,42 @@ fn symbolize_trace_file(
             }
             _ => &parsed_bytes,
         })?;
+        Ok(())
     }
-    Ok(output.flush()?)
+}
+
+impl Drop for Symbolizer {
+    fn drop(&mut self) {
+        let _ = self.output_file.flush();
+    }
+}
+
+struct CategoryCounter {
+    category_counter: HashMap<String, usize>,
+}
+
+impl CategoryCounter {
+    fn new(input_categories: Vec<String>) -> Self {
+        let mut category_counter = HashMap::new();
+        for category in &input_categories {
+            category_counter.insert(category.clone(), 0);
+        }
+        Self { category_counter }
+    }
+
+    fn increment_category(&mut self, record: &Result<TraceRecord, ParseError>) {
+        if let Ok(TraceRecord::Event(fxt::EventRecord { category, .. })) = record {
+            *self.category_counter.entry(category.to_string()).or_insert(0) += 1;
+        }
+    }
+
+    fn get_invalid_category_list(&mut self) -> Vec<String> {
+        self.category_counter
+            .iter()
+            .filter(|(_, &count)| count == 0)
+            .map(|(category, _)| category.clone())
+            .collect()
+    }
 }
 
 type Writer = MachineWriter<TraceOutput>;
@@ -623,7 +743,9 @@ pub async fn trace(
         TraceSubCommand::Symbolize(opts) => {
             if let Some(trace_file) = opts.fxt {
                 let outfile = opts.outfile.unwrap_or_else(|| trace_file.clone());
-                symbolize_trace_file(trace_file, outfile.clone(), &context)?;
+                let mut processor = TraceProcessor::new(trace_file)?;
+                processor.with_symbolizer(&outfile, &context);
+                processor.run()?;
                 writer.line(format!("Symbolized traces written to {outfile}"))?;
             } else if let Some(ordinal) = opts.ordinal {
                 let mut all_ir_files = opts.ir_path.clone();
@@ -728,20 +850,26 @@ async fn stop_tracing(
             for line in output {
                 writer.line(line)?;
             }
-            if !no_verify_trace {
-                match std::fs::read(output_file.clone()) {
-                    Ok(content) => {
-                        let mut parser = SessionParser::new(std::io::Cursor::new(content));
-                        let mut parser_iter = parser.by_ref().peekable();
-                        if parser_iter.peek().is_none() {
-                            writer.line(format!("The trace file is empty. Please verify that the input categories are valid. Input categories are: {:?}", categories))?;
-                        }
+
+            let skip_symbolization =
+                skip_symbolization || !categories.contains(&"kernel:ipc".to_string());
+            if !no_verify_trace || !skip_symbolization {
+                let mut processor = TraceProcessor::new(output_file.clone())?;
+
+                if !no_verify_trace {
+                    processor.with_category_check(categories);
+                }
+
+                if !skip_symbolization {
+                    processor.with_symbolizer(&output_file, context);
+                }
+
+                let warnings = processor.run()?;
+                if !warnings.is_empty() {
+                    for warning in warnings {
+                        writer.line(format!("{}", warning))?;
                     }
-                    Err(e) => ffx_bail!("Failed to read the trace file: {}", e),
-                };
-            }
-            if !skip_symbolization && categories.contains(&"kernel:ipc".to_string()) {
-                symbolize_trace_file(output_file.clone(), output_file.clone(), &context)?;
+                }
             }
 
             (target, output_file)
@@ -1141,6 +1269,9 @@ mod tests {
     }
 
     #[fuchsia::test]
+    #[should_panic(
+        expected = "WARNING: The trace file is empty. Please verify that the input categories are valid. Input categories are:"
+    )]
     async fn test_empty_trace_data() {
         let fake_temp_file =
             Builder::new().suffix("foo.fxt").tempfile().expect("Failed to create a temp file");
@@ -1167,9 +1298,6 @@ mod tests {
             writer,
         )
         .await;
-        let output = test_buffers.into_stdout_str();
-        let want = "The trace file is empty. Please verify that the input categories are valid. Input categories are: ";
-        assert!(output.contains(want), "\"{}\" didn't contain  /{}/", output, want);
     }
 
     #[fuchsia::test]
