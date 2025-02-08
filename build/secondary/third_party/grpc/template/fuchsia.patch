@@ -162,7 +162,7 @@ index 2ff55896c87..f3f6615b1a0 100644
  
    def wanted_lib(lib):
 -    wanted_libs = ("grpc_plugin_support", "address_sorting", "upb")
-+    wanted_libs = ("grpc_plugin_support", "address_sorting", "upb_json_lib", "upb_textformat_lib", "upb","upb_collections_lib", "utf8_range_lib")
++    wanted_libs = ("grpc_plugin_support", "address_sorting", "upb_base_lib", "upb_json_lib", "upb_mem_lib", "upb_message_lib", "upb_textformat_lib", "upb","upb_collections_lib", "utf8_range_lib")
      return lib.build in ("all", "protoc") and lib.get("name", "") in wanted_libs
  
    def wanted_binary(tgt):
