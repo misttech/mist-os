@@ -55,6 +55,15 @@
                 "fuchsia.process.Launcher",
             ],
         },
+
+        // This service doesn't really exist, the route is here to tell component manager that
+        // fshost should get the signal to shut down before anything in the collection. Using this,
+        // fshost shuts down components here in the proper order, and anything that happens to be
+        // left can be shut down by component manager.
+        {
+            service: "fs-collection.shutdown-order",
+            from: "#fs-collection",
+        },
     ],
     offer: [
         {
