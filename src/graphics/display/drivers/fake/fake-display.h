@@ -228,8 +228,7 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   // This representation assumes that only single-layer display configurations
   // are supported. The representation will be revised when we add multi-layer
   // support.
-  display::DriverImageId current_image_to_capture_id_ __TA_GUARDED(mutex_) =
-      display::kInvalidDriverImageId;
+  display::DriverImageId applied_image_id_ __TA_GUARDED(mutex_) = display::kInvalidDriverImageId;
 
   // Next image ID assigned to an imported image.
   //
@@ -244,7 +243,7 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   // ID of the destination image of the currently in-progress capture.
   //
   // Set to `kInvalidDriverCaptureImageId` when no capture is in progress.
-  display::DriverCaptureImageId current_capture_target_image_id_ __TA_GUARDED(mutex_) =
+  display::DriverCaptureImageId started_capture_target_id_ __TA_GUARDED(mutex_) =
       display::kInvalidDriverCaptureImageId;
 
   // Next image ID assigned to an imported capture image.
@@ -257,7 +256,7 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   // The config stamp of the applied display configuration.
   //
   // Updated by ApplyConfiguration(), used by the VSync thread.
-  display::DriverConfigStamp current_config_stamp_ __TA_GUARDED(mutex_) =
+  display::DriverConfigStamp applied_config_stamp_ __TA_GUARDED(mutex_) =
       display::kInvalidDriverConfigStamp;
 
   // Minimum value of RGB channels, via the SetMinimumRgb() method.

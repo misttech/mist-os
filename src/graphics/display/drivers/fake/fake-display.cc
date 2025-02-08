@@ -372,7 +372,7 @@ void FakeDisplay::DisplayEngineReleaseImage(uint64_t image_handle) {
 
   std::lock_guard lock(mutex_);
 
-  if (current_image_to_capture_id_ == driver_image_id) {
+  if (applied_image_id_ == driver_image_id) {
     FDF_LOG(FATAL, "Cannot safely release an image used in currently applied configuration");
     return;
   }
@@ -454,13 +454,12 @@ void FakeDisplay::DisplayEngineApplyConfiguration(const display_config_t* displa
   std::lock_guard lock(mutex_);
   if (display_count == 1 && display_configs[0].layer_count) {
     // Only support one display.
-    current_image_to_capture_id_ =
-        display::ToDriverImageId(display_configs[0].layer_list[0].image_handle);
+    applied_image_id_ = display::ToDriverImageId(display_configs[0].layer_list[0].image_handle);
   } else {
-    current_image_to_capture_id_ = display::kInvalidDriverImageId;
+    applied_image_id_ = display::kInvalidDriverImageId;
   }
 
-  current_config_stamp_ = config_stamp;
+  applied_config_stamp_ = config_stamp;
 }
 
 enum class FakeDisplay::BufferCollectionUsage {
@@ -682,7 +681,7 @@ zx_status_t FakeDisplay::DisplayEngineStartCapture(uint64_t capture_handle) {
 
   std::lock_guard lock(mutex_);
 
-  if (current_capture_target_image_id_ != display::kInvalidDriverCaptureImageId) {
+  if (started_capture_target_id_ != display::kInvalidDriverCaptureImageId) {
     FDF_LOG(ERROR, "Capture start request declined while a capture is already in-progress");
     return ZX_ERR_SHOULD_WAIT;
   }
@@ -697,7 +696,7 @@ zx_status_t FakeDisplay::DisplayEngineStartCapture(uint64_t capture_handle) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  current_capture_target_image_id_ = driver_capture_image_id;
+  started_capture_target_id_ = driver_capture_image_id;
   return ZX_OK;
 }
 
@@ -710,7 +709,7 @@ zx_status_t FakeDisplay::DisplayEngineReleaseCapture(uint64_t capture_handle) {
 
   std::lock_guard lock(mutex_);
 
-  if (current_capture_target_image_id_ == driver_capture_image_id) {
+  if (started_capture_target_id_ == driver_capture_image_id) {
     FDF_LOG(FATAL, "Refusing to release the target of an in-progress capture");
 
     // TODO(https://fxrev.dev/394954078): The return code is not meaningful. It will be
@@ -744,19 +743,19 @@ void FakeDisplay::CaptureThread() {
 
 zx::result<> FakeDisplay::ServiceAnyCaptureRequest() {
   std::lock_guard lock(mutex_);
-  if (current_capture_target_image_id_ == display::kInvalidDriverCaptureImageId) {
+  if (started_capture_target_id_ == display::kInvalidDriverCaptureImageId) {
     return zx::ok();
   }
 
-  auto imported_captures_it = imported_captures_.find(current_capture_target_image_id_);
+  auto imported_captures_it = imported_captures_.find(started_capture_target_id_);
 
   ZX_ASSERT_MSG(imported_captures_it.IsValid(),
                 "Driver allowed releasing the target of an in-progress capture");
   CaptureImageInfo& capture_destination_info = *imported_captures_it;
 
-  if (current_image_to_capture_id_ != display::kInvalidDriverImageId) {
+  if (applied_image_id_ != display::kInvalidDriverImageId) {
     // We have a valid image being displayed. Let's capture it.
-    auto imported_images_it = imported_images_.find(current_image_to_capture_id_);
+    auto imported_images_it = imported_images_.find(applied_image_id_);
 
     ZX_ASSERT_MSG(imported_images_it.IsValid(),
                   "Driver allowed releasing an image used in the currently applied configuration");
@@ -772,7 +771,7 @@ zx::result<> FakeDisplay::ServiceAnyCaptureRequest() {
 
   SendCaptureComplete();
 
-  current_capture_target_image_id_ = display::kInvalidDriverCaptureImageId;
+  started_capture_target_id_ = display::kInvalidDriverCaptureImageId;
 
   return zx::ok();
 }
@@ -859,7 +858,7 @@ void FakeDisplay::SendVsync() {
   display::DriverConfigStamp vsync_config_stamp;
   {
     std::lock_guard lock(mutex_);
-    vsync_config_stamp = current_config_stamp_;
+    vsync_config_stamp = applied_config_stamp_;
   }
   const config_stamp_t banjo_vsync_config_stamp =
       display::ToBanjoDriverConfigStamp(vsync_config_stamp);
