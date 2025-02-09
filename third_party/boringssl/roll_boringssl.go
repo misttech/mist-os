@@ -125,7 +125,7 @@ func exportTestData(dir string) {
 // Regenerates the Rust bindings.
 func generateRustBindings(dir string) {
 	log.Printf("Generating Rust bindings...")
-	cmd := exec.Command(filepath.Join("rust", "boringssl-sys", "bindgen.sh"))
+	cmd := exec.Command(filepath.Join("rust", "bssl-sys", "generate.py"))
 	cmd.Dir = dir
 	if err := cmd.Run(); err != nil {
 		log.Fatalf("%s failed: %s", cmd.Args, err)
