@@ -11,7 +11,12 @@ rustc_library("mundane") {
   with_unit_tests = true
   edition = "2015"
 
-  deps = [ "//third_party/boringssl/rust/boringssl-sys:bssl-sys" ]
+  # Avoid a shared libssl dependency until needed.
+  if (is_fuchsia) {
+    deps = [ "//third_party/boringssl/rust:bssl-sys.shared-no-ssl" ]
+  } else if (is_host) {
+    deps = [ "//third_party/boringssl/rust:bssl-sys.static" ]
+  }
 
   features = [
     "bytes",
