@@ -93,8 +93,8 @@ macro_rules! endpoint {
         where
             T: TakeFrom<U>,
         {
-            fn take_from(from: &mut $name<U, P>) -> Self {
-                Self { transport: T::take_from(&mut from.transport), _protocol: PhantomData }
+            fn take_from(from: &$name<U, P>) -> Self {
+                Self { transport: T::take_from(&from.transport), _protocol: PhantomData }
             }
         }
     };

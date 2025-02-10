@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use core::cell::Cell;
 use core::fmt;
-use core::mem::replace;
+use core::mem::{replace, ManuallyDrop};
 
 use zx::sys::{zx_handle_t, ZX_HANDLE_INVALID};
 use zx::{Handle, HandleBased as _};
@@ -18,7 +19,7 @@ use crate::{
 #[repr(C, align(4))]
 pub union WireHandle {
     encoded: u32_le,
-    decoded: zx_handle_t,
+    decoded: ManuallyDrop<Cell<zx_handle_t>>,
 }
 
 impl Drop for WireHandle {
@@ -40,15 +41,15 @@ impl WireHandle {
     }
 
     /// Takes the handle, if any, leaving an invalid handle in its place.
-    pub fn take(&mut self) -> Handle {
-        let raw = unsafe { replace(&mut self.decoded, ZX_HANDLE_INVALID) };
+    pub fn take(&self) -> Handle {
+        let raw = unsafe { self.decoded.replace(ZX_HANDLE_INVALID) };
         unsafe { Handle::from_raw(raw) }
     }
 
     /// Returns the underlying [`zx_handle_t`].
     #[inline]
     pub fn as_raw_handle(&self) -> zx_handle_t {
-        unsafe { self.decoded }
+        unsafe { self.decoded.get() }
     }
 }
 
@@ -67,7 +68,10 @@ unsafe impl<D: HandleDecoder + ?Sized> Decode<D> for WireHandle {
             u32::MAX => {
                 let handle = decoder.take_handle()?;
                 munge!(let Self { mut decoded } = slot);
-                decoded.write(handle.into_raw());
+                // SAFETY: `Cell` has no uninit bytes, even though it doesn't implement `IntoBytes`.
+                unsafe {
+                    decoded.as_mut_ptr().write(ManuallyDrop::new(Cell::new(handle.into_raw())));
+                }
             }
             e => return Err(DecodeError::InvalidHandlePresence(e)),
         }
@@ -76,7 +80,7 @@ unsafe impl<D: HandleDecoder + ?Sized> Decode<D> for WireHandle {
 }
 
 impl TakeFrom<WireHandle> for Handle {
-    fn take_from(from: &mut WireHandle) -> Self {
+    fn take_from(from: &WireHandle) -> Self {
         from.take()
     }
 }
@@ -112,7 +116,7 @@ impl WireOptionalHandle {
     }
 
     /// Takes the handle, if any, leaving an invalid handle in its place.
-    pub fn take(&mut self) -> Option<Handle> {
+    pub fn take(&self) -> Option<Handle> {
         self.is_some().then(|| self.handle.take())
     }
 
@@ -173,7 +177,7 @@ unsafe impl<D: HandleDecoder + ?Sized> Decode<D> for WireOptionalHandle {
 }
 
 impl TakeFrom<WireOptionalHandle> for Option<Handle> {
-    fn take_from(from: &mut WireOptionalHandle) -> Self {
+    fn take_from(from: &WireOptionalHandle) -> Self {
         from.take()
     }
 }

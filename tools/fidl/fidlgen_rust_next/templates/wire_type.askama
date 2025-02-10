@@ -1,23 +1,17 @@
-{%- let param -%}
-{%- if anonymous -%}
-    {%- let param = "'_" -%}
-{%- else %}
-    {%- let param = "'buf" -%}
-{%- endif -%}
 {%- match ty.kind -%}
     {%- when TypeKind::Array with { element_type, element_count } -%}
         [{{ context.wire_type(element_type) }}; {{ element_count }}]
     {%- when TypeKind::Vector with { element_type, element_count: _, nullable } -%}
         {%- if nullable -%}
-            ::fidl_next::WireOptionalVector<{{ param }}, {{ context.wire_type(element_type) }}>
+            ::fidl_next::WireOptionalVector<{{ context.wire_type(element_type) }}>
         {%- else -%}
-            ::fidl_next::WireVector<{{ param }}, {{ context.wire_type(element_type) }}>
+            ::fidl_next::WireVector<{{ context.wire_type(element_type) }}>
         {%- endif -%}
     {%- when TypeKind::String with { element_count: _, nullable } -%}
         {%- if nullable -%}
-            ::fidl_next::WireOptionalString<{{ param }}>
+            ::fidl_next::WireOptionalString
         {%- else -%}
-            ::fidl_next::WireString<{{ param }}>
+            ::fidl_next::WireString
         {%- endif -%}
     {%- when TypeKind::Handle with { nullable, rights: _, subtype: _, resource_identifier: _ } -%}
         {%- if nullable -%}
@@ -46,34 +40,18 @@
         {%- match context.schema.get_decl_type(identifier).unwrap() -%}
             {%- when DeclType::Bits -%} {{ context.wire_id(identifier) }}
             {%- when DeclType::Enum -%} {{ context.wire_id(identifier) }}
-            {%- when DeclType::Table -%} {{ context.wire_id(identifier) }}<{{ param }}>
+            {%- when DeclType::Table -%} {{ context.wire_id(identifier) }}
             {%- when DeclType::Struct -%}
                 {%- if nullable -%}
-                    ::fidl_next::WireBox<
-                        {{ param }},
-                        {{ context.wire_id(identifier) }}
-                        {%- if let Some(shape) = context.schema.get_type_shape(identifier) -%}
-                            {%- if shape.max_out_of_line != 0 -%}
-                                <{{ param }}>
-                            {%- endif -%}
-                        {%- endif -%}
-                    >
+                    ::fidl_next::WireBox<{{ context.wire_id(identifier) }}>
                 {%- else -%}
                     {{ context.wire_id(identifier) }}
-                    {%- if let Some(shape) = context.schema.get_type_shape(identifier) -%}
-                        {%- if shape.max_out_of_line != 0 -%}
-                            <{{ param }}>
-                        {%- endif -%}
-                    {%- endif -%}
                 {%- endif -%}
             {%- when DeclType::Union -%}
                 {%- if nullable -%}
                     {{ context.wire_optional_id(identifier) }}
                 {%- else -%}
                     {{ context.wire_id(identifier) }}
-                {%- endif -%}
-                {%- if ty.shape.max_out_of_line != 0 -%}
-                    <{{ param }}>
                 {%- endif -%}
             {%- when DeclType::Resource -%}
                 {%- if nullable -%}

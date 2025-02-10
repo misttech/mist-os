@@ -107,8 +107,8 @@ impl RawWireUnion {
         WireEnvelope::decode_as::<D, T>(envelope, decoder)
     }
 
-    /// The null (absent) union.
-    pub fn null() -> Self {
+    /// The absent optional union.
+    pub fn absent() -> Self {
         Self { ordinal: u64_le::from_native(0), envelope: WireEnvelope::zero() }
     }
 
@@ -130,11 +130,6 @@ impl RawWireUnion {
     /// Gets a reference to the envelope underlying the union.
     pub fn get(&self) -> &WireEnvelope {
         &self.envelope
-    }
-
-    /// Gets a mutable reference to the envelope underlying the union.
-    pub fn get_mut(&mut self) -> &mut WireEnvelope {
-        &mut self.envelope
     }
 
     /// Clones the union, assuming that it contains an inline `T`.

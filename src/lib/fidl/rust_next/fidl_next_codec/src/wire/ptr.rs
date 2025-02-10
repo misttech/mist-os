@@ -2,32 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use core::marker::PhantomData;
-use core::ptr::{null_mut, NonNull};
-
 use munge::munge;
 
-use crate::{u64_le, Chunk, DecodeError, Owned, Slot};
+use crate::{u64_le, DecodeError, Slot};
 
 /// A raw FIDL pointer
 #[repr(C, align(8))]
-pub union WirePointer<'buf, T> {
+pub union WirePointer<T> {
     encoded: u64_le,
     decoded: *mut T,
-    _phantom: PhantomData<&'buf mut [Chunk]>,
 }
 
-impl<'buf, T> WirePointer<'buf, T> {
-    /// Returns the null wire pointer.
-    pub const fn null() -> Self {
-        Self { decoded: null_mut() }
-    }
-
-    /// Returns the dangling wire pointer.
-    pub const fn dangling() -> Self {
-        Self { decoded: NonNull::dangling().as_ptr() }
-    }
-
+impl<T> WirePointer<T> {
     /// Returns whether the wire pointer was encoded present.
     pub fn is_encoded_present(slot: Slot<'_, Self>) -> Result<bool, DecodeError> {
         munge!(let Self { encoded } = slot);
@@ -51,11 +37,13 @@ impl<'buf, T> WirePointer<'buf, T> {
     }
 
     /// Sets the decoded value of the pointer.
-    pub fn set_decoded(slot: Slot<'_, Self>, ptr: Owned<'buf, T>) {
+    pub fn set_decoded(slot: Slot<'_, Self>, ptr: *mut T) {
         munge!(let Self { mut decoded } = slot);
         // SAFETY: Identical to `decoded.write(ptr.into_raw())`, but raw
         // pointers don't currently implement `IntoBytes`.
-        unsafe { decoded.as_mut_ptr().write(ptr.into_raw()) };
+        unsafe {
+            *decoded.as_mut_ptr() = ptr;
+        }
     }
 
     /// Returns the underlying pointer.

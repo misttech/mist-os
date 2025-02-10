@@ -49,7 +49,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<AllInstants> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireAllInstants>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireAllInstants>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<AllInstants>
@@ -74,15 +74,15 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireAllInstants> for AllInstants {
-    fn take_from(from: &mut WireAllInstants) -> Self {
+    fn take_from(from: &WireAllInstants) -> Self {
         Self {
-            monotonic: ::fidl_next::TakeFrom::take_from(&mut from.monotonic),
+            monotonic: ::fidl_next::TakeFrom::take_from(&from.monotonic),
 
-            boot: ::fidl_next::TakeFrom::take_from(&mut from.boot),
+            boot: ::fidl_next::TakeFrom::take_from(&from.boot),
 
-            monotonic_ticks: ::fidl_next::TakeFrom::take_from(&mut from.monotonic_ticks),
+            monotonic_ticks: ::fidl_next::TakeFrom::take_from(&from.monotonic_ticks),
 
-            boot_ticks: ::fidl_next::TakeFrom::take_from(&mut from.boot_ticks),
+            boot_ticks: ::fidl_next::TakeFrom::take_from(&from.boot_ticks),
         }
     }
 }
@@ -164,7 +164,7 @@ impl ComplexInstants {
 }
 
 impl ::fidl_next::Encodable for ComplexInstants {
-    type Encoded<'buf> = WireComplexInstants<'buf>;
+    type Encoded<'buf> = WireComplexInstants;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ComplexInstants
@@ -246,27 +246,27 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireComplexInstants<'buf>> for ComplexInstants {
-    fn take_from(from: &mut WireComplexInstants<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<WireComplexInstants> for ComplexInstants {
+    fn take_from(from: &WireComplexInstants) -> Self {
         Self {
-            monotonic: from.monotonic_mut().map(::fidl_next::TakeFrom::take_from),
+            monotonic: from.monotonic().map(::fidl_next::TakeFrom::take_from),
 
-            boot: from.boot_mut().map(::fidl_next::TakeFrom::take_from),
+            boot: from.boot().map(::fidl_next::TakeFrom::take_from),
 
-            monotonic_ticks: from.monotonic_ticks_mut().map(::fidl_next::TakeFrom::take_from),
+            monotonic_ticks: from.monotonic_ticks().map(::fidl_next::TakeFrom::take_from),
 
-            boot_ticks: from.boot_ticks_mut().map(::fidl_next::TakeFrom::take_from),
+            boot_ticks: from.boot_ticks().map(::fidl_next::TakeFrom::take_from),
         }
     }
 }
 
 /// The wire type corresponding to [`ComplexInstants`].
 #[repr(C)]
-pub struct WireComplexInstants<'buf> {
-    table: ::fidl_next::WireTable<'buf>,
+pub struct WireComplexInstants {
+    table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireComplexInstants<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireComplexInstants
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
 {
@@ -292,7 +292,7 @@ where
                 2 => {
                     ::fidl_next::WireEnvelope::decode_as::<
                         ___D,
-                        ::fidl_next::WireVector<'buf, ::fidl_next::i64_le>,
+                        ::fidl_next::WireVector<::fidl_next::i64_le>,
                     >(slot.as_mut(), decoder)?;
 
                     Ok(())
@@ -322,57 +322,25 @@ where
     }
 }
 
-impl<'buf> WireComplexInstants<'buf> {
+impl WireComplexInstants {
     pub fn monotonic(&self) -> Option<&[::fidl_next::i64_le; 10]> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
 
-    pub fn monotonic_mut(&mut self) -> Option<&mut [::fidl_next::i64_le; 10]> {
-        unsafe { Some(self.table.get_mut(1)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_monotonic(&mut self) -> Option<[::fidl_next::i64_le; 10]> {
-        unsafe { Some(self.table.get_mut(1)?.take_unchecked()) }
-    }
-
-    pub fn boot(&self) -> Option<&::fidl_next::WireVector<'buf, ::fidl_next::i64_le>> {
+    pub fn boot(&self) -> Option<&::fidl_next::WireVector<::fidl_next::i64_le>> {
         unsafe { Some(self.table.get(2)?.deref_unchecked()) }
-    }
-
-    pub fn boot_mut(&mut self) -> Option<&mut ::fidl_next::WireVector<'buf, ::fidl_next::i64_le>> {
-        unsafe { Some(self.table.get_mut(2)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_boot(&mut self) -> Option<::fidl_next::WireVector<'buf, ::fidl_next::i64_le>> {
-        unsafe { Some(self.table.get_mut(2)?.take_unchecked()) }
     }
 
     pub fn monotonic_ticks(&self) -> Option<&[::fidl_next::i64_le; 10]> {
         unsafe { Some(self.table.get(3)?.deref_unchecked()) }
     }
 
-    pub fn monotonic_ticks_mut(&mut self) -> Option<&mut [::fidl_next::i64_le; 10]> {
-        unsafe { Some(self.table.get_mut(3)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_monotonic_ticks(&mut self) -> Option<[::fidl_next::i64_le; 10]> {
-        unsafe { Some(self.table.get_mut(3)?.take_unchecked()) }
-    }
-
     pub fn boot_ticks(&self) -> Option<&[::fidl_next::i64_le; 10]> {
         unsafe { Some(self.table.get(4)?.deref_unchecked()) }
     }
-
-    pub fn boot_ticks_mut(&mut self) -> Option<&mut [::fidl_next::i64_le; 10]> {
-        unsafe { Some(self.table.get_mut(4)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_boot_ticks(&mut self) -> Option<[::fidl_next::i64_le; 10]> {
-        unsafe { Some(self.table.get_mut(4)?.take_unchecked()) }
-    }
 }
 
-impl ::core::fmt::Debug for WireComplexInstants<'_> {
+impl ::core::fmt::Debug for WireComplexInstants {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> Result<(), ::core::fmt::Error> {
         f.debug_struct("ComplexInstants")
             .field("monotonic", &self.monotonic())

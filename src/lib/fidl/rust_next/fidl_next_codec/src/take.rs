@@ -6,17 +6,17 @@ use core::mem::MaybeUninit;
 
 use crate::{f32_le, f64_le, i16_le, i32_le, i64_le, u16_le, u32_le, u64_le};
 
-/// `From` conversions which take from a mutable reference.
+/// `From` conversions which may take from a reference using interior mutability.
 pub trait TakeFrom<T: ?Sized> {
     /// Converts from the given `T`, taking any resources that can't be cloned.
-    fn take_from(from: &mut T) -> Self;
+    fn take_from(from: &T) -> Self;
 }
 
 macro_rules! impl_primitive {
     ($from:ty, $to:ty) => {
         impl TakeFrom<$from> for $to {
             #[inline]
-            fn take_from(from: &mut $from) -> $to {
+            fn take_from(from: &$from) -> $to {
                 (*from).into()
             }
         }
@@ -49,9 +49,9 @@ impl_primitives! {
 }
 
 impl<T: TakeFrom<WT>, WT, const N: usize> TakeFrom<[WT; N]> for [T; N] {
-    fn take_from(from: &mut [WT; N]) -> Self {
+    fn take_from(from: &[WT; N]) -> Self {
         let mut result = MaybeUninit::<[T; N]>::uninit();
-        for (i, item) in from.iter_mut().enumerate() {
+        for (i, item) in from.iter().enumerate() {
             let taken = T::take_from(item);
             unsafe {
                 result.as_mut_ptr().cast::<T>().add(i).write(taken);
@@ -62,7 +62,7 @@ impl<T: TakeFrom<WT>, WT, const N: usize> TakeFrom<[WT; N]> for [T; N] {
 }
 
 impl<T: TakeFrom<WT>, WT> TakeFrom<WT> for Box<T> {
-    fn take_from(from: &mut WT) -> Self {
+    fn take_from(from: &WT) -> Self {
         Box::new(T::take_from(from))
     }
 }

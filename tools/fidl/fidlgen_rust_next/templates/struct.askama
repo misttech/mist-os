@@ -3,13 +3,6 @@
 {% let name = filters::ident(base_name)? %}
 {% let wire_name = format!("Wire{base_name}") %}
 
-{% let params %}
-{% if is_static %}
-    {% let params = "" %}
-{% else %}
-    {% let params = "<'buf>" %}
-{% endif %}
-
 {{ self::doc_string(strct.attributes) -}}
 #[derive(
     {% if !strct.is_resource %}
@@ -26,7 +19,7 @@ pub struct {{ name }} {
 }
 
 impl ::fidl_next::Encodable for {{ name }} {
-    type Encoded<'buf> = {{ wire_name }}{{ params }};
+    type Encoded<'buf> = {{ wire_name }};
 }
 
 impl<___E> ::fidl_next::Encode<___E> for {{ name }}
@@ -61,7 +54,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<{{ name }}> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, {{ wire_name }}{{ params }}>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<{{ wire_name }}>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<{{ name }}>
@@ -85,12 +78,12 @@ where
     }
 }
 
-impl{{ params }} ::fidl_next::TakeFrom<{{ wire_name }}{{ params }}> for {{ name }} {
-    fn take_from(from: &mut {{ wire_name }}{{ params }}) -> Self {
+impl ::fidl_next::TakeFrom<{{ wire_name }}> for {{ name }} {
+    fn take_from(from: &{{ wire_name }}) -> Self {
         Self {
             {% for member in strct.members %}
                 {% let member_name = filters::ident(member.name.snake())? %}
-                {{ member_name }}: ::fidl_next::TakeFrom::take_from(&mut from.{{ member_name }}),
+                {{ member_name }}: ::fidl_next::TakeFrom::take_from(&from.{{ member_name }}),
             {% endfor %}
         }
     }
@@ -106,13 +99,13 @@ impl{{ params }} ::fidl_next::TakeFrom<{{ wire_name }}{{ params }}> for {{ name 
     {% endif %}
 )]
 #[repr(C)]
-pub struct {{ wire_name }}{{ params }} {
+pub struct {{ wire_name }} {
     {% for member in strct.members %}
         pub {{ member.name.snake()|ident }}: {{ context.wire_type(member.ty) }},
     {% endfor %}
 }
 
-unsafe impl<{% if !is_static %}'buf, {% endif %}___D> ::fidl_next::Decode<___D> for {{ wire_name }}{{ params }}
+unsafe impl<{% if !is_static %}'buf, {% endif %}___D> ::fidl_next::Decode<___D> for {{ wire_name }}
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
     {% if !is_static %}

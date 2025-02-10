@@ -39,7 +39,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<TwoWayAddRequest> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireTwoWayAddRequest>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireTwoWayAddRequest>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<TwoWayAddRequest>
@@ -64,11 +64,11 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireTwoWayAddRequest> for TwoWayAddRequest {
-    fn take_from(from: &mut WireTwoWayAddRequest) -> Self {
+    fn take_from(from: &WireTwoWayAddRequest) -> Self {
         Self {
-            addend1: ::fidl_next::TakeFrom::take_from(&mut from.addend1),
+            addend1: ::fidl_next::TakeFrom::take_from(&from.addend1),
 
-            addend2: ::fidl_next::TakeFrom::take_from(&mut from.addend2),
+            addend2: ::fidl_next::TakeFrom::take_from(&from.addend2),
         }
     }
 }
@@ -138,7 +138,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<TwoWayAddResponse> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireTwoWayAddResponse>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireTwoWayAddResponse>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<TwoWayAddResponse>
@@ -163,8 +163,8 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireTwoWayAddResponse> for TwoWayAddResponse {
-    fn take_from(from: &mut WireTwoWayAddResponse) -> Self {
-        Self { sum: ::fidl_next::TakeFrom::take_from(&mut from.sum) }
+    fn take_from(from: &WireTwoWayAddResponse) -> Self {
+        Self { sum: ::fidl_next::TakeFrom::take_from(&from.sum) }
     }
 }
 

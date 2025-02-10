@@ -8,7 +8,7 @@ pub struct SuperFooRequest {
 }
 
 impl ::fidl_next::Encodable for SuperFooRequest {
-    type Encoded<'buf> = WireSuperFooRequest<'buf>;
+    type Encoded<'buf> = WireSuperFooRequest;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for SuperFooRequest
@@ -36,7 +36,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<SuperFooRequest> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireSuperFooRequest<'buf>>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireSuperFooRequest>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<SuperFooRequest>
@@ -60,20 +60,20 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireSuperFooRequest<'buf>> for SuperFooRequest {
-    fn take_from(from: &mut WireSuperFooRequest<'buf>) -> Self {
-        Self { s: ::fidl_next::TakeFrom::take_from(&mut from.s) }
+impl ::fidl_next::TakeFrom<WireSuperFooRequest> for SuperFooRequest {
+    fn take_from(from: &WireSuperFooRequest) -> Self {
+        Self { s: ::fidl_next::TakeFrom::take_from(&from.s) }
     }
 }
 
 /// The wire type corersponding to [`SuperFooRequest`].
 #[derive(Debug)]
 #[repr(C)]
-pub struct WireSuperFooRequest<'buf> {
-    pub s: ::fidl_next::WireString<'buf>,
+pub struct WireSuperFooRequest {
+    pub s: ::fidl_next::WireString,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSuperFooRequest<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSuperFooRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -128,7 +128,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<SuperFooResponse> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireSuperFooResponse>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireSuperFooResponse>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<SuperFooResponse>
@@ -153,8 +153,8 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireSuperFooResponse> for SuperFooResponse {
-    fn take_from(from: &mut WireSuperFooResponse) -> Self {
-        Self { y: ::fidl_next::TakeFrom::take_from(&mut from.y) }
+    fn take_from(from: &WireSuperFooResponse) -> Self {
+        Self { y: ::fidl_next::TakeFrom::take_from(&from.y) }
     }
 }
 
@@ -199,7 +199,7 @@ pub mod super_ {
 
         type Protocol = crate::Super;
 
-        type Request<'buf> = crate::WireSuperFooRequest<'buf>;
+        type Request<'buf> = crate::WireSuperFooRequest;
 
         type Response<'buf> = crate::WireSuperFooResponse;
     }
@@ -212,10 +212,8 @@ pub trait SuperClientSender<___T: ::fidl_next::protocol::Transport> {
         request: &mut ___R,
     ) -> Result<::fidl_next::bind::ResponseFuture<'_, ___T, super_::Foo>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
-            Encoded<'buf> = crate::WireSuperFooRequest<'buf>,
-        >;
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireSuperFooRequest>;
 }
 
 impl<___T> SuperClientSender<___T> for ::fidl_next::bind::ClientSender<___T, Super>
@@ -227,10 +225,8 @@ where
         request: &mut ___R,
     ) -> Result<::fidl_next::bind::ResponseFuture<'_, ___T, super_::Foo>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
-            Encoded<'buf> = crate::WireSuperFooRequest<'buf>,
-        >,
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireSuperFooRequest>,
     {
         self.as_untyped()
             .send_two_way(7540745593380780216, request)
@@ -292,7 +288,7 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: SuperServerHandler<___T>,
 
-    for<'buf> crate::WireSuperFooRequest<'buf>:
+    for<'buf> crate::WireSuperFooRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
     fn on_one_way(
@@ -343,7 +339,7 @@ pub mod sub {
 
         type Protocol = crate::Sub;
 
-        type Request<'buf> = crate::WireSuperFooRequest<'buf>;
+        type Request<'buf> = crate::WireSuperFooRequest;
 
         type Response<'buf> = crate::WireSuperFooResponse;
     }
@@ -356,10 +352,8 @@ pub trait SubClientSender<___T: ::fidl_next::protocol::Transport> {
         request: &mut ___R,
     ) -> Result<::fidl_next::bind::ResponseFuture<'_, ___T, sub::Foo>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
-            Encoded<'buf> = crate::WireSuperFooRequest<'buf>,
-        >;
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireSuperFooRequest>;
 }
 
 impl<___T> SubClientSender<___T> for ::fidl_next::bind::ClientSender<___T, Sub>
@@ -371,10 +365,8 @@ where
         request: &mut ___R,
     ) -> Result<::fidl_next::bind::ResponseFuture<'_, ___T, sub::Foo>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
-            Encoded<'buf> = crate::WireSuperFooRequest<'buf>,
-        >,
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireSuperFooRequest>,
     {
         self.as_untyped()
             .send_two_way(7540745593380780216, request)
@@ -436,7 +428,7 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: SubServerHandler<___T>,
 
-    for<'buf> crate::WireSuperFooRequest<'buf>:
+    for<'buf> crate::WireSuperFooRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
     fn on_one_way(

@@ -34,7 +34,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ByteAndBytes> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireByteAndBytes>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireByteAndBytes>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ByteAndBytes>
@@ -59,8 +59,8 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireByteAndBytes> for ByteAndBytes {
-    fn take_from(from: &mut WireByteAndBytes) -> Self {
-        Self { single_byte: ::fidl_next::TakeFrom::take_from(&mut from.single_byte) }
+    fn take_from(from: &WireByteAndBytes) -> Self {
+        Self { single_byte: ::fidl_next::TakeFrom::take_from(&from.single_byte) }
     }
 }
 

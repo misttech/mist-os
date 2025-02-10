@@ -20,7 +20,7 @@ pub type WireAliasOfArrayContainingAliasOfArray = [::fidl_next::u64_le; 2];
 pub type AliasOfBytes = Vec<u8>;
 
 /// The wire type corresponding to [`AliasOfBytes`].
-pub type WireAliasOfBytes<'buf> = ::fidl_next::WireVector<'buf, u8>;
+pub type WireAliasOfBytes = ::fidl_next::WireVector<u8>;
 
 pub type AliasOfRequest =
     ::fidl_next::bind::ServerEnd<Option<::fidl_next::fuchsia::zx::Handle>, crate::MyProtocol>;
@@ -32,13 +32,12 @@ pub type WireAliasOfRequest =
 pub type AliasOfString = String;
 
 /// The wire type corresponding to [`AliasOfString`].
-pub type WireAliasOfString<'buf> = ::fidl_next::WireString<'buf>;
+pub type WireAliasOfString = ::fidl_next::WireString;
 
 pub type AliasOfVectorContainingAliasOfVector = Vec<u64>;
 
 /// The wire type corresponding to [`AliasOfVectorContainingAliasOfVector`].
-pub type WireAliasOfVectorContainingAliasOfVector<'buf> =
-    ::fidl_next::WireVector<'buf, ::fidl_next::u64_le>;
+pub type WireAliasOfVectorContainingAliasOfVector = ::fidl_next::WireVector<::fidl_next::u64_le>;
 
 /// The type corresponding to the MyProtocol protocol.
 #[derive(Debug)]
@@ -127,7 +126,7 @@ where
 pub type Vector = Option<Vec<u64>>;
 
 /// The wire type corresponding to [`Vector`].
-pub type WireVector<'buf> = ::fidl_next::WireOptionalVector<'buf, ::fidl_next::u64_le>;
+pub type WireVector = ::fidl_next::WireOptionalVector<::fidl_next::u64_le>;
 
 #[derive(Debug)]
 pub struct Testing {
@@ -194,7 +193,7 @@ pub struct Testing {
 }
 
 impl ::fidl_next::Encodable for Testing {
-    type Encoded<'buf> = WireTesting<'buf>;
+    type Encoded<'buf> = WireTesting;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for Testing
@@ -305,7 +304,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<Testing> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireTesting<'buf>>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireTesting>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<Testing>
@@ -329,64 +328,64 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireTesting<'buf>> for Testing {
-    fn take_from(from: &mut WireTesting<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<WireTesting> for Testing {
+    fn take_from(from: &WireTesting) -> Self {
         Self {
-            u1: ::fidl_next::TakeFrom::take_from(&mut from.u1),
+            u1: ::fidl_next::TakeFrom::take_from(&from.u1),
 
-            u2: ::fidl_next::TakeFrom::take_from(&mut from.u2),
+            u2: ::fidl_next::TakeFrom::take_from(&from.u2),
 
-            u3: ::fidl_next::TakeFrom::take_from(&mut from.u3),
+            u3: ::fidl_next::TakeFrom::take_from(&from.u3),
 
-            u4: ::fidl_next::TakeFrom::take_from(&mut from.u4),
+            u4: ::fidl_next::TakeFrom::take_from(&from.u4),
 
-            u5: ::fidl_next::TakeFrom::take_from(&mut from.u5),
+            u5: ::fidl_next::TakeFrom::take_from(&from.u5),
 
-            u6: ::fidl_next::TakeFrom::take_from(&mut from.u6),
+            u6: ::fidl_next::TakeFrom::take_from(&from.u6),
 
-            u7: ::fidl_next::TakeFrom::take_from(&mut from.u7),
+            u7: ::fidl_next::TakeFrom::take_from(&from.u7),
 
-            v1: ::fidl_next::TakeFrom::take_from(&mut from.v1),
+            v1: ::fidl_next::TakeFrom::take_from(&from.v1),
 
-            v2: ::fidl_next::TakeFrom::take_from(&mut from.v2),
+            v2: ::fidl_next::TakeFrom::take_from(&from.v2),
 
-            v3: ::fidl_next::TakeFrom::take_from(&mut from.v3),
+            v3: ::fidl_next::TakeFrom::take_from(&from.v3),
 
-            a1: ::fidl_next::TakeFrom::take_from(&mut from.a1),
+            a1: ::fidl_next::TakeFrom::take_from(&from.a1),
 
-            a2: ::fidl_next::TakeFrom::take_from(&mut from.a2),
+            a2: ::fidl_next::TakeFrom::take_from(&from.a2),
 
-            a3: ::fidl_next::TakeFrom::take_from(&mut from.a3),
+            a3: ::fidl_next::TakeFrom::take_from(&from.a3),
 
-            r1: ::fidl_next::TakeFrom::take_from(&mut from.r1),
+            r1: ::fidl_next::TakeFrom::take_from(&from.r1),
 
-            r2: ::fidl_next::TakeFrom::take_from(&mut from.r2),
+            r2: ::fidl_next::TakeFrom::take_from(&from.r2),
 
-            r3: ::fidl_next::TakeFrom::take_from(&mut from.r3),
+            r3: ::fidl_next::TakeFrom::take_from(&from.r3),
 
-            b1: ::fidl_next::TakeFrom::take_from(&mut from.b1),
+            b1: ::fidl_next::TakeFrom::take_from(&from.b1),
 
-            b2: ::fidl_next::TakeFrom::take_from(&mut from.b2),
+            b2: ::fidl_next::TakeFrom::take_from(&from.b2),
 
-            b3: ::fidl_next::TakeFrom::take_from(&mut from.b3),
+            b3: ::fidl_next::TakeFrom::take_from(&from.b3),
 
-            s1: ::fidl_next::TakeFrom::take_from(&mut from.s1),
+            s1: ::fidl_next::TakeFrom::take_from(&from.s1),
 
-            s2: ::fidl_next::TakeFrom::take_from(&mut from.s2),
+            s2: ::fidl_next::TakeFrom::take_from(&from.s2),
 
-            s3: ::fidl_next::TakeFrom::take_from(&mut from.s3),
+            s3: ::fidl_next::TakeFrom::take_from(&from.s3),
 
-            vv1: ::fidl_next::TakeFrom::take_from(&mut from.vv1),
+            vv1: ::fidl_next::TakeFrom::take_from(&from.vv1),
 
-            vv2: ::fidl_next::TakeFrom::take_from(&mut from.vv2),
+            vv2: ::fidl_next::TakeFrom::take_from(&from.vv2),
 
-            vv3: ::fidl_next::TakeFrom::take_from(&mut from.vv3),
+            vv3: ::fidl_next::TakeFrom::take_from(&from.vv3),
 
-            aa1: ::fidl_next::TakeFrom::take_from(&mut from.aa1),
+            aa1: ::fidl_next::TakeFrom::take_from(&from.aa1),
 
-            aa2: ::fidl_next::TakeFrom::take_from(&mut from.aa2),
+            aa2: ::fidl_next::TakeFrom::take_from(&from.aa2),
 
-            aa3: ::fidl_next::TakeFrom::take_from(&mut from.aa3),
+            aa3: ::fidl_next::TakeFrom::take_from(&from.aa3),
         }
     }
 }
@@ -394,31 +393,30 @@ impl<'buf> ::fidl_next::TakeFrom<WireTesting<'buf>> for Testing {
 /// The wire type corersponding to [`Testing`].
 #[derive(Debug)]
 #[repr(C)]
-pub struct WireTesting<'buf> {
+pub struct WireTesting {
     pub u1: ::fidl_next::u64_le,
 
-    pub u2: ::fidl_next::WireVector<'buf, ::fidl_next::u64_le>,
+    pub u2: ::fidl_next::WireVector<::fidl_next::u64_le>,
 
     pub u3: [::fidl_next::u64_le; 1],
 
-    pub u4: ::fidl_next::WireVector<'buf, ::fidl_next::WireVector<'buf, ::fidl_next::u64_le>>,
+    pub u4: ::fidl_next::WireVector<::fidl_next::WireVector<::fidl_next::u64_le>>,
 
-    pub u5: ::fidl_next::WireVector<'buf, [::fidl_next::u64_le; 1]>,
+    pub u5: ::fidl_next::WireVector<[::fidl_next::u64_le; 1]>,
 
-    pub u6: [::fidl_next::WireVector<'buf, ::fidl_next::u64_le>; 4],
+    pub u6: [::fidl_next::WireVector<::fidl_next::u64_le>; 4],
 
     pub u7: [[::fidl_next::u64_le; 1]; 4],
 
-    pub v1: ::fidl_next::WireOptionalVector<'buf, ::fidl_next::u64_le>,
+    pub v1: ::fidl_next::WireOptionalVector<::fidl_next::u64_le>,
 
-    pub v2:
-        ::fidl_next::WireVector<'buf, ::fidl_next::WireOptionalVector<'buf, ::fidl_next::u64_le>>,
+    pub v2: ::fidl_next::WireVector<::fidl_next::WireOptionalVector<::fidl_next::u64_le>>,
 
-    pub v3: [::fidl_next::WireOptionalVector<'buf, ::fidl_next::u64_le>; 4],
+    pub v3: [::fidl_next::WireOptionalVector<::fidl_next::u64_le>; 4],
 
     pub a1: [::fidl_next::u64_le; 1],
 
-    pub a2: ::fidl_next::WireVector<'buf, [::fidl_next::u64_le; 1]>,
+    pub a2: ::fidl_next::WireVector<[::fidl_next::u64_le; 1]>,
 
     pub a3: [[::fidl_next::u64_le; 1]; 4],
 
@@ -426,7 +424,6 @@ pub struct WireTesting<'buf> {
         ::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::MyProtocol>,
 
     pub r2: ::fidl_next::WireVector<
-        'buf,
         ::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::MyProtocol>,
     >,
 
@@ -434,32 +431,32 @@ pub struct WireTesting<'buf> {
         [::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::MyProtocol>;
             4],
 
-    pub b1: ::fidl_next::WireVector<'buf, u8>,
+    pub b1: ::fidl_next::WireVector<u8>,
 
-    pub b2: ::fidl_next::WireVector<'buf, ::fidl_next::WireVector<'buf, u8>>,
+    pub b2: ::fidl_next::WireVector<::fidl_next::WireVector<u8>>,
 
-    pub b3: [::fidl_next::WireVector<'buf, u8>; 4],
+    pub b3: [::fidl_next::WireVector<u8>; 4],
 
-    pub s1: ::fidl_next::WireString<'buf>,
+    pub s1: ::fidl_next::WireString,
 
-    pub s2: ::fidl_next::WireVector<'buf, ::fidl_next::WireString<'buf>>,
+    pub s2: ::fidl_next::WireVector<::fidl_next::WireString>,
 
-    pub s3: [::fidl_next::WireString<'buf>; 4],
+    pub s3: [::fidl_next::WireString; 4],
 
-    pub vv1: ::fidl_next::WireVector<'buf, ::fidl_next::u64_le>,
+    pub vv1: ::fidl_next::WireVector<::fidl_next::u64_le>,
 
-    pub vv2: ::fidl_next::WireVector<'buf, ::fidl_next::WireVector<'buf, ::fidl_next::u64_le>>,
+    pub vv2: ::fidl_next::WireVector<::fidl_next::WireVector<::fidl_next::u64_le>>,
 
-    pub vv3: [::fidl_next::WireVector<'buf, ::fidl_next::u64_le>; 3],
+    pub vv3: [::fidl_next::WireVector<::fidl_next::u64_le>; 3],
 
     pub aa1: [::fidl_next::u64_le; 2],
 
-    pub aa2: ::fidl_next::WireVector<'buf, [::fidl_next::u64_le; 2]>,
+    pub aa2: ::fidl_next::WireVector<[::fidl_next::u64_le; 2]>,
 
     pub aa3: [[::fidl_next::u64_le; 2]; 3],
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireTesting<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireTesting
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 

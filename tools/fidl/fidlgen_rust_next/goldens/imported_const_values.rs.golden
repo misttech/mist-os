@@ -39,7 +39,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<MyStruct> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireMyStruct>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireMyStruct>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<MyStruct>
@@ -64,7 +64,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireMyStruct> for MyStruct {
-    fn take_from(from: &mut WireMyStruct) -> Self {
+    fn take_from(from: &WireMyStruct) -> Self {
         Self {}
     }
 }

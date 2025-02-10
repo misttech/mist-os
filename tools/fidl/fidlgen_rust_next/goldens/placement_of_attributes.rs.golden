@@ -50,7 +50,7 @@ impl ::core::convert::From<WireExampleBits> for ExampleBits {
 }
 
 impl ::fidl_next::TakeFrom<WireExampleBits> for ExampleBits {
-    fn take_from(from: &mut WireExampleBits) -> Self {
+    fn take_from(from: &WireExampleBits) -> Self {
         Self::from(*from)
     }
 }
@@ -128,7 +128,7 @@ impl ::core::convert::From<WireExampleEnum> for ExampleEnum {
 }
 
 impl ::fidl_next::TakeFrom<WireExampleEnum> for ExampleEnum {
-    fn take_from(from: &mut WireExampleEnum) -> Self {
+    fn take_from(from: &WireExampleEnum) -> Self {
         Self::from(*from)
     }
 }
@@ -204,7 +204,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ExampleProtocolMethodRequest> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireExampleProtocolMethodRequest>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireExampleProtocolMethodRequest>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ExampleProtocolMethodRequest>
@@ -229,8 +229,8 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireExampleProtocolMethodRequest> for ExampleProtocolMethodRequest {
-    fn take_from(from: &mut WireExampleProtocolMethodRequest) -> Self {
-        Self { arg: ::fidl_next::TakeFrom::take_from(&mut from.arg) }
+    fn take_from(from: &WireExampleProtocolMethodRequest) -> Self {
+        Self { arg: ::fidl_next::TakeFrom::take_from(&from.arg) }
     }
 }
 
@@ -432,7 +432,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ExampleStruct> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireExampleStruct>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireExampleStruct>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ExampleStruct>
@@ -457,8 +457,8 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireExampleStruct> for ExampleStruct {
-    fn take_from(from: &mut WireExampleStruct) -> Self {
-        Self { member: ::fidl_next::TakeFrom::take_from(&mut from.member) }
+    fn take_from(from: &WireExampleStruct) -> Self {
+        Self { member: ::fidl_next::TakeFrom::take_from(&from.member) }
     }
 }
 
@@ -506,7 +506,7 @@ impl ExampleTable {
 }
 
 impl ::fidl_next::Encodable for ExampleTable {
-    type Encoded<'buf> = WireExampleTable<'buf>;
+    type Encoded<'buf> = WireExampleTable;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ExampleTable
@@ -552,19 +552,19 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireExampleTable<'buf>> for ExampleTable {
-    fn take_from(from: &mut WireExampleTable<'buf>) -> Self {
-        Self { member: from.member_mut().map(::fidl_next::TakeFrom::take_from) }
+impl ::fidl_next::TakeFrom<WireExampleTable> for ExampleTable {
+    fn take_from(from: &WireExampleTable) -> Self {
+        Self { member: from.member().map(::fidl_next::TakeFrom::take_from) }
     }
 }
 
 /// The wire type corresponding to [`ExampleTable`].
 #[repr(C)]
-pub struct WireExampleTable<'buf> {
-    table: ::fidl_next::WireTable<'buf>,
+pub struct WireExampleTable {
+    table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireExampleTable<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireExampleTable
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
 {
@@ -593,21 +593,13 @@ where
     }
 }
 
-impl<'buf> WireExampleTable<'buf> {
+impl WireExampleTable {
     pub fn member(&self) -> Option<&::fidl_next::u32_le> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
-
-    pub fn member_mut(&mut self) -> Option<&mut ::fidl_next::u32_le> {
-        unsafe { Some(self.table.get_mut(1)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_member(&mut self) -> Option<::fidl_next::u32_le> {
-        unsafe { Some(self.table.get_mut(1)?.take_unchecked()) }
-    }
 }
 
-impl ::core::fmt::Debug for WireExampleTable<'_> {
+impl ::core::fmt::Debug for WireExampleTable {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> Result<(), ::core::fmt::Error> {
         f.debug_struct("ExampleTable").field("member", &self.member()).finish()
     }
@@ -631,7 +623,7 @@ where
         encoder: &mut ___E,
         slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireExampleUnion { raw, _phantom: _ } = slot);
+        ::fidl_next::munge!(let WireExampleUnion { raw } = slot);
 
         match self {
             Self::Variant(value) => {
@@ -657,7 +649,7 @@ where
         encoder: &mut ___E,
         mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalExampleUnion { raw, _phantom: _ } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalExampleUnion { raw } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
@@ -671,10 +663,10 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireExampleUnion> for ExampleUnion {
-    fn take_from(from: &mut WireExampleUnion) -> Self {
+    fn take_from(from: &WireExampleUnion) -> Self {
         match from.raw.ordinal() {
             1 => Self::Variant(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get_mut().deref_mut_unchecked()
+                from.raw.get().deref_unchecked()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -683,8 +675,8 @@ impl ::fidl_next::TakeFrom<WireExampleUnion> for ExampleUnion {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalExampleUnion> for Option<Box<ExampleUnion>> {
-    fn take_from(from: &mut WireOptionalExampleUnion) -> Self {
-        if let Some(inner) = from.as_mut() {
+    fn take_from(from: &WireOptionalExampleUnion) -> Self {
+        if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
         } else {
             None
@@ -696,16 +688,11 @@ impl ::fidl_next::TakeFrom<WireOptionalExampleUnion> for Option<Box<ExampleUnion
 #[repr(transparent)]
 pub struct WireExampleUnion {
     raw: ::fidl_next::RawWireUnion,
-    _phantom: ::core::marker::PhantomData<()>,
 }
 
 pub mod example_union {
     pub enum Ref<'union> {
         Variant(&'union ::fidl_next::u32_le),
-    }
-
-    pub enum Mut<'union> {
-        Variant(&'union mut ::fidl_next::u32_le),
     }
 }
 
@@ -717,25 +704,12 @@ impl WireExampleUnion {
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
-
-    pub fn as_mut(&mut self) -> crate::example_union::Mut<'_> {
-        match self.raw.ordinal() {
-            1 => crate::example_union::Mut::Variant(unsafe {
-                self.raw.get_mut().deref_mut_unchecked()
-            }),
-
-            _ => unsafe { ::core::hint::unreachable_unchecked() },
-        }
-    }
 }
 
 impl Clone for WireExampleUnion {
     fn clone(&self) -> Self {
         match self.raw.ordinal() {
-            1 => Self {
-                raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() },
-                _phantom: ::core::marker::PhantomData,
-            },
+            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -750,7 +724,7 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
                 raw, decoder,
@@ -775,7 +749,6 @@ impl ::core::fmt::Debug for WireExampleUnion {
 #[repr(transparent)]
 pub struct WireOptionalExampleUnion {
     raw: ::fidl_next::RawWireUnion,
-    _phantom: ::core::marker::PhantomData<()>,
 }
 
 impl WireOptionalExampleUnion {
@@ -794,47 +767,16 @@ impl WireOptionalExampleUnion {
             None
         }
     }
-
-    pub fn as_mut(&mut self) -> Option<&mut WireExampleUnion> {
-        if self.is_some() {
-            Some(unsafe { &mut *(self as *mut Self).cast() })
-        } else {
-            None
-        }
-    }
-
-    pub fn take(&mut self) -> Option<WireExampleUnion> {
-        if self.is_some() {
-            Some(WireExampleUnion {
-                raw: ::core::mem::replace(&mut self.raw, ::fidl_next::RawWireUnion::null()),
-                _phantom: ::core::marker::PhantomData,
-            })
-        } else {
-            None
-        }
-    }
-}
-
-impl Default for WireOptionalExampleUnion {
-    fn default() -> Self {
-        Self { raw: ::fidl_next::RawWireUnion::null(), _phantom: ::core::marker::PhantomData }
-    }
 }
 
 impl Clone for WireOptionalExampleUnion {
     fn clone(&self) -> Self {
         if self.is_none() {
-            return WireOptionalExampleUnion {
-                raw: ::fidl_next::RawWireUnion::null(),
-                _phantom: ::core::marker::PhantomData,
-            };
+            return WireOptionalExampleUnion { raw: ::fidl_next::RawWireUnion::absent() };
         }
 
         match self.raw.ordinal() {
-            1 => Self {
-                raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() },
-                _phantom: ::core::marker::PhantomData,
-            },
+            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -849,7 +791,7 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
                 raw, decoder,

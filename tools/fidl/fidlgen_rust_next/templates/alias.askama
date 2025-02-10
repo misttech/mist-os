@@ -1,6 +1,5 @@
 {% let base_name = alias.name.decl_name().camel() %}
 {% let name = filters::ident(base_name)? %}
-{% let is_static = alias.ty.shape.max_out_of_line == 0 %}
 {% let natural_ty = context.natural_type(alias.ty) %}
 {% let wire_ty = context.wire_type(alias.ty) %}
 
@@ -8,4 +7,4 @@
 pub type {{ name }} = {{ natural_ty }};
 
 /// The wire type corresponding to [`{{ name }}`].
-pub type Wire{{ name }}{% if !is_static %}<'buf>{% endif %} = {{ wire_ty }};
+pub type Wire{{ name }} = {{ wire_ty }};

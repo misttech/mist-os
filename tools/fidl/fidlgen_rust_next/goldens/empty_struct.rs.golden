@@ -29,7 +29,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<Empty> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireEmpty>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireEmpty>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<Empty>
@@ -54,7 +54,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireEmpty> for Empty {
-    fn take_from(from: &mut WireEmpty) -> Self {
+    fn take_from(from: &WireEmpty) -> Self {
         Self {}
     }
 }
@@ -114,7 +114,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<EmptyProtocolSendRequest> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireEmptyProtocolSendRequest>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireEmptyProtocolSendRequest>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<EmptyProtocolSendRequest>
@@ -139,8 +139,8 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireEmptyProtocolSendRequest> for EmptyProtocolSendRequest {
-    fn take_from(from: &mut WireEmptyProtocolSendRequest) -> Self {
-        Self { e: ::fidl_next::TakeFrom::take_from(&mut from.e) }
+    fn take_from(from: &WireEmptyProtocolSendRequest) -> Self {
+        Self { e: ::fidl_next::TakeFrom::take_from(&from.e) }
     }
 }
 
@@ -204,7 +204,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<EmptyProtocolReceiveRequest> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireEmptyProtocolReceiveRequest>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireEmptyProtocolReceiveRequest>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<EmptyProtocolReceiveRequest>
@@ -229,8 +229,8 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireEmptyProtocolReceiveRequest> for EmptyProtocolReceiveRequest {
-    fn take_from(from: &mut WireEmptyProtocolReceiveRequest) -> Self {
-        Self { e: ::fidl_next::TakeFrom::take_from(&mut from.e) }
+    fn take_from(from: &WireEmptyProtocolReceiveRequest) -> Self {
+        Self { e: ::fidl_next::TakeFrom::take_from(&from.e) }
     }
 }
 
@@ -294,7 +294,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<EmptyProtocolSendAndReceiveRequest> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireEmptyProtocolSendAndReceiveRequest>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireEmptyProtocolSendAndReceiveRequest>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<EmptyProtocolSendAndReceiveRequest>
@@ -321,8 +321,8 @@ where
 impl ::fidl_next::TakeFrom<WireEmptyProtocolSendAndReceiveRequest>
     for EmptyProtocolSendAndReceiveRequest
 {
-    fn take_from(from: &mut WireEmptyProtocolSendAndReceiveRequest) -> Self {
-        Self { e: ::fidl_next::TakeFrom::take_from(&mut from.e) }
+    fn take_from(from: &WireEmptyProtocolSendAndReceiveRequest) -> Self {
+        Self { e: ::fidl_next::TakeFrom::take_from(&from.e) }
     }
 }
 
@@ -386,7 +386,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<EmptyProtocolSendAndReceiveResponse> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireEmptyProtocolSendAndReceiveResponse>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireEmptyProtocolSendAndReceiveResponse>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<EmptyProtocolSendAndReceiveResponse>
@@ -413,8 +413,8 @@ where
 impl ::fidl_next::TakeFrom<WireEmptyProtocolSendAndReceiveResponse>
     for EmptyProtocolSendAndReceiveResponse
 {
-    fn take_from(from: &mut WireEmptyProtocolSendAndReceiveResponse) -> Self {
-        Self { e: ::fidl_next::TakeFrom::take_from(&mut from.e) }
+    fn take_from(from: &WireEmptyProtocolSendAndReceiveResponse) -> Self {
+        Self { e: ::fidl_next::TakeFrom::take_from(&from.e) }
     }
 }
 

@@ -12,7 +12,7 @@ impl EmptyTable {
 }
 
 impl ::fidl_next::Encodable for EmptyTable {
-    type Encoded<'buf> = WireEmptyTable<'buf>;
+    type Encoded<'buf> = WireEmptyTable;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for EmptyTable
@@ -46,19 +46,19 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireEmptyTable<'buf>> for EmptyTable {
-    fn take_from(from: &mut WireEmptyTable<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<WireEmptyTable> for EmptyTable {
+    fn take_from(from: &WireEmptyTable) -> Self {
         Self {}
     }
 }
 
 /// The wire type corresponding to [`EmptyTable`].
 #[repr(C)]
-pub struct WireEmptyTable<'buf> {
-    table: ::fidl_next::WireTable<'buf>,
+pub struct WireEmptyTable {
+    table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireEmptyTable<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireEmptyTable
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
 {
@@ -78,9 +78,9 @@ where
     }
 }
 
-impl<'buf> WireEmptyTable<'buf> {}
+impl WireEmptyTable {}
 
-impl ::core::fmt::Debug for WireEmptyTable<'_> {
+impl ::core::fmt::Debug for WireEmptyTable {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> Result<(), ::core::fmt::Error> {
         f.debug_struct("EmptyTable").finish()
     }
@@ -96,7 +96,7 @@ impl ExtensionTable {
 }
 
 impl ::fidl_next::Encodable for ExtensionTable {
-    type Encoded<'buf> = WireExtensionTable<'buf>;
+    type Encoded<'buf> = WireExtensionTable;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ExtensionTable
@@ -130,19 +130,19 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireExtensionTable<'buf>> for ExtensionTable {
-    fn take_from(from: &mut WireExtensionTable<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<WireExtensionTable> for ExtensionTable {
+    fn take_from(from: &WireExtensionTable) -> Self {
         Self {}
     }
 }
 
 /// The wire type corresponding to [`ExtensionTable`].
 #[repr(C)]
-pub struct WireExtensionTable<'buf> {
-    table: ::fidl_next::WireTable<'buf>,
+pub struct WireExtensionTable {
+    table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireExtensionTable<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireExtensionTable
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
 {
@@ -162,9 +162,9 @@ where
     }
 }
 
-impl<'buf> WireExtensionTable<'buf> {}
+impl WireExtensionTable {}
 
-impl ::core::fmt::Debug for WireExtensionTable<'_> {
+impl ::core::fmt::Debug for WireExtensionTable {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> Result<(), ::core::fmt::Error> {
         f.debug_struct("ExtensionTable").finish()
     }
@@ -198,7 +198,7 @@ impl NewerSimpleTable {
 }
 
 impl ::fidl_next::Encodable for NewerSimpleTable {
-    type Encoded<'buf> = WireNewerSimpleTable<'buf>;
+    type Encoded<'buf> = WireNewerSimpleTable;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for NewerSimpleTable
@@ -268,25 +268,25 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireNewerSimpleTable<'buf>> for NewerSimpleTable {
-    fn take_from(from: &mut WireNewerSimpleTable<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<WireNewerSimpleTable> for NewerSimpleTable {
+    fn take_from(from: &WireNewerSimpleTable) -> Self {
         Self {
-            x: from.x_mut().map(::fidl_next::TakeFrom::take_from),
+            x: from.x().map(::fidl_next::TakeFrom::take_from),
 
-            y: from.y_mut().map(::fidl_next::TakeFrom::take_from),
+            y: from.y().map(::fidl_next::TakeFrom::take_from),
 
-            z: from.z_mut().map(::fidl_next::TakeFrom::take_from),
+            z: from.z().map(::fidl_next::TakeFrom::take_from),
         }
     }
 }
 
 /// The wire type corresponding to [`NewerSimpleTable`].
 #[repr(C)]
-pub struct WireNewerSimpleTable<'buf> {
-    table: ::fidl_next::WireTable<'buf>,
+pub struct WireNewerSimpleTable {
+    table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireNewerSimpleTable<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireNewerSimpleTable
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
 {
@@ -333,45 +333,21 @@ where
     }
 }
 
-impl<'buf> WireNewerSimpleTable<'buf> {
+impl WireNewerSimpleTable {
     pub fn x(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
-    }
-
-    pub fn x_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(1)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_x(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(1)?.take_unchecked()) }
     }
 
     pub fn y(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(5)?.deref_unchecked()) }
     }
 
-    pub fn y_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(5)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_y(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(5)?.take_unchecked()) }
-    }
-
     pub fn z(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(6)?.deref_unchecked()) }
     }
-
-    pub fn z_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(6)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_z(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(6)?.take_unchecked()) }
-    }
 }
 
-impl ::core::fmt::Debug for WireNewerSimpleTable<'_> {
+impl ::core::fmt::Debug for WireNewerSimpleTable {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> Result<(), ::core::fmt::Error> {
         f.debug_struct("NewerSimpleTable")
             .field("x", &self.x())
@@ -397,7 +373,7 @@ impl OlderSimpleTable {
 }
 
 impl ::fidl_next::Encodable for OlderSimpleTable {
-    type Encoded<'buf> = WireOlderSimpleTable<'buf>;
+    type Encoded<'buf> = WireOlderSimpleTable;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for OlderSimpleTable
@@ -443,19 +419,19 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireOlderSimpleTable<'buf>> for OlderSimpleTable {
-    fn take_from(from: &mut WireOlderSimpleTable<'buf>) -> Self {
-        Self { x: from.x_mut().map(::fidl_next::TakeFrom::take_from) }
+impl ::fidl_next::TakeFrom<WireOlderSimpleTable> for OlderSimpleTable {
+    fn take_from(from: &WireOlderSimpleTable) -> Self {
+        Self { x: from.x().map(::fidl_next::TakeFrom::take_from) }
     }
 }
 
 /// The wire type corresponding to [`OlderSimpleTable`].
 #[repr(C)]
-pub struct WireOlderSimpleTable<'buf> {
-    table: ::fidl_next::WireTable<'buf>,
+pub struct WireOlderSimpleTable {
+    table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOlderSimpleTable<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOlderSimpleTable
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
 {
@@ -484,21 +460,13 @@ where
     }
 }
 
-impl<'buf> WireOlderSimpleTable<'buf> {
+impl WireOlderSimpleTable {
     pub fn x(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
-
-    pub fn x_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(1)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_x(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(1)?.take_unchecked()) }
-    }
 }
 
-impl ::core::fmt::Debug for WireOlderSimpleTable<'_> {
+impl ::core::fmt::Debug for WireOlderSimpleTable {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> Result<(), ::core::fmt::Error> {
         f.debug_struct("OlderSimpleTable").field("x", &self.x()).finish()
     }
@@ -532,7 +500,7 @@ impl ReverseOrdinalTable {
 }
 
 impl ::fidl_next::Encodable for ReverseOrdinalTable {
-    type Encoded<'buf> = WireReverseOrdinalTable<'buf>;
+    type Encoded<'buf> = WireReverseOrdinalTable;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ReverseOrdinalTable
@@ -602,25 +570,25 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireReverseOrdinalTable<'buf>> for ReverseOrdinalTable {
-    fn take_from(from: &mut WireReverseOrdinalTable<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<WireReverseOrdinalTable> for ReverseOrdinalTable {
+    fn take_from(from: &WireReverseOrdinalTable) -> Self {
         Self {
-            z: from.z_mut().map(::fidl_next::TakeFrom::take_from),
+            z: from.z().map(::fidl_next::TakeFrom::take_from),
 
-            y: from.y_mut().map(::fidl_next::TakeFrom::take_from),
+            y: from.y().map(::fidl_next::TakeFrom::take_from),
 
-            x: from.x_mut().map(::fidl_next::TakeFrom::take_from),
+            x: from.x().map(::fidl_next::TakeFrom::take_from),
         }
     }
 }
 
 /// The wire type corresponding to [`ReverseOrdinalTable`].
 #[repr(C)]
-pub struct WireReverseOrdinalTable<'buf> {
-    table: ::fidl_next::WireTable<'buf>,
+pub struct WireReverseOrdinalTable {
+    table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireReverseOrdinalTable<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireReverseOrdinalTable
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
 {
@@ -667,45 +635,21 @@ where
     }
 }
 
-impl<'buf> WireReverseOrdinalTable<'buf> {
+impl WireReverseOrdinalTable {
     pub fn z(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
-    }
-
-    pub fn z_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(1)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_z(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(1)?.take_unchecked()) }
     }
 
     pub fn y(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(2)?.deref_unchecked()) }
     }
 
-    pub fn y_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(2)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_y(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(2)?.take_unchecked()) }
-    }
-
     pub fn x(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(3)?.deref_unchecked()) }
     }
-
-    pub fn x_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(3)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_x(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(3)?.take_unchecked()) }
-    }
 }
 
-impl ::core::fmt::Debug for WireReverseOrdinalTable<'_> {
+impl ::core::fmt::Debug for WireReverseOrdinalTable {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> Result<(), ::core::fmt::Error> {
         f.debug_struct("ReverseOrdinalTable")
             .field("z", &self.z())
@@ -737,7 +681,7 @@ impl SimpleTable {
 }
 
 impl ::fidl_next::Encodable for SimpleTable {
-    type Encoded<'buf> = WireSimpleTable<'buf>;
+    type Encoded<'buf> = WireSimpleTable;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for SimpleTable
@@ -795,23 +739,23 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireSimpleTable<'buf>> for SimpleTable {
-    fn take_from(from: &mut WireSimpleTable<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<WireSimpleTable> for SimpleTable {
+    fn take_from(from: &WireSimpleTable) -> Self {
         Self {
-            x: from.x_mut().map(::fidl_next::TakeFrom::take_from),
+            x: from.x().map(::fidl_next::TakeFrom::take_from),
 
-            y: from.y_mut().map(::fidl_next::TakeFrom::take_from),
+            y: from.y().map(::fidl_next::TakeFrom::take_from),
         }
     }
 }
 
 /// The wire type corresponding to [`SimpleTable`].
 #[repr(C)]
-pub struct WireSimpleTable<'buf> {
-    table: ::fidl_next::WireTable<'buf>,
+pub struct WireSimpleTable {
+    table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSimpleTable<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSimpleTable
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
 {
@@ -849,33 +793,17 @@ where
     }
 }
 
-impl<'buf> WireSimpleTable<'buf> {
+impl WireSimpleTable {
     pub fn x(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
-    }
-
-    pub fn x_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(1)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_x(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(1)?.take_unchecked()) }
     }
 
     pub fn y(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(5)?.deref_unchecked()) }
     }
-
-    pub fn y_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(5)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_y(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(5)?.take_unchecked()) }
-    }
 }
 
-impl ::core::fmt::Debug for WireSimpleTable<'_> {
+impl ::core::fmt::Debug for WireSimpleTable {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> Result<(), ::core::fmt::Error> {
         f.debug_struct("SimpleTable").field("x", &self.x()).field("y", &self.y()).finish()
     }
@@ -1275,7 +1203,7 @@ impl SixtyFourOrdinalTable {
 }
 
 impl ::fidl_next::Encodable for SixtyFourOrdinalTable {
-    type Encoded<'buf> = WireSixtyFourOrdinalTable<'buf>;
+    type Encoded<'buf> = WireSixtyFourOrdinalTable;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for SixtyFourOrdinalTable
@@ -2077,147 +2005,147 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireSixtyFourOrdinalTable<'buf>> for SixtyFourOrdinalTable {
-    fn take_from(from: &mut WireSixtyFourOrdinalTable<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<WireSixtyFourOrdinalTable> for SixtyFourOrdinalTable {
+    fn take_from(from: &WireSixtyFourOrdinalTable) -> Self {
         Self {
-            v1: from.v1_mut().map(::fidl_next::TakeFrom::take_from),
+            v1: from.v1().map(::fidl_next::TakeFrom::take_from),
 
-            v2: from.v2_mut().map(::fidl_next::TakeFrom::take_from),
+            v2: from.v2().map(::fidl_next::TakeFrom::take_from),
 
-            v3: from.v3_mut().map(::fidl_next::TakeFrom::take_from),
+            v3: from.v3().map(::fidl_next::TakeFrom::take_from),
 
-            v4: from.v4_mut().map(::fidl_next::TakeFrom::take_from),
+            v4: from.v4().map(::fidl_next::TakeFrom::take_from),
 
-            v5: from.v5_mut().map(::fidl_next::TakeFrom::take_from),
+            v5: from.v5().map(::fidl_next::TakeFrom::take_from),
 
-            v6: from.v6_mut().map(::fidl_next::TakeFrom::take_from),
+            v6: from.v6().map(::fidl_next::TakeFrom::take_from),
 
-            v7: from.v7_mut().map(::fidl_next::TakeFrom::take_from),
+            v7: from.v7().map(::fidl_next::TakeFrom::take_from),
 
-            v8: from.v8_mut().map(::fidl_next::TakeFrom::take_from),
+            v8: from.v8().map(::fidl_next::TakeFrom::take_from),
 
-            v9: from.v9_mut().map(::fidl_next::TakeFrom::take_from),
+            v9: from.v9().map(::fidl_next::TakeFrom::take_from),
 
-            v10: from.v10_mut().map(::fidl_next::TakeFrom::take_from),
+            v10: from.v10().map(::fidl_next::TakeFrom::take_from),
 
-            v11: from.v11_mut().map(::fidl_next::TakeFrom::take_from),
+            v11: from.v11().map(::fidl_next::TakeFrom::take_from),
 
-            v12: from.v12_mut().map(::fidl_next::TakeFrom::take_from),
+            v12: from.v12().map(::fidl_next::TakeFrom::take_from),
 
-            v13: from.v13_mut().map(::fidl_next::TakeFrom::take_from),
+            v13: from.v13().map(::fidl_next::TakeFrom::take_from),
 
-            v14: from.v14_mut().map(::fidl_next::TakeFrom::take_from),
+            v14: from.v14().map(::fidl_next::TakeFrom::take_from),
 
-            v15: from.v15_mut().map(::fidl_next::TakeFrom::take_from),
+            v15: from.v15().map(::fidl_next::TakeFrom::take_from),
 
-            v16: from.v16_mut().map(::fidl_next::TakeFrom::take_from),
+            v16: from.v16().map(::fidl_next::TakeFrom::take_from),
 
-            v17: from.v17_mut().map(::fidl_next::TakeFrom::take_from),
+            v17: from.v17().map(::fidl_next::TakeFrom::take_from),
 
-            v18: from.v18_mut().map(::fidl_next::TakeFrom::take_from),
+            v18: from.v18().map(::fidl_next::TakeFrom::take_from),
 
-            v19: from.v19_mut().map(::fidl_next::TakeFrom::take_from),
+            v19: from.v19().map(::fidl_next::TakeFrom::take_from),
 
-            v20: from.v20_mut().map(::fidl_next::TakeFrom::take_from),
+            v20: from.v20().map(::fidl_next::TakeFrom::take_from),
 
-            v21: from.v21_mut().map(::fidl_next::TakeFrom::take_from),
+            v21: from.v21().map(::fidl_next::TakeFrom::take_from),
 
-            v22: from.v22_mut().map(::fidl_next::TakeFrom::take_from),
+            v22: from.v22().map(::fidl_next::TakeFrom::take_from),
 
-            v23: from.v23_mut().map(::fidl_next::TakeFrom::take_from),
+            v23: from.v23().map(::fidl_next::TakeFrom::take_from),
 
-            v24: from.v24_mut().map(::fidl_next::TakeFrom::take_from),
+            v24: from.v24().map(::fidl_next::TakeFrom::take_from),
 
-            v25: from.v25_mut().map(::fidl_next::TakeFrom::take_from),
+            v25: from.v25().map(::fidl_next::TakeFrom::take_from),
 
-            v26: from.v26_mut().map(::fidl_next::TakeFrom::take_from),
+            v26: from.v26().map(::fidl_next::TakeFrom::take_from),
 
-            v27: from.v27_mut().map(::fidl_next::TakeFrom::take_from),
+            v27: from.v27().map(::fidl_next::TakeFrom::take_from),
 
-            v28: from.v28_mut().map(::fidl_next::TakeFrom::take_from),
+            v28: from.v28().map(::fidl_next::TakeFrom::take_from),
 
-            v29: from.v29_mut().map(::fidl_next::TakeFrom::take_from),
+            v29: from.v29().map(::fidl_next::TakeFrom::take_from),
 
-            v30: from.v30_mut().map(::fidl_next::TakeFrom::take_from),
+            v30: from.v30().map(::fidl_next::TakeFrom::take_from),
 
-            v31: from.v31_mut().map(::fidl_next::TakeFrom::take_from),
+            v31: from.v31().map(::fidl_next::TakeFrom::take_from),
 
-            v32: from.v32_mut().map(::fidl_next::TakeFrom::take_from),
+            v32: from.v32().map(::fidl_next::TakeFrom::take_from),
 
-            v33: from.v33_mut().map(::fidl_next::TakeFrom::take_from),
+            v33: from.v33().map(::fidl_next::TakeFrom::take_from),
 
-            v34: from.v34_mut().map(::fidl_next::TakeFrom::take_from),
+            v34: from.v34().map(::fidl_next::TakeFrom::take_from),
 
-            v35: from.v35_mut().map(::fidl_next::TakeFrom::take_from),
+            v35: from.v35().map(::fidl_next::TakeFrom::take_from),
 
-            v36: from.v36_mut().map(::fidl_next::TakeFrom::take_from),
+            v36: from.v36().map(::fidl_next::TakeFrom::take_from),
 
-            v37: from.v37_mut().map(::fidl_next::TakeFrom::take_from),
+            v37: from.v37().map(::fidl_next::TakeFrom::take_from),
 
-            v38: from.v38_mut().map(::fidl_next::TakeFrom::take_from),
+            v38: from.v38().map(::fidl_next::TakeFrom::take_from),
 
-            v39: from.v39_mut().map(::fidl_next::TakeFrom::take_from),
+            v39: from.v39().map(::fidl_next::TakeFrom::take_from),
 
-            v40: from.v40_mut().map(::fidl_next::TakeFrom::take_from),
+            v40: from.v40().map(::fidl_next::TakeFrom::take_from),
 
-            v41: from.v41_mut().map(::fidl_next::TakeFrom::take_from),
+            v41: from.v41().map(::fidl_next::TakeFrom::take_from),
 
-            v42: from.v42_mut().map(::fidl_next::TakeFrom::take_from),
+            v42: from.v42().map(::fidl_next::TakeFrom::take_from),
 
-            v43: from.v43_mut().map(::fidl_next::TakeFrom::take_from),
+            v43: from.v43().map(::fidl_next::TakeFrom::take_from),
 
-            v44: from.v44_mut().map(::fidl_next::TakeFrom::take_from),
+            v44: from.v44().map(::fidl_next::TakeFrom::take_from),
 
-            v45: from.v45_mut().map(::fidl_next::TakeFrom::take_from),
+            v45: from.v45().map(::fidl_next::TakeFrom::take_from),
 
-            v46: from.v46_mut().map(::fidl_next::TakeFrom::take_from),
+            v46: from.v46().map(::fidl_next::TakeFrom::take_from),
 
-            v47: from.v47_mut().map(::fidl_next::TakeFrom::take_from),
+            v47: from.v47().map(::fidl_next::TakeFrom::take_from),
 
-            v48: from.v48_mut().map(::fidl_next::TakeFrom::take_from),
+            v48: from.v48().map(::fidl_next::TakeFrom::take_from),
 
-            v49: from.v49_mut().map(::fidl_next::TakeFrom::take_from),
+            v49: from.v49().map(::fidl_next::TakeFrom::take_from),
 
-            v50: from.v50_mut().map(::fidl_next::TakeFrom::take_from),
+            v50: from.v50().map(::fidl_next::TakeFrom::take_from),
 
-            v51: from.v51_mut().map(::fidl_next::TakeFrom::take_from),
+            v51: from.v51().map(::fidl_next::TakeFrom::take_from),
 
-            v52: from.v52_mut().map(::fidl_next::TakeFrom::take_from),
+            v52: from.v52().map(::fidl_next::TakeFrom::take_from),
 
-            v53: from.v53_mut().map(::fidl_next::TakeFrom::take_from),
+            v53: from.v53().map(::fidl_next::TakeFrom::take_from),
 
-            v54: from.v54_mut().map(::fidl_next::TakeFrom::take_from),
+            v54: from.v54().map(::fidl_next::TakeFrom::take_from),
 
-            v55: from.v55_mut().map(::fidl_next::TakeFrom::take_from),
+            v55: from.v55().map(::fidl_next::TakeFrom::take_from),
 
-            v56: from.v56_mut().map(::fidl_next::TakeFrom::take_from),
+            v56: from.v56().map(::fidl_next::TakeFrom::take_from),
 
-            v57: from.v57_mut().map(::fidl_next::TakeFrom::take_from),
+            v57: from.v57().map(::fidl_next::TakeFrom::take_from),
 
-            v58: from.v58_mut().map(::fidl_next::TakeFrom::take_from),
+            v58: from.v58().map(::fidl_next::TakeFrom::take_from),
 
-            v59: from.v59_mut().map(::fidl_next::TakeFrom::take_from),
+            v59: from.v59().map(::fidl_next::TakeFrom::take_from),
 
-            v60: from.v60_mut().map(::fidl_next::TakeFrom::take_from),
+            v60: from.v60().map(::fidl_next::TakeFrom::take_from),
 
-            v61: from.v61_mut().map(::fidl_next::TakeFrom::take_from),
+            v61: from.v61().map(::fidl_next::TakeFrom::take_from),
 
-            v62: from.v62_mut().map(::fidl_next::TakeFrom::take_from),
+            v62: from.v62().map(::fidl_next::TakeFrom::take_from),
 
-            v63: from.v63_mut().map(::fidl_next::TakeFrom::take_from),
+            v63: from.v63().map(::fidl_next::TakeFrom::take_from),
 
-            v64: from.v64_mut().map(::fidl_next::TakeFrom::take_from),
+            v64: from.v64().map(::fidl_next::TakeFrom::take_from),
         }
     }
 }
 
 /// The wire type corresponding to [`SixtyFourOrdinalTable`].
 #[repr(C)]
-pub struct WireSixtyFourOrdinalTable<'buf> {
-    table: ::fidl_next::WireTable<'buf>,
+pub struct WireSixtyFourOrdinalTable {
+    table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSixtyFourOrdinalTable<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSixtyFourOrdinalTable
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
 {
@@ -2799,7 +2727,7 @@ where
                 }
 
                 64 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, crate::WireExtensionTable<'buf>>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, crate::WireExtensionTable>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2813,777 +2741,265 @@ where
     }
 }
 
-impl<'buf> WireSixtyFourOrdinalTable<'buf> {
+impl WireSixtyFourOrdinalTable {
     pub fn v1(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
-    }
-
-    pub fn v1_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(1)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v1(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(1)?.take_unchecked()) }
     }
 
     pub fn v2(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(2)?.deref_unchecked()) }
     }
 
-    pub fn v2_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(2)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v2(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(2)?.take_unchecked()) }
-    }
-
     pub fn v3(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(3)?.deref_unchecked()) }
-    }
-
-    pub fn v3_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(3)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v3(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(3)?.take_unchecked()) }
     }
 
     pub fn v4(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(4)?.deref_unchecked()) }
     }
 
-    pub fn v4_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(4)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v4(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(4)?.take_unchecked()) }
-    }
-
     pub fn v5(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(5)?.deref_unchecked()) }
-    }
-
-    pub fn v5_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(5)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v5(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(5)?.take_unchecked()) }
     }
 
     pub fn v6(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(6)?.deref_unchecked()) }
     }
 
-    pub fn v6_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(6)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v6(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(6)?.take_unchecked()) }
-    }
-
     pub fn v7(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(7)?.deref_unchecked()) }
-    }
-
-    pub fn v7_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(7)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v7(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(7)?.take_unchecked()) }
     }
 
     pub fn v8(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(8)?.deref_unchecked()) }
     }
 
-    pub fn v8_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(8)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v8(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(8)?.take_unchecked()) }
-    }
-
     pub fn v9(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(9)?.deref_unchecked()) }
-    }
-
-    pub fn v9_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(9)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v9(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(9)?.take_unchecked()) }
     }
 
     pub fn v10(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(10)?.deref_unchecked()) }
     }
 
-    pub fn v10_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(10)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v10(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(10)?.take_unchecked()) }
-    }
-
     pub fn v11(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(11)?.deref_unchecked()) }
-    }
-
-    pub fn v11_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(11)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v11(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(11)?.take_unchecked()) }
     }
 
     pub fn v12(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(12)?.deref_unchecked()) }
     }
 
-    pub fn v12_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(12)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v12(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(12)?.take_unchecked()) }
-    }
-
     pub fn v13(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(13)?.deref_unchecked()) }
-    }
-
-    pub fn v13_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(13)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v13(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(13)?.take_unchecked()) }
     }
 
     pub fn v14(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(14)?.deref_unchecked()) }
     }
 
-    pub fn v14_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(14)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v14(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(14)?.take_unchecked()) }
-    }
-
     pub fn v15(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(15)?.deref_unchecked()) }
-    }
-
-    pub fn v15_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(15)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v15(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(15)?.take_unchecked()) }
     }
 
     pub fn v16(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(16)?.deref_unchecked()) }
     }
 
-    pub fn v16_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(16)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v16(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(16)?.take_unchecked()) }
-    }
-
     pub fn v17(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(17)?.deref_unchecked()) }
-    }
-
-    pub fn v17_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(17)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v17(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(17)?.take_unchecked()) }
     }
 
     pub fn v18(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(18)?.deref_unchecked()) }
     }
 
-    pub fn v18_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(18)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v18(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(18)?.take_unchecked()) }
-    }
-
     pub fn v19(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(19)?.deref_unchecked()) }
-    }
-
-    pub fn v19_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(19)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v19(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(19)?.take_unchecked()) }
     }
 
     pub fn v20(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(20)?.deref_unchecked()) }
     }
 
-    pub fn v20_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(20)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v20(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(20)?.take_unchecked()) }
-    }
-
     pub fn v21(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(21)?.deref_unchecked()) }
-    }
-
-    pub fn v21_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(21)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v21(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(21)?.take_unchecked()) }
     }
 
     pub fn v22(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(22)?.deref_unchecked()) }
     }
 
-    pub fn v22_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(22)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v22(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(22)?.take_unchecked()) }
-    }
-
     pub fn v23(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(23)?.deref_unchecked()) }
-    }
-
-    pub fn v23_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(23)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v23(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(23)?.take_unchecked()) }
     }
 
     pub fn v24(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(24)?.deref_unchecked()) }
     }
 
-    pub fn v24_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(24)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v24(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(24)?.take_unchecked()) }
-    }
-
     pub fn v25(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(25)?.deref_unchecked()) }
-    }
-
-    pub fn v25_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(25)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v25(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(25)?.take_unchecked()) }
     }
 
     pub fn v26(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(26)?.deref_unchecked()) }
     }
 
-    pub fn v26_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(26)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v26(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(26)?.take_unchecked()) }
-    }
-
     pub fn v27(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(27)?.deref_unchecked()) }
-    }
-
-    pub fn v27_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(27)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v27(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(27)?.take_unchecked()) }
     }
 
     pub fn v28(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(28)?.deref_unchecked()) }
     }
 
-    pub fn v28_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(28)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v28(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(28)?.take_unchecked()) }
-    }
-
     pub fn v29(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(29)?.deref_unchecked()) }
-    }
-
-    pub fn v29_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(29)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v29(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(29)?.take_unchecked()) }
     }
 
     pub fn v30(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(30)?.deref_unchecked()) }
     }
 
-    pub fn v30_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(30)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v30(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(30)?.take_unchecked()) }
-    }
-
     pub fn v31(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(31)?.deref_unchecked()) }
-    }
-
-    pub fn v31_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(31)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v31(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(31)?.take_unchecked()) }
     }
 
     pub fn v32(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(32)?.deref_unchecked()) }
     }
 
-    pub fn v32_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(32)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v32(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(32)?.take_unchecked()) }
-    }
-
     pub fn v33(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(33)?.deref_unchecked()) }
-    }
-
-    pub fn v33_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(33)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v33(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(33)?.take_unchecked()) }
     }
 
     pub fn v34(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(34)?.deref_unchecked()) }
     }
 
-    pub fn v34_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(34)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v34(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(34)?.take_unchecked()) }
-    }
-
     pub fn v35(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(35)?.deref_unchecked()) }
-    }
-
-    pub fn v35_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(35)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v35(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(35)?.take_unchecked()) }
     }
 
     pub fn v36(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(36)?.deref_unchecked()) }
     }
 
-    pub fn v36_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(36)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v36(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(36)?.take_unchecked()) }
-    }
-
     pub fn v37(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(37)?.deref_unchecked()) }
-    }
-
-    pub fn v37_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(37)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v37(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(37)?.take_unchecked()) }
     }
 
     pub fn v38(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(38)?.deref_unchecked()) }
     }
 
-    pub fn v38_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(38)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v38(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(38)?.take_unchecked()) }
-    }
-
     pub fn v39(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(39)?.deref_unchecked()) }
-    }
-
-    pub fn v39_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(39)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v39(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(39)?.take_unchecked()) }
     }
 
     pub fn v40(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(40)?.deref_unchecked()) }
     }
 
-    pub fn v40_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(40)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v40(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(40)?.take_unchecked()) }
-    }
-
     pub fn v41(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(41)?.deref_unchecked()) }
-    }
-
-    pub fn v41_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(41)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v41(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(41)?.take_unchecked()) }
     }
 
     pub fn v42(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(42)?.deref_unchecked()) }
     }
 
-    pub fn v42_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(42)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v42(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(42)?.take_unchecked()) }
-    }
-
     pub fn v43(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(43)?.deref_unchecked()) }
-    }
-
-    pub fn v43_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(43)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v43(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(43)?.take_unchecked()) }
     }
 
     pub fn v44(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(44)?.deref_unchecked()) }
     }
 
-    pub fn v44_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(44)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v44(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(44)?.take_unchecked()) }
-    }
-
     pub fn v45(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(45)?.deref_unchecked()) }
-    }
-
-    pub fn v45_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(45)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v45(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(45)?.take_unchecked()) }
     }
 
     pub fn v46(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(46)?.deref_unchecked()) }
     }
 
-    pub fn v46_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(46)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v46(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(46)?.take_unchecked()) }
-    }
-
     pub fn v47(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(47)?.deref_unchecked()) }
-    }
-
-    pub fn v47_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(47)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v47(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(47)?.take_unchecked()) }
     }
 
     pub fn v48(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(48)?.deref_unchecked()) }
     }
 
-    pub fn v48_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(48)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v48(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(48)?.take_unchecked()) }
-    }
-
     pub fn v49(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(49)?.deref_unchecked()) }
-    }
-
-    pub fn v49_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(49)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v49(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(49)?.take_unchecked()) }
     }
 
     pub fn v50(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(50)?.deref_unchecked()) }
     }
 
-    pub fn v50_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(50)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v50(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(50)?.take_unchecked()) }
-    }
-
     pub fn v51(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(51)?.deref_unchecked()) }
-    }
-
-    pub fn v51_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(51)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v51(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(51)?.take_unchecked()) }
     }
 
     pub fn v52(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(52)?.deref_unchecked()) }
     }
 
-    pub fn v52_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(52)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v52(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(52)?.take_unchecked()) }
-    }
-
     pub fn v53(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(53)?.deref_unchecked()) }
-    }
-
-    pub fn v53_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(53)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v53(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(53)?.take_unchecked()) }
     }
 
     pub fn v54(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(54)?.deref_unchecked()) }
     }
 
-    pub fn v54_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(54)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v54(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(54)?.take_unchecked()) }
-    }
-
     pub fn v55(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(55)?.deref_unchecked()) }
-    }
-
-    pub fn v55_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(55)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v55(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(55)?.take_unchecked()) }
     }
 
     pub fn v56(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(56)?.deref_unchecked()) }
     }
 
-    pub fn v56_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(56)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v56(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(56)?.take_unchecked()) }
-    }
-
     pub fn v57(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(57)?.deref_unchecked()) }
-    }
-
-    pub fn v57_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(57)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v57(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(57)?.take_unchecked()) }
     }
 
     pub fn v58(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(58)?.deref_unchecked()) }
     }
 
-    pub fn v58_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(58)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v58(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(58)?.take_unchecked()) }
-    }
-
     pub fn v59(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(59)?.deref_unchecked()) }
-    }
-
-    pub fn v59_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(59)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v59(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(59)?.take_unchecked()) }
     }
 
     pub fn v60(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(60)?.deref_unchecked()) }
     }
 
-    pub fn v60_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(60)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v60(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(60)?.take_unchecked()) }
-    }
-
     pub fn v61(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(61)?.deref_unchecked()) }
-    }
-
-    pub fn v61_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(61)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v61(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(61)?.take_unchecked()) }
     }
 
     pub fn v62(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(62)?.deref_unchecked()) }
     }
 
-    pub fn v62_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(62)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v62(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(62)?.take_unchecked()) }
-    }
-
     pub fn v63(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(63)?.deref_unchecked()) }
     }
 
-    pub fn v63_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(63)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v63(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(63)?.take_unchecked()) }
-    }
-
-    pub fn v64(&self) -> Option<&crate::WireExtensionTable<'buf>> {
+    pub fn v64(&self) -> Option<&crate::WireExtensionTable> {
         unsafe { Some(self.table.get(64)?.deref_unchecked()) }
-    }
-
-    pub fn v64_mut(&mut self) -> Option<&mut crate::WireExtensionTable<'buf>> {
-        unsafe { Some(self.table.get_mut(64)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_v64(&mut self) -> Option<crate::WireExtensionTable<'buf>> {
-        unsafe { Some(self.table.get_mut(64)?.take_unchecked()) }
     }
 }
 
-impl ::core::fmt::Debug for WireSixtyFourOrdinalTable<'_> {
+impl ::core::fmt::Debug for WireSixtyFourOrdinalTable {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> Result<(), ::core::fmt::Error> {
         f.debug_struct("SixtyFourOrdinalTable")
             .field("v1", &self.v1())
@@ -3670,7 +3086,7 @@ impl TableWithAttributes {
 }
 
 impl ::fidl_next::Encodable for TableWithAttributes {
-    type Encoded<'buf> = WireTableWithAttributes<'buf>;
+    type Encoded<'buf> = WireTableWithAttributes;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for TableWithAttributes
@@ -3716,19 +3132,19 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireTableWithAttributes<'buf>> for TableWithAttributes {
-    fn take_from(from: &mut WireTableWithAttributes<'buf>) -> Self {
-        Self { x: from.x_mut().map(::fidl_next::TakeFrom::take_from) }
+impl ::fidl_next::TakeFrom<WireTableWithAttributes> for TableWithAttributes {
+    fn take_from(from: &WireTableWithAttributes) -> Self {
+        Self { x: from.x().map(::fidl_next::TakeFrom::take_from) }
     }
 }
 
 /// The wire type corresponding to [`TableWithAttributes`].
 #[repr(C)]
-pub struct WireTableWithAttributes<'buf> {
-    table: ::fidl_next::WireTable<'buf>,
+pub struct WireTableWithAttributes {
+    table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireTableWithAttributes<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireTableWithAttributes
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
 {
@@ -3757,21 +3173,13 @@ where
     }
 }
 
-impl<'buf> WireTableWithAttributes<'buf> {
+impl WireTableWithAttributes {
     pub fn x(&self) -> Option<&::fidl_next::i64_le> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
-
-    pub fn x_mut(&mut self) -> Option<&mut ::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(1)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_x(&mut self) -> Option<::fidl_next::i64_le> {
-        unsafe { Some(self.table.get_mut(1)?.take_unchecked()) }
-    }
 }
 
-impl ::core::fmt::Debug for WireTableWithAttributes<'_> {
+impl ::core::fmt::Debug for WireTableWithAttributes {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> Result<(), ::core::fmt::Error> {
         f.debug_struct("TableWithAttributes").field("x", &self.x()).finish()
     }

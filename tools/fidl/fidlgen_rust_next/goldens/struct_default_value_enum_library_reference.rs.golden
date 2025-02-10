@@ -34,7 +34,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<Foo> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireFoo>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireFoo>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<Foo>
@@ -59,8 +59,8 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireFoo> for Foo {
-    fn take_from(from: &mut WireFoo) -> Self {
-        Self { field: ::fidl_next::TakeFrom::take_from(&mut from.field) }
+    fn take_from(from: &WireFoo) -> Self {
+        Self { field: ::fidl_next::TakeFrom::take_from(&from.field) }
     }
 }
 

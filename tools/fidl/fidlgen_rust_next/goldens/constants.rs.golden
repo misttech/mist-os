@@ -45,7 +45,7 @@ impl ::core::convert::From<WireBits> for Bits {
 }
 
 impl ::fidl_next::TakeFrom<WireBits> for Bits {
-    fn take_from(from: &mut WireBits) -> Self {
+    fn take_from(from: &WireBits) -> Self {
         Self::from(*from)
     }
 }
@@ -129,7 +129,7 @@ impl ::core::convert::From<WireBitsType> for BitsType {
 }
 
 impl ::fidl_next::TakeFrom<WireBitsType> for BitsType {
-    fn take_from(from: &mut WireBitsType) -> Self {
+    fn take_from(from: &WireBitsType) -> Self {
         Self::from(*from)
     }
 }
@@ -207,7 +207,7 @@ impl ::core::convert::From<WireEnum> for Enum {
 }
 
 impl ::fidl_next::TakeFrom<WireEnum> for Enum {
-    fn take_from(from: &mut WireEnum) -> Self {
+    fn take_from(from: &WireEnum) -> Self {
         Self::from(*from)
     }
 }
@@ -294,7 +294,7 @@ impl ::core::convert::From<WireEnumType> for EnumType {
 }
 
 impl ::fidl_next::TakeFrom<WireEnumType> for EnumType {
-    fn take_from(from: &mut WireEnumType) -> Self {
+    fn take_from(from: &WireEnumType) -> Self {
         Self::from(*from)
     }
 }
@@ -370,7 +370,7 @@ pub struct Struct {
 }
 
 impl ::fidl_next::Encodable for Struct {
-    type Encoded<'buf> = WireStruct<'buf>;
+    type Encoded<'buf> = WireStruct;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for Struct
@@ -410,7 +410,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<Struct> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireStruct<'buf>>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireStruct>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<Struct>
@@ -434,18 +434,18 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireStruct<'buf>> for Struct {
-    fn take_from(from: &mut WireStruct<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<WireStruct> for Struct {
+    fn take_from(from: &WireStruct) -> Self {
         Self {
-            int64_with_default: ::fidl_next::TakeFrom::take_from(&mut from.int64_with_default),
+            int64_with_default: ::fidl_next::TakeFrom::take_from(&from.int64_with_default),
 
-            string_with_default: ::fidl_next::TakeFrom::take_from(&mut from.string_with_default),
+            string_with_default: ::fidl_next::TakeFrom::take_from(&from.string_with_default),
 
-            bool_with_default: ::fidl_next::TakeFrom::take_from(&mut from.bool_with_default),
+            bool_with_default: ::fidl_next::TakeFrom::take_from(&from.bool_with_default),
 
-            enum_with_default: ::fidl_next::TakeFrom::take_from(&mut from.enum_with_default),
+            enum_with_default: ::fidl_next::TakeFrom::take_from(&from.enum_with_default),
 
-            bits_with_default: ::fidl_next::TakeFrom::take_from(&mut from.bits_with_default),
+            bits_with_default: ::fidl_next::TakeFrom::take_from(&from.bits_with_default),
         }
     }
 }
@@ -453,10 +453,10 @@ impl<'buf> ::fidl_next::TakeFrom<WireStruct<'buf>> for Struct {
 /// The wire type corersponding to [`Struct`].
 #[derive(Debug)]
 #[repr(C)]
-pub struct WireStruct<'buf> {
+pub struct WireStruct {
     pub int64_with_default: ::fidl_next::i64_le,
 
-    pub string_with_default: ::fidl_next::WireString<'buf>,
+    pub string_with_default: ::fidl_next::WireString,
 
     pub bool_with_default: bool,
 
@@ -465,7 +465,7 @@ pub struct WireStruct<'buf> {
     pub bits_with_default: crate::WireBits,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireStruct<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireStruct
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 

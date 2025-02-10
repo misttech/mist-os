@@ -50,7 +50,7 @@ impl ::core::convert::From<WireBitsType> for BitsType {
 }
 
 impl ::fidl_next::TakeFrom<WireBitsType> for BitsType {
-    fn take_from(from: &mut WireBitsType) -> Self {
+    fn take_from(from: &WireBitsType) -> Self {
         Self::from(*from)
     }
 }
@@ -139,7 +139,7 @@ impl ::core::convert::From<WireEnumType> for EnumType {
 }
 
 impl ::fidl_next::TakeFrom<WireEnumType> for EnumType {
-    fn take_from(from: &mut WireEnumType) -> Self {
+    fn take_from(from: &WireEnumType) -> Self {
         Self::from(*from)
     }
 }

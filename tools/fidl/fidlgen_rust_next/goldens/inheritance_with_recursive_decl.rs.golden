@@ -36,7 +36,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ParentFirstRequest> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireParentFirstRequest>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireParentFirstRequest>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ParentFirstRequest>
@@ -61,8 +61,8 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireParentFirstRequest> for ParentFirstRequest {
-    fn take_from(from: &mut WireParentFirstRequest) -> Self {
-        Self { request: ::fidl_next::TakeFrom::take_from(&mut from.request) }
+    fn take_from(from: &WireParentFirstRequest) -> Self {
+        Self { request: ::fidl_next::TakeFrom::take_from(&from.request) }
     }
 }
 
@@ -261,7 +261,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ChildSecondRequest> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireChildSecondRequest>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireChildSecondRequest>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ChildSecondRequest>
@@ -286,8 +286,8 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireChildSecondRequest> for ChildSecondRequest {
-    fn take_from(from: &mut WireChildSecondRequest) -> Self {
-        Self { request: ::fidl_next::TakeFrom::take_from(&mut from.request) }
+    fn take_from(from: &WireChildSecondRequest) -> Self {
+        Self { request: ::fidl_next::TakeFrom::take_from(&from.request) }
     }
 }
 

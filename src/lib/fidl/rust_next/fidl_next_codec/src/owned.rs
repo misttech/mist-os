@@ -5,10 +5,13 @@
 use core::fmt;
 use core::marker::PhantomData;
 use core::mem::forget;
-use core::ops::{Deref, DerefMut};
+use core::ops::Deref;
 use core::ptr::NonNull;
 
 /// An owned value in borrowed backing memory.
+///
+/// While the owned value may be dropped, it does not provide a mutable reference to the contained
+/// value.
 pub struct Owned<'buf, T: ?Sized> {
     ptr: NonNull<T>,
     _phantom: PhantomData<&'buf mut [u8]>,
@@ -40,14 +43,6 @@ impl<T: ?Sized> Owned<'_, T> {
         Self { ptr: unsafe { NonNull::new_unchecked(ptr) }, _phantom: PhantomData }
     }
 
-    /// Returns the owned value.
-    pub fn take(self) -> T
-    where
-        T: Sized,
-    {
-        unsafe { self.into_raw().read() }
-    }
-
     /// Consumes the `Owned`, returning its pointer to the owned value.
     pub fn into_raw(self) -> *mut T {
         let result = self.ptr.as_ptr();
@@ -61,12 +56,6 @@ impl<T: ?Sized> Deref for Owned<'_, T> {
 
     fn deref(&self) -> &Self::Target {
         unsafe { self.ptr.as_ref() }
-    }
-}
-
-impl<T: ?Sized> DerefMut for Owned<'_, T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { self.ptr.as_mut() }
     }
 }
 

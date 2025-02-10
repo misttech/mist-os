@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use core::fmt;
-use core::ops::{Deref, DerefMut};
-use core::str::{from_utf8, from_utf8_unchecked, from_utf8_unchecked_mut};
+use core::ops::Deref;
+use core::str::{from_utf8, from_utf8_unchecked};
 
 use munge::munge;
 
@@ -14,18 +14,12 @@ use crate::{
 };
 
 /// A FIDL string
-#[derive(Default)]
 #[repr(transparent)]
-pub struct WireString<'buf> {
-    vec: WireVector<'buf, u8>,
+pub struct WireString {
+    vec: WireVector<u8>,
 }
 
-impl<'buf> WireString<'buf> {
-    /// Creates a new `WireString` from the a `WireVector` of UTF-8 bytes.
-    pub(super) unsafe fn new_unchecked(vec: WireVector<'buf, u8>) -> Self {
-        Self { vec }
-    }
-
+impl WireString {
     /// Encodes that a string is present in a slot.
     pub fn encode_present(slot: Slot<'_, Self>, len: u64) {
         munge!(let Self { vec } = slot);
@@ -46,14 +40,9 @@ impl<'buf> WireString<'buf> {
     pub fn as_str(&self) -> &str {
         unsafe { from_utf8_unchecked(self.vec.as_slice()) }
     }
-
-    /// Returns a mutable reference to the underlying `str`.
-    pub fn as_mut_str(&mut self) -> &mut str {
-        unsafe { from_utf8_unchecked_mut(self.vec.as_mut_slice()) }
-    }
 }
 
-impl Deref for WireString<'_> {
+impl Deref for WireString {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -61,19 +50,13 @@ impl Deref for WireString<'_> {
     }
 }
 
-impl DerefMut for WireString<'_> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.as_mut_str()
-    }
-}
-
-impl fmt::Debug for WireString<'_> {
+impl fmt::Debug for WireString {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.as_str().fmt(f)
     }
 }
 
-unsafe impl<'buf, D: Decoder<'buf> + ?Sized> Decode<D> for WireString<'buf> {
+unsafe impl<'buf, D: Decoder<'buf> + ?Sized> Decode<D> for WireString {
     fn decode(slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
         munge!(let Self { mut vec } = slot);
 
@@ -86,7 +69,7 @@ unsafe impl<'buf, D: Decoder<'buf> + ?Sized> Decode<D> for WireString<'buf> {
 }
 
 impl Encodable for String {
-    type Encoded<'buf> = WireString<'buf>;
+    type Encoded<'buf> = WireString;
 }
 
 impl<E: Encoder + ?Sized> Encode<E> for String {
@@ -101,8 +84,8 @@ impl<E: Encoder + ?Sized> Encode<E> for String {
     }
 }
 
-impl TakeFrom<WireString<'_>> for String {
-    fn take_from(from: &mut WireString<'_>) -> Self {
+impl TakeFrom<WireString> for String {
+    fn take_from(from: &WireString) -> Self {
         from.to_string()
     }
 }

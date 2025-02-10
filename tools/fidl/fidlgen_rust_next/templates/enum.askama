@@ -67,7 +67,7 @@ impl ::core::convert::From<{{ wire_name }}> for {{ name }} {
 }
 
 impl ::fidl_next::TakeFrom<{{ wire_name }}> for {{ name }} {
-    fn take_from(from: &mut {{ wire_name }}) -> Self {
+    fn take_from(from: &{{ wire_name }}) -> Self {
         Self::from(*from)
     }
 }

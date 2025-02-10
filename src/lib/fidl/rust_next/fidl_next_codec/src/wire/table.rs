@@ -10,12 +10,12 @@ use crate::{
 
 /// A FIDL table
 #[repr(C)]
-pub struct WireTable<'buf> {
+pub struct WireTable {
     len: u64_le,
-    ptr: WirePointer<'buf, WireEnvelope>,
+    ptr: WirePointer<WireEnvelope>,
 }
 
-impl<'buf> WireTable<'buf> {
+impl WireTable {
     /// Encodes that a table contains `len` values in a slot.
     pub fn encode_len(slot: Slot<'_, Self>, len: usize) {
         munge!(let Self { len: mut table_len, ptr } = slot);
@@ -26,7 +26,7 @@ impl<'buf> WireTable<'buf> {
     /// Decodes the fields of the table with a decoding function.
     ///
     /// The decoding function receives the ordinal of the field, its slot, and the decoder.
-    pub fn decode_with<D: Decoder<'buf> + ?Sized>(
+    pub fn decode_with<'buf, D: Decoder<'buf> + ?Sized>(
         slot: Slot<'_, Self>,
         decoder: &mut D,
         f: impl Fn(i64, Slot<'_, WireEnvelope>, &mut D) -> Result<(), DecodeError>,
@@ -46,7 +46,7 @@ impl<'buf> WireTable<'buf> {
             }
 
             let envelopes = unsafe { Owned::new_unchecked(envelopes_ptr) };
-            WirePointer::set_decoded(ptr, envelopes);
+            WirePointer::set_decoded(ptr, envelopes.into_raw());
         } else if len != 0 {
             return Err(DecodeError::InvalidOptionalSize(len));
         }
@@ -61,16 +61,6 @@ impl<'buf> WireTable<'buf> {
         }
 
         let envelope = unsafe { &*self.ptr.as_ptr().add(ordinal - 1) };
-        (!envelope.is_zero()).then_some(envelope)
-    }
-
-    /// Returns a mutable reference to the envelope for the given ordinal, if any.
-    pub fn get_mut(&mut self, ordinal: usize) -> Option<&mut WireEnvelope> {
-        if ordinal == 0 || ordinal > self.len.to_native() as usize {
-            return None;
-        }
-
-        let envelope = unsafe { &mut *self.ptr.as_ptr().add(ordinal - 1) };
         (!envelope.is_zero()).then_some(envelope)
     }
 }

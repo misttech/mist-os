@@ -34,7 +34,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<Baz> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireBaz>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireBaz>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<Baz>
@@ -59,8 +59,8 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireBaz> for Baz {
-    fn take_from(from: &mut WireBaz) -> Self {
-        Self { g: ::fidl_next::TakeFrom::take_from(&mut from.g) }
+    fn take_from(from: &WireBaz) -> Self {
+        Self { g: ::fidl_next::TakeFrom::take_from(&from.g) }
     }
 }
 

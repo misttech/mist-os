@@ -45,7 +45,7 @@ impl ::core::convert::From<WireBitsType> for BitsType {
 }
 
 impl ::fidl_next::TakeFrom<WireBitsType> for BitsType {
-    fn take_from(from: &mut WireBitsType) -> Self {
+    fn take_from(from: &WireBitsType) -> Self {
         Self::from(*from)
     }
 }

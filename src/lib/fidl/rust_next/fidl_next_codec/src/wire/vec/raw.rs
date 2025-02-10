@@ -9,19 +9,19 @@ use munge::munge;
 use crate::{u64_le, Decode, DecodeError, Decoder, DecoderExt, Owned, Slot, WirePointer};
 
 #[repr(C)]
-pub struct RawWireVector<'buf, T> {
+pub struct RawWireVector<T> {
     len: u64_le,
-    ptr: WirePointer<'buf, T>,
+    ptr: WirePointer<T>,
 }
 
 // SAFETY: `RawWireVector` doesn't add any restrictions on sending across thread boundaries, and so
 // is `Send` if `T` is `Send`.
-unsafe impl<T: Send> Send for RawWireVector<'_, T> {}
+unsafe impl<T: Send> Send for RawWireVector<T> {}
 
 // SAFETY: `RawWireVector` doesn't add any interior mutability, so it is `Sync` if `T` is `Sync`.
-unsafe impl<T: Sync> Sync for RawWireVector<'_, T> {}
+unsafe impl<T: Sync> Sync for RawWireVector<T> {}
 
-impl<T> Drop for RawWireVector<'_, T> {
+impl<T> Drop for RawWireVector<T> {
     fn drop(&mut self) {
         if !self.ptr.as_ptr().is_null() {
             unsafe {
@@ -31,15 +31,7 @@ impl<T> Drop for RawWireVector<'_, T> {
     }
 }
 
-impl<T> RawWireVector<'_, T> {
-    pub fn dangling() -> Self {
-        Self { len: u64_le::from_native(0), ptr: WirePointer::dangling() }
-    }
-
-    pub fn null() -> Self {
-        Self { len: u64_le::from_native(0), ptr: WirePointer::null() }
-    }
-
+impl<T> RawWireVector<T> {
     pub fn encode_present(slot: Slot<'_, Self>, len: u64) {
         munge!(let Self { len: mut encoded_len, ptr } = slot);
         *encoded_len = u64_le::from_native(len);
@@ -65,7 +57,7 @@ impl<T> RawWireVector<'_, T> {
     }
 }
 
-unsafe impl<'buf, D: Decoder<'buf> + ?Sized, T: Decode<D>> Decode<D> for RawWireVector<'buf, T> {
+unsafe impl<'buf, D: Decoder<'buf> + ?Sized, T: Decode<D>> Decode<D> for RawWireVector<T> {
     fn decode(slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
         munge!(let Self { len, mut ptr } = slot);
 
@@ -73,7 +65,7 @@ unsafe impl<'buf, D: Decoder<'buf> + ?Sized, T: Decode<D>> Decode<D> for RawWire
         if WirePointer::is_encoded_present(ptr.as_mut())? {
             let slice = decoder.decode_next_slice::<T>(len as usize)?;
             let slice = unsafe { Owned::new_unchecked(slice.into_raw().cast::<T>()) };
-            WirePointer::set_decoded(ptr, slice);
+            WirePointer::set_decoded(ptr, slice.into_raw());
         }
 
         Ok(())

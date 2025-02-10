@@ -33,7 +33,7 @@ impl WireChannel {
     }
 
     /// Takes the channel, if any, leaving an invalid handle in its place.
-    pub fn take(&mut self) -> Channel {
+    pub fn take(&self) -> Channel {
         self.handle.take().into()
     }
 
@@ -52,7 +52,7 @@ unsafe impl<D: HandleDecoder + ?Sized> Decode<D> for WireChannel {
 }
 
 impl TakeFrom<WireChannel> for Channel {
-    fn take_from(from: &mut WireChannel) -> Self {
+    fn take_from(from: &WireChannel) -> Self {
         from.take()
     }
 }
@@ -88,7 +88,7 @@ impl WireOptionalChannel {
     }
 
     /// Takes the channel, if any, leaving an invalid channel in its place.
-    pub fn take(&mut self) -> Option<Channel> {
+    pub fn take(&self) -> Option<Channel> {
         self.handle.take().map(Channel::from)
     }
 
@@ -141,7 +141,7 @@ unsafe impl<D: HandleDecoder + ?Sized> Decode<D> for WireOptionalChannel {
 }
 
 impl TakeFrom<WireOptionalChannel> for Option<Channel> {
-    fn take_from(from: &mut WireOptionalChannel) -> Self {
+    fn take_from(from: &WireOptionalChannel) -> Self {
         from.take()
     }
 }

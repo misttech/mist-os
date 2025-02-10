@@ -10,7 +10,7 @@ pub struct BasicStruct {
 }
 
 impl ::fidl_next::Encodable for BasicStruct {
-    type Encoded<'buf> = WireBasicStruct<'buf>;
+    type Encoded<'buf> = WireBasicStruct;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for BasicStruct
@@ -41,7 +41,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<BasicStruct> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireBasicStruct<'buf>>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireBasicStruct>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<BasicStruct>
@@ -65,12 +65,12 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireBasicStruct<'buf>> for BasicStruct {
-    fn take_from(from: &mut WireBasicStruct<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<WireBasicStruct> for BasicStruct {
+    fn take_from(from: &WireBasicStruct) -> Self {
         Self {
-            x: ::fidl_next::TakeFrom::take_from(&mut from.x),
+            x: ::fidl_next::TakeFrom::take_from(&from.x),
 
-            y: ::fidl_next::TakeFrom::take_from(&mut from.y),
+            y: ::fidl_next::TakeFrom::take_from(&from.y),
         }
     }
 }
@@ -78,13 +78,13 @@ impl<'buf> ::fidl_next::TakeFrom<WireBasicStruct<'buf>> for BasicStruct {
 /// The wire type corersponding to [`BasicStruct`].
 #[derive(Debug)]
 #[repr(C)]
-pub struct WireBasicStruct<'buf> {
+pub struct WireBasicStruct {
     pub x: ::fidl_next::u32_le,
 
-    pub y: ::fidl_next::WireString<'buf>,
+    pub y: ::fidl_next::WireString,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireBasicStruct<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireBasicStruct
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -147,7 +147,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<Simple> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireSimple>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireSimple>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<Simple>
@@ -172,11 +172,11 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireSimple> for Simple {
-    fn take_from(from: &mut WireSimple) -> Self {
+    fn take_from(from: &WireSimple) -> Self {
         Self {
-            f1: ::fidl_next::TakeFrom::take_from(&mut from.f1),
+            f1: ::fidl_next::TakeFrom::take_from(&from.f1),
 
-            f2: ::fidl_next::TakeFrom::take_from(&mut from.f2),
+            f2: ::fidl_next::TakeFrom::take_from(&from.f2),
         }
     }
 }

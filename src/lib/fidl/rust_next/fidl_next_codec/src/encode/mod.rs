@@ -64,7 +64,7 @@ macro_rules! impl_primitive {
         }
 
         impl EncodableOption for $ty {
-            type EncodedOption<'buf> = WireBox<'buf, $enc>;
+            type EncodedOption<'buf> = WireBox<$enc>;
         }
 
         impl<E: Encoder + ?Sized> EncodeOption<E> for $ty {

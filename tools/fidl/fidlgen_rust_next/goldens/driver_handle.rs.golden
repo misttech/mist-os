@@ -37,7 +37,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ClientEndWrapper> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireClientEndWrapper>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireClientEndWrapper>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ClientEndWrapper>
@@ -62,8 +62,8 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireClientEndWrapper> for ClientEndWrapper {
-    fn take_from(from: &mut WireClientEndWrapper) -> Self {
-        Self { value: ::fidl_next::TakeFrom::take_from(&mut from.value) }
+    fn take_from(from: &WireClientEndWrapper) -> Self {
+        Self { value: ::fidl_next::TakeFrom::take_from(&from.value) }
     }
 }
 
@@ -210,7 +210,7 @@ impl T {
 }
 
 impl ::fidl_next::Encodable for T {
-    type Encoded<'buf> = WireT<'buf>;
+    type Encoded<'buf> = WireT;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for T
@@ -270,23 +270,23 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireT<'buf>> for T {
-    fn take_from(from: &mut WireT<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<WireT> for T {
+    fn take_from(from: &WireT) -> Self {
         Self {
-            zircon_handle: from.zircon_handle_mut().map(::fidl_next::TakeFrom::take_from),
+            zircon_handle: from.zircon_handle().map(::fidl_next::TakeFrom::take_from),
 
-            fdf_handle: from.fdf_handle_mut().map(::fidl_next::TakeFrom::take_from),
+            fdf_handle: from.fdf_handle().map(::fidl_next::TakeFrom::take_from),
         }
     }
 }
 
 /// The wire type corresponding to [`T`].
 #[repr(C)]
-pub struct WireT<'buf> {
-    table: ::fidl_next::WireTable<'buf>,
+pub struct WireT {
+    table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireT<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireT
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
 
@@ -329,17 +329,9 @@ where
     }
 }
 
-impl<'buf> WireT<'buf> {
+impl WireT {
     pub fn zircon_handle(&self) -> Option<&::fidl_next::fuchsia::WireHandle> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
-    }
-
-    pub fn zircon_handle_mut(&mut self) -> Option<&mut ::fidl_next::fuchsia::WireHandle> {
-        unsafe { Some(self.table.get_mut(1)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_zircon_handle(&mut self) -> Option<::fidl_next::fuchsia::WireHandle> {
-        unsafe { Some(self.table.get_mut(1)?.take_unchecked()) }
     }
 
     pub fn fdf_handle(
@@ -349,24 +341,9 @@ impl<'buf> WireT<'buf> {
     > {
         unsafe { Some(self.table.get(2)?.deref_unchecked()) }
     }
-
-    pub fn fdf_handle_mut(
-        &mut self,
-    ) -> Option<
-        &mut ::fidl_next::bind::ClientEnd<::fidl_next::fuchsia::WireHandle, crate::DriverProtocol>,
-    > {
-        unsafe { Some(self.table.get_mut(2)?.deref_mut_unchecked()) }
-    }
-
-    pub fn take_fdf_handle(
-        &mut self,
-    ) -> Option<::fidl_next::bind::ClientEnd<::fidl_next::fuchsia::WireHandle, crate::DriverProtocol>>
-    {
-        unsafe { Some(self.table.get_mut(2)?.take_unchecked()) }
-    }
 }
 
-impl ::core::fmt::Debug for WireT<'_> {
+impl ::core::fmt::Debug for WireT {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> Result<(), ::core::fmt::Error> {
         f.debug_struct("T")
             .field("zircon_handle", &self.zircon_handle())
@@ -381,7 +358,7 @@ pub struct HandlesInProtocolSendHandlesRequest {
 }
 
 impl ::fidl_next::Encodable for HandlesInProtocolSendHandlesRequest {
-    type Encoded<'buf> = WireHandlesInProtocolSendHandlesRequest<'buf>;
+    type Encoded<'buf> = WireHandlesInProtocolSendHandlesRequest;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for HandlesInProtocolSendHandlesRequest
@@ -411,8 +388,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<HandlesInProtocolSendHandlesRequest> {
-    type EncodedOption<'buf> =
-        ::fidl_next::WireBox<'buf, WireHandlesInProtocolSendHandlesRequest<'buf>>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireHandlesInProtocolSendHandlesRequest>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<HandlesInProtocolSendHandlesRequest>
@@ -436,22 +412,22 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireHandlesInProtocolSendHandlesRequest<'buf>>
+impl ::fidl_next::TakeFrom<WireHandlesInProtocolSendHandlesRequest>
     for HandlesInProtocolSendHandlesRequest
 {
-    fn take_from(from: &mut WireHandlesInProtocolSendHandlesRequest<'buf>) -> Self {
-        Self { t: ::fidl_next::TakeFrom::take_from(&mut from.t) }
+    fn take_from(from: &WireHandlesInProtocolSendHandlesRequest) -> Self {
+        Self { t: ::fidl_next::TakeFrom::take_from(&from.t) }
     }
 }
 
 /// The wire type corersponding to [`HandlesInProtocolSendHandlesRequest`].
 #[derive(Debug)]
 #[repr(C)]
-pub struct WireHandlesInProtocolSendHandlesRequest<'buf> {
-    pub t: crate::WireT<'buf>,
+pub struct WireHandlesInProtocolSendHandlesRequest {
+    pub t: crate::WireT,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireHandlesInProtocolSendHandlesRequest<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireHandlesInProtocolSendHandlesRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -489,7 +465,7 @@ pub mod handles_in_protocol {
 
         type Protocol = crate::HandlesInProtocol;
 
-        type Request<'buf> = crate::WireHandlesInProtocolSendHandlesRequest<'buf>;
+        type Request<'buf> = crate::WireHandlesInProtocolSendHandlesRequest;
 
         type Response<'buf> = ::fidl_next::bind::Never;
     }
@@ -504,7 +480,7 @@ pub trait HandlesInProtocolClientSender<___T: ::fidl_next::protocol::Transport> 
     where
         for<'buf> ___R: ::fidl_next::Encode<
             ___T::Encoder<'buf>,
-            Encoded<'buf> = crate::WireHandlesInProtocolSendHandlesRequest<'buf>,
+            Encoded<'buf> = crate::WireHandlesInProtocolSendHandlesRequest,
         >;
 }
 
@@ -520,7 +496,7 @@ where
     where
         for<'buf> ___R: ::fidl_next::Encode<
             ___T::Encoder<'buf>,
-            Encoded<'buf> = crate::WireHandlesInProtocolSendHandlesRequest<'buf>,
+            Encoded<'buf> = crate::WireHandlesInProtocolSendHandlesRequest,
         >,
     {
         self.as_untyped().send_one_way(8904504160365833729, request)
@@ -578,7 +554,7 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: HandlesInProtocolServerHandler<___T>,
 
-    for<'buf> crate::WireHandlesInProtocolSendHandlesRequest<'buf>:
+    for<'buf> crate::WireHandlesInProtocolSendHandlesRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
     fn on_one_way(
@@ -649,7 +625,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ServerEndWrapper> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireServerEndWrapper>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireServerEndWrapper>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ServerEndWrapper>
@@ -674,8 +650,8 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireServerEndWrapper> for ServerEndWrapper {
-    fn take_from(from: &mut WireServerEndWrapper) -> Self {
-        Self { value: ::fidl_next::TakeFrom::take_from(&mut from.value) }
+    fn take_from(from: &WireServerEndWrapper) -> Self {
+        Self { value: ::fidl_next::TakeFrom::take_from(&from.value) }
     }
 }
 

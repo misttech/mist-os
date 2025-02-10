@@ -42,7 +42,7 @@ impl ::core::convert::From<WireEmptyBits> for EmptyBits {
 }
 
 impl ::fidl_next::TakeFrom<WireEmptyBits> for EmptyBits {
-    fn take_from(from: &mut WireEmptyBits) -> Self {
+    fn take_from(from: &WireEmptyBits) -> Self {
         Self::from(*from)
     }
 }
@@ -114,7 +114,7 @@ impl ::core::convert::From<WireFlexibleBits> for FlexibleBits {
 }
 
 impl ::fidl_next::TakeFrom<WireFlexibleBits> for FlexibleBits {
-    fn take_from(from: &mut WireFlexibleBits) -> Self {
+    fn take_from(from: &WireFlexibleBits) -> Self {
         Self::from(*from)
     }
 }
@@ -187,7 +187,7 @@ impl ::core::convert::From<WireMyBits> for MyBits {
 }
 
 impl ::fidl_next::TakeFrom<WireMyBits> for MyBits {
-    fn take_from(from: &mut WireMyBits) -> Self {
+    fn take_from(from: &WireMyBits) -> Self {
         Self::from(*from)
     }
 }
@@ -268,7 +268,7 @@ impl ::core::convert::From<WireStrictBits> for StrictBits {
 }
 
 impl ::fidl_next::TakeFrom<WireStrictBits> for StrictBits {
-    fn take_from(from: &mut WireStrictBits) -> Self {
+    fn take_from(from: &WireStrictBits) -> Self {
         Self::from(*from)
     }
 }

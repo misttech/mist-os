@@ -36,7 +36,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<DocCommentWithQuotes> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireDocCommentWithQuotes>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireDocCommentWithQuotes>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<DocCommentWithQuotes>
@@ -61,7 +61,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireDocCommentWithQuotes> for DocCommentWithQuotes {
-    fn take_from(from: &mut WireDocCommentWithQuotes) -> Self {
+    fn take_from(from: &WireDocCommentWithQuotes) -> Self {
         Self {}
     }
 }

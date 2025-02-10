@@ -12,7 +12,7 @@ pub enum FlexibleFoo {
 }
 
 impl ::fidl_next::Encodable for FlexibleFoo {
-    type Encoded<'buf> = WireFlexibleFoo<'buf>;
+    type Encoded<'buf> = WireFlexibleFoo;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for FlexibleFoo
@@ -26,7 +26,7 @@ where
         encoder: &mut ___E,
         slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireFlexibleFoo { raw, _phantom: _ } = slot);
+        ::fidl_next::munge!(let WireFlexibleFoo { raw } = slot);
 
         match self {
             Self::S(value) => {
@@ -47,7 +47,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<FlexibleFoo> {
-    type EncodedOption<'buf> = WireOptionalFlexibleFoo<'buf>;
+    type EncodedOption<'buf> = WireOptionalFlexibleFoo;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<FlexibleFoo>
@@ -60,7 +60,7 @@ where
         encoder: &mut ___E,
         mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalFlexibleFoo { raw, _phantom: _ } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalFlexibleFoo { raw } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
@@ -73,15 +73,15 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireFlexibleFoo<'buf>> for FlexibleFoo {
-    fn take_from(from: &mut WireFlexibleFoo<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<WireFlexibleFoo> for FlexibleFoo {
+    fn take_from(from: &WireFlexibleFoo) -> Self {
         match from.raw.ordinal() {
             1 => Self::S(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get_mut().deref_mut_unchecked()
+                from.raw.get().deref_unchecked()
             })),
 
             2 => Self::I(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get_mut().deref_mut_unchecked()
+                from.raw.get().deref_unchecked()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -89,9 +89,9 @@ impl<'buf> ::fidl_next::TakeFrom<WireFlexibleFoo<'buf>> for FlexibleFoo {
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireOptionalFlexibleFoo<'buf>> for Option<Box<FlexibleFoo>> {
-    fn take_from(from: &mut WireOptionalFlexibleFoo<'buf>) -> Self {
-        if let Some(inner) = from.as_mut() {
+impl ::fidl_next::TakeFrom<WireOptionalFlexibleFoo> for Option<Box<FlexibleFoo>> {
+    fn take_from(from: &WireOptionalFlexibleFoo) -> Self {
+        if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
         } else {
             None
@@ -101,31 +101,22 @@ impl<'buf> ::fidl_next::TakeFrom<WireOptionalFlexibleFoo<'buf>> for Option<Box<F
 
 /// The wire type corresponding to [`FlexibleFoo`].
 #[repr(transparent)]
-pub struct WireFlexibleFoo<'buf> {
+pub struct WireFlexibleFoo {
     raw: ::fidl_next::RawWireUnion,
-    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
 pub mod flexible_foo {
-    pub enum Ref<'union, 'buf> {
-        S(&'union ::fidl_next::WireString<'buf>),
+    pub enum Ref<'union> {
+        S(&'union ::fidl_next::WireString),
 
         I(&'union ::fidl_next::i32_le),
 
         UnknownOrdinal_(u64),
     }
-
-    pub enum Mut<'union, 'buf> {
-        S(&'union mut ::fidl_next::WireString<'buf>),
-
-        I(&'union mut ::fidl_next::i32_le),
-
-        UnknownOrdinal_(u64),
-    }
 }
 
-impl<'buf> WireFlexibleFoo<'buf> {
-    pub fn as_ref(&self) -> crate::flexible_foo::Ref<'_, 'buf> {
+impl WireFlexibleFoo {
+    pub fn as_ref(&self) -> crate::flexible_foo::Ref<'_> {
         match self.raw.ordinal() {
             1 => crate::flexible_foo::Ref::S(unsafe { self.raw.get().deref_unchecked() }),
 
@@ -134,19 +125,9 @@ impl<'buf> WireFlexibleFoo<'buf> {
             unknown => crate::flexible_foo::Ref::UnknownOrdinal_(unknown),
         }
     }
-
-    pub fn as_mut(&mut self) -> crate::flexible_foo::Mut<'_, 'buf> {
-        match self.raw.ordinal() {
-            1 => crate::flexible_foo::Mut::S(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
-
-            2 => crate::flexible_foo::Mut::I(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
-
-            unknown => crate::flexible_foo::Mut::UnknownOrdinal_(unknown),
-        }
-    }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireFlexibleFoo<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireFlexibleFoo
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -156,11 +137,11 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString<'buf>>(
-                raw, decoder,
-            )?,
+            1 => {
+                ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
+            }
 
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
 
@@ -171,12 +152,10 @@ where
     }
 }
 
-impl<'buf> ::core::fmt::Debug for WireFlexibleFoo<'buf> {
+impl ::core::fmt::Debug for WireFlexibleFoo {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
-            1 => unsafe {
-                self.raw.get().deref_unchecked::<::fidl_next::WireString<'buf>>().fmt(f)
-            },
+            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireString>().fmt(f) },
             2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i32_le>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -184,12 +163,11 @@ impl<'buf> ::core::fmt::Debug for WireFlexibleFoo<'buf> {
 }
 
 #[repr(transparent)]
-pub struct WireOptionalFlexibleFoo<'buf> {
+pub struct WireOptionalFlexibleFoo {
     raw: ::fidl_next::RawWireUnion,
-    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-impl<'buf> WireOptionalFlexibleFoo<'buf> {
+impl WireOptionalFlexibleFoo {
     pub fn is_some(&self) -> bool {
         self.raw.is_some()
     }
@@ -198,41 +176,16 @@ impl<'buf> WireOptionalFlexibleFoo<'buf> {
         self.raw.is_none()
     }
 
-    pub fn as_ref(&self) -> Option<&WireFlexibleFoo<'buf>> {
+    pub fn as_ref(&self) -> Option<&WireFlexibleFoo> {
         if self.is_some() {
             Some(unsafe { &*(self as *const Self).cast() })
         } else {
             None
         }
     }
-
-    pub fn as_mut(&mut self) -> Option<&mut WireFlexibleFoo<'buf>> {
-        if self.is_some() {
-            Some(unsafe { &mut *(self as *mut Self).cast() })
-        } else {
-            None
-        }
-    }
-
-    pub fn take(&mut self) -> Option<WireFlexibleFoo<'buf>> {
-        if self.is_some() {
-            Some(WireFlexibleFoo {
-                raw: ::core::mem::replace(&mut self.raw, ::fidl_next::RawWireUnion::null()),
-                _phantom: ::core::marker::PhantomData,
-            })
-        } else {
-            None
-        }
-    }
 }
 
-impl<'buf> Default for WireOptionalFlexibleFoo<'buf> {
-    fn default() -> Self {
-        Self { raw: ::fidl_next::RawWireUnion::null(), _phantom: ::core::marker::PhantomData }
-    }
-}
-
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalFlexibleFoo<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalFlexibleFoo
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -242,11 +195,11 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString<'buf>>(
-                raw, decoder,
-            )?,
+            1 => {
+                ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
+            }
 
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
 
@@ -258,7 +211,7 @@ where
     }
 }
 
-impl<'buf> ::core::fmt::Debug for WireOptionalFlexibleFoo<'buf> {
+impl ::core::fmt::Debug for WireOptionalFlexibleFoo {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         self.as_ref().fmt(f)
     }
@@ -272,7 +225,7 @@ pub enum StrictFoo {
 }
 
 impl ::fidl_next::Encodable for StrictFoo {
-    type Encoded<'buf> = WireStrictFoo<'buf>;
+    type Encoded<'buf> = WireStrictFoo;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for StrictFoo
@@ -286,7 +239,7 @@ where
         encoder: &mut ___E,
         slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireStrictFoo { raw, _phantom: _ } = slot);
+        ::fidl_next::munge!(let WireStrictFoo { raw } = slot);
 
         match self {
             Self::S(value) => {
@@ -303,7 +256,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<StrictFoo> {
-    type EncodedOption<'buf> = WireOptionalStrictFoo<'buf>;
+    type EncodedOption<'buf> = WireOptionalStrictFoo;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<StrictFoo>
@@ -316,7 +269,7 @@ where
         encoder: &mut ___E,
         mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalStrictFoo { raw, _phantom: _ } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalStrictFoo { raw } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
@@ -329,15 +282,15 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireStrictFoo<'buf>> for StrictFoo {
-    fn take_from(from: &mut WireStrictFoo<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<WireStrictFoo> for StrictFoo {
+    fn take_from(from: &WireStrictFoo) -> Self {
         match from.raw.ordinal() {
             1 => Self::S(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get_mut().deref_mut_unchecked()
+                from.raw.get().deref_unchecked()
             })),
 
             2 => Self::I(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get_mut().deref_mut_unchecked()
+                from.raw.get().deref_unchecked()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -345,9 +298,9 @@ impl<'buf> ::fidl_next::TakeFrom<WireStrictFoo<'buf>> for StrictFoo {
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireOptionalStrictFoo<'buf>> for Option<Box<StrictFoo>> {
-    fn take_from(from: &mut WireOptionalStrictFoo<'buf>) -> Self {
-        if let Some(inner) = from.as_mut() {
+impl ::fidl_next::TakeFrom<WireOptionalStrictFoo> for Option<Box<StrictFoo>> {
+    fn take_from(from: &WireOptionalStrictFoo) -> Self {
+        if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
         } else {
             None
@@ -357,27 +310,20 @@ impl<'buf> ::fidl_next::TakeFrom<WireOptionalStrictFoo<'buf>> for Option<Box<Str
 
 /// The wire type corresponding to [`StrictFoo`].
 #[repr(transparent)]
-pub struct WireStrictFoo<'buf> {
+pub struct WireStrictFoo {
     raw: ::fidl_next::RawWireUnion,
-    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
 pub mod strict_foo {
-    pub enum Ref<'union, 'buf> {
-        S(&'union ::fidl_next::WireString<'buf>),
+    pub enum Ref<'union> {
+        S(&'union ::fidl_next::WireString),
 
         I(&'union ::fidl_next::i32_le),
     }
-
-    pub enum Mut<'union, 'buf> {
-        S(&'union mut ::fidl_next::WireString<'buf>),
-
-        I(&'union mut ::fidl_next::i32_le),
-    }
 }
 
-impl<'buf> WireStrictFoo<'buf> {
-    pub fn as_ref(&self) -> crate::strict_foo::Ref<'_, 'buf> {
+impl WireStrictFoo {
+    pub fn as_ref(&self) -> crate::strict_foo::Ref<'_> {
         match self.raw.ordinal() {
             1 => crate::strict_foo::Ref::S(unsafe { self.raw.get().deref_unchecked() }),
 
@@ -386,19 +332,9 @@ impl<'buf> WireStrictFoo<'buf> {
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
-
-    pub fn as_mut(&mut self) -> crate::strict_foo::Mut<'_, 'buf> {
-        match self.raw.ordinal() {
-            1 => crate::strict_foo::Mut::S(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
-
-            2 => crate::strict_foo::Mut::I(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
-
-            _ => unsafe { ::core::hint::unreachable_unchecked() },
-        }
-    }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireStrictFoo<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireStrictFoo
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -408,11 +344,11 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString<'buf>>(
-                raw, decoder,
-            )?,
+            1 => {
+                ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
+            }
 
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
 
@@ -423,12 +359,10 @@ where
     }
 }
 
-impl<'buf> ::core::fmt::Debug for WireStrictFoo<'buf> {
+impl ::core::fmt::Debug for WireStrictFoo {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
-            1 => unsafe {
-                self.raw.get().deref_unchecked::<::fidl_next::WireString<'buf>>().fmt(f)
-            },
+            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireString>().fmt(f) },
             2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i32_le>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -436,12 +370,11 @@ impl<'buf> ::core::fmt::Debug for WireStrictFoo<'buf> {
 }
 
 #[repr(transparent)]
-pub struct WireOptionalStrictFoo<'buf> {
+pub struct WireOptionalStrictFoo {
     raw: ::fidl_next::RawWireUnion,
-    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-impl<'buf> WireOptionalStrictFoo<'buf> {
+impl WireOptionalStrictFoo {
     pub fn is_some(&self) -> bool {
         self.raw.is_some()
     }
@@ -450,41 +383,16 @@ impl<'buf> WireOptionalStrictFoo<'buf> {
         self.raw.is_none()
     }
 
-    pub fn as_ref(&self) -> Option<&WireStrictFoo<'buf>> {
+    pub fn as_ref(&self) -> Option<&WireStrictFoo> {
         if self.is_some() {
             Some(unsafe { &*(self as *const Self).cast() })
         } else {
             None
         }
     }
-
-    pub fn as_mut(&mut self) -> Option<&mut WireStrictFoo<'buf>> {
-        if self.is_some() {
-            Some(unsafe { &mut *(self as *mut Self).cast() })
-        } else {
-            None
-        }
-    }
-
-    pub fn take(&mut self) -> Option<WireStrictFoo<'buf>> {
-        if self.is_some() {
-            Some(WireStrictFoo {
-                raw: ::core::mem::replace(&mut self.raw, ::fidl_next::RawWireUnion::null()),
-                _phantom: ::core::marker::PhantomData,
-            })
-        } else {
-            None
-        }
-    }
 }
 
-impl<'buf> Default for WireOptionalStrictFoo<'buf> {
-    fn default() -> Self {
-        Self { raw: ::fidl_next::RawWireUnion::null(), _phantom: ::core::marker::PhantomData }
-    }
-}
-
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalStrictFoo<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalStrictFoo
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -494,11 +402,11 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString<'buf>>(
-                raw, decoder,
-            )?,
+            1 => {
+                ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
+            }
 
             2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
 
@@ -510,7 +418,7 @@ where
     }
 }
 
-impl<'buf> ::core::fmt::Debug for WireOptionalStrictFoo<'buf> {
+impl ::core::fmt::Debug for WireOptionalStrictFoo {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         self.as_ref().fmt(f)
     }
@@ -522,7 +430,7 @@ pub struct ProtocolRequestStrictResponseFlexibleRequest {
 }
 
 impl ::fidl_next::Encodable for ProtocolRequestStrictResponseFlexibleRequest {
-    type Encoded<'buf> = WireProtocolRequestStrictResponseFlexibleRequest<'buf>;
+    type Encoded<'buf> = WireProtocolRequestStrictResponseFlexibleRequest;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ProtocolRequestStrictResponseFlexibleRequest
@@ -551,7 +459,7 @@ where
 
 impl ::fidl_next::EncodableOption for Box<ProtocolRequestStrictResponseFlexibleRequest> {
     type EncodedOption<'buf> =
-        ::fidl_next::WireBox<'buf, WireProtocolRequestStrictResponseFlexibleRequest<'buf>>;
+        ::fidl_next::WireBox<WireProtocolRequestStrictResponseFlexibleRequest>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ProtocolRequestStrictResponseFlexibleRequest>
@@ -575,23 +483,23 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireProtocolRequestStrictResponseFlexibleRequest<'buf>>
+impl ::fidl_next::TakeFrom<WireProtocolRequestStrictResponseFlexibleRequest>
     for ProtocolRequestStrictResponseFlexibleRequest
 {
-    fn take_from(from: &mut WireProtocolRequestStrictResponseFlexibleRequest<'buf>) -> Self {
-        Self { s: ::fidl_next::TakeFrom::take_from(&mut from.s) }
+    fn take_from(from: &WireProtocolRequestStrictResponseFlexibleRequest) -> Self {
+        Self { s: ::fidl_next::TakeFrom::take_from(&from.s) }
     }
 }
 
 /// The wire type corersponding to [`ProtocolRequestStrictResponseFlexibleRequest`].
 #[derive(Debug)]
 #[repr(C)]
-pub struct WireProtocolRequestStrictResponseFlexibleRequest<'buf> {
-    pub s: crate::WireStrictFoo<'buf>,
+pub struct WireProtocolRequestStrictResponseFlexibleRequest {
+    pub s: crate::WireStrictFoo,
 }
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
-    for WireProtocolRequestStrictResponseFlexibleRequest<'buf>
+    for WireProtocolRequestStrictResponseFlexibleRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -620,7 +528,7 @@ pub struct ProtocolRequestStrictResponseFlexibleResponse {
 }
 
 impl ::fidl_next::Encodable for ProtocolRequestStrictResponseFlexibleResponse {
-    type Encoded<'buf> = WireProtocolRequestStrictResponseFlexibleResponse<'buf>;
+    type Encoded<'buf> = WireProtocolRequestStrictResponseFlexibleResponse;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ProtocolRequestStrictResponseFlexibleResponse
@@ -649,7 +557,7 @@ where
 
 impl ::fidl_next::EncodableOption for Box<ProtocolRequestStrictResponseFlexibleResponse> {
     type EncodedOption<'buf> =
-        ::fidl_next::WireBox<'buf, WireProtocolRequestStrictResponseFlexibleResponse<'buf>>;
+        ::fidl_next::WireBox<WireProtocolRequestStrictResponseFlexibleResponse>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ProtocolRequestStrictResponseFlexibleResponse>
@@ -673,23 +581,23 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireProtocolRequestStrictResponseFlexibleResponse<'buf>>
+impl ::fidl_next::TakeFrom<WireProtocolRequestStrictResponseFlexibleResponse>
     for ProtocolRequestStrictResponseFlexibleResponse
 {
-    fn take_from(from: &mut WireProtocolRequestStrictResponseFlexibleResponse<'buf>) -> Self {
-        Self { f: ::fidl_next::TakeFrom::take_from(&mut from.f) }
+    fn take_from(from: &WireProtocolRequestStrictResponseFlexibleResponse) -> Self {
+        Self { f: ::fidl_next::TakeFrom::take_from(&from.f) }
     }
 }
 
 /// The wire type corersponding to [`ProtocolRequestStrictResponseFlexibleResponse`].
 #[derive(Debug)]
 #[repr(C)]
-pub struct WireProtocolRequestStrictResponseFlexibleResponse<'buf> {
-    pub f: crate::WireFlexibleFoo<'buf>,
+pub struct WireProtocolRequestStrictResponseFlexibleResponse {
+    pub f: crate::WireFlexibleFoo,
 }
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
-    for WireProtocolRequestStrictResponseFlexibleResponse<'buf>
+    for WireProtocolRequestStrictResponseFlexibleResponse
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -718,7 +626,7 @@ pub struct ProtocolRequestFlexibleResponseStrictRequest {
 }
 
 impl ::fidl_next::Encodable for ProtocolRequestFlexibleResponseStrictRequest {
-    type Encoded<'buf> = WireProtocolRequestFlexibleResponseStrictRequest<'buf>;
+    type Encoded<'buf> = WireProtocolRequestFlexibleResponseStrictRequest;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ProtocolRequestFlexibleResponseStrictRequest
@@ -747,7 +655,7 @@ where
 
 impl ::fidl_next::EncodableOption for Box<ProtocolRequestFlexibleResponseStrictRequest> {
     type EncodedOption<'buf> =
-        ::fidl_next::WireBox<'buf, WireProtocolRequestFlexibleResponseStrictRequest<'buf>>;
+        ::fidl_next::WireBox<WireProtocolRequestFlexibleResponseStrictRequest>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ProtocolRequestFlexibleResponseStrictRequest>
@@ -771,23 +679,23 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireProtocolRequestFlexibleResponseStrictRequest<'buf>>
+impl ::fidl_next::TakeFrom<WireProtocolRequestFlexibleResponseStrictRequest>
     for ProtocolRequestFlexibleResponseStrictRequest
 {
-    fn take_from(from: &mut WireProtocolRequestFlexibleResponseStrictRequest<'buf>) -> Self {
-        Self { s: ::fidl_next::TakeFrom::take_from(&mut from.s) }
+    fn take_from(from: &WireProtocolRequestFlexibleResponseStrictRequest) -> Self {
+        Self { s: ::fidl_next::TakeFrom::take_from(&from.s) }
     }
 }
 
 /// The wire type corersponding to [`ProtocolRequestFlexibleResponseStrictRequest`].
 #[derive(Debug)]
 #[repr(C)]
-pub struct WireProtocolRequestFlexibleResponseStrictRequest<'buf> {
-    pub s: crate::WireFlexibleFoo<'buf>,
+pub struct WireProtocolRequestFlexibleResponseStrictRequest {
+    pub s: crate::WireFlexibleFoo,
 }
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
-    for WireProtocolRequestFlexibleResponseStrictRequest<'buf>
+    for WireProtocolRequestFlexibleResponseStrictRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -816,7 +724,7 @@ pub struct ProtocolRequestFlexibleResponseStrictResponse {
 }
 
 impl ::fidl_next::Encodable for ProtocolRequestFlexibleResponseStrictResponse {
-    type Encoded<'buf> = WireProtocolRequestFlexibleResponseStrictResponse<'buf>;
+    type Encoded<'buf> = WireProtocolRequestFlexibleResponseStrictResponse;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ProtocolRequestFlexibleResponseStrictResponse
@@ -845,7 +753,7 @@ where
 
 impl ::fidl_next::EncodableOption for Box<ProtocolRequestFlexibleResponseStrictResponse> {
     type EncodedOption<'buf> =
-        ::fidl_next::WireBox<'buf, WireProtocolRequestFlexibleResponseStrictResponse<'buf>>;
+        ::fidl_next::WireBox<WireProtocolRequestFlexibleResponseStrictResponse>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ProtocolRequestFlexibleResponseStrictResponse>
@@ -869,23 +777,23 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireProtocolRequestFlexibleResponseStrictResponse<'buf>>
+impl ::fidl_next::TakeFrom<WireProtocolRequestFlexibleResponseStrictResponse>
     for ProtocolRequestFlexibleResponseStrictResponse
 {
-    fn take_from(from: &mut WireProtocolRequestFlexibleResponseStrictResponse<'buf>) -> Self {
-        Self { f: ::fidl_next::TakeFrom::take_from(&mut from.f) }
+    fn take_from(from: &WireProtocolRequestFlexibleResponseStrictResponse) -> Self {
+        Self { f: ::fidl_next::TakeFrom::take_from(&from.f) }
     }
 }
 
 /// The wire type corersponding to [`ProtocolRequestFlexibleResponseStrictResponse`].
 #[derive(Debug)]
 #[repr(C)]
-pub struct WireProtocolRequestFlexibleResponseStrictResponse<'buf> {
-    pub f: crate::WireStrictFoo<'buf>,
+pub struct WireProtocolRequestFlexibleResponseStrictResponse {
+    pub f: crate::WireStrictFoo,
 }
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
-    for WireProtocolRequestFlexibleResponseStrictResponse<'buf>
+    for WireProtocolRequestFlexibleResponseStrictResponse
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -921,9 +829,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = crate::WireProtocolRequestStrictResponseFlexibleRequest<'buf>;
+        type Request<'buf> = crate::WireProtocolRequestStrictResponseFlexibleRequest;
 
-        type Response<'buf> = crate::WireProtocolRequestStrictResponseFlexibleResponse<'buf>;
+        type Response<'buf> = crate::WireProtocolRequestStrictResponseFlexibleResponse;
     }
 
     pub struct RequestFlexibleResponseStrict;
@@ -933,9 +841,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = crate::WireProtocolRequestFlexibleResponseStrictRequest<'buf>;
+        type Request<'buf> = crate::WireProtocolRequestFlexibleResponseStrictRequest;
 
-        type Response<'buf> = crate::WireProtocolRequestFlexibleResponseStrictResponse<'buf>;
+        type Response<'buf> = crate::WireProtocolRequestFlexibleResponseStrictResponse;
     }
 }
 
@@ -951,7 +859,7 @@ pub trait ProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     where
         for<'buf> ___R: ::fidl_next::Encode<
             ___T::Encoder<'buf>,
-            Encoded<'buf> = crate::WireProtocolRequestStrictResponseFlexibleRequest<'buf>,
+            Encoded<'buf> = crate::WireProtocolRequestStrictResponseFlexibleRequest,
         >;
 
     fn request_flexible_response_strict<___R>(
@@ -964,7 +872,7 @@ pub trait ProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     where
         for<'buf> ___R: ::fidl_next::Encode<
             ___T::Encoder<'buf>,
-            Encoded<'buf> = crate::WireProtocolRequestFlexibleResponseStrictRequest<'buf>,
+            Encoded<'buf> = crate::WireProtocolRequestFlexibleResponseStrictRequest,
         >;
 }
 
@@ -982,7 +890,7 @@ where
     where
         for<'buf> ___R: ::fidl_next::Encode<
             ___T::Encoder<'buf>,
-            Encoded<'buf> = crate::WireProtocolRequestStrictResponseFlexibleRequest<'buf>,
+            Encoded<'buf> = crate::WireProtocolRequestStrictResponseFlexibleRequest,
         >,
     {
         self.as_untyped()
@@ -1000,7 +908,7 @@ where
     where
         for<'buf> ___R: ::fidl_next::Encode<
             ___T::Encoder<'buf>,
-            Encoded<'buf> = crate::WireProtocolRequestFlexibleResponseStrictRequest<'buf>,
+            Encoded<'buf> = crate::WireProtocolRequestFlexibleResponseStrictRequest,
         >,
     {
         self.as_untyped()
@@ -1019,10 +927,10 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: ProtocolClientHandler<___T>,
 
-    for<'buf> crate::WireProtocolRequestStrictResponseFlexibleResponse<'buf>:
+    for<'buf> crate::WireProtocolRequestStrictResponseFlexibleResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 
-    for<'buf> crate::WireProtocolRequestFlexibleResponseStrictResponse<'buf>:
+    for<'buf> crate::WireProtocolRequestFlexibleResponseStrictResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
     fn on_event(
@@ -1075,10 +983,10 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: ProtocolServerHandler<___T>,
 
-    for<'buf> crate::WireProtocolRequestStrictResponseFlexibleRequest<'buf>:
+    for<'buf> crate::WireProtocolRequestStrictResponseFlexibleRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 
-    for<'buf> crate::WireProtocolRequestFlexibleResponseStrictRequest<'buf>:
+    for<'buf> crate::WireProtocolRequestFlexibleResponseStrictRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
     fn on_one_way(

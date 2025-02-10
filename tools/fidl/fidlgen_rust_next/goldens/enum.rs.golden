@@ -39,7 +39,7 @@ impl ::core::convert::From<WireMyEmptyFlexibleEnum> for MyEmptyFlexibleEnum {
 }
 
 impl ::fidl_next::TakeFrom<WireMyEmptyFlexibleEnum> for MyEmptyFlexibleEnum {
-    fn take_from(from: &mut WireMyEmptyFlexibleEnum) -> Self {
+    fn take_from(from: &WireMyEmptyFlexibleEnum) -> Self {
         Self::from(*from)
     }
 }
@@ -122,7 +122,7 @@ impl ::core::convert::From<WireMyFlexibleEnum> for MyFlexibleEnum {
 }
 
 impl ::fidl_next::TakeFrom<WireMyFlexibleEnum> for MyFlexibleEnum {
-    fn take_from(from: &mut WireMyFlexibleEnum) -> Self {
+    fn take_from(from: &WireMyFlexibleEnum) -> Self {
         Self::from(*from)
     }
 }
@@ -224,7 +224,7 @@ impl ::core::convert::From<WireMyFlexibleEnumWithCustomUnknown>
 impl ::fidl_next::TakeFrom<WireMyFlexibleEnumWithCustomUnknown>
     for MyFlexibleEnumWithCustomUnknown
 {
-    fn take_from(from: &mut WireMyFlexibleEnumWithCustomUnknown) -> Self {
+    fn take_from(from: &WireMyFlexibleEnumWithCustomUnknown) -> Self {
         Self::from(*from)
     }
 }
@@ -323,7 +323,7 @@ impl ::core::convert::From<WireMyStrictEnum> for MyStrictEnum {
 }
 
 impl ::fidl_next::TakeFrom<WireMyStrictEnum> for MyStrictEnum {
-    fn take_from(from: &mut WireMyStrictEnum) -> Self {
+    fn take_from(from: &WireMyStrictEnum) -> Self {
         Self::from(*from)
     }
 }

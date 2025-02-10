@@ -27,7 +27,7 @@ impl {{ name }} {
 }
 
 impl ::fidl_next::Encodable for {{ name }} {
-    type Encoded<'buf> = {{ wire_name }}<'buf>;
+    type Encoded<'buf> = {{ wire_name }};
 }
 
 impl<___E> ::fidl_next::Encode<___E> for {{ name }}
@@ -75,12 +75,12 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<{{ wire_name }}<'buf>> for {{ name }} {
-    fn take_from(from: &mut {{ wire_name }}<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<{{ wire_name }}> for {{ name }} {
+    fn take_from(from: &{{ wire_name }}) -> Self {
         Self {
             {% for member in table.members %}
                 {% let member_name = member.name.snake() %}
-                {{ member_name|ident }}: from.{{ member_name }}_mut().map(::fidl_next::TakeFrom::take_from),
+                {{ member_name|ident }}: from.{{ member_name }}().map(::fidl_next::TakeFrom::take_from),
             {% endfor %}
         }
     }
@@ -88,11 +88,11 @@ impl<'buf> ::fidl_next::TakeFrom<{{ wire_name }}<'buf>> for {{ name }} {
 
 /// The wire type corresponding to [`{{ name }}`].
 #[repr(C)]
-pub struct {{ wire_name }}<'buf> {
-    table: ::fidl_next::WireTable<'buf>,
+pub struct {{ wire_name }} {
+    table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for {{ wire_name }}<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for {{ wire_name }}
 where
     ___D: ::fidl_next::Decoder<'buf> + ?Sized,
     {% if table.is_resource %}
@@ -176,7 +176,7 @@ where
     }
 }
 
-impl<'buf> {{ wire_name }}<'buf> {
+impl {{ wire_name }} {
     {% for member in table.members %}
         {% let member_name = member.name.snake() %}
 
@@ -185,23 +185,11 @@ impl<'buf> {{ wire_name }}<'buf> {
                 Some(self.table.get({{ member.ordinal }})?.deref_unchecked())
             }
         }
-
-        pub fn {{ member_name }}_mut(&mut self) -> Option<&mut {{ context.wire_type(member.ty) }}> {
-            unsafe {
-                Some(self.table.get_mut({{ member.ordinal }})?.deref_mut_unchecked())
-            }
-        }
-
-        pub fn take_{{ member_name }}(&mut self) -> Option<{{ context.wire_type(member.ty) }}> {
-            unsafe {
-                Some(self.table.get_mut({{ member.ordinal }})?.take_unchecked())
-            }
-        }
     {% endfor %}
 }
 
 {% if context.config.emit_debug_impls %}
-    impl ::core::fmt::Debug for {{ wire_name }}<'_> {
+    impl ::core::fmt::Debug for {{ wire_name }} {
         fn fmt(
             &self,
             f: &mut ::core::fmt::Formatter<'_>,

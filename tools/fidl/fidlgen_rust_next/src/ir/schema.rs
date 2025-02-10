@@ -51,6 +51,7 @@ impl Schema {
         }
     }
 
+    #[expect(dead_code)]
     pub fn get_type_shape(&self, ident: &CompId) -> Option<&TypeShape> {
         let library = ident.library();
         if library == self.name {

@@ -65,7 +65,7 @@ impl<E: ?Sized> Encode<E> for FrameworkError {
 }
 
 impl TakeFrom<WireFrameworkError> for FrameworkError {
-    fn take_from(from: &mut WireFrameworkError) -> Self {
+    fn take_from(from: &WireFrameworkError) -> Self {
         Self::from(*from)
     }
 }

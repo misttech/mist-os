@@ -8,7 +8,7 @@ pub enum UnionSize12Alignment4 {
 }
 
 impl ::fidl_next::Encodable for UnionSize12Alignment4 {
-    type Encoded<'buf> = WireUnionSize12Alignment4<'buf>;
+    type Encoded<'buf> = WireUnionSize12Alignment4;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for UnionSize12Alignment4
@@ -22,7 +22,7 @@ where
         encoder: &mut ___E,
         slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireUnionSize12Alignment4 { raw, _phantom: _ } = slot);
+        ::fidl_next::munge!(let WireUnionSize12Alignment4 { raw } = slot);
 
         match self {
             Self::Variant(value) => {
@@ -35,7 +35,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<UnionSize12Alignment4> {
-    type EncodedOption<'buf> = WireOptionalUnionSize12Alignment4<'buf>;
+    type EncodedOption<'buf> = WireOptionalUnionSize12Alignment4;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<UnionSize12Alignment4>
@@ -48,7 +48,7 @@ where
         encoder: &mut ___E,
         mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalUnionSize12Alignment4 { raw, _phantom: _ } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalUnionSize12Alignment4 { raw } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
@@ -61,11 +61,11 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireUnionSize12Alignment4<'buf>> for UnionSize12Alignment4 {
-    fn take_from(from: &mut WireUnionSize12Alignment4<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<WireUnionSize12Alignment4> for UnionSize12Alignment4 {
+    fn take_from(from: &WireUnionSize12Alignment4) -> Self {
         match from.raw.ordinal() {
             1 => Self::Variant(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get_mut().deref_mut_unchecked()
+                from.raw.get().deref_unchecked()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -73,11 +73,11 @@ impl<'buf> ::fidl_next::TakeFrom<WireUnionSize12Alignment4<'buf>> for UnionSize1
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireOptionalUnionSize12Alignment4<'buf>>
+impl ::fidl_next::TakeFrom<WireOptionalUnionSize12Alignment4>
     for Option<Box<UnionSize12Alignment4>>
 {
-    fn take_from(from: &mut WireOptionalUnionSize12Alignment4<'buf>) -> Self {
-        if let Some(inner) = from.as_mut() {
+    fn take_from(from: &WireOptionalUnionSize12Alignment4) -> Self {
+        if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
         } else {
             None
@@ -87,22 +87,17 @@ impl<'buf> ::fidl_next::TakeFrom<WireOptionalUnionSize12Alignment4<'buf>>
 
 /// The wire type corresponding to [`UnionSize12Alignment4`].
 #[repr(transparent)]
-pub struct WireUnionSize12Alignment4<'buf> {
+pub struct WireUnionSize12Alignment4 {
     raw: ::fidl_next::RawWireUnion,
-    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
 pub mod union_size12_alignment4 {
     pub enum Ref<'union> {
         Variant(&'union [u8; 6]),
     }
-
-    pub enum Mut<'union> {
-        Variant(&'union mut [u8; 6]),
-    }
 }
 
-impl<'buf> WireUnionSize12Alignment4<'buf> {
+impl WireUnionSize12Alignment4 {
     pub fn as_ref(&self) -> crate::union_size12_alignment4::Ref<'_> {
         match self.raw.ordinal() {
             1 => crate::union_size12_alignment4::Ref::Variant(unsafe {
@@ -112,19 +107,9 @@ impl<'buf> WireUnionSize12Alignment4<'buf> {
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
-
-    pub fn as_mut(&mut self) -> crate::union_size12_alignment4::Mut<'_> {
-        match self.raw.ordinal() {
-            1 => crate::union_size12_alignment4::Mut::Variant(unsafe {
-                self.raw.get_mut().deref_mut_unchecked()
-            }),
-
-            _ => unsafe { ::core::hint::unreachable_unchecked() },
-        }
-    }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireUnionSize12Alignment4<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireUnionSize12Alignment4
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -134,7 +119,7 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl_next::RawWireUnion::decode_as::<___D, [u8; 6]>(raw, decoder)?,
 
@@ -145,7 +130,7 @@ where
     }
 }
 
-impl<'buf> ::core::fmt::Debug for WireUnionSize12Alignment4<'buf> {
+impl ::core::fmt::Debug for WireUnionSize12Alignment4 {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
             1 => unsafe { self.raw.get().deref_unchecked::<[u8; 6]>().fmt(f) },
@@ -155,12 +140,11 @@ impl<'buf> ::core::fmt::Debug for WireUnionSize12Alignment4<'buf> {
 }
 
 #[repr(transparent)]
-pub struct WireOptionalUnionSize12Alignment4<'buf> {
+pub struct WireOptionalUnionSize12Alignment4 {
     raw: ::fidl_next::RawWireUnion,
-    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-impl<'buf> WireOptionalUnionSize12Alignment4<'buf> {
+impl WireOptionalUnionSize12Alignment4 {
     pub fn is_some(&self) -> bool {
         self.raw.is_some()
     }
@@ -169,41 +153,16 @@ impl<'buf> WireOptionalUnionSize12Alignment4<'buf> {
         self.raw.is_none()
     }
 
-    pub fn as_ref(&self) -> Option<&WireUnionSize12Alignment4<'buf>> {
+    pub fn as_ref(&self) -> Option<&WireUnionSize12Alignment4> {
         if self.is_some() {
             Some(unsafe { &*(self as *const Self).cast() })
         } else {
             None
         }
     }
-
-    pub fn as_mut(&mut self) -> Option<&mut WireUnionSize12Alignment4<'buf>> {
-        if self.is_some() {
-            Some(unsafe { &mut *(self as *mut Self).cast() })
-        } else {
-            None
-        }
-    }
-
-    pub fn take(&mut self) -> Option<WireUnionSize12Alignment4<'buf>> {
-        if self.is_some() {
-            Some(WireUnionSize12Alignment4 {
-                raw: ::core::mem::replace(&mut self.raw, ::fidl_next::RawWireUnion::null()),
-                _phantom: ::core::marker::PhantomData,
-            })
-        } else {
-            None
-        }
-    }
 }
 
-impl<'buf> Default for WireOptionalUnionSize12Alignment4<'buf> {
-    fn default() -> Self {
-        Self { raw: ::fidl_next::RawWireUnion::null(), _phantom: ::core::marker::PhantomData }
-    }
-}
-
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalUnionSize12Alignment4<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalUnionSize12Alignment4
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -213,7 +172,7 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl_next::RawWireUnion::decode_as::<___D, [u8; 6]>(raw, decoder)?,
 
@@ -225,7 +184,7 @@ where
     }
 }
 
-impl<'buf> ::core::fmt::Debug for WireOptionalUnionSize12Alignment4<'buf> {
+impl ::core::fmt::Debug for WireOptionalUnionSize12Alignment4 {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         self.as_ref().fmt(f)
     }
@@ -241,7 +200,7 @@ pub struct SandwichUnionSize12Alignment4 {
 }
 
 impl ::fidl_next::Encodable for SandwichUnionSize12Alignment4 {
-    type Encoded<'buf> = WireSandwichUnionSize12Alignment4<'buf>;
+    type Encoded<'buf> = WireSandwichUnionSize12Alignment4;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for SandwichUnionSize12Alignment4
@@ -275,7 +234,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<SandwichUnionSize12Alignment4> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireSandwichUnionSize12Alignment4<'buf>>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireSandwichUnionSize12Alignment4>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<SandwichUnionSize12Alignment4>
@@ -299,16 +258,14 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireSandwichUnionSize12Alignment4<'buf>>
-    for SandwichUnionSize12Alignment4
-{
-    fn take_from(from: &mut WireSandwichUnionSize12Alignment4<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<WireSandwichUnionSize12Alignment4> for SandwichUnionSize12Alignment4 {
+    fn take_from(from: &WireSandwichUnionSize12Alignment4) -> Self {
         Self {
-            before: ::fidl_next::TakeFrom::take_from(&mut from.before),
+            before: ::fidl_next::TakeFrom::take_from(&from.before),
 
-            union_: ::fidl_next::TakeFrom::take_from(&mut from.union_),
+            union_: ::fidl_next::TakeFrom::take_from(&from.union_),
 
-            after: ::fidl_next::TakeFrom::take_from(&mut from.after),
+            after: ::fidl_next::TakeFrom::take_from(&from.after),
         }
     }
 }
@@ -316,15 +273,15 @@ impl<'buf> ::fidl_next::TakeFrom<WireSandwichUnionSize12Alignment4<'buf>>
 /// The wire type corersponding to [`SandwichUnionSize12Alignment4`].
 #[derive(Debug)]
 #[repr(C)]
-pub struct WireSandwichUnionSize12Alignment4<'buf> {
+pub struct WireSandwichUnionSize12Alignment4 {
     pub before: ::fidl_next::u32_le,
 
-    pub union_: crate::WireUnionSize12Alignment4<'buf>,
+    pub union_: crate::WireUnionSize12Alignment4,
 
     pub after: ::fidl_next::i32_le,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSandwichUnionSize12Alignment4<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSandwichUnionSize12Alignment4
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -390,7 +347,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<StructSize16Alignment8> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireStructSize16Alignment8>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireStructSize16Alignment8>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<StructSize16Alignment8>
@@ -415,11 +372,11 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStructSize16Alignment8> for StructSize16Alignment8 {
-    fn take_from(from: &mut WireStructSize16Alignment8) -> Self {
+    fn take_from(from: &WireStructSize16Alignment8) -> Self {
         Self {
-            f1: ::fidl_next::TakeFrom::take_from(&mut from.f1),
+            f1: ::fidl_next::TakeFrom::take_from(&from.f1),
 
-            f2: ::fidl_next::TakeFrom::take_from(&mut from.f2),
+            f2: ::fidl_next::TakeFrom::take_from(&from.f2),
         }
     }
 }
@@ -463,7 +420,7 @@ pub enum UnionSize24Alignment8 {
 }
 
 impl ::fidl_next::Encodable for UnionSize24Alignment8 {
-    type Encoded<'buf> = WireUnionSize24Alignment8<'buf>;
+    type Encoded<'buf> = WireUnionSize24Alignment8;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for UnionSize24Alignment8
@@ -477,7 +434,7 @@ where
         encoder: &mut ___E,
         slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireUnionSize24Alignment8 { raw, _phantom: _ } = slot);
+        ::fidl_next::munge!(let WireUnionSize24Alignment8 { raw } = slot);
 
         match self {
             Self::Variant(value) => ::fidl_next::RawWireUnion::encode_as::<
@@ -491,7 +448,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<UnionSize24Alignment8> {
-    type EncodedOption<'buf> = WireOptionalUnionSize24Alignment8<'buf>;
+    type EncodedOption<'buf> = WireOptionalUnionSize24Alignment8;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<UnionSize24Alignment8>
@@ -504,7 +461,7 @@ where
         encoder: &mut ___E,
         mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalUnionSize24Alignment8 { raw, _phantom: _ } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalUnionSize24Alignment8 { raw } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
@@ -517,11 +474,11 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireUnionSize24Alignment8<'buf>> for UnionSize24Alignment8 {
-    fn take_from(from: &mut WireUnionSize24Alignment8<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<WireUnionSize24Alignment8> for UnionSize24Alignment8 {
+    fn take_from(from: &WireUnionSize24Alignment8) -> Self {
         match from.raw.ordinal() {
             1 => Self::Variant(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get_mut().deref_mut_unchecked()
+                from.raw.get().deref_unchecked()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -529,11 +486,11 @@ impl<'buf> ::fidl_next::TakeFrom<WireUnionSize24Alignment8<'buf>> for UnionSize2
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireOptionalUnionSize24Alignment8<'buf>>
+impl ::fidl_next::TakeFrom<WireOptionalUnionSize24Alignment8>
     for Option<Box<UnionSize24Alignment8>>
 {
-    fn take_from(from: &mut WireOptionalUnionSize24Alignment8<'buf>) -> Self {
-        if let Some(inner) = from.as_mut() {
+    fn take_from(from: &WireOptionalUnionSize24Alignment8) -> Self {
+        if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
         } else {
             None
@@ -543,22 +500,17 @@ impl<'buf> ::fidl_next::TakeFrom<WireOptionalUnionSize24Alignment8<'buf>>
 
 /// The wire type corresponding to [`UnionSize24Alignment8`].
 #[repr(transparent)]
-pub struct WireUnionSize24Alignment8<'buf> {
+pub struct WireUnionSize24Alignment8 {
     raw: ::fidl_next::RawWireUnion,
-    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
 pub mod union_size24_alignment8 {
     pub enum Ref<'union> {
         Variant(&'union crate::WireStructSize16Alignment8),
     }
-
-    pub enum Mut<'union> {
-        Variant(&'union mut crate::WireStructSize16Alignment8),
-    }
 }
 
-impl<'buf> WireUnionSize24Alignment8<'buf> {
+impl WireUnionSize24Alignment8 {
     pub fn as_ref(&self) -> crate::union_size24_alignment8::Ref<'_> {
         match self.raw.ordinal() {
             1 => crate::union_size24_alignment8::Ref::Variant(unsafe {
@@ -568,19 +520,9 @@ impl<'buf> WireUnionSize24Alignment8<'buf> {
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
-
-    pub fn as_mut(&mut self) -> crate::union_size24_alignment8::Mut<'_> {
-        match self.raw.ordinal() {
-            1 => crate::union_size24_alignment8::Mut::Variant(unsafe {
-                self.raw.get_mut().deref_mut_unchecked()
-            }),
-
-            _ => unsafe { ::core::hint::unreachable_unchecked() },
-        }
-    }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireUnionSize24Alignment8<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireUnionSize24Alignment8
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -590,7 +532,7 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl_next::RawWireUnion::decode_as::<___D, crate::WireStructSize16Alignment8>(
                 raw, decoder,
@@ -603,7 +545,7 @@ where
     }
 }
 
-impl<'buf> ::core::fmt::Debug for WireUnionSize24Alignment8<'buf> {
+impl ::core::fmt::Debug for WireUnionSize24Alignment8 {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
             1 => unsafe {
@@ -615,12 +557,11 @@ impl<'buf> ::core::fmt::Debug for WireUnionSize24Alignment8<'buf> {
 }
 
 #[repr(transparent)]
-pub struct WireOptionalUnionSize24Alignment8<'buf> {
+pub struct WireOptionalUnionSize24Alignment8 {
     raw: ::fidl_next::RawWireUnion,
-    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-impl<'buf> WireOptionalUnionSize24Alignment8<'buf> {
+impl WireOptionalUnionSize24Alignment8 {
     pub fn is_some(&self) -> bool {
         self.raw.is_some()
     }
@@ -629,41 +570,16 @@ impl<'buf> WireOptionalUnionSize24Alignment8<'buf> {
         self.raw.is_none()
     }
 
-    pub fn as_ref(&self) -> Option<&WireUnionSize24Alignment8<'buf>> {
+    pub fn as_ref(&self) -> Option<&WireUnionSize24Alignment8> {
         if self.is_some() {
             Some(unsafe { &*(self as *const Self).cast() })
         } else {
             None
         }
     }
-
-    pub fn as_mut(&mut self) -> Option<&mut WireUnionSize24Alignment8<'buf>> {
-        if self.is_some() {
-            Some(unsafe { &mut *(self as *mut Self).cast() })
-        } else {
-            None
-        }
-    }
-
-    pub fn take(&mut self) -> Option<WireUnionSize24Alignment8<'buf>> {
-        if self.is_some() {
-            Some(WireUnionSize24Alignment8 {
-                raw: ::core::mem::replace(&mut self.raw, ::fidl_next::RawWireUnion::null()),
-                _phantom: ::core::marker::PhantomData,
-            })
-        } else {
-            None
-        }
-    }
 }
 
-impl<'buf> Default for WireOptionalUnionSize24Alignment8<'buf> {
-    fn default() -> Self {
-        Self { raw: ::fidl_next::RawWireUnion::null(), _phantom: ::core::marker::PhantomData }
-    }
-}
-
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalUnionSize24Alignment8<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalUnionSize24Alignment8
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -673,7 +589,7 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl_next::RawWireUnion::decode_as::<___D, crate::WireStructSize16Alignment8>(
                 raw, decoder,
@@ -687,7 +603,7 @@ where
     }
 }
 
-impl<'buf> ::core::fmt::Debug for WireOptionalUnionSize24Alignment8<'buf> {
+impl ::core::fmt::Debug for WireOptionalUnionSize24Alignment8 {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         self.as_ref().fmt(f)
     }
@@ -703,7 +619,7 @@ pub struct SandwichUnionSize24Alignment8 {
 }
 
 impl ::fidl_next::Encodable for SandwichUnionSize24Alignment8 {
-    type Encoded<'buf> = WireSandwichUnionSize24Alignment8<'buf>;
+    type Encoded<'buf> = WireSandwichUnionSize24Alignment8;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for SandwichUnionSize24Alignment8
@@ -737,7 +653,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<SandwichUnionSize24Alignment8> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireSandwichUnionSize24Alignment8<'buf>>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireSandwichUnionSize24Alignment8>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<SandwichUnionSize24Alignment8>
@@ -761,16 +677,14 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireSandwichUnionSize24Alignment8<'buf>>
-    for SandwichUnionSize24Alignment8
-{
-    fn take_from(from: &mut WireSandwichUnionSize24Alignment8<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<WireSandwichUnionSize24Alignment8> for SandwichUnionSize24Alignment8 {
+    fn take_from(from: &WireSandwichUnionSize24Alignment8) -> Self {
         Self {
-            before: ::fidl_next::TakeFrom::take_from(&mut from.before),
+            before: ::fidl_next::TakeFrom::take_from(&from.before),
 
-            union_: ::fidl_next::TakeFrom::take_from(&mut from.union_),
+            union_: ::fidl_next::TakeFrom::take_from(&from.union_),
 
-            after: ::fidl_next::TakeFrom::take_from(&mut from.after),
+            after: ::fidl_next::TakeFrom::take_from(&from.after),
         }
     }
 }
@@ -778,15 +692,15 @@ impl<'buf> ::fidl_next::TakeFrom<WireSandwichUnionSize24Alignment8<'buf>>
 /// The wire type corersponding to [`SandwichUnionSize24Alignment8`].
 #[derive(Debug)]
 #[repr(C)]
-pub struct WireSandwichUnionSize24Alignment8<'buf> {
+pub struct WireSandwichUnionSize24Alignment8 {
     pub before: ::fidl_next::u32_le,
 
-    pub union_: crate::WireUnionSize24Alignment8<'buf>,
+    pub union_: crate::WireUnionSize24Alignment8,
 
     pub after: ::fidl_next::u32_le,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSandwichUnionSize24Alignment8<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSandwichUnionSize24Alignment8
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -821,7 +735,7 @@ pub enum UnionSize36Alignment4 {
 }
 
 impl ::fidl_next::Encodable for UnionSize36Alignment4 {
-    type Encoded<'buf> = WireUnionSize36Alignment4<'buf>;
+    type Encoded<'buf> = WireUnionSize36Alignment4;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for UnionSize36Alignment4
@@ -835,7 +749,7 @@ where
         encoder: &mut ___E,
         slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireUnionSize36Alignment4 { raw, _phantom: _ } = slot);
+        ::fidl_next::munge!(let WireUnionSize36Alignment4 { raw } = slot);
 
         match self {
             Self::Variant(value) => {
@@ -848,7 +762,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<UnionSize36Alignment4> {
-    type EncodedOption<'buf> = WireOptionalUnionSize36Alignment4<'buf>;
+    type EncodedOption<'buf> = WireOptionalUnionSize36Alignment4;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<UnionSize36Alignment4>
@@ -861,7 +775,7 @@ where
         encoder: &mut ___E,
         mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalUnionSize36Alignment4 { raw, _phantom: _ } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalUnionSize36Alignment4 { raw } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
@@ -874,11 +788,11 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireUnionSize36Alignment4<'buf>> for UnionSize36Alignment4 {
-    fn take_from(from: &mut WireUnionSize36Alignment4<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<WireUnionSize36Alignment4> for UnionSize36Alignment4 {
+    fn take_from(from: &WireUnionSize36Alignment4) -> Self {
         match from.raw.ordinal() {
             1 => Self::Variant(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get_mut().deref_mut_unchecked()
+                from.raw.get().deref_unchecked()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -886,11 +800,11 @@ impl<'buf> ::fidl_next::TakeFrom<WireUnionSize36Alignment4<'buf>> for UnionSize3
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireOptionalUnionSize36Alignment4<'buf>>
+impl ::fidl_next::TakeFrom<WireOptionalUnionSize36Alignment4>
     for Option<Box<UnionSize36Alignment4>>
 {
-    fn take_from(from: &mut WireOptionalUnionSize36Alignment4<'buf>) -> Self {
-        if let Some(inner) = from.as_mut() {
+    fn take_from(from: &WireOptionalUnionSize36Alignment4) -> Self {
+        if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
         } else {
             None
@@ -900,22 +814,17 @@ impl<'buf> ::fidl_next::TakeFrom<WireOptionalUnionSize36Alignment4<'buf>>
 
 /// The wire type corresponding to [`UnionSize36Alignment4`].
 #[repr(transparent)]
-pub struct WireUnionSize36Alignment4<'buf> {
+pub struct WireUnionSize36Alignment4 {
     raw: ::fidl_next::RawWireUnion,
-    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
 pub mod union_size36_alignment4 {
     pub enum Ref<'union> {
         Variant(&'union [u8; 32]),
     }
-
-    pub enum Mut<'union> {
-        Variant(&'union mut [u8; 32]),
-    }
 }
 
-impl<'buf> WireUnionSize36Alignment4<'buf> {
+impl WireUnionSize36Alignment4 {
     pub fn as_ref(&self) -> crate::union_size36_alignment4::Ref<'_> {
         match self.raw.ordinal() {
             1 => crate::union_size36_alignment4::Ref::Variant(unsafe {
@@ -925,19 +834,9 @@ impl<'buf> WireUnionSize36Alignment4<'buf> {
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
-
-    pub fn as_mut(&mut self) -> crate::union_size36_alignment4::Mut<'_> {
-        match self.raw.ordinal() {
-            1 => crate::union_size36_alignment4::Mut::Variant(unsafe {
-                self.raw.get_mut().deref_mut_unchecked()
-            }),
-
-            _ => unsafe { ::core::hint::unreachable_unchecked() },
-        }
-    }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireUnionSize36Alignment4<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireUnionSize36Alignment4
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -947,7 +846,7 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl_next::RawWireUnion::decode_as::<___D, [u8; 32]>(raw, decoder)?,
 
@@ -958,7 +857,7 @@ where
     }
 }
 
-impl<'buf> ::core::fmt::Debug for WireUnionSize36Alignment4<'buf> {
+impl ::core::fmt::Debug for WireUnionSize36Alignment4 {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
             1 => unsafe { self.raw.get().deref_unchecked::<[u8; 32]>().fmt(f) },
@@ -968,12 +867,11 @@ impl<'buf> ::core::fmt::Debug for WireUnionSize36Alignment4<'buf> {
 }
 
 #[repr(transparent)]
-pub struct WireOptionalUnionSize36Alignment4<'buf> {
+pub struct WireOptionalUnionSize36Alignment4 {
     raw: ::fidl_next::RawWireUnion,
-    _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-impl<'buf> WireOptionalUnionSize36Alignment4<'buf> {
+impl WireOptionalUnionSize36Alignment4 {
     pub fn is_some(&self) -> bool {
         self.raw.is_some()
     }
@@ -982,41 +880,16 @@ impl<'buf> WireOptionalUnionSize36Alignment4<'buf> {
         self.raw.is_none()
     }
 
-    pub fn as_ref(&self) -> Option<&WireUnionSize36Alignment4<'buf>> {
+    pub fn as_ref(&self) -> Option<&WireUnionSize36Alignment4> {
         if self.is_some() {
             Some(unsafe { &*(self as *const Self).cast() })
         } else {
             None
         }
     }
-
-    pub fn as_mut(&mut self) -> Option<&mut WireUnionSize36Alignment4<'buf>> {
-        if self.is_some() {
-            Some(unsafe { &mut *(self as *mut Self).cast() })
-        } else {
-            None
-        }
-    }
-
-    pub fn take(&mut self) -> Option<WireUnionSize36Alignment4<'buf>> {
-        if self.is_some() {
-            Some(WireUnionSize36Alignment4 {
-                raw: ::core::mem::replace(&mut self.raw, ::fidl_next::RawWireUnion::null()),
-                _phantom: ::core::marker::PhantomData,
-            })
-        } else {
-            None
-        }
-    }
 }
 
-impl<'buf> Default for WireOptionalUnionSize36Alignment4<'buf> {
-    fn default() -> Self {
-        Self { raw: ::fidl_next::RawWireUnion::null(), _phantom: ::core::marker::PhantomData }
-    }
-}
-
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalUnionSize36Alignment4<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalUnionSize36Alignment4
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -1026,7 +899,7 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl_next::RawWireUnion::decode_as::<___D, [u8; 32]>(raw, decoder)?,
 
@@ -1038,7 +911,7 @@ where
     }
 }
 
-impl<'buf> ::core::fmt::Debug for WireOptionalUnionSize36Alignment4<'buf> {
+impl ::core::fmt::Debug for WireOptionalUnionSize36Alignment4 {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         self.as_ref().fmt(f)
     }
@@ -1054,7 +927,7 @@ pub struct SandwichUnionSize36Alignment4 {
 }
 
 impl ::fidl_next::Encodable for SandwichUnionSize36Alignment4 {
-    type Encoded<'buf> = WireSandwichUnionSize36Alignment4<'buf>;
+    type Encoded<'buf> = WireSandwichUnionSize36Alignment4;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for SandwichUnionSize36Alignment4
@@ -1088,7 +961,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<SandwichUnionSize36Alignment4> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireSandwichUnionSize36Alignment4<'buf>>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireSandwichUnionSize36Alignment4>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<SandwichUnionSize36Alignment4>
@@ -1112,16 +985,14 @@ where
     }
 }
 
-impl<'buf> ::fidl_next::TakeFrom<WireSandwichUnionSize36Alignment4<'buf>>
-    for SandwichUnionSize36Alignment4
-{
-    fn take_from(from: &mut WireSandwichUnionSize36Alignment4<'buf>) -> Self {
+impl ::fidl_next::TakeFrom<WireSandwichUnionSize36Alignment4> for SandwichUnionSize36Alignment4 {
+    fn take_from(from: &WireSandwichUnionSize36Alignment4) -> Self {
         Self {
-            before: ::fidl_next::TakeFrom::take_from(&mut from.before),
+            before: ::fidl_next::TakeFrom::take_from(&from.before),
 
-            union_: ::fidl_next::TakeFrom::take_from(&mut from.union_),
+            union_: ::fidl_next::TakeFrom::take_from(&from.union_),
 
-            after: ::fidl_next::TakeFrom::take_from(&mut from.after),
+            after: ::fidl_next::TakeFrom::take_from(&from.after),
         }
     }
 }
@@ -1129,15 +1000,15 @@ impl<'buf> ::fidl_next::TakeFrom<WireSandwichUnionSize36Alignment4<'buf>>
 /// The wire type corersponding to [`SandwichUnionSize36Alignment4`].
 #[derive(Debug)]
 #[repr(C)]
-pub struct WireSandwichUnionSize36Alignment4<'buf> {
+pub struct WireSandwichUnionSize36Alignment4 {
     pub before: ::fidl_next::u32_le,
 
-    pub union_: crate::WireUnionSize36Alignment4<'buf>,
+    pub union_: crate::WireUnionSize36Alignment4,
 
     pub after: ::fidl_next::u32_le,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSandwichUnionSize36Alignment4<'buf>
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSandwichUnionSize36Alignment4
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -1184,7 +1055,7 @@ where
         encoder: &mut ___E,
         slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireUnionSize8Alignment4 { raw, _phantom: _ } = slot);
+        ::fidl_next::munge!(let WireUnionSize8Alignment4 { raw } = slot);
 
         match self {
             Self::Variant(value) => {
@@ -1210,7 +1081,7 @@ where
         encoder: &mut ___E,
         mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
     ) -> Result<(), ::fidl_next::EncodeError> {
-        ::fidl_next::munge!(let WireOptionalUnionSize8Alignment4 { raw, _phantom: _ } = slot.as_mut());
+        ::fidl_next::munge!(let WireOptionalUnionSize8Alignment4 { raw } = slot.as_mut());
 
         if let Some(inner) = this {
             let slot = unsafe { ::fidl_next::Slot::new_unchecked(slot.as_mut_ptr().cast()) };
@@ -1224,10 +1095,10 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireUnionSize8Alignment4> for UnionSize8Alignment4 {
-    fn take_from(from: &mut WireUnionSize8Alignment4) -> Self {
+    fn take_from(from: &WireUnionSize8Alignment4) -> Self {
         match from.raw.ordinal() {
             1 => Self::Variant(::fidl_next::TakeFrom::take_from(unsafe {
-                from.raw.get_mut().deref_mut_unchecked()
+                from.raw.get().deref_unchecked()
             })),
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -1236,8 +1107,8 @@ impl ::fidl_next::TakeFrom<WireUnionSize8Alignment4> for UnionSize8Alignment4 {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalUnionSize8Alignment4> for Option<Box<UnionSize8Alignment4>> {
-    fn take_from(from: &mut WireOptionalUnionSize8Alignment4) -> Self {
-        if let Some(inner) = from.as_mut() {
+    fn take_from(from: &WireOptionalUnionSize8Alignment4) -> Self {
+        if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
         } else {
             None
@@ -1249,16 +1120,11 @@ impl ::fidl_next::TakeFrom<WireOptionalUnionSize8Alignment4> for Option<Box<Unio
 #[repr(transparent)]
 pub struct WireUnionSize8Alignment4 {
     raw: ::fidl_next::RawWireUnion,
-    _phantom: ::core::marker::PhantomData<()>,
 }
 
 pub mod union_size8_alignment4 {
     pub enum Ref<'union> {
         Variant(&'union ::fidl_next::u32_le),
-    }
-
-    pub enum Mut<'union> {
-        Variant(&'union mut ::fidl_next::u32_le),
     }
 }
 
@@ -1272,25 +1138,12 @@ impl WireUnionSize8Alignment4 {
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
-
-    pub fn as_mut(&mut self) -> crate::union_size8_alignment4::Mut<'_> {
-        match self.raw.ordinal() {
-            1 => crate::union_size8_alignment4::Mut::Variant(unsafe {
-                self.raw.get_mut().deref_mut_unchecked()
-            }),
-
-            _ => unsafe { ::core::hint::unreachable_unchecked() },
-        }
-    }
 }
 
 impl Clone for WireUnionSize8Alignment4 {
     fn clone(&self) -> Self {
         match self.raw.ordinal() {
-            1 => Self {
-                raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() },
-                _phantom: ::core::marker::PhantomData,
-            },
+            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -1305,7 +1158,7 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
                 raw, decoder,
@@ -1330,7 +1183,6 @@ impl ::core::fmt::Debug for WireUnionSize8Alignment4 {
 #[repr(transparent)]
 pub struct WireOptionalUnionSize8Alignment4 {
     raw: ::fidl_next::RawWireUnion,
-    _phantom: ::core::marker::PhantomData<()>,
 }
 
 impl WireOptionalUnionSize8Alignment4 {
@@ -1349,47 +1201,16 @@ impl WireOptionalUnionSize8Alignment4 {
             None
         }
     }
-
-    pub fn as_mut(&mut self) -> Option<&mut WireUnionSize8Alignment4> {
-        if self.is_some() {
-            Some(unsafe { &mut *(self as *mut Self).cast() })
-        } else {
-            None
-        }
-    }
-
-    pub fn take(&mut self) -> Option<WireUnionSize8Alignment4> {
-        if self.is_some() {
-            Some(WireUnionSize8Alignment4 {
-                raw: ::core::mem::replace(&mut self.raw, ::fidl_next::RawWireUnion::null()),
-                _phantom: ::core::marker::PhantomData,
-            })
-        } else {
-            None
-        }
-    }
-}
-
-impl Default for WireOptionalUnionSize8Alignment4 {
-    fn default() -> Self {
-        Self { raw: ::fidl_next::RawWireUnion::null(), _phantom: ::core::marker::PhantomData }
-    }
 }
 
 impl Clone for WireOptionalUnionSize8Alignment4 {
     fn clone(&self) -> Self {
         if self.is_none() {
-            return WireOptionalUnionSize8Alignment4 {
-                raw: ::fidl_next::RawWireUnion::null(),
-                _phantom: ::core::marker::PhantomData,
-            };
+            return WireOptionalUnionSize8Alignment4 { raw: ::fidl_next::RawWireUnion::absent() };
         }
 
         match self.raw.ordinal() {
-            1 => Self {
-                raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() },
-                _phantom: ::core::marker::PhantomData,
-            },
+            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -1404,7 +1225,7 @@ where
         mut slot: ::fidl_next::Slot<'_, Self>,
         decoder: &mut ___D,
     ) -> Result<(), ::fidl_next::DecodeError> {
-        ::fidl_next::munge!(let Self { mut raw, _phantom: _ } = slot.as_mut());
+        ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
             1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
                 raw, decoder,
@@ -1466,7 +1287,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<SandwichUnionSize8Alignment4> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireSandwichUnionSize8Alignment4>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireSandwichUnionSize8Alignment4>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<SandwichUnionSize8Alignment4>
@@ -1491,13 +1312,13 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireSandwichUnionSize8Alignment4> for SandwichUnionSize8Alignment4 {
-    fn take_from(from: &mut WireSandwichUnionSize8Alignment4) -> Self {
+    fn take_from(from: &WireSandwichUnionSize8Alignment4) -> Self {
         Self {
-            before: ::fidl_next::TakeFrom::take_from(&mut from.before),
+            before: ::fidl_next::TakeFrom::take_from(&from.before),
 
-            union_: ::fidl_next::TakeFrom::take_from(&mut from.union_),
+            union_: ::fidl_next::TakeFrom::take_from(&from.union_),
 
-            after: ::fidl_next::TakeFrom::take_from(&mut from.after),
+            after: ::fidl_next::TakeFrom::take_from(&from.after),
         }
     }
 }

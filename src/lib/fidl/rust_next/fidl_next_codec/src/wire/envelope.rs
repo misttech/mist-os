@@ -307,28 +307,6 @@ impl WireEnvelope {
         unsafe { &*ptr }
     }
 
-    /// Returns a mutable reference to the contained `T`.
-    ///
-    /// # Safety
-    ///
-    /// The envelope must have been successfully decoded as a `T`.
-    pub unsafe fn deref_mut_unchecked<T>(&mut self) -> &mut T {
-        let ptr = unsafe { Self::as_ptr::<T>(self as *mut Self) };
-        unsafe { &mut *ptr }
-    }
-
-    /// Takes the contained `T`, leaving an empty envelope.
-    ///
-    /// # Safety
-    ///
-    /// The envelope must have been successfully decoded as a `T`.
-    pub unsafe fn take_unchecked<T>(&mut self) -> T {
-        let ptr = unsafe { Self::as_ptr::<T>(self as *mut Self) };
-        let result = unsafe { ptr.read() };
-        *self = Self { zero: [0; 8] };
-        result
-    }
-
     /// Clones the envelope, assuming that it contains an inline `T`.
     ///
     /// # Safety

@@ -34,7 +34,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<Payload> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WirePayload>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WirePayload>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<Payload>
@@ -59,8 +59,8 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WirePayload> for Payload {
-    fn take_from(from: &mut WirePayload) -> Self {
-        Self { value: ::fidl_next::TakeFrom::take_from(&mut from.value) }
+    fn take_from(from: &WirePayload) -> Self {
+        Self { value: ::fidl_next::TakeFrom::take_from(&from.value) }
     }
 }
 
@@ -124,7 +124,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<OneWaySendRequest> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<'buf, WireOneWaySendRequest>;
+    type EncodedOption<'buf> = ::fidl_next::WireBox<WireOneWaySendRequest>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<OneWaySendRequest>
@@ -149,8 +149,8 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireOneWaySendRequest> for OneWaySendRequest {
-    fn take_from(from: &mut WireOneWaySendRequest) -> Self {
-        Self { payload: ::fidl_next::TakeFrom::take_from(&mut from.payload) }
+    fn take_from(from: &WireOneWaySendRequest) -> Self {
+        Self { payload: ::fidl_next::TakeFrom::take_from(&from.payload) }
     }
 }
 

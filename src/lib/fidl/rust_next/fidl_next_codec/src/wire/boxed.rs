@@ -14,18 +14,18 @@ use crate::{
 
 /// A boxed (optional) FIDL value.
 #[repr(C)]
-pub struct WireBox<'buf, T> {
-    ptr: WirePointer<'buf, T>,
+pub struct WireBox<T> {
+    ptr: WirePointer<T>,
 }
 
 // SAFETY: `WireBox` doesn't add any restrictions on sending across thread boundaries, and so is
 // `Send` if `T` is `Send`.
-unsafe impl<T: Send> Send for WireBox<'_, T> {}
+unsafe impl<T: Send> Send for WireBox<T> {}
 
 // SAFETY: `WireBox` doesn't add any interior mutability, so it is `Sync` if `T` is `Sync`.
-unsafe impl<T: Sync> Sync for WireBox<'_, T> {}
+unsafe impl<T: Sync> Sync for WireBox<T> {}
 
-impl<T> Drop for WireBox<'_, T> {
+impl<T> Drop for WireBox<T> {
     fn drop(&mut self) {
         if self.is_some() {
             unsafe {
@@ -35,7 +35,7 @@ impl<T> Drop for WireBox<'_, T> {
     }
 }
 
-impl<T> WireBox<'_, T> {
+impl<T> WireBox<T> {
     /// Encodes that a value is present in a slot.
     pub fn encode_present(slot: Slot<'_, Self>) {
         munge!(let Self { ptr } = slot);
@@ -62,32 +62,21 @@ impl<T> WireBox<'_, T> {
     pub fn as_ref(&self) -> Option<&T> {
         NonNull::new(self.ptr.as_ptr()).map(|ptr| unsafe { ptr.as_ref() })
     }
-
-    /// Returns a mutable reference to the boxed value, if any.
-    pub fn as_mut(&mut self) -> Option<&mut T> {
-        NonNull::new(self.ptr.as_ptr()).map(|mut ptr| unsafe { ptr.as_mut() })
-    }
 }
 
-impl<T> Default for WireBox<'_, T> {
-    fn default() -> Self {
-        Self { ptr: WirePointer::null() }
-    }
-}
-
-impl<T: fmt::Debug> fmt::Debug for WireBox<'_, T> {
+impl<T: fmt::Debug> fmt::Debug for WireBox<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.as_ref().fmt(f)
     }
 }
 
-unsafe impl<'buf, D: Decoder<'buf> + ?Sized, T: Decode<D>> Decode<D> for WireBox<'buf, T> {
+unsafe impl<'buf, D: Decoder<'buf> + ?Sized, T: Decode<D>> Decode<D> for WireBox<T> {
     fn decode(slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
         munge!(let Self { mut ptr } = slot);
 
         if WirePointer::is_encoded_present(ptr.as_mut())? {
             let value = decoder.decode_next::<T>()?;
-            WirePointer::set_decoded(ptr, value);
+            WirePointer::set_decoded(ptr, value.into_raw());
         }
 
         Ok(())
@@ -108,8 +97,8 @@ impl<E: ?Sized, T: EncodeOption<E>> Encode<E> for Option<T> {
     }
 }
 
-impl<T: TakeFrom<WT>, WT> TakeFrom<WireBox<'_, WT>> for Option<T> {
-    fn take_from(from: &mut WireBox<'_, WT>) -> Self {
-        from.as_mut().map(|value| T::take_from(value))
+impl<T: TakeFrom<WT>, WT> TakeFrom<WireBox<WT>> for Option<T> {
+    fn take_from(from: &WireBox<WT>) -> Self {
+        from.as_ref().map(|value| T::take_from(value))
     }
 }
