@@ -423,6 +423,8 @@ if (!is_host) {
         #
         # TODO(https://fxbug.dev/310006516): Remove these once all IDK users are
         # using the per-API-level artifacts.
+        # For the sysroot, Bazel needs to support the per-level sysroot first -
+        # see https://fxbug.dev/385408047.
         ":core_cc_prebuilt_libraries",
         ":core_sysroot",
       ]
