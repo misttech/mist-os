@@ -30,6 +30,17 @@ use {
     fidl_fuchsia_ui_views as fuiviews,
 };
 
+fn get_display_size() -> Result<fmath::SizeU, Errno> {
+    let singleton_display_info =
+        connect_to_protocol_sync::<fuidisplay::InfoMarker>().map_err(|_| errno!(ENOENT))?;
+    let metrics = singleton_display_info
+        .get_metrics(zx::MonotonicInstant::INFINITE)
+        .map_err(|_| errno!(EINVAL))?;
+    let extent_in_px =
+        metrics.extent_in_px.ok_or("Failed to get extent_in_px").map_err(|_| errno!(EINVAL))?;
+    Ok(extent_in_px)
+}
+
 #[derive(Default, Debug)]
 pub struct AspectRatio {
     pub width: u32,
@@ -55,8 +66,7 @@ impl Framebuffer {
     ) -> Result<Arc<Self>, Errno> {
         let mut info = fb_var_screeninfo::default();
 
-        let display_size =
-            Self::get_display_size().unwrap_or(fmath::SizeU { width: 700, height: 1200 });
+        let display_size = get_display_size().unwrap_or(fmath::SizeU { width: 700, height: 1200 });
 
         // If the container has a specific aspect ratio set, use that to fit the framebuffer
         // inside of the display.
@@ -158,17 +168,6 @@ impl Framebuffer {
         if let Some(server) = &self.server {
             init_viewport_scene(server.clone(), viewport_token);
         }
-    }
-
-    fn get_display_size() -> Result<fmath::SizeU, Errno> {
-        let singleton_display_info =
-            connect_to_protocol_sync::<fuidisplay::InfoMarker>().map_err(|_| errno!(ENOENT))?;
-        let metrics = singleton_display_info
-            .get_metrics(zx::MonotonicInstant::INFINITE)
-            .map_err(|_| errno!(EINVAL))?;
-        let extent_in_px =
-            metrics.extent_in_px.ok_or("Failed to get extent_in_px").map_err(|_| errno!(EINVAL))?;
-        Ok(extent_in_px)
     }
 }
 
