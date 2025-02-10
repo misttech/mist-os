@@ -677,6 +677,8 @@ void Client::CheckConfig(CheckConfigRequestView request, CheckConfigCompleter::S
   completer.Reply(res, ::fidl::VectorView<fhd::wire::ClientCompositionOp>::FromExternal(ops));
 }
 
+void Client::DiscardConfig(DiscardConfigCompleter::Sync& /*_completer*/) { DiscardConfig(); }
+
 void Client::ApplyConfig(ApplyConfigCompleter::Sync& /*_completer*/) {
   ApplyConfigFromFidl(latest_config_stamp_ + display::ConfigStamp(1));
 }

@@ -695,11 +695,8 @@ void DisplayCompositor::DiscardConfig() {
   FX_DCHECK(display_coordinator_.is_valid());
 
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::DiscardConfig");
-  // TODO(https://fxbug.dev/42068734): Replace this with a one-way call to
-  // `Coordinator::DiscardConfig` once when it becomes available.
-  display_coordinator_->CheckConfig(true).Then([](auto& result) {
-    FX_DCHECK(result.ok()) << "Failed to call FIDL CheckConfig method: " << result.status_string();
-  });
+  const fidl::OneWayStatus result = display_coordinator_->DiscardConfig();
+  FX_DCHECK(result.ok()) << "Failed to call FIDL DiscardConfig method: " << result.status_string();
 }
 
 fuchsia_hardware_display::wire::ConfigStamp DisplayCompositor::ApplyConfig() {

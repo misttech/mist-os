@@ -385,11 +385,16 @@ closed protocol Coordinator {
     ///
     /// If discard is true, the pending changes will be discarded after validation.
     strict CheckConfig(struct {
+        // TODO(https://fxbug.dev/395488933): Deprecated; always set this to false.
+        // To discard pending configuration changes, use DiscardConfig() instead.
         discard bool;
     }) -> (struct {
         res fuchsia.hardware.display.types.ConfigResult;
         ops vector<ClientCompositionOp>:MAX;
     });
+
+    /// Discard all pending configuration changes.
+    strict DiscardConfig();
 
     // TODO(https://fxbug.dev/42152065): Deprecated; use ApplyConfig3() instead.
     //

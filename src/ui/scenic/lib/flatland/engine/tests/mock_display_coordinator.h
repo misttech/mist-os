@@ -67,6 +67,8 @@ class MockDisplayCoordinator
                CheckConfigCompleter::Sync&),
               (override));
 
+  MOCK_METHOD(void, DiscardConfig, (DiscardConfigCompleter::Sync&), (override));
+
   MOCK_METHOD(void, ImportBufferCollection,
               (fuchsia_hardware_display::wire::CoordinatorImportBufferCollectionRequest*,
                ImportBufferCollectionCompleter::Sync&),

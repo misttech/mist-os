@@ -308,12 +308,7 @@ TEST_F(DisplayCompositorTest, ImportAndReleaseBufferCollectionTest) {
   display_compositor_->ReleaseBufferCollection(kGlobalBufferCollectionId,
                                                BufferCollectionUsage::kClientImage);
 
-  EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
-      .Times(1)
-      .WillOnce(testing::Invoke([](fuchsia_hardware_display::wire::CoordinatorCheckConfigRequest*,
-                                   MockDisplayCoordinator::CheckConfigCompleter::Sync& completer) {
-        completer.Reply(fuchsia_hardware_display_types::wire::ConfigResult::kOk, {});
-      }));
+  EXPECT_CALL(*mock_display_coordinator_, DiscardConfig(_)).Times(1).WillOnce(Return());
 }
 
 // This test makes sure the buffer negotiations work as intended.
@@ -403,12 +398,7 @@ TEST_F(DisplayCompositorTest,
         completer.Reply(fit::ok());
       }));
 
-  EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
-      .Times(1)
-      .WillOnce(testing::Invoke([&](fuchsia_hardware_display::wire::CoordinatorCheckConfigRequest*,
-                                    MockDisplayCoordinator::CheckConfigCompleter::Sync& completer) {
-        completer.Reply(fuchsia_hardware_display_types::wire::ConfigResult::kOk, {});
-      }));
+  EXPECT_CALL(*mock_display_coordinator_, DiscardConfig(_)).Times(1).WillOnce(Return());
 
   // Set renderer constraints.
   EXPECT_CALL(*renderer_, ImportBufferCollection(kGlobalBufferCollectionId, _, _, _, _))
@@ -524,12 +514,7 @@ TEST_F(DisplayCompositorTest,
             completer.Reply(fit::ok());
           }));
 
-  EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
-      .Times(1)
-      .WillOnce(testing::Invoke([&](fuchsia_hardware_display::wire::CoordinatorCheckConfigRequest*,
-                                    MockDisplayCoordinator::CheckConfigCompleter::Sync& completer) {
-        completer.Reply(fuchsia_hardware_display_types::wire::ConfigResult::kOk, {});
-      }));
+  EXPECT_CALL(*mock_display_coordinator_, DiscardConfig(_)).Times(1).WillOnce(Return());
 
   // Set renderer constraints.
   EXPECT_CALL(*renderer_, ImportBufferCollection(kGlobalBufferCollectionId, _, _, _, _))
@@ -600,12 +585,7 @@ TEST_F(DisplayCompositorTest, SysmemNegotiationTest_InRendererOnlyMode_DisplaySh
   const fuchsia_hardware_display::wire::BufferCollectionId kDisplayBufferCollectionId =
       scenic_impl::ToDisplayFidlBufferCollectionId(kGlobalBufferCollectionId);
 
-  EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
-      .Times(1)
-      .WillOnce(testing::Invoke([&](fuchsia_hardware_display::wire::CoordinatorCheckConfigRequest*,
-                                    MockDisplayCoordinator::CheckConfigCompleter::Sync& completer) {
-        completer.Reply(fuchsia_hardware_display_types::wire::ConfigResult::kOk, {});
-      }));
+  EXPECT_CALL(*mock_display_coordinator_, DiscardConfig(_)).Times(1).WillOnce(Return());
 
   // Set renderer constraints.
   EXPECT_CALL(*renderer_, ImportBufferCollection(kGlobalBufferCollectionId, _, _, _, _))
@@ -682,12 +662,7 @@ TEST_F(DisplayCompositorTest, ClientDropSysmemToken) {
 
   EXPECT_CALL(*renderer_, ImportBufferCollection(kGlobalBufferCollectionId, _, _, _, _)).Times(0);
 
-  EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
-      .Times(1)
-      .WillOnce(testing::Invoke([&](fuchsia_hardware_display::wire::CoordinatorCheckConfigRequest*,
-                                    MockDisplayCoordinator::CheckConfigCompleter::Sync& completer) {
-        completer.Reply(fuchsia_hardware_display_types::wire::ConfigResult::kOk, {});
-      }));
+  EXPECT_CALL(*mock_display_coordinator_, DiscardConfig(_)).Times(1).WillOnce(Return());
 
   EXPECT_CALL(*mock_display_coordinator_, ImportBufferCollection(_, _)).Times(0);
 
@@ -779,12 +754,7 @@ TEST_F(DisplayCompositorTest, ImageIsValidAfterReleaseBufferCollection) {
   display_compositor_->ReleaseBufferCollection(kGlobalBufferCollectionId,
                                                BufferCollectionUsage::kClientImage);
 
-  EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
-      .Times(1)
-      .WillOnce(testing::Invoke([&](fuchsia_hardware_display::wire::CoordinatorCheckConfigRequest*,
-                                    MockDisplayCoordinator::CheckConfigCompleter::Sync& completer) {
-        completer.Reply(fuchsia_hardware_display_types::wire::ConfigResult::kOk, {});
-      }));
+  EXPECT_CALL(*mock_display_coordinator_, DiscardConfig(_)).Times(1).WillOnce(Return());
 }
 
 TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
@@ -957,12 +927,7 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
       display_compositor_->ImportBufferImage(copy_metadata, BufferCollectionUsage::kClientImage);
   EXPECT_FALSE(result);
 
-  EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
-      .Times(1)
-      .WillOnce(testing::Invoke([&](fuchsia_hardware_display::wire::CoordinatorCheckConfigRequest*,
-                                    MockDisplayCoordinator::CheckConfigCompleter::Sync& completer) {
-        completer.Reply(fuchsia_hardware_display_types::wire::ConfigResult::kOk, {});
-      }));
+  EXPECT_CALL(*mock_display_coordinator_, DiscardConfig(_)).Times(1).WillOnce(Return());
 }
 
 // This test checks that DisplayCompositor properly processes ConfigStamp from Vsync.
@@ -973,13 +938,7 @@ TEST_F(DisplayCompositorTest, VsyncConfigStampAreProcessed) {
   glm::uvec2 resolution(1024, 768);
   DisplayInfo display_info = {resolution, {kPixelFormat}};
 
-  EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
-      .Times(3)
-      .WillRepeatedly(
-          testing::Invoke([&](fuchsia_hardware_display::wire::CoordinatorCheckConfigRequest*,
-                              MockDisplayCoordinator::CheckConfigCompleter::Sync& completer) {
-            completer.Reply(fuchsia_hardware_display_types::wire::ConfigResult::kOk, {});
-          }));
+  EXPECT_CALL(*mock_display_coordinator_, DiscardConfig(_)).Times(3).WillOnce(Return());
   EXPECT_CALL(*mock_display_coordinator_, ApplyConfig(_)).Times(2).WillRepeatedly(Return());
 
   const fuchsia_hardware_display::wire::ConfigStamp kConfigStamp1 = {.value = 234};
@@ -1950,12 +1909,7 @@ TEST_F(DisplayCompositorTest, RendererOnly_ImportAndReleaseBufferCollectionTest)
   display_compositor_->ReleaseBufferCollection(kGlobalBufferCollectionId,
                                                BufferCollectionUsage::kClientImage);
 
-  EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
-      .Times(1)
-      .WillOnce(testing::Invoke([&](fuchsia_hardware_display::wire::CoordinatorCheckConfigRequest*,
-                                    MockDisplayCoordinator::CheckConfigCompleter::Sync& completer) {
-        completer.Reply(fuchsia_hardware_display_types::wire::ConfigResult::kOk, {});
-      }));
+  EXPECT_CALL(*mock_display_coordinator_, DiscardConfig(_)).Times(1).WillOnce(Return());
 }
 
 }  // namespace flatland::test

@@ -180,6 +180,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   void SetLayerImage2(SetLayerImage2RequestView request,
                       SetLayerImage2Completer::Sync& _completer) override;
   void CheckConfig(CheckConfigRequestView request, CheckConfigCompleter::Sync& _completer) override;
+  void DiscardConfig(DiscardConfigCompleter::Sync& _completer) override;
   void ApplyConfig(ApplyConfigCompleter::Sync& _completer) override;
   void ApplyConfig3(ApplyConfig3RequestView request,
                     ApplyConfigCompleter::Sync& _completer) override;
