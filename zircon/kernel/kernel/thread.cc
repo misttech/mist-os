@@ -102,9 +102,6 @@ static lazy_init::LazyInit<Thread::List> thread_list TA_GUARDED(Thread::get_list
 
 Thread::MigrateList Thread::migrate_list_;
 
-// master thread spinlock
-MonitoredSpinLock thread_lock __CPU_ALIGN_EXCLUSIVE{"thread_lock"_intern};
-
 const char* ToString(enum thread_state state) {
   switch (state) {
     case THREAD_INITIAL:
@@ -1247,7 +1244,7 @@ void Thread::Current::DoSuspend() {
   }
 
   if (current_thread->user_thread_) {
-    DEBUG_ASSERT(!arch_ints_disabled() || !thread_lock.IsHeld());
+    DEBUG_ASSERT(!arch_ints_disabled());
     current_thread->user_thread_->Resuming();
   }
 }
@@ -1646,9 +1643,6 @@ void Thread::SleepHandler(Timer* timer, zx_instant_mono_t now, void* arg) {
 }
 
 void Thread::HandleSleep(Timer* timer, zx_instant_mono_t now) {
-  // spin trylocking on the thread lock since the routine that set up the
-  // callback, thread_sleep_etc, may be trying to simultaneously cancel this
-  // timer while holding the thread_lock.
   const auto do_transaction =
       [&]() TA_REQ(chainlock_transaction_token) -> ChainLockTransaction::Result<> {
     if (timer->TrylockOrCancel(get_lock())) {
