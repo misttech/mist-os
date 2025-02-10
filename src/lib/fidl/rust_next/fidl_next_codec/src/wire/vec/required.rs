@@ -54,6 +54,33 @@ impl<T> WireVector<T> {
     pub fn as_slice(&self) -> &[T] {
         unsafe { self.as_slice_ptr().as_ref() }
     }
+
+    /// Decodes a wire vector which contains raw data.
+    ///
+    /// # Safety
+    ///
+    /// The elements of the wire vecot rmust not need to be individually decoded, and must always be
+    /// valid.
+    pub unsafe fn decode_raw<D>(
+        mut slot: Slot<'_, Self>,
+        decoder: &mut D,
+    ) -> Result<(), DecodeError>
+    where
+        D: Decoder + ?Sized,
+        T: Decode<D>,
+    {
+        munge!(let Self { raw } = slot.as_mut());
+        unsafe {
+            RawWireVector::decode_raw(raw, decoder)?;
+        }
+
+        let this = unsafe { slot.deref_unchecked() };
+        if this.raw.as_ptr().is_null() {
+            return Err(DecodeError::RequiredValueAbsent);
+        }
+
+        Ok(())
+    }
 }
 
 impl<T> Deref for WireVector<T> {

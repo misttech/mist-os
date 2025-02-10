@@ -51,16 +51,19 @@ pub unsafe trait Decoder: InternalHandleDecoder {
 }
 
 impl InternalHandleDecoder for &mut [Chunk] {
+    #[inline]
     fn __internal_take_handles(&mut self, _: usize) -> Result<(), DecodeError> {
         Err(DecodeError::InsufficientHandles)
     }
 
+    #[inline]
     fn __internal_handles_remaining(&self) -> usize {
         0
     }
 }
 
 unsafe impl Decoder for &mut [Chunk] {
+    #[inline]
     fn take_chunks_raw(&mut self, count: usize) -> Result<NonNull<Chunk>, DecodeError> {
         if count > self.len() {
             return Err(DecodeError::InsufficientData);
@@ -72,6 +75,7 @@ unsafe impl Decoder for &mut [Chunk] {
         unsafe { Ok(NonNull::new_unchecked(prefix.as_mut_ptr())) }
     }
 
+    #[inline]
     fn finish(&mut self) -> Result<(), DecodeError> {
         if !self.is_empty() {
             return Err(DecodeError::ExtraBytes { num_extra: self.len() * CHUNK_SIZE });

@@ -17,6 +17,7 @@ pub struct WireTable {
 
 impl WireTable {
     /// Encodes that a table contains `len` values in a slot.
+    #[inline]
     pub fn encode_len(slot: Slot<'_, Self>, len: usize) {
         munge!(let Self { len: mut table_len, ptr } = slot);
         *table_len = u64_le::from_native(len.try_into().unwrap());
@@ -26,6 +27,7 @@ impl WireTable {
     /// Decodes the fields of the table with a decoding function.
     ///
     /// The decoding function receives the ordinal of the field, its slot, and the decoder.
+    #[inline]
     pub fn decode_with<D: Decoder + ?Sized>(
         slot: Slot<'_, Self>,
         mut decoder: &mut D,
@@ -55,6 +57,7 @@ impl WireTable {
     }
 
     /// Returns a reference to the envelope for the given ordinal, if any.
+    #[inline]
     pub fn get(&self, ordinal: usize) -> Option<&WireEnvelope> {
         if ordinal == 0 || ordinal > self.len.to_native() as usize {
             return None;

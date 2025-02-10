@@ -59,6 +59,33 @@ impl<T> WireOptionalVector<T> {
             None
         }
     }
+
+    /// Decodes a wire vector which contains raw data.
+    ///
+    /// # Safety
+    ///
+    /// The elements of the wire vecot rmust not need to be individually decoded, and must always be
+    /// valid.
+    pub unsafe fn decode_raw<D>(
+        mut slot: Slot<'_, Self>,
+        decoder: &mut D,
+    ) -> Result<(), DecodeError>
+    where
+        D: Decoder + ?Sized,
+        T: Decode<D>,
+    {
+        munge!(let Self { raw } = slot.as_mut());
+        unsafe {
+            RawWireVector::decode_raw(raw, decoder)?;
+        }
+
+        let this = unsafe { slot.deref_unchecked() };
+        if this.raw.as_ptr().is_null() && this.raw.len() != 0 {
+            return Err(DecodeError::InvalidOptionalSize(this.raw.len()));
+        }
+
+        Ok(())
+    }
 }
 
 impl<T: fmt::Debug> fmt::Debug for WireOptionalVector<T> {

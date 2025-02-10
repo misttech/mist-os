@@ -21,22 +21,26 @@ pub struct WireString {
 
 impl WireString {
     /// Encodes that a string is present in a slot.
+    #[inline]
     pub fn encode_present(slot: Slot<'_, Self>, len: u64) {
         munge!(let Self { vec } = slot);
         WireVector::encode_present(vec, len);
     }
 
     /// Returns the length of the string in bytes.
+    #[inline]
     pub fn len(&self) -> usize {
         self.vec.len()
     }
 
     /// Returns whether the string is empty.
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     /// Returns a reference to the underlying `str`.
+    #[inline]
     pub fn as_str(&self) -> &str {
         unsafe { from_utf8_unchecked(self.vec.as_slice()) }
     }
@@ -45,22 +49,27 @@ impl WireString {
 impl Deref for WireString {
     type Target = str;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         self.as_str()
     }
 }
 
 impl fmt::Debug for WireString {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.as_str().fmt(f)
     }
 }
 
 unsafe impl<D: Decoder + ?Sized> Decode<D> for WireString {
+    #[inline]
     fn decode(slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
         munge!(let Self { mut vec } = slot);
 
-        WireVector::decode(vec.as_mut(), decoder)?;
+        unsafe {
+            WireVector::decode_raw(vec.as_mut(), decoder)?;
+        }
         let vec = unsafe { vec.deref_unchecked() };
         from_utf8(vec.as_slice())?;
 
@@ -73,6 +82,7 @@ impl Encodable for String {
 }
 
 impl<E: Encoder + ?Sized> Encode<E> for String {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut E,
@@ -85,6 +95,7 @@ impl<E: Encoder + ?Sized> Encode<E> for String {
 }
 
 impl TakeFrom<WireString> for String {
+    #[inline]
     fn take_from(from: &WireString) -> Self {
         from.to_string()
     }

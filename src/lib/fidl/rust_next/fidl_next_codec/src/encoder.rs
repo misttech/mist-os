@@ -40,16 +40,19 @@ pub trait Encoder: InternalHandleEncoder {
 }
 
 impl InternalHandleEncoder for Vec<Chunk> {
+    #[inline]
     fn __internal_handle_count(&self) -> usize {
         0
     }
 }
 
 impl Encoder for Vec<Chunk> {
+    #[inline]
     fn bytes_written(&self) -> usize {
         self.len() * CHUNK_SIZE
     }
 
+    #[inline]
     fn reserve(&mut self, len: usize) {
         let count = len.div_ceil(CHUNK_SIZE);
         self.reserve(count);
@@ -62,6 +65,7 @@ impl Encoder for Vec<Chunk> {
         }
     }
 
+    #[inline]
     fn write(&mut self, bytes: &[u8]) {
         let count = bytes.len().div_ceil(CHUNK_SIZE);
         self.reserve(count);
@@ -84,6 +88,7 @@ impl Encoder for Vec<Chunk> {
         }
     }
 
+    #[inline]
     fn rewrite(&mut self, pos: usize, bytes: &[u8]) {
         assert!(pos + bytes.len() <= self.bytes_written());
 

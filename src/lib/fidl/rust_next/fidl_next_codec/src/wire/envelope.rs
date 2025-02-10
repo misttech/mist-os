@@ -35,12 +35,14 @@ impl WireEnvelope {
     const IS_INLINE_BIT: u16 = 1;
 
     /// Encodes a zero envelope into a slot.
+    #[inline]
     pub fn encode_zero(slot: Slot<'_, Self>) {
         munge!(let Self { mut zero } = slot);
         *zero = [0; 8];
     }
 
     /// Encodes a `'static` value into an envelope with an encoder.
+    #[inline]
     pub fn encode_value_static<E: InternalHandleEncoder + ?Sized, T: Encode<E>>(
         value: &mut T,
         encoder: &mut E,
@@ -75,6 +77,7 @@ impl WireEnvelope {
     }
 
     /// Encodes a value into an envelope with an encoder.
+    #[inline]
     pub fn encode_value<E: Encoder + ?Sized, T: Encode<E>>(
         value: &mut T,
         encoder: &mut E,
@@ -114,21 +117,25 @@ impl WireEnvelope {
     }
 
     /// Returns the zero envelope.
+    #[inline]
     pub fn zero() -> Self {
         Self { zero: [0; 8] }
     }
 
     /// Returns whether a envelope slot is encoded as zero.
+    #[inline]
     pub fn is_encoded_zero(slot: Slot<'_, Self>) -> bool {
         munge!(let Self { zero } = slot);
         *zero == [0; 8]
     }
 
     /// Returns whether an envelope is zero.
+    #[inline]
     pub fn is_zero(&self) -> bool {
         unsafe { self.zero == [0; 8] }
     }
 
+    #[inline]
     fn out_of_line_chunks(
         maybe_num_bytes: Slot<'_, u32_le>,
         flags: Slot<'_, u16_le>,
@@ -148,6 +155,7 @@ impl WireEnvelope {
     }
 
     /// Decodes and discards a static type in an envelope.
+    #[inline]
     pub fn decode_unknown_static<D: InternalHandleDecoder + ?Sized>(
         slot: Slot<'_, Self>,
         decoder: &mut D,
@@ -172,6 +180,7 @@ impl WireEnvelope {
     }
 
     /// Decodes and discards an unknown value in an envelope.
+    #[inline]
     pub fn decode_unknown<D: Decoder + ?Sized>(
         slot: Slot<'_, Self>,
         mut decoder: &mut D,
@@ -196,6 +205,7 @@ impl WireEnvelope {
     }
 
     /// Decodes a value of a known type from an envelope.
+    #[inline]
     pub fn decode_as_static<D: InternalHandleDecoder + ?Sized, T: Decode<D>>(
         mut slot: Slot<'_, Self>,
         decoder: &mut D,
@@ -237,6 +247,7 @@ impl WireEnvelope {
     }
 
     /// Decodes a value of a known type from an envelope.
+    #[inline]
     pub fn decode_as<D: Decoder + ?Sized, T: Decode<D>>(
         mut slot: Slot<'_, Self>,
         mut decoder: &mut D,
@@ -288,6 +299,7 @@ impl WireEnvelope {
         Ok(())
     }
 
+    #[inline]
     unsafe fn as_ptr<T>(this: *mut Self) -> *mut T {
         if size_of::<T>() <= 4 {
             let inline = unsafe { addr_of_mut!((*this).decoded_inline) };
@@ -302,6 +314,7 @@ impl WireEnvelope {
     /// # Safety
     ///
     /// The envelope must have been successfully decoded as a `T`.
+    #[inline]
     pub unsafe fn deref_unchecked<T>(&self) -> &T {
         let ptr = unsafe { Self::as_ptr::<T>((self as *const Self).cast_mut()).cast_const() };
         unsafe { &*ptr }
@@ -312,6 +325,7 @@ impl WireEnvelope {
     /// # Safety
     ///
     /// The envelope must have been successfully decoded as a `T`.
+    #[inline]
     pub unsafe fn clone_unchecked<T: Clone>(&self) -> Self {
         debug_assert_eq!(size_of::<T>(), 4);
 

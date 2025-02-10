@@ -55,6 +55,29 @@ impl<T> RawWireVector<T> {
     pub fn as_slice_ptr(&self) -> *mut [T] {
         slice_from_raw_parts_mut(self.as_ptr(), self.len().try_into().unwrap())
     }
+
+    /// # Safety
+    ///
+    /// The elements of the wire vector must not need to be individually decoded, and must always be
+    /// valid.
+    pub unsafe fn decode_raw<D>(
+        slot: Slot<'_, Self>,
+        mut decoder: &mut D,
+    ) -> Result<(), DecodeError>
+    where
+        D: Decoder + ?Sized,
+        T: Decode<D>,
+    {
+        munge!(let Self { len, mut ptr } = slot);
+
+        let len = len.to_native();
+        if WirePointer::is_encoded_present(ptr.as_mut())? {
+            let mut slice = decoder.take_slice_slot::<u8>(len as usize)?;
+            WirePointer::set_decoded(ptr, slice.as_mut_ptr().cast());
+        }
+
+        Ok(())
+    }
 }
 
 unsafe impl<D: Decoder + ?Sized, T: Decode<D>> Decode<D> for RawWireVector<T> {
