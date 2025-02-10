@@ -273,7 +273,6 @@ fn load_many<T: DeserializeOwned + RemembersSource>(paths: Paths) -> Result<Vec<
 #[derive(Debug)]
 pub struct SamplerConfig {
     pub project_configs: Vec<Arc<ProjectConfig>>,
-    pub configure_reader_for_tests: bool,
     pub minimum_sample_rate_sec: i64,
 
     // Used to store a lazy node that publishes data to Inspect if
@@ -285,7 +284,6 @@ pub struct SamplerConfig {
 /// optionally FIRE, configs.
 pub struct SamplerConfigBuilder {
     minimum_sample_rate_sec: i64,
-    configure_reader_for_tests: bool,
     sampler_dir: Option<PathBuf>, // Not optional - load() will fail if this is not set.
     fire_dir: Option<PathBuf>,
 }
@@ -295,7 +293,6 @@ impl Default for SamplerConfigBuilder {
     fn default() -> Self {
         SamplerConfigBuilder {
             minimum_sample_rate_sec: DEFAULT_MIN_SAMPLE_RATE_SEC,
-            configure_reader_for_tests: false,
             sampler_dir: None,
             fire_dir: None,
         }
@@ -306,13 +303,6 @@ impl SamplerConfigBuilder {
     /// Optional. If not called, a default value will be used.
     pub fn minimum_sample_rate_sec(mut self, minimum_sample_rate_sec: i64) -> Self {
         self.minimum_sample_rate_sec = minimum_sample_rate_sec;
-        self
-    }
-
-    /// Optional. For use in tests only. Configures ArchiveReader
-    /// (and thus ArchiveAccessor) to avoid test flakes.
-    pub fn configure_reader_for_tests(mut self, configure_reader_for_tests: bool) -> Self {
-        self.configure_reader_for_tests = configure_reader_for_tests;
         self
     }
 
@@ -335,7 +325,6 @@ impl SamplerConfigBuilder {
         if let Some(sampler_dir) = self.sampler_dir.as_ref() {
             SamplerConfig::from_directories_internal(
                 self.minimum_sample_rate_sec,
-                self.configure_reader_for_tests,
                 sampler_dir,
                 self.fire_dir,
             )
@@ -476,7 +465,6 @@ impl SamplerConfig {
     /// If a FIRE directory is given, load FIRE data and convert it to ProjectConfig's.
     fn from_directories_internal(
         minimum_sample_rate_sec: i64,
-        configure_reader_for_tests: bool,
         sampler_dir: impl AsRef<Path>,
         fire_dir: Option<impl AsRef<Path>>,
     ) -> Result<Self, Error> {
@@ -506,12 +494,7 @@ impl SamplerConfig {
                 .append(&mut expand_fire_projects(fire_project_templates, fire_components)?);
         }
         let project_configs = project_configs.into_iter().map(Arc::new).collect();
-        Ok(Self {
-            minimum_sample_rate_sec,
-            project_configs,
-            configure_reader_for_tests,
-            inspect_node: Mutex::new(None),
-        })
+        Ok(Self { minimum_sample_rate_sec, project_configs, inspect_node: Mutex::new(None) })
     }
 
     /// Publish data about this config to Inspect under the given node.
