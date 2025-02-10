@@ -23,7 +23,7 @@ use netstack3_base::{
     AnyDevice, BroadcastIpExt, CounterContext, DeviceIdContext, ExistsError,
     IpDeviceAddressIdContext, Ipv4DeviceAddr, Ipv6DeviceAddr, NotFoundError, ReceivableFrameMeta,
     RecvIpFrameMeta, ReferenceNotifiersExt, RemoveResourceResultWithContext,
-    ResourceCounterContext, SendFrameError,
+    ResourceCounterContext, SendFrameError, WeakDeviceIdentifier,
 };
 use netstack3_device::blackhole::{BlackholeDeviceCounters, BlackholeDeviceId};
 use netstack3_device::ethernet::{
@@ -33,8 +33,9 @@ use netstack3_device::ethernet::{
 use netstack3_device::loopback::{self, LoopbackDevice, LoopbackDeviceId, LoopbackPrimaryDeviceId};
 use netstack3_device::pure_ip::{self, PureIpDeviceCounters, PureIpDeviceId};
 use netstack3_device::queue::TransmitQueueHandler;
+use netstack3_device::socket::{DeviceSocketCounters, DeviceSocketId, HeldDeviceSockets};
 use netstack3_device::{
-    for_any_device_id, socket, ArpCounters, BaseDeviceId, DeviceCollectionContext,
+    for_any_device_id, ArpCounters, BaseDeviceId, DeviceCollectionContext,
     DeviceConfigurationContext, DeviceCounters, DeviceId, DeviceLayerState, DeviceStateSpec,
     Devices, DevicesIter, IpLinkDeviceState, IpLinkDeviceStateInner, Ipv6DeviceLinkLayerAddr,
     OriginTracker, OriginTrackerContext, WeakDeviceId,
@@ -1097,6 +1098,12 @@ impl<BC: BindingsContext, L> CounterContext<EthernetDeviceCounters> for CoreCtx<
     }
 }
 
+impl<BC: BindingsContext, L> CounterContext<DeviceSocketCounters> for CoreCtx<'_, BC, L> {
+    fn with_counters<O, F: FnOnce(&DeviceSocketCounters) -> O>(&self, cb: F) -> O {
+        cb(&self.unlocked_access::<crate::lock_ordering::DeviceState>().device_socket_counters)
+    }
+}
+
 impl<BC: BindingsContext, L> CounterContext<PureIpDeviceCounters> for CoreCtx<'_, BC, L> {
     fn with_counters<O, F: FnOnce(&PureIpDeviceCounters) -> O>(&self, cb: F) -> O {
         cb(&self.unlocked_access::<crate::lock_ordering::DeviceState>().pure_ip_counters)
@@ -1126,6 +1133,18 @@ impl<'a, BC: BindingsContext, D: DeviceStateSpec, L>
         cb: F,
     ) -> O {
         cb(device_state(self, device_id).unlocked_access::<crate::lock_ordering::DeviceCounters>())
+    }
+}
+
+impl<'a, BC: BindingsContext, L, D: WeakDeviceIdentifier>
+    ResourceCounterContext<DeviceSocketId<D, BC>, DeviceSocketCounters> for CoreCtx<'a, BC, L>
+{
+    fn with_per_resource_counters<O, F: FnOnce(&DeviceSocketCounters) -> O>(
+        &mut self,
+        socket_id: &DeviceSocketId<D, BC>,
+        cb: F,
+    ) -> O {
+        cb(socket_id.counters())
     }
 }
 
@@ -1190,7 +1209,7 @@ impl<'a, BC: BindingsContext, L>
 impl<T, BT: BindingsTypes> LockLevelFor<IpLinkDeviceStateInner<T, BT>>
     for crate::lock_ordering::DeviceSockets
 {
-    type Data = socket::HeldDeviceSockets<BT>;
+    type Data = HeldDeviceSockets<BT>;
 }
 
 impl<T, BT: BindingsTypes> UnlockedAccessMarkerFor<IpLinkDeviceStateInner<T, BT>>

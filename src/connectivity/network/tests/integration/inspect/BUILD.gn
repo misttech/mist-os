@@ -58,6 +58,7 @@ rustc_test("netstack3_inspect_tests") {
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
     "//sdk/fidl/fuchsia.net.multicast.admin:fuchsia.net.multicast.admin_rust",
     "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
+    "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet_rust",
     "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw_rust",
     "//src/connectivity/lib/net-declare",
     "//src/connectivity/lib/net-types",

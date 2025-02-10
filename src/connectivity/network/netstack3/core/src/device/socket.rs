@@ -24,11 +24,23 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets>>
     type SocketTablesCoreCtx<'a> =
         CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::AnyDeviceSockets>>;
 
+    fn with_all_device_sockets<
+        F: FnOnce(&AllSockets<Self::WeakDeviceId, BC>, &mut Self::SocketTablesCoreCtx<'_>) -> R,
+        R,
+    >(
+        &mut self,
+        cb: F,
+    ) -> R {
+        let (sockets, mut locked) = self.read_lock_and::<crate::lock_ordering::AllDeviceSockets>();
+        let mut locked = locked.cast_locked::<crate::lock_ordering::AnyDeviceSockets>();
+        cb(&*sockets, &mut locked)
+    }
+
     fn with_all_device_sockets_mut<F: FnOnce(&mut AllSockets<Self::WeakDeviceId, BC>) -> R, R>(
         &mut self,
         cb: F,
     ) -> R {
-        let mut locked = self.lock::<crate::lock_ordering::AllDeviceSockets>();
+        let mut locked = self.write_lock::<crate::lock_ordering::AllDeviceSockets>();
         cb(&mut locked)
     }
 

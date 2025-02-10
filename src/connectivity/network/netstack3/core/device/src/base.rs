@@ -32,7 +32,7 @@ use crate::internal::loopback::{LoopbackDeviceId, LoopbackPrimaryDeviceId};
 use crate::internal::pure_ip::{PureIpDeviceId, PureIpPrimaryDeviceId};
 use crate::internal::queue::rx::ReceiveQueueBindingsContext;
 use crate::internal::queue::tx::TransmitQueueBindingsContext;
-use crate::internal::socket::{self, HeldSockets};
+use crate::internal::socket::{self, DeviceSocketCounters, HeldSockets};
 use crate::internal::state::DeviceStateSpec;
 
 /// Iterator over devices.
@@ -169,6 +169,8 @@ pub struct DeviceLayerState<BT: DeviceLayerTypes> {
     pub origin: OriginTracker,
     /// Collection of all device sockets.
     pub shared_sockets: HeldSockets<BT>,
+    /// Device socket counters.
+    pub device_socket_counters: DeviceSocketCounters,
     /// Common device counters.
     pub counters: DeviceCounters,
     /// Ethernet counters.

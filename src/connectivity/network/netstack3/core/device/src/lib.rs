@@ -78,11 +78,11 @@ pub mod pure_ip {
 pub mod socket {
     pub use crate::internal::socket::{
         AllSockets, AnyDeviceSockets, DeviceSocketAccessor, DeviceSocketApi,
-        DeviceSocketBindingsContext, DeviceSocketContext, DeviceSocketId, DeviceSocketMetadata,
-        DeviceSocketTypes, DeviceSockets, EthernetFrame, EthernetHeaderParams, Frame,
-        HeldDeviceSockets, HeldSockets, IpFrame, ParseSentFrameError, PrimaryDeviceSocketId,
-        Protocol, ReceivedFrame, SentFrame, SocketId, SocketInfo, SocketState, SocketStateAccessor,
-        Target, TargetDevice, WeakDeviceSocketId,
+        DeviceSocketBindingsContext, DeviceSocketContext, DeviceSocketCounters, DeviceSocketId,
+        DeviceSocketMetadata, DeviceSocketTypes, DeviceSockets, EthernetFrame,
+        EthernetHeaderParams, Frame, HeldDeviceSockets, HeldSockets, IpFrame, ParseSentFrameError,
+        PrimaryDeviceSocketId, Protocol, ReceivedFrame, SentFrame, SocketId, SocketInfo,
+        SocketState, SocketStateAccessor, Target, TargetDevice, WeakDeviceSocketId,
     };
 }
 

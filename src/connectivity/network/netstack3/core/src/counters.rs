@@ -7,6 +7,7 @@
 use net_types::ip::{Ip, Ipv4, Ipv6};
 use netstack3_base::{ContextPair, CounterContext, Inspector};
 use netstack3_device::ethernet::EthernetDeviceCounters;
+use netstack3_device::socket::DeviceSocketCounters;
 use netstack3_device::{ArpCounters, DeviceCounters};
 use netstack3_ip::icmp::{
     IcmpRxCounters, IcmpRxCountersInner, IcmpTxCounters, IcmpTxCountersInner, NdpCounters,
@@ -51,7 +52,8 @@ where
         + CounterContext<NdpCounters>
         + CounterContext<ArpCounters>
         + CounterContext<DeviceCounters>
-        + CounterContext<EthernetDeviceCounters>,
+        + CounterContext<EthernetDeviceCounters>
+        + CounterContext<DeviceSocketCounters>,
 {
     fn core_ctx(&mut self) -> &mut C::CoreContext {
         let Self(pair) = self;
@@ -127,6 +129,11 @@ where
                 self.core_ctx().with_counters(|counters: &MulticastForwardingCounters<Ipv6>| {
                     inspector.delegate_inspectable(counters)
                 })
+            });
+        });
+        inspector.record_child("DeviceSockets", |inspector| {
+            self.core_ctx().with_counters(|counters: &DeviceSocketCounters| {
+                inspector.delegate_inspectable(counters);
             });
         });
         inspector.record_child("RawIpSockets", |inspector| {

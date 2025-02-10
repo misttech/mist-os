@@ -50,7 +50,9 @@ use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter as fnet_filter,
     fidl_fuchsia_net_filter_ext as fnet_filter_ext,
     fidl_fuchsia_net_multicast_admin as fnet_multicast_admin, fidl_fuchsia_netemul as fnetemul,
-    fidl_fuchsia_posix_socket as fposix_socket, fidl_fuchsia_posix_socket_raw as fposix_socket_raw,
+    fidl_fuchsia_posix_socket as fposix_socket,
+    fidl_fuchsia_posix_socket_packet as fposix_socket_packet,
+    fidl_fuchsia_posix_socket_raw as fposix_socket_raw,
 };
 
 enum TcpSocketState {
@@ -489,6 +491,45 @@ async fn inspect_raw_ip_sockets<I: TestIpExt>(name: &str) {
                     Tx: {
                         SentPackets: 0u64,
                         ChecksumErrors: 0u64,
+                    },
+                },
+            },
+        }
+    })
+}
+
+#[netstack_test]
+async fn inspect_device_sockets(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm =
+        sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create realm");
+
+    // Ensure ns3 has started and that there is a Socket to collect inspect data about.
+    let _device_socket =
+        realm.packet_socket(fposix_socket_packet::Kind::Link).await.expect("create device socket");
+
+    let data =
+        get_inspect_data(&realm, "netstack", "root").await.expect("inspect data should be present");
+
+    // Debug print the tree to make debugging easier in case of failures.
+    println!("Got inspect data: {:#?}", data);
+    // NB: The sockets are keyed by an opaque debug identifier.
+    let sockets = data.get_child("Sockets").unwrap();
+    let sock_name = assert_matches!(&sockets.children[..], [socket] => socket.name.clone());
+    diagnostics_assertions::assert_data_tree!(data, "root": contains {
+        Sockets: {
+            sock_name => {
+                Protocol: "None",
+                Device: "Any",
+                Counters: {
+                    Rx: {
+                        DeliveredFrames: 0u64,
+                    },
+                    Tx: {
+                        SentFrames: 0u64,
+                        QueueFullError: 0u64,
+                        AllocError: 0u64,
+                        SizeConstraintError: 0u64,
                     },
                 },
             },
@@ -1198,6 +1239,17 @@ async fn inspect_counters(name: &str) {
                         SentPackets: 0u64,
                         ChecksumErrors: 0u64,
                     },
+                },
+            },
+            "DeviceSockets": {
+                "Rx": {
+                    DeliveredFrames: 0u64,
+                },
+                "Tx": {
+                    SentFrames: 0u64,
+                    QueueFullError: 0u64,
+                    AllocError: 0u64,
+                    SizeConstraintError: 0u64,
                 },
             },
             "UDP": {
