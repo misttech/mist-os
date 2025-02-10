@@ -6,6 +6,11 @@ library fuchsia.bluetooth.le;
 using fuchsia.bluetooth as bt;
 using zx;
 
+/// An ISO data packet can be no larger than the maximum 12-bit unsigned integer.
+/// See Bluetooth Core Spec Version 6.0 | Vol 4, Part E, Section 5.4.5
+@available(added=NEXT)
+const MAX_ISO_PACKET_SIZE uint16 = 0x0FFF;
+
 /// Parameters related to a single direction of transmission in an established CIS.
 @available(added=24)
 type CisUnidirectionalParams = table {
@@ -146,6 +151,6 @@ open protocol IsochronousStream {
     @available(added=NEXT)
     flexible Write(table {
         /// The data frame itself.
-        1: data vector<uint8>:MAX;
+        1: data vector<uint8>:MAX_ISO_PACKET_SIZE;
     }) -> () error zx.Status;
 };
