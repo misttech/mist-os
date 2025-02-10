@@ -256,7 +256,7 @@ pub struct WireTableLargeArray {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireTableLargeArray
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireTableLargeArray
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 {
@@ -371,7 +371,7 @@ pub struct WireTableSmallArray {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireTableSmallArray
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireTableSmallArray
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 {
@@ -515,7 +515,7 @@ impl WireUnionLargeArray {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireUnionLargeArray
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireUnionLargeArray
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -570,7 +570,7 @@ impl WireOptionalUnionLargeArray {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalUnionLargeArray
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalUnionLargeArray
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -703,7 +703,7 @@ impl WireUnionSmallArray {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireUnionSmallArray
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireUnionSmallArray
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -758,7 +758,7 @@ impl WireOptionalUnionSmallArray {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalUnionSmallArray
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalUnionSmallArray
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 

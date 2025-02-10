@@ -73,7 +73,7 @@ pub struct WireExampleFooRequest {
     pub s: ::fidl_next::WireString,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireExampleFooRequest
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleFooRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -306,7 +306,7 @@ impl WireExampleFooResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireExampleFooResult
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleFooResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -366,7 +366,7 @@ impl WireOptionalExampleFooResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalExampleFooResult
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalExampleFooResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -424,8 +424,7 @@ pub trait ExampleClientSender<___T: ::fidl_next::protocol::Transport> {
         request: &mut ___R,
     ) -> Result<::fidl_next::bind::ResponseFuture<'_, ___T, example::Foo>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireExampleFooRequest>;
+        ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireExampleFooRequest>;
 }
 
 impl<___T> ExampleClientSender<___T> for ::fidl_next::bind::ClientSender<___T, Example>
@@ -437,8 +436,7 @@ where
         request: &mut ___R,
     ) -> Result<::fidl_next::bind::ResponseFuture<'_, ___T, example::Foo>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireExampleFooRequest>,
+        ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireExampleFooRequest>,
     {
         self.as_untyped()
             .send_two_way(1107623248440401476, request)
@@ -456,7 +454,7 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: ExampleClientHandler<___T>,
 
-    for<'buf> crate::WireExampleFooResult:
+    crate::WireExampleFooResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
@@ -500,7 +498,7 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: ExampleServerHandler<___T>,
 
-    for<'buf> crate::WireExampleFooRequest:
+    crate::WireExampleFooRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_one_way(

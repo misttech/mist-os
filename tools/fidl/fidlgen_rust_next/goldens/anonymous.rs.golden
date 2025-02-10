@@ -263,7 +263,7 @@ pub struct WireOverrideTest {
     pub right: crate::WireOptionalExpression,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOverrideTest
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOverrideTest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -479,7 +479,7 @@ pub struct WireFunctionApplication {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireFunctionApplication
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireFunctionApplication
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 {
@@ -720,7 +720,7 @@ impl WireExpression {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireExpression
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireExpression
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -785,7 +785,7 @@ impl WireOptionalExpression {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalExpression
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalExpression
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -1195,7 +1195,7 @@ pub struct WireTableMember {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireTableMember
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireTableMember
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 {
@@ -1330,7 +1330,7 @@ pub struct WireSomeProtocolSomeMethodRequest {
     pub table_member: crate::WireTableMember,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSomeProtocolSomeMethodRequest
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireSomeProtocolSomeMethodRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -1835,7 +1835,7 @@ pub trait SomeProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireSomeProtocolSomeMethodRequest,
         >;
@@ -1853,7 +1853,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireSomeProtocolSomeMethodRequest,
         >,
@@ -1874,7 +1874,7 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: SomeProtocolClientHandler<___T>,
 
-    for<'buf> crate::WireSomeProtocolSomeMethodResult:
+    crate::WireSomeProtocolSomeMethodResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
@@ -1918,7 +1918,7 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: SomeProtocolServerHandler<___T>,
 
-    for<'buf> crate::WireSomeProtocolSomeMethodRequest:
+    crate::WireSomeProtocolSomeMethodRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_one_way(

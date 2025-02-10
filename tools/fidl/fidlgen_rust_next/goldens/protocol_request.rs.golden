@@ -538,15 +538,14 @@ pub trait ParentClientSender<___T: ::fidl_next::protocol::Transport> {
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireParentTakeChildRequest>;
+        ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireParentTakeChildRequest>;
 
     fn take_child_request<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireParentTakeChildRequestRequest,
         >;
@@ -583,8 +582,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireParentTakeChildRequest>,
+        ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireParentTakeChildRequest>,
     {
         self.as_untyped().send_one_way(4470101341872267920, request)
     }
@@ -594,7 +592,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireParentTakeChildRequestRequest,
         >,
@@ -613,10 +611,10 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: ParentClientHandler<___T>,
 
-    for<'buf> crate::WireParentGetChildResponse:
+    crate::WireParentGetChildResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireParentGetChildRequestResponse:
+    crate::WireParentGetChildRequestResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
@@ -679,10 +677,10 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: ParentServerHandler<___T>,
 
-    for<'buf> crate::WireParentTakeChildRequest:
+    crate::WireParentTakeChildRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireParentTakeChildRequestRequest:
+    crate::WireParentTakeChildRequestRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_one_way(

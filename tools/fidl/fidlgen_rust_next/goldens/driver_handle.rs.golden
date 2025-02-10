@@ -286,7 +286,7 @@ pub struct WireT {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireT
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireT
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 
@@ -427,7 +427,7 @@ pub struct WireHandlesInProtocolSendHandlesRequest {
     pub t: crate::WireT,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireHandlesInProtocolSendHandlesRequest
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireHandlesInProtocolSendHandlesRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -478,7 +478,7 @@ pub trait HandlesInProtocolClientSender<___T: ::fidl_next::protocol::Transport> 
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireHandlesInProtocolSendHandlesRequest,
         >;
@@ -494,7 +494,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireHandlesInProtocolSendHandlesRequest,
         >,
@@ -554,7 +554,7 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: HandlesInProtocolServerHandler<___T>,
 
-    for<'buf> crate::WireHandlesInProtocolSendHandlesRequest:
+    crate::WireHandlesInProtocolSendHandlesRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_one_way(

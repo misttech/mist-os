@@ -292,7 +292,7 @@ pub struct WireExampleOfUseOfAliases {
     pub field_of_nullable_client_end: ::fidl_next::fuchsia::WireOptionalHandle,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireExampleOfUseOfAliases
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleOfUseOfAliases
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 

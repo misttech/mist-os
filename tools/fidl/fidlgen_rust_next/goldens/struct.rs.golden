@@ -84,7 +84,7 @@ pub struct WireBasicStruct {
     pub y: ::fidl_next::WireString,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireBasicStruct
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireBasicStruct
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 

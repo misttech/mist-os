@@ -52,7 +52,7 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: TopClientHandler<___T>,
 
-    for<'buf> ::fidl_next_test_middle::WireMiddleGetFooResponse:
+    ::fidl_next_test_middle::WireMiddleGetFooResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(

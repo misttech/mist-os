@@ -425,7 +425,7 @@ pub struct WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -1603,7 +1603,7 @@ impl WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -1669,7 +1669,7 @@ impl WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -1784,7 +1784,7 @@ pub struct WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -1973,7 +1973,7 @@ impl WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -2039,7 +2039,7 @@ impl WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -2452,25 +2452,25 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: UnknownInteractionsAjarDriverProtocolClientHandler<___T>,
 
-    for<'buf> crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse:
+    crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse:
+    crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse:
+    crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult:
+    crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult:
+    crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult:
+    crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult:
+    crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
@@ -3086,7 +3086,7 @@ pub struct WireUnknownInteractionsAjarProtocolStrictTwoWayTableResponse {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayTableResponse
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -4224,7 +4224,7 @@ impl WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -4288,7 +4288,7 @@ impl WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -4398,7 +4398,7 @@ pub struct WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -4578,7 +4578,7 @@ impl WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -4642,7 +4642,7 @@ impl WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayTableErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayTableErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -5079,7 +5079,7 @@ pub struct WireUnknownInteractionsAjarProtocolStrictEventTableRequest {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictEventTableRequest
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -5530,7 +5530,7 @@ pub struct WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -6114,43 +6114,43 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: UnknownInteractionsAjarProtocolClientHandler<___T>,
 
-    for<'buf> crate::WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse:
+    crate::WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse:
+    crate::WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsAjarProtocolStrictTwoWayTableResponse:
+    crate::WireUnknownInteractionsAjarProtocolStrictTwoWayTableResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsAjarProtocolStrictTwoWayErrResult:
+    crate::WireUnknownInteractionsAjarProtocolStrictTwoWayErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult:
+    crate::WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult:
+    crate::WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResult:
+    crate::WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest:
+    crate::WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsAjarProtocolStrictEventUnionRequest:
+    crate::WireUnknownInteractionsAjarProtocolStrictEventUnionRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsAjarProtocolStrictEventTableRequest:
+    crate::WireUnknownInteractionsAjarProtocolStrictEventTableRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest:
+    crate::WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest:
+    crate::WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest:
+    crate::WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
@@ -6212,7 +6212,7 @@ pub trait UnknownInteractionsAjarProtocolServerSender<___T: ::fidl_next::protoco
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest,
         >;
@@ -6222,7 +6222,7 @@ pub trait UnknownInteractionsAjarProtocolServerSender<___T: ::fidl_next::protoco
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsAjarProtocolStrictEventUnionRequest,
         >;
@@ -6232,7 +6232,7 @@ pub trait UnknownInteractionsAjarProtocolServerSender<___T: ::fidl_next::protoco
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsAjarProtocolStrictEventTableRequest,
         >;
@@ -6244,7 +6244,7 @@ pub trait UnknownInteractionsAjarProtocolServerSender<___T: ::fidl_next::protoco
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest,
         >;
@@ -6254,7 +6254,7 @@ pub trait UnknownInteractionsAjarProtocolServerSender<___T: ::fidl_next::protoco
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest,
         >;
@@ -6264,7 +6264,7 @@ pub trait UnknownInteractionsAjarProtocolServerSender<___T: ::fidl_next::protoco
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest,
         >;
@@ -6284,7 +6284,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest,
         >,
@@ -6297,7 +6297,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsAjarProtocolStrictEventUnionRequest,
         >,
@@ -6310,7 +6310,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsAjarProtocolStrictEventTableRequest,
         >,
@@ -6327,7 +6327,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest,
         >,
@@ -6340,7 +6340,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest,
         >,
@@ -6353,7 +6353,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest,
         >,
@@ -6964,7 +6964,7 @@ pub struct WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse 
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -8153,7 +8153,7 @@ impl WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -8219,7 +8219,7 @@ impl WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResu
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -8336,7 +8336,7 @@ pub struct WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrRespon
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -8527,7 +8527,7 @@ impl WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -8593,7 +8593,7 @@ impl WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResu
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -8989,25 +8989,25 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: UnknownInteractionsClosedDriverProtocolClientHandler<___T>,
 
-    for<'buf> crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse:
+    crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse:
+    crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse:
+    crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult:
+    crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult:
+    crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult:
+    crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult:
+    crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
@@ -9618,7 +9618,7 @@ pub struct WireUnknownInteractionsClosedProtocolStrictTwoWayTableResponse {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayTableResponse
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -10768,7 +10768,7 @@ impl WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -10834,7 +10834,7 @@ impl WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -10947,7 +10947,7 @@ pub struct WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -11127,7 +11127,7 @@ impl WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -11193,7 +11193,7 @@ impl WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayTableErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayTableErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -11636,7 +11636,7 @@ pub struct WireUnknownInteractionsClosedProtocolStrictEventTableRequest {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictEventTableRequest
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -12111,34 +12111,34 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: UnknownInteractionsClosedProtocolClientHandler<___T>,
 
-    for<'buf> crate::WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse:
+    crate::WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse:
+    crate::WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsClosedProtocolStrictTwoWayTableResponse:
+    crate::WireUnknownInteractionsClosedProtocolStrictTwoWayTableResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsClosedProtocolStrictTwoWayErrResult:
+    crate::WireUnknownInteractionsClosedProtocolStrictTwoWayErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult:
+    crate::WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult:
+    crate::WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResult:
+    crate::WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest:
+    crate::WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsClosedProtocolStrictEventUnionRequest:
+    crate::WireUnknownInteractionsClosedProtocolStrictEventUnionRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsClosedProtocolStrictEventTableRequest:
+    crate::WireUnknownInteractionsClosedProtocolStrictEventTableRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
@@ -12183,7 +12183,7 @@ pub trait UnknownInteractionsClosedProtocolServerSender<___T: ::fidl_next::proto
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest,
         >;
@@ -12193,7 +12193,7 @@ pub trait UnknownInteractionsClosedProtocolServerSender<___T: ::fidl_next::proto
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsClosedProtocolStrictEventUnionRequest,
         >;
@@ -12203,7 +12203,7 @@ pub trait UnknownInteractionsClosedProtocolServerSender<___T: ::fidl_next::proto
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsClosedProtocolStrictEventTableRequest,
         >;
@@ -12223,7 +12223,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest,
         >,
@@ -12236,7 +12236,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsClosedProtocolStrictEventUnionRequest,
         >,
@@ -12249,7 +12249,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsClosedProtocolStrictEventTableRequest,
         >,
@@ -12832,7 +12832,7 @@ pub struct WireUnknownInteractionsDriverProtocolStrictTwoWayTableResponse {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayTableResponse
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -13982,7 +13982,7 @@ impl WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -14048,7 +14048,7 @@ impl WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -14161,7 +14161,7 @@ pub struct WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -14341,7 +14341,7 @@ impl WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -14407,7 +14407,7 @@ impl WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayTableErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayTableErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -15568,7 +15568,7 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -15639,7 +15639,7 @@ impl WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -15753,7 +15753,7 @@ pub struct WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -15934,7 +15934,7 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -16005,7 +16005,7 @@ impl WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayTableResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayTableResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -17268,7 +17268,7 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -17342,7 +17342,7 @@ impl WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -17462,7 +17462,7 @@ pub struct WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -17664,7 +17664,7 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -17738,7 +17738,7 @@ impl WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -18457,49 +18457,49 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: UnknownInteractionsDriverProtocolClientHandler<___T>,
 
-    for<'buf> crate::WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse:
+    crate::WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse:
+    crate::WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsDriverProtocolStrictTwoWayTableResponse:
+    crate::WireUnknownInteractionsDriverProtocolStrictTwoWayTableResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsDriverProtocolStrictTwoWayErrResult:
+    crate::WireUnknownInteractionsDriverProtocolStrictTwoWayErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult:
+    crate::WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult:
+    crate::WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResult:
+    crate::WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayResult:
+    crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult:
+    crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult:
+    crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResult:
+    crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResult:
+    crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult:
+    crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult:
+    crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult:
+    crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
@@ -19223,7 +19223,7 @@ pub struct WireUnknownInteractionsProtocolStrictTwoWayTableResponse {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayTableResponse
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -20340,7 +20340,7 @@ impl WireUnknownInteractionsProtocolStrictTwoWayUnionErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayUnionErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -20404,7 +20404,7 @@ impl WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -20514,7 +20514,7 @@ pub struct WireUnknownInteractionsProtocolStrictTwoWayTableErrResponse {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayTableErrResponse
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -20689,7 +20689,7 @@ impl WireUnknownInteractionsProtocolStrictTwoWayTableErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayTableErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -20753,7 +20753,7 @@ impl WireOptionalUnknownInteractionsProtocolStrictTwoWayTableErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolStrictTwoWayTableErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -21883,7 +21883,7 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayUnionResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayUnionResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -21952,7 +21952,7 @@ impl WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -22065,7 +22065,7 @@ pub struct WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -22242,7 +22242,7 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayTableResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayTableResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -22311,7 +22311,7 @@ impl WireOptionalUnknownInteractionsProtocolFlexibleTwoWayTableResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayTableResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -23536,7 +23536,7 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -23608,7 +23608,7 @@ impl WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -23723,7 +23723,7 @@ pub struct WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResponse
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -23918,7 +23918,7 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -23990,7 +23990,7 @@ impl WireOptionalUnknownInteractionsProtocolFlexibleTwoWayTableErrResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayTableErrResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -24430,7 +24430,7 @@ pub struct WireUnknownInteractionsProtocolStrictEventTableRequest {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictEventTableRequest
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -24875,7 +24875,7 @@ pub struct WireUnknownInteractionsProtocolFlexibleEventTableRequest {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleEventTableRequest
 where
     ___D: ::fidl_next::Decoder + ?Sized,
@@ -25739,67 +25739,67 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: UnknownInteractionsProtocolClientHandler<___T>,
 
-    for<'buf> crate::WireUnknownInteractionsProtocolStrictTwoWayFieldsResponse:
+    crate::WireUnknownInteractionsProtocolStrictTwoWayFieldsResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsProtocolStrictTwoWayUnionResponse:
+    crate::WireUnknownInteractionsProtocolStrictTwoWayUnionResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsProtocolStrictTwoWayTableResponse:
+    crate::WireUnknownInteractionsProtocolStrictTwoWayTableResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsProtocolStrictTwoWayErrResult:
+    crate::WireUnknownInteractionsProtocolStrictTwoWayErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResult:
+    crate::WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsProtocolStrictTwoWayUnionErrResult:
+    crate::WireUnknownInteractionsProtocolStrictTwoWayUnionErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsProtocolStrictTwoWayTableErrResult:
+    crate::WireUnknownInteractionsProtocolStrictTwoWayTableErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsProtocolFlexibleTwoWayResult:
+    crate::WireUnknownInteractionsProtocolFlexibleTwoWayResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResult:
+    crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsProtocolFlexibleTwoWayUnionResult:
+    crate::WireUnknownInteractionsProtocolFlexibleTwoWayUnionResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsProtocolFlexibleTwoWayTableResult:
+    crate::WireUnknownInteractionsProtocolFlexibleTwoWayTableResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsProtocolFlexibleTwoWayErrResult:
+    crate::WireUnknownInteractionsProtocolFlexibleTwoWayErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult:
+    crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResult:
+    crate::WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResult:
+    crate::WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsProtocolStrictEventFieldsRequest:
+    crate::WireUnknownInteractionsProtocolStrictEventFieldsRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsProtocolStrictEventUnionRequest:
+    crate::WireUnknownInteractionsProtocolStrictEventUnionRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsProtocolStrictEventTableRequest:
+    crate::WireUnknownInteractionsProtocolStrictEventTableRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsProtocolFlexibleEventFieldsRequest:
+    crate::WireUnknownInteractionsProtocolFlexibleEventFieldsRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsProtocolFlexibleEventUnionRequest:
+    crate::WireUnknownInteractionsProtocolFlexibleEventUnionRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireUnknownInteractionsProtocolFlexibleEventTableRequest:
+    crate::WireUnknownInteractionsProtocolFlexibleEventTableRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
@@ -25861,7 +25861,7 @@ pub trait UnknownInteractionsProtocolServerSender<___T: ::fidl_next::protocol::T
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsProtocolStrictEventFieldsRequest,
         >;
@@ -25871,7 +25871,7 @@ pub trait UnknownInteractionsProtocolServerSender<___T: ::fidl_next::protocol::T
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsProtocolStrictEventUnionRequest,
         >;
@@ -25881,7 +25881,7 @@ pub trait UnknownInteractionsProtocolServerSender<___T: ::fidl_next::protocol::T
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsProtocolStrictEventTableRequest,
         >;
@@ -25893,7 +25893,7 @@ pub trait UnknownInteractionsProtocolServerSender<___T: ::fidl_next::protocol::T
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsProtocolFlexibleEventFieldsRequest,
         >;
@@ -25903,7 +25903,7 @@ pub trait UnknownInteractionsProtocolServerSender<___T: ::fidl_next::protocol::T
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsProtocolFlexibleEventUnionRequest,
         >;
@@ -25913,7 +25913,7 @@ pub trait UnknownInteractionsProtocolServerSender<___T: ::fidl_next::protocol::T
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsProtocolFlexibleEventTableRequest,
         >;
@@ -25933,7 +25933,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsProtocolStrictEventFieldsRequest,
         >,
@@ -25946,7 +25946,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsProtocolStrictEventUnionRequest,
         >,
@@ -25959,7 +25959,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsProtocolStrictEventTableRequest,
         >,
@@ -25976,7 +25976,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsProtocolFlexibleEventFieldsRequest,
         >,
@@ -25989,7 +25989,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsProtocolFlexibleEventUnionRequest,
         >,
@@ -26002,7 +26002,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsProtocolFlexibleEventTableRequest,
         >,

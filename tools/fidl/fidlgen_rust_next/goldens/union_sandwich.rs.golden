@@ -109,7 +109,7 @@ impl WireUnionSize12Alignment4 {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireUnionSize12Alignment4
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireUnionSize12Alignment4
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -162,7 +162,7 @@ impl WireOptionalUnionSize12Alignment4 {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalUnionSize12Alignment4
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalUnionSize12Alignment4
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -281,7 +281,7 @@ pub struct WireSandwichUnionSize12Alignment4 {
     pub after: ::fidl_next::i32_le,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSandwichUnionSize12Alignment4
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireSandwichUnionSize12Alignment4
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -522,7 +522,7 @@ impl WireUnionSize24Alignment8 {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireUnionSize24Alignment8
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireUnionSize24Alignment8
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -579,7 +579,7 @@ impl WireOptionalUnionSize24Alignment8 {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalUnionSize24Alignment8
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalUnionSize24Alignment8
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -700,7 +700,7 @@ pub struct WireSandwichUnionSize24Alignment8 {
     pub after: ::fidl_next::u32_le,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSandwichUnionSize24Alignment8
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireSandwichUnionSize24Alignment8
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -836,7 +836,7 @@ impl WireUnionSize36Alignment4 {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireUnionSize36Alignment4
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireUnionSize36Alignment4
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -889,7 +889,7 @@ impl WireOptionalUnionSize36Alignment4 {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalUnionSize36Alignment4
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalUnionSize36Alignment4
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -1008,7 +1008,7 @@ pub struct WireSandwichUnionSize36Alignment4 {
     pub after: ::fidl_next::u32_le,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSandwichUnionSize36Alignment4
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireSandwichUnionSize36Alignment4
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 

@@ -75,8 +75,7 @@ pub struct WireExampleUseOfErrorSyntaxCallWhichMayFailRequest {
     pub s: ::fidl_next::WireString,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
-    for WireExampleUseOfErrorSyntaxCallWhichMayFailRequest
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleUseOfErrorSyntaxCallWhichMayFailRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -317,8 +316,7 @@ impl WireExampleUseOfErrorSyntaxCallWhichMayFailResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
-    for WireExampleUseOfErrorSyntaxCallWhichMayFailResult
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleUseOfErrorSyntaxCallWhichMayFailResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -382,7 +380,7 @@ impl WireOptionalExampleUseOfErrorSyntaxCallWhichMayFailResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireOptionalExampleUseOfErrorSyntaxCallWhichMayFailResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -461,7 +459,7 @@ pub trait ExampleUseOfErrorSyntaxClientSender<___T: ::fidl_next::protocol::Trans
                         ::fidl_next::EncodeError,
                     >
                     where
-                        for<'buf> ___R: ::fidl_next::Encode<
+                        ___R: ::fidl_next::Encode<
                             ___T::SendBuffer,
                             Encoded = ::fidl_next_test_errorsyntax_parent::WireParentUsesErrorSyntaxComposedCallWhichMayFailRequest,
                         >;
@@ -474,7 +472,7 @@ pub trait ExampleUseOfErrorSyntaxClientSender<___T: ::fidl_next::protocol::Trans
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireExampleUseOfErrorSyntaxCallWhichMayFailRequest,
         >;
@@ -493,7 +491,7 @@ where
                         ::fidl_next::EncodeError,
                     >
                     where
-                        for<'buf> ___R: ::fidl_next::Encode<
+                        ___R: ::fidl_next::Encode<
                             ___T::SendBuffer,
                             Encoded = ::fidl_next_test_errorsyntax_parent::WireParentUsesErrorSyntaxComposedCallWhichMayFailRequest,
                         >,
@@ -511,7 +509,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireExampleUseOfErrorSyntaxCallWhichMayFailRequest,
         >,
@@ -532,10 +530,10 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: ExampleUseOfErrorSyntaxClientHandler<___T>,
 
-    for<'buf> ::fidl_next_test_errorsyntax_parent::WireParentUsesErrorSyntaxComposedCallWhichMayFailResult:
+    ::fidl_next_test_errorsyntax_parent::WireParentUsesErrorSyntaxComposedCallWhichMayFailResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireExampleUseOfErrorSyntaxCallWhichMayFailResult:
+    crate::WireExampleUseOfErrorSyntaxCallWhichMayFailResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
@@ -598,10 +596,10 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: ExampleUseOfErrorSyntaxServerHandler<___T>,
 
-    for<'buf> ::fidl_next_test_errorsyntax_parent::WireParentUsesErrorSyntaxComposedCallWhichMayFailRequest:
+    ::fidl_next_test_errorsyntax_parent::WireParentUsesErrorSyntaxComposedCallWhichMayFailRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireExampleUseOfErrorSyntaxCallWhichMayFailRequest:
+    crate::WireExampleUseOfErrorSyntaxCallWhichMayFailRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_one_way(

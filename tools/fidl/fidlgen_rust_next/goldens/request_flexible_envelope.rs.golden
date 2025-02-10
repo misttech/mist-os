@@ -127,7 +127,7 @@ impl WireFlexibleFoo {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireFlexibleFoo
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireFlexibleFoo
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -185,7 +185,7 @@ impl WireOptionalFlexibleFoo {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalFlexibleFoo
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalFlexibleFoo
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -334,7 +334,7 @@ impl WireStrictFoo {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireStrictFoo
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireStrictFoo
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -392,7 +392,7 @@ impl WireOptionalStrictFoo {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalStrictFoo
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalStrictFoo
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -497,8 +497,7 @@ pub struct WireProtocolRequestStrictResponseFlexibleRequest {
     pub s: crate::WireStrictFoo,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
-    for WireProtocolRequestStrictResponseFlexibleRequest
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireProtocolRequestStrictResponseFlexibleRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -594,8 +593,7 @@ pub struct WireProtocolRequestStrictResponseFlexibleResponse {
     pub f: crate::WireFlexibleFoo,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
-    for WireProtocolRequestStrictResponseFlexibleResponse
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireProtocolRequestStrictResponseFlexibleResponse
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -691,8 +689,7 @@ pub struct WireProtocolRequestFlexibleResponseStrictRequest {
     pub s: crate::WireFlexibleFoo,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
-    for WireProtocolRequestFlexibleResponseStrictRequest
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireProtocolRequestFlexibleResponseStrictRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -788,8 +785,7 @@ pub struct WireProtocolRequestFlexibleResponseStrictResponse {
     pub f: crate::WireStrictFoo,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
-    for WireProtocolRequestFlexibleResponseStrictResponse
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireProtocolRequestFlexibleResponseStrictResponse
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -853,7 +849,7 @@ pub trait ProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireProtocolRequestStrictResponseFlexibleRequest,
         >;
@@ -866,7 +862,7 @@ pub trait ProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireProtocolRequestFlexibleResponseStrictRequest,
         >;
@@ -884,7 +880,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireProtocolRequestStrictResponseFlexibleRequest,
         >,
@@ -902,7 +898,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireProtocolRequestFlexibleResponseStrictRequest,
         >,
@@ -923,10 +919,10 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: ProtocolClientHandler<___T>,
 
-    for<'buf> crate::WireProtocolRequestStrictResponseFlexibleResponse:
+    crate::WireProtocolRequestStrictResponseFlexibleResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireProtocolRequestFlexibleResponseStrictResponse:
+    crate::WireProtocolRequestFlexibleResponseStrictResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
@@ -979,10 +975,10 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: ProtocolServerHandler<___T>,
 
-    for<'buf> crate::WireProtocolRequestStrictResponseFlexibleRequest:
+    crate::WireProtocolRequestStrictResponseFlexibleRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireProtocolRequestFlexibleResponseStrictRequest:
+    crate::WireProtocolRequestFlexibleResponseStrictRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_one_way(

@@ -58,7 +58,7 @@ pub struct WireEmptyTable {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireEmptyTable
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireEmptyTable
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 {
@@ -142,7 +142,7 @@ pub struct WireExtensionTable {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireExtensionTable
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireExtensionTable
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 {
@@ -286,7 +286,7 @@ pub struct WireNewerSimpleTable {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireNewerSimpleTable
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireNewerSimpleTable
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 {
@@ -431,7 +431,7 @@ pub struct WireOlderSimpleTable {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOlderSimpleTable
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOlderSimpleTable
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 {
@@ -588,7 +588,7 @@ pub struct WireReverseOrdinalTable {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireReverseOrdinalTable
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireReverseOrdinalTable
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 {
@@ -755,7 +755,7 @@ pub struct WireSimpleTable {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSimpleTable
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireSimpleTable
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 {
@@ -2145,7 +2145,7 @@ pub struct WireSixtyFourOrdinalTable {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSixtyFourOrdinalTable
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireSixtyFourOrdinalTable
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 {
@@ -3144,7 +3144,7 @@ pub struct WireTableWithAttributes {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireTableWithAttributes
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireTableWithAttributes
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 {

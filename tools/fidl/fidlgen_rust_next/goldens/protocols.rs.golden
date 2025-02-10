@@ -854,7 +854,7 @@ pub trait ChannelProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireChannelProtocolMethodARequest,
         >;
@@ -867,7 +867,7 @@ pub trait ChannelProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireChannelProtocolMethodBRequest,
         >;
@@ -880,7 +880,7 @@ pub trait ChannelProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireChannelProtocolTakeHandleRequest,
         >;
@@ -893,7 +893,7 @@ pub trait ChannelProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireChannelProtocolMutateSocketRequest,
         >;
@@ -909,7 +909,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireChannelProtocolMethodARequest,
         >,
@@ -925,7 +925,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireChannelProtocolMethodBRequest,
         >,
@@ -943,7 +943,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireChannelProtocolTakeHandleRequest,
         >,
@@ -961,7 +961,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireChannelProtocolMutateSocketRequest,
         >,
@@ -989,13 +989,13 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: ChannelProtocolClientHandler<___T>,
 
-    for<'buf> crate::WireChannelProtocolEventARequest:
+    crate::WireChannelProtocolEventARequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireChannelProtocolMethodBResponse:
+    crate::WireChannelProtocolMethodBResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireChannelProtocolMutateSocketResponse:
+    crate::WireChannelProtocolMutateSocketResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
@@ -1024,7 +1024,7 @@ pub trait ChannelProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireChannelProtocolEventARequest,
         >;
@@ -1040,7 +1040,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireChannelProtocolEventARequest,
         >,
@@ -1093,16 +1093,16 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: ChannelProtocolServerHandler<___T>,
 
-    for<'buf> crate::WireChannelProtocolMethodARequest:
+    crate::WireChannelProtocolMethodARequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireChannelProtocolMethodBRequest:
+    crate::WireChannelProtocolMethodBRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireChannelProtocolTakeHandleRequest:
+    crate::WireChannelProtocolTakeHandleRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireChannelProtocolMutateSocketRequest:
+    crate::WireChannelProtocolMutateSocketRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_one_way(
@@ -1796,7 +1796,7 @@ pub trait HandleRightsProtocolClientSender<___T: ::fidl_next::protocol::Transpor
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireHandleRightsProtocolNoResponseMethodRequest,
         >;
@@ -1809,7 +1809,7 @@ pub trait HandleRightsProtocolClientSender<___T: ::fidl_next::protocol::Transpor
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireHandleRightsProtocolResponseMethodRequest,
         >;
@@ -1825,7 +1825,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireHandleRightsProtocolNoResponseMethodRequest,
         >,
@@ -1841,7 +1841,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireHandleRightsProtocolResponseMethodRequest,
         >,
@@ -1869,10 +1869,10 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: HandleRightsProtocolClientHandler<___T>,
 
-    for<'buf> crate::WireHandleRightsProtocolResponseMethodResponse:
+    crate::WireHandleRightsProtocolResponseMethodResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireHandleRightsProtocolAnEventRequest:
+    crate::WireHandleRightsProtocolAnEventRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
@@ -1901,7 +1901,7 @@ pub trait HandleRightsProtocolServerSender<___T: ::fidl_next::protocol::Transpor
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireHandleRightsProtocolAnEventRequest,
         >;
@@ -1917,7 +1917,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireHandleRightsProtocolAnEventRequest,
         >,
@@ -1952,10 +1952,10 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: HandleRightsProtocolServerHandler<___T>,
 
-    for<'buf> crate::WireHandleRightsProtocolNoResponseMethodRequest:
+    crate::WireHandleRightsProtocolNoResponseMethodRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireHandleRightsProtocolResponseMethodRequest:
+    crate::WireHandleRightsProtocolResponseMethodRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_one_way(
@@ -2284,7 +2284,7 @@ pub trait ManyParametersClientSender<___T: ::fidl_next::protocol::Transport> {
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireManyParametersFifteenRequest,
         >;
@@ -2300,7 +2300,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireManyParametersFifteenRequest,
         >,
@@ -2360,7 +2360,7 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: ManyParametersServerHandler<___T>,
 
-    for<'buf> crate::WireManyParametersFifteenRequest:
+    crate::WireManyParametersFifteenRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_one_way(
@@ -2823,7 +2823,7 @@ pub trait MethodWithUnionClientSender<___T: ::fidl_next::protocol::Transport> {
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireMethodWithUnionUnionMethodRequest,
         >;
@@ -2842,7 +2842,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireMethodWithUnionUnionMethodRequest,
         >,
@@ -2863,7 +2863,7 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: MethodWithUnionClientHandler<___T>,
 
-    for<'buf> crate::WireMethodWithUnionUnionMethodResponse:
+    crate::WireMethodWithUnionUnionMethodResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
@@ -2909,7 +2909,7 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: MethodWithUnionServerHandler<___T>,
 
-    for<'buf> crate::WireMethodWithUnionUnionMethodRequest:
+    crate::WireMethodWithUnionUnionMethodRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_one_way(
@@ -3313,7 +3313,7 @@ pub trait SyscallProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireSyscallProtocolMethodCRequest,
         >;
@@ -3329,7 +3329,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireSyscallProtocolMethodCRequest,
         >,
@@ -3389,7 +3389,7 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: SyscallProtocolServerHandler<___T>,
 
-    for<'buf> crate::WireSyscallProtocolMethodCRequest:
+    crate::WireSyscallProtocolMethodCRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_one_way(
@@ -3502,7 +3502,7 @@ pub struct WireWithAndWithoutRequestResponseNoRequestWithResponseResponse {
     pub ret: ::fidl_next::WireString,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireWithAndWithoutRequestResponseNoRequestWithResponseResponse
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -3603,7 +3603,7 @@ pub struct WireWithAndWithoutRequestResponseWithRequestNoResponseRequest {
     pub arg: ::fidl_next::WireString,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireWithAndWithoutRequestResponseWithRequestNoResponseRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -3705,7 +3705,7 @@ pub struct WireWithAndWithoutRequestResponseWithRequestEmptyResponseRequest {
     pub arg: ::fidl_next::WireString,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireWithAndWithoutRequestResponseWithRequestEmptyResponseRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -3806,7 +3806,7 @@ pub struct WireWithAndWithoutRequestResponseWithRequestWithResponseRequest {
     pub arg: ::fidl_next::WireString,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireWithAndWithoutRequestResponseWithRequestWithResponseRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -3908,7 +3908,7 @@ pub struct WireWithAndWithoutRequestResponseWithRequestWithResponseResponse {
     pub ret: ::fidl_next::WireString,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireWithAndWithoutRequestResponseWithRequestWithResponseResponse
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -4007,7 +4007,7 @@ pub struct WireWithAndWithoutRequestResponseOnWithResponseRequest {
     pub ret: ::fidl_next::WireString,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireWithAndWithoutRequestResponseOnWithResponseRequest
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -4165,7 +4165,7 @@ pub trait WithAndWithoutRequestResponseClientSender<___T: ::fidl_next::protocol:
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireWithAndWithoutRequestResponseWithRequestNoResponseRequest,
         >;
@@ -4182,7 +4182,7 @@ pub trait WithAndWithoutRequestResponseClientSender<___T: ::fidl_next::protocol:
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireWithAndWithoutRequestResponseWithRequestEmptyResponseRequest,
         >;
@@ -4199,7 +4199,7 @@ pub trait WithAndWithoutRequestResponseClientSender<___T: ::fidl_next::protocol:
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireWithAndWithoutRequestResponseWithRequestWithResponseRequest,
         >;
@@ -4249,7 +4249,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireWithAndWithoutRequestResponseWithRequestNoResponseRequest,
         >,
@@ -4269,7 +4269,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireWithAndWithoutRequestResponseWithRequestEmptyResponseRequest,
         >,
@@ -4291,7 +4291,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireWithAndWithoutRequestResponseWithRequestWithResponseRequest,
         >,
@@ -4327,13 +4327,13 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: WithAndWithoutRequestResponseClientHandler<___T>,
 
-    for<'buf> crate::WireWithAndWithoutRequestResponseNoRequestWithResponseResponse:
+    crate::WireWithAndWithoutRequestResponseNoRequestWithResponseResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireWithAndWithoutRequestResponseWithRequestWithResponseResponse:
+    crate::WireWithAndWithoutRequestResponseWithRequestWithResponseResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireWithAndWithoutRequestResponseOnWithResponseRequest:
+    crate::WireWithAndWithoutRequestResponseOnWithResponseRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
@@ -4368,7 +4368,7 @@ pub trait WithAndWithoutRequestResponseServerSender<___T: ::fidl_next::protocol:
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireWithAndWithoutRequestResponseOnWithResponseRequest,
         >;
@@ -4388,7 +4388,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireWithAndWithoutRequestResponseOnWithResponseRequest,
         >,
@@ -4468,13 +4468,13 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: WithAndWithoutRequestResponseServerHandler<___T>,
 
-    for<'buf> crate::WireWithAndWithoutRequestResponseWithRequestNoResponseRequest:
+    crate::WireWithAndWithoutRequestResponseWithRequestNoResponseRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireWithAndWithoutRequestResponseWithRequestEmptyResponseRequest:
+    crate::WireWithAndWithoutRequestResponseWithRequestEmptyResponseRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireWithAndWithoutRequestResponseWithRequestWithResponseRequest:
+    crate::WireWithAndWithoutRequestResponseWithRequestWithResponseRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_one_way(
@@ -4784,7 +4784,7 @@ impl WireWithErrorSyntaxResponseAsStructResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireWithErrorSyntaxResponseAsStructResult
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireWithErrorSyntaxResponseAsStructResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -4848,8 +4848,7 @@ impl WireOptionalWithErrorSyntaxResponseAsStructResult {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
-    for WireOptionalWithErrorSyntaxResponseAsStructResult
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalWithErrorSyntaxResponseAsStructResult
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -6034,16 +6033,16 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: WithErrorSyntaxClientHandler<___T>,
 
-    for<'buf> crate::WireWithErrorSyntaxResponseAsStructResult:
+    crate::WireWithErrorSyntaxResponseAsStructResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireWithErrorSyntaxErrorAsPrimitiveResult:
+    crate::WireWithErrorSyntaxErrorAsPrimitiveResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireWithErrorSyntaxErrorAsEnumResult:
+    crate::WireWithErrorSyntaxErrorAsEnumResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireWithErrorSyntaxHandleInResultResult:
+    crate::WireWithErrorSyntaxHandleInResultResult:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
@@ -6805,7 +6804,7 @@ pub trait WithProtocolEndsClientSender<___T: ::fidl_next::protocol::Transport> {
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireWithProtocolEndsClientEndsRequest,
         >;
@@ -6818,7 +6817,7 @@ pub trait WithProtocolEndsClientSender<___T: ::fidl_next::protocol::Transport> {
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireWithProtocolEndsServerEndsRequest,
         >;
@@ -6831,7 +6830,7 @@ pub trait WithProtocolEndsClientSender<___T: ::fidl_next::protocol::Transport> {
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireWithProtocolEndsStructContainingEndsRequest,
         >;
@@ -6850,7 +6849,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireWithProtocolEndsClientEndsRequest,
         >,
@@ -6868,7 +6867,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireWithProtocolEndsServerEndsRequest,
         >,
@@ -6886,7 +6885,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<
+        ___R: ::fidl_next::Encode<
             ___T::SendBuffer,
             Encoded = crate::WireWithProtocolEndsStructContainingEndsRequest,
         >,
@@ -6907,13 +6906,13 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: WithProtocolEndsClientHandler<___T>,
 
-    for<'buf> crate::WireWithProtocolEndsClientEndsResponse:
+    crate::WireWithProtocolEndsClientEndsResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireWithProtocolEndsServerEndsResponse:
+    crate::WireWithProtocolEndsServerEndsResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireWithProtocolEndsStructContainingEndsResponse:
+    crate::WireWithProtocolEndsStructContainingEndsResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
@@ -6977,13 +6976,13 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: WithProtocolEndsServerHandler<___T>,
 
-    for<'buf> crate::WireWithProtocolEndsClientEndsRequest:
+    crate::WireWithProtocolEndsClientEndsRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireWithProtocolEndsServerEndsRequest:
+    crate::WireWithProtocolEndsServerEndsRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireWithProtocolEndsStructContainingEndsRequest:
+    crate::WireWithProtocolEndsStructContainingEndsRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_one_way(

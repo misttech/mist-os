@@ -61,7 +61,7 @@ pub trait {{ client_sender_name }}<___T: ::fidl_next::protocol::Transport> {
                         request: &mut ___R,
                     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
                     where
-                        for<'buf> ___R: ::fidl_next::Encode<
+                        ___R: ::fidl_next::Encode<
                             ___T::SendBuffer,
                             Encoded = {{ context.wire_type(request) }},
                         >;
@@ -85,7 +85,7 @@ pub trait {{ client_sender_name }}<___T: ::fidl_next::protocol::Transport> {
                         ::fidl_next::EncodeError,
                     >
                     where
-                        for<'buf> ___R: ::fidl_next::Encode<
+                        ___R: ::fidl_next::Encode<
                             ___T::SendBuffer,
                             Encoded = {{ context.wire_type(request) }},
                         >;
@@ -123,7 +123,7 @@ where
                         request: &mut ___R,
                     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
                     where
-                        for<'buf> ___R: ::fidl_next::Encode<
+                        ___R: ::fidl_next::Encode<
                             ___T::SendBuffer,
                             Encoded = {{ context.wire_type(request) }},
                         >,
@@ -148,7 +148,7 @@ where
                         ::fidl_next::EncodeError,
                     >
                     where
-                        for<'buf> ___R: ::fidl_next::Encode<
+                        ___R: ::fidl_next::Encode<
                             ___T::SendBuffer,
                             Encoded = {{ context.wire_type(request) }},
                         >,
@@ -210,7 +210,7 @@ where
     ___H: {{ client_handler_name }}<___T>,
     {% for method in protocol.methods %}
         {% if let Some(response) = method.maybe_response_payload %}
-            for<'buf> {{ context.wire_type(response) }}:
+            {{ context.wire_type(response) }}:
                 ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
         {% endif %}
     {% endfor %}
@@ -263,7 +263,7 @@ pub trait {{ server_sender_name }}<___T: ::fidl_next::protocol::Transport> {
                     request: &mut ___R,
                 ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
                 where
-                    for<'buf> ___R: ::fidl_next::Encode<
+                    ___R: ::fidl_next::Encode<
                             ___T::SendBuffer,
                         Encoded = {{ context.wire_type(request) }},
                     >;
@@ -291,7 +291,7 @@ where
                     request: &mut ___R,
                 ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
                 where
-                    for<'buf> ___R: ::fidl_next::Encode<
+                    ___R: ::fidl_next::Encode<
                             ___T::SendBuffer,
                         Encoded = {{ context.wire_type(request) }},
                     >,
@@ -359,7 +359,7 @@ where
     ___H: {{ server_handler_name }}<___T>,
     {% for method in protocol.methods %}
         {% if let Some(request) = method.maybe_request_payload %}
-            for<'buf> {{ context.wire_type(request) }}:
+            {{ context.wire_type(request) }}:
                 ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
         {% endif %}
     {% endfor %}

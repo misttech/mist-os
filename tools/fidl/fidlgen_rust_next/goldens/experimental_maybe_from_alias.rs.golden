@@ -456,7 +456,7 @@ pub struct WireTesting {
     pub aa3: [[::fidl_next::u64_le; 2]; 3],
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireTesting
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireTesting
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 

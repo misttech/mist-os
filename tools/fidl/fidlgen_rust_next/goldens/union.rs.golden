@@ -400,7 +400,7 @@ impl WireExplicitFlexibleUnion {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireExplicitFlexibleUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireExplicitFlexibleUnion
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -456,7 +456,7 @@ impl WireOptionalExplicitFlexibleUnion {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalExplicitFlexibleUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalExplicitFlexibleUnion
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -611,7 +611,7 @@ impl WireExplicitFoo {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireExplicitFoo
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireExplicitFoo
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -669,7 +669,7 @@ impl WireOptionalExplicitFoo {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalExplicitFoo
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalExplicitFoo
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -772,7 +772,7 @@ pub struct WirePizza {
     pub toppings: ::fidl_next::WireVector<::fidl_next::WireString>,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WirePizza
+unsafe impl<___D> ::fidl_next::Decode<___D> for WirePizza
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -866,7 +866,7 @@ pub struct WirePasta {
     pub sauce: ::fidl_next::WireString,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WirePasta
+unsafe impl<___D> ::fidl_next::Decode<___D> for WirePasta
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -1019,7 +1019,7 @@ impl WireExplicitPizzaOrPasta {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireExplicitPizzaOrPasta
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireExplicitPizzaOrPasta
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -1075,7 +1075,7 @@ impl WireOptionalExplicitPizzaOrPasta {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalExplicitPizzaOrPasta
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalExplicitPizzaOrPasta
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -1222,7 +1222,7 @@ impl WireExplicitStrictFoo {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireExplicitStrictFoo
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireExplicitStrictFoo
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -1280,7 +1280,7 @@ impl WireOptionalExplicitStrictFoo {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalExplicitStrictFoo
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalExplicitStrictFoo
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -1431,7 +1431,7 @@ impl WireExplicitUnion {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireExplicitUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireExplicitUnion
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -1489,7 +1489,7 @@ impl WireOptionalExplicitUnion {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalExplicitUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalExplicitUnion
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -1854,7 +1854,7 @@ impl WireFlexibleFoo {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireFlexibleFoo
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireFlexibleFoo
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -1912,7 +1912,7 @@ impl WireOptionalFlexibleFoo {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalFlexibleFoo
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalFlexibleFoo
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -2073,7 +2073,7 @@ impl WireFlexiblePizzaOrPasta {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireFlexiblePizzaOrPasta
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireFlexiblePizzaOrPasta
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -2129,7 +2129,7 @@ impl WireOptionalFlexiblePizzaOrPasta {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalFlexiblePizzaOrPasta
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalFlexiblePizzaOrPasta
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -2302,7 +2302,7 @@ impl WireFlexibleUnion {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireFlexibleUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireFlexibleUnion
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -2371,7 +2371,7 @@ impl WireOptionalFlexibleUnion {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalFlexibleUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalFlexibleUnion
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -2547,7 +2547,7 @@ impl WireNewerSimpleUnion {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireNewerSimpleUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireNewerSimpleUnion
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -2616,7 +2616,7 @@ impl WireOptionalNewerSimpleUnion {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalNewerSimpleUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalNewerSimpleUnion
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -2724,7 +2724,7 @@ pub struct WireNullableUnionStruct {
     pub the_union: crate::WireOptionalUnion,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireNullableUnionStruct
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireNullableUnionStruct
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -2872,7 +2872,7 @@ impl WireOlderSimpleUnion {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOlderSimpleUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOlderSimpleUnion
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -2928,7 +2928,7 @@ impl WireOptionalOlderSimpleUnion {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalOlderSimpleUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalOlderSimpleUnion
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -3075,7 +3075,7 @@ impl WirePizzaOrPasta {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WirePizzaOrPasta
+unsafe impl<___D> ::fidl_next::Decode<___D> for WirePizzaOrPasta
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -3131,7 +3131,7 @@ impl WireOptionalPizzaOrPasta {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalPizzaOrPasta
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalPizzaOrPasta
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -3501,7 +3501,7 @@ impl WireStrictBoundedUnion {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireStrictBoundedUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireStrictBoundedUnion
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -3556,7 +3556,7 @@ impl WireOptionalStrictBoundedUnion {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalStrictBoundedUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalStrictBoundedUnion
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -3703,7 +3703,7 @@ impl WireStrictFoo {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireStrictFoo
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireStrictFoo
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -3761,7 +3761,7 @@ impl WireOptionalStrictFoo {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalStrictFoo
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalStrictFoo
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -3914,7 +3914,7 @@ impl WireStrictPizzaOrPasta {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireStrictPizzaOrPasta
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireStrictPizzaOrPasta
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -3970,7 +3970,7 @@ impl WireOptionalStrictPizzaOrPasta {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalStrictPizzaOrPasta
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalStrictPizzaOrPasta
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -4131,7 +4131,7 @@ impl WireStrictSimpleUnion {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireStrictSimpleUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireStrictSimpleUnion
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -4192,7 +4192,7 @@ impl WireOptionalStrictSimpleUnion {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalStrictSimpleUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalStrictSimpleUnion
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -4361,7 +4361,7 @@ impl WireStrictUnion {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireStrictUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireStrictUnion
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -4430,7 +4430,7 @@ impl WireOptionalStrictUnion {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalStrictUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalStrictUnion
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -4538,7 +4538,7 @@ pub struct WireStructWithNullableUnion {
     pub x1: crate::WireOptionalOlderSimpleUnion,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireStructWithNullableUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableUnion
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -4641,7 +4641,7 @@ pub struct WireTestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse {
     pub xu: crate::WireStrictBoundedUnion,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireTestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -4745,7 +4745,7 @@ pub struct WireTestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse
     pub xu: crate::WireOlderSimpleUnion,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
+unsafe impl<___D> ::fidl_next::Decode<___D>
     for WireTestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
@@ -4871,10 +4871,10 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: TestProtocolClientHandler<___T>,
 
-    for<'buf> crate::WireTestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse:
+    crate::WireTestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
-    for<'buf> crate::WireTestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse:
+    crate::WireTestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
@@ -5102,7 +5102,7 @@ impl WireUnion {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireUnion
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -5171,7 +5171,7 @@ impl WireOptionalUnion {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalUnion
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalUnion
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -5521,7 +5521,7 @@ pub struct WireUnionSandwich {
     pub b: ::fidl_next::u32_le,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireUnionSandwich
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireUnionSandwich
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -5661,7 +5661,7 @@ impl WireUnionWithAttributes {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireUnionWithAttributes
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireUnionWithAttributes
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -5714,7 +5714,7 @@ impl WireOptionalUnionWithAttributes {
     }
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalUnionWithAttributes
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptionalUnionWithAttributes
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 

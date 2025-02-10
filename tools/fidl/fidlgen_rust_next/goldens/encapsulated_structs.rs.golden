@@ -384,7 +384,7 @@ pub struct WireNonInlineStructTestStruct {
     pub h: ::fidl_next::fuchsia::WireHandle,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireNonInlineStructTestStruct
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireNonInlineStructTestStruct
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -612,7 +612,7 @@ pub struct WireTopLevelStruct {
     pub b: crate::WireNonInlineStructTestStruct,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireTopLevelStruct
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireTopLevelStruct
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 

@@ -192,7 +192,7 @@ impl {{ wire_name }} {
     }
 {% endif %}
 
-unsafe impl<{% if !is_static %}'buf, {% endif %}___D> ::fidl_next::Decode<___D> for {{ wire_name }}
+unsafe impl<___D> ::fidl_next::Decode<___D> for {{ wire_name }}
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
     {% if !is_static %}
@@ -292,7 +292,7 @@ impl WireOptional{{ name }} {
     }
 {% endif %}
 
-unsafe impl<{% if !is_static %}'buf, {% endif %}___D> ::fidl_next::Decode<___D> for WireOptional{{ name }}
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireOptional{{ name }}
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
     {% if !is_static %}

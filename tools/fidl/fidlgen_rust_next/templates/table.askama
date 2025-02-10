@@ -92,7 +92,7 @@ pub struct {{ wire_name }} {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for {{ wire_name }}
+unsafe impl<___D> ::fidl_next::Decode<___D> for {{ wire_name }}
 where
     ___D: ::fidl_next::Decoder + ?Sized,
     {% if table.is_resource %}

@@ -144,7 +144,7 @@ pub struct WireEmptyResourceTable {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireEmptyResourceTable
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireEmptyResourceTable
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 
@@ -514,7 +514,7 @@ pub struct WireTableWithHandle {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireTableWithHandle
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireTableWithHandle
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 
@@ -884,7 +884,7 @@ pub struct WireHandlesInTypes {
     pub union_with_handle: crate::WireUnionWithHandle,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireHandlesInTypes
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireHandlesInTypes
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 

@@ -266,7 +266,7 @@ pub struct WireComplexInstants {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireComplexInstants
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireComplexInstants
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 {

@@ -465,7 +465,7 @@ pub struct WireStruct {
     pub bits_with_default: crate::WireBits,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireStruct
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireStruct
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 

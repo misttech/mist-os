@@ -138,7 +138,7 @@ pub struct WireSerializableTable {
     table: ::fidl_next::WireTable,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSerializableTable
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireSerializableTable
 where
     ___D: ::fidl_next::Decoder + ?Sized,
 {

@@ -222,8 +222,7 @@ pub trait TwoWayClientSender<___T: ::fidl_next::protocol::Transport> {
         request: &mut ___R,
     ) -> Result<::fidl_next::bind::ResponseFuture<'_, ___T, two_way::Add>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireTwoWayAddRequest>;
+        ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireTwoWayAddRequest>;
 }
 
 impl<___T> TwoWayClientSender<___T> for ::fidl_next::bind::ClientSender<___T, TwoWay>
@@ -235,8 +234,7 @@ where
         request: &mut ___R,
     ) -> Result<::fidl_next::bind::ResponseFuture<'_, ___T, two_way::Add>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireTwoWayAddRequest>,
+        ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireTwoWayAddRequest>,
     {
         self.as_untyped()
             .send_two_way(989730524426044687, request)
@@ -254,7 +252,7 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: TwoWayClientHandler<___T>,
 
-    for<'buf> crate::WireTwoWayAddResponse:
+    crate::WireTwoWayAddResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
@@ -298,7 +296,7 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: TwoWayServerHandler<___T>,
 
-    for<'buf> crate::WireTwoWayAddRequest:
+    crate::WireTwoWayAddRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_one_way(

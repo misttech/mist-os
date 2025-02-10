@@ -315,8 +315,7 @@ pub trait SimpleProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireSimpleProtocolAddRequest>;
+        ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireSimpleProtocolAddRequest>;
 }
 
 impl<___T> SimpleProtocolClientSender<___T>
@@ -332,8 +331,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireSimpleProtocolAddRequest>,
+        ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireSimpleProtocolAddRequest>,
     {
         self.as_untyped()
             .send_two_way(9142761280038437494, request)
@@ -351,7 +349,7 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: SimpleProtocolClientHandler<___T>,
 
-    for<'buf> crate::WireSimpleProtocolAddResponse:
+    crate::WireSimpleProtocolAddResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
@@ -397,7 +395,7 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: SimpleProtocolServerHandler<___T>,
 
-    for<'buf> crate::WireSimpleProtocolAddRequest:
+    crate::WireSimpleProtocolAddRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_one_way(
@@ -1033,7 +1031,7 @@ pub struct WireStructWithNullableString {
     pub val: ::fidl_next::WireOptionalString,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireStructWithNullableString
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableString
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -1127,7 +1125,7 @@ pub struct WireStructWithNullableStruct {
     pub val: ::fidl_next::WireBox<crate::WireInt32Wrapper>,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireStructWithNullableStruct
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableStruct
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
@@ -1311,7 +1309,7 @@ pub struct WireStructWithNullableVector {
     pub val: ::fidl_next::WireOptionalVector<::fidl_next::i32_le>,
 }
 
-unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireStructWithNullableVector
+unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableVector
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
