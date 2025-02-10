@@ -83,85 +83,86 @@ driver_bind_rules("pci_bind") {
   ]
 }
 
-if (platform_enable_user_pci) {
-  fuchsia_cc_driver("bus-pci-driver") {
-    legacy = true
-    output_name = "bus-pci"
-    configs += [
-      "//build/config:all_source",
-      "//build/config/fuchsia:enable_zircon_asserts",
-    ]
+# bus-pci is used on boards that enable user space PCI support.
+fuchsia_cc_driver("bus-pci-driver") {
+  legacy = true
+  output_name = "bus-pci"
+  configs += [
+    "//build/config:all_source",
+    "//build/config/fuchsia:enable_zircon_asserts",
+  ]
 
-    sources = [
-      # The driver needs bind glue, unlike tests.
-      "bind.cc",
-    ]
-    deps = [
-      ":pci_bind",
-      ":user_pci",
-      "//src/devices/lib/driver",
-    ]
-  }
+  sources = [
+    # The driver needs bind glue, unlike tests.
+    "bind.cc",
+  ]
+  deps = [
+    ":pci_bind",
+    ":user_pci",
+    "//src/devices/lib/driver",
+  ]
+}
 
-  fuchsia_driver_component("bus-pci") {
-    component_name = "bus-pci"
-    deps = [ ":bus-pci-driver" ]
-    info = "meta/bus-pci-info.json"
-    manifest = "meta/pci.cml"
-  }
+fuchsia_driver_component("bus-pci") {
+  component_name = "bus-pci"
+  deps = [ ":bus-pci-driver" ]
+  info = "meta/bus-pci-info.json"
+  manifest = "meta/pci.cml"
+}
 
-  fuchsia_driver_package("package") {
-    package_name = "bus-pci"
-    driver_components = [ ":bus-pci" ]
-  }
-} else {  # Kernel PCI
-  fuchsia_cc_driver("bus-pci-driver") {
-    legacy = true
-    output_name = "bus-pci"
-    configs += [
-      "//build/config:all_source",
-      "//build/config/fuchsia:enable_zircon_asserts",
-    ]
-    sources = [
-      "composite.cc",
-      "kpci.cc",
-    ]
-    deps = [
-      ":pci_bind",
-      "//sdk/banjo/fuchsia.hardware.pciroot:fuchsia.hardware.pciroot_banjo_cpp",
-      "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib_cpp",
-      "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp",
-      "//sdk/lib/async-loop:async-loop-cpp",
-      "//sdk/lib/component/outgoing/cpp",
-      "//sdk/lib/driver/runtime:driver_runtime_cpp",
-      "//sdk/lib/fidl",
-      "//src/devices/bind/fuchsia:fuchsia_cpp",
-      "//src/devices/bind/fuchsia.acpi:fuchsia.acpi_cpp",
-      "//src/devices/bus/lib/device-protocol-pdev",
-      "//src/devices/lib/driver",
-      "//src/devices/lib/driver:driver_runtime",
-      "//src/devices/pci/lib/device-protocol-pci",
-      "//src/devices/pci/lib/pci",
-      "//src/lib/ddk",
-      "//src/lib/ddktl",
-      "//zircon/system/ulib/pretty",
-    ]
+fuchsia_driver_package("bus-pci-package") {
+  package_name = "bus-pci"
+  driver_components = [ ":bus-pci" ]
+}
 
-    # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-    configs += [ "//build/config:Wno-conversion" ]
-  }
+# bus-kpci is used by boards that use kernel PCI support.
+# TODO(https://fxbug.dev/42182308): Delete this once qemu-arm64 is converted to user space PCI.
+fuchsia_cc_driver("bus-kpci-driver") {
+  legacy = true
+  output_name = "bus-kpci"
+  configs += [
+    "//build/config:all_source",
+    "//build/config/fuchsia:enable_zircon_asserts",
+  ]
+  sources = [
+    "composite.cc",
+    "kpci.cc",
+  ]
+  deps = [
+    ":pci_bind",
+    "//sdk/banjo/fuchsia.hardware.pciroot:fuchsia.hardware.pciroot_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib_cpp",
+    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//sdk/lib/fidl",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.acpi:fuchsia.acpi_cpp",
+    "//src/devices/bus/lib/device-protocol-pdev",
+    "//src/devices/lib/driver",
+    "//src/devices/lib/driver:driver_runtime",
+    "//src/devices/pci/lib/device-protocol-pci",
+    "//src/devices/pci/lib/pci",
+    "//src/lib/ddk",
+    "//src/lib/ddktl",
+    "//zircon/system/ulib/pretty",
+  ]
 
-  fuchsia_driver_component("bus-pci") {
-    component_name = "bus-pci"
-    deps = [ ":bus-pci-driver" ]
-    info = "meta/bus-pci-info.json"
-    manifest = "meta/kpci.cml"
-  }
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-conversion" ]
+}
 
-  fuchsia_driver_package("package") {
-    package_name = "bus-pci"
-    driver_components = [ ":bus-pci" ]
-  }
+fuchsia_driver_component("bus-kpci") {
+  component_name = "bus-kpci"
+  deps = [ ":bus-kpci-driver" ]
+  info = "meta/bus-pci-info.json"
+  manifest = "meta/kpci.cml"
+}
+
+fuchsia_driver_package("bus-kpci-package") {
+  package_name = "bus-kpci"
+  driver_components = [ ":bus-kpci" ]
 }
 
 group("tests") {

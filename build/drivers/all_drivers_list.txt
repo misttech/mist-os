@@ -115,6 +115,7 @@
 //src/devices/board/drivers/vim3-devicetree:bazel_package.bazel_build
 //src/devices/bus/drivers/pci/test:pci_fake-driver
 //src/devices/bus/drivers/pci/test:pci_protocol_test_driver-driver
+//src/devices/bus/drivers/pci:bus-kpci-driver
 //src/devices/bus/drivers/pci:bus-pci-driver
 //src/devices/bus/drivers/platform/test/power-integration-test:test-power-child-driver
 //src/devices/bus/drivers/platform/test/power-integration-test:test-power-integration-board-driver

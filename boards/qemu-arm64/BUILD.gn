@@ -8,6 +8,7 @@ board_configuration("qemu-arm64") {
   provided_features = [
     "fuchsia::driver_framework_v2_support",
     "fuchsia::real_time_clock",
+    "fuchsia::bus_kpci",
   ]
 
   input_bundles = [

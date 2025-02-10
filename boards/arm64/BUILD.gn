@@ -12,6 +12,7 @@ assert(current_cpu == "arm64",
 
 board_configuration("arm64") {
   provided_features = [
+    "fuchsia::bus_kpci",
     "fuchsia::driver_framework_v2_support",
     "fuchsia::paravirtualization",
     "fuchsia::real_time_clock",
@@ -61,11 +62,6 @@ board_input_bundle("main_bundle") {
       package_set = "bootfs"
       driver_components = [ "meta/nvme.cm" ]
     },
-    {
-      package_target = "//src/devices/bus/drivers/pci:package"
-      package_set = "bootfs"
-      driver_components = [ "meta/bus-pci.cm" ]
-    },
   ]
 
   # Additional drivers to support running as a virtualization guest.
@@ -84,6 +80,16 @@ board_input_bundle("main_bundle") {
       package_target = "//src/devices/rtc/drivers/pl031-rtc:package"
       package_set = "bootfs"
       driver_components = [ "meta/pl031-rtc.cm" ]
+    },
+  ]
+}
+
+board_input_bundle("bus_kpci") {
+  drivers = [
+    {
+      package_target = "//src/devices/bus/drivers/pci:bus-kpci-package"
+      package_set = "bootfs"
+      driver_components = [ "meta/bus-kpci.cm" ]
     },
   ]
 }

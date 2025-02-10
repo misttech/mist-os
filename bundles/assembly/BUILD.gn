@@ -502,8 +502,18 @@ assembly_input_bundle("bt_transport_uart_driver") {
 assembly_input_bundle("bus_pci_driver") {
   boot_driver_packages = [
     {
-      package_target = "//src/devices/bus/drivers/pci:package"
+      package_target = "//src/devices/bus/drivers/pci:bus-pci-package"
       driver_components = [ "meta/bus-pci.cm" ]
+    },
+  ]
+}
+
+# AIB for the bus-kpci driver
+assembly_input_bundle("bus_kpci_driver") {
+  boot_driver_packages = [
+    {
+      package_target = "//src/devices/bus/drivers/pci:bus-kpci-package"
+      driver_components = [ "meta/bus-kpci.cm" ]
     },
   ]
 }

@@ -69,7 +69,7 @@ if (labels.images == "//build/images/bringup") {
         driver_components = [ "meta/machina.cm" ]
       },
       {
-        package_target = "//src/devices/bus/drivers/pci:package"
+        package_target = "//src/devices/bus/drivers/pci:bus-pci-package"
         package_set = "bootfs"
         driver_components = [ "meta/bus-pci.cm" ]
       },

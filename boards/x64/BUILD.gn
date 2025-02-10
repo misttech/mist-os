@@ -197,7 +197,7 @@ board_input_bundle("x64_common") {
       driver_components = [ "meta/platform-bus-x86.cm" ]
     },
     {
-      package_target = "//src/devices/bus/drivers/pci:package"
+      package_target = "//src/devices/bus/drivers/pci:bus-pci-package"
       package_set = "bootfs"
       driver_components = [ "meta/bus-pci.cm" ]
     },

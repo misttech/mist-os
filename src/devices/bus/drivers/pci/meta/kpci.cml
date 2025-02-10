@@ -10,7 +10,7 @@
     program: {
         runner: 'driver',
         bind: 'meta/bind/pci_bind.bindbc',
-        compat: 'driver/bus-pci.so',
+        compat: 'driver/bus-kpci.so',
         colocate: 'false',
     },
     capabilities: [
