@@ -899,24 +899,8 @@ _FUCHSIA_CLANG_VARIANT_MAP = {
     "hwasan": "@fuchsia_clang//:hwasan_variant",
 }
 
-# Maps a Fuchsia API level to the corresponding config_setting() label in
-# @fuchsia_sdk//fuchsia/constraints
-def _fuchsia_api_level_constraint(api_level, default = "//conditions:default"):
-    if _is_undefined_api_level(api_level):
-        return default
-    return "//fuchsia/constraints:api_level_%s" % api_level
-
 def _get_api_level(variant):
-    api_level = variant["api_level"]
-    return "HEAD" if _is_undefined_api_level(api_level) else api_level
-
-def _is_undefined_api_level(api_level):
-    return api_level in (-1, "unversioned")
-
-def _api_level_deprecation_message(api_level):
-    if _is_undefined_api_level(api_level):
-        return '"Warning: Dependencies with unstable API levels are being used, incompatibility may occur."'
-    return "None"
+    return variant["api_level"]
 
 # We can't just do f"//:{file}" for file srcs, since the relative dir may have a
 # BUILD.bazel file, making that subdir its own Bazel package.
@@ -1185,15 +1169,11 @@ def _generate_package_build_rules(
                    (name, variant["arch"], _get_api_level(variant)),
             files = variant["files"],
             manifest = variant["manifest_file"],
-            deprecation = _api_level_deprecation_message(_get_api_level(variant)),
             constraint = "is_%s_api_%s" %
                          (variant["arch"], _get_api_level(variant)),
             os = "@platforms//os:fuchsia",
             cpu = _FUCHSIA_CPU_CONSTRAINT_MAP[variant["arch"]].replace("@fuchsia_sdk", "@" + process_context.rules_fuchsia),
-            api_level = _fuchsia_api_level_constraint(
-                _get_api_level(variant),
-                None,
-            ),
+            api_level = "//fuchsia/constraints:api_level_%s" % _get_api_level(variant),
         )
         for variant in meta["variants"]
     ]
@@ -1217,7 +1197,6 @@ def _generate_package_build_rules(
                     relative_dir,
                     variant.manifest,
                 ),
-                "{{deprecation}}": variant.deprecation,
                 "{{rules_fuchsia}}": process_context.rules_fuchsia,
             },
         )
@@ -1277,6 +1256,21 @@ def _generate_python_e2e_test_rules(
         build_file,
         process_context,
         parent_sdk_contents):
+    # Helper functions to handle the unversioned tests.
+    # TODO(https://fxbug.dev/330373943): Remove once tests are versioned.
+    def _fuchsia_api_level_constraint(api_level, default = "//conditions:default"):
+        if _is_undefined_api_level(api_level):
+            return default
+        return "//fuchsia/constraints:api_level_%s" % api_level
+
+    def _api_level_deprecation_message(api_level):
+        if _is_undefined_api_level(api_level):
+            return '"Warning: Dependencies with unstable API levels are being used, incompatibility may occur."'
+        return "None"
+
+    def _is_undefined_api_level(api_level):
+        return api_level == "unversioned"
+
     ctx = runtime.ctx
     process_context.files_to_copy[meta["_meta_sdk_root"]].extend(meta["files"])
 
