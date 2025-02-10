@@ -154,8 +154,15 @@ expected panic and then exit without unwinding, which means they don't free
 their [heap allocations][rust-heap]. To LeakSanitizer this is indistinguishable
 from a real memory leak.
 
-If this issue affects your test then you can disable it in sanitizer builds by
-following [this example][fxr605381].
+If this issue affects your tests, you can:
+
+* Switch to the [`#[fuchsia::test]`][fuchsia-test-lib] attribute by following
+  [this example][fxr1202323]. This is the preferred attribute because
+  `#[fuchsia::test]` only disables LeakSanitizer but keeps other sanitizers
+  enabled.
+
+* In case that it is difficult to switch to `#[fuchsia::test]`, disable the
+  test in sanitizer builds by following [this example][fxr605381].
 
 See: [Issue 88496: Rust tests that should_panic trigger leaksanitizer][fxb88496]
 
@@ -292,11 +299,13 @@ See also: [sanitizers in the 2021 roadmap][sanitizers-2021-roadmap].
 [ffi]: https://doc.rust-lang.org/nomicon/ffi.html
 [fsanitize]: https://clang.llvm.org/docs/UsersManual.html#controlling-code-generation
 [ftrivial-rfc]: https://lists.llvm.org/pipermail/cfe-dev/2018-November/060172.html
+[fuchsia-test-lib]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/lib/fuchsia/src/lib.rs
 [fuzz-testing]: /docs/contribute/testing/fuzz_testing.md
 [fxb]: https://bugs.fuchsia.dev/p/fuchsia/issues/list
 [fxb73214]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=73214
 [fxb88496]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=88496
 [fxr605381]: https://fuchsia-review.googlesource.com/c/fuchsia/+/605381/
+[fxr1202323]: https://fuchsia-review.googlesource.com/c/fuchsia/+/1202323
 [kasan]: /zircon/kernel/lib/instrumentation/asan/README.md
 [lockdep]: /docs/concepts/kernel/lockdep.md
 [llvm-asan]: https://clang.llvm.org/docs/AddressSanitizer.html
