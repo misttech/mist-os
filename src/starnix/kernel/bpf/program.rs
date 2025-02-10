@@ -11,7 +11,7 @@ use ebpf::{
     BPF_PSEUDO_BTF_ID, BPF_PSEUDO_FUNC, BPF_PSEUDO_MAP_FD, BPF_PSEUDO_MAP_IDX,
     BPF_PSEUDO_MAP_IDX_VALUE, BPF_PSEUDO_MAP_VALUE,
 };
-use ebpf_api::{get_common_helpers, Map, PinnedMap, ProgramType};
+use ebpf_api::{get_common_helpers, EbpfApiError, Map, PinnedMap, ProgramType};
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{bpf_attr__bindgen_ty_4, bpf_insn, errno, error};
@@ -26,7 +26,7 @@ impl TryFrom<&bpf_attr__bindgen_ty_4> for ProgramInfo {
     type Error = Errno;
 
     fn try_from(info: &bpf_attr__bindgen_ty_4) -> Result<Self, Self::Error> {
-        Ok(Self { program_type: info.prog_type.try_into().map_err(map_ebpf_error)? })
+        Ok(Self { program_type: info.prog_type.try_into().map_err(map_ebpf_api_error)? })
     }
 }
 
@@ -42,6 +42,14 @@ fn map_ebpf_error(e: EbpfError) -> Errno {
     errno!(EINVAL)
 }
 
+fn map_ebpf_api_error(e: EbpfApiError) -> Errno {
+    log_error!("Failed to load eBPF program: {e:?}");
+    match e {
+        EbpfApiError::InvalidProgramType(_) => errno!(EINVAL),
+        EbpfApiError::UnsupportedProgramType(_) => errno!(ENOTSUP),
+    }
+}
+
 impl Program {
     pub fn new(
         current_task: &CurrentTask,
@@ -51,8 +59,10 @@ impl Program {
     ) -> Result<Program, Errno> {
         let maps = link_maps_fds(current_task, &mut code)?;
         let mut logger = BufferVeriferLogger::new(logger);
-        let calling_context =
-            info.program_type.create_calling_context(maps.iter().map(|m| m.schema).collect());
+        let calling_context = info
+            .program_type
+            .create_calling_context(maps.iter().map(|m| m.schema).collect())
+            .map_err(map_ebpf_api_error)?;
         let program = verify_program(code, calling_context, &mut logger).map_err(map_ebpf_error)?;
         Ok(Program { info, program, maps })
     }

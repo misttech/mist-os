@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use ebpf::{
-    CallingContext, CbpfConfig, CbpfLenInstruction, EbpfError, FieldDescriptor, FieldType,
-    FunctionSignature, MapSchema, MemoryId, MemoryParameterSize, StructDescriptor, Type,
+    CallingContext, CbpfConfig, CbpfLenInstruction, FieldDescriptor, FieldType, FunctionSignature,
+    MapSchema, MemoryId, MemoryParameterSize, StructDescriptor, Type,
 };
 use linux_uapi::{
     __sk_buff, bpf_func_id_BPF_FUNC_csum_update, bpf_func_id_BPF_FUNC_get_current_uid_gid,
@@ -20,13 +20,24 @@ use linux_uapi::{
     bpf_func_id_BPF_FUNC_skb_change_head, bpf_func_id_BPF_FUNC_skb_change_proto,
     bpf_func_id_BPF_FUNC_skb_load_bytes_relative, bpf_func_id_BPF_FUNC_skb_pull_data,
     bpf_func_id_BPF_FUNC_skb_store_bytes, bpf_func_id_BPF_FUNC_trace_printk,
-    bpf_prog_type_BPF_PROG_TYPE_CGROUP_SKB, bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK,
-    bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCKOPT, bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK_ADDR,
-    bpf_prog_type_BPF_PROG_TYPE_KPROBE, bpf_prog_type_BPF_PROG_TYPE_SCHED_ACT,
-    bpf_prog_type_BPF_PROG_TYPE_SCHED_CLS, bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER,
-    bpf_prog_type_BPF_PROG_TYPE_TRACEPOINT, bpf_prog_type_BPF_PROG_TYPE_XDP, bpf_sock,
-    bpf_sock_addr, bpf_sockopt, bpf_user_pt_regs_t, fuse_bpf_arg, fuse_bpf_args,
-    fuse_entry_bpf_out, fuse_entry_out, seccomp_data, xdp_md,
+    bpf_prog_type_BPF_PROG_TYPE_CGROUP_DEVICE, bpf_prog_type_BPF_PROG_TYPE_CGROUP_SKB,
+    bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK, bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCKOPT,
+    bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK_ADDR, bpf_prog_type_BPF_PROG_TYPE_CGROUP_SYSCTL,
+    bpf_prog_type_BPF_PROG_TYPE_EXT, bpf_prog_type_BPF_PROG_TYPE_FLOW_DISSECTOR,
+    bpf_prog_type_BPF_PROG_TYPE_KPROBE, bpf_prog_type_BPF_PROG_TYPE_LIRC_MODE2,
+    bpf_prog_type_BPF_PROG_TYPE_LSM, bpf_prog_type_BPF_PROG_TYPE_LWT_IN,
+    bpf_prog_type_BPF_PROG_TYPE_LWT_OUT, bpf_prog_type_BPF_PROG_TYPE_LWT_SEG6LOCAL,
+    bpf_prog_type_BPF_PROG_TYPE_LWT_XMIT, bpf_prog_type_BPF_PROG_TYPE_NETFILTER,
+    bpf_prog_type_BPF_PROG_TYPE_PERF_EVENT, bpf_prog_type_BPF_PROG_TYPE_RAW_TRACEPOINT,
+    bpf_prog_type_BPF_PROG_TYPE_RAW_TRACEPOINT_WRITABLE, bpf_prog_type_BPF_PROG_TYPE_SCHED_ACT,
+    bpf_prog_type_BPF_PROG_TYPE_SCHED_CLS, bpf_prog_type_BPF_PROG_TYPE_SK_LOOKUP,
+    bpf_prog_type_BPF_PROG_TYPE_SK_MSG, bpf_prog_type_BPF_PROG_TYPE_SK_REUSEPORT,
+    bpf_prog_type_BPF_PROG_TYPE_SK_SKB, bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER,
+    bpf_prog_type_BPF_PROG_TYPE_SOCK_OPS, bpf_prog_type_BPF_PROG_TYPE_STRUCT_OPS,
+    bpf_prog_type_BPF_PROG_TYPE_SYSCALL, bpf_prog_type_BPF_PROG_TYPE_TRACEPOINT,
+    bpf_prog_type_BPF_PROG_TYPE_TRACING, bpf_prog_type_BPF_PROG_TYPE_UNSPEC,
+    bpf_prog_type_BPF_PROG_TYPE_XDP, bpf_sock, bpf_sock_addr, bpf_sockopt, bpf_user_pt_regs_t,
+    fuse_bpf_arg, fuse_bpf_args, fuse_entry_bpf_out, fuse_entry_out, seccomp_data, xdp_md,
 };
 use std::collections::HashMap;
 use std::mem::{offset_of, size_of};
@@ -193,8 +204,8 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
             ),
             (
                 vec![
-                    ProgramType::KProbe,
-                    ProgramType::TracePoint,
+                    ProgramType::Kprobe,
+                    ProgramType::Tracepoint,
                     ProgramType::CgroupSock,
                     ProgramType::CgroupSockopt,
                     ProgramType::CgroupSockAddr,
@@ -310,7 +321,7 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                 },
             ),
             (
-                vec![ProgramType::KProbe, ProgramType::TracePoint].into(),
+                vec![ProgramType::Kprobe, ProgramType::Tracepoint].into(),
                 EbpfHelperDefinition {
                     index: bpf_func_id_BPF_FUNC_probe_read_str,
                     name: "probe_read_str",
@@ -654,38 +665,93 @@ static BPF_TRACEPOINT_ARGS: LazyLock<Vec<Type>> =
 /// The different type of BPF programs.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ProgramType {
-    SocketFilter,
-    KProbe,
-    SchedCls,
-    SchedAct,
-    TracePoint,
-    Xdp,
+    CgroupDevice,
     CgroupSkb,
     CgroupSock,
-    CgroupSockopt,
     CgroupSockAddr,
+    CgroupSockopt,
+    CgroupSysctl,
+    Ext,
+    FlowDissector,
+    Kprobe,
+    LircMode2,
+    Lsm,
+    LwtIn,
+    LwtOut,
+    LwtSeg6Local,
+    LwtXmit,
+    Netfilter,
+    PerfEvent,
+    RawTracepoint,
+    RawTracepointWritable,
+    SchedAct,
+    SchedCls,
+    SkLookup,
+    SkMsg,
+    SkReuseport,
+    SkSkb,
+    SocketFilter,
+    SockOps,
+    StructOps,
+    Syscall,
+    Tracepoint,
+    Tracing,
+    Unspec,
+    Xdp,
     /// Custom id for Fuse
     Fuse,
 }
 
+#[derive(thiserror::Error, Debug, PartialEq, Eq)]
+pub enum EbpfApiError {
+    #[error("Invalid program type: 0x{0:x}")]
+    InvalidProgramType(u32),
+
+    #[error("Unsupported program type: {0:?}")]
+    UnsupportedProgramType(ProgramType),
+}
+
 impl TryFrom<u32> for ProgramType {
-    type Error = EbpfError;
+    type Error = EbpfApiError;
 
     fn try_from(program_type: u32) -> Result<Self, Self::Error> {
         match program_type {
             #![allow(non_upper_case_globals)]
-            bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER => Ok(Self::SocketFilter),
-            bpf_prog_type_BPF_PROG_TYPE_KPROBE => Ok(Self::KProbe),
-            bpf_prog_type_BPF_PROG_TYPE_SCHED_CLS => Ok(Self::SchedCls),
-            bpf_prog_type_BPF_PROG_TYPE_SCHED_ACT => Ok(Self::SchedAct),
-            bpf_prog_type_BPF_PROG_TYPE_TRACEPOINT => Ok(Self::TracePoint),
-            bpf_prog_type_BPF_PROG_TYPE_XDP => Ok(Self::Xdp),
+            bpf_prog_type_BPF_PROG_TYPE_CGROUP_DEVICE => Ok(Self::CgroupDevice),
             bpf_prog_type_BPF_PROG_TYPE_CGROUP_SKB => Ok(Self::CgroupSkb),
             bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK => Ok(Self::CgroupSock),
-            bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCKOPT => Ok(Self::CgroupSockopt),
             bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK_ADDR => Ok(Self::CgroupSockAddr),
+            bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCKOPT => Ok(Self::CgroupSockopt),
+            bpf_prog_type_BPF_PROG_TYPE_CGROUP_SYSCTL => Ok(Self::CgroupSysctl),
+            bpf_prog_type_BPF_PROG_TYPE_EXT => Ok(Self::Ext),
+            bpf_prog_type_BPF_PROG_TYPE_FLOW_DISSECTOR => Ok(Self::FlowDissector),
+            bpf_prog_type_BPF_PROG_TYPE_KPROBE => Ok(Self::Kprobe),
+            bpf_prog_type_BPF_PROG_TYPE_LIRC_MODE2 => Ok(Self::LircMode2),
+            bpf_prog_type_BPF_PROG_TYPE_LSM => Ok(Self::Lsm),
+            bpf_prog_type_BPF_PROG_TYPE_LWT_IN => Ok(Self::LwtIn),
+            bpf_prog_type_BPF_PROG_TYPE_LWT_OUT => Ok(Self::LwtOut),
+            bpf_prog_type_BPF_PROG_TYPE_LWT_SEG6LOCAL => Ok(Self::LwtSeg6Local),
+            bpf_prog_type_BPF_PROG_TYPE_LWT_XMIT => Ok(Self::LwtXmit),
+            bpf_prog_type_BPF_PROG_TYPE_NETFILTER => Ok(Self::Netfilter),
+            bpf_prog_type_BPF_PROG_TYPE_PERF_EVENT => Ok(Self::PerfEvent),
+            bpf_prog_type_BPF_PROG_TYPE_RAW_TRACEPOINT => Ok(Self::RawTracepoint),
+            bpf_prog_type_BPF_PROG_TYPE_RAW_TRACEPOINT_WRITABLE => Ok(Self::RawTracepointWritable),
+            bpf_prog_type_BPF_PROG_TYPE_SCHED_ACT => Ok(Self::SchedAct),
+            bpf_prog_type_BPF_PROG_TYPE_SCHED_CLS => Ok(Self::SchedCls),
+            bpf_prog_type_BPF_PROG_TYPE_SK_LOOKUP => Ok(Self::SkLookup),
+            bpf_prog_type_BPF_PROG_TYPE_SK_MSG => Ok(Self::SkMsg),
+            bpf_prog_type_BPF_PROG_TYPE_SK_REUSEPORT => Ok(Self::SkReuseport),
+            bpf_prog_type_BPF_PROG_TYPE_SK_SKB => Ok(Self::SkSkb),
+            bpf_prog_type_BPF_PROG_TYPE_SOCK_OPS => Ok(Self::SockOps),
+            bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER => Ok(Self::SocketFilter),
+            bpf_prog_type_BPF_PROG_TYPE_STRUCT_OPS => Ok(Self::StructOps),
+            bpf_prog_type_BPF_PROG_TYPE_SYSCALL => Ok(Self::Syscall),
+            bpf_prog_type_BPF_PROG_TYPE_TRACEPOINT => Ok(Self::Tracepoint),
+            bpf_prog_type_BPF_PROG_TYPE_TRACING => Ok(Self::Tracing),
+            bpf_prog_type_BPF_PROG_TYPE_UNSPEC => Ok(Self::Unspec),
+            bpf_prog_type_BPF_PROG_TYPE_XDP => Ok(Self::Xdp),
             BPF_PROG_TYPE_FUSE => Ok(Self::Fuse),
-            program_type @ _ => Err(EbpfError::UnsupportedProgramType(program_type)),
+            program_type @ _ => Err(EbpfApiError::InvalidProgramType(program_type)),
         }
     }
 }
@@ -693,16 +759,41 @@ impl TryFrom<u32> for ProgramType {
 impl From<ProgramType> for u32 {
     fn from(program_type: ProgramType) -> u32 {
         match program_type {
-            ProgramType::SocketFilter => bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER,
-            ProgramType::KProbe => bpf_prog_type_BPF_PROG_TYPE_KPROBE,
-            ProgramType::SchedCls => bpf_prog_type_BPF_PROG_TYPE_SCHED_CLS,
-            ProgramType::SchedAct => bpf_prog_type_BPF_PROG_TYPE_SCHED_ACT,
-            ProgramType::TracePoint => bpf_prog_type_BPF_PROG_TYPE_TRACEPOINT,
-            ProgramType::Xdp => bpf_prog_type_BPF_PROG_TYPE_XDP,
+            ProgramType::CgroupDevice => bpf_prog_type_BPF_PROG_TYPE_CGROUP_DEVICE,
             ProgramType::CgroupSkb => bpf_prog_type_BPF_PROG_TYPE_CGROUP_SKB,
             ProgramType::CgroupSock => bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK,
-            ProgramType::CgroupSockopt => bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCKOPT,
             ProgramType::CgroupSockAddr => bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK_ADDR,
+            ProgramType::CgroupSockopt => bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCKOPT,
+            ProgramType::CgroupSysctl => bpf_prog_type_BPF_PROG_TYPE_CGROUP_SYSCTL,
+            ProgramType::Ext => bpf_prog_type_BPF_PROG_TYPE_EXT,
+            ProgramType::FlowDissector => bpf_prog_type_BPF_PROG_TYPE_FLOW_DISSECTOR,
+            ProgramType::Kprobe => bpf_prog_type_BPF_PROG_TYPE_KPROBE,
+            ProgramType::LircMode2 => bpf_prog_type_BPF_PROG_TYPE_LIRC_MODE2,
+            ProgramType::Lsm => bpf_prog_type_BPF_PROG_TYPE_LSM,
+            ProgramType::LwtIn => bpf_prog_type_BPF_PROG_TYPE_LWT_IN,
+            ProgramType::LwtOut => bpf_prog_type_BPF_PROG_TYPE_LWT_OUT,
+            ProgramType::LwtSeg6Local => bpf_prog_type_BPF_PROG_TYPE_LWT_SEG6LOCAL,
+            ProgramType::LwtXmit => bpf_prog_type_BPF_PROG_TYPE_LWT_XMIT,
+            ProgramType::Netfilter => bpf_prog_type_BPF_PROG_TYPE_NETFILTER,
+            ProgramType::PerfEvent => bpf_prog_type_BPF_PROG_TYPE_PERF_EVENT,
+            ProgramType::RawTracepoint => bpf_prog_type_BPF_PROG_TYPE_RAW_TRACEPOINT,
+            ProgramType::RawTracepointWritable => {
+                bpf_prog_type_BPF_PROG_TYPE_RAW_TRACEPOINT_WRITABLE
+            }
+            ProgramType::SchedAct => bpf_prog_type_BPF_PROG_TYPE_SCHED_ACT,
+            ProgramType::SchedCls => bpf_prog_type_BPF_PROG_TYPE_SCHED_CLS,
+            ProgramType::SkLookup => bpf_prog_type_BPF_PROG_TYPE_SK_LOOKUP,
+            ProgramType::SkMsg => bpf_prog_type_BPF_PROG_TYPE_SK_MSG,
+            ProgramType::SkReuseport => bpf_prog_type_BPF_PROG_TYPE_SK_REUSEPORT,
+            ProgramType::SkSkb => bpf_prog_type_BPF_PROG_TYPE_SK_SKB,
+            ProgramType::SockOps => bpf_prog_type_BPF_PROG_TYPE_SOCK_OPS,
+            ProgramType::SocketFilter => bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER,
+            ProgramType::StructOps => bpf_prog_type_BPF_PROG_TYPE_STRUCT_OPS,
+            ProgramType::Syscall => bpf_prog_type_BPF_PROG_TYPE_SYSCALL,
+            ProgramType::Tracepoint => bpf_prog_type_BPF_PROG_TYPE_TRACEPOINT,
+            ProgramType::Tracing => bpf_prog_type_BPF_PROG_TYPE_TRACING,
+            ProgramType::Unspec => bpf_prog_type_BPF_PROG_TYPE_UNSPEC,
+            ProgramType::Xdp => bpf_prog_type_BPF_PROG_TYPE_XDP,
             ProgramType::Fuse => BPF_PROG_TYPE_FUSE,
         }
     }
@@ -718,28 +809,56 @@ impl ProgramType {
             .collect()
     }
 
-    pub fn get_args(self) -> &'static [Type] {
-        match self {
+    pub fn get_args(self) -> Result<&'static [Type], EbpfApiError> {
+        let args = match self {
             Self::CgroupSkb | Self::SchedAct | Self::SchedCls | Self::SocketFilter => &SK_BUF_ARGS,
             Self::Xdp => &XDP_MD_ARGS,
-            Self::KProbe => &BPF_USER_PT_REGS_T_ARGS,
-            Self::TracePoint => &BPF_TRACEPOINT_ARGS,
+            Self::Kprobe => &BPF_USER_PT_REGS_T_ARGS,
+            Self::Tracepoint => &BPF_TRACEPOINT_ARGS,
             Self::CgroupSock => &BPF_SOCK_ARGS,
             Self::CgroupSockopt => &BPF_SOCKOPT_ARGS,
             Self::CgroupSockAddr => &BPF_SOCK_ADDR_ARGS,
             Self::Fuse => &BPF_FUSE_ARGS,
-        }
+
+            Self::CgroupDevice
+            | Self::CgroupSysctl
+            | Self::Ext
+            | Self::FlowDissector
+            | Self::LircMode2
+            | Self::Lsm
+            | Self::LwtIn
+            | Self::LwtOut
+            | Self::LwtSeg6Local
+            | Self::LwtXmit
+            | Self::Netfilter
+            | Self::PerfEvent
+            | Self::RawTracepoint
+            | Self::RawTracepointWritable
+            | Self::SkLookup
+            | Self::SkMsg
+            | Self::SkReuseport
+            | Self::SkSkb
+            | Self::SockOps
+            | Self::StructOps
+            | Self::Syscall
+            | Self::Tracing
+            | Self::Unspec => return Err(EbpfApiError::UnsupportedProgramType(self)),
+        };
+        Ok(args)
     }
 
-    pub fn create_calling_context(self, maps: Vec<MapSchema>) -> CallingContext {
-        let args = self.get_args().to_vec();
+    pub fn create_calling_context(
+        self,
+        maps: Vec<MapSchema>,
+    ) -> Result<CallingContext, EbpfApiError> {
+        let args = self.get_args()?.to_vec();
         let packet_type = match self {
             Self::CgroupSkb | Self::SchedAct | Self::SchedCls | Self::SocketFilter => {
                 Some(SK_BUF_TYPE.clone())
             }
             _ => None,
         };
-        CallingContext { maps, helpers: self.get_helpers(), args, packet_type }
+        Ok(CallingContext { maps, helpers: self.get_helpers(), args, packet_type })
     }
 }
 

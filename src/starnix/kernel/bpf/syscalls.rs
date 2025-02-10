@@ -5,6 +5,7 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
+use crate::bpf::attachments::{bpf_prog_attach, BpfAttachAttr};
 use crate::bpf::fs::{get_bpf_object, BpfFsDir, BpfFsObject, BpfHandle};
 use crate::bpf::program::{Program, ProgramInfo};
 use crate::mm::{MemoryAccessor, MemoryAccessorExt};
@@ -295,9 +296,8 @@ pub fn sys_bpf(
 
         // Attach an eBPF program to a target_fd at the specified attach_type hook.
         bpf_cmd_BPF_PROG_ATTACH => {
-            log_trace!("BPF_PROG_ATTACH");
-            track_stub!(TODO("https://fxbug.dev/322874307"), "Bpf::BPF_PROG_ATTACH");
-            Ok(SUCCESS)
+            let attach_attr: BpfAttachAttr = read_attr(current_task, attr_addr, attr_size)?;
+            bpf_prog_attach(locked, current_task, attach_attr)
         }
 
         // Obtain information about eBPF programs associated with the specified attach_type hook.

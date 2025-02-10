@@ -25,6 +25,7 @@ rustc_library("ebpf-api") {
     "//src/starnix/lib/linux_uapi",
     "//third_party/rust_crates:smallvec",
     "//third_party/rust_crates:static_assertions",
+    "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:zerocopy",
   ]
 
