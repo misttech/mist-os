@@ -166,7 +166,7 @@ pub fn dispatch_syscall(
             sys_set_tid_address as sys_arch32_set_tid_address, sys_setuid as sys_arch32_setuid,
         };
         pub use crate::vfs::socket::syscalls::{
-            sys_connect as sys_arch32_connect, sys_socket as sys_arch32_socket,
+            sys_arch32_recvfrom, sys_connect as sys_arch32_connect, sys_socket as sys_arch32_socket,
         };
         pub use crate::vfs::syscalls::{
             sys_arch32__llseek, sys_arch32_access, sys_arch32_dup2, sys_arch32_fstat64,
@@ -256,6 +256,7 @@ pub fn dispatch_syscall(
             read[3],
             readlink[3],
             readlinkat[4],
+            recvfrom[6],
             rmdir[1],
             rt_sigaction[4],
             rt_sigprocmask[4],

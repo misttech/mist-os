@@ -862,6 +862,15 @@ pub fn sys_shutdown(
     Ok(())
 }
 
+// Syscalls for arch32 usage
+#[cfg(feature = "arch32")]
+mod arch32 {
+    pub use super::sys_recvfrom as sys_arch32_recvfrom;
+}
+
+#[cfg(feature = "arch32")]
+pub use arch32::*;
+
 #[cfg(test)]
 mod tests {
     use super::*;
