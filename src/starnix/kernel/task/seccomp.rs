@@ -430,7 +430,7 @@ impl SeccompState {
     ) -> Option<Result<SyscallResult, Errno>> {
         let action = result.action;
         if let Some(filter) = result.filter.as_ref() {
-            if action.is_logged(&current_task.kernel(), filter.log) {
+            if action.is_logged(current_task.kernel(), filter.log) {
                 Self::log_action(current_task, syscall);
             }
         }

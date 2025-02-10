@@ -320,31 +320,27 @@ impl Drop for RunningThread {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::task::Kernel;
     use crate::testing::{create_kernel_and_task, AutoReleasableTask};
-    use std::ops::Deref;
 
-    fn build_spawner(
-        max_idle_threads: u8,
-    ) -> (impl Deref<Target = Arc<Kernel>>, AutoReleasableTask, DynamicThreadSpawner) {
+    fn build_spawner(max_idle_threads: u8) -> (AutoReleasableTask, DynamicThreadSpawner) {
         let (kernel, task) = create_kernel_and_task();
         let spawner = DynamicThreadSpawner::new(
             max_idle_threads,
             task.weak_task(),
             kernel.on_shutdown.clone(),
         );
-        (kernel, task, spawner)
+        (task, spawner)
     }
 
     #[fuchsia::test]
     async fn run_simple_task() {
-        let (_kernel, _task, spawner) = build_spawner(2);
+        let (_task, spawner) = build_spawner(2);
         spawner.spawn(|_, _| {});
     }
 
     #[fuchsia::test]
     async fn run_10_tasks() {
-        let (_kernel, _task, spawner) = build_spawner(2);
+        let (_task, spawner) = build_spawner(2);
         for _ in 0..10 {
             spawner.spawn(|_, _| {});
         }
@@ -352,7 +348,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn blocking_task_do_not_prevent_further_processing() {
-        let (_kernel, _task, spawner) = build_spawner(1);
+        let (_task, spawner) = build_spawner(1);
 
         let pair = Arc::new((std::sync::Mutex::new(false), std::sync::Condvar::new()));
         for _ in 0..10 {
@@ -381,7 +377,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn run_spawn_and_get_result() {
-        let (_kernel, _task, spawner) = build_spawner(2);
+        let (_task, spawner) = build_spawner(2);
         assert_eq!(spawner.spawn_and_get_result(|_, _| 3).await, Ok(3));
     }
 }

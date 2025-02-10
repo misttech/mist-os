@@ -87,7 +87,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 use zerocopy::{FromBytes, Immutable, IntoBytes};
 use {fidl_fuchsia_posix as fposix, fidl_fuchsia_starnix_binder as fbinder};
 
@@ -151,7 +151,7 @@ impl BinderConnection {
         if process.pid == current_task.get_pid() {
             Ok(process)
         } else {
-            process.release(&*current_task.kernel());
+            process.release(current_task.kernel());
             error!(EINVAL)
         }
     }
@@ -182,7 +182,7 @@ impl FileOps for BinderConnection {
         _file: &FileObject,
         current_task: &CurrentTask,
     ) {
-        self.close(&*current_task.kernel());
+        self.close(current_task.kernel());
     }
 
     fn query_events(
@@ -192,13 +192,12 @@ impl FileOps for BinderConnection {
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
         let binder_process = self.proc(current_task);
-        let kernel = current_task.kernel();
-        release_after!(binder_process, &*kernel, {
+        release_after!(binder_process, current_task.kernel(), {
             Ok(match &binder_process {
                 Ok(binder_process) => {
                     let binder_thread =
                         binder_process.lock().find_or_register_thread(current_task.get_tid());
-                    release_after!(binder_thread, &*kernel, {
+                    release_after!(binder_thread, current_task.kernel(), {
                         let mut thread_state = binder_thread.lock();
                         let mut process_command_queue = binder_process.command_queue.lock();
                         BinderDriver::get_active_queue(
@@ -224,13 +223,12 @@ impl FileOps for BinderConnection {
     ) -> Option<WaitCanceler> {
         log_trace!("binder wait_async");
         let binder_process = self.proc(current_task);
-        let kernel = current_task.kernel();
-        release_after!(binder_process, &*kernel, {
+        release_after!(binder_process, current_task.kernel(), {
             match &binder_process {
                 Ok(binder_process) => {
                     let binder_thread =
                         binder_process.lock().find_or_register_thread(current_task.get_tid());
-                    release_after!(binder_thread, &*kernel, {
+                    release_after!(binder_thread, current_task.kernel(), {
                         Some(self.device.wait_async(
                             &binder_process,
                             &binder_thread,
@@ -257,8 +255,7 @@ impl FileOps for BinderConnection {
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
         let binder_process = self.proc(current_task)?;
-        let kernel = current_task.kernel();
-        release_after!(binder_process, &*kernel, {
+        release_after!(binder_process, current_task.kernel(), {
             self.device.ioctl(locked, current_task, &binder_process, request, arg)
         })
     }
@@ -287,8 +284,7 @@ impl FileOps for BinderConnection {
         filename: NamespaceNode,
     ) -> Result<UserAddress, Errno> {
         let binder_process = self.proc(current_task)?;
-        let kernel = current_task.kernel();
-        release_after!(binder_process, &*kernel, {
+        release_after!(binder_process, current_task.kernel(), {
             self.device.mmap(
                 current_task,
                 &binder_process,
@@ -333,7 +329,7 @@ impl FileOps for BinderConnection {
     ) {
         // Errors are not meaningful on flush.
         let Ok(binder_process) = self.proc(current_task) else { return };
-        release_after!(binder_process, &*current_task.kernel(), {
+        release_after!(binder_process, current_task.kernel(), {
             binder_process.kick_all_threads()
         });
     }
@@ -353,8 +349,7 @@ impl RemoteBinderConnection {
         mapped_address: u64,
     ) -> Result<(), Errno> {
         let binder_process = self.binder_connection.proc(current_task)?;
-        let kernel = current_task.kernel();
-        release_after!(binder_process, &*kernel, {
+        release_after!(binder_process, current_task.kernel(), {
             binder_process.map_external_vmo(vmo, mapped_address)
         })
     }
@@ -367,8 +362,7 @@ impl RemoteBinderConnection {
         arg: SyscallArg,
     ) -> Result<(), Errno> {
         let binder_process = self.binder_connection.proc(current_task)?;
-        let kernel = current_task.kernel();
-        release_after!(binder_process, &*kernel, {
+        release_after!(binder_process, current_task.kernel(), {
             self.binder_connection
                 .device
                 .ioctl(locked, current_task, &binder_process, request, arg)
@@ -485,7 +479,7 @@ impl Releasable for ActiveTransaction {
 /// state is dropped, decrementing temporary strong references to binder objects.
 #[derive(Debug)]
 struct TransactionState {
-    kernel: Weak<Kernel>,
+    kernel: Arc<Kernel>,
     /// The process whose handle table `handles` belong to.
     proc: WeakRef<BinderProcess>,
     /// The pid of the target process.
@@ -534,13 +528,7 @@ impl Releasable for TransactionState {
 
         // Close the owned fd.
         if !self.owned_fds.is_empty() {
-            let weak_task = self
-                .kernel
-                .upgrade()
-                .expect("kernel can't have dropped")
-                .pids
-                .read()
-                .get_task(self.pid);
+            let weak_task = self.kernel.pids.read().get_task(self.pid);
             if let Some(task) = weak_task.upgrade() {
                 let resource_accessor =
                     get_resource_accessor(task.deref(), &self.remote_resource_accessor);
@@ -601,7 +589,7 @@ impl<'a> TransientTransactionState<'a> {
         TransientTransactionState {
             state: Some(
                 TransactionState {
-                    kernel: Arc::downgrade(&accessor.kernel()),
+                    kernel: accessor.kernel().clone(),
                     proc: target_proc.weak_self.clone(),
                     pid: target_proc.pid,
                     remote_resource_accessor: target_proc.remote_resource_accessor.clone(),
@@ -939,8 +927,7 @@ impl<'a> BinderProcessGuard<'a> {
 
     /// Unregister the `BinderThread` with the given `tid`.
     fn unregister_thread(&mut self, current_task: &CurrentTask, tid: pid_t) {
-        let kernel = current_task.kernel();
-        self.thread_pool.0.remove(&tid).release(&*kernel);
+        self.thread_pool.0.remove(&tid).release(current_task.kernel());
     }
 
     /// Inserts a reference to a binder object, returning a handle that represents it.
@@ -2801,8 +2788,7 @@ trait ResourceAccessor: std::fmt::Debug + MemoryAccessor {
     ) -> Result<FdNumber, Errno>;
 
     // State related methods.
-    #[track_caller]
-    fn kernel(&self) -> Arc<Kernel>;
+    fn kernel(&self) -> &Arc<Kernel>;
 
     // Convenience method to allow passing a MemoryAccessor as a parameter.
     fn as_memory_accessor(&self) -> &dyn MemoryAccessor;
@@ -2825,7 +2811,7 @@ impl MemoryAccessorExt for dyn ResourceAccessor + '_ {}
 
 /// Implementation of `ResourceAccessor` for a remote client.
 struct RemoteResourceAccessor {
-    kernel: Weak<Kernel>,
+    kernel: Arc<Kernel>,
     process: zx::Process,
     process_accessor: fbinder::ProcessAccessorSynchronousProxy,
 }
@@ -3008,9 +2994,8 @@ impl ResourceAccessor for RemoteResourceAccessor {
         error!(ENOENT)
     }
 
-    #[track_caller]
-    fn kernel(&self) -> Arc<Kernel> {
-        self.kernel.upgrade().expect("cleanup requiring Kernel must run in Kernel::shutdown")
+    fn kernel(&self) -> &Arc<Kernel> {
+        &self.kernel
     }
 
     fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
@@ -3044,8 +3029,7 @@ impl ResourceAccessor for CurrentTask {
         self.add_file(file, flags)
     }
 
-    #[track_caller]
-    fn kernel(&self) -> Arc<Kernel> {
+    fn kernel(&self) -> &Arc<Kernel> {
         (self as &Task).kernel()
     }
 
@@ -3080,8 +3064,7 @@ impl ResourceAccessor for Task {
         self.add_file(file, flags)
     }
 
-    #[track_caller]
-    fn kernel(&self) -> Arc<Kernel> {
+    fn kernel(&self) -> &Arc<Kernel> {
         (self as &Task).kernel()
     }
 
@@ -3112,9 +3095,8 @@ impl Releasable for BinderDriver {
 
     fn release<'a: 'b, 'b>(mut self, context: Self::Context<'a, 'b>) {
         let (_locked, current_task) = context;
-        let kernel = current_task.kernel();
         for binder_process in std::mem::take(self.procs.get_mut()).into_values() {
-            binder_process.release(&*kernel);
+            binder_process.release(current_task.kernel());
         }
     }
 }
@@ -3194,7 +3176,7 @@ impl BinderDriver {
         let identifier = this.create_remote_process(
             current_task.get_pid(),
             RemoteResourceAccessor {
-                kernel: Arc::downgrade(&current_task.kernel()),
+                kernel: current_task.kernel().clone(),
                 process_accessor,
                 process,
             },
@@ -3239,8 +3221,7 @@ impl BinderDriver {
         trace_duration!(CATEGORY_STARNIX, NAME_BINDER_IOCTL, "request" => request);
         let user_arg = UserAddress::from(arg);
         let binder_thread = binder_proc.lock().find_or_register_thread(current_task.get_tid());
-        let kernel = current_task.kernel();
-        release_after!(binder_thread, &*kernel, {
+        release_after!(binder_thread, current_task.kernel(), {
             match request {
                 uapi::BINDER_VERSION => {
                     // A thread is requesting the version of this binder driver.
@@ -4650,7 +4631,7 @@ impl BinderFs {
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let kernel = current_task.kernel();
-        let fs = FileSystem::new(&kernel, CacheMode::Permanent, BinderFs, options)?;
+        let fs = FileSystem::new(kernel, CacheMode::Permanent, BinderFs, options)?;
         fs.set_root(BinderFsDir::new(locked, current_task)?);
         Ok(fs)
     }
@@ -4700,8 +4681,8 @@ pub mod tests {
         ) -> Result<FdNumber, Errno> {
             self.deref().add_file_with_flags(locked, current_task, file, flags)
         }
-        fn kernel(&self) -> Arc<Kernel> {
-            self.deref().kernel()
+        fn kernel(&self) -> &Arc<Kernel> {
+            &self.deref().kernel()
         }
         fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
             self.deref().as_memory_accessor()
@@ -4721,8 +4702,7 @@ pub mod tests {
             current_task: &CurrentTask,
             device: &BinderDevice,
         ) -> Self {
-            let kernel = current_task.kernel();
-            let task = create_task(locked, &kernel, "task");
+            let task = create_task(locked, current_task.kernel(), "task");
             let (proc, thread) = device.create_process_and_thread(task.get_pid());
 
             mmap_shared_memory(&device, &task, &proc);
@@ -4738,11 +4718,11 @@ pub mod tests {
 
     impl Drop for BinderProcessFixture {
         fn drop(&mut self) {
-            OwnedRef::take(&mut self.thread).release(&self.task.kernel());
+            OwnedRef::take(&mut self.thread).release(self.task.kernel());
             if let Some(device) = self.device.upgrade() {
-                device.procs.write().remove(&self.proc.identifier).release(&self.task.kernel());
+                device.procs.write().remove(&self.proc.identifier).release(self.task.kernel());
             }
-            OwnedRef::take(&mut self.proc).release(&self.task.kernel());
+            OwnedRef::take(&mut self.proc).release(self.task.kernel());
         }
     }
 
@@ -7111,8 +7091,7 @@ pub mod tests {
         binder_driver: &BinderDevice,
     ) -> FileHandle {
         // `open()` requires an `FsNode` so create one in `AnonFs`.
-        let kernel = current_task.kernel();
-        let fs = anon_fs(&kernel);
+        let fs = anon_fs(current_task.kernel());
         let node = fs.create_node(
             &current_task,
             Anon::default(),
@@ -7141,11 +7120,10 @@ pub mod tests {
             let identifier = binder_connection.identifier;
 
             // Ensure that the binder driver has created process state.
-            let kernel = current_task.kernel();
             binder_driver
                 .find_process(identifier)
                 .expect("failed to find process")
-                .release(&kernel);
+                .release(current_task.kernel());
 
             // Close the file descriptor.
             std::mem::drop(binder_fd);
@@ -7204,9 +7182,8 @@ pub mod tests {
                 .unwrap();
             assert_eq!(bytes_read, 0);
             thread.join().expect("join");
-            let kernel = current_task.kernel();
-            binder_thread.release(&kernel);
-            binder_proc.release(&kernel);
+            binder_thread.release(current_task.kernel());
+            binder_proc.release(current_task.kernel());
         });
     }
 
@@ -8331,11 +8308,8 @@ pub mod tests {
             let process = fuchsia_runtime::process_self()
                 .duplicate(zx::Rights::SAME_RIGHTS)
                 .expect("process");
-            let remote_binder_task = RemoteResourceAccessor {
-                process_accessor,
-                process,
-                kernel: Arc::downgrade(&task.kernel()),
-            };
+            let remote_binder_task =
+                RemoteResourceAccessor { process_accessor, process, kernel: task.kernel().clone() };
             let mut vector = Vec::with_capacity(vector_size);
             for i in 0..vector_size {
                 vector.push((i & 255) as u8);

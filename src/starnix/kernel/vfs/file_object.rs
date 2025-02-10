@@ -1475,7 +1475,7 @@ impl FileObject {
             None
         };
         let fs = name.entry.node.fs();
-        let kernel = fs.kernel();
+        let kernel = fs.kernel.upgrade().ok_or_else(|| errno!(ENOENT))?;
         let id = FileObjectId(kernel.next_file_object_id.next());
         let security_state = security::file_alloc_security(current_task);
         let file = FileHandle::new_cyclic(|weak_handle| {

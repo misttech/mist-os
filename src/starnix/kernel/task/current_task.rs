@@ -1421,7 +1421,7 @@ impl CurrentTask {
                 let process = zx::Process::from(zx::Handle::invalid());
                 let thread_group = ThreadGroup::new(
                     locked,
-                    Arc::downgrade(&kernel),
+                    kernel.clone(),
                     process,
                     None,
                     pid,
@@ -1559,8 +1559,7 @@ impl CurrentTask {
     where
         L: LockBefore<TaskRelease>,
     {
-        let kernel = system_task.kernel();
-        let mut pids = kernel.pids.write();
+        let mut pids = system_task.kernel().pids.write();
         let pid = pids.allocate_pid();
 
         let scheduler_policy;
@@ -1795,7 +1794,7 @@ impl CurrentTask {
                 let process_group = thread_group_state.process_group.clone();
                 ReleaseGuard::take(create_zircon_process(
                     locked,
-                    &kernel,
+                    kernel,
                     Some(thread_group_state),
                     pid,
                     process_group,

@@ -60,8 +60,8 @@ fn close_inaccessible_file_descriptors(
     current_task: &CurrentTask,
     new_sid: SecurityId,
 ) {
-    let kernel = current_task.kernel();
-    let kernel_state = kernel
+    let kernel_state = current_task
+        .kernel()
         .security_state
         .state
         .as_ref()

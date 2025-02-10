@@ -167,8 +167,7 @@ pub async fn serve_container_controller(
                     });
                 }
                 fstarcontainer::ControllerRequest::SpawnConsole { payload, responder } => {
-                    let kernel = system_task.kernel();
-                    responder.send(spawn_console(&kernel, payload).await?)?;
+                    responder.send(spawn_console(system_task.kernel(), payload).await?)?;
                 }
                 fstarcontainer::ControllerRequest::GetVmoReferences { payload, responder } => {
                     if let Some(koid) = payload.koid {

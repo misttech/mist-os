@@ -37,7 +37,7 @@ use starnix_uapi::{errno, errno_from_code, error, pid_t, uapi, PATH_MAX};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::ffi::CStr;
 use std::rc::Rc;
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 use {
     fidl_fuchsia_posix as fposix, fidl_fuchsia_starnix_binder as fbinder, fuchsia_async as fasync,
     zx,
@@ -266,7 +266,7 @@ fn must_interrupt<R>(result: &Result<R, Errno>) -> Option<Errno> {
 /// Connection to the remote binder device. One connection is associated to one instance of a
 /// remote fuchsia component.
 struct RemoteBinderHandle<F: RemoteControllerConnector> {
-    kernel: Weak<Kernel>,
+    kernel: Arc<Kernel>,
     state: Mutex<RemoteBinderHandleState>,
 
     /// Marker struct, needed because the struct is parametrized by `F`.
@@ -457,7 +457,7 @@ impl RemoteBinderHandleState {
 impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     fn new(current_task: &CurrentTask) -> Arc<Self> {
         Arc::new(Self {
-            kernel: Arc::downgrade(&current_task.kernel()),
+            kernel: current_task.kernel().clone(),
             state: Mutex::new(RemoteBinderHandleState {
                 thread_group: OwnedRef::downgrade(&current_task.thread_group),
                 koid_to_task: Default::default(),
@@ -760,8 +760,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         scopeguard::defer! {
             // When leaving the current scope, close the connection, even if some operation are in
             // progress. This should kick the tasks back with an error.
-            let kernel = self.kernel.upgrade().expect("kernel can't have dropped");
-            remote_binder_connection_for_close.close(&kernel);
+            remote_binder_connection_for_close.close(&self.kernel);
         }
 
         // Register a receiver to be notified of exit
@@ -1010,7 +1009,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                 .lock()
                 .thread_group
                 .upgrade()
-                .map(|tg| (tg.kernel(), tg.drop_notifier.waiter()));
+                .map(|tg| (tg.kernel.clone(), tg.drop_notifier.waiter()));
             let Some((kernel, drop_waiter)) = kernel_and_drop_waiter else {
                 return;
             };
@@ -1426,7 +1425,7 @@ mod tests {
         let (power_controller, power_controller_server_end) = fidl::endpoints::create_proxy();
         let (event, event_remote) = zx::EventPair::create();
         let _server_task = fasync::Task::local(async move {
-            let result = RemoteBinderHandle::<TestRemoteControllerConnector>::serve_container_power_controller(power_controller_server_end, event_remote, kernel.clone(), "test").await;
+            let result = RemoteBinderHandle::<TestRemoteControllerConnector>::serve_container_power_controller(power_controller_server_end, event_remote, kernel, "test").await;
             assert_matches::assert_matches!(result, Ok(_));
         });
 

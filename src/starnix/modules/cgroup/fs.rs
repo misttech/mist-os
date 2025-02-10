@@ -26,11 +26,10 @@ impl CgroupV1Fs {
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
-        let kernel = current_task.kernel();
-        let weak_kernel = Arc::downgrade(&kernel);
+        let weak_kernel = Arc::downgrade(current_task.kernel());
         let root = CgroupRoot::new(weak_kernel);
         let fs = FileSystem::new(
-            &kernel,
+            current_task.kernel(),
             CacheMode::Uncached,
             CgroupV1Fs { root: root.clone() },
             options,
@@ -64,11 +63,10 @@ impl CgroupV2Fs {
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
-        let kernel = current_task.kernel();
-        let weak_kernel = Arc::downgrade(&kernel);
+        let weak_kernel = Arc::downgrade(current_task.kernel());
         let root = CgroupRoot::new(weak_kernel);
         let fs = FileSystem::new(
-            &kernel,
+            current_task.kernel(),
             CacheMode::Uncached,
             CgroupV2Fs { root: root.clone() },
             options,

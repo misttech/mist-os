@@ -536,30 +536,27 @@ pub struct InotifyLimits {
 }
 
 pub trait AtomicGetter {
-    fn with_atomic<F: FnOnce(&AtomicI32) -> R, R>(current_task: &CurrentTask, f: F) -> R;
+    fn get_atomic<'a>(current_task: &'a CurrentTask) -> &'a AtomicI32;
 }
 
 pub struct MaxQueuedEventsGetter;
 impl AtomicGetter for MaxQueuedEventsGetter {
-    fn with_atomic<F: FnOnce(&AtomicI32) -> R, R>(current_task: &CurrentTask, f: F) -> R {
-        let kernel = current_task.kernel();
-        f(&kernel.system_limits.inotify.max_queued_events)
+    fn get_atomic<'a>(current_task: &'a CurrentTask) -> &'a AtomicI32 {
+        &current_task.kernel().system_limits.inotify.max_queued_events
     }
 }
 
 pub struct MaxUserInstancesGetter;
 impl AtomicGetter for MaxUserInstancesGetter {
-    fn with_atomic<F: FnOnce(&AtomicI32) -> R, R>(current_task: &CurrentTask, f: F) -> R {
-        let kernel = current_task.kernel();
-        f(&kernel.system_limits.inotify.max_user_instances)
+    fn get_atomic<'a>(current_task: &'a CurrentTask) -> &'a AtomicI32 {
+        &current_task.kernel().system_limits.inotify.max_user_instances
     }
 }
 
 pub struct MaxUserWatchesGetter;
 impl AtomicGetter for MaxUserWatchesGetter {
-    fn with_atomic<F: FnOnce(&AtomicI32) -> R, R>(current_task: &CurrentTask, f: F) -> R {
-        let kernel = current_task.kernel();
-        f(&kernel.system_limits.inotify.max_user_watches)
+    fn get_atomic<'a>(current_task: &'a CurrentTask) -> &'a AtomicI32 {
+        &current_task.kernel().system_limits.inotify.max_user_watches
     }
 }
 
@@ -582,15 +579,12 @@ impl<G: AtomicGetter + Send + Sync + 'static> BytesFileOps for InotifyLimitProcF
         if value < 0 {
             return error!(EINVAL);
         }
-        G::with_atomic(current_task, |a| a.store(value, Ordering::Relaxed));
+        G::get_atomic(current_task).store(value, Ordering::Relaxed);
         Ok(())
     }
 
     fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        Ok(G::with_atomic(current_task, |a| a.load(Ordering::Relaxed))
-            .to_string()
-            .into_bytes()
-            .into())
+        Ok(G::get_atomic(current_task).load(Ordering::Relaxed).to_string().into_bytes().into())
     }
 }
 

@@ -56,14 +56,10 @@ pub struct FdTableEntry {
 
 impl Drop for FdTableEntry {
     fn drop(&mut self) {
-        self.file
-            .name
-            .entry
-            .node
-            .fs()
-            .kernel()
-            .delayed_releaser
-            .flush_file(&self.file, self.fd_table_id);
+        let fs = self.file.name.entry.node.fs();
+        if let Some(kernel) = fs.kernel.upgrade() {
+            kernel.delayed_releaser.flush_file(&self.file, self.fd_table_id);
+        }
     }
 }
 

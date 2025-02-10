@@ -786,12 +786,6 @@ impl Kernel {
     }
 }
 
-impl Drop for Kernel {
-    fn drop(&mut self) {
-        log_debug!("dropping kernel");
-    }
-}
-
 impl std::fmt::Debug for Kernel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Kernel").finish()

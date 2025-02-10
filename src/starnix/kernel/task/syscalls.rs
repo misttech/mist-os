@@ -1690,8 +1690,7 @@ pub fn sys_swapon(
         return error!(EINVAL);
     }
 
-    let kernel = current_task.kernel();
-    let mut swap_files = kernel.swap_files.lock(locked);
+    let mut swap_files = current_task.kernel().swap_files.lock(locked);
     for swap_file in swap_files.iter() {
         if Arc::ptr_eq(swap_file.node(), file.node()) {
             return error!(EBUSY);
@@ -1714,8 +1713,7 @@ pub fn sys_swapoff(
     let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
     let file = current_task.open_file(locked, path.as_ref(), OpenFlags::RDWR)?;
 
-    let kernel = current_task.kernel();
-    let mut swap_files = kernel.swap_files.lock(locked);
+    let mut swap_files = current_task.kernel().swap_files.lock(locked);
     let original_length = swap_files.len();
     swap_files.retain(|swap_file| !Arc::ptr_eq(swap_file.node(), file.node()));
     if swap_files.len() == original_length {
@@ -1821,8 +1819,7 @@ pub fn sys_syslog(
     length: i32,
 ) -> Result<i32, Errno> {
     let action = SyslogAction::try_from(action_type)?;
-    let kernel = current_task.kernel();
-    let syslog = kernel.syslog.access(&current_task)?;
+    let syslog = current_task.kernel().syslog.access(&current_task)?;
     match action {
         SyslogAction::Read => {
             if address.is_null() || length < 0 {

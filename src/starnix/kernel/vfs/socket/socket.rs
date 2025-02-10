@@ -291,7 +291,7 @@ fn create_socket_ops(
         }
         SocketDomain::Netlink => {
             let netlink_family = NetlinkFamily::from_raw(protocol.as_raw());
-            new_netlink_socket(&current_task.kernel(), socket_type, netlink_family)
+            new_netlink_socket(current_task.kernel(), socket_type, netlink_family)
         }
         SocketDomain::Packet => {
             // Follow Linux, and require CAP_NET_RAW to create packet sockets.
@@ -357,8 +357,7 @@ impl Socket {
         socket: SocketHandle,
         open_flags: OpenFlags,
     ) -> FileHandle {
-        let kernel = current_task.kernel();
-        let fs = socket_fs(&kernel);
+        let fs = socket_fs(current_task.kernel());
         let mode = mode!(IFSOCK, 0o777);
         let node = fs.create_node(
             current_task,

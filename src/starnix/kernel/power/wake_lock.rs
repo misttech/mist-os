@@ -49,7 +49,7 @@ impl BytesFileOps for PowerWakeLockFile {
 
         // Set a timer to disable the wake lock when expired.
         if let Some(target_monotonic) = target_monotonic {
-            let kernel_ref = current_task.kernel();
+            let kernel_ref = current_task.kernel().clone();
             let clean_lock_string = clean_lock_str.to_string();
             current_task.kernel().kthreads.spawn_future(async move {
                 fuchsia_async::Timer::new(target_monotonic).await;

@@ -629,16 +629,15 @@ pub fn load_executable(
     // even though entry points would normally all be in the lower 1Gb.
     let entry = UserAddress::from_ptr(entry_addr);
 
-    let kernel = current_task.kernel();
     let vdso_memory = if main_elf.arch_width.is_arch32() {
-        &kernel.vdso_arch32.as_ref().expect("an arch32 VDSO").memory
+        &current_task.kernel().vdso_arch32.as_ref().expect("an arch32 VDSO").memory
     } else {
-        &kernel.vdso.memory
+        &current_task.kernel().vdso.memory
     };
     let vvar_memory = if main_elf.arch_width.is_arch32() {
-        kernel.vdso_arch32.as_ref().unwrap().vvar_readonly.clone()
+        current_task.kernel().vdso_arch32.as_ref().unwrap().vvar_readonly.clone()
     } else {
-        kernel.vdso.vvar_readonly.clone()
+        current_task.kernel().vdso.vvar_readonly.clone()
     };
 
     let vdso_size = vdso_memory.get_size();

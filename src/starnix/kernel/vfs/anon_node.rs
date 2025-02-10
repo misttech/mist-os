@@ -49,8 +49,7 @@ impl Anon {
         name: &'static str,
         info: impl FnOnce(ino_t) -> FsNodeInfo,
     ) -> FileHandle {
-        let kernel = current_task.kernel();
-        let fs = anon_fs(&kernel);
+        let fs = anon_fs(current_task.kernel());
         let node = fs.create_node(current_task, Anon { name: Some(name) }, info);
         security::fs_node_init_anon(current_task, &node, name);
         FileObject::new_anonymous(current_task, ops, node, flags)

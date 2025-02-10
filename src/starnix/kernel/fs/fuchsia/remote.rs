@@ -79,7 +79,7 @@ pub fn new_remote_fs(
     let open_rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
     let mut subdir_options = options;
     subdir_options.source = BString::from(subdir);
-    create_remotefs_filesystem(&kernel, &root_proxy, subdir_options, open_rights)
+    create_remotefs_filesystem(kernel, &root_proxy, subdir_options, open_rights)
 }
 
 /// Create a filesystem to access the content of the fuchsia directory available at `fs_src` inside

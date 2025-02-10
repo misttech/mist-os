@@ -40,7 +40,7 @@ use starnix_uapi::{
 use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::atomic::Ordering;
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 use zx::AsHandleRef;
 
 /// Values used for waiting on the [ThreadGroup] lifecycle wait queue.
@@ -160,7 +160,7 @@ pub struct ThreadGroup {
     pub weak_thread_group: WeakRef<ThreadGroup>,
 
     /// The kernel to which this thread group belongs.
-    kernel: Weak<Kernel>,
+    pub kernel: Arc<Kernel>,
 
     /// A handle to the underlying Zircon process object.
     ///
@@ -233,8 +233,7 @@ impl Releasable for ThreadGroup {
     type Context<'a: 'b, 'b> = ();
 
     fn release<'a: 'b, 'b>(mut self, _context: Self::Context<'a, 'b>) {
-        let kernel = self.kernel();
-        let mut pids = kernel.pids.write();
+        let mut pids = self.kernel.pids.write();
         let state = self.mutable_state.get_mut();
 
         for zombie in state.zombie_children.drain(..) {
@@ -434,7 +433,7 @@ impl Releasable for ZombieProcess {
 impl ThreadGroup {
     pub fn new<L>(
         locked: &mut Locked<'_, L>,
-        kernel: Weak<Kernel>,
+        kernel: Arc<Kernel>,
         process: zx::Process,
         parent: Option<ThreadGroupWriteGuard<'_>>,
         leader: pid_t,
@@ -507,11 +506,6 @@ impl ThreadGroup {
         self.stop_state.load(Ordering::Relaxed)
     }
 
-    #[track_caller]
-    pub fn kernel(&self) -> Arc<Kernel> {
-        self.kernel.upgrade().expect("cleanup code requiring Kernel must run in Kernel::shutdown")
-    }
-
     // Causes the thread group to exit.  If this is being called from a task
     // that is part of the current thread group, the caller should pass
     // `current_task`.  If ownership issues prevent passing `current_task`, then
@@ -529,8 +523,7 @@ impl ThreadGroup {
                 exit_status.signal_info_status() as u64,
             );
         }
-        let kernel = self.kernel();
-        let mut pids = kernel.pids.write();
+        let mut pids = self.kernel.pids.write();
         let mut state = self.write();
         if state.terminating {
             // The thread group is already terminating and all threads in the thread group have
@@ -576,8 +569,7 @@ impl ThreadGroup {
     where
         L: LockBefore<ProcessGroupState>,
     {
-        let kernel = self.kernel();
-        let mut pids = kernel.pids.write();
+        let mut pids = self.kernel.pids.write();
 
         task.set_ptrace_zombie(&pids);
         pids.remove_task(task.id);
@@ -783,8 +775,7 @@ impl ThreadGroup {
         L: LockBefore<ProcessGroupState>,
     {
         {
-            let kernel = self.kernel();
-            let mut pids = kernel.pids.write();
+            let mut pids = self.kernel.pids.write();
             if pids.get_process_group(self.leader).is_some() {
                 return error!(EPERM);
             }
@@ -807,8 +798,7 @@ impl ThreadGroup {
         L: LockBefore<ProcessGroupState>,
     {
         {
-            let kernel = self.kernel();
-            let mut pids = kernel.pids.write();
+            let mut pids = self.kernel.pids.write();
 
             let current_process_group = Arc::clone(&self.read().process_group);
 
@@ -1003,8 +993,7 @@ impl ThreadGroup {
         let send_ttou;
         {
             // Keep locks to ensure atomicity.
-            let kernel = self.kernel();
-            let pids = kernel.pids.read();
+            let pids = self.kernel.pids.read();
             let state = self.read();
             process_group = Arc::clone(&state.process_group);
             let terminal_state = terminal.read();
@@ -1170,15 +1159,14 @@ impl ThreadGroup {
     }
 
     pub fn time_stats(&self) -> TaskTimeStats {
-        let kernel = self.kernel();
         let process: &zx::Process = if zx::AsHandleRef::as_handle_ref(&self.process).is_invalid() {
             // `process` must be valid for all tasks, except `kthreads`. In that case get the
             // stats from starnix process.
             assert_eq!(
                 self as *const ThreadGroup,
-                TempRef::as_ptr(&kernel.kthreads.system_thread_group())
+                TempRef::as_ptr(&self.kernel.kthreads.system_thread_group())
             );
-            &kernel.kthreads.starnix_process
+            &self.kernel.kthreads.starnix_process
         } else {
             &self.process
         };

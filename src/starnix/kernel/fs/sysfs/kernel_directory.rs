@@ -32,7 +32,7 @@ pub fn sysfs_kernel_directory(current_task: &CurrentTask, dir: &mut StaticDirect
             dir.entry(
                 current_task,
                 "last_resume_reason",
-                create_bytes_file_with_handler(Arc::downgrade(&kernel), |kernel| {
+                create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
                     kernel
                         .suspend_resume_manager
                         .suspend_stats()
@@ -44,7 +44,7 @@ pub fn sysfs_kernel_directory(current_task: &CurrentTask, dir: &mut StaticDirect
             dir.entry(
                 current_task,
                 "last_suspend_time",
-                create_bytes_file_with_handler(Arc::downgrade(&kernel), |kernel| {
+                create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
                     let suspend_stats = kernel.suspend_resume_manager.suspend_stats();
                     // First number is the time spent in suspend and resume processes.
                     // Second number is the time spent in sleep state.

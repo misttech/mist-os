@@ -1189,15 +1189,8 @@ impl FsNode {
     ) -> FsNodeHandle {
         let ops = ops.into();
         let creds = current_task.creds();
-        Self::new_internal(
-            ops,
-            Arc::downgrade(&fs.kernel()),
-            Arc::downgrade(fs),
-            node_id,
-            info,
-            &creds,
-        )
-        .into_handle()
+        Self::new_internal(ops, fs.kernel.clone(), Arc::downgrade(fs), node_id, info, &creds)
+            .into_handle()
     }
 
     pub fn into_handle(mut self) -> FsNodeHandle {
@@ -1285,7 +1278,7 @@ impl FsNode {
     pub fn set_fs(&mut self, fs: &FileSystemHandle) {
         debug_assert!(self.fs.ptr_eq(&Weak::new()));
         self.fs = Arc::downgrade(fs);
-        self.kernel = Arc::downgrade(&fs.kernel());
+        self.kernel = fs.kernel.clone();
     }
 
     pub fn ops(&self) -> &dyn FsNodeOps {

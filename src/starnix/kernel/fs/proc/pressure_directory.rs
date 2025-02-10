@@ -26,8 +26,7 @@ pub fn pressure_directory(
     current_task: &CurrentTask,
     fs: &FileSystemHandle,
 ) -> Option<FsNodeHandle> {
-    let kernel = current_task.kernel();
-    let Some(psi_provider) = kernel.psi_provider.get() else {
+    let Some(psi_provider) = current_task.kernel().psi_provider.get() else {
         return None;
     };
 

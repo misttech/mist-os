@@ -530,8 +530,7 @@ mod tests {
 
     /// Creates a kernel and initial task, giving the task a stack.
     fn create_kernel_and_task_with_stack<'l>(
-    ) -> (impl std::ops::Deref<Target = Arc<Kernel>>, AutoReleasableTask, Locked<'l, Unlocked>)
-    {
+    ) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
         let (kernel, mut current_task, locked) = create_kernel_task_and_unlocked();
 
         const STACK_SIZE: usize = 0x1000;

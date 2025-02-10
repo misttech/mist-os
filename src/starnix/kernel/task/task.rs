@@ -1027,9 +1027,8 @@ pub struct PageFaultExceptionReport {
 }
 
 impl Task {
-    #[track_caller]
-    pub fn kernel(&self) -> Arc<Kernel> {
-        self.thread_group.kernel()
+    pub fn kernel(&self) -> &Arc<Kernel> {
+        &self.thread_group.kernel
     }
 
     pub fn has_same_address_space(&self, other: &Self) -> bool {
@@ -1085,8 +1084,7 @@ impl Task {
 
     /// Disconnects this task from the tracer, if the tracer is still running.
     pub fn ptrace_disconnect(&mut self) {
-        let kernel = self.thread_group.kernel();
-        let pids = kernel.pids.read();
+        let pids = self.thread_group.kernel.pids.read();
         let mut state = self.write();
         let ptracer_pid = state.ptrace.as_ref().map(|ptrace| ptrace.get_pid());
         if let Some(ptracer_pid) = ptracer_pid {
@@ -1263,8 +1261,7 @@ impl Task {
             state.scheduler_policy
         };
 
-        let kernel = self.thread_group.kernel();
-        let Some(role_manager) = &kernel.role_manager else {
+        let Some(role_manager) = &self.thread_group.kernel.role_manager else {
             log_debug!("thread role update requested in kernel without ProfileProvider, skipping");
             return Ok(());
         };

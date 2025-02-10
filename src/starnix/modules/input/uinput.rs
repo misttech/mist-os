@@ -550,14 +550,12 @@ mod test {
     use starnix_core::task::Kernel;
     use starnix_core::testing::{create_kernel_task_and_unlocked, AutoReleasableTask};
     use starnix_core::vfs::FileHandle;
-    use std::ops::Deref;
     use std::sync::Arc;
     use test_case::test_case;
 
     fn make_kernel_objects<'l>(
         file: Arc<UinputDeviceFile>,
-    ) -> (impl Deref<Target = Arc<Kernel>>, AutoReleasableTask, FileHandle, Locked<'l, Unlocked>)
-    {
+    ) -> (Arc<Kernel>, AutoReleasableTask, FileHandle, Locked<'l, Unlocked>) {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let file_object = FileObject::new(
             &current_task,

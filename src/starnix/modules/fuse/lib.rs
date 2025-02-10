@@ -61,8 +61,7 @@ pub fn open_fuse_device(
     _node: &FsNode,
     _flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
-    let kernel = current_task.kernel();
-    let connection = fuse_connections(&kernel).new_connection(current_task);
+    let connection = fuse_connections(current_task.kernel()).new_connection(current_task);
     Ok(Box::new(DevFuse { connection }))
 }
 
@@ -185,9 +184,8 @@ pub fn new_fuse_fs(
         .connection
         .clone();
 
-    let kernel = current_task.kernel();
     let fs = FileSystem::new(
-        &kernel,
+        current_task.kernel(),
         CacheMode::Cached(CacheConfig::default()),
         FuseFs { connection: connection.clone(), default_permissions },
         options,
@@ -220,8 +218,7 @@ pub fn new_fusectl_fs(
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
-    let kernel = current_task.kernel();
-    let fs = FileSystem::new(&kernel, CacheMode::Uncached, FuseCtlFs, options)?;
+    let fs = FileSystem::new(current_task.kernel(), CacheMode::Uncached, FuseCtlFs, options)?;
     let root_node = FsNode::new_root_with_properties(FuseCtlConnectionsDirectory {}, |info| {
         info.chmod(mode!(IFDIR, 0o755));
     });
@@ -394,8 +391,7 @@ impl FsNodeOps for FuseCtlConnectionsDirectory {
         current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        let kernel = current_task.kernel();
-        let connnections = fuse_connections(&kernel);
+        let connnections = fuse_connections(current_task.kernel());
         let mut entries = vec![];
         connnections.for_each(|connection| {
             entries.push(VecDirectoryEntry {
@@ -416,8 +412,7 @@ impl FsNodeOps for FuseCtlConnectionsDirectory {
     ) -> Result<FsNodeHandle, Errno> {
         let name = std::str::from_utf8(name).map_err(|_| errno!(ENOENT))?;
         let id = name.parse::<u64>().map_err(|_| errno!(ENOENT))?;
-        let kernel = current_task.kernel();
-        let connnections = fuse_connections(&kernel);
+        let connnections = fuse_connections(current_task.kernel());
         let mut connection = None;
         connnections.for_each(|c| {
             if c.id == id {

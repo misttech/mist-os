@@ -59,7 +59,7 @@ impl Namespace {
     }
 
     pub fn new_with_flags(fs: FileSystemHandle, flags: MountFlags) -> Arc<Namespace> {
-        let kernel = fs.kernel();
+        let kernel = fs.kernel.upgrade().expect("can't create namespace without a kernel");
         let root_mount = Mount::new(WhatToMount::Fs(fs), flags);
         Arc::new(Self { root_mount, id: kernel.get_next_namespace_id() })
     }
@@ -69,7 +69,8 @@ impl Namespace {
     }
 
     pub fn clone_namespace(&self) -> Arc<Namespace> {
-        let kernel = self.root_mount.fs.kernel();
+        let kernel =
+            self.root_mount.fs.kernel.upgrade().expect("can't clone namespace without a kernel");
         Arc::new(Self {
             root_mount: self.root_mount.clone_mount_recursive(),
             id: kernel.get_next_namespace_id(),
@@ -291,7 +292,7 @@ impl Mount {
             flags - known_flags
         );
         let fs = root.node.fs();
-        let kernel = fs.kernel();
+        let kernel = fs.kernel.upgrade().expect("can't create mount without kernel");
         Arc::new(Self {
             id: kernel.get_next_mount_id(),
             flags: Mutex::new(flags),
@@ -550,7 +551,7 @@ impl MountState<Base = Mount, BaseType = Arc<Mount>> {
             return;
         }
 
-        let submount = mount.fs.kernel().mounts.register_mount(dir, mount.clone());
+        let submount = mount.fs.kernel.upgrade().unwrap().mounts.register_mount(dir, mount.clone());
         let old_mountpoint =
             mount.state.write().mountpoint.replace((Arc::downgrade(self.base), Arc::clone(dir)));
         assert!(old_mountpoint.is_none(), "add_submount can only take a newly created mount");
@@ -603,7 +604,8 @@ impl MountState<Base = Mount, BaseType = Arc<Mount>> {
         if self.is_shared() {
             return;
         }
-        let kernel = self.base.fs.kernel();
+        let kernel =
+            self.base.fs.kernel.upgrade().expect("can't create new peer group without kernel");
         self.set_peer_group(PeerGroup::new(kernel.get_next_peer_group_id()));
     }
 
@@ -1750,7 +1752,7 @@ struct Submount {
 
 impl Drop for Submount {
     fn drop(&mut self) {
-        self.mount.fs.kernel().mounts.unregister_mount(&self.dir, &self.mount)
+        self.mount.fs.kernel.upgrade().unwrap().mounts.unregister_mount(&self.dir, &self.mount)
     }
 }
 

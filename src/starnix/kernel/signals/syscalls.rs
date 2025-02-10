@@ -382,8 +382,7 @@ pub fn sys_kill(
     pid: pid_t,
     unchecked_signal: UncheckedSignal,
 ) -> Result<(), Errno> {
-    let kernel = current_task.kernel();
-    let pids = kernel.pids.read();
+    let pids = current_task.kernel().pids.read();
     match pid {
         pid if pid > 0 => {
             // "If pid is positive, then signal sig is sent to the process with
@@ -454,8 +453,7 @@ pub fn sys_kill(
 }
 
 fn verify_tgid_for_task(task: &Task, tgid: pid_t) -> Result<(), Errno> {
-    let kernel = task.thread_group.kernel();
-    let pids = kernel.pids.read();
+    let pids = task.thread_group.kernel.pids.read();
     let thread_group = match pids.get_process(tgid) {
         Some(ProcessEntryRef::Process(proc)) => proc,
         Some(ProcessEntryRef::Zombie(_)) => return error!(EINVAL),
@@ -687,10 +685,9 @@ fn wait_on_pid(
     options: &WaitingOptions,
 ) -> Result<Option<WaitResult>, Errno> {
     let waiter = Waiter::new();
-    let kernel = current_task.kernel();
     loop {
         {
-            let mut pids = kernel.pids.write();
+            let mut pids = current_task.kernel().pids.write();
             // Waits and notifies on a given task need to be done atomically
             // with respect to changes to the task's waitable state; otherwise,
             // we see missing notifications. We do that by holding the task lock.

@@ -82,11 +82,10 @@ pub async fn start_component(
 
     // If the component specifies a filesystem security label then it will be applied to all files
     // in all directories mounted from the component's namespace.
-    let kernel = system_task.kernel();
     let mount_seclabel = {
         match get_program_string(&start_info, "fsseclabel") {
             Some(s) => Some(s),
-            None => kernel.features.default_fsseclabel.as_deref(),
+            None => system_task.kernel().features.default_fsseclabel.as_deref(),
         }
     };
 
@@ -183,10 +182,11 @@ pub async fn start_component(
         credentials.cap_ambient = capabilities;
     }
 
-    let kernel = system_task.kernel();
-    run_component_features(&kernel, &component_features, maybe_svc).unwrap_or_else(|e| {
-        log_error!("failed to set component features for {} - {:?}", url, e);
-    });
+    run_component_features(system_task.kernel(), &component_features, maybe_svc).unwrap_or_else(
+        |e| {
+            log_error!("failed to set component features for {} - {:?}", url, e);
+        },
+    );
 
     let security_context = {
         match get_program_string(&start_info, "seclabel") {
@@ -200,10 +200,9 @@ pub async fn start_component(
         }
     };
     let (task_complete_sender, task_complete) = oneshot::channel::<TaskResult>();
-    let kernel = system_task.kernel();
     let current_task = CurrentTask::create_init_child_process(
         system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
-        &kernel,
+        system_task.kernel(),
         &binary_path,
         security_context.as_ref(),
     )?;
@@ -506,9 +505,8 @@ impl MountRecord {
             MountParams::default()
         };
 
-        let kernel = system_task.kernel();
         let fs = RemoteFs::new_fs(
-            &kernel,
+            system_task.kernel(),
             client_end,
             FileSystemOptions { source: path.into(), params, ..Default::default() },
             rights,
