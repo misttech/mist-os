@@ -27,16 +27,12 @@ pub const FLAG_0_WIRE_FORMAT_V2_BIT: u8 = 0b0000_0010;
 pub const MAGIC_NUMBER: u8 = 0x01;
 
 impl Encodable for WireMessageHeader {
-    type Encoded<'buf> = WireMessageHeader;
+    type Encoded = WireMessageHeader;
 }
 
 impl<E: ?Sized> Encode<E> for WireMessageHeader {
     #[inline]
-    fn encode(
-        &mut self,
-        _: &mut E,
-        mut slot: Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), EncodeError> {
+    fn encode(&mut self, _: &mut E, mut slot: Slot<'_, Self::Encoded>) -> Result<(), EncodeError> {
         slot.write(*self);
         Ok(())
     }

@@ -145,9 +145,9 @@ impl<E: Encoder + ?Sized> EncoderExt for E {
     }
 
     fn encode_next_slice<T: Encode<Self>>(&mut self, values: &mut [T]) -> Result<(), EncodeError> {
-        let mut slots = self.preallocate::<T::Encoded<'_>>(values.len());
+        let mut slots = self.preallocate::<T::Encoded>(values.len());
 
-        let mut backing = MaybeUninit::<T::Encoded<'_>>::uninit();
+        let mut backing = MaybeUninit::<T::Encoded>::uninit();
         for value in values {
             let mut slot = Slot::new(&mut backing);
             value.encode(slots.encoder, slot.as_mut())?;

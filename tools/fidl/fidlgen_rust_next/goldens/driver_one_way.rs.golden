@@ -8,7 +8,7 @@ pub struct Payload {
 }
 
 impl ::fidl_next::Encodable for Payload {
-    type Encoded<'buf> = WirePayload;
+    type Encoded = WirePayload;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for Payload
@@ -18,7 +18,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -34,7 +34,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<Payload> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WirePayload>;
+    type EncodedOption = ::fidl_next::WireBox<WirePayload>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<Payload>
@@ -45,7 +45,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -98,7 +98,7 @@ pub struct OneWaySendRequest {
 }
 
 impl ::fidl_next::Encodable for OneWaySendRequest {
-    type Encoded<'buf> = WireOneWaySendRequest;
+    type Encoded = WireOneWaySendRequest;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for OneWaySendRequest
@@ -108,7 +108,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -124,7 +124,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<OneWaySendRequest> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireOneWaySendRequest>;
+    type EncodedOption = ::fidl_next::WireBox<WireOneWaySendRequest>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<OneWaySendRequest>
@@ -135,7 +135,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -195,9 +195,9 @@ pub mod one_way {
 
         type Protocol = crate::OneWay;
 
-        type Request<'buf> = crate::WireOneWaySendRequest;
+        type Request = crate::WireOneWaySendRequest;
 
-        type Response<'buf> = ::fidl_next::bind::Never;
+        type Response = ::fidl_next::bind::Never;
     }
 }
 
@@ -209,7 +209,7 @@ pub trait OneWayClientSender<___T: ::fidl_next::protocol::Transport> {
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireOneWaySendRequest>;
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireOneWaySendRequest>;
 }
 
 impl<___T> OneWayClientSender<___T> for ::fidl_next::bind::ClientSender<___T, OneWay>
@@ -222,7 +222,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireOneWaySendRequest>,
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireOneWaySendRequest>,
     {
         self.as_untyped().send_one_way(7942965975761529343, request)
     }

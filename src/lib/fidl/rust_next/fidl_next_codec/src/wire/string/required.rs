@@ -69,14 +69,14 @@ unsafe impl<'buf, D: Decoder<'buf> + ?Sized> Decode<D> for WireString {
 }
 
 impl Encodable for String {
-    type Encoded<'buf> = WireString;
+    type Encoded = WireString;
 }
 
 impl<E: Encoder + ?Sized> Encode<E> for String {
     fn encode(
         &mut self,
         encoder: &mut E,
-        slot: Slot<'_, Self::Encoded<'_>>,
+        slot: Slot<'_, Self::Encoded>,
     ) -> Result<(), EncodeError> {
         encoder.write(self.as_bytes());
         WireString::encode_present(slot, self.len() as u64);

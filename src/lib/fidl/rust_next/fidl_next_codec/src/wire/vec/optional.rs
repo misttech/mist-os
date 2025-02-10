@@ -82,14 +82,14 @@ unsafe impl<'buf, D: Decoder<'buf> + ?Sized, T: Decode<D>> Decode<D> for WireOpt
 }
 
 impl<T: Encodable> EncodableOption for Vec<T> {
-    type EncodedOption<'buf> = WireOptionalVector<T::Encoded<'buf>>;
+    type EncodedOption = WireOptionalVector<T::Encoded>;
 }
 
 impl<E: Encoder + ?Sized, T: Encode<E>> EncodeOption<E> for Vec<T> {
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut E,
-        slot: Slot<'_, Self::EncodedOption<'_>>,
+        slot: Slot<'_, Self::EncodedOption>,
     ) -> Result<(), EncodeError> {
         if let Some(vec) = this {
             encoder.encode_next_slice(vec.as_mut_slice())?;

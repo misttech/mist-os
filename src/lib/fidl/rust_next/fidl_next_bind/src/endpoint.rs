@@ -49,14 +49,14 @@ macro_rules! endpoint {
         where
             T: Encodable,
         {
-            type Encoded<'buf> = $name<T::Encoded<'buf>, P>;
+            type Encoded = $name<T::Encoded, P>;
         }
 
         impl<T, P> EncodableOption for $name<T, P>
         where
             T: EncodableOption,
         {
-            type EncodedOption<'buf> = $name<T::EncodedOption<'buf>, P>;
+            type EncodedOption = $name<T::EncodedOption, P>;
         }
 
         impl<E, T, P> Encode<E> for $name<T, P>
@@ -67,7 +67,7 @@ macro_rules! endpoint {
             fn encode(
                 &mut self,
                 encoder: &mut E,
-                slot: Slot<'_, Self::Encoded<'_>>,
+                slot: Slot<'_, Self::Encoded>,
             ) -> Result<(), EncodeError> {
                 munge!(let Self::Encoded { transport, _protocol: _ } = slot);
                 self.transport.encode(encoder, transport)
@@ -82,7 +82,7 @@ macro_rules! endpoint {
             fn encode_option(
                 this: Option<&mut Self>,
                 encoder: &mut E,
-                slot: Slot<'_, Self::EncodedOption<'_>>,
+                slot: Slot<'_, Self::EncodedOption>,
             ) -> Result<(), EncodeError> {
                 munge!(let Self::EncodedOption { transport, _protocol: _ } = slot);
                 T::encode_option(this.map(|this| &mut this.transport), encoder, transport)

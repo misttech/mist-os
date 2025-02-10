@@ -84,14 +84,14 @@ unsafe impl<'buf, D: Decoder<'buf> + ?Sized, T: Decode<D>> Decode<D> for WireBox
 }
 
 impl<T: EncodableOption> Encodable for Option<T> {
-    type Encoded<'buf> = T::EncodedOption<'buf>;
+    type Encoded = T::EncodedOption;
 }
 
 impl<E: ?Sized, T: EncodeOption<E>> Encode<E> for Option<T> {
     fn encode(
         &mut self,
         encoder: &mut E,
-        slot: Slot<'_, Self::Encoded<'_>>,
+        slot: Slot<'_, Self::Encoded>,
     ) -> Result<(), EncodeError> {
         T::encode_option(self.as_mut(), encoder, slot)
     }

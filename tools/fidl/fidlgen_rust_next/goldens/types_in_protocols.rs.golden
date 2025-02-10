@@ -30,7 +30,7 @@ pub struct ArrayBasic {
 }
 
 impl ::fidl_next::Encodable for ArrayBasic {
-    type Encoded<'buf> = WireArrayBasic;
+    type Encoded = WireArrayBasic;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ArrayBasic
@@ -42,7 +42,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -91,7 +91,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ArrayBasic> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireArrayBasic>;
+    type EncodedOption = ::fidl_next::WireBox<WireArrayBasic>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ArrayBasic>
@@ -102,7 +102,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -246,7 +246,7 @@ where
 }
 
 impl ::fidl_next::Encodable for Bits {
-    type Encoded<'buf> = WireBits;
+    type Encoded = WireBits;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for Bits
@@ -256,7 +256,7 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireBits { mut value } = slot);
         *value = ::fidl_next::u32_le::from(self.bits());
@@ -309,7 +309,7 @@ pub enum Enum {
 }
 
 impl ::fidl_next::Encodable for Enum {
-    type Encoded<'buf> = WireEnum;
+    type Encoded = WireEnum;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for Enum
@@ -319,7 +319,7 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireEnum { mut value } = slot);
         *value = ::fidl_next::u32_le::from(match *self {
@@ -385,7 +385,7 @@ impl ::core::convert::From<Enum> for WireEnum {
 pub struct Struct {}
 
 impl ::fidl_next::Encodable for Struct {
-    type Encoded<'buf> = WireStruct;
+    type Encoded = WireStruct;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for Struct
@@ -395,7 +395,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -408,7 +408,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<Struct> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireStruct>;
+    type EncodedOption = ::fidl_next::WireBox<WireStruct>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<Struct>
@@ -419,7 +419,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -471,7 +471,7 @@ impl Table {
 }
 
 impl ::fidl_next::Encodable for Table {
-    type Encoded<'buf> = WireTable;
+    type Encoded = WireTable;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for Table
@@ -481,7 +481,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireTable { table } = slot);
 
@@ -553,7 +553,7 @@ pub enum Union {
 }
 
 impl ::fidl_next::Encodable for Union {
-    type Encoded<'buf> = WireUnion;
+    type Encoded = WireUnion;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for Union
@@ -563,7 +563,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireUnion { raw } = slot);
 
@@ -582,7 +582,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<Union> {
-    type EncodedOption<'buf> = WireOptionalUnion;
+    type EncodedOption = WireOptionalUnion;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<Union>
@@ -593,7 +593,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireOptionalUnion { raw } = slot.as_mut());
 
@@ -773,7 +773,7 @@ pub struct ArrayCompound {
 }
 
 impl ::fidl_next::Encodable for ArrayCompound {
-    type Encoded<'buf> = WireArrayCompound;
+    type Encoded = WireArrayCompound;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ArrayCompound
@@ -785,7 +785,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -819,7 +819,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ArrayCompound> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireArrayCompound>;
+    type EncodedOption = ::fidl_next::WireBox<WireArrayCompound>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ArrayCompound>
@@ -830,7 +830,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -935,7 +935,7 @@ pub struct ArrayVectorNested {
 }
 
 impl ::fidl_next::Encodable for ArrayVectorNested {
-    type Encoded<'buf> = WireArrayVectorNested;
+    type Encoded = WireArrayVectorNested;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ArrayVectorNested
@@ -947,7 +947,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -972,7 +972,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ArrayVectorNested> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireArrayVectorNested>;
+    type EncodedOption = ::fidl_next::WireBox<WireArrayVectorNested>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ArrayVectorNested>
@@ -983,7 +983,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -1083,7 +1083,7 @@ pub struct Basic {
 }
 
 impl ::fidl_next::Encodable for Basic {
-    type Encoded<'buf> = WireBasic;
+    type Encoded = WireBasic;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for Basic
@@ -1095,7 +1095,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -1144,7 +1144,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<Basic> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireBasic>;
+    type EncodedOption = ::fidl_next::WireBox<WireBasic>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<Basic>
@@ -1155,7 +1155,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -1301,7 +1301,7 @@ pub struct Compound {
 }
 
 impl ::fidl_next::Encodable for Compound {
-    type Encoded<'buf> = WireCompound;
+    type Encoded = WireCompound;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for Compound
@@ -1313,7 +1313,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -1347,7 +1347,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<Compound> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireCompound>;
+    type EncodedOption = ::fidl_next::WireBox<WireCompound>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<Compound>
@@ -1358,7 +1358,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -1459,7 +1459,7 @@ pub enum ProtocolErrorBasicResult {
 }
 
 impl ::fidl_next::Encodable for ProtocolErrorBasicResult {
-    type Encoded<'buf> = WireProtocolErrorBasicResult;
+    type Encoded = WireProtocolErrorBasicResult;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ProtocolErrorBasicResult
@@ -1471,7 +1471,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireProtocolErrorBasicResult { raw } = slot);
 
@@ -1490,7 +1490,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ProtocolErrorBasicResult> {
-    type EncodedOption<'buf> = WireOptionalProtocolErrorBasicResult;
+    type EncodedOption = WireOptionalProtocolErrorBasicResult;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ProtocolErrorBasicResult>
@@ -1501,7 +1501,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireOptionalProtocolErrorBasicResult { raw } = slot.as_mut());
 
@@ -1668,7 +1668,7 @@ pub enum ProtocolErrorCompoundResult {
 }
 
 impl ::fidl_next::Encodable for ProtocolErrorCompoundResult {
-    type Encoded<'buf> = WireProtocolErrorCompoundResult;
+    type Encoded = WireProtocolErrorCompoundResult;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ProtocolErrorCompoundResult
@@ -1680,7 +1680,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireProtocolErrorCompoundResult { raw } = slot);
 
@@ -1699,7 +1699,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ProtocolErrorCompoundResult> {
-    type EncodedOption<'buf> = WireOptionalProtocolErrorCompoundResult;
+    type EncodedOption = WireOptionalProtocolErrorCompoundResult;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ProtocolErrorCompoundResult>
@@ -1710,7 +1710,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireOptionalProtocolErrorCompoundResult { raw } = slot.as_mut());
 
@@ -1877,7 +1877,7 @@ pub enum ProtocolErrorArrayBasicResult {
 }
 
 impl ::fidl_next::Encodable for ProtocolErrorArrayBasicResult {
-    type Encoded<'buf> = WireProtocolErrorArrayBasicResult;
+    type Encoded = WireProtocolErrorArrayBasicResult;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ProtocolErrorArrayBasicResult
@@ -1889,7 +1889,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireProtocolErrorArrayBasicResult { raw } = slot);
 
@@ -1910,7 +1910,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ProtocolErrorArrayBasicResult> {
-    type EncodedOption<'buf> = WireOptionalProtocolErrorArrayBasicResult;
+    type EncodedOption = WireOptionalProtocolErrorArrayBasicResult;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ProtocolErrorArrayBasicResult>
@@ -1921,7 +1921,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireOptionalProtocolErrorArrayBasicResult { raw } = slot.as_mut());
 
@@ -2088,7 +2088,7 @@ pub enum ProtocolErrorArrayCompoundResult {
 }
 
 impl ::fidl_next::Encodable for ProtocolErrorArrayCompoundResult {
-    type Encoded<'buf> = WireProtocolErrorArrayCompoundResult;
+    type Encoded = WireProtocolErrorArrayCompoundResult;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ProtocolErrorArrayCompoundResult
@@ -2100,7 +2100,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireProtocolErrorArrayCompoundResult { raw } = slot);
 
@@ -2120,7 +2120,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ProtocolErrorArrayCompoundResult> {
-    type EncodedOption<'buf> = WireOptionalProtocolErrorArrayCompoundResult;
+    type EncodedOption = WireOptionalProtocolErrorArrayCompoundResult;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ProtocolErrorArrayCompoundResult>
@@ -2131,7 +2131,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireOptionalProtocolErrorArrayCompoundResult { raw } = slot.as_mut());
 
@@ -2324,7 +2324,7 @@ pub struct VectorBasic {
 }
 
 impl ::fidl_next::Encodable for VectorBasic {
-    type Encoded<'buf> = WireVectorBasic;
+    type Encoded = WireVectorBasic;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for VectorBasic
@@ -2336,7 +2336,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -2385,7 +2385,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<VectorBasic> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireVectorBasic>;
+    type EncodedOption = ::fidl_next::WireBox<WireVectorBasic>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<VectorBasic>
@@ -2396,7 +2396,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -2532,7 +2532,7 @@ pub enum ProtocolErrorVectorBasicResult {
 }
 
 impl ::fidl_next::Encodable for ProtocolErrorVectorBasicResult {
-    type Encoded<'buf> = WireProtocolErrorVectorBasicResult;
+    type Encoded = WireProtocolErrorVectorBasicResult;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ProtocolErrorVectorBasicResult
@@ -2544,7 +2544,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireProtocolErrorVectorBasicResult { raw } = slot);
 
@@ -2564,7 +2564,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ProtocolErrorVectorBasicResult> {
-    type EncodedOption<'buf> = WireOptionalProtocolErrorVectorBasicResult;
+    type EncodedOption = WireOptionalProtocolErrorVectorBasicResult;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ProtocolErrorVectorBasicResult>
@@ -2575,7 +2575,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireOptionalProtocolErrorVectorBasicResult { raw } = slot.as_mut());
 
@@ -2756,7 +2756,7 @@ pub struct VectorCompound {
 }
 
 impl ::fidl_next::Encodable for VectorCompound {
-    type Encoded<'buf> = WireVectorCompound;
+    type Encoded = WireVectorCompound;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for VectorCompound
@@ -2768,7 +2768,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -2802,7 +2802,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<VectorCompound> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireVectorCompound>;
+    type EncodedOption = ::fidl_next::WireBox<WireVectorCompound>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<VectorCompound>
@@ -2813,7 +2813,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -2914,7 +2914,7 @@ pub enum ProtocolErrorVectorCompoundResult {
 }
 
 impl ::fidl_next::Encodable for ProtocolErrorVectorCompoundResult {
-    type Encoded<'buf> = WireProtocolErrorVectorCompoundResult;
+    type Encoded = WireProtocolErrorVectorCompoundResult;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ProtocolErrorVectorCompoundResult
@@ -2926,7 +2926,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireProtocolErrorVectorCompoundResult { raw } = slot);
 
@@ -2946,7 +2946,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ProtocolErrorVectorCompoundResult> {
-    type EncodedOption<'buf> = WireOptionalProtocolErrorVectorCompoundResult;
+    type EncodedOption = WireOptionalProtocolErrorVectorCompoundResult;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ProtocolErrorVectorCompoundResult>
@@ -2957,7 +2957,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireOptionalProtocolErrorVectorCompoundResult { raw } = slot.as_mut());
 
@@ -3134,7 +3134,7 @@ pub struct VectorOptional {
 }
 
 impl ::fidl_next::Encodable for VectorOptional {
-    type Encoded<'buf> = WireVectorOptional;
+    type Encoded = WireVectorOptional;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for VectorOptional
@@ -3146,7 +3146,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -3175,7 +3175,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<VectorOptional> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireVectorOptional>;
+    type EncodedOption = ::fidl_next::WireBox<WireVectorOptional>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<VectorOptional>
@@ -3186,7 +3186,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -3267,7 +3267,7 @@ pub enum ProtocolErrorVectorOptionalResult {
 }
 
 impl ::fidl_next::Encodable for ProtocolErrorVectorOptionalResult {
-    type Encoded<'buf> = WireProtocolErrorVectorOptionalResult;
+    type Encoded = WireProtocolErrorVectorOptionalResult;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ProtocolErrorVectorOptionalResult
@@ -3279,7 +3279,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireProtocolErrorVectorOptionalResult { raw } = slot);
 
@@ -3299,7 +3299,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ProtocolErrorVectorOptionalResult> {
-    type EncodedOption<'buf> = WireOptionalProtocolErrorVectorOptionalResult;
+    type EncodedOption = WireOptionalProtocolErrorVectorOptionalResult;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ProtocolErrorVectorOptionalResult>
@@ -3310,7 +3310,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireOptionalProtocolErrorVectorOptionalResult { raw } = slot.as_mut());
 
@@ -3483,7 +3483,7 @@ pub enum ProtocolErrorArrayVectorNestedResult {
 }
 
 impl ::fidl_next::Encodable for ProtocolErrorArrayVectorNestedResult {
-    type Encoded<'buf> = WireProtocolErrorArrayVectorNestedResult;
+    type Encoded = WireProtocolErrorArrayVectorNestedResult;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ProtocolErrorArrayVectorNestedResult
@@ -3495,7 +3495,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireProtocolErrorArrayVectorNestedResult { raw } = slot);
 
@@ -3515,7 +3515,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ProtocolErrorArrayVectorNestedResult> {
-    type EncodedOption<'buf> = WireOptionalProtocolErrorArrayVectorNestedResult;
+    type EncodedOption = WireOptionalProtocolErrorArrayVectorNestedResult;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ProtocolErrorArrayVectorNestedResult>
@@ -3526,7 +3526,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireOptionalProtocolErrorArrayVectorNestedResult { raw } = slot.as_mut());
 
@@ -3696,7 +3696,7 @@ impl ::core::fmt::Debug for WireOptionalProtocolErrorArrayVectorNestedResult {
 pub struct ResourceStruct {}
 
 impl ::fidl_next::Encodable for ResourceStruct {
-    type Encoded<'buf> = WireResourceStruct;
+    type Encoded = WireResourceStruct;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ResourceStruct
@@ -3708,7 +3708,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -3721,7 +3721,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ResourceStruct> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireResourceStruct>;
+    type EncodedOption = ::fidl_next::WireBox<WireResourceStruct>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ResourceStruct>
@@ -3732,7 +3732,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -3786,7 +3786,7 @@ impl ResourceTable {
 }
 
 impl ::fidl_next::Encodable for ResourceTable {
-    type Encoded<'buf> = WireResourceTable;
+    type Encoded = WireResourceTable;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ResourceTable
@@ -3798,7 +3798,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireResourceTable { table } = slot);
 
@@ -3872,7 +3872,7 @@ pub enum ResourceUnion {
 }
 
 impl ::fidl_next::Encodable for ResourceUnion {
-    type Encoded<'buf> = WireResourceUnion;
+    type Encoded = WireResourceUnion;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ResourceUnion
@@ -3884,7 +3884,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireResourceUnion { raw } = slot);
 
@@ -3903,7 +3903,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ResourceUnion> {
-    type EncodedOption<'buf> = WireOptionalResourceUnion;
+    type EncodedOption = WireOptionalResourceUnion;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ResourceUnion>
@@ -3914,7 +3914,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireOptionalResourceUnion { raw } = slot.as_mut());
 
@@ -4120,7 +4120,7 @@ pub struct Resource {
 }
 
 impl ::fidl_next::Encodable for Resource {
-    type Encoded<'buf> = WireResource;
+    type Encoded = WireResource;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for Resource
@@ -4134,7 +4134,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -4228,7 +4228,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<Resource> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireResource>;
+    type EncodedOption = ::fidl_next::WireBox<WireResource>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<Resource>
@@ -4239,7 +4239,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -4490,7 +4490,7 @@ pub enum ProtocolErrorResourceResult {
 }
 
 impl ::fidl_next::Encodable for ProtocolErrorResourceResult {
-    type Encoded<'buf> = WireProtocolErrorResourceResult;
+    type Encoded = WireProtocolErrorResourceResult;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ProtocolErrorResourceResult
@@ -4504,7 +4504,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireProtocolErrorResourceResult { raw } = slot);
 
@@ -4523,7 +4523,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ProtocolErrorResourceResult> {
-    type EncodedOption<'buf> = WireOptionalProtocolErrorResourceResult;
+    type EncodedOption = WireOptionalProtocolErrorResourceResult;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ProtocolErrorResourceResult>
@@ -4534,7 +4534,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireOptionalProtocolErrorResourceResult { raw } = slot.as_mut());
 
@@ -4710,9 +4710,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = crate::WireBasic;
+        type Request = crate::WireBasic;
 
-        type Response<'buf> = ::fidl_next::bind::Never;
+        type Response = ::fidl_next::bind::Never;
     }
 
     pub struct TwoWayBasic;
@@ -4722,9 +4722,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = crate::WireBasic;
+        type Request = crate::WireBasic;
 
-        type Response<'buf> = crate::WireBasic;
+        type Response = crate::WireBasic;
     }
 
     pub struct ErrorBasic;
@@ -4734,9 +4734,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = ();
+        type Request = ();
 
-        type Response<'buf> = crate::WireProtocolErrorBasicResult;
+        type Response = crate::WireProtocolErrorBasicResult;
     }
 
     pub struct EventBasic;
@@ -4746,9 +4746,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = ::fidl_next::bind::Never;
+        type Request = ::fidl_next::bind::Never;
 
-        type Response<'buf> = crate::WireBasic;
+        type Response = crate::WireBasic;
     }
 
     pub struct OneWayCompound;
@@ -4758,9 +4758,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = crate::WireCompound;
+        type Request = crate::WireCompound;
 
-        type Response<'buf> = ::fidl_next::bind::Never;
+        type Response = ::fidl_next::bind::Never;
     }
 
     pub struct TwoWayCompound;
@@ -4770,9 +4770,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = crate::WireCompound;
+        type Request = crate::WireCompound;
 
-        type Response<'buf> = crate::WireCompound;
+        type Response = crate::WireCompound;
     }
 
     pub struct ErrorCompound;
@@ -4782,9 +4782,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = ();
+        type Request = ();
 
-        type Response<'buf> = crate::WireProtocolErrorCompoundResult;
+        type Response = crate::WireProtocolErrorCompoundResult;
     }
 
     pub struct EventCompound;
@@ -4794,9 +4794,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = ::fidl_next::bind::Never;
+        type Request = ::fidl_next::bind::Never;
 
-        type Response<'buf> = crate::WireCompound;
+        type Response = crate::WireCompound;
     }
 
     pub struct OneWayArrayBasic;
@@ -4806,9 +4806,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = crate::WireArrayBasic;
+        type Request = crate::WireArrayBasic;
 
-        type Response<'buf> = ::fidl_next::bind::Never;
+        type Response = ::fidl_next::bind::Never;
     }
 
     pub struct TwoWayArrayBasic;
@@ -4818,9 +4818,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = crate::WireArrayBasic;
+        type Request = crate::WireArrayBasic;
 
-        type Response<'buf> = crate::WireArrayBasic;
+        type Response = crate::WireArrayBasic;
     }
 
     pub struct ErrorArrayBasic;
@@ -4830,9 +4830,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = ();
+        type Request = ();
 
-        type Response<'buf> = crate::WireProtocolErrorArrayBasicResult;
+        type Response = crate::WireProtocolErrorArrayBasicResult;
     }
 
     pub struct EventArrayBasic;
@@ -4842,9 +4842,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = ::fidl_next::bind::Never;
+        type Request = ::fidl_next::bind::Never;
 
-        type Response<'buf> = crate::WireArrayBasic;
+        type Response = crate::WireArrayBasic;
     }
 
     pub struct OneWayArrayCompound;
@@ -4854,9 +4854,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = crate::WireArrayCompound;
+        type Request = crate::WireArrayCompound;
 
-        type Response<'buf> = ::fidl_next::bind::Never;
+        type Response = ::fidl_next::bind::Never;
     }
 
     pub struct TwoWayArrayCompound;
@@ -4866,9 +4866,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = crate::WireArrayCompound;
+        type Request = crate::WireArrayCompound;
 
-        type Response<'buf> = crate::WireArrayCompound;
+        type Response = crate::WireArrayCompound;
     }
 
     pub struct ErrorArrayCompound;
@@ -4878,9 +4878,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = ();
+        type Request = ();
 
-        type Response<'buf> = crate::WireProtocolErrorArrayCompoundResult;
+        type Response = crate::WireProtocolErrorArrayCompoundResult;
     }
 
     pub struct EventArrayCompound;
@@ -4890,9 +4890,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = ::fidl_next::bind::Never;
+        type Request = ::fidl_next::bind::Never;
 
-        type Response<'buf> = crate::WireArrayCompound;
+        type Response = crate::WireArrayCompound;
     }
 
     pub struct OneWayVectorBasic;
@@ -4902,9 +4902,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = crate::WireVectorBasic;
+        type Request = crate::WireVectorBasic;
 
-        type Response<'buf> = ::fidl_next::bind::Never;
+        type Response = ::fidl_next::bind::Never;
     }
 
     pub struct TwoWayVectorBasic;
@@ -4914,9 +4914,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = crate::WireVectorBasic;
+        type Request = crate::WireVectorBasic;
 
-        type Response<'buf> = crate::WireVectorBasic;
+        type Response = crate::WireVectorBasic;
     }
 
     pub struct ErrorVectorBasic;
@@ -4926,9 +4926,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = ();
+        type Request = ();
 
-        type Response<'buf> = crate::WireProtocolErrorVectorBasicResult;
+        type Response = crate::WireProtocolErrorVectorBasicResult;
     }
 
     pub struct EventVectorBasic;
@@ -4938,9 +4938,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = ::fidl_next::bind::Never;
+        type Request = ::fidl_next::bind::Never;
 
-        type Response<'buf> = crate::WireVectorBasic;
+        type Response = crate::WireVectorBasic;
     }
 
     pub struct OneWayVectorCompound;
@@ -4950,9 +4950,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = crate::WireVectorCompound;
+        type Request = crate::WireVectorCompound;
 
-        type Response<'buf> = ::fidl_next::bind::Never;
+        type Response = ::fidl_next::bind::Never;
     }
 
     pub struct TwoWayVectorCompound;
@@ -4962,9 +4962,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = crate::WireVectorCompound;
+        type Request = crate::WireVectorCompound;
 
-        type Response<'buf> = crate::WireVectorCompound;
+        type Response = crate::WireVectorCompound;
     }
 
     pub struct ErrorVectorCompound;
@@ -4974,9 +4974,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = ();
+        type Request = ();
 
-        type Response<'buf> = crate::WireProtocolErrorVectorCompoundResult;
+        type Response = crate::WireProtocolErrorVectorCompoundResult;
     }
 
     pub struct EventVectorCompound;
@@ -4986,9 +4986,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = ::fidl_next::bind::Never;
+        type Request = ::fidl_next::bind::Never;
 
-        type Response<'buf> = crate::WireVectorCompound;
+        type Response = crate::WireVectorCompound;
     }
 
     pub struct OneWayVectorOptional;
@@ -4998,9 +4998,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = crate::WireVectorOptional;
+        type Request = crate::WireVectorOptional;
 
-        type Response<'buf> = ::fidl_next::bind::Never;
+        type Response = ::fidl_next::bind::Never;
     }
 
     pub struct TwoWayVectorOptional;
@@ -5010,9 +5010,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = crate::WireVectorOptional;
+        type Request = crate::WireVectorOptional;
 
-        type Response<'buf> = crate::WireVectorOptional;
+        type Response = crate::WireVectorOptional;
     }
 
     pub struct ErrorVectorOptional;
@@ -5022,9 +5022,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = ();
+        type Request = ();
 
-        type Response<'buf> = crate::WireProtocolErrorVectorOptionalResult;
+        type Response = crate::WireProtocolErrorVectorOptionalResult;
     }
 
     pub struct EventVectorOptional;
@@ -5034,9 +5034,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = ::fidl_next::bind::Never;
+        type Request = ::fidl_next::bind::Never;
 
-        type Response<'buf> = crate::WireVectorOptional;
+        type Response = crate::WireVectorOptional;
     }
 
     pub struct OneWayArrayVectorNested;
@@ -5046,9 +5046,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = crate::WireArrayVectorNested;
+        type Request = crate::WireArrayVectorNested;
 
-        type Response<'buf> = ::fidl_next::bind::Never;
+        type Response = ::fidl_next::bind::Never;
     }
 
     pub struct TwoWayArrayVectorNested;
@@ -5058,9 +5058,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = crate::WireArrayVectorNested;
+        type Request = crate::WireArrayVectorNested;
 
-        type Response<'buf> = crate::WireArrayVectorNested;
+        type Response = crate::WireArrayVectorNested;
     }
 
     pub struct ErrorArrayVectorNested;
@@ -5070,9 +5070,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = ();
+        type Request = ();
 
-        type Response<'buf> = crate::WireProtocolErrorArrayVectorNestedResult;
+        type Response = crate::WireProtocolErrorArrayVectorNestedResult;
     }
 
     pub struct EventArrayVectorNested;
@@ -5082,9 +5082,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = ::fidl_next::bind::Never;
+        type Request = ::fidl_next::bind::Never;
 
-        type Response<'buf> = crate::WireArrayVectorNested;
+        type Response = crate::WireArrayVectorNested;
     }
 
     pub struct OneWayResource;
@@ -5094,9 +5094,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = crate::WireResource;
+        type Request = crate::WireResource;
 
-        type Response<'buf> = ::fidl_next::bind::Never;
+        type Response = ::fidl_next::bind::Never;
     }
 
     pub struct TwoWayResource;
@@ -5106,9 +5106,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = crate::WireResource;
+        type Request = crate::WireResource;
 
-        type Response<'buf> = crate::WireResource;
+        type Response = crate::WireResource;
     }
 
     pub struct ErrorResource;
@@ -5118,9 +5118,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = ();
+        type Request = ();
 
-        type Response<'buf> = crate::WireProtocolErrorResourceResult;
+        type Response = crate::WireProtocolErrorResourceResult;
     }
 
     pub struct EventResource;
@@ -5130,9 +5130,9 @@ pub mod protocol {
 
         type Protocol = crate::Protocol;
 
-        type Request<'buf> = ::fidl_next::bind::Never;
+        type Request = ::fidl_next::bind::Never;
 
-        type Response<'buf> = crate::WireResource;
+        type Response = crate::WireResource;
     }
 }
 
@@ -5143,7 +5143,7 @@ pub trait ProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireBasic>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireBasic>;
 
     fn two_way_basic<___R>(
         &self,
@@ -5153,7 +5153,7 @@ pub trait ProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireBasic>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireBasic>;
 
     fn error_basic(
         &self,
@@ -5167,8 +5167,7 @@ pub trait ProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireCompound>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireCompound>;
 
     fn two_way_compound<___R>(
         &self,
@@ -5178,8 +5177,7 @@ pub trait ProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireCompound>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireCompound>;
 
     fn error_compound(
         &self,
@@ -5193,8 +5191,7 @@ pub trait ProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireArrayBasic>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireArrayBasic>;
 
     fn two_way_array_basic<___R>(
         &self,
@@ -5204,8 +5201,7 @@ pub trait ProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireArrayBasic>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireArrayBasic>;
 
     fn error_array_basic(
         &self,
@@ -5220,7 +5216,7 @@ pub trait ProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireArrayCompound>;
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireArrayCompound>;
 
     fn two_way_array_compound<___R>(
         &self,
@@ -5231,7 +5227,7 @@ pub trait ProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     >
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireArrayCompound>;
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireArrayCompound>;
 
     fn error_array_compound(
         &self,
@@ -5245,8 +5241,7 @@ pub trait ProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireVectorBasic>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireVectorBasic>;
 
     fn two_way_vector_basic<___R>(
         &self,
@@ -5256,8 +5251,7 @@ pub trait ProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireVectorBasic>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireVectorBasic>;
 
     fn error_vector_basic(
         &self,
@@ -5272,7 +5266,7 @@ pub trait ProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireVectorCompound>;
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireVectorCompound>;
 
     fn two_way_vector_compound<___R>(
         &self,
@@ -5283,7 +5277,7 @@ pub trait ProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     >
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireVectorCompound>;
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireVectorCompound>;
 
     fn error_vector_compound(
         &self,
@@ -5298,7 +5292,7 @@ pub trait ProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireVectorOptional>;
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireVectorOptional>;
 
     fn two_way_vector_optional<___R>(
         &self,
@@ -5309,7 +5303,7 @@ pub trait ProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     >
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireVectorOptional>;
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireVectorOptional>;
 
     fn error_vector_optional(
         &self,
@@ -5324,7 +5318,7 @@ pub trait ProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireArrayVectorNested>;
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireArrayVectorNested>;
 
     fn two_way_array_vector_nested<___R>(
         &self,
@@ -5335,7 +5329,7 @@ pub trait ProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     >
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireArrayVectorNested>;
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireArrayVectorNested>;
 
     fn error_array_vector_nested(
         &self,
@@ -5349,8 +5343,7 @@ pub trait ProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireResource>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireResource>;
 
     fn two_way_resource<___R>(
         &self,
@@ -5360,8 +5353,7 @@ pub trait ProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireResource>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireResource>;
 
     fn error_resource(
         &self,
@@ -5380,7 +5372,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireBasic>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireBasic>,
     {
         self.as_untyped().send_one_way(8948968077914418681, request)
     }
@@ -5393,7 +5385,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireBasic>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireBasic>,
     {
         self.as_untyped()
             .send_two_way(2331618702752598159, request)
@@ -5416,8 +5408,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireCompound>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireCompound>,
     {
         self.as_untyped().send_one_way(3153289648860022476, request)
     }
@@ -5430,8 +5421,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireCompound>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireCompound>,
     {
         self.as_untyped()
             .send_two_way(8787219719097524529, request)
@@ -5454,8 +5444,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireArrayBasic>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireArrayBasic>,
     {
         self.as_untyped().send_one_way(7125516817014311449, request)
     }
@@ -5468,8 +5457,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireArrayBasic>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireArrayBasic>,
     {
         self.as_untyped()
             .send_two_way(5309034178175279380, request)
@@ -5493,7 +5481,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireArrayCompound>,
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireArrayCompound>,
     {
         self.as_untyped().send_one_way(5064659223443251357, request)
     }
@@ -5507,7 +5495,7 @@ where
     >
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireArrayCompound>,
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireArrayCompound>,
     {
         self.as_untyped()
             .send_two_way(849744466051983995, request)
@@ -5530,8 +5518,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireVectorBasic>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireVectorBasic>,
     {
         self.as_untyped().send_one_way(5733220720079947351, request)
     }
@@ -5544,8 +5531,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireVectorBasic>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireVectorBasic>,
     {
         self.as_untyped()
             .send_two_way(8674156353091415668, request)
@@ -5569,7 +5555,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireVectorCompound>,
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireVectorCompound>,
     {
         self.as_untyped().send_one_way(1853985797298830992, request)
     }
@@ -5583,7 +5569,7 @@ where
     >
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireVectorCompound>,
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireVectorCompound>,
     {
         self.as_untyped()
             .send_two_way(3968024057912959924, request)
@@ -5607,7 +5593,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireVectorOptional>,
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireVectorOptional>,
     {
         self.as_untyped().send_one_way(1530215841195476271, request)
     }
@@ -5621,7 +5607,7 @@ where
     >
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireVectorOptional>,
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireVectorOptional>,
     {
         self.as_untyped()
             .send_two_way(1030024737742222323, request)
@@ -5645,7 +5631,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireArrayVectorNested>,
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireArrayVectorNested>,
     {
         self.as_untyped().send_one_way(5912603762133524183, request)
     }
@@ -5659,7 +5645,7 @@ where
     >
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireArrayVectorNested>,
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireArrayVectorNested>,
     {
         self.as_untyped()
             .send_two_way(5351275678438791132, request)
@@ -5682,8 +5668,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireResource>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireResource>,
     {
         self.as_untyped().send_one_way(6553996787849601058, request)
     }
@@ -5696,8 +5681,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireResource>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireResource>,
     {
         self.as_untyped()
             .send_two_way(1802709005492464987, request)
@@ -5936,23 +5920,21 @@ pub trait ProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireBasic>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireBasic>;
 
     fn event_compound<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireCompound>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireCompound>;
 
     fn event_array_basic<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireArrayBasic>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireArrayBasic>;
 
     fn event_array_compound<___R>(
         &self,
@@ -5960,15 +5942,14 @@ pub trait ProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireArrayCompound>;
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireArrayCompound>;
 
     fn event_vector_basic<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireVectorBasic>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireVectorBasic>;
 
     fn event_vector_compound<___R>(
         &self,
@@ -5976,7 +5957,7 @@ pub trait ProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireVectorCompound>;
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireVectorCompound>;
 
     fn event_vector_optional<___R>(
         &self,
@@ -5984,7 +5965,7 @@ pub trait ProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireVectorOptional>;
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireVectorOptional>;
 
     fn event_array_vector_nested<___R>(
         &self,
@@ -5992,15 +5973,14 @@ pub trait ProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireArrayVectorNested>;
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireArrayVectorNested>;
 
     fn event_resource<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireResource>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireResource>;
 }
 
 impl<___T> ProtocolServerSender<___T> for ::fidl_next::bind::ServerSender<___T, Protocol>
@@ -6012,7 +5992,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireBasic>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireBasic>,
     {
         self.as_untyped().send_event(5892309624949902400, request)
     }
@@ -6022,8 +6002,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireCompound>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireCompound>,
     {
         self.as_untyped().send_event(7024581948727571669, request)
     }
@@ -6033,8 +6012,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireArrayBasic>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireArrayBasic>,
     {
         self.as_untyped().send_event(5888282827283820590, request)
     }
@@ -6045,7 +6023,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireArrayCompound>,
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireArrayCompound>,
     {
         self.as_untyped().send_event(2189769767733851157, request)
     }
@@ -6055,8 +6033,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireVectorBasic>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireVectorBasic>,
     {
         self.as_untyped().send_event(4583890770109526006, request)
     }
@@ -6067,7 +6044,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireVectorCompound>,
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireVectorCompound>,
     {
         self.as_untyped().send_event(6026375226599919603, request)
     }
@@ -6078,7 +6055,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireVectorOptional>,
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireVectorOptional>,
     {
         self.as_untyped().send_event(1684763340073130077, request)
     }
@@ -6089,7 +6066,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireArrayVectorNested>,
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireArrayVectorNested>,
     {
         self.as_untyped().send_event(1228201560727880574, request)
     }
@@ -6099,8 +6076,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireResource>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireResource>,
     {
         self.as_untyped().send_event(5745997765922613643, request)
     }

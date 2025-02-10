@@ -100,14 +100,14 @@ impl WireOptionalChannel {
 }
 
 impl Encodable for Channel {
-    type Encoded<'buf> = WireChannel;
+    type Encoded = WireChannel;
 }
 
 impl<E: HandleEncoder + ?Sized> Encode<E> for Channel {
     fn encode(
         &mut self,
         encoder: &mut E,
-        slot: Slot<'_, Self::Encoded<'_>>,
+        slot: Slot<'_, Self::Encoded>,
     ) -> Result<(), EncodeError> {
         let channel = replace(self, Channel::from(Handle::invalid()));
 
@@ -117,14 +117,14 @@ impl<E: HandleEncoder + ?Sized> Encode<E> for Channel {
 }
 
 impl EncodableOption for Channel {
-    type EncodedOption<'buf> = WireOptionalChannel;
+    type EncodedOption = WireOptionalChannel;
 }
 
 impl<E: HandleEncoder + ?Sized> EncodeOption<E> for Channel {
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut E,
-        slot: Slot<'_, Self::EncodedOption<'_>>,
+        slot: Slot<'_, Self::EncodedOption>,
     ) -> Result<(), EncodeError> {
         let channel = this.map(|channel| replace(channel, Channel::from(Handle::invalid())));
 

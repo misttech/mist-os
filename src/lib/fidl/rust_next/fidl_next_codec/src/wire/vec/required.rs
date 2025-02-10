@@ -85,14 +85,14 @@ unsafe impl<'buf, D: Decoder<'buf> + ?Sized, T: Decode<D>> Decode<D> for WireVec
 }
 
 impl<T: Encodable> Encodable for Vec<T> {
-    type Encoded<'buf> = WireVector<T::Encoded<'buf>>;
+    type Encoded = WireVector<T::Encoded>;
 }
 
 impl<E: Encoder + ?Sized, T: Encode<E>> Encode<E> for Vec<T> {
     fn encode(
         &mut self,
         encoder: &mut E,
-        slot: Slot<'_, Self::Encoded<'_>>,
+        slot: Slot<'_, Self::Encoded>,
     ) -> Result<(), EncodeError> {
         encoder.encode_next_slice(self.as_mut_slice())?;
         WireVector::encode_present(slot, self.len() as u64);

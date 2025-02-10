@@ -128,14 +128,14 @@ impl WireOptionalHandle {
 }
 
 impl Encodable for Handle {
-    type Encoded<'buf> = WireHandle;
+    type Encoded = WireHandle;
 }
 
 impl<E: HandleEncoder + ?Sized> Encode<E> for Handle {
     fn encode(
         &mut self,
         encoder: &mut E,
-        slot: Slot<'_, Self::Encoded<'_>>,
+        slot: Slot<'_, Self::Encoded>,
     ) -> Result<(), EncodeError> {
         if self.is_invalid() {
             Err(EncodeError::InvalidRequiredHandle)
@@ -149,14 +149,14 @@ impl<E: HandleEncoder + ?Sized> Encode<E> for Handle {
 }
 
 impl EncodableOption for Handle {
-    type EncodedOption<'buf> = WireOptionalHandle;
+    type EncodedOption = WireOptionalHandle;
 }
 
 impl<E: HandleEncoder + ?Sized> EncodeOption<E> for Handle {
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut E,
-        slot: Slot<'_, Self::EncodedOption<'_>>,
+        slot: Slot<'_, Self::EncodedOption>,
     ) -> Result<(), EncodeError> {
         if let Some(handle) = this {
             let handle = replace(handle, Handle::invalid());

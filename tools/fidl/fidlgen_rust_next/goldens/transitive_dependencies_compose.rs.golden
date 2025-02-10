@@ -15,9 +15,9 @@ pub mod top {
 
         type Protocol = crate::Top;
 
-        type Request<'buf> = ();
+        type Request = ();
 
-        type Response<'buf> = ::fidl_next_test_bottom::WireBottomGetFooResponse;
+        type Response = ::fidl_next_test_bottom::WireBottomGetFooResponse;
     }
 }
 

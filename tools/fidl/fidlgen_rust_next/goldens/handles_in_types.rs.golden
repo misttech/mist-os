@@ -6,7 +6,7 @@
 pub struct EmptyResourceStruct {}
 
 impl ::fidl_next::Encodable for EmptyResourceStruct {
-    type Encoded<'buf> = WireEmptyResourceStruct;
+    type Encoded = WireEmptyResourceStruct;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for EmptyResourceStruct
@@ -18,7 +18,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -31,7 +31,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<EmptyResourceStruct> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireEmptyResourceStruct>;
+    type EncodedOption = ::fidl_next::WireBox<WireEmptyResourceStruct>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<EmptyResourceStruct>
@@ -42,7 +42,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -96,7 +96,7 @@ impl EmptyResourceTable {
 }
 
 impl ::fidl_next::Encodable for EmptyResourceTable {
-    type Encoded<'buf> = WireEmptyResourceTable;
+    type Encoded = WireEmptyResourceTable;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for EmptyResourceTable
@@ -108,7 +108,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireEmptyResourceTable { table } = slot);
 
@@ -180,7 +180,7 @@ pub enum EmptyResourceUnion {
 }
 
 impl ::fidl_next::Encodable for EmptyResourceUnion {
-    type Encoded<'buf> = WireEmptyResourceUnion;
+    type Encoded = WireEmptyResourceUnion;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for EmptyResourceUnion
@@ -192,7 +192,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireEmptyResourceUnion { raw } = slot);
 
@@ -207,7 +207,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<EmptyResourceUnion> {
-    type EncodedOption<'buf> = WireOptionalEmptyResourceUnion;
+    type EncodedOption = WireOptionalEmptyResourceUnion;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<EmptyResourceUnion>
@@ -218,7 +218,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireOptionalEmptyResourceUnion { raw } = slot.as_mut());
 
@@ -355,7 +355,7 @@ pub enum ObjType {
 }
 
 impl ::fidl_next::Encodable for ObjType {
-    type Encoded<'buf> = WireObjType;
+    type Encoded = WireObjType;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ObjType
@@ -365,7 +365,7 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireObjType { mut value } = slot);
         *value = ::fidl_next::u32_le::from(match *self {
@@ -454,7 +454,7 @@ impl TableWithHandle {
 }
 
 impl ::fidl_next::Encodable for TableWithHandle {
-    type Encoded<'buf> = WireTableWithHandle;
+    type Encoded = WireTableWithHandle;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for TableWithHandle
@@ -466,7 +466,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireTableWithHandle { table } = slot);
 
@@ -565,7 +565,7 @@ pub enum UnionWithHandle {
 }
 
 impl ::fidl_next::Encodable for UnionWithHandle {
-    type Encoded<'buf> = WireUnionWithHandle;
+    type Encoded = WireUnionWithHandle;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for UnionWithHandle
@@ -577,7 +577,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireUnionWithHandle { raw } = slot);
 
@@ -597,7 +597,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<UnionWithHandle> {
-    type EncodedOption<'buf> = WireOptionalUnionWithHandle;
+    type EncodedOption = WireOptionalUnionWithHandle;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<UnionWithHandle>
@@ -608,7 +608,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireOptionalUnionWithHandle { raw } = slot.as_mut());
 
@@ -774,7 +774,7 @@ pub struct HandlesInTypes {
 }
 
 impl ::fidl_next::Encodable for HandlesInTypes {
-    type Encoded<'buf> = WireHandlesInTypes;
+    type Encoded = WireHandlesInTypes;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for HandlesInTypes
@@ -788,7 +788,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -823,7 +823,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<HandlesInTypes> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireHandlesInTypes>;
+    type EncodedOption = ::fidl_next::WireBox<WireHandlesInTypes>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<HandlesInTypes>
@@ -834,7 +834,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;

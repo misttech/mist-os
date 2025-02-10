@@ -20,7 +20,7 @@ pub const BOOL: bool = true;
 }
 
 impl ::fidl_next::Encodable for Bits {
-    type Encoded<'buf> = WireBits;
+    type Encoded = WireBits;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for Bits
@@ -30,7 +30,7 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireBits { mut value } = slot);
         *value = ::fidl_next::u32_le::from(self.bits());
@@ -104,7 +104,7 @@ pub const UINT32: u32 = 4;
 }
 
 impl ::fidl_next::Encodable for BitsType {
-    type Encoded<'buf> = WireBitsType;
+    type Encoded = WireBitsType;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for BitsType
@@ -114,7 +114,7 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireBitsType { mut value } = slot);
         *value = ::fidl_next::u32_le::from(self.bits());
@@ -175,7 +175,7 @@ pub enum Enum {
 }
 
 impl ::fidl_next::Encodable for Enum {
-    type Encoded<'buf> = WireEnum;
+    type Encoded = WireEnum;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for Enum
@@ -185,7 +185,7 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireEnum { mut value } = slot);
         *value = ::fidl_next::u32_le::from(match *self {
@@ -258,7 +258,7 @@ pub enum EnumType {
 }
 
 impl ::fidl_next::Encodable for EnumType {
-    type Encoded<'buf> = WireEnumType;
+    type Encoded = WireEnumType;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for EnumType
@@ -268,7 +268,7 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireEnumType { mut value } = slot);
         *value = ::fidl_next::i32_le::from(match *self {
@@ -370,7 +370,7 @@ pub struct Struct {
 }
 
 impl ::fidl_next::Encodable for Struct {
-    type Encoded<'buf> = WireStruct;
+    type Encoded = WireStruct;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for Struct
@@ -382,7 +382,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -410,7 +410,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<Struct> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireStruct>;
+    type EncodedOption = ::fidl_next::WireBox<WireStruct>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<Struct>
@@ -421,7 +421,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;

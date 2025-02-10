@@ -8,7 +8,7 @@ pub struct ExampleFooRequest {
 }
 
 impl ::fidl_next::Encodable for ExampleFooRequest {
-    type Encoded<'buf> = WireExampleFooRequest;
+    type Encoded = WireExampleFooRequest;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ExampleFooRequest
@@ -20,7 +20,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -36,7 +36,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ExampleFooRequest> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireExampleFooRequest>;
+    type EncodedOption = ::fidl_next::WireBox<WireExampleFooRequest>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ExampleFooRequest>
@@ -47,7 +47,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -102,7 +102,7 @@ pub struct ExampleFooResponse {
 }
 
 impl ::fidl_next::Encodable for ExampleFooResponse {
-    type Encoded<'buf> = WireExampleFooResponse;
+    type Encoded = WireExampleFooResponse;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ExampleFooResponse
@@ -112,7 +112,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -128,7 +128,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ExampleFooResponse> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireExampleFooResponse>;
+    type EncodedOption = ::fidl_next::WireBox<WireExampleFooResponse>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ExampleFooResponse>
@@ -139,7 +139,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -194,7 +194,7 @@ pub enum ExampleFooResult {
 }
 
 impl ::fidl_next::Encodable for ExampleFooResult {
-    type Encoded<'buf> = WireExampleFooResult;
+    type Encoded = WireExampleFooResult;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ExampleFooResult
@@ -206,7 +206,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireExampleFooResult { raw } = slot);
 
@@ -226,7 +226,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ExampleFooResult> {
-    type EncodedOption<'buf> = WireOptionalExampleFooResult;
+    type EncodedOption = WireOptionalExampleFooResult;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ExampleFooResult>
@@ -237,7 +237,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireOptionalExampleFooResult { raw } = slot.as_mut());
 
@@ -411,9 +411,9 @@ pub mod example {
 
         type Protocol = crate::Example;
 
-        type Request<'buf> = crate::WireExampleFooRequest;
+        type Request = crate::WireExampleFooRequest;
 
-        type Response<'buf> = crate::WireExampleFooResult;
+        type Response = crate::WireExampleFooResult;
     }
 }
 
@@ -425,7 +425,7 @@ pub trait ExampleClientSender<___T: ::fidl_next::protocol::Transport> {
     ) -> Result<::fidl_next::bind::ResponseFuture<'_, ___T, example::Foo>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireExampleFooRequest>;
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireExampleFooRequest>;
 }
 
 impl<___T> ExampleClientSender<___T> for ::fidl_next::bind::ClientSender<___T, Example>
@@ -438,7 +438,7 @@ where
     ) -> Result<::fidl_next::bind::ResponseFuture<'_, ___T, example::Foo>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireExampleFooRequest>,
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireExampleFooRequest>,
     {
         self.as_untyped()
             .send_two_way(1107623248440401476, request)

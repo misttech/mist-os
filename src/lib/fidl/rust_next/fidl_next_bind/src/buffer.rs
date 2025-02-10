@@ -29,12 +29,12 @@ macro_rules! buffer {
             }
 
             /// Decodes the buffer.
-            pub fn decode<'buf>(&'buf mut self) -> Result<Owned<'buf, M::$type<'buf>>, DecodeError>
+            pub fn decode<'buf>(&'buf mut self) -> Result<Owned<'buf, M::$type>, DecodeError>
             where
                 M: $trait,
-                M::$type<'buf>: Decode<T::Decoder<'buf>>,
+                M::$type: Decode<T::Decoder<'buf>>,
             {
-                T::decoder(&mut self.buffer).decode_last::<M::$type<'buf>>()
+                T::decoder(&mut self.buffer).decode_last::<M::$type>()
             }
         }
     };

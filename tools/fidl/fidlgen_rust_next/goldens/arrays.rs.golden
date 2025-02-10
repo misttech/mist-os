@@ -8,7 +8,7 @@ pub struct StructLargeArray {
 }
 
 impl ::fidl_next::Encodable for StructLargeArray {
-    type Encoded<'buf> = WireStructLargeArray;
+    type Encoded = WireStructLargeArray;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for StructLargeArray
@@ -18,7 +18,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -34,7 +34,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<StructLargeArray> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireStructLargeArray>;
+    type EncodedOption = ::fidl_next::WireBox<WireStructLargeArray>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<StructLargeArray>
@@ -45,7 +45,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -98,7 +98,7 @@ pub struct StructSmallArray {
 }
 
 impl ::fidl_next::Encodable for StructSmallArray {
-    type Encoded<'buf> = WireStructSmallArray;
+    type Encoded = WireStructSmallArray;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for StructSmallArray
@@ -108,7 +108,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -124,7 +124,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<StructSmallArray> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireStructSmallArray>;
+    type EncodedOption = ::fidl_next::WireBox<WireStructSmallArray>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<StructSmallArray>
@@ -135,7 +135,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -198,7 +198,7 @@ impl TableLargeArray {
 }
 
 impl ::fidl_next::Encodable for TableLargeArray {
-    type Encoded<'buf> = WireTableLargeArray;
+    type Encoded = WireTableLargeArray;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for TableLargeArray
@@ -208,7 +208,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireTableLargeArray { table } = slot);
 
@@ -313,7 +313,7 @@ impl TableSmallArray {
 }
 
 impl ::fidl_next::Encodable for TableSmallArray {
-    type Encoded<'buf> = WireTableSmallArray;
+    type Encoded = WireTableSmallArray;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for TableSmallArray
@@ -323,7 +323,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireTableSmallArray { table } = slot);
 
@@ -418,7 +418,7 @@ pub enum UnionLargeArray {
 }
 
 impl ::fidl_next::Encodable for UnionLargeArray {
-    type Encoded<'buf> = WireUnionLargeArray;
+    type Encoded = WireUnionLargeArray;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for UnionLargeArray
@@ -430,7 +430,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireUnionLargeArray { raw } = slot);
 
@@ -445,7 +445,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<UnionLargeArray> {
-    type EncodedOption<'buf> = WireOptionalUnionLargeArray;
+    type EncodedOption = WireOptionalUnionLargeArray;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<UnionLargeArray>
@@ -456,7 +456,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireOptionalUnionLargeArray { raw } = slot.as_mut());
 
@@ -606,7 +606,7 @@ pub enum UnionSmallArray {
 }
 
 impl ::fidl_next::Encodable for UnionSmallArray {
-    type Encoded<'buf> = WireUnionSmallArray;
+    type Encoded = WireUnionSmallArray;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for UnionSmallArray
@@ -618,7 +618,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireUnionSmallArray { raw } = slot);
 
@@ -633,7 +633,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<UnionSmallArray> {
-    type EncodedOption<'buf> = WireOptionalUnionSmallArray;
+    type EncodedOption = WireOptionalUnionSmallArray;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<UnionSmallArray>
@@ -644,7 +644,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireOptionalUnionSmallArray { raw } = slot.as_mut());
 

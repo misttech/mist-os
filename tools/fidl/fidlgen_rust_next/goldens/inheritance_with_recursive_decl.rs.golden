@@ -8,7 +8,7 @@ pub struct ParentFirstRequest {
 }
 
 impl ::fidl_next::Encodable for ParentFirstRequest {
-    type Encoded<'buf> = WireParentFirstRequest;
+    type Encoded = WireParentFirstRequest;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ParentFirstRequest
@@ -20,7 +20,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -36,7 +36,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ParentFirstRequest> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireParentFirstRequest>;
+    type EncodedOption = ::fidl_next::WireBox<WireParentFirstRequest>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ParentFirstRequest>
@@ -47,7 +47,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -109,9 +109,9 @@ pub mod parent {
 
         type Protocol = crate::Parent;
 
-        type Request<'buf> = crate::WireParentFirstRequest;
+        type Request = crate::WireParentFirstRequest;
 
-        type Response<'buf> = ::fidl_next::bind::Never;
+        type Response = ::fidl_next::bind::Never;
     }
 }
 
@@ -123,7 +123,7 @@ pub trait ParentClientSender<___T: ::fidl_next::protocol::Transport> {
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireParentFirstRequest>;
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireParentFirstRequest>;
 }
 
 impl<___T> ParentClientSender<___T> for ::fidl_next::bind::ClientSender<___T, Parent>
@@ -136,7 +136,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireParentFirstRequest>,
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireParentFirstRequest>,
     {
         self.as_untyped().send_one_way(3973163707930985819, request)
     }
@@ -233,7 +233,7 @@ pub struct ChildSecondRequest {
 }
 
 impl ::fidl_next::Encodable for ChildSecondRequest {
-    type Encoded<'buf> = WireChildSecondRequest;
+    type Encoded = WireChildSecondRequest;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ChildSecondRequest
@@ -245,7 +245,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -261,7 +261,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ChildSecondRequest> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireChildSecondRequest>;
+    type EncodedOption = ::fidl_next::WireBox<WireChildSecondRequest>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ChildSecondRequest>
@@ -272,7 +272,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -334,9 +334,9 @@ pub mod child {
 
         type Protocol = crate::Child;
 
-        type Request<'buf> = crate::WireParentFirstRequest;
+        type Request = crate::WireParentFirstRequest;
 
-        type Response<'buf> = ::fidl_next::bind::Never;
+        type Response = ::fidl_next::bind::Never;
     }
 
     pub struct Second;
@@ -346,9 +346,9 @@ pub mod child {
 
         type Protocol = crate::Child;
 
-        type Request<'buf> = crate::WireChildSecondRequest;
+        type Request = crate::WireChildSecondRequest;
 
-        type Response<'buf> = ::fidl_next::bind::Never;
+        type Response = ::fidl_next::bind::Never;
     }
 }
 
@@ -360,7 +360,7 @@ pub trait ChildClientSender<___T: ::fidl_next::protocol::Transport> {
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireParentFirstRequest>;
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireParentFirstRequest>;
 
     fn second<___R>(
         &self,
@@ -368,7 +368,7 @@ pub trait ChildClientSender<___T: ::fidl_next::protocol::Transport> {
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireChildSecondRequest>;
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireChildSecondRequest>;
 }
 
 impl<___T> ChildClientSender<___T> for ::fidl_next::bind::ClientSender<___T, Child>
@@ -381,7 +381,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireParentFirstRequest>,
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireParentFirstRequest>,
     {
         self.as_untyped().send_one_way(3973163707930985819, request)
     }
@@ -392,7 +392,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireChildSecondRequest>,
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireChildSecondRequest>,
     {
         self.as_untyped().send_one_way(2545123272820824165, request)
     }

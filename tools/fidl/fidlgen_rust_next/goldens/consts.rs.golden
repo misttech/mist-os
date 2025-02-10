@@ -25,7 +25,7 @@ pub const ANSWER_NARROWED: u8 = 42;
 }
 
 impl ::fidl_next::Encodable for BitsType {
-    type Encoded<'buf> = WireBitsType;
+    type Encoded = WireBitsType;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for BitsType
@@ -35,7 +35,7 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireBitsType { mut value } = slot);
         *value = ::fidl_next::u32_le::from(self.bits());
@@ -103,7 +103,7 @@ pub enum EnumType {
 }
 
 impl ::fidl_next::Encodable for EnumType {
-    type Encoded<'buf> = WireEnumType;
+    type Encoded = WireEnumType;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for EnumType
@@ -113,7 +113,7 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireEnumType { mut value } = slot);
         *value = ::fidl_next::i32_le::from(match *self {

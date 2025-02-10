@@ -68,14 +68,14 @@ unsafe impl<'buf, D: Decoder<'buf> + ?Sized> Decode<D> for WireOptionalString {
 }
 
 impl EncodableOption for String {
-    type EncodedOption<'buf> = WireOptionalString;
+    type EncodedOption = WireOptionalString;
 }
 
 impl<E: Encoder + ?Sized> EncodeOption<E> for String {
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut E,
-        slot: Slot<'_, Self::EncodedOption<'_>>,
+        slot: Slot<'_, Self::EncodedOption>,
     ) -> Result<(), EncodeError> {
         if let Some(string) = this {
             encoder.write(string.as_bytes());

@@ -17,7 +17,7 @@
 }
 
 impl ::fidl_next::Encodable for EmptyBits {
-    type Encoded<'buf> = WireEmptyBits;
+    type Encoded = WireEmptyBits;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for EmptyBits
@@ -27,7 +27,7 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireEmptyBits { mut value } = slot);
         *value = ::fidl_next::u32_le::from(self.bits());
@@ -89,7 +89,7 @@ impl ::core::convert::From<EmptyBits> for WireEmptyBits {
 }
 
 impl ::fidl_next::Encodable for FlexibleBits {
-    type Encoded<'buf> = WireFlexibleBits;
+    type Encoded = WireFlexibleBits;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for FlexibleBits
@@ -99,7 +99,7 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireFlexibleBits { mut value } = slot);
         *value = ::fidl_next::u64_le::from(self.bits());
@@ -162,7 +162,7 @@ impl ::core::convert::From<FlexibleBits> for WireFlexibleBits {
 }
 
 impl ::fidl_next::Encodable for MyBits {
-    type Encoded<'buf> = WireMyBits;
+    type Encoded = WireMyBits;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for MyBits
@@ -172,7 +172,7 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireMyBits { mut value } = slot);
         *value = ::fidl_next::u32_le::from(self.bits());
@@ -243,7 +243,7 @@ impl ::core::convert::From<MyBits> for WireMyBits {
 }
 
 impl ::fidl_next::Encodable for StrictBits {
-    type Encoded<'buf> = WireStrictBits;
+    type Encoded = WireStrictBits;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for StrictBits
@@ -253,7 +253,7 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireStrictBits { mut value } = slot);
         *value = ::fidl_next::u64_le::from(self.bits());

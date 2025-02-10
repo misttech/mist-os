@@ -50,11 +50,11 @@ unsafe impl<D: ?Sized> Decode<D> for WireFrameworkError {
 }
 
 impl Encodable for FrameworkError {
-    type Encoded<'buf> = WireFrameworkError;
+    type Encoded = WireFrameworkError;
 }
 
 impl<E: ?Sized> Encode<E> for FrameworkError {
-    fn encode(&mut self, _: &mut E, slot: Slot<'_, Self::Encoded<'_>>) -> Result<(), EncodeError> {
+    fn encode(&mut self, _: &mut E, slot: Slot<'_, Self::Encoded>) -> Result<(), EncodeError> {
         munge!(let WireFrameworkError { mut inner } = slot);
         inner.write(i32_le::from_native(match self {
             Self::UnknownMethod => -2,

@@ -9,7 +9,7 @@ pub enum MyEmptyFlexibleEnum {
 }
 
 impl ::fidl_next::Encodable for MyEmptyFlexibleEnum {
-    type Encoded<'buf> = WireMyEmptyFlexibleEnum;
+    type Encoded = WireMyEmptyFlexibleEnum;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for MyEmptyFlexibleEnum
@@ -19,7 +19,7 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireMyEmptyFlexibleEnum { mut value } = slot);
         *value = ::fidl_next::u32_le::from(match *self {
@@ -84,7 +84,7 @@ pub enum MyFlexibleEnum {
 }
 
 impl ::fidl_next::Encodable for MyFlexibleEnum {
-    type Encoded<'buf> = WireMyFlexibleEnum;
+    type Encoded = WireMyFlexibleEnum;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for MyFlexibleEnum
@@ -94,7 +94,7 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireMyFlexibleEnum { mut value } = slot);
         *value = ::fidl_next::u32_le::from(match *self {
@@ -178,7 +178,7 @@ pub enum MyFlexibleEnumWithCustomUnknown {
 }
 
 impl ::fidl_next::Encodable for MyFlexibleEnumWithCustomUnknown {
-    type Encoded<'buf> = WireMyFlexibleEnumWithCustomUnknown;
+    type Encoded = WireMyFlexibleEnumWithCustomUnknown;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for MyFlexibleEnumWithCustomUnknown
@@ -188,7 +188,7 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireMyFlexibleEnumWithCustomUnknown { mut value } = slot);
         *value = ::fidl_next::u32_le::from(match *self {
@@ -287,7 +287,7 @@ pub enum MyStrictEnum {
 }
 
 impl ::fidl_next::Encodable for MyStrictEnum {
-    type Encoded<'buf> = WireMyStrictEnum;
+    type Encoded = WireMyStrictEnum;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for MyStrictEnum
@@ -297,7 +297,7 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireMyStrictEnum { mut value } = slot);
         *value = ::fidl_next::u32_le::from(match *self {

@@ -22,22 +22,22 @@ pub mod {{ module_name }} {
 
             {% if method.kind == ProtocolMethodKind::OneWay || method.kind == ProtocolMethodKind::TwoWay %}
                 {% if let Some(request) = method.maybe_request_payload %}
-                    type Request<'buf> = {{ context.wire_type(request) }};
+                    type Request = {{ context.wire_type(request) }};
                 {% else %}
-                    type Request<'buf> = ();
+                    type Request = ();
                 {% endif %}
             {% else %}
-                type Request<'buf> = ::fidl_next::bind::Never;
+                type Request = ::fidl_next::bind::Never;
             {% endif %}
 
             {% if method.kind == ProtocolMethodKind::TwoWay || method.kind == ProtocolMethodKind::Event %}
                 {% if let Some(response) = method.maybe_response_payload %}
-                    type Response<'buf> = {{ context.wire_type(response) }};
+                    type Response = {{ context.wire_type(response) }};
                 {% else %}
-                    type Response<'buf> = ();
+                    type Response = ();
                 {% endif %}
             {% else %}
-                type Response<'buf> = ::fidl_next::bind::Never;
+                type Response = ::fidl_next::bind::Never;
             {% endif %}
         }
     {% endfor %}
@@ -63,7 +63,7 @@ pub trait {{ client_sender_name }}<___T: ::fidl_next::protocol::Transport> {
                     where
                         for<'buf> ___R: ::fidl_next::Encode<
                             ___T::Encoder<'buf>,
-                            Encoded<'buf> = {{ context.wire_type(request) }},
+                            Encoded = {{ context.wire_type(request) }},
                         >;
                 {% else %}
                     fn {{ method_name }}(
@@ -87,7 +87,7 @@ pub trait {{ client_sender_name }}<___T: ::fidl_next::protocol::Transport> {
                     where
                         for<'buf> ___R: ::fidl_next::Encode<
                             ___T::Encoder<'buf>,
-                            Encoded<'buf> = {{ context.wire_type(request) }},
+                            Encoded = {{ context.wire_type(request) }},
                         >;
                 {% else %}
                     fn {{ method_name }}(
@@ -125,7 +125,7 @@ where
                     where
                         for<'buf> ___R: ::fidl_next::Encode<
                             ___T::Encoder<'buf>,
-                            Encoded<'buf> = {{ context.wire_type(request) }},
+                            Encoded = {{ context.wire_type(request) }},
                         >,
                     {
                         self.as_untyped().send_one_way({{ method.ordinal }}, request)
@@ -150,7 +150,7 @@ where
                     where
                         for<'buf> ___R: ::fidl_next::Encode<
                             ___T::Encoder<'buf>,
-                            Encoded<'buf> = {{ context.wire_type(request) }},
+                            Encoded = {{ context.wire_type(request) }},
                         >,
                     {
                         self.as_untyped().send_two_way({{ method.ordinal }}, request)
@@ -265,7 +265,7 @@ pub trait {{ server_sender_name }}<___T: ::fidl_next::protocol::Transport> {
                 where
                     for<'buf> ___R: ::fidl_next::Encode<
                         ___T::Encoder<'buf>,
-                        Encoded<'buf> = {{ context.wire_type(request) }},
+                        Encoded = {{ context.wire_type(request) }},
                     >;
             {% else %}
                 fn {{ method_name }}(
@@ -293,7 +293,7 @@ where
                 where
                     for<'buf> ___R: ::fidl_next::Encode<
                         ___T::Encoder<'buf>,
-                        Encoded<'buf> = {{ context.wire_type(request) }},
+                        Encoded = {{ context.wire_type(request) }},
                     >,
                 {
                     self.as_untyped().send_event({{ method.ordinal }}, request)

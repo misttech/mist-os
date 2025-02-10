@@ -58,8 +58,8 @@ impl WireEnvelope {
 
         let handles_before = encoder.__internal_handle_count();
 
-        if size_of::<T::Encoded<'_>>() > 4 {
-            return Err(EncodeError::ExpectedInline(size_of::<T::Encoded<'_>>()));
+        if size_of::<T::Encoded>() > 4 {
+            return Err(EncodeError::ExpectedInline(size_of::<T::Encoded>()));
         }
 
         let slot = unsafe { Slot::new_unchecked(maybe_num_bytes.as_mut_ptr().cast()) };
@@ -92,7 +92,7 @@ impl WireEnvelope {
 
         let handles_before = encoder.__internal_handle_count();
 
-        if size_of::<T::Encoded<'_>>() <= 4 {
+        if size_of::<T::Encoded>() <= 4 {
             let slot = unsafe { Slot::new_unchecked(maybe_num_bytes.as_mut_ptr().cast()) };
             value.encode(encoder, slot)?;
 

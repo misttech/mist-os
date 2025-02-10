@@ -19,7 +19,7 @@ pub struct {{ name }} {
 }
 
 impl ::fidl_next::Encodable for {{ name }} {
-    type Encoded<'buf> = {{ wire_name }};
+    type Encoded = {{ wire_name }};
 }
 
 impl<___E> ::fidl_next::Encode<___E> for {{ name }}
@@ -35,7 +35,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -54,7 +54,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<{{ name }}> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<{{ wire_name }}>;
+    type EncodedOption = ::fidl_next::WireBox<{{ wire_name }}>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<{{ name }}>
@@ -65,7 +65,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;

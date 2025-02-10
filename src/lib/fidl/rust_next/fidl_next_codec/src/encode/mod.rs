@@ -16,23 +16,20 @@ use crate::{
 /// A type which can be encoded as FIDL.
 pub trait Encodable {
     /// The wire type for the value.
-    type Encoded<'buf>;
+    type Encoded;
 }
 
 /// Encodes a value.
 pub trait Encode<E: ?Sized>: Encodable {
     /// Encodes this value into an encoder and slot.
-    fn encode(
-        &mut self,
-        encoder: &mut E,
-        slot: Slot<'_, Self::Encoded<'_>>,
-    ) -> Result<(), EncodeError>;
+    fn encode(&mut self, encoder: &mut E, slot: Slot<'_, Self::Encoded>)
+        -> Result<(), EncodeError>;
 }
 
 /// A type which can be encoded as FIDL when optional.
 pub trait EncodableOption {
     /// The wire type for the optional value.
-    type EncodedOption<'buf>;
+    type EncodedOption;
 }
 
 /// Encodes an optional value.
@@ -41,14 +38,14 @@ pub trait EncodeOption<E: ?Sized>: EncodableOption {
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut E,
-        slot: Slot<'_, Self::EncodedOption<'_>>,
+        slot: Slot<'_, Self::EncodedOption>,
     ) -> Result<(), EncodeError>;
 }
 
 macro_rules! impl_primitive {
     ($ty:ty, $enc:ty) => {
         impl Encodable for $ty {
-            type Encoded<'buf> = $enc;
+            type Encoded = $enc;
         }
 
         impl<E: ?Sized> Encode<E> for $ty {
@@ -56,7 +53,7 @@ macro_rules! impl_primitive {
             fn encode(
                 &mut self,
                 _: &mut E,
-                mut slot: Slot<'_, Self::Encoded<'_>>,
+                mut slot: Slot<'_, Self::Encoded>,
             ) -> Result<(), EncodeError> {
                 slot.write(<$enc>::from(*self));
                 Ok(())
@@ -64,7 +61,7 @@ macro_rules! impl_primitive {
         }
 
         impl EncodableOption for $ty {
-            type EncodedOption<'buf> = WireBox<$enc>;
+            type EncodedOption = WireBox<$enc>;
         }
 
         impl<E: Encoder + ?Sized> EncodeOption<E> for $ty {
@@ -72,7 +69,7 @@ macro_rules! impl_primitive {
             fn encode_option(
                 this: Option<&mut Self>,
                 encoder: &mut E,
-                slot: Slot<'_, Self::EncodedOption<'_>>,
+                slot: Slot<'_, Self::EncodedOption>,
             ) -> Result<(), EncodeError> {
                 if let Some(value) = this {
                     encoder.encode_next(value)?;
@@ -108,14 +105,14 @@ impl_primitives! {
 }
 
 impl<T: Encodable, const N: usize> Encodable for [T; N] {
-    type Encoded<'buf> = [T::Encoded<'buf>; N];
+    type Encoded = [T::Encoded; N];
 }
 
 impl<E: ?Sized, T: Encode<E>, const N: usize> Encode<E> for [T; N] {
     fn encode(
         &mut self,
         encoder: &mut E,
-        mut slot: Slot<'_, Self::Encoded<'_>>,
+        mut slot: Slot<'_, Self::Encoded>,
     ) -> Result<(), EncodeError> {
         for (i, item) in self.iter_mut().enumerate() {
             item.encode(encoder, slot.index(i))?;
@@ -125,14 +122,14 @@ impl<E: ?Sized, T: Encode<E>, const N: usize> Encode<E> for [T; N] {
 }
 
 impl<T: Encodable> Encodable for Box<T> {
-    type Encoded<'buf> = T::Encoded<'buf>;
+    type Encoded = T::Encoded;
 }
 
 impl<E: ?Sized, T: Encode<E>> Encode<E> for Box<T> {
     fn encode(
         &mut self,
         encoder: &mut E,
-        slot: Slot<'_, Self::Encoded<'_>>,
+        slot: Slot<'_, Self::Encoded>,
     ) -> Result<(), EncodeError> {
         T::encode(self, encoder, slot)
     }

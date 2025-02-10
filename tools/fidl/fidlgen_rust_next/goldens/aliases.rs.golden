@@ -30,7 +30,7 @@ pub enum ObjType {
 }
 
 impl ::fidl_next::Encodable for ObjType {
-    type Encoded<'buf> = WireObjType;
+    type Encoded = WireObjType;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ObjType
@@ -40,7 +40,7 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireObjType { mut value } = slot);
         *value = ::fidl_next::u32_le::from(match *self {
@@ -143,7 +143,7 @@ pub struct ExampleOfUseOfAliases {
 }
 
 impl ::fidl_next::Encodable for ExampleOfUseOfAliases {
-    type Encoded<'buf> = WireExampleOfUseOfAliases;
+    type Encoded = WireExampleOfUseOfAliases;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ExampleOfUseOfAliases
@@ -157,7 +157,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -214,7 +214,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<ExampleOfUseOfAliases> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireExampleOfUseOfAliases>;
+    type EncodedOption = ::fidl_next::WireBox<WireExampleOfUseOfAliases>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<ExampleOfUseOfAliases>
@@ -225,7 +225,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;

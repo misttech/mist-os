@@ -10,7 +10,7 @@ pub struct TwoWayAddRequest {
 }
 
 impl ::fidl_next::Encodable for TwoWayAddRequest {
-    type Encoded<'buf> = WireTwoWayAddRequest;
+    type Encoded = WireTwoWayAddRequest;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for TwoWayAddRequest
@@ -20,7 +20,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -39,7 +39,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<TwoWayAddRequest> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireTwoWayAddRequest>;
+    type EncodedOption = ::fidl_next::WireBox<WireTwoWayAddRequest>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<TwoWayAddRequest>
@@ -50,7 +50,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -112,7 +112,7 @@ pub struct TwoWayAddResponse {
 }
 
 impl ::fidl_next::Encodable for TwoWayAddResponse {
-    type Encoded<'buf> = WireTwoWayAddResponse;
+    type Encoded = WireTwoWayAddResponse;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for TwoWayAddResponse
@@ -122,7 +122,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -138,7 +138,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<TwoWayAddResponse> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireTwoWayAddResponse>;
+    type EncodedOption = ::fidl_next::WireBox<WireTwoWayAddResponse>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<TwoWayAddResponse>
@@ -149,7 +149,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -209,9 +209,9 @@ pub mod two_way {
 
         type Protocol = crate::TwoWay;
 
-        type Request<'buf> = crate::WireTwoWayAddRequest;
+        type Request = crate::WireTwoWayAddRequest;
 
-        type Response<'buf> = crate::WireTwoWayAddResponse;
+        type Response = crate::WireTwoWayAddResponse;
     }
 }
 
@@ -223,7 +223,7 @@ pub trait TwoWayClientSender<___T: ::fidl_next::protocol::Transport> {
     ) -> Result<::fidl_next::bind::ResponseFuture<'_, ___T, two_way::Add>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireTwoWayAddRequest>;
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireTwoWayAddRequest>;
 }
 
 impl<___T> TwoWayClientSender<___T> for ::fidl_next::bind::ClientSender<___T, TwoWay>
@@ -236,7 +236,7 @@ where
     ) -> Result<::fidl_next::bind::ResponseFuture<'_, ___T, two_way::Add>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireTwoWayAddRequest>,
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireTwoWayAddRequest>,
     {
         self.as_untyped()
             .send_two_way(989730524426044687, request)

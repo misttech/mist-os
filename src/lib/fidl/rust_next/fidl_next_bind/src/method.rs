@@ -11,10 +11,10 @@ pub trait Method {
     type Protocol;
 
     /// The request payload for the method.
-    type Request<'buf>;
+    type Request;
 
     /// The response payload for the method.
-    type Response<'buf>;
+    type Response;
 }
 
 /// The request or response type of a method which does not have a request or response.

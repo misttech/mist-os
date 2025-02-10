@@ -12,7 +12,7 @@ impl EmptyTable {
 }
 
 impl ::fidl_next::Encodable for EmptyTable {
-    type Encoded<'buf> = WireEmptyTable;
+    type Encoded = WireEmptyTable;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for EmptyTable
@@ -22,7 +22,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireEmptyTable { table } = slot);
 
@@ -96,7 +96,7 @@ impl ExtensionTable {
 }
 
 impl ::fidl_next::Encodable for ExtensionTable {
-    type Encoded<'buf> = WireExtensionTable;
+    type Encoded = WireExtensionTable;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ExtensionTable
@@ -106,7 +106,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireExtensionTable { table } = slot);
 
@@ -198,7 +198,7 @@ impl NewerSimpleTable {
 }
 
 impl ::fidl_next::Encodable for NewerSimpleTable {
-    type Encoded<'buf> = WireNewerSimpleTable;
+    type Encoded = WireNewerSimpleTable;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for NewerSimpleTable
@@ -208,7 +208,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireNewerSimpleTable { table } = slot);
 
@@ -373,7 +373,7 @@ impl OlderSimpleTable {
 }
 
 impl ::fidl_next::Encodable for OlderSimpleTable {
-    type Encoded<'buf> = WireOlderSimpleTable;
+    type Encoded = WireOlderSimpleTable;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for OlderSimpleTable
@@ -383,7 +383,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireOlderSimpleTable { table } = slot);
 
@@ -500,7 +500,7 @@ impl ReverseOrdinalTable {
 }
 
 impl ::fidl_next::Encodable for ReverseOrdinalTable {
-    type Encoded<'buf> = WireReverseOrdinalTable;
+    type Encoded = WireReverseOrdinalTable;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for ReverseOrdinalTable
@@ -510,7 +510,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireReverseOrdinalTable { table } = slot);
 
@@ -681,7 +681,7 @@ impl SimpleTable {
 }
 
 impl ::fidl_next::Encodable for SimpleTable {
-    type Encoded<'buf> = WireSimpleTable;
+    type Encoded = WireSimpleTable;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for SimpleTable
@@ -691,7 +691,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireSimpleTable { table } = slot);
 
@@ -1203,7 +1203,7 @@ impl SixtyFourOrdinalTable {
 }
 
 impl ::fidl_next::Encodable for SixtyFourOrdinalTable {
-    type Encoded<'buf> = WireSixtyFourOrdinalTable;
+    type Encoded = WireSixtyFourOrdinalTable;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for SixtyFourOrdinalTable
@@ -1213,7 +1213,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireSixtyFourOrdinalTable { table } = slot);
 
@@ -3086,7 +3086,7 @@ impl TableWithAttributes {
 }
 
 impl ::fidl_next::Encodable for TableWithAttributes {
-    type Encoded<'buf> = WireTableWithAttributes;
+    type Encoded = WireTableWithAttributes;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for TableWithAttributes
@@ -3096,7 +3096,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireTableWithAttributes { table } = slot);
 

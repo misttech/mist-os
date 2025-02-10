@@ -8,7 +8,7 @@ pub enum UnionSize12Alignment4 {
 }
 
 impl ::fidl_next::Encodable for UnionSize12Alignment4 {
-    type Encoded<'buf> = WireUnionSize12Alignment4;
+    type Encoded = WireUnionSize12Alignment4;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for UnionSize12Alignment4
@@ -20,7 +20,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireUnionSize12Alignment4 { raw } = slot);
 
@@ -35,7 +35,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<UnionSize12Alignment4> {
-    type EncodedOption<'buf> = WireOptionalUnionSize12Alignment4;
+    type EncodedOption = WireOptionalUnionSize12Alignment4;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<UnionSize12Alignment4>
@@ -46,7 +46,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireOptionalUnionSize12Alignment4 { raw } = slot.as_mut());
 
@@ -200,7 +200,7 @@ pub struct SandwichUnionSize12Alignment4 {
 }
 
 impl ::fidl_next::Encodable for SandwichUnionSize12Alignment4 {
-    type Encoded<'buf> = WireSandwichUnionSize12Alignment4;
+    type Encoded = WireSandwichUnionSize12Alignment4;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for SandwichUnionSize12Alignment4
@@ -212,7 +212,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -234,7 +234,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<SandwichUnionSize12Alignment4> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireSandwichUnionSize12Alignment4>;
+    type EncodedOption = ::fidl_next::WireBox<WireSandwichUnionSize12Alignment4>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<SandwichUnionSize12Alignment4>
@@ -245,7 +245,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -318,7 +318,7 @@ pub struct StructSize16Alignment8 {
 }
 
 impl ::fidl_next::Encodable for StructSize16Alignment8 {
-    type Encoded<'buf> = WireStructSize16Alignment8;
+    type Encoded = WireStructSize16Alignment8;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for StructSize16Alignment8
@@ -328,7 +328,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -347,7 +347,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<StructSize16Alignment8> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireStructSize16Alignment8>;
+    type EncodedOption = ::fidl_next::WireBox<WireStructSize16Alignment8>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<StructSize16Alignment8>
@@ -358,7 +358,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -420,7 +420,7 @@ pub enum UnionSize24Alignment8 {
 }
 
 impl ::fidl_next::Encodable for UnionSize24Alignment8 {
-    type Encoded<'buf> = WireUnionSize24Alignment8;
+    type Encoded = WireUnionSize24Alignment8;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for UnionSize24Alignment8
@@ -432,7 +432,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireUnionSize24Alignment8 { raw } = slot);
 
@@ -448,7 +448,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<UnionSize24Alignment8> {
-    type EncodedOption<'buf> = WireOptionalUnionSize24Alignment8;
+    type EncodedOption = WireOptionalUnionSize24Alignment8;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<UnionSize24Alignment8>
@@ -459,7 +459,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireOptionalUnionSize24Alignment8 { raw } = slot.as_mut());
 
@@ -619,7 +619,7 @@ pub struct SandwichUnionSize24Alignment8 {
 }
 
 impl ::fidl_next::Encodable for SandwichUnionSize24Alignment8 {
-    type Encoded<'buf> = WireSandwichUnionSize24Alignment8;
+    type Encoded = WireSandwichUnionSize24Alignment8;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for SandwichUnionSize24Alignment8
@@ -631,7 +631,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -653,7 +653,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<SandwichUnionSize24Alignment8> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireSandwichUnionSize24Alignment8>;
+    type EncodedOption = ::fidl_next::WireBox<WireSandwichUnionSize24Alignment8>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<SandwichUnionSize24Alignment8>
@@ -664,7 +664,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -735,7 +735,7 @@ pub enum UnionSize36Alignment4 {
 }
 
 impl ::fidl_next::Encodable for UnionSize36Alignment4 {
-    type Encoded<'buf> = WireUnionSize36Alignment4;
+    type Encoded = WireUnionSize36Alignment4;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for UnionSize36Alignment4
@@ -747,7 +747,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireUnionSize36Alignment4 { raw } = slot);
 
@@ -762,7 +762,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<UnionSize36Alignment4> {
-    type EncodedOption<'buf> = WireOptionalUnionSize36Alignment4;
+    type EncodedOption = WireOptionalUnionSize36Alignment4;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<UnionSize36Alignment4>
@@ -773,7 +773,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireOptionalUnionSize36Alignment4 { raw } = slot.as_mut());
 
@@ -927,7 +927,7 @@ pub struct SandwichUnionSize36Alignment4 {
 }
 
 impl ::fidl_next::Encodable for SandwichUnionSize36Alignment4 {
-    type Encoded<'buf> = WireSandwichUnionSize36Alignment4;
+    type Encoded = WireSandwichUnionSize36Alignment4;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for SandwichUnionSize36Alignment4
@@ -939,7 +939,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -961,7 +961,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<SandwichUnionSize36Alignment4> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireSandwichUnionSize36Alignment4>;
+    type EncodedOption = ::fidl_next::WireBox<WireSandwichUnionSize36Alignment4>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<SandwichUnionSize36Alignment4>
@@ -972,7 +972,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;
@@ -1043,7 +1043,7 @@ pub enum UnionSize8Alignment4 {
 }
 
 impl ::fidl_next::Encodable for UnionSize8Alignment4 {
-    type Encoded<'buf> = WireUnionSize8Alignment4;
+    type Encoded = WireUnionSize8Alignment4;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for UnionSize8Alignment4
@@ -1053,7 +1053,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireUnionSize8Alignment4 { raw } = slot);
 
@@ -1068,7 +1068,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<UnionSize8Alignment4> {
-    type EncodedOption<'buf> = WireOptionalUnionSize8Alignment4;
+    type EncodedOption = WireOptionalUnionSize8Alignment4;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<UnionSize8Alignment4>
@@ -1079,7 +1079,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        mut slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireOptionalUnionSize8Alignment4 { raw } = slot.as_mut());
 
@@ -1255,7 +1255,7 @@ pub struct SandwichUnionSize8Alignment4 {
 }
 
 impl ::fidl_next::Encodable for SandwichUnionSize8Alignment4 {
-    type Encoded<'buf> = WireSandwichUnionSize8Alignment4;
+    type Encoded = WireSandwichUnionSize8Alignment4;
 }
 
 impl<___E> ::fidl_next::Encode<___E> for SandwichUnionSize8Alignment4
@@ -1265,7 +1265,7 @@ where
     fn encode(
         &mut self,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
@@ -1287,7 +1287,7 @@ where
 }
 
 impl ::fidl_next::EncodableOption for Box<SandwichUnionSize8Alignment4> {
-    type EncodedOption<'buf> = ::fidl_next::WireBox<WireSandwichUnionSize8Alignment4>;
+    type EncodedOption = ::fidl_next::WireBox<WireSandwichUnionSize8Alignment4>;
 }
 
 impl<___E> ::fidl_next::EncodeOption<___E> for Box<SandwichUnionSize8Alignment4>
@@ -1298,7 +1298,7 @@ where
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::EncodedOption<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::EncodedOption>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         if let Some(inner) = this {
             ::fidl_next::EncoderExt::encode_next(encoder, inner)?;

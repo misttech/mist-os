@@ -25,7 +25,7 @@ pub enum {{ name }} {
 }
 
 impl ::fidl_next::Encodable for {{ name }} {
-    type Encoded<'buf> = {{ wire_name }};
+    type Encoded = {{ wire_name }};
 }
 
 impl<___E> ::fidl_next::Encode<___E> for {{ name }}
@@ -35,7 +35,7 @@ where
     fn encode(
         &mut self,
         _: &mut ___E,
-        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+        slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let {{ wire_name }} { mut value } = slot);
         *value = {{ wire_int }}::from(match *self {
