@@ -497,7 +497,7 @@ pub trait EmptyProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireEmptyProtocolSendRequest>;
+            ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireEmptyProtocolSendRequest>;
 
     fn send_and_receive<___R>(
         &self,
@@ -508,7 +508,7 @@ pub trait EmptyProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     >
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireEmptyProtocolSendAndReceiveRequest,
         >;
 }
@@ -523,7 +523,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireEmptyProtocolSendRequest>,
+            ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireEmptyProtocolSendRequest>,
     {
         self.as_untyped().send_one_way(1378773277029173000, request)
     }
@@ -537,7 +537,7 @@ where
     >
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireEmptyProtocolSendAndReceiveRequest,
         >,
     {
@@ -596,10 +596,8 @@ pub trait EmptyProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
-            Encoded = crate::WireEmptyProtocolReceiveRequest,
-        >;
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireEmptyProtocolReceiveRequest>;
 }
 
 impl<___T> EmptyProtocolServerSender<___T> for ::fidl_next::bind::ServerSender<___T, EmptyProtocol>
@@ -611,10 +609,8 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
-            Encoded = crate::WireEmptyProtocolReceiveRequest,
-        >,
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireEmptyProtocolReceiveRequest>,
     {
         self.as_untyped().send_event(2301564782476583487, request)
     }

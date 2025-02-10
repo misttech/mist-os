@@ -1872,7 +1872,7 @@ pub trait ComposedProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireComposedProtocolOneWayAnonComposedRequest,
         >;
 
@@ -1885,7 +1885,7 @@ pub trait ComposedProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     >
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireComposedProtocolTwoWayAnonComposedRequest,
         >;
 
@@ -1898,7 +1898,7 @@ pub trait ComposedProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     >
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireComposedProtocolTwoWayAnonComposedWithErrorRequest,
         >;
 
@@ -1907,7 +1907,7 @@ pub trait ComposedProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireTablePayload>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireTablePayload>;
 
     fn two_way_named_composed<___R>(
         &self,
@@ -1917,7 +1917,7 @@ pub trait ComposedProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireUnionPayload>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireUnionPayload>;
 
     fn two_way_named_composed_with_error<___R>(
         &self,
@@ -1931,7 +1931,7 @@ pub trait ComposedProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireTablePayload>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireTablePayload>;
 }
 
 impl<___T> ComposedProtocolClientSender<___T>
@@ -1945,7 +1945,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireComposedProtocolOneWayAnonComposedRequest,
         >,
     {
@@ -1961,7 +1961,7 @@ where
     >
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireComposedProtocolTwoWayAnonComposedRequest,
         >,
     {
@@ -1979,7 +1979,7 @@ where
     >
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireComposedProtocolTwoWayAnonComposedWithErrorRequest,
         >,
     {
@@ -1993,7 +1993,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireTablePayload>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireTablePayload>,
     {
         self.as_untyped().send_one_way(1159174053475281336, request)
     }
@@ -2006,7 +2006,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireUnionPayload>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireUnionPayload>,
     {
         self.as_untyped()
             .send_two_way(5022872388073111636, request)
@@ -2025,7 +2025,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireTablePayload>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireTablePayload>,
     {
         self.as_untyped()
             .send_two_way(4973436213756973807, request)
@@ -2107,7 +2107,7 @@ pub trait ComposedProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireComposedProtocolOnAnonComposedRequest,
         >;
 
@@ -2116,7 +2116,7 @@ pub trait ComposedProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireUnionPayload>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireUnionPayload>;
 }
 
 impl<___T> ComposedProtocolServerSender<___T>
@@ -2130,7 +2130,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireComposedProtocolOnAnonComposedRequest,
         >,
     {
@@ -2142,7 +2142,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireUnionPayload>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireUnionPayload>,
     {
         self.as_untyped().send_event(1712755118419701115, request)
     }
@@ -3945,7 +3945,7 @@ pub trait MainProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireComposedProtocolOneWayAnonComposedRequest,
         >;
 
@@ -3958,7 +3958,7 @@ pub trait MainProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     >
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireComposedProtocolTwoWayAnonComposedRequest,
         >;
 
@@ -3971,7 +3971,7 @@ pub trait MainProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     >
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireComposedProtocolTwoWayAnonComposedWithErrorRequest,
         >;
 
@@ -3980,7 +3980,7 @@ pub trait MainProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireTablePayload>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireTablePayload>;
 
     fn two_way_named_composed<___R>(
         &self,
@@ -3990,7 +3990,7 @@ pub trait MainProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireUnionPayload>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireUnionPayload>;
 
     fn two_way_named_composed_with_error<___R>(
         &self,
@@ -4000,14 +4000,14 @@ pub trait MainProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireTablePayload>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireTablePayload>;
 
     fn one_way_local<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireTablePayload>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireTablePayload>;
 
     fn two_way_local<___R>(
         &self,
@@ -4017,7 +4017,7 @@ pub trait MainProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireUnionPayload>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireUnionPayload>;
 
     fn two_way_local_with_error<___R>(
         &self,
@@ -4027,7 +4027,7 @@ pub trait MainProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireTablePayload>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireTablePayload>;
 
     fn one_way_anon<___R>(
         &self,
@@ -4035,7 +4035,7 @@ pub trait MainProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireMainProtocolOneWayAnonRequest,
         >;
 
@@ -4048,7 +4048,7 @@ pub trait MainProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     >
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireMainProtocolTwoWayAnonRequest,
         >;
 
@@ -4061,7 +4061,7 @@ pub trait MainProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     >
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireMainProtocolTwoWayAnonWithErrorRequest,
         >;
 }
@@ -4076,7 +4076,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireComposedProtocolOneWayAnonComposedRequest,
         >,
     {
@@ -4092,7 +4092,7 @@ where
     >
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireComposedProtocolTwoWayAnonComposedRequest,
         >,
     {
@@ -4110,7 +4110,7 @@ where
     >
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireComposedProtocolTwoWayAnonComposedWithErrorRequest,
         >,
     {
@@ -4124,7 +4124,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireTablePayload>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireTablePayload>,
     {
         self.as_untyped().send_one_way(1159174053475281336, request)
     }
@@ -4137,7 +4137,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireUnionPayload>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireUnionPayload>,
     {
         self.as_untyped()
             .send_two_way(5022872388073111636, request)
@@ -4152,7 +4152,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireTablePayload>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireTablePayload>,
     {
         self.as_untyped()
             .send_two_way(4973436213756973807, request)
@@ -4164,7 +4164,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireTablePayload>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireTablePayload>,
     {
         self.as_untyped().send_one_way(4131125523789731521, request)
     }
@@ -4177,7 +4177,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireUnionPayload>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireUnionPayload>,
     {
         self.as_untyped()
             .send_two_way(2781407403924167255, request)
@@ -4192,7 +4192,7 @@ where
         ::fidl_next::EncodeError,
     >
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireTablePayload>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireTablePayload>,
     {
         self.as_untyped()
             .send_two_way(5367158046384127463, request)
@@ -4205,7 +4205,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireMainProtocolOneWayAnonRequest,
         >,
     {
@@ -4221,7 +4221,7 @@ where
     >
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireMainProtocolTwoWayAnonRequest,
         >,
     {
@@ -4239,7 +4239,7 @@ where
     >
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireMainProtocolTwoWayAnonWithErrorRequest,
         >,
     {
@@ -4365,7 +4365,7 @@ pub trait MainProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireComposedProtocolOnAnonComposedRequest,
         >;
 
@@ -4374,24 +4374,22 @@ pub trait MainProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireUnionPayload>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireUnionPayload>;
 
     fn on_local<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireUnionPayload>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireUnionPayload>;
 
     fn on_anon<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
-            Encoded = crate::WireMainProtocolOnAnonRequest,
-        >;
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireMainProtocolOnAnonRequest>;
 }
 
 impl<___T> MainProtocolServerSender<___T> for ::fidl_next::bind::ServerSender<___T, MainProtocol>
@@ -4404,7 +4402,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireComposedProtocolOnAnonComposedRequest,
         >,
     {
@@ -4416,7 +4414,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireUnionPayload>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireUnionPayload>,
     {
         self.as_untyped().send_event(1712755118419701115, request)
     }
@@ -4426,7 +4424,7 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireUnionPayload>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireUnionPayload>,
     {
         self.as_untyped().send_event(8208103053879750285, request)
     }
@@ -4436,10 +4434,8 @@ where
         request: &mut ___R,
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
-            Encoded = crate::WireMainProtocolOnAnonRequest,
-        >,
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireMainProtocolOnAnonRequest>,
     {
         self.as_untyped().send_event(977183060572945300, request)
     }

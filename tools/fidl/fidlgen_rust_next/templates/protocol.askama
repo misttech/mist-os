@@ -62,7 +62,7 @@ pub trait {{ client_sender_name }}<___T: ::fidl_next::protocol::Transport> {
                     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
                     where
                         for<'buf> ___R: ::fidl_next::Encode<
-                            ___T::Encoder<'buf>,
+                            ___T::SendBuffer,
                             Encoded = {{ context.wire_type(request) }},
                         >;
                 {% else %}
@@ -86,7 +86,7 @@ pub trait {{ client_sender_name }}<___T: ::fidl_next::protocol::Transport> {
                     >
                     where
                         for<'buf> ___R: ::fidl_next::Encode<
-                            ___T::Encoder<'buf>,
+                            ___T::SendBuffer,
                             Encoded = {{ context.wire_type(request) }},
                         >;
                 {% else %}
@@ -124,7 +124,7 @@ where
                     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
                     where
                         for<'buf> ___R: ::fidl_next::Encode<
-                            ___T::Encoder<'buf>,
+                            ___T::SendBuffer,
                             Encoded = {{ context.wire_type(request) }},
                         >,
                     {
@@ -149,7 +149,7 @@ where
                     >
                     where
                         for<'buf> ___R: ::fidl_next::Encode<
-                            ___T::Encoder<'buf>,
+                            ___T::SendBuffer,
                             Encoded = {{ context.wire_type(request) }},
                         >,
                     {
@@ -264,7 +264,7 @@ pub trait {{ server_sender_name }}<___T: ::fidl_next::protocol::Transport> {
                 ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
                 where
                     for<'buf> ___R: ::fidl_next::Encode<
-                        ___T::Encoder<'buf>,
+                            ___T::SendBuffer,
                         Encoded = {{ context.wire_type(request) }},
                     >;
             {% else %}
@@ -292,7 +292,7 @@ where
                 ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
                 where
                     for<'buf> ___R: ::fidl_next::Encode<
-                        ___T::Encoder<'buf>,
+                            ___T::SendBuffer,
                         Encoded = {{ context.wire_type(request) }},
                     >,
                 {

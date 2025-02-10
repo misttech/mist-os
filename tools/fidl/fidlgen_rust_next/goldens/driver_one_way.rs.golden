@@ -209,7 +209,7 @@ pub trait OneWayClientSender<___T: ::fidl_next::protocol::Transport> {
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireOneWaySendRequest>;
+            ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireOneWaySendRequest>;
 }
 
 impl<___T> OneWayClientSender<___T> for ::fidl_next::bind::ClientSender<___T, OneWay>
@@ -222,7 +222,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireOneWaySendRequest>,
+            ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireOneWaySendRequest>,
     {
         self.as_untyped().send_one_way(7942965975761529343, request)
     }

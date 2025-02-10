@@ -155,7 +155,7 @@ impl<M> Responder<M> {
     where
         T: Transport,
         M: Method<Protocol = P>,
-        for<'buf> R: Encode<T::Encoder<'buf>, Encoded = M::Response>,
+        R: Encode<T::SendBuffer, Encoded = M::Response>,
     {
         server.as_untyped().send_response(self.responder, M::ORDINAL, response)
     }

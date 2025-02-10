@@ -45,7 +45,7 @@ impl<T: Transport> ClientSender<T> {
         request: &mut M,
     ) -> Result<T::SendFuture<'_>, EncodeError>
     where
-        M: for<'a> Encode<T::Encoder<'a>>,
+        M: Encode<T::SendBuffer>,
     {
         self.send_message(0, ordinal, request)
     }
@@ -57,7 +57,7 @@ impl<T: Transport> ClientSender<T> {
         request: &mut M,
     ) -> Result<ResponseFuture<'_, T>, EncodeError>
     where
-        M: for<'a> Encode<T::Encoder<'a>>,
+        M: Encode<T::SendBuffer>,
     {
         let index = self.shared.responses.lock().unwrap().alloc(ordinal);
 
@@ -82,11 +82,11 @@ impl<T: Transport> ClientSender<T> {
         message: &mut M,
     ) -> Result<T::SendFuture<'_>, EncodeError>
     where
-        M: for<'a> Encode<T::Encoder<'a>>,
+        M: Encode<T::SendBuffer>,
     {
         let mut buffer = T::acquire(&self.sender);
         encode_header::<T>(&mut buffer, txid, ordinal)?;
-        T::encoder(&mut buffer).encode_next(message)?;
+        buffer.encode_next(message)?;
         Ok(T::send(&self.sender, buffer))
     }
 }

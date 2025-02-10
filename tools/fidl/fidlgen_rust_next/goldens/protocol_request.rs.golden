@@ -539,7 +539,7 @@ pub trait ParentClientSender<___T: ::fidl_next::protocol::Transport> {
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireParentTakeChildRequest>;
+            ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireParentTakeChildRequest>;
 
     fn take_child_request<___R>(
         &self,
@@ -547,7 +547,7 @@ pub trait ParentClientSender<___T: ::fidl_next::protocol::Transport> {
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireParentTakeChildRequestRequest,
         >;
 }
@@ -584,7 +584,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireParentTakeChildRequest>,
+            ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireParentTakeChildRequest>,
     {
         self.as_untyped().send_one_way(4470101341872267920, request)
     }
@@ -595,7 +595,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireParentTakeChildRequestRequest,
         >,
     {

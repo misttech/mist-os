@@ -313,15 +313,10 @@ impl Transport for Channel {
 
     type Sender = Sender;
     type SendBuffer = Buffer;
-    type Encoder<'b> = &'b mut Buffer;
     type SendFuture<'s> = SendFuture<'s>;
 
     fn acquire(_: &Self::Sender) -> Self::SendBuffer {
         Buffer::new()
-    }
-
-    fn encoder(buffer: &mut Self::SendBuffer) -> Self::Encoder<'_> {
-        buffer
     }
 
     fn send(sender: &Self::Sender, buffer: Self::SendBuffer) -> Self::SendFuture<'_> {

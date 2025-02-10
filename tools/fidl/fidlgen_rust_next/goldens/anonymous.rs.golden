@@ -1836,7 +1836,7 @@ pub trait SomeProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     >
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireSomeProtocolSomeMethodRequest,
         >;
 }
@@ -1854,7 +1854,7 @@ where
     >
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireSomeProtocolSomeMethodRequest,
         >,
     {

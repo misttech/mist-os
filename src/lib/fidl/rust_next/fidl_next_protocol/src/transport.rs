@@ -39,11 +39,7 @@ pub trait Transport: 'static {
     /// the transport.
     type Sender: Send + Clone;
     /// The buffer type for senders.
-    type SendBuffer: Send;
-    /// The encoder for send buffers.
-    type Encoder<'b>: Encoder + Send
-    where
-        Self: 'b;
+    type SendBuffer: Encoder + Send;
     /// The future type for send operations.
     type SendFuture<'s>: Future<Output = Result<(), Self::Error>> + Send
     where
@@ -51,8 +47,6 @@ pub trait Transport: 'static {
 
     /// Acquires an empty send buffer for the transport.
     fn acquire(sender: &Self::Sender) -> Self::SendBuffer;
-    /// Gets the encoder for a buffer.
-    fn encoder(buffer: &mut Self::SendBuffer) -> Self::Encoder<'_>;
     /// Sends an encoded message over the transport.
     fn send(sender: &Self::Sender, buffer: Self::SendBuffer) -> Self::SendFuture<'_>;
     /// Closes the transport.

@@ -212,8 +212,7 @@ pub trait SuperClientSender<___T: ::fidl_next::protocol::Transport> {
         request: &mut ___R,
     ) -> Result<::fidl_next::bind::ResponseFuture<'_, ___T, super_::Foo>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireSuperFooRequest>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireSuperFooRequest>;
 }
 
 impl<___T> SuperClientSender<___T> for ::fidl_next::bind::ClientSender<___T, Super>
@@ -225,8 +224,7 @@ where
         request: &mut ___R,
     ) -> Result<::fidl_next::bind::ResponseFuture<'_, ___T, super_::Foo>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireSuperFooRequest>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireSuperFooRequest>,
     {
         self.as_untyped()
             .send_two_way(7540745593380780216, request)
@@ -352,8 +350,7 @@ pub trait SubClientSender<___T: ::fidl_next::protocol::Transport> {
         request: &mut ___R,
     ) -> Result<::fidl_next::bind::ResponseFuture<'_, ___T, sub::Foo>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireSuperFooRequest>;
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireSuperFooRequest>;
 }
 
 impl<___T> SubClientSender<___T> for ::fidl_next::bind::ClientSender<___T, Sub>
@@ -365,8 +362,7 @@ where
         request: &mut ___R,
     ) -> Result<::fidl_next::bind::ResponseFuture<'_, ___T, sub::Foo>, ::fidl_next::EncodeError>
     where
-        for<'buf> ___R:
-            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded = crate::WireSuperFooRequest>,
+        for<'buf> ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireSuperFooRequest>,
     {
         self.as_untyped()
             .send_two_way(7540745593380780216, request)

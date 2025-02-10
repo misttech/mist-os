@@ -34,11 +34,11 @@ impl<T: Transport> ServerSender<T> {
         event: &mut M,
     ) -> Result<T::SendFuture<'_>, EncodeError>
     where
-        M: for<'a> Encode<T::Encoder<'a>>,
+        M: Encode<T::SendBuffer>,
     {
         let mut buffer = T::acquire(&self.sender);
         encode_header::<T>(&mut buffer, 0, ordinal)?;
-        T::encoder(&mut buffer).encode_next(event)?;
+        buffer.encode_next(event)?;
         Ok(T::send(&self.sender, buffer))
     }
 
@@ -50,11 +50,11 @@ impl<T: Transport> ServerSender<T> {
         response: &mut M,
     ) -> Result<T::SendFuture<'_>, EncodeError>
     where
-        M: for<'a> Encode<T::Encoder<'a>>,
+        M: Encode<T::SendBuffer>,
     {
         let mut buffer = T::acquire(&self.sender);
         encode_header::<T>(&mut buffer, responder.txid.get(), ordinal)?;
-        T::encoder(&mut buffer).encode_next(response)?;
+        buffer.encode_next(response)?;
         Ok(T::send(&self.sender, buffer))
     }
 }

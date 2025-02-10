@@ -6213,7 +6213,7 @@ pub trait UnknownInteractionsAjarProtocolServerSender<___T: ::fidl_next::protoco
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest,
         >;
 
@@ -6223,7 +6223,7 @@ pub trait UnknownInteractionsAjarProtocolServerSender<___T: ::fidl_next::protoco
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsAjarProtocolStrictEventUnionRequest,
         >;
 
@@ -6233,7 +6233,7 @@ pub trait UnknownInteractionsAjarProtocolServerSender<___T: ::fidl_next::protoco
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsAjarProtocolStrictEventTableRequest,
         >;
 
@@ -6245,7 +6245,7 @@ pub trait UnknownInteractionsAjarProtocolServerSender<___T: ::fidl_next::protoco
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest,
         >;
 
@@ -6255,7 +6255,7 @@ pub trait UnknownInteractionsAjarProtocolServerSender<___T: ::fidl_next::protoco
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest,
         >;
 
@@ -6265,7 +6265,7 @@ pub trait UnknownInteractionsAjarProtocolServerSender<___T: ::fidl_next::protoco
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest,
         >;
 }
@@ -6285,7 +6285,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest,
         >,
     {
@@ -6298,7 +6298,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsAjarProtocolStrictEventUnionRequest,
         >,
     {
@@ -6311,7 +6311,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsAjarProtocolStrictEventTableRequest,
         >,
     {
@@ -6328,7 +6328,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest,
         >,
     {
@@ -6341,7 +6341,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest,
         >,
     {
@@ -6354,7 +6354,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest,
         >,
     {
@@ -12184,7 +12184,7 @@ pub trait UnknownInteractionsClosedProtocolServerSender<___T: ::fidl_next::proto
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest,
         >;
 
@@ -12194,7 +12194,7 @@ pub trait UnknownInteractionsClosedProtocolServerSender<___T: ::fidl_next::proto
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsClosedProtocolStrictEventUnionRequest,
         >;
 
@@ -12204,7 +12204,7 @@ pub trait UnknownInteractionsClosedProtocolServerSender<___T: ::fidl_next::proto
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsClosedProtocolStrictEventTableRequest,
         >;
 }
@@ -12224,7 +12224,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest,
         >,
     {
@@ -12237,7 +12237,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsClosedProtocolStrictEventUnionRequest,
         >,
     {
@@ -12250,7 +12250,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsClosedProtocolStrictEventTableRequest,
         >,
     {
@@ -25862,7 +25862,7 @@ pub trait UnknownInteractionsProtocolServerSender<___T: ::fidl_next::protocol::T
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsProtocolStrictEventFieldsRequest,
         >;
 
@@ -25872,7 +25872,7 @@ pub trait UnknownInteractionsProtocolServerSender<___T: ::fidl_next::protocol::T
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsProtocolStrictEventUnionRequest,
         >;
 
@@ -25882,7 +25882,7 @@ pub trait UnknownInteractionsProtocolServerSender<___T: ::fidl_next::protocol::T
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsProtocolStrictEventTableRequest,
         >;
 
@@ -25894,7 +25894,7 @@ pub trait UnknownInteractionsProtocolServerSender<___T: ::fidl_next::protocol::T
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsProtocolFlexibleEventFieldsRequest,
         >;
 
@@ -25904,7 +25904,7 @@ pub trait UnknownInteractionsProtocolServerSender<___T: ::fidl_next::protocol::T
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsProtocolFlexibleEventUnionRequest,
         >;
 
@@ -25914,7 +25914,7 @@ pub trait UnknownInteractionsProtocolServerSender<___T: ::fidl_next::protocol::T
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsProtocolFlexibleEventTableRequest,
         >;
 }
@@ -25934,7 +25934,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsProtocolStrictEventFieldsRequest,
         >,
     {
@@ -25947,7 +25947,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsProtocolStrictEventUnionRequest,
         >,
     {
@@ -25960,7 +25960,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsProtocolStrictEventTableRequest,
         >,
     {
@@ -25977,7 +25977,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsProtocolFlexibleEventFieldsRequest,
         >,
     {
@@ -25990,7 +25990,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsProtocolFlexibleEventUnionRequest,
         >,
     {
@@ -26003,7 +26003,7 @@ where
     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
-            ___T::Encoder<'buf>,
+            ___T::SendBuffer,
             Encoded = crate::WireUnknownInteractionsProtocolFlexibleEventTableRequest,
         >,
     {
