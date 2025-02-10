@@ -211,7 +211,6 @@ template("fidl_library") {
     "fuchsia.audio",
     "fuchsia.audio.controller",
     "fuchsia.audio.device",
-    "fuchsia.bluetooth.pandora",
     "fuchsia.drm",
     "fuchsia.media2",
     "fuchsia.memory.attribution.plugin",

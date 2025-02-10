@@ -270,7 +270,6 @@ _partner_internal_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.audio:fuchsia.audio",
   "//sdk/fidl/fuchsia.audio.controller:fuchsia.audio.controller",
   "//sdk/fidl/fuchsia.audio.device:fuchsia.audio.device",
-  "//sdk/fidl/fuchsia.bluetooth.pandora:fuchsia.bluetooth.pandora",
   "//sdk/fidl/fuchsia.dash:fuchsia.dash",
   "//sdk/fidl/fuchsia.debugger:fuchsia.debugger",
   "//sdk/fidl/fuchsia.developer.ffxdaemonlifecycle:fuchsia.developer.ffxdaemonlifecycle",
