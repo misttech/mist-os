@@ -4,7 +4,6 @@
 {
     include: [
         "//src/storage/lib/fs_management/client.shard.cml",
-        "//src/storage/testing/driver_test_realm/meta/client.shard.cml",
         "//src/storage/testing/meta/storage_test.shard.cml",
         "//src/sys/test_runners/rust/default.shard.cml",
         "sys/component/realm_builder.shard.cml",

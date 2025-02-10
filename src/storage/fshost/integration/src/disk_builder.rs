@@ -3,38 +3,35 @@
 // found in the LICENSE file.
 
 use blob_writer::BlobWriter;
-use block_client::BlockClient as _;
+use block_client::{BlockClient as _, RemoteBlockClient};
 use delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob};
-use device_watcher::{recursive_wait_and_open, recursive_wait_and_open_directory};
+use fake_block_server::FakeServer;
 use fidl::endpoints::{create_proxy, Proxy as _, ServerEnd};
-use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
 use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
 use fidl_fuchsia_fxfs::{BlobCreatorProxy, CryptManagementMarker, CryptMarker, KeyPurpose};
-use fidl_fuchsia_hardware_block::BlockMarker;
-use fs_management::filesystem::ServingMultiVolumeFilesystem;
-use fs_management::format::constants::{F2FS_MAGIC, FXFS_MAGIC, MINFS_MAGIC};
-use fs_management::{Blobfs, Fxfs, BLOBFS_TYPE_GUID, DATA_TYPE_GUID, FVM_TYPE_GUID_STR};
-use fuchsia_component::client::{
-    connect_to_named_protocol_at_dir_root, connect_to_protocol_at_dir_svc,
+use fs_management::filesystem::{
+    BlockConnector, DirBasedBlockConnector, Filesystem, ServingMultiVolumeFilesystem,
 };
+use fs_management::format::constants::{F2FS_MAGIC, FXFS_MAGIC, MINFS_MAGIC};
+use fs_management::{Fvm, Fxfs, BLOBFS_TYPE_GUID, DATA_TYPE_GUID, FVM_TYPE_GUID};
+use fuchsia_component::client::connect_to_protocol_at_dir_svc;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use fuchsia_hash::Hash;
-use fuchsia_runtime::vmar_root_self;
-use gpt::{partition_types, GptConfig};
+use gpt_component::gpt::GptManager;
 use key_bag::Aes256Key;
-use ramdevice_client::{RamdiskClient, RamdiskClientBuilder};
-use std::io::Write;
 use std::ops::Deref;
-use storage_isolated_driver_manager::fvm::{create_fvm_volume, set_up_fvm};
-use storage_isolated_driver_manager::zxcrypt;
+use std::sync::Arc;
+use storage_isolated_driver_manager::fvm::format_for_fvm;
 use uuid::Uuid;
+use vfs::directory::entry_container::Directory;
+use vfs::execution_scope::ExecutionScope;
+use vfs::path::Path;
+use vfs::ObjectRequest;
 use zerocopy::{Immutable, IntoBytes};
 use zx::{self as zx, HandleBased};
-use {fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger};
+use {fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger, fuchsia_async as fasync};
 
-const GPT_DRIVER_PATH: &str = "gpt.cm";
-
-const RAMDISK_BLOCK_SIZE: u64 = 512;
+const TEST_DISK_BLOCK_SIZE: u32 = 512;
 pub const FVM_SLICE_SIZE: u64 = 32 * 1024;
 
 // The default disk size is about 110MiB, with about 106MiB dedicated to the data volume. This size
@@ -86,58 +83,7 @@ const METADATA_KEY: Aes256Key = Aes256Key::create([
     0x8e, 0xea, 0xd8, 0x05, 0xc4, 0xc9, 0x0b, 0xa8, 0xd8, 0x85, 0x87, 0x50, 0x75, 0x40, 0x1c, 0x4c,
 ]);
 
-fn initialize_gpt(vmo: &zx::Vmo, block_size: u64) {
-    // The GPT library requires a File-like object or a slice of memory to write into. To avoid
-    // unnecessary copies, we temporarily map `vmo` into the test's address space, and pass a
-    // byte slice to the GPT library to use.
-    let flags =
-        zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE | zx::VmarFlags::REQUIRE_NON_RESIZABLE;
-    let size: usize = vmo.get_size().expect("Failed to obtain VMO size").try_into().unwrap();
-    let addr = vmar_root_self().map(0, &vmo, 0, size, flags).unwrap();
-    // Safety: The `buffer` slice is valid so long as the mapping exists and it's not resizable.
-    // We **must** ensure `addr` is unmapped before returning so it cannot outlive `vmo`.
-    assert!(flags.contains(zx::VmarFlags::REQUIRE_NON_RESIZABLE));
-    let buffer = unsafe { std::slice::from_raw_parts_mut(addr as *mut u8, size) };
-
-    // Initialize a new GPT with a single FVM partition.
-    let vmo_wrapper = Box::new(std::io::Cursor::new(buffer));
-    let mut disk = GptConfig::new()
-        .initialized(false)
-        .writable(true)
-        .logical_block_size(block_size.try_into().expect("Unsupported logical block size"))
-        .create_from_device(vmo_wrapper, None)
-        .unwrap();
-    disk.update_partitions(std::collections::BTreeMap::new()).expect("Failed to initialize GPT");
-
-    let sectors = disk.find_free_sectors();
-    assert!(sectors.len() == 1);
-    let block_size: u64 = disk.logical_block_size().clone().into();
-    let available_space = block_size * sectors[0].1 as u64;
-    let fvm_type = partition_types::Type {
-        guid: FVM_TYPE_GUID_STR,
-        os: partition_types::OperatingSystem::Custom("Fuchsia".to_owned()),
-    };
-    disk.add_partition("fvm", available_space, fvm_type, 0, None).unwrap();
-    let disk = disk.write().expect("Failed to write GPT");
-
-    // Safety: We have to ensure we drop all objects that own a reference to `buffer`, and ensure
-    // that we unmap the region before returning (so it cannot outlive `vmo`).
-    unsafe {
-        std::mem::drop(disk);
-        vmar_root_self().unmap(addr, size).expect("Failed to unmap VMAR");
-    }
-}
-
-async fn bind_gpt_driver(ramdisk: &RamdiskClient) {
-    ramdisk
-        .as_controller()
-        .unwrap()
-        .bind(GPT_DRIVER_PATH)
-        .await
-        .expect("FIDL error calling bind()")
-        .map_err(zx::Status::from_raw)
-        .expect("bind() returned non-Ok status");
-}
+const FVM_PART_INSTANCE_GUID: [u8; 16] = [3u8; 16];
 
 async fn create_hermetic_crypt_service(
     data_key: Aes256Key,
@@ -285,7 +231,7 @@ pub struct VolumesSpec {
 }
 
 enum FxfsType {
-    Fxfs(ControllerProxy),
+    Fxfs(Box<dyn BlockConnector>),
     FxBlob(ServingMultiVolumeFilesystem, RealmInstance),
 }
 
@@ -336,6 +282,13 @@ impl DiskBuilder {
     }
 
     pub fn data_volume_size(&mut self, data_volume_size: u64) -> &mut Self {
+        assert_eq!(
+            data_volume_size % FVM_SLICE_SIZE,
+            0,
+            "data_volume_size {} needs to be a multiple of fvm slice size {}",
+            data_volume_size,
+            FVM_SLICE_SIZE
+        );
         self.data_volume_size = data_volume_size;
         // Increase the size of the disk if required. NB: We don't decrease the size of the disk
         // because some tests set a lower initial size and expect to be able to resize to a larger
@@ -393,9 +346,72 @@ impl DiskBuilder {
         self
     }
 
-    async fn build_fxfs_as_volume_manager(&mut self, device_controller: ControllerProxy) {
+    pub async fn build(mut self) -> zx::Vmo {
+        let vmo = zx::Vmo::create(self.size).unwrap();
+
+        if self.uninitialized {
+            return vmo;
+        }
+
+        let server = Arc::new(FakeServer::from_vmo(
+            TEST_DISK_BLOCK_SIZE,
+            vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
+        ));
+
+        if self.gpt {
+            // Format the disk with gpt, with a single empty partition named "fvm".
+            let client = Arc::new(RemoteBlockClient::new(server.block_proxy()).await.unwrap());
+            let _ = gpt::Gpt::format(
+                client,
+                vec![gpt::PartitionInfo {
+                    label: "fvm".to_string(),
+                    type_guid: gpt::Guid::from_bytes(FVM_TYPE_GUID),
+                    instance_guid: gpt::Guid::from_bytes(FVM_PART_INSTANCE_GUID),
+                    start_block: 64,
+                    num_blocks: self.size / TEST_DISK_BLOCK_SIZE as u64 - 128,
+                    flags: 0,
+                }],
+            )
+            .await
+            .expect("gpt format failed");
+        }
+
+        if !self.format_volume_manager {
+            return vmo;
+        }
+
+        let mut gpt = None;
+        let connector: Box<dyn BlockConnector> = if self.gpt {
+            // Format the volume manager in the gpt partition named "fvm".
+            let partitions_dir = vfs::directory::immutable::simple();
+            let manager =
+                GptManager::new(server.block_proxy(), partitions_dir.clone()).await.unwrap();
+            let scope = ExecutionScope::new();
+            let (dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+            let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE;
+            ObjectRequest::new(flags, &fio::Options::default(), server_end.into_channel())
+                .handle(|request| partitions_dir.open3(scope.clone(), Path::dot(), flags, request));
+            gpt = Some(manager);
+            Box::new(DirBasedBlockConnector::new(dir, String::from("part-000/volume")))
+        } else {
+            // Format the volume manager onto the disk directly.
+            Box::new(move || Ok(server.volume_proxy().into_client_end().unwrap()))
+        };
+
+        if self.volumes_spec.fxfs_blob {
+            self.build_fxfs_as_volume_manager(connector).await;
+        } else {
+            self.build_fvm_as_volume_manager(connector).await;
+        }
+        if let Some(gpt) = gpt {
+            gpt.shutdown().await;
+        }
+        vmo
+    }
+
+    async fn build_fxfs_as_volume_manager(&mut self, connector: Box<dyn BlockConnector>) {
         let crypt_realm = create_hermetic_crypt_service(DATA_KEY, METADATA_KEY).await;
-        let mut fxfs = Fxfs::new(device_controller);
+        let mut fxfs = Filesystem::from_boxed_config(connector, Box::new(Fxfs::default()));
         // Wipes the device
         fxfs.format().await.expect("format failed");
         let mut fs = fxfs.serve_multi_volume().await.expect("serve_multi_volume failed");
@@ -420,220 +436,130 @@ impl DiskBuilder {
         }
     }
 
-    async fn build_fvm_as_volume_manager(
-        &mut self,
-        device_dir: &fio::DirectoryProxy,
-        device_controller: ControllerProxy,
-    ) {
-        // Initialize/provision the FVM headers and bind the FVM driver.
-        let volume_manager = set_up_fvm(&device_controller, device_dir, FVM_SLICE_SIZE as usize)
+    async fn build_fvm_as_volume_manager(&mut self, connector: Box<dyn BlockConnector>) {
+        let block_device = connector.connect_block().unwrap().into_proxy();
+        fasync::unblock(move || format_for_fvm(&block_device, FVM_SLICE_SIZE as usize))
             .await
-            .expect("set_up_fvm failed");
+            .unwrap();
+        let mut fvm_fs = Filesystem::from_boxed_config(connector, Box::new(Fvm::dynamic_child()));
+        let mut fvm = fvm_fs.serve_multi_volume().await.unwrap();
 
-        // Create and format the blobfs partition.
-        create_fvm_volume(
-            &volume_manager,
-            "blobfs",
-            &BLOBFS_TYPE_GUID,
-            Uuid::new_v4().as_bytes(),
-            None,
-            0,
-        )
-        .await
-        .expect("create_fvm_volume failed");
-        let blobfs_controller = recursive_wait_and_open::<ControllerMarker>(
-            &device_dir,
-            "/fvm/blobfs-p-1/block/device_controller",
-        )
-        .await
-        .expect("failed to open controller");
+        {
+            let blob_volume = fvm
+                .create_volume(
+                    "blobfs",
+                    CreateOptions {
+                        type_guid: Some(BLOBFS_TYPE_GUID),
+                        guid: Some(Uuid::new_v4().into_bytes()),
+                        ..Default::default()
+                    },
+                    MountOptions {
+                        uri: Some(String::from("#meta/blobfs.cm")),
+                        ..Default::default()
+                    },
+                )
+                .await
+                .expect("failed to make fvm blobfs volume");
+            self.blob_hash = Some(write_test_blob(blob_volume.root(), &BLOB_CONTENTS, false).await);
+        }
+        fvm.shutdown_volume("blobfs").await.unwrap();
 
-        let mut blobfs = Blobfs::new(blobfs_controller);
-        blobfs.format().await.expect("format failed");
-        blobfs.fsck().await.expect("failed to fsck blobfs");
-        let serving_blobfs = blobfs.serve().await.expect("failed to serve blobfs");
-        self.blob_hash = Some(write_test_blob(serving_blobfs.root(), &BLOB_CONTENTS, false).await);
-        serving_blobfs.shutdown().await.expect("shutdown failed");
         if self.volumes_spec.create_data_partition {
             let data_label = if self.legacy_data_label { "minfs" } else { "data" };
-            // Create and format the data partition.
-            create_fvm_volume(
-                &volume_manager,
-                data_label,
-                &DATA_TYPE_GUID,
-                Uuid::new_v4().as_bytes(),
-                Some(self.data_volume_size),
-                0,
-            )
-            .await
-            .expect("create_fvm_volume failed");
 
-            // TODO(https://fxbug.dev/42072287): Remove hardcoded path.
-            let data_block_path = format!("/fvm/{}-p-2/block", data_label);
-            let data_dir = recursive_wait_and_open_directory(&device_dir, &data_block_path)
-                .await
-                .expect("failed to open data partition");
-            let data_controller = connect_to_named_protocol_at_dir_root::<ControllerMarker>(
-                &data_dir,
-                "device_controller",
-            )
-            .expect("failed to connect to data device controller");
-            // Potentially set up zxcrypt, if we are configured to and aren't using Fxfs.
-            let data_controller = if self.data_spec.format != Some("fxfs") && self.data_spec.zxcrypt
-            {
-                let zxcrypt_block_dir = zxcrypt::set_up_insecure_zxcrypt(&data_dir)
-                    .await
-                    .expect("failed to set up zxcrypt");
-                connect_to_named_protocol_at_dir_root::<ControllerMarker>(
-                    &zxcrypt_block_dir,
-                    "device_controller",
-                )
-                .expect("failed to connect to the device")
+            let _crypt_service;
+            let crypt = if self.data_spec.format != Some("fxfs") && self.data_spec.zxcrypt {
+                let (crypt, stream) = fidl::endpoints::create_request_stream();
+                _crypt_service = fasync::Task::spawn(zxcrypt_crypt::run_crypt_service(
+                    crypt_policy::Policy::Null,
+                    stream,
+                ));
+                Some(crypt)
             } else {
-                data_controller
+                None
+            };
+            let uri = match (&self.data_spec.format, self.corrupt_data) {
+                (None, _) => None,
+                (_, true) => None,
+                (Some("fxfs"), false) => None,
+                (Some("minfs"), false) => Some(String::from("#meta/minfs.cm")),
+                (Some("f2fs"), false) => Some(String::from("#meta/f2fs.cm")),
+                (Some(format), _) => panic!("unsupported data volume format '{}'", format),
             };
 
-            if let Some(format) = self.data_spec.format {
-                match format {
-                    "fxfs" => self.init_data_fxfs(FxfsType::Fxfs(data_controller)).await,
-                    "minfs" => self.init_data_minfs(data_controller).await,
-                    "f2fs" => self.init_data_f2fs(data_controller).await,
-                    _ => panic!("unsupported data filesystem format type"),
+            let data_volume = fvm
+                .create_volume(
+                    data_label,
+                    CreateOptions {
+                        initial_size: Some(self.data_volume_size),
+                        type_guid: Some(DATA_TYPE_GUID),
+                        guid: Some(Uuid::new_v4().into_bytes()),
+                        ..Default::default()
+                    },
+                    MountOptions { crypt, uri, ..Default::default() },
+                )
+                .await
+                .unwrap();
+
+            if self.corrupt_data {
+                let volume_proxy = connect_to_protocol_at_dir_svc::<
+                    fidl_fuchsia_hardware_block_volume::VolumeMarker,
+                >(data_volume.exposed_dir())
+                .unwrap();
+                match self.data_spec.format {
+                    Some("fxfs") => self.write_magic(volume_proxy, FXFS_MAGIC, 0).await,
+                    Some("minfs") => self.write_magic(volume_proxy, MINFS_MAGIC, 0).await,
+                    Some("f2fs") => self.write_magic(volume_proxy, F2FS_MAGIC, 1024).await,
+                    _ => (),
                 }
+            } else if self.data_spec.format == Some("fxfs") {
+                let dir = fuchsia_fs::directory::clone(data_volume.exposed_dir()).unwrap();
+                self.init_data_fxfs(FxfsType::Fxfs(Box::new(DirBasedBlockConnector::new(
+                    dir,
+                    String::from("svc/fuchsia.hardware.block.volume.Volume"),
+                ))))
+                .await
+            } else if self.data_spec.format.is_some() {
+                self.write_test_data(data_volume.root()).await;
+                fvm.shutdown_volume(data_label).await.unwrap();
             }
         }
+
         if self.with_account_and_virtualization {
-            // Create account and virtualization partitions
-            create_fvm_volume(
-                &volume_manager,
+            fvm.create_volume(
                 "account",
-                &DATA_TYPE_GUID,
-                Uuid::new_v4().as_bytes(),
-                None,
-                0,
+                CreateOptions {
+                    type_guid: Some(DATA_TYPE_GUID),
+                    guid: Some(Uuid::new_v4().into_bytes()),
+                    ..Default::default()
+                },
+                MountOptions::default(),
             )
             .await
-            .expect("create_fvm_volume failed");
-
-            // For the sake of the test, we set up virtualization
-            // with a DATA_TYPE_GUID
-            create_fvm_volume(
-                &volume_manager,
+            .expect("failed to make fvm account volume");
+            fvm.create_volume(
                 "virtualization",
-                &DATA_TYPE_GUID,
-                Uuid::new_v4().as_bytes(),
-                None,
-                0,
+                CreateOptions {
+                    type_guid: Some(DATA_TYPE_GUID),
+                    guid: Some(Uuid::new_v4().into_bytes()),
+                    ..Default::default()
+                },
+                MountOptions::default(),
             )
             .await
-            .expect("create_fvm_volume failed");
-        }
-    }
-
-    pub async fn build(mut self) -> zx::Vmo {
-        let vmo = zx::Vmo::create(self.size).unwrap();
-
-        if self.uninitialized {
-            return vmo;
+            .expect("failed to make fvm virtualization volume");
         }
 
-        // Initialize the VMO with GPT headers and an *empty* FVM partition.
-        if self.gpt {
-            initialize_gpt(&vmo, RAMDISK_BLOCK_SIZE);
-        }
-
-        if !self.format_volume_manager {
-            return vmo;
-        }
-
-        // Create a ramdisk with a duplicate handle of `vmo` so we can keep the data once destroyed.
-        let ramdisk = RamdiskClientBuilder::new_with_vmo(
-            vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
-            Some(RAMDISK_BLOCK_SIZE),
-        )
-        .build()
-        .await
-        .unwrap();
-
-        // Path to block device or partition which will back the FVM. Assumed to be empty/zeroed.
-        // TODO(https://fxbug.dev/42072287): Remove hardcoded path.
-        let block_path = "/part-000/block";
-        let device_dir = if self.gpt {
-            bind_gpt_driver(&ramdisk).await;
-            let device_dir = recursive_wait_and_open_directory(
-                ramdisk.as_dir().expect("invalid directory proxy"),
-                block_path,
-            )
-            .await
-            .expect("failed to open device");
-            Some(device_dir)
-        } else {
-            None
-        };
-
-        let device_dir =
-            device_dir.as_ref().unwrap_or(ramdisk.as_dir().expect("invalid directory proxy"));
-        let device_controller = connect_to_named_protocol_at_dir_root::<ControllerMarker>(
-            device_dir,
-            "device_controller",
-        )
-        .expect("failed to connect to device controller");
-
-        if self.volumes_spec.fxfs_blob {
-            self.build_fxfs_as_volume_manager(device_controller).await;
-        } else {
-            self.build_fvm_as_volume_manager(device_dir, device_controller).await;
-        }
-
-        ramdisk.destroy().await.expect("destroy failed");
-        vmo
-    }
-
-    async fn init_data_minfs(&self, data_device: ControllerProxy) {
-        if self.corrupt_data {
-            let (block, server) = fidl::endpoints::create_proxy::<BlockMarker>();
-            let () = data_device.connect_to_device_fidl(server.into_channel()).unwrap();
-
-            // Just write the magic so it appears formatted to fshost.
-            return self.write_magic(block, MINFS_MAGIC, 0).await;
-        }
-
-        let mut minfs = fs_management::Minfs::new(data_device);
-        minfs.format().await.expect("format failed");
-        let fs = minfs.serve().await.expect("serve_single_volume failed");
-        self.write_test_data(&fs.root()).await;
-        fs.shutdown().await.expect("shutdown failed");
-    }
-
-    async fn init_data_f2fs(&self, data_device: ControllerProxy) {
-        if self.corrupt_data {
-            let (block, server) = fidl::endpoints::create_proxy::<BlockMarker>();
-            let () = data_device.connect_to_device_fidl(server.into_channel()).unwrap();
-
-            // Just write the magic so it appears formatted to fshost.
-            return self.write_magic(block, F2FS_MAGIC, 1024).await;
-        }
-
-        let mut f2fs = fs_management::F2fs::new(data_device);
-        f2fs.format().await.expect("format failed");
-        let fs = f2fs.serve().await.expect("serve_single_volume failed");
-        self.write_test_data(&fs.root()).await;
-        fs.shutdown().await.expect("shutdown failed");
+        fvm.shutdown().await.expect("fvm shutdown failed");
     }
 
     async fn init_data_fxfs(&self, fxfs: FxfsType) {
         let mut fxblob = false;
         let (mut fs, crypt_realm) = match fxfs {
-            FxfsType::Fxfs(data_device) => {
-                if self.corrupt_data {
-                    let (block, server) = fidl::endpoints::create_proxy::<BlockMarker>();
-                    let () = data_device.connect_to_device_fidl(server.into_channel()).unwrap();
-
-                    // Just write the magic so it appears formatted to fshost.
-                    return self.write_magic(block, FXFS_MAGIC, 0).await;
-                }
+            FxfsType::Fxfs(connector) => {
                 let crypt_realm = create_hermetic_crypt_service(DATA_KEY, METADATA_KEY).await;
-                let mut fxfs = Fxfs::new(data_device);
+                let mut fxfs =
+                    Filesystem::from_boxed_config(connector, Box::new(Fxfs::dynamic_child()));
                 fxfs.format().await.expect("format failed");
                 (fxfs.serve_multi_volume().await.expect("serve_multi_volume failed"), crypt_realm)
             }
@@ -648,16 +574,30 @@ impl DiskBuilder {
                 .create_volume("unencrypted", CreateOptions::default(), MountOptions::default())
                 .await
                 .expect("create_volume failed");
-            vol.bind_to_path("/unencrypted_volume").unwrap();
-            // Initialize the key-bag with the static keys.
-            std::fs::create_dir("/unencrypted_volume/keys").expect("create_dir failed");
-            let mut file = std::fs::File::create("/unencrypted_volume/keys/fxfs-data")
-                .expect("create file failed");
+            let keys_dir = fuchsia_fs::directory::create_directory(
+                vol.root(),
+                "keys",
+                fio::PERM_READABLE | fio::PERM_WRITABLE,
+            )
+            .await
+            .unwrap();
+            let keys_file = fuchsia_fs::directory::open_file(
+                &keys_dir,
+                "fxfs-data",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::Flags::PROTOCOL_FILE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE,
+            )
+            .await
+            .unwrap();
             let mut key_bag = KEY_BAG_CONTENTS.as_bytes();
             if self.corrupt_data && fxblob {
                 key_bag = &BLOB_CONTENTS;
             }
-            file.write_all(key_bag).expect("write file failed");
+            fuchsia_fs::file::write(&keys_file, key_bag).await.unwrap();
+            fuchsia_fs::file::close(keys_file).await.unwrap();
+            fuchsia_fs::directory::close(keys_dir).await.unwrap();
 
             let crypt_service = Some(
                 crypt_realm
@@ -734,11 +674,11 @@ impl DiskBuilder {
 
     async fn write_magic<const N: usize>(
         &self,
-        block_proxy: fidl_fuchsia_hardware_block::BlockProxy,
+        volume_proxy: fidl_fuchsia_hardware_block_volume::VolumeProxy,
         value: [u8; N],
         offset: u64,
     ) {
-        let client = block_client::RemoteBlockClient::new(block_proxy)
+        let client = block_client::RemoteBlockClient::new(volume_proxy)
             .await
             .expect("Failed to create client");
         let block_size = client.block_size() as usize;

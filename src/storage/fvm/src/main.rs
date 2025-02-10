@@ -1245,11 +1245,16 @@ impl Component {
         let slices = match create_options.initial_size {
             Some(x) => {
                 if x % inner.metadata.header.slice_size > 0 {
-                    return Err(anyhow!(zx::Status::INVALID_ARGS).context("Invalid volume size"));
+                    return Err(anyhow!(zx::Status::INVALID_ARGS)).with_context(|| {
+                        format!(
+                            "Invalid volume size: size {} not a multiple of slice size {}",
+                            x, inner.metadata.header.slice_size
+                        )
+                    });
                 }
-                (x / inner.metadata.header.slice_size)
-                    .try_into()
-                    .map_err(|_| anyhow!(zx::Status::INVALID_ARGS).context("Invalid volume size"))?
+                (x / inner.metadata.header.slice_size).try_into().map_err(|_| {
+                    anyhow!(zx::Status::INVALID_ARGS).context("Invalid volume size: too large")
+                })?
             }
             None => 1,
         };

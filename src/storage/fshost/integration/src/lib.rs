@@ -42,6 +42,17 @@ pub const BLOBFS_MAX_BYTES: u64 = 8765432;
 pub const DATA_MAX_BYTES: u64 = 109876543;
 pub const STARNIX_VOLUME_NAME: &str = "starnix_volume";
 
+pub fn round_down<
+    T: Into<U>,
+    U: Copy + std::ops::Rem<U, Output = U> + std::ops::Sub<U, Output = U>,
+>(
+    offset: U,
+    block_size: T,
+) -> U {
+    let block_size = block_size.into();
+    offset - offset % block_size
+}
+
 pub struct TestFixtureBuilder {
     netboot: bool,
     no_fuchsia_boot: bool,
@@ -338,7 +349,7 @@ impl TestFixture {
         self.dir("data", fio::PERM_READABLE)
             .open(".testdata", fio::PERM_READABLE, &fio::Options::default(), server.into_channel())
             .expect("open failed");
-        file.get_attr().await.expect("get_attr failed");
+        file.get_attr().await.expect("get_attr failed - data was probably deleted!");
 
         let data = self.dir("data", fio::PERM_READABLE);
         fuchsia_fs::directory::open_file(&data, ".testdata", fio::PERM_READABLE).await.unwrap();

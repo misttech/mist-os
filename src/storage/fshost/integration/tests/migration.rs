@@ -33,15 +33,15 @@
 
 pub mod config;
 use config::{data_fs_name, data_fs_type, new_builder, volumes_spec};
-use fshost_test_fixture::disk_builder::DataSpec;
-use fshost_test_fixture::DATA_MAX_BYTES;
+use fshost_test_fixture::disk_builder::{DataSpec, FVM_SLICE_SIZE};
+use fshost_test_fixture::{round_down, DATA_MAX_BYTES};
 
 /// f2fs requires more space than other filesystems so we use different values for it..
 fn data_max_bytes() -> u64 {
     if data_fs_name() == "f2fs" {
         100 * 1024 * 1024
     } else {
-        DATA_MAX_BYTES / 2
+        round_down(DATA_MAX_BYTES / 2, FVM_SLICE_SIZE)
     }
 }
 fn disk_size_bytes() -> u64 {

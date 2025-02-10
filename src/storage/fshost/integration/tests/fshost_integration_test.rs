@@ -15,7 +15,7 @@ use fshost_test_fixture::disk_builder::{
     DataSpec, VolumesSpec, DEFAULT_DATA_VOLUME_SIZE, FVM_SLICE_SIZE,
 };
 use fshost_test_fixture::{
-    BLOBFS_MAX_BYTES, DATA_MAX_BYTES, VFS_TYPE_FXFS, VFS_TYPE_MEMFS, VFS_TYPE_MINFS,
+    round_down, BLOBFS_MAX_BYTES, DATA_MAX_BYTES, VFS_TYPE_FXFS, VFS_TYPE_MEMFS, VFS_TYPE_MINFS,
 };
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use futures::FutureExt;
@@ -85,6 +85,7 @@ async fn data_formatted() {
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
+    fixture.check_test_blob(DATA_FILESYSTEM_VARIANT == "fxblob").await;
 
     fixture.tear_down().await;
 }
@@ -131,7 +132,7 @@ async fn data_formatted_no_fuchsia_boot() {
 #[fuchsia::test]
 async fn data_formatted_with_small_initial_volume() {
     let mut builder = new_builder();
-    builder.with_disk().format_volumes(volumes_spec()).data_volume_size(1);
+    builder.with_disk().format_volumes(volumes_spec()).data_volume_size(FVM_SLICE_SIZE);
     let fixture = builder.build().await;
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
@@ -149,7 +150,7 @@ async fn data_formatted_with_small_initial_volume_big_target() {
         "data_max_bytes",
         fshost_test_fixture::disk_builder::DEFAULT_DISK_SIZE * 2,
     );
-    builder.with_disk().format_volumes(volumes_spec()).data_volume_size(1);
+    builder.with_disk().format_volumes(volumes_spec()).data_volume_size(FVM_SLICE_SIZE);
     let fixture = builder.build().await;
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
@@ -1011,7 +1012,7 @@ async fn migration_toggle() {
         .set_config_value("use_disk_migration", true);
     builder
         .with_disk()
-        .data_volume_size(DATA_MAX_BYTES / 2)
+        .data_volume_size(round_down(DATA_MAX_BYTES / 2, FVM_SLICE_SIZE))
         .format_volumes(volumes_spec())
         .format_data(DataSpec { format: Some("minfs"), zxcrypt: true, ..Default::default() })
         .set_fs_switch("toggle");
@@ -1043,7 +1044,7 @@ async fn migration_to_fxfs() {
         .set_config_value("use_disk_migration", true);
     builder
         .with_disk()
-        .data_volume_size(DATA_MAX_BYTES / 2)
+        .data_volume_size(round_down(DATA_MAX_BYTES / 2, FVM_SLICE_SIZE))
         .format_volumes(volumes_spec())
         .format_data(DataSpec { format: Some("minfs"), zxcrypt: true, ..Default::default() })
         .set_fs_switch("fxfs");
@@ -1065,7 +1066,7 @@ async fn migration_to_minfs() {
         .set_config_value("use_disk_migration", true);
     builder
         .with_disk()
-        .data_volume_size(DATA_MAX_BYTES / 2)
+        .data_volume_size(round_down(DATA_MAX_BYTES / 2, FVM_SLICE_SIZE))
         .format_volumes(volumes_spec())
         .format_data(DataSpec { format: Some("fxfs"), zxcrypt: false, ..Default::default() })
         .set_fs_switch("minfs");
