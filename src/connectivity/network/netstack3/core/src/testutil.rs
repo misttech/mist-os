@@ -1324,7 +1324,7 @@ impl IcmpEchoBindingsTypes for FakeBindingsCtx {
 }
 
 impl DeviceSocketTypes for FakeBindingsCtx {
-    type SocketState = Mutex<Vec<(WeakDeviceId<FakeBindingsCtx>, Vec<u8>)>>;
+    type SocketState<D: Send + Sync + Debug> = Mutex<Vec<(WeakDeviceId<FakeBindingsCtx>, Vec<u8>)>>;
 }
 
 impl RawIpSocketsBindingsTypes for FakeBindingsCtx {
@@ -1334,7 +1334,7 @@ impl RawIpSocketsBindingsTypes for FakeBindingsCtx {
 impl DeviceSocketBindingsContext<DeviceId<Self>> for FakeBindingsCtx {
     fn receive_frame(
         &self,
-        state: &Self::SocketState,
+        state: &Self::SocketState<WeakDeviceId<Self>>,
         device: &DeviceId<Self>,
         _frame: device::socket::Frame<&[u8]>,
         raw_frame: &[u8],

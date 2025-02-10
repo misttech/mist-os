@@ -62,7 +62,10 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets>>
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSocketState>>
     SocketStateAccessor<BC> for CoreCtx<'_, BC, L>
 {
-    fn with_socket_state<F: FnOnce(&BC::SocketState, &Target<Self::WeakDeviceId>) -> R, R>(
+    fn with_socket_state<
+        F: FnOnce(&BC::SocketState<Self::WeakDeviceId>, &Target<Self::WeakDeviceId>) -> R,
+        R,
+    >(
         &mut self,
         id: &DeviceSocketId<Self::WeakDeviceId, BC>,
         cb: F,
@@ -74,7 +77,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceSocketState>
     }
 
     fn with_socket_state_mut<
-        F: FnOnce(&BC::SocketState, &mut Target<Self::WeakDeviceId>) -> R,
+        F: FnOnce(&BC::SocketState<Self::WeakDeviceId>, &mut Target<Self::WeakDeviceId>) -> R,
         R,
     >(
         &mut self,

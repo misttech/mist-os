@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::fmt::Debug;
 use std::num::NonZeroU16;
 use std::ops::ControlFlow;
 
@@ -50,13 +51,13 @@ pub(crate) struct SocketState {
 }
 
 impl DeviceSocketTypes for BindingsCtx {
-    type SocketState = SocketState;
+    type SocketState<D: Send + Sync + Debug> = SocketState;
 }
 
 impl DeviceSocketBindingsContext<DeviceId<Self>> for BindingsCtx {
     fn receive_frame(
         &self,
-        state: &Self::SocketState,
+        state: &SocketState,
         device: &DeviceId<Self>,
         frame: Frame<&[u8]>,
         raw: &[u8],
