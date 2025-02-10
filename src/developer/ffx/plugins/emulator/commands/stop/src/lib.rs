@@ -16,6 +16,7 @@ use std::path::PathBuf;
 
 /// Sub-sub tool for `emu stop`
 #[derive(FfxTool)]
+#[no_target]
 pub struct EmuStopTool {
     #[command]
     cmd: StopCommand,
