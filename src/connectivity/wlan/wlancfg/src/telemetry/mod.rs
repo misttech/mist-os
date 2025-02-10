@@ -61,6 +61,18 @@ pub const MINUTES_BETWEEN_COBALT_SYSLOG_WARNINGS: i64 = 60;
 /// TODO(https://fxbug.dev/42165706): Tune smoothing factor.
 pub const EWMA_SMOOTHING_FACTOR_FOR_METRICS: usize = 10;
 
+#[allow(non_camel_case_types)]
+// Temporary metric ids while renaming. See go/tq-cobalt-registry-changes#renaming-entities.
+const ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID: u32 = 2008;
+const NON_ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID: u32 = 2009;
+const CONNECTED_DURATION_BEFORE_ROAMING_DISCONNECT_METRIC_ID: u32 = 4030;
+const NETWORK_ROAMING_DISCONNECT_COUNTS_METRIC_ID: u32 = 4027;
+const CONNECTED_DURATION_BEFORE_NON_ROAMING_DISCONNECT_METRIC_ID: u32 = 4031;
+const NETWORK_NON_ROAMING_DISCONNECT_COUNTS_METRIC_ID: u32 = 4028;
+const ROAMING_RECONNECT_DURATION_METRIC_ID: u32 = 4035;
+const NON_ROAMING_RECONNECT_DURATION_METRIC_ID: u32 = 4036;
+const POLICY_PROACTIVE_ROAMING_SCAN_COUNTS_METRIC_ID: u32 = 4026;
+
 #[derive(Clone, Debug, PartialEq)]
 // Connection score and the time at which it was calculated.
 pub struct TimestampedConnectionScore {
@@ -2077,7 +2089,7 @@ impl StatsLogger {
         let roam_dpdc_ratio = c.roaming_disconnect_count as f64 / connected_dur_in_day;
         if roam_dpdc_ratio.is_finite() {
             metric_events.push(MetricEvent {
-                metric_id: metrics::ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID,
+                metric_id: ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID,
                 event_codes: vec![],
                 payload: MetricEventPayload::IntegerValue(float_to_ten_thousandth(roam_dpdc_ratio)),
             });
@@ -2086,7 +2098,7 @@ impl StatsLogger {
         let non_roam_dpdc_ratio = c.non_roaming_disconnect_count as f64 / connected_dur_in_day;
         if non_roam_dpdc_ratio.is_finite() {
             metric_events.push(MetricEvent {
-                metric_id: metrics::NON_ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID,
+                metric_id: NON_ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID,
                 event_codes: vec![],
                 payload: MetricEventPayload::IntegerValue(float_to_ten_thousandth(
                     non_roam_dpdc_ratio,
@@ -2524,24 +2536,24 @@ impl StatsLogger {
             // if it is another user reason such as an unsaved network.
             if is_roam_disconnect(reason) {
                 metric_events.push(MetricEvent {
-                    metric_id: metrics::CONNECTED_DURATION_BEFORE_ROAMING_DISCONNECT_METRIC_ID,
+                    metric_id: CONNECTED_DURATION_BEFORE_ROAMING_DISCONNECT_METRIC_ID,
                     event_codes: vec![],
                     payload: MetricEventPayload::IntegerValue(duration_minutes),
                 });
                 metric_events.push(MetricEvent {
-                    metric_id: metrics::NETWORK_ROAMING_DISCONNECT_COUNTS_METRIC_ID,
+                    metric_id: NETWORK_ROAMING_DISCONNECT_COUNTS_METRIC_ID,
                     event_codes: vec![],
                     payload: MetricEventPayload::Count(1),
                 });
             }
         } else {
             metric_events.push(MetricEvent {
-                metric_id: metrics::CONNECTED_DURATION_BEFORE_NON_ROAMING_DISCONNECT_METRIC_ID,
+                metric_id: CONNECTED_DURATION_BEFORE_NON_ROAMING_DISCONNECT_METRIC_ID,
                 event_codes: vec![],
                 payload: MetricEventPayload::IntegerValue(duration_minutes),
             });
             metric_events.push(MetricEvent {
-                metric_id: metrics::NETWORK_NON_ROAMING_DISCONNECT_COUNTS_METRIC_ID,
+                metric_id: NETWORK_NON_ROAMING_DISCONNECT_COUNTS_METRIC_ID,
                 event_codes: vec![],
                 payload: MetricEventPayload::Count(1),
             });
@@ -2911,7 +2923,7 @@ impl StatsLogger {
         if let fidl_sme::DisconnectSource::User(reason) = disconnect_reason {
             if is_roam_disconnect(reason) {
                 metric_events.push(MetricEvent {
-                    metric_id: metrics::ROAMING_RECONNECT_DURATION_METRIC_ID,
+                    metric_id: ROAMING_RECONNECT_DURATION_METRIC_ID,
                     event_codes: vec![],
                     payload: MetricEventPayload::IntegerValue(reconnect_duration.into_micros()),
                 });
@@ -2919,7 +2931,7 @@ impl StatsLogger {
         } else {
             // The other disconnect sources are AP and MLME, which are all considered unexpected.
             metric_events.push(MetricEvent {
-                metric_id: metrics::NON_ROAMING_RECONNECT_DURATION_METRIC_ID,
+                metric_id: NON_ROAMING_RECONNECT_DURATION_METRIC_ID,
                 event_codes: vec![],
                 payload: MetricEventPayload::IntegerValue(reconnect_duration.into_micros()),
             });
@@ -3049,7 +3061,7 @@ impl StatsLogger {
         self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
             self.cobalt_1dot1_proxy,
             log_occurrence,
-            metrics::POLICY_PROACTIVE_ROAMING_SCAN_COUNTS_METRIC_ID,
+            POLICY_PROACTIVE_ROAMING_SCAN_COUNTS_METRIC_ID,
             1,
             &[],
         ));
@@ -3062,7 +3074,7 @@ impl StatsLogger {
         self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
             self.cobalt_1dot1_proxy,
             log_occurrence,
-            metrics::NETWORK_ROAMING_DISCONNECT_COUNTS_METRIC_ID,
+            NETWORK_ROAMING_DISCONNECT_COUNTS_METRIC_ID,
             1,
             &[],
         ));
@@ -5918,13 +5930,13 @@ mod tests {
         assert_eq!(dpdc_ratios[0].payload, MetricEventPayload::IntegerValue(60_000));
 
         // 1 roaming disconnect, 0.5 day connected => 2 roaming disconnects per day connected
-        let non_roam_dpdc_ratios = test_helper
-            .get_logged_metrics(metrics::NON_ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID);
+        let non_roam_dpdc_ratios =
+            test_helper.get_logged_metrics(NON_ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID);
         assert_eq!(non_roam_dpdc_ratios.len(), 1);
         assert_eq!(non_roam_dpdc_ratios[0].payload, MetricEventPayload::IntegerValue(20_000));
 
         let roam_dpdc_ratios =
-            test_helper.get_logged_metrics(metrics::ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID);
+            test_helper.get_logged_metrics(ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID);
         assert_eq!(roam_dpdc_ratios.len(), 1);
         assert_eq!(roam_dpdc_ratios[0].payload, MetricEventPayload::IntegerValue(20_000));
 
@@ -5948,8 +5960,8 @@ mod tests {
         assert_eq!(dpdc_ratios.len(), 1);
         assert_eq!(dpdc_ratios[0].payload, MetricEventPayload::IntegerValue(0));
 
-        let non_roam_dpdc_ratios = test_helper
-            .get_logged_metrics(metrics::NON_ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID);
+        let non_roam_dpdc_ratios =
+            test_helper.get_logged_metrics(NON_ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID);
         assert_eq!(non_roam_dpdc_ratios.len(), 1);
         assert_eq!(non_roam_dpdc_ratios[0].payload, MetricEventPayload::IntegerValue(0));
 
@@ -5961,7 +5973,7 @@ mod tests {
         assert_eq!(dpdc_ratios_7d[0].payload, MetricEventPayload::IntegerValue(20_000));
 
         let roam_dpdc_ratios =
-            test_helper.get_logged_metrics(metrics::ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID);
+            test_helper.get_logged_metrics(ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID);
         assert_eq!(roam_dpdc_ratios.len(), 1);
         assert_eq!(roam_dpdc_ratios[0].payload, MetricEventPayload::IntegerValue(0));
     }
@@ -5994,13 +6006,13 @@ mod tests {
         // (which equals 20_0000 in TenThousandth unit)
         assert_eq!(dpdc_ratios[0].payload, MetricEventPayload::IntegerValue(20_000));
 
-        let non_roam_dpdc_ratios = test_helper
-            .get_logged_metrics(metrics::NON_ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID);
+        let non_roam_dpdc_ratios =
+            test_helper.get_logged_metrics(NON_ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID);
         assert_eq!(non_roam_dpdc_ratios.len(), 1);
         assert_eq!(non_roam_dpdc_ratios[0].payload, MetricEventPayload::IntegerValue(0));
 
         let roam_dpdc_ratios =
-            test_helper.get_logged_metrics(metrics::ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID);
+            test_helper.get_logged_metrics(ROAMING_DISCONNECT_PER_DAY_CONNECTED_METRIC_ID);
         assert_eq!(roam_dpdc_ratios.len(), 1);
         assert_eq!(roam_dpdc_ratios[0].payload, MetricEventPayload::IntegerValue(20_000));
     }
@@ -6680,13 +6692,12 @@ mod tests {
         assert_eq!(breakdowns_by_security_type[0].payload, MetricEventPayload::Count(1));
 
         // Check that non-roaming and total disconnects are logged but not a roaming disconnect.
-        let roam_connected_duration = test_helper
-            .get_logged_metrics(metrics::CONNECTED_DURATION_BEFORE_ROAMING_DISCONNECT_METRIC_ID);
+        let roam_connected_duration =
+            test_helper.get_logged_metrics(CONNECTED_DURATION_BEFORE_ROAMING_DISCONNECT_METRIC_ID);
         assert_eq!(roam_connected_duration.len(), 0);
 
-        let non_roam_connected_duration = test_helper.get_logged_metrics(
-            metrics::CONNECTED_DURATION_BEFORE_NON_ROAMING_DISCONNECT_METRIC_ID,
-        );
+        let non_roam_connected_duration = test_helper
+            .get_logged_metrics(CONNECTED_DURATION_BEFORE_NON_ROAMING_DISCONNECT_METRIC_ID);
         assert_eq!(non_roam_connected_duration.len(), 1);
         assert_eq!(non_roam_connected_duration[0].payload, MetricEventPayload::IntegerValue(300));
 
@@ -6700,11 +6711,11 @@ mod tests {
         assert!(user_network_change_counts.is_empty());
 
         let roam_disconnect_counts =
-            test_helper.get_logged_metrics(metrics::NETWORK_ROAMING_DISCONNECT_COUNTS_METRIC_ID);
+            test_helper.get_logged_metrics(NETWORK_ROAMING_DISCONNECT_COUNTS_METRIC_ID);
         assert!(roam_disconnect_counts.is_empty());
 
-        let non_roam_disconnect_counts = test_helper
-            .get_logged_metrics(metrics::NETWORK_NON_ROAMING_DISCONNECT_COUNTS_METRIC_ID);
+        let non_roam_disconnect_counts =
+            test_helper.get_logged_metrics(NETWORK_NON_ROAMING_DISCONNECT_COUNTS_METRIC_ID);
         assert_eq!(non_roam_disconnect_counts.len(), 1);
         assert_eq!(non_roam_disconnect_counts[0].payload, MetricEventPayload::Count(1));
 
@@ -6739,14 +6750,13 @@ mod tests {
 
         // Check that connected durations for roam and total disconnects are logged, and not for
         // a non-roaming disconnect.
-        let roam_connected_duration = test_helper
-            .get_logged_metrics(metrics::CONNECTED_DURATION_BEFORE_ROAMING_DISCONNECT_METRIC_ID);
+        let roam_connected_duration =
+            test_helper.get_logged_metrics(CONNECTED_DURATION_BEFORE_ROAMING_DISCONNECT_METRIC_ID);
         assert_eq!(roam_connected_duration.len(), 1);
         assert_eq!(roam_connected_duration[0].payload, MetricEventPayload::IntegerValue(DUR_MIN));
 
-        let non_roam_connected_duration = test_helper.get_logged_metrics(
-            metrics::CONNECTED_DURATION_BEFORE_NON_ROAMING_DISCONNECT_METRIC_ID,
-        );
+        let non_roam_connected_duration = test_helper
+            .get_logged_metrics(CONNECTED_DURATION_BEFORE_NON_ROAMING_DISCONNECT_METRIC_ID);
         assert_eq!(non_roam_connected_duration.len(), 0);
 
         let total_connected_duration =
@@ -6761,12 +6771,12 @@ mod tests {
 
         // Check that a roam and total disconnect is logged, and not a non-roaming disconnect.
         let roam_disconnect_counts =
-            test_helper.get_logged_metrics(metrics::NETWORK_ROAMING_DISCONNECT_COUNTS_METRIC_ID);
+            test_helper.get_logged_metrics(NETWORK_ROAMING_DISCONNECT_COUNTS_METRIC_ID);
         assert_eq!(roam_disconnect_counts.len(), 1);
         assert_eq!(roam_disconnect_counts[0].payload, MetricEventPayload::Count(1));
 
-        let non_roam_disconnect_counts = test_helper
-            .get_logged_metrics(metrics::NETWORK_NON_ROAMING_DISCONNECT_COUNTS_METRIC_ID);
+        let non_roam_disconnect_counts =
+            test_helper.get_logged_metrics(NETWORK_NON_ROAMING_DISCONNECT_COUNTS_METRIC_ID);
         assert!(non_roam_disconnect_counts.is_empty());
 
         let total_disconnect_counts =
@@ -6805,21 +6815,20 @@ mod tests {
         assert_eq!(user_network_change_counts[0].payload, MetricEventPayload::Count(1));
 
         // Check that nothing was logged for roaming and non-roaming disconnects.
-        let roam_connected_duration = test_helper
-            .get_logged_metrics(metrics::CONNECTED_DURATION_BEFORE_ROAMING_DISCONNECT_METRIC_ID);
+        let roam_connected_duration =
+            test_helper.get_logged_metrics(CONNECTED_DURATION_BEFORE_ROAMING_DISCONNECT_METRIC_ID);
         assert_eq!(roam_connected_duration.len(), 0);
 
-        let non_roam_connected_duration = test_helper.get_logged_metrics(
-            metrics::CONNECTED_DURATION_BEFORE_NON_ROAMING_DISCONNECT_METRIC_ID,
-        );
+        let non_roam_connected_duration = test_helper
+            .get_logged_metrics(CONNECTED_DURATION_BEFORE_NON_ROAMING_DISCONNECT_METRIC_ID);
         assert_eq!(non_roam_connected_duration.len(), 0);
 
         let roam_disconnect_counts =
-            test_helper.get_logged_metrics(metrics::NETWORK_ROAMING_DISCONNECT_COUNTS_METRIC_ID);
+            test_helper.get_logged_metrics(NETWORK_ROAMING_DISCONNECT_COUNTS_METRIC_ID);
         assert!(roam_disconnect_counts.is_empty());
 
-        let non_roam_disconnect_counts = test_helper
-            .get_logged_metrics(metrics::NETWORK_NON_ROAMING_DISCONNECT_COUNTS_METRIC_ID);
+        let non_roam_disconnect_counts =
+            test_helper.get_logged_metrics(NETWORK_NON_ROAMING_DISCONNECT_COUNTS_METRIC_ID);
         assert!(non_roam_disconnect_counts.is_empty());
 
         // Check that a connected duration and a count were logged for overall disconnects.
@@ -7517,14 +7526,10 @@ mod tests {
 
         // Verify the reconnect duration was logged for an unexpected disconnect and not a roam.
         // 3 seconds would be sent as 3,000,000 microseconds.
-        let metrics =
-            test_helper.get_logged_metrics(metrics::NON_ROAMING_RECONNECT_DURATION_METRIC_ID);
+        let metrics = test_helper.get_logged_metrics(NON_ROAMING_RECONNECT_DURATION_METRIC_ID);
         assert_eq!(metrics.len(), 1);
         assert_eq!(metrics[0].payload, MetricEventPayload::IntegerValue(3_000_000));
-        assert_eq!(
-            test_helper.get_logged_metrics(metrics::ROAMING_RECONNECT_DURATION_METRIC_ID).len(),
-            0
-        );
+        assert_eq!(test_helper.get_logged_metrics(ROAMING_RECONNECT_DURATION_METRIC_ID).len(), 0);
 
         // Send a disconnect and reconnect for a proactive network switch.
         test_helper.clear_cobalt_events();
@@ -7545,12 +7550,11 @@ mod tests {
         // is not logged.
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         test_helper.drain_cobalt_events(&mut test_fut);
-        let roam_reconnect =
-            test_helper.get_logged_metrics(metrics::ROAMING_RECONNECT_DURATION_METRIC_ID);
+        let roam_reconnect = test_helper.get_logged_metrics(ROAMING_RECONNECT_DURATION_METRIC_ID);
         assert_eq!(roam_reconnect.len(), 1);
         assert_eq!(roam_reconnect[0].payload, MetricEventPayload::IntegerValue(downtime));
         let non_roam_reconnect =
-            test_helper.get_logged_metrics(metrics::NON_ROAMING_RECONNECT_DURATION_METRIC_ID);
+            test_helper.get_logged_metrics(NON_ROAMING_RECONNECT_DURATION_METRIC_ID);
         assert_eq!(non_roam_reconnect.len(), 0);
     }
 
@@ -7853,7 +7857,7 @@ mod tests {
 
         // Check that the event was logged to cobalt.
         let metrics =
-            test_helper.get_logged_metrics(metrics::POLICY_PROACTIVE_ROAMING_SCAN_COUNTS_METRIC_ID);
+            test_helper.get_logged_metrics(POLICY_PROACTIVE_ROAMING_SCAN_COUNTS_METRIC_ID);
         assert_eq!(metrics.len(), 1);
         assert_eq!(metrics[0].payload, MetricEventPayload::Count(1));
     }
