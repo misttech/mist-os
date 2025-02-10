@@ -31,7 +31,7 @@ use zx::{
     Task, {self as zx},
 };
 
-type TimeSpecPtr = MultiArchUserRef<uapi::timespec, uapi::arch32::timespec>;
+pub type TimeSpecPtr = MultiArchUserRef<uapi::timespec, uapi::arch32::timespec>;
 type TimeValPtr = MultiArchUserRef<uapi::timeval, uapi::arch32::timeval>;
 type TimeZonePtr = MultiArchUserRef<uapi::timezone, uapi::arch32::timezone>;
 

@@ -7,6 +7,7 @@ use crate::mm::{
     DesiredAddress, FutexKey, MappingName, MappingOptions, MemoryAccessorExt, MremapFlags,
     PrivateFutexKey, ProtectionFlags, SharedFutexKey, PAGE_SIZE,
 };
+use crate::syscalls::time::TimeSpecPtr;
 use crate::task::{CurrentTask, TargetTime, Task};
 use crate::time::utc::estimate_boot_deadline_from_utc;
 use crate::vfs::buffers::{OutputBuffer, UserBuffersInputBuffer, UserBuffersOutputBuffer};
@@ -23,13 +24,13 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::user_value::UserValue;
 use starnix_uapi::{
-    errno, error, pid_t, robust_list_head, timespec, uapi, FUTEX_BITSET_MATCH_ANY,
-    FUTEX_CLOCK_REALTIME, FUTEX_CMD_MASK, FUTEX_CMP_REQUEUE, FUTEX_CMP_REQUEUE_PI, FUTEX_LOCK_PI,
-    FUTEX_LOCK_PI2, FUTEX_PRIVATE_FLAG, FUTEX_REQUEUE, FUTEX_TRYLOCK_PI, FUTEX_UNLOCK_PI,
-    FUTEX_WAIT, FUTEX_WAIT_BITSET, FUTEX_WAIT_REQUEUE_PI, FUTEX_WAKE, FUTEX_WAKE_BITSET,
-    FUTEX_WAKE_OP, MAP_ANONYMOUS, MAP_DENYWRITE, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_GROWSDOWN,
-    MAP_NORESERVE, MAP_POPULATE, MAP_PRIVATE, MAP_SHARED, MAP_SHARED_VALIDATE, MAP_STACK,
-    O_CLOEXEC, O_NONBLOCK, PROT_EXEC, UFFD_USER_MODE_ONLY,
+    errno, error, pid_t, robust_list_head, uapi, FUTEX_BITSET_MATCH_ANY, FUTEX_CLOCK_REALTIME,
+    FUTEX_CMD_MASK, FUTEX_CMP_REQUEUE, FUTEX_CMP_REQUEUE_PI, FUTEX_LOCK_PI, FUTEX_LOCK_PI2,
+    FUTEX_PRIVATE_FLAG, FUTEX_REQUEUE, FUTEX_TRYLOCK_PI, FUTEX_UNLOCK_PI, FUTEX_WAIT,
+    FUTEX_WAIT_BITSET, FUTEX_WAIT_REQUEUE_PI, FUTEX_WAKE, FUTEX_WAKE_BITSET, FUTEX_WAKE_OP,
+    MAP_ANONYMOUS, MAP_DENYWRITE, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_GROWSDOWN, MAP_NORESERVE,
+    MAP_POPULATE, MAP_PRIVATE, MAP_SHARED, MAP_SHARED_VALIDATE, MAP_STACK, O_CLOEXEC, O_NONBLOCK,
+    PROT_EXEC, UFFD_USER_MODE_ONLY,
 };
 use std::ops::Deref as _;
 use zx;
@@ -467,11 +468,12 @@ fn do_futex<Key: FutexKey>(
     // The timeout is interpreted differently by WAIT and WAIT_BITSET: WAIT takes a
     // timeout and WAIT_BITSET takes a deadline.
     let read_timespec = |current_task: &CurrentTask| {
-        let utime = UserRef::<timespec>::from(timeout_or_value2);
+        let utime: TimeSpecPtr =
+            current_task.thread_state.arch_width.make_user_ref(timeout_or_value2);
         if utime.is_null() {
             Ok(timespec_from_time(zx::MonotonicInstant::INFINITE))
         } else {
-            current_task.read_object(utime)
+            current_task.read_multi_arch_object(utime)
         }
     };
     let read_timeout = |current_task: &CurrentTask| {
@@ -731,7 +733,7 @@ mod arch32 {
         Ok(())
     }
 
-    pub use super::sys_mremap as sys_arch32_mremap;
+    pub use super::{sys_futex as sys_arch32_futex, sys_mremap as sys_arch32_mremap};
 }
 
 #[cfg(feature = "arch32")]
