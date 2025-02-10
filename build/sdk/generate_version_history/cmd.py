@@ -67,8 +67,24 @@ def main() -> None:
     # updated to use "phase".
     generate_version_history.add_deprecated_status_field(version_history)
 
-    with args.output.open("w") as f:
-        json.dump(version_history, f, indent=2)
+    write_file_if_changed(args.output, json.dumps(version_history, indent=2))
+
+
+def write_file_if_changed(path: str, contents: str) -> None:
+    if path:
+        if contents_changed(path, contents):
+            with open(path, "w") as file:
+                file.write(contents)
+
+
+def contents_changed(path: str, contents: str) -> bool:
+    try:
+        with open(path, "r") as file:
+            existing_contents = file.read()
+            return existing_contents != contents
+    except Exception:
+        pass
+    return True
 
 
 if __name__ == "__main__":
