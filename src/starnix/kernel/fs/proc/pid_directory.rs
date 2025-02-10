@@ -1258,9 +1258,7 @@ impl BytesFileOps for OomAdjFile {
             let fraction = (value - OOM_ADJUST_MIN) / (OOM_ADJUST_MAX - OOM_ADJUST_MIN);
             fraction * (OOM_SCORE_ADJ_MAX - OOM_SCORE_ADJ_MIN) + OOM_SCORE_ADJ_MIN
         };
-        if !current_task.creds().has_capability(CAP_SYS_RESOURCE) {
-            return error!(EPERM);
-        }
+        security::check_task_capable(current_task, CAP_SYS_RESOURCE)?;
         let task = Task::from_weak(&self.0)?;
         task.write().oom_score_adj = oom_score_adj;
         Ok(())
@@ -1294,9 +1292,7 @@ impl BytesFileOps for OomScoreAdjFile {
         if !(OOM_SCORE_ADJ_MIN..=OOM_SCORE_ADJ_MAX).contains(&value) {
             return error!(EINVAL);
         }
-        if !current_task.creds().has_capability(CAP_SYS_RESOURCE) {
-            return error!(EPERM);
-        }
+        security::check_task_capable(current_task, CAP_SYS_RESOURCE)?;
         let task = Task::from_weak(&self.0)?;
         task.write().oom_score_adj = value;
         Ok(())

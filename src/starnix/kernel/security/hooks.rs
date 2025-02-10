@@ -570,6 +570,19 @@ pub fn task_get_context(current_task: &CurrentTask, target: &Task) -> Result<Vec
     )
 }
 
+/// Verifies that a task has all of the given capabilities.
+/// Corresponds to the `capable()` LSM hook.
+pub fn check_task_capable(
+    current_task: &CurrentTask,
+    capabilities: starnix_uapi::auth::Capabilities,
+) -> Result<(), Errno> {
+    profile_duration!("security.hooks.task_capable");
+    if !current_task.creds().has_capability(capabilities) {
+        return error!(EPERM);
+    }
+    Ok(()) // TODO: https://fxbug.dev/364569559 - add an `if_selinux_else_default_ok` call here.
+}
+
 /// Checks if creating a task is allowed.
 /// Directly maps to the `selinux_task_create` LSM hook from the original NSA white paper.
 /// Partially corresponds to the `task_alloc()` LSM hook. Compared to `task_alloc()`,

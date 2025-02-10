@@ -354,11 +354,10 @@ fn get_task_if_owner_or_has_capabilities(
     let weak = current_task.get_task(pid);
     let task_creds = Task::from_weak(&weak)?.creds();
     let current_creds = current_task.creds();
-    if task_creds.euid == current_creds.euid || current_creds.has_capability(capabilities) {
-        Ok(weak)
-    } else {
-        error!(EPERM)
+    if task_creds.euid != current_creds.euid {
+        security::check_task_capable(current_task, capabilities)?;
     }
+    Ok(weak)
 }
 
 fn get_task_or_current(current_task: &CurrentTask, pid: pid_t) -> WeakRef<Task> {
@@ -787,9 +786,7 @@ pub fn sys_sched_setaffinity(
     cpusetsize: u32,
     user_mask: UserAddress,
 ) -> Result<(), Errno> {
-    if !current_task.creds().has_capability(CAP_SYS_NICE) {
-        return error!(EPERM);
-    }
+    security::check_task_capable(current_task, CAP_SYS_NICE)?;
     if pid < 0 {
         return error!(EINVAL);
     }
@@ -1045,9 +1042,7 @@ pub fn sys_prctl(
         PR_SET_SECUREBITS => {
             // TODO(security): This does not yet respect locked flags.
             let mut creds = current_task.creds();
-            if !creds.has_capability(CAP_SETPCAP) {
-                return error!(EPERM);
-            }
+            security::check_task_capable(current_task, CAP_SETPCAP)?;
 
             let securebits = SecureBits::from_bits(arg2 as u32).ok_or_else(|| {
                 track_stub!(TODO("https://fxbug.dev/322875244"), "PR_SET_SECUREBITS", arg2);
@@ -1063,9 +1058,7 @@ pub fn sys_prctl(
         }
         PR_CAPBSET_DROP => {
             let mut creds = current_task.creds();
-            if !creds.has_capability(CAP_SETPCAP) {
-                return error!(EPERM);
-            }
+            security::check_task_capable(current_task, CAP_SETPCAP)?;
 
             creds.cap_bounding.remove(Capabilities::try_from(arg2)?);
             current_task.set_creds(creds);
@@ -1413,10 +1406,8 @@ pub fn sys_capset(
     let mut creds = target_task.creds();
     {
         log_trace!("Capabilities({{permitted={:?} from {:?}, effective={:?} from {:?}, inheritable={:?} from {:?}}}, bounding={:?})", new_permitted, creds.cap_permitted, new_effective, creds.cap_effective, new_inheritable, creds.cap_inheritable, creds.cap_bounding);
-        if !creds.has_capability(CAP_SETPCAP)
-            && !creds.cap_inheritable.union(creds.cap_permitted).contains(new_inheritable)
-        {
-            return error!(EPERM);
+        if !creds.cap_inheritable.union(creds.cap_permitted).contains(new_inheritable) {
+            security::check_task_capable(current_task, CAP_SETPCAP)?;
         }
 
         if !creds.cap_inheritable.union(creds.cap_bounding).contains(new_inheritable) {
@@ -1607,9 +1598,7 @@ pub fn sys_setns(
     // From man pages this is not quite right because some namespace types require more capabilities
     // or require this capability in multiple namespaces, but it should cover our current test
     // cases and we can make this more nuanced once more namespace types are supported.
-    if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
-        return error!(EPERM);
-    }
+    security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
 
     if let Some(mount_ns) = file_handle.downcast_file::<MountNamespaceFile>() {
         if !(ns_type == 0 || ns_type == CLONE_NEWNS as i32) {
@@ -1652,16 +1641,12 @@ pub fn sys_unshare(
     }
 
     if (flags & CLONE_NEWNS) != 0 {
-        if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
-            return error!(EPERM);
-        }
+        security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
         current_task.fs().unshare_namespace();
     }
 
     if (flags & CLONE_NEWUTS) != 0 {
-        if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
-            return error!(EPERM);
-        }
+        security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
         // Fork the UTS namespace.
         let mut task_state = current_task.write();
         let new_uts_ns = task_state.uts_ns.read().clone();
@@ -1679,9 +1664,7 @@ pub fn sys_swapon(
 ) -> Result<(), Errno> {
     const MAX_SWAPFILES: usize = 30; // See https://man7.org/linux/man-pages/man2/swapon.2.html
 
-    if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
-        return error!(EPERM);
-    }
+    security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
 
     track_stub!(TODO("https://fxbug.dev/322893905"), "swapon validate flags");
 
@@ -1726,9 +1709,7 @@ pub fn sys_swapoff(
     current_task: &CurrentTask,
     user_path: UserCString,
 ) -> Result<(), Errno> {
-    if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
-        return error!(EPERM);
-    }
+    security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
 
     let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
     let file = current_task.open_file(locked, path.as_ref(), OpenFlags::RDWR)?;
@@ -1892,9 +1873,7 @@ pub fn sys_vhangup(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
 ) -> Result<(), Errno> {
-    if !current_task.creds().has_capability(CAP_SYS_TTY_CONFIG) {
-        return error!(EPERM);
-    }
+    security::check_task_capable(current_task, CAP_SYS_TTY_CONFIG)?;
     track_stub!(TODO("https://fxbug.dev/324079257"), "vhangup");
     Ok(())
 }
