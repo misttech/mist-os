@@ -62,16 +62,15 @@ use crate::context::{CoreCtxAndResource, Locked, WrapLockLevel};
 use crate::ip::integration::CoreCtxWithIpDeviceConfiguration;
 use crate::{BindingsContext, BindingsTypes, CoreCtx, StackState};
 
-impl<BC: BindingsTypes> UnlockedAccess<crate::lock_ordering::DeviceLayerStateOrigin>
-    for StackState<BC>
-{
-    type Data = OriginTracker;
+impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::DeviceState> for StackState<BT> {
+    type Data = DeviceLayerState<BT>;
     type Guard<'l>
-        = &'l OriginTracker
+        = &'l DeviceLayerState<BT>
     where
         Self: 'l;
+
     fn access(&self) -> Self::Guard<'_> {
-        &self.device.origin
+        &self.device
     }
 }
 
@@ -822,7 +821,7 @@ pub(crate) fn device_state<'a, BT: BindingsTypes, L, D: DeviceStateSpec>(
     device_id: &'a BaseDeviceId<D, BT>,
 ) -> Locked<&'a IpLinkDeviceState<D, BT>, L> {
     let state = device_id
-        .device_state(core_ctx.unlocked_access::<crate::lock_ordering::DeviceLayerStateOrigin>());
+        .device_state(&core_ctx.unlocked_access::<crate::lock_ordering::DeviceState>().origin);
     core_ctx.replace(state)
 }
 
@@ -831,7 +830,7 @@ pub(crate) fn device_state_and_core_ctx<'a, BT: BindingsTypes, L, D: DeviceState
     id: &'a BaseDeviceId<D, BT>,
 ) -> CoreCtxAndResource<'a, BT, IpLinkDeviceState<D, BT>, L> {
     let state =
-        id.device_state(core_ctx.unlocked_access::<crate::lock_ordering::DeviceLayerStateOrigin>());
+        id.device_state(&core_ctx.unlocked_access::<crate::lock_ordering::DeviceState>().origin);
     core_ctx.adopt(state)
 }
 
@@ -844,7 +843,7 @@ pub(crate) fn ip_device_state<'a, BC: BindingsContext, L>(
         device,
         id => {
             let state = id.device_state(
-                core_ctx.unlocked_access::<crate::lock_ordering::DeviceLayerStateOrigin>()
+                &core_ctx.unlocked_access::<crate::lock_ordering::DeviceState>().origin
             );
             core_ctx.replace(state.as_ref())
         }
@@ -860,7 +859,7 @@ pub(crate) fn ip_device_state_and_core_ctx<'a, BC: BindingsContext, L>(
         device,
         id => {
             let state = id.device_state(
-                core_ctx.unlocked_access::<crate::lock_ordering::DeviceLayerStateOrigin>()
+                &core_ctx.unlocked_access::<crate::lock_ordering::DeviceState>().origin
             );
             core_ctx.adopt(state.as_ref())
         }
@@ -1028,7 +1027,7 @@ where
 
 impl<'a, BT: BindingsTypes, L> OriginTrackerContext for CoreCtx<'a, BT, L> {
     fn origin_tracker(&mut self) -> OriginTracker {
-        self.unlocked_access::<crate::lock_ordering::DeviceLayerStateOrigin>().clone()
+        self.unlocked_access::<crate::lock_ordering::DeviceState>().origin.clone()
     }
 }
 
@@ -1092,43 +1091,15 @@ where
     }
 }
 
-impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::EthernetDeviceCounters>
-    for StackState<BC>
-{
-    type Data = EthernetDeviceCounters;
-    type Guard<'l>
-        = &'l EthernetDeviceCounters
-    where
-        Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.device.ethernet_counters
-    }
-}
-
 impl<BC: BindingsContext, L> CounterContext<EthernetDeviceCounters> for CoreCtx<'_, BC, L> {
     fn with_counters<O, F: FnOnce(&EthernetDeviceCounters) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::EthernetDeviceCounters>())
-    }
-}
-
-impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::PureIpDeviceCounters>
-    for StackState<BC>
-{
-    type Data = PureIpDeviceCounters;
-    type Guard<'l>
-        = &'l PureIpDeviceCounters
-    where
-        Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.device.pure_ip_counters
+        cb(&self.unlocked_access::<crate::lock_ordering::DeviceState>().ethernet_counters)
     }
 }
 
 impl<BC: BindingsContext, L> CounterContext<PureIpDeviceCounters> for CoreCtx<'_, BC, L> {
     fn with_counters<O, F: FnOnce(&PureIpDeviceCounters) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::PureIpDeviceCounters>())
+        cb(&self.unlocked_access::<crate::lock_ordering::DeviceState>().pure_ip_counters)
     }
 }
 
@@ -1222,18 +1193,6 @@ impl<T, BT: BindingsTypes> LockLevelFor<IpLinkDeviceStateInner<T, BT>>
     type Data = socket::HeldDeviceSockets<BT>;
 }
 
-impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::DeviceCounters> for StackState<BT> {
-    type Data = DeviceCounters;
-    type Guard<'l>
-        = &'l DeviceCounters
-    where
-        Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.device.counters
-    }
-}
-
 impl<T, BT: BindingsTypes> UnlockedAccessMarkerFor<IpLinkDeviceStateInner<T, BT>>
     for crate::lock_ordering::DeviceCounters
 {
@@ -1245,7 +1204,7 @@ impl<T, BT: BindingsTypes> UnlockedAccessMarkerFor<IpLinkDeviceStateInner<T, BT>
 
 impl<BT: BindingsTypes, L> CounterContext<DeviceCounters> for CoreCtx<'_, BT, L> {
     fn with_counters<O, F: FnOnce(&DeviceCounters) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::DeviceCounters>())
+        cb(&self.unlocked_access::<crate::lock_ordering::DeviceState>().counters)
     }
 }
 
@@ -1267,20 +1226,8 @@ where
     }
 }
 
-impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::ArpCounters> for StackState<BT> {
-    type Data = ArpCounters;
-    type Guard<'l>
-        = &'l ArpCounters
-    where
-        Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.device.arp_counters
-    }
-}
-
 impl<BT: BindingsTypes, L> CounterContext<ArpCounters> for CoreCtx<'_, BT, L> {
     fn with_counters<O, F: FnOnce(&ArpCounters) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::ArpCounters>())
+        cb(&self.unlocked_access::<crate::lock_ordering::DeviceState>().arp_counters)
     }
 }

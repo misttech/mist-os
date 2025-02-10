@@ -4,14 +4,10 @@
 
 //! Structs containing the entire stack state.
 
-use net_types::ip::{Ip, Ipv4, Ipv6};
 use netstack3_base::{BuildableCoreContext, ContextProvider, CoreTimerContext, CtxPair};
 use netstack3_device::{DeviceId, DeviceLayerState};
 use netstack3_ip::icmp::IcmpState;
-use netstack3_ip::nud::NudCounters;
 use netstack3_ip::{self as ip, IpLayerIpExt, IpLayerTimerId, IpStateInner, Ipv4State, Ipv6State};
-use netstack3_tcp::TcpCounters;
-use netstack3_udp::UdpCounters;
 
 use crate::api::CoreApi;
 use crate::time::TimerId;
@@ -75,22 +71,6 @@ impl<BT: BindingsTypes> StackState<BT> {
         bindings_ctx: BP,
     ) -> CoreApi<'a, BP> {
         CoreApi::new(CtxPair { core_ctx: CoreCtx::new(self), bindings_ctx })
-    }
-
-    pub(crate) fn nud_counters<I: Ip>(&self) -> &NudCounters<I> {
-        I::map_ip_out(
-            self,
-            |state| state.device.nud_counters::<Ipv4>(),
-            |state| state.device.nud_counters::<Ipv6>(),
-        )
-    }
-
-    pub(crate) fn udp_counters<I: Ip>(&self) -> &UdpCounters<I> {
-        &self.transport.udp_counters::<I>()
-    }
-
-    pub(crate) fn tcp_counters<I: Ip>(&self) -> &TcpCounters<I> {
-        &self.transport.tcp_counters::<I>()
     }
 
     pub(crate) fn inner_ip_state<I: IpLayerIpExt>(&self) -> &IpStateInner<I, DeviceId<BT>, BT> {

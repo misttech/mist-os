@@ -19,7 +19,7 @@ use netstack3_udp::{self as udp, UdpCounters, UdpSocketId, UdpSocketSet, UdpSock
 
 use crate::context::prelude::*;
 use crate::context::WrapLockLevel;
-use crate::transport::TransportLayerTimerId;
+use crate::transport::{TransportLayerState, TransportLayerTimerId};
 use crate::{BindingsContext, BindingsTypes, CoreCtx, StackState};
 
 impl<I, BC, L> CoreTimerContext<WeakTcpSocketId<I, WeakDeviceId<BC>, BC>, BC> for CoreCtx<'_, BC, L>
@@ -587,42 +587,26 @@ impl<I: datagram::IpExt, BT: BindingsTypes>
     }
 }
 
-impl<BC: BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::TcpCounters<I>>
-    for StackState<BC>
-{
-    type Data = TcpCounters<I>;
+impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::TransportState> for StackState<BT> {
+    type Data = TransportLayerState<BT>;
     type Guard<'l>
-        = &'l TcpCounters<I>
+        = &'l TransportLayerState<BT>
     where
         Self: 'l;
 
     fn access(&self) -> Self::Guard<'_> {
-        self.tcp_counters()
+        &self.transport
     }
 }
 
 impl<BC: BindingsContext, I: Ip, L> CounterContext<TcpCounters<I>> for CoreCtx<'_, BC, L> {
     fn with_counters<O, F: FnOnce(&TcpCounters<I>) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::TcpCounters<I>>())
-    }
-}
-
-impl<BC: BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::UdpCounters<I>>
-    for StackState<BC>
-{
-    type Data = UdpCounters<I>;
-    type Guard<'l>
-        = &'l UdpCounters<I>
-    where
-        Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        self.udp_counters()
+        cb(self.unlocked_access::<crate::lock_ordering::TransportState>().tcp_counters::<I>())
     }
 }
 
 impl<BC: BindingsContext, I: Ip, L> CounterContext<UdpCounters<I>> for CoreCtx<'_, BC, L> {
     fn with_counters<O, F: FnOnce(&UdpCounters<I>) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::UdpCounters<I>>())
+        cb(self.unlocked_access::<crate::lock_ordering::TransportState>().udp_counters::<I>())
     }
 }

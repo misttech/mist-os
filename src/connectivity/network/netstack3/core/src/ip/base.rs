@@ -5,7 +5,6 @@
 //! The integrations for protocols built on top of IP.
 
 use alloc::collections::HashMap;
-use core::sync::atomic::AtomicU16;
 
 use lock_order::lock::{DelegatedOrderedLockAccess, LockLevelFor, UnlockedAccess};
 use lock_order::relation::LockBefore;
@@ -23,7 +22,7 @@ use netstack3_icmp_echo::{
     IcmpEchoIpTransportContext, IcmpEchoStateContext, IcmpSocketId, IcmpSocketSet, IcmpSocketState,
     IcmpSockets,
 };
-use netstack3_ip::device::{self, IidSecret, IpDeviceBindingsContext, IpDeviceIpExt};
+use netstack3_ip::device::{self, IpDeviceBindingsContext, IpDeviceIpExt};
 use netstack3_ip::icmp::{
     self, IcmpIpTransportContext, IcmpRxCounters, IcmpState, IcmpTxCounters, InnerIcmpContext,
     InnerIcmpv4Context, NdpCounters,
@@ -33,9 +32,10 @@ use netstack3_ip::raw::RawIpSocketMap;
 use netstack3_ip::{
     self as ip, FragmentContext, IpCounters, IpDeviceContext, IpHeaderInfo, IpLayerBindingsContext,
     IpLayerIpExt, IpPacketFragmentCache, IpRouteTableContext, IpRouteTablesContext, IpStateContext,
-    IpStateInner, IpTransportContext, IpTransportDispatchContext, LocalDeliveryPacketInfo, Marks,
-    MulticastMembershipHandler, PmtuCache, PmtuContext, ResolveRouteError, ResolvedRoute,
-    RoutingTable, RoutingTableId, RulesTable, TransportReceiveError,
+    IpStateInner, IpTransportContext, IpTransportDispatchContext, Ipv4State, Ipv6State,
+    LocalDeliveryPacketInfo, Marks, MulticastMembershipHandler, PmtuCache, PmtuContext,
+    ResolveRouteError, ResolvedRoute, RoutingTable, RoutingTableId, RulesTable,
+    TransportReceiveError,
 };
 use netstack3_sync::rc::Primary;
 use netstack3_sync::RwLock;
@@ -47,6 +47,30 @@ use packet_formats::ip::{IpProto, Ipv4Proto, Ipv6Proto};
 use crate::context::prelude::*;
 use crate::context::WrapLockLevel;
 use crate::{BindingsContext, BindingsTypes, CoreCtx, StackState};
+
+impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::Ipv4State> for StackState<BT> {
+    type Data = Ipv4State<DeviceId<BT>, BT>;
+    type Guard<'l>
+        = &'l Ipv4State<DeviceId<BT>, BT>
+    where
+        Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        &self.ipv4
+    }
+}
+
+impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::Ipv6State> for StackState<BT> {
+    type Data = Ipv6State<DeviceId<BT>, BT>;
+    type Guard<'l>
+        = &'l Ipv6State<DeviceId<BT>, BT>
+    where
+        Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        &self.ipv6
+    }
+}
 
 impl<I, BT, L> FragmentContext<I, BT> for CoreCtx<'_, BT, L>
 where
@@ -170,35 +194,9 @@ impl<BT: BindingsTypes, I: datagram::DualStackIpExt, L> CounterContext<IcmpRxCou
     }
 }
 
-impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::NdpCounters> for StackState<BT> {
-    type Data = NdpCounters;
-    type Guard<'l>
-        = &'l NdpCounters
-    where
-        Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.ipv6.icmp.ndp_counters
-    }
-}
-
 impl<BT: BindingsTypes, L> CounterContext<NdpCounters> for CoreCtx<'_, BT, L> {
     fn with_counters<O, F: FnOnce(&NdpCounters) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::NdpCounters>())
-    }
-}
-
-impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::IcmpSendTimestampReply<Ipv4>>
-    for StackState<BT>
-{
-    type Data = bool;
-    type Guard<'l>
-        = &'l bool
-    where
-        Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.ipv4.icmp.send_timestamp_reply
+        cb(&self.unlocked_access::<crate::lock_ordering::Ipv6State>().icmp.ndp_counters)
     }
 }
 
@@ -210,7 +208,7 @@ impl<
     > InnerIcmpv4Context<BC> for CoreCtx<'_, BC, L>
 {
     fn should_send_timestamp_reply(&self) -> bool {
-        *self.unlocked_access::<crate::lock_ordering::IcmpSendTimestampReply<Ipv4>>()
+        self.unlocked_access::<crate::lock_ordering::Ipv4State>().icmp.send_timestamp_reply
     }
 }
 
@@ -901,46 +899,4 @@ impl<I: datagram::DualStackIpExt, D: WeakDeviceIdentifier, BT: BindingsTypes>
     LockLevelFor<IcmpSocketId<I, D, BT>> for crate::lock_ordering::IcmpSocketState<I>
 {
     type Data = IcmpSocketState<I, D, BT>;
-}
-
-impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::Ipv4StateNextPacketId>
-    for StackState<BT>
-{
-    type Data = AtomicU16;
-    type Guard<'l>
-        = &'l AtomicU16
-    where
-        Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.ipv4.next_packet_id
-    }
-}
-
-impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::SlaacTempSecretKey>
-    for StackState<BT>
-{
-    type Data = IidSecret;
-    type Guard<'l>
-        = &'l IidSecret
-    where
-        Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.ipv6.slaac_temp_secret_key
-    }
-}
-
-impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::SlaacStableSecretKey>
-    for StackState<BT>
-{
-    type Data = IidSecret;
-    type Guard<'l>
-        = &'l IidSecret
-    where
-        Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.ipv6.slaac_stable_secret_key
-    }
 }
