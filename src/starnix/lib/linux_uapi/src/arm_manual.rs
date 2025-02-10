@@ -54,6 +54,12 @@ impl From<crate::timespec> for crate::arch32::timespec {
     }
 }
 
+impl From<crate::arch32::timespec> for crate::timespec {
+    fn from(tv: crate::arch32::timespec) -> Self {
+        Self { tv_sec: tv.tv_sec.into(), tv_nsec: tv.tv_nsec.into() }
+    }
+}
+
 impl From<crate::timeval> for crate::arch32::timeval {
     fn from(tv: crate::timeval) -> Self {
         Self {

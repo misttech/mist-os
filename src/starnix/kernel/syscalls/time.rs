@@ -19,7 +19,7 @@ use starnix_types::time::{
 };
 use starnix_uapi::auth::CAP_WAKE_ALARM;
 use starnix_uapi::errors::{Errno, EINTR};
-use starnix_uapi::user_address::UserRef;
+use starnix_uapi::user_address::{MultiArchUserRef, UserRef};
 use starnix_uapi::{
     errno, error, from_status_like_fdio, itimerspec, itimerval, pid_t, sigevent, timespec, timeval,
     timezone, tms, uapi, CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC,
@@ -30,6 +30,10 @@ use starnix_uapi::{
 use zx::{
     Task, {self as zx},
 };
+
+type TimeSpecPtr = MultiArchUserRef<uapi::timespec, uapi::arch32::timespec>;
+type TimeValPtr = MultiArchUserRef<uapi::timeval, uapi::arch32::timeval>;
+type TimeZonePtr = MultiArchUserRef<uapi::timezone, uapi::arch32::timezone>;
 
 fn get_clock_res(current_task: &CurrentTask, which_clock: i32) -> Result<timespec, Errno> {
     match which_clock as u32 {
@@ -55,7 +59,7 @@ pub fn sys_clock_getres(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     which_clock: i32,
-    tp_addr: UserRef<timespec>,
+    tp_addr: TimeSpecPtr,
 ) -> Result<(), Errno> {
     if which_clock < 0 && !is_valid_cpu_clock(which_clock) {
         return error!(EINVAL);
@@ -64,7 +68,7 @@ pub fn sys_clock_getres(
         return Ok(());
     }
     let tv = get_clock_res(current_task, which_clock)?;
-    current_task.write_object(tp_addr, &tv)?;
+    current_task.write_multi_arch_object(tp_addr, tv)?;
     Ok(())
 }
 
@@ -104,22 +108,22 @@ pub fn sys_clock_gettime(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     which_clock: i32,
-    tp_addr: UserRef<timespec>,
+    tp_addr: TimeSpecPtr,
 ) -> Result<(), Errno> {
     let tv = get_clock_gettime(current_task, which_clock)?;
-    current_task.write_object(tp_addr, &tv)?;
+    current_task.write_multi_arch_object(tp_addr, tv)?;
     Ok(())
 }
 
 pub fn sys_gettimeofday(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
-    user_tv: UserRef<timeval>,
-    user_tz: UserRef<timezone>,
+    user_tv: TimeValPtr,
+    user_tz: TimeZonePtr,
 ) -> Result<(), Errno> {
     if !user_tv.is_null() {
         let tv = timeval_from_time(utc_now());
-        current_task.write_object(user_tv, &tv)?;
+        current_task.write_multi_arch_object(user_tv, tv)?;
     }
     if !user_tz.is_null() {
         // Return early if the user passes an obviously invalid pointer. This check is not a guarantee.
@@ -147,8 +151,8 @@ pub fn sys_clock_nanosleep(
     current_task: &mut CurrentTask,
     which_clock: ClockId,
     flags: u32,
-    user_request: UserRef<timespec>,
-    user_remaining: UserRef<timespec>,
+    user_request: TimeSpecPtr,
+    user_remaining: TimeSpecPtr,
 ) -> Result<(), Errno> {
     if which_clock < 0 {
         return error!(EINVAL);
@@ -178,7 +182,7 @@ pub fn sys_clock_nanosleep(
         _ => return error!(ENOTSUP),
     }
 
-    let request = current_task.read_object(user_request)?;
+    let request = current_task.read_multi_arch_object(user_request)?;
     log_trace!("clock_nanosleep({}, {}, {:?})", which_clock, flags, request);
 
     if timespec_is_zero(request) {
@@ -219,7 +223,7 @@ fn clock_nanosleep_relative_to_utc(
     current_task: &mut CurrentTask,
     request: timespec,
     is_absolute: bool,
-    user_remaining: UserRef<timespec>,
+    user_remaining: TimeSpecPtr,
 ) -> Result<(), Errno> {
     let clock_deadline_absolute = if is_absolute {
         time_from_timespec(request)?
@@ -258,7 +262,7 @@ fn clock_nanosleep_boot_with_deadline(
     is_absolute: bool,
     deadline: zx::BootInstant,
     original_utc_deadline: Option<UtcInstant>,
-    user_remaining: UserRef<timespec>,
+    user_remaining: TimeSpecPtr,
 ) -> Result<(), Errno> {
     let waiter = Waiter::new();
     let timer = zx::BootTimer::create();
@@ -286,7 +290,7 @@ fn clock_nanosleep_boot_with_deadline(
                     GenericDuration::from_nanos(0),
                     remaining,
                 ));
-                current_task.write_object(user_remaining, &remaining)?;
+                current_task.write_multi_arch_object(user_remaining, remaining)?;
             }
             current_task.set_syscall_restart_func(move |locked, current_task| {
                 clock_nanosleep_boot_with_deadline(
@@ -307,8 +311,8 @@ fn clock_nanosleep_boot_with_deadline(
 pub fn sys_nanosleep(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
-    user_request: UserRef<timespec>,
-    user_remaining: UserRef<timespec>,
+    user_request: TimeSpecPtr,
+    user_remaining: TimeSpecPtr,
 ) -> Result<(), Errno> {
     sys_clock_nanosleep(
         locked,
@@ -569,65 +573,43 @@ pub fn sys_times(
 // Syscalls for arch32 usage
 #[cfg(feature = "arch32")]
 mod arch32 {
-    use crate::mm::MemoryAccessorExt;
-    use crate::syscalls::time::{
-        get_clock_gettime, get_clock_res, is_valid_cpu_clock, timeval_from_time, utc_now,
-    };
     use crate::task::CurrentTask;
-    use starnix_logging::track_stub;
     use starnix_sync::{Locked, Unlocked};
     use starnix_uapi::errors::Errno;
+    use starnix_uapi::uapi;
     use starnix_uapi::user_address::UserRef;
-    use starnix_uapi::{errno, error};
+    use static_assertions::const_assert;
 
-    pub fn sys_arch32_clock_getres(
-        _locked: &mut Locked<'_, Unlocked>,
+    pub fn sys_arch32_clock_gettime64(
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         which_clock: i32,
-        tp_addr: UserRef<linux_uapi::arch32::timespec>,
+        tp_addr: UserRef<uapi::timespec>,
     ) -> Result<(), Errno> {
-        if which_clock < 0 && !is_valid_cpu_clock(which_clock) {
-            return error!(EINVAL);
-        }
-        if tp_addr.is_null() {
-            return Ok(());
-        }
-        let tv64 = get_clock_res(current_task, which_clock)?;
-        current_task.write_object(tp_addr, &(tv64.into()))?;
-        Ok(())
+        const_assert!(
+            std::mem::size_of::<uapi::timespec>()
+                == std::mem::size_of::<uapi::arch32::__kernel_timespec>()
+        );
+        super::sys_clock_gettime(locked, current_task, which_clock, tp_addr.into())
     }
 
-    pub fn sys_arch32_gettimeofday(
-        _locked: &mut Locked<'_, Unlocked>,
+    pub fn sys_arch32_timer_gettime64(
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
-        user_tv: UserRef<linux_uapi::arch32::timeval>,
-        user_tz: UserRef<linux_uapi::arch32::timezone>,
+        id: uapi::arch32::__kernel_timer_t,
+        curr_value: UserRef<uapi::itimerspec>,
     ) -> Result<(), Errno> {
-        if !user_tv.is_null() {
-            let tv = timeval_from_time(utc_now());
-            current_task.write_object(user_tv, &(tv.into()))?;
-        }
-        if !user_tz.is_null() {
-            // Return early if the user passes an obviously invalid pointer. This check is not a guarantee.
-            current_task.mm().ok_or_else(|| errno!(EINVAL))?.check_plausible(
-                user_tz.addr(),
-                std::mem::size_of::<linux_uapi::arch32::timezone>(),
-            )?;
-            track_stub!(TODO("https://fxbug.dev/322874502"), "gettimeofday tz argument");
-        }
-        Ok(())
+        const_assert!(
+            std::mem::size_of::<uapi::itimerspec>()
+                == std::mem::size_of::<uapi::arch32::__kernel_itimerspec>()
+        );
+        super::sys_timer_gettime(locked, current_task, id, curr_value.into())
     }
 
-    pub fn sys_arch32_clock_gettime(
-        _locked: &mut Locked<'_, Unlocked>,
-        current_task: &CurrentTask,
-        which_clock: i32,
-        tp_addr: UserRef<linux_uapi::arch32::timespec>,
-    ) -> Result<(), Errno> {
-        let tv = get_clock_gettime(current_task, which_clock)?;
-        current_task.write_object(tp_addr, &(tv.into()))?;
-        Ok(())
-    }
+    pub use super::{
+        sys_clock_getres as sys_arch32_clock_getres, sys_clock_gettime as sys_arch32_clock_gettime,
+        sys_gettimeofday as sys_arch32_gettimeofday, sys_nanosleep as sys_arch32_nanosleep,
+    };
 }
 
 #[cfg(feature = "arch32")]
@@ -673,12 +655,18 @@ mod test {
             UserAddress::default(),
             std::mem::size_of::<timespec>() as u64,
         );
-        current_task.write_object(address.into(), &duration).expect("write_object");
+        let address_ptr = UserRef::<timespec>::from(address);
+        current_task.write_object(address_ptr, &duration).expect("write_object");
 
         // nanosleep will be interrupted by the current thread and should not fail with EFAULT
         // because the remainder pointer is null.
         assert_eq!(
-            sys_nanosleep(&mut locked, &mut current_task, address.into(), UserRef::default()),
+            sys_nanosleep(
+                &mut locked,
+                &mut current_task,
+                address_ptr.into(),
+                UserRef::default().into()
+            ),
             error!(ERESTART_RESTARTBLOCK)
         );
 
@@ -709,7 +697,7 @@ mod test {
             &mut current_task,
             tv,
             false,
-            remaining,
+            remaining.into(),
         )
         .unwrap();
         let elapsed = test_clock.read().unwrap() - before;
@@ -760,7 +748,7 @@ mod test {
             &mut current_task,
             tv,
             false,
-            remaining,
+            remaining.into(),
         );
 
         // We can't know deterministically if our interrupter thread will be able to interrupt our sleep.

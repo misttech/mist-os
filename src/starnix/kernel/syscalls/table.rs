@@ -152,9 +152,8 @@ pub fn dispatch_syscall(
             sys_personality as sys_arch32_personality,
         };
         pub use crate::syscalls::time::{
-            sys_arch32_clock_getres, sys_arch32_clock_gettime, sys_arch32_gettimeofday,
-            sys_clock_gettime as sys_arch32_clock_gettime64,
-            sys_timer_gettime as sys_arch32_timer_gettime64,
+            sys_arch32_clock_getres, sys_arch32_clock_gettime, sys_arch32_clock_gettime64,
+            sys_arch32_gettimeofday, sys_arch32_nanosleep, sys_arch32_timer_gettime64,
         };
         pub use crate::task::syscalls::{
             sys_arch32_setrlimit, sys_arch32_ugetrlimit, sys_capget as sys_arch32_capget,
@@ -243,6 +242,7 @@ pub fn dispatch_syscall(
             mprotect[3],
             mremap[5],
             munmap[2],
+            nanosleep[2],
             open[3],
             openat[4],
             personality[1],
