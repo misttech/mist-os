@@ -147,11 +147,6 @@ impl<I: IpExt, DeviceClass: Clone + Debug> ValidRoutines<I, DeviceClass> {
             &[UnavailableAction::TransparentProxy, UnavailableAction::Masquerade],
         )?;
 
-        // TODO(https://fxbug.dev/318717702): ensure that no rule has an action
-        // that is not valid for the routine and hook to which the rule is
-        // appended. For example, NAT rules are not allowed outside of NAT
-        // routines, and the TPROXY action is only allowed in the INGRESS hook.
-
         let mut index = UninstalledRoutineIndex::default();
         let routines = routines.strip_debug_info(&mut index);
         Ok((Self(routines), index.into_values()))
