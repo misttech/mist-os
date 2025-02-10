@@ -1,0 +1,26 @@
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library test.log;
+
+type Address = struct {
+    x0 uint8;
+    x1 uint8;
+    x2 uint8;
+    x3 uint8;
+};
+
+type Log = struct {
+    address Address;
+    identity string;
+    userid string;
+    date string;
+    request string;
+    code uint16;
+    size uint64;
+};
+
+type Logs = struct {
+    logs vector<Log>;
+};
