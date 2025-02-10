@@ -286,6 +286,9 @@
 
                 // TODO(http://fxbuf.dev/390870202): Re-enable once flake is resolved.
                 "clock_nanosleep02",
+
+                // TODO(http://fxbuf.dev/395053835): Re-enable once flake is resolved.
+                "setrlimit01",
             ],
         },
     ],
