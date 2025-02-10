@@ -11,7 +11,7 @@ use crate::mm::MemoryAccessorExt;
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::{fileops_impl_memory, fileops_impl_noop_sync, FileObject, FileOps, FsNode};
 use fuchsia_component::client::connect_to_protocol_sync;
-use starnix_logging::{impossible_error, log_info, log_warn};
+use starnix_logging::{log_info, log_warn};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, RwLock, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::device_type::DeviceType;
@@ -48,10 +48,9 @@ pub struct AspectRatio {
 }
 
 pub struct Framebuffer {
-    memory: Arc<MemoryObject>,
-    memory_len: u32,
-    pub info: RwLock<fb_var_screeninfo>,
     server: Option<Arc<FramebufferServer>>,
+    memory: Option<Arc<MemoryObject>>,
+    pub info: RwLock<fb_var_screeninfo>,
     pub view_identity: Mutex<Option<fuiviews::ViewIdentityOnCreation>>,
     pub view_bound_protocols: Mutex<Option<fuicomposition::ViewBoundProtocols>>,
 }
@@ -89,9 +88,8 @@ impl Framebuffer {
         info.blue = fb_bitfield { offset: 16, length: 8, msb_right: 0 };
         info.transp = fb_bitfield { offset: 24, length: 8, msb_right: 0 };
 
-        if let Ok(server) = FramebufferServer::new(width, height) {
+        if let Ok((server, memory)) = FramebufferServer::new(width, height) {
             let server = Arc::new(server);
-            let memory = Arc::new(server.get_memory()?);
             let memory_len = memory.info()?.size_bytes as u32;
 
             // Fill the buffer with black pixels as a placeholder, if visual debug is off.
@@ -107,26 +105,16 @@ impl Framebuffer {
             }
 
             Ok(Arc::new(Self {
-                memory,
-                memory_len,
                 server: Some(server),
+                memory: Some(memory),
                 info: RwLock::new(info),
                 view_identity: Default::default(),
                 view_bound_protocols: Default::default(),
             }))
         } else {
-            let memory_len = info.xres * info.yres * (info.bits_per_pixel / 8);
-            let memory = Arc::new(
-                MemoryObject::from(zx::Vmo::create(memory_len as u64).map_err(|s| match s {
-                    zx::Status::NO_MEMORY => errno!(ENOMEM),
-                    _ => impossible_error(s),
-                })?)
-                .with_zx_name(b"starnix:framebuffer"),
-            );
             Ok(Arc::new(Self {
-                memory,
-                memory_len,
                 server: None,
+                memory: None,
                 info: RwLock::new(info),
                 view_identity: Default::default(),
                 view_bound_protocols: Default::default(),
@@ -169,6 +157,22 @@ impl Framebuffer {
             init_viewport_scene(server.clone(), viewport_token);
         }
     }
+
+    /// Returns the framebuffer's memory.
+    fn get_memory(&self) -> Result<&Arc<MemoryObject>, Errno> {
+        self.memory.as_ref().ok_or_else(|| errno!(EIO))
+    }
+
+    /// Returns the logical size of the framebuffer's memory.
+    fn memory_len(&self) -> usize {
+        self.get_memory().map_or(0, |memory| memory.info().map_or(0, |info| info.size_bytes))
+            as usize
+    }
+
+    /// Returns the allocated size of the framebuffer's memory.
+    fn memory_size(&self) -> usize {
+        self.get_memory().map_or(0, |memory| memory.get_size()) as usize
+    }
 }
 
 impl DeviceOps for Arc<Framebuffer> {
@@ -184,8 +188,8 @@ impl DeviceOps for Arc<Framebuffer> {
             return error!(ENODEV);
         }
         node.update_info(|info| {
-            info.size = self.memory_len as usize;
-            info.blocks = self.memory.get_size() as usize / info.blksize;
+            info.size = self.memory_len();
+            info.blocks = self.memory_size() / info.blksize;
             Ok(())
         })?;
         Ok(Box::new(Arc::clone(self)))
@@ -193,7 +197,7 @@ impl DeviceOps for Arc<Framebuffer> {
 }
 
 impl FileOps for Framebuffer {
-    fileops_impl_memory!(self, &self.memory);
+    fileops_impl_memory!(self, self.get_memory()?);
     fileops_impl_noop_sync!();
 
     fn ioctl(
@@ -212,7 +216,7 @@ impl FileOps for Framebuffer {
                     id: zerocopy::FromBytes::read_from_bytes(&b"Starnix\0\0\0\0\0\0\0\0\0"[..])
                         .unwrap(),
                     smem_start: 0,
-                    smem_len: self.memory_len,
+                    smem_len: self.memory_len() as u32,
                     type_: FB_TYPE_PACKED_PIXELS,
                     visual: FB_VISUAL_TRUECOLOR,
                     line_length: info.bits_per_pixel / 8 * info.xres,
