@@ -124,6 +124,17 @@ impl MapInfo {
     }
 }
 
+impl std::cmp::PartialEq for MapInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.base == other.base
+            && self.size == other.size
+            && self.depth == other.depth
+            && self.details() == other.details()
+    }
+}
+impl std::cmp::Eq for MapInfo {}
+
 impl std::fmt::Debug for MapInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MapInfo")
@@ -136,7 +147,7 @@ impl std::fmt::Debug for MapInfo {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum MapDetails<'a> {
     /// The underlying value returned by the kernel is unknown.
     Unknown,
@@ -158,7 +169,7 @@ impl<'a> MapDetails<'a> {
 
 static_assert_align!(
     #[repr(C)]
-    #[derive(Copy, Clone, Debug, FromBytes, Immutable)]
+    #[derive(Copy, Clone, Debug, Eq, FromBytes, Immutable, PartialEq)]
     <sys::zx_info_maps_mapping_t> pub struct MappingDetails {
         pub mmu_flags <mmu_flags>: VmarFlagsExtended,
         padding1: [PadByte; 4],
