@@ -39,30 +39,6 @@ pub trait Encoder: InternalHandleEncoder {
     fn rewrite(&mut self, pos: usize, bytes: &[u8]);
 }
 
-impl<T: InternalHandleEncoder> InternalHandleEncoder for &mut T {
-    fn __internal_handle_count(&self) -> usize {
-        T::__internal_handle_count(self)
-    }
-}
-
-impl<T: Encoder> Encoder for &mut T {
-    fn bytes_written(&self) -> usize {
-        T::bytes_written(self)
-    }
-
-    fn reserve(&mut self, len: usize) {
-        T::reserve(self, len)
-    }
-
-    fn write(&mut self, bytes: &[u8]) {
-        T::write(self, bytes)
-    }
-
-    fn rewrite(&mut self, pos: usize, bytes: &[u8]) {
-        T::rewrite(self, pos, bytes)
-    }
-}
-
 impl InternalHandleEncoder for Vec<Chunk> {
     fn __internal_handle_count(&self) -> usize {
         0

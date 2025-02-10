@@ -565,10 +565,10 @@ where
     ___H: EmptyProtocolClientHandler<___T>,
 
     for<'buf> crate::WireEmptyProtocolReceiveRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireEmptyProtocolSendAndReceiveResponse:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
         handler: &mut ___H,
@@ -643,10 +643,10 @@ where
     ___H: EmptyProtocolServerHandler<___T>,
 
     for<'buf> crate::WireEmptyProtocolSendRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireEmptyProtocolSendAndReceiveRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_one_way(
         handler: &mut ___H,

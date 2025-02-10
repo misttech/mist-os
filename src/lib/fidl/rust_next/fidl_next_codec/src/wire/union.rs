@@ -81,7 +81,7 @@ impl RawWireUnion {
     /// Decodes an unknown value from a union.
     ///
     /// The handles owned by the unknown value are discarded.
-    pub fn decode_unknown<'buf, D: Decoder<'buf> + ?Sized>(
+    pub fn decode_unknown<D: Decoder + ?Sized>(
         slot: Slot<'_, Self>,
         decoder: &mut D,
     ) -> Result<(), DecodeError> {
@@ -99,7 +99,7 @@ impl RawWireUnion {
     }
 
     /// Decodes the typed value in a union.
-    pub fn decode_as<'buf, D: Decoder<'buf> + ?Sized, T: Decode<D>>(
+    pub fn decode_as<D: Decoder + ?Sized, T: Decode<D>>(
         slot: Slot<'_, Self>,
         decoder: &mut D,
     ) -> Result<(), DecodeError> {

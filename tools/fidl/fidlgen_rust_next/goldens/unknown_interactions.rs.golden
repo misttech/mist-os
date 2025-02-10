@@ -428,7 +428,7 @@ pub struct WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -1608,7 +1608,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -1674,7 +1674,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -1787,7 +1787,7 @@ pub struct WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -1978,7 +1978,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -2044,7 +2044,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -2453,25 +2453,25 @@ where
     ___H: UnknownInteractionsAjarDriverProtocolClientHandler<___T>,
 
     for<'buf> crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
         handler: &mut ___H,
@@ -3089,7 +3089,7 @@ pub struct WireUnknownInteractionsAjarProtocolStrictTwoWayTableResponse {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayTableResponse
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -4229,7 +4229,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -4293,7 +4293,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -4401,7 +4401,7 @@ pub struct WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -4583,7 +4583,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -4647,7 +4647,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -5082,7 +5082,7 @@ pub struct WireUnknownInteractionsAjarProtocolStrictEventTableRequest {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictEventTableRequest
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -5533,7 +5533,7 @@ pub struct WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -6115,43 +6115,43 @@ where
     ___H: UnknownInteractionsAjarProtocolClientHandler<___T>,
 
     for<'buf> crate::WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsAjarProtocolStrictTwoWayTableResponse:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsAjarProtocolStrictTwoWayErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsAjarProtocolStrictEventUnionRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsAjarProtocolStrictEventTableRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
         handler: &mut ___H,
@@ -6967,7 +6967,7 @@ pub struct WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -8158,7 +8158,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -8224,7 +8224,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -8339,7 +8339,7 @@ pub struct WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrRespon
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -8532,7 +8532,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -8598,7 +8598,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -8990,25 +8990,25 @@ where
     ___H: UnknownInteractionsClosedDriverProtocolClientHandler<___T>,
 
     for<'buf> crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
         handler: &mut ___H,
@@ -9621,7 +9621,7 @@ pub struct WireUnknownInteractionsClosedProtocolStrictTwoWayTableResponse {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayTableResponse
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -10773,7 +10773,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -10839,7 +10839,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -10950,7 +10950,7 @@ pub struct WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -11132,7 +11132,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -11198,7 +11198,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -11639,7 +11639,7 @@ pub struct WireUnknownInteractionsClosedProtocolStrictEventTableRequest {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictEventTableRequest
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -12112,34 +12112,34 @@ where
     ___H: UnknownInteractionsClosedProtocolClientHandler<___T>,
 
     for<'buf> crate::WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsClosedProtocolStrictTwoWayTableResponse:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsClosedProtocolStrictTwoWayErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsClosedProtocolStrictEventUnionRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsClosedProtocolStrictEventTableRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
         handler: &mut ___H,
@@ -12835,7 +12835,7 @@ pub struct WireUnknownInteractionsDriverProtocolStrictTwoWayTableResponse {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayTableResponse
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -13987,7 +13987,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -14053,7 +14053,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -14164,7 +14164,7 @@ pub struct WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -14346,7 +14346,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -14412,7 +14412,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -15573,7 +15573,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -15644,7 +15644,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -15756,7 +15756,7 @@ pub struct WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -15939,7 +15939,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -16010,7 +16010,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -17273,7 +17273,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -17347,7 +17347,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -17465,7 +17465,7 @@ pub struct WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -17669,7 +17669,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -17743,7 +17743,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -18458,49 +18458,49 @@ where
     ___H: UnknownInteractionsDriverProtocolClientHandler<___T>,
 
     for<'buf> crate::WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsDriverProtocolStrictTwoWayTableResponse:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsDriverProtocolStrictTwoWayErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
         handler: &mut ___H,
@@ -19226,7 +19226,7 @@ pub struct WireUnknownInteractionsProtocolStrictTwoWayTableResponse {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayTableResponse
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -20345,7 +20345,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -20409,7 +20409,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -20517,7 +20517,7 @@ pub struct WireUnknownInteractionsProtocolStrictTwoWayTableErrResponse {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayTableErrResponse
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -20694,7 +20694,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -20758,7 +20758,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -21888,7 +21888,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -21957,7 +21957,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -22068,7 +22068,7 @@ pub struct WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -22247,7 +22247,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -22316,7 +22316,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -23541,7 +23541,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -23613,7 +23613,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -23726,7 +23726,7 @@ pub struct WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResponse
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -23923,7 +23923,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -23995,7 +23995,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -24433,7 +24433,7 @@ pub struct WireUnknownInteractionsProtocolStrictEventTableRequest {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictEventTableRequest
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -24878,7 +24878,7 @@ pub struct WireUnknownInteractionsProtocolFlexibleEventTableRequest {
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleEventTableRequest
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -25740,67 +25740,67 @@ where
     ___H: UnknownInteractionsProtocolClientHandler<___T>,
 
     for<'buf> crate::WireUnknownInteractionsProtocolStrictTwoWayFieldsResponse:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsProtocolStrictTwoWayUnionResponse:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsProtocolStrictTwoWayTableResponse:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsProtocolStrictTwoWayErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsProtocolStrictTwoWayUnionErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsProtocolStrictTwoWayTableErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsProtocolFlexibleTwoWayResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsProtocolFlexibleTwoWayUnionResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsProtocolFlexibleTwoWayTableResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsProtocolFlexibleTwoWayErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsProtocolStrictEventFieldsRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsProtocolStrictEventUnionRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsProtocolStrictEventTableRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsProtocolFlexibleEventFieldsRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsProtocolFlexibleEventUnionRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireUnknownInteractionsProtocolFlexibleEventTableRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
         handler: &mut ___H,

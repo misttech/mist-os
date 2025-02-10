@@ -94,7 +94,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireExampleUseOfVectors
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

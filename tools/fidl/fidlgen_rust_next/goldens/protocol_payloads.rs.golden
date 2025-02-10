@@ -236,7 +236,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireMainProtocolTwoWayLoca
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -297,7 +297,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -1237,7 +1237,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireMainProtocolTwoWayAnon
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -1302,7 +1302,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -2009,40 +2009,40 @@ where
     ___H: MainProtocolClientHandler<___T>,
 
     for<'buf> ::fidl_next_test_protocolpayloads_imported::WireImportStructPayload:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> ::fidl_next_test_protocolpayloads_imported::WireComposedProtocolTwoWayComposedWithErrorResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> ::fidl_next_test_protocolpayloads_imported::WireImportStructPayload:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireLocalStructPayload:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireMainProtocolTwoWayLocalWithErrorResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireLocalStructPayload:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> ::fidl_next_test_protocolpayloads_imported::WireImportStructPayload:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireMainProtocolTwoWayImportWithErrorResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> ::fidl_next_test_protocolpayloads_imported::WireImportStructPayload:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireMainProtocolTwoWayAnonResponse:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireMainProtocolTwoWayAnonWithErrorResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireMainProtocolOnAnonRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
         handler: &mut ___H,
@@ -2281,40 +2281,40 @@ where
     ___H: MainProtocolServerHandler<___T>,
 
     for<'buf> ::fidl_next_test_protocolpayloads_imported::WireImportStructPayload:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> ::fidl_next_test_protocolpayloads_imported::WireImportStructPayload:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> ::fidl_next_test_protocolpayloads_imported::WireImportStructPayload:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireLocalStructPayload:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireLocalStructPayload:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireLocalStructPayload:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> ::fidl_next_test_protocolpayloads_imported::WireImportStructPayload:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> ::fidl_next_test_protocolpayloads_imported::WireImportStructPayload:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> ::fidl_next_test_protocolpayloads_imported::WireImportStructPayload:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireMainProtocolOneWayAnonRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireMainProtocolTwoWayAnonRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireMainProtocolTwoWayAnonWithErrorRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_one_way(
         handler: &mut ___H,

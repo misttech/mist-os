@@ -59,14 +59,8 @@ pub trait Transport: 'static {
     where
         Self: 'r;
     /// The buffer type for receivers.
-    type RecvBuffer: Send;
-    /// The decoder for receive buffers.
-    type Decoder<'b>: Decoder<'b> + Send
-    where
-        Self: 'b;
+    type RecvBuffer: Decoder + Send;
 
     /// Receives an encoded message over the transport.
     fn recv(receiver: &mut Self::Receiver) -> Self::RecvFuture<'_>;
-    /// Gets the decoder for a buffer.
-    fn decoder(buffer: &mut Self::RecvBuffer) -> Self::Decoder<'_>;
 }

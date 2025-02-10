@@ -388,7 +388,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireNonInlineStructTestStr
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 
     ___D: ::fidl_next::fuchsia::HandleDecoder,
 {
@@ -616,7 +616,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireTopLevelStruct
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 
     ___D: ::fidl_next::fuchsia::HandleDecoder,
 {

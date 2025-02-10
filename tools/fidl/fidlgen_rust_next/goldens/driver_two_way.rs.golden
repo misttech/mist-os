@@ -255,7 +255,7 @@ where
     ___H: TwoWayClientHandler<___T>,
 
     for<'buf> crate::WireTwoWayAddResponse:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
         handler: &mut ___H,
@@ -299,7 +299,7 @@ where
     ___H: TwoWayServerHandler<___T>,
 
     for<'buf> crate::WireTwoWayAddRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_one_way(
         handler: &mut ___H,

@@ -235,8 +235,11 @@ pub struct RecvBuffer {
     handles_taken: usize,
 }
 
-impl<'buf> Decoder<'buf> for &'buf mut RecvBuffer {
-    fn take_chunks(&mut self, count: usize) -> Result<&'buf mut [Chunk], DecodeError> {
+impl Decoder for RecvBuffer {
+    fn take_chunks<'buf>(
+        self: &mut &'buf mut Self,
+        count: usize,
+    ) -> Result<&'buf mut [Chunk], DecodeError> {
         if count > self.buffer.chunks.len() - self.chunks_taken {
             return Err(DecodeError::InsufficientData);
         }
@@ -266,7 +269,7 @@ impl<'buf> Decoder<'buf> for &'buf mut RecvBuffer {
     }
 }
 
-impl InternalHandleDecoder for &mut RecvBuffer {
+impl InternalHandleDecoder for RecvBuffer {
     fn __internal_take_handles(&mut self, count: usize) -> Result<(), DecodeError> {
         if count > self.buffer.handles.len() - self.handles_taken {
             return Err(DecodeError::InsufficientHandles);
@@ -286,7 +289,7 @@ impl InternalHandleDecoder for &mut RecvBuffer {
     }
 }
 
-impl HandleDecoder for &mut RecvBuffer {
+impl HandleDecoder for RecvBuffer {
     fn take_handle(&mut self) -> Result<Handle, DecodeError> {
         if self.handles_taken >= self.buffer.handles.len() {
             return Err(DecodeError::InsufficientHandles);
@@ -330,14 +333,9 @@ impl Transport for Channel {
     type Receiver = Receiver;
     type RecvFuture<'r> = RecvFuture<'r>;
     type RecvBuffer = RecvBuffer;
-    type Decoder<'b> = &'b mut RecvBuffer;
 
     fn recv(receiver: &mut Self::Receiver) -> Self::RecvFuture<'_> {
         RecvFuture { shared: &receiver.shared, buffer: Some(Buffer::new()) }
-    }
-
-    fn decoder(buffer: &mut Self::RecvBuffer) -> Self::Decoder<'_> {
-        buffer
     }
 }
 

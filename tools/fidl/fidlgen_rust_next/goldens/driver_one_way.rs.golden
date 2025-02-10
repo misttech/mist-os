@@ -278,7 +278,7 @@ where
     ___H: OneWayServerHandler<___T>,
 
     for<'buf> crate::WireOneWaySendRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_one_way(
         handler: &mut ___H,

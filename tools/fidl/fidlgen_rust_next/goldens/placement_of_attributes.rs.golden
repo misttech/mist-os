@@ -365,7 +365,7 @@ where
     ___H: ExampleProtocolServerHandler<___T>,
 
     for<'buf> crate::WireExampleProtocolMethodRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_one_way(
         handler: &mut ___H,
@@ -566,7 +566,7 @@ pub struct WireExampleTable {
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireExampleTable
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

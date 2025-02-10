@@ -57,8 +57,8 @@ impl<T> RawWireVector<T> {
     }
 }
 
-unsafe impl<'buf, D: Decoder<'buf> + ?Sized, T: Decode<D>> Decode<D> for RawWireVector<T> {
-    fn decode(slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
+unsafe impl<D: Decoder + ?Sized, T: Decode<D>> Decode<D> for RawWireVector<T> {
+    fn decode(slot: Slot<'_, Self>, mut decoder: &mut D) -> Result<(), DecodeError> {
         munge!(let Self { len, mut ptr } = slot);
 
         let len = len.to_native();

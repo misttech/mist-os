@@ -172,9 +172,9 @@ impl WireEnvelope {
     }
 
     /// Decodes and discards an unknown value in an envelope.
-    pub fn decode_unknown<'buf, D: Decoder<'buf> + ?Sized>(
+    pub fn decode_unknown<D: Decoder + ?Sized>(
         slot: Slot<'_, Self>,
-        decoder: &mut D,
+        mut decoder: &mut D,
     ) -> Result<(), DecodeError> {
         munge! {
             let Self {
@@ -237,9 +237,9 @@ impl WireEnvelope {
     }
 
     /// Decodes a value of a known type from an envelope.
-    pub fn decode_as<'buf, D: Decoder<'buf> + ?Sized, T: Decode<D>>(
+    pub fn decode_as<D: Decoder + ?Sized, T: Decode<D>>(
         mut slot: Slot<'_, Self>,
-        decoder: &mut D,
+        mut decoder: &mut D,
     ) -> Result<(), DecodeError> {
         munge! {
             let Self {

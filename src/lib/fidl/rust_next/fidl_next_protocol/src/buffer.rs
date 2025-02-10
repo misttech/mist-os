@@ -21,10 +21,11 @@ pub fn encode_header<T: Transport>(
 }
 
 /// Parses the transaction ID and ordinal from the given buffer.
-pub fn decode_header<T: Transport>(buffer: &mut T::RecvBuffer) -> Result<(u32, u64), DecodeError> {
+pub fn decode_header<T: Transport>(
+    mut buffer: &mut T::RecvBuffer,
+) -> Result<(u32, u64), DecodeError> {
     let (txid, ordinal) = {
-        let mut decoder = T::decoder(buffer);
-        let header = decoder.decode_next::<WireMessageHeader>()?;
+        let header = buffer.decode_next::<WireMessageHeader>()?;
         (header.txid.to_native(), header.ordinal.to_native())
     };
 

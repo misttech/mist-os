@@ -26,11 +26,14 @@ pub trait InternalHandleDecoder {
 }
 
 /// A decoder for FIDL messages.
-pub trait Decoder<'buf>: InternalHandleDecoder {
+pub trait Decoder: InternalHandleDecoder {
     /// Takes a slice of `Chunk`s from the decoder.
     ///
     /// Returns `Err` if the decoder doesn't have enough chunks left.
-    fn take_chunks(&mut self, count: usize) -> Result<&'buf mut [Chunk], DecodeError>;
+    fn take_chunks<'buf>(
+        self: &mut &'buf mut Self,
+        count: usize,
+    ) -> Result<&'buf mut [Chunk], DecodeError>;
 
     /// Finishes decoding.
     ///
@@ -38,27 +41,7 @@ pub trait Decoder<'buf>: InternalHandleDecoder {
     fn finish(&mut self) -> Result<(), DecodeError>;
 }
 
-impl<T: InternalHandleDecoder> InternalHandleDecoder for &mut T {
-    fn __internal_take_handles(&mut self, count: usize) -> Result<(), DecodeError> {
-        T::__internal_take_handles(self, count)
-    }
-
-    fn __internal_handles_remaining(&self) -> usize {
-        T::__internal_handles_remaining(self)
-    }
-}
-
-impl<'buf, T: Decoder<'buf>> Decoder<'buf> for &mut T {
-    fn take_chunks(&mut self, count: usize) -> Result<&'buf mut [Chunk], DecodeError> {
-        T::take_chunks(self, count)
-    }
-
-    fn finish(&mut self) -> Result<(), DecodeError> {
-        T::finish(self)
-    }
-}
-
-impl InternalHandleDecoder for &mut [Chunk] {
+impl InternalHandleDecoder for [Chunk] {
     fn __internal_take_handles(&mut self, _: usize) -> Result<(), DecodeError> {
         Err(DecodeError::InsufficientHandles)
     }
@@ -68,8 +51,11 @@ impl InternalHandleDecoder for &mut [Chunk] {
     }
 }
 
-impl<'buf> Decoder<'buf> for &'buf mut [Chunk] {
-    fn take_chunks(&mut self, count: usize) -> Result<&'buf mut [Chunk], DecodeError> {
+impl Decoder for [Chunk] {
+    fn take_chunks<'buf>(
+        self: &mut &'buf mut Self,
+        count: usize,
+    ) -> Result<&'buf mut [Chunk], DecodeError> {
         if count > self.len() {
             return Err(DecodeError::InsufficientData);
         }
@@ -90,23 +76,28 @@ impl<'buf> Decoder<'buf> for &'buf mut [Chunk] {
 }
 
 /// Extension methods for [`Decoder`].
-pub trait DecoderExt<'buf> {
+pub trait DecoderExt {
     /// Takes enough chunks for a `T`, returning a `Slot` of the taken value.
-    fn take_slot<T>(&mut self) -> Result<Slot<'buf, T>, DecodeError>;
+    fn take_slot<'buf, T>(self: &mut &'buf mut Self) -> Result<Slot<'buf, T>, DecodeError>;
 
     /// Takes enough chunks for a slice of `T`, returning a `Slot` of the taken slice.
-    fn take_slice_slot<T>(&mut self, len: usize) -> Result<Slot<'buf, [T]>, DecodeError>;
+    fn take_slice_slot<'buf, T>(
+        self: &mut &'buf mut Self,
+        len: usize,
+    ) -> Result<Slot<'buf, [T]>, DecodeError>;
 
     /// Decodes a `T` and returns an `Owned` pointer to it.
     ///
     /// Returns `Err` if decoding failed.
-    fn decode_next<T: Decode<Self>>(&mut self) -> Result<Owned<'buf, T>, DecodeError>;
+    fn decode_next<'buf, T: Decode<Self>>(
+        self: &mut &'buf mut Self,
+    ) -> Result<Owned<'buf, T>, DecodeError>;
 
     /// Decodes a slice of `T` and returns an `Owned` pointer to it.
     ///
     /// Returns `Err` if decoding failed.
-    fn decode_next_slice<T: Decode<Self>>(
-        &mut self,
+    fn decode_next_slice<'buf, T: Decode<Self>>(
+        self: &mut &'buf mut Self,
         len: usize,
     ) -> Result<Owned<'buf, [T]>, DecodeError>;
 
@@ -114,20 +105,22 @@ pub trait DecoderExt<'buf> {
     ///
     /// On success, returns `Ok` of an `Owned` pointer to the decoded value. Returns `Err` if the
     /// decoder did not finish successfully.
-    fn decode_last<T: Decode<Self>>(&mut self) -> Result<Owned<'buf, T>, DecodeError>;
+    fn decode_last<'buf, T: Decode<Self>>(
+        self: &mut &'buf mut Self,
+    ) -> Result<Owned<'buf, T>, DecodeError>;
 
     /// Finishes the decoder by decoding a slice of `T`.
     ///
     /// On success, returns `Ok` of an `Owned` pointer to the decoded slice. Returns `Err` if the
     /// decoder did not finish successfully.
-    fn decode_last_slice<T: Decode<Self>>(
-        &mut self,
+    fn decode_last_slice<'buf, T: Decode<Self>>(
+        self: &mut &'buf mut Self,
         len: usize,
     ) -> Result<Owned<'buf, [T]>, DecodeError>;
 }
 
-impl<'buf, D: Decoder<'buf> + ?Sized> DecoderExt<'buf> for D {
-    fn take_slot<T>(&mut self) -> Result<Slot<'buf, T>, DecodeError> {
+impl<D: Decoder + ?Sized> DecoderExt for D {
+    fn take_slot<'buf, T>(self: &mut &'buf mut Self) -> Result<Slot<'buf, T>, DecodeError> {
         // TODO: might be able to move this into a const for guaranteed const
         // eval
         assert!(
@@ -144,7 +137,10 @@ impl<'buf, D: Decoder<'buf> + ?Sized> DecoderExt<'buf> for D {
         unsafe { Ok(Slot::new_unchecked(chunks.as_mut_ptr().cast())) }
     }
 
-    fn take_slice_slot<T>(&mut self, len: usize) -> Result<Slot<'buf, [T]>, DecodeError> {
+    fn take_slice_slot<'buf, T>(
+        self: &mut &'buf mut Self,
+        len: usize,
+    ) -> Result<Slot<'buf, [T]>, DecodeError> {
         assert!(
             align_of::<T>() <= CHUNK_SIZE,
             "attempted to take a slice slot for a type with an alignment \
@@ -159,14 +155,16 @@ impl<'buf, D: Decoder<'buf> + ?Sized> DecoderExt<'buf> for D {
         unsafe { Ok(Slot::new_slice_unchecked(chunks.as_mut_ptr().cast(), len)) }
     }
 
-    fn decode_next<T: Decode<Self>>(&mut self) -> Result<Owned<'buf, T>, DecodeError> {
+    fn decode_next<'buf, T: Decode<Self>>(
+        self: &mut &'buf mut Self,
+    ) -> Result<Owned<'buf, T>, DecodeError> {
         let mut slot = self.take_slot::<T>()?;
         T::decode(slot.as_mut(), self)?;
         unsafe { Ok(Owned::new_unchecked(slot.as_mut_ptr())) }
     }
 
-    fn decode_next_slice<T: Decode<Self>>(
-        &mut self,
+    fn decode_next_slice<'buf, T: Decode<Self>>(
+        self: &mut &'buf mut Self,
         len: usize,
     ) -> Result<Owned<'buf, [T]>, DecodeError> {
         let mut slot = self.take_slice_slot::<T>(len)?;
@@ -176,14 +174,16 @@ impl<'buf, D: Decoder<'buf> + ?Sized> DecoderExt<'buf> for D {
         unsafe { Ok(Owned::new_unchecked(slot.as_mut_ptr())) }
     }
 
-    fn decode_last<T: Decode<Self>>(&mut self) -> Result<Owned<'buf, T>, DecodeError> {
+    fn decode_last<'buf, T: Decode<Self>>(
+        self: &mut &'buf mut Self,
+    ) -> Result<Owned<'buf, T>, DecodeError> {
         let result = self.decode_next()?;
         self.finish()?;
         Ok(result)
     }
 
-    fn decode_last_slice<T: Decode<Self>>(
-        &mut self,
+    fn decode_last_slice<'buf, T: Decode<Self>>(
+        self: &mut &'buf mut Self,
         len: usize,
     ) -> Result<Owned<'buf, [T]>, DecodeError> {
         let result = self.decode_next_slice(len)?;

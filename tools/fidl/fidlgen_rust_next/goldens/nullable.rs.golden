@@ -352,7 +352,7 @@ where
     ___H: SimpleProtocolClientHandler<___T>,
 
     for<'buf> crate::WireSimpleProtocolAddResponse:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
         handler: &mut ___H,
@@ -398,7 +398,7 @@ where
     ___H: SimpleProtocolServerHandler<___T>,
 
     for<'buf> crate::WireSimpleProtocolAddRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_one_way(
         handler: &mut ___H,
@@ -1037,7 +1037,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireStructWithNullableStri
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -1131,7 +1131,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireStructWithNullableStru
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -1315,7 +1315,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireStructWithNullableVect
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

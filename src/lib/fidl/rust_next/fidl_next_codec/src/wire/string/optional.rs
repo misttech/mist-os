@@ -53,7 +53,7 @@ impl fmt::Debug for WireOptionalString {
     }
 }
 
-unsafe impl<'buf, D: Decoder<'buf> + ?Sized> Decode<D> for WireOptionalString {
+unsafe impl<D: Decoder + ?Sized> Decode<D> for WireOptionalString {
     fn decode(slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
         munge!(let Self { mut vec } = slot);
 

@@ -288,7 +288,7 @@ pub struct WireT {
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireT
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 
     ___D: ::fidl_next::fuchsia::HandleDecoder,
 {
@@ -431,7 +431,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireHandlesInProtocolSendH
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 
     ___D: ::fidl_next::fuchsia::HandleDecoder,
 {
@@ -555,7 +555,7 @@ where
     ___H: HandlesInProtocolServerHandler<___T>,
 
     for<'buf> crate::WireHandlesInProtocolSendHandlesRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_one_way(
         handler: &mut ___H,

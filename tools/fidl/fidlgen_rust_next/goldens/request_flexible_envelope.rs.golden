@@ -131,7 +131,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireFlexibleFoo
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -189,7 +189,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalFlexibleFoo
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -338,7 +338,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireStrictFoo
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -396,7 +396,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOptionalStrictFoo
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -502,7 +502,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -599,7 +599,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -696,7 +696,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -793,7 +793,7 @@ unsafe impl<'buf, ___D> ::fidl_next::Decode<___D>
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
 
-    ___D: ::fidl_next::Decoder<'buf>,
+    ___D: ::fidl_next::Decoder,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -924,10 +924,10 @@ where
     ___H: ProtocolClientHandler<___T>,
 
     for<'buf> crate::WireProtocolRequestStrictResponseFlexibleResponse:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireProtocolRequestFlexibleResponseStrictResponse:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_event(
         handler: &mut ___H,
@@ -980,10 +980,10 @@ where
     ___H: ProtocolServerHandler<___T>,
 
     for<'buf> crate::WireProtocolRequestStrictResponseFlexibleRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 
     for<'buf> crate::WireProtocolRequestFlexibleResponseStrictRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
 {
     fn on_one_way(
         handler: &mut ___H,

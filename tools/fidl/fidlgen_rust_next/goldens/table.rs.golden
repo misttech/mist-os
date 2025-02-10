@@ -60,7 +60,7 @@ pub struct WireEmptyTable {
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireEmptyTable
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -144,7 +144,7 @@ pub struct WireExtensionTable {
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireExtensionTable
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -288,7 +288,7 @@ pub struct WireNewerSimpleTable {
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireNewerSimpleTable
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -433,7 +433,7 @@ pub struct WireOlderSimpleTable {
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireOlderSimpleTable
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -590,7 +590,7 @@ pub struct WireReverseOrdinalTable {
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireReverseOrdinalTable
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -757,7 +757,7 @@ pub struct WireSimpleTable {
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSimpleTable
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -2147,7 +2147,7 @@ pub struct WireSixtyFourOrdinalTable {
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireSixtyFourOrdinalTable
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -3146,7 +3146,7 @@ pub struct WireTableWithAttributes {
 
 unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for WireTableWithAttributes
 where
-    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    ___D: ::fidl_next::Decoder + ?Sized,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

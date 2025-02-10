@@ -56,7 +56,7 @@ impl fmt::Debug for WireString {
     }
 }
 
-unsafe impl<'buf, D: Decoder<'buf> + ?Sized> Decode<D> for WireString {
+unsafe impl<D: Decoder + ?Sized> Decode<D> for WireString {
     fn decode(slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
         munge!(let Self { mut vec } = slot);
 

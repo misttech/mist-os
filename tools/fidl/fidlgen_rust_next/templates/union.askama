@@ -196,7 +196,7 @@ unsafe impl<{% if !is_static %}'buf, {% endif %}___D> ::fidl_next::Decode<___D> 
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
     {% if !is_static %}
-        ___D: ::fidl_next::Decoder<'buf>,
+        ___D: ::fidl_next::Decoder,
     {% endif %}
     {% if union.is_resource %}
         ___D: ::fidl_next::fuchsia::HandleDecoder,
@@ -296,7 +296,7 @@ unsafe impl<{% if !is_static %}'buf, {% endif %}___D> ::fidl_next::Decode<___D> 
 where
     ___D: ::fidl_next::decoder::InternalHandleDecoder + ?Sized,
     {% if !is_static %}
-        ___D: ::fidl_next::Decoder<'buf>,
+        ___D: ::fidl_next::Decoder,
     {% endif %}
     {% if union.is_resource %}
         ___D: ::fidl_next::fuchsia::HandleDecoder,

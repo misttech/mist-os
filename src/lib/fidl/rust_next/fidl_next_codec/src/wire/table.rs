@@ -26,9 +26,9 @@ impl WireTable {
     /// Decodes the fields of the table with a decoding function.
     ///
     /// The decoding function receives the ordinal of the field, its slot, and the decoder.
-    pub fn decode_with<'buf, D: Decoder<'buf> + ?Sized>(
+    pub fn decode_with<D: Decoder + ?Sized>(
         slot: Slot<'_, Self>,
-        decoder: &mut D,
+        mut decoder: &mut D,
         f: impl Fn(i64, Slot<'_, WireEnvelope>, &mut D) -> Result<(), DecodeError>,
     ) -> Result<(), DecodeError> {
         munge!(let Self { len, mut ptr } = slot);

@@ -168,7 +168,7 @@ pub struct RecvBuffer {
     chunks_taken: usize,
 }
 
-impl InternalHandleDecoder for &mut RecvBuffer {
+impl InternalHandleDecoder for RecvBuffer {
     fn __internal_take_handles(&mut self, _: usize) -> Result<(), DecodeError> {
         Err(DecodeError::InsufficientHandles)
     }
@@ -178,8 +178,11 @@ impl InternalHandleDecoder for &mut RecvBuffer {
     }
 }
 
-impl<'buf> Decoder<'buf> for &'buf mut RecvBuffer {
-    fn take_chunks(&mut self, count: usize) -> Result<&'buf mut [Chunk], DecodeError> {
+impl Decoder for RecvBuffer {
+    fn take_chunks<'buf>(
+        self: &mut &'buf mut Self,
+        count: usize,
+    ) -> Result<&'buf mut [Chunk], DecodeError> {
         if count > self.chunks.len() - self.chunks_taken {
             return Err(DecodeError::InsufficientData);
         }
@@ -233,14 +236,9 @@ impl Transport for Mpsc {
     type Receiver = Receiver;
     type RecvFuture<'r> = RecvFuture<'r>;
     type RecvBuffer = RecvBuffer;
-    type Decoder<'b> = &'b mut RecvBuffer;
 
     fn recv(receiver: &mut Self::Receiver) -> Self::RecvFuture<'_> {
         RecvFuture { receiver }
-    }
-
-    fn decoder(buffer: &mut Self::RecvBuffer) -> Self::Decoder<'_> {
-        buffer
     }
 }
 

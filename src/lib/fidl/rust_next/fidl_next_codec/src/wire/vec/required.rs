@@ -70,7 +70,7 @@ impl<T: fmt::Debug> fmt::Debug for WireVector<T> {
     }
 }
 
-unsafe impl<'buf, D: Decoder<'buf> + ?Sized, T: Decode<D>> Decode<D> for WireVector<T> {
+unsafe impl<D: Decoder + ?Sized, T: Decode<D>> Decode<D> for WireVector<T> {
     fn decode(mut slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
         munge!(let Self { raw } = slot.as_mut());
         RawWireVector::decode(raw, decoder)?;

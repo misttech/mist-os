@@ -70,8 +70,8 @@ impl<T: fmt::Debug> fmt::Debug for WireBox<T> {
     }
 }
 
-unsafe impl<'buf, D: Decoder<'buf> + ?Sized, T: Decode<D>> Decode<D> for WireBox<T> {
-    fn decode(slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
+unsafe impl<D: Decoder + ?Sized, T: Decode<D>> Decode<D> for WireBox<T> {
+    fn decode(slot: Slot<'_, Self>, mut decoder: &mut D) -> Result<(), DecodeError> {
         munge!(let Self { mut ptr } = slot);
 
         if WirePointer::is_encoded_present(ptr.as_mut())? {

@@ -211,7 +211,7 @@ where
     {% for method in protocol.methods %}
         {% if let Some(response) = method.maybe_response_payload %}
             for<'buf> {{ context.wire_type(response) }}:
-                ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+                ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
         {% endif %}
     {% endfor %}
 {
@@ -360,7 +360,7 @@ where
     {% for method in protocol.methods %}
         {% if let Some(request) = method.maybe_request_payload %}
             for<'buf> {{ context.wire_type(request) }}:
-                ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+                ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
         {% endif %}
     {% endfor %}
 {
