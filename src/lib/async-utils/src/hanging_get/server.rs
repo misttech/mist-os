@@ -111,7 +111,19 @@ where
     /// Errors occur when:
     /// * A Subscriber attempts to register an observation when there is already an outstanding
     ///   observation waiting on updates.
+    ///
+    /// Returns `observation` on error.
     pub fn register(&self, observation: O) -> Result<(), HangingGetServerError> {
+        self.register2(observation).map_err(|_| HangingGetServerError::MultipleObservers)
+    }
+    /// Register a new observation.
+    ///
+    /// Errors occur when:
+    /// * A Subscriber attempts to register an observation when there is already an outstanding
+    ///   observation waiting on updates.
+    ///
+    /// Returns `observation` on error.
+    pub fn register2(&self, observation: O) -> Result<(), O> {
         self.inner.lock().subscribe(self.key, observation)
     }
 }
@@ -222,7 +234,9 @@ where
     /// key. All unresolved observers will be resolved to the same value immediately after the state
     /// is updated. If there is no stored state, then the notification will be delayed until an
     /// update is made.
-    pub fn subscribe(&mut self, key: K, observer: O) -> Result<(), HangingGetServerError> {
+    ///
+    /// Returns `observer` on error.
+    pub fn subscribe(&mut self, key: K, observer: O) -> Result<(), O> {
         let entry = self.observers.entry(key).or_insert_with(Window::new);
         entry.observe(observer, &self.notify, self.state.as_ref())
     }
@@ -250,14 +264,16 @@ impl<O> Window<O> {
     /// Register a new observer. The observer will be notified immediately if the `Window`
     /// has a dirty view of the state. The observer will be stored for future notification
     /// if the `Window` does not have a dirty view.
+    ///
+    /// Returns `Err(observer)` if the window already has an observer.
     pub fn observe<S>(
         &mut self,
         observer: O,
         f: impl Fn(&S, O) -> bool,
         current_state: Option<&S>,
-    ) -> Result<(), HangingGetServerError> {
+    ) -> Result<(), O> {
         if self.observer.is_some() {
-            return Err(HangingGetServerError::MultipleObservers);
+            return Err(observer);
         }
         self.observer = Some(observer);
         if let Some(current_state) = current_state {
@@ -392,7 +408,7 @@ mod tests {
         let o2 = TestObserver::expect_no_value();
         window.observe(o1.clone(), TestObserver::observe, Some(&state)).unwrap();
         let result = window.observe(o2.clone(), TestObserver::observe, Some(&state));
-        assert_eq!(result, Err(HangingGetServerError::MultipleObservers));
+        assert_eq!(result, Err(o2));
         assert!(!o1.has_value());
         state = 1;
         window.notify(TestObserver::observe, &state);
@@ -525,8 +541,9 @@ mod tests {
         hanging.subscribe(0, TestObserver::expect_value(1)).unwrap();
 
         // Since the first result is delayed, subscribing again is an error.
-        let result = hanging.subscribe(0, TestObserver::expect_no_value());
-        assert_eq!(result, Err(HangingGetServerError::MultipleObservers));
+        let o = TestObserver::expect_no_value();
+        let result = hanging.subscribe(0, o.clone());
+        assert_eq!(result, Err(o));
         hanging.set(1);
     }
 
@@ -539,12 +556,13 @@ mod tests {
         // been notified
         let o2 = TestObserver::expect_no_value();
         let result = hanging.subscribe(0, o2.clone());
-        assert_eq!(result, Err(HangingGetServerError::MultipleObservers));
+        assert_eq!(result, Err(o2.clone()));
         assert!(!o2.has_value());
 
         // A third subscription will also fail for the same reason.
-        let result = hanging.subscribe(0, TestObserver::expect_no_value());
-        assert_eq!(result, Err(HangingGetServerError::MultipleObservers));
+        let o3 = TestObserver::expect_no_value();
+        let result = hanging.subscribe(0, o3.clone());
+        assert_eq!(result, Err(o3));
 
         // Set should notify all observers to the change
         hanging.set(1);
@@ -554,11 +572,13 @@ mod tests {
     fn hanging_get_inner_delayed_subscribe_with_two_clients_then_set() {
         let mut hanging = HangingGetInner::new(None, TestObserver::observe);
         hanging.subscribe(0, TestObserver::expect_value(1)).unwrap();
-        let result = hanging.subscribe(0, TestObserver::expect_no_value());
-        assert_eq!(result, Err(HangingGetServerError::MultipleObservers));
+        let o = TestObserver::expect_no_value();
+        let result = hanging.subscribe(0, o.clone());
+        assert_eq!(result, Err(o));
         hanging.subscribe(1, TestObserver::expect_value(1)).unwrap();
-        let result = hanging.subscribe(1, TestObserver::expect_no_value());
-        assert_eq!(result, Err(HangingGetServerError::MultipleObservers));
+        let o2 = TestObserver::expect_no_value();
+        let result = hanging.subscribe(1, o2.clone());
+        assert_eq!(result, Err(o2));
         hanging.set(1);
     }
 
@@ -566,8 +586,9 @@ mod tests {
     fn hanging_get_inner_delayed_unsubscribe() {
         let mut hanging = HangingGetInner::new(None, TestObserver::observe);
         hanging.subscribe(0, TestObserver::expect_no_value()).unwrap();
-        let result = hanging.subscribe(0, TestObserver::expect_no_value());
-        assert_eq!(result, Err(HangingGetServerError::MultipleObservers));
+        let o = TestObserver::expect_no_value();
+        let result = hanging.subscribe(0, o.clone());
+        assert_eq!(result, Err(o));
         hanging.unsubscribe(0);
         hanging.set(1);
     }
@@ -577,11 +598,13 @@ mod tests {
         let mut hanging = HangingGetInner::new(None, TestObserver::observe);
 
         hanging.subscribe(0, TestObserver::<i32>::expect_no_value()).unwrap();
-        let result = hanging.subscribe(0, TestObserver::expect_no_value());
-        assert_eq!(result, Err(HangingGetServerError::MultipleObservers));
+        let o = TestObserver::expect_no_value();
+        let result = hanging.subscribe(0, o.clone());
+        assert_eq!(result, Err(o));
         hanging.subscribe(1, TestObserver::expect_no_value()).unwrap();
-        let result = hanging.subscribe(1, TestObserver::expect_no_value());
-        assert_eq!(result, Err(HangingGetServerError::MultipleObservers));
+        let o2 = TestObserver::expect_no_value();
+        let result = hanging.subscribe(1, o2.clone());
+        assert_eq!(result, Err(o2));
 
         // Unsubscribe one of the two observers
         hanging.unsubscribe(0);

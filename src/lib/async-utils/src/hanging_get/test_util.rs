@@ -11,7 +11,7 @@ use std::rc::Rc;
 /// times without the value being taken with `take_value` inbetween each
 /// observation. This prevents overwriting observations without checking
 /// them and simplifies the logic and API surface of this fake.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TestObserver<V: Debug + PartialEq> {
     value: Rc<RefCell<Option<V>>>,
     expected: Option<V>,
