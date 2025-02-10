@@ -332,7 +332,7 @@ pub enum EcGroupId {
 }
 
 impl EcGroupId {
-    fn nid(&self) -> i32 {
+    fn nid(&self) -> u32 {
         match self {
             EcGroupId::P256 => NID_X9_62_prime256v1,
             EcGroupId::P384 => NID_secp384r1,
@@ -362,7 +362,7 @@ impl Drop for EcGroup {
 
 impl EcGroup {
     pub fn new(id: EcGroupId) -> Result<Self, Error> {
-        ptr_or_error(unsafe { EC_GROUP_new_by_curve_name(id.nid()) }).map(Self)
+        ptr_or_error(unsafe { EC_GROUP_new_by_curve_name(id.nid() as i32) }).map(Self)
     }
 
     /// Returns the prime and curve parameters that constitute this group.

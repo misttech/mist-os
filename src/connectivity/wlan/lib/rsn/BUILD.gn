@@ -21,7 +21,7 @@ rustc_library("wlan-rsn") {
     "//src/connectivity/wlan/lib/statemachine:wlan-statemachine",
     "//src/lib/fuchsia-sync",
     "//src/lib/mundane",
-    "//third_party/boringssl/rust:bssl-sys.shared-no-ssl",
+    "//third_party/boringssl/rust/boringssl-sys:bssl-sys",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:bitfield",
     "//third_party/rust_crates:bytes",
