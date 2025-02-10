@@ -266,6 +266,25 @@ pub enum SocketPeer {
     Address(SocketAddress),
 }
 
+// `resolve_protocol()` returns the protocol that should be used for a new
+// socket. `socket()` allows `protocol` parameter to be set 0, in which case the
+// protocol defaults to TCP or UDP depending on the specified `socket_type`.
+fn resolve_protocol(
+    domain: SocketDomain,
+    socket_type: SocketType,
+    protocol: SocketProtocol,
+) -> SocketProtocol {
+    if domain.is_inet() && protocol.as_raw() == 0 {
+        match socket_type {
+            SocketType::Stream => SocketProtocol::TCP,
+            SocketType::Datagram => SocketProtocol::UDP,
+            _ => protocol,
+        }
+    } else {
+        protocol
+    }
+}
+
 fn create_socket_ops(
     current_task: &CurrentTask,
     domain: SocketDomain,
@@ -328,6 +347,7 @@ impl Socket {
         socket_type: SocketType,
         protocol: SocketProtocol,
     ) -> Result<SocketHandle, Errno> {
+        let protocol = resolve_protocol(domain, socket_type, protocol);
         let ops = create_socket_ops(current_task, domain, socket_type, protocol)?;
         Ok(Self::new_with_ops_and_info(ops, domain, socket_type, protocol))
     }
@@ -425,9 +445,7 @@ impl Socket {
                     let domain = self.domain.as_raw() as u32;
                     domain.to_ne_bytes().to_vec()
                 }
-                SO_PROTOCOL if !self.domain.is_inet() => {
-                    self.protocol.as_raw().to_ne_bytes().to_vec()
-                }
+                SO_PROTOCOL => self.protocol.as_raw().to_ne_bytes().to_vec(),
                 SO_RCVTIMEO => {
                     let duration = self.receive_timeout().unwrap_or_default();
                     timeval_from_duration(duration).as_bytes().to_owned()
