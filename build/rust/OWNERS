@@ -1,5 +1,6 @@
 dkoloski@google.com
 aaronwood@google.com
+jayzhuang@google.com
 
 per-file rustc_fuzzer.gni=aarongreen@google.com
 per-file fidl_rust.gni = file: /src/fidl/OWNERS
