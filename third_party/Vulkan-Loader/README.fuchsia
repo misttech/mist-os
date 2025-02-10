@@ -1,6 +1,6 @@
 Name: Vulkan-Loader
 License: Apache 2.0
-License File: LICENSE.txt
+License File: src/LICENSE.txt
 Upstream Git: https://github.com/KhronosGroup/Vulkan-Loader
 Description:
 

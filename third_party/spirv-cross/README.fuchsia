@@ -1,6 +1,6 @@
 Name: spirv-cross
 License: Apache 2.0
-License File: LICENSE
+License File: src/LICENSE
 Upstream Git: https://github.com/KhronosGroup/SPIRV-Cross
 Description:
 

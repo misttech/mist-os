@@ -1,6 +1,6 @@
 Name: glslang
 License: Apache-2.0, BSD-2-Clause, BSD-3-Clause, GPL-3.0-with-bison-exception, MIT
-License File: LICENSE.txt
+License File: src/LICENSE.txt
 Upstream Git: https://github.com/KhronosGroup/glslang
 Description:
 
