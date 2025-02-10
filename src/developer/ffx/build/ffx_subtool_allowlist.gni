@@ -51,6 +51,9 @@ ffx_subtool_fidl_allowlist = [
   # used by ffx power
   "//sdk/fidl/fuchsia.power.topology.test:fuchsia.power.topology.test",
 
+  # used by ffx session
+  "//sdk/fidl/fuchsia.session.power:fuchsia.session.power",
+
   # used by ffx net-test-realm
   "//src/connectivity/network/testing/network-test-realm/fidl:fuchsia.net.test.realm",
 

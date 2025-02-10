@@ -214,7 +214,6 @@ template("fidl_library") {
     "fuchsia.drm",
     "fuchsia.media2",
     "fuchsia.memory.attribution.plugin",
-    "fuchsia.session.power",
 
     # TODO(https://fxbug.dev/377756547): Remove this when FDomain passes API review.
     "fuchsia.fdomain",
