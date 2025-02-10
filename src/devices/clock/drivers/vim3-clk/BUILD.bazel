@@ -26,8 +26,8 @@ fuchsia_driver_bind_bytecode(
     ],
 )
 
-fuchsia_cc_driver(
-    name = "vim3-clk-driver",
+cc_library(
+    name = "common",
     srcs = [
         "aml-fclk.h",
         "aml-fclk-rates.cc",
@@ -38,7 +38,6 @@ fuchsia_cc_driver(
         "vim3_clk.cc",
         "vim3_clk.h",
     ],
-    output_name = "vim3-clk",
     deps = [
         "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
         "//sdk/lib/driver/compat/cpp",
@@ -52,6 +51,14 @@ fuchsia_cc_driver(
         "@fuchsia_sdk//pkg/driver_runtime_cpp",
         "@fuchsia_sdk//pkg/hwreg",
         "@fuchsia_sdk//pkg/mmio",
+    ],
+)
+
+fuchsia_cc_driver(
+    name = "vim3-clk-driver",
+    output_name = "vim3-clk",
+    deps = [
+        ":common",
     ],
 )
 
@@ -80,35 +87,19 @@ fuchsia_package(
 fuchsia_cc_test(
     name = "vim3-clk-test-bin",
     srcs = [
-        "aml-fclk.h",
-        "aml-fclk-rates.cc",
-        "meson_gate.cc",
-        "meson_gate.h",
-        "meson_pll.cc",
-        "meson_pll.h",
         "test.cc",
-        "vim3_clk.cc",
-        "vim3_clk.h",
     ],
     deps = [
-        "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
-        "//sdk/lib/driver/compat/cpp",
+        ":common",
         "//src/devices/lib/amlogic",
-        "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
-        "@fuchsia_sdk//bind/fuchsia.test:fuchsia.test_cc",
         "@fuchsia_sdk//fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
         "@fuchsia_sdk//fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
         "@fuchsia_sdk//pkg/async-loop-cpp",
         "@fuchsia_sdk//pkg/async-loop-default",
         "@fuchsia_sdk//pkg/async_patterns_testing_cpp",
-        "@fuchsia_sdk//pkg/driver_component_cpp",
-        "@fuchsia_sdk//pkg/driver_devfs_cpp",
-        "@fuchsia_sdk//pkg/driver_metadata_cpp",
         "@fuchsia_sdk//pkg/driver_platform_device_cpp",
-        "@fuchsia_sdk//pkg/driver_runtime_cpp",
         "@fuchsia_sdk//pkg/driver_testing_cpp",
-        "@fuchsia_sdk//pkg/hwreg",
         "@fuchsia_sdk//pkg/mmio",
         "@internal_sdk//pkg/mmio-test-helper",
     ],

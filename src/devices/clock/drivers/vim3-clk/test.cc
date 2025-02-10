@@ -5,7 +5,6 @@
 #include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire_test_base.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/vmo.h>
