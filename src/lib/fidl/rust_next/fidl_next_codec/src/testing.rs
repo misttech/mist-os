@@ -10,7 +10,10 @@ pub fn assert_encoded<T: Encode<Vec<Chunk>>>(mut value: T, chunks: &[Chunk]) {
     assert_eq!(encoded_chunks, chunks, "encoded chunks did not match");
 }
 
-pub fn assert_decoded<T: Decode<[Chunk]>>(mut chunks: &mut [Chunk], f: impl FnOnce(Owned<'_, T>)) {
-    let value = chunks.decode_next::<T>().expect("failed to decode");
+pub fn assert_decoded<T: for<'a> Decode<&'a mut [Chunk]>>(
+    mut chunks: &mut [Chunk],
+    f: impl FnOnce(Owned<'_, T>),
+) {
+    let value = (&mut chunks).decode_next::<T>().expect("failed to decode");
     f(value)
 }

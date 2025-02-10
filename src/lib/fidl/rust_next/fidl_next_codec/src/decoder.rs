@@ -5,6 +5,8 @@
 //! The core [`Decoder`] trait.
 
 use core::mem::take;
+use core::ptr::NonNull;
+use core::slice;
 
 use crate::{Chunk, Decode, DecodeError, Owned, Slot, CHUNK_SIZE};
 
@@ -26,14 +28,21 @@ pub trait InternalHandleDecoder {
 }
 
 /// A decoder for FIDL messages.
-pub trait Decoder: InternalHandleDecoder {
-    /// Takes a slice of `Chunk`s from the decoder.
+///
+/// # Safety
+///
+/// Pointers returned from `take_chunks` must:
+///
+/// - Point to `count` initialized `Chunk`s
+/// - Be valid for reads and writes
+/// - Remain valid until the decoder is dropped
+///
+/// The decoder **may be moved** without invalidating the returned pointers.
+pub unsafe trait Decoder: InternalHandleDecoder {
+    /// Takes a slice of `Chunk`s from the decoder, returning a pointer to them.
     ///
     /// Returns `Err` if the decoder doesn't have enough chunks left.
-    fn take_chunks<'buf>(
-        self: &mut &'buf mut Self,
-        count: usize,
-    ) -> Result<&'buf mut [Chunk], DecodeError>;
+    fn take_chunks_raw(&mut self, count: usize) -> Result<NonNull<Chunk>, DecodeError>;
 
     /// Finishes decoding.
     ///
@@ -41,7 +50,7 @@ pub trait Decoder: InternalHandleDecoder {
     fn finish(&mut self) -> Result<(), DecodeError>;
 }
 
-impl InternalHandleDecoder for [Chunk] {
+impl InternalHandleDecoder for &mut [Chunk] {
     fn __internal_take_handles(&mut self, _: usize) -> Result<(), DecodeError> {
         Err(DecodeError::InsufficientHandles)
     }
@@ -51,11 +60,8 @@ impl InternalHandleDecoder for [Chunk] {
     }
 }
 
-impl Decoder for [Chunk] {
-    fn take_chunks<'buf>(
-        self: &mut &'buf mut Self,
-        count: usize,
-    ) -> Result<&'buf mut [Chunk], DecodeError> {
+unsafe impl Decoder for &mut [Chunk] {
+    fn take_chunks_raw(&mut self, count: usize) -> Result<NonNull<Chunk>, DecodeError> {
         if count > self.len() {
             return Err(DecodeError::InsufficientData);
         }
@@ -63,7 +69,7 @@ impl Decoder for [Chunk] {
         let chunks = take(self);
         let (prefix, suffix) = unsafe { chunks.split_at_mut_unchecked(count) };
         *self = suffix;
-        Ok(prefix)
+        unsafe { Ok(NonNull::new_unchecked(prefix.as_mut_ptr())) }
     }
 
     fn finish(&mut self) -> Result<(), DecodeError> {
@@ -77,6 +83,12 @@ impl Decoder for [Chunk] {
 
 /// Extension methods for [`Decoder`].
 pub trait DecoderExt {
+    /// Takes a slice of `Chunk`s from the decoder.
+    fn take_chunks<'buf>(
+        self: &mut &'buf mut Self,
+        count: usize,
+    ) -> Result<&'buf mut [Chunk], DecodeError>;
+
     /// Takes enough chunks for a `T`, returning a `Slot` of the taken value.
     fn take_slot<'buf, T>(self: &mut &'buf mut Self) -> Result<Slot<'buf, T>, DecodeError>;
 
@@ -120,6 +132,13 @@ pub trait DecoderExt {
 }
 
 impl<D: Decoder + ?Sized> DecoderExt for D {
+    fn take_chunks<'buf>(
+        self: &mut &'buf mut Self,
+        count: usize,
+    ) -> Result<&'buf mut [Chunk], DecodeError> {
+        self.take_chunks_raw(count).map(|p| unsafe { slice::from_raw_parts_mut(p.as_ptr(), count) })
+    }
+
     fn take_slot<'buf, T>(self: &mut &'buf mut Self) -> Result<Slot<'buf, T>, DecodeError> {
         // TODO: might be able to move this into a const for guaranteed const
         // eval

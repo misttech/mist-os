@@ -8,7 +8,7 @@ use core::fmt;
 use core::future::Future;
 use core::mem::take;
 use core::pin::Pin;
-use core::slice::from_raw_parts_mut;
+use core::ptr::NonNull;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use core::task::{Context, Poll};
 use std::sync::{mpsc, Arc};
@@ -178,20 +178,16 @@ impl InternalHandleDecoder for RecvBuffer {
     }
 }
 
-impl Decoder for RecvBuffer {
-    fn take_chunks<'buf>(
-        self: &mut &'buf mut Self,
-        count: usize,
-    ) -> Result<&'buf mut [Chunk], DecodeError> {
+unsafe impl Decoder for RecvBuffer {
+    fn take_chunks_raw(&mut self, count: usize) -> Result<NonNull<Chunk>, DecodeError> {
         if count > self.chunks.len() - self.chunks_taken {
             return Err(DecodeError::InsufficientData);
         }
 
-        let chunks =
-            unsafe { from_raw_parts_mut(self.chunks.as_mut_ptr().add(self.chunks_taken), count) };
+        let chunks = unsafe { self.chunks.as_mut_ptr().add(self.chunks_taken) };
         self.chunks_taken += count;
 
-        Ok(chunks)
+        unsafe { Ok(NonNull::new_unchecked(chunks)) }
     }
 
     fn finish(&mut self) -> Result<(), DecodeError> {
