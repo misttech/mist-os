@@ -39,6 +39,8 @@ fuchsia_cc_driver("driver") {
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/devicetree/manager",
     "//sdk/lib/driver/devicetree/visitors:load-visitors",
+    "//sdk/lib/driver/devicetree/visitors/default/bind-property:bind-property",
+    "//sdk/lib/driver/devicetree/visitors/drivers/pci",
     "//sdk/lib/driver/metadata/cpp",
     "//src/devices/bind/fuchsia.pci:fuchsia.pci_cpp",
     "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",

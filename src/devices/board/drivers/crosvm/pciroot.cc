@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/async/cpp/task.h>
+#include <lib/driver/devicetree/visitors/drivers/pci/pci.h>
 #include <lib/fdf/cpp/arena.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/sync/cpp/completion.h>
@@ -14,33 +15,17 @@
 
 #include "crosvm.h"
 
-namespace {
-// Crosvm maps interrupts by device id, starting at 0x04.
-constexpr std::array kCrosvmInterruptMap = {
-    pci::Gicv3InterruptMapElement{0x0800, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x04, 0x04},
-    pci::Gicv3InterruptMapElement{0x1000, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x05, 0x04},
-    pci::Gicv3InterruptMapElement{0x1800, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x06, 0x04},
-    pci::Gicv3InterruptMapElement{0x2000, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x07, 0x04},
-    pci::Gicv3InterruptMapElement{0x2800, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x08, 0x04},
-    pci::Gicv3InterruptMapElement{0x3000, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x09, 0x04},
-    pci::Gicv3InterruptMapElement{0x3800, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x0a, 0x04},
-    pci::Gicv3InterruptMapElement{0x4000, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x0b, 0x04},
-    pci::Gicv3InterruptMapElement{0x4800, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x0c, 0x04},
-    pci::Gicv3InterruptMapElement{0x5000, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x0d, 0x04},
-    pci::Gicv3InterruptMapElement{0x5800, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x0e, 0x04},
-};
-}  // namespace
-
 namespace board_crosvm {
 
-zx::result<> Pciroot::CreateInterruptsAndRouting() {
+zx::result<> Pciroot::CreateInterruptsAndRouting(
+    std::span<const pci_dt::Gicv3InterruptMapElement> interrupts) {
   // This is only used for allocating the interrupt objects mapped to PCI.
-  for (const auto& entry : kCrosvmInterruptMap) {
+  for (const auto& entry : interrupts) {
     FDF_LOG(DEBUG, "%02X.%02X.%02x: pin %u int %#x %s %s", entry.child_unit_address.bus(),
             entry.child_unit_address.device(), entry.child_unit_address.function(), entry.pin,
-            entry.parent.int_number, pci::Gicv3InterruptTypeLabel(entry.parent.type),
-            pci::Gicv3InterruptFlagsLabel(entry.parent.flags));
-    ZX_DEBUG_ASSERT_MSG(entry.parent.flags == pci::Gicv3InterruptFlags::LevelTriggered,
+            entry.parent.int_number, pci_dt::Gicv3InterruptTypeLabel(entry.parent.type),
+            pci_dt::Gicv3InterruptFlagsLabel(entry.parent.flags));
+    ZX_DEBUG_ASSERT_MSG(entry.parent.flags == pci_dt::Gicv3InterruptFlags::LevelTriggered,
                         "Expected interrupt-map to contain level triggered interrupts");
     zx::interrupt interrupt;
     zx_status_t status = zx::interrupt::create(/*resource=*/irq_resource_,

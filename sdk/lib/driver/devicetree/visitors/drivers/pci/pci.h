@@ -9,6 +9,9 @@
 #include <lib/driver/devicetree/visitors/driver-visitor.h>
 #include <lib/driver/devicetree/visitors/drivers/pci/interrupt.h>
 
+#include <span>
+#include <vector>
+
 #include <hwreg/bitfields.h>
 
 // Parser compatible with the "pci-host-cam-generic" and "pci-host-ecam-generic" host controller
@@ -56,7 +59,7 @@ class PciVisitor : public fdf_devicetree::DriverVisitor {
 
   // Interrupt specifications if this device is gicv3.
   // TODO: Add support for other interrupt controllers as needed.
-  const std::vector<Gicv3InterruptMapElement>& gic_v3_interrupt_map_elements() const {
+  std::span<const Gicv3InterruptMapElement> gic_v3_interrupt_map_elements() const {
     return gic_v3_interrupt_map_elements_;
   }
 
@@ -65,6 +68,19 @@ class PciVisitor : public fdf_devicetree::DriverVisitor {
   std::vector<PciRange> ranges_;
   std::vector<Gicv3InterruptMapElement> gic_v3_interrupt_map_elements_;
 };
+
+constexpr const char* AddressSpaceLabel(AddressSpace e) {
+  switch (e) {
+    case AddressSpace::Configuration:
+      return "Configuration";
+    case AddressSpace::Io:
+      return "Io";
+    case AddressSpace::Mmio32:
+      return "32-bit";
+    case AddressSpace::Mmio64:
+      return "64-bit";
+  }
+}
 
 }  // namespace pci_dt
 

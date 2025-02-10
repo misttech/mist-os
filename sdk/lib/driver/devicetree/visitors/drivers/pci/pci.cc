@@ -142,6 +142,9 @@ zx::result<InterruptMapElementParseResult> ParseInterruptMapElement(
     return child_interrupt_view.take_error();
   }
 
+  // We interpret the child's interrupt view as the pin.
+  uint32_t pin = *devicetree::PropertyValue(*child_interrupt_view).AsUint32();
+
   // interrupt-parent: phandle (always u32)
   auto interrupt_parent_view = advance_cells(1);
   if (interrupt_parent_view.is_error()) {
@@ -176,8 +179,6 @@ zx::result<InterruptMapElementParseResult> ParseInterruptMapElement(
   // Currently, we consider only the first cell of the child address in our address computation.
   BusAddress child_unit_address(
       *devicetree::PropertyValue(child_address_view->subspan(0, sizeof(uint32_t))).AsUint32());
-
-  uint32_t pin = interrupt_parent_phandle;
 
   // In Gicv3, we interpret the parent interrupt specification as a 3-tuple of cells.
   auto parent_interrupt_specification =

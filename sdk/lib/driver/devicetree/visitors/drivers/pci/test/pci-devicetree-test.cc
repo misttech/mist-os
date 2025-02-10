@@ -164,7 +164,7 @@ TEST(PciVisitorTest, QemuArm64) {
 
   auto first_interrupt = interrupts[0];
   EXPECT_EQ(first_interrupt.child_unit_address.value, 0x0u);
-  EXPECT_EQ(first_interrupt.pin, 0x8001u);
+  EXPECT_EQ(first_interrupt.pin, 0x1u);
   EXPECT_EQ(first_interrupt.parent.type, Gicv3InterruptType::SPI);
   EXPECT_EQ(first_interrupt.parent.int_number, /*SPI*/ 0x20 + /*address*/ 0x3u);
   EXPECT_EQ(first_interrupt.parent.flags, Gicv3InterruptFlags::LevelTriggered);
@@ -175,7 +175,7 @@ TEST(PciVisitorTest, QemuArm64) {
   // | 0x1800 0x00 0x00 : 0x04    | 0x8001           | 0x00 0x00 : 0x00 0x05 0x04 |
   auto last_interrupt = interrupts[15];
   EXPECT_EQ(last_interrupt.child_unit_address.value, 0x1800u);
-  EXPECT_EQ(last_interrupt.pin, 0x8001u);
+  EXPECT_EQ(last_interrupt.pin, 0x4u);
   EXPECT_EQ(last_interrupt.parent.type, Gicv3InterruptType::SPI);
   EXPECT_EQ(last_interrupt.parent.int_number, /*SPI*/ 0x20 + /*address*/ 0x5u);
   EXPECT_EQ(last_interrupt.parent.flags, Gicv3InterruptFlags::LevelTriggered);

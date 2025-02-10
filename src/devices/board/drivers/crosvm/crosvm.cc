@@ -8,6 +8,9 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.kernel/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/devicetree/manager/manager.h>
+#include <lib/driver/devicetree/visitors/default/bind-property/bind-property.h>
+#include <lib/driver/devicetree/visitors/registry.h>
 #include <lib/zx/resource.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
@@ -17,31 +20,11 @@
 
 #include "fidl/fuchsia.hardware.pci/cpp/natural_types.h"
 #include "fuchsia/hardware/pciroot/c/banjo.h"
-#include "lib/pci/devicetree.h"
 
 namespace board_crosvm {
 
 namespace {
 const std::string kPcirootNodeName = "PCI0";
-// all values here are taken directly from dts/crosvm.dts.
-constexpr pci::RegPropertyElement kCrosvmReg{
-    .phys_hi = 0x00, .phys_lo = 0x10000, .size_hi = 0x00, .size_lo = 0x1000000};
-constexpr std::array kCrosvmRanges{
-    pci::RangePropertyElement{.phys_hi = 0x3000000,
-                              .phys_mid = 0x00,
-                              .phys_lo = 0x2000000,
-                              .parent_hi = 0x00,
-                              .parent_lo = 0x2000000,
-                              .size_hi = 0x00,
-                              .size_lo = 0x2000000},
-    pci::RangePropertyElement{.phys_hi = 0x3000000,
-                              .phys_mid = 0x00,
-                              .phys_lo = 0x90800000,
-                              .parent_hi = 0x00,
-                              .parent_lo = 0x90800000,
-                              .size_hi = 0xff,
-                              .size_lo = 0x6f800000},
-};
 
 // DFv2 does not expose get_mmio_resource() and the other methods for acquiring higher privilege
 // resources so we need to obtain them ourselves.
@@ -59,7 +42,7 @@ zx::result<zx::resource> GetResource(const std::shared_ptr<fdf::Namespace>& inco
 }
 }  // namespace
 
-zx::result<> Crosvm::CreateRoothost() {
+zx::result<> Crosvm::CreateRoothost(const pci_dt::PciVisitor& pci_visitor) {
   // Root host resource and construction is handled first.
   zx::result<zx::resource> msi{};
   if (msi = GetResource<fuchsia_kernel::MsiResource>(incoming()); msi.is_error()) {
@@ -82,17 +65,19 @@ zx::result<> Crosvm::CreateRoothost() {
   root_host_.emplace(msi_resource_.borrow(), mmio_resource_.borrow(), io_resource_.borrow(),
                      PCI_ADDRESS_SPACE_MEMORY);
 
-  for (auto& range : kCrosvmRanges) {
+  for (const auto& pci_range : pci_visitor.ranges()) {
     FDF_LOG(DEBUG, "%02X.%02X.%01X: %s base %#lx size %#zx %sprefetchable, %saliased",
-            range.bus_number(), range.device_number(), range.function_number(),
-            pci::AddressSpaceLabel(range.address_space()), range.child_address(), range.size(),
-            (range.prefetchable()) ? "" : "non-", (range.aliased_or_below()) ? "" : "not ");
-    ZX_DEBUG_ASSERT_MSG(range.address_space() == pci::AddressSpace::Mmio64,
-                        "The ranges expected in kCrosvmRanges should only be 64 bit.");
-    if (zx::result result = root_host_->AddMmioRange(range.child_address(), range.size());
-        result.is_error()) {
-      FDF_LOG(ERROR, "failed to add region [%#lx, %#lx) to MMIO allocators: %s",
-              range.child_address(), range.child_address() + range.size(), result.status_string());
+            pci_range.bus_number(), pci_range.device_number(), pci_range.function_number(),
+            pci_dt::AddressSpaceLabel(pci_range.address_space()),
+            *pci_range.range.child_bus_address(), *pci_range.range.length(),
+            (pci_range.prefetchable()) ? "" : "non-", (pci_range.aliased_or_below()) ? "" : "not ");
+    ZX_DEBUG_ASSERT_MSG(pci_range.address_space() == pci_dt::AddressSpace::Mmio64,
+                        "Expecting only 64 bit addresses.");
+    uint64_t address = *pci_range.range.child_bus_address();
+    uint64_t length = *pci_range.range.length();
+    if (zx::result result = root_host_->AddMmioRange(address, length); result.is_error()) {
+      FDF_LOG(ERROR, "failed to add region [%#lx, %#lx) to MMIO allocators: %s", address,
+              address + length, result.status_string());
     }
   }
 
@@ -113,23 +98,26 @@ zx::result<> Crosvm::CreateMetadata() {
   return zx::ok();
 }
 
-zx::result<> Crosvm::CreatePciroot() {
+zx::result<> Crosvm::CreatePciroot(const pci_dt::PciVisitor& pci_visitor) {
   zx::result iommu = incoming()->Connect<fuchsia_hardware_platform_bus::Service::Iommu>();
   if (iommu.is_error()) {
     FDF_LOG(ERROR, "Failed to connect to iommu: %s", iommu.status_string());
     return iommu.take_error();
   }
 
+  const auto& pci_reg = pci_visitor.reg();
   zx::vmo ecam;
   zx_status_t status =
-      zx::vmo::create_physical(/*resource=*/mmio_resource_, /*paddr=*/kCrosvmReg.base(),
-                               /*size=*/kCrosvmReg.size(), /*result=*/&ecam);
+      zx::vmo::create_physical(/*resource=*/mmio_resource_, /*paddr=*/*pci_reg->address(),
+                               /*size=*/*pci_reg->size(), /*result=*/&ecam);
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "Failed to create allocate ECAM for PCI: %s", zx_status_get_string(status));
     return zx::error(status);
   }
-  root_host_->mcfgs().push_back(
-      {.address = kCrosvmReg.base(), .pci_segment = 0, .start_bus_number = 0, .end_bus_number = 0});
+  root_host_->mcfgs().push_back({.address = *pci_reg->address(),
+                                 .pci_segment = 0,
+                                 .start_bus_number = 0,
+                                 .end_bus_number = 0});
 
   zx::result<zx::resource> irq;
   if (irq = GetResource<fuchsia_kernel::IrqResource>(incoming()); irq.is_error()) {
@@ -140,7 +128,9 @@ zx::result<> Crosvm::CreatePciroot() {
   pciroot_.emplace(kPcirootNodeName, &*root_host_, dispatcher(), std::move(iommu.value()),
                    std::move(ecam), std::move(irq.value()));
 
-  if (zx::result<> result = pciroot_->CreateInterruptsAndRouting(); result.is_error()) {
+  if (zx::result<> result =
+          pciroot_->CreateInterruptsAndRouting(pci_visitor.gic_v3_interrupt_map_elements());
+      result.is_error()) {
     return result.take_error();
   }
 
@@ -176,7 +166,25 @@ zx::result<> Crosvm::StartBanjoServer() {
 }
 
 zx::result<> Crosvm::Start() {
-  if (zx::result<> result = CreateRoothost(); result.is_error()) {
+  auto manager = fdf_devicetree::Manager::CreateFromNamespace(*incoming());
+
+  fdf_devicetree::VisitorRegistry visitors;
+  auto pci_visitor = std::make_unique<pci_dt::PciVisitor>();
+  const auto& pci_visitor_ref = *pci_visitor.get();
+  if (zx::result<> result =
+          visitors.RegisterVisitor(std::make_unique<fdf_devicetree::BindPropertyVisitor>());
+      result.is_error()) {
+    return result.take_error();
+  }
+  if (zx::result<> result = visitors.RegisterVisitor(std::move(pci_visitor)); result.is_error()) {
+    return result.take_error();
+  }
+
+  if (zx::result<> result = manager->Walk(visitors); result.is_error()) {
+    return result.take_error();
+  }
+
+  if (zx::result<> result = CreateRoothost(pci_visitor_ref); result.is_error()) {
     return result.take_error();
   }
 
@@ -184,7 +192,7 @@ zx::result<> Crosvm::Start() {
     return result.take_error();
   }
 
-  if (zx::result<> result = CreatePciroot(); result.is_error()) {
+  if (zx::result<> result = CreatePciroot(pci_visitor_ref); result.is_error()) {
     return result.take_error();
   }
 
