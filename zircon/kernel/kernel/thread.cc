@@ -857,11 +857,6 @@ void Thread::Forget() {
  * This function does not return.
  */
 __NO_RETURN void Thread::Current::Exit(int retcode) {
-  // create a dpc on the stack to queue up a free.
-  // must be put at top scope in this function to force the compiler to keep it from
-  // reusing the stack before the function exits
-  Dpc free_dpc;
-
   Thread* const current_thread = Thread::Current::Get();
   current_thread->canary_.Assert();
   DEBUG_ASSERT(!current_thread->IsIdle());
@@ -1019,7 +1014,7 @@ __NO_RETURN void Thread::Current::Exit(int retcode) {
   // It should not be possible to get to this point without needing to drop our
   // locks and queue a DPC to clean ourselves up.
   ASSERT(queue_free_dpc);
-  free_dpc = Dpc(&Thread::FreeDpc, current_thread);
+  Dpc free_dpc(&Thread::FreeDpc, current_thread);
   [[maybe_unused]] zx_status_t status = free_dpc.Queue();
   DEBUG_ASSERT(status == ZX_OK);
 
