@@ -206,7 +206,7 @@ impl MemoryFileObject {
 
 impl MemoryFileObject {
     pub fn read(
-        memory: &MemoryObject,
+        memory: &Arc<MemoryObject>,
         file: &FileObject,
         offset: usize,
         data: &mut dyn OutputBuffer,
@@ -231,7 +231,7 @@ impl MemoryFileObject {
     }
 
     pub fn write(
-        memory: &MemoryObject,
+        memory: &Arc<MemoryObject>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
