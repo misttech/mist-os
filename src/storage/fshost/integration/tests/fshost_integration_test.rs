@@ -54,6 +54,8 @@ async fn blobfs_and_data_mounted() {
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
+    // Also make sure tmpfs is getting exported.
+    fixture.check_fs_type("tmp", VFS_TYPE_MEMFS).await;
     fixture.check_test_data_file().await;
     fixture.check_test_blob(DATA_FILESYSTEM_VARIANT == "fxblob").await;
     fixture.tear_down().await;
@@ -511,16 +513,6 @@ async fn set_data_and_blob_max_bytes_zero_new_write_api() {
         .await
         .expect("failed to create BlobWriter");
     blob_writer.write(&compressed_data).await.unwrap();
-
-    fixture.tear_down().await;
-}
-
-#[fuchsia::test]
-async fn tmp_is_available() {
-    let builder = new_builder();
-    let fixture = builder.build().await;
-
-    fixture.check_fs_type("tmp", VFS_TYPE_MEMFS).await;
 
     fixture.tear_down().await;
 }
