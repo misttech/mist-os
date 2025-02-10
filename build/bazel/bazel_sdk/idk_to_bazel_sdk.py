@@ -147,11 +147,26 @@ class BazelPath(object):
     def dirname(self) -> "BazelPath":
         return BazelPath(self._value.parent)
 
-    def get_child(self, name: str) -> "BazelPath":
-        return BazelPath(self._value / name)
+    @property
+    def is_dir(self) -> bool:
+        return self._value.is_dir()
+
+    @property
+    def basename(self) -> str:
+        return self._value.name
+
+    def get_child(self, *names: str) -> "BazelPath":
+        return BazelPath(self._value.joinpath(*names))
 
     def read(self) -> str:
         return self._value.read_text()
+
+    def readdir(self) -> list["BazelPath"]:
+        # The Bazel implementation of readdir will fail with an error like
+        # "Error in readdir: can't readdir(), not a directory". This will match
+        # what happens when we try to iterate over the generator returned from
+        # iterdir() when it is called on a regular file.
+        return [BazelPath(v) for v in self._value.iterdir()]
 
 
 class BazelRepositoryAttr(object):
