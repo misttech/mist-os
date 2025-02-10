@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::cell::Cell;
+use std::marker::PhantomData;
+use std::thread::{self, Thread};
+
 use crate::task::Kernel;
-use crossbeam_channel::{Receiver, Sender};
-use std::time::Duration;
 
 /// Spawns a kernel thread, run the given closure with a [`Waiter`], and returns
 /// the corresponding [`Notifier`].
@@ -12,13 +14,14 @@ pub(super) fn spawn_thread<F>(kernel: &Kernel, f: F) -> Notifier
 where
     F: FnOnce(Waiter) + Send + 'static,
 {
-    let (tx, rx) = crossbeam_channel::bounded(1);
+    let (tx, rx) = std::sync::mpsc::channel();
 
-    // Don't need to use OnShutdown here because the shutdown flow will drop the thread group
-    // notifier and notify waiters to exit.
     kernel.kthreads.spawn(move |_, _| {
-        let (notifier, waiter) = Notifier::new();
-        tx.send(notifier).unwrap();
+        // Send the thread handle to be parked and unparked.
+        let thread = thread::current();
+        tx.send(Notifier::new(thread)).unwrap();
+        let key = Key(PhantomData);
+        let waiter = Waiter(key);
         f(waiter);
     });
 
@@ -26,35 +29,36 @@ where
     rx.recv().unwrap()
 }
 
-/// Notifier is used to wake up kthread.
+/// Notifier is used to wake up a specific thread.
 #[derive(Debug)]
 pub struct Notifier {
-    notifier: Sender<()>,
+    thread: Thread,
 }
 
 impl Notifier {
     /// Create a new Notifier for the given thread.
-    fn new() -> (Self, Waiter) {
-        let (notifier, notified) = crossbeam_channel::unbounded();
-        (Self { notifier }, Waiter { notified })
+    fn new(thread: Thread) -> Self {
+        Notifier { thread }
     }
 
-    /// Notify the corresponding Waiter.
+    /// Notify the associated thread by unparking it.
     pub fn notify(&self) {
-        self.notifier.send(()).ok();
+        self.thread.unpark();
     }
 }
 
 /// Waiter is used by the spawned thread to wait for notifications.
-pub(super) struct Waiter {
-    notified: Receiver<()>,
-}
+pub(super) struct Waiter(Key);
+
+struct Key(PhantomUnsync);
+
+/// A type that cannot be sent across threads. This disables sending
+/// [`Waiter`] to other threads which wouldn't make sense.
+type PhantomUnsync = PhantomData<Cell<()>>;
 
 impl Waiter {
     /// Wait for a notification from [`Notifier`] by parking the thread.
-    pub(super) fn wait(&self, timeout: Duration) -> Result<(), ShuttingDown> {
-        self.notified.recv_timeout(timeout).map_err(|_| ShuttingDown)
+    pub(super) fn wait(&self, timeout: std::time::Duration) {
+        thread::park_timeout(timeout);
     }
 }
-
-pub(super) struct ShuttingDown;

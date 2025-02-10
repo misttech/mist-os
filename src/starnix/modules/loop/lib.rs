@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![recursion_limit = "256"]
-
 use bitflags::bitflags;
 use starnix_core::device::kobject::{Device, DeviceMetadata};
 use starnix_core::device::DeviceMode;
@@ -736,7 +734,6 @@ impl FileOps for LoopControlDevice {
                 let registry = Arc::clone(&self.registry);
                 // Delegate to the system task to have the permission to create the loop device.
                 current_task.kernel().kthreads.spawner().spawn_and_get_result_sync(
-                    // No need to let shutdown interrupt us, this should return ~immediately.
                     move |locked, task| registry.add(locked, task, minor),
                 )??;
                 Ok(minor.into())

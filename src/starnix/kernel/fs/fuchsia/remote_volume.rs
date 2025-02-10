@@ -4,7 +4,6 @@
 
 use fidl_fuchsia_fshost::{StarnixVolumeProviderMarker, StarnixVolumeProviderSynchronousProxy};
 use fidl_fuchsia_fxfs::CryptMarker;
-use fidl_fuchsia_io as fio;
 use starnix_core::fs::fuchsia::{RemoteFs, RemoteNode};
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{
@@ -17,6 +16,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, from_status_like_fdio, statfs};
 use std::sync::Arc;
 use syncio::{zxio_node_attr_has_t, zxio_node_attributes_t, Zxio};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 pub struct RemoteVolume {
     remotefs: RemoteFs,
@@ -106,10 +106,13 @@ pub fn new_remote_vol(
     crypt.add_wrapping_key(wrapping_key_id, wrapping_key_bytes.to_vec(), 0)?;
     crypt.set_metadata_key(wrapping_key_id)?;
 
-    kernel.kthreads.spawn_executor(|_, _| async move {
-        if let Err(e) = crypt.handle_connection(crypt_proxy.into_stream()).await {
-            log_error!("Error while handling a Crypt request {e}");
-        }
+    kernel.kthreads.spawner().spawn(|_, _| {
+        let mut executor = fasync::LocalExecutor::new();
+        executor.run_singlethreaded(async move {
+            if let Err(e) = crypt.handle_connection(crypt_proxy.into_stream()).await {
+                log_error!("Error while handling a Crypt request {e}");
+            }
+        });
     });
 
     volume_provider

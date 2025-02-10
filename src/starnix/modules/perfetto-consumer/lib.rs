@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crossbeam_channel::Sender;
 use perfetto_consumer_proto::perfetto::protos::trace_config::buffer_config::FillPolicy;
 use perfetto_consumer_proto::perfetto::protos::trace_config::{BufferConfig, DataSource};
 use perfetto_consumer_proto::perfetto::protos::{
@@ -12,10 +11,11 @@ use perfetto_consumer_proto::perfetto::protos::{
 use prost::Message;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::FsString;
-use starnix_logging::{log_debug, log_error, CATEGORY_ATRACE, NAME_PERFETTO_BLOB};
+use starnix_logging::{log_error, CATEGORY_ATRACE, NAME_PERFETTO_BLOB};
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
+use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, OnceLock};
 
 use fuchsia_trace::{category_enabled, trace_state, ProlongedContext, TraceState};
@@ -267,7 +267,7 @@ pub fn start_perfetto_consumer_thread(
     kernel: &Arc<Kernel>,
     socket_path: FsString,
 ) -> Result<(), Errno> {
-    let (sender, receiver) = crossbeam_channel::unbounded::<TraceState>();
+    let (sender, receiver) = channel::<TraceState>();
     kernel.kthreads.spawner().spawn({
         move |locked, current_task| {
             let mut callback_state = CallbackState {
@@ -277,23 +277,10 @@ pub fn start_perfetto_consumer_thread(
                 prolonged_context: None,
                 packet_data: Vec::new(),
             };
-            let receiver = current_task.kernel().on_shutdown.wrap_channel(receiver);
-            loop {
-                match receiver.recv() {
-                    Some(Ok(state)) => callback_state
-                        .on_state_change(locked, state, &current_task)
-                        .unwrap_or_else(|e| {
-                            log_error!("perfetto_consumer callback error: {:?}", e);
-                        }),
-                    Some(Err(e)) => {
-                        log_error!(e:?; "exiting perfetto consumer thread due to error");
-                        break;
-                    }
-                    None => {
-                        log_debug!("exiting perfetto consumer thread");
-                        break;
-                    }
-                }
+            while let Ok(state) = receiver.recv() {
+                callback_state.on_state_change(locked, state, &current_task).unwrap_or_else(|e| {
+                    log_error!("perfetto_consumer callback error: {:?}", e);
+                })
             }
         }
     });

@@ -11,7 +11,7 @@ use zx::sys::zx_page_request_command_t::{ZX_PAGER_VMO_COMPLETE, ZX_PAGER_VMO_REA
 
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::FsStr;
-use starnix_logging::{log_error, log_info, log_trace, log_warn, with_zx_name};
+use starnix_logging::{log_debug, log_error, log_info, log_warn, with_zx_name};
 use starnix_sync::Mutex;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
@@ -31,7 +31,7 @@ pub struct Pager {
     backing_vmo: Arc<zx::Vmo>,
     block_size: u64,
     pager: zx::Pager,
-    port: Arc<zx::Port>,
+    port: zx::Port,
     files_by_inode: Mutex<HashMap<u32, Arc<Ext4PagedFile>>>,
     zero_vmo: zx::Vmo,
 }
@@ -50,7 +50,7 @@ impl Pager {
                 log_error!(error:?; "Pager::create failed");
                 errno!(EINVAL)
             })?,
-            port: Arc::new(zx::Port::create()),
+            port: zx::Port::create(),
             files_by_inode: Mutex::new(HashMap::new()),
             zero_vmo: with_zx_name(
                 zx::Vmo::create(ZERO_VMO_SIZE).map_err(|_| errno!(EINVAL))?,
@@ -65,11 +65,7 @@ impl Pager {
         log_info!("ext4 pager port koid: {:?}", self.port.as_handle_ref().get_koid());
         for _ in 0..PAGER_THREADS {
             let this = self.clone();
-            current_task.kernel().kthreads.spawn(move |_, current_task| {
-                let _shutdown_guard = current_task
-                    .kernel()
-                    .on_shutdown
-                    .register_port_for_user_packet(&this.port, zx::UserPacket::default());
+            current_task.kernel().kthreads.spawn(move |_, _| {
                 this.run_pager_thread();
             });
         }
@@ -191,17 +187,14 @@ impl Pager {
                                 }
                             }
                         }
-                        zx::PacketContents::User(_) => {
-                            log_trace!("exiting ext4 pager loop after receiving user packet");
-                            break;
-                        }
+                        zx::PacketContents::User(_) => break,
                         _ => log_error!("Unexpected port packet: {:?}", packet.contents()),
                     }
                 }
                 Err(error) => log_error!(error:?; "Port::wait failed"),
             }
         }
-        log_trace!("Pager thread terminating");
+        log_debug!("Pager thread terminating");
     }
 
     /// Terminates (asynchronously) the pager threads.

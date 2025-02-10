@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crossbeam_channel::{Receiver, Sender};
 use starnix_core::device::DeviceOps;
 use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::{CurrentTask, Kernel};
@@ -10,12 +9,13 @@ use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, FileObject, FileOps, FsNode,
 };
-use starnix_logging::{log_debug, log_error, log_info};
+use starnix_logging::{log_error, log_info};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
+use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Arc;
 use zerocopy::IntoBytes;
 
@@ -51,28 +51,15 @@ impl TouchPowerPolicyDevice {
 
     pub fn start_relay(self: &Arc<Self>, kernel: &Kernel, touch_standby_receiver: Receiver<bool>) {
         let slf = self.clone();
-        kernel.kthreads.spawn(move |_lock_context, current_task| {
-            let touch_standby_receiver =
-                current_task.kernel().on_shutdown.wrap_channel(touch_standby_receiver);
+        kernel.kthreads.spawn(move |_lock_context, _current_task| {
             let mut prev_enabled = true;
-            loop {
-                match touch_standby_receiver.recv() {
-                    Some(Ok(touch_enabled)) => {
-                        if touch_enabled != prev_enabled {
-                            slf.notify_standby_state_changed(touch_enabled);
-                        }
-                        prev_enabled = touch_enabled;
-                    }
-                    Some(Err(e)) => {
-                        log_error!(e:?; "touch_standby relay terminated unexpectedly");
-                        break;
-                    }
-                    None => {
-                        log_debug!("exiting touch power policy relay for shutdown");
-                        break;
-                    }
+            while let Ok(touch_enabled) = touch_standby_receiver.recv() {
+                if touch_enabled != prev_enabled {
+                    slf.notify_standby_state_changed(touch_enabled);
                 }
+                prev_enabled = touch_enabled;
             }
+            log_error!("touch_standby relay was terminated unexpectedly.");
         });
     }
 

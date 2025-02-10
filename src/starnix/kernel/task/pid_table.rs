@@ -84,10 +84,6 @@ impl PidTable {
         self.thread_group_notifier = Some(notifier);
     }
 
-    pub fn take_thread_group_notifier(&mut self) -> Option<memory_attribution::sync::Notifier> {
-        self.thread_group_notifier.take()
-    }
-
     pub fn allocate_pid(&mut self) -> pid_t {
         match self.last_pid.checked_add(1) {
             Some(p) => self.last_pid = p,

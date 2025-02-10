@@ -102,9 +102,7 @@ impl MemoryAttributionManager {
         let InitialState { mut processes } = initial_state;
 
         loop {
-            if let Err(sync::ShuttingDown) = waiter.wait(MAXIMUM_RESCAN_INTERVAL) {
-                break;
-            }
+            waiter.wait(MAXIMUM_RESCAN_INTERVAL);
 
             let Some(kernel) = kernel.upgrade() else { break };
 

@@ -291,12 +291,13 @@ pub fn start_presentation_loop(
     let mut presentation_receiver = server_clone.presentation_receiver.lock();
     let mut presentation_receiver = presentation_receiver.deref_mut().take().unwrap();
     let kernel_clone = kernel.clone();
-    kernel.kthreads.spawn_executor(|_, _| {
+    kernel.kthreads.spawner().spawn(|_, _| {
+        let mut executor = fasync::LocalExecutor::new();
         let scheduler = ThroughputScheduler::new();
         let mut view_bound_protocols = Some(view_bound_protocols);
         let mut view_identity = Some(view_identity);
         let mut maybe_view_controller_proxy = None;
-        async move {
+        executor.run_singlethreaded(async move {
             let mut scene_state = None;
             let link_token_pair =
                 ViewCreationTokenPair::new().expect("failed to create ViewCreationTokenPair");
@@ -455,6 +456,6 @@ pub fn start_presentation_loop(
                     }
                 }
             }
-        }
+        });
     });
 }
