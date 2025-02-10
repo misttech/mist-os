@@ -4,9 +4,11 @@
 
 mod cpu_element_manager;
 mod cpu_manager;
+mod events;
 mod system_activity_governor;
 
 use crate::cpu_element_manager::{CpuElementManager, SystemActivityGovernorFactory};
+use crate::events::SagEventLogger;
 use crate::system_activity_governor::SystemActivityGovernor;
 use anyhow::{Context, Result};
 use fuchsia_async::{DurationExt, TimeoutExt};
@@ -21,7 +23,8 @@ use std::time::Duration;
 use zx::MonotonicDuration;
 use {
     fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_power_broker as fbroker,
-    fidl_fuchsia_power_suspend as fsuspend, fidl_fuchsia_power_system as fsystem,
+    fidl_fuchsia_power_observability as fobs, fidl_fuchsia_power_suspend as fsuspend,
+    fidl_fuchsia_power_system as fsystem,
 };
 
 const SUSPEND_DEVICE_TIMEOUT: MonotonicDuration = MonotonicDuration::from_seconds(10);
@@ -139,15 +142,21 @@ async fn main() -> Result<()> {
     };
 
     let topology = connect_to_protocol::<fbroker::TopologyMarker>()?;
+    let sag_event_logger =
+        SagEventLogger::new(inspector.root().create_child(fobs::SUSPEND_EVENTS_NODE));
+
     let topology2 = topology.clone();
+    let sag_event_logger2 = sag_event_logger.clone();
 
     let sag_factory_fn = move |cpu_manager, execution_state_dependencies| {
         let topology = topology2.clone();
+        let sag_event_logger = sag_event_logger2.clone();
         async move {
             log::info!("Creating activity governor server...");
             SystemActivityGovernor::new(
                 &topology,
                 inspector.root().clone_weak(),
+                sag_event_logger,
                 cpu_manager,
                 execution_state_dependencies,
             )
@@ -160,13 +169,20 @@ async fn main() -> Result<()> {
         CpuElementManager::new_wait_for_suspending_token(
             &topology,
             inspector.root().clone_weak(),
+            sag_event_logger,
             suspender,
             sag_factory_fn,
         )
         .await
     } else {
-        CpuElementManager::new(&topology, inspector.root().clone_weak(), suspender, sag_factory_fn)
-            .await
+        CpuElementManager::new(
+            &topology,
+            inspector.root().clone_weak(),
+            sag_event_logger,
+            suspender,
+            sag_factory_fn,
+        )
+        .await
     };
 
     fuchsia_inspect::component::health().set_ok();

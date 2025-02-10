@@ -258,9 +258,9 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
                ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
-            suspend_events: {
+            ref fobs::SUSPEND_EVENTS_NODE: {
             },
-            wake_leases: {},
+            ref fobs::WAKE_LEASES_NODE: {},
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -311,16 +311,22 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
-            suspend_events: {
+            ref fobs::SUSPEND_EVENTS_NODE: {
                 "0": {
-                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
                 },
                 "1": {
+                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
+                },
+                "2": {
                     ref fobs::SUSPEND_LAST_TIMESTAMP: AnyProperty,
                     ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
                 },
+                "3": {
+                    ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
+                },
             },
-            wake_leases: {},
+            ref fobs::WAKE_LEASES_NODE: {},
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -356,16 +362,22 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
-            suspend_events: {
+            ref fobs::SUSPEND_EVENTS_NODE: {
                 "0": {
-                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
                 },
                 "1": {
-                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
+                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
+                },
+                "2": {
                     ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
+                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
+                },
+                "3": {
+                    ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
                 },
             },
-            wake_leases: {},
+            ref fobs::WAKE_LEASES_NODE: {},
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -416,23 +428,35 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 ref fobs::SUSPEND_LAST_TIMESTAMP: 3u64,
                 ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
-            suspend_events: {
+            ref fobs::SUSPEND_EVENTS_NODE: {
                 "0": {
-                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
                 },
                 "1": {
-                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
-                    ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
+                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
                 "2": {
-                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
+                    ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
+                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
                 },
                 "3": {
-                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
+                    ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
+                },
+                "4": {
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
+                },
+                "5": {
+                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
+                },
+                "6": {
                     ref fobs::SUSPEND_LAST_TIMESTAMP: 3u64,
+                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
+                },
+                "7": {
+                    ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
                 },
             },
-            wake_leases: {},
+            ref fobs::WAKE_LEASES_NODE: {},
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -491,9 +515,9 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
                 ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
                 ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
-            suspend_events: {
+            ref fobs::SUSPEND_EVENTS_NODE: {
             },
-            wake_leases: {},
+            ref fobs::WAKE_LEASES_NODE: {},
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -530,15 +554,21 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
                 ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
                 ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
-            suspend_events: {
+            ref fobs::SUSPEND_EVENTS_NODE: {
                 "0": {
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
+                 },
+                "1": {
                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
-                "1": {
+                "2": {
                     ref fobs::SUSPEND_FAILED_AT: AnyProperty,
                 },
+                "3": {
+                    ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
+                 },
             },
-            wake_leases: {},
+            ref fobs::WAKE_LEASES_NODE: {},
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -597,9 +627,9 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                 ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
                 ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
-            suspend_events: {
+            ref fobs::SUSPEND_EVENTS_NODE: {
             },
-            wake_leases: {},
+            ref fobs::WAKE_LEASES_NODE: {},
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -636,15 +666,21 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                 ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
                 ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
-            suspend_events: {
+            ref fobs::SUSPEND_EVENTS_NODE: {
                 "0": {
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
+                 },
+                "1": {
                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
-                "1": {
+                "2": {
                     ref fobs::SUSPEND_FAILED_AT: AnyProperty,
                 },
+                "3": {
+                    ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
+                 },
             },
-            wake_leases: {},
+            ref fobs::WAKE_LEASES_NODE: {},
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -691,20 +727,32 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                 ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
-            suspend_events: {
+            ref fobs::SUSPEND_EVENTS_NODE: {
                 "0": {
-                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
-                },
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
+                 },
                 "1": {
-                    ref fobs::SUSPEND_FAILED_AT: AnyProperty,
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
                 "2": {
-                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
+                    ref fobs::SUSPEND_FAILED_AT: AnyProperty,
                 },
                 "3": {
+                    ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
+                },
+                "4": {
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
+                },
+                "5": {
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
+                },
+                "6": {
                     ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
                     ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 },
+                "7": {
+                    ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
+                 },
             },
         }
     );
@@ -792,12 +840,15 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
                 ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
                 ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
-            suspend_events: {
+            ref fobs::SUSPEND_EVENTS_NODE: {
                 "0": {
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
+                },
+                "1": {
                     ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
             },
-            wake_leases: {},
+            ref fobs::WAKE_LEASES_NODE: {},
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -855,16 +906,22 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
                 ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
-            suspend_events: {
+            ref fobs::SUSPEND_EVENTS_NODE: {
                 "0": {
-                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
                 },
                 "1": {
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
+                },
+                "2": {
                     ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
                     ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 },
+                "3": {
+                    ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
+                },
             },
-            wake_leases: {},
+            ref fobs::WAKE_LEASES_NODE: {},
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -1104,16 +1161,22 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                 ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
-            suspend_events: {
+            ref fobs::SUSPEND_EVENTS_NODE: {
                 "0": {
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
+                 },
+                "1": {
                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
-                "1": {
+                "2": {
                     ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
                     ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 },
+                "3": {
+                    ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
+                 },
             },
-            wake_leases: {},
+            ref fobs::WAKE_LEASES_NODE: {},
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -1164,23 +1227,35 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                 ref fobs::SUSPEND_LAST_TIMESTAMP: 3u64,
                 ref fobs::SUSPEND_LAST_DURATION: 1u64,
             },
-            suspend_events: {
+            ref fobs::SUSPEND_EVENTS_NODE: {
                 "0": {
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
+                 },
+                "1": {
                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
-                "1": {
+                "2": {
                     ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
                     ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
                 },
-                "2": {
+                "3": {
+                    ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
+                 },
+                "4": {
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
+                 },
+                "5": {
                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
-                "3": {
+                "6": {
                     ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
                     ref fobs::SUSPEND_LAST_TIMESTAMP: 3u64,
                 },
+                "7": {
+                    ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
+                 },
             },
-            wake_leases: {},
+            ref fobs::WAKE_LEASES_NODE: {},
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -1231,9 +1306,9 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
                 ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
                 ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
-            suspend_events: {
+            ref fobs::SUSPEND_EVENTS_NODE: {
             },
-            wake_leases: {},
+            ref fobs::WAKE_LEASES_NODE: {},
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -1271,12 +1346,15 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
                 ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
                 ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
-            suspend_events: {
+            ref fobs::SUSPEND_EVENTS_NODE: {
                 "0": {
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
+                },
+                "1": {
                     ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 }
             },
-            wake_leases: {},
+            ref fobs::WAKE_LEASES_NODE: {},
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -1555,13 +1633,13 @@ async fn test_activity_governor_take_wake_lease_raises_execution_state_to_wake_h
     block_until_inspect_matches!(
         activity_governor_moniker,
         root: contains {
-            wake_leases: {
+            ref fobs::WAKE_LEASES_NODE: {
                 var server_token_koid: {
-                    created_at: NonZeroUintProperty,
-                    client_token_koid: wake_lease.get_koid().unwrap().raw_koid(),
-                    name: wake_lease_name,
-                    type: AnyStringProperty,
-                    status: "Satisfied",
+                    ref fobs::WAKE_LEASE_ITEM_NODE_CREATED_AT: NonZeroUintProperty,
+                    ref fobs::WAKE_LEASE_ITEM_CLIENT_TOKEN_KOID: wake_lease.get_koid().unwrap().raw_koid(),
+                    ref fobs::WAKE_LEASE_ITEM_NAME: wake_lease_name,
+                    ref fobs::WAKE_LEASE_ITEM_TYPE: AnyStringProperty,
+                    ref fobs::WAKE_LEASE_ITEM_STATUS: fobs::WAKE_LEASE_ITEM_STATUS_SATISFIED,
                 }
             },
         }
@@ -1573,7 +1651,7 @@ async fn test_activity_governor_take_wake_lease_raises_execution_state_to_wake_h
     block_until_inspect_matches!(
         activity_governor_moniker,
         root: contains {
-            wake_leases: {},
+            ref fobs::WAKE_LEASES_NODE: {},
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -1634,13 +1712,13 @@ async fn test_activity_governor_acquire_wake_lease_raises_execution_state_to_sus
     block_until_inspect_matches!(
         activity_governor_moniker,
         root: contains {
-            wake_leases: {
+            ref fobs::WAKE_LEASES_NODE: {
                 var server_token_koid: {
-                    created_at: NonZeroUintProperty,
-                    client_token_koid: wake_lease.get_koid().unwrap().raw_koid(),
-                    name: wake_lease_name,
-                    type: AnyStringProperty,
-                    status: "Satisfied",
+                    ref fobs::WAKE_LEASE_ITEM_NODE_CREATED_AT: NonZeroUintProperty,
+                    ref fobs::WAKE_LEASE_ITEM_CLIENT_TOKEN_KOID: wake_lease.get_koid().unwrap().raw_koid(),
+                    ref fobs::WAKE_LEASE_ITEM_NAME: wake_lease_name,
+                    ref fobs::WAKE_LEASE_ITEM_TYPE: AnyStringProperty,
+                    ref fobs::WAKE_LEASE_ITEM_STATUS: fobs::WAKE_LEASE_ITEM_STATUS_SATISFIED,
                 }
             },
         }
@@ -1652,7 +1730,7 @@ async fn test_activity_governor_acquire_wake_lease_raises_execution_state_to_sus
     block_until_inspect_matches!(
         activity_governor_moniker,
         root: contains {
-            wake_leases: {},
+            ref fobs::WAKE_LEASES_NODE: {},
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -1715,12 +1793,12 @@ async fn test_activity_governor_take_application_activity_lease() -> Result<()> 
     block_until_inspect_matches!(
         activity_governor_moniker,
         root: contains {
-            wake_leases: {
+            ref fobs::WAKE_LEASES_NODE: {
                 var server_token_koid: {
-                    created_at: NonZeroUintProperty,
-                    client_token_koid: application_activity_lease.get_koid().unwrap().raw_koid(),
-                    name: application_activity_lease_name,
-                    type: AnyStringProperty,
+                    ref fobs::WAKE_LEASE_ITEM_NODE_CREATED_AT: NonZeroUintProperty,
+                    ref fobs::WAKE_LEASE_ITEM_CLIENT_TOKEN_KOID: application_activity_lease.get_koid().unwrap().raw_koid(),
+                    ref fobs::WAKE_LEASE_ITEM_NAME: application_activity_lease_name,
+                    ref fobs::WAKE_LEASE_ITEM_TYPE: AnyStringProperty,
                 }
             },
         }
@@ -1732,7 +1810,7 @@ async fn test_activity_governor_take_application_activity_lease() -> Result<()> 
     block_until_inspect_matches!(
         activity_governor_moniker,
         root: contains {
-            wake_leases: {},
+            ref fobs::WAKE_LEASES_NODE: {},
         }
     );
 
@@ -1759,11 +1837,20 @@ async fn test_activity_governor_handles_1000_wake_leases() -> Result<()> {
         let client_token_koid = &wake_lease.get_koid().unwrap().raw_koid();
 
         let mut wake_lease_child = TreeAssertion::new(server_token_koid, false);
-        wake_lease_child.add_property_assertion("created_at", Box::new(NonZeroUintProperty));
-        wake_lease_child.add_property_assertion("client_token_koid", Box::new(*client_token_koid));
-        wake_lease_child.add_property_assertion("name", Box::new(wake_lease_name));
-        wake_lease_child.add_property_assertion("type", Box::new(AnyStringProperty));
-        wake_lease_child.add_property_assertion("status", Box::new(AnyStringProperty));
+        wake_lease_child.add_property_assertion(
+            fobs::WAKE_LEASE_ITEM_NODE_CREATED_AT,
+            Box::new(NonZeroUintProperty),
+        );
+        wake_lease_child.add_property_assertion(
+            fobs::WAKE_LEASE_ITEM_CLIENT_TOKEN_KOID,
+            Box::new(*client_token_koid),
+        );
+        wake_lease_child
+            .add_property_assertion(fobs::WAKE_LEASE_ITEM_NAME, Box::new(wake_lease_name));
+        wake_lease_child
+            .add_property_assertion(fobs::WAKE_LEASE_ITEM_TYPE, Box::new(AnyStringProperty));
+        wake_lease_child
+            .add_property_assertion(fobs::WAKE_LEASE_ITEM_STATUS, Box::new(AnyStringProperty));
         wake_leases_child.add_child_assertion(wake_lease_child);
 
         wake_leases.push(wake_lease);
@@ -1796,7 +1883,7 @@ async fn test_activity_governor_handles_1000_wake_leases() -> Result<()> {
     block_until_inspect_matches!(
         activity_governor_moniker,
         root: contains {
-            wake_leases: {},
+            ref fobs::WAKE_LEASES_NODE: {},
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -1827,11 +1914,20 @@ async fn test_activity_governor_handles_1000_acquired_wake_leases() -> Result<()
         let client_token_koid = &wake_lease.get_koid().unwrap().raw_koid();
 
         let mut wake_lease_child = TreeAssertion::new(server_token_koid, false);
-        wake_lease_child.add_property_assertion("created_at", Box::new(NonZeroUintProperty));
-        wake_lease_child.add_property_assertion("client_token_koid", Box::new(*client_token_koid));
-        wake_lease_child.add_property_assertion("name", Box::new(wake_lease_name));
-        wake_lease_child.add_property_assertion("type", Box::new(AnyStringProperty));
-        wake_lease_child.add_property_assertion("status", Box::new(AnyStringProperty));
+        wake_lease_child.add_property_assertion(
+            fobs::WAKE_LEASE_ITEM_NODE_CREATED_AT,
+            Box::new(NonZeroUintProperty),
+        );
+        wake_lease_child.add_property_assertion(
+            fobs::WAKE_LEASE_ITEM_CLIENT_TOKEN_KOID,
+            Box::new(*client_token_koid),
+        );
+        wake_lease_child
+            .add_property_assertion(fobs::WAKE_LEASE_ITEM_NAME, Box::new(wake_lease_name));
+        wake_lease_child
+            .add_property_assertion(fobs::WAKE_LEASE_ITEM_TYPE, Box::new(AnyStringProperty));
+        wake_lease_child
+            .add_property_assertion(fobs::WAKE_LEASE_ITEM_STATUS, Box::new(AnyStringProperty));
         wake_leases_child.add_child_assertion(wake_lease_child);
 
         wake_leases.push(wake_lease);
@@ -1864,7 +1960,7 @@ async fn test_activity_governor_handles_1000_acquired_wake_leases() -> Result<()
     block_until_inspect_matches!(
         activity_governor_moniker,
         root: contains {
-            wake_leases: {},
+            ref fobs::WAKE_LEASES_NODE: {},
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -2160,7 +2256,7 @@ async fn test_activity_governor_cpu_element_allows_leases_during_boot() -> Resul
 
 #[fuchsia::test]
 async fn test_acquire_wake_lease_blocks_during_suspend() -> Result<()> {
-    let (realm, _) = create_realm().await?;
+    let (realm, activity_governor_moniker) = create_realm().await?;
     let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
     set_up_default_suspender(&suspend_device).await;
 
@@ -2184,11 +2280,348 @@ async fn test_acquire_wake_lease_blocks_during_suspend() -> Result<()> {
 
     // Allow the system to resume and confirm that AcquireWakeLease returns.
     suspend_device
-        .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult::default()))
+        .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
+            suspend_duration: Some(2i64),
+            suspend_overhead: Some(1i64),
+            ..Default::default()
+        }))
         .await
         .unwrap()
         .unwrap();
     let _ = task.await;
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            booting: false,
+            power_elements: contains {
+                execution_state: {
+                    power_level: 1u64,
+                },
+            },
+            ref fobs::SUSPEND_EVENTS_NODE: {
+                "0": {
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
+                },
+                "1": {
+                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
+                },
+                "2": {
+                    ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
+                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
+                },
+                "3": {
+                    ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
+                },
+                "4": {
+                    ref fobs::SUSPEND_BLOCKER_ACQUIRED_AT: AnyProperty,
+                },
+                "5": {
+                    ref fobs::WAKE_LEASE_CREATED_AT: AnyProperty,
+                    ref fobs::WAKE_LEASE_ITEM_NAME: "some_wake_lease",
+                },
+                "6": {
+                    ref fobs::WAKE_LEASE_SATISFIED_AT: AnyProperty,
+                    ref fobs::WAKE_LEASE_ITEM_NAME: "some_wake_lease",
+                },
+                "7": {
+                    ref fobs::WAKE_LEASE_DROPPED_AT: AnyProperty,
+                    ref fobs::WAKE_LEASE_ITEM_NAME: "some_wake_lease",
+                },
+                "8": {
+                    ref fobs::SUSPEND_BLOCKER_DROPPED_AT: AnyProperty,
+                },
+            },
+            config: {
+                use_suspender: true,
+                wait_for_suspending_token: false,
+            },
+        }
+    );
+
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_last_wake_lease_blocks_suspend_lifo() -> Result<()> {
+    let (realm, activity_governor_moniker) = create_realm().await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
+    let mut wake_leases = Vec::new();
+
+    for i in 0..2 {
+        let wake_lease_name = format!("wake_lease{}", i);
+        let wake_lease = activity_governor.acquire_wake_lease(&wake_lease_name).await?.unwrap();
+        let server_token_koid =
+            wake_lease.basic_info().unwrap().related_koid.raw_koid().to_string();
+
+        wake_leases.push((wake_lease, server_token_koid));
+    }
+
+    // Call SetBootComplete to allow SAG to start suspending.
+    {
+        let boot_control = realm.connect_to_protocol::<fsystem::BootControlMarker>().await?;
+        let () =
+            boot_control.set_boot_complete().await.expect("SetBootComplete should have succeeded");
+    }
+
+    // Ensure the wake lease is holding Execution State up.
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            booting: false,
+            power_elements: contains {
+                execution_state: {
+                    power_level: 1u64,
+                },
+            },
+            ref fobs::SUSPEND_EVENTS_NODE: contains {
+                "0": {
+                    ref fobs::SUSPEND_BLOCKER_ACQUIRED_AT: AnyProperty,
+                },
+                "1": {
+                    ref fobs::WAKE_LEASE_CREATED_AT: AnyProperty,
+                    ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease0",
+                },
+                // Events 2-4 cover the creation and satisfaction of the two
+                // wake leases. These events could occur in any order.
+            },
+            config: {
+                use_suspender: true,
+                wait_for_suspending_token: false,
+            },
+        }
+    );
+
+    drop(wake_leases.pop());
+    let last_token_koid = &wake_leases[0].1;
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            booting: false,
+            power_elements: contains {
+                execution_state: {
+                    power_level: 1u64,
+                },
+            },
+            ref fobs::WAKE_LEASES_NODE: {
+                var last_token_koid: contains {
+                    ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease0",
+                },
+            },
+            ref fobs::SUSPEND_EVENTS_NODE: contains {
+                "0": {
+                    ref fobs::SUSPEND_BLOCKER_ACQUIRED_AT: AnyProperty,
+                },
+                "1": {
+                    ref fobs::WAKE_LEASE_CREATED_AT: AnyProperty,
+                    ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease0",
+                },
+                // Events 2-4 cover the creation and satisfaction of the two
+                // wake leases. These events could occur in any order.
+                "5": {
+                    ref fobs::WAKE_LEASE_DROPPED_AT: AnyProperty,
+                    ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease1",
+                },
+            },
+            config: {
+                use_suspender: true,
+                wait_for_suspending_token: false,
+            },
+        }
+    );
+
+    drop(wake_leases.pop());
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            booting: false,
+            power_elements: contains {
+                execution_state: {
+                    power_level: 0u64,
+                },
+            },
+            ref fobs::WAKE_LEASES_NODE: {},
+            ref fobs::SUSPEND_EVENTS_NODE: contains {
+                "0": {
+                    ref fobs::SUSPEND_BLOCKER_ACQUIRED_AT: AnyProperty,
+                },
+                "1": {
+                    ref fobs::WAKE_LEASE_CREATED_AT: AnyProperty,
+                    ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease0",
+                },
+                // Events 2-4 cover the creation and satisfaction of the two
+                // wake leases. These events could occur in any order.
+                "5": {
+                    ref fobs::WAKE_LEASE_DROPPED_AT: AnyProperty,
+                    ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease1",
+                },
+                "6": {
+                    ref fobs::WAKE_LEASE_DROPPED_AT: AnyProperty,
+                    ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease0",
+                },
+                "7": {
+                    ref fobs::SUSPEND_BLOCKER_DROPPED_AT: AnyProperty,
+                },
+                "8": {
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
+                },
+                "9": {
+                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
+                },
+            },
+            config: {
+                use_suspender: true,
+                wait_for_suspending_token: false,
+            },
+        }
+    );
+
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_last_wake_lease_blocks_suspend_fifo() -> Result<()> {
+    let (realm, activity_governor_moniker) = create_realm().await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
+    let mut wake_leases = Vec::new();
+
+    for i in 0..2 {
+        let wake_lease_name = format!("wake_lease{}", i);
+        let wake_lease = activity_governor.acquire_wake_lease(&wake_lease_name).await?.unwrap();
+        let server_token_koid =
+            wake_lease.basic_info().unwrap().related_koid.raw_koid().to_string();
+
+        wake_leases.insert(0, (wake_lease, server_token_koid));
+    }
+
+    // Call SetBootComplete to allow SAG to start suspending.
+    {
+        let boot_control = realm.connect_to_protocol::<fsystem::BootControlMarker>().await?;
+        let () =
+            boot_control.set_boot_complete().await.expect("SetBootComplete should have succeeded");
+    }
+
+    // Ensure the wake lease is holding Execution State up.
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            booting: false,
+            power_elements: contains {
+                execution_state: {
+                    power_level: 1u64,
+                },
+            },
+            ref fobs::SUSPEND_EVENTS_NODE: contains {
+                "0": {
+                    ref fobs::SUSPEND_BLOCKER_ACQUIRED_AT: AnyProperty,
+                },
+                "1": {
+                    ref fobs::WAKE_LEASE_CREATED_AT: AnyProperty,
+                    ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease0",
+                },
+                // Events 2-4 cover the creation and satisfaction of the two
+                // wake leases. These events could occur in any order.
+            },
+            config: {
+                use_suspender: true,
+                wait_for_suspending_token: false,
+            },
+        }
+    );
+
+    drop(wake_leases.pop());
+    let last_token_koid = &wake_leases[0].1;
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            booting: false,
+            power_elements: contains {
+                execution_state: {
+                    power_level: 1u64,
+                },
+            },
+            ref fobs::WAKE_LEASES_NODE: {
+                var last_token_koid: contains {
+                    ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease1",
+                },
+            },
+            ref fobs::SUSPEND_EVENTS_NODE: contains {
+                "0": {
+                    ref fobs::SUSPEND_BLOCKER_ACQUIRED_AT: AnyProperty,
+                },
+                "1": {
+                    ref fobs::WAKE_LEASE_CREATED_AT: AnyProperty,
+                    ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease0",
+                },
+                // Events 2-4 cover the creation and satisfaction of the two
+                // wake leases. These events could occur in any order.
+                "5": {
+                    ref fobs::WAKE_LEASE_DROPPED_AT: AnyProperty,
+                    ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease0",
+                },
+            },
+            config: {
+                use_suspender: true,
+                wait_for_suspending_token: false,
+            },
+        }
+    );
+
+    drop(wake_leases.pop());
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            booting: false,
+            power_elements: contains {
+                execution_state: {
+                    power_level: 0u64,
+                },
+            },
+            ref fobs::WAKE_LEASES_NODE: {},
+            ref fobs::SUSPEND_EVENTS_NODE: contains {
+                "0": {
+                    ref fobs::SUSPEND_BLOCKER_ACQUIRED_AT: AnyProperty,
+                },
+                "1": {
+                    ref fobs::WAKE_LEASE_CREATED_AT: AnyProperty,
+                    ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease0",
+                },
+                // Events 2-4 cover the creation and satisfaction of the two
+                // wake leases. These events could occur in any order.
+                "5": {
+                    ref fobs::WAKE_LEASE_DROPPED_AT: AnyProperty,
+                    ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease0",
+                },
+                "6": {
+                    ref fobs::WAKE_LEASE_DROPPED_AT: AnyProperty,
+                    ref fobs::WAKE_LEASE_ITEM_NAME: "wake_lease1",
+                },
+                "7": {
+                    ref fobs::SUSPEND_BLOCKER_DROPPED_AT: AnyProperty,
+                },
+                "8": {
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
+                },
+                "9": {
+                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
+                },
+            },
+            config: {
+                use_suspender: true,
+                wait_for_suspending_token: false,
+            },
+        }
+    );
 
     Ok(())
 }

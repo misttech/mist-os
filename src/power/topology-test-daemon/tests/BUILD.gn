@@ -27,6 +27,7 @@ rustc_test("bin") {
     "//src/power/topology-test-daemon:component",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:log",
+    "//third_party/rust_crates:serde_json",
   ]
 
   sources = [ "src/lib.rs" ]

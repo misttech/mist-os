@@ -5,6 +5,7 @@
 use crate::cpu_manager::{
     CpuManager, SuspendBlockManager, SuspendResumeListener, SuspendStatsUpdater,
 };
+use crate::events::{SagEvent, SagEventLogger};
 use anyhow::Result;
 use async_trait::async_trait;
 use async_utils::hanging_get::server::{HangingGet, Publisher};
@@ -17,6 +18,7 @@ use fuchsia_inspect::{
 };
 use fuchsia_inspect_contrib::nodes::NodeTimeExt;
 use futures::future::FutureExt;
+use futures::lock::Mutex;
 use futures::prelude::*;
 use futures::stream::StreamExt;
 use power_broker_client::{
@@ -161,10 +163,17 @@ impl SuspendStatsUpdater for SuspendStatsManager {
 struct LeaseManager {
     /// The inspect node for lease stats.
     inspect_node: INode,
+    /// Logger for system-wide activity governor events.
+    sag_event_logger: SagEventLogger,
     /// Proxy to the power topology to create power elements.
     topology: fbroker::TopologyProxy,
-    /// Dependency token for Execution State.
-    execution_state_assertive_dependency_token: fbroker::DependencyToken,
+    /// Proxy to the lessor for the Execution State power element.
+    execution_state_lessor: fbroker::LessorProxy,
+    /// Proxy to the lease control service for Execution State.
+    /// This lease is owned by async Tasks spawned inside of LeaseManager.
+    /// When all Tasks complete, this lease is dropped.
+    execution_state_suspending_lease:
+        Rc<Mutex<std::rc::Weak<(Option<fbroker::LeaseControlProxy>, Result<()>)>>>,
     /// Dependency token for Application Activity.
     application_activity_assertive_dependency_token: fbroker::DependencyToken,
     /// Used to block suspension in CpuManager while a lease is in-flight but not yet satisfied.
@@ -174,15 +183,18 @@ struct LeaseManager {
 impl LeaseManager {
     pub fn new(
         inspect_node: INode,
+        sag_event_logger: SagEventLogger,
         topology: fbroker::TopologyProxy,
-        execution_state_assertive_dependency_token: fbroker::DependencyToken,
+        execution_state_lessor: fbroker::LessorProxy,
         application_activity_assertive_dependency_token: fbroker::DependencyToken,
         suspend_blocker: Rc<SuspendBlockManager>,
     ) -> Self {
         Self {
             inspect_node,
+            sag_event_logger,
             topology,
-            execution_state_assertive_dependency_token,
+            execution_state_lessor,
+            execution_state_suspending_lease: Rc::new(Mutex::new(std::rc::Weak::new())),
             application_activity_assertive_dependency_token,
             suspend_block_manager: suspend_blocker,
         }
@@ -213,10 +225,16 @@ impl LeaseManager {
             self.inspect_node.create_child(token_info.koid.raw_koid().to_string());
         let related_koid = token_info.related_koid.raw_koid();
 
-        inspect_lease_node.record_string("name", name.clone());
-        inspect_lease_node.record_string("type", "application_activity");
-        inspect_lease_node.record_uint("client_token_koid", related_koid);
-        NodeTimeExt::<zx::BootTimeline>::record_time(&inspect_lease_node, "created_at");
+        inspect_lease_node.record_string(fobs::WAKE_LEASE_ITEM_NAME, name.clone());
+        inspect_lease_node.record_string(
+            fobs::WAKE_LEASE_ITEM_TYPE,
+            fobs::WAKE_LEASE_ITEM_TYPE_APPLICATION_ACTIVITY,
+        );
+        inspect_lease_node.record_uint(fobs::WAKE_LEASE_ITEM_CLIENT_TOKEN_KOID, related_koid);
+        NodeTimeExt::<zx::BootTimeline>::record_time(
+            &inspect_lease_node,
+            fobs::WAKE_LEASE_ITEM_NODE_CREATED_AT,
+        );
 
         fasync::Task::local(async move {
             // Keep lease alive for as long as the client keeps it alive.
@@ -231,8 +249,6 @@ impl LeaseManager {
     }
 
     async fn create_wake_lease(&self, name: String) -> Result<fsystem::LeaseToken> {
-        let (server_token, client_token) = fsystem::LeaseToken::create();
-
         let suspend_blocker = match self.suspend_block_manager.try_get_blocker() {
             None => {
                 log::info!(
@@ -244,60 +260,99 @@ impl LeaseManager {
             Some(blocker) => blocker,
         };
 
-        let lease_helper =
-            LeaseHelper::new(
-                &self.topology,
-                &name,
-                vec![power_broker_client::LeaseDependency {
-                    dependency_type: fbroker::DependencyType::Assertive,
-                    requires_token: self
-                        .execution_state_assertive_dependency_token
-                        .duplicate_handle(zx::Rights::SAME_RIGHTS)?,
-                    requires_level_by_preference: vec![
-                        ExecutionStateLevel::Suspending.into_primitive()
-                    ],
-                }],
-            )
-            .await?;
-        log::debug!("Acquiring lease for '{}'", name);
-        let lease = lease_helper.create_lease().await?;
+        let (server_token, client_token) = fsystem::LeaseToken::create();
+        let execution_state_suspending_lease = self.execution_state_suspending_lease.clone();
+        let inspect_node = self.inspect_node.clone_weak();
+        let execution_state_lessor = self.execution_state_lessor.clone();
 
-        let token_info = server_token.basic_info()?;
-        let inspect_lease_node =
-            self.inspect_node.create_child(token_info.koid.raw_koid().to_string());
-        let related_koid = token_info.related_koid.raw_koid();
-
-        inspect_lease_node.record_string("name", name.clone());
-        inspect_lease_node.record_string("type", "wake");
-        inspect_lease_node.record_uint("client_token_koid", related_koid);
-        inspect_lease_node.record_string("status", "Awaiting satisfaction");
-
-        NodeTimeExt::<zx::BootTimeline>::record_time(&inspect_lease_node, "created_at");
+        let sag_event_logger = self.sag_event_logger.clone();
+        sag_event_logger.log(SagEvent::WakeLeaseCreated { name: name.clone() });
 
         fasync::Task::local(async move {
-            match lease.wait_until_satisfied().await {
+            let token_info = server_token.basic_info().expect("zx_object_get_info failed");
+            let inspect_lease_node =
+                inspect_node.create_child(token_info.koid.raw_koid().to_string());
+            let related_koid = token_info.related_koid.raw_koid();
+
+            NodeTimeExt::<zx::BootTimeline>::record_time(&inspect_lease_node, fobs::WAKE_LEASE_ITEM_NODE_CREATED_AT);
+            inspect_lease_node.record_string(fobs::WAKE_LEASE_ITEM_NAME, name.clone());
+            inspect_lease_node.record_string(fobs::WAKE_LEASE_ITEM_TYPE, fobs::WAKE_LEASE_ITEM_TYPE_WAKE);
+            inspect_lease_node.record_uint(fobs::WAKE_LEASE_ITEM_CLIENT_TOKEN_KOID, related_koid);
+            inspect_lease_node.record_string(fobs::WAKE_LEASE_ITEM_STATUS, fobs::WAKE_LEASE_ITEM_STATUS_AWAITING_SATISFACTION);
+
+            let lease = {
+                let mut lease_guard = execution_state_suspending_lease.lock().await;
+                let lease_opt = lease_guard.upgrade();
+
+                match lease_opt {
+                    Some(lease) => lease,
+                    None => {
+                        match execution_state_lessor
+                            .lease(ExecutionStateLevel::Suspending.into_primitive())
+                            .await
+                        {
+                            Ok(Ok(lease_client_end)) => {
+                                let lease = lease_client_end.into_proxy();
+                                let mut status = fbroker::LeaseStatus::Unknown;
+                                let lease_result = loop {
+                                    match lease.watch_status(status).await {
+                                        Ok(fbroker::LeaseStatus::Satisfied) => break Ok(()),
+                                        Ok(new_status) => {
+                                            status = new_status;
+                                        }
+                                        Err(e) => break Err(anyhow::anyhow!(e)),
+                                    }
+                                };
+
+                                let result = Rc::new((Some(lease), lease_result));
+                                *lease_guard = Rc::downgrade(&result);
+                                result
+                            }
+                            Ok(Err(e)) => Rc::new((
+                                None,
+                                Err(anyhow::anyhow!(
+                                    "Failed to lease execution state for wake lease: {e:?})"
+                                )),
+                            )),
+                            Err(e) => Rc::new((
+                                None,
+                                Err(anyhow::anyhow!(
+                                    "Failed to contact power broker to lease execution state for wake lease: {e:?})"
+                                )),
+                            )),
+                        }
+                    }
+                }
+            };
+
+            match &lease.1 {
                 Ok(_) => {
-                    inspect_lease_node.record_string("status", "Satisfied");
+                    inspect_lease_node.record_string(fobs::WAKE_LEASE_ITEM_STATUS, fobs::WAKE_LEASE_ITEM_STATUS_SATISFIED);
+                    sag_event_logger.log(SagEvent::WakeLeaseSatisfied { name: name.clone() });
                 }
                 // If there is an error while waiting for lease satisfaction, `suspend_blocker`
                 // will still prevent suspension until the client drops its token.
                 Err(e) => {
                     log::error!(
                         "Waiting for satisfaction of wake lease with client_token_koid {} failed: \
-                        {:?}. SAG will block suspension internally for the lifetime of the client \
-                        token.",
+                    {:?}. SAG will block suspension internally for the lifetime of the client \
+                    token.",
                         related_koid,
                         e
                     );
                     inspect_lease_node
-                        .record_string("status", "Failed waiting for lease satisfaction.");
-                    inspect_lease_node.record_string("error", e.to_string());
+                        .record_string(fobs::WAKE_LEASE_ITEM_STATUS, fobs::WAKE_LEASE_ITEM_STATUS_FAILED_SATISFACTION);
+                    inspect_lease_node.record_string(fobs::WAKE_LEASE_ITEM_ERROR, e.to_string());
+                    sag_event_logger.log(SagEvent::WakeLeaseSatisfactionFailed { name: name.clone(), error: e.to_string() });
                 }
             }
 
-            // Keep lease alive for as long as the client keeps it alive.
+            // Keep wake lease alive for as long as the client keeps it alive.
+            // The power element lease will be dropped once all references to lease have
+            // been been dropped.
             let _ = fasync::OnSignals::new(server_token, zx::Signals::EVENTPAIR_PEER_CLOSED).await;
-            log::debug!("Dropping lease for '{}'", name);
+            log::debug!("Dropping wake lease for '{}'", name);
+            sag_event_logger.log(SagEvent::WakeLeaseDropped { name: name.clone() });
             drop(inspect_lease_node);
 
             // Drop `suspend_blocker` before `lease` to avoid to avoid the possibility (however
@@ -356,6 +411,7 @@ impl SystemActivityGovernor {
     pub async fn new(
         topology: &fbroker::TopologyProxy,
         inspect_root: INode,
+        sag_event_logger: SagEventLogger,
         cpu_manager: Rc<CpuManager>,
         execution_state_dependencies: Vec<fbroker::LevelDependency>,
     ) -> Result<Rc<Self>> {
@@ -413,9 +469,10 @@ impl SystemActivityGovernor {
         .expect("PowerElementContext encountered error while building application_activity");
 
         let lease_manager = LeaseManager::new(
-            inspect_root.create_child("wake_leases"),
+            inspect_root.create_child(fobs::WAKE_LEASES_NODE),
+            sag_event_logger,
             topology.clone(),
-            execution_state.assertive_dependency_token().expect("token not registered"),
+            execution_state.lessor.clone(),
             application_activity.assertive_dependency_token().expect("token not registered"),
             cpu_manager.suspend_block_manager().await,
         );

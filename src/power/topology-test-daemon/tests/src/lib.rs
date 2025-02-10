@@ -52,7 +52,7 @@ macro_rules! block_until_inspect_matches {
                     }
                     if  i >= MAX_LOOPS_COUNT {  // upper bound, so test terminates on mismatch
                         // Print the actual, so we know why the match failed if it does.
-                        return Err(anyhow::anyhow!("err: {}: last observed {:?}", error, &data));
+                        return Err(anyhow::anyhow!("err: {}: last observed {:?}", error, serde_json::to_string_pretty(&data).unwrap()));
                     }
                 }
             }
@@ -348,10 +348,16 @@ async fn test_system_activity_control() -> Result<()> {
             },
             suspend_events: {
                 "0": {
-                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
                 },
                 "1": {
+                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
+                },
+                "2": {
                     ref fobs::SUSPEND_FAILED_AT: AnyProperty,
+                },
+                "3": {
+                    ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
                 },
             },
             "fuchsia.inspect.Health": contains {

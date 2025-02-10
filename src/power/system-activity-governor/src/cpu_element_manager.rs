@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::cpu_manager::CpuManager;
+use crate::events::SagEventLogger;
 use crate::system_activity_governor::SystemActivityGovernor;
 use anyhow::Result;
 use async_lock::OnceCell;
@@ -57,6 +58,7 @@ where
     pub async fn new_wait_for_suspending_token(
         topology: &fbroker::TopologyProxy,
         inspect_root: INode,
+        sag_event_logger: SagEventLogger,
         suspender: Option<fhsuspend::SuspenderProxy>,
         sag_factory: F,
     ) -> Rc<Self> {
@@ -79,11 +81,7 @@ where
         let power_elements_node2 = power_elements_node.clone_weak();
         inspect_root.record(power_elements_node);
 
-        let cpu_manager = Rc::new(CpuManager::new(
-            cpu.clone(),
-            suspender,
-            inspect_root.create_child("suspend_events"),
-        ));
+        let cpu_manager = Rc::new(CpuManager::new(cpu.clone(), suspender, sag_event_logger));
 
         cpu_manager.run(&power_elements_node2);
 
@@ -133,12 +131,18 @@ where
     pub async fn new(
         topology: &fbroker::TopologyProxy,
         inspect_root: INode,
+        sag_event_logger: SagEventLogger,
         suspender: Option<fhsuspend::SuspenderProxy>,
         sag_factory: F,
     ) -> Rc<Self> {
-        let manager =
-            Self::new_wait_for_suspending_token(topology, inspect_root, suspender, sag_factory)
-                .await;
+        let manager = Self::new_wait_for_suspending_token(
+            topology,
+            inspect_root,
+            sag_event_logger,
+            suspender,
+            sag_factory,
+        )
+        .await;
 
         // No dependencies will be provided, so construct SystemActivityGovernor now.
         let sag = (manager.sag_factory)(
