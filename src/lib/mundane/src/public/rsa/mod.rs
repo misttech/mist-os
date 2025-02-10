@@ -52,7 +52,7 @@ mod inner {
             let mut key = CHeapWrapper::default();
             let mut e = CStackWrapper::default();
             // BN_set_u64 can only fail due to OOM.
-            e.bn_set_u64(boringssl::RSA_F4.try_into().unwrap()).unwrap();
+            e.bn_set_u64(boringssl::RSA_F4.into()).unwrap();
             key.rsa_generate_key_ex(B::BITS.try_into().unwrap(), &e.as_c_ref())?;
             Ok(RsaKey { key, _marker: PhantomData })
         }
