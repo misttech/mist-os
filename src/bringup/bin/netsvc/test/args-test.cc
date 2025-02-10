@@ -9,6 +9,7 @@
 #include <lib/async-loop/loop.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/dispatcher.h>
+#include <lib/component/incoming/cpp/directory.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdio/spawn.h>
@@ -49,8 +50,7 @@ class FakeSvc {
   mock_boot_arguments::Server& mock_boot() { return mock_boot_; }
 
   zx::result<fidl::ClientEnd<fuchsia_io::Directory>> svc() {
-    return component::ConnectAt<fuchsia_io::Directory>(
-        root_, component::OutgoingDirectory::kServiceDirectory);
+    return component::OpenDirectoryAt(root_, component::OutgoingDirectory::kServiceDirectory);
   }
 
  private:

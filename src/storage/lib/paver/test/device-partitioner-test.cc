@@ -21,6 +21,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
+#include <lib/component/incoming/cpp/directory.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
@@ -443,8 +444,7 @@ class FakeSvc {
   FakeSystemStateTransition& fake_system_shutdown_state() { return fake_system_shutdown_state_; }
 
   zx::result<fidl::ClientEnd<fuchsia_io::Directory>> svc() {
-    return component::ConnectAt<fuchsia_io::Directory>(
-        root_, component::OutgoingDirectory::kServiceDirectory);
+    return component::OpenDirectoryAt(root_, component::OutgoingDirectory::kServiceDirectory);
   }
 
  private:

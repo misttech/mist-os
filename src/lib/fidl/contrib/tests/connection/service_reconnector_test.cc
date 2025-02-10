@@ -6,21 +6,17 @@
 
 #include <fidl/test.protocol.connector/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
+#include <lib/component/incoming/cpp/directory.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fidl/cpp/wire/channel.h>
 
-#include <functional>
 #include <optional>
 #include <queue>
-#include <type_traits>
 
 #include <gtest/gtest.h>
 
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
-#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
-#include "src/storage/lib/vfs/cpp/service.h"
-#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
 
 namespace {
 
@@ -139,7 +135,7 @@ class ServiceReconnectorTest : public gtest::TestLoopFixture {
     ASSERT_EQ(ZX_OK, outgoing_directory_->Serve(std::move(endpoints.server)).status_value());
     root_dir_ = std::move(endpoints.client);
 
-    auto svc_dir = component::ConnectAt<fuchsia_io::Directory>(root_dir_, "svc");
+    auto svc_dir = component::OpenDirectoryAt(root_dir_, "svc");
     ASSERT_EQ(ZX_OK, svc_dir.status_value());
     svc_dir_ = std::move(svc_dir.value());
 

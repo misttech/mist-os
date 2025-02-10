@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.hardware.input/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.peripheral/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.virtual.bus/cpp/wire.h>
+#include <lib/component/incoming/cpp/directory.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
@@ -80,8 +81,7 @@ class UsbHidTest : public zxtest::Test {
             function_descs)}));
     fdio_cpp::UnownedFdioCaller caller(bus_->GetRootFd());
     {
-      zx::result directory =
-          component::ConnectAt<fuchsia_io::Directory>(caller.directory(), "class/input");
+      zx::result directory = component::OpenDirectoryAt(caller.directory(), "class/input");
       ASSERT_OK(directory);
       zx::result watch_result = device_watcher::WatchDirectoryForItems(
           directory.value(), [this](std::string_view devpath) {

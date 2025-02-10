@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.driver.test/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/loop.h>
+#include <lib/component/incoming/cpp/directory.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
@@ -103,7 +104,7 @@ zx::result<BusLauncher> BusLauncher::Create() {
   }
 
   zx::result directory_result =
-      component::ConnectAt<fuchsia_io::Directory>(caller.directory(), "class/usb-peripheral");
+      component::OpenDirectoryAt(caller.directory(), "class/usb-peripheral");
   if (directory_result.is_error()) {
     std::cerr << "component::ConnectAt(): " << directory_result.status_string() << '\n';
     return directory_result.take_error();

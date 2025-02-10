@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.driver.test/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.powersource/cpp/fidl.h>
+#include <lib/component/incoming/cpp/directory.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/driver_test_realm/realm_builder/cpp/lib.h>
@@ -46,18 +47,17 @@ class FakeBatteryRealmTest : public gtest::TestLoopFixture {
 };
 
 TEST_F(FakeBatteryRealmTest, DriversExist) {
-  // Connect to dev.
-  zx::result dev_class_dir = Realm().component().Connect<fuchsia_io::Directory>("dev-class");
-  ASSERT_EQ(dev_class_dir.status_value(), ZX_OK);
-  zx::result dir_result = component::ConnectAt<fuchsia_io::Directory>(*dev_class_dir, "power");
-  ASSERT_EQ(dir_result.status_value(), ZX_OK);
-  auto& dir = dir_result.value();
+  // Open dev-class/power and wait for the power source.
+  fidl::UnownedClientEnd<fuchsia_io::Directory> exposed{
+      Realm().component().exposed().unowned_channel()};
+  zx::result dir = component::OpenDirectoryAt(exposed, "dev-class/power");
+  ASSERT_EQ(dir.status_value(), ZX_OK);
 
   auto watch_result = device_watcher::WatchDirectoryForItems<std::string>(
-      dir, [](std::string_view name) -> std::optional<std::string> { return std::string(name); });
+      *dir, [](std::string_view name) -> std::optional<std::string> { return std::string(name); });
   ASSERT_EQ(watch_result.status_value(), ZX_OK);
   auto name = std::move(watch_result.value());
-  auto client_end = component::ConnectAt<fuchsia_hardware_powersource::Source>(dir, name);
+  auto client_end = component::ConnectAt<fuchsia_hardware_powersource::Source>(*dir, name);
   ASSERT_EQ(client_end.status_value(), ZX_OK);
   fidl::WireSyncClient client(std::move(*client_end));
 

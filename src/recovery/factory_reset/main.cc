@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/component/incoming/cpp/directory.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 
@@ -13,7 +15,7 @@
 #include "src/recovery/factory_reset/factory_reset_config.h"
 
 int main(int argc, const char** argv) {
-  zx::result dev = component::Connect<fuchsia_io::Directory>("/dev");
+  zx::result dev = component::OpenDirectory("/dev");
   if (dev.is_error()) {
     std::cerr << "failed to open '/dev': " << dev.status_string();
     return -1;
@@ -36,7 +38,7 @@ int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   component::OutgoingDirectory outgoing(loop.dispatcher());
 
-  factory_reset::FactoryReset factory_reset(loop.dispatcher(), std::move(dev).value(),
+  factory_reset::FactoryReset factory_reset(loop.dispatcher(), std::move(*dev),
                                             std::move(admin.value()), std::move(fshost.value()),
                                             factory_reset_config::Config::TakeFromStartupHandle());
   fidl::ServerBindingGroup<fuchsia_recovery::FactoryReset> bindings;

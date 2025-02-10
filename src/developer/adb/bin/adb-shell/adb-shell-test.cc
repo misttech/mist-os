@@ -10,6 +10,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/testing/cpp/real_loop.h>
+#include <lib/component/incoming/cpp/directory.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/syslog/cpp/macros.h>
@@ -101,15 +102,6 @@ class AdbShellTest : public zxtest::Test, public loop_fixture::RealLoop {
   void SetUp() override {
     shell_loop_.StartThread("adb-shell-test-shell");
     incoming_ = std::make_unique<component::OutgoingDirectory>(dispatcher());
-    auto svc_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
-    SetupIncomingServices(std::move(svc_endpoints.server));
-    adb_ = std::make_unique<adb_shell::AdbShell>(
-        std::move(svc_endpoints.client), shell_loop_.dispatcher(), adb_shell_config::Config());
-    ASSERT_NO_FAILURES();
-  }
-
-  void SetupIncomingServices(fidl::ServerEnd<fuchsia_io::Directory> svc) {
-    auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
     ASSERT_OK(incoming_->AddUnmanagedProtocol<fuchsia_dash::Launcher>(
         [this](fidl::ServerEnd<fuchsia_dash::Launcher> server_end) {
           fake_dash_launcher_.BindServer(dispatcher(), std::move(server_end));
@@ -119,9 +111,13 @@ class AdbShellTest : public zxtest::Test, public loop_fixture::RealLoop {
           fake_lifecycle_controller_.BindServer(dispatcher(), std::move(server_end));
         },
         "fuchsia.sys2.LifecycleController.root"));
-    ASSERT_OK(incoming_->Serve(std::move(server_end)));
-    ASSERT_OK(component::ConnectAt<fuchsia_io::Directory>(
-        client_end, std::move(svc), component::OutgoingDirectory::kServiceDirectory));
+    auto [incoming_client, incoming_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    ASSERT_OK(incoming_->Serve(std::move(incoming_server)));
+    zx::result svc_dir = component::OpenDirectoryAt(
+        incoming_client, component::OutgoingDirectory::kServiceDirectory);
+    ASSERT_OK(svc_dir);
+    adb_ = std::make_unique<adb_shell::AdbShell>(std::move(*svc_dir), shell_loop_.dispatcher(),
+                                                 adb_shell_config::Config());
   }
 
  protected:
