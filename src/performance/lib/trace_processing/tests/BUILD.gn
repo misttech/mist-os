@@ -11,6 +11,7 @@ if (is_host) {
       "data/wakeup_metrics_processor/incomplete_wakeup.json",
       "data/wakeup_metrics_processor/many_wakeups.json",
       "data/wakeup_metrics_processor/one_wakeup.json",
+      "data/wakeup_metrics_processor/restarted_wakeup.json",
       "data/wakeup_metrics_processor/zero_wakeups.json",
     ]
 

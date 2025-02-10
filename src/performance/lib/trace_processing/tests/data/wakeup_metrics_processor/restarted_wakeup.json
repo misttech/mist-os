@@ -54,15 +54,6 @@
             "dur": 1
         },
         {
-            "cat": "power",
-            "name": "WakeupEvent3",
-            "ph": "X",
-            "pid": 53280,
-            "tid": 32768,
-            "ts": 50000,
-            "dur": 2000
-        },
-        {
             "cat": "random",
             "name": "palette cleansing event",
             "ph": "X",

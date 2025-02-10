@@ -12,6 +12,16 @@ class WakeupMetricsProcessor(trace_metrics.MetricsProcessor):
     """
     Computes time taken for the device to process a "wakeup", as defined by
     the provided series of trace events.
+
+    A wakeup sequence is specified by a list `event_names` of length N. A sequence is defined as
+    follows:
+    - All events in the sequence are duration events.
+    - The sequence begins at the end of an event named `event_names[0]`.
+    - The sequence is completed when all further events are observed in a strict sequence, with
+      an instance of `event_names[i+1]` beginning strictly after an instance of `event_names[i]`,
+      for each i in range(0, N-2).
+    - A second instance of `event_names[0]` cannot occur between the instance of `event_names[0]`
+      that begins a sequence and the instance of `event_names[N-1] that ends it.
     """
 
     def __init__(
@@ -20,7 +30,8 @@ class WakeupMetricsProcessor(trace_metrics.MetricsProcessor):
         """
         Args:
             label: Report wakeup durations under this TestCaseResult label.
-            event_names: Events that define a "wakeup".
+            event_names: Duration events that define a wakeup sequence. See class docstring for
+              details.
             require_wakeup: When true, raise exception when no wakeup observed.
         """
         self._label = label
@@ -49,13 +60,27 @@ class WakeupMetricsProcessor(trace_metrics.MetricsProcessor):
         next_event_index = 0
 
         for e in events:
+            # An instance of `event_names[0]` will start tracking a new sequence. If one was
+            # already in progress, it is discarded.
             if e.name == self._event_names[0]:
-                wakeup_start = e.start
+                if not isinstance(e, trace_model.DurationEvent):
+                    raise RuntimeError(f"Event {e} is not a duration event.")
+                if e.duration is None:
+                    raise RuntimeError(f"Event {e} has no duration.")
+
+                wakeup_start = e.start + e.duration
                 next_event_index = 1
             elif e.name == self._event_names[next_event_index]:
+                if not isinstance(e, trace_model.DurationEvent):
+                    raise RuntimeError(f"Event {e} is not a duration event.")
+                if e.duration is None:
+                    raise RuntimeError(f"Event {e} has no duration.")
+
                 if next_event_index == len(self._event_names) - 1:
                     assert wakeup_start is not None
-                    wakeup_durations += [(e.start - wakeup_start)._delta]
+                    wakeup_durations += [
+                        (e.start + e.duration - wakeup_start)._delta
+                    ]
                     wakeup_start = None
                     next_event_index = 0
                 else:

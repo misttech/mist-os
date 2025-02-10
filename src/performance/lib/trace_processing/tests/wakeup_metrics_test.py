@@ -75,7 +75,8 @@ class WakeupMetricsTest(unittest.TestCase):
                 TCR(
                     label=_LABEL,
                     unit=U.nanoseconds,
-                    values=[30000000],
+                    # Measured from end of WakeupEvent1 to end of WakeupEvent3.
+                    values=[31000000],
                 )
             ],
         )
@@ -91,7 +92,25 @@ class WakeupMetricsTest(unittest.TestCase):
                 TCR(
                     label=_LABEL,
                     unit=U.nanoseconds,
-                    values=[30000000, 20000000],
+                    # Measured from end of WakeupEvent1 to end of WakeupEvent3.
+                    values=[31000000, 22000000],
+                )
+            ],
+        )
+
+    def test_event_0_restarts_sequence(self) -> None:
+        model = WakeupMetricsTest._load_model("restarted_wakeup.json")
+        result = wakeup.WakeupMetricsProcessor(_LABEL, _EVENTS).process_metrics(
+            model
+        )
+        self.assertEqual(
+            result,
+            [
+                TCR(
+                    label=_LABEL,
+                    unit=U.nanoseconds,
+                    # Measured from end of the second instance WakeupEvent1 to end of WakeupEvent3.
+                    values=[22000000],
                 )
             ],
         )
