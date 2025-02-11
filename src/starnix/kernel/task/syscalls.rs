@@ -1912,7 +1912,7 @@ mod arch32 {
         sys_getrlimit as sys_arch32_ugetrlimit,
         sys_sched_getaffinity as sys_arch32_sched_getaffinity,
         sys_sched_setaffinity as sys_arch32_sched_setaffinity,
-        sys_setrlimit as sys_arch32_setrlimit,
+        sys_setpriority as sys_arch32_setpriority, sys_setrlimit as sys_arch32_setrlimit,
     };
 }
 
