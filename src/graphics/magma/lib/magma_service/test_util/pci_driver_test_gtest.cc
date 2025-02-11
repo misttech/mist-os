@@ -9,6 +9,8 @@
 #include <lib/magma_service/test_util/platform_pci_device_helper.h>
 #include <zircon/types.h>
 
+#include <thread>
+
 #include <gtest/gtest.h>
 
 namespace {
@@ -31,8 +33,14 @@ zx_status_t magma_indriver_test(magma::PlatformPciDevice* platform_pci_device) {
   const char* argv[kArgc + 1] = {"magma_indriver_test"};
   testing::InitGoogleTest(const_cast<int*>(&kArgc), const_cast<char**>(argv));
 
-  printf("[DRV START=]\n");
-  zx_status_t status = RUN_ALL_TESTS() == 0 ? ZX_OK : ZX_ERR_INTERNAL;
-  printf("[DRV END===]\n[==========]\n");
+  // Use a thread with a well-known lifetime to run the test to ensure all
+  // gtest-internal TLS state is released by the end of testing.
+  zx_status_t status;
+  std::thread test_thread([&]() {
+    printf("[DRV START=]\n");
+    status = RUN_ALL_TESTS() == 0 ? ZX_OK : ZX_ERR_INTERNAL;
+    printf("[DRV END===]\n[==========]\n");
+  });
+  test_thread.join();
   return status;
 }
