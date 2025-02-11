@@ -21,6 +21,7 @@ group("tests") {
     "ddktl:tests",
     "debug:tests",
     "dense-map:tests",
+    "depfile:depfile_test($host_toolchain)",
     "detect-stall:tests",
     "diagnostics:tests",
     "digest:tests",
