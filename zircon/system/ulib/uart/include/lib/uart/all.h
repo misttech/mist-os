@@ -325,19 +325,22 @@ class KernelDriver {
     return DoMatchHelper(std::make_index_sequence<n>(), std::forward<Args>(args)...);
   }
 
+  // The VariantVisitor can be called exactly once, so its call operator has
+  // only the rvalue overload.  When called on the std::monostate, it always
+  // crashes rather than invoking the delegate object.
   template <typename Delegate>
   struct VariantVisitor {
     template <typename T, typename... Args>
-    void operator()(T&& alternative, Args&&... args) const {
-      delegate(std::forward<T>(alternative), std::forward<Args>(args)...);
-    }
-
-    template <typename... Args>
-    void operator()(std::monostate, Args&&... args) const {
-      // We cannot use panic macros in this spot, since it will end up calling printf, which
-      // may end up visiting the same uart, whose invalid state(monostate) triggered this. Even
-      // this will cause a chain of exceptions.
-      __builtin_abort();
+    void operator()(T&& alternative, Args&&... args) && {
+      if constexpr (std::is_same_v<std::decay_t<T>, std::monostate>) {
+        // We cannot use panic macros in this spot, since that would end up
+        // calling printf, which may end up visiting the same uart, whose
+        // invalid state (std::monostate) triggered this.  Even this will cause
+        // a cascade of machine exceptions.
+        __builtin_abort();
+      } else {
+        std::invoke(std::move(delegate), std::forward<T>(alternative), std::forward<Args>(args)...);
+      }
     }
 
     Delegate delegate;

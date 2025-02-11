@@ -226,7 +226,7 @@ constexpr void Visit(F&& f, V&& v, A&&... args) {
     VisitEach(std::forward<F>(f), std::forward<V>(v), std::forward<A>(args)...,
               std::make_index_sequence<n>());
   } else {
-    f(std::forward<V>(v), std::forward<A>(args)...);
+    std::forward<F>(f)(std::forward<V>(v), std::forward<A>(args)...);
   }
 }
 
