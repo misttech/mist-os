@@ -52,7 +52,7 @@ for all supported CPUs, not just $target_cpu.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/BUILD.gn:22
+From //zircon/kernel/BUILD.gn:21
 
 ### all_cpu_phys_boot_tests
 
@@ -79,7 +79,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2111
+From //build/config/BUILDCONFIG.gn:2112
 
 ### allowed_test_device_types
 
@@ -313,7 +313,7 @@ From //build/images/args.gni:190
 
 **Current value for `target_cpu = "riscv64"`:** `"riscv64"`
 
-From //boards/riscv64.gni:36
+From //boards/riscv64.gni:34
 
 **Overridden from the default:** `false`
 
@@ -731,7 +731,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8723275727082107553"`
+**Current value for `target_cpu = "arm64"`:** `"8723230422093070353"`
 
 From //out/not-default/args.gn:10
 
@@ -739,7 +739,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8723275727082107553"`
+**Current value for `target_cpu = "riscv64"`:** `"8723230422093070353"`
 
 From //out/not-default/args.gn:10
 
@@ -747,7 +747,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8723275727082107553"`
+**Current value for `target_cpu = "x64"`:** `"8723230422093070353"`
 
 From //out/not-default/args.gn:10
 
@@ -2378,15 +2378,6 @@ Disables ELF checks for packages.
 
 From //build/dist/verify_manifest_elf_binaries.gni:10
 
-### disable_kernel_pci
-
-Disable kernel PCI driver support. A counterpart of the build
-flag platform_enable_user_pci in //src/devices/bus/drivers/pci/pci.gni.
-
-**Current value (from the default):** `false`
-
-From //zircon/kernel/params.gni:82
-
 ### discoverable_package_labels
 
 If you add package labels to this variable, the packages will be included in
@@ -2554,7 +2545,7 @@ disabled.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:136
+From //zircon/kernel/params.gni:132
 
 ### enable_mdns_trace
 
@@ -2842,7 +2833,7 @@ Include a mechanism for the kernel to sample threads and write the results to a 
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:128
+From //zircon/kernel/params.gni:124
 
 ### exported_package_labels
 
@@ -2885,7 +2876,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1891
+From //build/config/BUILDCONFIG.gn:1892
 
 ### fastboot_product
 
@@ -3556,31 +3547,31 @@ value regardless of whether persistent tracing is enabled or not.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:118
+From //zircon/kernel/params.gni:114
 
 ### jtrace_last_entry_storage
 
 **Current value (from the default):** `0`
 
-From //zircon/kernel/params.gni:119
+From //zircon/kernel/params.gni:115
 
 ### jtrace_target_buffer_size
 
 **Current value (from the default):** `"auto"`
 
-From //zircon/kernel/params.gni:120
+From //zircon/kernel/params.gni:116
 
 ### jtrace_use_large_entries
 
 **Current value (from the default):** `"auto"`
 
-From //zircon/kernel/params.gni:121
+From //zircon/kernel/params.gni:117
 
 ### jtrace_use_mono_timestamps
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:122
+From //zircon/kernel/params.gni:118
 
 ### kernel_base
 
@@ -3601,7 +3592,7 @@ the two and set kernel_debug_level independently.
 
 **Current value (from the default):** `2`
 
-From //zircon/kernel/params.gni:94
+From //zircon/kernel/params.gni:90
 
 ### kernel_debug_print_level
 
@@ -3613,7 +3604,7 @@ the more dprintf messages emitted. Valid values are 0-2 (inclusive):
 
 **Current value (from the default):** `2`
 
-From //zircon/kernel/params.gni:101
+From //zircon/kernel/params.gni:97
 
 ### kernel_extra_defines
 
@@ -3622,7 +3613,7 @@ Extra macro definitions for kernel code, e.g. "DISABLE_KASLR",
 
 **Current value (from the default):** `[]`
 
-From //zircon/kernel/params.gni:86
+From //zircon/kernel/params.gni:82
 
 ### kernel_extra_deps
 
@@ -3633,7 +3624,7 @@ injecting new instances of subsystems that the kernel has defined modularly
 
 **Current value (from the default):** `[]`
 
-From //zircon/kernel/BUILD.gn:38
+From //zircon/kernel/BUILD.gn:37
 
 ### kernel_no_userabi
 
@@ -3641,7 +3632,7 @@ Build a kernel with no user-space support, for development only.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:125
+From //zircon/kernel/params.gni:121
 
 ### kernel_version_string
 
@@ -3666,7 +3657,7 @@ the like can be listed here to be used as a ZBI-to-ZBI boot shim
 
 **Current value (from the default):** `[]`
 
-From //zircon/kernel/BUILD.gn:32
+From //zircon/kernel/BUILD.gn:31
 
 ### known_variants
 
@@ -3772,6 +3763,8 @@ Each element of the list is one variant, which is a scope defining:
   configs = ["//build/config/profile:profile-rust"]
   tags = ["debugdata", "instrumented", "llvm-profdata", "needs-writable-globals", "profile"]
 }, {
+  configs = ["//build/config/profile:profile-use"]
+}, {
   configs = ["//build/config/sanitizers:tsan"]
   tags = ["tsan", "instrumentation-runtime", "instrumented", "needs-compiler-abi", "needs-writable-globals", "uses-shadow", "kernel-excluded"]
 }, {
@@ -3860,7 +3853,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1687
+From //build/config/BUILDCONFIG.gn:1684
 
 ### legacy_base_package_labels
 
@@ -4812,7 +4805,7 @@ From //build/board.gni:48
 
 **Current value for `target_cpu = "riscv64"`:** `"//boards/partitions:riscv64"`
 
-From //boards/riscv64.gni:34
+From //boards/riscv64.gni:32
 
 **Overridden from the default:** `false`
 
@@ -4820,7 +4813,7 @@ From //build/board.gni:48
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/x64.gni:38
+From //boards/x64.gni:34
 
 **Overridden from the default:** `false`
 
@@ -4920,7 +4913,7 @@ cacheline size of the target architecture.
 
 **Current value (from the default):** `128`
 
-From //zircon/kernel/params.gni:108
+From //zircon/kernel/params.gni:104
 
 ### pgo_profile_path
 
@@ -4929,12 +4922,6 @@ Profile data path that is used by PGO.
 **Current value (from the default):** `""`
 
 From //build/config/profile/config.gni:45
-
-### platform_enable_user_pci
-
-**Current value (from the default):** `false`
-
-From //src/devices/bus/drivers/pci/pci.gni:10
 
 ### pre_erase_flash
 
@@ -5302,7 +5289,7 @@ Enable the rust parallel front-end with N threads
 
 **Current value (from the default):** `false`
 
-From //build/config/rust/BUILD.gn:29
+From //build/config/rust/BUILD.gn:30
 
 ### rust_rbe_check
 
@@ -5388,7 +5375,7 @@ Controls whether the rust compiler uses v0 symbol mangling scheme
 
 **Current value (from the default):** `true`
 
-From //build/config/rust/BUILD.gn:26
+From //build/config/rust/BUILD.gn:27
 
 ### rustc_prefix
 
@@ -5691,7 +5678,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2101
+From //build/config/BUILDCONFIG.gn:2102
 
 ### select_variant_canonical
 
@@ -5701,7 +5688,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2106
+From //build/config/BUILDCONFIG.gn:2107
 
 ### select_variant_shortcuts
 
@@ -5766,7 +5753,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1898
+From //build/config/BUILDCONFIG.gn:1899
 
 ### size_checker_input
 
@@ -6839,6 +6826,14 @@ test ICD is being used instead.
 **Current value (from the default):** `false`
 
 From //src/graphics/drivers/arm-mali/icd/prebuilt_arm_mali.gni:8
+
+### qemu_arm64_enable_user_pci
+
+Enable user space PCI stack in the qemu-arm64 board driver.
+
+**Current value (from the default):** `false`
+
+From //src/devices/board/drivers/qemu-arm64/pci.gni:7
 
 ## `target_cpu = "arm64", target_cpu = "x64"`
 
