@@ -244,3 +244,14 @@ pub use transport::TxMetadata;
 // Re-export useful macros.
 pub use netstack3_device::for_any_device_id;
 pub use netstack3_macros::context_ip_bounds;
+
+// Rust compiler spinning workaround (https://fxbug.dev/395694598):
+//
+// If you find yourself with a spinning rustc because you're changing traits
+// that need to be implemented by bindings, uncomment the lines below and give
+// it a go. See attached bug for details.
+//
+// unsafe impl<BT: BindingsTypes> Send for TimerId<BT> {}
+// unsafe impl<BT: BindingsTypes> Sync for TimerId<BT> {}
+// unsafe impl<BT: BindingsTypes> Send for TxMetadata<BT> {}
+// unsafe impl<BT: BindingsTypes> Sync for TxMetadata<BT> {}
