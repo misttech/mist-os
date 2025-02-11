@@ -733,7 +733,10 @@ mod arch32 {
         Ok(())
     }
 
-    pub use super::{sys_futex as sys_arch32_futex, sys_mremap as sys_arch32_mremap};
+    pub use super::{
+        sys_futex as sys_arch32_futex, sys_madvise as sys_arch32_madvise,
+        sys_mremap as sys_arch32_mremap,
+    };
 }
 
 #[cfg(feature = "arch32")]
