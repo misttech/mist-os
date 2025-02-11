@@ -97,6 +97,10 @@
                 // TODO(https://fxbug.dev/384194637): deflake and re-enable
                 "CgroupFreezerTest.FreezeNestedCgroups",
                 "CgroupFreezerTest.MoveProcess",
+
+                // TODO(https://fxbug.dev/394934526)
+                "PtraceTest.PtraceAttachesToParentThread",
+                "PtraceTest.ExitKillFromThread",
             ],
         },
     ],

@@ -542,10 +542,19 @@ impl ThreadGroup {
         let tasks = state.tasks().map(TempRef::into_static).collect::<Vec<_>>();
         drop(state);
 
-        // Detach from any ptraced tasks.
+        // Detach from any ptraced tasks, killing the ones that set PTRACE_O_EXITKILL.
         let tracees = self.ptracees.lock().keys().cloned().collect::<Vec<_>>();
         for tracee in tracees {
             if let Some(task_ref) = pids.get_task(tracee).clone().upgrade() {
+                let mut should_send_sigkill = false;
+                if let Some(ptrace) = &task_ref.read().ptrace {
+                    should_send_sigkill = ptrace.has_option(PtraceOptions::EXITKILL);
+                }
+                if should_send_sigkill {
+                    send_standard_signal(task_ref.as_ref(), SignalInfo::default(SIGKILL));
+                    continue;
+                }
+
                 let _ = ptrace_detach(self, task_ref.as_ref(), &UserAddress::NULL);
             }
         }
