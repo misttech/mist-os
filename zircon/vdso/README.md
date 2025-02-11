@@ -6,6 +6,9 @@ This library is used internally to generate syscall definitions used by other
 code. For the public library imported by `using zx;`, see
 [`//zircon/vdso/zx/`](/zircon/vdso/zx/).
 
+If you're adding a new syscall or a new Zircon object, see
+[Adding a New Zircon Syscall][adding-a-new-zircon-syscall].
+
 The modeling of the syscall interface is currently undergoing a slow evolution
 toward the design described in [RFC 0190][rfc-0190]. This will involve migrating
 more of the APIs in this library to the public library.
@@ -294,7 +297,7 @@ return a struct and should be sidestepped an ultimate design for syscall
 specification that does not have to piggy back off of protocols
 ([issue 42061412][42061412]).
 
-
+[adding-a-new-zircon-syscall]: /docs/development/kernel/adding_a_new_syscall.md
 [42057022]: https://fxbug.dev/42057022
 [42061412]: https://fxbug.dev/42061412
 [42061642]: https://fxbug.dev/42061642
