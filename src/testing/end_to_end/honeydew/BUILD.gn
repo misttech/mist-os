@@ -125,8 +125,6 @@ python_library("honeydew_no_testonly") {
     "typing/__init__.py",
     "typing/custom_types.py",
     "typing/ffx.py",
-    "typing/screenshot_image.py",
-    "typing/ui.py",
     "utils/__init__.py",
     "utils/common.py",
     "utils/decorators.py",
