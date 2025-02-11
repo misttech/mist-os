@@ -11,7 +11,7 @@ use crate::object_handle::INVALID_OBJECT_ID;
 use crate::object_store::allocator::{AllocatorItem, Reservation};
 use crate::object_store::object_manager::{reserved_space_from_journal_usage, ObjectManager};
 use crate::object_store::object_record::{
-    ObjectItem, ObjectItemV32, ObjectItemV33, ObjectItemV37, ObjectItemV38, ObjectItemV40,
+    ObjectItem, ObjectItemV40,
     ObjectItemV41, ObjectItemV43, ObjectKey, ObjectKeyData, ObjectValue, ProjectProperty,
 };
 use crate::serialized_types::{migrate_nodefault, migrate_to_version, Migrate, Versioned};
@@ -130,61 +130,6 @@ pub enum MutationV40 {
     CreateInternalDir(u64),
 }
 
-#[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
-#[migrate_to_version(MutationV40)]
-pub enum MutationV38 {
-    ObjectStore(ObjectStoreMutationV38),
-    EncryptedObjectStore(Box<[u8]>),
-    Allocator(AllocatorMutationV32),
-    BeginFlush,
-    EndFlush,
-    DeleteVolume,
-    UpdateBorrowed(u64),
-    UpdateMutationsKey(UpdateMutationsKeyV32),
-    CreateInternalDir(u64),
-}
-
-#[derive(Migrate, Deserialize, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(MutationV38)]
-pub enum MutationV37 {
-    ObjectStore(ObjectStoreMutationV37),
-    EncryptedObjectStore(Box<[u8]>),
-    Allocator(AllocatorMutationV32),
-    BeginFlush,
-    EndFlush,
-    DeleteVolume,
-    UpdateBorrowed(u64),
-    UpdateMutationsKey(UpdateMutationsKeyV32),
-    CreateInternalDir(u64),
-}
-
-#[derive(Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(MutationV37)]
-pub enum MutationV33 {
-    ObjectStore(ObjectStoreMutationV33),
-    EncryptedObjectStore(Box<[u8]>),
-    Allocator(AllocatorMutationV32),
-    BeginFlush,
-    EndFlush,
-    DeleteVolume,
-    UpdateBorrowed(u64),
-    UpdateMutationsKey(UpdateMutationsKeyV32),
-    CreateInternalDir(u64),
-}
-
-#[derive(Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(MutationV33)]
-pub enum MutationV32 {
-    ObjectStore(ObjectStoreMutationV32),
-    EncryptedObjectStore(Box<[u8]>),
-    Allocator(AllocatorMutationV32),
-    BeginFlush,
-    EndFlush,
-    DeleteVolume,
-    UpdateBorrowed(u64),
-    UpdateMutationsKey(UpdateMutationsKeyV32),
-}
-
 impl Mutation {
     pub fn insert_object(key: ObjectKey, value: ObjectValue) -> Self {
         Mutation::ObjectStore(ObjectStoreMutation {
@@ -239,38 +184,6 @@ pub struct ObjectStoreMutationV41 {
 pub struct ObjectStoreMutationV40 {
     pub item: ObjectItemV40,
     pub op: OperationV32,
-}
-
-#[derive(Migrate, Serialize, Deserialize, TypeFingerprint)]
-#[migrate_nodefault]
-#[migrate_to_version(ObjectStoreMutationV40)]
-pub struct ObjectStoreMutationV38 {
-    pub item: ObjectItemV38,
-    pub op: OperationV32,
-}
-
-#[derive(Deserialize, Migrate, Serialize, TypeFingerprint)]
-#[migrate_nodefault]
-#[migrate_to_version(ObjectStoreMutationV38)]
-pub struct ObjectStoreMutationV37 {
-    item: ObjectItemV37,
-    op: OperationV32,
-}
-
-#[derive(Deserialize, Migrate, Serialize, TypeFingerprint)]
-#[migrate_nodefault]
-#[migrate_to_version(ObjectStoreMutationV37)]
-pub struct ObjectStoreMutationV33 {
-    item: ObjectItemV33,
-    op: OperationV32,
-}
-
-#[derive(Deserialize, Migrate, Serialize, TypeFingerprint)]
-#[migrate_nodefault]
-#[migrate_to_version(ObjectStoreMutationV33)]
-pub struct ObjectStoreMutationV32 {
-    item: ObjectItemV32,
-    op: OperationV32,
 }
 
 /// The different LSM tree operations that can be performed as part of a mutation.

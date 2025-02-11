@@ -36,10 +36,7 @@ use crate::object_store::journal::writer::JournalWriter;
 use crate::object_store::journal::{
     JournalCheckpoint, JournalCheckpointV32, JournalHandle as _, BLOCK_SIZE,
 };
-use crate::object_store::object_record::{
-    ObjectItemV32, ObjectItemV33, ObjectItemV37, ObjectItemV38, ObjectItemV40, ObjectItemV41,
-    ObjectItemV43,
-};
+use crate::object_store::object_record::{ObjectItemV40, ObjectItemV41, ObjectItemV43};
 use crate::object_store::transaction::{AssocObj, Options};
 use crate::object_store::tree::MajorCompactable;
 use crate::object_store::{
@@ -248,38 +245,6 @@ pub enum SuperBlockRecordV41 {
 pub enum SuperBlockRecordV40 {
     Extent(Range<u64>),
     ObjectItem(ObjectItemV40),
-    End,
-}
-
-#[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
-#[migrate_to_version(SuperBlockRecordV40)]
-pub enum SuperBlockRecordV38 {
-    Extent(Range<u64>),
-    ObjectItem(ObjectItemV38),
-    End,
-}
-
-#[derive(Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(SuperBlockRecordV38)]
-pub enum SuperBlockRecordV37 {
-    Extent(Range<u64>),
-    ObjectItem(ObjectItemV37),
-    End,
-}
-
-#[derive(Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(SuperBlockRecordV37)]
-pub enum SuperBlockRecordV33 {
-    Extent(Range<u64>),
-    ObjectItem(ObjectItemV33),
-    End,
-}
-
-#[derive(Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(SuperBlockRecordV33)]
-pub enum SuperBlockRecordV32 {
-    Extent(Range<u64>),
-    ObjectItem(ObjectItemV32),
     End,
 }
 

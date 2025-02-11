@@ -22,7 +22,7 @@ mod reader;
 pub mod super_block;
 mod writer;
 
-use crate::checksum::{Checksum, Checksums, ChecksumsV37, ChecksumsV38};
+use crate::checksum::{Checksum, Checksums, ChecksumsV38};
 use crate::debug_assert_not_too_long;
 use crate::errors::FxfsError;
 use crate::filesystem::{ApplyContext, ApplyMode, FxFilesystem, SyncOptions};
@@ -45,9 +45,8 @@ use crate::object_store::journal::writer::JournalWriter;
 use crate::object_store::object_manager::ObjectManager;
 use crate::object_store::object_record::{AttributeKey, ObjectKey, ObjectKeyData, ObjectValue};
 use crate::object_store::transaction::{
-    lock_keys, AllocatorMutation, Mutation, MutationV32, MutationV33, MutationV37, MutationV38,
-    MutationV40, MutationV41, MutationV43, ObjectStoreMutation, Options, Transaction, TxnMutation,
-    TRANSACTION_MAX_JOURNAL_USAGE,
+    lock_keys, AllocatorMutation, Mutation, MutationV40, MutationV41, MutationV43,
+    ObjectStoreMutation, Options, Transaction, TxnMutation, TRANSACTION_MAX_JOURNAL_USAGE,
 };
 use crate::object_store::{
     AssocObj, DataObjectHandle, HandleOptions, HandleOwner, Item, ItemRef, NewChildStoreOptions,
@@ -196,111 +195,6 @@ pub enum JournalRecordV40 {
     Discard(u64),
     DidFlushDevice(u64),
     DataChecksums(Range<u64>, ChecksumsV38),
-}
-
-#[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
-#[migrate_to_version(JournalRecordV40)]
-pub enum JournalRecordV38 {
-    EndBlock,
-    Mutation { object_id: u64, mutation: MutationV38 },
-    Commit,
-    Discard(u64),
-    DidFlushDevice(u64),
-    DataChecksums(Range<u64>, ChecksumsV38),
-}
-
-#[derive(Deserialize, Serialize, Versioned, TypeFingerprint)]
-pub enum JournalRecordV37 {
-    EndBlock,
-    Mutation { object_id: u64, mutation: MutationV37 },
-    Commit,
-    Discard(u64),
-    DidFlushDevice(u64),
-    DataChecksums(Range<u64>, ChecksumsV37),
-}
-
-impl From<JournalRecordV37> for JournalRecordV38 {
-    fn from(record: JournalRecordV37) -> Self {
-        match record {
-            JournalRecordV37::EndBlock => Self::EndBlock,
-            JournalRecordV37::Mutation { object_id, mutation } => {
-                Self::Mutation { object_id, mutation: mutation.into() }
-            }
-            JournalRecordV37::Commit => Self::Commit,
-            JournalRecordV37::Discard(offset) => Self::Discard(offset),
-            JournalRecordV37::DidFlushDevice(offset) => Self::DidFlushDevice(offset),
-            JournalRecordV37::DataChecksums(range, sums) => {
-                // Putting the original Checksums in DataChecksums was a mistake - it's virtually
-                // meaningless to have a record DataChecksums(Checksums::None), such a record
-                // should just not have been written in the first place. Luckily, the only place we
-                // write DataChecksum records explicitly created Checksums::Fletcher so we can
-                // quickly fix it without a complicated migration. The new Checksums doesn't have a
-                // None value so it's no longer an issue.
-                let sums = sums
-                    .migrate()
-                    .expect("BUG: found journal checksums record with None checksum value");
-                Self::DataChecksums(range, sums)
-            }
-        }
-    }
-}
-
-#[derive(Deserialize, Serialize, Versioned, TypeFingerprint)]
-pub enum JournalRecordV36 {
-    EndBlock,
-    Mutation { object_id: u64, mutation: MutationV33 },
-    Commit,
-    Discard(u64),
-    DidFlushDevice(u64),
-    DataChecksums(Range<u64>, Vec<Checksum>),
-}
-
-impl From<JournalRecordV36> for JournalRecordV37 {
-    fn from(record: JournalRecordV36) -> Self {
-        match record {
-            JournalRecordV36::EndBlock => Self::EndBlock,
-            JournalRecordV36::Mutation { object_id, mutation } => {
-                Self::Mutation { object_id, mutation: mutation.into() }
-            }
-            JournalRecordV36::Commit => Self::Commit,
-            JournalRecordV36::Discard(offset) => Self::Discard(offset),
-            JournalRecordV36::DidFlushDevice(offset) => Self::DidFlushDevice(offset),
-            JournalRecordV36::DataChecksums(range, sums) => {
-                Self::DataChecksums(range, ChecksumsV37::fletcher(sums))
-            }
-        }
-    }
-}
-
-#[derive(Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(JournalRecordV36)]
-pub enum JournalRecordV34 {
-    EndBlock,
-    Mutation { object_id: u64, mutation: MutationV33 },
-    Commit,
-    Discard(u64),
-    DidFlushDevice(u64),
-    DataChecksums(Range<u64>, Vec<Checksum>),
-}
-
-#[derive(Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(JournalRecordV34)]
-pub enum JournalRecordV33 {
-    EndBlock,
-    Mutation { object_id: u64, mutation: MutationV33 },
-    Commit,
-    Discard(u64),
-    DidFlushDevice(u64),
-}
-
-#[derive(Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
-#[migrate_to_version(JournalRecordV33)]
-pub enum JournalRecordV32 {
-    EndBlock,
-    Mutation { object_id: u64, mutation: MutationV32 },
-    Commit,
-    Discard(u64),
-    DidFlushDevice(u64),
 }
 
 pub(super) fn journal_handle_options() -> HandleOptions {
