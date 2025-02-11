@@ -669,7 +669,8 @@ class VmObject : public VmHierarchyBase,
 
   // Adds a child to this VMO and returns true if the dispatcher which matches
   // user_id should be notified about the first child being added.
-  bool AddChildLocked(VmObject* child) TA_REQ(lock());
+  bool AddChildLocked(VmObject* child) TA_REQ(ChildListLock::Get());
+  bool AddChild(VmObject* child) TA_EXCL(ChildListLock::Get());
 
   // Removes the child |child| from this VMO and notifies the child observer if the new child count
   // is zero. The |guard| must be this VMO's lock.
@@ -677,7 +678,7 @@ class VmObject : public VmHierarchyBase,
 
   // Drops |c| from the child list without going through the full removal
   // process. ::RemoveChild is probably what you want here.
-  void DropChildLocked(VmObject* c) TA_REQ(lock());
+  void DropChildLocked(VmObject* c) TA_REQ(ChildListLock::Get());
 
   uint32_t num_children() const;
 
@@ -756,8 +757,14 @@ class VmObject : public VmHierarchyBase,
   // list of every mapping
   fbl::DoublyLinkedList<VmMapping*> mapping_list_ TA_GUARDED(lock());
 
-  // list of every child
-  fbl::TaggedDoublyLinkedList<VmObject*, internal::ChildListTag> children_list_ TA_GUARDED(lock());
+  // list of every child. Usage of this lock happens on VmObject creation/deletion in situations
+  // where we are also either manipulating the heap and/or the AllVmosList lock. As such this lock
+  // does not end up receiving any contention, due to both being an infrequent operation and already
+  // effectively serialized by the aforementioned other global locks.
+  // This lock is expected to be acquired after the VMO lock.
+  DECLARE_SINGLETON_CRITICAL_MUTEX(ChildListLock);
+  fbl::TaggedDoublyLinkedList<VmObject*, internal::ChildListTag> children_list_
+      TA_GUARDED(ChildListLock::Get());
 
   // The user_id_ is semi-const in that it is set once, before the VMO becomes publicly visible, by
   // the dispatcher layer. While the dispatcher setting the ID and querying it is trivially
@@ -767,7 +774,7 @@ class VmObject : public VmHierarchyBase,
   RelaxedAtomic<uint64_t> user_id_ = 0;
 
   uint32_t mapping_list_len_ TA_GUARDED(lock()) = 0;
-  uint32_t children_list_len_ TA_GUARDED(lock()) = 0;
+  uint32_t children_list_len_ TA_GUARDED(ChildListLock::Get()) = 0;
 
   // The user-friendly VMO name. For debug purposes only. That
   // is, there is no mechanism to get access to a VMO via this name.

@@ -93,7 +93,7 @@ class VmObjectPhysical final : public VmObject, public VmDeferredDeleter<VmObjec
   uint32_t mapping_cache_flags_ TA_GUARDED(lock()) = 0;
 
   // parent pointer (may be null)
-  fbl::RefPtr<VmObjectPhysical> parent_ TA_GUARDED(lock()) = nullptr;
+  fbl::RefPtr<VmObjectPhysical> parent_ TA_GUARDED(ChildListLock::Get()) = nullptr;
 };
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_VM_OBJECT_PHYSICAL_H_

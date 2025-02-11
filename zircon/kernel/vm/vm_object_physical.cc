@@ -46,7 +46,7 @@ VmObjectPhysical::~VmObjectPhysical() {
   LTRACEF("%p\n", this);
 
   {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<CriticalMutex> guard{ChildListLock::Get()};
     if (parent_) {
       parent_->RemoveChild(this, guard.take());
       // Avoid recursing destructors when we delete our parent by using the deferred deletion
@@ -147,7 +147,7 @@ zx_status_t VmObjectPhysical::CreateChildSlice(uint64_t offset, uint64_t size, b
     vmo->parent_ = fbl::RefPtr(this);
 
     // add the new vmo as a child.
-    AddChildLocked(vmo.get());
+    AddChild(vmo.get());
 
     if (copy_name) {
       vmo->name_ = name_;
@@ -263,6 +263,7 @@ zx_status_t VmObjectPhysical::SetMappingCachePolicy(const uint32_t cache_policy)
     return ZX_OK;
   }
 
+  Guard<CriticalMutex> list_guard{ChildListLock::Get()};
   // If this VMO is mapped already it is not safe to allow its caching policy to change
   if (mapping_list_len_ != 0 || children_list_len_ != 0 || parent_) {
     LTRACEF(

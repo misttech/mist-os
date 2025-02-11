@@ -105,13 +105,13 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
     if (is_reference()) {
       return ChildType::kReference;
     }
-    Guard<CriticalMutex> guard{lock()};
+    Guard<CriticalMutex> guard{ChildListLock::Get()};
     return parent_ ? ChildType::kCowClone : ChildType::kNotChild;
   }
   bool is_slice() const { return options_ & kSlice; }
   bool is_reference() const { return (options_ & kReference); }
-  uint64_t parent_user_id() const override {
-    Guard<CriticalMutex> guard{lock()};
+  uint64_t parent_user_id() const override TA_NO_THREAD_SAFETY_ANALYSIS {
+    Guard<CriticalMutex> guard{ChildListLock::Get()};
     if (parent_) {
       return parent_->user_id();
     }
@@ -456,7 +456,7 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
 
   // parent pointer (may be null). This is a raw pointer as we have no need to hold our parent alive
   // once they want to go away.
-  VmObjectPaged* parent_ TA_GUARDED(lock()) = nullptr;
+  VmObjectPaged* parent_ TA_GUARDED(ChildListLock::Get()) = nullptr;
 
   const fbl::RefPtr<VmCowPages> cow_pages_;
 

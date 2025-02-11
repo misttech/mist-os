@@ -239,6 +239,11 @@ bool VmObject::AddChildLocked(VmObject* child) {
   return children_list_len_ == 1;
 }
 
+bool VmObject::AddChild(VmObject* child) {
+  Guard<CriticalMutex> guard{ChildListLock::Get()};
+  return AddChildLocked(child);
+}
+
 void VmObject::DropChildLocked(VmObject* c) {
   canary_.Assert();
   DEBUG_ASSERT(children_list_len_ > 0);
@@ -254,7 +259,8 @@ void VmObject::RemoveChild(VmObject* o, Guard<CriticalMutex>::Adoptable adopt) {
   // otherwise we have lock ordering issue, since we already allow the shared lock to be acquired
   // whilst holding the child_observer_lock.
   {
-    Guard<CriticalMutex> guard{AdoptLock, lock(), ktl::move(adopt)};
+    Guard<CriticalMutex> guard{AdoptLock, ChildListLock::Get(), ktl::move(adopt)};
+    AssertHeld(*ChildListLock::Get());
     DropChildLocked(o);
 
     if (children_list_len_ != 0) {
@@ -274,7 +280,7 @@ void VmObject::RemoveChild(VmObject* o, Guard<CriticalMutex>::Adoptable adopt) {
 
 uint32_t VmObject::num_children() const {
   canary_.Assert();
-  Guard<CriticalMutex> guard{lock()};
+  Guard<CriticalMutex> guard{ChildListLock::Get()};
   return children_list_len_;
 }
 

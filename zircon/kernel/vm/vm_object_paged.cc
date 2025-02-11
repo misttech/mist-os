@@ -80,86 +80,94 @@ void VmObjectPaged::DestructorHelper() {
     Unpin(0, size());
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  {
+    Guard<CriticalMutex> guard{lock()};
 
-  // Only clear the backlink if we are not a reference. A reference does not "own" the VmCowPages,
-  // so in the typical case, the VmCowPages will not have its backlink set to a reference. There
-  // does exist an edge case where the backlink can be a reference, which is handled by the else
-  // block below.
-  if (!is_reference()) {
-    cow_pages_locked()->set_paged_backlink_locked(nullptr);
-  } else {
-    // If this is a reference, we need to remove it from the original (parent) VMO's reference list.
-    VmObjectPaged* root_ref = cow_pages_locked()->get_paged_backlink_locked();
-    // The VmCowPages will have a valid backlink, either to the original VmObjectPaged or a
-    // reference VmObjectPaged, as long as there is a reference that is alive. We know that this is
-    // a reference.
-    DEBUG_ASSERT(root_ref);
-    if (likely(root_ref != this)) {
-      AssertHeld(root_ref->lock_ref());
-      VmObjectPaged* removed = root_ref->reference_list_.erase(*this);
-      DEBUG_ASSERT(removed == this);
-    } else {
-      // It is possible for the backlink to point to |this| if the original parent went away at some
-      // point and the rest of the reference list had to be re-homed to |this|, and the backlink set
-      // to |this|.
-      // The VmCowPages was pointing to us, so clear the backlink. The backlink will get reset below
-      // if other references remain.
+    // Only clear the backlink if we are not a reference. A reference does not "own" the VmCowPages,
+    // so in the typical case, the VmCowPages will not have its backlink set to a reference. There
+    // does exist an edge case where the backlink can be a reference, which is handled by the else
+    // block below.
+    if (!is_reference()) {
       cow_pages_locked()->set_paged_backlink_locked(nullptr);
+    } else {
+      // If this is a reference, we need to remove it from the original (parent) VMO's reference
+      // list.
+      VmObjectPaged* root_ref = cow_pages_locked()->get_paged_backlink_locked();
+      // The VmCowPages will have a valid backlink, either to the original VmObjectPaged or a
+      // reference VmObjectPaged, as long as there is a reference that is alive. We know that this
+      // is a reference.
+      DEBUG_ASSERT(root_ref);
+      if (likely(root_ref != this)) {
+        AssertHeld(root_ref->lock_ref());
+        VmObjectPaged* removed = root_ref->reference_list_.erase(*this);
+        DEBUG_ASSERT(removed == this);
+      } else {
+        // It is possible for the backlink to point to |this| if the original parent went away at
+        // some point and the rest of the reference list had to be re-homed to |this|, and the
+        // backlink set to |this|. The VmCowPages was pointing to us, so clear the backlink. The
+        // backlink will get reset below if other references remain.
+        cow_pages_locked()->set_paged_backlink_locked(nullptr);
+      }
     }
+
+    // If this VMO had references, pick one of the references as the paged backlink from the shared
+    // VmCowPages. Also, move the remainder of the reference list to the chosen reference. Note that
+    // we're only moving the reference list over without adding the references to the children list;
+    // we do not want these references to be counted as children of the chosen VMO. We simply want a
+    // safe way to propagate mapping updates and VmCowPages changes on hidden node addition.
+    if (!reference_list_.is_empty()) {
+      // We should only be attempting to reset the backlink if the owner is going away and has reset
+      // the backlink above.
+      DEBUG_ASSERT(cow_pages_locked()->get_paged_backlink_locked() == nullptr);
+      VmObjectPaged* paged_backlink = reference_list_.pop_front();
+      cow_pages_locked()->set_paged_backlink_locked(paged_backlink);
+      AssertHeld(paged_backlink->lock_ref());
+      paged_backlink->reference_list_.splice(paged_backlink->reference_list_.end(),
+                                             reference_list_);
+    }
+    DEBUG_ASSERT(reference_list_.is_empty());
+    cow_pages_locked()->MaybeDeadTransitionLocked(guard);
   }
 
-  // If this VMO had references, pick one of the references as the paged backlink from the shared
-  // VmCowPages. Also, move the remainder of the reference list to the chosen reference. Note that
-  // we're only moving the reference list over without adding the references to the children list;
-  // we do not want these references to be counted as children of the chosen VMO. We simply want a
-  // safe way to propagate mapping updates and VmCowPages changes on hidden node addition.
-  if (!reference_list_.is_empty()) {
-    // We should only be attempting to reset the backlink if the owner is going away and has reset
-    // the backlink above.
-    DEBUG_ASSERT(cow_pages_locked()->get_paged_backlink_locked() == nullptr);
-    VmObjectPaged* paged_backlink = reference_list_.pop_front();
-    cow_pages_locked()->set_paged_backlink_locked(paged_backlink);
-    AssertHeld(paged_backlink->lock_ref());
-    paged_backlink->reference_list_.splice(paged_backlink->reference_list_.end(), reference_list_);
-  }
-  DEBUG_ASSERT(reference_list_.is_empty());
-  cow_pages_locked()->MaybeDeadTransitionLocked(guard);
+  fbl::RefPtr<VmObjectPaged> maybe_parent;
 
   // Re-home all our children with any parent that we have.
-  while (!children_list_.is_empty()) {
-    VmObject* c = &children_list_.front();
-    children_list_.pop_front();
-    VmObjectPaged* child = reinterpret_cast<VmObjectPaged*>(c);
-    AssertHeld(child->lock_ref());
-    child->parent_ = parent_;
+  {
+    Guard<CriticalMutex> child_guard{ChildListLock::Get()};
+    while (!children_list_.is_empty()) {
+      VmObject* c = &children_list_.front();
+      children_list_.pop_front();
+      VmObjectPaged* child = reinterpret_cast<VmObjectPaged*>(c);
+      child->parent_ = parent_;
+      if (parent_) {
+        // Ignore the return since 'this' is a child so we know we are not transitioning from 0->1
+        // children.
+        [[maybe_unused]] bool notify = parent_->AddChildLocked(child);
+        DEBUG_ASSERT(!notify);
+      }
+    }
+
     if (parent_) {
-      AssertHeld(parent_->lock_ref());
-      // Ignore the return since 'this' is a child so we know we are not transitioning from 0->1
-      // children.
-      [[maybe_unused]] bool notify = parent_->AddChildLocked(child);
-      DEBUG_ASSERT(!notify);
+      // As parent_ is a raw pointer we must ensure that if we call a method on it that it lives
+      // long enough. To do so we attempt to upgrade it to a refptr, which could fail if it's
+      // already slated for deletion.
+      maybe_parent = fbl::MakeRefPtrUpgradeFromRaw(parent_, child_guard);
+      if (maybe_parent) {
+        // Holding refptr, can safely pass in the guard to RemoveChild.
+        parent_->RemoveChild(this, child_guard.take());
+      } else {
+        // parent is up for deletion and so there's no need to use RemoveChild since there is no
+        // user dispatcher to notify anyway and so just drop ourselves to keep the hierarchy
+        // correct.
+        parent_->DropChildLocked(this);
+      }
     }
   }
-
-  if (parent_) {
-    AssertHeld(parent_->lock_ref());
-    // As parent_ is a raw pointer we must ensure that if we call a method on it that it lives long
-    // enough. To do so we attempt to upgrade it to a refptr, which could fail if it's already
-    // slated for deletion.
-    fbl::RefPtr<VmObjectPaged> parent = fbl::MakeRefPtrUpgradeFromRaw(parent_, guard);
-    if (parent) {
-      // Holding refptr, can safely pass in the guard to RemoveChild.
-      parent_->RemoveChild(this, guard.take());
-      // As we constructed a RefPtr to our parent, and we are in our own destructor, there is now
-      // the potential for recursive destruction if we need to delete the parent due to holding the
-      // last ref, hit this same path, etc.
-      VmDeferredDeleter<VmObjectPaged>::DoDeferredDelete(ktl::move(parent));
-    } else {
-      // parent is up for deletion and so there's no need to use RemoveChild since there is no
-      // user dispatcher to notify anyway and so just drop ourselves to keep the hierarchy correct.
-      parent_->DropChildLocked(this);
-    }
+  if (maybe_parent) {
+    // As we constructed a RefPtr to our parent, and we are in our own destructor, there is now
+    // the potential for recursive destruction if we need to delete the parent due to holding the
+    // last ref, hit this same path, etc.
+    VmDeferredDeleter<VmObjectPaged>::DoDeferredDelete(ktl::move(maybe_parent));
   }
 }
 
@@ -708,10 +716,13 @@ zx_status_t VmObjectPaged::CreateChildReferenceCommon(uint32_t options, VmCowRan
       return ZX_ERR_BAD_STATE;
     }
     vmo->cache_policy_ = cache_policy_;
-    vmo->parent_ = this;
-    const bool first = AddChildLocked(vmo.get());
-    if (first_child) {
-      *first_child = first;
+    {
+      Guard<CriticalMutex> child_guard{ChildListLock::Get()};
+      vmo->parent_ = this;
+      const bool first = AddChildLocked(vmo.get());
+      if (first_child) {
+        *first_child = first;
+      }
     }
 
     // Also insert into the reference list. The reference should only be inserted in the list of the
@@ -816,11 +827,14 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, SnapshotType type
     vmo->cow_pages_locked()->TransitionToAliveLocked();
 
     // Install the parent.
-    vmo->parent_ = this;
+    {
+      Guard<CriticalMutex> child_guard{ChildListLock::Get()};
+      vmo->parent_ = this;
 
-    // add the new vmo as a child before we do anything, since its
-    // dtor expects to find it in its parent's child list
-    AddChildLocked(vmo.get());
+      // add the new vmo as a child before we do anything, since its
+      // dtor expects to find it in its parent's child list
+      AddChildLocked(vmo.get());
+    }
 
     if (copy_name) {
       vmo->name_ = name_;
@@ -839,15 +853,22 @@ void VmObjectPaged::DumpLocked(uint depth, bool verbose) const {
   canary_.Assert();
 
   uint64_t parent_id = 0;
-  if (parent_) {
-    parent_id = parent_->user_id();
+  // Cache the parent value as a void* as it's not safe to dereference once the ChildListLock is
+  // dropped, but we can still print out its value.
+  void* parent;
+  {
+    Guard<CriticalMutex> guard{ChildListLock::Get()};
+    parent = parent_;
+    if (parent_) {
+      parent_id = parent_->user_id();
+    }
   }
 
   for (uint i = 0; i < depth; ++i) {
     printf("  ");
   }
   printf("vmo %p/k%" PRIu64 " ref %d parent %p/k%" PRIu64 "\n", this, user_id_.load(),
-         ref_count_debug(), parent_, parent_id);
+         ref_count_debug(), parent, parent_id);
 
   char name[ZX_MAX_NAME_LEN];
   get_name(name, sizeof(name));
@@ -2018,11 +2039,19 @@ zx_status_t VmObjectPaged::SetMappingCachePolicy(const uint32_t cache_policy) {
     return ZX_ERR_BAD_STATE;
   }
 
-  if (!children_list_.is_empty()) {
-    return ZX_ERR_BAD_STATE;
-  }
-  if (parent_) {
-    return ZX_ERR_BAD_STATE;
+  // The ChildListLock needs to be held to inspect the children/parent pointers, however we do not
+  // need to hold it over the remainder of this method as the main VMO lock is held, and creating a
+  // new child happens under that lock as well since the creation path must, in a single lock
+  // acquisition, be checking the cache_policy_ and creating the child.
+  {
+    Guard<CriticalMutex> child_guard{ChildListLock::Get()};
+
+    if (!children_list_.is_empty()) {
+      return ZX_ERR_BAD_STATE;
+    }
+    if (parent_) {
+      return ZX_ERR_BAD_STATE;
+    }
   }
 
   // Forbid if there are references, or if this object is a reference itself. We do not want cache
