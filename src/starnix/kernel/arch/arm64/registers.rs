@@ -46,11 +46,7 @@ impl RegisterState {
     /// Returns the register that indicates the single-machine-word return value from a
     /// function call.
     pub fn instruction_pointer_register(&self) -> u64 {
-        if (self.real_registers.cpsr & zx::sys::ZX_REG_CPSR_ARCH_32_MASK) != 0 {
-            self.real_registers.r[15]
-        } else {
-            self.real_registers.pc
-        }
+        self.real_registers.pc
     }
 
     /// Sets the register that indicates the single-machine-word return value from a
@@ -76,11 +72,7 @@ impl RegisterState {
 
     /// Gets the register that indicates the current stack pointer.
     pub fn stack_pointer_register(&self) -> u64 {
-        if (self.real_registers.cpsr & zx::sys::ZX_REG_CPSR_ARCH_32_MASK) != 0 {
-            self.real_registers.r[13]
-        } else {
-            self.real_registers.sp
-        }
+        self.real_registers.sp
     }
 
     /// Sets the register that indicates the current stack pointer.
@@ -132,31 +124,40 @@ impl RegisterState {
         offset: usize,
         f: &mut dyn FnMut(&mut u64),
     ) -> Result<(), Errno> {
+        fn reg_offset(index: usize) -> usize {
+            memoffset::offset_of!(user_regs_struct, regs) + index * std::mem::size_of::<u64>()
+        }
+
+        let is_arm: bool = self.real_registers.cpsr & zx::sys::ZX_REG_CPSR_ARCH_32_MASK != 0;
         if offset >= std::mem::size_of::<user_regs_struct>() {
             return error!(EINVAL);
         }
-        if offset == memoffset::offset_of!(user_regs_struct, sp) {
+        if offset == memoffset::offset_of!(user_regs_struct, sp)
+            || (offset == reg_offset(13) && is_arm)
+        {
+            f(&mut self.real_registers.sp);
             // For arm, sp is register 13
-            let ret = f(&mut self.real_registers.sp);
-            if (self.real_registers.cpsr & zx::sys::ZX_REG_CPSR_ARCH_32_MASK) != 0 {
+            if is_arm {
                 self.real_registers.r[13] = self.real_registers.sp;
             }
-            ret
-        } else if offset == memoffset::offset_of!(user_regs_struct, pc) {
-            f(&mut self.real_registers.pc)
-        } else if offset == memoffset::offset_of!(user_regs_struct, pstate) {
-            f(&mut self.real_registers.cpsr)
-        } else if offset
-            == memoffset::offset_of!(user_regs_struct, regs) + 30 * std::mem::size_of::<u64>()
+        } else if offset == memoffset::offset_of!(user_regs_struct, pc)
+            || (offset == reg_offset(15) && is_arm)
         {
+            f(&mut self.real_registers.pc);
+            // For arm, pc is register 15
+            if is_arm {
+                self.real_registers.r[15] = self.real_registers.pc;
+            }
+        } else if offset == memoffset::offset_of!(user_regs_struct, pstate) {
+            f(&mut self.real_registers.cpsr);
+        } else if offset == reg_offset(30) || (offset == reg_offset(14) && is_arm) {
             // The 30th register is stored as lr in self.real_registers
-            let ret = f(&mut self.real_registers.lr);
-            if (self.real_registers.cpsr & zx::sys::ZX_REG_CPSR_ARCH_32_MASK) != 0 {
+            f(&mut self.real_registers.lr);
+            if is_arm {
                 // The 14th register is stored as lr in self.real_registers for
                 // arm
                 self.real_registers.r[14] = self.real_registers.lr;
             }
-            ret
         } else if offset % std::mem::align_of::<u64>() == 0 {
             let index = (offset - memoffset::offset_of!(user_regs_struct, regs)) >> 3;
             f(&mut self.real_registers.r[index])
@@ -168,7 +169,16 @@ impl RegisterState {
 }
 
 impl From<zx::sys::zx_thread_state_general_regs_t> for RegisterState {
-    fn from(regs: zx::sys::zx_thread_state_general_regs_t) -> Self {
+    fn from(mut regs: zx::sys::zx_thread_state_general_regs_t) -> Self {
+        // We should synchronize the stack pointer with the aarch32 registers.
+        if regs.cpsr & zx::sys::ZX_REG_CPSR_ARCH_32_MASK != 0 {
+            regs.sp = regs.r[13];
+            regs.lr = regs.r[14];
+            // The PC appears to advance properly and _not_ prefer r[15]
+            // TODO(https://fxbug.dev/380402551): Make sure this isn't because of anything
+            // done in zircon.
+            regs.r[15] = regs.pc;
+        }
         RegisterState { real_registers: regs, orig_x0: regs.r[0], elr: 0 }
     }
 }
@@ -189,17 +199,14 @@ impl std::ops::DerefMut for RegisterState {
 
 impl From<RegisterState> for zx::sys::zx_thread_state_general_regs_t {
     fn from(register_state: RegisterState) -> Self {
+        let regs = register_state.real_registers;
         // This is primarily called when returning from restricted mode.
-        // We should synchronize the stack pointer with the aarch32 registers.
+        // Check that the special registers stayed synchronized.
         if register_state.cpsr & zx::sys::ZX_REG_CPSR_ARCH_32_MASK != 0 {
-            let mut regs = register_state.real_registers;
-            // The PC appears to advance properly and _not_ prefer r[15]
-            // TODO(https://fxbug.dev/380402551): Make sure this isn't because of anything
-            // done in zircon.
-            regs.sp = regs.r[13];
-            regs
-        } else {
-            register_state.real_registers
+            assert_eq!(regs.sp, regs.r[13]);
+            assert_eq!(regs.lr, regs.r[14]);
+            assert_eq!(regs.pc, regs.r[15]);
         }
+        regs
     }
 }
