@@ -232,12 +232,6 @@
         "value": "25"
     },
     {
-        "kind": "const",
-        "name": "fuchsia.diagnostics/MAX_STRING_SELECTOR_LENGTH",
-        "type": "uint16",
-        "value": "100"
-    },
-    {
         "kind": "table/member",
         "name": "fuchsia.diagnostics/PerformanceConfiguration.batch_retrieval_timeout_seconds",
         "ordinal": "2",
@@ -420,13 +414,13 @@
         "kind": "union/member",
         "name": "fuchsia.diagnostics/StringSelector.exact_match",
         "ordinal": "2",
-        "type": "string:100"
+        "type": "string:1024"
     },
     {
         "kind": "union/member",
         "name": "fuchsia.diagnostics/StringSelector.string_pattern",
         "ordinal": "1",
-        "type": "string:100"
+        "type": "string:1024"
     },
     {
         "kind": "union",
@@ -453,7 +447,7 @@
         "kind": "union/member",
         "name": "fuchsia.diagnostics/TreeNames.some",
         "ordinal": "1",
-        "type": "vector<string:100>"
+        "type": "vector<string:1024>"
     },
     {
         "kind": "union",
