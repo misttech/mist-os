@@ -79,7 +79,7 @@ TEST(SymbolsTest, InvalidFormat) {
   constexpr std::string_view kDriverUrl = "fuchsia-boot:///#meta/driver.cm";
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(4096, 0, &vmo));
-  auto result = driver_symbols::FindRestrictedSymbols(vmo, kDriverUrl);
+  auto result = driver_symbols::FindRestrictedSymbols(zx::unowned(vmo), kDriverUrl);
   ASSERT_TRUE(result.is_error());
 }
 
@@ -92,7 +92,7 @@ TEST(SymbolsTest, NoRestrictedSymbols) {
 
   zx::vmo vmo;
   ASSERT_NO_FATAL_FAILURE(CreateFakeElf(kSymbols, &vmo));
-  auto result = driver_symbols::FindRestrictedSymbols(vmo, kDriverUrl);
+  auto result = driver_symbols::FindRestrictedSymbols(zx::unowned(vmo), kDriverUrl);
   ASSERT_TRUE(result.is_ok());
 
   ASSERT_EQ(result->size(), 0);
@@ -112,7 +112,7 @@ TEST(SymbolsTest, RestrictedSymbols) {
 
   zx::vmo vmo;
   ASSERT_NO_FATAL_FAILURE(CreateFakeElf(kSymbols, &vmo));
-  auto result = driver_symbols::FindRestrictedSymbols(vmo, kDriverUrl);
+  auto result = driver_symbols::FindRestrictedSymbols(zx::unowned(vmo), kDriverUrl);
   ASSERT_TRUE(result.is_ok());
 
   std::sort(want_symbols.begin(), want_symbols.end());
@@ -128,7 +128,7 @@ TEST(SymbolsTest, ThreadSymbolsAllowedDriver) {
 
   zx::vmo vmo;
   ASSERT_NO_FATAL_FAILURE(CreateFakeElf(kSymbols, &vmo));
-  auto result = driver_symbols::FindRestrictedSymbols(vmo, kDriverUrl);
+  auto result = driver_symbols::FindRestrictedSymbols(zx::unowned(vmo), kDriverUrl);
   ASSERT_TRUE(result.is_ok());
 
   ASSERT_EQ(result->size(), 0);
@@ -145,7 +145,7 @@ TEST(SymbolsTest, ThreadSymbolsRestrictedDriver) {
 
   zx::vmo vmo;
   ASSERT_NO_FATAL_FAILURE(CreateFakeElf(kSymbols, &vmo));
-  auto result = driver_symbols::FindRestrictedSymbols(vmo, kDriverUrl);
+  auto result = driver_symbols::FindRestrictedSymbols(zx::unowned(vmo), kDriverUrl);
   ASSERT_TRUE(result.is_ok());
 
   std::sort(want_symbols.begin(), want_symbols.end());

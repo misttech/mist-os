@@ -271,11 +271,11 @@ zx::result<fbl::RefPtr<Driver>> Driver::Load(std::string url, zx::vmo vmo,
   // DFv1 driver's url, so we would be incorrectly looking for |url| in the allowlist for
   // the compat driver's symbols.
   if (relative_binary_path != kCompatDriverRelativePath) {
-    auto result = driver_symbols::FindRestrictedSymbols(vmo, url);
+    auto result = driver_symbols::FindRestrictedSymbols(zx::unowned(vmo), url);
     if (result.is_error()) {
       LOGF(WARNING, "Driver '%s' failed to validate as ELF: %s", url.c_str(),
            result.status_value());
-    } else if (result->size() > 0) {
+    } else if (!result->empty()) {
       LOGF(ERROR, "Driver '%s' referenced %lu restricted libc symbols: ", url.c_str(),
            result->size());
       for (auto& str : *result) {
