@@ -278,8 +278,10 @@ pub fn run_container_features(
         fb_device_init(locked, system_task);
 
         let (touch_source_client, touch_source_server) = fidl::endpoints::create_endpoints();
+        let (mouse_source_client, mouse_source_server) = fidl::endpoints::create_endpoints();
         let view_bound_protocols = fuicomposition::ViewBoundProtocols {
             touch_source: Some(touch_source_server),
+            mouse_source: Some(mouse_source_server),
             ..Default::default()
         };
         let view_identity = fuiviews::ViewIdentityOnCreation::from(
@@ -326,7 +328,11 @@ pub fn run_container_features(
             &kernel.kthreads.system_task(),
             DEFAULT_KEYBOARD_DEVICE_ID,
         );
-        mouse_device.register(locked, &kernel.kthreads.system_task(), DEFAULT_MOUSE_DEVICE_ID);
+        mouse_device.clone().register(
+            locked,
+            &kernel.kthreads.system_task(),
+            DEFAULT_MOUSE_DEVICE_ID,
+        );
 
         let input_events_relay = InputEventsRelay::new();
         input_events_relay.start_relays(
@@ -334,10 +340,12 @@ pub fn run_container_features(
             EventProxyMode::WakeContainer,
             touch_source_client,
             keyboard,
+            mouse_source_client,
             view_ref,
             registry_proxy,
             touch_device.open_files.clone(),
             keyboard_device.open_files.clone(),
+            mouse_device.open_files.clone(),
             Some(touch_device.inspect_status.clone()),
             Some(keyboard_device.inspect_status.clone()),
         );

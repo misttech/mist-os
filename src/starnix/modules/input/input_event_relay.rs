@@ -119,10 +119,12 @@ impl InputEventsRelay {
         event_proxy_mode: EventProxyMode,
         touch_source_client_end: ClientEnd<fuipointer::TouchSourceMarker>,
         keyboard: KeyboardSynchronousProxy,
+        mouse_source_client_end: ClientEnd<fuipointer::MouseSourceMarker>,
         view_ref: fuiviews::ViewRef,
         registry_proxy: fuipolicy::DeviceListenerRegistrySynchronousProxy,
         default_touch_device_opened_files: OpenedFiles,
         default_keyboard_device_opened_files: OpenedFiles,
+        default_mouse_device_opened_files: OpenedFiles,
         default_touch_device_inspect: Option<Arc<InputDeviceStatus>>,
         default_keyboard_device_inspect: Option<Arc<InputDeviceStatus>>,
     ) {
@@ -146,6 +148,12 @@ impl InputEventsRelay {
             event_proxy_mode,
             default_keyboard_device_opened_files,
             default_keyboard_device_inspect,
+        );
+        self.start_mouse_relay(
+            kernel,
+            event_proxy_mode,
+            mouse_source_client_end,
+            default_mouse_device_opened_files,
         );
     }
 
@@ -506,6 +514,71 @@ impl InputEventsRelay {
 
         log_warn!("MediaButtonsListener request stream has ended");
     }
+
+    fn start_mouse_relay(
+        self: &Arc<Self>,
+        kernel: &Kernel,
+        event_proxy_mode: EventProxyMode,
+        mouse_source_client_end: ClientEnd<fuipointer::MouseSourceMarker>,
+        default_mouse_device_opened_files: OpenedFiles,
+    ) {
+        let slf = self.clone();
+        kernel.kthreads.spawn(move |_lock_context, _current_task| {
+            fasync::LocalExecutor::new().run_singlethreaded(async {
+                slf.run_mouse_relay(
+                    event_proxy_mode,
+                    mouse_source_client_end,
+                    default_mouse_device_opened_files,
+                )
+                .await;
+            })
+        });
+    }
+
+    async fn run_mouse_relay(
+        self: Arc<Self>,
+        event_proxy_mode: EventProxyMode,
+        mouse_source_client_end: ClientEnd<fuipointer::MouseSourceMarker>,
+        _default_mouse_device_opened_files: Arc<Mutex<Vec<Weak<InputFile>>>>,
+    ) {
+        let (mouse_source_proxy, resume_event) = match event_proxy_mode {
+            EventProxyMode::WakeContainer => {
+                // Proxy the mouse events through the Starnix runner. This allows mouse events to
+                // wake the container when it is suspended.
+                let (mouse_source_channel, resume_event) = create_proxy_for_wake_events(
+                    mouse_source_client_end.into_channel(),
+                    "mouse".to_string(),
+                );
+                (
+                    fuipointer::MouseSourceProxy::new(fidl::AsyncChannel::from_channel(
+                        mouse_source_channel,
+                    )),
+                    Some(resume_event),
+                )
+            }
+            EventProxyMode::None => (mouse_source_client_end.into_proxy(), None),
+        };
+
+        loop {
+            // Create the future to watch for the the next input events, but don't execute
+            // it...
+            let event_future = mouse_source_proxy.watch();
+
+            // .. until the event that we passed to the runner has been cleared. This prevents
+            // the container from suspending between calls to `watch`.
+            resume_event.as_ref().map(clear_wake_proxy_signal);
+
+            match event_future.await {
+                Ok(_mouse_events) => {
+                    // TODO(b/380119987): implement MouseEvent conversion & handoff to open files.
+                }
+                Err(e) => {
+                    log_warn!("error {:?} reading from MouseSourceProxy; input is stopped", e);
+                    break;
+                }
+            }
+        }
+    }
 }
 
 /// Returns a FIDL response for `fidl_event`.
@@ -572,10 +645,13 @@ mod test {
         Arc<InputEventsRelay>,
         Arc<InputDevice>,
         Arc<InputDevice>,
+        Arc<InputDevice>,
+        FileHandle,
         FileHandle,
         FileHandle,
         TouchSourceRequestStream,
         fuiinput::KeyboardRequestStream,
+        fuipointer::MouseSourceRequestStream,
         fuipolicy::DeviceListenerRegistryRequestStream,
     ) {
         let inspector = fuchsia_inspect::Inspector::default();
@@ -588,9 +664,14 @@ mod test {
         let keyboard_file =
             keyboard_device.open_test(locked, current_task).expect("Failed to create input file");
 
+        let mouse_device = InputDevice::new_mouse(inspector.root());
+        let mouse_file =
+            mouse_device.open_test(locked, current_task).expect("Failed to create input file");
+
         let (touch_source_client_end, touch_source_stream) =
             fidl::endpoints::create_request_stream::<TouchSourceMarker>();
-
+        let (mouse_source_client_end, mouse_stream) =
+            fidl::endpoints::create_request_stream::<fuipointer::MouseSourceMarker>();
         let (keyboard_proxy, keyboard_stream) =
             fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>();
         let view_ref_pair =
@@ -605,10 +686,12 @@ mod test {
             EventProxyMode::None,
             touch_source_client_end,
             keyboard_proxy,
+            mouse_source_client_end,
             view_ref_pair.view_ref,
             device_registry_proxy,
             touch_device.open_files.clone(),
             keyboard_device.open_files.clone(),
+            mouse_device.open_files.clone(),
             Some(touch_device.inspect_status.clone()),
             Some(keyboard_device.inspect_status.clone()),
         );
@@ -617,10 +700,13 @@ mod test {
             relay,
             touch_device,
             keyboard_device,
+            mouse_device,
             touch_file,
             keyboard_file,
+            mouse_file,
             touch_source_stream,
             keyboard_stream,
+            mouse_stream,
             device_listener_stream,
         )
     }
@@ -756,10 +842,13 @@ mod test {
             input_relay,
             _touch_device,
             _keyboard_device,
+            _mouse_device,
             input_file,
             _keyboard_file,
+            _mouse_file,
             mut touch_source_stream,
             _keyboard_stream,
+            _mouse_source_stream,
             _device_listener_stream,
         ) = start_input_relays(&mut locked, &current_task);
 
@@ -817,10 +906,13 @@ mod test {
             input_relay,
             _touch_device,
             _keyboard_device,
+            _mouse_device,
             _input_file,
             _keyboard_file,
+            _mouse_file,
             mut touch_source_stream,
             _keyboard_stream,
+            _mouse_source_stream,
             _device_listener_stream,
         ) = start_input_relays(&mut locked, &current_task);
 
@@ -894,10 +986,13 @@ mod test {
             input_relay,
             _touch_device,
             _keyboard_device,
+            _mouse_device,
             _touch_file,
             keyboard_file,
+            _mouse_file,
             _touch_source_stream,
             mut keyboard_stream,
+            _mouse_source_stream,
             _device_listener_stream,
         ) = start_input_relays(&mut locked, &current_task);
 
@@ -971,10 +1066,13 @@ mod test {
             input_relay,
             _touch_device,
             _keyboard_device,
+            _mouse_device,
             _touch_file,
             keyboard_file,
+            _mouse_file,
             _touch_source_stream,
             _keyboard_stream,
+            _mouse_source_stream,
             mut device_listener_stream,
         ) = start_input_relays(&mut locked, &current_task);
 
@@ -1061,10 +1159,13 @@ mod test {
             _input_relay,
             touch_device,
             _keyboard_device,
+            _mouse_device,
             touch_reader1,
             _keyboard_file,
+            _mouse_file,
             mut touch_source_stream,
             _keyboard_stream,
+            _mouse_source_stream,
             _device_listener_stream,
         ) = start_input_relays(&mut locked, &current_task);
 
@@ -1104,10 +1205,13 @@ mod test {
             _input_relay,
             _touch_device,
             keyboard_device,
+            _mouse_device,
             _touch_file,
             keyboard_reader1,
+            _mouse_file,
             _touch_source_stream,
             mut keyboard_stream,
+            _mouse_source_stream,
             _device_listener_stream,
         ) = start_input_relays(&mut locked, &current_task);
 
@@ -1156,10 +1260,13 @@ mod test {
             _input_relay,
             _touch_device,
             keyboard_device,
+            _mouse_device,
             _touch_file,
             keyboard_reader1,
+            _mouse_file,
             _touch_source_stream,
             _keyboard_stream,
+            _mouse_source_stream,
             mut device_listener_stream,
         ) = start_input_relays(&mut locked, &current_task);
 

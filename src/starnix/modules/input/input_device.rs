@@ -392,6 +392,9 @@ mod test {
         let (touch_source_client_end, touch_source_stream) =
             fidl::endpoints::create_request_stream::<TouchSourceMarker>();
 
+        let (mouse_source_client_end, _mouse_source_stream) =
+            fidl::endpoints::create_request_stream::<fuipointer::MouseSourceMarker>();
+
         let (keyboard_proxy, _keyboard_stream) =
             fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>();
         let view_ref_pair =
@@ -407,9 +410,11 @@ mod test {
             EventProxyMode::None,
             touch_source_client_end,
             keyboard_proxy,
+            mouse_source_client_end,
             view_ref_pair.view_ref,
             device_registry_proxy,
             input_device.open_files.clone(),
+            Default::default(),
             Default::default(),
             Some(input_device.inspect_status.clone()),
             None,
@@ -438,16 +443,21 @@ mod test {
         let (touch_source_client_end, _touch_source_stream) =
             fidl::endpoints::create_request_stream::<TouchSourceMarker>();
 
+        let (mouse_source_client_end, _mouse_source_stream) =
+            fidl::endpoints::create_request_stream::<fuipointer::MouseSourceMarker>();
+
         let relay = input_event_relay::InputEventsRelay::new();
         relay.start_relays(
             current_task.kernel(),
             EventProxyMode::None,
             touch_source_client_end,
             keyboard_proxy,
+            mouse_source_client_end,
             view_ref_pair.view_ref,
             device_registry_proxy,
             Default::default(),
             input_device.open_files.clone(),
+            Default::default(),
             None,
             Some(input_device.inspect_status.clone()),
         );
@@ -477,6 +487,8 @@ mod test {
 
         let (touch_source_client_end, _touch_source_stream) =
             fidl::endpoints::create_request_stream::<TouchSourceMarker>();
+        let (mouse_source_client_end, _mouse_source_stream) =
+            fidl::endpoints::create_request_stream::<fuipointer::MouseSourceMarker>();
         let (keyboard_proxy, _keyboard_stream) =
             fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>();
         let view_ref_pair =
@@ -488,10 +500,12 @@ mod test {
             EventProxyMode::None,
             touch_source_client_end,
             keyboard_proxy,
+            mouse_source_client_end,
             view_ref_pair.view_ref,
             device_registry_proxy,
             Default::default(),
             input_device.open_files.clone(),
+            Default::default(),
             None,
             Some(input_device.inspect_status.clone()),
         );
@@ -1821,6 +1835,8 @@ mod test {
 
         let (touch_source_client_end, mut touch_source_stream) =
             fidl::endpoints::create_request_stream::<TouchSourceMarker>();
+        let (mouse_source_client_end, _mouse_source_stream) =
+            fidl::endpoints::create_request_stream::<fuipointer::MouseSourceMarker>();
         let (keyboard_proxy, _keyboard_stream) =
             fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>();
         let view_ref_pair =
@@ -1841,9 +1857,11 @@ mod test {
             EventProxyMode::None,
             touch_source_client_end,
             keyboard_proxy,
+            mouse_source_client_end,
             view_ref_pair.view_ref,
             device_registry_proxy,
             input_device.open_files.clone(),
+            Default::default(),
             Default::default(),
             Some(input_device.inspect_status.clone()),
             None,
