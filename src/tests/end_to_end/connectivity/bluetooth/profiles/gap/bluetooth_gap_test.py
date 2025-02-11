@@ -9,7 +9,7 @@ from typing import List, Tuple
 
 from bluetooth_utils_lib import bluetooth_utils
 from fuchsia_base_test import fuchsia_base_test
-from honeydew.typing.bluetooth import (
+from honeydew.affordances.connectivity.bluetooth.utils.types import (
     BluetoothAcceptPairing,
     BluetoothConnectionType,
 )

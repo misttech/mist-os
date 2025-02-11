@@ -9,7 +9,7 @@ import time
 from typing import Any, List
 
 from fuchsia_base_test import fuchsia_base_test
-from honeydew.typing.bluetooth import (
+from honeydew.affordances.connectivity.bluetooth.utils.types import (
     BluetoothAcceptPairing,
     BluetoothLEAppearance,
 )

@@ -8,13 +8,15 @@ import logging
 from fuchsia_base_test import fuchsia_base_test
 from mobly import asserts, test_runner
 
+from honeydew.affordances.connectivity.bluetooth.utils import (
+    types as bluetooth_types,
+)
 from honeydew.errors import Sl4fError
 from honeydew.interfaces.device_classes import fuchsia_device
-from honeydew.typing import bluetooth
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
-BluetoothAvrcpCommand = bluetooth.BluetoothAvrcpCommand
+BluetoothAvrcpCommand = bluetooth_types.BluetoothAvrcpCommand
 
 
 class BluetoothAvrcpAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
