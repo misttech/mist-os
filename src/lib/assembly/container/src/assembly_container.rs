@@ -7,6 +7,7 @@ use std::collections::{BTreeMap, HashMap};
 use anyhow::{anyhow, Context, Result};
 use assembly_package_copy::PackageCopier;
 use camino::{Utf8Path, Utf8PathBuf};
+use depfile::Depfile;
 use pathdiff::diff_paths;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -65,12 +66,22 @@ pub trait AssemblyContainer {
     }
 
     /// Write an assembly container to a directory on disk.
+    ///
     /// The paths will be transformed from absolute to relative before writing
     /// them to disk.
-    fn write_to_dir(mut self, dir: impl AsRef<Utf8Path>) -> Result<Self>
+    ///
+    /// A depfile will also be written that includes all the files that were
+    /// opened or copied.
+    fn write_to_dir(
+        mut self,
+        dir: impl AsRef<Utf8Path>,
+        depfile_path: Option<impl AsRef<Utf8Path>>,
+    ) -> Result<Self>
     where
         Self: Sized + WalkPaths + Serialize,
     {
+        let config_path = dir.as_ref().join(Self::get_config_filename());
+
         // Ignore failures to remove the directory.
         let _ = std::fs::remove_dir_all(dir.as_ref());
         std::fs::create_dir_all(dir.as_ref())?;
@@ -83,6 +94,9 @@ pub trait AssemblyContainer {
         std::fs::create_dir_all(&packages_dir)?;
         std::fs::create_dir_all(&subpackages_dir)?;
         let mut package_copier = PackageCopier::new(&packages_dir, &subpackages_dir, &blobs_dir);
+
+        // Collect all inputs into a depfile.
+        let mut depfile = Depfile::new_with_output(&config_path);
 
         // Copy each file referenced by the config into `dir`.
         self.walk_paths(&mut |path: &mut Utf8PathBuf, dest: Utf8PathBuf, filetype: FileType| {
@@ -98,6 +112,7 @@ pub trait AssemblyContainer {
 
                 // All other files are copied directly.
                 FileType::Unknown => {
+                    depfile.add_input(&path);
                     let name = path
                         .file_name()
                         .ok_or_else(|| anyhow!("Path is missing a filename: {}", &path))?;
@@ -123,13 +138,13 @@ pub trait AssemblyContainer {
         })?;
 
         // Copy all the packages.
-        let _ = package_copier.perform_copy().with_context(|| {
+        let package_deps = package_copier.perform_copy().with_context(|| {
             format!("Copying all packages reference by the config into: {}", dir.as_ref())
         })?;
+        depfile.add_inputs(package_deps);
 
         // Write the new config to the `dir`.
-        let config_filename = dir.as_ref().join(Self::get_config_filename());
-        let config_file = std::fs::File::create(config_filename)?;
+        let config_file = std::fs::File::create(config_path)?;
         serde_json::to_writer_pretty(config_file, &self)
             .with_context(|| format!("Writing the config file into: {}", dir.as_ref()))?;
 
@@ -140,6 +155,14 @@ pub trait AssemblyContainer {
             Ok(())
         })
         .context("Making all the paths absolute")?;
+
+        // Write the depfile.
+        if let Some(depfile_path) = depfile_path {
+            depfile
+                .write_to(&depfile_path)
+                .with_context(|| format!("Writing depfile: {}", depfile_path.as_ref()))?;
+        }
+
         Ok(self)
     }
 
@@ -282,6 +305,7 @@ mod tests {
     use serde_json::json;
     use std::collections::{BTreeMap, HashMap};
     use std::fs::File;
+    use std::io::Read;
     use std::str::FromStr;
     use tempfile::{tempdir, NamedTempFile};
 
@@ -335,15 +359,19 @@ mod tests {
         let gamma_name = gamma_path.file_name().unwrap();
         let c = Config { alpha: Alpha { beta: Beta { gamma: gamma_path.clone() } } };
 
+        // Prepare a depfile.
+        let mut depfile = NamedTempFile::new().unwrap();
+        let depfile_path = Utf8PathBuf::from_path_buf(depfile.path().to_path_buf()).unwrap();
+
         // Write the config to disk.
         let dir = tempdir().unwrap();
         let dir_path = Utf8PathBuf::from_path_buf(dir.path().to_path_buf()).unwrap();
-        let c = c.write_to_dir(&dir_path).unwrap();
+        let c = c.write_to_dir(&dir_path, Some(depfile_path)).unwrap();
 
         // Ensure the returned config is correct.
         // The config in memory should have absolute paths.
-        let gamma_path = dir_path.join("alpha/beta/gamma").join(&gamma_name);
-        let expected = Config { alpha: Alpha { beta: Beta { gamma: gamma_path.clone() } } };
+        let new_gamma_path = dir_path.join("alpha/beta/gamma").join(&gamma_name);
+        let expected = Config { alpha: Alpha { beta: Beta { gamma: new_gamma_path.clone() } } };
         assert_eq!(expected, c);
 
         // Ensure the contents of the config on disk are correct.
@@ -361,8 +389,12 @@ mod tests {
         assert_eq!(expected, actual);
 
         // Ensure gamma exists in the right location.
-        let gamma_path = dir_path.join("alpha/beta/gamma").join(&gamma_name);
-        assert!(gamma_path.exists());
+        assert!(new_gamma_path.exists());
+
+        // Ensure the depfile is correct.
+        let mut deps = String::new();
+        depfile.read_to_string(&mut deps).unwrap();
+        assert_eq!(format!("{}: \\\n  {}\n", &config_path, &gamma_path), deps);
 
         // Parse the config on disk back into memory and ensure it is correct.
         let parsed_c = Config::from_dir(&dir_path).unwrap();
@@ -386,14 +418,6 @@ mod tests {
                 // Put the files under "custom_dir".
                 let dest = dest.join("custom_dir");
                 found(&mut self.path, dest.clone(), FileType::Unknown)?;
-
-                // Write another new file.
-                // We use a tempdir so that we can name the file something consistent.
-                let dir = tempdir().unwrap();
-                let dir_path = Utf8PathBuf::from_path_buf(dir.path().to_path_buf()).unwrap();
-                let mut path = dir_path.join("new_file.txt");
-                std::fs::write(&path, "").unwrap();
-                found(&mut path, dest, FileType::Unknown)?;
                 Ok(())
             }
         }
@@ -404,10 +428,14 @@ mod tests {
         let name = path.file_name().unwrap();
         let config = ConfigWithCustomWalk { path: path.clone() };
 
+        // Prepare a depfile.
+        let mut depfile = NamedTempFile::new().unwrap();
+        let depfile_path = Utf8PathBuf::from_path_buf(depfile.path().to_path_buf()).unwrap();
+
         // Write the config to a hermetic directory.
         let dir = tempdir().unwrap();
         let dir_path = Utf8PathBuf::from_path_buf(dir.path().to_path_buf()).unwrap();
-        config.write_to_dir(&dir_path).unwrap();
+        config.write_to_dir(&dir_path, Some(depfile_path)).unwrap();
 
         // Ensure the contents of the config on disk are correct.
         // The config on disk should have relative paths.
@@ -420,10 +448,13 @@ mod tests {
         assert_eq!(expected, actual);
 
         // Ensure the files exists in the right location.
-        let path = dir_path.join("custom_dir").join(&name);
-        assert!(path.exists());
-        let path = dir_path.join("custom_dir").join("new_file.txt");
-        assert!(path.exists());
+        let new_path = dir_path.join("custom_dir").join(&name);
+        assert!(new_path.exists());
+
+        // Ensure the depfile is correct.
+        let mut deps = String::new();
+        depfile.read_to_string(&mut deps).unwrap();
+        assert_eq!(format!("{}: \\\n  {}\n", &config_path, &path), deps);
     }
 
     #[test]
@@ -452,10 +483,14 @@ mod tests {
             field2: MyEnum::Named { key: path.clone() },
         };
 
+        // Prepare a depfile.
+        let mut depfile = NamedTempFile::new().unwrap();
+        let depfile_path = Utf8PathBuf::from_path_buf(depfile.path().to_path_buf()).unwrap();
+
         // Write the config to a hermetic directory.
         let dir = tempdir().unwrap();
         let dir_path = Utf8PathBuf::from_path_buf(dir.path().to_path_buf()).unwrap();
-        config.write_to_dir(&dir_path).unwrap();
+        config.write_to_dir(&dir_path, Some(depfile_path)).unwrap();
 
         // Ensure the contents of the config on disk are correct.
         // The config on disk should have relative paths.
@@ -475,10 +510,15 @@ mod tests {
         assert_eq!(expected, actual);
 
         // Ensure the files exists in the right location.
-        let path = dir_path.join("field1").join("Unnamed").join(&name);
-        assert!(path.exists());
-        let path = dir_path.join("field2").join("Named").join("key").join(&name);
-        assert!(path.exists());
+        let new_path = dir_path.join("field1").join("Unnamed").join(&name);
+        assert!(new_path.exists());
+        let new_path = dir_path.join("field2").join("Named").join("key").join(&name);
+        assert!(new_path.exists());
+
+        // Ensure the depfile is correct.
+        let mut deps = String::new();
+        depfile.read_to_string(&mut deps).unwrap();
+        assert_eq!(format!("{}: \\\n  {}\n", &config_path, &path), deps);
     }
 
     #[test]
@@ -501,10 +541,14 @@ mod tests {
             btree_map: [("key".into(), path.clone())].into(),
         };
 
+        // Prepare a depfile.
+        let mut depfile = NamedTempFile::new().unwrap();
+        let depfile_path = Utf8PathBuf::from_path_buf(depfile.path().to_path_buf()).unwrap();
+
         // Write the config to a hermetic directory.
         let dir = tempdir().unwrap();
         let dir_path = Utf8PathBuf::from_path_buf(dir.path().to_path_buf()).unwrap();
-        config.write_to_dir(&dir_path).unwrap();
+        config.write_to_dir(&dir_path, Some(depfile_path)).unwrap();
 
         // Ensure the contents of the config on disk are correct.
         // The config on disk should have relative paths.
@@ -522,10 +566,15 @@ mod tests {
         assert_eq!(expected, actual);
 
         // Ensure the files exists in the right location.
-        let path = dir_path.join("hash_map").join("key").join(&name);
-        assert!(path.exists());
-        let path = dir_path.join("btree_map").join("key").join(&name);
-        assert!(path.exists());
+        let new_path = dir_path.join("hash_map").join("key").join(&name);
+        assert!(new_path.exists());
+        let new_path = dir_path.join("btree_map").join("key").join(&name);
+        assert!(new_path.exists());
+
+        // Ensure the depfile is correct.
+        let mut deps = String::new();
+        depfile.read_to_string(&mut deps).unwrap();
+        assert_eq!(format!("{}: \\\n  {}\n", &config_path, &path), deps);
     }
 
     #[test]
@@ -545,10 +594,14 @@ mod tests {
         let name = path.file_name().unwrap();
         let config = ConfigWithOption { option1: Some(path.clone()), option2: None };
 
+        // Prepare a depfile.
+        let mut depfile = NamedTempFile::new().unwrap();
+        let depfile_path = Utf8PathBuf::from_path_buf(depfile.path().to_path_buf()).unwrap();
+
         // Write the config to a hermetic directory.
         let dir = tempdir().unwrap();
         let dir_path = Utf8PathBuf::from_path_buf(dir.path().to_path_buf()).unwrap();
-        config.write_to_dir(&dir_path).unwrap();
+        config.write_to_dir(&dir_path, Some(depfile_path)).unwrap();
 
         // Ensure the contents of the config on disk are correct.
         // The config on disk should have relative paths.
@@ -562,8 +615,13 @@ mod tests {
         assert_eq!(expected, actual);
 
         // Ensure the files exists in the right location.
-        let path = dir_path.join("option1").join(&name);
-        assert!(path.exists());
+        let new_path = dir_path.join("option1").join(&name);
+        assert!(new_path.exists());
+
+        // Ensure the depfile is correct.
+        let mut deps = String::new();
+        depfile.read_to_string(&mut deps).unwrap();
+        assert_eq!(format!("{}: \\\n  {}\n", &config_path, &path), deps);
     }
 
     #[test]
@@ -603,10 +661,14 @@ mod tests {
             ],
         };
 
+        // Prepare a depfile.
+        let mut depfile = NamedTempFile::new().unwrap();
+        let depfile_path = Utf8PathBuf::from_path_buf(depfile.path().to_path_buf()).unwrap();
+
         // Write the config to a hermetic directory.
         let dir = tempdir().unwrap();
         let dir_path = Utf8PathBuf::from_path_buf(dir.path().to_path_buf()).unwrap();
-        config.write_to_dir(&dir_path).unwrap();
+        config.write_to_dir(&dir_path, Some(depfile_path)).unwrap();
 
         // Ensure the contents of the config on disk are correct.
         // The config on disk should have relative paths.
@@ -640,14 +702,19 @@ mod tests {
         assert_eq!(expected, actual);
 
         // Ensure the files exists in the right location.
-        let path = dir_path.join("top_vec/0/parent_vec/0/child_vec/0").join(&name);
-        assert!(path.exists());
-        let path = dir_path.join("top_vec/1/parent_vec/0/child_vec/0").join(&name);
-        assert!(path.exists());
-        let path = dir_path.join("top_vec/1/parent_vec/1/child_vec/0").join(&name);
-        assert!(path.exists());
-        let path = dir_path.join("top_vec/1/parent_vec/1/child_vec/1").join(&name);
-        assert!(path.exists());
+        let new_path = dir_path.join("top_vec/0/parent_vec/0/child_vec/0").join(&name);
+        assert!(new_path.exists());
+        let new_path = dir_path.join("top_vec/1/parent_vec/0/child_vec/0").join(&name);
+        assert!(new_path.exists());
+        let new_path = dir_path.join("top_vec/1/parent_vec/1/child_vec/0").join(&name);
+        assert!(new_path.exists());
+        let new_path = dir_path.join("top_vec/1/parent_vec/1/child_vec/1").join(&name);
+        assert!(new_path.exists());
+
+        // Ensure the depfile is correct.
+        let mut deps = String::new();
+        depfile.read_to_string(&mut deps).unwrap();
+        assert_eq!(format!("{}: \\\n  {}\n", &config_path, &path), deps);
     }
 
     #[test]
@@ -690,9 +757,13 @@ mod tests {
         package_manifest.write_with_relative_paths(&package_manifest_path).unwrap();
         let config = ConfigWithPackageManifest { manifest: package_manifest_path.clone() };
 
+        // Prepare a depfile.
+        let mut depfile = NamedTempFile::new().unwrap();
+        let depfile_path = Utf8PathBuf::from_path_buf(depfile.path().to_path_buf()).unwrap();
+
         // Write the config to a hermetic directory.
         let container_dir = dir_path.join("container");
-        config.write_to_dir(&container_dir).unwrap();
+        config.write_to_dir(&container_dir, Some(depfile_path)).unwrap();
 
         // Ensure the contents of the config on disk are correct.
         // The config on disk should have relative paths.
@@ -705,10 +776,18 @@ mod tests {
         assert_eq!(expected, actual);
 
         // Ensure the files exists in the right location.
-        let path = container_dir.join("packages/fake");
-        assert!(path.exists());
-        let path = container_dir
+        let new_path = container_dir.join("packages/fake");
+        assert!(new_path.exists());
+        let new_path = container_dir
             .join("blobs/0000000000000000000000000000000000000000000000000000000000000000");
-        assert!(path.exists());
+        assert!(new_path.exists());
+
+        // Ensure the depfile is correct.
+        let mut deps = String::new();
+        depfile.read_to_string(&mut deps).unwrap();
+        assert_eq!(
+            format!("{}: \\\n  {} \\\n  {}\n", &config_path, &package_manifest_path, &blob_path),
+            deps
+        );
     }
 }
