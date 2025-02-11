@@ -314,9 +314,7 @@ macro_rules! new_raw_repr {
             if let Some(existing) = cache.get($borrowed_bytes) {
                 RawRepr::from_storage(existing)
             } else {
-                let (ret, for_cache) = RawRepr::new_for_storage($owned_bytes);
-                cache.insert(for_cache);
-                ret
+                RawRepr::new_for_storage(&mut cache, $owned_bytes)
             }
         }
     };
@@ -742,13 +740,14 @@ impl RawRepr {
     }
 
     #[inline]
-    fn new_for_storage(bytes: Box<[u8]>) -> (Self, Storage) {
+    fn new_for_storage(cache: &mut AHashSet<Storage>, bytes: Box<[u8]>) -> Self {
         assert!(bytes.len() > MAX_INLINE_SIZE);
         let new_storage = Arc::new(bytes);
         let for_cache = Storage(Arc::clone(&new_storage));
         let new = Self { heap: nonnull_from_arc(new_storage) };
         assert!(!new.is_inline(), "least significant bit must be 0 for heap strings");
-        (new, for_cache)
+        cache.insert(for_cache);
+        new
     }
 
     #[inline]
@@ -1103,6 +1102,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg_attr(not(target_os = "fuchsia"), serial)]
     fn utf8_and_bytestrings_share_the_cache() {
         reset_global_cache();
 
@@ -1266,6 +1266,8 @@ mod tests {
     #[test_case(LONG_STRING ; "long strings")]
     #[cfg_attr(not(target_os = "fuchsia"), serial)]
     fn serde_works(contents: &str) {
+        reset_global_cache();
+
         let s = FlyStr::new(contents);
         let as_json = serde_json::to_string(&s).unwrap();
         assert_eq!(as_json, format!("\"{contents}\""));
@@ -1279,6 +1281,8 @@ mod tests {
     #[test_case(LONG_STRING ; "long strings")]
     #[cfg_attr(not(target_os = "fuchsia"), serial)]
     fn serde_works_bytestring(contents: &str) {
+        reset_global_cache();
+
         let s = FlyByteStr::new(contents);
         let as_json = serde_json::to_string(&s).unwrap();
         assert_eq!(s, serde_json::from_str::<FlyByteStr>(&as_json).unwrap());
@@ -1288,6 +1292,8 @@ mod tests {
     #[test_case(LONG_NON_UTF8 ; "long non-utf8 bytestring")]
     #[cfg_attr(not(target_os = "fuchsia"), serial)]
     fn non_utf8_works(contents: &[u8]) {
+        reset_global_cache();
+
         let res: Result<FlyStr, _> = FlyByteStr::from(contents).try_into();
         res.unwrap_err();
     }
@@ -1299,6 +1305,8 @@ mod tests {
     #[test_case(LONG_STRING ; "long strings")]
     #[cfg_attr(not(target_os = "fuchsia"), serial)]
     fn flystr_to_flybytestr_and_back(contents: &str) {
+        reset_global_cache();
+
         let bytestr = FlyByteStr::from(contents);
         let flystr = FlyStr::try_from(bytestr.clone()).unwrap();
         assert_eq!(bytestr, flystr);
