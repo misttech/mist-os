@@ -9120,7 +9120,9 @@ rust_library("nom-v7_1_3") {
     "--cfg=feature=\"std\"",
   ]
 
-  visibility = [ ":*" ]
+  visibility = []
+  visibility += [ ":*" ]
+  visibility += [ "//*" ]
 
   applicable_licenses = [ ":nom-v7_1_3.license" ]
 }

@@ -705,6 +705,11 @@ rustflags = [
   "--cfg=macos",
 ]
 
+[gn.package.nom."7.1.3"]
+# TODO(https://fxbug.dev/394623198): temporarily allow anyone to depend on 7.1.3 to enable a soft
+# migration.
+visibility = [":*", "//*"]
+
 [gn.package.num-bigint."0.4.3"]
 rustflags = [
   "--cfg=u64_digit",
