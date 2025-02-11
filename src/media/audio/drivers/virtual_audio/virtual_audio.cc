@@ -142,6 +142,7 @@ void VirtualAudio::OnDeviceShutdown(DeviceId device_id) {
     for (auto& completer : remove_all_completers_) {
       completer.Reply();
     }
+    remove_all_completers_.clear();
     if (unbind_txn_.has_value()) {
       zxlogf(INFO, "Completing unbind");
       unbind_txn_->Reply();
