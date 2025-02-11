@@ -12,16 +12,16 @@ use fidl_fuchsia_fxfs::{
 };
 use fuchsia_component::client::connect_to_protocol_at_dir_root;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
+use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
 use futures::channel::mpsc::{self};
 use futures::{FutureExt as _, StreamExt as _};
 use ramdevice_client::{RamdiskClient, RamdiskClientBuilder};
 use std::pin::pin;
 use std::time::Duration;
 use {
-    fidl_fuchsia_boot as fboot, fidl_fuchsia_feedback as ffeedback,
-    fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_hardware_ramdisk as framdisk,
-    fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger, fidl_fuchsia_process as fprocess,
-    fuchsia_async as fasync,
+    fidl_fuchsia_boot as fboot, fidl_fuchsia_driver_test as fdt,
+    fidl_fuchsia_feedback as ffeedback, fidl_fuchsia_hardware_block_volume as fvolume,
+    fidl_fuchsia_hardware_ramdisk as framdisk, fidl_fuchsia_io as fio, fuchsia_async as fasync,
 };
 
 pub mod disk_builder;
@@ -152,20 +152,39 @@ impl TestFixtureBuilder {
                 .unwrap();
         }
 
-        let drivers = builder
-            .add_child(
-                "storage_driver_test_realm",
-                "#meta/storage_driver_test_realm.cm",
-                ChildOptions::new().eager(),
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::dictionary("diagnostics"))
+                    .from(Ref::parent())
+                    .to(&fshost),
             )
             .await
             .unwrap();
+
+        let dtr_exposes = vec![
+            fidl_fuchsia_component_test::Capability::Service(
+                fidl_fuchsia_component_test::Service {
+                    name: Some("fuchsia.hardware.ramdisk.Service".to_owned()),
+                    ..Default::default()
+                },
+            ),
+            fidl_fuchsia_component_test::Capability::Service(
+                fidl_fuchsia_component_test::Service {
+                    name: Some("fuchsia.hardware.block.volume.Service".to_owned()),
+                    ..Default::default()
+                },
+            ),
+        ];
+        builder.driver_test_realm_setup().await.unwrap();
+        builder.driver_test_realm_add_dtr_exposes(&dtr_exposes).await.unwrap();
         builder
             .add_route(
                 Route::new()
                     .capability(Capability::directory("dev-topological").rights(fio::R_STAR_DIR))
-                    .from(&drivers)
-                    .to(Ref::parent())
+                    .capability(Capability::service::<framdisk::ServiceMarker>())
+                    .capability(Capability::service::<fvolume::ServiceMarker>())
+                    .from(Ref::child(fuchsia_driver_test::COMPONENT_NAME))
                     .to(&fshost),
             )
             .await
@@ -179,48 +198,8 @@ impl TestFixtureBuilder {
                             .subdir("block")
                             .as_("dev-class-block"),
                     )
-                    .from(&drivers)
+                    .from(Ref::child(fuchsia_driver_test::COMPONENT_NAME))
                     .to(Ref::parent()),
-            )
-            .await
-            .unwrap();
-        builder
-            .add_route(
-                Route::new()
-                    .capability(Capability::protocol::<fprocess::LauncherMarker>())
-                    .capability(Capability::protocol::<flogger::LogSinkMarker>())
-                    .from(Ref::parent())
-                    .to(&drivers),
-            )
-            .await
-            .unwrap();
-        builder
-            .add_route(
-                Route::new()
-                    .capability(Capability::dictionary("diagnostics"))
-                    .from(Ref::parent())
-                    .to(&drivers)
-                    .to(&fshost),
-            )
-            .await
-            .unwrap();
-
-        builder
-            .add_route(
-                Route::new()
-                    .capability(Capability::service::<framdisk::ServiceMarker>())
-                    .from(&drivers)
-                    .to(Ref::parent())
-                    .to(&fshost),
-            )
-            .await
-            .unwrap();
-        builder
-            .add_route(
-                Route::new()
-                    .capability(Capability::service::<fvolume::ServiceMarker>())
-                    .from(&drivers)
-                    .to(&fshost),
             )
             .await
             .unwrap();
@@ -238,6 +217,26 @@ impl TestFixtureBuilder {
             realm_name:? = fixture.realm.root.child_name();
             "built new test realm",
         );
+
+        fixture
+            .realm
+            .driver_test_realm_start(fdt::RealmArgs {
+                root_driver: Some("fuchsia-boot:///platform-bus#meta/platform-bus.cm".to_owned()),
+                dtr_exposes: Some(dtr_exposes),
+                software_devices: Some(vec![
+                    fdt::SoftwareDevice {
+                        device_name: "ram-disk".to_string(),
+                        device_id: bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_RAM_DISK,
+                    },
+                    fdt::SoftwareDevice {
+                        device_name: "ram-nand".to_string(),
+                        device_id: bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_RAM_NAND,
+                    },
+                ]),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
 
         if let Some(disk) = self.disk {
             let vmo = disk.get_vmo().await;
