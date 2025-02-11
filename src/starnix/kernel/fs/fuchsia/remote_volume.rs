@@ -128,13 +128,6 @@ pub fn new_remote_vol(
     .map_err(|e| errno!(EIO, format!("Failed to open root: {e}")))?;
 
     let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
-    let root = syncio::directory_open_directory_async(
-        &root,
-        std::str::from_utf8(&options.source)
-            .map_err(|_| errno!(EINVAL, "source path is not utf8"))?,
-        rights,
-    )
-    .map_err(|e| errno!(EIO, format!("Failed to open root: {e}")))?;
 
     let (client_end, server_end) = zx::Channel::create();
     let remotefs = RemoteFs::new(root.into_channel(), server_end)?;
