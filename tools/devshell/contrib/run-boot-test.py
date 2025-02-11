@@ -168,7 +168,7 @@ class BootTest(object):
         if self._state != self.ProductBundle.NOT_BUILT and not rebuild:
             return self._state == self.ProductBundle.BUILT
         build_command = ["fx", "build", self.label]
-        info("Rebuilidng: " + " ".join(build_command))
+        info("Rebuilding: " + " ".join(build_command))
         if subprocess.run(build_command, cwd=self.build_dir).returncode == 0:
             self._state = self.ProductBundle.BUILT
             self._set_images_if_built()
