@@ -6,7 +6,7 @@
 
 #include <endian.h>
 #include <fidl/fuchsia.hardware.rpmb/cpp/wire.h>
-#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/ddk/debug.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fidl/cpp/wire/string_view.h>
@@ -35,6 +35,8 @@
 #include "optee-util.h"
 
 namespace {
+
+namespace fio = fuchsia_io;
 
 constexpr const char kTaFileExtension[] = ".ta";
 
@@ -121,93 +123,71 @@ std::filesystem::path GetPathFromRawMemory(void* mem, size_t max_size) {
   return std::filesystem::path(std::move(result)).lexically_relative("/");
 }
 
-// Awaits the `fuchsia.io.Node/OnOpen` event that is fired when opening with
-// `fuchsia.io.kOpenFlagDescribe` flag and returns the status contained in the event.
-//
-// This is useful for synchronously awaiting the result of an `Open` request.
-zx_status_t AwaitIoOnOpenStatus(fidl::UnownedClientEnd<fuchsia_io::Node> node) {
-  class EventHandler final : public fidl::WireSyncEventHandler<fuchsia_io::Node> {
-   public:
-    EventHandler() = default;
-
-    bool call_was_successful() const { return call_was_successful_; }
-    zx_status_t status() const { return status_; }
-
-    void OnOpen(fidl::WireEvent<fuchsia_io::Node::OnOpen>* event) override {
-      call_was_successful_ = true;
-      status_ = event->s;
+class OnRepresentationHandler final : public fidl::WireSyncEventHandler<fio::Node> {
+ public:
+  static zx_status_t WaitForEvent(fidl::UnownedClientEnd<fio::Node> client_end) {
+    OnRepresentationHandler handler;
+    if (zx_status_t status = handler.HandleOneEvent(client_end).status(); status != ZX_OK) {
+      return status;
     }
-
-    void OnRepresentation(fidl::WireEvent<fuchsia_io::Node::OnRepresentation>* event) override {
-      status_ = ZX_ERR_NOT_SUPPORTED;
-      LOG(ERROR, "OnRepresentation is not supported");
-    }
-
-    void handle_unknown_event(fidl::UnknownEventMetadata<fuchsia_io::Node> metadata) override {
-      LOG(ERROR, "Unknown Node event: %lu", metadata.event_ordinal);
-    }
-
-    bool call_was_successful_ = false;
-    zx_status_t status_ = ZX_OK;
-  };
-
-  EventHandler event_handler;
-  // TODO(godtamit): check for an epitaph here once `fuchsia.io` (and LLCPP) supports it.
-  auto status = event_handler.HandleOneEvent(node).status();
-  if (status == ZX_OK) {
-    status = event_handler.status();
+    return handler.status();
   }
-  if (!event_handler.call_was_successful()) {
-    LOG(ERROR, "failed to wait for OnOpen event (status: %d)", status);
+
+  zx_status_t status() const { return status_; }
+
+ protected:
+  OnRepresentationHandler() = default;
+
+  void OnRepresentation(fidl::WireEvent<fio::Node::OnRepresentation>* event) override {
+    status_ = ZX_OK;
   }
-  return status;
-}
+
+  void OnOpen(fidl::WireEvent<fio::Node::OnOpen>* event) override {
+    LOG(ERROR, "optee: received invalid OnOpen wire event!");
+  }
+
+  void handle_unknown_event(fidl::UnknownEventMetadata<fio::Node> metadata) override {
+    LOG(ERROR, "optee: received unknown wire event (%" PRIu64 ")!", metadata.event_ordinal);
+  }
+
+ private:
+  zx_status_t status_ = ZX_ERR_INTERNAL;
+};
 
 // Calls `fuchsia.io.Directory/Open` on a channel and awaits the result.
-zx::result<fidl::ClientEnd<fuchsia_io::Node>> OpenObjectInDirectory(
-    fidl::UnownedClientEnd<fuchsia_io::Directory> root, fuchsia_io::wire::OpenFlags flags,
-    const std::string& path) {
-  // Ensure `kOpenFlagDescribe` is passed
-  flags |= fuchsia_io::wire::OpenFlags::kDescribe;
-
+zx::result<fidl::ClientEnd<fio::Node>> OpenObjectInDirectory(
+    fidl::UnownedClientEnd<fio::Directory> root, const std::string& path, fio::Flags flags) {
   // Create temporary channel ends to make FIDL call
-  auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Node>::Create();
-
-  auto result = fidl::WireCall(root)->DeprecatedOpen(
-      flags, {}, fidl::StringView::FromExternal(path), std::move(server_end));
+  auto [client_end, server_end] = fidl::Endpoints<fio::Node>::Create();
+  // We want to wait for a wire event to ensure the open was successful.
+  flags |= fio::Flags::kFlagSendRepresentation;
+  auto result = fidl::WireCall(root)->Open(fidl::StringView::FromExternal(path), flags,
+                                           /*options=*/{}, server_end.TakeChannel());
   if (!result.ok()) {
     LOG(ERROR, "could not call fuchsia.io.Directory/Open (status: %s)", result.status_string());
     return zx::error(result.status());
   }
-
-  zx_status_t status = AwaitIoOnOpenStatus(client_end.borrow());
-  if (status != ZX_OK) {
+  if (zx_status_t status = OnRepresentationHandler::WaitForEvent(client_end); status != ZX_OK) {
     return zx::error(status);
   }
-
   return zx::ok(std::move(client_end));
 }
 
-// Recursively walks down a multi-part path, opening and outputting the final destination.
+// Recursively opens a multi-part path, returning a connection to the final directory component.
 //
-// Template Parameters:
-//  * kOpenFlags: The flags to call `fuchsia.io.Directory/Open` with. This must not contain
-//               `kOpenFlagNotDirectory`.
 // Parameters:
 //  * root: The channel to the directory to start the walk from.
-//  * path: The path relative to `root` to open.
-template <uint32_t kOpenFlags>
-static zx::result<fidl::ClientEnd<fuchsia_io::Directory>> RecursivelyWalkPath(
-    fidl::UnownedClientEnd<fuchsia_io::Directory> root, const std::filesystem::path& path) {
-  static_assert(
-      (kOpenFlags & static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kNotDirectory)) == 0,
-      "kOpenFlags must not include fuchsia_io::wire::OpenFlags::kNotDirectory");
+//  * path: The path relative to `root` to open. All components must be directories.
+//  * flags: The flags to use when opening each child along `path`.
+zx::result<fidl::ClientEnd<fio::Directory>> RecursivelyWalkDirectories(
+    fidl::UnownedClientEnd<fio::Directory> root, const std::filesystem::path& path,
+    fio::Flags flags) {
   ZX_DEBUG_ASSERT(root.is_valid());
   // If the path is lexicographically equivalent to the (relative) root directory, clone the root
   // channel instead of opening the path. An empty path is considered equivalent to the relative
   // root directory.
   if (path.empty() || path == std::filesystem::path(".")) {
-    auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    auto [client_end, server_end] = fidl::Endpoints<fio::Directory>::Create();
     auto result = fidl::WireCall(root)->Clone(
         fidl::ServerEnd<fuchsia_unknown::Cloneable>{server_end.TakeChannel()});
     if (!result.ok()) {
@@ -217,36 +197,17 @@ static zx::result<fidl::ClientEnd<fuchsia_io::Directory>> RecursivelyWalkPath(
   }
 
   // If the path is more than just the root, then we need to walk the path.
-  fidl::ClientEnd<fuchsia_io::Directory> current_dir{};
+  fidl::ClientEnd<fio::Directory> current_dir{};
   for (const auto& fragment : path) {
     auto new_client_end =
         OpenObjectInDirectory(current_dir.is_valid() ? current_dir.borrow() : root,
-                              static_cast<fuchsia_io::wire::OpenFlags>(kOpenFlags) |
-                                  fuchsia_io::wire::OpenFlags::kDirectory,
-                              fragment.string());
+                              fragment.string(), flags | fio::Flags::kProtocolDirectory);
     if (new_client_end.is_error()) {
       return new_client_end.take_error();
     }
-
-    current_dir = fidl::ClientEnd<fuchsia_io::Directory>(new_client_end.value().TakeChannel());
+    current_dir = fidl::ClientEnd<fio::Directory>(new_client_end.value().TakeChannel());
   }
   return zx::ok(std::move(current_dir));
-}
-
-inline zx::result<fidl::ClientEnd<fuchsia_io::Directory>> CreateDirectory(
-    fidl::UnownedClientEnd<fuchsia_io::Directory> root, const std::filesystem::path& path) {
-  static constexpr fuchsia_io::wire::OpenFlags kCreateFlags =
-      fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kRightWritable |
-      fuchsia_io::wire::OpenFlags::kCreate | fuchsia_io::wire::OpenFlags::kDirectory;
-  return RecursivelyWalkPath<static_cast<uint32_t>(kCreateFlags)>(root, path);
-}
-
-inline zx::result<fidl::ClientEnd<fuchsia_io::Directory>> OpenDirectory(
-    fidl::UnownedClientEnd<fuchsia_io::Directory> root, const std::filesystem::path& path) {
-  static constexpr fuchsia_io::wire::OpenFlags kOpenFlags =
-      fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kRightWritable |
-      fuchsia_io::wire::OpenFlags::kDirectory;
-  return RecursivelyWalkPath<static_cast<uint32_t>(kOpenFlags)>(root, path);
 }
 
 }  // namespace
@@ -493,7 +454,7 @@ std::optional<SharedMemoryView> OpteeClient::GetMemoryReference(SharedMemoryList
   return result;
 }
 
-zx::result<fidl::UnownedClientEnd<fuchsia_io::Directory>> OpteeClient::GetRootStorage() {
+zx::result<fidl::UnownedClientEnd<fio::Directory>> OpteeClient::GetRootStorage() {
   if (!provider_.is_valid()) {
     return zx::error(ZX_ERR_UNAVAILABLE);
   }
@@ -532,30 +493,34 @@ zx_status_t OpteeClient::InitRpmbClient() {
   return ZX_OK;
 }
 
-zx::result<fidl::ClientEnd<fuchsia_io::Directory>> OpteeClient::GetStorageDirectory(
+zx::result<fidl::ClientEnd<fio::Directory>> OpteeClient::GetStorageDirectory(
     const std::filesystem::path& path, bool create) {
   auto root = GetRootStorage();
   if (root.is_error()) {
     return root.take_error();
   }
 
-  auto storage = create ? CreateDirectory(root.value(), path) : OpenDirectory(root.value(), path);
+  fio::Flags flags = fio::kPermReadable | fio::kPermWritable | fio::Flags::kProtocolDirectory;
+  if (create) {
+    flags |= fio::Flags::kFlagMaybeCreate;  // Don't fail if `path` already exists.
+  }
 
+  zx::result storage =
+      RecursivelyWalkDirectories(root.value(), path, fio::kPermReadable | fio::kPermWritable);
   if (storage.is_error()) {
     return storage.take_error();
   }
-
   return zx::ok(std::move(storage.value()));
 }
 
-uint64_t OpteeClient::TrackFileSystemObject(fidl::ClientEnd<fuchsia_io::File> file) {
+uint64_t OpteeClient::TrackFileSystemObject(fidl::ClientEnd<fio::File> file) {
   uint64_t object_id = next_file_system_object_id_.fetch_add(1, std::memory_order_relaxed);
   open_file_system_objects_.insert({object_id, std::move(file)});
 
   return object_id;
 }
 
-std::optional<fidl::UnownedClientEnd<fuchsia_io::File>> OpteeClient::GetFileSystemObject(
+std::optional<fidl::UnownedClientEnd<fio::File>> OpteeClient::GetFileSystemObject(
     uint64_t identifier) {
   auto iter = open_file_system_objects_.find(identifier);
   if (iter == open_file_system_objects_.end()) {
@@ -1268,11 +1233,9 @@ zx_status_t OpteeClient::HandleRpcCommandFileSystemOpenFile(OpenFileFileSystemRp
     return storage_dir.status_value();
   }
 
-  static constexpr fuchsia_io::wire::OpenFlags kOpenFlags =
-      fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kRightWritable |
-      fuchsia_io::wire::OpenFlags::kNotDirectory | fuchsia_io::wire::OpenFlags::kDescribe;
-  auto node =
-      OpenObjectInDirectory(storage_dir.value().borrow(), kOpenFlags, path.filename().string());
+  zx::result node =
+      OpenObjectInDirectory(storage_dir.value().borrow(), path.filename().string(),
+                            fio::kPermReadable | fio::kPermWritable | fio::Flags::kProtocolFile);
   if (node.status_value() == ZX_ERR_NOT_FOUND) {
     LOG(DEBUG, "file not found (status: %s)", node.status_string());
     message->set_return_code(TEEC_ERROR_ITEM_NOT_FOUND);
@@ -1284,9 +1247,9 @@ zx_status_t OpteeClient::HandleRpcCommandFileSystemOpenFile(OpenFileFileSystemRp
     return node.status_value();
   }
 
-  // By the open mode this node is a file.
+  // We made sure this is a file by specifying the PROTOCOL_FILE flag.
   uint64_t object_id =
-      TrackFileSystemObject(fidl::ClientEnd<fuchsia_io::File>(node.value().TakeChannel()));
+      TrackFileSystemObject(fidl::ClientEnd<fio::File>(node.value().TakeChannel()));
 
   message->set_output_file_system_object_identifier(object_id);
   message->set_return_code(TEEC_SUCCESS);
@@ -1317,12 +1280,10 @@ zx_status_t OpteeClient::HandleRpcCommandFileSystemCreateFile(
     return storage_dir.status_value();
   }
 
-  static constexpr fuchsia_io::wire::OpenFlags kCreateFlags =
-      fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kRightWritable |
-      fuchsia_io::wire::OpenFlags::kCreate | fuchsia_io::wire::OpenFlags::kNotDirectory |
-      fuchsia_io::wire::OpenFlags::kDescribe;
+  constexpr fio::Flags kCreateFlags = fio::kPermReadable | fio::kPermWritable |
+                                      fio::Flags::kFlagMaybeCreate | fio::Flags::kProtocolFile;
   auto node =
-      OpenObjectInDirectory(storage_dir.value().borrow(), kCreateFlags, path.filename().string());
+      OpenObjectInDirectory(storage_dir.value().borrow(), path.filename().string(), kCreateFlags);
   if (node.is_error()) {
     LOG(DEBUG, "unable to create file (status: %s)", node.status_string());
     message->set_return_code(node.status_value() == ZX_ERR_ALREADY_EXISTS
@@ -1333,7 +1294,7 @@ zx_status_t OpteeClient::HandleRpcCommandFileSystemCreateFile(
 
   // By the open mode this node is a file.
   uint64_t object_id =
-      TrackFileSystemObject(fidl::ClientEnd<fuchsia_io::File>(node.value().TakeChannel()));
+      TrackFileSystemObject(fidl::ClientEnd<fio::File>(node.value().TakeChannel()));
 
   message->set_output_file_system_object_identifier(object_id);
   message->set_return_code(TEEC_SUCCESS);
@@ -1381,9 +1342,9 @@ zx_status_t OpteeClient::HandleRpcCommandFileSystemReadFile(ReadFileFileSystemRp
   uint64_t offset = message->file_offset();
   size_t bytes_left = buffer_mem->size();
   size_t bytes_read = 0;
-  fidl::SyncClientBuffer<fuchsia_io::File::ReadAt> fidl_buffer;
+  fidl::SyncClientBuffer<fio::File::ReadAt> fidl_buffer;
   while (bytes_left > 0) {
-    uint64_t read_chunk_request = std::min(bytes_left, fuchsia_io::wire::kMaxBuf);
+    uint64_t read_chunk_request = std::min(bytes_left, fio::kMaxBuf);
     uint64_t read_chunk_actual = 0;
 
     const fidl::WireUnownedResult result =
@@ -1445,7 +1406,7 @@ zx_status_t OpteeClient::HandleRpcCommandFileSystemWriteFile(
   uint64_t offset = message->file_offset();
   size_t bytes_left = message->file_contents_memory_size();
   while (bytes_left > 0) {
-    uint64_t write_chunk_request = std::min(bytes_left, fuchsia_io::wire::kMaxBuf);
+    uint64_t write_chunk_request = std::min(bytes_left, fio::kMaxBuf);
 
     const fidl::WireResult result = fidl::WireCall(file)->WriteAt(
         fidl::VectorView<uint8_t>::FromExternal(buffer, write_chunk_request), offset);
@@ -1528,9 +1489,8 @@ zx_status_t OpteeClient::HandleRpcCommandFileSystemRemoveFile(
   }
 
   std::string filename = path.filename().string();
-  auto result =
-      fidl::WireCall(storage_dir.value().borrow())
-          ->Unlink(fidl::StringView::FromExternal(filename), fuchsia_io::wire::UnlinkOptions{});
+  auto result = fidl::WireCall(storage_dir.value().borrow())
+                    ->Unlink(fidl::StringView::FromExternal(filename), /*options=*/{});
   if (!result.ok()) {
     LOG(ERROR, "failed to remove file (FIDL status: %s)", result.status_string());
     message->set_return_code(TEEC_ERROR_GENERIC);
@@ -1585,10 +1545,9 @@ zx_status_t OpteeClient::HandleRpcCommandFileSystemRenameFile(
   }
 
   if (!message->should_overwrite()) {
-    static constexpr fuchsia_io::wire::OpenFlags kCheckRenameFlags =
-        fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kDescribe;
-    auto destination =
-        OpenObjectInDirectory(new_storage.value().borrow(), kCheckRenameFlags, new_name);
+    // Open `new_name` as readable to check if it already exists.
+    zx::result destination =
+        OpenObjectInDirectory(new_storage.value().borrow(), new_name, fio::kPermReadable);
     if (destination.is_ok()) {
       // The file exists but shouldn't be overwritten
       LOG(INFO, "refusing to rename file to path that already exists with overwrite set to false");
