@@ -190,6 +190,15 @@ void internal::PropertyListMatcher::DescribeNegationTo(::std::ostream* os) const
                           ::testing::Property(&DoubleArrayValue::value, std::move(matcher))));
 }
 
+::testing::Matcher<const PropertyValue&> StringArrayIs(
+    const std::string& name, const ::testing::Matcher<std::vector<std::string>>& matcher) {
+  return ::testing::AllOf(
+      ::testing::Property(&PropertyValue::name, ::testing::StrEq(name)),
+      ::testing::Property(&PropertyValue::format, PropertyFormat::kStringArray),
+      ::testing::Property(&PropertyValue::Get<StringArrayValue>,
+                          ::testing::Property(&StringArrayValue::value, matcher)));
+}
+
 ::testing::Matcher<const PropertyValue&> ArrayDisplayFormatIs(ArrayDisplayFormat format) {
   return ::testing::AnyOf(
       ::testing::AllOf(
