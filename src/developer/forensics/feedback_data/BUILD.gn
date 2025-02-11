@@ -100,7 +100,6 @@ source_set("log_source") {
   deps = [
     ":constants",
     "//sdk/lib/syslog/cpp",
-    "//src/lib/fostr/fidl/fuchsia.diagnostics",
   ]
 }
 
