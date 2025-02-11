@@ -102,7 +102,6 @@ python_library("honeydew_no_testonly") {
     "auxiliary_devices/power_switch/__init__.py",
     "auxiliary_devices/power_switch/power_switch.py",
     "auxiliary_devices/power_switch/power_switch_using_dmc.py",
-    "auxiliary_devices/power_switch_dmc.py",
     "errors.py",
     "fuchsia_device/__init__.py",
     "fuchsia_device/fuchsia_device.py",
