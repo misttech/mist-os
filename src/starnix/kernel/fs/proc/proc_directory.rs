@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::device::DeviceMode;
+use crate::fs::proc::cpuinfo::CpuinfoFile;
 use crate::fs::proc::pid_directory::pid_directory;
 use crate::fs::proc::pressure_directory::pressure_directory;
 use crate::fs::proc::sysctl::{net_directory, sysctl_directory};
@@ -19,7 +20,6 @@ use crate::vfs::{
     FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
     SeekTarget, SimpleFileNode, StaticDirectoryBuilder, StubEmptyFile, SymlinkTarget,
 };
-use fuchsia_component::client::connect_to_protocol_sync;
 
 use maplit::btreemap;
 use starnix_logging::{bug_ref, log_error, track_stub};
@@ -35,7 +35,7 @@ use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{errno, error, off_t, pid_t};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
-use std::sync::{Arc, LazyLock, Weak};
+use std::sync::{Arc, Weak};
 use std::time::SystemTime;
 
 /// `ProcDirectory` represents the top-level directory in `procfs`.
@@ -541,61 +541,6 @@ impl FsNodeOps for MountsSymlink {
         _current_task: &CurrentTask,
     ) -> Result<SymlinkTarget, Errno> {
         Ok(SymlinkTarget::Path("self/mounts".into()))
-    }
-}
-
-struct SysInfo {
-    board_name: String,
-}
-
-impl SysInfo {
-    fn is_qemu(&self) -> bool {
-        matches!(
-            self.board_name.as_str(),
-            "Standard PC (Q35 + ICH9, 2009)" | "qemu-arm64" | "qemu-riscv64"
-        )
-    }
-
-    fn fetch() -> Result<SysInfo, anyhow::Error> {
-        let sysinfo = connect_to_protocol_sync::<fidl_fuchsia_sysinfo::SysInfoMarker>()?;
-        let board_name = match sysinfo.get_board_name(zx::MonotonicInstant::INFINITE)? {
-            (zx::sys::ZX_OK, Some(name)) => name,
-            (_, _) => "Unknown".to_string(),
-        };
-        Ok(SysInfo { board_name })
-    }
-}
-
-const SYSINFO: LazyLock<SysInfo> = LazyLock::new(|| {
-    SysInfo::fetch().unwrap_or_else(|e| {
-        log_error!("Failed to fetch sysinfo: {e}");
-        SysInfo { board_name: "Unknown".to_string() }
-    })
-});
-
-#[derive(Clone)]
-struct CpuinfoFile {}
-impl CpuinfoFile {
-    pub fn new_node() -> impl FsNodeOps {
-        DynamicFile::new_node(Self {})
-    }
-}
-impl DynamicFileSource for CpuinfoFile {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let is_qemu = SYSINFO.is_qemu();
-
-        for i in 0..zx::system_get_num_cpus() {
-            writeln!(sink, "processor\t: {}", i)?;
-
-            // Report emulated CPU as "QEMU Virtual CPU". Some LTP tests rely on this to detect
-            // that they running in a VM.
-            if is_qemu {
-                writeln!(sink, "model name\t: QEMU Virtual CPU")?;
-            }
-
-            writeln!(sink)?;
-        }
-        Ok(())
     }
 }
 
