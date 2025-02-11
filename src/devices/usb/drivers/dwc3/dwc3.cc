@@ -875,9 +875,8 @@ void Dwc3::EpServer::GetInfo(GetInfoCompleter::Sync& completer) {
 
 void Dwc3::EpServer::QueueRequests(QueueRequestsRequest& request,
                                    QueueRequestsCompleter::Sync& completer) {
+  std::lock_guard<std::mutex> lock(uep_->ep.lock);
   for (auto& req : request.req()) {
-    std::lock_guard<std::mutex> lock(uep_->ep.lock);
-
     usb::FidlRequest freq{std::move(req)};
 
     zx_status_t status{ZX_OK};
@@ -913,12 +912,11 @@ void Dwc3::EpServer::QueueRequests(QueueRequestsRequest& request,
       continue;
     }
 
-    RequestInfo info{0, 0, uep_, std::move(freq)};
-    uep_->ep.queued_reqs.push(std::move(info));
+    uep_->ep.queued_reqs.push(RequestInfo{0, 0, uep_, std::move(freq)});
+  }
 
-    if (dwc3_->configured_) {
-      dwc3_->UserEpQueueNext(*uep_);
-    }
+  if (dwc3_->configured_) {
+    dwc3_->UserEpQueueNext(*uep_);
   }
 }
 

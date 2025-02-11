@@ -51,7 +51,7 @@ void Dwc3::Ep0Start() {
 void Dwc3::Ep0QueueSetupLocked() {
   CacheFlushInvalidate(ep0_.buffer.get(), 0, sizeof(fdescriptor::wire::UsbSetup));
   EpStartTransfer(ep0_.out, ep0_.shared_fifo, TRB_TRBCTL_SETUP, ep0_.buffer->phys(),
-                  sizeof(fdescriptor::wire::UsbSetup), false);
+                  sizeof(fdescriptor::wire::UsbSetup));
   ep0_.state = Ep0::State::Setup;
 }
 
@@ -98,7 +98,7 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
       if (setup.w_length > 0 && is_out) {
         CacheFlushInvalidate(ep0_.buffer.get(), 0, ep0_.buffer->size());
         EpStartTransfer(ep0_.out, ep0_.shared_fifo, TRB_TRBCTL_CONTROL_DATA, paddr,
-                        ep0_.buffer->size(), false);
+                        ep0_.buffer->size());
         ep0_.state = Ep0::State::DataOut;
       } else {
         zx::result<size_t> status = HandleEp0Setup(setup, vaddr, ep0_.buffer->size());
@@ -114,7 +114,7 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
         if (setup.w_length > 0) {
           // queue a write for the data phase
           CacheFlush(ep0_.buffer.get(), 0, actual);
-          EpStartTransfer(ep0_.in, ep0_.shared_fifo, TRB_TRBCTL_CONTROL_DATA, paddr, actual, false);
+          EpStartTransfer(ep0_.in, ep0_.shared_fifo, TRB_TRBCTL_CONTROL_DATA, paddr, actual);
           ep0_.state = Ep0::State::DataIn;
         } else {
           ep0_.state = Ep0::State::WaitNrdyIn;
@@ -183,16 +183,14 @@ void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
     case Ep0::State::WaitNrdyOut:
       if (ep_num == kEp0Out) {
         EpStartTransfer(ep0_.out, ep0_.shared_fifo,
-                        ep0_.cur_setup.w_length ? TRB_TRBCTL_STATUS_3 : TRB_TRBCTL_STATUS_2, 0, 0,
-                        false);
+                        ep0_.cur_setup.w_length ? TRB_TRBCTL_STATUS_3 : TRB_TRBCTL_STATUS_2, 0, 0);
         ep0_.state = Ep0::State::Status;
       }
       break;
     case Ep0::State::WaitNrdyIn:
       if (ep_num == kEp0In) {
         EpStartTransfer(ep0_.in, ep0_.shared_fifo,
-                        ep0_.cur_setup.w_length ? TRB_TRBCTL_STATUS_3 : TRB_TRBCTL_STATUS_2, 0, 0,
-                        false);
+                        ep0_.cur_setup.w_length ? TRB_TRBCTL_STATUS_3 : TRB_TRBCTL_STATUS_2, 0, 0);
         ep0_.state = Ep0::State::Status;
       }
       break;

@@ -83,7 +83,7 @@ zx_status_t Dwc3::EpSetStall(Endpoint& ep, bool stall) {
 }
 
 void Dwc3::EpStartTransfer(Endpoint& ep, Fifo& fifo, uint32_t type, zx_paddr_t buffer,
-                           size_t length, bool send_zlp) {
+                           size_t length) {
   FDF_LOG(DEBUG, "Dwc3::EpStartTransfer ep %u type %u length %zu", ep.ep_num, type, length);
 
   dwc3_trb_t* trb = fifo.next++;
@@ -97,24 +97,8 @@ void Dwc3::EpStartTransfer(Endpoint& ep, Fifo& fifo, uint32_t type, zx_paddr_t b
   trb->ptr_low = static_cast<uint32_t>(buffer);
   trb->ptr_high = static_cast<uint32_t>(buffer >> 32);
   trb->status = TRB_BUFSIZ(static_cast<uint32_t>(length));
-  if (send_zlp) {
-    trb->control = type | TRB_HWO;
-  } else {
-    trb->control = type | TRB_LST | TRB_IOC | TRB_HWO;
-  }
+  trb->control = type | TRB_LST | TRB_IOC | TRB_HWO;
   CacheFlush(fifo.buffer.get(), (trb - fifo.first) * sizeof(*trb), sizeof(*trb));
-
-  if (send_zlp) {
-    dwc3_trb_t* zlp_trb = fifo.next++;
-    if (fifo.next == fifo.last) {
-      fifo.next = fifo.first;
-    }
-    zlp_trb->ptr_low = 0;
-    zlp_trb->ptr_high = 0;
-    zlp_trb->status = TRB_BUFSIZ(0);
-    zlp_trb->control = type | TRB_LST | TRB_IOC | TRB_HWO;
-    CacheFlush(fifo.buffer.get(), (zlp_trb - fifo.first) * sizeof(*trb), sizeof(*trb));
-  }
 
   CmdEpStartTransfer(ep, fifo.GetTrbPhys(trb));
 }
@@ -181,9 +165,7 @@ void Dwc3::UserEpQueueNext(UserEndpoint& uep) {
 
     // TODO(voydanoff) scatter/gather support
     std::tie(phys, size) = *result->at(0).begin();
-    bool send_zlp{(size % ep.max_packet_size) == 0};
-
-    EpStartTransfer(ep, uep.fifo, TRB_TRBCTL_NORMAL, phys, size, send_zlp);
+    EpStartTransfer(ep, uep.fifo, TRB_TRBCTL_NORMAL, phys, size);
   }
 }
 

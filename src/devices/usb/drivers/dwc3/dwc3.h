@@ -463,8 +463,8 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
   void EpEnable(const Endpoint& ep, bool enable) __TA_EXCLUDES(lock_);
   void EpSetConfig(Endpoint& ep, bool enable) __TA_EXCLUDES(lock_);
   zx_status_t EpSetStall(Endpoint& ep, bool stall) __TA_EXCLUDES(lock_);
-  void EpStartTransfer(Endpoint& ep, Fifo& fifo, uint32_t type, zx_paddr_t buffer, size_t length,
-                       bool send_zlp) __TA_EXCLUDES(lock_);
+  void EpStartTransfer(Endpoint& ep, Fifo& fifo, uint32_t type, zx_paddr_t buffer, size_t length)
+      __TA_EXCLUDES(lock_);
   void EpEndTransfers(Endpoint& ep, zx_status_t reason) __TA_EXCLUDES(lock_);
   void EpReadTrb(Endpoint& ep, Fifo& fifo, const dwc3_trb_t* src, dwc3_trb_t* dst)
       __TA_EXCLUDES(lock_);
