@@ -15,6 +15,7 @@ group("tests") {
   testonly = true
 
   deps = [
+    ":build_tests_json_tests",
     ":regenerator_tests",
     "bazel:tests",
     "fidl:tests",
@@ -37,6 +38,11 @@ python_build_time_tests("regenerator_tests") {
     "//build/bazel/scripts/compute_content_hash.py",
     "//build/bazel/scripts/get_git_head_commit.py",
   ]
+}
+
+python_build_time_tests("build_tests_json_tests") {
+  tests = [ "//build/build_tests_json_test.py" ]
+  inputs = [ "//build/build_tests_json.py" ]
 }
 
 group("non_hermetic_deps") {

@@ -1,0 +1,77 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/product.gni")
+import("//build/python/python_action.gni")
+
+# Declares metadata for a set of tests and the product bundle to run them on.
+#
+# By default tests will run on the default product bundle from the build.
+# With multi-product builds, we may want to target a specific non-default
+# product bundle for a set of tests.
+
+# We can now use this GN template for declaring this desire.
+
+# product_bundle_test_group("target") {
+#   product_bundle_name = "foo"
+#   tests = [ ... ]
+# }
+
+# In order to declare one of these targets, you must make them available
+# in your product.gni:
+#   product_bundle_test_groups = [ "//path/to:target" ]
+
+# This ensures that gn can "discover" the target and resolve the
+# generated_file() at gn-time.
+#
+#
+# Parameters:
+#
+#   tests (required)
+#     [list] List of targets to walk to find test specs.
+#
+#   product_bundle_name (optional; default = target_name)
+#     [str] The name of the product bundle to assign the tests to.
+#
+template("product_bundle_test_group") {
+  assert(defined(invoker.tests), "tests is a required parameter")
+
+  # Ensure this template is only used in approved locations.
+  # This ensures that they are resolved by gn-gen.
+  # See root_patterns in the //.gn file.
+  _valid_targets = product_bundle_test_groups
+  if (!label_matches(":$target_name", _valid_targets)) {
+    print("")
+    print(
+        "ERROR: All product_bundle_test_group()s must be added to the gn argument: product_bundle_test_groups")
+    print("")
+    assert(false)
+  }
+
+  _product_bundle_name = target_name
+  if (defined(invoker.product_bundle_name)) {
+    _product_bundle_name = invoker.product_bundle_name
+  }
+
+  _tests_json = "${target_out_dir}/${target_name}/tests.json"
+
+  generated_file(target_name) {
+    testonly = true
+    deps = invoker.tests
+    data_keys = [ "tests" ]
+    walk_keys = [ "tests_barrier" ]
+    outputs = [ _tests_json ]
+    output_conversion = "json"
+
+    metadata = {
+      tests_barrier = []
+      pb_test_groups = [
+        {
+          product_bundle_name = _product_bundle_name
+          tests_json = rebase_path(_tests_json, root_build_dir)
+        },
+      ]
+    }
+  }
+}

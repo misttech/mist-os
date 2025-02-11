@@ -14,6 +14,8 @@ import sys
 import typing as T
 from pathlib import Path
 
+import build_tests_json
+
 _SCRIPT_DIR = Path(__file__).parent
 
 # The directory that contains helper python modules for this script.
@@ -278,11 +280,17 @@ def main() -> int:
         extra_ninja_build_inputs: T.Set[Path] = set()
         extra_ninja_build_inputs.add(fuchsia_dir / "build" / "regenerator")
         extra_ninja_build_inputs.add(fuchsia_dir / "build" / "regenerator.py")
+        extra_ninja_build_inputs.add(
+            fuchsia_dir / "build" / "build_tests_json.py"
+        )
 
         extra_ninja_build_inputs |= {
             _BUILD_BAZEL_SCRIPTS / python_file
             for python_file in _IMPORTED_PYTHON_FILES
         }
+
+        log("Generating tests.json.")
+        extra_ninja_build_inputs |= build_tests_json.build_tests_json(build_dir)
 
         # Where to store regenerator outputs. This must be in a directory specific to
         # the current Ninja build directory, to support building multiple Fuchsia build
