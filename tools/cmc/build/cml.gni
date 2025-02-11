@@ -40,7 +40,7 @@ template("cm") {
 
   # We need to inject a use clause for DebugData for the coverage and profile variants.
   # is_coverage is true for profile and coverage variants.
-  needs_debugdata = is_coverage
+  needs_debugdata = is_coverage || is_profile
 
   if (needs_debugdata) {
     cmc_merge("${target_name}_merge") {
