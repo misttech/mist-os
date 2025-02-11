@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <inttypes.h>
 #include <lib/fit/defer.h>
 #include <lib/stdcompat/string_view.h>
 #include <string.h>
@@ -218,7 +219,7 @@ class MMapProcTest : public ProcTestBase {};
 
 TEST_F(MMapProcTest, CommonMappingsHavePathnames) {
   uintptr_t stack_addr = reinterpret_cast<uintptr_t>(__builtin_frame_address(0));
-  uintptr_t vdso_addr = reinterpret_cast<uintptr_t>(getauxval(AT_SYSINFO_EHDR));
+  uintptr_t vdso_addr = static_cast<uintptr_t>(getauxval(AT_SYSINFO_EHDR));
 
   std::string maps;
   ASSERT_TRUE(files::ReadFileToString(proc_path() + "/self/maps", &maps));
@@ -242,7 +243,7 @@ TEST_F(MMapProcTest, MapFileWithNewlineInName) {
   ASSERT_TRUE(fd);
   SAFE_SYSCALL(ftruncate(fd.get(), page_size));
   void* p = mmap(nullptr, page_size, PROT_READ, MAP_SHARED, fd.get(), 0);
-  std::string address_formatted = fxl::StringPrintf("%8lx", (uintptr_t)p);
+  std::string address_formatted = fxl::StringPrintf("%8" PRIxPTR, (uintptr_t)p);
 
   std::string maps;
   ASSERT_TRUE(files::ReadFileToString(proc_path() + "/self/maps", &maps));
@@ -263,7 +264,7 @@ TEST_F(MMapProcTest, MapDeletedField) {
   ASSERT_TRUE(fd);
   SAFE_SYSCALL(ftruncate(fd.get(), page_size));
   void* p = mmap(nullptr, page_size, PROT_READ, MAP_SHARED, fd.get(), 0);
-  std::string address_formatted = fxl::StringPrintf("%8lx", (uintptr_t)p);
+  std::string address_formatted = fxl::StringPrintf("%8" PRIxPTR, (uintptr_t)p);
   fd.reset();
   unlink(path.c_str());
 
