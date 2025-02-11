@@ -9,6 +9,7 @@
 #include <fuchsia/sysmem2/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/trace/event.h>
 
 #include <cmath>
 #include <cstdint>
@@ -166,6 +167,7 @@ void CpuRenderer::Render(const allocation::ImageMetadata& render_target,
                          const std::vector<allocation::ImageMetadata>& images,
                          const std::vector<zx::event>& release_fences = {},
                          bool apply_color_conversion = false) {
+  TRACE_DURATION("gfx", "CpuRenderer::Render");
   std::scoped_lock lock(lock_);
   FX_CHECK(images.size() == rectangles.size());
   for (uint32_t i = 0; i < images.size(); i++) {
