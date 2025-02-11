@@ -31,7 +31,7 @@
             path: "/data",
         },
         {
-            protocol: "fuchsia.ui.display.internal.DisplayPower",
+            protocol: "fuchsia.ui.display.singleton.DisplayPower",
             availability: "optional",
         },
         {

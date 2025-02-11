@@ -11,7 +11,7 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.ui.display.internal.DisplayPower" ],
+            protocol: [ "fuchsia.ui.display.singleton.DisplayPower" ],
             from: "#ui",
             to: "#brightness_manager",
             dependency: "weak",
@@ -37,13 +37,13 @@
             subdir: "input-report",
         },
         {
-            from: "parent",
-            to: "#brightness_manager",
             config: [
                 "fuchsia.ui.ManageDisplayPower",
                 "fuchsia.ui.PowerOffDelayMillis",
                 "fuchsia.ui.PowerOnDelayMillis",
             ],
+            from: "parent",
+            to: "#brightness_manager",
         },
     ],
 }
