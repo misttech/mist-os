@@ -172,6 +172,18 @@ void raise_with_stack(int signal, uintptr_t stack) {
       : [pid] "r"(pid), [signal] "r"(signal), [new_rsp] "r"(new_rsp), [sys_kill] "i"(SYS_kill)
       : "x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13",
         "x14", "x15", "x16", "x17", "x19", "cc", "memory");
+#elif defined(__arm__)
+  __asm__ volatile(
+      "mov r4, sp\n"
+      "mov sp, %[new_rsp]\n"
+      "mov r0, %[pid]\n"
+      "mov r1, %[signal]\n"
+      "mov r7, %[sys_kill]\n"
+      "svc #0\n"
+      "mov sp, r4\n"
+      :
+      : [pid] "r"(pid), [signal] "r"(signal), [new_rsp] "r"(new_rsp), [sys_kill] "i"(SYS_kill)
+      : "r0", "r1", "r2", "r3", "r4", "r7", "cc", "memory");
 #elif defined(__riscv)
   __asm__ volatile(
       "mv s1, sp\n"
@@ -417,9 +429,9 @@ TEST(SignalHandlingDeathTest, SignalStackUnmappedDeliversSIGSEGV) {
   ASSERT_NE(MAP_FAILED, temp_stack);
 
   // Set the stack ptr to the end of the allocated region.
-  uint64_t stack_addr = reinterpret_cast<uint64_t>(temp_stack) + kStackSize;
+  uintptr_t stack_addr = reinterpret_cast<uintptr_t>(temp_stack) + kStackSize;
 
-  auto test_func = [](uint64_t stack_addr) {
+  auto test_func = [](uintptr_t stack_addr) {
     // Set up a handler for SIGUSR1
     struct sigaction sa = {};
     sa.sa_handler = [](int) { exit(kExitTestSuccess); };
@@ -483,8 +495,9 @@ TEST(SignalHandlingDeathTest, SignalAltStackUnmappedDeliversSIGSEGV) {
 // This intentionally creates a segfault which can't pass on sanitizer runs.
 #if (!__has_feature(address_sanitizer))
 TEST(SignalHandlingDeathTest, SignalStackErrorsDeliversSIGSEGV) {
-  std::vector<uint64_t> stack_addrs = {0x0, kRedzoneSize, kRedzoneSize + 1, UINT64_MAX,
-                                       UINT64_MAX - 1};
+  std::vector<uintptr_t> stack_addrs = {0x0, kRedzoneSize, kRedzoneSize + 1,
+                                        std::numeric_limits<uintptr_t>::max(),
+                                        std::numeric_limits<uintptr_t>::max() - 1};
   for (const auto stack_addr : stack_addrs) {
     EXPECT_EXIT(
         [stack_addr]() {
@@ -1081,6 +1094,13 @@ TEST(SignalHandling, Repro347063218) {
 #elif __aarch64__
     __asm__ volatile(
         "mov x0, %0\n"
+        "udf #0\n"
+        :
+        : "r"(value)
+        : "r0");
+#elif __arm__
+    __asm__ volatile(
+        "mov r0, %0\n"
         "udf #0\n"
         :
         : "r"(value)
