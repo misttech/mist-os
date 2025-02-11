@@ -528,6 +528,9 @@ func (t *Device) provisionSSHKey(ctx context.Context) error {
 		{Cmd: []string{"echo", fmt.Sprintf("\"%s\"", pubkey), ">", "/data/ssh/authorized_keys"}},
 		{Cmd: []string{"cat", "/data/ssh/authorized_keys"}},
 	}
+	if err := serial.RunCommands(ctx, socket, cmds); err != nil {
+		return err
+	}
 	waitChan := make(chan error, 1)
 	go func() {
 		truncCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -545,9 +548,6 @@ func (t *Device) provisionSSHKey(ctx context.Context) error {
 		}
 		waitChan <- readErr
 	}()
-	if err := serial.RunCommands(ctx, socket, cmds); err != nil {
-		return err
-	}
 	return <-waitChan
 }
 
