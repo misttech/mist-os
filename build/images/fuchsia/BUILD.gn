@@ -104,7 +104,6 @@ if (is_fuchsia) {
       "//:legacy_cache_packages",
     ]
     universe_packages = [ "//:developer_universe_packages" ]
-    bootfs_package_labels = product_bootfs_packages
 
     if (generate_fvm) {
       assembly_include_account_in_fvm = include_account_in_fvm

@@ -2098,8 +2098,6 @@ group("host") {
   # TODO(https://fxbug.dev/42160904) investigate removing testonly here
   testonly = true
   public_deps = [
-    "//build/input/product:host($host_toolchain)",
-
     # Static analysis tools used by shac should always be built so that
     # `fx format-code` and other static analysis entrypoints can be run on any
     # build configuration.

@@ -53,11 +53,7 @@ group("disable_strict_sources_check_allowlist") {
 #       - `//:developer_base_package_labels`
 #  3) New `args.gn` files created by `fx set --cargo-toml-gen` will instead use
 #     the `host_labels` arg (which assumes the host toolchain).  That list is
-#     currently being used with the `//:host` group, but it's being split into
-#       - `//build/input/product:host_labels`
-#       - `//build/input/board:host_labels`
-#       - `//:host` will remain for developer-specified host tools to include in
-#         the build.
+#     currently being used with the `//:host` group
 #   4) Developers _may_ have added `//build/rust:cargo_toml_gen` to either of
 #      following:
 #        - `cache_package_labels` (`//:developer_cache_packages`)
