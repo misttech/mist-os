@@ -15,15 +15,38 @@ following logs:
   * `ERROR`
   * `WARNING`
   * `INFO`
-* [debuglog](/docs/development/diagnostics/logs/recording.md#debuglog_handles):
-  * `SERIAL`
 
-To control which log levels are sent to the syslog (other than `SERIAL`), the
-[kernel commandline](/docs/reference/kernel/kernel_cmdline.md#drivernamelogflags)
-`driver.<driver_name>.log=<level>` can be used. For example,
-`driver.sdhci.log=TRACE` additionally enables `DEBUG` and `TRACE` logs for the
-sdhci driver, as we are setting a _minimum_ log level, and `TRACE` is lower than
-`DEBUG`.
+To control which log levels are sent to the `syslog`, you can use the
+[assembly platform configuration](/reference/assembly/DiagnosticsConfig)
+. An assembly platform configuration can be specified in either the product or
+via assembly overrides.
+
+For example, you can make a `//local/BUILD.gn` file:
+
+ ```
+# //local/BUILD.gn:
+assembly_developer_overrides("sdhci-debug-logs") {
+    platform = {
+        diagnostics = {
+            component_log_initial_interests = [
+                {
+                    component = "fuchsia-boot:///sdhci#meta/sdhci.cm"
+                    log_severity = "debug"
+                },
+            ]
+        }
+    }
+}
+```
+
+Then use `fx set` to set the `assembly-override`:
+
+```
+fx set <product.board> --assembly-override=//local:sdhci-debug-logs
+```
+
+Additionally, this enables `DEBUG` and `TRACE` logs for the sdhci driver, as we
+are setting a _minimum_ log level, and `TRACE` is lower than `DEBUG`.
 
 A driver's logs are tagged with the process name, "driver", and the driver name.
 This can be used to filter the output of the syslog whilst searching for
