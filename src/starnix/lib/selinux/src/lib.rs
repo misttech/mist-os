@@ -672,9 +672,19 @@ impl<'a, S: AsRef<[u8]> + ?Sized> From<&'a S> for NullessByteStr<'a> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct FileSystemMountSids {
+    pub context: Option<SecurityId>,
+    pub fs_context: Option<SecurityId>,
+    pub def_context: Option<SecurityId>,
+    pub root_context: Option<SecurityId>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct FileSystemLabel {
     pub sid: SecurityId,
     pub scheme: FileSystemLabelingScheme,
+    // Sids obtained by parsing the mount options of the FileSystem.
+    pub mount_sids: FileSystemMountSids,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -682,10 +692,10 @@ pub enum FileSystemLabelingScheme {
     /// This filesystem was mounted with "context=".
     Mountpoint { sid: SecurityId },
     /// This filesystem has an "fs_use_xattr", "fs_use_task", or "fs_use_trans" entry in the
-    /// policy. `root_sid` identifies the context for the root of the filesystem and `def_sid`
-    /// identifies the context to use for unlabeled files in the filesystem (the "default
-    /// context").
-    FsUse { fs_use_type: FsUseType, def_sid: SecurityId, root_sid: Option<SecurityId> },
+    /// policy. `root_sid` identifies the context for the root of the filesystem and
+    /// `computed_def_sid`  identifies the context to use for unlabeled files in the filesystem
+    /// (the "default context").
+    FsUse { fs_use_type: FsUseType, computed_def_sid: SecurityId },
     /// This filesystem has one or more "genfscon" statements associated with it in the policy.
     GenFsCon,
 }

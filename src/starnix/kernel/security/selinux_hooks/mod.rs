@@ -251,7 +251,7 @@ where
         FileSystemLabelingScheme::Mountpoint { sid } => sid,
         // fs_use_xattr-labelling defers to the security attribute on the file node, with fall-back
         // behaviours for missing and invalid labels.
-        FileSystemLabelingScheme::FsUse { fs_use_type, def_sid, root_sid, .. } => {
+        FileSystemLabelingScheme::FsUse { fs_use_type, computed_def_sid: def_sid, .. } => {
             match fs_use_type {
                 FsUseType::Xattr => {
                     // Determine the SID from the "security.selinux" attribute.
@@ -276,6 +276,7 @@ where
                                 // filesystem from re-instantiation of the `FsNode` representing an
                                 // existing root is tricky, so we work-around the issue by writing
                                 // the `root_sid` label here, if available, or the filesystem label.
+                                let root_sid = label.mount_sids.root_context;
                                 let root_or_fs_sid = root_sid.unwrap_or(label.sid);
                                 let root_context = security_server
                                     .sid_to_security_context(root_or_fs_sid)
@@ -478,9 +479,10 @@ fn compute_new_fs_node_sid(
             Ok(Some((label.sid, label)))
         }
         FileSystemLabelingScheme::Mountpoint { sid } => Ok(Some((sid, label))),
-        FileSystemLabelingScheme::FsUse { fs_use_type, root_sid, .. } => {
+        FileSystemLabelingScheme::FsUse { fs_use_type, .. } => {
             // For root nodes, the specified root_sid takes precedence over all other rules.
             if parent.is_none() {
+                let root_sid = label.mount_sids.root_context;
                 if let Some(root_sid) = root_sid {
                     return Ok(Some((root_sid, label)));
                 }

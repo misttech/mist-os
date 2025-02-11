@@ -21,6 +21,7 @@ use crate::{
     SeLinuxStatusPublisher, SecurityId,
 };
 
+use crate::FileSystemMountSids;
 use anyhow::Context as _;
 use std::collections::HashMap;
 use std::ops::DerefMut;
@@ -338,22 +339,20 @@ impl SecurityServer {
         let mut locked_state = self.state.lock();
         let active_policy = locked_state.expect_active_policy_mut();
 
-        let mountpoint_sid_from_mount_option =
-            sid_from_mount_option(active_policy, &mount_options.context);
-        let fs_sid_from_mount_option =
-            sid_from_mount_option(active_policy, &mount_options.fs_context);
-        let def_sid_from_mount_option =
-            sid_from_mount_option(active_policy, &mount_options.def_context);
-        let root_sid_from_mount_option =
-            sid_from_mount_option(active_policy, &mount_options.root_context);
-
-        if let Some(mountpoint_sid) = mountpoint_sid_from_mount_option {
+        let mount_sids = FileSystemMountSids {
+            context: sid_from_mount_option(active_policy, &mount_options.context),
+            fs_context: sid_from_mount_option(active_policy, &mount_options.fs_context),
+            def_context: sid_from_mount_option(active_policy, &mount_options.def_context),
+            root_context: sid_from_mount_option(active_policy, &mount_options.root_context),
+        };
+        if let Some(mountpoint_sid) = mount_sids.context {
             // `mount_options` has `context` set, so the file-system and the nodes it contains are
             // labeled with that value, which is not modifiable. The `fs_context` option, if set,
             // overrides the file-system label.
             FileSystemLabel {
-                sid: fs_sid_from_mount_option.unwrap_or(mountpoint_sid),
+                sid: mount_sids.fs_context.unwrap_or(mountpoint_sid),
                 scheme: FileSystemLabelingScheme::Mountpoint { sid: mountpoint_sid },
+                mount_sids,
             }
         } else if let Some(FsUseLabelAndType { context, use_type }) =
             active_policy.parsed.fs_use_label_and_type(fs_type)
@@ -361,23 +360,24 @@ impl SecurityServer {
             // There is an `fs_use` statement for this file-system type in the policy.
             let fs_sid_from_policy =
                 active_policy.sid_table.security_context_to_sid(&context).unwrap();
-            let fs_sid = fs_sid_from_mount_option.unwrap_or(fs_sid_from_policy);
+            let fs_sid = mount_sids.fs_context.unwrap_or(fs_sid_from_policy);
             FileSystemLabel {
                 sid: fs_sid,
                 scheme: FileSystemLabelingScheme::FsUse {
                     fs_use_type: use_type,
-                    def_sid: def_sid_from_mount_option
+                    computed_def_sid: mount_sids
+                        .def_context
                         .unwrap_or_else(|| SecurityId::initial(InitialSid::File)),
-                    root_sid: root_sid_from_mount_option,
                 },
+                mount_sids,
             }
         } else if let Some(context) =
             active_policy.parsed.genfscon_label_for_fs_and_path(fs_type, ROOT_PATH.into(), None)
         {
             // There is a `genfscon` statement for this file-system type in the policy.
             let genfscon_sid = active_policy.sid_table.security_context_to_sid(&context).unwrap();
-            let fs_sid = fs_sid_from_mount_option.unwrap_or(genfscon_sid);
-            FileSystemLabel { sid: fs_sid, scheme: FileSystemLabelingScheme::GenFsCon }
+            let fs_sid = mount_sids.fs_context.unwrap_or(genfscon_sid);
+            FileSystemLabel { sid: fs_sid, scheme: FileSystemLabelingScheme::GenFsCon, mount_sids }
         } else {
             // The name of the filesystem type was not recognized.
             //
@@ -386,12 +386,14 @@ impl SecurityServer {
             let unrecognized_filesystem_type_fs_use_type = FsUseType::Xattr;
 
             FileSystemLabel {
-                sid: fs_sid_from_mount_option.unwrap_or(unrecognized_filesystem_type_sid),
+                sid: mount_sids.fs_context.unwrap_or(unrecognized_filesystem_type_sid),
                 scheme: FileSystemLabelingScheme::FsUse {
                     fs_use_type: unrecognized_filesystem_type_fs_use_type,
-                    def_sid: def_sid_from_mount_option.unwrap_or(unrecognized_filesystem_type_sid),
-                    root_sid: root_sid_from_mount_option,
+                    computed_def_sid: mount_sids
+                        .def_context
+                        .unwrap_or(unrecognized_filesystem_type_sid),
                 },
+                mount_sids,
             }
         }
     }
