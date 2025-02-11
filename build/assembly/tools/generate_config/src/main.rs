@@ -78,7 +78,7 @@ fn generate_product(args: &ProductArgs) -> Result<()> {
     // We add the package names in now, so all the rest of the rules can assume
     // the config has proper package names.
     let config = config.add_package_names()?;
-    config.write_to_dir(&args.output, None::<Utf8PathBuf>)?;
+    config.write_to_dir(&args.output)?;
     Ok(())
 }
 
@@ -99,7 +99,7 @@ fn generate_hybrid_product(args: &HybridProductArgs) -> Result<()> {
             anyhow::bail!("Could not find package to replace: {}", &package_name);
         }
     }
-    config.write_to_dir(&args.output, None::<Utf8PathBuf>)?;
+    config.write_to_dir(&args.output)?;
     Ok(())
 }
 
