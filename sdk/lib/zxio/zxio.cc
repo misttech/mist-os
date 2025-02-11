@@ -6,20 +6,27 @@
 #include <fidl/fuchsia.net/cpp/wire.h>
 #include <fidl/fuchsia.posix.socket.packet/cpp/wire.h>
 #include <fidl/fuchsia.posix.socket.raw/cpp/wire.h>
+#include <fidl/fuchsia.posix.socket/cpp/wire.h>
 #include <ifaddrs.h>
+#include <lib/fidl/cpp/wire/arena.h>
+#include <lib/fidl/cpp/wire/envelope.h>
+#include <lib/fidl/cpp/wire/vector_view.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/eventpair.h>
+#include <lib/zx/result.h>
 #include <lib/zxio/bsdsocket.h>
 #include <lib/zxio/ops.h>
 #include <lib/zxio/types.h>
 #include <lib/zxio/watcher.h>
 #include <lib/zxio/zxio.h>
 #include <string.h>
+#include <zircon/errors.h>
 #include <zircon/syscalls.h>
+#include <zircon/types.h>
 
-#include <atomic>
-#include <new>
+#include <optional>
 #include <type_traits>
+#include <variant>
 
 #include <netpacket/packet.h>
 
@@ -601,11 +608,175 @@ zx::result<fidl::UnownedClientEnd<T>> connect_socket_provider(
   return zx::ok(fidl::UnownedClientEnd<T>(zx::unowned_channel(socket_provider_handle)));
 }
 
-zx_status_t zxio_socket(zxio_service_connector service_connector, int domain, int type,
-                        int protocol, zxio_storage_alloc allocator, void** out_context,
-                        int16_t* out_code) {
+namespace {
+struct socket_creation_options {
+  cpp20::span<zxio_socket_mark_t> marks;
+  socket_creation_options() = default;
+
+  explicit socket_creation_options(zxio_socket_creation_options_t opts)
+      : marks(opts.marks, opts.num_marks) {}
+};
+
+// A class template to extract the client end from the FIDL response.
+template <typename FidlMethod>
+class WireResponse {};
+
+template <>
+struct WireResponse<fsocket::Provider::StreamSocket> {
+  using ClientEnd = fidl::ClientEnd<fsocket::StreamSocket>;
+
+  static ClientEnd FromResponse(fsocket::wire::ProviderStreamSocketResponse* response) {
+    return std::move(response->s);
+  }
+};
+
+template <>
+struct WireResponse<fsocket::Provider::DatagramSocket> {
+  using ClientEnd = std::variant<fidl::ClientEnd<fsocket::DatagramSocket>,
+                                 fidl::ClientEnd<fsocket::SynchronousDatagramSocket>, zx_status_t>;
+
+  static ClientEnd FromResponse(fsocket::wire::ProviderDatagramSocketResponse* response) {
+    if (response->is_datagram_socket()) {
+      return std::move(response->datagram_socket());
+    }
+    if (response->is_synchronous_datagram_socket()) {
+      return std::move(response->synchronous_datagram_socket());
+    }
+    return ZX_ERR_IO;
+  }
+};
+
+template <>
+struct WireResponse<frawsocket::Provider::Socket> {
+  using ClientEnd = fidl::ClientEnd<frawsocket::Socket>;
+
+  static ClientEnd FromResponse(frawsocket::wire::ProviderSocketResponse* response) {
+    return std::move(response->s);
+  }
+};
+
+// TODO(https://fxbug.dev/384115233): Update after the API is stabilized.
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+template <>
+struct WireResponse<fsocket::Provider::StreamSocketWithOptions> {
+  using ClientEnd = fidl::ClientEnd<fsocket::StreamSocket>;
+
+  static ClientEnd FromResponse(fsocket::wire::ProviderStreamSocketWithOptionsResponse* response) {
+    return std::move(response->s);
+  }
+};
+
+template <>
+struct WireResponse<fsocket::Provider::DatagramSocketWithOptions> {
+  using ClientEnd = std::variant<fidl::ClientEnd<fsocket::DatagramSocket>,
+                                 fidl::ClientEnd<fsocket::SynchronousDatagramSocket>, zx_status_t>;
+
+  static ClientEnd FromResponse(
+      fsocket::wire::ProviderDatagramSocketWithOptionsResponse* response) {
+    if (response->is_datagram_socket()) {
+      return std::move(response->datagram_socket());
+    }
+    if (response->is_synchronous_datagram_socket()) {
+      return std::move(response->synchronous_datagram_socket());
+    }
+    return ZX_ERR_IO;
+  }
+};
+
+template <>
+struct WireResponse<frawsocket::Provider::SocketWithOptions> {
+  using ClientEnd = fidl::ClientEnd<frawsocket::Socket>;
+
+  static ClientEnd FromResponse(frawsocket::wire::ProviderSocketWithOptionsResponse* response) {
+    return std::move(response->s);
+  }
+};
+#endif
+
+// Handles the wire result from socket provider and extracts client end channel it returns.
+template <typename FidlMethod>
+zx::result<fit::result<fuchsia_posix::Errno, typename WireResponse<FidlMethod>::ClientEnd>>
+handle_wire_result(fidl::WireResult<FidlMethod> result) {
+  if (!result.ok()) {
+    return zx::error(result.status());
+  }
+  if (result->is_error()) {
+    return zx::ok(result->take_error());
+  }
+  auto client_end = WireResponse<FidlMethod>::FromResponse(result->value());
+  return zx::ok(fit::ok(std::move(client_end)));
+}
+
+// Helper class to deal with variants.
+template <class... Ts>
+struct overloaded : Ts... {
+  using Ts::operator()...;
+};
+
+template <class... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
+
+zx_status_t zxio_socket_inner(zxio_service_connector service_connector, int domain, int type,
+                              int protocol, std::optional<socket_creation_options> opts,
+                              zxio_storage_alloc allocator, void** out_context, int16_t* out_code) {
   zxio_storage_t* zxio_storage = nullptr;
   fsocket::wire::Domain sock_domain;
+// TODO(https://fxbug.dev/384115233): Update after the API is stabilized.
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  constexpr size_t kMaxSocketCreationOptionsArenaSize =
+      fidl::MaxSizeInChannel<fsocket::wire::SocketCreationOptions,
+                             fidl::MessageDirection::kSending>();
+  // Set a sensible upper limit for how much stack space we're going to allow
+  // using here to prevent deep stack usage in zxio/fdio. If this grows to
+  // untenable sizes we might have to change strategies here.
+  static_assert(kMaxSocketCreationOptionsArenaSize <= 128);
+
+  if (opts.has_value()) {
+    if (opts->marks.size() > fsocket::wire::kMaxSocketCreationMarks) {
+      *out_code = EINVAL;
+      return ZX_OK;
+    }
+    for (const auto& mark : opts->marks) {
+      if (mark.domain != ZXIO_SOCKET_MARK_DOMAIN_1 && mark.domain != ZXIO_SOCKET_MARK_DOMAIN_2) {
+        *out_code = EINVAL;
+        return ZX_OK;
+      }
+    }
+  }
+  fidl::Arena<kMaxSocketCreationOptionsArenaSize> arena;
+  // Must check that `opts` has value.
+  auto creation_opts = [&arena, &opts]() -> fsocket::wire::SocketCreationOptions {
+    auto fidl_marks = fidl::ObjectView<fidl::VectorView<fsocket::wire::Marks>>(
+        arena,
+        /* args for VectorView */ arena, opts->marks.size());
+    for (size_t i = 0; i < opts->marks.size(); i++) {
+      fsocket::wire::MarkDomain mark_domain;
+      switch (opts->marks[i].domain) {
+        case ZXIO_SOCKET_MARK_DOMAIN_1:
+          mark_domain = fsocket::wire::MarkDomain::kMark1;
+          break;
+        case ZXIO_SOCKET_MARK_DOMAIN_2:
+          mark_domain = fsocket::wire::MarkDomain::kMark2;
+          break;
+        default:
+          // We did the validation before.
+          __builtin_unreachable();
+      }
+      (*fidl_marks)[i] = fsocket::wire::Marks{
+          .domain = mark_domain,
+          .mark = opts->marks[i].is_present
+                      ? fsocket::wire::OptionalUint32::WithValue(opts->marks[i].value)
+                      : fsocket::wire::OptionalUint32::WithUnset(fsocket::wire::Empty{}),
+      };
+    }
+    return fsocket::wire::SocketCreationOptions::Builder(arena).marks(fidl_marks).Build();
+  };
+#else
+  if (opts.has_value()) {
+    *out_code = EOPNOTSUPP;
+    return ZX_OK;
+  }
+#endif
   switch (domain) {
     case AF_PACKET: {
       if ((protocol > std::numeric_limits<uint16_t>::max()) ||
@@ -696,17 +867,28 @@ zx_status_t zxio_socket(zxio_service_connector service_connector, int domain, in
             return ZX_ERR_IO;
           }
           auto socket_result =
-              fidl::WireCall(provider.value())
-                  ->StreamSocket(sock_domain, fsocket::wire::StreamSocketProtocol::kTcp);
-          if (socket_result.status() != ZX_OK) {
-            return socket_result.status();
+// TODO(https://fxbug.dev/384115233): Update after the API is stabilized. Use if-else
+// instead of the ternary operator.
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+              opts.has_value()
+                  ? handle_wire_result(
+                        fidl::WireCall(provider.value())
+                            ->StreamSocketWithOptions(sock_domain,
+                                                      fsocket::wire::StreamSocketProtocol::kTcp,
+                                                      creation_opts()))
+                  :
+#endif
+                  handle_wire_result(
+                      fidl::WireCall((provider.value()))
+                          ->StreamSocket(sock_domain, fsocket::wire::StreamSocketProtocol::kTcp));
+          if (socket_result.is_error()) {
+            return socket_result.error_value();
           }
-          if (socket_result->is_error()) {
-            *out_code = static_cast<int16_t>(socket_result->error_value());
+          if ((*socket_result).is_error()) {
+            *out_code = static_cast<int16_t>((*socket_result).error_value());
             return ZX_OK;
           }
-
-          fidl::ClientEnd<fsocket::StreamSocket>& control = socket_result->value()->s;
+          fidl::ClientEnd<fsocket::StreamSocket>& control = (*socket_result).value();
           fidl::WireResult result = fidl::WireCall(control)->Describe();
           if (!result.ok()) {
             return result.status();
@@ -767,86 +949,97 @@ zx_status_t zxio_socket(zxio_service_connector service_connector, int domain, in
         return ZX_ERR_IO;
       }
 
-      fidl::WireResult socket_result =
-          fidl::WireCall(provider.value())->DatagramSocket(sock_domain, proto);
-      if (socket_result.status() != ZX_OK) {
-        return socket_result.status();
+      auto socket_result =
+// TODO(https://fxbug.dev/384115233): Update after the API is stabilized. Use if-else
+// instead of the ternary operator.
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+          opts.has_value()
+              ? handle_wire_result(
+                    fidl::WireCall(provider.value())
+                        ->DatagramSocketWithOptions(sock_domain, proto, creation_opts()))
+              :
+#endif
+              handle_wire_result(
+                  fidl::WireCall(provider.value())->DatagramSocket(sock_domain, proto));
+      if (socket_result.is_error()) {
+        return socket_result.error_value();
       }
-      if (socket_result->is_error()) {
-        *out_code = static_cast<int16_t>(socket_result->error_value());
+      if ((*socket_result).is_error()) {
+        *out_code = static_cast<int16_t>((*socket_result).error_value());
         return ZX_OK;
       }
-      fsocket::wire::ProviderDatagramSocketResponse& response = *socket_result->value();
-      if (response.has_invalid_tag()) {
-        return ZX_ERR_IO;
-      }
-      switch (response.Which()) {
-        case fsocket::wire::ProviderDatagramSocketResponse::Tag::kDatagramSocket: {
-          fidl::ClientEnd<fsocket::DatagramSocket>& control = response.datagram_socket();
-          fidl::WireResult result = fidl::WireCall(control)->Describe();
-          if (!result.ok()) {
-            return result.status();
-          }
-          fidl::WireResponse response = result.value();
-          if (!response.has_socket()) {
-            return ZX_ERR_NOT_SUPPORTED;
-          }
-          if (!response.has_tx_meta_buf_size()) {
-            return ZX_ERR_NOT_SUPPORTED;
-          }
-          if (!response.has_rx_meta_buf_size()) {
-            return ZX_ERR_NOT_SUPPORTED;
-          }
-          if (!(response.has_metadata_encoding_protocol_version() &&
-                response.metadata_encoding_protocol_version() ==
-                    fsocket::UdpMetadataEncodingProtocolVersion::kZero)) {
-            return ZX_ERR_NOT_SUPPORTED;
-          }
-          zx::socket& socket = response.socket();
-          zx_info_socket_t info;
-          if (zx_status_t status =
-                  socket.get_info(ZX_INFO_SOCKET, &info, sizeof(info), nullptr, nullptr);
-              status != ZX_OK) {
-            return status;
-          }
-          if (zx_status_t status =
-                  allocator(ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET, &zxio_storage, out_context);
-              status != ZX_OK || zxio_storage == nullptr) {
-            return ZX_ERR_NO_MEMORY;
-          }
-          if (zx_status_t status = zxio_datagram_socket_init(zxio_storage, std::move(socket), info,
-                                                             {
-                                                                 response.tx_meta_buf_size(),
-                                                                 response.rx_meta_buf_size(),
-                                                             },
-                                                             std::move(control));
-              status != ZX_OK) {
-            return status;
-          }
-        } break;
-        case fsocket::wire::ProviderDatagramSocketResponse::Tag::kSynchronousDatagramSocket: {
-          fidl::ClientEnd<fsocket::SynchronousDatagramSocket>& control =
-              response.synchronous_datagram_socket();
-          fidl::WireResult result = fidl::WireCall(control)->Describe();
-          if (!result.ok()) {
-            return result.status();
-          }
-          fidl::WireResponse response = result.value();
-          if (!response.has_event()) {
-            return ZX_ERR_NOT_SUPPORTED;
-          }
-          if (zx_status_t status = allocator(ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET,
-                                             &zxio_storage, out_context);
-              status != ZX_OK || zxio_storage == nullptr) {
-            return ZX_ERR_NO_MEMORY;
-          }
-          if (zx_status_t status = zxio_synchronous_datagram_socket_init(
-                  zxio_storage, std::move(response.event()), std::move(control));
-              status != ZX_OK) {
-            return status;
-          }
-        } break;
-      }
+      auto& response = (*socket_result).value();
+      return std::visit(
+          overloaded{
+              [&](fidl::ClientEnd<fsocket::DatagramSocket>& control) {
+                fidl::WireResult result = fidl::WireCall(control)->Describe();
+                if (!result.ok()) {
+                  return result.status();
+                }
+                fidl::WireResponse response = result.value();
+                if (!response.has_socket()) {
+                  return ZX_ERR_NOT_SUPPORTED;
+                }
+                if (!response.has_tx_meta_buf_size()) {
+                  return ZX_ERR_NOT_SUPPORTED;
+                }
+                if (!response.has_rx_meta_buf_size()) {
+                  return ZX_ERR_NOT_SUPPORTED;
+                }
+                if (!response.has_metadata_encoding_protocol_version() ||
+                    response.metadata_encoding_protocol_version() !=
+                        fsocket::UdpMetadataEncodingProtocolVersion::kZero) {
+                  return ZX_ERR_NOT_SUPPORTED;
+                }
+                zx::socket& socket = response.socket();
+                zx_info_socket_t info;
+                if (zx_status_t status =
+                        socket.get_info(ZX_INFO_SOCKET, &info, sizeof(info), nullptr, nullptr);
+                    status != ZX_OK) {
+                  return status;
+                }
+                if (zx_status_t status =
+                        allocator(ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET, &zxio_storage, out_context);
+                    status != ZX_OK || zxio_storage == nullptr) {
+                  return ZX_ERR_NO_MEMORY;
+                }
+                if (zx_status_t status =
+                        zxio_datagram_socket_init(zxio_storage, std::move(socket), info,
+                                                  {
+                                                      response.tx_meta_buf_size(),
+                                                      response.rx_meta_buf_size(),
+                                                  },
+                                                  std::move(control));
+                    status != ZX_OK) {
+                  return status;
+                }
+                *out_code = 0;
+                return ZX_OK;
+              },
+              [&](fidl::ClientEnd<fsocket::SynchronousDatagramSocket>& control) {
+                fidl::WireResult result = fidl::WireCall(control)->Describe();
+                if (!result.ok()) {
+                  return result.status();
+                }
+                fidl::WireResponse response = result.value();
+                if (!response.has_event()) {
+                  return ZX_ERR_NOT_SUPPORTED;
+                }
+                if (zx_status_t status = allocator(ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET,
+                                                   &zxio_storage, out_context);
+                    status != ZX_OK || zxio_storage == nullptr) {
+                  return ZX_ERR_NO_MEMORY;
+                }
+                if (zx_status_t status = zxio_synchronous_datagram_socket_init(
+                        zxio_storage, std::move(response.event()), std::move(control));
+                    status != ZX_OK) {
+                  return status;
+                }
+                *out_code = 0;
+                return ZX_OK;
+              },
+              [](zx_status_t err) { return err; }},
+          response);
     } break;
     case SOCK_RAW: {
       if (protocol == 0) {
@@ -875,16 +1068,25 @@ zx_status_t zxio_socket(zxio_service_connector service_connector, int domain, in
       if (provider.is_error()) {
         return ZX_ERR_IO;
       }
-      fidl::WireResult socket_result =
-          fidl::WireCall(provider.value())->Socket(sock_domain, proto_assoc);
-      if (!socket_result.ok()) {
-        return ZX_ERR_PEER_CLOSED;
+      auto socket_result =
+// TODO(https://fxbug.dev/384115233): Update after the API is stabilized. Use if-else
+// instead of the ternary operator.
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+          opts.has_value() ? handle_wire_result(
+                                 fidl::WireCall(provider.value())
+                                     ->SocketWithOptions(sock_domain, proto_assoc, creation_opts()))
+                           :
+#endif
+                           handle_wire_result(
+                               fidl::WireCall(provider.value())->Socket(sock_domain, proto_assoc));
+      if (socket_result.is_error()) {
+        return socket_result.error_value();
       }
-      if (socket_result->is_error()) {
-        *out_code = static_cast<int16_t>(socket_result->error_value());
+      if ((*socket_result).is_error()) {
+        *out_code = static_cast<int16_t>((*socket_result).error_value());
         return ZX_OK;
       }
-      fidl::ClientEnd<frawsocket::Socket>& control = socket_result->value()->s;
+      fidl::ClientEnd<frawsocket::Socket>& control = (*socket_result).value();
       fidl::WireResult result = fidl::WireCall(control)->Describe();
       if (!result.ok()) {
         return result.status();
@@ -909,6 +1111,21 @@ zx_status_t zxio_socket(zxio_service_connector service_connector, int domain, in
 
   *out_code = 0;
   return ZX_OK;
+}
+}  // namespace
+
+zx_status_t zxio_socket_with_options(zxio_service_connector service_connector, int domain, int type,
+                                     int protocol, zxio_socket_creation_options opts,
+                                     zxio_storage_alloc allocator, void** out_context,
+                                     int16_t* out_code) {
+  return zxio_socket_inner(service_connector, domain, type, protocol, socket_creation_options(opts),
+                           allocator, out_context, out_code);
+}
+zx_status_t zxio_socket(zxio_service_connector service_connector, int domain, int type,
+                        int protocol, zxio_storage_alloc allocator, void** out_context,
+                        int16_t* out_code) {
+  return zxio_socket_inner(service_connector, domain, type, protocol, {}, allocator, out_context,
+                           out_code);
 }
 
 zx_status_t zxio_read_link(zxio_t* io, const uint8_t** out_target, size_t* out_target_len) {

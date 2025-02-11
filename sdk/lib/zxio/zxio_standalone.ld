@@ -48,6 +48,7 @@
 		zxio_setsockopt;
 		zxio_shutdown;
 		zxio_socket;
+		zxio_socket_with_options;
 		zxio_sync;
 		zxio_token_get;
 		zxio_truncate;
