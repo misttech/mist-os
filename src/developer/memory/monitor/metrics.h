@@ -27,7 +27,7 @@ class Metrics {
   using DigestCb = fit::function<void(const memory::Capture&, memory::Digest*)>;
   Metrics(const std::vector<memory::BucketMatch>& bucket_matches, zx::duration poll_frequency,
           async_dispatcher_t* dispatcher, inspect::ComponentInspector* inspector,
-          fidl::SyncClient<fuchsia_metrics::MetricEventLogger> logger, CaptureCb capture_cb,
+          fidl::Client<fuchsia_metrics::MetricEventLogger> logger, CaptureCb capture_cb,
           DigestCb digest_cb);
 
   // Allow monitor to update the memory bandwidth readings
@@ -59,16 +59,13 @@ class Metrics {
 
   zx::duration poll_frequency_;
   async_dispatcher_t* dispatcher_;
-  fidl::SyncClient<fuchsia_metrics::MetricEventLogger> logger_;
+  fidl::Client<fuchsia_metrics::MetricEventLogger> logger_;
   CaptureCb capture_cb_;
   DigestCb digest_cb_;
   async::TaskClosureMethod<Metrics, &Metrics::CollectMetrics> task_{this};
   std::unordered_map<std::string, cobalt_registry::MemoryMigratedMetricDimensionBucket>
       bucket_name_to_code_;
 
-  // The component inspector to publish data to.
-  // Not owned.
-  inspect::ComponentInspector* inspector_;
   inspect::Node platform_metric_node_;
   inspect::Node metric_memory_node_;
   std::map<std::string, inspect::UintProperty> inspect_memory_usages_;

@@ -155,10 +155,10 @@ class MetricsUnitTest : public gtest::RealLoopFixture {
 // Wrapper around |cobalt::StubMetricEventLogger_Sync| for new style C++ bindings.
 class StubMetricEventLogger : public fidl::Server<fuchsia_metrics::MetricEventLogger> {
  public:
-  fidl::SyncClient<fuchsia_metrics::MetricEventLogger> SpawnClient(async_dispatcher_t* dispatcher) {
+  fidl::Client<fuchsia_metrics::MetricEventLogger> SpawnClient(async_dispatcher_t* dispatcher) {
     auto endpoints = fidl::CreateEndpoints<fuchsia_metrics::MetricEventLogger>().value();
     fidl::BindServer(dispatcher, std::move(endpoints.server), this);
-    return fidl::SyncClient{std::move(endpoints.client)};
+    return fidl::Client{std::move(endpoints.client), dispatcher};
   }
 
   void LogOccurrence(LogOccurrenceRequest& request,
@@ -243,15 +243,13 @@ class StubMetricEventLogger : public fidl::Server<fuchsia_metrics::MetricEventLo
 TEST_F(MetricsUnitTest, Inspect) {
   CaptureSupplier cs(Template());
   inspect::ComponentInspector inspector(dispatcher(), inspect::PublishOptions{});
-  async::Loop loop{&kAsyncLoopConfigNoAttachToCurrentThread};
   StubMetricEventLogger logger;
   Metrics m(
-      kBucketMatches, zx::min(5), dispatcher(), &inspector, logger.SpawnClient(loop.dispatcher()),
+      kBucketMatches, zx::min(5), dispatcher(), &inspector, logger.SpawnClient(dispatcher()),
       [&cs](Capture* c) {
         return cs.GetCapture(c, CaptureLevel::VMO, true /*use_capture_supplier_time*/);
       },
       [](const Capture& c, Digest* d) { Digester(kBucketMatches).Digest(c, d); });
-  loop.StartThread();
   RunLoopUntil([&cs] { return cs.empty(); });
 
   // [START get_hierarchy]
@@ -279,14 +277,12 @@ TEST_F(MetricsUnitTest, All) {
   CaptureSupplier cs(Template());
   inspect::ComponentInspector inspector(dispatcher(), inspect::PublishOptions{});
   StubMetricEventLogger logger;
-  async::Loop loop{&kAsyncLoopConfigNoAttachToCurrentThread};
   Metrics m(
-      kBucketMatches, zx::msec(10), dispatcher(), &inspector, logger.SpawnClient(loop.dispatcher()),
+      kBucketMatches, zx::msec(10), dispatcher(), &inspector, logger.SpawnClient(dispatcher()),
       [&cs](Capture* c) {
         return cs.GetCapture(c, CaptureLevel::VMO, true /*use_capture_supplier_time*/);
       },
       [](const Capture& c, Digest* d) { Digester(kBucketMatches).Digest(c, d); });
-  loop.StartThread();
   RunLoopUntil([&cs] { return cs.empty(); });
   // memory metric: 20 buckets + 4 (Orphaned, Kernel, Undigested and Free buckets)  +
   // memory_general_breakdown metric: 10 +
@@ -453,13 +449,11 @@ TEST_F(MetricsUnitTest, One) {
           },
   }});
   StubMetricEventLogger logger;
-  async::Loop loop{&kAsyncLoopConfigNoAttachToCurrentThread};
   inspect::ComponentInspector inspector(dispatcher(), inspect::PublishOptions{});
   Metrics m(
-      kBucketMatches, zx::msec(10), dispatcher(), &inspector, logger.SpawnClient(loop.dispatcher()),
+      kBucketMatches, zx::msec(10), dispatcher(), &inspector, logger.SpawnClient(dispatcher()),
       [&cs](Capture* c) { return cs.GetCapture(c, CaptureLevel::VMO); },
       [](const Capture& c, Digest* d) { Digester(kBucketMatches).Digest(c, d); });
-  loop.StartThread();
   RunLoopUntil([&cs] { return cs.empty(); });
   EXPECT_EQ(21U, logger.event_count());  // 1 + 10 + 10
 }
@@ -493,13 +487,11 @@ TEST_F(MetricsUnitTest, Undigested) {
           },
   }});
   StubMetricEventLogger logger;
-  async::Loop loop{&kAsyncLoopConfigNoAttachToCurrentThread};
   inspect::ComponentInspector inspector(dispatcher(), inspect::PublishOptions{});
   Metrics m(
-      kBucketMatches, zx::msec(10), dispatcher(), &inspector, logger.SpawnClient(loop.dispatcher()),
+      kBucketMatches, zx::msec(10), dispatcher(), &inspector, logger.SpawnClient(dispatcher()),
       [&cs](Capture* c) { return cs.GetCapture(c, CaptureLevel::VMO); },
       [](const Capture& c, Digest* d) { Digester(kBucketMatches).Digest(c, d); });
-  loop.StartThread();
   RunLoopUntil([&cs] { return cs.empty(); });
   EXPECT_EQ(22U, logger.event_count());  // 2 + 10 + 10
 }

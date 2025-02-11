@@ -131,12 +131,12 @@ Monitor::Monitor(const fxl::CommandLine& command_line, async_dispatcher_t* dispa
                  memory_monitor_config::Config config, memory::CaptureMaker capture_maker,
                  std::optional<fidl::Client<fuchsia_memorypressure::Provider>> pressure_provider,
                  std::optional<zx_handle_t> root_job,
-                 std::optional<fidl::SyncClient<fuchsia_metrics::MetricEventLoggerFactory>> factory)
+                 std::optional<fidl::Client<fuchsia_metrics::MetricEventLoggerFactory>> factory)
     : capture_maker_(std::move(capture_maker)),
       high_water_(
           "/cache", kHighWaterPollFrequency, kHighWaterThreshold, dispatcher,
           [this](Capture* c, CaptureLevel l) { return capture_maker_.GetCapture(c, l); },
-          [this](const Capture& c, Digest* d) { digester_->Digest(c, d); }),
+          [this](const Capture& c, Digest* d) { digester_.Digest(c, d); }),
       prealloc_size_(0),
       logging_(command_line.HasOption("log")),
       tracing_(false),
@@ -149,17 +149,17 @@ Monitor::Monitor(const fxl::CommandLine& command_line, async_dispatcher_t* dispa
           [this](Capture* c) { return capture_maker_.GetCapture(c, CaptureLevel::VMO); },
           [this](const Capture& c, Digest* d) { GetDigest(c, d); }, &config_,
           inspector_.root().CreateChild(kLoggerInspectKey)),
+      metric_event_logger_factory_(std::move(factory)),
+      bucket_matches_(CreateBucketMatchesFromConfigData()),
+      digester_(bucket_matches_),
       level_(pressure_signaler::Level::kNumLevels) {
-  auto bucket_matches = CreateBucketMatchesFromConfigData();
-  digester_ = std::make_unique<Digester>(bucket_matches);
-  if (factory)
-    CreateMetrics(std::move(*factory), bucket_matches);
+  if (metric_event_logger_factory_)
+    CreateMetrics();
 
   // Expose lazy values under the root, populated from the Inspect method.
-  inspector_.root().RecordLazyValues(
-      "memory_measurements", [this, bucket_matches = std::move(bucket_matches)] {
-        return fpromise::make_result_promise(fpromise::ok(Inspect(bucket_matches)));
-      });
+  inspector_.root().RecordLazyValues("memory_measurements", [this] {
+    return fpromise::make_result_promise(fpromise::ok(Inspect()));
+  });
   inspect::Node config_node = inspector_.root().CreateChild("config");
   config_.RecordInspect(&config_node);
 
@@ -198,7 +198,7 @@ Monitor::Monitor(const fxl::CommandLine& command_line, async_dispatcher_t* dispa
       exit(-1);
     }
 
-    status = prealloc_vmo_.op_range(ZX_VMO_OP_COMMIT, 0, prealloc_size_, NULL, 0);
+    status = prealloc_vmo_.op_range(ZX_VMO_OP_COMMIT, 0, prealloc_size_, nullptr, 0);
     if (status != ZX_OK) {
       FX_LOGS(ERROR) << "zx::vmo::op_range() returns " << zx_status_get_string(status);
       exit(-1);
@@ -254,9 +254,7 @@ void Monitor::SetRamDevice(fidl::Client<fuchsia_hardware_ram_metrics::Device> de
     PeriodicMeasureBandwidth();
 }
 
-void Monitor::CreateMetrics(
-    fidl::SyncClient<fuchsia_metrics::MetricEventLoggerFactory> metric_event_logger_factory,
-    const std::vector<memory::BucketMatch>& bucket_matches) {
+void Monitor::CreateMetrics() {
   fuchsia_metrics::ProjectSpec project_spec{
       {.customer_id = cobalt_registry::kCustomerId, .project_id = cobalt_registry::kProjectId}};
   auto endpoints = fidl::CreateEndpoints<fuchsia_metrics::MetricEventLogger>();
@@ -264,19 +262,20 @@ void Monitor::CreateMetrics(
     FX_LOGS(ERROR) << "Unable to create fuchsia_metrics::MetricEventLogger channels.";
     return;
   }
-  fidl::SyncClient<fuchsia_metrics::MetricEventLogger> metric_event_logger{
-      std::move(endpoints->client)};
-  auto result = metric_event_logger_factory->CreateMetricEventLogger(
-      {{.project_spec = project_spec, .logger = std::move(endpoints->server)}});
-  if (result.is_error()) {
-    FX_LOGS(ERROR) << "Unable to get metrics.Logger from factory.";
-    return;
-  }
-  metrics_.emplace(
-      bucket_matches, kMetricsPollFrequency, dispatcher_, &inspector_,
-      std::move(metric_event_logger),
-      [this](Capture* c) { return capture_maker_.GetCapture(c, CaptureLevel::VMO); },
-      [this](const Capture& c, Digest* d) { GetDigest(c, d); });
+  (*metric_event_logger_factory_)
+      ->CreateMetricEventLogger(
+          {{.project_spec = project_spec, .logger = std::move(endpoints->server)}})
+      .Then([this, client = std::move(endpoints->client)](const auto& result) mutable {
+        if (result.is_error()) {
+          FX_LOGS(ERROR) << "Unable to get metrics.Logger from factory.";
+          return;
+        }
+        metrics_.emplace(
+            bucket_matches_, kMetricsPollFrequency, dispatcher_, &inspector_,
+            fidl::Client<fuchsia_metrics::MetricEventLogger>(std::move(client), dispatcher_),
+            [this](Capture* c) { return capture_maker_.GetCapture(c, CaptureLevel::VMO); },
+            [this](const Capture& c, Digest* d) { GetDigest(c, d); });
+      });
 }
 
 void Monitor::CollectJsonStats(CollectJsonStatsRequest& request,
@@ -324,7 +323,7 @@ void Monitor::PrintHelp() {
   std::cout << "  --delay=msecs\n";
 }
 
-inspect::Inspector Monitor::Inspect(const std::vector<memory::BucketMatch>& bucket_matches) {
+inspect::Inspector Monitor::Inspect() {
   inspect::Inspector inspector(inspect::InspectSettings{.maximum_size = 1024ul * 1024});
   auto& root = inspector.GetRoot();
 
@@ -348,7 +347,7 @@ inspect::Inspector Monitor::Inspect(const std::vector<memory::BucketMatch>& buck
     root.RecordString("high_water_digest_previous_boot", previous_high_water_digest_string);
   }
 
-  root.RecordLazyValues("lazynode", [this, bucket_matches] {
+  root.RecordLazyValues("lazynode", [this] {
     inspect::Inspector inspector(inspect::InspectSettings{.maximum_size = 1024ul * 1024});
     auto& root = inspector.GetRoot();
     Capture capture;
@@ -424,7 +423,7 @@ inspect::Inspector Monitor::Inspect(const std::vector<memory::BucketMatch>& buck
     }
 
     Digest digest;
-    digester_->Digest(capture, &digest);
+    digester_.Digest(capture, &digest);
     std::ostringstream digest_stream;
     TextPrinter digest_printer(digest_stream);
     digest_printer.PrintDigest(digest);
@@ -595,7 +594,7 @@ void Monitor::UpdateState() {
 
 void Monitor::GetDigest(const memory::Capture& capture, memory::Digest* digest) {
   std::lock_guard<std::mutex> lock(digester_mutex_);
-  digester_->Digest(capture, digest);
+  digester_.Digest(capture, digest);
 }
 
 namespace {

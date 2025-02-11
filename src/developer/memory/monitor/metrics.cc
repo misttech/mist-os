@@ -39,7 +39,7 @@ const std::map<zx_duration_boot_t, TimeSinceBoot> UptimeLevelMap = {
 Metrics::Metrics(const std::vector<memory::BucketMatch>& bucket_matches,
                  zx::duration poll_frequency, async_dispatcher_t* dispatcher,
                  inspect::ComponentInspector* inspector,
-                 fidl::SyncClient<fuchsia_metrics::MetricEventLogger> logger, CaptureCb capture_cb,
+                 fidl::Client<fuchsia_metrics::MetricEventLogger> logger, CaptureCb capture_cb,
                  DigestCb digest_cb)
     : poll_frequency_(poll_frequency),
       dispatcher_(dispatcher),
@@ -62,8 +62,7 @@ Metrics::Metrics(const std::vector<memory::BucketMatch>& bucket_matches,
           {"[Addl]ZramCompressedBytes",
            MemoryMigratedMetricDimensionBucket::__Addl_ZramCompressedBytes},
       }),
-      inspector_(inspector),
-      platform_metric_node_(inspector_->root().CreateChild(kInspectPlatformNodeName)),
+      platform_metric_node_(inspector->root().CreateChild(kInspectPlatformNodeName)),
       // Diagram of hierarchy can be seen below:
       // root
       // - platform_metrics
@@ -126,12 +125,13 @@ void Metrics::CollectMetrics() {
         fuchsia_metrics::MetricEventPayload::WithIntegerValue(static_cast<int64_t>(bucket.size()))};
     events.push_back(event);
   }
-  auto response = logger_->LogMetricEvents({std::move(events)});
-  if (response.is_error() &&
-      response.error_value().domain_error() == fuchsia_metrics::Error::kInvalidArguments) {
-    FX_LOGS(ERROR) << "LogMetricEvents() returned status INVALID_ARGUMENTS";
-  }
-  task_.PostDelayed(dispatcher_, poll_frequency_);
+  logger_->LogMetricEvents({std::move(events)}).Then([this](const auto& response) {
+    if (response.is_error() &&
+        response.error_value().domain_error() == fuchsia_metrics::Error::kInvalidArguments) {
+      FX_LOGS(ERROR) << "LogMetricEvents() returned status INVALID_ARGUMENTS";
+    }
+    task_.PostDelayed(dispatcher_, poll_frequency_);
+  });
 }
 
 void Metrics::WriteDigestToInspect(const memory::Digest& digest) {

@@ -4,13 +4,10 @@
 
 #include <lib/async/cpp/executor.h>
 #include <lib/inspect/testing/cpp/inspect.h>
-#include <lib/sys/cpp/testing/component_context_provider.h>
 
 #include <cstddef>
-#include <future>
 
 #include <gtest/gtest.h>
-#include <src/cobalt/bin/testing/stub_metric_event_logger.h>
 
 #include "lib/fpromise/result.h"
 #include "src/developer/memory/monitor/monitor.h"
@@ -83,8 +80,8 @@ class MockLoggerFactory : public fidl::Server<fuchsia_metrics::MetricEventLogger
 
   void CreateMetricEventLogger(CreateMetricEventLoggerRequest& request,
                                CreateMetricEventLoggerCompleter::Sync& completer) override {
-    received_project_id_ = request.project_spec().project_id().value();
-    auto _ = fidl::BindServer(dispatcher_, std::move(request.logger()), &logger_);
+    received_project_id_ = *request.project_spec().project_id();
+    fidl::BindServer(dispatcher_, std::move(request.logger()), &logger_);
     completer.Reply(fit::success());
   }
 
@@ -96,34 +93,33 @@ class MockLoggerFactory : public fidl::Server<fuchsia_metrics::MetricEventLogger
 
  private:
   uint32_t received_project_id_;
-  MockLogger logger_{};
+  MockLogger logger_;
   async_dispatcher_t* dispatcher_;
 };
 
 class MemoryBandwidthInspectTest : public gtest::TestLoopFixture {
  public:
-  MemoryBandwidthInspectTest()
-      : monitor_(fxl::CommandLine{}, dispatcher(), memory_monitor_config::Config{},
-                 memory::CaptureMaker::Create(memory::CreateDefaultOS()).value()),
-        executor_(dispatcher()),
-        metric_event_logger_factory_loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
-        logger_factory_(metric_event_logger_factory_loop_.dispatcher()) {
-    metric_event_logger_factory_loop_.StartThread();
+  MemoryBandwidthInspectTest() : executor_(dispatcher()), logger_factory_(dispatcher()) {
     // Create metrics
     {
       auto endpoints = fidl::CreateEndpoints<fuchsia_metrics::MetricEventLoggerFactory>();
       fidl::BindServer<fuchsia_metrics::MetricEventLoggerFactory>(
-          metric_event_logger_factory_loop_.dispatcher(), std::move(endpoints->server),
-          &logger_factory_);
-      CreateMetrics(fidl::SyncClient<fuchsia_metrics::MetricEventLoggerFactory>{
-          std::move(endpoints->client)});
+          dispatcher(), std::move(endpoints->server), &logger_factory_);
+      monitor_ = std::make_unique<Monitor>(
+          fxl::CommandLine{}, dispatcher(), memory_monitor_config::Config{},
+          *memory::CaptureMaker::Create(memory::CreateDefaultOS()),
+          /* pressure_provider */ std::nullopt, /* root_job */ std::nullopt,
+          fidl::Client<fuchsia_metrics::MetricEventLoggerFactory>{std::move(endpoints->client),
+                                                                  dispatcher()});
+      RunLoopUntilIdle();
     }
     // Set RamDevice
     {
       auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_ram_metrics::Device>();
       fidl::BindServer<fuchsia_hardware_ram_metrics::Device>(
           dispatcher(), std::move(endpoints->server), &fake_device_);
-      monitor_.SetRamDevice(fidl::Client(std::move(endpoints->client), dispatcher()));
+      monitor_->SetRamDevice(fidl::Client(std::move(endpoints->client), dispatcher()));
+      RunLoopUntilIdle();
     }
   }
 
@@ -143,29 +139,13 @@ class MemoryBandwidthInspectTest : public gtest::TestLoopFixture {
     return hierarchy;
   }
 
-  inspect::Inspector Inspector() { return monitor_.inspector_.inspector(); }
+  inspect::Inspector Inspector() { return monitor_->inspector_.inspector(); }
 
  private:
-  void CreateMetrics(fidl::SyncClient<fuchsia_metrics::MetricEventLoggerFactory> factory) {
-    // The Monitor will make asynchronous calls to the MockLogger*s that are also running in this
-    // class/tests thread. So the call to the Monitor needs to be made on a different thread, such
-    // that the MockLogger*s running on the main thread can respond to those calls.
-    std::future<void /*fuchsia::metrics::MetricEventLogger_Sync**/> result =
-        std::async([this, factory = std::move(factory)]() mutable {
-          monitor_.CreateMetrics(std::move(factory), {});
-        });
-    while (result.wait_for(std::chrono::milliseconds(1)) != std::future_status::ready) {
-      // Run the main thread's loop, allowing the MockLogger* objects to respond to requests.
-      RunLoopUntilIdle();
-    }
-    result.get();
-  }
-
-  Monitor monitor_;
   async::Executor executor_;
   FakeRamDevice fake_device_;
-  async::Loop metric_event_logger_factory_loop_;
   MockLoggerFactory logger_factory_;
+  std::unique_ptr<Monitor> monitor_;
 };
 
 TEST_F(MemoryBandwidthInspectTest, MemoryBandwidth) {

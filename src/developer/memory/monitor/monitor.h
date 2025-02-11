@@ -40,7 +40,7 @@ class Monitor : public fidl::Server<fuchsia_memory_inspection::Collector>,
           std::optional<fidl::Client<fuchsia_memorypressure::Provider>> pressure_provider =
               std::nullopt,
           std::optional<zx_handle_t> root_job = std::nullopt,
-          std::optional<fidl::SyncClient<fuchsia_metrics::MetricEventLoggerFactory>>
+          std::optional<fidl::Client<fuchsia_metrics::MetricEventLoggerFactory>>
               metric_event_logger_factory = std::nullopt);
   ~Monitor() override = default;
 
@@ -67,9 +67,7 @@ class Monitor : public fidl::Server<fuchsia_memory_inspection::Collector>,
  private:
   void CollectJsonStatsWithOptions(zx::socket socket);
 
-  void CreateMetrics(
-      fidl::SyncClient<fuchsia_metrics::MetricEventLoggerFactory> metric_event_logger_factory,
-      const std::vector<memory::BucketMatch>& bucket_matches);
+  void CreateMetrics();
 
   void UpdateState();
 
@@ -77,7 +75,7 @@ class Monitor : public fidl::Server<fuchsia_memory_inspection::Collector>,
   void MeasureBandwidthAndPost();
   void PeriodicMeasureBandwidth();
   static void PrintHelp();
-  inspect::Inspector Inspect(const std::vector<memory::BucketMatch>& bucket_matches);
+  inspect::Inspector Inspect();
 
   void GetDigest(const memory::Capture& capture, memory::Digest* digest);
 
@@ -96,8 +94,11 @@ class Monitor : public fidl::Server<fuchsia_memory_inspection::Collector>,
   memory_monitor_config::Config config_;
   inspect::ComponentInspector inspector_;
   Logger logger_;
+  std::optional<fidl::Client<fuchsia_metrics::MetricEventLoggerFactory>>
+      metric_event_logger_factory_;
   std::optional<Metrics> metrics_;
-  std::unique_ptr<memory::Digester> digester_;
+  std::vector<memory::BucketMatch> bucket_matches_;
+  memory::Digester digester_;
   std::mutex digester_mutex_;
   fidl::Client<fuchsia_hardware_ram_metrics::Device> ram_device_;
   uint64_t pending_bandwidth_measurements_ = 0;

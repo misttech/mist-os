@@ -85,13 +85,13 @@ int main(int argc, const char** argv) {
     }
   }
 
-  std::optional<fidl::SyncClient<fuchsia_metrics::MetricEventLoggerFactory>> factory;
+  std::optional<fidl::Client<fuchsia_metrics::MetricEventLoggerFactory>> factory;
   {
     zx::result client_end = component::Connect<fuchsia_metrics::MetricEventLoggerFactory>();
     if (!client_end.is_ok()) {
       FX_LOGS(ERROR) << "Unable to get metrics.MetricEventLoggerFactory.";
     } else {
-      factory.emplace(std::move(client_end.value()));
+      factory.emplace(std::move(*client_end), loop.dispatcher());
     }
   }
   auto app = std::make_unique<monitor::Monitor>(
