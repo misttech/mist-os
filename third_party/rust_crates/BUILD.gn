@@ -9,10 +9,6 @@ import("//build/licenses/license.gni")
 gn_source_root = rebase_path("//", root_build_dir)
 not_needed([ "gn_source_root" ])
 
-group("aead") {
-  public_deps = [ ":aead-v0_4_3" ]
-}
-
 group("aes") {
   public_deps = [ ":aes-v0_8_4" ]
 }
@@ -1223,41 +1219,6 @@ rust_library("adler32-v1_0_4") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":adler32-v1_0_4.license" ]
-}
-
-license("aead-v0_4_3.license") {
-  public_package_name = "aead"
-  license_files = [
-    "//third_party/rust_crates/vendor/aead-0.4.3/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/aead-0.4.3/LICENSE-MIT",
-  ]
-}
-
-rust_library("aead-v0_4_3") {
-  crate_name = "aead"
-  crate_root = "//third_party/rust_crates/vendor/aead-0.4.3/src/lib.rs"
-  output_name = "aead-af52864ec4702c1b"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":generic-array-v0_14_5" ]
-  deps += [ ":rand_core-v0_6_3" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=af52864ec4702c1b",
-    "-Cextra-filename=-af52864ec4702c1b",
-    "--cfg=feature=\"alloc\"",
-    "--cfg=feature=\"rand_core\"",
-    "--cfg=feature=\"std\"",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":aead-v0_4_3.license" ]
 }
 
 license("aead-v0_5_2.license") {

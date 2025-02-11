@@ -23,7 +23,6 @@ version = "0.1.0"
 
 [dependencies]
 # keep-sorted start
-aead = { version = "0.4.2", features = ["std"] }
 aes = "0.8.4"
 aes-gcm = "0.10.1"
 aes-gcm-siv = { version = "0.11.1", features = ["std"] }
