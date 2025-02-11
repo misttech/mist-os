@@ -24,6 +24,7 @@
 #include <unordered_map>
 
 #include "src/graphics/display/drivers/fake/image-info.h"
+#include "src/graphics/display/lib/api-types/cpp/color.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
@@ -145,6 +146,10 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   static zx::result<> DoImageCapture(DisplayImageInfo& source_info,
                                      CaptureImageInfo& destination_info);
 
+  // Simulates a display capture for a single-layer color fill configuration.
+  static zx::result<> DoColorFillCapture(display::Color fill_color,
+                                         CaptureImageInfo& destination_info);
+
   // Dispatches an OnCaptureComplete() event to the Display Coordinator.
   void SendCaptureComplete() __TA_EXCLUDES(engine_listener_mutex_);
 
@@ -229,6 +234,9 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   // are supported. The representation will be revised when we add multi-layer
   // support.
   display::DriverImageId applied_image_id_ __TA_GUARDED(mutex_) = display::kInvalidDriverImageId;
+
+  // The fallback color in the applied display configuration.
+  display::Color applied_fallback_color_ __TA_GUARDED(mutex_);
 
   // Next image ID assigned to an imported image.
   //

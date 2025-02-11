@@ -24,16 +24,17 @@
 #include <zircon/threads.h>
 #include <zircon/types.h>
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cinttypes>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <initializer_list>
 #include <iterator>
 #include <limits>
 #include <mutex>
-#include <string>
 #include <utility>
 
 #include <fbl/alloc_checker.h>
@@ -41,12 +42,14 @@
 
 #include "src/graphics/display/drivers/coordinator/preferred-scanout-image-type.h"
 #include "src/graphics/display/drivers/fake/image-info.h"
+#include "src/graphics/display/lib/api-types/cpp/color.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -117,6 +120,10 @@ FakeDisplay::FakeDisplay(FakeDisplayDeviceConfig device_config,
     : display_engine_banjo_protocol_({&display_engine_protocol_ops_, this}),
       device_config_(device_config),
       sysmem_(std::move(sysmem_allocator)),
+      applied_fallback_color_({
+          .format = display::PixelFormat::kB8G8R8A8,
+          .bytes = std::initializer_list<uint8_t>{0, 0, 0, 0, 0, 0, 0, 0},
+      }),
       inspector_(std::move(inspector)) {
   ZX_DEBUG_ASSERT(sysmem_.is_valid());
   InitializeSysmemClient();
@@ -413,23 +420,46 @@ config_check_result_t FakeDisplay::DisplayEngineCheckConfiguration(
     }
     ZX_DEBUG_ASSERT(display_configs[0].layer_count == 1);
     const layer_t& layer = display_configs[0].layer_list[0];
+
     const rect_u_t display_area = {.x = 0, .y = 0, .width = kWidth, .height = kHeight};
-    if (layer.image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY) {
-      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-    }
-    if (layer.image_metadata.dimensions.width != kWidth) {
-      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-    }
-    if (layer.image_metadata.dimensions.height != kHeight) {
-      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-    }
     if (memcmp(&layer.display_destination, &display_area, sizeof(rect_u_t)) != 0) {
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
+
     if (memcmp(&layer.image_source, &display_area, sizeof(rect_u_t)) != 0) {
+      // Allow solid color fill layers.
+      if (layer.image_source.width != 0 || layer.image_source.height != 0) {
+        return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+      }
+      if (layer.image_source.x != 0 || layer.image_source.y != 0) {
+        return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+      }
+
+      if (!display::PixelFormat::IsSupported(layer.fallback_color.format)) {
+        return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+      }
+
+      // The capture simulation implementation is currently optimized for 32-bit
+      // colors. Removing this constraint will require updating that
+      // implementation.
+      display::PixelFormat fallback_color_pixel_format =
+          display::PixelFormat(layer.fallback_color.format);
+      if (fallback_color_pixel_format.EncodingSize() != sizeof(uint32_t)) {
+        return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+      }
+    }
+
+    if (layer.image_metadata.dimensions.width != layer.image_source.width) {
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
+    if (layer.image_metadata.dimensions.height != layer.image_source.height) {
+      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    }
+
     if (layer.alpha_mode != ALPHA_DISABLE) {
+      return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    }
+    if (layer.image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY) {
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
     return CONFIG_CHECK_RESULT_OK;
@@ -455,8 +485,13 @@ void FakeDisplay::DisplayEngineApplyConfiguration(const display_config_t* displa
   if (display_count == 1 && display_configs[0].layer_count) {
     // Only support one display.
     applied_image_id_ = display::ToDriverImageId(display_configs[0].layer_list[0].image_handle);
+    applied_fallback_color_ = display::Color::From(display_configs[0].layer_list[0].fallback_color);
   } else {
     applied_image_id_ = display::kInvalidDriverImageId;
+    static constexpr display::Color kBlackBgra(
+        {.format = display::PixelFormat::kB8G8R8A8,
+         .bytes = std::initializer_list<uint8_t>{0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0x00}});
+    applied_fallback_color_ = kBlackBgra;
   }
 
   applied_config_stamp_ = config_stamp;
@@ -753,8 +788,16 @@ zx::result<> FakeDisplay::ServiceAnyCaptureRequest() {
                 "Driver allowed releasing the target of an in-progress capture");
   CaptureImageInfo& capture_destination_info = *imported_captures_it;
 
-  if (applied_image_id_ != display::kInvalidDriverImageId) {
-    // We have a valid image being displayed. Let's capture it.
+  if (applied_image_id_ == display::kInvalidDriverImageId) {
+    // Solid color fill capture.
+    zx::result<> color_fill_capture_result =
+        DoColorFillCapture(applied_fallback_color_, capture_destination_info);
+    if (color_fill_capture_result.is_error()) {
+      // DoColorFillCapture() has already logged the error.
+      return color_fill_capture_result;
+    }
+  } else {
+    // Image capture.
     auto imported_images_it = imported_images_.find(applied_image_id_);
 
     ZX_ASSERT_MSG(imported_images_it.IsValid(),
@@ -793,6 +836,11 @@ zx::result<> FakeDisplay::DoImageCapture(DisplayImageInfo& source_info,
             zx_status_get_string(status));
     return zx::error(status);
   }
+  if (source_vmo_size % sizeof(uint32_t) != 0) {
+    FDF_LOG(ERROR, "Capture will fail; the displayed image VMO size %zu is not a 32-bit multiple",
+            source_vmo_size);
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
 
   size_t destination_vmo_size;
   status = destination_info.vmo().get_size(&destination_vmo_size);
@@ -817,6 +865,12 @@ zx::result<> FakeDisplay::DoImageCapture(DisplayImageInfo& source_info,
     return zx::error(status);
   }
 
+  // Inline implementation of std::is_sufficiently_aligned() from C++26.
+  ZX_ASSERT_MSG(std::bit_cast<std::uintptr_t>(source_mapper.start()) % sizeof(uint32_t) == 0,
+                "Page size <= 32 bits; the pointer cast below will cause UB");
+  std::span<const uint32_t> source_colors(static_cast<const uint32_t*>(source_mapper.start()),
+                                          source_vmo_size / sizeof(uint32_t));
+
   fzl::VmoMapper destination_mapper;
   status = destination_mapper.Map(destination_info.vmo(), 0, destination_vmo_size,
                                   ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
@@ -826,11 +880,72 @@ zx::result<> FakeDisplay::DoImageCapture(DisplayImageInfo& source_info,
     return zx::error(status);
   }
 
+  // Inline implementation of std::is_sufficiently_aligned() from C++26.
+  ZX_ASSERT_MSG(std::bit_cast<std::uintptr_t>(destination_mapper.start()) % sizeof(uint32_t) == 0,
+                "Page size <= 32 bits; the pointer cast below will cause UB");
+  std::span<uint32_t> destination_colors(static_cast<uint32_t*>(destination_mapper.start()),
+                                         destination_vmo_size / sizeof(uint32_t));
+
   if (source_info.metadata().coherency_domain == fuchsia_sysmem2::CoherencyDomain::kRam) {
     zx_cache_flush(source_mapper.start(), source_vmo_size,
                    ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
   }
-  std::memcpy(destination_mapper.start(), source_mapper.start(), destination_vmo_size);
+  std::ranges::copy(source_colors, destination_colors.begin());
+  if (destination_info.metadata().coherency_domain == fuchsia_sysmem2::CoherencyDomain::kRam) {
+    zx_cache_flush(destination_mapper.start(), destination_vmo_size,
+                   ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
+  }
+
+  return zx::ok();
+}
+
+// static
+zx::result<> FakeDisplay::DoColorFillCapture(display::Color fill_color,
+                                             CaptureImageInfo& destination_info) {
+  // TODO(https://fxbug.dev/394954078): Capture requests issued before a
+  // configuration is applied are constrained to the initial fill color format,
+  // which happens to be 32-bit BGRA. This rough edge will be removed when we
+  // explicitly disallow starting a capture before a config is applied.
+  if (fill_color.format().ToFidl() != destination_info.metadata().pixel_format) {
+    FDF_LOG(ERROR, "Capture will fail; trying to capture format=%u as format=%u\n",
+            fill_color.format().ValueForLogging(),
+            static_cast<uint32_t>(destination_info.metadata().pixel_format));
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  ZX_ASSERT_MSG(std::bit_cast<std::uintptr_t>(fill_color.bytes().data()) % sizeof(uint32_t) == 0,
+                "Color byte buffer not 32-bit aligned; the pointer cast below will cause UB");
+  const uint32_t source_color = *(reinterpret_cast<const uint32_t*>(fill_color.bytes().data()));
+
+  size_t destination_vmo_size;
+  zx_status_t status = destination_info.vmo().get_size(&destination_vmo_size);
+  if (status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to get the size of the VMO for the captured image: %s",
+            zx_status_get_string(status));
+    return zx::error(status);
+  }
+  if (destination_vmo_size % sizeof(uint32_t) != 0) {
+    FDF_LOG(ERROR, "Capture will fail; the captured image VMO size %zu is not a 32-bit multiple",
+            destination_vmo_size);
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  fzl::VmoMapper destination_mapper;
+  status = destination_mapper.Map(destination_info.vmo(), 0, destination_vmo_size,
+                                  ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
+  if (status != ZX_OK) {
+    FDF_LOG(ERROR, "Capture will fail; failed to map capture image VMO: %s",
+            zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  // Inline implementation of std::is_sufficiently_aligned() from C++26.
+  ZX_ASSERT_MSG(std::bit_cast<std::uintptr_t>(destination_mapper.start()) % sizeof(uint32_t) == 0,
+                "Page size <= 32 bits; the pointer cast below will cause UB");
+  std::span<uint32_t> destination_colors(static_cast<uint32_t*>(destination_mapper.start()),
+                                         destination_vmo_size / sizeof(uint32_t));
+
+  std::ranges::fill(destination_colors, source_color);
   if (destination_info.metadata().coherency_domain == fuchsia_sysmem2::CoherencyDomain::kRam) {
     zx_cache_flush(destination_mapper.start(), destination_vmo_size,
                    ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
