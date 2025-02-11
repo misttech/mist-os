@@ -102,7 +102,6 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
   zx_status_t GetProtocol(BanjoProtoId proto_id, GenericProtocol* out) const;
 
   // Serve this interface in an outgoing directory.
-  zx_status_t Serve(async_dispatcher_t* dispatcher, component::OutgoingDirectory* outgoing);
   zx_status_t Serve(async_dispatcher_t* dispatcher, fdf::OutgoingDirectory* outgoing);
 
   // Create offers to offer this interface to another component.

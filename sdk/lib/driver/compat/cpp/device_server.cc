@@ -149,29 +149,6 @@ zx_status_t DeviceServer::GetProtocol(BanjoProtoId proto_id, GenericProtocol* ou
   return ZX_OK;
 }
 
-zx_status_t DeviceServer::Serve(async_dispatcher_t* dispatcher,
-                                component::OutgoingDirectory* outgoing) {
-  auto device = [this, dispatcher](
-                    fidl::ServerEnd<fuchsia_driver_compat::Device> server_end) mutable -> void {
-    bindings_.AddBinding(dispatcher, std::move(server_end), this, fidl::kIgnoreBindingClosure);
-  };
-
-  fuchsia_driver_compat::Service::InstanceHandler handler({.device = std::move(device)});
-  zx::result<> status =
-      outgoing->AddService<fuchsia_driver_compat::Service>(std::move(handler), name());
-  if (status.is_error()) {
-    return status.error_value();
-  }
-  stop_serving_ = [this, outgoing]() {
-    (void)outgoing->RemoveService<fuchsia_driver_compat::Service>(name_);
-  };
-
-  if (service_offers_) {
-    return service_offers_->Serve(dispatcher, outgoing);
-  }
-  return ZX_OK;
-}
-
 zx_status_t DeviceServer::Serve(async_dispatcher_t* dispatcher, fdf::OutgoingDirectory* outgoing) {
   auto device = [this, dispatcher](
                     fidl::ServerEnd<fuchsia_driver_compat::Device> server_end) mutable -> void {
