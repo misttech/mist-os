@@ -43,7 +43,7 @@ source_set("layer_common") {
     "$validation_layer_dir/layers/vulkan/generated/vk_layer_dispatch_table.h",
   ]
 
-  public_deps = [ "//third_party/Vulkan-Headers:vulkan_headers" ]
+  public_deps = [ "//third_party/Vulkan-Headers/src:vulkan_headers" ]
 }
 
 loadable_module("swapchain") {

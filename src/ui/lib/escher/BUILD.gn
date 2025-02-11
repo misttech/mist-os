@@ -137,15 +137,15 @@ template("escher_library") {
     ]
 
     deps = [
-      "//third_party/spirv-cross/gn:spirv_cross_sources",
-      "//third_party/spirv-tools:spvtools_opt",
+      "//third_party/spirv-cross/src/gn:spirv_cross_sources",
+      "//third_party/spirv-tools/src:spvtools_opt",
     ]
 
     if (use_runtime_glsl) {
       deps += [
-        "//third_party/glslang:glslang_default_resource_limits_sources",
-        "//third_party/glslang:glslang_sources",
-        "//third_party/shaderc:libshaderc",
+        "//third_party/glslang/src:glslang_default_resource_limits_sources",
+        "//third_party/glslang/src:glslang_sources",
+        "//third_party/shaderc/src:libshaderc",
       ]
     }
 

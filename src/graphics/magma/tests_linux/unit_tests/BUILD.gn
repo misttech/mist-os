@@ -18,7 +18,7 @@ cc_test_executable("virtmagma_vulkan_unit_tests") {
 }
 
 compiled_action("basic_compute") {
-  tool = "//third_party/glslang:glslang_validator"
+  tool = "//third_party/glslang/src:glslang_validator"
   inputs = [ "${target_name}.glsl" ]
   outputs = [ "$target_gen_dir/${target_name}.h" ]
   args = [

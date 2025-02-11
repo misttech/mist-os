@@ -109,8 +109,8 @@ if (is_linux && !has_prebuilt_vulkan_runtime) {
 
     if (escher_use_runtime_glsl) {
       deps += [
-        "//third_party/glslang:glslang_sources",
-        "//third_party/shaderc:libshaderc",
+        "//third_party/glslang/src:glslang_sources",
+        "//third_party/shaderc/src:libshaderc",
       ]
     }
 

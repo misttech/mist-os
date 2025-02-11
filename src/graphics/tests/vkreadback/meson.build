@@ -25,7 +25,7 @@ exe_external_sources = sources + [
 ]
 
 inc_vulkan = include_directories(
-    fuchsia_root + '/third_party/Vulkan-Headers/include',
+    fuchsia_root + '/third_party/Vulkan-Headers/src/include',
 )
 
 gtest_main_dep = dependency('gtest_main', main: true)
