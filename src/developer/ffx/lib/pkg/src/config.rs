@@ -189,7 +189,7 @@ pub async fn unset_default_repository() -> Result<()> {
 }
 
 /// Get repository spec from config.
-pub async fn get_repository(repo_name: &str) -> Result<Option<RepositorySpec>> {
+pub fn get_repository(repo_name: &str) -> Result<Option<RepositorySpec>> {
     if let Some(value) = ffx_config::get(&repository_query(repo_name))? {
         Ok(serde_json::from_value(value)?)
     } else {
@@ -556,7 +556,7 @@ mod tests {
             .unwrap();
 
         // Initially the repositoy does not exist.
-        assert_eq!(get_repository("repo").await.unwrap(), None);
+        assert_eq!(get_repository("repo").unwrap(), None);
 
         // Add the repository.
         let repository = RepositorySpec::Pm {
@@ -578,15 +578,15 @@ mod tests {
         );
 
         // Make sure we can get the repository.
-        assert_eq!(get_repository("repo").await.unwrap(), Some(repository));
+        assert_eq!(get_repository("repo").unwrap(), Some(repository));
 
         // We can't get unknown repositories.
-        assert_eq!(get_repository("unknown").await.unwrap(), None);
+        assert_eq!(get_repository("unknown").unwrap(), None);
 
         // We can remove the repository.
         remove_repository("repo").await.unwrap();
         assert_eq!(env.context.get::<Option<Value>, _>(CONFIG_KEY_REPOSITORIES).unwrap(), None,);
-        assert_eq!(get_repository("repo").await.unwrap(), None);
+        assert_eq!(get_repository("repo").unwrap(), None);
     }
 
     #[fuchsia::test]

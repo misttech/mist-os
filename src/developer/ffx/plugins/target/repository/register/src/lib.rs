@@ -133,7 +133,7 @@ impl RegisterTool {
             // If so, treat it as a daemon based repo
             // with a warning. Once we migrate away from the daemon, it should go back to being an error.
 
-            if get_repository(&repo_name).await?.is_some() {
+            if get_repository(&repo_name)?.is_some() {
                 tracing::warn!("Repository server \"{repo_name}\" not running. Treating this as a daemon based server.");
                 eprintln!("Repository server \"{repo_name}\" not running. Treating this as a daemon based server.");
                 eprintln!("If \"{repo_name}\" is supposed to be a standalone server, please start it before running this command.");

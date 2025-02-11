@@ -310,7 +310,6 @@ async fn connect_to_repo(
         {
             Some(info.repo_spec())
         } else if let Some(repo_spec) = pkg::config::get_repository(&repo_name)
-            .await
             .with_context(|| format!("Finding repo spec for {repo_name}"))?
         {
             Some(repo_spec)
@@ -321,7 +320,6 @@ async fn connect_to_repo(
         // Otherwise, check if the default repository exists. Don't error out if
         // it doesn't.
         pkg::config::get_repository(&repo_name)
-            .await
             .with_context(|| format!("Finding repo spec for {repo_name}"))?
     } else {
         None
