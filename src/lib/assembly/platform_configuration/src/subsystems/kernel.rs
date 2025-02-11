@@ -43,6 +43,15 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
                 builder.platform_bundle("kernel_serial_legacy")
             }
         }
+
+        if let Some(serial) = &context.board_info.kernel.serial {
+            if context.build_type == &BuildType::Eng {
+                builder.kernel_arg(KernelArg::Serial(serial.to_string()));
+            } else {
+                println!("'kernel.serial' can only be enabled in 'eng' builds. Not enabling.")
+            }
+        }
+
         if kernel_config.lru_memory_compression && !kernel_config.memory_compression {
             anyhow::bail!("'lru_memory_compression' can only be enabled with 'memory_compression'");
         }
@@ -91,14 +100,6 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
                 "'quiet_early_boot' can only be enabled in 'eng' builds"
             );
             builder.kernel_arg(KernelArg::PhysVerbose(false))
-        }
-
-        if let Some(serial) = &context.board_info.kernel.serial {
-            anyhow::ensure!(
-                context.build_type == &BuildType::Eng,
-                "'kernel.serial' can only be enabled in 'eng' builds"
-            );
-            builder.kernel_arg(KernelArg::Serial(serial.to_string()));
         }
 
         if let Some(oom) = &context.board_info.kernel.oom {
