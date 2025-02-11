@@ -1571,6 +1571,8 @@ pub fn sys_setsid(
     Ok(current_task.get_pid())
 }
 
+// Note the asymmetry with sys_setpriority: this returns what Starnix calls a "raw" priority, which
+// ranges from 1 (weakest) to 40 (strongest).
 pub fn sys_getpriority(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
@@ -1588,6 +1590,9 @@ pub fn sys_getpriority(
     Ok(state.scheduler_policy.raw_priority())
 }
 
+// Note the asymmetry with sys_getpriority: the `priority` parameter is what Starnix calls a
+// "user space" priority, which ranges from -20 (strongest) to 19 (weakest) (other values can be
+// passed and are clamped to that range and interpretation).
 pub fn sys_setpriority(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
@@ -1603,17 +1608,15 @@ pub fn sys_setpriority(
     let weak = get_task_or_current(current_task, who);
     let target_task = Task::from_weak(&weak)?;
     security::check_setsched_access(current_task, &target_task)?;
-    // The priority passed into setpriority is actually in the -19...20 range and is not
-    // transformed into the 1...40 range. The man page is lying. (I sent a patch, so it might not
-    // be lying anymore by the time you read this.)
-    const MIN_PRIORITY: u8 = 1;
-    const MID_PRIORITY: u8 = 20;
-    const MAX_PRIORITY: u8 = 40;
-    let priority = (MID_PRIORITY as i32).saturating_sub(priority);
-    let max_priority =
-        std::cmp::min(MAX_PRIORITY as u64, target_task.thread_group.get_rlimit(Resource::NICE));
-    target_task
-        .update_scheduler_nice(priority.clamp(MIN_PRIORITY as i32, max_priority as i32) as u8)?;
+    const MIN_RAW_PRIORITY: u8 = 1;
+    const MID_RAW_PRIORITY: u8 = 20;
+    const MAX_RAW_PRIORITY: u8 = 40;
+    let unclamped_raw_priority = (MID_RAW_PRIORITY as i32).saturating_sub(priority);
+    let raw_priority_ceiling =
+        std::cmp::min(MAX_RAW_PRIORITY as u64, target_task.thread_group.get_rlimit(Resource::NICE));
+    target_task.update_scheduler_nice(
+        unclamped_raw_priority.clamp(MIN_RAW_PRIORITY as i32, raw_priority_ceiling as i32) as u8,
+    )?;
     Ok(())
 }
 

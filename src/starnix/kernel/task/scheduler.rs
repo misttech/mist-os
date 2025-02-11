@@ -47,11 +47,11 @@ pub enum SchedulerPolicyKind {
         priority: u8,
     },
     Fifo {
-        /// 0-99, from sched_setpriority()
+        /// 0-99, from sched_setscheduler()
         priority: u8,
     },
     RoundRobin {
-        /// 0-99, from sched_setpriority()
+        /// 0-99, from sched_setscheduler()
         priority: u8,
     },
 }
