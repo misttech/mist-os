@@ -32,8 +32,6 @@ rustc_library("fuchsia-component") {
   test_deps = [
     "tests:fuchsia.component.client.test_rust",
     "//src/lib/fuchsia",
-    "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-fs",
     "//src/lib/test_util",
     "//third_party/rust_crates:assert_matches",
   ]
