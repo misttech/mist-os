@@ -4,7 +4,6 @@
 
 import("//build/bind/bind.gni")
 import("//build/drivers.gni")
-import("//src/devices/bus/drivers/pci/pci.gni")
 
 driver_bind_rules("qemu-riscv64_bind") {
   rules = "meta/qemu-riscv64.bind"

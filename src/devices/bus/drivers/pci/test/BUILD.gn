@@ -5,7 +5,6 @@
 import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
-import("//src/devices/bus/drivers/pci/pci.gni")
 
 # The output of the test code below is made up of several binaries
 # pci-unit-test: A binary to run the unit tests defiend in test/

@@ -4,7 +4,7 @@
 
 import("//build/bind/bind.gni")
 import("//build/drivers.gni")
-import("//src/devices/bus/drivers/pci/pci.gni")
+import("//src/devices/board/drivers/qemu-arm64/pci.gni")
 
 driver_bind_rules("qemu-arm64_bind") {
   rules = "meta/qemu-arm64.bind"
@@ -48,7 +48,7 @@ fuchsia_cc_driver("qemu-arm64-driver") {
     "//zircon/system/ulib/zx",
   ]
 
-  if (platform_enable_user_pci) {
+  if (qemu_arm64_enable_user_pci) {
     sources -= [ "qemu-kpci.cc" ]
     sources += [ "qemu-pci.cc" ]
   }

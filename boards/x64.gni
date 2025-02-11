@@ -31,10 +31,6 @@ bazel_product_bundle_board = "x64"
 board_is_emu = true
 add_qemu_to_build_archives = true
 
-# userspace PCI migration flags
-# https://fxbug.dev/42108122
-platform_enable_user_pci = true
-
 partitions_config_label = "//boards/partitions:x64"
 
 use_vbmeta = true

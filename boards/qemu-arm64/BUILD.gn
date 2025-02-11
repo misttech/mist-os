@@ -3,13 +3,18 @@
 # found in the LICENSE file.
 
 import("//build/assembly/board_configuration.gni")
+import("//src/devices/board/drivers/qemu-arm64/pci.gni")
 
 board_configuration("qemu-arm64") {
   provided_features = [
     "fuchsia::driver_framework_v2_support",
     "fuchsia::real_time_clock",
-    "fuchsia::bus_kpci",
   ]
+  if (qemu_arm64_enable_user_pci) {
+    provided_features += [ "fuchsia::bus_pci" ]
+  } else {
+    provided_features += [ "fuchsia::bus_kpci" ]
+  }
 
   input_bundles = [
     "//boards/arm64:main_bundle",

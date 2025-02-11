@@ -4,7 +4,6 @@
 
 import("//build/bind/bind.gni")
 import("//build/drivers.gni")
-import("pci.gni")
 
 group("pci") {
   deps = [ ":bus-pci" ]

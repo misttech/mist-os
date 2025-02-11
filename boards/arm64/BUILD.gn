@@ -84,6 +84,16 @@ board_input_bundle("main_bundle") {
   ]
 }
 
+board_input_bundle("bus_pci") {
+  drivers = [
+    {
+      package_target = "//src/devices/bus/drivers/pci:bus-pci-package"
+      package_set = "bootfs"
+      driver_components = [ "meta/bus-pci.cm" ]
+    },
+  ]
+}
+
 board_input_bundle("bus_kpci") {
   drivers = [
     {

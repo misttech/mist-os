@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/zircon/zircon_cpu.gni")
-import("//src/devices/bus/drivers/pci/pci.gni")
 
 source_set("bad-syscall") {
   testonly = true

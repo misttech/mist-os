@@ -29,8 +29,6 @@ board_description = "A generic emulated riscv64 device."
 # Supports only virtual devices.
 board_is_emu = true
 
-platform_enable_user_pci = true
-
 partitions_config_label = "//boards/partitions:riscv64"
 
 bazel_product_bundle_board = "riscv64"

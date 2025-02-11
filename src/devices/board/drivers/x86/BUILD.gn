@@ -7,7 +7,6 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
 import("//build/testing/bootfs_test.gni")
-import("//src/devices/bus/drivers/pci/pci.gni")
 
 group("x86") {
   deps = [ ":platform-bus-x86" ]

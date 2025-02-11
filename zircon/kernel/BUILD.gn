@@ -10,7 +10,6 @@ import("//build/toolchain/zircon/zircon_toolchain_suite.gni")
 import("//build/zbi/zbi.gni")
 import("//build/zircon/c_utils.gni")
 import("//build/zircon/zircon_cpu.gni")
-import("//src/devices/bus/drivers/pci/pci.gni")
 import("//zircon/kernel/phys/kernel_elf_binary.gni")
 import("kernel_package.gni")
 import("kernel_shell_script.gni")
@@ -36,10 +35,6 @@ declare_args() {
   # injecting new instances of subsystems that the kernel has defined modularly
   # (e.g., pdev drivers or k commands).
   kernel_extra_deps = []
-}
-
-if (platform_enable_user_pci) {
-  disable_kernel_pci = true
 }
 
 if (current_toolchain == default_toolchain) {
