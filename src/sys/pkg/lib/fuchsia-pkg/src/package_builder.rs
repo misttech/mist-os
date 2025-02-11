@@ -29,7 +29,7 @@ pub struct PackageBuilder {
     name: String,
 
     /// The abi_revision to embed in the package.
-    abi_revision: AbiRevision,
+    pub abi_revision: AbiRevision,
 
     /// The contents that are to be placed inside the FAR itself, not as
     /// separate blobs.
@@ -944,6 +944,34 @@ mod tests {
                 other => panic!("unrecognized path in blobs `{other}`"),
             }
         }
+    }
+
+    #[test]
+    fn test_overwrite_abi_revision() {
+        const OTHER_FAKE_ABI_REVISION: AbiRevision = AbiRevision::from_u64(0x1234);
+
+        let outdir = TempDir::new().unwrap();
+        let metafar_path = outdir.path().join("meta.far");
+
+        // Create the builder
+        let mut builder = PackageBuilder::new("some_pkg_name", FAKE_ABI_REVISION);
+
+        assert_eq!(builder.abi_revision, FAKE_ABI_REVISION);
+
+        // Replace the ABI revision.
+        builder.abi_revision = OTHER_FAKE_ABI_REVISION;
+
+        // Build the package
+        let _ = builder.build(&outdir, &metafar_path).unwrap();
+
+        // Validate that the new abi_revision was written correctly
+        let mut metafar = std::fs::File::open(metafar_path).unwrap();
+        let mut far_reader = fuchsia_archive::Utf8Reader::new(&mut metafar).unwrap();
+
+        let abi_revision_data = far_reader.read_file("meta/fuchsia.abi/abi-revision").unwrap();
+        let abi_revision_data: [u8; 8] = abi_revision_data.try_into().unwrap();
+        let abi_revision = AbiRevision::from_bytes(abi_revision_data);
+        assert_eq!(abi_revision, OTHER_FAKE_ABI_REVISION);
     }
 
     #[test]
