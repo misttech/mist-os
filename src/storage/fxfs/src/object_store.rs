@@ -245,27 +245,6 @@ pub struct EncryptedMutationsV40 {
     mutations_key_roll: Vec<(usize, WrappedKeyV40)>,
 }
 
-#[derive(Deserialize, Serialize, TypeFingerprint, Versioned)]
-pub struct EncryptedMutationsV32 {
-    transactions: Vec<(JournalCheckpoint, u64)>,
-    data: Vec<u8>,
-    mutations_key_roll: Vec<(usize, WrappedKeyV32)>,
-}
-
-impl From<EncryptedMutationsV32> for EncryptedMutationsV40 {
-    fn from(item: EncryptedMutationsV32) -> Self {
-        Self {
-            transactions: item.transactions,
-            data: item.data,
-            mutations_key_roll: item
-                .mutations_key_roll
-                .into_iter()
-                .map(|(a, b)| (a, b.into()))
-                .collect(),
-        }
-    }
-}
-
 impl std::fmt::Debug for EncryptedMutations {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         f.debug_struct("EncryptedMutations")

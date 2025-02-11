@@ -68,10 +68,8 @@ use crate::lsm_tree::types::{
 };
 use crate::object_handle::{ObjectHandle, ReadObjectHandle, WriteBytes};
 use crate::object_store::caching_object_handle::{CachedChunk, CachingObjectHandle, CHUNK_SIZE};
-use crate::round::{how_many, round_down, round_up};
-use crate::serialized_types::{
-    Version, Versioned, VersionedLatest, LATEST_VERSION, NEW_PERSISTENT_LAYER_VERSION,
-};
+use crate::round::{round_down, round_up};
+use crate::serialized_types::{Version, Versioned, VersionedLatest, LATEST_VERSION};
 use anyhow::{anyhow, bail, ensure, Context, Error};
 use async_trait::async_trait;
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
@@ -431,33 +429,6 @@ async fn load_seek_table(
     Ok(seek_table)
 }
 
-// Takes the total size of the data and seek segments of the layer file, then returns the count that
-// are data blocks.  There are some impossible values due to boundary conditions, which will result
-// in an Inconsistent error.
-// NB: This can only be used for the old format.
-fn block_split_old_format(data_and_seek_size: u64, block_size: u64) -> Result<u64, Error> {
-    let blocks = how_many(data_and_seek_size, block_size);
-    // Entries are u64, so 8 bytes.
-    assert!(block_size % 8 == 0);
-    let entries_per_block = block_size / 8;
-    let seek_block_count = if blocks <= 1 {
-        0
-    } else {
-        // The first data block doesn't get an entry. Divide by `entries_per block + 1` since one
-        // seek block will be required for each `entries_per_block` data blocks.
-        how_many(blocks - 1, entries_per_block + 1)
-    };
-    let data_block_count = blocks - seek_block_count;
-    // When the number of blocks is such that all seek blocks are completely filled to support
-    // the associated number of data blocks, adding one block more would be impossible. So check
-    // that we don't have an extra seek block that would be empty.
-    if seek_block_count != 0 && (seek_block_count - 1) * entries_per_block >= data_block_count - 1 {
-        return Err(anyhow!(FxfsError::Inconsistent))
-            .context(format!("Invalid blocks to split: {}", blocks));
-    }
-    Ok(data_block_count)
-}
-
 async fn load_bloom_filter<K: FuzzyHash>(
     handle: &(impl ReadObjectHandle + 'static),
     bloom_filter_offset: u64,
@@ -485,20 +456,12 @@ impl<K: Key, V: LayerValue> PersistentLayer<K, V> {
         handle.read(0, buffer.as_mut()).await.context("Failed to read first block")?;
         let mut cursor = std::io::Cursor::new(buffer.as_slice());
         let version = Version::deserialize_from(&mut cursor)?;
-        if version < NEW_PERSISTENT_LAYER_VERSION {
-            std::mem::drop(cursor);
-            std::mem::drop(buffer);
-            return Self::open_old_format(handle).await;
-        }
 
         ensure!(version <= LATEST_VERSION, FxfsError::InvalidVersion);
         let header = LayerHeader::deserialize_from_version(&mut cursor, version)
             .context("Failed to deserialize header")?;
         if &header.magic != PERSISTENT_LAYER_MAGIC {
             return Err(anyhow!(FxfsError::Inconsistent).context("Invalid layer file magic"));
-        }
-        if version < NEW_PERSISTENT_LAYER_VERSION {
-            return Err(anyhow!(FxfsError::Inconsistent).context("Unexpectedly old version"));
         }
         if header.block_size == 0 || !header.block_size.is_power_of_two() {
             return Err(anyhow!(FxfsError::Inconsistent))
@@ -583,53 +546,6 @@ impl<K: Key, V: LayerValue> PersistentLayer<K, V> {
             bloom_filter_stats,
             close_event: Mutex::new(Some(Arc::new(DropEvent::new()))),
             _value_type: PhantomData::default(),
-        }))
-    }
-
-    async fn open_old_format(handle: impl ReadObjectHandle + 'static) -> Result<Arc<Self>, Error> {
-        let physical_block_size = handle.block_size();
-        let (layer_info, version) = {
-            let mut buffer = handle.allocate_buffer(physical_block_size as usize).await;
-            handle.read(0, buffer.as_mut()).await?;
-            let mut cursor = std::io::Cursor::new(buffer.as_slice());
-            OldLayerInfo::deserialize_with_version(&mut cursor)?
-        };
-
-        // We expect the layer block size to be a multiple of the physical block size.
-        if layer_info.block_size % physical_block_size != 0 {
-            return Err(anyhow!(FxfsError::Inconsistent)).context(format!(
-                "{} not a multiple of physical block size {}",
-                layer_info.block_size, physical_block_size
-            ));
-        }
-        ensure!(
-            layer_info.key_value_version <= NEW_PERSISTENT_LAYER_VERSION,
-            FxfsError::InvalidVersion
-        );
-        ensure!(layer_info.block_size <= MAX_BLOCK_SIZE, FxfsError::NotSupported);
-
-        let data_and_seek_size = handle.get_size() - layer_info.block_size;
-        let data_block_count = block_split_old_format(data_and_seek_size, layer_info.block_size)?;
-        let data_size = data_block_count * layer_info.block_size;
-        let seek_table_offset = data_size + layer_info.block_size;
-        let seek_table = load_seek_table(&handle, seek_table_offset, data_block_count)
-            .await
-            .context("Failed to load seek table")?;
-
-        let handle = Arc::new(handle) as Arc<dyn ReadObjectHandle>;
-        let caching_object_handle = CachingObjectHandle::new(handle.clone());
-        Ok(Arc::new(PersistentLayer {
-            object_handle: handle,
-            caching_object_handle,
-            data_size,
-            seek_table,
-            close_event: Mutex::new(Some(Arc::new(DropEvent::new()))),
-            version,
-            block_size: layer_info.block_size,
-            num_items: None,
-            bloom_filter: None,
-            bloom_filter_stats: None,
-            _value_type: PhantomData,
         }))
     }
 
@@ -1031,152 +947,26 @@ impl<W: WriteBytes, K: Key, V: LayerValue> Drop for PersistentLayerWriter<W, K, 
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        block_split_old_format, OldLayerInfo, PersistentLayer, PersistentLayerWriter,
-        PER_DATA_BLOCK_HEADER_SIZE, PER_DATA_BLOCK_SEEK_ENTRY_SIZE,
-    };
+    use super::{PersistentLayer, PersistentLayerWriter};
     use crate::filesystem::MAX_BLOCK_SIZE;
     use crate::lsm_tree::types::{
-        DefaultOrdUpperBound, FuzzyHash, Item, ItemRef, Key, Layer, LayerKey, LayerValue,
-        LayerWriter, MergeType, SortByU64,
+        DefaultOrdUpperBound, FuzzyHash, Item, ItemRef, Layer, LayerKey, LayerWriter, MergeType,
+        SortByU64,
     };
     use crate::lsm_tree::LayerIterator;
     use crate::object_handle::WriteBytes;
     use crate::round::round_up;
     use crate::serialized_types::{
         versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
-        NEW_PERSISTENT_LAYER_VERSION,
     };
     use crate::testing::fake_object::{FakeObject, FakeObjectHandle};
     use crate::testing::writer::Writer;
-    use anyhow::Error;
-    use byteorder::{ByteOrder as _, LittleEndian, WriteBytesExt as _};
     use fprint::TypeFingerprint;
     use fxfs_macros::FuzzyHash;
     use std::fmt::Debug;
     use std::hash::Hash;
-    use std::io::Write as _;
-    use std::marker::PhantomData;
     use std::ops::{Bound, Range};
     use std::sync::Arc;
-
-    /// Exists for testing backwards compatibility.
-    struct OldPersistentLayerWriter<W: WriteBytes, K: Key, V: LayerValue> {
-        writer: W,
-        block_size: u64,
-        buf: Vec<u8>,
-        item_count: u16,
-        block_offsets: Vec<u16>,
-        block_keys: Vec<u64>,
-        _key: PhantomData<K>,
-        _value: PhantomData<V>,
-    }
-
-    impl<W: WriteBytes, K: Key, V: LayerValue> OldPersistentLayerWriter<W, K, V> {
-        /// Creates a new writer that will serialize items to the object accessible via
-        /// |object_handle| (which provides a write interface to the object).
-        pub async fn new(version: Version, mut writer: W, block_size: u64) -> Result<Self, Error> {
-            assert!(block_size <= MAX_BLOCK_SIZE);
-            let layer_info = OldLayerInfo { block_size, key_value_version: version };
-            let mut cursor = std::io::Cursor::new(vec![0u8; block_size as usize]);
-            version.serialize_into(&mut cursor)?;
-            layer_info.serialize_into(&mut cursor)?;
-            writer.write_bytes(cursor.get_ref()).await?;
-            Ok(OldPersistentLayerWriter {
-                writer,
-                block_size,
-                buf: Vec::new(),
-                item_count: 0,
-                block_offsets: Vec::new(),
-                block_keys: Vec::new(),
-                _key: PhantomData,
-                _value: PhantomData,
-            })
-        }
-
-        /// Writes 'buf[..len]' out as a block.
-        ///
-        /// Blocks are fixed size, consisting of a 16-bit item count, data, zero padding
-        /// and seek table at the end.
-        async fn write_block(&mut self, len: usize) -> Result<(), Error> {
-            if self.item_count == 0 {
-                return Ok(());
-            }
-            let seek_table_size = self.block_offsets.len() * PER_DATA_BLOCK_SEEK_ENTRY_SIZE;
-            assert!(seek_table_size + len + std::mem::size_of::<u16>() <= self.block_size as usize);
-            let mut cursor = std::io::Cursor::new(vec![0u8; self.block_size as usize]);
-            cursor.write_u16::<LittleEndian>(self.item_count)?;
-            cursor.write_all(self.buf.drain(..len).as_ref())?;
-            cursor.set_position(self.block_size - seek_table_size as u64);
-            // Write the seek table. Entries are 2 bytes each and items are always at least 10.
-            for &offset in &self.block_offsets {
-                cursor.write_u16::<LittleEndian>(offset)?;
-            }
-            self.writer.write_bytes(cursor.get_ref()).await?;
-            self.item_count = 0;
-            self.block_offsets.clear();
-            Ok(())
-        }
-
-        async fn write_seek_table(&mut self) -> Result<(), Error> {
-            if self.block_keys.len() == 0 {
-                return Ok(());
-            }
-            self.buf.resize(self.block_keys.len() * 8, 0);
-            let mut len = 0;
-            for key in &self.block_keys {
-                LittleEndian::write_u64(&mut self.buf[len..len + 8], *key);
-                len += 8;
-            }
-            self.writer.write_bytes(&self.buf).await?;
-            Ok(())
-        }
-    }
-
-    impl<W: WriteBytes + Send, K: Key, V: LayerValue> LayerWriter<K, V>
-        for OldPersistentLayerWriter<W, K, V>
-    {
-        async fn write(&mut self, item: ItemRef<'_, K, V>) -> Result<(), Error> {
-            // Note the length before we write this item.
-            let len = self.buf.len();
-            item.key.serialize_into(&mut self.buf)?;
-            item.value.serialize_into(&mut self.buf)?;
-            self.buf.write_u64::<LittleEndian>(item.sequence)?;
-            let mut added_offset = false;
-            // Never record the first item. The offset is always the same.
-            if self.item_count > 0 {
-                self.block_offsets.push(u16::try_from(len + PER_DATA_BLOCK_HEADER_SIZE).unwrap());
-                added_offset = true;
-            }
-
-            // If writing the item took us over a block, flush the bytes in the buffer prior to this
-            // item.
-            if PER_DATA_BLOCK_HEADER_SIZE
-                + self.buf.len()
-                + (self.block_offsets.len() * PER_DATA_BLOCK_SEEK_ENTRY_SIZE)
-                > self.block_size as usize - 1
-            {
-                if added_offset {
-                    // Drop the recently added offset from the list. The latest item will be the
-                    // first on the next block and have a known offset there.
-                    self.block_offsets.pop();
-                }
-                self.write_block(len).await?;
-
-                // Note that this will not insert an entry for the first data block.
-                self.block_keys.push(item.key.get_leading_u64());
-            }
-
-            self.item_count += 1;
-            Ok(())
-        }
-
-        async fn flush(&mut self) -> Result<(), Error> {
-            self.write_block(self.buf.len()).await?;
-            self.write_seek_table().await?;
-            self.writer.complete().await
-        }
-    }
 
     impl<W: WriteBytes> Debug for PersistentLayerWriter<W, i32, i32> {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -1738,105 +1528,5 @@ mod tests {
             }
             PersistentLayer::<TestKey, u64>::open(handle).await.expect("new failed");
         }
-    }
-
-    // Verifies (for the old layer file format) that the size of the generated seek blocks will be
-    // correctly calculated based on the size of the layer. Even though there are no interesting
-    // branches, testing the math from two ends was really helpful in development.
-    #[fuchsia::test]
-    async fn test_seek_block_count() {
-        fn validate_values(block_size: u64, data_blocks: u64, seek_blocks: u64) -> bool {
-            if data_blocks <= 1 {
-                seek_blocks == 0
-            } else {
-                // No entry for the first data block, so don't count it. Look how much space would be
-                // generated in the seek blocks for those entries and then ensure that is the right
-                // amount of space reserved for the seek blocks.
-                round_up((data_blocks - 1) * 8, block_size).unwrap() / block_size == seek_blocks
-            }
-        }
-        const BLOCK_SIZE: u64 = 512;
-        const PER_BLOCK: u64 = BLOCK_SIZE / 8;
-        // Don't include zero, there must always be a layerinfo block.
-        for block_count in 1..(PER_BLOCK * (PER_BLOCK + 1)) {
-            let size = block_count * BLOCK_SIZE;
-            if let Ok(data_blocks) = block_split_old_format(size, BLOCK_SIZE) {
-                let seek_blocks = block_count - data_blocks;
-                assert!(
-                    validate_values(BLOCK_SIZE, data_blocks, seek_blocks),
-                    "For {} blocks got {} data and {} seek",
-                    block_count,
-                    data_blocks,
-                    seek_blocks
-                );
-            } else {
-                // Whenever the split fails, the previous count would have perfectly saturated all
-                // seek blocks. The only available options with this count of blocks is an empty
-                // seek block or a data block entry that doesn't fit into any seek block.
-                let data_blocks =
-                    block_split_old_format(BLOCK_SIZE * (block_count - 1), BLOCK_SIZE)
-                        .expect("Previous count split");
-                assert_eq!(
-                    (data_blocks - 1) % PER_BLOCK,
-                    0,
-                    "Failed to split a valid value {}.",
-                    block_count
-                );
-            }
-        }
-    }
-
-    #[fuchsia::test]
-    async fn test_zero_items_old_format() {
-        const BLOCK_SIZE: u64 = 512;
-
-        let handle = FakeObjectHandle::new(Arc::new(FakeObject::new()));
-        {
-            let mut writer = OldPersistentLayerWriter::<_, i32, i32>::new(
-                Version { major: NEW_PERSISTENT_LAYER_VERSION.major - 1, minor: 0 },
-                Writer::new(&handle).await,
-                BLOCK_SIZE,
-            )
-            .await
-            .expect("writer new");
-            writer.flush().await.expect("flush failed");
-        }
-
-        let layer = PersistentLayer::<i32, i32>::open(handle).await.expect("new failed");
-        let iterator = (layer.as_ref() as &dyn Layer<i32, i32>)
-            .seek(Bound::Unbounded)
-            .await
-            .expect("seek failed");
-        assert!(iterator.get().is_none())
-    }
-
-    #[fuchsia::test]
-    async fn test_some_items_old_format() {
-        const BLOCK_SIZE: u64 = 512;
-        const ITEM_COUNT: i32 = 10000;
-
-        let handle = FakeObjectHandle::new(Arc::new(FakeObject::new()));
-        {
-            let mut writer = OldPersistentLayerWriter::<_, i32, i32>::new(
-                Version { major: NEW_PERSISTENT_LAYER_VERSION.major - 1, minor: 0 },
-                Writer::new(&handle).await,
-                BLOCK_SIZE,
-            )
-            .await
-            .expect("writer new");
-            for i in 0..ITEM_COUNT {
-                writer.write(Item::new(i, i).as_item_ref()).await.expect("write failed");
-            }
-            writer.flush().await.expect("flush failed");
-        }
-        let layer = PersistentLayer::<i32, i32>::open(handle).await.expect("new failed");
-        let mut iterator = layer.seek(Bound::Unbounded).await.expect("failed to seek");
-        let ItemRef { key, value, .. } = iterator.get().expect("missing item");
-        assert_eq!((key, value), (&0, &0));
-
-        // Check that we can advance to the next item.
-        iterator.advance().await.expect("failed to advance");
-        let ItemRef { key, value, .. } = iterator.get().expect("missing item");
-        assert_eq!((key, value), (&1, &1));
     }
 }

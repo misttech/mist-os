@@ -549,12 +549,6 @@ impl SuperBlockHeader {
 
         reader.fill_buf().await?;
 
-        if reader.buffer().len() == 0 {
-            // Try with the old block size.
-            reader.set_version(EARLIEST_SUPPORTED_VERSION);
-            reader.fill_buf().await?;
-        }
-
         let mut super_block_header;
         let super_block_version;
         reader.consume({
