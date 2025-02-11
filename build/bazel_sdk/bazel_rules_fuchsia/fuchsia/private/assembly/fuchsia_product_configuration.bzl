@@ -147,7 +147,13 @@ def _fuchsia_product_configuration_impl(ctx):
     input_files.append(product_config_file)
 
     product_config_dir = ctx.actions.declare_directory(ctx.label.name)
-    args = ["product", "--config", product_config_file.path, "--output", product_config_dir.path]
+    args = [
+        "product",
+        "--config",
+        product_config_file.path,
+        "--output",
+        product_config_dir.path,
+    ]
     ctx.actions.run(
         executable = sdk.assembly_generate_config,
         arguments = args,

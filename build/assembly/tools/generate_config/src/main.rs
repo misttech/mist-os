@@ -43,6 +43,10 @@ struct ProductArgs {
     /// the directory to write the product config to.
     #[argh(option)]
     output: Utf8PathBuf,
+
+    /// a depfile to write.
+    #[argh(option)]
+    depfile: Option<Utf8PathBuf>,
 }
 
 /// Arguments to generate a hybrid product config.
@@ -60,6 +64,10 @@ struct HybridProductArgs {
     /// the directory to write the product config to.
     #[argh(option)]
     output: Utf8PathBuf,
+
+    /// a depfile to write.
+    #[argh(option)]
+    depfile: Option<Utf8PathBuf>,
 }
 
 fn main() -> Result<()> {
@@ -78,7 +86,7 @@ fn generate_product(args: &ProductArgs) -> Result<()> {
     // We add the package names in now, so all the rest of the rules can assume
     // the config has proper package names.
     let config = config.add_package_names()?;
-    config.write_to_dir(&args.output, None::<Utf8PathBuf>)?;
+    config.write_to_dir(&args.output, args.depfile.as_ref())?;
     Ok(())
 }
 
@@ -99,7 +107,7 @@ fn generate_hybrid_product(args: &HybridProductArgs) -> Result<()> {
             anyhow::bail!("Could not find package to replace: {}", &package_name);
         }
     }
-    config.write_to_dir(&args.output, None::<Utf8PathBuf>)?;
+    config.write_to_dir(&args.output, args.depfile.as_ref())?;
     Ok(())
 }
 

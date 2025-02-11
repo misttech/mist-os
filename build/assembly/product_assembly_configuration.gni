@@ -398,12 +398,16 @@ template("product_assembly_configuration") {
                              "visibility",
                            ])
 
-    # This will not be resolved except by moving to Bazel.
-    hermetic_deps = false
+    # The contents of these folders are dynamic, and managed entirely by this
+    # action.  Further, this action will need to delete items from these
+    # directories that are not added back (on an incremental build, if an item
+    # is removed from one of these sets)
+    hermetic_action_ignored_prefixes = [ "${files.assembly_config_dir}" ]
 
     tool = "//build/assembly/tools/generate_config"
     tool_output_name = "assembly_generate_config"
     outputs = [ files.assembly_config_file ]
+    depfile = "${target_out_dir}/${labels.target_name}.d"
 
     args = [
       "product",
@@ -411,6 +415,8 @@ template("product_assembly_configuration") {
       rebase_path(files.assembly_config_file_intermediate, root_build_dir),
       "--output",
       rebase_path(files.assembly_config_dir, root_build_dir),
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
     ]
 
     public_deps = [ ":${labels.assembly_config}" ]
