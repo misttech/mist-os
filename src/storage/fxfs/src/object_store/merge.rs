@@ -71,30 +71,36 @@ fn merge_extents(
         // Right layer is newer.
         debug_assert!(left_key.range.start < right_key.range.start);
         return MergeResult::Other {
-            emit: Some(Item::new_with_sequence(
-                ObjectKey::extent(
-                    object_id,
-                    attribute_id,
-                    left_key.range.start..right_key.range.start,
-                ),
-                ObjectValue::Extent(left_value.shrunk(
-                    left_key.range.end - left_key.range.start,
-                    right_key.range.start - left_key.range.start,
-                )),
-                std::cmp::min(left.sequence(), right.sequence()),
-            )),
-            left: Replace(Item::new_with_sequence(
-                ObjectKey::extent(
-                    object_id,
-                    attribute_id,
-                    right_key.range.start..left_key.range.end,
-                ),
-                ObjectValue::Extent(left_value.offset_by(
-                    right_key.range.start - left_key.range.start,
-                    left_key.range.end - left_key.range.start,
-                )),
-                std::cmp::min(left.sequence(), right.sequence()),
-            )),
+            emit: Some(
+                Item::new_with_sequence(
+                    ObjectKey::extent(
+                        object_id,
+                        attribute_id,
+                        left_key.range.start..right_key.range.start,
+                    ),
+                    ObjectValue::Extent(left_value.shrunk(
+                        left_key.range.end - left_key.range.start,
+                        right_key.range.start - left_key.range.start,
+                    )),
+                    std::cmp::min(left.sequence(), right.sequence()),
+                )
+                .boxed(),
+            ),
+            left: Replace(
+                Item::new_with_sequence(
+                    ObjectKey::extent(
+                        object_id,
+                        attribute_id,
+                        right_key.range.start..left_key.range.end,
+                    ),
+                    ObjectValue::Extent(left_value.offset_by(
+                        right_key.range.start - left_key.range.start,
+                        left_key.range.end - left_key.range.start,
+                    )),
+                    std::cmp::min(left.sequence(), right.sequence()),
+                )
+                .boxed(),
+            ),
             right: Keep,
         };
     }
@@ -106,14 +112,17 @@ fn merge_extents(
     MergeResult::Other {
         emit: None,
         left: Keep,
-        right: Replace(Item::new_with_sequence(
-            ObjectKey::extent(object_id, attribute_id, left_key.range.end..right_key.range.end),
-            ObjectValue::Extent(right_value.offset_by(
-                left_key.range.end - right_key.range.start,
-                right_key.range.end - right_key.range.start,
-            )),
-            std::cmp::min(left.sequence(), right.sequence()),
-        )),
+        right: Replace(
+            Item::new_with_sequence(
+                ObjectKey::extent(object_id, attribute_id, left_key.range.end..right_key.range.end),
+                ObjectValue::Extent(right_value.offset_by(
+                    left_key.range.end - right_key.range.start,
+                    right_key.range.end - right_key.range.start,
+                )),
+                std::cmp::min(left.sequence(), right.sequence()),
+            )
+            .boxed(),
+        ),
     }
 }
 
@@ -138,11 +147,11 @@ fn merge_deleted_extents(
     MergeResult::Other {
         emit: None,
         left: Discard,
-        right: Replace(Item::new_with_sequence(
+        right: Replace(Box::new(Item::new_with_sequence(
             ObjectKey::extent(object_id, attribute_id, left_key.range.start..right_key.range.end),
             ObjectValue::deleted_extent(),
             sequence,
-        )),
+        ))),
     }
 }
 
@@ -232,11 +241,14 @@ pub fn merge(
                 _ => MergeResult::Other {
                     emit: None,
                     left: Discard,
-                    right: Replace(Item {
-                        key: right.key().clone(),
-                        value: ObjectValue::BytesAndNodes { bytes, nodes },
-                        sequence: right.sequence(),
-                    }),
+                    right: Replace(
+                        Item {
+                            key: right.key().clone(),
+                            value: ObjectValue::BytesAndNodes { bytes, nodes },
+                            sequence: right.sequence(),
+                        }
+                        .boxed(),
+                    ),
                 },
             }
         }

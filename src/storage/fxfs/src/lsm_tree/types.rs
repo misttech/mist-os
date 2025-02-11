@@ -127,6 +127,10 @@ impl<K: Clone, V: Clone> ItemRef<'_, K, V> {
     pub fn cloned(&self) -> Item<K, V> {
         Item { key: self.key.clone(), value: self.value.clone(), sequence: self.sequence }
     }
+
+    pub fn boxed(&self) -> BoxedItem<K, V> {
+        Box::new(self.cloned())
+    }
 }
 
 impl<'a, K, V> Clone for ItemRef<'a, K, V> {
@@ -148,6 +152,8 @@ pub struct Item<K, V> {
     /// same |sequence|.
     pub sequence: u64,
 }
+
+pub type BoxedItem<K, V> = Box<Item<K, V>>;
 
 // Nb: type-fprint doesn't support generics yet.
 impl<K: TypeFingerprint, V: TypeFingerprint> TypeFingerprint for Item<K, V> {
@@ -172,10 +178,20 @@ impl<K, V> Item<K, V> {
     pub fn as_item_ref(&self) -> ItemRef<'_, K, V> {
         self.into()
     }
+
+    pub fn boxed(self) -> BoxedItem<K, V> {
+        Box::new(self)
+    }
 }
 
 impl<'a, K, V> From<&'a Item<K, V>> for ItemRef<'a, K, V> {
     fn from(item: &'a Item<K, V>) -> ItemRef<'a, K, V> {
+        ItemRef { key: &item.key, value: &item.value, sequence: item.sequence }
+    }
+}
+
+impl<'a, K, V> From<&'a BoxedItem<K, V>> for ItemRef<'a, K, V> {
+    fn from(item: &'a BoxedItem<K, V>) -> ItemRef<'a, K, V> {
         ItemRef { key: &item.key, value: &item.value, sequence: item.sequence }
     }
 }

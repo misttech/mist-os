@@ -5,8 +5,8 @@
 use crate::log::*;
 use crate::lsm_tree;
 use crate::lsm_tree::types::{
-    Item, ItemRef, Key, Layer, LayerIterator, LayerIteratorMut, LayerKey, MergeType, OrdLowerBound,
-    Value,
+    BoxedItem, Item, ItemRef, Key, Layer, LayerIterator, LayerIteratorMut, LayerKey, MergeType,
+    OrdLowerBound, Value,
 };
 use anyhow::Error;
 use async_trait::async_trait;
@@ -27,7 +27,7 @@ pub enum ItemOp<K, V> {
 
     /// Replaces the item with something new which will be presented to the merger subsequently with
     /// a new pair.
-    Replace(Item<K, V>),
+    Replace(BoxedItem<K, V>),
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -56,7 +56,7 @@ pub enum MergeResult<K, V> {
     ///
     /// There are some combinations that might lead to infinite loops (e.g. None, Keep, Keep) and
     /// should obviously be avoided.
-    Other { emit: Option<Item<K, V>>, left: ItemOp<K, V>, right: ItemOp<K, V> },
+    Other { emit: Option<BoxedItem<K, V>>, left: ItemOp<K, V>, right: ItemOp<K, V> },
 }
 
 /// Users must provide a merge function which will take pairs of items, left and right, and return a
@@ -68,7 +68,7 @@ pub type MergeFn<K, V> =
 
 pub enum MergeItem<K, V> {
     None,
-    Item(Item<K, V>),
+    Item(BoxedItem<K, V>),
     Iter,
 }
 
@@ -153,7 +153,7 @@ impl<'a, K, V> MergeLayerIterator<'a, K, V> {
         };
     }
 
-    fn take_item(&mut self) -> Option<Item<K, V>> {
+    fn take_item(&mut self) -> Option<BoxedItem<K, V>> {
         if let MergeItem::Item(_) = self.item {
             let mut item = MergeItem::None;
             std::mem::swap(&mut self.item, &mut item);
@@ -180,7 +180,7 @@ impl<'a, K, V> MergeLayerIterator<'a, K, V> {
         Ok(())
     }
 
-    fn replace(&mut self, item: Item<K, V>) {
+    fn replace(&mut self, item: BoxedItem<K, V>) {
         self.item = MergeItem::Item(item);
     }
 
@@ -222,7 +222,7 @@ impl<K: OrdLowerBound, V> Eq for MergeLayerIterator<'_, K, V> {}
 // the merge function, or an item referenced by an iterator, or nothing.
 enum CurrentItem<'a, 'b, K, V> {
     None,
-    Item(Item<K, V>),
+    Item(BoxedItem<K, V>),
     Iterator(&'a mut MergeLayerIterator<'b, K, V>),
 }
 
@@ -612,7 +612,7 @@ impl<'a, K: Key + LayerKey + OrdLowerBound, V: Value> LayerIterator<K, V>
         // additional iterators onto the heap (by calling push_iterators).
         if let Some(iterator) = self.item.take_iterator() {
             if self.needs_more_iterators(next_key.as_ref(), next_key_bound) {
-                let existing_item = iterator.item().cloned();
+                let existing_item = iterator.item().boxed();
                 iterator.advance().await?;
                 match &next_key {
                     Some(next_key)
@@ -697,7 +697,7 @@ pub(super) fn merge_into<K: Debug + OrdLowerBound, V: Debug>(
         layer_index: 1,
         item: merge_item,
     });
-    let mut item_merge_iter = MergeLayerIterator::new_with_item(0, MergeItem::Item(item));
+    let mut item_merge_iter = MergeLayerIterator::new_with_item(0, MergeItem::Item(item.boxed()));
     while mut_merge_iter.is_some() && item_merge_iter.is_some() {
         if mut_merge_iter.0 > item_merge_iter {
             // In this branch the mutable layer is left and the item we're merging-in is right.
@@ -710,7 +710,7 @@ pub(super) fn merge_into<K: Debug + OrdLowerBound, V: Debug>(
             match merge_result {
                 MergeResult::EmitLeft => {
                     if let Some(item) = mut_merge_iter.take_item() {
-                        mut_merge_iter.as_mut().insert(item);
+                        mut_merge_iter.as_mut().insert(*item);
                         mut_merge_iter.set_item_from_iter();
                     } else {
                         mut_merge_iter.advance();
@@ -718,7 +718,7 @@ pub(super) fn merge_into<K: Debug + OrdLowerBound, V: Debug>(
                 }
                 MergeResult::Other { emit, left, right } => {
                     if let Some(emit) = emit {
-                        mut_merge_iter.as_mut().insert(emit);
+                        mut_merge_iter.as_mut().insert(*emit);
                     }
                     match left {
                         ItemOp::Keep => {}
@@ -754,7 +754,7 @@ pub(super) fn merge_into<K: Debug + OrdLowerBound, V: Debug>(
                 MergeResult::EmitLeft => break, // Item is inserted outside the loop
                 MergeResult::Other { emit, left, right } => {
                     if let Some(emit) = emit {
-                        mut_merge_iter.as_mut().insert(emit);
+                        mut_merge_iter.as_mut().insert(*emit);
                     }
                     match left {
                         ItemOp::Keep => {}
@@ -784,10 +784,10 @@ pub(super) fn merge_into<K: Debug + OrdLowerBound, V: Debug>(
     // The only way we could get here with both items is via the break above, so we know the correct
     // order required here.
     if let MergeItem::Item(item) = item_merge_iter.item {
-        mut_merge_iter.as_mut().insert(item);
+        mut_merge_iter.as_mut().insert(*item);
     }
     if let Some(item) = mut_merge_iter.take_item() {
-        mut_merge_iter.as_mut().insert(item);
+        mut_merge_iter.as_mut().insert(*item);
     }
     if let RawIterator::Mut(mut iter) = mut_merge_iter.0.iter {
         iter.commit();
@@ -913,7 +913,7 @@ mod tests {
         let mut merger = Merger::new(
             layer_ref_iter(&skip_lists),
             |_left, _right| MergeResult::Other {
-                emit: Some(Item::new(TestKey(3..3), 3)),
+                emit: Some(Item::new(TestKey(3..3), 3).boxed()),
                 left: Discard,
                 right: Discard,
             },
@@ -937,7 +937,7 @@ mod tests {
             layer_ref_iter(&skip_lists),
             |_left, _right| MergeResult::Other {
                 emit: None,
-                left: Replace(Item::new(TestKey(3..3), 3)),
+                left: Replace(Item::new(TestKey(3..3), 3).boxed()),
                 right: Discard,
             },
             counters(),
@@ -963,7 +963,7 @@ mod tests {
             |_left, _right| MergeResult::Other {
                 emit: None,
                 left: Discard,
-                right: Replace(Item::new(TestKey(3..3), 3)),
+                right: Replace(Item::new(TestKey(3..3), 3).boxed()),
             },
             counters(),
         );
@@ -1027,7 +1027,7 @@ mod tests {
                 if left.key() == &TestKey(1..1) {
                     MergeResult::Other {
                         emit: None,
-                        left: Replace(Item::new(TestKey(3..3), 3)),
+                        left: Replace(Item::new(TestKey(3..3), 3).boxed()),
                         right: Keep,
                     }
                 } else {
@@ -1128,7 +1128,7 @@ mod tests {
                 assert_eq!(right.key(), &TestKey(2..2));
                 MergeResult::Other {
                     emit: None,
-                    left: Replace(Item::new(TestKey(3..3), 3)),
+                    left: Replace(Item::new(TestKey(3..3), 3).boxed()),
                     right: Keep,
                 }
             } else {
@@ -1159,7 +1159,7 @@ mod tests {
                 assert_eq!(right.key(), &TestKey(3..3));
                 MergeResult::Other {
                     emit: None,
-                    left: Replace(Item::new(TestKey(2..2), 2)),
+                    left: Replace(Item::new(TestKey(2..2), 2).boxed()),
                     right: Keep,
                 }
             } else {
@@ -1193,7 +1193,7 @@ mod tests {
                 // This tests the top branch in merge_into.
                 assert_eq!(right.key(), &TestKey(3..3));
                 MergeResult::Other {
-                    emit: Some(Item::new(TestKey(2..2), 2)),
+                    emit: Some(Item::new(TestKey(2..2), 2).boxed()),
                     left: Discard,
                     right: Keep,
                 }
@@ -1202,7 +1202,7 @@ mod tests {
                 assert_eq!(left.key(), &TestKey(3..3));
                 assert_eq!(right.key(), &TestKey(5..5));
                 MergeResult::Other {
-                    emit: Some(Item::new(TestKey(4..4), 4)),
+                    emit: Some(Item::new(TestKey(4..4), 4).boxed()),
                     left: Discard,
                     right: Discard,
                 }
@@ -1228,8 +1228,8 @@ mod tests {
         skip_list.insert(items[0].clone()).expect("insert error");
 
         skip_list.merge_into(items[1].clone(), &items[0].key, |_left, _right| MergeResult::Other {
-            emit: Some(Item::new(TestKey(2..2), 2)),
-            left: Replace(Item::new(TestKey(4..4), 4)),
+            emit: Some(Item::new(TestKey(2..2), 2).boxed()),
+            left: Replace(Item::new(TestKey(4..4), 4).boxed()),
             right: Discard,
         });
 
@@ -1258,13 +1258,13 @@ mod tests {
                 MergeResult::Other {
                     emit: None,
                     left: Discard,
-                    right: Replace(Item::new(TestKey(2..2), 2)),
+                    right: Replace(Item::new(TestKey(2..2), 2).boxed()),
                 }
             } else {
                 assert_eq!(right.key(), &TestKey(5..5));
                 MergeResult::Other {
                     emit: None,
-                    left: Replace(Item::new(TestKey(4..4), 4)),
+                    left: Replace(Item::new(TestKey(4..4), 4).boxed()),
                     right: Discard,
                 }
             }
@@ -1289,7 +1289,7 @@ mod tests {
                 MergeResult::Other {
                     emit: None,
                     left: Keep,
-                    right: Replace(Item::new(TestKey(2..2), 2)),
+                    right: Replace(Item::new(TestKey(2..2), 2).boxed()),
                 }
             } else {
                 MergeResult::EmitLeft
@@ -1532,7 +1532,9 @@ mod tests {
                     MergeResult::Other {
                         emit: None,
                         left: Discard,
-                        right: Replace(Item::new(left.key().clone(), left.value() + right.value())),
+                        right: Replace(
+                            Item::new(left.key().clone(), left.value() + right.value()).boxed(),
+                        ),
                     }
                 } else {
                     MergeResult::EmitLeft
@@ -1748,7 +1750,7 @@ mod tests {
                 if left.key() == &TestKey(1..8) {
                     MergeResult::Other {
                         emit: None,
-                        left: Replace(Item::new(TestKey(1..2), 1)),
+                        left: Replace(Item::new(TestKey(1..2), 1).boxed()),
                         right: Keep,
                     }
                 } else {
@@ -1782,18 +1784,17 @@ mod tests {
                 } else {
                     if left.key() == &TestKey(0..30) && right.key() == &TestKey(10..20) {
                         MergeResult::Other {
-                            emit: Some(Item::new(TestKey(0..10), 1)),
-                            left: Replace(Item::new(TestKey(10..30), 1)),
+                            emit: Some(Item::new(TestKey(0..10), 1).boxed()),
+                            left: Replace(Item::new(TestKey(10..30), 1).boxed()),
                             right: Keep,
                         }
                     } else {
                         MergeResult::Other {
                             emit: None,
                             left: Keep,
-                            right: Replace(Item::new(
-                                TestKey(left.key().0.end..right.key().0.end),
-                                1,
-                            )),
+                            right: Replace(
+                                Item::new(TestKey(left.key().0.end..right.key().0.end), 1).boxed(),
+                            ),
                         }
                     }
                 };
@@ -1839,7 +1840,7 @@ mod tests {
             MergeResult::Other {
                 emit: None,
                 left: Discard,
-                right: Replace(Item::new(left.key().clone(), left.value() + right.value())),
+                right: Replace(Item::new(left.key().clone(), left.value() + right.value()).boxed()),
             }
         } else {
             MergeResult::EmitLeft

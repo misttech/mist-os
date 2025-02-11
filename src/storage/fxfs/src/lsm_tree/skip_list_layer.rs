@@ -860,7 +860,7 @@ mod tests {
     ) -> MergeResult<TestKey, i32> {
         MergeResult::Other {
             emit: None,
-            left: Replace(Item::new((*left.key()).clone(), *left.value() + *right.value())),
+            left: Replace(Item::new((*left.key()).clone(), *left.value() + *right.value()).boxed()),
             right: Discard,
         }
     }
