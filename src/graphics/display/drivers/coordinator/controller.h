@@ -112,7 +112,6 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
 
   void OnClientDead(ClientProxy* client);
   void SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode virtcon_mode);
-  void ShowActiveDisplay();
 
   void ApplyConfig(DisplayConfig* configs[], int32_t count,
                    display::ConfigStamp client_config_stamp, uint32_t layer_stamp,
