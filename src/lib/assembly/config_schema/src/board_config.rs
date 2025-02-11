@@ -9,6 +9,7 @@ use std::collections::BTreeSet;
 use crate::common::{PackageDetails, PackagedDriverDetails};
 use crate::platform_config::sysmem_config::BoardSysmemConfig;
 use assembly_constants::Arm64DebugDapSoc;
+use assembly_container::{assembly_container, AssemblyContainer, WalkPaths};
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use assembly_images_config::BoardFilesystemConfig;
 use serde::{Deserialize, Serialize};
@@ -111,15 +112,20 @@ pub struct HardwareInfo {
 
 /// This struct defines a bundle of artifacts that can be included by the board
 /// in the assembled image.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
+#[derive(
+    Clone, Debug, Default, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths, WalkPaths,
+)]
+#[assembly_container(board_input_bundle.json)]
 #[serde(deny_unknown_fields)]
 pub struct BoardInputBundle {
     /// These are the drivers that are included by this bundle.
     #[file_relative_paths]
+    #[walk_paths]
     pub drivers: Vec<PackagedDriverDetails>,
 
     /// These are the packages to include with this bundle.
     #[file_relative_paths]
+    #[walk_paths]
     pub packages: Vec<PackageDetails>,
 
     /// These are kernel boot arguments that are to be passed to the kernel when
@@ -130,43 +136,53 @@ pub struct BoardInputBundle {
     /// structure can only be provided by one of the BoardInputBundles that a
     /// BoardInformation uses.
     #[file_relative_paths]
+    #[walk_paths]
     pub configuration: Option<BoardProvidedConfig>,
 }
 
 /// This struct defines board-provided configuration for platform services and
 /// features, used if those services are included by the product's supplied
 /// platform configuration.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
+#[derive(
+    Clone, Debug, Default, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths, WalkPaths,
+)]
 #[serde(deny_unknown_fields)]
 pub struct BoardProvidedConfig {
     /// Configuration for the cpu-manager service
     #[file_relative_paths]
+    #[walk_paths]
     pub cpu_manager: Option<FileRelativePathBuf>,
 
     /// Energy model configuration for processor power management
     #[file_relative_paths]
+    #[walk_paths]
     pub energy_model: Option<FileRelativePathBuf>,
 
     /// Configuration for the power-manager service
     #[file_relative_paths]
+    #[walk_paths]
     pub power_manager: Option<FileRelativePathBuf>,
 
     /// Configuration for the power metrics recorder service
     #[file_relative_paths]
+    #[walk_paths]
     pub power_metrics_recorder: Option<FileRelativePathBuf>,
 
     /// System power modes configuration
     #[file_relative_paths]
+    #[walk_paths]
     pub system_power_mode: Option<FileRelativePathBuf>,
 
     /// Thermal configuration for the power-manager service
     #[file_relative_paths]
+    #[walk_paths]
     pub thermal: Option<FileRelativePathBuf>,
 
     /// These files describe performance "roles" that threads can take.  These roles translate to
     /// Zircon profiles that change the runtime properties of the thread
     #[serde(default)]
     #[file_relative_paths]
+    #[walk_paths]
     pub thread_roles: Vec<FileRelativePathBuf>,
 
     /// Sysmem format costs configuration for the board. The file content bytes
@@ -179,6 +195,7 @@ pub struct BoardProvidedConfig {
     /// sysmem config.
     #[serde(default)]
     #[file_relative_paths]
+    #[walk_paths]
     pub sysmem_format_costs: Vec<FileRelativePathBuf>,
 }
 

@@ -112,8 +112,7 @@ impl WalkPaths for DriverDetails {
         found: &mut F,
         dest: Utf8PathBuf,
     ) -> anyhow::Result<()> {
-        found(self.package.as_mut_utf8_pathbuf(), dest.join("package"), FileType::PackageManifest)?;
-        Ok(())
+        found(self.package.as_mut_utf8_pathbuf(), dest.join("package"), FileType::PackageManifest)
     }
 }
 
@@ -135,6 +134,16 @@ pub struct PackagedDriverDetails {
     pub components: Vec<Utf8PathBuf>,
 }
 
+impl WalkPaths for PackagedDriverDetails {
+    fn walk_paths_with_dest<F: assembly_container::WalkPathsFn>(
+        &mut self,
+        found: &mut F,
+        dest: Utf8PathBuf,
+    ) -> anyhow::Result<()> {
+        found(self.package.as_mut_utf8_pathbuf(), dest.join("package"), FileType::PackageManifest)
+    }
+}
+
 /// This defines a package, and which package set it belongs to.
 #[derive(
     Clone, Debug, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths, JsonSchema,
@@ -146,6 +155,16 @@ pub struct PackageDetails {
 
     /// Which set this package belongs to.
     pub set: PackageSet,
+}
+
+impl WalkPaths for PackageDetails {
+    fn walk_paths_with_dest<F: assembly_container::WalkPathsFn>(
+        &mut self,
+        found: &mut F,
+        dest: Utf8PathBuf,
+    ) -> anyhow::Result<()> {
+        found(self.package.as_mut_utf8_pathbuf(), dest.join("package"), FileType::PackageManifest)
+    }
 }
 
 /// A typename to clarify intent around what Strings are package names.

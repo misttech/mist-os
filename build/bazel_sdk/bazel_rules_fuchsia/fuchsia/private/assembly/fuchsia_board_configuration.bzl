@@ -95,14 +95,12 @@ def _fuchsia_board_configuration_impl(ctx):
     # prefix "../"s to make them relative to the output board config.
     board_config_relative_to_root = "../" * board_config_file.path.count("/")
     for bib in ctx.attr.board_input_bundles:
-        path = bib[FuchsiaBoardInputBundleInfo].config.path
-        if paths.basename(path) == "board_input_bundle.json":
-            path = paths.dirname(path)
+        path = bib[FuchsiaBoardInputBundleInfo].directory
         board_config["input_bundles"] = board_config.get("input_bundles", []) + [
             board_config_relative_to_root + path,
         ]
-        board_files.extend(bib[FuchsiaBoardInputBundleInfo].files)
-        build_id_dirs = bib[FuchsiaBoardInputBundleInfo].build_id_dirs
+        build_id_dirs.extend(bib[FuchsiaBoardInputBundleInfo].build_id_dirs)
+    board_files.extend(ctx.files.board_input_bundles)
 
     if ctx.attr.devicetree:
         board_files.append(ctx.file.devicetree)

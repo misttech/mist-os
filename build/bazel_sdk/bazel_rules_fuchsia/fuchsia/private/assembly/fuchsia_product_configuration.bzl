@@ -19,7 +19,6 @@ load(
 load(
     ":utils.bzl",
     "LOCAL_ONLY_ACTION_KWARGS",
-    "combine_directories",
     "extract_labels",
     "replace_labels_with_files",
     "select_root_dir",
@@ -159,6 +158,7 @@ def _fuchsia_product_configuration_impl(ctx):
         arguments = args,
         inputs = input_files + ctx.files.product_config_labels + ctx.files.deps,
         outputs = [product_config_dir],
+        progress_message = "Creating product config for %s" % ctx.label.name,
         **LOCAL_ONLY_ACTION_KWARGS
     )
 
@@ -185,7 +185,6 @@ def _fuchsia_prebuilt_product_configuration_impl(ctx):
 _fuchsia_prebuilt_product_configuration = rule(
     doc = "Use a prebuilt product configuration directory for hybrid assembly.",
     implementation = _fuchsia_prebuilt_product_configuration_impl,
-    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "files": attr.label_list(
             doc = "All files referenced by the product config. This should be the entire contents of the product input artifacts directory.",

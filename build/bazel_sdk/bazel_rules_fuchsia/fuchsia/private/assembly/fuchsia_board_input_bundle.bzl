@@ -5,15 +5,15 @@
 """Rules for defining assembly board input bundle."""
 
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
-load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_args", "get_ffx_assembly_inputs")
 load("//fuchsia/private:fuchsia_package.bzl", "get_driver_component_manifests")
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 load(":providers.bzl", "FuchsiaBoardInputBundleInfo")
-load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS", "select_single_file")
+load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS", "select_root_dir")
 load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _fuchsia_board_input_bundle_impl(ctx):
-    fuchsia_toolchain = get_fuchsia_sdk_toolchain(ctx)
+    sdk = get_fuchsia_sdk_toolchain(ctx)
+
     driver_entries = []
     creation_inputs = []
     build_id_dirs = []
@@ -103,38 +103,22 @@ def _fuchsia_board_input_bundle_impl(ctx):
 
     # Create Board Input Bundle
     board_input_bundle_dir = ctx.actions.declare_directory(ctx.label.name)
-    ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
-    ffx_invocation = get_ffx_assembly_args(fuchsia_toolchain) + [
-        "--isolate-dir " + ffx_isolate_dir.path,
-        "assembly",
-        "board-input-bundle",
-        "--outdir",
-        board_input_bundle_dir.path,
-    ] + creation_args
-
-    script_lines = [
-        "set -e",
-        "mkdir -p " + ffx_isolate_dir.path,
-        " ".join(ffx_invocation),
-    ]
-    script = "\n".join(script_lines)
-    ctx.actions.run_shell(
-        inputs = creation_inputs + get_ffx_assembly_inputs(fuchsia_toolchain),
-        outputs = [board_input_bundle_dir, ffx_isolate_dir],
-        command = script,
+    args = ["board-input-bundle", "--output", board_input_bundle_dir.path] + creation_args
+    ctx.actions.run(
+        executable = sdk.assembly_generate_config,
+        arguments = args,
+        inputs = creation_inputs,
+        outputs = [board_input_bundle_dir],
         progress_message = "Creating board input bundle for %s" % ctx.label.name,
         **LOCAL_ONLY_ACTION_KWARGS
     )
 
-    deps = [board_input_bundle_dir] + creation_inputs
-
     return [
         DefaultInfo(
-            files = depset(deps),
+            files = depset([board_input_bundle_dir]),
         ),
         FuchsiaBoardInputBundleInfo(
-            config = board_input_bundle_dir,
-            files = deps,
+            directory = board_input_bundle_dir.path,
             build_id_dirs = build_id_dirs,
         ),
         OutputGroupInfo(
@@ -201,16 +185,11 @@ fuchsia_board_input_bundle = rule(
 )
 
 def _fuchsia_prebuilt_board_input_bundle_impl(ctx):
-    board_input_bundle = ctx.file.config or select_single_file(
-        ctx.files.files,
-        "board_input_bundle.json",
-        "Use the 'config' attribute to manually specify the board input bundle manifest.",
-    )
+    directory = select_root_dir(ctx.files.files)
     return [
         DefaultInfo(files = depset(ctx.files.files)),
         FuchsiaBoardInputBundleInfo(
-            config = board_input_bundle,
-            files = ctx.files.files,
+            directory = directory,
             build_id_dirs = [],
         ),
     ]
@@ -219,11 +198,6 @@ fuchsia_prebuilt_board_input_bundle = rule(
     doc = """Defines a Board Input Bundle based on preexisting BIB files.""",
     implementation = _fuchsia_prebuilt_board_input_bundle_impl,
     attrs = {
-        "config": attr.label(
-            doc = """For manually specifying the Board Input Bundle config file.
-                This file must be present within `files` as well.""",
-            allow_single_file = True,
-        ),
         "files": attr.label(
             doc = "All files belonging to the Board Input Bundles",
             mandatory = True,

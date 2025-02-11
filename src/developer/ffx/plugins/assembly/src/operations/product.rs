@@ -127,13 +127,9 @@ Resulting product is not supported and may misbehave!
     // configuration fields into that of the board_info struct.
     let mut board_input_bundles = Vec::new();
     for bundle_path in &board_info.input_bundles {
-        let bundle_path = bundle_path.as_utf8_pathbuf().join("board_input_bundle.json");
-        let bundle = read_config::<BoardInputBundle>(&bundle_path)
+        let bundle = BoardInputBundle::from_dir(&bundle_path)
             .with_context(|| format!("Reading board input bundle: {bundle_path}"))?;
-        let bundle = bundle
-            .resolve_paths_from_file(&bundle_path)
-            .with_context(|| format!("resolving paths in board input bundle: {bundle_path}"))?;
-        board_input_bundles.push((bundle_path, bundle));
+        board_input_bundles.push((bundle_path.clone(), bundle));
     }
     let board_input_bundles = board_input_bundles;
 

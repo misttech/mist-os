@@ -36,8 +36,7 @@ FuchsiaProductConfigInfo = provider(
 FuchsiaBoardInputBundleInfo = provider(
     doc = "A board input bundle info used to containing the board input bundle directory",
     fields = {
-        "config": "The config file located in the root directory containing Board Input Bundle.",
-        "files": "All files belong to Board Input Bundles",
+        "directory": "Directory of the board input bundle container",
         "build_id_dirs": "Directories containing the debug symbols",
     },
 )

@@ -3,9 +3,9 @@
 # found in the LICENSE file.
 
 import("//build/bazel/bazel_inputs.gni")
+import("//build/compiled_action.gni")
 import("//build/group_with_inputs.gni")
 import("//build/python/python_action.gni")
-import("//src/developer/ffx/build/ffx_action.gni")
 
 # Creates a Board Input Bundle, which provides packages and drivers to
 # assembly to provide support for some piece of hardware (such as a board, or a
@@ -329,40 +329,31 @@ template("board_input_bundle") {
     }
   }
 
-  ffx_action(labels.main_target) {
+  compiled_action(labels.main_target) {
     forward_variables_from(invoker,
                            [
                              "testonly",
                              "visibility",
                            ])
-
-    ffx_tool = "//src/developer/ffx/plugins/assembly:ffx_assembly_tool"
-    ffx_tool_output_name = "ffx-assembly"
+    tool = "//build/assembly/tools/generate_config"
+    tool_output_name = "assembly_generate_config"
 
     # The contents of these folders are dynamic, and managed entirely by this
     # action.  Further, this action will need to delete items from these
     # directories that are not added back (on an incremental build, if an item
     # is removed from one of these sets)
-    hermetic_action_ignored_prefixes = [
-      "${files.bundle_dir}/packages",
-      "${files.bundle_dir}/subpackages",
-      "${files.bundle_dir}/blobs",
-      "${files.bundle_dir}/config",
-    ]
+    hermetic_action_ignored_prefixes = [ "${files.bundle_dir}" ]
 
     inputs = creation_inputs
     outputs = [ files.bundle_file ]
     depfile = files.depfile
     deps = creation_deps
     args = [
-             "--config",
-             "assembly_enabled=true",
-             "assembly",
              "board-input-bundle",
-             "--outdir",
+             "--output",
              rebase_path(files.bundle_dir, root_build_dir),
              "--depfile",
-             rebase_path(files.depfile, root_build_dir),
+             rebase_path(depfile, root_build_dir),
            ] + creation_args
 
     metadata = {

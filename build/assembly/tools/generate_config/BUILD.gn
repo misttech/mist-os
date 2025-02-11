@@ -9,15 +9,22 @@ import("//build/sdk/sdk_host_tool.gni")
 
 rustc_binary("generate_config") {
   edition = "2021"
-  sources = [ "src/main.rs" ]
+  sources = [
+    "src/board_input_bundle.rs",
+    "src/main.rs",
+    "src/product_config.rs",
+  ]
   output_name = "assembly_generate_config"
   deps = [
     "//src/lib/assembly/config_schema",
     "//src/lib/assembly/container",
+    "//src/lib/assembly/file_relative_path",
+    "//src/lib/assembly/util",
     "//src/sys/pkg/lib/fuchsia-pkg",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:camino",
+    "//third_party/rust_crates:serde",
   ]
 }
 
