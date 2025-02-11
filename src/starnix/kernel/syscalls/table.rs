@@ -157,7 +157,8 @@ pub fn dispatch_syscall(
             sys_arch32_gettimeofday, sys_arch32_nanosleep, sys_arch32_timer_gettime64,
         };
         pub use crate::task::syscalls::{
-            sys_arch32_setrlimit, sys_arch32_ugetrlimit, sys_capget as sys_arch32_capget,
+            sys_arch32_sched_getaffinity, sys_arch32_sched_setaffinity, sys_arch32_setrlimit,
+            sys_arch32_ugetrlimit, sys_capget as sys_arch32_capget,
             sys_capset as sys_arch32_capset, sys_exit as sys_arch32_exit,
             sys_exit_group as sys_arch32_exit_group, sys_getpid as sys_arch32_getpid,
             sys_gettid as sys_arch32_gettid, sys_getuid as sys_arch32_getuid32,
@@ -261,7 +262,9 @@ pub fn dispatch_syscall(
             rt_sigaction[4],
             rt_sigprocmask[4],
             rt_tgsigqueueinfo[4],
+            sched_getaffinity[3],
             sched_getscheduler[1],
+            sched_setaffinity[3],
             setrlimit[2],
             set_robust_list[2],
             set_tid_address[1],

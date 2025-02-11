@@ -738,19 +738,46 @@ pub fn sys_sched_setscheduler(
     Ok(())
 }
 
-type CpuAffinityMask = u64;
-const CPU_AFFINITY_MASK_SIZE: u32 = std::mem::size_of::<CpuAffinityMask>() as u32;
-const NUM_CPUS_MAX: u32 = CPU_AFFINITY_MASK_SIZE * 8;
+const CPU_SET_SIZE: usize = 128;
 
-fn get_default_cpumask() -> CpuAffinityMask {
-    match zx::system_get_num_cpus() {
-        num_cpus if num_cpus > NUM_CPUS_MAX => {
-            log_error!("num_cpus={}, greater than the {} max supported.", num_cpus, NUM_CPUS_MAX);
-            CpuAffinityMask::MAX
-        }
-        NUM_CPUS_MAX => CpuAffinityMask::MAX,
-        num_cpus => (1 << num_cpus) - 1,
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct CpuSet {
+    bits: [u8; CPU_SET_SIZE],
+}
+
+impl Default for CpuSet {
+    fn default() -> Self {
+        Self { bits: [0; CPU_SET_SIZE] }
     }
+}
+
+fn check_cpu_set_alignment(current_task: &CurrentTask, cpusetsize: u32) -> Result<(), Errno> {
+    let alignment = if current_task.thread_state.arch_width.is_arch32() { 4 } else { 8 };
+    if cpusetsize < alignment || cpusetsize % alignment != 0 {
+        return error!(EINVAL);
+    }
+    Ok(())
+}
+
+fn get_default_cpu_set() -> CpuSet {
+    let mut result = CpuSet::default();
+    let mut cpus_count = zx::system_get_num_cpus();
+    let cpus_count_max = (CPU_SET_SIZE * 8) as u32;
+    if cpus_count > cpus_count_max {
+        log_error!("cpus_count={cpus_count}, greater than the {cpus_count_max} max supported.");
+        cpus_count = cpus_count_max;
+    }
+    let mut index = 0;
+    while cpus_count > 0 {
+        let count = std::cmp::min(cpus_count, 8);
+        let (shl, overflow) = 1_u8.overflowing_shl(count);
+        let mask = if overflow { u8::max_value() } else { shl - 1 };
+        result.bits[index] = mask;
+        index += 1;
+        cpus_count -= count;
+    }
+    result
 }
 
 pub fn sys_sched_getaffinity(
@@ -763,20 +790,18 @@ pub fn sys_sched_getaffinity(
     if pid < 0 {
         return error!(EINVAL);
     }
-    if cpusetsize < CPU_AFFINITY_MASK_SIZE
-        || cpusetsize % (std::mem::size_of::<usize>() as u32) != 0
-    {
-        return error!(EINVAL);
-    }
+
+    check_cpu_set_alignment(current_task, cpusetsize)?;
 
     let weak = get_task_or_current(current_task, pid);
     let _task = Task::from_weak(&weak)?;
 
     // sched_setaffinity() is not implemented. Fake affinity mask based on the number of CPUs.
-    let mask = get_default_cpumask();
-    current_task.write_memory(user_mask, &mask.to_ne_bytes())?;
+    let mask = get_default_cpu_set();
+    let mask_size = std::cmp::min(cpusetsize as usize, CPU_SET_SIZE);
+    current_task.write_memory(user_mask, &mask.bits[..mask_size])?;
     track_stub!(TODO("https://fxbug.dev/322874659"), "sched_getaffinity");
-    Ok(CPU_AFFINITY_MASK_SIZE as usize)
+    Ok(mask_size)
 }
 
 pub fn sys_sched_setaffinity(
@@ -793,14 +818,19 @@ pub fn sys_sched_setaffinity(
     let weak = get_task_or_current(current_task, pid);
     let _task = Task::from_weak(&weak)?;
 
-    if cpusetsize < CPU_AFFINITY_MASK_SIZE {
-        return error!(EINVAL);
-    }
+    check_cpu_set_alignment(current_task, cpusetsize)?;
 
-    let mask = current_task.read_object::<CpuAffinityMask>(user_mask.into())?;
+    let mask_size = std::cmp::min(cpusetsize as usize, CPU_SET_SIZE);
+    let mut mask = CpuSet::default();
+    current_task.read_memory_to_slice(user_mask, &mut mask.bits[..mask_size])?;
 
     // Specified mask must include at least one valid CPU.
-    if mask & get_default_cpumask() == 0 {
+    let max_mask = get_default_cpu_set();
+    let mut has_valid_cpu_in_mask = false;
+    for (l1, l2) in std::iter::zip(max_mask.bits, mask.bits) {
+        has_valid_cpu_in_mask = has_valid_cpu_in_mask || (l1 & l2 > 0);
+    }
+    if !has_valid_cpu_in_mask {
         return error!(EINVAL);
     }
 
@@ -1879,7 +1909,10 @@ pub fn sys_vhangup(
 #[cfg(feature = "arch32")]
 mod arch32 {
     pub use super::{
-        sys_getrlimit as sys_arch32_ugetrlimit, sys_setrlimit as sys_arch32_setrlimit,
+        sys_getrlimit as sys_arch32_ugetrlimit,
+        sys_sched_getaffinity as sys_arch32_sched_getaffinity,
+        sys_sched_setaffinity as sys_arch32_sched_setaffinity,
+        sys_setrlimit as sys_arch32_setrlimit,
     };
 }
 
@@ -2098,7 +2131,11 @@ mod tests {
         let pid = current_task.get_pid();
         assert_eq!(
             sys_sched_getaffinity(&mut locked, &current_task, pid, 16, mapped_address),
-            Ok(std::mem::size_of::<u64>())
+            Ok(16)
+        );
+        assert_eq!(
+            sys_sched_getaffinity(&mut locked, &current_task, pid, 1024, mapped_address),
+            Ok(std::mem::size_of::<CpuSet>())
         );
         assert_eq!(
             sys_sched_getaffinity(&mut locked, &current_task, pid, 1, mapped_address),
@@ -2118,7 +2155,13 @@ mod tests {
         current_task.write_memory(mapped_address, &[0xffu8]).expect("failed to cpumask");
         let pid = current_task.get_pid();
         assert_eq!(
-            sys_sched_setaffinity(&mut locked, &current_task, pid, u32::MAX, mapped_address),
+            sys_sched_setaffinity(
+                &mut locked,
+                &current_task,
+                pid,
+                *PAGE_SIZE as u32,
+                mapped_address
+            ),
             Ok(())
         );
         assert_eq!(
