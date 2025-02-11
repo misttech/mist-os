@@ -12,20 +12,15 @@ use {
 };
 
 /// Connect to an instance of a FIDL protocol hosted in `directory` using the given `path`.
-// This is essentially the same as `fuchsia_component::client::connect_to_named_protocol_at_dir_root`.
-// We can't use the `fuchsia_component` library in ffx because it doesn't build on host.
+// This is the same as `fuchsia_component::client::connect_to_named_protocol_at_dir_root`, however
+// the `fuchsia_component` library doesn't build on host.
 fn connect_to_named_protocol_at_dir_root<P: fidl::endpoints::ProtocolMarker>(
     directory: &fio::DirectoryProxy,
     path: &str,
 ) -> Result<P::Proxy> {
     let (proxy, server_end) = create_proxy::<P>();
     directory
-        .deprecated_open(
-            fio::OpenFlags::empty(),
-            fio::ModeType::empty(),
-            path,
-            server_end.into_channel().into(),
-        )
+        .open(path, fio::Flags::PROTOCOL_SERVICE, &Default::default(), server_end.into_channel())
         .bug_context("Failed to call Directory.Open")?;
     Ok(proxy)
 }
