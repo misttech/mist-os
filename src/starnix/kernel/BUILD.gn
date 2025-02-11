@@ -154,6 +154,7 @@ rustc_library("starnix_core") {
     "fs/proc/self_symlink.rs",
     "fs/proc/sysctl.rs",
     "fs/proc/sysrq.rs",
+    "fs/proc/thread_self.rs",
     "fs/sysfs/bus_collection_directory.rs",
     "fs/sysfs/cpu_class_directory.rs",
     "fs/sysfs/device_directory.rs",

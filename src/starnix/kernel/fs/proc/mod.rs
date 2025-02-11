@@ -11,6 +11,7 @@ mod proc_directory;
 pub mod self_symlink;
 mod sysctl;
 mod sysrq;
+pub mod thread_self;
 
 pub use fs::{get_proc_fs, proc_fs};
 pub use sysctl::{ProcSysNetDev, SystemLimits};
