@@ -1,0 +1,164 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/config/clang/clang_cpu.gni")
+import("//build/config/sysroot.gni")
+import("//src/starnix/kernel/starnix.gni")
+import("//src/starnix/tests/build/starnix_linux_test_component.gni")
+import("//src/starnix/tests/starnix_test_subpackages.gni")
+
+if (is_linux) {
+  sysroot_libs = sysroot + "/lib/${clang_cpu}-linux-gnu"
+
+  if (current_cpu == "x64") {
+    ld_so_name = "ld-linux-x86-64.so.2"
+    ld_so_dir = "lib64"
+  } else if (current_cpu == "arm64") {
+    ld_so_name = "ld-linux-aarch64.so.1"
+    ld_so_dir = "lib"
+  } else if (current_cpu == "riscv64") {
+    ld_so_name = "ld-linux-riscv64-lp64d.so.1"
+    ld_so_dir = "lib"
+  } else {
+    assert(false, "Unknown CPU: ${current_cpu}")
+  }
+
+  # Expose a dynamic linker.
+  resource("dynamic_linker") {
+    sources = [ sysroot_libs + "/${ld_so_name}" ]
+    outputs = "${ld_so_dir}/{{source_file_part}}"
+  }
+
+  # Libraries used by the test binaries. Add new ones as needed.
+  resource("libs") {
+    sources = [
+      sysroot_libs + "/libc.so.6",
+      sysroot_libs + "/libdl.so.2",
+      sysroot_libs + "/libm.so.6",
+      sysroot_libs + "/libpthread.so.0",
+      sysroot_libs + "/libresolv.so.2",
+      sysroot_libs + "/librt.so.1",
+    ]
+    outputs = "data/lib/{{source_file_part}}"
+  }
+
+  executable("init_for_linux") {
+    sources = [ "init_for_linux.cc" ]
+    deps = [ "//sdk/lib/fit" ]
+    configs += [ ":rpath_config" ]
+  }
+}
+
+resource("init_for_linux_resource") {
+  out_dir =
+      get_label_info(":init_for_linux($target_linux_toolchain)", "root_out_dir")
+  sources = [ "${out_dir}/init_for_linux" ]
+  outputs = [ "data/bin/init_for_linux" ]
+  deps = [ ":init_for_linux($target_linux_toolchain)" ]
+}
+
+fuchsia_package_with_single_component("sestarnix_userspace_test_container") {
+  manifest = "meta/sestarnix_userspace_test_container.cml"
+  package_name = "sestarnix_userspace_test_container"
+  component_name = "container"
+
+  deps = [
+    ":dynamic_linker($target_linux_toolchain)",
+    ":init_for_linux_resource",
+    ":libs($target_linux_toolchain)",
+    "//src/starnix/containers:default_init",
+  ]
+}
+
+# Makes libraries in the container's data/lib/ directory visible to the test binary.
+config("rpath_config") {
+  ldflags = [ "-Wl,-rpath=/container/lib" ]
+}
+
+source_set("userspace_test_main") {
+  testonly = true
+  sources = [
+    "test_main.cc",
+    "util.cc",
+    "util.h",
+  ]
+  deps = [
+    "//sdk/lib/fit",
+    "//third_party/googletest:gtest",
+    "//zircon/system/ulib/fbl",
+  ]
+}
+
+# List of tests.
+test_names = [
+  "load_policy",
+  "pipe",
+]
+
+# Policies made available to the tests.
+resource("policies") {
+  sources = [ "//src/starnix/lib/selinux/testdata/composite_policies/compiled/minimal_policy.pp" ]
+  outputs = "data/policies/{{source_file_part}}"
+}
+
+copy("expectations") {
+  sources = [ "expectations/expectations.json5" ]
+  outputs = [ "${target_gen_dir}/{{source_file_part}}" ]
+}
+
+test_component_targets = []
+foreach(test_name, test_names) {
+  test_component_targets += [ ":${test_name}" ]
+
+  executable("${test_name}_bin") {
+    testonly = true
+    sources = [ "tests/${test_name}.cc" ]
+    deps = [
+      ":userspace_test_main",
+      "//third_party/googletest:gtest",
+    ]
+    configs += [ ":rpath_config" ]
+
+    # LeakSanitizer fails on the test binaries from trying to clone with CLONE_UNTRACED.
+    exclude_toolchain_tags = [ "lsan" ]
+  }
+
+  generated_file("${test_name}.cml") {
+    outputs = [ "${target_gen_dir}/${test_name}.cml" ]
+    output_conversion = "json"
+
+    contents = {
+      include = [ "//src/starnix/tests/selinux/userspace/meta/sestarnix_userspace_test.shard.cml" ]
+      program = {
+        binary = "data/tests/${test_name}_bin"
+      }
+    }
+  }
+
+  starnix_linux_test_component("${test_name}") {
+    test_label = ":${test_name}_bin"
+    test_binary = "${test_name}_bin"
+    test_type = "starnix"
+    deps = [
+      ":${test_name}.cml",
+      ":expectations",
+      ":policies",
+    ]
+    manifest = "${target_gen_dir}/${test_name}.cml"
+    uses_expectations = true
+    generated_expectations = ":expectations"
+  }
+}
+
+fuchsia_test_package("sestarnix_userspace_tests") {
+  test_components = test_component_targets
+  subpackages =
+      starnix_test_subpackages + [ ":sestarnix_userspace_test_container" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":sestarnix_userspace_tests" ]
+}
