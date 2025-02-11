@@ -1598,8 +1598,7 @@ TEST_F(IntegrationTest, ClampRgb) {
   ASSERT_TRUE(PollUntilOnLoop([&]() { return FakeDisplayEngine().GetClampRgbValue() == 32; }));
 }
 
-// TODO(https://fxbug.dev/340926351): De-flake and reenable this test.
-TEST_F(IntegrationTest, DISABLED_ImagelessConfigIsNotApplied) {
+TEST_F(IntegrationTest, ImagelessConfigIsNotApplied) {
   // Create and bind virtcon client.
   std::unique_ptr<TestFidlClient> virtcon_client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kVirtcon);
