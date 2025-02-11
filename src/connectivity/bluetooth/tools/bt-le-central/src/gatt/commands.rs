@@ -6,8 +6,7 @@ use rustyline::completion::Completer;
 use rustyline::error::ReadlineError;
 use rustyline::highlight::Highlighter;
 use rustyline::hint::Hinter;
-use rustyline::validate::Validator;
-use rustyline::{Context, Helper};
+use rustyline::Helper;
 use std::borrow::Cow::{self, Borrowed, Owned};
 use std::fmt;
 use std::str::FromStr;
@@ -127,12 +126,7 @@ impl CmdHelper {
 impl Completer for CmdHelper {
     type Candidate = String;
 
-    fn complete(
-        &self,
-        line: &str,
-        _pos: usize,
-        _context: &Context<'_>,
-    ) -> Result<(usize, Vec<String>), ReadlineError> {
+    fn complete(&self, line: &str, _pos: usize) -> Result<(usize, Vec<String>), ReadlineError> {
         let mut variants = Vec::new();
         for variant in Cmd::variants() {
             if variant.starts_with(line) {
@@ -144,10 +138,8 @@ impl Completer for CmdHelper {
 }
 
 impl Hinter for CmdHelper {
-    type Hint = String;
-
     /// CmdHelper provides hints for commands with arguments
-    fn hint(&self, line: &str, _pos: usize, _context: &Context<'_>) -> Option<String> {
+    fn hint(&self, line: &str, _pos: usize) -> Option<String> {
         let needs_space = !line.ends_with(" ");
         line.trim()
             .parse::<Cmd>()
@@ -169,16 +161,12 @@ impl Highlighter for CmdHelper {
     }
 }
 
-impl Validator for CmdHelper {}
-
 /// CmdHelper can be used as an `Editor` helper for entering input commands
 impl Helper for CmdHelper {}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rustyline::history::MemHistory;
-    use rustyline::Context;
 
     #[test]
     fn test_gen_commands_macro() {
@@ -196,27 +184,16 @@ mod tests {
 
     #[test]
     fn test_completer() {
-        let history = MemHistory::new();
-        let context = Context::new(&history);
-
         let cmdhelper = CmdHelper::new();
 
         assert!(cmdhelper
-            .complete("write-long-c", 0, &context)
+            .complete("write-long-c", 0)
             .unwrap()
             .1
             .contains(&"write-long-chr".to_string()));
-        assert!(cmdhelper.complete("he", 0, &context).unwrap().1.contains(&"help".to_string()));
-        assert!(cmdhelper.complete("ex", 0, &context).unwrap().1.contains(&"exit".to_string()));
-        assert!(cmdhelper
-            .complete("read-d", 0, &context)
-            .unwrap()
-            .1
-            .contains(&"read-desc".to_string()));
-        assert!(cmdhelper
-            .complete("en", 0, &context)
-            .unwrap()
-            .1
-            .contains(&"enable-notify".to_string()));
+        assert!(cmdhelper.complete("he", 0).unwrap().1.contains(&"help".to_string()));
+        assert!(cmdhelper.complete("ex", 0).unwrap().1.contains(&"exit".to_string()));
+        assert!(cmdhelper.complete("read-d", 0).unwrap().1.contains(&"read-desc".to_string()));
+        assert!(cmdhelper.complete("en", 0).unwrap().1.contains(&"enable-notify".to_string()));
     }
 }

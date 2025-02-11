@@ -10,8 +10,8 @@ use rustyline::completion::{Completer, FilenameCompleter, Pair};
 use rustyline::error::ReadlineError;
 use rustyline::highlight::Highlighter;
 use rustyline::hint::Hinter;
-use rustyline::validate::Validator;
-use rustyline::{Context, Helper};
+use rustyline::Helper;
+use std::borrow::Cow::{self, Borrowed};
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
@@ -29,13 +29,7 @@ pub struct FuzzHelper {
 
 impl Completer for FuzzHelper {
     type Candidate = Pair;
-
-    fn complete(
-        &self,
-        line: &str,
-        _pos: usize,
-        ctx: &Context<'_>,
-    ) -> Result<(usize, Vec<Pair>), ReadlineError> {
+    fn complete(&self, line: &str, _pos: usize) -> Result<(usize, Vec<Pair>), ReadlineError> {
         // First, complete commands.
         let (command, token) = self.split(line);
         let command = match command {
@@ -57,7 +51,7 @@ impl Completer for FuzzHelper {
         // If the token is expected to be a file or path, use the filename completer.
         match expected {
             Some(ParameterType::Input) | Some(ParameterType::Path) => {
-                if let Ok((_, paths)) = self.file_completer.complete(line, line.len(), ctx) {
+                if let Ok((_, paths)) = self.file_completer.complete(line, line.len()) {
                     pairs.extend(paths);
                 }
             }
@@ -220,12 +214,16 @@ fn trim_replacements(token: &Option<String>, pairs: Vec<Pair>) -> Vec<Pair> {
 }
 
 impl Hinter for FuzzHelper {
-    type Hint = String;
+    fn hint(&self, _line: &str, _pos: usize) -> Option<String> {
+        None
+    }
 }
 
-impl Highlighter for FuzzHelper {}
-
-impl Validator for FuzzHelper {}
+impl Highlighter for FuzzHelper {
+    fn highlight_prompt<'p>(&self, prompt: &'p str) -> Cow<'p, str> {
+        Borrowed(prompt)
+    }
+}
 
 impl Helper for FuzzHelper {}
 
@@ -262,8 +260,6 @@ mod test_fixtures {
     use ffx_fuzz_args::FuzzerState;
     use fuchsia_fuzzctl_test::Test;
     use rustyline::completion::{Completer, Pair};
-    use rustyline::history::MemHistory;
-    use rustyline::Context;
     use std::sync::{Arc, Mutex};
 
     /// Represents replacement strings when auto-completing. Typically, the replacement is just
@@ -328,10 +324,7 @@ mod test_fixtures {
             .context("failed to create test files")?;
 
         let cmdline = format!("{} {}/t", cmd, test_dir.to_string_lossy());
-        let history = MemHistory::new();
-        let context = Context::new(&history);
-        let result =
-            helper.complete(&cmdline, 0, &context).context("failed to complete cmdline")?;
+        let result = helper.complete(&cmdline, 0).context("failed to complete cmdline")?;
         verify_pairs(result.1, test_files, Replacements::except("t"));
         Ok(())
     }
@@ -345,26 +338,22 @@ mod tests {
     use ffx_fuzz_args::FuzzerState;
     use fuchsia_fuzzctl_test::Test;
     use rustyline::completion::Completer;
-    use rustyline::history::MemHistory;
-    use rustyline::Context;
     use std::sync::{Arc, Mutex};
 
     #[fuchsia::test]
     async fn test_empty() -> Result<()> {
         let state = Arc::new(Mutex::new(FuzzerState::Detached));
         let helper = FuzzHelper::new(None, Arc::clone(&state));
-        let history = MemHistory::new();
-        let context = Context::new(&history);
 
         // Not attached.
-        let result = helper.complete("", 0, &context)?;
+        let result = helper.complete("", 0)?;
         let candidates =
             vec!["list", "attach", "status", "stop", "exit", "clear", "help", "history"];
         verify_pairs(result.1, candidates, Replacements::Exact);
 
         // Not already running.
         set_state(Arc::clone(&state), FuzzerState::Idle);
-        let result = helper.complete("", 0, &context)?;
+        let result = helper.complete("", 0)?;
         let candidates = vec![
             "list", "get", "set", "add", "try", "run", "cleanse", "minimize", "merge", "status",
             "fetch", "detach", "stop", "exit", "clear", "help", "history",
@@ -373,7 +362,7 @@ mod tests {
 
         // Interrupting an attached fuzzer.
         set_state(Arc::clone(&state), FuzzerState::Running);
-        let result = helper.complete("", 0, &context)?;
+        let result = helper.complete("", 0)?;
         let candidates = vec![
             "list", "get", "add", "status", "fetch", "detach", "stop", "exit", "clear", "help",
             "history",
@@ -387,26 +376,24 @@ mod tests {
     async fn test_list() -> Result<()> {
         let state = Arc::new(Mutex::new(FuzzerState::Detached));
         let helper = FuzzHelper::new(None, Arc::clone(&state));
-        let history = MemHistory::new();
-        let context = Context::new(&history);
 
         // 'list' is always available.
-        let result = helper.complete("l", 0, &context)?;
+        let result = helper.complete("l", 0)?;
         verify_pairs(result.1, vec!["list"], Replacements::except("l"));
 
         set_state(Arc::clone(&state), FuzzerState::Idle);
-        let result = helper.complete("l", 0, &context)?;
+        let result = helper.complete("l", 0)?;
         verify_pairs(result.1, vec!["list"], Replacements::except("l"));
 
         set_state(Arc::clone(&state), FuzzerState::Running);
-        let result = helper.complete("l", 0, &context)?;
+        let result = helper.complete("l", 0)?;
         verify_pairs(result.1, vec!["list"], Replacements::except("l"));
 
         // 'list' takes flags as arguments.
-        let result = helper.complete("list -", 0, &context)?;
+        let result = helper.complete("list -", 0)?;
         verify_pairs(result.1, vec!["--json-file", "--pattern"], Replacements::except("-"));
 
-        let result = helper.complete("list --invalid", 0, &context)?;
+        let result = helper.complete("list --invalid", 0)?;
         verify_pairs(result.1, Vec::new(), Replacements::Exact);
 
         Ok(())
@@ -426,33 +413,30 @@ mod tests {
         let tests_json = test.create_tests_json(urls.iter())?;
         let tests_json = Some(tests_json.to_string_lossy().to_string());
         let helper = FuzzHelper::new(tests_json, Arc::clone(&state));
-        let history = MemHistory::new();
-        let context = Context::new(&history);
 
         // 'attach' is only suggested when detached.
-        let result = helper.complete("a", 0, &context)?;
+        let result = helper.complete("a", 0)?;
         verify_pairs(result.1, vec!["attach"], Replacements::except("a"));
 
         set_state(Arc::clone(&state), FuzzerState::Idle);
-        let result = helper.complete("at", 0, &context)?;
+        let result = helper.complete("at", 0)?;
         assert!(result.1.is_empty());
 
         set_state(Arc::clone(&state), FuzzerState::Running);
-        let result = helper.complete("at", 0, &context)?;
+        let result = helper.complete("at", 0)?;
         assert!(result.1.is_empty());
 
         set_state(Arc::clone(&state), FuzzerState::Detached);
 
         // Last token already complete.
-        let result = helper.complete("attach", 0, &context)?;
+        let result = helper.complete("attach", 0)?;
         verify_pairs(result.1, vec!["attach"], Replacements::except("attach"));
 
         // Completes to URL.
-        let result = helper.complete("attach f", 0, &context)?;
+        let result = helper.complete("attach f", 0)?;
         verify_pairs(result.1, urls.clone(), Replacements::except("f"));
 
-        let result =
-            helper.complete("attach fuchsia-pkg://fuchsia.com/fake#meta/b", 0, &context)?;
+        let result = helper.complete("attach fuchsia-pkg://fuchsia.com/fake#meta/b", 0)?;
         let candidates = vec![urls[1], urls[2]];
         verify_pairs(
             result.1,
@@ -461,7 +445,7 @@ mod tests {
         );
 
         // 'attach' takes a flag as an argument.
-        let result = helper.complete("attach -", 0, &context)?;
+        let result = helper.complete("attach -", 0)?;
         verify_pairs(
             result.1,
             vec!["--output", "--no-stdout", "--no-stderr", "--no-syslog"],
@@ -475,22 +459,20 @@ mod tests {
     async fn test_get() -> Result<()> {
         let state = Arc::new(Mutex::new(FuzzerState::Detached));
         let helper = FuzzHelper::new(None, Arc::clone(&state));
-        let history = MemHistory::new();
-        let context = Context::new(&history);
 
         // 'get' is only suggested if attached.
-        let result = helper.complete("g", 0, &context)?;
+        let result = helper.complete("g", 0)?;
         assert!(result.1.is_empty());
 
         set_state(Arc::clone(&state), FuzzerState::Idle);
-        let result = helper.complete("g", 0, &context)?;
+        let result = helper.complete("g", 0)?;
         verify_pairs(result.1, vec!["get"], Replacements::except("g"));
 
         set_state(Arc::clone(&state), FuzzerState::Running);
-        let result = helper.complete("g", 0, &context)?;
+        let result = helper.complete("g", 0)?;
         verify_pairs(result.1, vec!["get"], Replacements::except("g"));
 
-        let result = helper.complete("get ma", 0, &context)?;
+        let result = helper.complete("get ma", 0)?;
         let candidates =
             vec!["max_total_time", "max_input_size", "malloc_limit", "malloc_exitcode"];
         verify_pairs(result.1, candidates, Replacements::except("ma"));
@@ -502,22 +484,20 @@ mod tests {
     async fn test_set() -> Result<()> {
         let state = Arc::new(Mutex::new(FuzzerState::Detached));
         let helper = FuzzHelper::new(None, Arc::clone(&state));
-        let history = MemHistory::new();
-        let context = Context::new(&history);
 
         // 'set' is only suggested if attached but not running.
-        let result = helper.complete("se", 0, &context)?;
+        let result = helper.complete("se", 0)?;
         assert!(result.1.is_empty());
 
         set_state(Arc::clone(&state), FuzzerState::Running);
-        let result = helper.complete("se", 0, &context)?;
+        let result = helper.complete("se", 0)?;
         assert!(result.1.is_empty());
 
         set_state(Arc::clone(&state), FuzzerState::Idle);
-        let result = helper.complete("se", 0, &context)?;
+        let result = helper.complete("se", 0)?;
         verify_pairs(result.1, vec!["set"], Replacements::except("se"));
 
-        let result = helper.complete("set det", 0, &context)?;
+        let result = helper.complete("set det", 0)?;
         let candidates = vec!["detect_leaks", "detect_exits"];
         verify_pairs(result.1, candidates, Replacements::except("det"));
 
@@ -529,19 +509,17 @@ mod tests {
         let test = Test::try_new()?;
         let state = Arc::new(Mutex::new(FuzzerState::Detached));
         let helper = FuzzHelper::new(None, Arc::clone(&state));
-        let history = MemHistory::new();
-        let context = Context::new(&history);
 
         // 'add' is only suggested when attached.
-        let result = helper.complete("a", 0, &context)?;
+        let result = helper.complete("a", 0)?;
         verify_pairs(result.1, vec!["attach"], Replacements::except("a"));
 
         set_state(Arc::clone(&state), FuzzerState::Idle);
-        let result = helper.complete("a", 0, &context)?;
+        let result = helper.complete("a", 0)?;
         verify_pairs(result.1, vec!["add"], Replacements::except("a"));
 
         set_state(Arc::clone(&state), FuzzerState::Running);
-        let result = helper.complete("a", 0, &context)?;
+        let result = helper.complete("a", 0)?;
         verify_pairs(result.1, vec!["add"], Replacements::except("a"));
 
         // 'add' can take files as arguments.
@@ -553,19 +531,17 @@ mod tests {
         let test = Test::try_new()?;
         let state = Arc::new(Mutex::new(FuzzerState::Detached));
         let helper = FuzzHelper::new(None, Arc::clone(&state));
-        let history = MemHistory::new();
-        let context = Context::new(&history);
 
         // 'try' is only suggested when attached and not running.
-        let result = helper.complete("t", 0, &context)?;
+        let result = helper.complete("t", 0)?;
         assert!(result.1.is_empty());
 
         set_state(Arc::clone(&state), FuzzerState::Running);
-        let result = helper.complete("t", 0, &context)?;
+        let result = helper.complete("t", 0)?;
         assert!(result.1.is_empty());
 
         set_state(Arc::clone(&state), FuzzerState::Idle);
-        let result = helper.complete("t", 0, &context)?;
+        let result = helper.complete("t", 0)?;
         verify_pairs(result.1, vec!["try"], Replacements::except("t"));
 
         // 'try' can take a file as an argument.
@@ -576,23 +552,21 @@ mod tests {
     async fn test_run() -> Result<()> {
         let state = Arc::new(Mutex::new(FuzzerState::Detached));
         let helper = FuzzHelper::new(None, Arc::clone(&state));
-        let history = MemHistory::new();
-        let context = Context::new(&history);
 
         // 'run' is only suggested when attached and not running.
-        let result = helper.complete("r", 0, &context)?;
+        let result = helper.complete("r", 0)?;
         assert!(result.1.is_empty());
 
         set_state(Arc::clone(&state), FuzzerState::Running);
-        let result = helper.complete("r", 0, &context)?;
+        let result = helper.complete("r", 0)?;
         assert!(result.1.is_empty());
 
         set_state(Arc::clone(&state), FuzzerState::Idle);
-        let result = helper.complete("r", 0, &context)?;
+        let result = helper.complete("r", 0)?;
         verify_pairs(result.1, vec!["run"], Replacements::except("r"));
 
         // 'run' takes flags as arguments.
-        let result = helper.complete("run -", 0, &context)?;
+        let result = helper.complete("run -", 0)?;
         let candidates = vec!["--time", "--runs"];
         verify_pairs(result.1, candidates, Replacements::except("-"));
 
@@ -603,19 +577,17 @@ mod tests {
     async fn test_cleanse() -> Result<()> {
         let state = Arc::new(Mutex::new(FuzzerState::Detached));
         let helper = FuzzHelper::new(None, Arc::clone(&state));
-        let history = MemHistory::new();
-        let context = Context::new(&history);
 
         // 'cleanse' is only suggested when attached and not running.
-        let result = helper.complete("c", 0, &context)?;
+        let result = helper.complete("c", 0)?;
         verify_pairs(result.1, vec!["clear"], Replacements::except("c"));
 
         set_state(Arc::clone(&state), FuzzerState::Running);
-        let result = helper.complete("c", 0, &context)?;
+        let result = helper.complete("c", 0)?;
         verify_pairs(result.1, vec!["clear"], Replacements::except("c"));
 
         set_state(Arc::clone(&state), FuzzerState::Idle);
-        let result = helper.complete("clean", 0, &context)?;
+        let result = helper.complete("clean", 0)?;
         verify_pairs(result.1, vec!["cleanse"], Replacements::except("clean"));
 
         Ok(())
@@ -625,19 +597,17 @@ mod tests {
     async fn test_minimize() -> Result<()> {
         let state = Arc::new(Mutex::new(FuzzerState::Detached));
         let helper = FuzzHelper::new(None, Arc::clone(&state));
-        let history = MemHistory::new();
-        let context = Context::new(&history);
 
         // 'minimize' is only suggested when attached and not running.
-        let result = helper.complete("m", 0, &context)?;
+        let result = helper.complete("m", 0)?;
         assert!(result.1.is_empty());
 
         set_state(Arc::clone(&state), FuzzerState::Running);
-        let result = helper.complete("m", 0, &context)?;
+        let result = helper.complete("m", 0)?;
         assert!(result.1.is_empty());
 
         set_state(Arc::clone(&state), FuzzerState::Idle);
-        let result = helper.complete("mi", 0, &context)?;
+        let result = helper.complete("mi", 0)?;
         verify_pairs(result.1, vec!["minimize"], Replacements::except("mi"));
 
         Ok(())
@@ -647,19 +617,17 @@ mod tests {
     async fn test_merge() -> Result<()> {
         let state = Arc::new(Mutex::new(FuzzerState::Detached));
         let helper = FuzzHelper::new(None, Arc::clone(&state));
-        let history = MemHistory::new();
-        let context = Context::new(&history);
 
         // 'minimize' is only suggested when attached and not running.
-        let result = helper.complete("m", 0, &context)?;
+        let result = helper.complete("m", 0)?;
         assert!(result.1.is_empty());
 
         set_state(Arc::clone(&state), FuzzerState::Running);
-        let result = helper.complete("m", 0, &context)?;
+        let result = helper.complete("m", 0)?;
         assert!(result.1.is_empty());
 
         set_state(Arc::clone(&state), FuzzerState::Idle);
-        let result = helper.complete("me", 0, &context)?;
+        let result = helper.complete("me", 0)?;
         verify_pairs(result.1, vec!["merge"], Replacements::except("me"));
 
         Ok(())
@@ -669,19 +637,17 @@ mod tests {
     async fn test_status() -> Result<()> {
         let state = Arc::new(Mutex::new(FuzzerState::Detached));
         let helper = FuzzHelper::new(None, Arc::clone(&state));
-        let history = MemHistory::new();
-        let context = Context::new(&history);
 
         // 'status' is always available.
-        let result = helper.complete("sta", 0, &context)?;
+        let result = helper.complete("sta", 0)?;
         verify_pairs(result.1, vec!["status"], Replacements::except("sta"));
 
         set_state(Arc::clone(&state), FuzzerState::Idle);
-        let result = helper.complete("sta", 0, &context)?;
+        let result = helper.complete("sta", 0)?;
         verify_pairs(result.1, vec!["status"], Replacements::except("sta"));
 
         set_state(Arc::clone(&state), FuzzerState::Running);
-        let result = helper.complete("sta", 0, &context)?;
+        let result = helper.complete("sta", 0)?;
         verify_pairs(result.1, vec!["status"], Replacements::except("sta"));
 
         Ok(())
@@ -691,23 +657,21 @@ mod tests {
     async fn test_fetch() -> Result<()> {
         let state = Arc::new(Mutex::new(FuzzerState::Detached));
         let helper = FuzzHelper::new(None, Arc::clone(&state));
-        let history = MemHistory::new();
-        let context = Context::new(&history);
 
         // 'fetch' is only suggested when attached.
-        let result = helper.complete("f", 0, &context)?;
+        let result = helper.complete("f", 0)?;
         assert!(result.1.is_empty());
 
         set_state(Arc::clone(&state), FuzzerState::Idle);
-        let result = helper.complete("f", 0, &context)?;
+        let result = helper.complete("f", 0)?;
         verify_pairs(result.1, vec!["fetch"], Replacements::except("f"));
 
         set_state(Arc::clone(&state), FuzzerState::Running);
-        let result = helper.complete("f", 0, &context)?;
+        let result = helper.complete("f", 0)?;
         verify_pairs(result.1, vec!["fetch"], Replacements::except("f"));
 
         // 'fetch' can take flags as arguments.
-        let result = helper.complete("fetch -", 0, &context)?;
+        let result = helper.complete("fetch -", 0)?;
         let candidates = vec!["--seed"];
         verify_pairs(result.1, candidates, Replacements::except("-"));
 
@@ -718,19 +682,17 @@ mod tests {
     async fn test_detach() -> Result<()> {
         let state = Arc::new(Mutex::new(FuzzerState::Detached));
         let helper = FuzzHelper::new(None, Arc::clone(&state));
-        let history = MemHistory::new();
-        let context = Context::new(&history);
 
         // 'detach' is only suggested when attached.
-        let result = helper.complete("d", 0, &context)?;
+        let result = helper.complete("d", 0)?;
         assert!(result.1.is_empty());
 
         set_state(Arc::clone(&state), FuzzerState::Idle);
-        let result = helper.complete("d", 0, &context)?;
+        let result = helper.complete("d", 0)?;
         verify_pairs(result.1, vec!["detach"], Replacements::except("d"));
 
         set_state(Arc::clone(&state), FuzzerState::Running);
-        let result = helper.complete("d", 0, &context)?;
+        let result = helper.complete("d", 0)?;
         verify_pairs(result.1, vec!["detach"], Replacements::except("d"));
 
         Ok(())
@@ -740,19 +702,17 @@ mod tests {
     async fn test_stop() -> Result<()> {
         let state = Arc::new(Mutex::new(FuzzerState::Detached));
         let helper = FuzzHelper::new(None, Arc::clone(&state));
-        let history = MemHistory::new();
-        let context = Context::new(&history);
 
         // 'stop' is always available.
-        let result = helper.complete("sto", 0, &context)?;
+        let result = helper.complete("sto", 0)?;
         verify_pairs(result.1, vec!["stop"], Replacements::except("sto"));
 
         set_state(Arc::clone(&state), FuzzerState::Idle);
-        let result = helper.complete("sto", 0, &context)?;
+        let result = helper.complete("sto", 0)?;
         verify_pairs(result.1, vec!["stop"], Replacements::except("sto"));
 
         set_state(Arc::clone(&state), FuzzerState::Running);
-        let result = helper.complete("sto", 0, &context)?;
+        let result = helper.complete("sto", 0)?;
         verify_pairs(result.1, vec!["stop"], Replacements::except("sto"));
 
         Ok(())
@@ -762,19 +722,17 @@ mod tests {
     async fn test_exit() -> Result<()> {
         let state = Arc::new(Mutex::new(FuzzerState::Detached));
         let helper = FuzzHelper::new(None, Arc::clone(&state));
-        let history = MemHistory::new();
-        let context = Context::new(&history);
 
         // 'exit' is always available.
-        let result = helper.complete("e", 0, &context)?;
+        let result = helper.complete("e", 0)?;
         verify_pairs(result.1, vec!["exit"], Replacements::except("e"));
 
         set_state(Arc::clone(&state), FuzzerState::Idle);
-        let result = helper.complete("e", 0, &context)?;
+        let result = helper.complete("e", 0)?;
         verify_pairs(result.1, vec!["exit"], Replacements::except("e"));
 
         set_state(Arc::clone(&state), FuzzerState::Running);
-        let result = helper.complete("e", 0, &context)?;
+        let result = helper.complete("e", 0)?;
         verify_pairs(result.1, vec!["exit"], Replacements::except("e"));
 
         Ok(())
@@ -784,19 +742,17 @@ mod tests {
     async fn test_clear() -> Result<()> {
         let state = Arc::new(Mutex::new(FuzzerState::Detached));
         let helper = FuzzHelper::new(None, Arc::clone(&state));
-        let history = MemHistory::new();
-        let context = Context::new(&history);
 
         // 'clear' is always available.
-        let result = helper.complete("c", 0, &context)?;
+        let result = helper.complete("c", 0)?;
         verify_pairs(result.1, vec!["clear"], Replacements::except("c"));
 
         set_state(Arc::clone(&state), FuzzerState::Idle);
-        let result = helper.complete("clear", 0, &context)?;
+        let result = helper.complete("clear", 0)?;
         verify_pairs(result.1, vec!["clear"], Replacements::except("clear"));
 
         set_state(Arc::clone(&state), FuzzerState::Running);
-        let result = helper.complete("c", 0, &context)?;
+        let result = helper.complete("c", 0)?;
         verify_pairs(result.1, vec!["clear"], Replacements::except("c"));
 
         Ok(())
@@ -806,19 +762,17 @@ mod tests {
     async fn test_history() -> Result<()> {
         let state = Arc::new(Mutex::new(FuzzerState::Detached));
         let helper = FuzzHelper::new(None, Arc::clone(&state));
-        let history = MemHistory::new();
-        let context = Context::new(&history);
 
         // 'history' is always available.
-        let result = helper.complete("hi", 0, &context)?;
+        let result = helper.complete("hi", 0)?;
         verify_pairs(result.1, vec!["history"], Replacements::except("hi"));
 
         set_state(Arc::clone(&state), FuzzerState::Idle);
-        let result = helper.complete("hi", 0, &context)?;
+        let result = helper.complete("hi", 0)?;
         verify_pairs(result.1, vec!["history"], Replacements::except("hi"));
 
         set_state(Arc::clone(&state), FuzzerState::Running);
-        let result = helper.complete("hi", 0, &context)?;
+        let result = helper.complete("hi", 0)?;
         verify_pairs(result.1, vec!["history"], Replacements::except("hi"));
 
         Ok(())

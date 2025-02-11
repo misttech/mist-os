@@ -166,11 +166,11 @@ async fn shell_read_loop(
 ) {
     let config =
         Config::builder().history_ignore_space(true).completion_type(CompletionType::List).build();
-    let mut editor = Editor::with_config(config).unwrap();
+    let mut editor = Editor::with_config(config);
     let _ = editor.load_history("/tmp/fuzz_history");
     {
         let mut history_mut = history.lock().unwrap();
-        *history_mut = editor.history().into_iter().map(|s| s.clone()).collect();
+        *history_mut = editor.history().iter().map(|s| s.clone()).collect();
     }
     editor.set_helper(Some(FuzzHelper::new(tests_json, state)));
     while let Some(input_request) = receiver.next().await {
@@ -186,7 +186,7 @@ async fn shell_read_loop(
                     Ok(line) => match parse(&line) {
                         ParsedCommand::Empty => ParsedCommand::Empty,
                         other => {
-                            editor.add_history_entry(&line).unwrap();
+                            editor.add_history_entry(&line);
                             let _ = editor.save_history("/tmp/fuzz_history");
                             let mut history_mut = history.lock().unwrap();
                             history_mut.push(line);
