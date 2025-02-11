@@ -26,7 +26,6 @@ cc_test_executable("memory_monitor_unittests") {
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.hardware.ram.metrics:fuchsia.hardware.ram.metrics_hlcpp",
     "//sdk/lib/inspect/testing/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//src/cobalt/bin/testing:stub_metric_event_logger_lib",

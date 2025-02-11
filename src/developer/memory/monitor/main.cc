@@ -20,21 +20,19 @@
 
 namespace {
 const char kRamDeviceClassPath[] = "/dev/class/aml-ram";
-void SetRamDevice(monitor::Monitor* app) {
+void SetRamDevice(monitor::Monitor* app, async_dispatcher_t* dispatcher) {
   // Look for optional RAM device that provides bandwidth measurement interface.
-  fuchsia::hardware::ram::metrics::DevicePtr ram_device;
   std::error_code ec;
   // Use the noexcept version of std::filesystem::exists.
   if (std::filesystem::exists(kRamDeviceClassPath, ec)) {
     for (const auto& entry : std::filesystem::directory_iterator(kRamDeviceClassPath)) {
-      zx_status_t status = fdio_service_connect(entry.path().c_str(),
-                                                ram_device.NewRequest().TakeChannel().release());
-      if (status == ZX_OK) {
-        app->SetRamDevice(std::move(ram_device));
+      auto device = component::Connect<fuchsia_hardware_ram_metrics::Device>(entry.path().c_str());
+      if (device.is_ok()) {
+        app->SetRamDevice(fidl::Client<fuchsia_hardware_ram_metrics::Device>(
+            std::move(device.value()), dispatcher));
         FX_LOGS(INFO) << "Will collect memory bandwidth measurements.";
         return;
       }
-      break;
     }
   }
   FX_LOGS(INFO) << "CANNOT collect memory bandwidth measurements. error_code: " << ec;
@@ -99,7 +97,7 @@ int main(int argc, const char** argv) {
   auto app = std::make_unique<monitor::Monitor>(
       command_line, loop.dispatcher(), memory_monitor_config::Config::TakeFromStartupHandle(),
       std::move(maker_result.value()), std::move(pressure_provider), root_job, std::move(factory));
-  SetRamDevice(app.get());
+  SetRamDevice(app.get(), loop.dispatcher());
   component::OutgoingDirectory outgoing = component::OutgoingDirectory(loop.dispatcher());
   zx::result result = outgoing.AddProtocol<fuchsia_memory_inspection::Collector>(std::move(app));
   FX_CHECK(result.is_ok());

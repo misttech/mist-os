@@ -4,7 +4,7 @@
 
 #include "src/developer/memory/monitor/monitor.h"
 
-#include <fuchsia/hardware/ram/metrics/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.ram.metrics/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/cpp/time.h>
 #include <lib/async/default.h>
@@ -88,10 +88,10 @@ zx_ticks_t TimestampToTicks(zx_time_t timestamp) {
   __uint128_t temp = static_cast<__uint128_t>(timestamp) * zx_ticks_per_second() / ZX_SEC(1);
   return static_cast<zx_ticks_t>(temp);
 }
-fuchsia::hardware::ram::metrics::BandwidthMeasurementConfig BuildConfig(
+fuchsia_hardware_ram_metrics::BandwidthMeasurementConfig BuildConfig(
     uint64_t cycles_to_measure, bool use_camera_channels = false) {
-  fuchsia::hardware::ram::metrics::BandwidthMeasurementConfig config = {};
-  config.cycles_to_measure = cycles_to_measure;
+  fuchsia_hardware_ram_metrics::BandwidthMeasurementConfig config = {
+      {.cycles_to_measure = cycles_to_measure}};
   size_t num_channels = std::size(kRamDefaultChannels);
   const auto* channels = kRamDefaultChannels;
   if (use_camera_channels) {
@@ -99,14 +99,14 @@ fuchsia::hardware::ram::metrics::BandwidthMeasurementConfig BuildConfig(
     channels = kRamCameraChannels;
   }
   for (size_t i = 0; i < num_channels; i++) {
-    config.channels[i] = channels[i].mask;
+    config.channels()[i] = channels[i].mask;
   }
   return config;
 }
-uint64_t TotalReadWriteCycles(const fuchsia::hardware::ram::metrics::BandwidthInfo& info) {
+uint64_t TotalReadWriteCycles(const fuchsia_hardware_ram_metrics::BandwidthInfo& info) {
   uint64_t total_readwrite_cycles = 0;
-  for (auto& channel : info.channels) {
-    total_readwrite_cycles += channel.readwrite_cycles;
+  for (auto& channel : info.channels()) {
+    total_readwrite_cycles += channel.readwrite_cycles();
   }
   return total_readwrite_cycles;
 }
@@ -121,7 +121,7 @@ std::vector<memory::BucketMatch> CreateBucketMatchesFromConfigData() {
   std::string configuration_str;
   FX_CHECK(files::ReadFileToString(kBucketConfigPath, &configuration_str));
   auto bucket_matches = memory::BucketMatch::ReadBucketMatchesFromConfig(configuration_str);
-  FX_CHECK(bucket_matches.has_value()) << "Unable to read configuration: " << configuration_str;
+  FX_CHECK(bucket_matches) << "Unable to read configuration: " << configuration_str;
   return std::move(*bucket_matches);
 }
 
@@ -153,7 +153,7 @@ Monitor::Monitor(const fxl::CommandLine& command_line, async_dispatcher_t* dispa
   auto bucket_matches = CreateBucketMatchesFromConfigData();
   digester_ = std::make_unique<Digester>(bucket_matches);
   if (factory)
-    CreateMetrics(std::move(factory.value()), bucket_matches);
+    CreateMetrics(std::move(*factory), bucket_matches);
 
   // Expose lazy values under the root, populated from the Inspect method.
   inspector_.root().RecordLazyValues(
@@ -231,9 +231,9 @@ Monitor::Monitor(const fxl::CommandLine& command_line, async_dispatcher_t* dispa
   }
 
   // Imminent OOM monitoring
-  if (root_job.has_value()) {
-    zx_status_t status = zx_system_get_event(
-        root_job.value(), ZX_SYSTEM_EVENT_IMMINENT_OUT_OF_MEMORY, &imminent_oom_event_handle_);
+  if (root_job) {
+    zx_status_t status = zx_system_get_event(*root_job, ZX_SYSTEM_EVENT_IMMINENT_OUT_OF_MEMORY,
+                                             &imminent_oom_event_handle_);
     if (status != ZX_OK) {
       FX_LOGS(ERROR) << "zx_system_get_event [IMMINENT-OOM] returned "
                      << zx_status_get_string(status);
@@ -248,9 +248,9 @@ Monitor::Monitor(const fxl::CommandLine& command_line, async_dispatcher_t* dispa
   SampleAndPost();
 }
 
-void Monitor::SetRamDevice(fuchsia::hardware::ram::metrics::DevicePtr ptr) {
-  ram_device_ = std::move(ptr);
-  if (ram_device_.is_bound())
+void Monitor::SetRamDevice(fidl::Client<fuchsia_hardware_ram_metrics::Device> device) {
+  ram_device_ = std::move(device);
+  if (ram_device_.is_valid())
     PeriodicMeasureBandwidth();
 }
 
@@ -288,7 +288,7 @@ void Monitor::CollectJsonStats(CollectJsonStatsRequest& request,
 
 void Monitor::CollectJsonStatsWithOptions(CollectJsonStatsWithOptionsRequest& request,
                                           CollectJsonStatsWithOptionsCompleter::Sync& completer) {
-  CollectJsonStatsWithOptions(std::move(request.socket().value()));
+  CollectJsonStatsWithOptions(std::move(*request.socket()));
 }
 
 void Monitor::CollectJsonStatsWithOptions(zx::socket socket) {
@@ -369,7 +369,7 @@ inspect::Inspector Monitor::Inspect(const std::vector<memory::BucketMatch>& buck
     // Expose raw values for downstream computation.
     {
       auto values = root.CreateChild("values");
-      const auto& stats = capture.kmem_extended().value();
+      const auto& stats = *capture.kmem_extended();
       values.CreateUint("total_bytes", stats.total_bytes, &inspector);
       values.CreateUint("free_bytes", stats.free_bytes, &inspector);
       values.CreateUint("wired_bytes", stats.wired_bytes, &inspector);
@@ -390,7 +390,7 @@ inspect::Inspector Monitor::Inspect(const std::vector<memory::BucketMatch>& buck
       inspector.emplace(std::move(values));
     }
     if (capture.kmem_compression()) {
-      const auto& stats = capture.kmem_compression().value();
+      const auto& stats = *capture.kmem_compression();
       auto values = root.CreateChild("kmem_stats_compression");
       values.CreateUint("uncompressed_storage_bytes", stats.uncompressed_storage_bytes, &inspector);
       values.CreateUint("compressed_storage_bytes", stats.compressed_storage_bytes, &inspector);
@@ -482,51 +482,50 @@ void Monitor::MeasureBandwidthAndPost() {
       cycles_to_measure = kMemCyclesToMeasureHighPrecision;
     }
     ++pending_bandwidth_measurements_;
-    ram_device_->MeasureBandwidth(
-        BuildConfig(cycles_to_measure, trace_high_precision_camera),
-        [this, cycles_to_measure, trace_high_precision_camera](
-            fuchsia::hardware::ram::metrics::Device_MeasureBandwidth_Result result) {
+    ram_device_->MeasureBandwidth({{BuildConfig(cycles_to_measure, trace_high_precision)}})
+        .Then([this, cycles_to_measure, trace_high_precision_camera](
+                  fidl::Result<fuchsia_hardware_ram_metrics::Device::MeasureBandwidth>& result) {
           --pending_bandwidth_measurements_;
-          if (result.is_err()) {
-            FX_LOGS(ERROR) << "Bad bandwidth measurement result: " << result.err();
+          if (result.is_error()) {
+            FX_LOGS(ERROR) << "Bad bandwidth measurement result: " << result.error_value();
           } else {
-            const auto& info = result.response().info;
+            const auto& info = result->info();
             uint64_t total_readwrite_cycles = TotalReadWriteCycles(info);
             uint64_t other_readwrite_cycles =
-                (info.total.readwrite_cycles > total_readwrite_cycles)
-                    ? info.total.readwrite_cycles - total_readwrite_cycles
+                (info.total().readwrite_cycles() > total_readwrite_cycles)
+                    ? info.total().readwrite_cycles() - total_readwrite_cycles
                     : 0;
             static_assert(std::size(kRamDefaultChannels) == std::size(kRamCameraChannels));
             const auto* channels =
                 trace_high_precision_camera ? kRamCameraChannels : kRamDefaultChannels;
             TRACE_VTHREAD_COUNTER(
                 kTraceName, "bandwidth_usage", "membw" /*vthread_literal*/, 1 /*vthread_id*/,
-                0 /*counter_id*/, TimestampToTicks(info.timestamp), channels[0].name,
-                CounterToBandwidth(info.channels[0].readwrite_cycles, info.frequency,
+                0 /*counter_id*/, TimestampToTicks(info.timestamp()), channels[0].name,
+                CounterToBandwidth(info.channels()[0].readwrite_cycles(), info.frequency(),
                                    cycles_to_measure) *
-                    info.bytes_per_cycle,
+                    info.bytes_per_cycle(),
                 channels[1].name,
-                CounterToBandwidth(info.channels[1].readwrite_cycles, info.frequency,
+                CounterToBandwidth(info.channels()[1].readwrite_cycles(), info.frequency(),
                                    cycles_to_measure) *
-                    info.bytes_per_cycle,
+                    info.bytes_per_cycle(),
                 channels[2].name,
-                CounterToBandwidth(info.channels[2].readwrite_cycles, info.frequency,
+                CounterToBandwidth(info.channels()[2].readwrite_cycles(), info.frequency(),
                                    cycles_to_measure) *
-                    info.bytes_per_cycle,
+                    info.bytes_per_cycle(),
                 channels[3].name,
-                CounterToBandwidth(info.channels[3].readwrite_cycles, info.frequency,
+                CounterToBandwidth(info.channels()[3].readwrite_cycles(), info.frequency(),
                                    cycles_to_measure) *
-                    info.bytes_per_cycle,
+                    info.bytes_per_cycle(),
                 "other",
-                CounterToBandwidth(other_readwrite_cycles, info.frequency, cycles_to_measure) *
-                    info.bytes_per_cycle);
+                CounterToBandwidth(other_readwrite_cycles, info.frequency(), cycles_to_measure) *
+                    info.bytes_per_cycle());
             TRACE_VTHREAD_COUNTER(kTraceName, "bandwidth_free", "membw" /*vthread_literal*/,
                                   1 /*vthread_id*/, 0 /*counter_id*/,
-                                  TimestampToTicks(info.timestamp), "value",
+                                  TimestampToTicks(info.timestamp()), "value",
                                   CounterToBandwidth(cycles_to_measure - total_readwrite_cycles -
                                                          other_readwrite_cycles,
-                                                     info.frequency, cycles_to_measure) *
-                                      info.bytes_per_cycle);
+                                                     info.frequency(), cycles_to_measure) *
+                                      info.bytes_per_cycle());
           }
           async::PostTask(dispatcher_, [this] { MeasureBandwidthAndPost(); });
         });
@@ -543,22 +542,22 @@ void Monitor::PeriodicMeasureBandwidth() {
     return;
 
   uint64_t cycles_to_measure = kMemCyclesToMeasure;
-  ram_device_->MeasureBandwidth(
-      BuildConfig(cycles_to_measure),
-      [this,
-       cycles_to_measure](fuchsia::hardware::ram::metrics::Device_MeasureBandwidth_Result result) {
-        if (result.is_err()) {
-          FX_LOGS(ERROR) << "Bad bandwidth measurement result: " << result.err();
+  ram_device_->MeasureBandwidth({{BuildConfig(cycles_to_measure)}})
+      .Then([this, cycles_to_measure](
+                fidl::Result<fuchsia_hardware_ram_metrics::Device::MeasureBandwidth>& result) {
+        if (result.is_error()) {
+          FX_LOGS(ERROR) << "Bad bandwidth measurement result: " << result.error_value();
         } else {
-          const auto& info = result.response().info;
+          const auto& info = result->info();
           uint64_t total_readwrite_cycles = TotalReadWriteCycles(info);
-          total_readwrite_cycles = std::max(total_readwrite_cycles, info.total.readwrite_cycles);
+          total_readwrite_cycles =
+              std::max(total_readwrite_cycles, info.total().readwrite_cycles());
 
           uint64_t memory_bandwidth_reading =
-              CounterToBandwidth(total_readwrite_cycles, info.frequency, cycles_to_measure) *
-              info.bytes_per_cycle;
+              CounterToBandwidth(total_readwrite_cycles, info.frequency(), cycles_to_measure) *
+              info.bytes_per_cycle();
           if (metrics_)
-            metrics_->NextMemoryBandwidthReading(memory_bandwidth_reading, info.timestamp);
+            metrics_->NextMemoryBandwidthReading(memory_bandwidth_reading, info.timestamp());
         }
       });
 }
@@ -581,7 +580,7 @@ void Monitor::UpdateState() {
         if (!logging_) {
           SampleAndPost();
         }
-        if (ram_device_.is_bound()) {
+        if (ram_device_.is_valid()) {
           MeasureBandwidthAndPost();
         }
       }

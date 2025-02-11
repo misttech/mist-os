@@ -5,9 +5,9 @@
 #ifndef SRC_DEVELOPER_MEMORY_MONITOR_MONITOR_H_
 #define SRC_DEVELOPER_MEMORY_MONITOR_MONITOR_H_
 
+#include <fidl/fuchsia.hardware.ram.metrics/cpp/fidl.h>
 #include <fidl/fuchsia.memory.inspection/cpp/fidl.h>
 #include <fidl/fuchsia.memorypressure/cpp/fidl.h>
-#include <fuchsia/hardware/ram/metrics/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/inspect/component/cpp/component.h>
@@ -45,7 +45,7 @@ class Monitor : public fidl::Server<fuchsia_memory_inspection::Collector>,
   ~Monitor() override = default;
 
   // For memory bandwidth measurement, SetRamDevice should be called once
-  void SetRamDevice(fuchsia::hardware::ram::metrics::DevicePtr ptr);
+  void SetRamDevice(fidl::Client<fuchsia_hardware_ram_metrics::Device> device);
 
   // Writes a memory capture and the bucket definition to |socket| in JSON,
   // in UTF-8.
@@ -99,7 +99,7 @@ class Monitor : public fidl::Server<fuchsia_memory_inspection::Collector>,
   std::optional<Metrics> metrics_;
   std::unique_ptr<memory::Digester> digester_;
   std::mutex digester_mutex_;
-  fuchsia::hardware::ram::metrics::DevicePtr ram_device_;
+  fidl::Client<fuchsia_hardware_ram_metrics::Device> ram_device_;
   uint64_t pending_bandwidth_measurements_ = 0;
   pressure_signaler::Level level_;
 

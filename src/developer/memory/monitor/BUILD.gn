@@ -19,8 +19,7 @@ source_set("lib") {
   ]
   public_deps = [
     ":memory_monitor_config",
-    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
-    "//sdk/fidl/fuchsia.hardware.ram.metrics:fuchsia.hardware.ram.metrics_hlcpp",
+    "//sdk/fidl/fuchsia.hardware.ram.metrics:fuchsia.hardware.ram.metrics_cpp",
     "//sdk/fidl/fuchsia.memory.inspection:fuchsia.memory.inspection_cpp",
     "//sdk/fidl/fuchsia.memorypressure:fuchsia.memorypressure_cpp",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_cpp",
