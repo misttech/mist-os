@@ -480,10 +480,16 @@ void Client::SetDisplayColorConversion(SetDisplayColorConversionRequestView requ
 
 void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
                               SetDisplayLayersCompleter::Sync& /*_completer*/) {
+  if (request->layer_ids.empty()) {
+    FDF_LOG(ERROR, "SetDisplayLayers called with an empty layer list");
+    TearDown(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+
   const display::DisplayId display_id = display::ToDisplayId(request->display_id);
   auto config = configs_.find(display_id);
   if (!config.IsValid()) {
-    FDF_LOG(WARNING, "SetDisplayLayers on display layer %lu", display_id.value());
+    FDF_LOG(WARNING, "SetDisplayLayers on invalid display ID %" PRIu64, display_id.value());
     return;
   }
 
