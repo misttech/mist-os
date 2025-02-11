@@ -40,7 +40,8 @@ pub struct FxBlob {
     handle: DataObjectHandle<FxVolume>,
     vmo: zx::Vmo,
     open_count: AtomicUsize,
-    merkle_tree: MerkleTree,
+    merkle_root: Hash,
+    merkle_leaves: Box<[Hash]>,
     compressed_chunk_size: u64,   // zero if blob is not compressed.
     compressed_offsets: Vec<u64>, // unused if blob is not compressed.
     uncompressed_size: u64,       // always set.
@@ -57,7 +58,14 @@ impl FxBlob {
     ) -> Arc<Self> {
         let (vmo, pager_packet_receiver_registration) =
             handle.owner().pager().create_vmo(uncompressed_size, zx::VmoOptions::empty()).unwrap();
-        let trimmed_merkle = &merkle_tree.root().to_string()[0..8];
+
+        // Only the merkle root and leaves are needed, the rest of the tree can be dropped.
+        let merkle_root = merkle_tree.root();
+        // The merkle leaves are intentionally copied to remove all of the spare capacity from the
+        // Vec.
+        let merkle_leaves = merkle_tree.as_ref()[0].clone().into_boxed_slice();
+
+        let trimmed_merkle = &merkle_root.to_string()[0..8];
         let name = format!("blob-{}", trimmed_merkle);
         let name = zx::Name::new(&name).unwrap();
         vmo.set_name(&name).unwrap();
@@ -65,7 +73,8 @@ impl FxBlob {
             handle,
             vmo,
             open_count: AtomicUsize::new(0),
-            merkle_tree,
+            merkle_root,
+            merkle_leaves,
             compressed_chunk_size,
             compressed_offsets,
             uncompressed_size,
@@ -73,10 +82,6 @@ impl FxBlob {
         });
         file.handle.owner().pager().register_file(&file);
         file
-    }
-
-    pub fn merkle_root(&self) -> Hash {
-        self.merkle_tree.root()
     }
 
     /// Marks the blob as being purged.  Returns true if there are no open references.
@@ -97,7 +102,7 @@ impl FxBlob {
     }
 
     pub fn root(&self) -> Hash {
-        self.merkle_tree.root()
+        self.merkle_root
     }
 }
 
@@ -287,16 +292,15 @@ impl PagerBacked for FxBlob {
             ensure!(decompressed_size == len, FxfsError::IntegrityError);
             len
         };
-        // TODO(https://fxbug.dev/42073035): This should be offloaded to the kernel at which point we can
-        // delete this.
-        let hashes = &self.merkle_tree.as_ref()[0];
+        // TODO(https://fxbug.dev/42073035): This should be offloaded to the kernel at which point
+        // we can delete this.
         let mut offset = range.start as usize;
         let bs = BLOCK_SIZE as usize;
         {
             fxfs_trace::duration!(c"blob-verify", "len" => read);
             for b in buffer.as_slice()[..read].chunks(bs) {
                 ensure!(
-                    hash_block(b, offset) == hashes[offset / bs],
+                    hash_block(b, offset) == self.merkle_leaves[offset / bs],
                     anyhow!(FxfsError::Inconsistent).context("Hash mismatch")
                 );
                 offset += bs;
