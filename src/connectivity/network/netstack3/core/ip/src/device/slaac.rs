@@ -50,6 +50,12 @@ const MIN_PREFIX_VALID_LIFETIME_FOR_UPDATE: NonZeroDuration =
 /// and IPv6 addresses are 128 bits.
 const REQUIRED_PREFIX_BITS: u8 = 64;
 
+/// The maximum number of times to attempt to regenerate a SLAAC address after
+/// a local conflict (as opposed to DAD failure), either with an address already
+/// assigned to the interface or with an IANA-reserved IID, before stopping and
+/// giving up on address generation for that prefix.
+const MAX_LOCAL_REGEN_ATTEMPTS: u8 = 10;
+
 /// Internal SLAAC timer ID key for [`SlaacState`]'s `LocalTimerHeap`.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Hash)]
 #[allow(missing_docs)]
@@ -1718,7 +1724,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
                     either::Either::Left(core::iter::once((address, config)))
                 }
                 IidGenerationConfiguration::Opaque { idgen_retries: _ } => {
-                    either::Either::Right(core::iter::repeat_with(move || {
+                    either::Either::Right(core::iter::from_fn(move || {
                         // RFC 7217 Section 5:
                         //
                         //   The resulting Interface Identifier SHOULD be compared against the
@@ -1728,6 +1734,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
                         //   prefix.  In the event that an unacceptable identifier has been
                         //   generated, this situation SHOULD be handled in the same way as
                         //   the case of duplicate addresses (see Section 6).
+                        let mut attempts = 0;
                         loop {
                             let address = generate_stable_address_with_opaque_iid(
                                 &subnet,
@@ -1752,7 +1759,12 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
                             regen_count = regen_count.wrapping_add(1);
 
                             if has_iana_allowed_iid(address.addr().get()) {
-                                break (address, config);
+                                break Some((address, config));
+                            }
+
+                            attempts += 1;
+                            if attempts > MAX_LOCAL_REGEN_ATTEMPTS {
+                                return None;
                             }
                         }
                     }))
@@ -1870,7 +1882,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
                     });
 
                     let mut seed = per_attempt_random_seed;
-                    let addresses = either::Either::Right(core::iter::repeat_with(move || {
+                    let addresses = either::Either::Right(core::iter::from_fn(move || {
                         // RFC 8981 Section 3.3.3 specifies that
                         //
                         //   The resulting IID MUST be compared against the reserved
@@ -1879,6 +1891,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
                         //   prefix.  In the event that an unacceptable identifier has
                         //   been generated, the DAD_Counter should be incremented by 1,
                         //   and the algorithm should be restarted from the first step.
+                        let mut attempts = 0;
                         loop {
                             let address = generate_global_temporary_address(
                                 &subnet,
@@ -1889,7 +1902,12 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
                             seed = seed.wrapping_add(1);
 
                             if has_iana_allowed_iid(address.addr().get()) {
-                                break (address, config);
+                                break Some((address, config));
+                            }
+
+                            attempts += 1;
+                            if attempts > MAX_LOCAL_REGEN_ATTEMPTS {
+                                return None;
                             }
                         }
                     }));
@@ -1901,10 +1919,11 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
     };
 
     // Attempt to add the address to the device.
+    let mut local_regen_attempts = 0;
     loop {
         let Some((address, slaac_config)) = addresses.next() else {
             // No more addresses to try - do nothing further.
-            trace!("exhausted possible SLAAC addresses without assigning on device {device_id:?}");
+            debug!("exhausted possible SLAAC addresses without assigning on device {device_id:?}");
             return;
         };
 
@@ -1982,10 +2001,16 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
             Err(ExistsError) => {
                 trace!("IPv6 SLAAC address {:?} already exists on device {:?}", address, device_id);
 
-                // Try the next address.
-                //
-                // TODO(https://fxbug.dev/42050670): Limit number of attempts.
+                // Try the next address, as long as we have not reached the maximum number of
+                // attempts.
                 slaac_addrs.increment(|counters| &counters.generated_slaac_addr_exists);
+                local_regen_attempts += 1;
+                if local_regen_attempts > MAX_LOCAL_REGEN_ATTEMPTS {
+                    debug!(
+                        "exceeded max local SLAAC addr generation attempts on device {device_id:?}"
+                    );
+                    return;
+                }
             }
             Ok(addr_sub) => {
                 trace!("receive_ndp_packet: Successfully configured new IPv6 address {:?} on device {:?} via SLAAC", addr_sub, device_id);
@@ -2111,7 +2136,7 @@ mod tests {
     #[derive(Default)]
     struct FakeSlaacAddrs {
         slaac_addrs: Vec<SlaacAddressEntry<FakeInstant>>,
-        non_slaac_addr: Option<Ipv6DeviceAddr>,
+        non_slaac_addrs: Vec<Ipv6DeviceAddr>,
         counters: SlaacCounters,
     }
 
@@ -2126,7 +2151,7 @@ mod tests {
             &mut self,
             mut cb: F,
         ) {
-            let FakeSlaacAddrs { slaac_addrs, non_slaac_addr: _, counters: _ } = self;
+            let FakeSlaacAddrs { slaac_addrs, non_slaac_addrs: _, counters: _ } = self;
             slaac_addrs.iter_mut().for_each(|SlaacAddressEntry { addr_sub, config }| {
                 cb(SlaacAddressEntryMut { addr_sub: *addr_sub, config })
             })
@@ -2135,7 +2160,7 @@ mod tests {
         type AddrsIter<'b> =
             core::iter::Cloned<core::slice::Iter<'b, SlaacAddressEntry<FakeInstant>>>;
         fn with_addrs<O, F: FnOnce(Self::AddrsIter<'_>) -> O>(&mut self, cb: F) -> O {
-            let FakeSlaacAddrs { slaac_addrs, non_slaac_addr: _, counters: _ } = self;
+            let FakeSlaacAddrs { slaac_addrs, non_slaac_addrs: _, counters: _ } = self;
             cb(slaac_addrs.iter().cloned())
         }
 
@@ -2149,9 +2174,9 @@ mod tests {
             config: Ipv6AddrSlaacConfig<FakeInstant>,
             and_then: F,
         ) -> Result<O, ExistsError> {
-            let FakeSlaacAddrs { slaac_addrs, non_slaac_addr, counters: _ } = self;
+            let FakeSlaacAddrs { slaac_addrs, non_slaac_addrs, counters: _ } = self;
 
-            if non_slaac_addr.is_some_and(|a| a == add_addr_sub.addr()) {
+            if non_slaac_addrs.iter().any(|a| *a == add_addr_sub.addr()) {
                 return Err(ExistsError);
             }
 
@@ -2174,7 +2199,7 @@ mod tests {
             (AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>, Ipv6AddrSlaacConfig<FakeInstant>),
             NotFoundError,
         > {
-            let FakeSlaacAddrs { slaac_addrs, non_slaac_addr: _, counters: _ } = self;
+            let FakeSlaacAddrs { slaac_addrs, non_slaac_addrs: _, counters: _ } = self;
 
             slaac_addrs
                 .iter()
@@ -2444,7 +2469,7 @@ mod tests {
                 slaac_addrs: Default::default(),
                 // Consider the address we will generate as already assigned without
                 // SLAAC.
-                non_slaac_addr: Some(addr_sub.addr()),
+                non_slaac_addrs: vec![addr_sub.addr()],
                 counters: Default::default(),
             },
             None,
@@ -2535,7 +2560,6 @@ mod tests {
 
     #[test]
     fn temporary_address_conflict() {
-        const ONE_HOUR: NonZeroDuration = NonZeroDuration::from_secs(60 * 60).unwrap();
         const TEMP_IDGEN_RETRIES: u8 = 0;
 
         let CtxPair { mut core_ctx, mut bindings_ctx } = new_context(
@@ -2558,7 +2582,7 @@ mod tests {
         let seed = dup_rng.gen();
         let first_attempt =
             generate_global_temporary_address(&SUBNET, &IID, seed, &TEMP_SECRET_KEY);
-        core_ctx.state.slaac_addrs.non_slaac_addr = Some(first_attempt.addr());
+        core_ctx.state.slaac_addrs.non_slaac_addrs = vec![first_attempt.addr()];
 
         // Generate a new temporary SLAAC address.
         SlaacHandler::apply_slaac_update(
@@ -2595,6 +2619,67 @@ mod tests {
             },
         };
         assert_eq!(core_ctx.state.iter_slaac_addrs().collect::<Vec<_>>(), [entry]);
+    }
+
+    #[test]
+    fn local_regen_limit() {
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context(
+            SlaacConfiguration {
+                stable_address_configuration:
+                    StableSlaacAddressConfiguration::ENABLED_WITH_OPAQUE_IIDS,
+                temporary_address_configuration: TemporarySlaacAddressConfiguration::Enabled {
+                    temp_valid_lifetime: ONE_HOUR,
+                    temp_preferred_lifetime: ONE_HOUR,
+                    temp_idgen_retries: 0,
+                },
+                ..Default::default()
+            },
+            FakeSlaacAddrs::default(),
+            None,
+            DEFAULT_RETRANS_TIMER,
+        );
+
+        let mut dup_rng = bindings_ctx.rng().deep_clone();
+        let mut seed = dup_rng.gen();
+
+        let link_local_subnet =
+            Subnet::new(Ipv6::LINK_LOCAL_UNICAST_SUBNET.network(), REQUIRED_PREFIX_BITS).unwrap();
+
+        // Consider all the SLAAC addresses we will generate (link-local, stable, and
+        // temporary) as already assigned manually without SLAAC.
+        for attempt in 0..=MAX_LOCAL_REGEN_ATTEMPTS {
+            let link_local =
+                calculate_stable_slaac_addr_sub_with_opaque_iid(link_local_subnet, IID, attempt);
+
+            let stable = calculate_stable_slaac_addr_sub_with_opaque_iid(SUBNET, IID, attempt);
+
+            let temporary =
+                generate_global_temporary_address(&SUBNET, &IID, seed, &TEMP_SECRET_KEY);
+            seed = seed.wrapping_add(1);
+
+            core_ctx.state.slaac_addrs.non_slaac_addrs.extend(&[
+                link_local.addr(),
+                stable.addr(),
+                temporary.addr(),
+            ]);
+        }
+
+        // Trigger SLAAC address generation (both link-local and global addresses for an
+        // advertised prefix).
+        SlaacHandler::apply_slaac_update(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            &FakeDeviceId,
+            SUBNET,
+            Some(NonZeroNdpLifetime::Finite(ONE_HOUR)),
+            Some(NonZeroNdpLifetime::Finite(ONE_HOUR)),
+        );
+        SlaacHandler::generate_link_local_address(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId);
+
+        // The maximum number of local retries should be exhausted due to the
+        // conflicting addresses and no addresses of any kind should be generated.
+        assert_empty(core_ctx.state.iter_slaac_addrs());
+        bindings_ctx.timers.assert_no_timers_installed();
     }
 
     const LIFETIME: NonZeroNdpLifetime =
