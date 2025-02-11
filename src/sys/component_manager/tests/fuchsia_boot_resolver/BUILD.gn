@@ -40,6 +40,7 @@ if (current_toolchain == default_toolchain) {
   }
 
   product_assembly_configuration("product_config") {
+    testonly = true
     platform = {
       build_type = "eng"
       feature_set_level = "bootstrap"
@@ -60,6 +61,13 @@ if (current_toolchain == default_toolchain) {
     }
     product = {
     }
+
+    # "base" packages are placed in bootfs on bootstrap feature set levels
+    base_packages = [
+      {
+        package_target = ":root_component_pkg"
+      },
+    ]
   }
 
   # `assembled_system` builds a zbi for consumption by the test.
@@ -70,7 +78,6 @@ if (current_toolchain == default_toolchain) {
     board_config_label = ":board_config"
     use_bringup_platform_bundles_only = true
     bootfs_labels = [ ":config" ]
-    bootfs_package_labels = [ ":root_component_pkg" ]
     base_packages = []
   }
 
