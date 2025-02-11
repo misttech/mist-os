@@ -200,7 +200,8 @@ async fn wipe_storage(
         // devices that we need to mark as accounted for for the block watcher.
         wipe_storage_fxblob(environment, blobfs_root, blob_creator).await
     } else {
-        wipe_storage_fvm(config, environment, launcher, matcher_lock, blobfs_root).await
+        wipe_storage_fvm(config, environment, launcher, matcher_lock, blobfs_root, blob_creator)
+            .await
     }
 }
 
@@ -256,11 +257,11 @@ async fn wipe_storage_fxblob(
         .await
         .context("making blob volume")?;
     clone_onto(blob_volume.root(), blobfs_root)?;
-    blob_volume.exposed_dir().deprecated_open(
-        fio::OpenFlags::empty(),
-        fio::ModeType::empty(),
+    blob_volume.exposed_dir().open(
         "svc/fuchsia.fxfs.BlobCreator",
-        blob_creator.into_channel().into(),
+        fio::Flags::PROTOCOL_SERVICE,
+        &fio::Options::default(),
+        blob_creator.into_channel(),
     )?;
     // Prevent fs_management from shutting down the filesystem when it's dropped.
     let _ = serving_fxfs.take_exposed_dir();
@@ -286,6 +287,7 @@ async fn wipe_storage_fvm(
     launcher: &FilesystemLauncher,
     matcher_lock: &Arc<Mutex<HashSet<String>>>,
     blobfs_root: Option<ServerEnd<DirectoryMarker>>,
+    blob_creator: Option<ServerEnd<fidl_fuchsia_fxfs::BlobCreatorMarker>>,
 ) -> Result<(), Error> {
     log::info!("Searching for FVM block device");
     let registered_devices = environment.lock().await.registered_devices().clone();
@@ -385,6 +387,14 @@ async fn wipe_storage_fvm(
     blobfs.format().await.context("Failed to format blobfs")?;
     let started_blobfs = blobfs.serve().await.context("serving blobfs")?;
     clone_onto(started_blobfs.root(), blobfs_root)?;
+    if let Some(blob_creator) = blob_creator {
+        started_blobfs.exposed_dir().open(
+            "fuchsia.fxfs.BlobCreator",
+            fio::Flags::PROTOCOL_SERVICE,
+            &fio::Options::default(),
+            blob_creator.into_channel(),
+        )?;
+    }
     // Prevent fs_management from shutting down the filesystem when it's dropped.
     let _ = started_blobfs.take_exposed_dir();
     Ok(())

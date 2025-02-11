@@ -4,9 +4,9 @@
 
 use blob_writer::BlobWriter;
 use block_client::{BlockClient as _, RemoteBlockClient};
-use delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob};
+use delivery_blob::{CompressionMode, Type1Blob};
 use fake_block_server::FakeServer;
-use fidl::endpoints::{create_proxy, Proxy as _, ServerEnd};
+use fidl::endpoints::Proxy as _;
 use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
 use fidl_fuchsia_fxfs::{BlobCreatorProxy, CryptManagementMarker, CryptMarker, KeyPurpose};
 use fs_management::filesystem::{
@@ -140,46 +140,8 @@ async fn create_hermetic_crypt_service(
     realm
 }
 
-/// Write a blob to blobfs to ensure that on format, blobfs doesn't get wiped.
-pub async fn write_test_blob(
-    blob_volume_root: &fio::DirectoryProxy,
-    data: &[u8],
-    as_delivery_blob: bool,
-) -> Hash {
-    let hash = fuchsia_merkle::from_slice(data).root();
-    let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
-    let (name, data) = if as_delivery_blob {
-        (delivery_blob_path(hash), compressed_data.as_slice())
-    } else {
-        (hash.to_string(), data)
-    };
-
-    let (blob, server_end) = create_proxy::<fio::FileMarker>();
-    let flags =
-        fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-    blob_volume_root
-        .deprecated_open(
-            flags,
-            fio::ModeType::empty(),
-            &name,
-            ServerEnd::new(server_end.into_channel()),
-        )
-        .expect("open failed");
-    let _: Vec<_> = blob.query().await.expect("open file failed");
-
-    blob.resize(data.len() as u64).await.expect("FIDL call failed").expect("truncate failed");
-    for chunk in data.chunks(fio::MAX_TRANSFER_SIZE as usize) {
-        assert_eq!(
-            blob.write(&chunk).await.expect("FIDL call failed").expect("write failed"),
-            chunk.len() as u64
-        );
-    }
-    hash
-}
-
-/// Write a blob to the fxfs blob volume to ensure that on format, the blob volume does not get
-/// wiped.
-pub async fn write_test_blob_fxblob(blob_creator: BlobCreatorProxy, data: &[u8]) -> Hash {
+/// Write a blob to the blob volume to ensure that on format, the blob volume does not get wiped.
+pub async fn write_test_blob(blob_creator: BlobCreatorProxy, data: &[u8]) -> Hash {
     let hash = fuchsia_merkle::from_slice(data).root();
     let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
 
@@ -427,7 +389,7 @@ impl DiskBuilder {
             blob_volume.exposed_dir(),
         )
         .expect("failed to connect to the Blob service");
-        self.blob_hash = Some(write_test_blob_fxblob(blob_creator, &BLOB_CONTENTS).await);
+        self.blob_hash = Some(write_test_blob(blob_creator, &BLOB_CONTENTS).await);
 
         if self.data_spec.format.is_some() {
             self.init_data_fxfs(FxfsType::FxBlob(fs, crypt_realm)).await;
@@ -460,7 +422,12 @@ impl DiskBuilder {
                 )
                 .await
                 .expect("failed to make fvm blobfs volume");
-            self.blob_hash = Some(write_test_blob(blob_volume.root(), &BLOB_CONTENTS, false).await);
+            let blob_creator =
+                connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
+                    blob_volume.exposed_dir(),
+                )
+                .expect("failed to connect to the Blob service");
+            self.blob_hash = Some(write_test_blob(blob_creator, &BLOB_CONTENTS).await);
         }
         fvm.shutdown_volume("blobfs").await.unwrap();
 

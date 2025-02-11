@@ -28,7 +28,7 @@ pub mod disk_builder;
 pub mod fshost_builder;
 mod mocks;
 
-pub use disk_builder::{write_test_blob, write_test_blob_fxblob};
+pub use disk_builder::write_test_blob;
 
 pub const VFS_TYPE_BLOBFS: u32 = 0x9e694d21;
 pub const VFS_TYPE_MINFS: u32 = 0x6e694d21;
