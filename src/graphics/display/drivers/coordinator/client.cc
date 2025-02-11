@@ -1488,8 +1488,6 @@ void Client::TearDown(zx_status_t epitaph) {
         controller_.engine_driver_client()->ReleaseBufferCollection(v.driver_buffer_collection_id);
   }
   collection_map_.clear();
-
-  ApplyConfig();
 }
 
 void Client::TearDownForTesting() { valid_ = false; }
