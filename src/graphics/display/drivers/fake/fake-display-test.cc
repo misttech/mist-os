@@ -690,20 +690,17 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureImage) {
   // Must match kDisplayId in fake-display.cc.
   // TODO(https://fxbug.dev/42078942): Do not hardcode the display ID.
   constexpr display::DisplayId kDisplayId(1);
-  constexpr size_t kDisplayCount = 1;
-  std::array<const display_config_t, kDisplayCount> kDisplayConfigs = {
-      display_config_t{
-          .display_id = display::ToBanjoDisplayId(kDisplayId),
-          .mode = {},
+  const display_config_t kDisplayConfig = {
+      .display_id = display::ToBanjoDisplayId(kDisplayId),
+      .mode = {},
 
-          .cc_flags = 0u,
-          .cc_preoffsets = {},
-          .cc_coefficients = {},
-          .cc_postoffsets = {},
+      .cc_flags = 0u,
+      .cc_preoffsets = {},
+      .cc_coefficients = {},
+      .cc_postoffsets = {},
 
-          .layer_list = kLayers.data(),
-          .layer_count = kLayers.size(),
-      },
+      .layer_list = kLayers.data(),
+      .layer_count = kLayers.size(),
   };
 
   std::array<layer_composition_operations_t, kLayerCount> layer_composition_operations = {0u};
@@ -712,14 +709,14 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureImage) {
   // Check and apply the display configuration.
   config_check_result_t config_check_result =
       fake_display_stack_->display_engine().DisplayEngineCheckConfiguration(
-          kDisplayConfigs.data(), kDisplayConfigs.size(), layer_composition_operations.data(),
-          layer_composition_operations.size(), &layer_composition_operations_count);
+          &kDisplayConfig, layer_composition_operations.data(), layer_composition_operations.size(),
+          &layer_composition_operations_count);
   EXPECT_EQ(config_check_result, CONFIG_CHECK_RESULT_OK);
 
   const display::DriverConfigStamp config_stamp(1);
   const config_stamp_t banjo_config_stamp = display::ToBanjoDriverConfigStamp(config_stamp);
-  fake_display_stack_->display_engine().DisplayEngineApplyConfiguration(
-      kDisplayConfigs.data(), kDisplayConfigs.size(), &banjo_config_stamp);
+  fake_display_stack_->display_engine().DisplayEngineApplyConfiguration(&kDisplayConfig,
+                                                                        &banjo_config_stamp);
 
   // Start capture; wait until the capture ends.
   EXPECT_FALSE(display_capture_completion.completed().signaled());
@@ -759,7 +756,7 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureImage) {
   }
 
   // Apply an empty configuration so the image can be released.
-  std::array<const display_config_t, kDisplayCount> kEmptyDisplayConfigs = {
+  const display_config_t kEmptyDisplayConfig = {
       display_config_t{
           .display_id = display::ToBanjoDisplayId(kDisplayId),
           .mode = {},
@@ -776,8 +773,8 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureImage) {
   const display::DriverConfigStamp empty_config_stamp(2);
   const config_stamp_t banjo_empty_config_stamp =
       display::ToBanjoDriverConfigStamp(empty_config_stamp);
-  fake_display_stack_->display_engine().DisplayEngineApplyConfiguration(
-      kEmptyDisplayConfigs.data(), kEmptyDisplayConfigs.size(), &banjo_empty_config_stamp);
+  fake_display_stack_->display_engine().DisplayEngineApplyConfiguration(&kEmptyDisplayConfig,
+                                                                        &banjo_empty_config_stamp);
 
   // Release the image.
   // TODO(https://fxbug.dev/42079040): Consider adding RAII handles to release the

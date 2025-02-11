@@ -390,37 +390,37 @@ void FakeDisplay::DisplayEngineReleaseImage(uint64_t image_handle) {
 }
 
 config_check_result_t FakeDisplay::DisplayEngineCheckConfiguration(
-    const display_config_t* display_configs, size_t display_count,
+    const display_config_t* display_config_ptr,
     layer_composition_operations_t* out_layer_composition_operations_list,
     size_t layer_composition_operations_count, size_t* out_layer_composition_operations_actual) {
+  ZX_DEBUG_ASSERT(display_config_ptr != nullptr);
+  const display_config_t& display_config = *display_config_ptr;
+
   if (out_layer_composition_operations_actual != nullptr) {
     *out_layer_composition_operations_actual = 0;
   }
 
-  if (display_count != 1) {
-    ZX_DEBUG_ASSERT(display_count == 0);
-    return CONFIG_CHECK_RESULT_OK;
-  }
-  ZX_DEBUG_ASSERT(display::ToDisplayId(display_configs[0].display_id) == kDisplayId);
+  ZX_DEBUG_ASSERT(display::ToDisplayId(display_config.display_id) == kDisplayId);
 
-  ZX_DEBUG_ASSERT(layer_composition_operations_count >= display_configs[0].layer_count);
+  ZX_DEBUG_ASSERT(layer_composition_operations_count >= display_config.layer_count);
   cpp20::span<layer_composition_operations_t> layer_composition_operations(
-      out_layer_composition_operations_list, display_configs[0].layer_count);
+      out_layer_composition_operations_list, display_config.layer_count);
   std::fill(layer_composition_operations.begin(), layer_composition_operations.end(), 0);
   if (out_layer_composition_operations_actual != nullptr) {
     *out_layer_composition_operations_actual = layer_composition_operations.size();
   }
 
   config_check_result_t check_result = [&] {
-    if (display_configs[0].layer_count == 0) {
+    // TODO(https://fxbug.dev/394413629): Remove support for empty configs.
+    if (display_config.layer_count == 0) {
       return CONFIG_CHECK_RESULT_OK;
     }
-    if (display_configs[0].layer_count > 1) {
+
+    if (display_config.layer_count > 1) {
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
-    ZX_DEBUG_ASSERT(display_configs[0].layer_count == 1);
-    const layer_t& layer = display_configs[0].layer_list[0];
-
+    ZX_DEBUG_ASSERT(display_config.layer_count == 1);
+    const layer_t& layer = display_config.layer_list[0];
     const rect_u_t display_area = {.x = 0, .y = 0, .width = kWidth, .height = kHeight};
     if (memcmp(&layer.display_destination, &display_area, sizeof(rect_u_t)) != 0) {
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
@@ -467,25 +467,26 @@ config_check_result_t FakeDisplay::DisplayEngineCheckConfiguration(
 
   if (check_result == CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG) {
     layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
-    for (unsigned i = 1; i < display_configs[0].layer_count; i++) {
+    for (size_t i = 1; i < display_config.layer_count; ++i) {
       layer_composition_operations[i] = LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
     }
   }
   return check_result;
 }
 
-void FakeDisplay::DisplayEngineApplyConfiguration(const display_config_t* display_configs,
-                                                  size_t display_count,
+void FakeDisplay::DisplayEngineApplyConfiguration(const display_config_t* display_config_ptr,
                                                   const config_stamp_t* banjo_config_stamp) {
-  ZX_DEBUG_ASSERT(display_configs);
+  ZX_DEBUG_ASSERT(display_config_ptr != nullptr);
+  const display_config_t& display_config = *display_config_ptr;
+
   ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
   const display::DriverConfigStamp config_stamp = display::ToDriverConfigStamp(*banjo_config_stamp);
 
   std::lock_guard lock(mutex_);
-  if (display_count == 1 && display_configs[0].layer_count) {
+  if (display_config.layer_count) {
     // Only support one display.
-    applied_image_id_ = display::ToDriverImageId(display_configs[0].layer_list[0].image_handle);
-    applied_fallback_color_ = display::Color::From(display_configs[0].layer_list[0].fallback_color);
+    applied_image_id_ = display::ToDriverImageId(display_config.layer_list[0].image_handle);
+    applied_fallback_color_ = display::Color::From(display_config.layer_list[0].fallback_color);
   } else {
     applied_image_id_ = display::kInvalidDriverImageId;
     static constexpr display::Color kBlackBgra(
@@ -495,6 +496,44 @@ void FakeDisplay::DisplayEngineApplyConfiguration(const display_config_t* displa
   }
 
   applied_config_stamp_ = config_stamp;
+}
+
+config_check_result_t FakeDisplay::DisplayEngineCheckConfiguration(
+    const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
+    layer_composition_operations_t* out_layer_composition_operations_list,
+    size_t out_layer_composition_operations_size, size_t* out_layer_composition_operations_actual) {
+  // The display coordinator currently uses zero-display configs to blank all
+  // displays. We'll remove this eventually.
+  if (banjo_display_configs_count == 0) {
+    return CONFIG_CHECK_RESULT_OK;
+  }
+
+  // This adapter does not support multiple-display operation. None of our
+  // drivers supports this mode.
+  if (banjo_display_configs_count > 1) {
+    ZX_DEBUG_ASSERT_MSG(false, "Multiple displays registered with the display coordinator");
+    return CONFIG_CHECK_RESULT_TOO_MANY;
+  }
+
+  return DisplayEngineCheckConfiguration(
+      banjo_display_configs_array, out_layer_composition_operations_list,
+      out_layer_composition_operations_size, out_layer_composition_operations_actual);
+}
+
+void FakeDisplay::DisplayEngineApplyConfiguration(
+    const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
+    const config_stamp_t* banjo_config_stamp) {
+  // The display coordinator currently uses zero-display configs to blank all
+  // displays. We'll remove this eventually.
+  if (banjo_display_configs_count == 0) {
+    return;
+  }
+
+  // This adapter does not support multiple-display operation. None of our
+  // drivers supports this mode.
+  ZX_DEBUG_ASSERT_MSG(banjo_display_configs_count == 1,
+                      "Display coordinator applied rejected multi-display config");
+  DisplayEngineApplyConfiguration(banjo_display_configs_array, banjo_config_stamp);
 }
 
 enum class FakeDisplay::BufferCollectionUsage {
