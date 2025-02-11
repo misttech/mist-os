@@ -7,6 +7,7 @@ use crate::fs::proc::cpuinfo::CpuinfoFile;
 use crate::fs::proc::devices::devices_node;
 use crate::fs::proc::pid_directory::pid_directory;
 use crate::fs::proc::pressure_directory::pressure_directory;
+use crate::fs::proc::self_symlink::self_node;
 use crate::fs::proc::sysctl::{net_directory, sysctl_directory};
 use crate::fs::proc::sysrq::SysRqNode;
 use crate::mm::PAGE_SIZE;
@@ -78,7 +79,7 @@ impl ProcDirectory {
                     }
                     directory.build(current_task)
             },
-            "self".into() => SelfSymlink::new_node(current_task, fs),
+            "self".into() => self_node(current_task, fs),
             "thread-self".into() => ThreadSelfSymlink::new_node(current_task, fs),
             "meminfo".into() => fs.create_node(
                 current_task,
@@ -431,33 +432,6 @@ impl FileOps for ProcKmsgFile {
         _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         error!(EIO)
-    }
-}
-
-/// A node that represents a symlink to `proc/<pid>` where <pid> is the pid of the task that
-/// reads the `proc/self` symlink.
-struct SelfSymlink;
-
-impl SelfSymlink {
-    fn new_node(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
-        fs.create_node(
-            current_task,
-            Self,
-            FsNodeInfo::new_factory(mode!(IFLNK, 0o777), FsCred::root()),
-        )
-    }
-}
-
-impl FsNodeOps for SelfSymlink {
-    fs_node_impl_symlink!();
-
-    fn readlink(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _node: &FsNode,
-        current_task: &CurrentTask,
-    ) -> Result<SymlinkTarget, Errno> {
-        Ok(SymlinkTarget::Path(current_task.get_pid().to_string().into()))
     }
 }
 

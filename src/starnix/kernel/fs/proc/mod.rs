@@ -8,6 +8,7 @@ mod fs;
 pub mod pid_directory;
 mod pressure_directory;
 mod proc_directory;
+pub mod self_symlink;
 mod sysctl;
 mod sysrq;
 
