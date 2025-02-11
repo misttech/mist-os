@@ -114,7 +114,10 @@ async fn write_blob() {
 async fn wipe_storage_deletes_starnix_volume() {
     let mut builder = new_builder();
     builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec()).with_gpt();
-    builder.fshost().set_config_value("starnix_volume_name", STARNIX_VOLUME_NAME);
+    builder
+        .fshost()
+        .create_starnix_volume_crypt()
+        .set_config_value("starnix_volume_name", STARNIX_VOLUME_NAME);
 
     let fixture = builder.build().await;
     fixture.check_fs_type("blob", blob_fs_type()).await;
@@ -139,7 +142,7 @@ async fn wipe_storage_deletes_starnix_volume() {
     let vmo = fixture.into_vmo().await.unwrap();
 
     let mut builder = new_builder().with_disk_from_vmo(vmo);
-    builder.fshost().set_config_value("ramdisk_image", true);
+    builder.fshost().create_starnix_volume_crypt().set_config_value("ramdisk_image", true);
     builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 
     let fixture = builder.build().await;
@@ -187,7 +190,10 @@ async fn wipe_storage_deletes_starnix_volume() {
 
     let vmo = fixture.into_vmo().await.unwrap();
     let mut builder = new_builder().with_disk_from_vmo(vmo);
-    builder.fshost().set_config_value("starnix_volume_name", STARNIX_VOLUME_NAME);
+    builder
+        .fshost()
+        .create_starnix_volume_crypt()
+        .set_config_value("starnix_volume_name", STARNIX_VOLUME_NAME);
 
     let fixture = builder.build().await;
     fixture.check_fs_type("blob", blob_fs_type()).await;

@@ -42,14 +42,8 @@ impl Container for FxfsContainer {
     async fn serve_data(&mut self, launcher: &FilesystemLauncher) -> Result<Filesystem, Error> {
         let mut expected =
             HashSet::from([BLOB_VOLUME_LABEL, DATA_VOLUME_LABEL, UNENCRYPTED_VOLUME_LABEL]);
-        if !launcher.config.starnix_volume_name.is_empty() {
-            expected.insert(&launcher.config.starnix_volume_name);
-        }
-
         for volume in self.get_volumes().await? {
-            if !expected.remove(volume.as_str()) {
-                return self.format_data(launcher).await;
-            }
+            expected.remove(volume.as_str());
         }
         if expected.is_empty() {
             match crypt::fxfs::unlock_data_volume(&mut self.0, &launcher.config).await {

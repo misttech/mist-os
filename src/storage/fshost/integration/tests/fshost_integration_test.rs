@@ -338,7 +338,10 @@ async fn partition_max_size_set() {
 #[cfg(feature = "fxblob")]
 async fn mount_and_unmount_starnix_volume() {
     let mut builder = new_builder();
-    builder.fshost().set_config_value("starnix_volume_name", STARNIX_VOLUME_NAME);
+    builder
+        .fshost()
+        .create_starnix_volume_crypt()
+        .set_config_value("starnix_volume_name", STARNIX_VOLUME_NAME);
     builder.with_disk().format_volumes(volumes_spec());
     let fixture = builder.build().await;
 
@@ -361,25 +364,30 @@ async fn mount_and_unmount_starnix_volume() {
         .expect("fidl transport error")
         .expect("mount failed");
 
-    let starnix_volume_root_dir = fuchsia_fs::directory::open_directory_async(
+    let starnix_volume_root_dir = fuchsia_fs::directory::open_directory(
         &exposed_dir_proxy,
         "root",
         fio::PERM_READABLE | fio::PERM_WRITABLE,
     )
+    .await
     .expect("Failed to open the root dir of the starnix volume");
 
-    let starnix_volume_file = fuchsia_fs::directory::open_file_async(
+    let starnix_volume_file = fuchsia_fs::directory::open_file(
         &starnix_volume_root_dir,
         "file",
         fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE | fio::PERM_WRITABLE,
     )
+    .await
     .expect("Failed to create file in starnix volume");
     fuchsia_fs::file::write(&starnix_volume_file, "file contents!").await.unwrap();
     volume_provider.unmount().await.expect("fidl transport error").expect("unmount failed");
 
     let vmo = fixture.into_vmo().await.unwrap();
     let mut builder = new_builder().with_disk_from_vmo(vmo);
-    builder.fshost().set_config_value("starnix_volume_name", STARNIX_VOLUME_NAME);
+    builder
+        .fshost()
+        .create_starnix_volume_crypt()
+        .set_config_value("starnix_volume_name", STARNIX_VOLUME_NAME);
     let fixture = builder.build().await;
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
@@ -402,15 +410,14 @@ async fn mount_and_unmount_starnix_volume() {
         .expect("mount failed");
 
     let starnix_volume_root_dir =
-        fuchsia_fs::directory::open_directory_async(&exposed_dir_proxy, "root", fio::PERM_READABLE)
+        fuchsia_fs::directory::open_directory(&exposed_dir_proxy, "root", fio::PERM_READABLE)
+            .await
             .expect("Failed to open the root dir of the starnix volume");
 
-    let starnix_volume_file = fuchsia_fs::directory::open_file_async(
-        &starnix_volume_root_dir,
-        "file",
-        fio::PERM_READABLE,
-    )
-    .expect("Failed to create file in starnix volume");
+    let starnix_volume_file =
+        fuchsia_fs::directory::open_file(&starnix_volume_root_dir, "file", fio::PERM_READABLE)
+            .await
+            .expect("Failed to create file in starnix volume");
     assert_eq!(&fuchsia_fs::file::read(&starnix_volume_file).await.unwrap()[..], b"file contents!");
 
     fixture.tear_down().await;
@@ -697,7 +704,10 @@ async fn shred_data_volume_when_mounted() {
 async fn shred_data_deletes_starnix_volume() {
     let mut builder = new_builder();
     builder.with_disk().format_volumes(volumes_spec());
-    builder.fshost().set_config_value("starnix_volume_name", STARNIX_VOLUME_NAME);
+    builder
+        .fshost()
+        .create_starnix_volume_crypt()
+        .set_config_value("starnix_volume_name", STARNIX_VOLUME_NAME);
     let fixture = builder.build().await;
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
@@ -734,7 +744,10 @@ async fn shred_data_deletes_starnix_volume() {
     fixture.tear_down().await;
 
     let mut builder = new_builder().with_disk_from_vmo(vmo);
-    builder.fshost().set_config_value("starnix_volume_name", STARNIX_VOLUME_NAME);
+    builder
+        .fshost()
+        .create_starnix_volume_crypt()
+        .set_config_value("starnix_volume_name", STARNIX_VOLUME_NAME);
     let fixture = builder.build().await;
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
@@ -744,6 +757,89 @@ async fn shred_data_deletes_starnix_volume() {
     let dir_entries =
         fuchsia_fs::directory::readdir(&volumes_dir).await.expect("Failed to readdir the volumes");
     assert!(dir_entries.iter().find(|x| x.name.contains(STARNIX_VOLUME_NAME)).is_none());
+
+    fixture.tear_down().await;
+}
+
+#[fuchsia::test]
+#[cfg(feature = "fxblob")]
+async fn vend_a_fresh_starnix_test_volume_on_each_mount() {
+    let mut builder = new_builder();
+    builder.with_disk().format_volumes(volumes_spec());
+    builder.fshost().create_starnix_volume_crypt();
+    let fixture = builder.build().await;
+
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    // Need to connect to the StarnixVolumeProvider protocol that fshost exposes and Mount the
+    // starnix volume.
+    let volume_provider = fixture
+        .realm
+        .root
+        .connect_to_protocol_at_exposed_dir::<StarnixVolumeProviderMarker>()
+        .expect("connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol");
+    let (crypt, _crypt_management) = fixture.setup_starnix_crypt().await;
+    let (exposed_dir_proxy, exposed_dir_server) =
+        fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+    volume_provider
+        .mount(crypt.into_client_end().unwrap(), exposed_dir_server)
+        .await
+        .expect("fidl transport error")
+        .expect("mount failed");
+
+    let starnix_volume_root_dir = fuchsia_fs::directory::open_directory(
+        &exposed_dir_proxy,
+        "root",
+        fio::PERM_READABLE | fio::PERM_WRITABLE,
+    )
+    .await
+    .expect("Failed to open the root dir of the starnix volume");
+
+    let starnix_volume_file = fuchsia_fs::directory::open_file(
+        &starnix_volume_root_dir,
+        "file",
+        fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE | fio::PERM_WRITABLE,
+    )
+    .await
+    .expect("Failed to create file in starnix volume");
+    fuchsia_fs::file::write(&starnix_volume_file, "file contents!").await.unwrap();
+    volume_provider.unmount().await.expect("fidl transport error").expect("unmount failed");
+
+    let vmo = fixture.into_vmo().await.unwrap();
+    let mut builder = new_builder().with_disk_from_vmo(vmo);
+    builder.fshost().create_starnix_volume_crypt();
+    let fixture = builder.build().await;
+
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    // Need to connect to the StarnixVolumeProvider protocol that fshost exposes and Mount the
+    // starnix volume.
+    let volume_provider = fixture
+        .realm
+        .root
+        .connect_to_protocol_at_exposed_dir::<StarnixVolumeProviderMarker>()
+        .expect("connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol");
+    let (crypt, _crypt_management) = fixture.setup_starnix_crypt().await;
+    let (exposed_dir_proxy, exposed_dir_server) =
+        fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+    volume_provider
+        .mount(crypt.into_client_end().unwrap(), exposed_dir_server)
+        .await
+        .expect("fidl transport error")
+        .expect("mount failed");
+
+    let starnix_volume_root_dir =
+        fuchsia_fs::directory::open_directory(&exposed_dir_proxy, "root", fio::PERM_READABLE)
+            .await
+            .expect("Failed to open the root dir of the starnix volume");
+
+    // fshost should vend a fresh Starnix test volume on every mount so this file should no longer
+    // exist.
+    fuchsia_fs::directory::open_file(&starnix_volume_root_dir, "file", fio::PERM_READABLE)
+        .await
+        .expect_err("fshost should vend a fresh Starnix test volume on every mount");
 
     fixture.tear_down().await;
 }
