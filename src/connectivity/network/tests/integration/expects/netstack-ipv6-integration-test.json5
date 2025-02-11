@@ -9,14 +9,5 @@
                 "*",
             ],
         },
-        {
-            type: "expect_failure_with_err_logs",
-            matchers: [
-                // TODO(https://fxbug.dev/42148800): This test should pass when
-                // we support opaque interface identifiers which then allow
-                // re-generation of stable SLAAC addresses.
-                "slaac_regeneration_after_dad_failure_ns3",
-            ],
-        },
     ],
 }

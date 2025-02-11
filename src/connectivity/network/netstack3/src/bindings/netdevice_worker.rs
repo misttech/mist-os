@@ -490,7 +490,9 @@ impl DeviceHandler {
         };
 
         let iid_generation = if ctx.bindings_ctx().config.default_opaque_iids {
-            IidGenerationConfiguration::Opaque
+            IidGenerationConfiguration::Opaque {
+                idgen_retries: StableSlaacAddressConfiguration::DEFAULT_IDGEN_RETRIES,
+            }
         } else {
             IidGenerationConfiguration::Eui64
         };

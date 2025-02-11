@@ -1078,7 +1078,13 @@ pub enum SlaacConfig<Instant> {
     Stable {
         /// The lifetime of the address.
         valid_until: Lifetime<Instant>,
-        // TODO(https://fxbug.dev/42148800): also keep track of DAD retry count.
+        /// The time at which the address was created.
+        creation_time: Instant,
+        /// The number of times the address has been regenerated to avoid either an
+        /// IANA-reserved IID or an address already assigned to the same interface.
+        regen_counter: u8,
+        /// The number of times the address has been regenerated due to DAD failure.
+        dad_counter: u8,
     },
     /// The address is a temporary address, as specified by [RFC 8981].
     ///
@@ -1090,13 +1096,10 @@ impl<Instant: Copy> SlaacConfig<Instant> {
     /// The lifetime for which the address is valid.
     pub fn valid_until(&self) -> Lifetime<Instant> {
         match self {
-            SlaacConfig::Stable { valid_until } => *valid_until,
-            SlaacConfig::Temporary(TemporarySlaacConfig {
-                valid_until,
-                desync_factor: _,
-                creation_time: _,
-                dad_counter: _,
-            }) => Lifetime::Finite(*valid_until),
+            SlaacConfig::Stable { valid_until, .. } => *valid_until,
+            SlaacConfig::Temporary(TemporarySlaacConfig { valid_until, .. }) => {
+                Lifetime::Finite(*valid_until)
+            }
         }
     }
 }
@@ -1221,7 +1224,15 @@ impl<Inst: Instant> Inspectable for Ipv6AddressState<Inst> {
                 Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { .. }) => false,
                 Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, preferred_lifetime: _ }) => {
                     match inner {
-                        SlaacConfig::Stable { valid_until: _ } => {}
+                        SlaacConfig::Stable {
+                            valid_until: _,
+                            creation_time: _,
+                            regen_counter: _,
+                            dad_counter: _,
+                        } => {
+                            // TODO(https://fxbug.dev/394169211): record stable SLAAC address
+                            // properties in inspect.
+                        }
                         SlaacConfig::Temporary(TemporarySlaacConfig {
                             valid_until: _,
                             desync_factor,
@@ -1306,6 +1317,7 @@ mod tests {
     use super::*;
 
     use netstack3_base::testutil::{FakeBindingsCtx, FakeInstant};
+    use netstack3_base::InstantContext as _;
     use test_case::test_case;
 
     type FakeBindingsCtxImpl = FakeBindingsCtx<(), (), (), ()>;
@@ -1356,7 +1368,12 @@ mod tests {
                     added_extra_transmits_after_detecting_looped_back_ns: false,
                 },
                 Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig {
-                    inner: SlaacConfig::Stable { valid_until },
+                    inner: SlaacConfig::Stable {
+                        valid_until,
+                        creation_time: bindings_ctx.now(),
+                        regen_counter: 0,
+                        dad_counter: 0,
+                    },
                     preferred_lifetime: PreferredLifetime::Preferred(Lifetime::Infinite),
                 }),
             ))

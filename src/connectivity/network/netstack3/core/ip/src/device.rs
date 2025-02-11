@@ -60,9 +60,8 @@ use crate::internal::device::state::{
     IpDeviceConfiguration, IpDeviceFlags, IpDeviceState, IpDeviceStateBindingsTypes,
     IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4AddressEntry, Ipv4AddressState,
     Ipv4DeviceConfiguration, Ipv4DeviceState, Ipv6AddrConfig, Ipv6AddrManualConfig,
-    Ipv6AddrSlaacConfig, Ipv6AddressEntry, Ipv6AddressFlags, Ipv6AddressState,
-    Ipv6DeviceConfiguration, Ipv6DeviceState, Ipv6NetworkLearnedParameters, Lifetime,
-    PreferredLifetime, WeakAddressId,
+    Ipv6AddressEntry, Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfiguration, Ipv6DeviceState,
+    Ipv6NetworkLearnedParameters, Lifetime, PreferredLifetime, WeakAddressId,
 };
 use crate::internal::gmp::igmp::{IgmpPacketHandler, IgmpTimerId};
 use crate::internal::gmp::mld::{MldPacketHandler, MldTimerId};
@@ -1654,16 +1653,14 @@ impl<CC: SlaacHandler<BC>, BC: InstantContext> IpAddressRemovalHandler<Ipv6, BC>
         reason: AddressRemovedReason,
     ) {
         match config {
-            Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, preferred_lifetime: _ }) => {
-                SlaacHandler::on_address_removed(
-                    self,
-                    bindings_ctx,
-                    device_id,
-                    addr_sub,
-                    inner,
-                    reason,
-                )
-            }
+            Ipv6AddrConfig::Slaac(config) => SlaacHandler::on_address_removed(
+                self,
+                bindings_ctx,
+                device_id,
+                addr_sub,
+                config,
+                reason,
+            ),
             Ipv6AddrConfig::Manual(_manual_config) => (),
         }
     }

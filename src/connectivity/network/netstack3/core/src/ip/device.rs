@@ -36,8 +36,8 @@ use netstack3_ip::device::{
     Ipv6AddressFlags, Ipv6AddressState, Ipv6DadState, Ipv6DeviceConfiguration, Ipv6DeviceTimerId,
     Ipv6DiscoveredRoute, Ipv6DiscoveredRoutesContext, Ipv6NetworkLearnedParameters,
     Ipv6RouteDiscoveryContext, Ipv6RouteDiscoveryState, RsContext, RsState, RsTimerId,
-    SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses, SlaacConfig, SlaacConfigAndState,
-    SlaacContext, SlaacCounters, SlaacState, WeakAddressId,
+    SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses, SlaacConfigAndState, SlaacContext,
+    SlaacCounters, SlaacState, WeakAddressId,
 };
 use netstack3_ip::gmp::{
     GmpGroupState, GmpState, GmpStateRef, IgmpContext, IgmpContextMarker, IgmpSendContext,
@@ -190,8 +190,10 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
         &mut self,
         bindings_ctx: &mut BC,
         addr: &Ipv6DeviceAddr,
-    ) -> Result<(AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>, SlaacConfig<BC::Instant>), NotFoundError>
-    {
+    ) -> Result<
+        (AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>, Ipv6AddrSlaacConfig<BC::Instant>),
+        NotFoundError,
+    > {
         let SlaacAddrs { core_ctx, device_id, config } = self;
         del_ip_addr_inner::<Ipv6, _, _>(
             core_ctx,
@@ -205,7 +207,7 @@ impl<'a, BC: BindingsContext> SlaacAddresses<BC> for SlaacAddrs<'a, BC> {
             assert_eq!(&addr_sub.addr(), addr);
             bindings_ctx.defer_removal_result(result);
             match config {
-                Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, .. }) => (addr_sub, inner),
+                Ipv6AddrConfig::Slaac(config) => (addr_sub, config),
                 Ipv6AddrConfig::Manual(_manual_config) => {
                     unreachable!(
                         "address {addr_sub} on device {device_id:?} should have been a SLAAC \

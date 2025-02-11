@@ -67,7 +67,6 @@ tests = [
   },
   {
     label = "ipv6"
-    err_logs = true
     package_deps = [ "//src/sys/stash:stash_secure_v2" ]
   },
   {
