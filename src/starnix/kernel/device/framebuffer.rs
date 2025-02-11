@@ -49,7 +49,7 @@ pub struct AspectRatio {
 
 pub struct Framebuffer {
     server: Option<Arc<FramebufferServer>>,
-    memory: Option<Arc<MemoryObject>>,
+    memory: Mutex<Option<Arc<MemoryObject>>>,
     pub info: RwLock<fb_var_screeninfo>,
     pub view_identity: Mutex<Option<fuiviews::ViewIdentityOnCreation>>,
     pub view_bound_protocols: Mutex<Option<fuicomposition::ViewBoundProtocols>>,
@@ -106,7 +106,7 @@ impl Framebuffer {
 
             Ok(Arc::new(Self {
                 server: Some(server),
-                memory: Some(memory),
+                memory: Mutex::new(Some(memory)),
                 info: RwLock::new(info),
                 view_identity: Default::default(),
                 view_bound_protocols: Default::default(),
@@ -114,7 +114,7 @@ impl Framebuffer {
         } else {
             Ok(Arc::new(Self {
                 server: None,
-                memory: None,
+                memory: Default::default(),
                 info: RwLock::new(info),
                 view_identity: Default::default(),
                 view_bound_protocols: Default::default(),
@@ -155,23 +155,34 @@ impl Framebuffer {
     pub fn present_view(&self, viewport_token: fuiviews::ViewportCreationToken) {
         if let Some(server) = &self.server {
             init_viewport_scene(server.clone(), viewport_token);
+
+            // Release the memory associated with the framebuffer.
+            let mut memory = self.memory.lock();
+            if let Some(memory_ref) = memory.as_ref() {
+                let bytes = memory_ref.get_size();
+                let refs = Arc::strong_count(memory_ref);
+                *memory = None;
+                log_info!("Released framebuffer memory ({} bytes, {} refs)", bytes, refs);
+            }
         }
     }
 
     /// Returns the framebuffer's memory.
-    fn get_memory(&self) -> Result<&Arc<MemoryObject>, Errno> {
-        self.memory.as_ref().ok_or_else(|| errno!(EIO))
+    fn get_memory(&self) -> Result<Arc<MemoryObject>, Errno> {
+        self.memory.lock().clone().ok_or_else(|| errno!(EIO))
     }
 
     /// Returns the logical size of the framebuffer's memory.
     fn memory_len(&self) -> usize {
-        self.get_memory().map_or(0, |memory| memory.info().map_or(0, |info| info.size_bytes))
-            as usize
+        self.memory
+            .lock()
+            .as_ref()
+            .map_or(0, |memory| memory.info().map_or(0, |info| info.size_bytes)) as usize
     }
 
     /// Returns the allocated size of the framebuffer's memory.
     fn memory_size(&self) -> usize {
-        self.get_memory().map_or(0, |memory| memory.get_size()) as usize
+        self.memory.lock().as_ref().map_or(0, |memory| memory.get_size()) as usize
     }
 }
 
@@ -197,7 +208,7 @@ impl DeviceOps for Arc<Framebuffer> {
 }
 
 impl FileOps for Framebuffer {
-    fileops_impl_memory!(self, self.get_memory()?);
+    fileops_impl_memory!(self, &self.get_memory()?);
     fileops_impl_noop_sync!();
 
     fn ioctl(
