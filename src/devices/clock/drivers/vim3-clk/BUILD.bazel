@@ -39,8 +39,6 @@ cc_library(
         "vim3_clk.h",
     ],
     deps = [
-        "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
-        "//sdk/lib/driver/compat/cpp",
         "//src/devices/lib/amlogic",
         "@fuchsia_sdk//bind/fuchsia.test:fuchsia.test_cc",
         "@fuchsia_sdk//fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",

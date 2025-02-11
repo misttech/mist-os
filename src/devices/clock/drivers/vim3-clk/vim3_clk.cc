@@ -104,15 +104,6 @@ zx::result<> Vim3Clock::Start() {
 
   auto child_name = "clocks";
 
-  // Initialize our compat server.
-  {
-    zx::result<> result = compat_server_.Initialize(incoming(), outgoing(), node_name(), child_name,
-                                                    compat::ForwardMetadata::None());
-    if (result.is_error()) {
-      return result.take_error();
-    }
-  }
-
   auto add_service_result = outgoing()->AddService<fuchsia_hardware_clockimpl::Service>(
       fuchsia_hardware_clockimpl::Service::InstanceHandler({
           .device = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->get(),
@@ -124,10 +115,11 @@ zx::result<> Vim3Clock::Start() {
   }
 
   // Add a child node.
-  auto offers = compat_server_.CreateOffers2();
-  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_clockimpl::Service>());
-  offers.push_back(clock_ids_metadata_server_.MakeOffer());
-  offers.push_back(clock_init_metadata_server_.MakeOffer());
+  std::vector<fuchsia_driver_framework::Offer> offers = {
+      fdf::MakeOffer2<fuchsia_hardware_clockimpl::Service>(),
+      clock_ids_metadata_server_.MakeOffer(),
+      clock_init_metadata_server_.MakeOffer(),
+  };
 
   std::vector<fuchsia_driver_framework::NodeProperty2> properties = {};
   auto add_child_result = AddChild(child_name, properties, offers);
