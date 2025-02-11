@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 pub mod cpuinfo;
+pub mod devices;
 mod fs;
 pub mod pid_directory;
 mod pressure_directory;

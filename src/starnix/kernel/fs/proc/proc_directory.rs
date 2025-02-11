@@ -4,6 +4,7 @@
 
 use crate::device::DeviceMode;
 use crate::fs::proc::cpuinfo::CpuinfoFile;
+use crate::fs::proc::devices::devices_node;
 use crate::fs::proc::pid_directory::pid_directory;
 use crate::fs::proc::pressure_directory::pressure_directory;
 use crate::fs::proc::sysctl::{net_directory, sysctl_directory};
@@ -69,11 +70,7 @@ impl ProcDirectory {
                     FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
                 )
             },
-            "devices".into() => fs.create_node(
-                current_task,
-                DevicesFile::new_node(),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
+            "devices".into() => devices_node(current_task, fs),
             "device-tree".into() => {
                     let mut directory = StaticDirectoryBuilder::new(fs);
                     for setup_function in &kernel.procfs_device_tree_setup {
@@ -434,31 +431,6 @@ impl FileOps for ProcKmsgFile {
         _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         error!(EIO)
-    }
-}
-
-struct DevicesFile;
-impl DevicesFile {
-    pub fn new_node() -> impl FsNodeOps {
-        BytesFile::new_node(Self)
-    }
-}
-impl BytesFileOps for DevicesFile {
-    fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        let registery = &current_task.kernel().device_registry;
-        let char_devices = registery.list_major_devices(DeviceMode::Char);
-        let block_devices = registery.list_major_devices(DeviceMode::Block);
-        let mut contents = String::new();
-        contents.push_str("Character devices:\n");
-        for (major, name) in char_devices {
-            contents.push_str(&format!("{:3} {}\n", major, name));
-        }
-        contents.push_str("\n");
-        contents.push_str("Block devices:\n");
-        for (major, name) in block_devices {
-            contents.push_str(&format!("{:3} {}\n", major, name));
-        }
-        Ok(contents.into_bytes().into())
     }
 }
 
