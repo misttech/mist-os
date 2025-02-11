@@ -40,7 +40,7 @@
 //!    let c = MyConfig {
 //!        inner: Inner { path: "path/to/file.txt" },
 //!    };
-//!    c.write_to_dir("my_dir").unwrap();
+//!    c.write_to_dir("my_dir", Some("depfile")).unwrap();
 //! }
 //! ```
 //!

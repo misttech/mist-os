@@ -15,6 +15,7 @@ rustc_library("container") {
   deps = [
     ":container_macro",
     "//src/lib/assembly/package_copy",
+    "//src/lib/depfile",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:pathdiff",
