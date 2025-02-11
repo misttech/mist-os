@@ -939,23 +939,26 @@ class IntegrationTest : public TestBase {
     ClientProxy* client_proxy = GetClientProxy(coordinator_controller, client_priority);
     ZX_ASSERT(client_proxy != nullptr);
 
-    fbl::AutoLock<fbl::Mutex> client_proxy_lock(&client_proxy->mtx_);
-    return client_proxy->handler_.LatestAckedCookie();
+    return client_proxy->LastVsyncAckCookieForTesting();
   }
 
   void SendVsyncAfterUnbind(std::unique_ptr<TestFidlClient> client, display::DisplayId display_id) {
     fbl::AutoLock<fbl::Mutex> controller_lock(CoordinatorController()->mtx());
+    ClientProxy* client_proxy = CoordinatorController()->active_client_;
+
     // Resetting the client will *start* client tear down.
     //
     // ~MockCoordinatorListener fences the server-side dispatcher thread (consistent with the
     // threading model of its fidl server binding), but that doesn't sync with the client end
     // (intentionally).
     client.reset();
-    ClientProxy* client_ptr = CoordinatorController()->active_client_;
-    EXPECT_OK(sync_completion_wait(client_ptr->handler_.fidl_unbound(), zx::sec(1).get()));
+    ZX_ASSERT_MSG(CoordinatorController()->active_client_ == client_proxy,
+                  "The display owner changed while holding the controller mutex");
+    EXPECT_OK(
+        sync_completion_wait(client_proxy->FidlUnboundCompletionForTesting(), zx::sec(1).get()));
     // SetVsyncEventDelivery(false) has not completed here, because we are still
     // holding controller()->mtx()
-    client_ptr->OnDisplayVsync(display_id, 0, display::kInvalidDriverConfigStamp);
+    client_proxy->OnDisplayVsync(display_id, 0, display::kInvalidDriverConfigStamp);
   }
 
   bool IsClientConnected(ClientPriority client_priority) {

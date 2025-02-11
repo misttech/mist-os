@@ -147,11 +147,9 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
 
   uint8_t GetMinimumRgb() const { return client_minimum_rgb_; }
 
-  size_t ImportedImagesCountForTesting() const { return images_.size(); }
+  display::VsyncAckCookie LastAckedCookie() const { return acked_cookie_; }
 
-  // Used for testing
-  sync_completion_t* fidl_unbound() { return &fidl_unbound_; }
-  display::VsyncAckCookie LatestAckedCookie() const { return acked_cookie_; }
+  size_t ImportedImagesCountForTesting() const { return images_.size(); }
 
   // fidl::WireServer<fuchsia_hardware_display::Coordinator> overrides:
   void ImportImage(ImportImageRequestView request, ImportImageCompleter::Sync& _completer) override;
@@ -274,7 +272,6 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
 
   // This is the client's clamped RGB value.
   uint8_t client_minimum_rgb_ = 0;
-  sync_completion_t fidl_unbound_;
 
   struct Collections {
     // The BufferCollection ID used in fuchsia.hardware.display.Controller
@@ -391,6 +388,11 @@ class ClientProxy {
 
   void CloseForTesting();
 
+  display::VsyncAckCookie LastVsyncAckCookieForTesting();
+
+  // Fired after the FIDL client is unbound.
+  sync_completion_t* FidlUnboundCompletionForTesting();
+
   size_t ImportedImagesCountForTesting() const { return handler_.ImportedImagesCountForTesting(); }
 
   // Define these constants here so we can access them in tests.
@@ -410,8 +412,6 @@ class ClientProxy {
   static constexpr uint32_t kMaxImageHandles = 8;
 
  private:
-  friend IntegrationTest;
-
   fbl::Mutex mtx_;
   Controller& controller_;
 
@@ -442,6 +442,11 @@ class ClientProxy {
   bool acknowledge_request_sent_ = false;
 
   fit::function<void()> on_client_disconnected_;
+
+  // Fired when the FIDL connection is unbound.
+  //
+  // This member is thread-safe.
+  sync_completion_t fidl_unbound_completion_;
 
   // Mapping from controller_stamp to client_stamp for all configurations that
   // are already applied and pending to be presented on the display.

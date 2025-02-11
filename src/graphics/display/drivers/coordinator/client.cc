@@ -1754,7 +1754,7 @@ zx_status_t ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_time_t
     } else {
       // Client has already been notified; check if client has acknowledged it.
       ZX_DEBUG_ASSERT(last_cookie_sent_ != display::kInvalidVsyncAckCookie);
-      if (handler_.LatestAckedCookie() == last_cookie_sent_) {
+      if (handler_.LastAckedCookie() == last_cookie_sent_) {
         // Client has acknowledged cookie. Reset vsync tracking states
         number_of_vsyncs_sent_ = 0;
         acknowledge_request_sent_ = false;
@@ -1854,6 +1854,16 @@ void ClientProxy::UpdateConfigStampMapping(ConfigStampPair stamps) {
   });
 }
 
+display::VsyncAckCookie ClientProxy::LastVsyncAckCookieForTesting() {
+  fbl::AutoLock<fbl::Mutex> lock(&mtx_);
+  return handler_.LastAckedCookie();
+}
+
+sync_completion_t* ClientProxy::FidlUnboundCompletionForTesting() {
+  fbl::AutoLock<fbl::Mutex> lock(&mtx_);
+  return &fidl_unbound_completion_;
+}
+
 void ClientProxy::CloseForTesting() { handler_.TearDownForTesting(); }
 
 void ClientProxy::CloseOnControllerLoop() {
@@ -1883,7 +1893,7 @@ zx_status_t ClientProxy::Init(
   fidl::OnUnboundFn<Client> unbound_callback =
       [this](Client* client, fidl::UnbindInfo info,
              fidl::ServerEnd<fuchsia_hardware_display::Coordinator> ch) {
-        sync_completion_signal(client->fidl_unbound());
+        sync_completion_signal(&fidl_unbound_completion_);
         // Make sure we `TearDown()` so that no further tasks are scheduled on the controller loop.
         client->TearDown(ZX_OK);
 
