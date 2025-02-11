@@ -18,11 +18,10 @@ constexpr std::string_view kMeasurementsEntry{"bucket_sizes"};
 constexpr std::string_view kTimestamp{"@timestamp"};
 constexpr std::string_view kMeasurementsKey{"measurements"};
 constexpr std::string_view kBucketsKey{"buckets"};
-constexpr size_t kMaxBucketsCount = 100;
 
 std::once_flag bucket_names_flag;
 
-void PrintDigestToInspect(inspect::contrib::BoundedListNode& node, const memory::Digest& digest) {
+void PushDigestToInspect(inspect::contrib::BoundedListNode& node, const memory::Digest& digest) {
   node.CreateEntry([&digest](inspect::Node& n) {
     n.RecordUint(kTimestamp, digest.time());
     auto& buckets = digest.buckets();
@@ -45,8 +44,8 @@ Logger::Logger(async_dispatcher_t* dispatcher, std::optional<monitor::HighWater*
       digest_cb_(std::move(digest_cb)),
       config_(config),
       root_node_(std::move(node)),
-      inspect_bucket_digest_node_(root_node_.CreateChild(kMeasurementsKey), kMeasurementsCapacity),
-      bucket_names_(root_node_.CreateStringArray(kBucketsKey, kMaxBucketsCount)) {}
+      inspect_bucket_digest_node_(root_node_.CreateChild(kMeasurementsKey), kMeasurementsCapacity) {
+}
 
 void Logger::SetPressureLevel(pressure_signaler::Level l) {
   switch (l) {
@@ -99,15 +98,16 @@ void Logger::Log() {
 
   // Enshrine the order of buckets, once they have been populated.
   std::call_once(bucket_names_flag, [this, &buckets = d.buckets()]() {
-    for (size_t i = 0; i < buckets.size() && i < kMaxBucketsCount; i++) {
-      bucket_names_.Set(i, buckets[i].name());
+    bucket_names_ = root_node_.CreateStringArray(kBucketsKey, buckets.size());
+    for (size_t i = 0; i < buckets.size(); i++) {
+      bucket_names_->Set(i, buckets[i].name());
     }
   });
-  PrintDigestToInspect(inspect_bucket_digest_node_, d);
+  PushDigestToInspect(inspect_bucket_digest_node_, d);
 
   if (capture_high_water_ && high_water_) {
-    high_water_.value()->RecordHighWater(c);
-    high_water_.value()->RecordHighWaterDigest(d);
+    (*high_water_)->RecordHighWater(c);
+    (*high_water_)->RecordHighWaterDigest(d);
   }
 
   task_.PostDelayed(dispatcher_, duration_);

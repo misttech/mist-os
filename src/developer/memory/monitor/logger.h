@@ -42,7 +42,7 @@ class Logger {
   async::TaskClosureMethod<Logger, &Logger::Log> task_{this};
   inspect::Node root_node_;
   inspect::contrib::BoundedListNode inspect_bucket_digest_node_;
-  inspect::StringArray bucket_names_;
+  std::optional<inspect::StringArray> bucket_names_;
 
   FXL_DISALLOW_COPY_AND_ASSIGN(Logger);
 };
