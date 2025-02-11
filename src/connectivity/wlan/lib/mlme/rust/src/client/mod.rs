@@ -34,7 +34,7 @@ use wlan_common::ie::{self, Id};
 use wlan_common::mac::{self, Aid, CapabilityInfo};
 use wlan_common::sequence::SequenceManager;
 use wlan_common::time::TimeUnit;
-use wlan_common::timer::{EventId, Timer};
+use wlan_common::timer::{EventHandle, Timer};
 use wlan_common::{data_writer, mgmt_writer, wmm};
 use wlan_frame_writer::{append_frame_to, write_frame, write_frame_with_fixed_slice};
 use zerocopy::SplitByteSlice;
@@ -139,8 +139,8 @@ impl<D: DeviceOps> crate::MlmeImpl for ClientMlme<D> {
     async fn handle_scan_complete(&mut self, status: zx::Status, scan_id: u64) {
         Self::handle_scan_complete(self, status, scan_id).await;
     }
-    async fn handle_timeout(&mut self, event_id: EventId, event: TimedEvent) {
-        Self::handle_timed_event(self, event_id, event).await
+    async fn handle_timeout(&mut self, event: TimedEvent) {
+        Self::handle_timed_event(self, event).await
     }
     fn access_device(&mut self) -> &mut Self::Device {
         &mut self.ctx.device
@@ -517,11 +517,11 @@ impl<D: DeviceOps> ClientMlme<D> {
 
     /// Called when a previously scheduled `TimedEvent` fired.
     /// Return true if auto-deauth has triggered. Return false otherwise.
-    pub async fn handle_timed_event(&mut self, event_id: EventId, event: TimedEvent) {
+    pub async fn handle_timed_event(&mut self, event: TimedEvent) {
         if let Some(sta) = self.sta.as_mut() {
             return sta
                 .bind(&mut self.ctx, &mut self.scanner, &mut self.channel_state)
-                .handle_timed_event(event, event_id)
+                .handle_timed_event(event)
                 .await;
         }
     }
@@ -535,7 +535,7 @@ pub struct Client {
     pub connect_req: ParsedConnectRequest,
     pub iface_mac: MacAddr,
     pub client_capabilities: ClientCapabilities,
-    pub connect_timeout: Option<EventId>,
+    pub connect_timeout: Option<EventHandle>,
 }
 
 impl Client {
@@ -997,9 +997,8 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
     }
 
     /// Called when a previously scheduled `TimedEvent` fired.
-    pub async fn handle_timed_event(&mut self, event: TimedEvent, event_id: EventId) {
-        self.sta.state =
-            Some(self.sta.state.take().unwrap().on_timed_event(self, event, event_id).await)
+    pub async fn handle_timed_event(&mut self, event: TimedEvent) {
+        self.sta.state = Some(self.sta.state.take().unwrap().on_timed_event(self, event).await)
     }
 
     /// Called when an arbitrary frame was received over the air.
@@ -1581,12 +1580,12 @@ mod tests {
         beacon_count: u32,
     ) {
         for _ in 0..beacon_count / super::state::ASSOCIATION_STATUS_TIMEOUT_BEACON_COUNT {
-            let (_, timed_event) = mock_objects
+            let (_, timed_event, _) = mock_objects
                 .time_stream
                 .try_next()
                 .unwrap()
                 .expect("Should have scheduled a timed event");
-            mlme.handle_timed_event(timed_event.id, timed_event.event).await;
+            mlme.handle_timed_event(timed_event.event).await;
             assert_eq!(mock_objects.fake_device_state.lock().wlan_queue.len(), 0);
             mock_objects
                 .fake_device_state
@@ -1614,14 +1613,14 @@ mod tests {
         .await;
 
         // One more timeout to trigger the auto deauth
-        let (_, timed_event) = mock_objects
+        let (_, timed_event, _) = mock_objects
             .time_stream
             .try_next()
             .unwrap()
             .expect("Should have scheduled a timed event");
 
         // Verify that triggering event at deadline causes deauth
-        mlme.handle_timed_event(timed_event.id, timed_event.event).await;
+        mlme.handle_timed_event(timed_event.event).await;
         mock_objects
             .fake_device_state
             .lock()
@@ -1698,14 +1697,14 @@ mod tests {
         .await;
 
         // Verify more timer is scheduled
-        let (_, timed_event2) = mock_objects
+        let (_, timed_event2, _) = mock_objects
             .time_stream
             .try_next()
             .unwrap()
             .expect("Should have scheduled a timed event");
 
         // Verify that triggering event at new deadline causes deauth
-        mlme.handle_timed_event(timed_event2.id, timed_event2.event).await;
+        mlme.handle_timed_event(timed_event2.event).await;
         mock_objects
             .fake_device_state
             .lock()
@@ -3095,7 +3094,7 @@ mod tests {
             .expect("Failed to send MlmeRequest::Connect.");
 
         // Verify an event was queued up in the timer.
-        let (event, id) = assert_variant!(drain_timeouts(&mut m.time_stream).get(&TimedEventClass::Connecting), Some(events) => {
+        let (event, _id) = assert_variant!(drain_timeouts(&mut m.time_stream).get(&TimedEventClass::Connecting), Some(events) => {
             assert_eq!(events.len(), 1);
             events[0].clone()
         });
@@ -3105,7 +3104,7 @@ mod tests {
         let (_frame, _txflags) = m.fake_device_state.lock().wlan_queue.remove(0);
 
         // Send connect timeout
-        me.handle_timed_event(id, event).await;
+        me.handle_timed_event(event).await;
 
         // Verify a connect confirm message was sent
         let msg = m

@@ -12,7 +12,7 @@ use ieee80211::{MacAddr, MacAddrBytes};
 use log::error;
 use wlan_common::ie::SupportedRate;
 use wlan_common::mac::{Aid, CapabilityInfo};
-use wlan_common::timer::EventId;
+use wlan_common::timer::EventHandle;
 use wlan_rsn::key::exchange::Key;
 use wlan_rsn::key::Tk;
 use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme};
@@ -97,10 +97,9 @@ impl RemoteClient {
         self.state = self.state.take().map(|state| state.handle_eapol_conf(self, ctx, result));
     }
 
-    pub fn handle_timeout(&mut self, ctx: &mut Context, event_id: EventId, event: ClientEvent) {
+    pub fn handle_timeout(&mut self, ctx: &mut Context, event: ClientEvent) {
         // Safe: |state| is never None and always replaced with Some(..).
-        self.state =
-            self.state.take().map(|state| state.handle_timeout(self, ctx, event_id, event));
+        self.state = self.state.take().map(|state| state.handle_timeout(self, ctx, event));
     }
 
     /// Sends MLME-AUTHENTICATE.response (IEEE Std 802.11-2016, 6.3.5.5) to the MLME.
@@ -207,7 +206,7 @@ impl RemoteClient {
         ctx: &mut Context,
         deadline: zx::MonotonicInstant,
         event: ClientEvent,
-    ) -> EventId {
+    ) -> EventHandle {
         ctx.timer.schedule_at(deadline, Event::Client { addr: self.addr, event })
     }
 }
@@ -356,9 +355,7 @@ mod tests {
         let (mut ctx, _, _) = make_env();
         r_sta.handle_auth_ind(&mut ctx, fidl_mlme::AuthenticationTypes::OpenSystem);
         assert!(r_sta.authenticated());
-        // TODO(tonyy): This is kind of fragile: EventId should be opaque, but we're just guessing
-        // what it should be here since we can't see into the state machine's EventId.
-        r_sta.handle_timeout(&mut ctx, 0, ClientEvent::AssociationTimeout);
+        r_sta.handle_timeout(&mut ctx, ClientEvent::AssociationTimeout);
         assert!(!r_sta.authenticated());
     }
 
@@ -478,13 +475,13 @@ mod tests {
     fn schedule_at() {
         let mut r_sta = make_remote_client();
         let (mut ctx, _, mut time_stream) = make_env();
-        let timeout_event_id = r_sta.schedule_at(
+        let timeout_event = r_sta.schedule_at(
             &mut ctx,
             zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(2)),
             ClientEvent::AssociationTimeout,
         );
-        let (_, timed_event) = time_stream.try_next().unwrap().expect("expected timed event");
-        assert_eq!(timed_event.id, timeout_event_id);
+        let (_, timed_event, _) = time_stream.try_next().unwrap().expect("expected timed event");
+        assert_eq!(timed_event.id, timeout_event.id());
         assert_variant!(timed_event.event, Event::Client { addr, event } => {
             assert_eq!(addr, *CLIENT_ADDR);
             assert_variant!(event, ClientEvent::AssociationTimeout);

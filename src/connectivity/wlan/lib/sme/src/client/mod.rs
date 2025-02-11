@@ -937,7 +937,7 @@ impl super::Station for ClientSme {
             | event @ Event::RsnaRetransmissionTimeout(..)
             | event @ Event::SaeTimeout(..)
             | event @ Event::DeauthenticateTimeout(..) => {
-                state.handle_timeout(timed_event.id, event, &mut self.context)
+                state.handle_timeout(event, &mut self.context)
             }
             Event::InspectPulseCheck(..) => {
                 self.context.mlme_sink.send(MlmeRequest::WmmStatusReq);
@@ -2146,7 +2146,7 @@ mod tests {
         });
 
         let mut persist_event = None;
-        while let Ok(Some((_timeout, timed_event))) = time_stream.try_next() {
+        while let Ok(Some((_timeout, timed_event, _handle))) = time_stream.try_next() {
             if let Event::InspectPulsePersist(..) = timed_event.event {
                 persist_event = Some(timed_event);
                 break;

@@ -14,7 +14,7 @@ use wlan_common::ie::rsn::rsne;
 use wlan_common::ie::{self};
 use wlan_common::mac::{self, Aid, AuthAlgorithmNumber, StatusCode};
 use wlan_common::sequence::SequenceManager;
-use wlan_common::timer::{EventId, Timer};
+use wlan_common::timer::{EventHandle, Timer};
 use wlan_common::{data_writer, mgmt_writer, wmm, TimeUnit};
 use wlan_frame_writer::{write_frame, write_frame_with_fixed_slice};
 use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme};
@@ -41,7 +41,7 @@ impl<D> Context<D> {
         &mut self,
         duration: zx::MonotonicDuration,
         event: TimedEvent,
-    ) -> EventId {
+    ) -> EventHandle {
         self.timer.schedule_after(duration, event)
     }
 
@@ -655,13 +655,13 @@ mod test {
     async fn schedule_after() {
         let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, mut time_stream) = make_context(fake_device);
-        let event_id = ctx.schedule_after(
+        let event_handle = ctx.schedule_after(
             zx::MonotonicDuration::from_seconds(5),
             TimedEvent::ClientEvent(MacAddr::from([1; 6]), ClientEvent::BssIdleTimeout),
         );
-        let (_, timed_event) =
+        let (_, timed_event, _) =
             time_stream.try_next().unwrap().expect("Should have scheduled an event");
-        assert_eq!(timed_event.id, event_id);
+        assert_eq!(timed_event.id, event_handle.id());
 
         assert_variant!(
             timed_event.event,

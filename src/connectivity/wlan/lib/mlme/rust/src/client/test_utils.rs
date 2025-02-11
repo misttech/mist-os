@@ -4,9 +4,9 @@
 
 #![cfg(test)]
 
-use crate::client::{EventId, TimedEvent, TimedEventClass};
+use crate::client::{TimedEvent, TimedEventClass};
 use std::collections::HashMap;
-use wlan_common::timer;
+use wlan_common::timer::{self, EventId};
 
 pub fn drain_timeouts(
     time_stream: &mut timer::EventStream<TimedEvent>,
@@ -14,7 +14,7 @@ pub fn drain_timeouts(
     let mut timeouts = HashMap::new();
     loop {
         match time_stream.try_next() {
-            Ok(Some((_, timed_event))) => {
+            Ok(Some((_, timed_event, _))) => {
                 timeouts
                     .entry(timed_event.event.class())
                     .or_insert(vec![])

@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 use wlan_common::ie::rsn::rsne;
 use wlan_common::ie::{intersect, SupportedRate};
 use wlan_common::mac::{Aid, CapabilityInfo};
-use wlan_common::timer::EventId;
+use wlan_common::timer::EventHandle;
 use wlan_rsn::gtk::GtkProvider;
 use wlan_rsn::nonce::NonceReader;
 use wlan_rsn::rsna::{SecAssocStatus, SecAssocUpdate, UpdateSink};
@@ -50,14 +50,14 @@ impl Authenticating {
         r_sta: &mut RemoteClient,
         ctx: &mut Context,
         auth_type: fidl_mlme::AuthenticationTypes,
-    ) -> Result<EventId, anyhow::Error> {
+    ) -> Result<EventHandle, anyhow::Error> {
         // We only support open system authentication today.
         if auth_type != fidl_mlme::AuthenticationTypes::OpenSystem {
             return Err(format_err!("unsupported authentication type: {:?}", auth_type));
         }
 
         let event = ClientEvent::AssociationTimeout;
-        let timeout_event_id = r_sta.schedule_at(
+        let timeout_event = r_sta.schedule_at(
             ctx,
             zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(
                 ASSOCIATION_TIMEOUT_SECONDS,
@@ -65,7 +65,7 @@ impl Authenticating {
             event,
         );
 
-        Ok(timeout_event_id)
+        Ok(timeout_event)
     }
 }
 
@@ -111,7 +111,7 @@ fn new_authenticator_from_rsne(
 /// While the client is Authenticated, a timeout event will fire to transition it back to
 /// Authenticating if it has not associated in time.
 pub struct Authenticated {
-    timeout_event_id: EventId,
+    _timeout_event: EventHandle,
 }
 
 /// AssociationError holds an error to log and the result code to send to the MLME for the
@@ -234,25 +234,6 @@ impl Authenticated {
             rsna_link_state,
         })
     }
-
-    /// Handles incoming association timeout events.
-    ///
-    /// The result determines whether or not we remain in this state or not:
-    /// - if the result is Ok, the client is remaining in Authenticated state.
-    /// - if the result is Err, the client is deauthenticating due an incoming timeout that is
-    ///   indicates that the client has not associated before timing out.
-    fn handle_association_timeout(
-        &self,
-        _unused_r_sta: &mut RemoteClient,
-        _unused_ctx: &mut Context,
-        timeout_event_id: EventId,
-    ) -> Result<(), ()> {
-        if timeout_event_id != self.timeout_event_id {
-            // This is not the timeout we scheduled earlier, so just ignore it.
-            return Ok(());
-        }
-        Err(())
-    }
 }
 
 /// RsnaLinkState contains the link state for 802.1X EAP authentication, if RSN configuration is
@@ -266,8 +247,8 @@ struct RsnaLinkState {
     last_key_frame: Option<eapol::KeyFrameBuf>,
 
     request_attempts: usize,
-    request_timeout_event_id: Option<EventId>,
-    negotiation_timeout_event_id: Option<EventId>,
+    request_timeout: Option<EventHandle>,
+    negotiation_timeout: Option<EventHandle>,
 }
 
 pub const RSNA_NEGOTIATION_REQUEST_MAX_ATTEMPTS: usize = 4;
@@ -280,8 +261,8 @@ impl RsnaLinkState {
             authenticator,
             last_key_frame: None,
             request_attempts: 0,
-            request_timeout_event_id: None,
-            negotiation_timeout_event_id: None,
+            request_timeout: None,
+            negotiation_timeout: None,
         }
     }
 
@@ -302,7 +283,7 @@ impl RsnaLinkState {
             return Err(format_err!("no key frame was produced on authenticator initiation"));
         }
 
-        self.negotiation_timeout_event_id = Some(r_sta.schedule_at(
+        self.negotiation_timeout = Some(r_sta.schedule_at(
             ctx,
             zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(
                 RSNA_NEGOTIATION_TIMEOUT_SECONDS,
@@ -315,7 +296,7 @@ impl RsnaLinkState {
     }
 
     fn reschedule_request_timeout(&mut self, r_sta: &mut RemoteClient, ctx: &mut Context) {
-        self.request_timeout_event_id = Some(r_sta.schedule_at(
+        self.request_timeout = Some(r_sta.schedule_at(
             ctx,
             zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(
                 RSNA_NEGOTIATION_REQUEST_TIMEOUT_SECONDS,
@@ -328,12 +309,11 @@ impl RsnaLinkState {
         &mut self,
         r_sta: &mut RemoteClient,
         ctx: &mut Context,
-        timeout_event_id: EventId,
         timeout_type: RsnaTimeout,
     ) -> Result<(), RsnaNegotiationError> {
         match timeout_type {
-            RsnaTimeout::Request => self.handle_rsna_request_timeout(r_sta, ctx, timeout_event_id),
-            RsnaTimeout::Negotiation => self.handle_rsna_negotiation_timeout(timeout_event_id),
+            RsnaTimeout::Request => self.handle_rsna_request_timeout(r_sta, ctx),
+            RsnaTimeout::Negotiation => self.handle_rsna_negotiation_timeout(),
         }
     }
 
@@ -341,13 +321,8 @@ impl RsnaLinkState {
         &mut self,
         r_sta: &mut RemoteClient,
         ctx: &mut Context,
-        timeout_event_id: EventId,
     ) -> Result<(), RsnaNegotiationError> {
-        if self.request_timeout_event_id != Some(timeout_event_id) {
-            // This was not the timeout we scheduled earlier.
-            return Ok(());
-        }
-        self.request_timeout_event_id = None;
+        self.request_timeout = None;
 
         self.request_attempts += 1;
         if self.request_attempts >= RSNA_NEGOTIATION_REQUEST_MAX_ATTEMPTS {
@@ -364,15 +339,8 @@ impl RsnaLinkState {
         Ok(())
     }
 
-    fn handle_rsna_negotiation_timeout(
-        &mut self,
-        timeout_event_id: EventId,
-    ) -> Result<(), RsnaNegotiationError> {
-        if self.negotiation_timeout_event_id != Some(timeout_event_id) {
-            // This was not the timeout we scheduled earlier.
-            return Ok(());
-        }
-        self.negotiation_timeout_event_id = None;
+    fn handle_rsna_negotiation_timeout(&mut self) -> Result<(), RsnaNegotiationError> {
+        self.negotiation_timeout = None;
         Err(RsnaNegotiationError::Timeout)
     }
 
@@ -400,8 +368,8 @@ impl RsnaLinkState {
                         // Negotiation is complete, clear the timeout and stop storing the last key
                         // frame.
                         self.last_key_frame = None;
-                        self.request_timeout_event_id = None;
-                        self.negotiation_timeout_event_id = None;
+                        self.request_timeout = None;
+                        self.negotiation_timeout = None;
                     }
                 }
                 update => error!("Unhandled association update: {:?}", update),
@@ -469,13 +437,10 @@ impl Associated {
         &mut self,
         r_sta: &mut RemoteClient,
         ctx: &mut Context,
-        timeout_event_id: EventId,
         timeout_type: RsnaTimeout,
     ) -> Result<(), RsnaNegotiationError> {
         match self.rsna_link_state.as_mut() {
-            Some(rsna_link_state) => {
-                rsna_link_state.handle_rsna_timeout(r_sta, ctx, timeout_event_id, timeout_type)
-            }
+            Some(rsna_link_state) => rsna_link_state.handle_rsna_timeout(r_sta, ctx, timeout_type),
             None => Ok(()),
         }
     }
@@ -515,7 +480,7 @@ impl Associated {
         r_sta: &mut RemoteClient,
         ctx: &mut Context,
         aid_map: &mut aid::Map,
-    ) -> EventId {
+    ) -> EventHandle {
         aid_map.release_aid(self.aid);
         let event = ClientEvent::AssociationTimeout;
         r_sta.schedule_at(
@@ -578,9 +543,9 @@ impl States {
     ) -> States {
         match self {
             States::Authenticating(state) => match state.handle_auth_ind(r_sta, ctx, auth_type) {
-                Ok(timeout_event_id) => {
+                Ok(timeout_event) => {
                     r_sta.send_authenticate_resp(ctx, fidl_mlme::AuthenticateResultCode::Success);
-                    state.transition_to(Authenticated { timeout_event_id }).into()
+                    state.transition_to(Authenticated { _timeout_event: timeout_event }).into()
                 }
                 Err(e) => {
                     error!("client {:02X?} MLME-AUTHENTICATE.indication: {}", r_sta.addr, e);
@@ -687,8 +652,8 @@ impl States {
     ) -> States {
         match self {
             States::Associated(state) => {
-                let timeout_event_id = state.handle_disassoc_ind(r_sta, ctx, aid_map);
-                state.transition_to(Authenticated { timeout_event_id }).into()
+                let timeout_event = state.handle_disassoc_ind(r_sta, ctx, aid_map);
+                state.transition_to(Authenticated { _timeout_event: timeout_event }).into()
             }
             _ => self,
         }
@@ -759,23 +724,17 @@ impl States {
         self,
         r_sta: &mut RemoteClient,
         ctx: &mut Context,
-        timeout_event_id: EventId,
         event: ClientEvent,
     ) -> States {
         match event {
             ClientEvent::AssociationTimeout => match self {
                 States::Authenticated(state) => {
-                    match state.handle_association_timeout(r_sta, ctx, timeout_event_id) {
-                        Ok(()) => state.into(),
-                        Err(()) => {
-                            r_sta.send_deauthenticate_req(
-                                ctx,
-                                // Not sure if this is the correct reason code.
-                                fidl_ieee80211::ReasonCode::InvalidAuthentication,
-                            );
-                            state.transition_to(Authenticating).into()
-                        }
-                    }
+                    r_sta.send_deauthenticate_req(
+                        ctx,
+                        // Not sure if this is the correct reason code.
+                        fidl_ieee80211::ReasonCode::InvalidAuthentication,
+                    );
+                    state.transition_to(Authenticating).into()
                 }
                 States::Associated(state) => {
                     // If the client is already associated, we can't time it out.
@@ -793,7 +752,7 @@ impl States {
             ClientEvent::RsnaTimeout(timeout_type) => match self {
                 States::Associated(state) => {
                     let (transition, mut state) = state.release_data();
-                    match state.handle_rsna_timeout(r_sta, ctx, timeout_event_id, timeout_type) {
+                    match state.handle_rsna_timeout(r_sta, ctx, timeout_type) {
                         Ok(()) => transition.to(state).into(),
                         Err(e) => {
                             let reason_code = match e {
@@ -874,13 +833,13 @@ mod tests {
         let state =
             state.handle_auth_ind(&mut r_sta, &mut ctx, fidl_mlme::AuthenticationTypes::OpenSystem);
 
-        let (_, Authenticated { timeout_event_id }) = match state {
+        let (_, Authenticated { _timeout_event }) = match state {
             States::Authenticated(state) => state.release_data(),
             _ => panic!("unexpected state"),
         };
 
-        let (_, timed_event) = time_stream.try_next().unwrap().expect("expected timed event");
-        assert_eq!(timed_event.id, timeout_event_id);
+        let (_, timed_event, _) = time_stream.try_next().unwrap().expect("expected timed event");
+        assert_eq!(timed_event.id, _timeout_event.id());
         assert_variant!(timed_event.event, Event::Client { addr, event } => {
             assert_eq!(addr, *CLIENT_ADDR);
             assert_variant!(event, ClientEvent::AssociationTimeout);
@@ -966,8 +925,9 @@ mod tests {
         let mut r_sta = make_remote_client();
         let (mut ctx, mut mlme_stream, _) = make_env();
 
-        let state: States =
-            State::new(Authenticating).transition_to(Authenticated { timeout_event_id: 1 }).into();
+        let state: States = State::new(Authenticating)
+            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
+            .into();
         let state =
             state.handle_auth_ind(&mut r_sta, &mut ctx, fidl_mlme::AuthenticationTypes::SharedKey);
 
@@ -991,9 +951,10 @@ mod tests {
         let mut r_sta = make_remote_client();
         let (mut ctx, mut mlme_stream, _) = make_env();
 
-        let state: States =
-            State::new(Authenticating).transition_to(Authenticated { timeout_event_id: 1 }).into();
-        let state = state.handle_timeout(&mut r_sta, &mut ctx, 1, ClientEvent::AssociationTimeout);
+        let state: States = State::new(Authenticating)
+            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
+            .into();
+        let state = state.handle_timeout(&mut r_sta, &mut ctx, ClientEvent::AssociationTimeout);
 
         let (_, Authenticating) = match state {
             States::Authenticating(state) => state.release_data(),
@@ -1011,29 +972,13 @@ mod tests {
     }
 
     #[test]
-    fn authenticated_does_not_send_deauthentication_on_wrong_timeout() {
-        let mut r_sta = make_remote_client();
-        let (mut ctx, mut mlme_stream, _) = make_env();
-
-        let state: States =
-            State::new(Authenticating).transition_to(Authenticated { timeout_event_id: 1 }).into();
-        let state = state.handle_timeout(&mut r_sta, &mut ctx, 2, ClientEvent::AssociationTimeout);
-
-        let (_, Authenticated { .. }) = match state {
-            States::Authenticated(state) => state.release_data(),
-            _ => panic!("unexpected state"),
-        };
-
-        assert_variant!(mlme_stream.try_next(), Err(_));
-    }
-
-    #[test]
     fn authenticated_goes_to_associated_no_rsn() {
         let mut r_sta = make_remote_client();
         let (mut ctx, mut mlme_stream, _) = make_env();
 
-        let state: States =
-            State::new(Authenticating).transition_to(Authenticated { timeout_event_id: 1 }).into();
+        let state: States = State::new(Authenticating)
+            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
+            .into();
 
         let mut aid_map = aid::Map::default();
         let state = state.handle_assoc_ind(
@@ -1076,8 +1021,9 @@ mod tests {
         let mut r_sta = make_remote_client();
         let (mut ctx, mut mlme_stream, _) = make_env();
 
-        let state: States =
-            State::new(Authenticating).transition_to(Authenticated { timeout_event_id: 1 }).into();
+        let state: States = State::new(Authenticating)
+            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
+            .into();
 
         let mut aid_map = aid::Map::default();
         let state = state.handle_assoc_ind(
@@ -1127,8 +1073,9 @@ mod tests {
         let mut r_sta = make_remote_client();
         let (mut ctx, mut mlme_stream, _) = make_env();
 
-        let state: States =
-            State::new(Authenticating).transition_to(Authenticated { timeout_event_id: 1 }).into();
+        let state: States = State::new(Authenticating)
+            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
+            .into();
 
         let mut aid_map = aid::Map::default();
         let _next_state = state.handle_assoc_ind(
@@ -1163,8 +1110,9 @@ mod tests {
         ctx.mac_sublayer_support.device.mac_implementation_type =
             fidl_common::MacImplementationType::Fullmac;
 
-        let state: States =
-            State::new(Authenticating).transition_to(Authenticated { timeout_event_id: 1 }).into();
+        let state: States = State::new(Authenticating)
+            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
+            .into();
 
         let mut aid_map = aid::Map::default();
         let _next_state = state.handle_assoc_ind(
@@ -1195,8 +1143,9 @@ mod tests {
         let mut r_sta = make_remote_client();
         let (mut ctx, mut mlme_stream, _) = make_env();
 
-        let state: States =
-            State::new(Authenticating).transition_to(Authenticated { timeout_event_id: 1 }).into();
+        let state: States = State::new(Authenticating)
+            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
+            .into();
 
         let mut aid_map = aid::Map::default();
         let _next_state = state.handle_assoc_ind(
@@ -1237,8 +1186,9 @@ mod tests {
         let mut r_sta = make_remote_client();
         let (mut ctx, mut mlme_stream, _) = make_env();
 
-        let state: States =
-            State::new(Authenticating).transition_to(Authenticated { timeout_event_id: 1 }).into();
+        let state: States = State::new(Authenticating)
+            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
+            .into();
 
         let mut aid_map = aid::Map::default();
         let _next_state = state.handle_assoc_ind(
@@ -1279,8 +1229,9 @@ mod tests {
         let mut r_sta = make_remote_client();
         let (mut ctx, mut mlme_stream, _) = make_env();
 
-        let state: States =
-            State::new(Authenticating).transition_to(Authenticated { timeout_event_id: 1 }).into();
+        let state: States = State::new(Authenticating)
+            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
+            .into();
 
         let mut aid_map = aid::Map::default();
         while aid_map.assign_aid().is_ok() {
@@ -1330,8 +1281,9 @@ mod tests {
         let mut r_sta = make_remote_client();
         let (mut ctx, mut mlme_stream, _) = make_env();
 
-        let state: States =
-            State::new(Authenticating).transition_to(Authenticated { timeout_event_id: 1 }).into();
+        let state: States = State::new(Authenticating)
+            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
+            .into();
 
         let s_rsne = Rsne::wpa2_rsne();
         let mut s_rsne_vec = Vec::with_capacity(s_rsne.len());
@@ -1381,8 +1333,9 @@ mod tests {
         let mut r_sta = make_remote_client();
         let (mut ctx, mut mlme_stream, _) = make_env();
 
-        let state: States =
-            State::new(Authenticating).transition_to(Authenticated { timeout_event_id: 1 }).into();
+        let state: States = State::new(Authenticating)
+            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
+            .into();
 
         let mut rsn_cfg =
             create_rsn_cfg(&Ssid::try_from("coolnet").unwrap(), b"password").unwrap().unwrap();
@@ -1446,8 +1399,9 @@ mod tests {
         let mut r_sta = make_remote_client();
         let (mut ctx, mut mlme_stream, _) = make_env();
 
-        let state: States =
-            State::new(Authenticating).transition_to(Authenticated { timeout_event_id: 1 }).into();
+        let state: States = State::new(Authenticating)
+            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
+            .into();
 
         let rsn_cfg =
             create_rsn_cfg(&Ssid::try_from("coolnet").unwrap(), b"password").unwrap().unwrap();
@@ -1499,8 +1453,9 @@ mod tests {
         let mut r_sta = make_remote_client();
         let (mut ctx, mut mlme_stream, _) = make_env();
 
-        let state: States =
-            State::new(Authenticating).transition_to(Authenticated { timeout_event_id: 1 }).into();
+        let state: States = State::new(Authenticating)
+            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
+            .into();
 
         let rsn_cfg =
             create_rsn_cfg(&Ssid::try_from("coolnet").unwrap(), b"password").unwrap().unwrap();
@@ -1565,21 +1520,21 @@ mod tests {
         let aid = aid_map.assign_aid().unwrap();
 
         let state: States = State::new(Authenticating)
-            .transition_to(Authenticated { timeout_event_id: 1 })
+            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
             .transition_to(Associated { aid, rsna_link_state: None })
             .into();
 
         let state = state.handle_disassoc_ind(&mut r_sta, &mut ctx, &mut aid_map);
 
-        let (_, Authenticated { timeout_event_id }) = match state {
+        let (_, Authenticated { _timeout_event }) = match state {
             States::Authenticated(state) => state.release_data(),
             _ => panic!("unexpected state"),
         };
 
         assert_eq!(aid, aid_map.assign_aid().unwrap());
 
-        let (_, timed_event) = time_stream.try_next().unwrap().expect("expected timed event");
-        assert_eq!(timed_event.id, timeout_event_id);
+        let (_, timed_event, _) = time_stream.try_next().unwrap().expect("expected timed event");
+        assert_eq!(timed_event.id, _timeout_event.id());
         assert_variant!(timed_event.event, Event::Client { addr, event } => {
             assert_eq!(addr, *CLIENT_ADDR);
             assert_variant!(event, ClientEvent::AssociationTimeout);
@@ -1592,14 +1547,13 @@ mod tests {
         let (mut ctx, _, mut time_stream) = make_env();
 
         let state: States = State::new(Authenticating)
-            .transition_to(Authenticated { timeout_event_id: 1 })
+            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
             .transition_to(Associated { aid: 1, rsna_link_state: None })
             .into();
 
         let state = state.handle_timeout(
             &mut r_sta,
             &mut ctx,
-            1,
             ClientEvent::RsnaTimeout(RsnaTimeout::Negotiation),
         );
 
@@ -1617,14 +1571,13 @@ mod tests {
         let (mut ctx, _, mut time_stream) = make_env();
 
         let state: States = State::new(Authenticating)
-            .transition_to(Authenticated { timeout_event_id: 1 })
+            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
             .transition_to(Associated { aid: 1, rsna_link_state: None })
             .into();
 
         let state = state.handle_timeout(
             &mut r_sta,
             &mut ctx,
-            1,
             ClientEvent::RsnaTimeout(RsnaTimeout::Request),
         );
 
@@ -1649,14 +1602,14 @@ mod tests {
         s_rsne.write_into(&mut s_rsne_vec).expect("error writing RSNE");
 
         let state: States = State::new(Authenticating)
-            .transition_to(Authenticated { timeout_event_id: 1 })
+            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
             .transition_to(Associated {
                 aid: 1,
                 rsna_link_state: Some(RsnaLinkState {
                     request_attempts: 0,
                     last_key_frame: Some(test_utils::eapol_key_frame()),
-                    request_timeout_event_id: Some(1),
-                    negotiation_timeout_event_id: Some(2),
+                    request_timeout: Some(EventHandle::new_test(2)),
+                    negotiation_timeout: Some(EventHandle::new_test(3)),
                     authenticator: new_authenticator_from_rsne(
                         *AP_ADDR,
                         *CLIENT_ADDR,
@@ -1671,7 +1624,6 @@ mod tests {
         let state = state.handle_timeout(
             &mut r_sta,
             &mut ctx,
-            1,
             ClientEvent::RsnaTimeout(RsnaTimeout::Request),
         );
 
@@ -1685,10 +1637,10 @@ mod tests {
         let mlme_event = mlme_stream.try_next().unwrap().expect("expected mlme event");
         assert_variant!(mlme_event, MlmeRequest::Eapol(fidl_mlme::EapolRequest { .. }));
 
-        let (_, timed_event) = time_stream.try_next().unwrap().expect("expected timed event");
+        let (_, timed_event, _) = time_stream.try_next().unwrap().expect("expected timed event");
         assert_eq!(
             timed_event.id,
-            rsna_link_state.as_ref().unwrap().request_timeout_event_id.unwrap()
+            rsna_link_state.as_ref().unwrap().request_timeout.as_ref().unwrap().id()
         );
         assert_variant!(timed_event.event, Event::Client { addr, event } => {
             assert_eq!(addr, *CLIENT_ADDR);
@@ -1709,14 +1661,14 @@ mod tests {
         s_rsne.write_into(&mut s_rsne_vec).expect("error writing RSNE");
 
         let state: States = State::new(Authenticating)
-            .transition_to(Authenticated { timeout_event_id: 1 })
+            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
             .transition_to(Associated {
                 aid: 1,
                 rsna_link_state: Some(RsnaLinkState {
                     request_attempts: 3,
                     last_key_frame: Some(test_utils::eapol_key_frame()),
-                    request_timeout_event_id: Some(1),
-                    negotiation_timeout_event_id: Some(2),
+                    request_timeout: Some(EventHandle::new_test(2)),
+                    negotiation_timeout: Some(EventHandle::new_test(3)),
                     authenticator: new_authenticator_from_rsne(
                         *AP_ADDR,
                         *CLIENT_ADDR,
@@ -1731,7 +1683,6 @@ mod tests {
         let state = state.handle_timeout(
             &mut r_sta,
             &mut ctx,
-            2,
             ClientEvent::RsnaTimeout(RsnaTimeout::Negotiation),
         );
 
@@ -1763,14 +1714,14 @@ mod tests {
         s_rsne.write_into(&mut s_rsne_vec).expect("error writing RSNE");
 
         let state: States = State::new(Authenticating)
-            .transition_to(Authenticated { timeout_event_id: 1 })
+            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
             .transition_to(Associated {
                 aid: 1,
                 rsna_link_state: Some(RsnaLinkState {
                     request_attempts: 3,
                     last_key_frame: Some(test_utils::eapol_key_frame()),
-                    request_timeout_event_id: Some(1),
-                    negotiation_timeout_event_id: Some(2),
+                    request_timeout: Some(EventHandle::new_test(1)),
+                    negotiation_timeout: Some(EventHandle::new_test(2)),
                     authenticator: new_authenticator_from_rsne(
                         *AP_ADDR,
                         *CLIENT_ADDR,
@@ -1809,14 +1760,14 @@ mod tests {
         s_rsne.write_into(&mut s_rsne_vec).expect("error writing RSNE");
 
         let state: States = State::new(Authenticating)
-            .transition_to(Authenticated { timeout_event_id: 1 })
+            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
             .transition_to(Associated {
                 aid: 1,
                 rsna_link_state: Some(RsnaLinkState {
                     request_attempts: 3,
                     last_key_frame: Some(test_utils::eapol_key_frame()),
-                    request_timeout_event_id: Some(1),
-                    negotiation_timeout_event_id: Some(2),
+                    request_timeout: Some(EventHandle::new_test(2)),
+                    negotiation_timeout: Some(EventHandle::new_test(3)),
                     authenticator: new_authenticator_from_rsne(
                         *AP_ADDR,
                         *CLIENT_ADDR,
@@ -1831,7 +1782,6 @@ mod tests {
         let state = state.handle_timeout(
             &mut r_sta,
             &mut ctx,
-            1,
             ClientEvent::RsnaTimeout(RsnaTimeout::Request),
         );
 
@@ -1856,14 +1806,14 @@ mod tests {
         let (mut ctx, mut mlme_stream, _) = make_env();
 
         let state: States = State::new(Authenticating)
-            .transition_to(Authenticated { timeout_event_id: 1 })
+            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
             .transition_to(Associated {
                 aid: 1,
                 rsna_link_state: Some(RsnaLinkState {
                     request_attempts: 0,
                     last_key_frame: Some(test_utils::eapol_key_frame()),
-                    request_timeout_event_id: Some(1),
-                    negotiation_timeout_event_id: Some(2),
+                    request_timeout: Some(EventHandle::new_test(2)),
+                    negotiation_timeout: Some(EventHandle::new_test(3)),
                     authenticator: Box::new(MockAuthenticator::new(
                         Arc::new(Mutex::new(vec![])),
                         Arc::new(Mutex::new(vec![SecAssocUpdate::TxEapolKeyFrame {
@@ -1899,14 +1849,14 @@ mod tests {
         let (mut ctx, _mlme_stream, _) = make_env();
 
         let state: States = State::new(Authenticating)
-            .transition_to(Authenticated { timeout_event_id: 1 })
+            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
             .transition_to(Associated {
                 aid: 1,
                 rsna_link_state: Some(RsnaLinkState {
                     request_attempts: 0,
                     last_key_frame: Some(test_utils::eapol_key_frame()),
-                    request_timeout_event_id: Some(1),
-                    negotiation_timeout_event_id: Some(2),
+                    request_timeout: Some(EventHandle::new_test(2)),
+                    negotiation_timeout: Some(EventHandle::new_test(3)),
                     authenticator: Box::new(MockAuthenticator::new(
                         Arc::new(Mutex::new(vec![])),
                         Arc::new(Mutex::new(vec![SecAssocUpdate::TxEapolKeyFrame {
@@ -1934,14 +1884,14 @@ mod tests {
         let (mut ctx, mut mlme_stream, _) = make_env();
 
         let state: States = State::new(Authenticating)
-            .transition_to(Authenticated { timeout_event_id: 1 })
+            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
             .transition_to(Associated {
                 aid: 1,
                 rsna_link_state: Some(RsnaLinkState {
                     request_attempts: 0,
                     last_key_frame: Some(test_utils::eapol_key_frame()),
-                    request_timeout_event_id: Some(1),
-                    negotiation_timeout_event_id: Some(2),
+                    request_timeout: Some(EventHandle::new_test(2)),
+                    negotiation_timeout: Some(EventHandle::new_test(3)),
                     authenticator: Box::new(MockAuthenticator::new(
                         Arc::new(Mutex::new(vec![])),
                         Arc::new(Mutex::new(vec![SecAssocUpdate::Key(
@@ -1978,14 +1928,14 @@ mod tests {
         let (mut ctx, mut mlme_stream, _) = make_env();
 
         let state: States = State::new(Authenticating)
-            .transition_to(Authenticated { timeout_event_id: 1 })
+            .transition_to(Authenticated { _timeout_event: EventHandle::new_test(1) })
             .transition_to(Associated {
                 aid: 1,
                 rsna_link_state: Some(RsnaLinkState {
                     request_attempts: 0,
                     last_key_frame: Some(test_utils::eapol_key_frame()),
-                    request_timeout_event_id: Some(1),
-                    negotiation_timeout_event_id: Some(2),
+                    request_timeout: Some(EventHandle::new_test(2)),
+                    negotiation_timeout: Some(EventHandle::new_test(3)),
                     authenticator: Box::new(MockAuthenticator::new(
                         Arc::new(Mutex::new(vec![])),
                         Arc::new(Mutex::new(vec![SecAssocUpdate::Status(
@@ -2008,8 +1958,8 @@ mod tests {
         };
 
         assert_variant!(&rsna_link_state.as_ref().unwrap().last_key_frame, None);
-        assert_variant!(&rsna_link_state.as_ref().unwrap().request_timeout_event_id, None);
-        assert_variant!(&rsna_link_state.as_ref().unwrap().negotiation_timeout_event_id, None);
+        assert_variant!(&rsna_link_state.as_ref().unwrap().request_timeout, None);
+        assert_variant!(&rsna_link_state.as_ref().unwrap().negotiation_timeout, None);
 
         let mlme_event = mlme_stream.try_next().unwrap().expect("expected mlme event");
         assert_variant!(mlme_event, MlmeRequest::SetCtrlPort(fidl_mlme::SetControlledPortRequest {

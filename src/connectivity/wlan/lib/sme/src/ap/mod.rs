@@ -23,7 +23,7 @@ use wlan_common::capabilities::get_device_band_cap;
 use wlan_common::channel::{Cbw, Channel};
 use wlan_common::ie::rsn::rsne::{RsnCapabilities, Rsne};
 use wlan_common::ie::{parse_ht_capabilities, ChanWidthSet, SupportedRate};
-use wlan_common::timer::{self, EventId, Timer};
+use wlan_common::timer::{self, EventHandle, Timer};
 use wlan_common::{mac, RadioConfig};
 use wlan_rsn::psk;
 use {
@@ -60,14 +60,14 @@ enum State {
         rates: Vec<SupportedRate>,
         start_responder: Responder<StartResult>,
         stop_responders: Vec<Responder<fidl_sme::StopApResultCode>>,
-        start_timeout: EventId,
+        start_timeout: EventHandle,
         op_radio_cfg: OpRadioConfig,
     },
     Stopping {
         ctx: Context,
         stop_req: fidl_mlme::StopRequest,
         responders: Vec<Responder<fidl_sme::StopApResultCode>>,
-        stop_timeout: Option<EventId>,
+        stop_timeout: Option<EventHandle>,
     },
     Started {
         bss: InfraBss,
@@ -300,7 +300,7 @@ impl ApSme {
     }
 }
 
-fn send_stop_req(ctx: &mut Context, stop_req: fidl_mlme::StopRequest) -> EventId {
+fn send_stop_req(ctx: &mut Context, stop_req: fidl_mlme::StopRequest) -> EventHandle {
     let event = Event::Sme { event: SmeEvent::StopTimeout };
     let stop_timeout = ctx.timer.schedule(event);
     ctx.mlme_sink.send(MlmeRequest::Stop(stop_req));
@@ -420,35 +420,22 @@ impl super::Station for ApSme {
                 rsn_cfg,
                 op_radio_cfg,
             } => match timed_event.event {
-                Event::Sme { event } => match event {
-                    SmeEvent::StartTimeout if start_timeout == timed_event.id => {
-                        warn!("Timed out waiting for MLME to start");
-                        start_responder.respond(StartResult::TimedOut);
-                        if stop_responders.is_empty() {
-                            State::Idle { ctx }
-                        } else {
-                            let stop_req = fidl_mlme::StopRequest { ssid: ssid.to_vec() };
-                            let timeout = send_stop_req(&mut ctx, stop_req.clone());
-                            State::Stopping {
-                                ctx,
-                                stop_req,
-                                responders: stop_responders,
-                                stop_timeout: Some(timeout),
-                            }
+                Event::Sme { event: SmeEvent::StartTimeout } => {
+                    warn!("Timed out waiting for MLME to start");
+                    start_responder.respond(StartResult::TimedOut);
+                    if stop_responders.is_empty() {
+                        State::Idle { ctx }
+                    } else {
+                        let stop_req = fidl_mlme::StopRequest { ssid: ssid.to_vec() };
+                        let timeout = send_stop_req(&mut ctx, stop_req.clone());
+                        State::Stopping {
+                            ctx,
+                            stop_req,
+                            responders: stop_responders,
+                            stop_timeout: Some(timeout),
                         }
                     }
-                    _ => State::Starting {
-                        start_timeout,
-                        ctx,
-                        start_responder,
-                        stop_responders,
-                        capabilities,
-                        rates,
-                        ssid,
-                        rsn_cfg,
-                        op_radio_cfg,
-                    },
-                },
+                }
                 _ => State::Starting {
                     start_timeout,
                     ctx,
@@ -462,18 +449,11 @@ impl super::Station for ApSme {
                 },
             },
             State::Stopping { ctx, stop_req, mut responders, mut stop_timeout } => {
-                if let Event::Sme { event } = timed_event.event {
-                    match event {
-                        SmeEvent::StopTimeout if stop_timeout.is_some() => {
-                            if stop_timeout == Some(timed_event.id) {
-                                for responder in responders.drain(..) {
-                                    responder.respond(fidl_sme::StopApResultCode::TimedOut);
-                                }
-                                stop_timeout = None;
-                            }
-                        }
-                        _ => (),
+                if let Event::Sme { event: SmeEvent::StopTimeout } = timed_event.event {
+                    for responder in responders.drain(..) {
+                        responder.respond(fidl_sme::StopApResultCode::TimedOut);
                     }
+                    stop_timeout = None;
                 }
                 // If timeout triggered, then the responders and the timeout are cleared, and
                 // we are left in an unclean stopping state
@@ -766,7 +746,7 @@ impl InfraBss {
                     Some(client) => client,
                 };
 
-                client.handle_timeout(&mut self.ctx, timed_event.id, event);
+                client.handle_timeout(&mut self.ctx, event);
                 if !client.authenticated() {
                     if !self.remove_client(&addr) {
                         error!("failed to remove client {} from AID map", addr);
@@ -1100,7 +1080,7 @@ mod tests {
         let (mut sme, _, mut time_stream) = create_sme().await;
         let mut receiver = sme.on_start_command(unprotected_config());
 
-        let (_, event) = time_stream.try_next().unwrap().expect("expect timer message");
+        let (_, event, _) = time_stream.try_next().unwrap().expect("expect timer message");
         sme.on_timeout(event);
 
         assert_eq!(Ok(Some(StartResult::TimedOut)), receiver.try_recv());
@@ -1198,7 +1178,7 @@ mod tests {
         });
 
         // Time out the start request. Then stop request is sent out
-        let (_, event) = time_stream.try_next().unwrap().expect("expect timer message");
+        let (_, event, _) = time_stream.try_next().unwrap().expect("expect timer message");
         sme.on_timeout(event);
         assert_eq!(Ok(Some(StartResult::TimedOut)), start_receiver.try_recv());
         assert_eq!(Ok(None), stop_receiver.try_recv());
@@ -1391,15 +1371,7 @@ mod tests {
 
         for _i in 0..4 {
             client.verify_eapol_req(&mut mlme_stream);
-
-            let (_, event) = time_stream.try_next().unwrap().expect("expect timer message");
-            // Calling `on_timeout` with a different event ID is a no-op
-            let mut fake_event = event.clone();
-            fake_event.id += 1;
-            sme.on_timeout(fake_event);
-            assert_variant!(mlme_stream.try_next(), Err(e) => {
-                assert_eq!(e.to_string(), "receiver channel is empty")
-            });
+            let (_, event, _) = time_stream.try_next().unwrap().expect("expect timer message");
             sme.on_timeout(event);
         }
 

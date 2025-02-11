@@ -13,7 +13,7 @@ use std::collections::VecDeque;
 use wlan_common::append::Append;
 use wlan_common::buffer_writer::BufferWriter;
 use wlan_common::mac::{self, Aid, AuthAlgorithmNumber, FrameClass, ReasonCode};
-use wlan_common::timer::EventId;
+use wlan_common::timer::EventHandle;
 use wlan_common::{ie, TimeUnit};
 use wlan_statemachine::StateMachine;
 use zerocopy::SplitByteSlice;
@@ -69,7 +69,7 @@ enum State {
         eapol_controlled_port: Option<fidl_mlme::ControlledPortState>,
 
         /// The current active timeout. Should never be None, except during initialization.
-        active_timeout_event_id: Option<EventId>,
+        active_timeout: Option<EventHandle>,
 
         /// Power-saving state of the client.
         ps_state: PowerSaveState,
@@ -216,11 +216,11 @@ impl RemoteClient {
         ctx: &mut Context<D>,
         duration: zx::MonotonicDuration,
         event: ClientEvent,
-    ) -> EventId {
+    ) -> EventHandle {
         ctx.schedule_after(duration, TimedEvent::ClientEvent(self.addr, event))
     }
 
-    fn schedule_bss_idle_timeout<D>(&self, ctx: &mut Context<D>) -> EventId {
+    fn schedule_bss_idle_timeout<D>(&self, ctx: &mut Context<D>) -> EventHandle {
         self.schedule_after(
             ctx,
             // dot11BssMaxIdlePeriod (IEEE Std 802.11-2016, 11.24.13 and Annex C.3) is measured in
@@ -235,15 +235,9 @@ impl RemoteClient {
     async fn handle_bss_idle_timeout<D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
-        event_id: EventId,
     ) -> Result<(), ClientRejection> {
         match self.state.as_ref() {
-            State::Associated { active_timeout_event_id, .. } => {
-                if *active_timeout_event_id != Some(event_id) {
-                    // This is not the right timeout.
-                    return Ok(());
-                }
-            }
+            State::Associated { .. } => {}
             _ => {
                 // This is not the right state.
                 return Ok(());
@@ -288,14 +282,14 @@ impl RemoteClient {
 
         // We need to do this in two parts: we can't schedule the timeout while also borrowing the
         // state, because it results in two simultaneous mutable borrows.
-        let new_active_timeout_event_id = match self.state.as_ref() {
+        let new_active_timeout = match self.state.as_ref() {
             State::Associated { .. } => Some(self.schedule_bss_idle_timeout(ctx)),
             _ => None,
         };
 
         match self.state.as_mut() {
-            State::Associated { active_timeout_event_id, .. } => {
-                *active_timeout_event_id = new_active_timeout_event_id;
+            State::Associated { active_timeout, .. } => {
+                *active_timeout = new_active_timeout;
             }
             _ => (),
         }
@@ -308,11 +302,10 @@ impl RemoteClient {
     pub async fn handle_event<D: DeviceOps>(
         &mut self,
         ctx: &mut Context<D>,
-        event_id: EventId,
         event: ClientEvent,
     ) -> Result<(), ClientRejection> {
         match event {
-            ClientEvent::BssIdleTimeout => self.handle_bss_idle_timeout(ctx, event_id).await,
+            ClientEvent::BssIdleTimeout => self.handle_bss_idle_timeout(ctx).await,
         }
     }
 
@@ -425,7 +418,7 @@ impl RemoteClient {
                     } else {
                         None
                     },
-                    active_timeout_event_id: None,
+                    active_timeout: None,
                     ps_state: PowerSaveState::Awake,
                 }
             } else {
@@ -1181,7 +1174,7 @@ mod tests {
     #[test_case(State::Associated {
             aid: 1,
             eapol_controlled_port: None,
-            active_timeout_event_id: None,
+            active_timeout: None,
             ps_state: PowerSaveState::Awake,
         }; "in associated state")]
     #[fuchsia::test(allow_stalls = false)]
@@ -1240,10 +1233,8 @@ mod tests {
             assert_eq!(aid, 1);
         });
 
-        let active_timeout_event_id = match r_sta.state.as_ref() {
-            State::Associated {
-                active_timeout_event_id: Some(active_timeout_event_id), ..
-            } => active_timeout_event_id,
+        let active_timeout = match r_sta.state.as_ref() {
+            State::Associated { active_timeout: Some(active_timeout), .. } => active_timeout,
             _ => panic!("no active timeout?"),
         };
 
@@ -1266,9 +1257,9 @@ mod tests {
             50, 2, 9, 10, // Extended rates
             90, 3, 90, 0, 0, // BSS max idle period
         ][..]);
-        let (_, timed_event) =
+        let (_, timed_event, _) =
             time_stream.try_next().unwrap().expect("Should have scheduled a timeout");
-        assert_eq!(timed_event.id, *active_timeout_event_id);
+        assert_eq!(timed_event.id, active_timeout.id());
 
         assert!(fake_device_state.lock().assocs.contains_key(&CLIENT_ADDR));
     }
@@ -1349,7 +1340,7 @@ mod tests {
             .expect("expected OK");
         assert_variant!(
             r_sta.state.as_ref(),
-            State::Associated { eapol_controlled_port: None, active_timeout_event_id: Some(_), .. }
+            State::Associated { eapol_controlled_port: None, active_timeout: Some(_), .. }
         );
     }
 
@@ -1457,7 +1448,7 @@ mod tests {
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
             eapol_controlled_port: Some(fidl_mlme::ControlledPortState::Closed),
-            active_timeout_event_id: None,
+            active_timeout: None,
             ps_state: PowerSaveState::Awake,
         });
         r_sta
@@ -1478,7 +1469,7 @@ mod tests {
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
             eapol_controlled_port: Some(fidl_mlme::ControlledPortState::Open),
-            active_timeout_event_id: None,
+            active_timeout: None,
             ps_state: PowerSaveState::Awake,
         });
         r_sta
@@ -1499,7 +1490,7 @@ mod tests {
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
             eapol_controlled_port: None,
-            active_timeout_event_id: None,
+            active_timeout: None,
             ps_state: PowerSaveState::Awake,
         });
         assert_eq!(
@@ -1587,7 +1578,7 @@ mod tests {
     #[test_case(State::Associated {
             aid: 1,
             eapol_controlled_port: None,
-            active_timeout_event_id: None,
+            active_timeout: None,
             ps_state: PowerSaveState::Awake,
         }; "in associated state")]
     #[fuchsia::test(allow_stalls = false)]
@@ -1629,7 +1620,7 @@ mod tests {
     #[test_case(State::Associated {
             aid: 1,
             eapol_controlled_port: None,
-            active_timeout_event_id: None,
+            active_timeout: None,
             ps_state: PowerSaveState::Awake,
         }; "in associated state")]
     #[fuchsia::test(allow_stalls = false)]
@@ -1728,7 +1719,7 @@ mod tests {
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
             eapol_controlled_port: None,
-            active_timeout_event_id: None,
+            active_timeout: None,
             ps_state: PowerSaveState::Awake,
         });
 
@@ -1812,7 +1803,7 @@ mod tests {
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
             eapol_controlled_port: None,
-            active_timeout_event_id: None,
+            active_timeout: None,
             ps_state: PowerSaveState::Awake,
         });
 
@@ -1830,7 +1821,7 @@ mod tests {
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
             eapol_controlled_port: None,
-            active_timeout_event_id: None,
+            active_timeout: None,
             ps_state: PowerSaveState::Awake,
         });
 
@@ -1851,7 +1842,7 @@ mod tests {
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
             eapol_controlled_port: None,
-            active_timeout_event_id: None,
+            active_timeout: None,
             ps_state: PowerSaveState::Awake,
         });
 
@@ -1870,7 +1861,7 @@ mod tests {
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
             eapol_controlled_port: None,
-            active_timeout_event_id: None,
+            active_timeout: None,
             ps_state: PowerSaveState::Awake,
         });
         r_sta
@@ -1899,7 +1890,7 @@ mod tests {
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
             eapol_controlled_port: None,
-            active_timeout_event_id: None,
+            active_timeout: None,
             ps_state: PowerSaveState::Awake,
         });
         r_sta
@@ -1925,7 +1916,7 @@ mod tests {
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
             eapol_controlled_port: None,
-            active_timeout_event_id: None,
+            active_timeout: None,
             ps_state: PowerSaveState::Awake,
         });
         r_sta
@@ -1987,7 +1978,7 @@ mod tests {
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
             eapol_controlled_port: Some(fidl_mlme::ControlledPortState::Closed),
-            active_timeout_event_id: None,
+            active_timeout: None,
             ps_state: PowerSaveState::Awake,
         });
         assert_variant!(
@@ -2014,7 +2005,7 @@ mod tests {
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
             eapol_controlled_port: Some(fidl_mlme::ControlledPortState::Open),
-            active_timeout_event_id: None,
+            active_timeout: None,
             ps_state: PowerSaveState::Awake,
         });
         r_sta
@@ -2186,7 +2177,7 @@ mod tests {
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
             eapol_controlled_port: None,
-            active_timeout_event_id: None,
+            active_timeout: None,
             ps_state: PowerSaveState::Awake,
         });
         let (mut ctx, _) = make_context(fake_device);
@@ -2219,13 +2210,10 @@ mod tests {
             .expect("expected OK");
 
         assert_eq!(fake_device_state.lock().eth_queue.len(), 1);
-        assert_ne!(
-            match r_sta.state.as_ref() {
-                State::Associated { active_timeout_event_id, .. } => *active_timeout_event_id,
-                _ => panic!("expected Associated"),
-            },
-            None
-        )
+        match r_sta.state.as_ref() {
+            State::Associated { active_timeout, .. } => assert!(active_timeout.is_some()),
+            _ => panic!("expected Associated"),
+        }
     }
 
     #[fuchsia::test(allow_stalls = false)]
@@ -2235,7 +2223,7 @@ mod tests {
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
             eapol_controlled_port: None,
-            active_timeout_event_id: None,
+            active_timeout: None,
             ps_state: PowerSaveState::Awake,
         });
         let (mut ctx, _) = make_context(fake_device);
@@ -2283,13 +2271,10 @@ mod tests {
             .expect("expected OK");
 
         assert_eq!(fake_device_state.lock().eth_queue.len(), 2);
-        assert_ne!(
-            match r_sta.state.as_ref() {
-                State::Associated { active_timeout_event_id, .. } => *active_timeout_event_id,
-                _ => panic!("expected Associated"),
-            },
-            None
-        )
+        match r_sta.state.as_ref() {
+            State::Associated { active_timeout, .. } => assert!(active_timeout.is_some()),
+            _ => panic!("expected Associated"),
+        }
     }
 
     #[fuchsia::test(allow_stalls = false)]
@@ -2530,7 +2515,7 @@ mod tests {
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
             eapol_controlled_port: None,
-            active_timeout_event_id: None,
+            active_timeout: None,
             ps_state: PowerSaveState::Awake,
         });
         let (mut ctx, _) = make_context(fake_device);
@@ -2572,7 +2557,7 @@ mod tests {
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
             eapol_controlled_port: None,
-            active_timeout_event_id: None,
+            active_timeout: None,
             ps_state: PowerSaveState::Awake,
         });
         let (mut ctx, _) = make_context(fake_device);
@@ -2601,13 +2586,10 @@ mod tests {
             )
             .await
             .expect("expected OK");
-        assert_ne!(
-            match r_sta.state.as_ref() {
-                State::Associated { active_timeout_event_id, .. } => *active_timeout_event_id,
-                _ => panic!("expected Associated"),
-            },
-            None
-        )
+        match r_sta.state.as_ref() {
+            State::Associated { active_timeout, .. } => assert!(active_timeout.is_some()),
+            _ => panic!("expected Associated"),
+        }
     }
 
     #[fuchsia::test(allow_stalls = false)]
@@ -2616,15 +2598,15 @@ mod tests {
         let (mut ctx, _) = make_context(fake_device);
 
         let mut r_sta = make_remote_client();
-        let event_id = r_sta.schedule_bss_idle_timeout(&mut ctx);
+        let event_handle = r_sta.schedule_bss_idle_timeout(&mut ctx);
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
             eapol_controlled_port: None,
-            active_timeout_event_id: Some(event_id),
+            active_timeout: Some(event_handle),
             ps_state: PowerSaveState::Awake,
         });
 
-        r_sta.handle_bss_idle_timeout(&mut ctx, event_id).await.expect("expected OK");
+        r_sta.handle_bss_idle_timeout(&mut ctx).await.expect("expected OK");
         assert_variant!(r_sta.state.as_ref(), State::Authenticated);
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
@@ -2662,7 +2644,7 @@ mod tests {
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
             eapol_controlled_port: None,
-            active_timeout_event_id: None,
+            active_timeout: None,
             ps_state: PowerSaveState::Awake,
         });
 
@@ -2744,7 +2726,7 @@ mod tests {
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
             eapol_controlled_port: None,
-            active_timeout_event_id: None,
+            active_timeout: None,
             ps_state: PowerSaveState::Awake,
         });
 
@@ -2761,7 +2743,7 @@ mod tests {
         r_sta.state = StateMachine::new(State::Associated {
             aid: 1,
             eapol_controlled_port: None,
-            active_timeout_event_id: None,
+            active_timeout: None,
             ps_state: PowerSaveState::Awake,
         });
 

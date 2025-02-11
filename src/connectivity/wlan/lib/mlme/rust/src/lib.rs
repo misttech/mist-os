@@ -136,17 +136,13 @@ pub trait MlmeImpl {
         status: zx::Status,
         scan_id: u64,
     ) -> impl Future<Output = ()>;
-    fn handle_timeout(
-        &mut self,
-        event_id: common::timer::EventId,
-        event: Self::TimerEvent,
-    ) -> impl Future<Output = ()>;
+    fn handle_timeout(&mut self, event: Self::TimerEvent) -> impl Future<Output = ()>;
     fn access_device(&mut self) -> &mut Self::Device;
 }
 
 pub struct MinstrelTimer {
     timer: wlan_common::timer::Timer<()>,
-    current_timer: Option<common::timer::EventId>,
+    current_timer: Option<common::timer::EventHandle>,
 }
 
 impl minstrel::TimerManager for MinstrelTimer {
@@ -409,7 +405,7 @@ async fn main_loop_impl<T: MlmeImpl>(
                 None => bail!("Driver event stream terminated unexpectedly."),
             },
             timed_event = timer_stream.select_next_some() => {
-                mlme_impl.handle_timeout(timed_event.id, timed_event.event).await;
+                mlme_impl.handle_timeout(timed_event.event).await;
             }
             _minstrel_timeout = minstrel_timer_stream.select_next_some() => {
                 if let Some(minstrel) = minstrel.as_ref() {
@@ -473,11 +469,7 @@ pub mod test_utils {
             unimplemented!()
         }
 
-        async fn handle_timeout(
-            &mut self,
-            _event_id: wlan_common::timer::EventId,
-            _event: Self::TimerEvent,
-        ) {
+        async fn handle_timeout(&mut self, _event: Self::TimerEvent) {
             unimplemented!()
         }
 
