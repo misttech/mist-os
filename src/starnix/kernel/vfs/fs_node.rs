@@ -1481,16 +1481,16 @@ impl FsNode {
             CheckAccessReason::InternalPermissionChecks,
         )?;
         if mode.is_reg() {
-            security::check_fs_node_create_access(current_task, self, mode)?;
+            security::check_fs_node_create_access(current_task, self, mode, name)?;
         } else if mode.is_dir() {
             // Even though the man page for mknod(2) says that mknod "cannot be used to create
             // directories" in starnix the mkdir syscall (`sys_mkdirat`) ends up calling mknod.
-            security::check_fs_node_mkdir_access(current_task, self, mode)?;
+            security::check_fs_node_mkdir_access(current_task, self, mode, name)?;
         } else if !matches!(
             mode.fmt(),
             FileMode::IFCHR | FileMode::IFBLK | FileMode::IFIFO | FileMode::IFSOCK
         ) {
-            security::check_fs_node_mknod_access(current_task, self, mode, dev)?;
+            security::check_fs_node_mknod_access(current_task, self, mode, name, dev)?;
         }
 
         self.update_metadata_for_child(current_task, &mut mode, &mut owner);
@@ -1517,7 +1517,7 @@ impl FsNode {
             self.ops().mknod(&mut locked, self, current_task, name, mode, dev, owner)?
         };
 
-        self.init_new_node_security_on_create(locked, current_task, &new_node)?;
+        self.init_new_node_security_on_create(locked, current_task, &new_node, name)?;
 
         Ok(new_node)
     }
@@ -1541,13 +1541,13 @@ impl FsNode {
             Access::WRITE,
             CheckAccessReason::InternalPermissionChecks,
         )?;
-        security::check_fs_node_symlink_access(current_task, self, target)?;
+        security::check_fs_node_symlink_access(current_task, self, name, target)?;
 
         let mut locked = locked.cast_locked::<FileOpsCore>();
         let new_node =
             self.ops().create_symlink(&mut locked, self, current_task, name, target, owner)?;
 
-        self.init_new_node_security_on_create(&mut locked, current_task, &new_node)?;
+        self.init_new_node_security_on_create(&mut locked, current_task, &new_node, name)?;
 
         Ok(new_node)
     }
@@ -1561,12 +1561,13 @@ impl FsNode {
         locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         new_node: &FsNode,
+        name: &FsStr,
     ) -> Result<(), Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
         let mut locked = locked.cast_locked::<FileOpsCore>();
-        security::fs_node_init_on_create(current_task, &new_node, self)?
+        security::fs_node_init_on_create(current_task, &new_node, self, name)?
             .map(|xattr| {
                 match new_node.ops().set_xattr(
                     &mut locked,
@@ -1612,7 +1613,7 @@ impl FsNode {
         )?;
         self.update_metadata_for_child(current_task, &mut mode, &mut owner);
         let node = self.ops().create_tmpfile(self, current_task, mode, owner)?;
-        security::fs_node_init_on_create(current_task, &node, self)?;
+        security::fs_node_init_on_create(current_task, &node, self, "".into())?;
         node.link_behavior.set(link_behavior).unwrap();
         Ok(node)
     }

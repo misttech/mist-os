@@ -318,11 +318,13 @@ where
                     // the filesystem sid if they don't have a parent node).
                     // TODO: https://fxbug.dev/381275592 - Use the SID from the creating task,
                     // rather than current_task!
+                    let name = dir_entry.local_name();
                     return fs_node_init_on_create(
                         security_server,
                         current_task,
                         fs_node,
                         dir_entry.parent().as_ref().map(|x| &**x.node),
+                        name.as_slice().into(),
                     )
                     .map(|_| ());
                 }
@@ -463,6 +465,7 @@ fn compute_new_fs_node_sid(
     fs: &FileSystem,
     parent: Option<&FsNode>,
     new_node_class: FileClass,
+    name: &FsStr,
 ) -> Result<Option<(SecurityId, FileSystemLabel)>, Errno> {
     let label = match &*fs.security_state.state.0.lock() {
         FileSystemLabelState::Unlabeled { .. } => {
@@ -509,7 +512,7 @@ fn compute_new_fs_node_sid(
                 };
                 let sid = security_server
                     .as_permission_check()
-                    .compute_new_file_sid(current_task_sid, parent_sid, new_node_class, "".into())
+                    .compute_new_file_sid(current_task_sid, parent_sid, new_node_class, name.into())
                     // TODO: https://fxbug.dev/377915452 - is EPERM right here? What does it mean
                     // for compute_new_file_sid to have failed?
                     .map_err(|_| errno!(EPERM))?;
@@ -525,6 +528,7 @@ pub(super) fn fs_node_init_on_create(
     current_task: &CurrentTask,
     new_node: &FsNode,
     parent: Option<&FsNode>,
+    name: &FsStr,
 ) -> Result<Option<FsNodeSecurityXattr>, Errno> {
     // By definition this is a new `FsNode` so should not have already been labeled
     // (unless we're working in the context of overlayfs and affected by
@@ -547,6 +551,7 @@ pub(super) fn fs_node_init_on_create(
         &new_node.fs(),
         parent,
         new_node_class,
+        name.into(),
     )? {
         // for the caller to apply to `new_node`.
         let (sid, xattr) = match label.scheme {
@@ -597,6 +602,7 @@ fn may_create(
     current_task: &CurrentTask,
     parent: &FsNode,
     new_file_mode: FileMode, // Only used to determine the file class.
+    name: &FsStr,
 ) -> Result<(), Errno> {
     let permission_check = security_server.as_permission_check();
 
@@ -628,6 +634,7 @@ fn may_create(
         &parent.fs(),
         Some(parent),
         new_file_class,
+        name.into(),
     )?
     .map(|(sid, _)| sid)
     .unwrap_or_else(|| SecurityId::initial(InitialSid::File));
@@ -728,8 +735,9 @@ pub(super) fn check_fs_node_create_access(
     current_task: &CurrentTask,
     parent: &FsNode,
     mode: FileMode,
+    name: &FsStr,
 ) -> Result<(), Errno> {
-    may_create(security_server, current_task, parent, mode)
+    may_create(security_server, current_task, parent, mode, name)
 }
 
 /// Validate that `current_task` has permission to create a symlink to `old_path` in the `parent`
@@ -738,9 +746,10 @@ pub(super) fn check_fs_node_symlink_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     parent: &FsNode,
+    name: &FsStr,
     _old_path: &FsStr,
 ) -> Result<(), Errno> {
-    may_create(security_server, current_task, parent, FileMode::IFLNK)
+    may_create(security_server, current_task, parent, FileMode::IFLNK, name)
 }
 
 /// Validate that `current_task` has permission to create a new directory in the `parent` directory,
@@ -750,8 +759,9 @@ pub(super) fn check_fs_node_mkdir_access(
     current_task: &CurrentTask,
     parent: &FsNode,
     mode: FileMode,
+    name: &FsStr,
 ) -> Result<(), Errno> {
-    may_create(security_server, current_task, parent, mode)
+    may_create(security_server, current_task, parent, mode, name)
 }
 
 /// Validate that `current_task` has permission to create a new special file, socket or pipe, in the
@@ -761,9 +771,10 @@ pub(super) fn check_fs_node_mknod_access(
     current_task: &CurrentTask,
     parent: &FsNode,
     mode: FileMode,
+    name: &FsStr,
     _device_id: DeviceType,
 ) -> Result<(), Errno> {
-    may_create(security_server, current_task, parent, mode)
+    may_create(security_server, current_task, parent, mode, name)
 }
 
 /// Validate that `current_task` has the permission to create a new hard link to a file.

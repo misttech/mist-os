@@ -260,15 +260,24 @@ pub fn fs_node_notify_security_context(
 /// Returns an extended attribute value to set on the newly-created file if the labeling scheme is
 /// `fs_use_xattr`. For other labeling schemes (e.g. `fs_use_trans`, mountpoint-labeling) a label
 /// is set on the `FsNode` security state, but no extended attribute is set nor returned.
+/// The `name` with which the new node is being created allows name-conditional `type_transition`
+/// rules to be applied when determining the label for the `new_node`.
 /// Corresponds to the `inode_init_security()` LSM hook.
 pub fn fs_node_init_on_create(
     current_task: &CurrentTask,
     new_node: &FsNode,
     parent: &FsNode,
+    name: &FsStr,
 ) -> Result<Option<FsNodeSecurityXattr>, Errno> {
     profile_duration!("security.hooks.fs_node_init_on_create");
     if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::fs_node_init_on_create(security_server, current_task, new_node, Some(parent))
+        selinux_hooks::fs_node_init_on_create(
+            security_server,
+            current_task,
+            new_node,
+            Some(parent),
+            name,
+        )
     })
 }
 
@@ -293,10 +302,17 @@ pub fn check_fs_node_create_access(
     current_task: &CurrentTask,
     parent: &FsNode,
     mode: FileMode,
+    name: &FsStr,
 ) -> Result<(), Errno> {
     profile_duration!("security.hooks.check_fs_node_create_access");
     if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::check_fs_node_create_access(security_server, current_task, parent, mode)
+        selinux_hooks::check_fs_node_create_access(
+            security_server,
+            current_task,
+            parent,
+            mode,
+            name,
+        )
     })
 }
 
@@ -306,11 +322,18 @@ pub fn check_fs_node_create_access(
 pub fn check_fs_node_symlink_access(
     current_task: &CurrentTask,
     parent: &FsNode,
+    name: &FsStr,
     old_path: &FsStr,
 ) -> Result<(), Errno> {
     profile_duration!("security.hooks.check_fs_node_symlink_access");
     if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::check_fs_node_symlink_access(security_server, current_task, parent, old_path)
+        selinux_hooks::check_fs_node_symlink_access(
+            security_server,
+            current_task,
+            parent,
+            name,
+            old_path,
+        )
     })
 }
 
@@ -321,10 +344,11 @@ pub fn check_fs_node_mkdir_access(
     current_task: &CurrentTask,
     parent: &FsNode,
     mode: FileMode,
+    name: &FsStr,
 ) -> Result<(), Errno> {
     profile_duration!("security.hooks.check_fs_node_mkdir_access");
     if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::check_fs_node_mkdir_access(security_server, current_task, parent, mode)
+        selinux_hooks::check_fs_node_mkdir_access(security_server, current_task, parent, mode, name)
     })
 }
 
@@ -337,6 +361,7 @@ pub fn check_fs_node_mknod_access(
     current_task: &CurrentTask,
     parent: &FsNode,
     mode: FileMode,
+    name: &FsStr,
     device_id: DeviceType,
 ) -> Result<(), Errno> {
     profile_duration!("security.hooks.check_fs_node_mknod_access");
@@ -348,6 +373,7 @@ pub fn check_fs_node_mknod_access(
             current_task,
             parent,
             mode,
+            name,
             device_id,
         )
     })
