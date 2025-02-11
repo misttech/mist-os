@@ -1252,35 +1252,6 @@ pub struct zxio_socket_mark {
     pub is_present: bool,
     pub __bindgen_padding_0: [u8; 2usize],
 }
-pub type zxio_socket_mark_t = zxio_socket_mark;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct zxio_socket_creation_options {
-    pub num_marks: usize,
-    pub marks: *mut zxio_socket_mark_t,
-}
-impl Default for zxio_socket_creation_options {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-pub type zxio_socket_creation_options_t = zxio_socket_creation_options;
-unsafe extern "C" {
-    pub fn zxio_socket_with_options(
-        service_connector: zxio_service_connector,
-        domain: ::std::os::raw::c_int,
-        type_: ::std::os::raw::c_int,
-        protocol: ::std::os::raw::c_int,
-        opts: zxio_socket_creation_options_t,
-        allocator: zxio_storage_alloc,
-        out_context: *mut *mut ::std::os::raw::c_void,
-        out_code: *mut i16,
-    ) -> zx_status_t;
-}
 unsafe extern "C" {
     pub fn zxio_default_maybe_faultable_copy(
         dest: *mut ::std::os::raw::c_uchar,

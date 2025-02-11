@@ -18,7 +18,7 @@ use starnix_uapi::errors::{Errno, ErrnoCode, ENOTSUP};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
     c_int, errno, errno_from_zxio_code, error, from_status_like_fdio, sock_filter, sock_fprog,
-    uapi, ucred, uid_t, AF_PACKET, BPF_MAXINSNS, MSG_DONTWAIT, MSG_WAITALL, SO_ATTACH_FILTER,
+    uapi, ucred, AF_PACKET, BPF_MAXINSNS, MSG_DONTWAIT, MSG_WAITALL, SO_ATTACH_FILTER,
 };
 
 use ebpf::convert_and_verify_cbpf;
@@ -29,17 +29,20 @@ use std::mem::size_of;
 use std::sync::{Arc, OnceLock};
 use syncio::zxio::{
     zxio_socket_mark, IP_RECVERR, SOL_IP, SOL_SOCKET, SO_DOMAIN, SO_FUCHSIA_MARK, SO_MARK,
-    SO_PROTOCOL, SO_TYPE,
+    SO_PROTOCOL, SO_TYPE, ZXIO_SOCKET_MARK_DOMAIN_1,
 };
-use syncio::{
-    ControlMessage, RecvMessageInfo, ServiceConnector, Zxio, ZxioErrorCode,
-    ZXIO_SOCKET_MARK_SO_MARK,
-};
+use syncio::{ControlMessage, RecvMessageInfo, ServiceConnector, Zxio, ZxioErrorCode};
 use {
     fidl_fuchsia_posix_socket as fposix_socket,
     fidl_fuchsia_posix_socket_packet as fposix_socket_packet,
     fidl_fuchsia_posix_socket_raw as fposix_socket_raw, zx,
 };
+
+/// Linux marks aren't compatible with Fuchsia marks, we store the `SO_MARK`
+/// value in the fuchsia `ZXIO_SOCKET_MARK_DOMAIN_1`. If a mark in this domain
+/// is absent, it will be reported to starnix applications as a `0` since that
+/// is the default mark value on Linux.
+const ZXIO_SOCKET_MARK_SO_MARK: u8 = ZXIO_SOCKET_MARK_DOMAIN_1;
 
 /// Connects to the appropriate `fuchsia_posix_socket_*::Provider` protocol.
 struct SocketProviderServiceConnector;
@@ -83,18 +86,17 @@ impl ZxioBackedSocket {
         domain: SocketDomain,
         socket_type: SocketType,
         protocol: SocketProtocol,
-        uid: uid_t,
     ) -> Result<ZxioBackedSocket, Errno> {
         let zxio = Zxio::new_socket::<SocketProviderServiceConnector>(
             domain.as_raw() as c_int,
             socket_type.as_raw() as c_int,
             protocol.as_raw() as c_int,
-            uid,
         )
         .map_err(|status| from_status_like_fdio!(status))?
         .map_err(|out_code| errno_from_zxio_code!(out_code))?;
 
-        Ok(Self::new_with_zxio(zxio))
+        let socket = Self::new_with_zxio(zxio);
+        Ok(socket)
     }
 
     pub fn new_with_zxio(zxio: syncio::Zxio) -> ZxioBackedSocket {
