@@ -253,7 +253,7 @@ variant("profile-rust") {
 }
 
 # PGO-optimized build that uses collected profiles.
-config("profile-use") {
+variant("profile-use") {
   if (pgo_profile_path != "") {
     cflags =
         [ "-fprofile-use=" + rebase_path(pgo_profile_path, root_build_dir) ]

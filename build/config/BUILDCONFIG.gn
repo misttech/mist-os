@@ -549,9 +549,6 @@ if (zircon_toolchain == false) {
   default_executable_deps = []
 }
 
-# Add profile-use config to build with the PGO collected profiles.
-default_common_binary_configs += [ "//build/config/profile:profile-use" ]
-
 # Rust proc macros don't support (Thin)LTO, so always remove it.
 default_rust_proc_macro_configs = default_shared_library_configs + [
                                     "//build/config/lto",
@@ -1754,6 +1751,10 @@ declare_args() {
         "needs-writable-globals",
         "profile",
       ]
+    },
+
+    {
+      configs = [ "//build/config/profile:profile-use" ]
     },
 
     {
