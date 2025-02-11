@@ -6,9 +6,10 @@ use async_trait::async_trait;
 use daemonize::daemonize;
 use ffx_config::EnvironmentContext;
 use ffx_repository_server_start_args::StartCommand;
+use ffx_writer::VerifiedMachineWriter;
 use fho::{
     bug, deferred, return_bug, return_user_error, Deferred, Error, FfxContext, FfxMain, FfxTool,
-    Result, VerifiedMachineWriter,
+    Result,
 };
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx_ext::RepositoryError;
@@ -305,7 +306,8 @@ async fn start_daemon_server(
 mod tests {
     use super::*;
     use ffx_target::TargetProxy;
-    use fho::{FhoConnectionBehavior, FhoEnvironment, Format, TestBuffers, TryFromEnv as _};
+    use ffx_writer::{Format, TestBuffers};
+    use fho::{FhoConnectionBehavior, FhoEnvironment, TryFromEnv as _};
     use fidl_fuchsia_developer_ffx::{RepositoryError, RepositoryRegistryRequest};
     use futures::channel::oneshot::channel;
     use std::net::Ipv4Addr;

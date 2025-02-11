@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{FhoEnvironment, ToolIO, TryFromEnv};
+use crate::{FhoEnvironment, TryFromEnv};
 use argh::{ArgsInfo, CommandInfo, FromArgs, SubCommand, SubCommands};
 use async_trait::async_trait;
 use ffx_command::{
@@ -11,6 +11,7 @@ use ffx_command::{
 };
 use ffx_config::environment::ExecutableKind;
 use ffx_config::EnvironmentContext;
+use ffx_writer::ToolIO;
 use fho_metadata::FhoToolMetadata;
 use std::fs::File;
 use std::os::unix::process::ExitStatusExt;
@@ -241,8 +242,9 @@ mod tests {
     use crate::adapters::tests::SimpleCheck;
     // This keeps the macros from having compiler errors.
     use crate::adapters::tests::{FakeCommand, FakeTool, SIMPLE_CHECK_COUNTER};
-    use crate::{self as fho, SimpleWriter};
+    use crate::{self as fho};
     use async_trait::async_trait;
+    use ffx_writer::SimpleWriter;
     use fho_macro::FfxTool;
     use fho_metadata::{FhoDetails, Only};
 

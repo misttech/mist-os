@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use ffx_repository_default_args::{RepositoryDefaultCommand, SubCommand};
-use fho::{bug, FfxMain, FfxTool, Result, SimpleWriter, ToolIO};
+use ffx_writer::{SimpleWriter, ToolIO};
+use fho::{bug, FfxMain, FfxTool, Result};
 
 pub(crate) const CONFIG_KEY_DEFAULT: &str = "repository.default";
 

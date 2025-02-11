@@ -21,6 +21,7 @@ ffx_plugin("ffx_target_ssh") {
     "//src/developer/ffx/lib/ssh:lib",
     "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/lib/timeout:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:nix",

@@ -11,7 +11,7 @@ ffx_tool("ffx_efi_tool") {
   deps = [
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
-    "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",

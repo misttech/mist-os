@@ -15,8 +15,9 @@ macro_rules! embedded_plugin {
         ) -> $crate::Result<()> {
             #[allow(unused_imports)]
             use $crate::macro_deps::{
-                argh, bug, check_strict_constraints, ffx_writer::Format, global_env_context,
-                return_bug,
+                argh, bug, check_strict_constraints,
+                ffx_writer::{Format, ToolIO},
+                global_env_context, return_bug,
             };
             use $crate::FfxMain as _;
 
@@ -30,8 +31,7 @@ macro_rules! embedded_plugin {
             let mut writer: <$tool as $crate::FfxMain>::Writer =
                 $crate::TryFromEnv::try_from_env(&env).await?;
             if env.ffx_command().global.schema {
-                use $crate::macro_deps::ffx_writer::ToolIO;
-                if <<$tool as $crate::FfxMain>::Writer as $crate::ToolIO>::has_schema() {
+                if <<$tool as $crate::FfxMain>::Writer as ToolIO>::has_schema() {
                     writer.try_print_schema()?;
                 } else {
                     $crate::macro_deps::return_user_error!(

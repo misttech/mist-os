@@ -17,7 +17,8 @@ use ffx_ssh::{SshKeyErrorKind, SshKeyFiles};
 use ffx_target::get_target_specifier;
 use ffx_target_show::ShowTool;
 use ffx_target_show_args::TargetShow;
-use fho::{FfxMain, FfxTool, FhoEnvironment, SimpleWriter, VerifiedMachineWriter};
+use ffx_writer::{SimpleWriter, VerifiedMachineWriter};
+use fho::{FfxMain, FfxTool, FhoEnvironment};
 use fidl::endpoints::create_proxy;
 use fidl::prelude::*;
 use fidl_fuchsia_developer_ffx::{
@@ -234,7 +235,7 @@ impl ShowToolWrapper {
     /// two steps in the process for running an invocation of `ffx target show`.
     async fn run(&mut self) -> fho::Result<(String, String)> {
         let tool = self.inner.take().unwrap();
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         match tool.main(VerifiedMachineWriter::new_test(None, &buffers)).await {
             Ok(_) => Ok(buffers.into_strings()),
             Err(e) => Err(fho::user_error!("{}\n\tstderr: {}", e, buffers.into_stderr_str())),

@@ -4,7 +4,8 @@
 
 use anyhow::{anyhow, Context, Result};
 use errors::FfxError;
-use fho::{deferred, AvailabilityFlag, Deferred, FfxMain, FfxTool, MachineWriter, ToolIO};
+use ffx_writer::{MachineWriter, ToolIO as _};
+use fho::{deferred, AvailabilityFlag, Deferred, FfxMain, FfxTool};
 use fidl_fuchsia_feedback::DataProviderProxy;
 use fuchsia_triage::{
     analyze, analyze_structured, ActionResultFormatter, ActionTagDirective, TriageOutput,

@@ -24,6 +24,7 @@ ffx_plugin("ffx_audio_play") {
     "//sdk/fidl/fuchsia.audio.controller:fuchsia.audio.controller_rust",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/target/holders:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/developer/ffx/plugins/audio/common:ffx_audio_common",
     "//src/lib/fidl/rust/fidl",
     "//third_party/rust_crates:anyhow",

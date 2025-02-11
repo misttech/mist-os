@@ -8,7 +8,8 @@ use component_debug::realm::Instance;
 use errors::FfxError;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_list_args::ComponentListCommand;
-use fho::{FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
+use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
+use fho::{FfxMain, FfxTool};
 use schemars::JsonSchema;
 use serde::Serialize;
 use target_holders::RemoteControlProxyHolder;
@@ -58,7 +59,8 @@ mod test {
     use anyhow::Result;
     use component_debug::realm::ResolvedInfo;
     use ffx_component_list_args::ComponentListCommand;
-    use fho::{FfxMain, Format, TestBuffers};
+    use ffx_writer::{Format, TestBuffers};
+    use fho::FfxMain;
     use fidl::endpoints::ServerEnd;
     use fidl_fuchsia_developer_remotecontrol::{
         RemoteControlMarker, RemoteControlProxy, RemoteControlRequest,

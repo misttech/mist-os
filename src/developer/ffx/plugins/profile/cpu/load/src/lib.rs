@@ -5,7 +5,8 @@
 use anyhow::{bail, Result};
 use async_trait::async_trait;
 use errors::ffx_bail;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use fidl_fuchsia_power_metrics::{self as fmetrics, CpuLoad, Metric};
 use target_holders::{moniker, RemoteControlProxyHolder};
 use {ffx_cpu_load_args as args_mod, fidl_fuchsia_kernel as fstats};

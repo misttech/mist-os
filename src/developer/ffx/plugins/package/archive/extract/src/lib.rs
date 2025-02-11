@@ -4,7 +4,8 @@
 
 use anyhow::Result;
 pub use ffx_package_archive_extract_args::PackageArchiveExtractCommand;
-use fho::{user_error, FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{user_error, FfxMain, FfxTool};
 use package_tool::cmd_package_archive_extract;
 
 #[derive(FfxTool)]

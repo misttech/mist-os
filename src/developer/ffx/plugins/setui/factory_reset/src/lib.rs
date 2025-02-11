@@ -5,7 +5,8 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use ffx_setui_factory_reset_args::FactoryReset;
-use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{AvailabilityFlag, FfxMain, FfxTool};
 use fidl_fuchsia_settings::{FactoryResetProxy, FactoryResetSettings};
 use target_holders::moniker;
 use utils::{handle_mixed_result, Either, WatchOrSetResult};

@@ -27,6 +27,7 @@ ffx_plugin("ffx_debug_core") {
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/symbol-index",
     "//src/developer/ffx/lib/target/holders:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/developer/ffx/plugins/component/common:ffx_component",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",

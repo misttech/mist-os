@@ -16,6 +16,7 @@ rustc_library("ffx_triage_lib") {
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/target/holders:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/developer/ffx/plugins/target/snapshot:ffx_snapshot",
     "//src/developer/ffx/plugins/target/snapshot:ffx_snapshot_args",
     "//src/diagnostics/lib/triage",

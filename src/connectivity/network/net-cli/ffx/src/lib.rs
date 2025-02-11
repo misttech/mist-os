@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fho::{user_error, FfxMain, FfxTool, MachineWriter};
+use ffx_writer::MachineWriter;
+use fho::{user_error, FfxMain, FfxTool};
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
 use std::ops::Deref as _;
 use target_holders::RemoteControlProxyHolder;

@@ -8,9 +8,9 @@ use async_trait::async_trait;
 use ffx_config::api::ConfigError;
 use ffx_config::EnvironmentContext;
 use ffx_repository_server_stop_args::StopCommand;
+use ffx_writer::VerifiedMachineWriter;
 use fho::{
     bug, deferred, return_bug, return_user_error, Deferred, Error, FfxMain, FfxTool, Result,
-    VerifiedMachineWriter,
 };
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx_ext::RepositoryError;
@@ -180,7 +180,7 @@ mod tests {
     use super::*;
     use camino::Utf8PathBuf;
     use ffx_config::{ConfigLevel, TestEnv};
-    use fho::Format;
+    use ffx_writer::Format;
     use fidl_fuchsia_developer_ffx::{RepositoryRegistryMarker, RepositoryRegistryRequest};
     use fidl_fuchsia_developer_ffx_ext::RepositorySpec;
     use fidl_fuchsia_pkg_ext::{
@@ -298,7 +298,7 @@ mod tests {
             cmd: StopCommand { all: true, name: None, port: None, product_bundle: None },
             repos,
         };
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         let writer = <RepoStopTool as FfxMain>::Writer::new_test(None, &buffers);
         let res = tool.main(writer).await;
 
@@ -332,7 +332,7 @@ mod tests {
             cmd: StopCommand { all: true, name: None, port: None, product_bundle: None },
             repos,
         };
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         let writer = <RepoStopTool as FfxMain>::Writer::new_test(None, &buffers);
         let res = tool.main(writer).await;
 
@@ -377,7 +377,7 @@ mod tests {
             },
             repos,
         };
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         let writer = <RepoStopTool as FfxMain>::Writer::new_test(None, &buffers);
         let res = tool.main(writer).await;
         let (stdout, stderr) = buffers.into_strings();
@@ -419,7 +419,7 @@ mod tests {
             cmd: StopCommand { all: true, name: None, port: None, product_bundle: None },
             repos,
         };
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         let writer = <RepoStopTool as FfxMain>::Writer::new_test(None, &buffers);
         let res = tool.main(writer).await;
 
@@ -455,7 +455,7 @@ mod tests {
             cmd: StopCommand { all: true, name: None, port: None, product_bundle: None },
             repos,
         };
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         let writer = <RepoStopTool as FfxMain>::Writer::new_test(None, &buffers);
         let res = tool.main(writer).await;
 
@@ -493,7 +493,7 @@ mod tests {
             cmd: StopCommand { all: true, name: None, port: None, product_bundle: None },
             repos,
         };
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         let writer = <RepoStopTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
         let res = tool.main(writer).await;
 
@@ -537,7 +537,7 @@ mod tests {
             cmd: StopCommand { all: true, name: None, port: None, product_bundle: None },
             repos,
         };
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         let writer = <RepoStopTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
         let res = tool.main(writer).await;
 
@@ -577,7 +577,7 @@ mod tests {
             cmd: StopCommand { all: false, name: None, port: None, product_bundle: None },
             repos,
         };
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         let writer = <RepoStopTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
         let res = tool.main(writer).await;
 
@@ -632,7 +632,7 @@ mod tests {
             },
             repos,
         };
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         let writer = <RepoStopTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
         let res = tool.main(writer).await;
 
@@ -683,7 +683,7 @@ mod tests {
             },
             repos,
         };
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         let writer = <RepoStopTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
         let res = tool.main(writer).await;
 

@@ -249,10 +249,10 @@ impl ToTokens for NamedFieldStruct<'_> {
                 }
 
                 fn supports_machine_output(&self) -> bool {
-                    <<Self as fho::FfxMain>::Writer as fho::ToolIO>::is_machine_supported()
+                    <<Self as fho::FfxMain>::Writer as fho::macro_deps::ffx_writer::ToolIO>::is_machine_supported()
                 }
                 fn has_schema(&self) -> bool {
-                    <<Self as fho::FfxMain>::Writer as fho::ToolIO>::has_schema()
+                    <<Self as fho::FfxMain>::Writer as fho::macro_deps::ffx_writer::ToolIO>::has_schema()
                 }
                 fn requires_target() -> bool {
                     #requires_target

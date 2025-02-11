@@ -5,7 +5,8 @@
 use async_trait::async_trait;
 use error::LogError;
 use ffx_log_args::LogCommand;
-use fho::{FfxMain, FfxTool, MachineWriter, ToolIO};
+use ffx_writer::{MachineWriter, ToolIO};
+use fho::{FfxMain, FfxTool};
 use fidl_fuchsia_diagnostics::{LogSettingsMarker, LogSettingsProxy, StreamParameters};
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
 use fidl_fuchsia_sys2::RealmQueryProxy;

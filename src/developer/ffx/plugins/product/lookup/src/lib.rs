@@ -9,7 +9,8 @@ use ffx_config::EnvironmentContext;
 use ffx_product::{CommandStatus, MachineOutput, MachineUi};
 use ffx_product_list::{pb_list_impl, ProductBundle};
 use ffx_product_lookup_args::LookupCommand;
-use fho::{bug, return_user_error, FfxMain, FfxTool, Result, ToolIO, VerifiedMachineWriter};
+use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
+use fho::{bug, return_user_error, FfxMain, FfxTool, Result};
 use pbms::AuthFlowChoice;
 use std::io::{stdin, stdout, Write};
 
@@ -130,7 +131,7 @@ where
 mod test {
     use super::*;
     use ffx_config::{ConfigLevel, TestEnv};
-    use fho::{Format, TestBuffers};
+    use ffx_writer::{Format, TestBuffers};
     use std::fs::File;
     use std::path::Path;
 

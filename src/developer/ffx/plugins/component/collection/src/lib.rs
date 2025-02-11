@@ -7,7 +7,8 @@ use component_debug::cli::{collection_list_cmd, collection_show_cmd};
 use errors::FfxError;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_collection_args::{CollectionCommand, ShowArgs, SubCommandEnum};
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use target_holders::RemoteControlProxyHolder;
 #[derive(FfxTool)]
 pub struct CollectionTool {

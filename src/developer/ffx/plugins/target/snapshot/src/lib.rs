@@ -5,9 +5,8 @@
 use async_trait::async_trait;
 use chrono::{Datelike, Local, Timelike};
 use ffx_snapshot_args::SnapshotCommand;
-use fho::{
-    bug, return_bug, return_user_error, Error, FfxMain, FfxTool, Result, VerifiedMachineWriter,
-};
+use ffx_writer::VerifiedMachineWriter;
+use fho::{bug, return_bug, return_user_error, Error, FfxMain, FfxTool, Result};
 use fidl_fuchsia_feedback::{
     Annotation, DataProviderProxy, GetAnnotationsParameters, GetSnapshotParameters,
 };
@@ -279,7 +278,7 @@ fn default_output_dir() -> PathBuf {
 #[cfg(test)]
 mod test {
     use super::*;
-    use fho::{Format, TestBuffers};
+    use ffx_writer::{Format, TestBuffers};
     use fidl::endpoints::ServerEnd;
     use fidl_fuchsia_feedback::{Annotations, DataProviderRequest, Snapshot};
     use futures::TryStreamExt;

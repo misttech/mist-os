@@ -7,7 +7,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
 use ffx_get_ssh_address_args::GetSshAddressCommand;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use fidl_fuchsia_developer_ffx::{
     DaemonError, TargetAddrInfo, TargetCollectionProxy, TargetMarker, TargetQuery,
 };

@@ -22,6 +22,7 @@ ffx_plugin("ffx_product_get_version") {
   deps = [
     "//build/sdk/meta:rust",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
   ]

@@ -35,11 +35,6 @@ pub use ffx_command_error::{
 // subtools.
 pub use ffx_command::FfxCommandLine;
 
-// Re-expose the ffx_writer::Writer as the 'simple writer'
-pub use ffx_writer::{
-    Format, MachineWriter, SimpleWriter, TestBuffer, TestBuffers, ToolIO, VerifiedMachineWriter,
-};
-
 #[doc(hidden)]
 pub mod macro_deps {
     pub use async_trait::async_trait;

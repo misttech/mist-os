@@ -5,7 +5,8 @@
 use anyhow::{format_err, Result};
 use async_trait::async_trait;
 use ffx_session_remove_args::SessionRemoveCommand;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use fidl_fuchsia_element::ManagerProxy;
 use target_holders::moniker;
 

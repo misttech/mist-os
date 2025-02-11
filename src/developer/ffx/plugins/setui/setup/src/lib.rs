@@ -5,7 +5,8 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use ffx_setui_setup_args::Setup;
-use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{AvailabilityFlag, FfxMain, FfxTool};
 use fidl_fuchsia_settings::{ConfigurationInterfaces, SetupProxy, SetupSettings};
 use target_holders::moniker;
 use utils::{handle_mixed_result, Either, WatchOrSetResult};

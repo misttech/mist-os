@@ -6,7 +6,8 @@ use crate::reader::{CommandReader, ShellReader};
 use crate::shell::Shell;
 use anyhow::Result;
 use ffx_fuzz_args::{FuzzCommand, Session};
-use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{AvailabilityFlag, FfxMain, FfxTool};
 use fuchsia_fuzzctl::{StdioSink, Writer};
 use target_holders::RemoteControlProxyHolder;
 

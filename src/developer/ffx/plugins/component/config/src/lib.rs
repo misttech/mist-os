@@ -11,7 +11,8 @@ use ffx_component::rcs::{
 use ffx_component_config_args::{
     ConfigComponentCommand, ListArgs, SetArgs, SubCommandEnum, UnsetArgs,
 };
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use target_holders::RemoteControlProxyHolder;
 
 #[derive(FfxTool)]

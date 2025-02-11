@@ -4,9 +4,8 @@
 
 use anyhow::Context;
 use ffx_package_file_hash_args::FileHashCommand;
-use fho::{
-    return_user_error, user_error, Error, FfxMain, FfxTool, Result, ToolIO, VerifiedMachineWriter,
-};
+use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
+use fho::{return_user_error, user_error, Error, FfxMain, FfxTool, Result};
 use fuchsia_merkle::MerkleTree;
 use rayon::prelude::*;
 use schemars::JsonSchema;
@@ -110,7 +109,7 @@ impl FileHashEntry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fho::{Format, TestBuffers};
+    use ffx_writer::{Format, TestBuffers};
     use tempfile::TempDir;
 
     fn create_test_files(name_content_pairs: &[(&str, &str)]) -> anyhow::Result<TempDir> {

@@ -4,7 +4,8 @@
 
 use async_trait::async_trait;
 pub use ffx_repository_publish_args::RepoPublishCommand;
-use fho::{Error, FfxMain, FfxTool, Result, VerifiedMachineWriter};
+use ffx_writer::VerifiedMachineWriter;
+use fho::{Error, FfxMain, FfxTool, Result};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
@@ -69,7 +70,8 @@ impl<T: PackageTools> FfxMain for PublishTool<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fho::{bug, Format, TestBuffers};
+    use ffx_writer::{Format, TestBuffers};
+    use fho::bug;
 
     struct OkFakeTools {}
     #[async_trait(?Send)]

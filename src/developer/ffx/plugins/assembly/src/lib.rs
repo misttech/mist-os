@@ -6,8 +6,8 @@ use anyhow::Context;
 use async_trait::async_trait;
 use errors::FfxError;
 use ffx_assembly_args::*;
-use fho::{AvailabilityFlag, FfxMain, FfxTool, Result, SimpleWriter};
-
+use ffx_writer::SimpleWriter;
+use fho::{AvailabilityFlag, FfxMain, FfxTool, Result};
 mod base_package;
 mod blobfs;
 mod compiled_package;

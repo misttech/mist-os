@@ -12,6 +12,7 @@ ffx_plugin("ffx_package_blob_compress") {
 
   deps = [
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/storage/lib/delivery_blob",
     "//src/sys/pkg/lib/fuchsia-merkle",
     "//third_party/rust_crates:anyhow",

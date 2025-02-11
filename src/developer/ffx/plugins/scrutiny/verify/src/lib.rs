@@ -4,7 +4,8 @@
 
 use anyhow::{anyhow, Context};
 use ffx_scrutiny_verify_args::{Command, SubCommand};
-use fho::{bug, return_user_error, FfxMain, FfxTool, Result, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{bug, return_user_error, FfxMain, FfxTool, Result};
 use scrutiny_utils::path::relativize_path;
 use std::fs;
 use std::io::Write;

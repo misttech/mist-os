@@ -23,6 +23,7 @@ ffx_plugin("ffx_doctor") {
     "//src/developer/ffx/lib/target:lib",
     "//src/developer/ffx/lib/timeout:lib",
     "//src/developer/ffx/lib/version:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/developer/ffx/plugins/target/show:ffx_target_show",
     "//src/developer/ffx/plugins/target/show:ffx_target_show_args",
     "//src/lib/fidl/rust/fidl",

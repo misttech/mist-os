@@ -31,7 +31,7 @@ fho::embedded_plugin!(ConfigTool);
 
 #[async_trait::async_trait(?Send)]
 impl FfxMain for ConfigTool {
-    type Writer = fho::SimpleWriter;
+    type Writer = ffx_writer::SimpleWriter;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
         match &self.config.sub {

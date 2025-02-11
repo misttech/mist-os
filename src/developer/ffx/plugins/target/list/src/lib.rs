@@ -9,7 +9,8 @@ use errors::{ffx_bail, ffx_bail_with_code};
 use ffx_config::EnvironmentContext;
 use ffx_list_args::{AddressTypes, ListCommand};
 use ffx_target::{KnockError, TargetInfoQuery};
-use fho::{deferred, Deferred, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
+use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
+use fho::{deferred, Deferred, FfxMain, FfxTool};
 use fidl_fuchsia_developer_ffx as ffx;
 use fuchsia_async::TimeoutExt;
 use futures::{StreamExt, TryStreamExt};
@@ -379,7 +380,8 @@ mod test {
         let env = ffx_config::test_init().await.unwrap();
         let proxy = setup_fake_target_collection_server(3);
         let test_buffers = TestBuffers::default();
-        let mut writer = VerifiedMachineWriter::new_test(Some(fho::Format::Json), &test_buffers);
+        let mut writer =
+            VerifiedMachineWriter::new_test(Some(ffx_writer::Format::Json), &test_buffers);
         let cmd = ListCommand { format: Format::Tabular, ..Default::default() };
         let infos = list_targets(proxy, &cmd).await.expect("list targets");
         show_targets(cmd, infos, &mut writer, &env.context).await.expect("show_targets");

@@ -15,6 +15,7 @@ ffx_plugin("ffx_power_collaborative_reboot") {
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/target/holders:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//third_party/rust_crates:async-trait",
   ]
 

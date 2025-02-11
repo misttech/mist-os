@@ -21,7 +21,7 @@ pub struct Efi {
 
 #[async_trait(?Send)]
 impl fho::FfxMain for Efi {
-    type Writer = fho::SimpleWriter;
+    type Writer = ffx_writer::SimpleWriter;
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
         command(self.cmd).await.map_err(|e| e.into())
     }

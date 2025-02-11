@@ -4,7 +4,8 @@
 
 use ffx_package_archive_cat_args::CatCommand;
 use ffx_package_archive_utils::{read_file_entries, FarArchiveReader, FarListReader};
-use fho::{bug, return_user_error, FfxMain, FfxTool, Result, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{bug, return_user_error, FfxMain, FfxTool, Result};
 
 #[derive(FfxTool)]
 pub struct ArchiveCatTool {

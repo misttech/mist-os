@@ -13,7 +13,8 @@ use ffx_config::EnvironmentContext;
 use ffx_repository_packages_args::{
     ExtractArchiveSubCommand, ListSubCommand, PackagesCommand, PackagesSubCommand, ShowSubCommand,
 };
-use fho::{bug, FfxMain, FfxTool, MachineWriter, ToolIO};
+use ffx_writer::{MachineWriter, ToolIO as _};
+use fho::{bug, FfxMain, FfxTool};
 use fuchsia_hash::Hash;
 use fuchsia_hyper::new_https_client;
 use fuchsia_pkg::PackageArchiveBuilder;
@@ -420,7 +421,7 @@ mod test {
     use super::*;
     use ffx_config::ConfigLevel;
     use ffx_package_archive_utils::{read_file_entries, ArchiveEntry, FarArchiveReader};
-    use fho::TestBuffers;
+    use ffx_writer::TestBuffers;
     use fuchsia_async as fasync;
     use fuchsia_repo::test_utils;
     use pretty_assertions::assert_eq;

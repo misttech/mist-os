@@ -27,7 +27,7 @@ fho::embedded_plugin!(DaemonLogTool);
 
 #[async_trait::async_trait(?Send)]
 impl FfxMain for DaemonLogTool {
-    type Writer = fho::SimpleWriter;
+    type Writer = ffx_writer::SimpleWriter;
 
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
         if !self.ctx.get("log.enabled").bug()? {

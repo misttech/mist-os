@@ -9,8 +9,9 @@ use component_debug::realm::{get_runtime, Runtime};
 use errors::{ffx_error, FfxError};
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_debug_args::ComponentDebugCommand;
+use ffx_writer::SimpleWriter;
 use ffx_zxdb::Debugger;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use fho::{FfxMain, FfxTool};
 use target_holders::{moniker, RemoteControlProxyHolder};
 use zx_types::zx_koid_t;
 

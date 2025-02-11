@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use ffx_repository_server_status_args::StatusCommand;
-use fho::{bug, FfxMain, FfxTool, MachineWriter, Result, ToolIO as _};
+use ffx_writer::{MachineWriter, ToolIO as _};
+use fho::{bug, FfxMain, FfxTool, Result};
 use fidl_fuchsia_developer_ffx::RepositoryRegistryProxy;
 use fidl_fuchsia_developer_ffx_ext::ServerStatus;
 use std::io::Write as _;
@@ -55,7 +56,7 @@ async fn status_impl(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fho::{Format, TestBuffers};
+    use ffx_writer::{Format, TestBuffers};
     use fidl_fuchsia_developer_ffx::RepositoryRegistryRequest;
     use futures::channel::oneshot::channel;
     use std::net::Ipv4Addr;

@@ -37,6 +37,7 @@ ffx_plugin("ffx_selftest") {
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/isolate:lib",
     "//src/developer/ffx/lib/netext:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",

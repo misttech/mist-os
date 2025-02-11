@@ -10,7 +10,8 @@ use anyhow::{Context, Result};
 use ffx_config::sdk::{in_tree_sdk_version, SdkVersion};
 use ffx_config::EnvironmentContext;
 use ffx_product_list_args::ListCommand;
-use fho::{bug, return_user_error, FfxMain, FfxTool, MachineWriter, ToolIO as _};
+use ffx_writer::{MachineWriter, ToolIO as _};
+use fho::{bug, return_user_error, FfxMain, FfxTool};
 use gcs::gs_url::split_gs_url;
 use lazy_static::lazy_static;
 use maplit::hashmap;
@@ -277,7 +278,7 @@ where
 mod test {
     use super::*;
     use ffx_config::{ConfigLevel, TestEnv};
-    use fho::{Format, TestBuffers};
+    use ffx_writer::{Format, TestBuffers};
     use std::fs::File;
 
     async fn setup_test_env() -> TestEnv {

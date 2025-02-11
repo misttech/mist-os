@@ -24,6 +24,7 @@ ffx_plugin("ffx_repository_add_from_pm") {
     "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
     "//src/developer/ffx/lib/pkg",
     "//src/developer/ffx/lib/target/holders:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fuchsia-url",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:camino",

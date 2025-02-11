@@ -9,7 +9,8 @@ use errors::ffx_error;
 use ffx_power_collaborative_reboot_args::{
     CollaborativeRebootCommand, PerformPendingRebootCommand, SubCommand,
 };
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use fidl_fuchsia_power as fpower;
 use target_holders::moniker;
 
@@ -53,7 +54,7 @@ async fn collaborative_reboot(
 
 #[cfg(test)]
 mod tests {
-    use fho::TestBuffers;
+    use ffx_writer::TestBuffers;
     use target_holders::fake_proxy;
 
     use super::*;

@@ -4,7 +4,8 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use target_holders::moniker;
 use {
     ffx_power_system_activity_application_activity_args as args_mod,

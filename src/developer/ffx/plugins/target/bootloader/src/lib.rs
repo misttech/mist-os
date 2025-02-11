@@ -20,7 +20,8 @@ use ffx_fastboot::lock::lock;
 use ffx_fastboot::unlock::unlock;
 use ffx_fastboot::util::{Event, UnlockEvent};
 use ffx_fastboot_interface::fastboot_interface::{FastbootInterface, UploadProgress, Variable};
-use fho::{FfxContext, FfxMain, FfxTool, VerifiedMachineWriter};
+use ffx_writer::VerifiedMachineWriter;
+use fho::{FfxContext, FfxMain, FfxTool};
 use fidl_fuchsia_developer_ffx::{
     FastbootInterface as FidlFastbootInterface, TargetInfo, TargetRebootState, TargetState,
 };
@@ -498,7 +499,7 @@ mod test {
     use ffx_bootloader_args::LockCommand;
     use ffx_fastboot::common::vars::LOCKED_VAR;
     use ffx_fastboot::test::setup;
-    use fho::Format;
+    use ffx_writer::Format;
     use tempfile::NamedTempFile;
 
     #[fuchsia_async::run_singlethreaded(test)]

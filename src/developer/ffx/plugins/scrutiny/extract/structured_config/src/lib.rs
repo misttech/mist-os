@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use ffx_scrutiny_structured_config_args::ScrutinyStructuredConfigCommand;
-use fho::{bug, FfxMain, FfxTool, Result, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{bug, FfxMain, FfxTool, Result};
 use scrutiny_frontend::Scrutiny;
 use scrutiny_utils::path::relativize_path;
 

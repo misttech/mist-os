@@ -6,9 +6,8 @@ use emulator_instance::{EmulatorInstanceInfo, EmulatorInstances};
 use ffx_config::EnvironmentContext;
 use ffx_emulator_engines::EngineBuilder;
 use ffx_emulator_stop_args::StopCommand;
-use fho::{
-    bug, return_user_error, user_error, Error, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter,
-};
+use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
+use fho::{bug, return_user_error, user_error, Error, FfxMain, FfxTool};
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::io::Write;

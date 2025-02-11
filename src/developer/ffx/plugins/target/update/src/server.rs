@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 use ffx_config::EnvironmentContext;
-use fho::{
-    bug, return_bug, return_user_error, user_error, Deferred, FfxMain, Result,
-    VerifiedMachineWriter,
-};
+use ffx_writer::VerifiedMachineWriter;
+use fho::{bug, return_bug, return_user_error, user_error, Deferred, FfxMain, Result};
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_ffx::{
     RepositoryRegistrationAliasConflictMode, RepositoryRegistryProxy,

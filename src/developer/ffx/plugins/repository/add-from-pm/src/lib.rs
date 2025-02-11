@@ -6,10 +6,8 @@ use camino::FromPathBufError;
 use errors::ffx_error;
 use ffx::RepositoryIteratorMarker;
 use ffx_repository_add_from_pm_args::AddFromPmCommand;
-use fho::{
-    bug, return_user_error, user_error, Error, FfxContext, FfxMain, FfxTool, Result,
-    VerifiedMachineWriter,
-};
+use ffx_writer::VerifiedMachineWriter;
+use fho::{bug, return_user_error, user_error, Error, FfxContext, FfxMain, FfxTool, Result};
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx_ext::{RepositoryError, RepositorySpec};
 use fuchsia_url::RepositoryUrl;
@@ -162,7 +160,7 @@ impl AddFromPmTool {
 #[cfg(test)]
 mod test {
     use super::*;
-    use fho::Format;
+    use ffx_writer::Format;
     use fidl_fuchsia_developer_ffx::{
         PmRepositorySpec, RepositoryConfig, RepositoryIteratorRequest, RepositoryRegistryMarker,
         RepositoryRegistryRequest, RepositoryRegistryRequestStream, RepositorySpec,
@@ -236,7 +234,7 @@ mod test {
             },
             repos,
         };
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         let writer = <AddFromPmTool as FfxMain>::Writer::new_test(None, &buffers);
 
         tool.main(writer).await.expect("main ok");
@@ -277,7 +275,7 @@ mod test {
                 },
                 repos: repos.clone(),
             };
-            let buffers = fho::TestBuffers::default();
+            let buffers = ffx_writer::TestBuffers::default();
             let writer = <AddFromPmTool as FfxMain>::Writer::new_test(None, &buffers);
             let got_msg = tool.main(writer).await.expect_err("expected error").to_string();
             assert_eq!(got_msg, want_msg);
@@ -305,7 +303,7 @@ mod test {
             },
             repos,
         };
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         let writer = <AddFromPmTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
 
         let res = tool.main(writer).await;
@@ -353,7 +351,7 @@ mod test {
                 },
                 repos: repos.clone(),
             };
-            let buffers = fho::TestBuffers::default();
+            let buffers = ffx_writer::TestBuffers::default();
             let writer = <AddFromPmTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
             let res = tool.main(writer).await;
 

@@ -7,7 +7,8 @@ use component_debug::cli::reload_cmd;
 use errors::FfxError;
 use ffx_component::rcs::{connect_to_lifecycle_controller, connect_to_realm_query};
 use ffx_component_reload_args::ReloadComponentCommand;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use target_holders::RemoteControlProxyHolder;
 
 #[derive(FfxTool)]

@@ -7,7 +7,8 @@ use component_debug::cli::graph_cmd;
 use errors::FfxError;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_graph_args::ComponentGraphCommand;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use target_holders::RemoteControlProxyHolder;
 
 #[derive(FfxTool)]

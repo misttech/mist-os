@@ -4,7 +4,8 @@
 
 use argh::{ArgsInfo, FromArgs};
 use auth::{mint_new_access_token, AuthError, AuthFlowChoice};
-use fho::{Result, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::Result;
 use std::fs::File;
 use std::io::{stderr, stdin, stdout, Write};
 use std::os::unix::fs::PermissionsExt;

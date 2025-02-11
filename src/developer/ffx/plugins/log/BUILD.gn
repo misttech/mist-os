@@ -27,6 +27,7 @@ ffx_plugin("ffx_log") {
     "//src/developer/ffx/lib/symbol-index",
     "//src/developer/ffx/lib/target/connector:lib",
     "//src/developer/ffx/lib/target/holders:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/diagnostics/lib/log-command",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",

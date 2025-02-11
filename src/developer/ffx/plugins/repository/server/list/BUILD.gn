@@ -22,6 +22,7 @@ ffx_plugin("ffx_repository_server_list") {
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/pkg",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/sys/lib/fidl-fuchsia-pkg-ext",
     "//src/sys/pkg/lib/fuchsia-repo",
     "//third_party/rust_crates:async-trait",

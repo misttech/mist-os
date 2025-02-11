@@ -5,7 +5,8 @@
 use ffx_config::EnvironmentContext;
 use ffx_daemon::{DaemonConfig, SocketDetails};
 use ffx_daemon_socket_args::SocketCommand;
-use fho::{FfxContext, FfxMain, FfxTool, Result, ToolIO};
+use ffx_writer::ToolIO as _;
+use fho::{FfxContext, FfxMain, FfxTool, Result};
 
 #[derive(FfxTool)]
 pub struct DaemonSocketTool {

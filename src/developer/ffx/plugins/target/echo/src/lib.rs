@@ -5,7 +5,8 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use ffx_target_echo_args::EchoCommand;
-use fho::{FfxMain, FfxTool, VerifiedMachineWriter};
+use ffx_writer::VerifiedMachineWriter;
+use fho::{FfxMain, FfxTool};
 use schemars::JsonSchema;
 use serde::Serialize;
 use target_connector::Connector;
@@ -125,7 +126,8 @@ mod test {
         RemoteControlMarker, RemoteControlProxy, RemoteControlRequest,
     };
     use ffx_config::environment::ExecutableKind;
-    use fho::{FhoConnectionBehavior, FhoEnvironment, Format, TestBuffers, TryFromEnv};
+    use ffx_writer::{Format, TestBuffers};
+    use fho::{FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
     use futures::FutureExt;
     use serde_json::json;
     use std::sync::Arc;

@@ -5,7 +5,8 @@
 use anyhow::{Context, Result};
 
 use ffx_package_far_list_args::ListCommand;
-use fho::{FfxMain, FfxTool, MachineWriter, ToolIO as _};
+use ffx_writer::{MachineWriter, ToolIO as _};
+use fho::{FfxMain, FfxTool};
 use fuchsia_archive as far;
 use humansize::{file_size_opts, FileSize};
 use prettytable::format::FormatBuilder;
@@ -105,7 +106,7 @@ fn format_table(entries: &[FarEntry], display_lengths: bool) -> Table {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fho::{Format, TestBuffers};
+    use ffx_writer::{Format, TestBuffers};
     use std::collections::BTreeMap;
     use std::io::Read;
     use std::path::PathBuf;

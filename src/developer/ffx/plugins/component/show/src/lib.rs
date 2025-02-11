@@ -8,7 +8,8 @@ use component_debug::cli::{show_cmd_print, show_cmd_serialized};
 use errors::FfxError;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_show_args::ComponentShowCommand;
-use fho::{FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
+use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
+use fho::{FfxMain, FfxTool};
 use target_holders::RemoteControlProxyHolder;
 #[derive(FfxTool)]
 pub struct ShowTool {

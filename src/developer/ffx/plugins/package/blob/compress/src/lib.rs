@@ -4,9 +4,8 @@
 
 use anyhow::Context as _;
 use camino::{Utf8Path, Utf8PathBuf};
-use fho::{
-    return_user_error, user_error, Error, FfxMain, FfxTool, Result, ToolIO, VerifiedMachineWriter,
-};
+use ffx_writer::{ToolIO, VerifiedMachineWriter};
+use fho::{return_user_error, user_error, Error, FfxMain, FfxTool, Result};
 use rayon::prelude::*;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -171,7 +170,7 @@ mod tests {
             hash_as_name: false,
             delivery_type: Type1,
         };
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         let writer = <CompressTool as FfxMain>::Writer::new_test(None, &buffers);
         CompressTool { cmd }.main(writer).await.expect("success");
 
@@ -206,7 +205,7 @@ mod tests {
             hash_as_name: false,
             delivery_type: Type1,
         };
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         let writer = <CompressTool as FfxMain>::Writer::new_test(None, &buffers);
         CompressTool { cmd }.main(writer).await.expect("success");
 
@@ -250,7 +249,7 @@ mod tests {
             hash_as_name: true,
             delivery_type: Type1,
         };
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         let writer = <CompressTool as FfxMain>::Writer::new_test(None, &buffers);
         CompressTool { cmd }.main(writer).await.expect("success");
 
@@ -300,8 +299,9 @@ mod tests {
             hash_as_name: false,
             delivery_type: Type1,
         };
-        let buffers = fho::TestBuffers::default();
-        let writer = <CompressTool as FfxMain>::Writer::new_test(Some(fho::Format::Json), &buffers);
+        let buffers = ffx_writer::TestBuffers::default();
+        let writer =
+            <CompressTool as FfxMain>::Writer::new_test(Some(ffx_writer::Format::Json), &buffers);
         CompressTool { cmd }.main(writer).await.expect("success");
 
         let (out, err) = &buffers.into_strings();
@@ -337,7 +337,7 @@ mod tests {
             hash_as_name: false,
             delivery_type: Type1,
         };
-        let buffers = fho::TestBuffers::default();
+        let buffers = ffx_writer::TestBuffers::default();
         let writer = <CompressTool as FfxMain>::Writer::new_test(None, &buffers);
 
         CompressTool { cmd }.main(writer).await.expect("success");
@@ -359,8 +359,9 @@ mod tests {
             hash_as_name: false,
             delivery_type: Type1,
         };
-        let buffers = fho::TestBuffers::default();
-        let writer = <CompressTool as FfxMain>::Writer::new_test(Some(fho::Format::Json), &buffers);
+        let buffers = ffx_writer::TestBuffers::default();
+        let writer =
+            <CompressTool as FfxMain>::Writer::new_test(Some(ffx_writer::Format::Json), &buffers);
 
         assert_matches!(CompressTool { cmd }.main(writer).await, Err(fho::Error::User(_)));
         let (out, err) = buffers.into_strings();

@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use ffx_selftest_experiment_args::ExperimentCommand;
-use fho::{AvailabilityFlag, FfxMain, FfxTool, Result, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{AvailabilityFlag, FfxMain, FfxTool, Result};
 
 #[derive(FfxTool)]
 #[check(AvailabilityFlag("selftest.experiment"))]

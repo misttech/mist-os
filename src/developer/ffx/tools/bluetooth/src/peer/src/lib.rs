@@ -5,11 +5,11 @@
 use ::async_trait::async_trait;
 use ::ffx_bluetooth_peer_args::{PeerCommand, PeerSubCommand};
 use ::fho::{
-    AvailabilityFlag, Error, FfxMain, FfxTool, FhoEnvironment, Result, SimpleWriter, ToolIO,
-    TryFromEnv, TryFromEnvWith,
+    AvailabilityFlag, Error, FfxMain, FfxTool, FhoEnvironment, Result, TryFromEnv, TryFromEnvWith,
 };
 use async_utils::hanging_get::client::HangingGetStream;
 use ffx_bluetooth_common::PeerIdOrAddr;
+use ffx_writer::{SimpleWriter, ToolIO as _};
 use fidl_fuchsia_bluetooth::PeerId as FidlPeerId;
 use fidl_fuchsia_bluetooth_sys::{AccessProxy, Peer as FidlPeer};
 use fuchsia_async::TimeoutExt;

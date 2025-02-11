@@ -6,7 +6,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 use errors::ffx_bail;
 use ffx_power_logger_args as args_mod;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use fidl_fuchsia_power_metrics::{self as fmetrics, Metric, Power, StatisticsArgs};
 use target_holders::moniker;
 

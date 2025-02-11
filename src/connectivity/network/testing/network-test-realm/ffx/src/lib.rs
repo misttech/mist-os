@@ -6,7 +6,8 @@
 #![warn(unused_results)]
 
 use anyhow::Context as _;
-use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{AvailabilityFlag, FfxMain, FfxTool};
 use log::error;
 use target_holders::RemoteControlProxyHolder;
 use {

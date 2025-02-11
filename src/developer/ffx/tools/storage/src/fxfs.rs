@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use argh::{ArgsInfo, FromArgs};
-use fho::{Error, Result, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{Error, Result};
 use fidl_fuchsia_fxfs::DebugProxy;
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]

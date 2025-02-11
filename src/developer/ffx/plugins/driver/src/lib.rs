@@ -4,7 +4,8 @@
 use anyhow::{Context, Result};
 use component_debug::capability;
 use ffx_driver_args::DriverCommand;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
 use target_holders::RemoteControlProxyHolder;
 use {

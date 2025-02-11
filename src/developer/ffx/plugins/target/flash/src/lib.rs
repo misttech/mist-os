@@ -16,7 +16,8 @@ use ffx_fastboot::util::{Event, UnlockEvent};
 use ffx_fastboot_interface::fastboot_interface::UploadProgress;
 use ffx_flash_args::FlashCommand;
 use ffx_ssh::SshKeyFiles;
-use fho::{FfxContext, FfxMain, FfxTool, VerifiedMachineWriter};
+use ffx_writer::VerifiedMachineWriter;
+use fho::{FfxContext, FfxMain, FfxTool};
 use fidl_fuchsia_developer_ffx::{
     FastbootInterface as FidlFastbootInterface, TargetInfo, TargetRebootState, TargetState,
 };
@@ -522,7 +523,7 @@ async fn handle_event(
 #[cfg(test)]
 mod test {
     use super::*;
-    use fho::Format;
+    use ffx_writer::Format;
     use pretty_assertions::assert_eq;
     use std::path::PathBuf;
     use tempfile::NamedTempFile;

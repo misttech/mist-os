@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use ffx_repository_remove_args::RemoveCommand;
-use fho::{bug, return_user_error, user_error, FfxMain, FfxTool, Result, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{bug, return_user_error, user_error, FfxMain, FfxTool, Result};
 use fidl_fuchsia_developer_ffx::{
     RepositoryConfig, RepositoryIteratorMarker, RepositoryRegistryProxy,
 };
@@ -82,7 +83,7 @@ async fn list_repositories(repos_proxy: RepositoryRegistryProxy) -> Result<Vec<R
 #[cfg(test)]
 mod test {
     use super::*;
-    use fho::TestBuffers;
+    use ffx_writer::TestBuffers;
     use fidl_fuchsia_developer_ffx::{
         FileSystemRepositorySpec, PmRepositorySpec, RepositoryIteratorRequest,
         RepositoryRegistryRequest, RepositorySpec,

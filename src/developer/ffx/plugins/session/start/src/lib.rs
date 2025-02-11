@@ -5,7 +5,8 @@
 use anyhow::{format_err, Result};
 use async_trait::async_trait;
 use ffx_session_start_args::SessionStartCommand;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use fidl_fuchsia_session::{LifecycleProxy, LifecycleStartRequest};
 use target_holders::moniker;
 

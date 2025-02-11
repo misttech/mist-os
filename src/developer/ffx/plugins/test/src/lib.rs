@@ -14,7 +14,8 @@ use errors::{ffx_bail, ffx_bail_with_code, ffx_error, ffx_error_with_code, FfxEr
 use ffx_test_args::{
     EarlyBootProfileCommand, ListCommand, RunCommand, TestCommand, TestSubCommand,
 };
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use fidl::endpoints::create_proxy;
 use futures::FutureExt;
 use lazy_static::lazy_static;

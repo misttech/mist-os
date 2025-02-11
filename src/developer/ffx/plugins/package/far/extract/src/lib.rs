@@ -5,7 +5,8 @@
 use anyhow::{Context, Result};
 use camino::Utf8PathBuf;
 use ffx_package_far_extract_args::ExtractCommand;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use fuchsia_archive as far;
 use std::fs::{self, File};
 

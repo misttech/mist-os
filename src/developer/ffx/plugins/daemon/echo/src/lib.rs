@@ -4,7 +4,8 @@
 
 use async_trait::async_trait;
 use ffx_echo_args::EchoCommand;
-use fho::{return_bug, FfxMain, FfxTool, Result, VerifiedMachineWriter};
+use ffx_writer::VerifiedMachineWriter;
+use fho::{return_bug, FfxMain, FfxTool, Result};
 use fidl_fuchsia_developer_ffx::EchoProxy;
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -57,7 +58,7 @@ async fn echo_impl(echo_proxy: EchoProxy, cmd: EchoCommand) -> Result<String> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use fho::{Format, TestBuffers};
+    use ffx_writer::{Format, TestBuffers};
     use fidl_fuchsia_developer_ffx as ffx;
     use futures_lite::stream::StreamExt;
     use serde_json::json;

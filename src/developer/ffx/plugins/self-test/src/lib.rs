@@ -6,7 +6,8 @@ use crate::test::*;
 use anyhow::Result;
 use errors::ffx_error;
 use ffx_selftest_args::SelftestCommand;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use std::time::Duration;
 
 mod component;

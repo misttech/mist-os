@@ -5,9 +5,8 @@
 use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
 use ffx_update_args::ForceInstall;
-use fho::{
-    bug, deferred, return_user_error, Deferred, FfxContext, FfxMain, FfxTool, Result, SimpleWriter,
-};
+use ffx_writer::SimpleWriter;
+use fho::{bug, deferred, return_user_error, Deferred, FfxContext, FfxMain, FfxTool, Result};
 use fidl_fuchsia_update::{
     CheckOptions, Initiator, ManagerProxy, MonitorMarker, MonitorRequest, MonitorRequestStream,
 };
@@ -524,7 +523,8 @@ mod tests {
     use assert_matches::assert_matches;
     use ffx_target::TargetProxy;
     use ffx_update_args::Update;
-    use fho::{FhoConnectionBehavior, FhoEnvironment, TestBuffers, TryFromEnv};
+    use ffx_writer::TestBuffers;
+    use fho::{FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
     use fidl_fuchsia_update::ManagerRequest;

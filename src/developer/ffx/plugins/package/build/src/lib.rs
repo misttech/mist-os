@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 pub use ffx_package_build_args::PackageBuildCommand;
-use fho::{user_error, FfxMain, FfxTool, Result, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{user_error, FfxMain, FfxTool, Result};
 use package_tool::cmd_package_build;
 
 #[derive(FfxTool)]

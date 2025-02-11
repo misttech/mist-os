@@ -23,6 +23,7 @@ ffx_plugin("ffx_product_download") {
     "//src/developer/ffx/core:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/pbms:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/developer/ffx/plugins/product/common:lib",
     "//src/developer/ffx/plugins/product/list:ffx_product_list",
     "//src/lib/gcs",

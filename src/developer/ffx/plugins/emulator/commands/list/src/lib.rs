@@ -7,7 +7,8 @@ use emulator_instance::{
     EmulatorInstanceData, EmulatorInstanceInfo, EmulatorInstances, EngineState,
 };
 use ffx_emulator_list_args::ListCommand;
-use fho::{bug, FfxContext, FfxMain, FfxTool, MachineWriter, ToolIO, TryFromEnv, TryFromEnvWith};
+use ffx_writer::{MachineWriter, ToolIO as _};
+use fho::{bug, FfxContext, FfxMain, FfxTool, TryFromEnv, TryFromEnvWith};
 use serde::Serialize;
 use std::marker::PhantomData;
 use std::path::PathBuf;

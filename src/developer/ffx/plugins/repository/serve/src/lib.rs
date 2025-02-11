@@ -8,9 +8,8 @@ use camino::{Utf8Path, Utf8PathBuf};
 use ffx_config::environment::EnvironmentKind;
 use ffx_config::EnvironmentContext;
 use ffx_repository_serve_args::ServeCommand;
-use fho::{
-    bug, deferred, return_bug, return_user_error, Deferred, FfxMain, FfxTool, Result, SimpleWriter,
-};
+use ffx_writer::SimpleWriter;
+use fho::{bug, deferred, return_bug, return_user_error, Deferred, FfxMain, FfxTool, Result};
 use fidl_fuchsia_developer_ffx::{self as ffx, RepositoryRegistryProxy, ServerStatus};
 use fuchsia_async as fasync;
 use fuchsia_repo::manager::RepositoryManager;

@@ -14,6 +14,7 @@ ffx_plugin("ffx_target_echo") {
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/target/connector:lib",
     "//src/developer/ffx/lib/target/holders:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",

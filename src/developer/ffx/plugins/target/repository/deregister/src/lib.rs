@@ -6,10 +6,8 @@ use async_trait::async_trait;
 use errors::ffx_bail;
 use ffx_config::EnvironmentContext;
 use ffx_target_repository_deregister_args::DeregisterCommand;
-use fho::{
-    bug, return_bug, return_user_error, user_error, FfxContext, FfxMain, FfxTool, Result,
-    SimpleWriter,
-};
+use ffx_writer::SimpleWriter;
+use fho::{bug, return_bug, return_user_error, user_error, FfxContext, FfxMain, FfxTool, Result};
 use fidl_fuchsia_developer_ffx::{
     RepositoryConfig, RepositoryIteratorMarker, RepositoryRegistryProxy,
 };
@@ -220,7 +218,7 @@ mod test {
     use super::*;
     use camino::Utf8PathBuf;
     use ffx_config::ConfigLevel;
-    use fho::TestBuffers;
+    use ffx_writer::TestBuffers;
     use fidl::endpoints::ServerEnd;
     use fidl_fuchsia_developer_ffx::{
         FileSystemRepositorySpec, PmRepositorySpec, RepositoryError, RepositoryIteratorRequest,

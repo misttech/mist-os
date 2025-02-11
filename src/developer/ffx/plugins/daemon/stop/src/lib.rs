@@ -6,10 +6,8 @@ use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
 use ffx_daemon::{DaemonConfig, SocketDetails};
 use ffx_daemon_stop_args::StopCommand;
-use fho::{
-    bug, return_bug, return_user_error, Error, FfxContext, FfxMain, FfxTool, Result, ToolIO,
-    VerifiedMachineWriter,
-};
+use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
+use fho::{bug, return_bug, return_user_error, Error, FfxContext, FfxMain, FfxTool, Result};
 use fuchsia_async::{MonotonicInstant, Timer};
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -182,8 +180,7 @@ impl FfxMain for StopTool {
 #[cfg(test)]
 mod test {
     use super::*;
-    use fho::macro_deps::ffx_writer::TestBuffer;
-    use fho::{Format, TestBuffers};
+    use ffx_writer::{Format, TestBuffer, TestBuffers};
     use fidl_fuchsia_developer_ffx::{self as ffx};
     use futures_lite::StreamExt;
     use serde_json::json;

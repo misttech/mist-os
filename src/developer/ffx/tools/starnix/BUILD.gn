@@ -33,6 +33,7 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/target/connector:lib",
     "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/lib/timeout:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/developer/ffx/plugins/emulator/configuration:ffx_emulator_config",
     "//src/developer/ffx/plugins/emulator/engines:ffx_emulator_engines",
     "//src/lib/fidl/rust/fidl",

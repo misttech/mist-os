@@ -11,6 +11,7 @@ ffx_plugin("ffx_repository_publish") {
   with_unit_tests = true
   deps = [
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/sys/pkg/lib/package-tool",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:schemars",

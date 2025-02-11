@@ -4,7 +4,8 @@
 
 use async_trait::async_trait;
 use ffx_repository_create_args::RepoCreateCommand;
-use fho::{bug, Error, FfxMain, FfxTool, Result, VerifiedMachineWriter};
+use ffx_writer::VerifiedMachineWriter;
+use fho::{bug, Error, FfxMain, FfxTool, Result};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
@@ -72,7 +73,7 @@ impl<T: PackageTools> FfxMain for CreateTool<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fho::{Format, TestBuffers};
+    use ffx_writer::{Format, TestBuffers};
 
     struct OkFakeTools {}
     #[async_trait(?Send)]

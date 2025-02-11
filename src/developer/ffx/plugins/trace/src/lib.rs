@@ -7,7 +7,8 @@ use errors::ffx_bail;
 use ffx_config::EnvironmentContext;
 use ffx_target::get_target_specifier;
 use ffx_trace_args::{TraceCommand, TraceSubCommand};
-use fho::{deferred, FfxMain, FfxTool, MachineWriter, ToolIO};
+use ffx_writer::{MachineWriter, ToolIO as _};
+use fho::{deferred, FfxMain, FfxTool};
 use fidl_fuchsia_developer_ffx::{self as ffx, RecordingError, TracingProxy};
 use fidl_fuchsia_tracing::{BufferingMode, KnownCategory};
 use fidl_fuchsia_tracing_controller::{

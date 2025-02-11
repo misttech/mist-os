@@ -6,7 +6,8 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use component_debug::cli::show_cmd_print;
 use ffx_session_show_args::SessionShowCommand;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use target_holders::RemoteControlProxyHolder;
 
 const DETAILS_FAILURE: &str = "Could not get session information from the target. This may be

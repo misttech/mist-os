@@ -8,7 +8,8 @@ use component_debug::route::RouteReport;
 use errors::FfxError;
 use ffx_component::rcs;
 use ffx_component_route_args::RouteCommand;
-use fho::{FfxMain, FfxTool, MachineWriter, ToolIO};
+use ffx_writer::{MachineWriter, ToolIO as _};
+use fho::{FfxMain, FfxTool};
 use target_holders::RemoteControlProxyHolder;
 
 #[derive(FfxTool)]

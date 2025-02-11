@@ -9,7 +9,8 @@ use ffx_audio_gen_args::{
     GenCommand, PinkNoiseCommand, SawtoothCommand, SineCommand, SquareCommand, SubCommand,
     TriangleCommand, WhiteNoiseCommand,
 };
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use fuchsia_audio::format::SampleType;
 use fuchsia_audio::Format;
 use rand::rngs::ThreadRng;

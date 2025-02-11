@@ -21,6 +21,7 @@ ffx_plugin("ffx_power_system_activity_application_activity") {
     "//sdk/fidl/fuchsia.power.topology.test:fuchsia.power.topology.test_rust",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/target/holders:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
   ]

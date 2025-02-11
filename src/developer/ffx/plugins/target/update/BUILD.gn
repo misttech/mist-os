@@ -24,6 +24,7 @@ ffx_plugin("ffx_update") {
     "//src/developer/ffx/lib/target/connector:lib",
     "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/lib/timeout:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/developer/ffx/plugins/repository/server/start:ffx_repository_server_start",
     "//src/developer/ffx/plugins/repository/server/start:ffx_repository_server_start_args",
     "//src/lib/fidl/rust/fidl",

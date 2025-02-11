@@ -4,7 +4,8 @@
 
 use anyhow::Context;
 use ffx_package_far_cat_args::CatCommand;
-use fho::{bug, user_error, FfxMain, FfxTool, Result, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{bug, user_error, FfxMain, FfxTool, Result};
 use fuchsia_archive as far;
 use std::fs::File;
 use std::io::{self, Write as _};

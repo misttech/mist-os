@@ -4,7 +4,8 @@
 
 use async_trait::async_trait;
 use ffx_daemon_disconnect_args::DisconnectCommand;
-use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxContext, FfxMain, FfxTool};
 use fidl_fuchsia_developer_ffx as ffx;
 use target_holders::TargetProxyHolder;
 

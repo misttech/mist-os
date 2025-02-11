@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use ffx_repository_list_args::ListCommand;
-use fho::{bug, FfxMain, FfxTool, MachineWriter, Result, ToolIO as _};
+use ffx_writer::{MachineWriter, ToolIO as _};
+use fho::{bug, FfxMain, FfxTool, Result};
 use fidl_fuchsia_developer_ffx::{RepositoryIteratorMarker, RepositoryRegistryProxy};
 use fidl_fuchsia_developer_ffx_ext::{RepositoryConfig, RepositorySpec};
 use prettytable::format::FormatBuilder;
@@ -155,7 +156,7 @@ fn cell_for_aliases(aliases: &BTreeSet<String>) -> Cell {
 #[cfg(test)]
 mod test {
     use super::*;
-    use fho::{Format, TestBuffers};
+    use ffx_writer::{Format, TestBuffers};
     use fidl_fuchsia_developer_ffx::{
         FileSystemRepositorySpec, PmRepositorySpec, RepositoryConfig, RepositoryIteratorRequest,
         RepositoryRegistryRequest, RepositorySpec,

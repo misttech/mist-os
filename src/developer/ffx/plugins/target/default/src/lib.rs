@@ -8,7 +8,8 @@ use ffx_config::api::ConfigError;
 use ffx_config::keys::TARGET_DEFAULT_KEY;
 use ffx_config::EnvironmentContext;
 use ffx_target_default_args::{SubCommand, TargetDefaultCommand, TargetDefaultGetCommand};
-use fho::{user_error, FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{user_error, FfxMain, FfxTool};
 
 #[derive(FfxTool)]
 pub struct TargetDefaultTool {

@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use ffx_repository_add_args::AddCommand;
-use fho::{bug, return_user_error, user_error, FfxMain, FfxTool, Result, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{bug, return_user_error, user_error, FfxMain, FfxTool, Result};
 use fidl_fuchsia_developer_ffx::RepositoryRegistryProxy;
 use fidl_fuchsia_developer_ffx_ext::{RepositoryError, RepositorySpec};
 use fuchsia_repo::repository::RepoProvider;
@@ -82,7 +83,7 @@ mod tests {
     use assembly_partitions_config::PartitionsConfig;
     use assert_matches::assert_matches;
     use camino::Utf8Path;
-    use fho::TestBuffers;
+    use ffx_writer::TestBuffers;
     use fidl_fuchsia_developer_ffx::{
         FileSystemRepositorySpec, RepositoryRegistryMarker, RepositoryRegistryRequest,
         RepositorySpec,

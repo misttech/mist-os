@@ -38,6 +38,7 @@ ffx_plugin("ffx_repository_serve") {
     "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/lib/target_errors:lib",
     "//src/developer/ffx/lib/timeout:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-url",
     "//src/sys/lib/fidl-fuchsia-pkg-ext",

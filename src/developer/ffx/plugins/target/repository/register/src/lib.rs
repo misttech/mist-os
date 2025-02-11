@@ -5,9 +5,9 @@
 use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
 use ffx_target_repository_register_args::RegisterCommand;
+use ffx_writer::VerifiedMachineWriter;
 use fho::{
     bug, return_bug, return_user_error, user_error, Error, FfxContext, FfxMain, FfxTool, Result,
-    VerifiedMachineWriter,
 };
 use fidl_fuchsia_developer_ffx::{RepositoryRegistryProxy, RepositoryTarget, TargetInfo};
 use fidl_fuchsia_developer_ffx_ext::{RepositoryError, RepositoryTarget as FfxRepositoryTarget};
@@ -238,7 +238,7 @@ mod test {
     use ffx_config::keys::TARGET_DEFAULT_KEY;
     use ffx_config::ConfigLevel;
     use ffx_target::TargetProxy;
-    use fho::{Format, TestBuffers};
+    use ffx_writer::{Format, TestBuffers};
     use fidl_fuchsia_developer_ffx::{
         RepositoryError, RepositoryRegistryRequest, RepositoryStorageType, SshHostAddrInfo,
         TargetRequest,

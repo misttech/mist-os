@@ -8,7 +8,8 @@ use component_debug::config::resolve_raw_config_overrides;
 use errors::{ffx_error, FfxError};
 use ffx_component::rcs::{connect_to_lifecycle_controller, connect_to_realm_query};
 use ffx_component_create_args::CreateComponentCommand;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxMain, FfxTool};
 use target_holders::RemoteControlProxyHolder;
 
 #[derive(FfxTool)]

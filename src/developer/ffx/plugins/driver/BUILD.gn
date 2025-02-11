@@ -26,6 +26,7 @@ ffx_plugin("ffx_driver") {
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/rcs:lib",
     "//src/developer/ffx/lib/target/holders:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/devices/bin/driver_tools:lib",
     "//src/devices/bin/driver_tools/connector:lib",
     "//src/lib/fidl/rust/fidl",

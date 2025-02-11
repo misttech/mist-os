@@ -4,9 +4,8 @@
 
 use async_trait::async_trait;
 use ffx_target_remove_args::RemoveCommand;
-use fho::{
-    bug, return_bug, return_user_error, FfxMain, FfxTool, Result, ToolIO, VerifiedMachineWriter,
-};
+use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
+use fho::{bug, return_bug, return_user_error, FfxMain, FfxTool, Result};
 use fidl_fuchsia_developer_ffx as ffx;
 use manual_targets::{Config, ManualTargets};
 use schemars::JsonSchema;
@@ -127,7 +126,7 @@ impl RemoveTool {
 mod test {
     use super::*;
     use ffx_config::ConfigLevel;
-    use fho::{Format, TestBuffers};
+    use ffx_writer::{Format, TestBuffers};
     use serde_json::json;
     use target_holders::fake_proxy;
 

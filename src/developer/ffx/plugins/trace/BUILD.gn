@@ -26,6 +26,7 @@ ffx_plugin("ffx_trace") {
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/target:lib",
     "//src/developer/ffx/lib/target/holders:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/performance/lib/fxt/rust",

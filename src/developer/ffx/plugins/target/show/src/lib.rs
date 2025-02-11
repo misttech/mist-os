@@ -7,7 +7,8 @@ use addr::TargetAddr;
 use anyhow::{anyhow, bail, Result};
 use async_lock::Mutex;
 use async_trait::async_trait;
-use fho::{deferred, Deferred, DirectConnector, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
+use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
+use fho::{deferred, Deferred, DirectConnector, FfxMain, FfxTool};
 use fidl_fuchsia_buildinfo::ProviderProxy;
 use fidl_fuchsia_developer_ffx::TargetAddrInfo;
 use fidl_fuchsia_feedback::{DeviceIdProviderProxy, LastRebootInfoProviderProxy};
@@ -260,7 +261,7 @@ async fn gather_update_show(channel_control: ChannelControlProxy) -> Result<Upda
 mod tests {
     use super::*;
     use ffx_target::{FidlPipe, TargetProxy};
-    use fho::{Format, TestBuffers};
+    use ffx_writer::{Format, TestBuffers};
     use fidl_fuchsia_buildinfo::{BuildInfo, ProviderRequest};
     use fidl_fuchsia_developer_ffx::{TargetInfo, TargetIp, TargetRequest};
     use fidl_fuchsia_developer_remotecontrol::{

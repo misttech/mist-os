@@ -6,10 +6,8 @@ use anyhow::{Context, Result};
 use camino::Utf8Path;
 use ffx_config::{ConfigLevel, EnvironmentContext};
 use ffx_sdk_args::{RunCommand, SdkCommand, SetCommand, SetRootCommand, SetSubCommand, SubCommand};
-use fho::{
-    bug, exit_with_code, return_user_error, user_error, FfxContext, FfxMain, FfxTool, ToolIO,
-    VerifiedMachineWriter,
-};
+use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
+use fho::{bug, exit_with_code, return_user_error, user_error, FfxContext, FfxMain, FfxTool};
 use schemars::JsonSchema;
 use sdk::metadata::ElementType;
 use sdk::{in_tree_sdk_version, Sdk, SdkRoot, SdkVersion};
@@ -160,7 +158,7 @@ fn exec_populate_path(
 #[cfg(test)]
 mod test {
     use super::*;
-    use fho::TestBuffers;
+    use ffx_writer::TestBuffers;
 
     #[fuchsia::test]
     async fn test_version_with_string() {

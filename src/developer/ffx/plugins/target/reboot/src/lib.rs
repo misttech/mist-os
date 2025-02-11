@@ -5,7 +5,8 @@
 use async_trait::async_trait;
 use errors::ffx_bail;
 use ffx_reboot_args::RebootCommand;
-use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
+use ffx_writer::SimpleWriter;
+use fho::{FfxContext, FfxMain, FfxTool};
 use fidl_fuchsia_developer_ffx::{TargetProxy, TargetRebootError, TargetRebootState};
 use target_holders::TargetProxyHolder;
 

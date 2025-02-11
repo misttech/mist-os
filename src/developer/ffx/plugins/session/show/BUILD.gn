@@ -14,6 +14,7 @@ ffx_plugin("ffx_session_show") {
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/rcs:lib",
     "//src/developer/ffx/lib/target/holders:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/sys/lib/component_debug",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",

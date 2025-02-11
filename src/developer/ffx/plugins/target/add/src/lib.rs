@@ -6,7 +6,8 @@ use async_trait::async_trait;
 use errors::ffx_error;
 use ffx_target::add_manual_target;
 use ffx_target_add_args::AddCommand;
-use fho::{FfxContext, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
+use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
+use fho::{FfxContext, FfxMain, FfxTool};
 use fidl_fuchsia_developer_ffx::{TargetCollectionProxy, TargetConnectionError};
 use netext::parse_address_parts;
 use schemars::JsonSchema;
@@ -120,7 +121,7 @@ pub async fn add_impl(
 #[cfg(test)]
 mod test {
     use super::*;
-    use fho::{Format, TestBuffers};
+    use ffx_writer::{Format, TestBuffers};
     use target_holders::fake_proxy;
     use {fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_net as net};
 

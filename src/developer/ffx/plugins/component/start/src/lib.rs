@@ -10,8 +10,9 @@ use component_debug::query::get_cml_moniker_from_query;
 use errors::FfxError;
 use ffx_component::rcs::{connect_to_lifecycle_controller, connect_to_realm_query};
 use ffx_component_start_args::ComponentStartCommand;
+use ffx_writer::SimpleWriter;
 use ffx_zxdb::Debugger;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use fho::{FfxMain, FfxTool};
 use target_holders::{moniker, RemoteControlProxyHolder};
 
 #[derive(FfxTool)]

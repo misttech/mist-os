@@ -25,6 +25,7 @@ ffx_plugin("ffx_target_add") {
     "//src/developer/ffx/lib/target:lib",
     "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/lib/target_errors:lib",
+    "//src/developer/ffx/lib/writer:lib",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",

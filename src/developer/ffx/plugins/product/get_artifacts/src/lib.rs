@@ -8,7 +8,8 @@ use async_trait::async_trait;
 use camino::{Utf8Path, Utf8PathBuf};
 use ffx_config::EnvironmentContext;
 use ffx_product_get_artifacts_args::GetArtifactsCommand;
-use fho::{bug, return_user_error, Error, FfxMain, FfxTool, Result, VerifiedMachineWriter};
+use ffx_writer::VerifiedMachineWriter;
+use fho::{bug, return_user_error, Error, FfxMain, FfxTool, Result};
 use schemars::JsonSchema;
 use sdk_metadata::{ProductBundle, Type, VirtualDeviceManifest};
 use serde::{Deserialize, Serialize};
@@ -237,7 +238,7 @@ mod tests {
 
     use assembly_partitions_config::PartitionsConfig;
     use ffx_config::ConfigLevel;
-    use fho::{Format, TestBuffers};
+    use ffx_writer::{Format, TestBuffers};
     use sdk_metadata::ProductBundleV2;
     use std::fs::{self, File};
     use std::io::Write;
