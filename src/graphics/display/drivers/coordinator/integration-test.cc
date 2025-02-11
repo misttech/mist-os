@@ -1021,14 +1021,10 @@ class IntegrationTest : public TestBase {
 
   // |TestBase|
   void TearDown() override {
-    // Wait until the display core has processed all client disconnections before sending the last
-    // vsync.
+    // Wait until the display core has processed all client disconnections.
     EXPECT_TRUE(PollUntilOnLoop([&]() { return !IsClientConnected(ClientPriority::kPrimary); }));
     EXPECT_TRUE(PollUntilOnLoop([&]() { return !IsClientConnected(ClientPriority::kVirtcon); }));
 
-    // Send one last vsync, to make sure any blank configs take effect.
-    SendVsyncFromDisplayEngine();
-    EXPECT_EQ(0u, CoordinatorController()->ImportedImagesCountForTesting());
     TestBase::TearDown();
   }
 

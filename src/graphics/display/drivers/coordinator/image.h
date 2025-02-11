@@ -91,6 +91,14 @@ class Image : public fbl::RefCounted<Image>,
   }
   display::ConfigStamp latest_client_config_stamp() const { return latest_client_config_stamp_; }
 
+  // Disposed images do not release engine driver-side resources on destruction.
+  //
+  // This state is necessary for safely shutting down an engine driver. When
+  // that happens, the driver may still be presenting some images. We want to
+  // clear out our data structures, but cannot call ReleaseImage() on those
+  // images.
+  void MarkDisposed() { disposed_ = true; }
+
   // Aliases controller_.mtx() for the purpose of thread-safety analysis.
   fbl::Mutex* mtx() const;
 
@@ -145,6 +153,9 @@ class Image : public fbl::RefCounted<Image>,
   // a client configuration sets a new layer image but the new image is not
   // ready yet, so the controller has to keep using the old image.
   display::ConfigStamp latest_client_config_stamp_ = display::kInvalidConfigStamp;
+
+  // If true, ReleaseImage() will not be called on image destruction.
+  bool disposed_ = false;
 
   inspect::Node node_;
   inspect::ValueList properties_;

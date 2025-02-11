@@ -922,26 +922,19 @@ void Controller::PrepareStop() {
 
     vsync_monitor_.Deinitialize();
 
-    // Set an empty config so that the display driver releases resources.
-    display_config_t empty_config;
-    ++last_issued_driver_config_stamp_;
-    const config_stamp_t banjo_config_stamp =
-        display::ToBanjoDriverConfigStamp(last_issued_driver_config_stamp_);
-    engine_driver_client_->ApplyConfiguration(&empty_config, 0, &banjo_config_stamp);
+    // Once this call completes, the engine driver will no longer send events,
+    // and we will no longer send it ImportImage() or ApplyConfiguration()
+    // requests. This means it's safe to stop keeping track of imported
+    // resources.
+    engine_driver_client_->UnsetListener();
 
-    // It's possible that the Vsync with the null configuration is never
-    // triggered when drivers are shut down. We should proactively retire
-    // all images on all displays.
+    // Dispose of all images without calling ReleaseImage().
     for (DisplayInfo& display : displays_) {
-      // Release all reffed images.
-      while (display.images.pop_front()) {
+      while (fbl::RefPtr<Image> displayed_image = display.images.pop_front()) {
+        displayed_image->MarkDisposed();
       }
     }
   }
-
-  // Deregister the Controller itself from the display engine driver while both
-  // drivers are still alive.
-  engine_driver_client_->UnsetListener();
 }
 
 void Controller::Stop() { FDF_LOG(INFO, "Controller::Stop"); }

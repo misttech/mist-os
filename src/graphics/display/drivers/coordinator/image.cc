@@ -30,12 +30,16 @@ Image::Image(Controller* controller, const display::ImageMetadata& metadata,
              display::DriverImageId driver_id, inspect::Node* parent_node, ClientId client_id)
     : driver_id_(driver_id), metadata_(metadata), controller_(*controller), client_id_(client_id) {
   ZX_DEBUG_ASSERT(controller);
+  ZX_DEBUG_ASSERT(driver_id != display::kInvalidDriverImageId);
+  ZX_DEBUG_ASSERT(client_id != kInvalidClientId);
   ZX_DEBUG_ASSERT(metadata.tiling_type() != display::ImageTilingType::kCapture);
   InitializeInspect(parent_node);
 }
 Image::~Image() {
   ZX_ASSERT(!InDoublyLinkedList());
-  controller_.ReleaseImage(driver_id_);
+  if (!disposed_) {
+    controller_.ReleaseImage(driver_id_);
+  }
 }
 
 void Image::InitializeInspect(inspect::Node* parent_node) {
