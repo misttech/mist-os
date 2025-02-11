@@ -19,6 +19,7 @@ import("//build/board.gni")
 import("//build/images/filesystem_limits.gni")
 import("//build/rust/config.gni")
 import("//build/toolchain/rbe.gni")
+import("//build/toolchain/runtime/rust_runtime.gni")
 
 declare_args() {
   # Controls whether the rust compiler uses v0 symbol mangling scheme
@@ -27,6 +28,12 @@ declare_args() {
 
   # Enable the rust parallel front-end with N threads
   rust_parallel_frontend_threads = false
+}
+
+if (is_fuchsia) {
+  rust_runtime_link_config("rust-libstd-so-ldflags") {
+    name = "libstd"
+  }
 }
 
 # Turns on the rust compilation analysis generator. This will produce a

@@ -270,10 +270,6 @@ template("rust_runtime_deps") {
   } else {
     import("//build/rust/config.gni")
 
-    _rustc_lib_dir = "$rustc_prefix/lib"
-    _rustc_runtime_file = "$_rustc_lib_dir/runtime.json"
-    _rustc_runtime = read_file(_rustc_runtime_file, "json")
-
     if (invoker.shared_runtime) {
       _rustflags = [ "-Cprefer-dynamic" ]
     } else {
@@ -288,7 +284,7 @@ template("rust_runtime_deps") {
     # This must use the same rustflags, target tuple and must contain
     #
     _entry = false
-    foreach(entry, _rustc_runtime) {
+    foreach(entry, rustc_runtime) {
       if (entry.rustflags == _rustflags && entry.target + [ _target_tuple ] -
                                            [ _target_tuple ] != entry.target) {
         # Need to find a library in entry.runtime that matches invoker.name
@@ -310,7 +306,7 @@ template("rust_runtime_deps") {
                                "visibility",
                              ])
       entry = _entry
-      rebased_toolchain_lib_dir = rebase_path(_rustc_lib_dir, root_build_dir)
+      rebased_toolchain_lib_dir = rebase_path(rustc_lib_dir, root_build_dir)
       libraries = [ invoker.name ]
       binary_common = {
         rustflags = _rustflags

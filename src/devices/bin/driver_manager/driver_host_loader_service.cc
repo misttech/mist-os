@@ -35,6 +35,12 @@ constexpr std::array kDriverAllowlist{
     "libvfs_internal.so",
 };
 
+// Do NOT add to this list when predictable library names can be added to
+// kDriverAllowlist.
+constexpr std::array kDriverPrefixAllowlist{
+    "libstd-",
+};
+
 // Check if the driver is in the allowlist.
 bool InAllowlist(std::string path) {
   // path may have multiple path components, e.g. if loading the asan variant of a library, and
@@ -42,6 +48,12 @@ bool InAllowlist(std::string path) {
   std::string base = files::GetBaseName(path);
   for (const char* entry : kDriverAllowlist) {
     if (base == entry) {
+      return true;
+    }
+  }
+
+  for (const char* prefix : kDriverPrefixAllowlist) {
+    if (base.starts_with(prefix)) {
       return true;
     }
   }

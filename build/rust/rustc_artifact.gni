@@ -87,9 +87,11 @@ import("//build/toolchain/rbe.gni")
 #     to find the template invocation in a BUILD file where this target was defined.
 #
 #
+#   all_dependent_configs
 #   applicable_licenses
 #   assert_no_deps
 #   configs
+#   data_deps
 #   deps
 #   inputs
 #   metadata
@@ -105,6 +107,7 @@ template("rustc_artifact") {
     group(target_name) {
       forward_variables_from(invoker,
                              [
+                               "all_dependent_configs",
                                "applicable_licenses",
                                "assert_no_deps",
                                "testonly",
@@ -207,8 +210,10 @@ template("rustc_artifact") {
     target(invoker.target_type, _actual_target_name) {
       forward_variables_from(invoker,
                              [
+                               "all_dependent_configs",
                                "applicable_licenses",
                                "assert_no_deps",
+                               "data_deps",
                                "deps",
                                "emit_tool_path",
                                "metadata",

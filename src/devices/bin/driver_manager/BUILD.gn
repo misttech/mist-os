@@ -190,6 +190,7 @@ fuchsia_component("component") {
 # List of shared libraries used by drivers.
 group("driver_shared_libraries") {
   deps = [
+    "//build/toolchain/runtime:shared-rust-libstd-deps",
     "//sdk/lib/async-default",
     "//sdk/lib/fdio",
     "//sdk/lib/svc",

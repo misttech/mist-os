@@ -139,3 +139,6 @@ if (current_cpu == "x64") {
 } else if (current_cpu == "wasm32" && current_os == "unknown") {
   rust_target = "wasm32-unknown-unknown"
 }
+
+rustc_lib_dir = "$rustc_prefix/lib"
+rustc_runtime = read_file("${rustc_lib_dir}/runtime.json", "json")
