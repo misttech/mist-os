@@ -173,11 +173,6 @@ board_input_bundle("drivers") {
 
     # arm64 common drivers
     {
-      package_target = "//src/devices/bus/drivers/pci:bus-pci-package"
-      package_set = "bootfs"
-      driver_components = [ "meta/bus-pci.cm" ]
-    },
-    {
       package_target = "//src/devices/usb/drivers/xhci:package"
       package_set = "bootfs"
       driver_components = [ "meta/xhci.cm" ]
