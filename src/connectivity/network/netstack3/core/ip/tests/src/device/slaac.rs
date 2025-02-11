@@ -17,7 +17,7 @@ use packet_formats::utils::NonZeroDuration;
 
 use netstack3_base::testutil::{TestAddrs, TestIpExt as _};
 use netstack3_base::{FrameDestination, InstantContext as _};
-use netstack3_core::device::{EthernetCreationProperties, EthernetLinkDevice};
+use netstack3_core::device::{BlackholeDevice, EthernetCreationProperties, EthernetLinkDevice};
 use netstack3_core::testutil::{CtxPairExt as _, FakeCtx, DEFAULT_INTERFACE_METRIC};
 use netstack3_device::loopback::{LoopbackCreationProperties, LoopbackDevice};
 use netstack3_device::pure_ip::{PureIpDevice, PureIpDeviceCreationProperties};
@@ -247,6 +247,11 @@ fn no_link_local_address_for_interfaces_with_no_link_layer_addressing() {
             DEFAULT_INTERFACE_METRIC,
         )
         .into();
+    let blackhole = ctx
+        .core_api()
+        .device::<BlackholeDevice>()
+        .add_device_with_default_state((), DEFAULT_INTERFACE_METRIC)
+        .into();
 
     // Enable IP and stable SLAAC addresses so a link-local address will be
     // generated if supported by the type of interface.
@@ -281,4 +286,5 @@ fn no_link_local_address_for_interfaces_with_no_link_layer_addressing() {
 
     enable_and_assert_no_addrs(loopback);
     enable_and_assert_no_addrs(pure_ip);
+    enable_and_assert_no_addrs(blackhole);
 }
