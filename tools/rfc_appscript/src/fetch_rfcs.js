@@ -8,7 +8,10 @@
 const CHANGE_ID_COL = 'Change Id';
 
 const RFCS_DIR = 'docs/contribute/governance/rfcs';
-const SUBJECT_TAG = '[rfc]';
+
+// Translation: if the beginning of the subject is [rfc] or [rfcs], possibly
+// preceded by [other][tags].
+const SUBJECT_TAG_RE = /^((\S+]))?\[rfcs?]/i;
 
 // Returns an Array of change_ids.
 function _fetchOpenRfcsCls() {
@@ -21,7 +24,7 @@ function _fetchOpenRfcsCls() {
   const changeIds = [];
 
   for (const cl of data) {
-    if (cl.subject.toLowerCase().startsWith(SUBJECT_TAG)) {
+    if (cl.subject.match(SUBJECT_TAG_RE)) {
       changeIds.push(cl.change_id);
     }
   }
