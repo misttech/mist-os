@@ -63,7 +63,11 @@ class PciVisitor : public fdf_devicetree::DriverVisitor {
     return gic_v3_interrupt_map_elements_;
   }
 
+  // Whether this node is extended (ecam) or not (cam).
+  bool is_extended() const { return is_extended_; }
+
  private:
+  bool is_extended_ = false;
   std::optional<devicetree::RegPropertyElement> reg_;
   std::vector<PciRange> ranges_;
   std::vector<Gicv3InterruptMapElement> gic_v3_interrupt_map_elements_;

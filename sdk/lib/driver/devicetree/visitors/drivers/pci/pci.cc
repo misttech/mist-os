@@ -289,6 +289,9 @@ zx::result<> PciVisitor::DriverVisit(fdf_devicetree::Node& node,
 
   gic_v3_interrupt_map_elements_ = std::move(*interrupt_map);
 
+  auto compatible = node.properties().find("compatible");
+  is_extended_ = compatible->second.AsString() == std::string("pci-host-ecam-generic");
+
   return zx::ok();
 }
 

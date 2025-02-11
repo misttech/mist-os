@@ -35,6 +35,8 @@ TEST(PciVisitorTest, CrosvmArm64) {
   ASSERT_OK(pci_tester->manager()->Walk(visitors).status_value());
   ASSERT_TRUE(pci_tester->has_visited());
 
+  EXPECT_FALSE(pci_tester->is_extended());
+
   auto reg = pci_tester->reg();
   ASSERT_TRUE(reg);
   uint64_t address = *reg->address();
@@ -100,6 +102,8 @@ TEST(PciVisitorTest, QemuArm64) {
 
   ASSERT_OK(pci_tester->manager()->Walk(visitors).status_value());
   ASSERT_TRUE(pci_tester->has_visited());
+
+  EXPECT_TRUE(pci_tester->is_extended());
 
   auto reg = pci_tester->reg();
   ASSERT_TRUE(reg);
