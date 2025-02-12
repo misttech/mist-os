@@ -9,6 +9,6 @@ mod selectors;
 mod validate;
 
 pub use error::*;
-pub use parser::{FastError, VerboseError};
+pub use parser::{FastError, ParsingError, VerboseError};
 pub use selectors::*;
 pub use validate::*;

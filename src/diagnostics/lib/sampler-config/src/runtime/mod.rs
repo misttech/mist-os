@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::common::{CustomerId, EventCode, MetricId, MetricType, ProjectId};
+use fidl_fuchsia_diagnostics::Selector;
 use serde::Deserialize;
 
 /// Configuration for a single project to map Inspect data to its Cobalt metrics.
@@ -28,9 +29,8 @@ pub struct ProjectConfig {
 #[derive(Clone, Deserialize, Debug, PartialEq)]
 pub struct MetricConfig {
     /// Selector identifying the metric to sample via the diagnostics platform.
-    #[serde(rename = "selector", deserialize_with = "crate::utils::one_or_many_strings")]
-    // TODO(https://fxbug.dev/395172409): we can make this a Selector.
-    pub selectors: Vec<String>,
+    #[serde(rename = "selector", deserialize_with = "crate::utils::one_or_many_selectors")]
+    pub selectors: Vec<Selector>,
 
     /// Cobalt metric id to map the selector to.
     pub metric_id: MetricId,
@@ -82,7 +82,7 @@ mod test {
             metrics: vec![
                 MetricConfig {
                     selectors: vec![
-                        "bootstrap/archivist:root/all_archive_accessor:inspect_batch_iterator_get_next_requests".into(),
+                        selectors::parse_verbose("bootstrap/archivist:root/all_archive_accessor:inspect_batch_iterator_get_next_requests").unwrap(),
                     ],
                     metric_id: MetricId(1),
                     metric_type: MetricType::Occurrence,
@@ -118,7 +118,10 @@ mod test {
                 poll_rate_sec: 3,
                 customer_id: CustomerId(1),
                 metrics: vec![MetricConfig {
-                    selectors: vec!["single_counter_test_component:root:counter".into()],
+                    selectors: vec![selectors::parse_verbose(
+                        "single_counter_test_component:root:counter"
+                    )
+                    .unwrap(),],
                     metric_id: MetricId(1),
                     metric_type: MetricType::Occurrence,
                     upload_once: false,
@@ -167,7 +170,8 @@ mod test {
                 customer_id: CustomerId(1),
                 metrics: vec![MetricConfig {
                     selectors: vec![
-               "bootstrap/archivist:root/all_archive_accessor:inspect_batch_iterator_get_next_requests".into()],
+                        selectors::parse_verbose("bootstrap/archivist:root/all_archive_accessor:inspect_batch_iterator_get_next_requests").unwrap(),
+                    ],
                     metric_id: MetricId(1),
                     metric_type: MetricType::Occurrence,
                     upload_once: true,
@@ -200,7 +204,8 @@ mod test {
                 customer_id: CustomerId(1),
                 metrics: vec![MetricConfig {
                     selectors: vec![
-               "bootstrap/archivist:root/all_archive_accessor:inspect_batch_iterator_get_next_requests".into()],
+                        selectors::parse_verbose("bootstrap/archivist:root/all_archive_accessor:inspect_batch_iterator_get_next_requests").unwrap(),
+                    ],
                     metric_id: MetricId(1),
                     metric_type: MetricType::Occurrence,
                     upload_once: false,
@@ -248,7 +253,7 @@ mod test {
                 customer_id: CustomerId(1),
                 metrics: vec![MetricConfig {
                     selectors: vec![
-                        "bootstrap/archivist:root/all_archive_accessor:inspect_batch_iterator_get_next_requests".into(),
+                        selectors::parse_verbose("bootstrap/archivist:root/all_archive_accessor:inspect_batch_iterator_get_next_requests").unwrap(),
                     ],
                     metric_id: MetricId(1),
                     metric_type: MetricType::Occurrence,
@@ -268,7 +273,10 @@ mod test {
                 poll_rate_sec: 3,
                 customer_id: CustomerId(6),
                 metrics: vec![MetricConfig {
-                    selectors: vec!["single_counter_test_component:root:counter".into()],
+                    selectors: vec![selectors::parse_verbose(
+                        "single_counter_test_component:root:counter"
+                    )
+                    .unwrap(),],
                     metric_id: MetricId(1),
                     metric_type: MetricType::Occurrence,
                     upload_once: false,
@@ -302,7 +310,7 @@ mod test {
                 customer_id: CustomerId(1),
                 metrics: vec![MetricConfig {
                     selectors: vec![
-                        "bootstrap/archivist:root/all_archive_accessor:inspect_batch_iterator_get_next_requests".into(),
+                        selectors::parse_verbose("bootstrap/archivist:root/all_archive_accessor:inspect_batch_iterator_get_next_requests").unwrap(),
                     ],
                     metric_id: MetricId(1),
                     metric_type: MetricType::Occurrence,

@@ -3,11 +3,12 @@
 // found in the LICENSE file.
 
 use crate::common::{CustomerId, EventCode, MetricId, MetricType, ProjectId};
+use crate::utils::OneOrMany;
 use anyhow::bail;
 use component_id_index::InstanceId;
-use log::warn;
 use moniker::ExtendedMoniker;
 use serde::{de, Deserialize, Deserializer};
+use std::marker::PhantomData;
 use std::str::FromStr;
 
 // At the moment there's no difference between the user facing project config and the one loaded at
@@ -36,17 +37,17 @@ pub struct ProjectTemplate {
 }
 
 impl ProjectTemplate {
-    pub fn expand(self, components: &[ComponentIdInfo]) -> ProjectConfig {
+    pub fn expand(self, components: &[ComponentIdInfo]) -> Result<ProjectConfig, anyhow::Error> {
         let ProjectTemplate { project_id, customer_id, poll_rate_sec, metrics } = self;
         let mut metric_configs = Vec::with_capacity(metrics.len() * components.len());
         for component in components {
             for metric in metrics.iter() {
-                if let Some(metric_config) = metric.expand(component) {
+                if let Some(metric_config) = metric.expand(component)? {
                     metric_configs.push(metric_config);
                 }
             }
         }
-        ProjectConfig { project_id, customer_id, poll_rate_sec, metrics: metric_configs }
+        Ok(ProjectConfig { project_id, customer_id, poll_rate_sec, metrics: metric_configs })
     }
 }
 
@@ -56,7 +57,7 @@ impl ProjectTemplate {
 pub struct MetricTemplate {
     /// Selector identifying the metric to
     /// sample via the diagnostics platform.
-    #[serde(rename = "selector", deserialize_with = "crate::utils::one_or_many_strings")]
+    #[serde(rename = "selector", deserialize_with = "one_or_many_strings")]
     pub selectors: Vec<String>,
 
     /// Cobalt metric id to map the selector to.
@@ -132,7 +133,7 @@ impl IntoIterator for ComponentIdInfoList {
 }
 
 impl MetricTemplate {
-    fn expand(&self, component: &ComponentIdInfo) -> Option<MetricConfig> {
+    fn expand(&self, component: &ComponentIdInfo) -> Result<Option<MetricConfig>, anyhow::Error> {
         let MetricTemplate {
             selectors,
             metric_id,
@@ -141,32 +142,26 @@ impl MetricTemplate {
             upload_once,
             project_id,
         } = self;
-        let mut selectors = selectors
-            .iter()
-            .filter_map(|s| {
-                // TODO: forward error.
-                match interpolate_template(s, component) {
-                    // TODO: parse the selector here.
-                    Ok(result) => result,
-                    Err(err) => {
-                        warn!(err:?, template=s.as_str(); "Couldn't fill selector template");
-                        None
-                    }
-                }
-            })
-            .peekable();
-        selectors.peek()?;
-        let selectors = selectors.collect::<Vec<String>>();
+        let mut result_selectors = Vec::with_capacity(selectors.len());
+        for selector in selectors {
+            if let Some(selector_string) = interpolate_template(selector, component)? {
+                let selector = crate::utils::parse_selector(&selector_string)?;
+                result_selectors.push(selector);
+            }
+        }
+        if result_selectors.is_empty() {
+            return Ok(None);
+        }
         let mut event_codes = event_codes.to_vec();
         event_codes.insert(0, component.event_id);
-        Some(MetricConfig {
+        Ok(Some(MetricConfig {
             event_codes,
-            selectors,
+            selectors: result_selectors,
             metric_id: *metric_id,
             metric_type: *metric_type,
             upload_once: *upload_once,
             project_id: *project_id,
-        })
+        }))
     }
 }
 
@@ -214,7 +209,7 @@ fn interpolate_template(
     }
 }
 
-pub fn moniker_deserialize<'de, D>(deserializer: D) -> Result<ExtendedMoniker, D::Error>
+fn moniker_deserialize<'de, D>(deserializer: D) -> Result<ExtendedMoniker, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -222,7 +217,7 @@ where
     ExtendedMoniker::parse_str(&moniker_str).map_err(de::Error::custom)
 }
 
-pub fn instance_id_deserialize<'de, D>(deserializer: D) -> Result<Option<InstanceId>, D::Error>
+fn instance_id_deserialize<'de, D>(deserializer: D) -> Result<Option<InstanceId>, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -235,10 +230,18 @@ where
     }
 }
 
+fn one_or_many_strings<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    deserializer.deserialize_any(OneOrMany(PhantomData::<String>))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use moniker::Moniker;
+    use selectors::FastError;
     use std::str::FromStr;
 
     #[fuchsia::test]
@@ -357,7 +360,7 @@ mod tests {
                 label: "Hello".into(),
             },
         ]);
-        let config = project_template.expand(&component_info);
+        let config = project_template.expand(&component_info).expect("expanded template");
         assert_eq!(
             config,
             ProjectConfig {
@@ -366,7 +369,10 @@ mod tests {
                 poll_rate_sec: 60,
                 metrics: vec![
                     MetricConfig {
-                        selectors: vec!["core/foo42:root/path:leaf".into(),],
+                        selectors: vec![selectors::parse_selector::<FastError>(
+                            "core/foo42:root/path:leaf"
+                        )
+                        .unwrap()],
                         metric_id: MetricId(1),
                         metric_type: MetricType::Occurrence,
                         event_codes: vec![EventCode(42), EventCode(1), EventCode(2)],
@@ -374,7 +380,10 @@ mod tests {
                         project_id: None,
                     },
                     MetricConfig {
-                        selectors: vec!["bootstrap/hello:root/path:leaf".into(),],
+                        selectors: vec![selectors::parse_selector::<FastError>(
+                            "bootstrap/hello:root/path:leaf"
+                        )
+                        .unwrap()],
                         metric_id: MetricId(1),
                         metric_type: MetricType::Occurrence,
                         event_codes: vec![EventCode(43), EventCode(1), EventCode(2)],
@@ -424,7 +433,7 @@ mod tests {
                 label: "Hello".into(),
             },
         ]);
-        let config = project_template.expand(&component_info);
+        let config = project_template.expand(&component_info).expect("expanded template");
         assert_eq!(
             config,
             ProjectConfig {
@@ -434,9 +443,16 @@ mod tests {
                 metrics: vec![
                     MetricConfig {
                         selectors: vec![
-                            "core/foo42:root/path2:leaf2".into(),
-                            "foo/bar:root/core\\/foo42:leaf3".into(),
-                            "asdf/qwer:root/path4:pre-core\\/foo42-post".into()
+                            selectors::parse_selector::<FastError>("core/foo42:root/path2:leaf2")
+                                .unwrap(),
+                            selectors::parse_selector::<FastError>(
+                                "foo/bar:root/core\\/foo42:leaf3"
+                            )
+                            .unwrap(),
+                            selectors::parse_selector::<FastError>(
+                                "asdf/qwer:root/path4:pre-core\\/foo42-post"
+                            )
+                            .unwrap()
                         ],
                         metric_id: MetricId(2),
                         metric_type: MetricType::Occurrence,
@@ -446,9 +462,18 @@ mod tests {
                     },
                     MetricConfig {
                         selectors: vec![
-                            "bootstrap/hello:root/path2:leaf2".into(),
-                            "foo/bar:root/bootstrap\\/hello:leaf3".into(),
-                            "asdf/qwer:root/path4:pre-bootstrap\\/hello-post".into()
+                            selectors::parse_selector::<FastError>(
+                                "bootstrap/hello:root/path2:leaf2"
+                            )
+                            .unwrap(),
+                            selectors::parse_selector::<FastError>(
+                                "foo/bar:root/bootstrap\\/hello:leaf3"
+                            )
+                            .unwrap(),
+                            selectors::parse_selector::<FastError>(
+                                "asdf/qwer:root/path4:pre-bootstrap\\/hello-post"
+                            )
+                            .unwrap()
                         ],
                         metric_id: MetricId(2),
                         metric_type: MetricType::Occurrence,
@@ -521,5 +546,36 @@ mod tests {
                 component.instance_id = ids.id_for_moniker(moniker).cloned();
             }
         }
+    }
+
+    #[derive(Debug, Deserialize, Eq, PartialEq)]
+    struct TestString(#[serde(deserialize_with = "super::one_or_many_strings")] Vec<String>);
+
+    #[fuchsia::test]
+    fn parse_valid_single_string() {
+        let json = "\"whatever-1982035*()$*H\"";
+        let data: TestString = serde_json5::from_str(json).expect("deserialize");
+        assert_eq!(data, TestString(vec!["whatever-1982035*()$*H".into()]));
+    }
+
+    #[fuchsia::test]
+    fn parse_valid_multiple_strings() {
+        let json = "[ \"core/foo:not:a:selector:root/branch:leaf\", \"core/bar:root/twig:leaf\"]";
+        let data: TestString = serde_json5::from_str(json).expect("deserialize");
+        assert_eq!(
+            data,
+            TestString(vec![
+                "core/foo:not:a:selector:root/branch:leaf".into(),
+                "core/bar:root/twig:leaf".into()
+            ])
+        );
+    }
+
+    #[fuchsia::test]
+    fn refuse_invalid_strings() {
+        let not_string = "42";
+        let bad_list = "[ 42, \"core/bar:not:a:selector:root/twig:leaf\"]";
+        serde_json5::from_str::<TestString>(not_string).expect_err("should fail");
+        serde_json5::from_str::<TestString>(bad_list).expect_err("should fail");
     }
 }
