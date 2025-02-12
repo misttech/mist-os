@@ -53,6 +53,7 @@ bool Fence::OnRefDead() { return --ref_count_ == 0; }
 
 zx_status_t Fence::OnRefArmed(fbl::RefPtr<FenceReference>&& ref) {
   ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent() == fence_creation_dispatcher_);
+  ZX_DEBUG_ASSERT(!ref->InContainer());
 
   if (armed_refs_.is_empty()) {
     ready_wait_.set_object(event_.get());
@@ -70,6 +71,8 @@ zx_status_t Fence::OnRefArmed(fbl::RefPtr<FenceReference>&& ref) {
 
 void Fence::OnRefDisarmed(FenceReference* ref) {
   ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent() == fence_creation_dispatcher_);
+  // Ideally we would also check that it is in `armed_refs_`, not some other list.
+  ZX_DEBUG_ASSERT(ref->InContainer());
 
   armed_refs_.erase(*ref);
   if (armed_refs_.is_empty()) {
@@ -173,7 +176,8 @@ zx_status_t FenceCollection::ImportEvent(zx::event event, display::EventId id) {
   fbl::AllocChecker ac;
   auto new_fence = fbl::AdoptRef(new (&ac) Fence(this, dispatcher_, id, std::move(event)));
   if (ac.check() && new_fence->CreateRef()) {
-    fences_.insert_or_find(std::move(new_fence));
+    bool successfully_inserted = fences_.insert_or_find(std::move(new_fence));
+    ZX_DEBUG_ASSERT(successfully_inserted);
   } else {
     FDF_LOG(ERROR, "Failed to allocate fence ref for event#%ld", id.value());
     return ZX_ERR_NO_MEMORY;
@@ -186,6 +190,23 @@ void FenceCollection::ReleaseEvent(display::EventId id) {
   auto fence_ref = GetFence(id);
   if (fence_ref) {
     fbl::AutoLock lock(&mtx_);
+    // TODO(https://fxbug.dev/394422104): this is an overly-complicated roundabout. It would be
+    // simpler/clearer to simply remove the fence from the map here, and allow any outstanding
+    // `FenceReference`s to keep the fence alive. Instead, the logic relies on `ClearRef()`
+    // releasing a ref so that when the last ref is (immediately or eventually) released, then
+    // `FenceCallback::OnRefForFenceDead()` (in production, implemented by `FenceCollection`) will
+    // check if it was the last ref, and if so erase the fence from `fences_`.
+    //
+    // Unwinding this might not be quite as simple as I made it sound; the `CreateRef()/ClearRef()`
+    // machinery will need to be revisited. If we simply erase the fence from `fences_`, there will
+    // be a circular reference between the fence (via `Fence::cur_ref_`) and the fence ref (via
+    // `FenceReference::fence_`).
+    //
+    // This raises the question of whether we even need to distinguish `Fence` and `FenceReference`.
+    // There is some fancy stuff that allows multiple refs to arm themselves and be signaled in
+    // order (once per signal of the underlying Zircon event), but AFAICT this is never used in
+    // practice because there is exactly one `FenceReference`: the one stashed in `Fence::cur_ref_`.
+    // But I digress; these breadcrumbs will hopefully help whoever comes next.
     fences_.find(id)->ClearRef();
   }
 }

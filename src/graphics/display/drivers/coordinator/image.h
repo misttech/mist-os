@@ -9,15 +9,13 @@
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
-#include <atomic>
-
 #include <fbl/intrusive_container_utils.h>
 #include <fbl/intrusive_double_list.h>
+#include <fbl/mutex.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 
 #include "src/graphics/display/drivers/coordinator/client-id.h"
-#include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
@@ -30,22 +28,6 @@ namespace display_coordinator {
 class Controller;
 
 // An Image is a reference to an imported sysmem pixel buffer.
-// and the state machine (hereafter ImageUse) for tracking its use as part of a config.
-//
-// ImageUse can be NOT_READY, READY, ACQUIRED, or PRESENTED.
-//   NOT_READY: initial state, transitions to READY when wait_event is null or signaled.
-//              When returning to NOT_READY via EarlyRetire, the signal_fence will fire.
-//   READY: the related ImageRef is ready for use. Controller::ApplyConfig may request a
-//          move to ACQUIRED (Acquire) or NOT_READY (EarlyRetire) because another ImageUse
-//          was ACQUIRED instead.
-//   ACQUIRED: this image will be used on the next display flip. Transitions to PRESENTED
-//             when the display hardware reports it in OnVsync.
-//   PRESENTED: this image has been observed in OnVsync. Transitions to NOT_READY when
-//              the Controller determines that a new ImageUse has been PRESENTED and
-//              this one can be retired.
-//
-// One special transition exists: upon the owning Client's death/disconnection, the
-// ImageUse will move from ACQUIRED to NOT_READY.
 class Image : public fbl::RefCounted<Image>,
               public IdMappable<fbl::RefPtr<Image>, display::ImageId> {
  private:

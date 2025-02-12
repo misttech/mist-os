@@ -18,7 +18,12 @@ class TestCallback : public FenceCallback {
  public:
   void OnFenceFired(FenceReference* f) override { fired_.push_back(f); }
 
-  void OnRefForFenceDead(Fence* fence) override { fence->OnRefDead(); }
+  void OnRefForFenceDead(Fence* fence) override {
+    // TODO(https://fxbug.dev/394422104): it is not ideal to require implementors of `FenceCallback`
+    // to call `OnRefDead()` in order to maintain the fence's ref-count. This should be handled
+    // between `Fence`/`FenceReference` without muddying the `FenceCallback` contract.
+    fence->OnRefDead();
+  }
 
   fbl::Vector<FenceReference*> fired_;
 };

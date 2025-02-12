@@ -29,7 +29,12 @@ namespace display_coordinator {
 class ImageTest : public TestBase, public FenceCallback {
  public:
   void OnFenceFired(FenceReference* f) override {}
-  void OnRefForFenceDead(Fence* fence) override { fence->OnRefDead(); }
+  void OnRefForFenceDead(Fence* fence) override {
+    // TODO(https://fxbug.dev/394422104): it is not ideal to require implementors of `FenceCallback`
+    // to call `OnRefDead()` in order to maintain the fence's ref-count. This should be handled
+    // between `Fence`/`FenceReference` without muddying the `FenceCallback` contract.
+    fence->OnRefDead();
+  }
 
   fbl::RefPtr<Image> ImportImage(zx::vmo vmo, const display::ImageMetadata& image_metadata) {
     zx::result<display::DriverImageId> import_result =

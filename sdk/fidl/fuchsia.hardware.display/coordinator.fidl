@@ -86,6 +86,9 @@ open protocol CoordinatorListener {
     });
 };
 
+/// Constrains the use of `Coordinator.SetLayerImage2`; see documentation there.
+const MAX_WAITING_IMAGES_PER_LAYER uint32 = 10;
+
 /// Interface for accessing the display hardware.
 ///
 /// A display configuration can be separated into two parts: the layer layout and
@@ -125,7 +128,7 @@ closed protocol Coordinator {
     /// Returns `ZX_ERR_NO_MEMORY` if memory cannot be allocated for managing the image
     /// Additionally, this method delegates internally to `fuchsia.hardware.display.engine/Engine`,
     /// and will forward errors received from `ImportImage()` and `ImportImageForCapture()`.
-    // TODO(https://fxbug.dev/391698891): it's undesirable to expose the implementation dependency
+    // TODO(https://fxbug.dev/391698891): it's undesirable to expose this implementation dependency
     //                                    on `fuchsia.hardware.display.engine/Engine`.
     strict ImportImage(struct {
         image_metadata fuchsia.hardware.display.types.ImageMetadata;
@@ -367,6 +370,14 @@ closed protocol Coordinator {
     /// with an image layer that has no image (note that is is not illegal to
     /// validate such a configuration). It is illegal to reuse a wait event which
     /// another layer that has not been presented is waiting on.
+    ///
+    /// Each layer can track a maximum of `MAX_WAITING_IMAGES_PER_LAYER` waiting images.
+    /// An image becomes "waiting" when it is the most recent image set to a layer that appears in
+    /// a config that is applied via `ApplyConfig()` or similar.  To avoid exceeding the maximum,
+    /// the client can infer that the image is no longer waiting by:
+    ///   - noting the config stamp when the config containing the layer/image is applied
+    ///   - watching for that same (or later) config stamp to be returned by
+    ///     `CoordinatorListener.OnVsync()`.
     strict SetLayerImage2(struct {
         layer_id LayerId;
         image_id ImageId;

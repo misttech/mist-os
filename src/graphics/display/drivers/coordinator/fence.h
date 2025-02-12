@@ -30,6 +30,8 @@ class Fence;
 class FenceCallback {
  public:
   virtual void OnFenceFired(FenceReference* ref) = 0;
+  // TODO(https://fxbug.dev/394422104): implementors must call `Fence::OnRefDead()`,
+  // but they shouldn't have to.
   virtual void OnRefForFenceDead(Fence* fence) = 0;
 };
 
@@ -68,6 +70,9 @@ class Fence : public fbl::RefCounted<Fence>,
   // FenceReference might still exist within the driver.
   void ClearRef();
   // Decrements the reference count and returns true if the last ref died.
+  // TODO(https://fxbug.dev/394422104): Currently, the implicit contract is that this must be called
+  // by the implementor of `FenceCallback::OnRefForFenceDead()`. Instead, this should be made
+  // private so it can only be called by `FenceReference`, which is already a friend.
   bool OnRefDead();
 
   // Gets the fence reference for the current import. An individual fence reference cannot
@@ -79,7 +84,6 @@ class Fence : public fbl::RefCounted<Fence>,
 
  private:
   void Signal() const;
-  void OnRefDied();
   zx_status_t OnRefArmed(fbl::RefPtr<FenceReference>&& ref);
   void OnRefDisarmed(FenceReference* ref);
 
@@ -129,6 +133,8 @@ class FenceReference : public fbl::RefCounted<FenceReference>,
 
   void Signal() const;
 
+  // The first of these two calls must be to `StartReadyWait()` and the next must be to
+  // `ResetReadyWait()`. Subsequent calls must continue to alternate in the same way.
   zx_status_t StartReadyWait();
   void ResetReadyWait();
 

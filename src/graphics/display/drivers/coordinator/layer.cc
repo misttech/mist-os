@@ -36,37 +36,12 @@ namespace fhdt = fuchsia_hardware_display_types;
 
 namespace display_coordinator {
 
-namespace {
+static_assert(WaitingImageList::kMaxSize ==
+                  fuchsia_hardware_display::wire::kMaxWaitingImagesPerLayer,
+              "Violation of fuchsia.hardware.display.Coordinator API contract.");
 
-// Removes and invokes EarlyRetire on all entries before end.
-static void EarlyRetireUpTo(LayerWaitingImageDoublyLinkedList& list,
-                            LayerWaitingImageDoublyLinkedList::iterator end) {
-  while (list.begin() != end) {
-    auto waiting_image = list.pop_front();
-    waiting_image->ResetWaitFence();
-  }
-}
-
-}  // namespace
-
-void LayerWaitingImage::OnFenceReady(FenceReference* fence) {
-  if (wait_fence_.get() == fence) {
-    wait_fence_ = nullptr;
-  }
-}
-
-void LayerWaitingImage::ResetWaitFence() {
-  if (wait_fence_) {
-    wait_fence_->ResetReadyWait();
-    wait_fence_ = nullptr;
-  }
-}
-
-Layer::Layer(Controller* controller, display::DriverLayerId id,
-             LayerWaitingImageAllocator* layer_waiting_image_allocator)
-    : controller_(*controller), layer_waiting_image_allocator_(*layer_waiting_image_allocator) {
+Layer::Layer(Controller* controller, display::DriverLayerId id) : controller_(*controller) {
   ZX_ASSERT(controller);
-  ZX_ASSERT(layer_waiting_image_allocator);
 
   this->id = id;
   memset(&pending_layer_, 0, sizeof(layer_t));
@@ -81,8 +56,7 @@ Layer::Layer(Controller* controller, display::DriverLayerId id,
 Layer::~Layer() {
   ZX_DEBUG_ASSERT(!in_use());
   ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
-
-  EarlyRetireUpTo(waiting_images_, waiting_images_.end());
+  waiting_images_.RemoveAllImages();
 }
 
 fbl::Mutex* Layer::mtx() const { return controller_.mtx(); }
@@ -99,7 +73,7 @@ bool Layer::ResolvePendingLayerProperties() {
       return false;
     }
 
-    EarlyRetireUpTo(waiting_images_, waiting_images_.end());
+    waiting_images_.RemoveAllImages();
     displayed_image_ = nullptr;
   }
   return true;
@@ -110,32 +84,23 @@ bool Layer::ResolvePendingImage(FenceCollection* fences, display::ConfigStamp st
 
   if (pending_image_) {
     auto wait_fence = fences->GetFence(pending_wait_event_id_);
-    if (wait_fence) {
-      if (wait_fence->InContainer()) {
-        FDF_LOG(ERROR, "Tried to wait with a busy event");
-        return false;
-      }
-      zx_status_t status = wait_fence->StartReadyWait();
-      if (status != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to start waiting for image. Status: %s",
-                zx_status_get_string(status));
-        // Mark the image as ready. Displaying garbage is better than hanging or crashing.
-        wait_fence = nullptr;
-      }
-    }
-
-    LayerWaitingImagePointer waiting_image =
-        layer_waiting_image_allocator_.New(std::move(pending_image_), wait_fence);
-    if (!waiting_image) {
-      FDF_LOG(ERROR, "Failed to allocate waiting-image");
+    pending_wait_event_id_ = display::kInvalidEventId;
+    if (auto result = waiting_images_.PushImage(std::move(pending_image_), std::move(wait_fence));
+        result.is_error()) {
       return false;
     }
-    waiting_images_.push_back(std::move(waiting_image));
   }
 
-  if (!waiting_images_.is_empty()) {
-    waiting_images_.back().image()->set_latest_client_config_stamp(stamp);
-  }
+  // This relates to the strategy used by `Client::ApplyConfig()` to compute the vsync config stamp
+  // that will be returned to the client (see more detailed comment there). The subtlety is that we
+  // cannot set the image's stamp above (within the scope of `if (pending_image_) {`); it must be
+  // done here.
+  //
+  // This is because the same image can appear in multiple configs. If we only set the stamp when
+  // the image moves from `pending_image_` to `waiting_images_`, then we would improperly compute
+  // the vsync config stamp sent in `CoordinatorListener.OnVsync`. Consequently, the client would
+  // improperly compute whether a particular image is free to reuse.
+  waiting_images_.UpdateLatestClientConfigStamp(stamp);
   return true;
 }
 
@@ -168,8 +133,7 @@ bool Layer::CleanUpAllImages() {
 
   RetirePendingImage();
 
-  // Retire all waiting images.
-  EarlyRetireUpTo(waiting_images_, waiting_images_.end());
+  waiting_images_.RemoveAllImages();
 
   return RetireDisplayedImage();
 }
@@ -197,28 +161,14 @@ std::optional<display::ConfigStamp> Layer::GetCurrentClientConfigStamp() const {
 bool Layer::ActivateLatestReadyImage() {
   ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
 
-  if (waiting_images_.is_empty()) {
+  fbl::RefPtr<Image> newest_ready_image = waiting_images_.PopNewestReadyImage();
+  if (!newest_ready_image) {
     return false;
   }
+  ZX_DEBUG_ASSERT(!displayed_image_ || (newest_ready_image->latest_client_config_stamp() >
+                                        displayed_image_->latest_client_config_stamp()));
 
-  // Find the most recent (i.e. the most behind) waiting image that is ready.
-  auto it = waiting_images_.end();
-  bool found_ready_image = false;
-  do {
-    --it;
-    if (it->IsReady()) {
-      found_ready_image = true;
-      break;
-    }
-  } while (it != waiting_images_.begin());
-
-  if (!found_ready_image) {
-    return false;
-  }
-
-  // Retire the waiting images that were never presented.
-  EarlyRetireUpTo(waiting_images_, /*end=*/it);
-  displayed_image_ = waiting_images_.pop_front()->image();
+  displayed_image_ = std::move(newest_ready_image);
 
   current_layer_.image_handle = ToBanjoDriverImageId(displayed_image_->driver_id());
   return true;
@@ -297,42 +247,21 @@ void Layer::SetImage(fbl::RefPtr<Image> image, display::EventId wait_event_id) {
   pending_wait_event_id_ = wait_event_id;
 }
 
-bool Layer::OnFenceReady(FenceReference* fence) {
+bool Layer::MarkFenceReady(FenceReference* fence) {
   ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
-
-  bool new_image_ready = false;
-  for (LayerWaitingImage& waiting_image : waiting_images_) {
-    waiting_image.OnFenceReady(fence);
-    new_image_ready |= waiting_image.IsReady();
-  }
-  return new_image_ready;
+  return waiting_images_.MarkFenceReady(fence);
 }
 
 bool Layer::HasWaitingImages() const {
   ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
-  return !waiting_images_.is_empty();
+  return waiting_images_.size() > 0;
 }
 
 void Layer::RetirePendingImage() { pending_image_ = nullptr; }
 
 void Layer::RetireWaitingImage(const Image& image) {
   ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher());
-
-  for (auto it = waiting_images_.begin(); it != waiting_images_.end();) {
-    if (it->image().get() == &image) {
-      // Get the next iterator, before erasing the current iterator invalidates it.
-      auto next_it = it;
-      ++next_it;
-
-      LayerWaitingImagePointer to_retire = waiting_images_.erase(it);
-      ZX_DEBUG_ASSERT(to_retire);
-      to_retire->ResetWaitFence();
-
-      it = next_it;
-    } else {
-      ++it;
-    }
-  }
+  waiting_images_.RemoveImage(image);
 }
 
 bool Layer::RetireDisplayedImage() {

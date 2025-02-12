@@ -37,11 +37,6 @@ class LayerTest : public TestBase {
   void SetUp() override {
     TestBase::SetUp();
     fences_ = std::make_unique<FenceCollection>(dispatcher(), [](FenceReference*) {});
-    layer_waiting_image_allocator_ = std::make_unique<LayerWaitingImageAllocator>(/*max_slabs*/ 1);
-  }
-
-  LayerWaitingImageAllocator& layer_waiting_image_allocator() const {
-    return *layer_waiting_image_allocator_;
   }
 
   fbl::RefPtr<Image> CreateReadyImage() {
@@ -80,9 +75,8 @@ class LayerTest : public TestBase {
                       });
       completion.Wait();
     };
-    return std::unique_ptr<Layer, decltype(deleter)>(
-        new Layer(CoordinatorController(), layer_id, &layer_waiting_image_allocator()),
-        std::move(deleter));
+    return std::unique_ptr<Layer, decltype(deleter)>(new Layer(CoordinatorController(), layer_id),
+                                                     std::move(deleter));
   }
 
   // Helper struct for `RunOnControllerLoop()`.  `std::optional<void>` is illegal, so we need our
@@ -123,7 +117,6 @@ class LayerTest : public TestBase {
   static constexpr uint32_t kDisplayHeight = 600;
 
   std::unique_ptr<FenceCollection> fences_;
-  std::unique_ptr<LayerWaitingImageAllocator> layer_waiting_image_allocator_;
 
   display::ImageId next_image_id_ = display::ImageId(1);
 };

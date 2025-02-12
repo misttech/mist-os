@@ -71,6 +71,8 @@ source_set("shared") {
     "migration-util.h",
     "vsync-monitor.cc",
     "vsync-monitor.h",
+    "waiting-image-list.cc",
+    "waiting-image-list.h",
   ]
   public_deps = [
     ":coordinator_bind",
@@ -122,6 +124,7 @@ test("display-coordinator-unittests") {
     "inspect-test.cc",
     "integration-test.cc",
     "layer-test.cc",
+    "waiting-image-list-test.cc",
   ]
   deps = [
     ":testing",

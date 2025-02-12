@@ -343,8 +343,7 @@ void Client::CreateLayer(CreateLayerCompleter::Sync& completer) {
 
   fbl::AllocChecker alloc_checker;
   display::DriverLayerId driver_layer_id = next_driver_layer_id++;
-  auto new_layer = fbl::make_unique_checked<Layer>(&alloc_checker, &controller_, driver_layer_id,
-                                                   &layer_waiting_image_allocator_);
+  auto new_layer = fbl::make_unique_checked<Layer>(&alloc_checker, &controller_, driver_layer_id);
   if (!alloc_checker.check()) {
     --driver_layer_id;
     completer.ReplyError(ZX_ERR_NO_MEMORY);
@@ -1161,6 +1160,12 @@ void Client::ApplyConfig() {
         display_config.pending_apply_layer_change_property_.Set(true);
       }
 
+      // This is subtle. Compute the config stamp for this config as the *earliest* stamp of any
+      // `Image` that appears on a `Layer` in this config. The goal is to satisfy the contract of
+      // the `applied_config_stamp` field of `CoordinatorListener.OnVsync()`, which returns the
+      // config stamp of the latest *fully applied* config. For example, a config is not fully
+      // applied if one of the images in the config is still waiting on a fence, even if the other
+      // images in the config have appeared on-screen.
       std::optional<display::ConfigStamp> layer_client_config_stamp =
           layer->GetCurrentClientConfigStamp();
       if (layer_client_config_stamp) {
@@ -1408,7 +1413,7 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
 void Client::OnFenceFired(FenceReference* fence) {
   bool new_image_ready = false;
   for (auto& layer : layers_) {
-    new_image_ready |= layer.OnFenceReady(fence);
+    new_image_ready |= layer.MarkFenceReady(fence);
   }
   if (new_image_ready) {
     ApplyConfig();
@@ -1614,12 +1619,7 @@ Client::Client(Controller* controller, ClientProxy* proxy, ClientPriority priori
       priority_(priority),
       id_(client_id),
       fences_(controller->client_dispatcher()->async_dispatcher(),
-              fit::bind_member<&Client::OnFenceFired>(this)),
-      // TODO(https://fxbug.dev/370839049): this assumes that clients won't exhaust a single slab's
-      // worth of allocations. Scenic's usage patterns shouldn't trigger this. Anyway, a CL is
-      // already in progress to replace this slab allocation approach, so this is a short-term
-      // concern.
-      layer_waiting_image_allocator_(/*max_slabs=*/1) {
+              fit::bind_member<&Client::OnFenceFired>(this)) {
   ZX_DEBUG_ASSERT(controller);
   ZX_DEBUG_ASSERT(proxy);
   ZX_DEBUG_ASSERT(client_id != kInvalidClientId);
@@ -1629,10 +1629,6 @@ Client::~Client() {
   ZX_DEBUG_ASSERT(!valid_);
 
   ZX_DEBUG_ASSERT(layers_.size() == 0);
-#ifndef NDEBUG
-  // obj_count() is only available in debug builds.
-  ZX_ASSERT(layer_waiting_image_allocator_.obj_count() == 0);
-#endif
 }
 
 void ClientProxy::SetOwnership(bool is_owner) {
