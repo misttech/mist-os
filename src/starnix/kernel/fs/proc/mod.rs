@@ -5,6 +5,7 @@
 pub mod cpuinfo;
 pub mod devices;
 mod fs;
+pub mod kallsyms;
 pub mod kmsg;
 pub mod meminfo;
 pub mod pid_directory;

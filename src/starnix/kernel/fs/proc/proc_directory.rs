@@ -5,6 +5,7 @@
 use crate::device::DeviceMode;
 use crate::fs::proc::cpuinfo::CpuinfoFile;
 use crate::fs::proc::devices::devices_node;
+use crate::fs::proc::kallsyms::kallsyms_node;
 use crate::fs::proc::kmsg::kmsg_node;
 use crate::fs::proc::meminfo::meminfo_node;
 use crate::fs::proc::pid_directory::pid_directory;
@@ -19,8 +20,8 @@ use crate::vfs::{
     emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
     fs_node_impl_symlink, unbounded_seek, BytesFile, BytesFileOps, DirectoryEntryType, DirentSink,
     DynamicFile, DynamicFileBuf, DynamicFileSource, FileObject, FileOps, FileSystemHandle, FsNode,
-    FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, SimpleFileNode,
-    StaticDirectoryBuilder, StubEmptyFile, SymlinkTarget,
+    FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, StaticDirectoryBuilder,
+    StubEmptyFile, SymlinkTarget,
 };
 
 use maplit::btreemap;
@@ -84,14 +85,7 @@ impl ProcDirectory {
             // Fake kmsg as being empty.
             "kmsg".into() => kmsg_node(current_task, fs),
             // Report just enough symbols to allow some tests to run.
-            "kallsyms".into() => fs.create_node(
-                current_task,
-                SimpleFileNode::new(|| {
-                    track_stub!(TODO("https://fxbug.dev/369067922"), "Provide a real /proc/kallsyms");
-                    Ok(BytesFile::new(b"0000000000000000 T security_inode_copy_up".to_vec()))
-                }),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
+            "kallsyms".into() => kallsyms_node(current_task, fs),
             "mounts".into() => MountsSymlink::new_node(current_task, fs),
             // File must exist to pass the CgroupsAvailable check, which is a little bit optional
             // for init but not optional for a lot of the system!
