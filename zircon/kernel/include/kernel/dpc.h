@@ -46,12 +46,17 @@ class Dpc : public fbl::DoublyLinkedListable<Dpc*, fbl::NodeOptions::AllowCopyMo
   // Returns ZX_ERR_ALREADY_EXISTS if |this| is already queued.
   zx_status_t Queue() TA_EXCL(chainlock_transaction_token);
 
+  // A single spinlock protects the data members of all DPC queues.
+  //
+  // Take care to drop this lock before calling any code that might acquire a chainlock.
+  DECLARE_SINGLETON_SPINLOCK(Lock);
+
  private:
   friend class DpcQueue;
 
   // The DpcQueue this Dpc gets enqueued onto is the only thing to actually Invoke this Dpc,
   // on its worker thread.
-  void Invoke();
+  void Invoke() TA_EXCL(Dpc::Lock::Get());
 
   Func* func_;
   void* arg_;
@@ -61,6 +66,8 @@ class Dpc : public fbl::DoublyLinkedListable<Dpc*, fbl::NodeOptions::AllowCopyMo
 class DpcQueue {
  public:
   // Initializes this DpcQueue for the current cpu.
+  //
+  // The calling thread must have hard-affinity to exactly one CPU.
   void InitForCurrentCpu();
 
   // Begins the Dpc shutdown process for the owning cpu.
@@ -97,31 +104,30 @@ class DpcQueue {
   void TransitionOffCpu(DpcQueue& source);
 
   // These are called by Dpc::Queue.
-  void Enqueue(Dpc* dpc);
-  void Signal();
+  void EnqueueLocked(Dpc* dpc) TA_REQ(Dpc::Lock::Get());
+  void Signal() TA_EXCL(Dpc::Lock::Get());
 
  private:
   static int WorkerThread(void* unused);
   int Work();
 
   // The cpu that owns this DpcQueue.
-  cpu_num_t cpu_ = INVALID_CPU;
+  cpu_num_t cpu_ TA_GUARDED(Dpc::Lock::Get()) = INVALID_CPU;
 
   // Whether the DpcQueue has been initialized for the owning cpu.
-  bool initialized_ = false;
+  bool initialized_ TA_GUARDED(Dpc::Lock::Get()) = false;
 
   // Request the thread_ to stop by setting to true.
   //
   // This guarded by the static global dpc_lock.
-  bool stop_ = false;
+  bool stop_ TA_GUARDED(Dpc::Lock::Get()) = false;
 
-  // This guarded by the static global dpc_lock.
-  fbl::DoublyLinkedList<Dpc*> list_;
-
-  Event event_;
+  fbl::DoublyLinkedList<Dpc*> list_ TA_GUARDED(Dpc::Lock::Get());
 
   // Each cpu maintains a dedicated thread for processing Dpcs.
-  Thread* thread_ = nullptr;
+  Thread* thread_ TA_GUARDED(Dpc::Lock::Get()) = nullptr;
+
+  Event event_;
 };
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_DPC_H_
