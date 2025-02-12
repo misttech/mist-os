@@ -11,9 +11,10 @@ executable("ktrace") {
   ]
   sources = [ "ktrace.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.tracing.kernel:fuchsia.tracing.kernel_hlcpp",
-    "//sdk/lib/sys/cpp",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
+    "//sdk/lib/component/incoming/cpp",
     "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
 }
