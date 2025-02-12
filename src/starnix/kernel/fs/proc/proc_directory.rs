@@ -5,7 +5,7 @@
 use crate::device::DeviceMode;
 use crate::fs::proc::cgroups::cgroups_node;
 use crate::fs::proc::cmdline::cmdline_node;
-use crate::fs::proc::cpuinfo::CpuinfoFile;
+use crate::fs::proc::cpuinfo::cpuinfo_node;
 use crate::fs::proc::device_tree::device_tree_node;
 use crate::fs::proc::devices::devices_node;
 use crate::fs::proc::kallsyms::kallsyms_node;
@@ -60,11 +60,7 @@ impl ProcDirectory {
         let kernel = current_task.kernel();
 
         let mut nodes = btreemap! {
-            "cpuinfo".into() => fs.create_node(
-                current_task,
-                CpuinfoFile::new_node(),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
+            "cpuinfo".into() => cpuinfo_node(current_task, fs),
             "cmdline".into() => cmdline_node(current_task, fs),
             "devices".into() => devices_node(current_task, fs),
             "device-tree".into() => device_tree_node(current_task, fs),
