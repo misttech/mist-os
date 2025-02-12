@@ -129,6 +129,7 @@ def _fuchsia_package_checker_test_impl(ctx):
     (resource_args, resource_runfiles) = _verify_package_resources(package_info, ctx.attr)
 
     args = [
+        "--far={}".format(sdk.far.short_path),
         "--ffx={}".format(sdk.ffx_package.short_path),
         "--meta_far={}".format(meta_far.short_path),
         "--package_name={}".format(ctx.attr.package_name),
@@ -136,6 +137,7 @@ def _fuchsia_package_checker_test_impl(ctx):
 
     runfiles = [
         meta_far,
+        sdk.far,
         sdk.ffx_package,
     ] + resource_runfiles
 

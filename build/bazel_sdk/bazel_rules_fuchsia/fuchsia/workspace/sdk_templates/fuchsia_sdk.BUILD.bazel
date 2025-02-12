@@ -81,6 +81,7 @@ fuchsia_toolchain_info(
     cmc_manifest = "//tools:{{HOST_CPU}}/cmc-meta.json",
     elf_test_runner_shard = "sys/testing/elf_test_runner.shard.cml",
     exec_cpu = "{{HOST_CPU}}",
+    far = "//tools:{{HOST_CPU}}/far",
     ffx = "//tools:{{HOST_CPU}}/ffx",
     ffx_assembly = "//tools:{{HOST_CPU}}/ffx_tools/ffx-assembly",
     ffx_assembly_fho_meta = "//tools:{{HOST_CPU}}/ffx_tools/ffx-assembly.json",
@@ -132,6 +133,8 @@ sdk_host_tool(name = "ffx")
 sdk_host_tool(name = "fssh")
 
 sdk_host_tool(name = "cmc")
+
+sdk_host_tool(name = "far")
 
 sdk_host_tool(name = "funnel")
 
