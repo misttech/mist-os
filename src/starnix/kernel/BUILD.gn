@@ -147,6 +147,7 @@ rustc_library("starnix_core") {
     "fs/proc/cpuinfo.rs",
     "fs/proc/devices.rs",
     "fs/proc/fs.rs",
+    "fs/proc/kmsg.rs",
     "fs/proc/meminfo.rs",
     "fs/proc/mod.rs",
     "fs/proc/pid_directory.rs",

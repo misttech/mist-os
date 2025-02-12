@@ -5,6 +5,7 @@
 use crate::device::DeviceMode;
 use crate::fs::proc::cpuinfo::CpuinfoFile;
 use crate::fs::proc::devices::devices_node;
+use crate::fs::proc::kmsg::kmsg_node;
 use crate::fs::proc::meminfo::meminfo_node;
 use crate::fs::proc::pid_directory::pid_directory;
 use crate::fs::proc::pressure_directory::pressure_directory;
@@ -13,16 +14,13 @@ use crate::fs::proc::sysctl::{net_directory, sysctl_directory};
 use crate::fs::proc::sysrq::SysRqNode;
 use crate::fs::proc::thread_self::thread_self_node;
 use crate::mm::PAGE_SIZE;
-use crate::task::{
-    CurrentTask, EventHandler, Kernel, KernelStats, TaskStateCode, WaitCanceler, Waiter,
-};
-use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::task::{CurrentTask, Kernel, KernelStats, TaskStateCode};
 use crate::vfs::{
-    emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fileops_impl_seekless,
-    fs_node_impl_dir_readonly, fs_node_impl_symlink, unbounded_seek, BytesFile, BytesFileOps,
-    DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource, FileObject,
-    FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-    SeekTarget, SimpleFileNode, StaticDirectoryBuilder, StubEmptyFile, SymlinkTarget,
+    emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
+    fs_node_impl_symlink, unbounded_seek, BytesFile, BytesFileOps, DirectoryEntryType, DirentSink,
+    DynamicFile, DynamicFileBuf, DynamicFileSource, FileObject, FileOps, FileSystemHandle, FsNode,
+    FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, SimpleFileNode,
+    StaticDirectoryBuilder, StubEmptyFile, SymlinkTarget,
 };
 
 use maplit::btreemap;
@@ -35,8 +33,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::version::{KERNEL_RELEASE, KERNEL_VERSION};
-use starnix_uapi::vfs::FdEvents;
-use starnix_uapi::{errno, error, off_t, pid_t};
+use starnix_uapi::{errno, off_t, pid_t};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Weak};
@@ -85,11 +82,7 @@ impl ProcDirectory {
             "thread-self".into() => thread_self_node(current_task, fs),
             "meminfo".into() => meminfo_node(current_task, fs),
             // Fake kmsg as being empty.
-            "kmsg".into() => fs.create_node(
-                current_task,
-                SimpleFileNode::new(|| Ok(ProcKmsgFile)),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o100), FsCred::root()),
-            ),
+            "kmsg".into() => kmsg_node(current_task, fs),
             // Report just enough symbols to allow some tests to run.
             "kallsyms".into() => fs.create_node(
                 current_task,
@@ -370,66 +363,6 @@ impl FileOps for ProcDirectory {
         }
 
         Ok(())
-    }
-}
-
-struct ProcKmsgFile;
-
-impl FileOps for ProcKmsgFile {
-    fileops_impl_seekless!();
-    fileops_impl_noop_sync!();
-
-    fn wait_async(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-        waiter: &Waiter,
-        events: FdEvents,
-        handler: EventHandler,
-    ) -> Option<WaitCanceler> {
-        let syslog = current_task.kernel().syslog.access(current_task).ok()?;
-        Some(syslog.wait(waiter, events, handler))
-    }
-
-    fn query_events(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-    ) -> Result<FdEvents, Errno> {
-        let syslog = current_task.kernel().syslog.access(current_task)?;
-        let mut events = FdEvents::empty();
-        if syslog.size_unread()? > 0 {
-            events |= FdEvents::POLLIN;
-        }
-        Ok(events)
-    }
-
-    fn read(
-        &self,
-        locked: &mut Locked<'_, FileOpsCore>,
-        file: &FileObject,
-        current_task: &CurrentTask,
-        _offset: usize,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        let syslog = current_task.kernel().syslog.access(current_task)?;
-        file.blocking_op(locked, current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, |_| {
-            let bytes_written = syslog.read(data)?;
-            Ok(bytes_written as usize)
-        })
-    }
-
-    fn write(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _offset: usize,
-        _data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        error!(EIO)
     }
 }
 
