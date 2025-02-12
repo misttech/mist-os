@@ -4,6 +4,7 @@
 
 use crate::device::DeviceMode;
 use crate::fs::proc::cpuinfo::CpuinfoFile;
+use crate::fs::proc::device_tree::device_tree_node;
 use crate::fs::proc::devices::devices_node;
 use crate::fs::proc::kallsyms::kallsyms_node;
 use crate::fs::proc::kmsg::kmsg_node;
@@ -72,23 +73,13 @@ impl ProcDirectory {
                 )
             },
             "devices".into() => devices_node(current_task, fs),
-            "device-tree".into() => {
-                    let mut directory = StaticDirectoryBuilder::new(fs);
-                    for setup_function in &kernel.procfs_device_tree_setup {
-                        setup_function(&mut directory, current_task);
-                    }
-                    directory.build(current_task)
-            },
+            "device-tree".into() => device_tree_node(current_task, fs),
             "self".into() => self_node(current_task, fs),
             "thread-self".into() => thread_self_node(current_task, fs),
             "meminfo".into() => meminfo_node(current_task, fs),
-            // Fake kmsg as being empty.
             "kmsg".into() => kmsg_node(current_task, fs),
-            // Report just enough symbols to allow some tests to run.
             "kallsyms".into() => kallsyms_node(current_task, fs),
             "mounts".into() => MountsSymlink::new_node(current_task, fs),
-            // File must exist to pass the CgroupsAvailable check, which is a little bit optional
-            // for init but not optional for a lot of the system!
             "cgroups".into() => fs.create_node(
                 current_task,
                 BytesFile::new_node(vec![]),

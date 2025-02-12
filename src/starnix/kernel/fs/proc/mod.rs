@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 pub mod cpuinfo;
+pub mod device_tree;
 pub mod devices;
 mod fs;
 pub mod kallsyms;
