@@ -307,7 +307,7 @@ pub(crate) fn static_children_component_output_dictionary_routers(
                         "component output dictionary",
                     ),
                 )))?;
-            let component_output_dict = child.sandbox.component_output_dict.clone();
+            let component_output_dict = child.sandbox.component_output.capabilities();
             Ok(RouterResponse::<Dict>::Capability(component_output_dict))
         }
     }

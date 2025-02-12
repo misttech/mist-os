@@ -3258,7 +3258,8 @@ async fn source_component_stopping_when_routing() {
 
     // Start to request a capability from the component.
     let (client_end, server_end) = zx::Channel::create();
-    let output = root.lock_resolved_state().await.unwrap().sandbox.component_output_dict.clone();
+    let output =
+        root.lock_resolved_state().await.unwrap().sandbox.component_output.capabilities().clone();
     let route_and_open_fut = async {
         // Route the capability.
         let cap = output.get_capability(&RelativePath::new("foo").unwrap()).unwrap();
@@ -3324,7 +3325,8 @@ async fn source_component_stopped_after_routing_before_open() {
     assert!(!root.is_started().await);
 
     // Request a capability from the component.
-    let output = root.lock_resolved_state().await.unwrap().sandbox.component_output_dict.clone();
+    let output =
+        root.lock_resolved_state().await.unwrap().sandbox.component_output.capabilities().clone();
 
     let cap = output.get_capability(&RelativePath::new("foo").unwrap()).unwrap();
     let cap = Router::<Connector>::try_from(cap).unwrap();
@@ -3395,7 +3397,8 @@ async fn source_component_shutdown_after_routing_before_open() {
     assert!(!root.is_started().await);
 
     // Request a capability from the component.
-    let output = root.lock_resolved_state().await.unwrap().sandbox.component_output_dict.clone();
+    let output =
+        root.lock_resolved_state().await.unwrap().sandbox.component_output.capabilities().clone();
     let cap = output.get_capability(&RelativePath::new("foo").unwrap()).unwrap();
     let cap = Router::<Connector>::try_from(cap).unwrap();
     let Ok(RouterResponse::Capability(conn)) = cap

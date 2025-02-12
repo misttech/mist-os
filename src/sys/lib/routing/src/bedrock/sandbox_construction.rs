@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use crate::bedrock::request_metadata::{Metadata, METADATA_KEY_TYPE};
-use crate::bedrock::structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap};
+use crate::bedrock::structured_dict::{
+    ComponentEnvironment, ComponentInput, ComponentOutput, StructuredDictMap,
+};
 use crate::bedrock::with_porcelain_type::WithPorcelainType as _;
 use crate::capability_source::{CapabilitySource, InternalCapability, VoidSource};
 use crate::component_instance::{ComponentInstanceInterface, WeakComponentInstanceInterface};
@@ -102,7 +104,7 @@ pub struct ComponentSandbox {
     pub component_input: ComponentInput,
 
     /// The dictionary containing all capabilities that a component makes available to its parent.
-    pub component_output_dict: Dict,
+    pub component_output: ComponentOutput,
 
     /// The dictionary containing all capabilities that are available to a component's program.
     pub program_input: ProgramInput,
@@ -138,7 +140,7 @@ impl ComponentSandbox {
         // the sandbox change.
         let ComponentSandbox {
             component_input,
-            component_output_dict,
+            component_output,
             program_input,
             program_output_dict,
             framework_dict,
@@ -158,7 +160,8 @@ impl ComponentSandbox {
                 &component_input.environment().resolvers(),
                 &self.component_input.environment().resolvers(),
             ),
-            (&component_output_dict, &self.component_output_dict),
+            (&component_output.capabilities(), &self.component_output.capabilities()),
+            (&component_output.framework(), &self.component_output.framework()),
             (&program_input.namespace(), &self.program_input.namespace()),
             (&program_input.config(), &self.program_input.config()),
             (&program_output_dict, &self.program_output_dict),
@@ -197,7 +200,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
     declared_dictionaries: Dict,
     error_reporter: impl ErrorReporter,
 ) -> ComponentSandbox {
-    let component_output_dict = Dict::new();
+    let component_output = ComponentOutput::new();
     let program_input = ProgramInput::default();
     let environments: StructuredDictMap<ComponentEnvironment> = Default::default();
     let child_inputs: StructuredDictMap<ComponentInput> = Default::default();
@@ -373,7 +376,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                 &framework_dict,
                 &capability_sourced_capabilities_dict,
                 expose,
-                &component_output_dict,
+                &component_output,
                 error_reporter.clone(),
             ),
             cm_rust::ExposeDecl::Dictionary(_) => extend_dict_with_expose::<Dict, _>(
@@ -383,7 +386,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                 &framework_dict,
                 &capability_sourced_capabilities_dict,
                 expose,
-                &component_output_dict,
+                &component_output,
                 error_reporter.clone(),
             ),
             cm_rust::ExposeDecl::Protocol(_)
@@ -395,7 +398,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                 &framework_dict,
                 &capability_sourced_capabilities_dict,
                 expose,
-                &component_output_dict,
+                &component_output,
                 error_reporter.clone(),
             ),
             _ => {}
@@ -404,7 +407,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
 
     ComponentSandbox {
         component_input,
-        component_output_dict,
+        component_output,
         program_input,
         program_output_dict,
         framework_dict,
@@ -987,7 +990,7 @@ fn extend_dict_with_expose<T, C: ComponentInstanceInterface + 'static>(
     framework_dict: &Dict,
     capability_sourced_capabilities_dict: &Dict,
     expose: &cm_rust::ExposeDecl,
-    target_dict: &Dict,
+    target_component_output: &ComponentOutput,
     error_reporter: impl ErrorReporter,
 ) where
     T: CapabilityBound + Clone,
@@ -996,9 +999,10 @@ fn extend_dict_with_expose<T, C: ComponentInstanceInterface + 'static>(
     assert!(is_supported_expose(expose), "{expose:?}");
 
     // Exposing to the framework is vestigial
-    if expose.target() != &cm_rust::ExposeTarget::Parent {
-        return;
-    }
+    let target_dict = match expose.target() {
+        cm_rust::ExposeTarget::Parent => target_component_output.capabilities(),
+        cm_rust::ExposeTarget::Framework => target_component_output.framework(),
+    };
     let source_path = expose.source_path();
     let target_name = expose.target_name();
 

@@ -109,7 +109,7 @@ impl ExposeRouteRequest {
         match self {
             Self::ExposeProtocol(decl) => {
                 let Some(capability) =
-                    sandbox.component_output_dict.get_capability(&decl.target_name)
+                    sandbox.component_output.capabilities().get_capability(&decl.target_name)
                 else {
                     panic!(
                         "router for capability {:?} is missing from component output dictionary for \
@@ -128,7 +128,7 @@ impl ExposeRouteRequest {
             }
             Self::ExposeDictionary(decl) => {
                 let Some(capability) =
-                    sandbox.component_output_dict.get_capability(&decl.target_name)
+                    sandbox.component_output.capabilities().get_capability(&decl.target_name)
                 else {
                     panic!(
                         "router for capability {:?} is missing from component output dictionary for \
@@ -147,7 +147,7 @@ impl ExposeRouteRequest {
             }
             Self::ExposeRunner(decl) => {
                 let Some(capability) =
-                    sandbox.component_output_dict.get_capability(&decl.target_name)
+                    sandbox.component_output.capabilities().get_capability(&decl.target_name)
                 else {
                     panic!(
                         "router for capability {:?} is missing from component output dictionary for \

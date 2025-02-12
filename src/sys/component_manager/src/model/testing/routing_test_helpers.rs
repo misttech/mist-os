@@ -33,6 +33,7 @@ use futures::channel::oneshot;
 use futures::prelude::*;
 use hooks::HooksRegistration;
 use moniker::{ChildName, Moniker};
+use sandbox::{Capability, Message, RouterResponse};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
@@ -914,6 +915,39 @@ impl RoutingTestModel for RoutingTest {
         }
     }
 
+    /// Checks if the capability name referred to in the first element of the path in the
+    /// `CheckUse` can successfully be routed from the capabilities exposed to framework. Panics if
+    /// `path.split()` is longer than one element. Yes it's hacky to use the path to carry a name
+    /// here, but since this is such a small edge case it doesn't seem worth the refactor.
+    async fn check_exposed_to_framework(&self, moniker: Moniker, check: CheckUse) {
+        match check {
+            CheckUse::Protocol { path, expected_res } => {
+                capability_util::call_echo_svc_exposed_to_framework(
+                    path,
+                    &moniker,
+                    &self.model,
+                    expected_res,
+                )
+                .await;
+            }
+            CheckUse::Service { .. } => {
+                panic!("unimplemented");
+            }
+            CheckUse::Directory { .. } => {
+                panic!("unimplemented");
+            }
+            CheckUse::Storage { .. } => {
+                panic!("storage capabilities can't be exposed");
+            }
+            CheckUse::StorageAdmin { .. } => {
+                panic!("unimplemented");
+            }
+            CheckUse::EventStream { .. } => {
+                panic!("unimplemented");
+            }
+        }
+    }
+
     async fn look_up_instance(
         &self,
         moniker: &Moniker,
@@ -1380,6 +1414,55 @@ pub mod capability_util {
         let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>();
         open_exposed_dir(&path, moniker, model, false, server_end).await;
         let echo_proxy = echo::EchoProxy::new(node_proxy.into_channel().unwrap());
+        call_echo_and_validate_result(echo_proxy, expected_res).await;
+    }
+
+    /// Attempts to use the fidl.examples.routing.echo.Echo service with name
+    /// `path.split().first()` in the component's set of capabilities exposed to framework. Panics
+    /// if `path.split()` is longer than one element. Yes it's hacky to use the path to carry a
+    /// name here, but since this is such a small edge case it doesn't seem worth the refactor.
+    pub async fn call_echo_svc_exposed_to_framework<'a>(
+        path: cm_types::Path,
+        moniker: &'a Moniker,
+        model: &'a Arc<Model>,
+        expected_res: ExpectedResult,
+    ) {
+        assert_eq!(
+            1,
+            path.split().len(),
+            "path must have only 1 element, instead we have {}",
+            path
+        );
+        let root = model.root();
+        let component = root
+            .find_and_maybe_resolve(moniker)
+            .await
+            .unwrap_or_else(|e| panic!("component not found {}: {}", moniker, e));
+
+        let capability_name = path.split().first().cloned().unwrap();
+        let router_capability = component
+            .lock_resolved_state()
+            .await
+            .unwrap()
+            .sandbox
+            .component_output
+            .framework()
+            .get(&capability_name)
+            .expect(
+                "component is missing capability in sandbox, does the expose to framework exist?",
+            )
+            .unwrap();
+        let router = match router_capability {
+            Capability::ConnectorRouter(r) => r,
+            _ => panic!("unexpected capability type"),
+        };
+        let connector = match router.route(None, false).await.expect("failed to route") {
+            RouterResponse::Capability(c) => c,
+            _ => panic!("unexpected router response"),
+        };
+
+        let (echo_proxy, server_end) = endpoints::create_proxy::<echo::EchoMarker>();
+        connector.send(Message { channel: server_end.into_channel() }).unwrap();
         call_echo_and_validate_result(echo_proxy, expected_res).await;
     }
 

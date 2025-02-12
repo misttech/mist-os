@@ -988,7 +988,7 @@ impl ComponentInstance {
 
     /// Obtains the component output dict.
     pub async fn get_component_output_dict(self: &Arc<Self>) -> Result<Dict, RouterError> {
-        Ok(self.lock_resolved_state().await?.sandbox.component_output_dict.clone())
+        Ok(self.lock_resolved_state().await?.sandbox.component_output.capabilities())
     }
 
     /// Returns a router that delegates to the component output dict.

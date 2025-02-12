@@ -451,9 +451,14 @@ impl<'a> ValidationContext<'a> {
 
         // Validate "exposes".
         if let Some(exposes) = decl.exposes.as_ref() {
-            let mut target_ids = HashMap::new();
+            let mut expose_to_parent_ids = HashMap::new();
+            let mut expose_to_framework_ids = HashMap::new();
             for expose in exposes.iter() {
-                self.validate_expose_decl(&expose, &mut target_ids);
+                self.validate_expose_decl(
+                    &expose,
+                    &mut expose_to_parent_ids,
+                    &mut expose_to_framework_ids,
+                );
             }
             self.validate_expose_group(&exposes);
         }
@@ -1810,7 +1815,8 @@ impl<'a> ValidationContext<'a> {
     fn validate_expose_decl(
         &mut self,
         expose: &'a fdecl::Expose,
-        prev_target_ids: &mut HashMap<&'a str, AllowableIds>,
+        expose_to_parent_ids: &mut HashMap<&'a str, AllowableIds>,
+        expose_to_framework_ids: &mut HashMap<&'a str, AllowableIds>,
     ) {
         match expose {
             fdecl::Expose::Service(e) => {
@@ -1826,7 +1832,8 @@ impl<'a> ValidationContext<'a> {
                     e.target.as_ref(),
                     e.target_name.as_ref(),
                     e.availability.as_ref(),
-                    prev_target_ids,
+                    expose_to_parent_ids,
+                    expose_to_framework_ids,
                 );
             }
             fdecl::Expose::Protocol(e) => {
@@ -1842,7 +1849,8 @@ impl<'a> ValidationContext<'a> {
                     e.target.as_ref(),
                     e.target_name.as_ref(),
                     e.availability.as_ref(),
-                    prev_target_ids,
+                    expose_to_parent_ids,
+                    expose_to_framework_ids,
                 );
             }
             fdecl::Expose::Directory(e) => {
@@ -1858,7 +1866,8 @@ impl<'a> ValidationContext<'a> {
                     e.target.as_ref(),
                     e.target_name.as_ref(),
                     e.availability.as_ref(),
-                    prev_target_ids,
+                    expose_to_parent_ids,
+                    expose_to_framework_ids,
                 );
 
                 // Subdir makes sense when routing, but when exposing to framework the subdirectory
@@ -1889,7 +1898,8 @@ impl<'a> ValidationContext<'a> {
                     e.target.as_ref(),
                     e.target_name.as_ref(),
                     Some(&fdecl::Availability::Required),
-                    prev_target_ids,
+                    expose_to_parent_ids,
+                    expose_to_framework_ids,
                 );
             }
             fdecl::Expose::Resolver(e) => {
@@ -1905,7 +1915,8 @@ impl<'a> ValidationContext<'a> {
                     e.target.as_ref(),
                     e.target_name.as_ref(),
                     Some(&fdecl::Availability::Required),
-                    prev_target_ids,
+                    expose_to_parent_ids,
+                    expose_to_framework_ids,
                 );
             }
             #[cfg(fuchsia_api_level_at_least = "25")]
@@ -1922,7 +1933,8 @@ impl<'a> ValidationContext<'a> {
                     e.target.as_ref(),
                     e.target_name.as_ref(),
                     Some(&fdecl::Availability::Required),
-                    prev_target_ids,
+                    expose_to_parent_ids,
+                    expose_to_framework_ids,
                 );
             }
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
@@ -1939,7 +1951,8 @@ impl<'a> ValidationContext<'a> {
                     e.target.as_ref(),
                     e.target_name.as_ref(),
                     e.availability.as_ref(),
-                    prev_target_ids,
+                    expose_to_parent_ids,
+                    expose_to_framework_ids,
                 );
             }
             _ => {
@@ -1963,18 +1976,15 @@ impl<'a> ValidationContext<'a> {
         target: Option<&fdecl::Ref>,
         target_name: Option<&'a String>,
         availability: Option<&fdecl::Availability>,
-        prev_child_target_ids: &mut HashMap<&'a str, AllowableIds>,
+        expose_to_parent_ids: &mut HashMap<&'a str, AllowableIds>,
+        expose_to_framework_ids: &mut HashMap<&'a str, AllowableIds>,
     ) {
         self.validate_expose_source(decl, collection_source, source, source_dictionary);
         check_route_availability(decl, availability, source, source_name, &mut self.errors);
         match target {
             Some(r) => match r {
                 fdecl::Ref::Parent(_) => {}
-                fdecl::Ref::Framework(_) => {
-                    if source != Some(&fdecl::Ref::Self_(fdecl::SelfRef {})) {
-                        self.errors.push(Error::invalid_field(decl, "target"));
-                    }
-                }
+                fdecl::Ref::Framework(_) => {}
                 _ => {
                     self.errors.push(Error::invalid_field(decl, "target"));
                 }
@@ -1988,12 +1998,17 @@ impl<'a> ValidationContext<'a> {
             check_relative_path(source_dictionary, decl, "source_dictionary", &mut self.errors);
         }
         if check_name(target_name, decl, "target_name", &mut self.errors) {
-            // TODO: This logic needs to pair the target name with the target before concluding
-            // there's a duplicate.
-            let target_name = target_name.unwrap();
-            if let Some(prev_state) = prev_child_target_ids.insert(target_name, allowable_ids) {
-                if prev_state == AllowableIds::One || prev_state != allowable_ids {
-                    self.errors.push(Error::duplicate_field(decl, "target_name", target_name));
+            let maybe_ids_set = match target {
+                Some(fdecl::Ref::Parent(_)) => Some(expose_to_parent_ids),
+                Some(fdecl::Ref::Framework(_)) => Some(expose_to_framework_ids),
+                _ => None,
+            };
+            if let Some(ids_set) = maybe_ids_set {
+                let target_name = target_name.unwrap();
+                if let Some(prev_state) = ids_set.insert(target_name, allowable_ids) {
+                    if prev_state == AllowableIds::One || prev_state != allowable_ids {
+                        self.errors.push(Error::duplicate_field(decl, "target_name", target_name));
+                    }
                 }
             }
         }
@@ -4629,6 +4644,37 @@ mod tests {
             },
             result = Ok(()),
         },
+        test_validate_expose_from_self_to_framework_and_parent => {
+            input = {
+                fdecl::Component {
+                    capabilities: Some(vec![
+                        fdecl::Capability::Protocol(fdecl::Protocol {
+                            name: Some("a".to_string()),
+                            source_path: Some("/a".to_string()),
+                            ..Default::default()
+                        }),
+                    ]),
+                    exposes: Some(vec![
+                        fdecl::Expose::Protocol(fdecl::ExposeProtocol {
+                            source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
+                            source_name: Some("a".to_string()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            target_name: Some("a".to_string()),
+                            ..Default::default()
+                        }),
+                        fdecl::Expose::Protocol(fdecl::ExposeProtocol {
+                            source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
+                            source_name: Some("a".to_string()),
+                            target: Some(fdecl::Ref::Framework(fdecl::FrameworkRef {})),
+                            target_name: Some("a".to_string()),
+                            ..Default::default()
+                        }),
+                    ]),
+                    ..new_component_decl()
+                }
+            },
+            result = Ok(()),
+        },
         test_validate_use_from_not_child_weak => {
             input = {
                 fdecl::Component {
@@ -5569,7 +5615,7 @@ mod tests {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                         source_name: Some("g".to_string()),
                         target_name: Some("h".to_string()),
-                        target: Some(fdecl::Ref::Framework(fdecl::FrameworkRef {})),
+                        target: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
                         rights: Some(fio::Operations::CONNECT),
                         subdir: None,
                         ..Default::default()
@@ -5577,14 +5623,14 @@ mod tests {
                     fdecl::Expose::Runner(fdecl::ExposeRunner {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                         source_name: Some("i".to_string()),
-                        target: Some(fdecl::Ref::Framework(fdecl::FrameworkRef {})),
+                        target: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
                         target_name: Some("j".to_string()),
                         ..Default::default()
                     }),
                     fdecl::Expose::Resolver(fdecl::ExposeResolver {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                         source_name: Some("k".to_string()),
-                        target: Some(fdecl::Ref::Framework(fdecl::FrameworkRef {})),
+                        target: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
                         target_name: Some("l".to_string()),
                         ..Default::default()
                     }),
@@ -5595,7 +5641,7 @@ mod tests {
                         })),
                         source_name: Some("m".to_string()),
                         target_name: Some("n".to_string()),
-                        target: Some(fdecl::Ref::Framework(fdecl::FrameworkRef {})),
+                        target: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
                         ..Default::default()
                     }),
                 ]);

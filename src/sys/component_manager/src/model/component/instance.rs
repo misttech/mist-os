@@ -738,7 +738,7 @@ impl ResolvedInstanceState {
         let create_exposed_dict = async {
             let component = self.weak_component.upgrade().unwrap();
             let dict = Dict::new();
-            for (key, value) in self.sandbox.component_output_dict.enumerate() {
+            for (key, value) in self.sandbox.component_output.capabilities().enumerate() {
                 let Ok(value) = value else {
                     // This capability is not cloneable. Skip it.
                     warn!(moniker:% = self.moniker(), key:%;

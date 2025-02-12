@@ -335,7 +335,7 @@ where
         }
         RouteRequest::ExposeProtocol(expose_protocol_decl) => {
             route_capability_inner::<Connector, _>(
-                &target.component_sandbox().await?.component_output_dict,
+                &target.component_sandbox().await?.component_output.capabilities(),
                 &expose_protocol_decl.target_name,
                 protocol_metadata(expose_protocol_decl.availability),
                 target,
@@ -347,7 +347,7 @@ where
         }
         RouteRequest::ExposeRunner(expose_runner_decl) => {
             route_capability_inner::<Connector, _>(
-                &target.component_sandbox().await?.component_output_dict,
+                &target.component_sandbox().await?.component_output.capabilities(),
                 &expose_runner_decl.target_name,
                 runner_metadata(Availability::Required),
                 target,
@@ -356,7 +356,7 @@ where
         }
         RouteRequest::ExposeResolver(expose_resolver_decl) => {
             route_capability_inner::<Connector, _>(
-                &target.component_sandbox().await?.component_output_dict,
+                &target.component_sandbox().await?.component_output.capabilities(),
                 &expose_resolver_decl.target_name,
                 resolver_metadata(Availability::Required),
                 target,
@@ -379,7 +379,7 @@ where
                     );
                     let child_component = target.lock_resolved_state().await?.get_child(&child_name).expect("resolver registration references nonexistent static child, this should be prevented by manifest validation");
                     let child_sandbox = child_component.component_sandbox().await?;
-                    child_sandbox.component_output_dict.clone()
+                    child_sandbox.component_output.capabilities().clone()
                 }
             };
             route_capability_inner::<Connector, _>(

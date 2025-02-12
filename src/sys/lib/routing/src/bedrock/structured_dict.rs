@@ -89,7 +89,7 @@ impl<T: StructuredDict> From<StructuredDictMap<T>> for Dict {
 
 // Dictionary keys for different kinds of sandboxes.
 lazy_static! {
-    /// Dictionary of capabilities from the parent.
+    /// Dictionary of capabilities from or to the parent.
     static ref PARENT: Name = "parent".parse().unwrap();
 
     /// Dictionary of capabilities from a component's environment.
@@ -103,6 +103,9 @@ lazy_static! {
 
     /// Dictionary of resolver capabilities in a component's environment.
     static ref RESOLVERS: Name = "resolvers".parse().unwrap();
+
+    /// Dictionary of capabilities available to the framework.
+    static ref FRAMEWORK: Name = "framework".parse().unwrap();
 }
 
 /// Contains the capabilities component receives from its parent and environment. Stored as a
@@ -245,6 +248,71 @@ impl ComponentEnvironment {
 
 impl From<ComponentEnvironment> for Dict {
     fn from(e: ComponentEnvironment) -> Self {
+        e.0
+    }
+}
+
+/// Contains the capabilities a component makes available to its parent or the framework. Stored as
+/// a [Dict] containing two nested [Dict]s for the capabilities made available to the parent and to
+/// the framework.
+#[derive(Clone, Debug)]
+pub struct ComponentOutput(Dict);
+
+impl Default for ComponentOutput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl StructuredDict for ComponentOutput {
+    fn from_dict(dict: Dict) -> Self {
+        Self(dict)
+    }
+}
+
+impl ComponentOutput {
+    pub fn new() -> Self {
+        let dict = Dict::new();
+        dict.insert(PARENT.clone(), Dict::new().into()).ok();
+        dict.insert(FRAMEWORK.clone(), Dict::new().into()).ok();
+        Self(dict)
+    }
+
+    /// Creates a new ComponentOutput with entries cloned from this ComponentOutput.
+    ///
+    /// This is a shallow copy. Values are cloned, not copied, so are new references to the same
+    /// underlying data.
+    pub fn shallow_copy(&self) -> Result<Self, ()> {
+        // Note: We call [Dict::copy] on the nested [Dict]s, not the root [Dict], because
+        // [Dict::copy] only goes one level deep and we want to copy the contents of the
+        // inner sandboxes.
+        let dict = Dict::new();
+        dict.insert(PARENT.clone(), self.capabilities().shallow_copy()?.into()).ok();
+        dict.insert(FRAMEWORK.clone(), self.framework().shallow_copy()?.into()).ok();
+        Ok(Self(dict))
+    }
+
+    /// Returns the sub-dictionary containing capabilities routed by the component's parent.
+    pub fn capabilities(&self) -> Dict {
+        let cap = self.0.get(&*PARENT).expect("capabilities must be cloneable").unwrap();
+        let Capability::Dictionary(dict) = cap else {
+            unreachable!("parent entry must be a dict: {cap:?}");
+        };
+        dict
+    }
+
+    /// Returns the sub-dictionary containing capabilities routed to the component's framework.
+    pub fn framework(&self) -> Dict {
+        let cap = self.0.get(&*FRAMEWORK).expect("capabilities must be cloneable").unwrap();
+        let Capability::Dictionary(dict) = cap else {
+            unreachable!("framework entry must be a dict: {cap:?}");
+        };
+        dict
+    }
+}
+
+impl From<ComponentOutput> for Dict {
+    fn from(e: ComponentOutput) -> Self {
         e.0
     }
 }

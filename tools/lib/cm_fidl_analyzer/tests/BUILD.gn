@@ -18,6 +18,8 @@ rustc_test("tests") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
+    "//src/sys/component_manager/lib/router_error",
+    "//src/sys/component_manager/lib/sandbox",
 
     # Depend on zx-status crate instead of zx so that this builds for host.
     "//sdk/rust/zx-status",
