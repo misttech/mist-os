@@ -56,6 +56,11 @@ fuchsia_cc_driver("wlansoftmac_driver-driver") {
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
+
+  # TODO(https://fxbug.dev/42085421): LTO results in wrong TLS access.
+  configs += [ "//build/config/lto" ]
+  configs -= [ "//build/config/lto" ]
+  configs += [ "//build/config/lto:no-lto" ]
 }
 
 fuchsia_driver_component("wlansoftmac_driver") {
