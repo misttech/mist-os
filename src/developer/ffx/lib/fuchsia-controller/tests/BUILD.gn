@@ -11,12 +11,10 @@ host_test_data("fuchsia_controller_host_test_data") {
   testonly = false
 
   sources = [
-    get_label_info("//build/fidl:all_fidl_json($default_toolchain)",
-                   "root_out_dir") + "/all_fidl_json.txt",
-    get_label_info("//src/developer/ffx/lib/fuchsia-controller/cpp",
-                   "root_out_dir") + "/libfuchsia_controller_internal.so",
-    get_label_info("//src/developer/ffx/lib/fuchsia-controller/cpp",
-                   "root_out_dir") + "/libfidl_codec.so",
+    get_label_info(":anything($default_toolchain)", "root_out_dir") +
+        "/all_fidl_json.txt",
+    "${root_out_dir}/libfidl_codec.so",
+    "${root_out_dir}/libfuchsia_controller_internal.so",
   ]
   deps = [
     "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py",
@@ -27,8 +25,8 @@ host_test_data("fuchsia_controller_host_test_data") {
 
 host_test_data("core_sdk_host_test_data") {
   _sdk_label = "//sdk:exported_idk_for_ffx_tests($default_toolchain)"
-  sources =
-      [ get_label_info(_sdk_label, "root_out_dir") + "/sdk/exported/core" ]
+  sources = [ get_label_info(":anything($default_toolchain)", "root_out_dir") +
+              "/sdk/exported/core" ]
   deps = [ _sdk_label ]
 }
 
@@ -39,18 +37,18 @@ group("fuchsia_controller_test_data") {
   deps = [
     ":fuchsia_controller_host_test_data",
     "//src/developer/ffx:test_data",
-    "//src/developer/ffx/fidl:fuchsia.developer.ffx_host_test_data(${toolchain_variant.base})",
+    "//src/developer/ffx/fidl:fuchsia.developer.ffx_host_test_data",
   ]
 }
 
 group("fuchsia_controller_fidl_test_data") {
   testonly = true
   deps = [
-    "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.othertest_host_test_data(${toolchain_variant.base})",
-    "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.test_host_test_data(${toolchain_variant.base})",
-    "//src/lib/fidl_codec:fidl-composed_host_test_data(${toolchain_variant.base})",
-    "//src/lib/fidl_codec:fidl-sys_host_test_data(${toolchain_variant.base})",
-    "//src/lib/fidl_codec:fidl_host_test_data(${toolchain_variant.base})",
+    "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.othertest_host_test_data",
+    "//src/developer/ffx/lib/fuchsia-controller/fidl:fuchsia.controller.test_host_test_data",
+    "//src/lib/fidl_codec:fidl-composed_host_test_data",
+    "//src/lib/fidl_codec:fidl-sys_host_test_data",
+    "//src/lib/fidl_codec:fidl_host_test_data",
   ]
 }
 
