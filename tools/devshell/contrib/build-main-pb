@@ -17,4 +17,4 @@ set -e
 
 product=$(fx-command-run get-main-pb)
 echo "Building $product..."
-fx-command-run build "$product"
+fx-command-run build "$product" "$@"
