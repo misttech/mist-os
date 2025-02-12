@@ -6,15 +6,14 @@
 //! in the pure_ip module.
 
 use alloc::vec::Vec;
-use lock_order::lock::{LockLevelFor, UnlockedAccessMarkerFor};
+use lock_order::lock::LockLevelFor;
 use lock_order::relation::LockBefore;
 use lock_order::wrap::LockedWrapperApi;
 use net_types::ip::Ip;
 use netstack3_base::DeviceIdContext;
 use netstack3_device::pure_ip::{
-    DynamicPureIpDeviceState, PureIpDevice, PureIpDeviceCounters, PureIpDeviceId,
-    PureIpDeviceStateContext, PureIpDeviceTxQueueFrameMetadata, PureIpPrimaryDeviceId,
-    PureIpWeakDeviceId,
+    DynamicPureIpDeviceState, PureIpDevice, PureIpDeviceId, PureIpDeviceStateContext,
+    PureIpDeviceTxQueueFrameMetadata, PureIpPrimaryDeviceId, PureIpWeakDeviceId,
 };
 use netstack3_device::queue::{
     BufVecU8Allocator, DequeueState, TransmitDequeueContext, TransmitQueueCommon,
@@ -185,15 +184,6 @@ impl<BT: BindingsTypes> LockLevelFor<IpLinkDeviceState<PureIpDevice, BT>>
     for crate::lock_ordering::PureIpDeviceTxDequeue
 {
     type Data = DequeueState<PureIpDeviceTxQueueFrameMetadata<BT>, Buf<Vec<u8>>>;
-}
-
-impl<BT: BindingsTypes> UnlockedAccessMarkerFor<IpLinkDeviceState<PureIpDevice, BT>>
-    for crate::lock_ordering::PureIpDeviceCounters
-{
-    type Data = PureIpDeviceCounters;
-    fn unlocked_access(t: &IpLinkDeviceState<PureIpDevice, BT>) -> &Self::Data {
-        &t.link.counters
-    }
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceDynamicState>>

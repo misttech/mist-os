@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use lock_order::lock::{DelegatedOrderedLockAccess, LockLevelFor, UnlockedAccess};
+use lock_order::lock::{DelegatedOrderedLockAccess, LockLevelFor};
 use lock_order::relation::LockBefore;
 use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6};
 use netstack3_base::socket::MaybeDualStack;
@@ -19,7 +19,7 @@ use netstack3_udp::{self as udp, UdpCounters, UdpSocketId, UdpSocketSet, UdpSock
 
 use crate::context::prelude::*;
 use crate::context::WrapLockLevel;
-use crate::transport::{TransportLayerState, TransportLayerTimerId};
+use crate::transport::TransportLayerTimerId;
 use crate::{BindingsContext, BindingsTypes, CoreCtx, StackState};
 
 impl<I, BC, L> CoreTimerContext<WeakTcpSocketId<I, WeakDeviceId<BC>, BC>, BC> for CoreCtx<'_, BC, L>
@@ -114,7 +114,11 @@ where
         id: &TcpSocketId<Ipv4, Self::WeakDeviceId, BC>,
         cb: F,
     ) -> O {
-        let isn = self.unlocked_access::<crate::lock_ordering::TcpIsnGenerator<Ipv4>>();
+        let isn = &self
+            .unlocked_access::<crate::lock_ordering::UnlockedState>()
+            .transport
+            .tcp_state::<Ipv4>()
+            .isn_generator;
         let mut locked = self.adopt(id);
         let (mut socket_state, mut restricted) = locked
             .write_lock_with_and::<crate::lock_ordering::TcpSocketState<Ipv4>, _>(|c| c.right());
@@ -201,7 +205,11 @@ where
         id: &TcpSocketId<Ipv6, Self::WeakDeviceId, BC>,
         cb: F,
     ) -> O {
-        let isn = self.unlocked_access::<crate::lock_ordering::TcpIsnGenerator<Ipv6>>();
+        let isn = &self
+            .unlocked_access::<crate::lock_ordering::UnlockedState>()
+            .transport
+            .tcp_state::<Ipv6>()
+            .isn_generator;
         let mut locked = self.adopt(id);
         let (mut socket_state, mut restricted) = locked
             .write_lock_with_and::<crate::lock_ordering::TcpSocketState<Ipv6>, _>(|c| c.right());
@@ -537,20 +545,6 @@ impl<I: crate::transport::tcp::DualStackIpExt, D: WeakDeviceIdentifier, BT: Bind
     type Data = TcpSocketState<I, D, BT>;
 }
 
-impl<I: crate::transport::tcp::DualStackIpExt, BC: BindingsContext>
-    UnlockedAccess<crate::lock_ordering::TcpIsnGenerator<I>> for StackState<BC>
-{
-    type Data = IsnGenerator<BC::Instant>;
-    type Guard<'l>
-        = &'l IsnGenerator<BC::Instant>
-    where
-        Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.transport.tcp_state::<I>().isn_generator
-    }
-}
-
 impl<I: datagram::IpExt, D: WeakDeviceIdentifier, BT: BindingsTypes>
     LockLevelFor<UdpSocketId<I, D, BT>> for crate::lock_ordering::UdpSocketState<I>
 {
@@ -587,26 +581,20 @@ impl<I: datagram::IpExt, BT: BindingsTypes>
     }
 }
 
-impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::TransportState> for StackState<BT> {
-    type Data = TransportLayerState<BT>;
-    type Guard<'l>
-        = &'l TransportLayerState<BT>
-    where
-        Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.transport
-    }
-}
-
 impl<BC: BindingsContext, I: Ip, L> CounterContext<TcpCounters<I>> for CoreCtx<'_, BC, L> {
     fn with_counters<O, F: FnOnce(&TcpCounters<I>) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::TransportState>().tcp_counters::<I>())
+        cb(self
+            .unlocked_access::<crate::lock_ordering::UnlockedState>()
+            .transport
+            .tcp_counters::<I>())
     }
 }
 
 impl<BC: BindingsContext, I: Ip, L> CounterContext<UdpCounters<I>> for CoreCtx<'_, BC, L> {
     fn with_counters<O, F: FnOnce(&UdpCounters<I>) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::TransportState>().udp_counters::<I>())
+        cb(self
+            .unlocked_access::<crate::lock_ordering::UnlockedState>()
+            .transport
+            .udp_counters::<I>())
     }
 }

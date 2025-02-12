@@ -5,7 +5,7 @@
 //! Implementations for raw IP sockets that integrate with traits/types from
 //! foreign modules.
 
-use lock_order::lock::{LockLevelFor, UnlockedAccess};
+use lock_order::lock::LockLevelFor;
 use lock_order::relation::LockBefore;
 use lock_order::wrap::{LockedWrapperApi, LockedWrapperUnlockedApi};
 use netstack3_base::{CounterContext, ResourceCounterContext, WeakDeviceIdentifier};
@@ -16,7 +16,7 @@ use netstack3_ip::raw::{
 };
 
 use crate::marker::IpExt;
-use crate::{lock_ordering, BindingsContext, BindingsTypes, CoreCtx, StackState};
+use crate::{lock_ordering, BindingsContext, BindingsTypes, CoreCtx};
 
 #[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<I: IpExt, BC: BindingsContext, L: LockBefore<lock_ordering::RawIpSocketState<I>>>
@@ -97,21 +97,10 @@ impl<I: IpExt, BC: BindingsContext, L> CounterContext<RawIpSocketCounters<I>>
     for CoreCtx<'_, BC, L>
 {
     fn with_counters<O, F: FnOnce(&RawIpSocketCounters<I>) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::RawIpSocketCounters<I>>())
-    }
-}
-
-impl<BC: BindingsContext, I: IpExt> UnlockedAccess<crate::lock_ordering::RawIpSocketCounters<I>>
-    for StackState<BC>
-{
-    type Data = RawIpSocketCounters<I>;
-    type Guard<'l>
-        = &'l RawIpSocketCounters<I>
-    where
-        Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        self.inner_ip_state().raw_ip_socket_counters()
+        cb(self
+            .unlocked_access::<crate::lock_ordering::UnlockedState>()
+            .inner_ip_state()
+            .raw_ip_socket_counters())
     }
 }
 

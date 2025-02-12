@@ -11,7 +11,7 @@ use core::num::NonZeroU8;
 use core::ops::{Deref as _, DerefMut as _};
 use core::sync::atomic::AtomicU16;
 
-use lock_order::lock::{LockLevelFor, UnlockedAccessMarkerFor};
+use lock_order::lock::{LockLevelFor, UnlockedAccess};
 use lock_order::relation::LockBefore;
 use log::debug;
 use net_types::ip::{AddrSubnet, Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu};
@@ -48,7 +48,7 @@ use netstack3_ip::nud::{self, ConfirmationFlags, NudCounters, NudIpHandler};
 use netstack3_ip::{
     self as ip, AddableMetric, AddressStatus, FilterHandlerProvider, IpDeviceContext,
     IpDeviceEgressStateContext, IpDeviceIngressStateContext, IpLayerIpExt, IpSasHandler,
-    IpSendFrameError, Ipv4PresentAddressStatus, RawMetric, DEFAULT_TTL,
+    IpSendFrameError, Ipv4PresentAddressStatus, DEFAULT_TTL,
 };
 use packet::{EmptyBuf, InnerPacketBuilder, Serializer};
 use packet_formats::icmp::ndp::options::{NdpNonce, NdpOptionBuilder};
@@ -114,7 +114,8 @@ impl<'a, BC: BindingsContext> CounterContext<SlaacCounters> for SlaacAddrs<'a, B
         cb(&self
             .core_ctx
             .core_ctx
-            .unlocked_access::<crate::lock_ordering::Ipv6State>()
+            .unlocked_access::<crate::lock_ordering::UnlockedState>()
+            .ipv6
             .slaac_counters)
     }
 }
@@ -334,7 +335,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
     IpDeviceEgressStateContext<Ipv4> for CoreCtx<'_, BC, L>
 {
     fn with_next_packet_id<O, F: FnOnce(&AtomicU16) -> O>(&self, cb: F) -> O {
-        cb(&self.unlocked_access::<crate::lock_ordering::Ipv4State>().next_packet_id)
+        cb(&self.unlocked_access::<crate::lock_ordering::UnlockedState>().ipv4.next_packet_id)
     }
 
     fn get_local_addr_for_remote(
@@ -670,10 +671,9 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> SlaacCont
             ip_config: _,
         } = *config;
 
-        let stable_secret_key =
-            core_ctx.unlocked_access::<crate::lock_ordering::Ipv6State>().slaac_stable_secret_key;
-        let temp_secret_key =
-            core_ctx.unlocked_access::<crate::lock_ordering::Ipv6State>().slaac_temp_secret_key;
+        let ipv6_state = &core_ctx.unlocked_access::<crate::lock_ordering::UnlockedState>().ipv6;
+        let stable_secret_key = ipv6_state.slaac_stable_secret_key;
+        let temp_secret_key = ipv6_state.slaac_temp_secret_key;
         let mut core_ctx_and_resource =
             crate::device::integration::ip_device_state_and_core_ctx(core_ctx, device_id);
         let (mut state, mut locked) = core_ctx_and_resource
@@ -1428,7 +1428,7 @@ impl<
 
 impl<BC: BindingsContext, I: Ip, L> CounterContext<NudCounters<I>> for CoreCtx<'_, BC, L> {
     fn with_counters<O, F: FnOnce(&NudCounters<I>) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::DeviceState>().nud_counters::<I>())
+        cb(self.unlocked_access::<crate::lock_ordering::UnlockedState>().device.nud_counters::<I>())
     }
 }
 
@@ -1495,12 +1495,25 @@ impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<DualStackIpDeviceState<BT>>
     type Data = SlaacState<BT>;
 }
 
-impl<BT: IpDeviceStateBindingsTypes> UnlockedAccessMarkerFor<DualStackIpDeviceState<BT>>
-    for crate::lock_ordering::RoutingMetric
+/// It is safe to provide unlocked access to [`DualStackIpDeviceState`] itself
+/// here because care has been taken to avoid exposing publicly to the core
+/// integration crate any state that is held by a lock, as opposed to read-only
+/// state that can be accessed safely at any lock level, e.g. state with no
+/// interior mutability or atomics.
+///
+/// Access to state held by locks *must* be mediated using the global lock
+/// ordering declared in [`crate::lock_ordering`].
+impl<BT: IpDeviceStateBindingsTypes> UnlockedAccess<crate::lock_ordering::UnlockedState>
+    for DualStackIpDeviceState<BT>
 {
-    type Data = RawMetric;
-    fn unlocked_access(t: &DualStackIpDeviceState<BT>) -> &Self::Data {
-        t.metric()
+    type Data = DualStackIpDeviceState<BT>;
+    type Guard<'l>
+        = &'l DualStackIpDeviceState<BT>
+    where
+        Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        &self
     }
 }
 
@@ -1554,6 +1567,6 @@ impl<BT: IpDeviceStateBindingsTypes> LockLevelFor<Ipv6AddressEntry<BT>>
 
 impl<BT: BindingsTypes, L> CounterContext<SlaacCounters> for CoreCtx<'_, BT, L> {
     fn with_counters<O, F: FnOnce(&SlaacCounters) -> O>(&self, cb: F) -> O {
-        cb(&self.unlocked_access::<crate::lock_ordering::Ipv6State>().slaac_counters)
+        cb(&self.unlocked_access::<crate::lock_ordering::UnlockedState>().ipv6.slaac_counters)
     }
 }

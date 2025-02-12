@@ -6,7 +6,7 @@
 
 use alloc::collections::HashMap;
 
-use lock_order::lock::{DelegatedOrderedLockAccess, LockLevelFor, UnlockedAccess};
+use lock_order::lock::{DelegatedOrderedLockAccess, LockLevelFor};
 use lock_order::relation::LockBefore;
 use log::trace;
 use net_types::ip::{Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr};
@@ -32,10 +32,9 @@ use netstack3_ip::raw::RawIpSocketMap;
 use netstack3_ip::{
     self as ip, FragmentContext, IpCounters, IpDeviceContext, IpHeaderInfo, IpLayerBindingsContext,
     IpLayerIpExt, IpPacketFragmentCache, IpRouteTableContext, IpRouteTablesContext, IpStateContext,
-    IpStateInner, IpTransportContext, IpTransportDispatchContext, Ipv4State, Ipv6State,
-    LocalDeliveryPacketInfo, Marks, MulticastMembershipHandler, PmtuCache, PmtuContext,
-    ResolveRouteError, ResolvedRoute, RoutingTable, RoutingTableId, RulesTable,
-    TransportReceiveError,
+    IpStateInner, IpTransportContext, IpTransportDispatchContext, LocalDeliveryPacketInfo, Marks,
+    MulticastMembershipHandler, PmtuCache, PmtuContext, ResolveRouteError, ResolvedRoute,
+    RoutingTable, RoutingTableId, RulesTable, TransportReceiveError,
 };
 use netstack3_sync::rc::Primary;
 use netstack3_sync::RwLock;
@@ -47,30 +46,6 @@ use packet_formats::ip::{IpProto, Ipv4Proto, Ipv6Proto};
 use crate::context::prelude::*;
 use crate::context::WrapLockLevel;
 use crate::{BindingsContext, BindingsTypes, CoreCtx, StackState};
-
-impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::Ipv4State> for StackState<BT> {
-    type Data = Ipv4State<DeviceId<BT>, BT>;
-    type Guard<'l>
-        = &'l Ipv4State<DeviceId<BT>, BT>
-    where
-        Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.ipv4
-    }
-}
-
-impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::Ipv6State> for StackState<BT> {
-    type Data = Ipv6State<DeviceId<BT>, BT>;
-    type Guard<'l>
-        = &'l Ipv6State<DeviceId<BT>, BT>
-    where
-        Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.ipv6
-    }
-}
 
 impl<I, BT, L> FragmentContext<I, BT> for CoreCtx<'_, BT, L>
 where
@@ -150,39 +125,14 @@ where
     }
 }
 
-impl<BT: BindingsTypes, I: datagram::DualStackIpExt>
-    UnlockedAccess<crate::lock_ordering::IcmpTxCounters<I>> for StackState<BT>
-{
-    type Data = IcmpTxCounters<I>;
-    type Guard<'l>
-        = &'l IcmpTxCounters<I>
-    where
-        Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.inner_icmp_state().tx_counters
-    }
-}
-
 impl<BT: BindingsTypes, I: datagram::DualStackIpExt, L> CounterContext<IcmpTxCounters<I>>
     for CoreCtx<'_, BT, L>
 {
     fn with_counters<O, F: FnOnce(&IcmpTxCounters<I>) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::IcmpTxCounters<I>>())
-    }
-}
-
-impl<BT: BindingsTypes, I: datagram::DualStackIpExt>
-    UnlockedAccess<crate::lock_ordering::IcmpRxCounters<I>> for StackState<BT>
-{
-    type Data = IcmpRxCounters<I>;
-    type Guard<'l>
-        = &'l IcmpRxCounters<I>
-    where
-        Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.inner_icmp_state().rx_counters
+        cb(&self
+            .unlocked_access::<crate::lock_ordering::UnlockedState>()
+            .inner_icmp_state::<I>()
+            .tx_counters)
     }
 }
 
@@ -190,13 +140,16 @@ impl<BT: BindingsTypes, I: datagram::DualStackIpExt, L> CounterContext<IcmpRxCou
     for CoreCtx<'_, BT, L>
 {
     fn with_counters<O, F: FnOnce(&IcmpRxCounters<I>) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::IcmpRxCounters<I>>())
+        cb(&self
+            .unlocked_access::<crate::lock_ordering::UnlockedState>()
+            .inner_icmp_state::<I>()
+            .rx_counters)
     }
 }
 
 impl<BT: BindingsTypes, L> CounterContext<NdpCounters> for CoreCtx<'_, BT, L> {
     fn with_counters<O, F: FnOnce(&NdpCounters) -> O>(&self, cb: F) -> O {
-        cb(&self.unlocked_access::<crate::lock_ordering::Ipv6State>().icmp.ndp_counters)
+        cb(&self.unlocked_access::<crate::lock_ordering::UnlockedState>().ipv6.icmp.ndp_counters)
     }
 }
 
@@ -208,38 +161,16 @@ impl<
     > InnerIcmpv4Context<BC> for CoreCtx<'_, BC, L>
 {
     fn should_send_timestamp_reply(&self) -> bool {
-        self.unlocked_access::<crate::lock_ordering::Ipv4State>().icmp.send_timestamp_reply
+        self.unlocked_access::<crate::lock_ordering::UnlockedState>().ipv4.icmp.send_timestamp_reply
     }
 }
 
 impl<BT: BindingsTypes, I: IpLayerIpExt, L> CounterContext<IpCounters<I>> for CoreCtx<'_, BT, L> {
     fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::IpStateCounters<I>>())
-    }
-}
-
-impl<BT: BindingsTypes, I: IpLayerIpExt> UnlockedAccess<crate::lock_ordering::IpStateCounters<I>>
-    for StackState<BT>
-{
-    type Data = IpCounters<I>;
-    type Guard<'l>
-        = &'l IpCounters<I>
-    where
-        Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        self.inner_ip_state().counters()
-    }
-}
-
-impl<BT: BindingsTypes, I: IpLayerIpExt> UnlockedAccess<crate::lock_ordering::IpMainTableId<I>>
-    for StackState<BT>
-{
-    type Data = RoutingTableId<I, DeviceId<BT>>;
-    type Guard<'l> = &'l RoutingTableId<I, DeviceId<BT>>;
-
-    fn access(&self) -> Self::Guard<'_> {
-        self.inner_ip_state::<I>().main_table_id()
+        cb(&self
+            .unlocked_access::<crate::lock_ordering::UnlockedState>()
+            .inner_ip_state()
+            .counters())
     }
 }
 
@@ -288,7 +219,10 @@ where
     type Ctx<'a> = CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IpStateRoutingTables<I>>>;
 
     fn main_table_id(&self) -> RoutingTableId<I, Self::DeviceId> {
-        self.unlocked_access::<crate::lock_ordering::IpMainTableId<I>>().clone()
+        self.unlocked_access::<crate::lock_ordering::UnlockedState>()
+            .inner_ip_state()
+            .main_table_id()
+            .clone()
     }
 
     fn with_ip_routing_tables<

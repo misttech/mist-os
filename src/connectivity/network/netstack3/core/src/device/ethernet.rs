@@ -6,7 +6,7 @@
 //! in the ethernet module.
 
 use alloc::vec::Vec;
-use lock_order::lock::{LockLevelFor, UnlockedAccessMarkerFor};
+use lock_order::lock::LockLevelFor;
 use lock_order::relation::LockBefore;
 
 use log::debug;
@@ -16,9 +16,9 @@ use net_types::{SpecifiedAddr, UnicastAddr, Witness};
 use netstack3_base::socket::SocketIpAddr;
 use netstack3_base::{CoreTimerContext, CounterContext, DeviceIdContext, SendFrameError};
 use netstack3_device::ethernet::{
-    self, DynamicEthernetDeviceState, EthernetDeviceCounters, EthernetDeviceId,
-    EthernetIpLinkDeviceDynamicStateContext, EthernetIpLinkDeviceStaticStateContext,
-    EthernetLinkDevice, EthernetTimerId, EthernetWeakDeviceId, StaticEthernetDeviceState,
+    self, DynamicEthernetDeviceState, EthernetDeviceId, EthernetIpLinkDeviceDynamicStateContext,
+    EthernetIpLinkDeviceStaticStateContext, EthernetLinkDevice, EthernetTimerId,
+    EthernetWeakDeviceId, StaticEthernetDeviceState,
 };
 use netstack3_device::queue::{
     BufVecU8Allocator, DequeueState, TransmitDequeueContext, TransmitQueueCommon,
@@ -68,7 +68,7 @@ impl<BC: BindingsContext, L> EthernetIpLinkDeviceStaticStateContext for CoreCtx<
         cb: F,
     ) -> O {
         let state = integration::device_state(self, device_id);
-        cb(state.unlocked_access::<crate::lock_ordering::EthernetDeviceStaticState>())
+        cb(&state.unlocked_access::<crate::lock_ordering::UnlockedState>().link.static_state)
     }
 }
 
@@ -87,7 +87,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetDeviceDyna
         let (dynamic_state, locked) =
             state.read_lock_and::<crate::lock_ordering::EthernetDeviceDynamicState>();
         cb(
-            &locked.unlocked_access::<crate::lock_ordering::EthernetDeviceStaticState>(),
+            &locked.unlocked_access::<crate::lock_ordering::UnlockedState>().link.static_state,
             &dynamic_state,
         )
     }
@@ -104,7 +104,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetDeviceDyna
         let (mut dynamic_state, locked) =
             state.write_lock_and::<crate::lock_ordering::EthernetDeviceDynamicState>();
         cb(
-            &locked.unlocked_access::<crate::lock_ordering::EthernetDeviceStaticState>(),
+            &locked.unlocked_access::<crate::lock_ordering::UnlockedState>().link.static_state,
             &mut dynamic_state,
         )
     }
@@ -541,24 +541,6 @@ impl<I: Ip, BT: BindingsTypes> LockLevelFor<IpLinkDeviceState<EthernetLinkDevice
     for crate::lock_ordering::NudConfig<I>
 {
     type Data = IpMarked<I, NudUserConfig>;
-}
-
-impl<BT: BindingsTypes> UnlockedAccessMarkerFor<IpLinkDeviceState<EthernetLinkDevice, BT>>
-    for crate::lock_ordering::EthernetDeviceStaticState
-{
-    type Data = StaticEthernetDeviceState;
-    fn unlocked_access(t: &IpLinkDeviceState<EthernetLinkDevice, BT>) -> &Self::Data {
-        &t.link.static_state
-    }
-}
-
-impl<BT: BindingsTypes> UnlockedAccessMarkerFor<IpLinkDeviceState<EthernetLinkDevice, BT>>
-    for crate::lock_ordering::EthernetDeviceCounters
-{
-    type Data = EthernetDeviceCounters;
-    fn unlocked_access(t: &IpLinkDeviceState<EthernetLinkDevice, BT>) -> &Self::Data {
-        &t.link.counters
-    }
 }
 
 impl<BT: BindingsTypes> LockLevelFor<IpLinkDeviceState<EthernetLinkDevice, BT>>

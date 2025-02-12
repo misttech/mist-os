@@ -4,6 +4,7 @@
 
 //! Structs containing the entire stack state.
 
+use lock_order::lock::UnlockedAccess;
 use netstack3_base::{BuildableCoreContext, ContextProvider, CoreTimerContext, CtxPair};
 use netstack3_device::{DeviceId, DeviceLayerState};
 use netstack3_ip::icmp::IcmpState;
@@ -120,5 +121,25 @@ impl<BT: BindingsTypes> StackState<BT> {
 impl<BT: BindingsTypes> CoreTimerContext<IpLayerTimerId, BT> for StackState<BT> {
     fn convert_timer(timer: IpLayerTimerId) -> TimerId<BT> {
         timer.into()
+    }
+}
+
+/// It is safe to provide unlocked access to [`StackState`] itself here because
+/// care has been taken to avoid exposing publicly to the core integration crate
+/// any state that is held by a lock, as opposed to read-only state that can be
+/// accessed safely at any lock level, e.g. state with no interior mutability or
+/// atomics.
+///
+/// Access to state held by locks *must* be mediated using the global lock
+/// ordering declared in [`crate::lock_ordering`].
+impl<BT: BindingsTypes> UnlockedAccess<crate::lock_ordering::UnlockedState> for StackState<BT> {
+    type Data = StackState<BT>;
+    type Guard<'l>
+        = &'l StackState<BT>
+    where
+        Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        &self
     }
 }

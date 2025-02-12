@@ -5,7 +5,7 @@
 //! Implementations for multicast forwarding that integrate with traits/types
 //! from foreign modules.
 
-use lock_order::lock::{LockLevelFor, UnlockedAccess};
+use lock_order::lock::LockLevelFor;
 use lock_order::relation::LockBefore;
 use lock_order::wrap::{LockedWrapperApi, LockedWrapperUnlockedApi};
 use netstack3_base::{CoreTimerContext, CounterContext};
@@ -18,7 +18,7 @@ use netstack3_ip::multicast_forwarding::{
 };
 use netstack3_ip::IpLayerTimerId;
 
-use crate::{lock_ordering, BindingsContext, BindingsTypes, CoreCtx, IpExt, StackState};
+use crate::{lock_ordering, BindingsContext, BindingsTypes, CoreCtx, IpExt};
 
 #[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<
@@ -141,22 +141,9 @@ where
     BC: BindingsContext,
 {
     fn with_counters<O, F: FnOnce(&MulticastForwardingCounters<I>) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::MulticastForwardingCounters<I>>())
-    }
-}
-
-impl<I, BC> UnlockedAccess<crate::lock_ordering::MulticastForwardingCounters<I>> for StackState<BC>
-where
-    I: IpExt,
-    BC: BindingsContext,
-{
-    type Data = MulticastForwardingCounters<I>;
-    type Guard<'l>
-        = &'l MulticastForwardingCounters<I>
-    where
-        Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        self.inner_ip_state().multicast_forwarding_counters()
+        cb(self
+            .unlocked_access::<crate::lock_ordering::UnlockedState>()
+            .inner_ip_state()
+            .multicast_forwarding_counters())
     }
 }
