@@ -66,11 +66,6 @@
             availability: "optional",
         },
         {
-            // Hardware-agnostic wake alarms support
-            protocol: [ "fuchsia.time.alarms.Wake" ],
-            from: "parent",
-        },
-        {
             protocol: [
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.diagnostics.ArchiveAccessor",
@@ -104,6 +99,7 @@
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
+                "fuchsia.time.alarms.Wake",
                 "fuchsia.tracing.provider.Registry",
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
