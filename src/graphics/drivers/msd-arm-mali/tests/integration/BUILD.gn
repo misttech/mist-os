@@ -8,7 +8,10 @@ import("//src/graphics/lib/magma/gnbuild/magma.gni")
 group("integration") {
   testonly = true
 
-  public_deps = [ ":msd_arm_mali_integration_tests" ]
+  public_deps = [
+    ":magma-conformance-vendor-helper-arm",
+    ":msd_arm_mali_integration_tests",
+  ]
 }
 
 source_set("mali_utils") {
@@ -70,5 +73,17 @@ cc_test_executable("msd_arm_mali_integration_tests") {
   deps = [
     ":mali_utils",
     "../../include",
+  ]
+}
+
+executable("magma-conformance-vendor-helper-arm") {
+  testonly = true
+  sources = [ "vendor_helper_arm.cc" ]
+  deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/syslog/cpp",
+    "//src/graphics/drivers/msd-arm-mali/include:include",
+    "//src/graphics/magma/tests/integration:vendor_helper_interface",
   ]
 }

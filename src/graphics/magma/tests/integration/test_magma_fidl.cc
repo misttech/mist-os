@@ -2,11 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.gpu.magma.test/cpp/wire.h>
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <unistd.h>
 
+#include <cstdint>
 #include <filesystem>
 
 #include <gtest/gtest.h>
@@ -60,6 +63,11 @@ class TestMagmaFidl : public gtest::RealLoopFixture {
   static constexpr const char* kDevicePathFuchsia = "/dev/class/gpu";
 
   void SetUp() override {
+    auto client_end = component::Connect<fuchsia_gpu_magma_test::VendorHelper>();
+    EXPECT_TRUE(client_end.is_ok()) << " status " << client_end.status_value();
+
+    vendor_helper_ = fidl::WireSyncClient(std::move(*client_end));
+
     for (auto& p : std::filesystem::directory_iterator(kDevicePathFuchsia)) {
       ASSERT_FALSE(device_.is_valid()) << " More than one GPU device found, specify --vendor-id";
 
@@ -71,15 +79,16 @@ class TestMagmaFidl : public gtest::RealLoopFixture {
 
       device_ = DeviceClient(std::move(endpoints.client));
 
+      uint64_t vendor_id = 0;
       {
         auto wire_result = device_->Query(fuchsia_gpu_magma::wire::QueryId::kVendorId);
         ASSERT_TRUE(wire_result.ok());
 
         ASSERT_TRUE(wire_result->value()->is_simple_result());
-        vendor_id_ = wire_result->value()->simple_result();
+        vendor_id = wire_result->value()->simple_result();
       }
 
-      if (gVendorId == 0 || vendor_id_ == gVendorId) {
+      if (gVendorId == 0 || vendor_id == gVendorId) {
         break;
       } else {
         device_ = {};
@@ -123,7 +132,40 @@ class TestMagmaFidl : public gtest::RealLoopFixture {
 
   void TearDown() override {}
 
-  uint64_t vendor_id() { return vendor_id_; }
+  bool vendor_has_unmap() {
+    auto result = vendor_helper_->GetConfig();
+    EXPECT_TRUE(result.ok());
+
+    if (!result.Unwrap()->has_buffer_unmap_type()) {
+      return false;
+    }
+    return result.Unwrap()->buffer_unmap_type() ==
+           ::fuchsia_gpu_magma_test::wire::BufferUnmapType::kSupported;
+  }
+
+  bool vendor_has_perform_buffer_op() {
+    auto result = vendor_helper_->GetConfig();
+    EXPECT_TRUE(result.ok());
+
+    if (!result.Unwrap()->has_connection_perform_buffer_op_type()) {
+      return false;
+    }
+    return result.Unwrap()->connection_perform_buffer_op_type() ==
+           ::fuchsia_gpu_magma_test::wire::ConnectionPerformBufferOpType::kSupported;
+  }
+
+  fuchsia_gpu_magma::wire::MapFlags vendor_set_buffer_map_flags(
+      fuchsia_gpu_magma::wire::MapFlags flags) {
+    auto result = vendor_helper_->GetConfig();
+    EXPECT_TRUE(result.ok());
+
+    if (result.Unwrap()->has_buffer_map_features() &&
+        result.Unwrap()->buffer_map_features() &
+            ::fuchsia_gpu_magma_test::wire::BufferMapFeatures::kSupportsGrowable) {
+      return flags | fuchsia_gpu_magma::wire::MapFlags::kGrowable;
+    }
+    return flags;
+  }
 
   bool CheckForUnbind() {
     // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
@@ -133,11 +175,11 @@ class TestMagmaFidl : public gtest::RealLoopFixture {
   }
 
   DeviceClient device_;
-  uint64_t vendor_id_ = 0;
   uint32_t max_inflight_messages_ = 0;
   TestAsyncHandler async_handler_;
   PrimaryClient primary_;
   zx::channel notification_channel_;
+  fidl::WireSyncClient<fuchsia_gpu_magma_test::VendorHelper> vendor_helper_;
 };
 
 TEST_F(TestMagmaFidl, Connect) {
@@ -386,9 +428,9 @@ TEST_F(TestMagmaFidl, MapUnmap) {
   constexpr uint64_t kGpuAddress = 0x1000;
 
   {
-    constexpr fuchsia_gpu_magma::wire::MapFlags flags =
+    fuchsia_gpu_magma::wire::MapFlags flags = vendor_set_buffer_map_flags(
         fuchsia_gpu_magma::wire::MapFlags::kRead | fuchsia_gpu_magma::wire::MapFlags::kWrite |
-        fuchsia_gpu_magma::wire::MapFlags::kExecute | fuchsia_gpu_magma::wire::MapFlags::kGrowable;
+        fuchsia_gpu_magma::wire::MapFlags::kExecute);
 
     fidl::Arena allocator;
     auto builder = fuchsia_gpu_magma::wire::PrimaryMapBufferRequest::Builder(allocator);
@@ -406,8 +448,8 @@ TEST_F(TestMagmaFidl, MapUnmap) {
 
     auto wire_result = primary_->UnmapBuffer(builder.Build());
     EXPECT_TRUE(wire_result.ok());
-    // Unmap not implemented on Intel
-    if (vendor_id() == 0x8086) {
+
+    if (!vendor_has_unmap()) {
       EXPECT_TRUE(CheckForUnbind());
     } else {
       EXPECT_FALSE(CheckForUnbind());
@@ -488,8 +530,7 @@ TEST_F(TestMagmaFidl, ExecuteImmediateCommands) {
 }
 
 TEST_F(TestMagmaFidl, BufferRangeOp2) {
-  // Not implemented for Intel or VSI
-  if (vendor_id() == 0x8086 || vendor_id() == 0x10001) {
+  if (!vendor_has_perform_buffer_op()) {
     GTEST_SKIP();
   }
 

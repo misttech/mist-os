@@ -820,7 +820,6 @@ sdk_molecule("core_packages") {
     "//src/developer/build_info/testing:fake-build-info-sdk",
     "//src/graphics/examples/vkproto/cmd-buf-benchmark:cmd-buf-benchmark-test-sdk",
     "//src/graphics/examples/vkproto/driver-tests:vkproto-driver-test-sdk",
-    "//src/graphics/magma/tests/integration:magma_conformance_tests_sdk",
     "//src/graphics/tests/benchmark:vkcopy-test-sdk",
     "//src/graphics/tests/vkext:vkext-test-sdk",
     "//src/graphics/tests/vkloop:vkloop-test-sdk",

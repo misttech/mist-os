@@ -23,7 +23,10 @@ group("nonhardware_tests") {
 
 group("integration") {
   testonly = true
-  deps = [ ":msd-arm-mali-integration-tests" ]
+  deps = [
+    ":magma-conformance-tests-arm",
+    ":msd-arm-mali-integration-tests",
+  ]
 }
 
 fuchsia_unittest_package("msd_arm_mali_nonhardware_tests") {
@@ -80,4 +83,30 @@ fuchsia_unittest_package("msd-arm-mali-integration-tests") {
     }
   }
   test_type = "device"
+}
+
+fuchsia_component("vendor-helper-arm-component") {
+  testonly = true
+  component_name = "vendor-helper"
+  manifest = "meta/vendor-helper.cml"
+  deps = [ "integration:magma-conformance-vendor-helper-arm" ]
+}
+
+fuchsia_test_component("magma-conformance-tests-arm-component") {
+  component_name = "magma-conformance-tests"
+  manifest = "meta/magma-conformance-tests-arm.cml"
+  test_type = "system"
+}
+
+fuchsia_test_package("magma-conformance-tests-arm") {
+  test_components = [ ":magma-conformance-tests-arm-component" ]
+  subpackages =
+      [ "//src/graphics/magma/tests/integration:magma-conformance-tests-child" ]
+  deps = [ ":vendor-helper-arm-component" ]
+  test_specs = {
+    environments = magma_arm_gpu_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }

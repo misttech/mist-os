@@ -1,0 +1,52 @@
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/sys/test_runners/gtest/default.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    use: [
+        {
+            protocol: [
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+                "fuchsia.tracing.provider.Registry",
+            ],
+        },
+        {
+            protocol: [ "fuchsia.gpu.magma.test.VendorHelper" ],
+            from: "parent",
+        },
+        {
+            directory: "dev-gpu",
+            rights: [ "r*" ],
+            path: "/dev/class/gpu",
+        },
+        {
+            directory: "dev-gpu-performance-counters",
+            rights: [ "r*" ],
+            path: "/dev/class/gpu-performance-counters",
+        },
+        {
+            config: "fuchsia.gpu.test.GpuVendorId",
+            from: "parent",
+            key: "gpu_vendor_id_int",
+            type: "uint32",
+        },
+        {
+            config: "fuchsia.gpu.test.GpuVendorIdString",
+            from: "parent",
+            key: "gpu_vendor_id",
+            type: "string",
+            max_size: 128,
+        },
+        {
+            config: "fuchsia.gpu.test.DisabledTestPattern",
+            from: "parent",
+            key: "disabled_test_pattern",
+            type: "string",
+            max_size: 1024,
+        },
+    ],
+}

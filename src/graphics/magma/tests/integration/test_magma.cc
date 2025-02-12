@@ -14,6 +14,7 @@
 
 #if defined(__Fuchsia__)
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/server.h>
@@ -27,6 +28,7 @@
 
 #include <filesystem>
 
+#include "fidl/fuchsia.gpu.magma.test/cpp/wire.h"
 #include "fidl/fuchsia.gpu.magma/cpp/wire.h"
 #include "fidl/fuchsia.logger/cpp/wire.h"
 #include "fidl/fuchsia.tracing.provider/cpp/wire.h"
@@ -44,10 +46,6 @@
 #include <lib/magma_client/test_util/magma_map_cpu.h>
 
 #include <gtest/gtest.h>
-
-#include "magma_intel_gen_defs.h"
-#include "src/graphics/drivers/msd-arm-mali/include/magma_arm_mali_types.h"
-#include "src/graphics/drivers/msd-arm-mali/include/magma_vendor_queries.h"
 
 extern "C" {
 #include "test_magma.h"
@@ -71,10 +69,6 @@ static uint64_t clock_gettime_monotonic_raw() {
 
   return 1000000000ull * ts.tv_sec + ts.tv_nsec;
 }
-
-constexpr uint32_t kVendorIdIntel = 0x8086;
-constexpr uint32_t kVendorIdArm = 0x13B5;
-constexpr uint32_t kVendorIdVsi = 0x10001;
 
 }  // namespace
 
@@ -210,6 +204,11 @@ class TestConnection {
 
   TestConnection() {
 #if defined(__Fuchsia__)
+    auto client_end = component::Connect<fuchsia_gpu_magma_test::VendorHelper>();
+    EXPECT_TRUE(client_end.is_ok()) << " status " << client_end.status_value();
+
+    vendor_helper_ = fidl::WireSyncClient(std::move(*client_end));
+
     EXPECT_TRUE(OpenFuchsiaDevice(&device_name_, &device_));
 
 #elif defined(__linux__)
@@ -251,6 +250,36 @@ class TestConnection {
   magma_connection_t connection() { return connection_; }
 
   void Connection() { ASSERT_TRUE(connection_); }
+
+  bool vendor_has_unmap() {
+#ifdef __Fuchsia__
+    auto result = vendor_helper_->GetConfig();
+    EXPECT_TRUE(result.ok());
+
+    if (!result.Unwrap()->has_buffer_unmap_type()) {
+      return false;
+    }
+    return result.Unwrap()->buffer_unmap_type() ==
+           ::fuchsia_gpu_magma_test::wire::BufferUnmapType::kSupported;
+#else
+    return false;
+#endif
+  }
+
+  bool vendor_has_perform_buffer_op() {
+#ifdef __Fuchsia__
+    auto result = vendor_helper_->GetConfig();
+    EXPECT_TRUE(result.ok());
+
+    if (!result.Unwrap()->has_connection_perform_buffer_op_type()) {
+      return false;
+    }
+    return result.Unwrap()->connection_perform_buffer_op_type() ==
+           ::fuchsia_gpu_magma_test::wire::ConnectionPerformBufferOpType::kSupported;
+#else
+    return false;
+#endif
+  }
 
   void Context() {
     ASSERT_TRUE(connection_);
@@ -343,15 +372,9 @@ class TestConnection {
                                                            size, MAGMA_MAP_FLAG_READ));
     EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_flush(connection_));
 
-    {
-      uint64_t vendor_id;
-      ASSERT_EQ(MAGMA_STATUS_OK,
-                magma_device_query(device_, MAGMA_QUERY_VENDOR_ID, nullptr, &vendor_id));
-      // Unmap not implemented on Intel
-      if (vendor_id != 0x8086) {
-        magma_connection_unmap_buffer(connection_, kGpuAddress, buffer);
-        EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_flush(connection_));
-      }
+    if (vendor_has_unmap()) {
+      magma_connection_unmap_buffer(connection_, kGpuAddress, buffer);
+      EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_flush(connection_));
     }
 
     // Invalid page offset, remote error
@@ -408,16 +431,6 @@ class TestConnection {
   void BufferMapDuplicates(int count) {
     ASSERT_TRUE(connection_);
 
-    bool is_intel_or_vsi = false;
-
-    {
-      uint64_t vendor_id;
-      ASSERT_EQ(MAGMA_STATUS_OK,
-                magma_device_query(device_, MAGMA_QUERY_VENDOR_ID, nullptr, &vendor_id));
-      if (vendor_id == 0x8086 || vendor_id == 0x10001)
-        is_intel_or_vsi = true;
-    }
-
     uint64_t size = page_size();
     uint64_t actual_size;
     magma_buffer_t buffer;
@@ -452,7 +465,7 @@ class TestConnection {
 
       ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_flush(connection_)) << "i " << i;
 
-      if (!is_intel_or_vsi) {
+      if (vendor_has_perform_buffer_op()) {
         ASSERT_EQ(MAGMA_STATUS_OK,
                   magma_connection_perform_buffer_op(
                       connection_, buffer2, MAGMA_BUFFER_RANGE_OP_POPULATE_TABLES, 0, size));
@@ -466,8 +479,9 @@ class TestConnection {
     }
 
     for (size_t i = 0; i < imported_buffers.size(); i++) {
-      if (!is_intel_or_vsi)
+      if (vendor_has_unmap()) {
         magma_connection_unmap_buffer(connection_, imported_addrs[i], imported_buffers[i]);
+      }
 
       EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_flush(connection_));
 
@@ -1225,90 +1239,77 @@ class TestConnection {
     ASSERT_TRUE(device_);
     ASSERT_TRUE(connection_);
 
-    uint64_t query_id = 0;
-    uint64_t vendor_id;
-    ASSERT_EQ(MAGMA_STATUS_OK,
-              magma_device_query(device_, MAGMA_QUERY_VENDOR_ID, nullptr, &vendor_id));
-    switch (vendor_id) {
-      case kVendorIdIntel:
-        query_id = kMagmaIntelGenQueryTimestamp;
+    std::optional<uint64_t> maybe_get_device_timestamp_query_id;
+
+#ifdef __Fuchsia__
+    auto result = vendor_helper_->GetConfig();
+    ASSERT_TRUE(result.ok()) << " status " << result.status();
+
+    auto get_device_timestamp_type =
+        result.Unwrap()->has_get_device_timestamp_type()
+            ? result.Unwrap()->get_device_timestamp_type()
+            : ::fuchsia_gpu_magma_test::GetDeviceTimestampType::kNotImplemented;
+
+    switch (get_device_timestamp_type) {
+      case ::fuchsia_gpu_magma_test::GetDeviceTimestampType::kNotImplemented:
         break;
-      case kVendorIdArm:
-        query_id = kMsdArmVendorQueryDeviceTimestamp;
+      case ::fuchsia_gpu_magma_test::GetDeviceTimestampType::kSupported:
+        EXPECT_TRUE(result.Unwrap()->has_get_device_timestamp_query_id());
+        maybe_get_device_timestamp_query_id = result.Unwrap()->get_device_timestamp_query_id();
         break;
       default:
-        GTEST_SKIP();
+        ASSERT_TRUE(false) << "Unhandled get_device_timestamp_type";
+    }
+#endif
+
+    if (!maybe_get_device_timestamp_query_id) {
+      GTEST_SKIP();
     }
 
     // Ensure failure if handle pointer not provided
-    EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_device_query(device_, query_id, nullptr, nullptr));
+    EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS,
+              magma_device_query(device_, *maybe_get_device_timestamp_query_id, nullptr, nullptr));
 
     uint64_t before_ns = clock_gettime_monotonic_raw();
 
     magma_handle_t buffer_handle;
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_device_query(device_, query_id, &buffer_handle, nullptr));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_device_query(device_, *maybe_get_device_timestamp_query_id,
+                                                  &buffer_handle, nullptr));
     EXPECT_TRUE(is_valid_handle(buffer_handle));
 
     uint64_t after_ns = clock_gettime_monotonic_raw();
 
     ASSERT_NE(0u, buffer_handle);
 
-    struct magma_intel_gen_timestamp_query intel_timestamp_query;
-    struct magma_arm_mali_device_timestamp_return arm_timestamp_return;
-
 #if defined(__Fuchsia__)
     zx_vaddr_t zx_vaddr;
+    size_t size = page_size();
     {
       zx::vmo vmo(buffer_handle);
 
       ASSERT_EQ(ZX_OK, zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE,
                                                   0,  // vmar_offset,
-                                                  vmo, 0 /*offset*/, page_size(), &zx_vaddr));
+                                                  vmo, 0 /*offset*/, size, &zx_vaddr));
     }
 
-    memcpy(&intel_timestamp_query, reinterpret_cast<void*>(zx_vaddr),
-           sizeof(intel_timestamp_query));
-    memcpy(&arm_timestamp_return, reinterpret_cast<void*>(zx_vaddr), sizeof(arm_timestamp_return));
+    // Check that clock_gettime is synchronized between client and driver.
+    // Required for clients using VK_EXT_calibrated_timestamps.
+    if (check_clock) {
+      auto result = vendor_helper_->ValidateCalibratedTimestamps(
+          fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(zx_vaddr), size),
+          before_ns, after_ns);
+      ASSERT_TRUE(result.ok());
+      bool validate_result = result.Unwrap()->result;
+      EXPECT_TRUE(validate_result);
+    }
 
     if (!leaky) {
       EXPECT_EQ(ZX_OK, zx::vmar::root_self()->unmap(zx_vaddr, page_size()));
     }
-
-#elif defined(__linux__)
-    void* addr;
-    {
-      int fd = buffer_handle;
-
-      addr = mmap(nullptr, page_size(), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 /*offset*/);
-      ASSERT_NE(MAP_FAILED, addr);
-
-      close(fd);
-    }
-
-    memcpy(&intel_timestamp_query, addr, sizeof(intel_timestamp_query));
-    memcpy(&arm_timestamp_return, addr, sizeof(arm_timestamp_return));
-
-    if (!leaky) {
-      munmap(addr, page_size());
-    }
-#endif
-
-    if (!check_clock)
-      return;
-
-    // Check that clock_gettime is synchronized between client and driver.
-    // Required for clients using VK_EXT_calibrated_timestamps.
-    if (vendor_id == kVendorIdIntel) {
-      EXPECT_LT(before_ns, intel_timestamp_query.monotonic_raw_timestamp[0]);
-      EXPECT_LT(intel_timestamp_query.monotonic_raw_timestamp[0],
-                intel_timestamp_query.monotonic_raw_timestamp[1]);
-      EXPECT_LT(intel_timestamp_query.monotonic_raw_timestamp[1], after_ns);
-    } else if (vendor_id == kVendorIdArm) {
-      EXPECT_LT(before_ns, arm_timestamp_return.monotonic_raw_timestamp_before);
-      EXPECT_LT(arm_timestamp_return.monotonic_raw_timestamp_before,
-                arm_timestamp_return.monotonic_raw_timestamp_after);
-      EXPECT_LT(arm_timestamp_return.monotonic_raw_timestamp_after, after_ns);
-    }
+#else
+    (void)before_ns;
+    (void)after_ns;
+#endif  // __Fuchsia__
   }
 
   void BufferCaching(magma_cache_policy_t policy) {
@@ -1429,6 +1430,9 @@ class TestConnection {
   int fd_ = -1;
   magma_device_t device_ = 0;
   magma_connection_t connection_ = 0;
+#ifdef __Fuchsia__
+  fidl::WireSyncClient<fuchsia_gpu_magma_test::VendorHelper> vendor_helper_;
+#endif
 };
 
 class TestConnectionWithContext : public TestConnection {
@@ -1484,10 +1488,6 @@ class TestConnectionWithContext : public TestConnection {
   }
 
   void ExecuteCommandNoResources() {
-    uint64_t vendor_id = 0;
-    ASSERT_EQ(MAGMA_STATUS_OK,
-              magma_device_query(device_, MAGMA_QUERY_VENDOR_ID, nullptr, &vendor_id));
-
     ASSERT_TRUE(connection());
 
     magma_command_descriptor descriptor = {.resource_count = 0, .command_buffer_count = 0};
@@ -1498,13 +1498,34 @@ class TestConnectionWithContext : public TestConnection {
     // Empty command buffers may or may not be valid.
     magma_status_t status = magma_connection_flush(connection());
 
-    if (vendor_id == kVendorIdVsi) {
-      EXPECT_TRUE(status == MAGMA_STATUS_OK) << "status: " << status;
-    } else if (vendor_id == kVendorIdArm) {
-      EXPECT_TRUE(status == MAGMA_STATUS_UNIMPLEMENTED) << "status: " << status;
-    } else {
-      EXPECT_TRUE(status == MAGMA_STATUS_INVALID_ARGS) << "status: " << status;
+    EXPECT_TRUE(status == MAGMA_STATUS_OK || status == MAGMA_STATUS_UNIMPLEMENTED ||
+                status == MAGMA_STATUS_INVALID_ARGS);
+
+#ifdef __Fuchsia__
+    auto result = vendor_helper_->GetConfig();
+    EXPECT_TRUE(result.ok());
+
+    auto execute_command_no_resources_type =
+        result.Unwrap()->has_execute_command_no_resources_type()
+            ? result.Unwrap()->execute_command_no_resources_type()
+            : ::fuchsia_gpu_magma_test::ExecuteCommandNoResourcesType::kUnknown;
+
+    switch (execute_command_no_resources_type) {
+      case ::fuchsia_gpu_magma_test::ExecuteCommandNoResourcesType::kUnknown:
+        break;
+      case ::fuchsia_gpu_magma_test::ExecuteCommandNoResourcesType::kSupported:
+        EXPECT_TRUE(status == MAGMA_STATUS_OK) << "status: " << status;
+        break;
+      case ::fuchsia_gpu_magma_test::ExecuteCommandNoResourcesType::kNotImplemented:
+        EXPECT_TRUE(status == MAGMA_STATUS_UNIMPLEMENTED) << "status: " << status;
+        break;
+      case ::fuchsia_gpu_magma_test::ExecuteCommandNoResourcesType::kInvalid:
+        EXPECT_TRUE(status == MAGMA_STATUS_INVALID_ARGS) << "status: " << status;
+        break;
+      default:
+        ASSERT_TRUE(false) << "Unhandled execute_command_no_resources_type";
     }
+#endif
   }
 
   void ExecuteCommandTwoCommandBuffers() {
