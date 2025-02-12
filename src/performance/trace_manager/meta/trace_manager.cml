@@ -67,10 +67,7 @@
             to: "#perfetto-bridge",
         },
         {
-            protocol: [
-                "fuchsia.boot.ReadOnlyLog",
-                "fuchsia.tracing.kernel.Reader",
-            ],
+            protocol: [ "fuchsia.boot.ReadOnlyLog" ],
             from: "parent",
             to: [ "#ktrace_provider" ],
         },

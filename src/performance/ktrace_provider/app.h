@@ -21,20 +21,21 @@ namespace ktrace_provider {
 std::vector<trace::KnownCategory> GetKnownCategories();
 
 struct DrainContext {
-  DrainContext(zx::time start, trace_prolonged_context_t* context)
-      : start(start), context(context) {}
+  DrainContext(zx::time start, trace_prolonged_context_t* context, zx::resource debug_resource)
+      : start(start), reader(std::move(debug_resource)), context(context) {}
 
-  static std::unique_ptr<DrainContext> Create() {
+  static std::unique_ptr<DrainContext> Create(const zx::resource& debug_resource) {
     auto context = trace_acquire_prolonged_context();
     if (context == nullptr) {
       return nullptr;
     }
-    auto out = std::make_unique<DrainContext>(zx::clock::get_monotonic(), context);
-    if (zx_status_t result = out->reader.Init(); result != ZX_OK) {
+    zx::resource cloned_resource;
+    zx_status_t res = debug_resource.duplicate(ZX_RIGHT_SAME_RIGHTS, &cloned_resource);
+    if (res != ZX_OK) {
       return nullptr;
     }
-
-    return out;
+    return std::make_unique<DrainContext>(zx::clock::get_monotonic(), context,
+                                          std::move(cloned_resource));
   }
 
   ~DrainContext() { trace_release_prolonged_context(context); }

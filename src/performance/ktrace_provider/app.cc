@@ -4,7 +4,6 @@
 
 #include "src/performance/ktrace_provider/app.h"
 
-#include <fidl/fuchsia.tracing.kernel/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
@@ -268,7 +267,7 @@ zx::result<> App::StopKTrace() {
     return res;
   }
 
-  auto drain_context = DrainContext::Create();
+  auto drain_context = DrainContext::Create(debug_resource_);
   if (!drain_context) {
     FX_LOGS(ERROR) << "Failed to start reading kernel buffer";
     return zx::error(ZX_ERR_NO_RESOURCES);
