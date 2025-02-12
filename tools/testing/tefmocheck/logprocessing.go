@@ -13,12 +13,14 @@ import (
 	"strconv"
 
 	"golang.org/x/sync/errgroup"
+
+	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 )
 
 // SplitTestLogs splits logBytes into per-test logs,
 // writes those per-test logs to files in outDir, and returns a slice of TestLogs.
 // The logs will be written to the parent directory of path.
-func SplitTestLogs(logBytes []byte, logBaseName, outDir string, testNames []string) ([]TestLog, error) {
+func SplitTestLogs(logBytes []byte, logBaseName, outDir string, testNames []runtests.TestDetails) ([]TestLog, error) {
 	testLogs, err := splitLogByTest(logBytes, testNames)
 	if err != nil {
 		return nil, err
@@ -32,7 +34,7 @@ func SplitTestLogs(logBytes []byte, logBaseName, outDir string, testNames []stri
 		testIndex := ti // capture
 		g.Go(func() error {
 			testLog := &testLogs[testIndex]
-			destPath := filepath.Join(outDir, strconv.Itoa(testIndex), logBaseName)
+			destPath := filepath.Join(outDir, testLog.TestOutputDir, logBaseName)
 			if err := os.MkdirAll(filepath.Dir(destPath), 0o766); err != nil {
 				return err
 			}
@@ -60,9 +62,10 @@ const testPlanSubmatches = 2
 
 // TestLog represents an individual test's slice of a larger log file.
 type TestLog struct {
-	TestName string
-	Bytes    []byte
-	FilePath string
+	TestName      string
+	TestOutputDir string
+	Bytes         []byte
+	FilePath      string
 	// Index represents the start index of the log within the larger log.
 	Index int
 }
@@ -83,7 +86,7 @@ type TestLog struct {
 // It exists separately because this code was originally written in google3.
 //
 // Returns a slice of TestLogs.
-func splitLogByTest(input []byte, testNames []string) ([]TestLog, error) {
+func splitLogByTest(input []byte, testNames []runtests.TestDetails) ([]TestLog, error) {
 	var ret []TestLog
 	// Everything up to and including tapVersionBytes is a prefix that we skip.
 	tapVersionBytes := []byte("TAP version 13\n")
@@ -106,6 +109,7 @@ func splitLogByTest(input []byte, testNames []string) ([]TestLog, error) {
 			return ret, fmt.Errorf("failed to compile regexp: %v", err)
 		}
 		var testName string
+		var testOutputDir string
 		const testFinishedSubmatches = 3
 		for len(data) > 0 {
 			advanceForLine, line := len(data), data
@@ -133,18 +137,20 @@ func splitLogByTest(input []byte, testNames []string) ([]TestLog, error) {
 						continue
 					} else if testName == "" {
 						newTestName := string(matches[testFinishedSubmatches-1])
-						if newTestName == testNames[testsSeen] {
+						if newTestName == testNames[testsSeen].Name {
 							testName = newTestName
+							testOutputDir = testNames[testsSeen].OutputDir
 						} else {
 							continue
 						}
 					}
 				} else {
 					newTestName := string(matches[1])
-					if testName == "" && newTestName == testNames[testsSeen] {
+					if testName == "" && newTestName == testNames[testsSeen].Name {
 						testName = newTestName
+						testOutputDir = testNames[testsSeen].OutputDir
 						continue
-					} else if testName != "" && int(testsSeen+1) < len(testNames) && newTestName == testNames[testsSeen+1] {
+					} else if testName != "" && int(testsSeen+1) < len(testNames) && newTestName == testNames[testsSeen+1].Name {
 						// A new test started, so reset the data so this line gets
 						// included in the next TestLog.
 						advance -= advanceForLine
@@ -155,7 +161,7 @@ func splitLogByTest(input []byte, testNames []string) ([]TestLog, error) {
 						continue
 					}
 				}
-				ret = append(ret, TestLog{testName, input[i : i+advance], "", i})
+				ret = append(ret, TestLog{testName, testOutputDir, input[i : i+advance], "", i})
 				testsSeen += 1
 				break
 			}

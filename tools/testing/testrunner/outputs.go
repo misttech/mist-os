@@ -40,20 +40,20 @@ func CreateTestOutputs(producer *tap.Producer, outdir string) (*TestOutputs, err
 }
 
 // rebaseOutputFiles takes the list of outputFiles and rebases them against the
-// global OutDir. If an `output file` refers to a directory, all the files in that
+// newOutputDir. If an `output file` refers to a directory, all the files in that
 // directory will be returned in the list of outputs.
-func (o *TestOutputs) rebaseOutputFiles(outputFiles []string, outputDir string) ([]string, error) {
+func (o *TestOutputs) rebaseOutputFiles(outputFiles []string, oldOutputDir, newOutputDir string) ([]string, error) {
 	var allOutputs []string
 	for _, outputFilePath := range outputFiles {
-		outputFilePath = filepath.Join(outputDir, outputFilePath)
+		outputFilePath = filepath.Join(oldOutputDir, outputFilePath)
 		if err := filepath.Walk(outputFilePath, func(path string, info fs.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
 			if !info.IsDir() {
-				pathRel, err := filepath.Rel(o.OutDir, path)
+				pathRel, err := filepath.Rel(newOutputDir, path)
 				if err != nil {
-					return fmt.Errorf("failed to get relative path of %s to %s: %w", path, o.OutDir, err)
+					return fmt.Errorf("failed to get relative path of %s to %s: %w", path, newOutputDir, err)
 				}
 				allOutputs = append(allOutputs, pathRel)
 			}
@@ -81,7 +81,7 @@ func (o *TestOutputs) Record(ctx context.Context, result TestResult) error {
 	}
 
 	// Rebase outputs from test against the global outdir.
-	suiteOutputFiles, err := o.rebaseOutputFiles(result.OutputFiles, result.OutputDir)
+	suiteOutputFiles, err := o.rebaseOutputFiles(result.OutputFiles, result.OutputDir, filepath.Join(o.OutDir, outputRelPath))
 	if err != nil {
 		return fmt.Errorf("error rebasing output files: %w", err)
 	}
@@ -109,12 +109,12 @@ func (o *TestOutputs) Record(ctx context.Context, result TestResult) error {
 			return fmt.Errorf("failed to write stdio file for test %q: %w", result.Name, err)
 		}
 
-		suiteOutputFiles = append(suiteOutputFiles, stdioPath)
+		suiteOutputFiles = append(suiteOutputFiles, runtests.TestOutputFilename)
 	}
 
 	var cases []runtests.TestCaseResult
 	for _, testCase := range result.Cases {
-		caseOutputFiles, err := o.rebaseOutputFiles(testCase.OutputFiles, testCase.OutputDir)
+		caseOutputFiles, err := o.rebaseOutputFiles(testCase.OutputFiles, testCase.OutputDir, filepath.Join(o.OutDir, outputRelPath))
 		if err != nil {
 			return fmt.Errorf("error rebasing output files: %w", err)
 		}
@@ -131,6 +131,7 @@ func (o *TestOutputs) Record(ctx context.Context, result TestResult) error {
 		Name:           result.Name,
 		GNLabel:        result.GNLabel,
 		OutputFiles:    suiteOutputFiles,
+		OutputDir:      outputRelPath,
 		Result:         result.Result,
 		Cases:          cases,
 		StartTime:      result.StartTime,

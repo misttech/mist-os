@@ -111,62 +111,15 @@ func ProcessSummaries(summaries []string, tags []*resultpb.StringPair, outputRoo
 	return requests, allTestsSkipped, nil
 }
 
-// getDuplicates returns a map of the base name of the files to a list
-// of all the files that share the same base name.
-func getDuplicates(files []string) map[string][]string {
-	duplicates := make(map[string][]string)
-	for _, f := range files {
-		duplicates[filepath.Base(f)] = append(duplicates[filepath.Base(f)], f)
-	}
-	return duplicates
-}
-
 // artifactName returns a unique name to correspond to the file which
-// will be uploaded as a resultDB artifact. It will use the base name
-// of the file and prepend the parent directories as necessary to avoid
-// any duplicate names.
-func artifactName(file string, duplicates map[string][]string) string {
-	root := commonRoot(duplicates[filepath.Base(file)])
-	var rel string
-	var err error
-	if root == "." {
-		rel = file
-	}
-	rel, err = filepath.Rel(root, file)
-	if err != nil {
-		rel = file
-	}
-	re := regexp.MustCompile(`[^a-zA-Z0-9-_.]`)
-	invalidChars := re.FindAllString(rel, -1)
+// will be uploaded as a resultDB artifact.
+func artifactName(file string) string {
+	re := regexp.MustCompile(`[^a-zA-Z0-9-_.\/]`)
+	invalidChars := re.FindAllString(file, -1)
 	for _, ch := range invalidChars {
-		rel = strings.ReplaceAll(rel, ch, "_")
+		file = strings.ReplaceAll(file, ch, "_")
 	}
-	return rel
-}
-
-// commonRoot returns the closest common root directory among the files.
-func commonRoot(files []string) string {
-	if len(files) == 0 {
-		return ""
-	}
-	root := filepath.Dir(files[0])
-	noCommonRoot := false
-	for _, f := range files {
-		for {
-			if strings.HasPrefix(f, root+string(os.PathSeparator)) {
-				break
-			}
-			root = filepath.Dir(root)
-			if root == "." {
-				noCommonRoot = true
-				break
-			}
-		}
-		if noCommonRoot {
-			break
-		}
-	}
-	return root
+	return file
 }
 
 // testCaseToResultSink converts TestCaseResult defined in //tools/testing/testparser/result.go
@@ -212,11 +165,10 @@ func testCaseToResultSink(testCases []runtests.TestCaseResult, tags []*resultpb.
 		}
 		r.Expected = determineExpected(testStatus, testCaseStatus)
 		r.Artifacts = make(map[string]*sinkpb.Artifact)
-		duplicates := getDuplicates(testCase.OutputFiles)
 		for _, of := range testCase.OutputFiles {
-			outputFile := filepath.Join(outputRoot, of)
+			outputFile := filepath.Join(outputRoot, testDetail.OutputDir, of)
 			if isReadable(outputFile) {
-				r.Artifacts[artifactName(of, duplicates)] = &sinkpb.Artifact{
+				r.Artifacts[artifactName(of)] = &sinkpb.Artifact{
 					Body: &sinkpb.Artifact_FilePath{FilePath: outputFile},
 				}
 			} else {
@@ -265,11 +217,10 @@ func testDetailsToResultSink(tags []*resultpb.StringPair, testDetail *runtests.T
 		r.Duration = durationpb.New(time.Duration(testDetail.DurationMillis) * time.Millisecond)
 	}
 	r.Artifacts = make(map[string]*sinkpb.Artifact)
-	duplicates := getDuplicates(testDetail.OutputFiles)
 	for _, of := range testDetail.OutputFiles {
-		outputFile := filepath.Join(outputRoot, of)
+		outputFile := filepath.Join(outputRoot, testDetail.OutputDir, of)
 		if isReadable(outputFile) {
-			r.Artifacts[artifactName(of, duplicates)] = &sinkpb.Artifact{
+			r.Artifacts[artifactName(of)] = &sinkpb.Artifact{
 				Body: &sinkpb.Artifact_FilePath{FilePath: outputFile},
 			}
 		} else {

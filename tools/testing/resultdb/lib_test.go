@@ -98,7 +98,7 @@ func TestSetTestDetailsToResultSink(t *testing.T) {
 		artifactNames = append(artifactNames, name)
 	}
 	sort.Strings(artifactNames)
-	if diff := cmp.Diff(artifactNames, []string{"dir-1_outputfile", "dir_2_outputfile"}); diff != "" {
+	if diff := cmp.Diff(artifactNames, []string{"dir-1/outputfile", "dir_2/outputfile"}); diff != "" {
 		t.Errorf("Diff in output files (-got +want):\n%s", diff)
 	}
 }
@@ -149,7 +149,7 @@ func TestSetTestDetailsToResultSink_DefaultFailureReason_ExceedsMaxSize(t *testi
 		artifactNames = append(artifactNames, name)
 	}
 	sort.Strings(artifactNames)
-	if diff := cmp.Diff(artifactNames, []string{"dir-1_outputfile", "dir_2_outputfile"}); diff != "" {
+	if diff := cmp.Diff(artifactNames, []string{"dir-1/outputfile", "dir_2/outputfile"}); diff != "" {
 		t.Errorf("Diff in output files (-got +want):\n%s", diff)
 	}
 }
@@ -183,7 +183,7 @@ func TestSetTestCaseToResultSink(t *testing.T) {
 			artifactNames = append(artifactNames, name)
 		}
 		sort.Strings(artifactNames)
-		if diff := cmp.Diff(artifactNames, []string{"outputfile1", "outputfile2"}); diff != "" {
+		if diff := cmp.Diff(artifactNames, []string{"case/outputfile1", "case/outputfile2"}); diff != "" {
 			t.Errorf("Diff in output files (-got +want):\n%s", diff)
 		}
 	}
@@ -208,7 +208,7 @@ func createTestSummary(testCount int) *runtests.TestSummary {
 func createTestDetailWithTestCase(testCase int, outputRoot string) *runtests.TestDetails {
 	t := []runtests.TestCaseResult{}
 	if outputRoot != "" {
-		for _, f := range []string{"dir-1/outputfile", "dir#2/outputfile", "case/outputfile1", "case/outputfile2"} {
+		for _, f := range []string{"foo/dir-1/outputfile", "foo/dir#2/outputfile", "foo/case/outputfile1", "foo/case/outputfile2"} {
 			outputfile := filepath.Join(outputRoot, f)
 			os.MkdirAll(filepath.Dir(outputfile), os.ModePerm)
 			os.WriteFile(outputfile, []byte("output"), os.ModePerm)
@@ -229,6 +229,7 @@ func createTestDetailWithTestCase(testCase int, outputRoot string) *runtests.Tes
 		Name:                 "foo",
 		GNLabel:              "some label",
 		OutputFiles:          []string{"dir-1/outputfile", "dir#2/outputfile"},
+		OutputDir:            "foo",
 		Result:               runtests.TestSuccess,
 		StartTime:            time.Now(),
 		DurationMillis:       39797,

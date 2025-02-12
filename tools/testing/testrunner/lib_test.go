@@ -229,7 +229,8 @@ func testDetails(name string, runIndex int, duration time.Duration, result runte
 		Name:           name,
 		Result:         result,
 		DurationMillis: duration.Milliseconds(),
-		OutputFiles:    []string{stdioPath(name, runIndex)},
+		OutputFiles:    []string{runtests.TestOutputFilename},
+		OutputDir:      testOutDir(name, runIndex),
 	}
 }
 
@@ -796,7 +797,7 @@ func TestRunAndOutputTests(t *testing.T) {
 					d := succeededTest("foo", 0, defaultDuration)
 					// The output files found in the test out dir will
 					// appear first in the list.
-					d.OutputFiles = append([]string{filepath.Join(testOutDir("foo", 0), "outputfile")}, d.OutputFiles...)
+					d.OutputFiles = append([]string{"outputfile"}, d.OutputFiles...)
 					return d
 				}(),
 				succeededTest("bar", 0, defaultDuration),

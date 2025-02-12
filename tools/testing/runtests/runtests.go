@@ -84,8 +84,11 @@ type TestDetails struct {
 	// GNLabel is label of the test target (with toolchain).
 	GNLabel string `json:"gn_label"`
 
-	// OutputFiles are paths to the test's output files.
+	// OutputFiles are paths to the test's output files relative to the OutputDir.
 	OutputFiles []string `json:"output_files"`
+
+	// OutputDir is the common dir that all the OutputFiles should be located in.
+	OutputDir string `json:"output_dir"`
 
 	// Result is the result of the test.
 	Result TestResult `json:"result"`
