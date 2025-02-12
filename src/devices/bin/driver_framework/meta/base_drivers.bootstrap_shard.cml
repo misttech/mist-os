@@ -117,6 +117,7 @@
         {
             service: [
                 "fuchsia.gpu.magma.Service",
+                "fuchsia.hardware.overnet.Service",
                 "fuchsia.hardware.rtc.Service",
                 "fuchsia.hardware.sockettunnel.Service",
             ],

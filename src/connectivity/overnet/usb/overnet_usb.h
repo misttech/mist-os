@@ -50,8 +50,7 @@ class OvernetUsb : public fdf::DriverBase,
  public:
   explicit OvernetUsb(fdf::DriverStartArgs start_args,
                       fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : DriverBase("overnet-usb", std::move(start_args), std::move(driver_dispatcher)),
-        devfs_connector_(fit::bind_member<&OvernetUsb::FidlConnect>(this)) {}
+      : DriverBase("overnet-usb", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override;
   void PrepareStop(fdf::PrepareStopCompleter Completer) override;
@@ -333,7 +332,6 @@ class OvernetUsb : public fdf::DriverBase,
 
   fidl::SyncClient<fuchsia_driver_framework::Node> node_;
   fidl::SyncClient<fuchsia_driver_framework::NodeController> node_controller_;
-  driver_devfs::Connector<fuchsia_hardware_overnet::Device> devfs_connector_;
   fidl::ServerBindingGroup<fuchsia_hardware_overnet::Device> device_binding_group_;
 
   ddk::UsbFunctionProtocolClient function_;

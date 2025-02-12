@@ -16,13 +16,5 @@
             to: "#remote-control",
             availability: "optional",
         },
-        {
-            directory: "dev-class",
-            from: "void",
-            as: "dev-overnet-usb",
-            to: "#remote-control",
-            subdir: "overnet-usb",
-            availability: "optional",
-        },
     ],
 }

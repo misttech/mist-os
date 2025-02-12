@@ -15,8 +15,17 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
         colocate: "true",
     },
+    capabilities: [
+        { service: "fuchsia.hardware.overnet.Service" },
+    ],
     use: [
         { service: "fuchsia.hardware.usb.function.UsbFunctionService" },
         { protocol: "fuchsia.hardware.usb.endpoint.Endpoint" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.overnet.Service",
+            from: "self",
+        },
     ],
 }

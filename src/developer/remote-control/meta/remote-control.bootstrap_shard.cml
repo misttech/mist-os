@@ -45,12 +45,6 @@
             to: "#remote-control",
         },
         {
-            directory: "dev-overnet-usb",
-            from: "void",
-            to: "#remote-control",
-            availability: "optional",
-        },
-        {
             protocol: [
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.device.NameProvider",

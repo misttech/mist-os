@@ -18,12 +18,9 @@
             availability: "optional",
         },
         {
-            directory: "dev-class",
+            service: [ "fuchsia.hardware.overnet.Service" ],
             from: "parent",
-            as: "dev-overnet-usb",
             to: "#remote-control",
-            subdir: "overnet-usb",
-            availability: "optional",
         },
     ],
 }

@@ -444,8 +444,7 @@ class OvernetUsbTest : public zxtest::Test {
       env.function_.ExpectGetRequestSize(0);
     });
     ASSERT_OK(driver_test().StartDriver().status_value());
-    auto device =
-        driver_test().ConnectThroughDevfs<fuchsia_hardware_overnet::Device>("overnet_usb");
+    auto device = driver_test().Connect<fuchsia_hardware_overnet::Service::Device>();
     EXPECT_OK(device.status_value());
     client_.Bind(std::move(device.value()));
   }

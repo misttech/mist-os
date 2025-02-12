@@ -107,7 +107,6 @@ const std::unordered_map<std::string_view, ServiceEntry> kClassNameToService = {
     {"network",
      {ServiceEntry::kDevfs, "", ""}},  // Protocol: "fuchsia.hardware.network.DeviceInstance",
     {"ot-radio", {ServiceEntry::kDevfs, "", ""}},
-    {"overnet-usb", {ServiceEntry::kDevfs, "", ""}},
     {"power-sensor", {ServiceEntry::kDevfs, "", ""}},
     {"power", {ServiceEntry::kDevfs, "", ""}},  // Proto: "fuchsia.hardware.powersource.Source",
     {"radar", {ServiceEntry::kDevfs, "", ""}},  // Proto: fuchsia.hardware.radar.RadarBurstReader

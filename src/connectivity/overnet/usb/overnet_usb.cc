@@ -125,19 +125,7 @@ zx::result<> OvernetUsb::Start() {
 
   function_.SetInterface(this, &usb_function_interface_protocol_ops_);
 
-  auto connector = devfs_connector_.Bind(dispatcher_);
-
-  if (connector.is_error()) {
-    FDF_SLOG(ERROR, "devfs_connector_.Bind() failed", KV("error", connector.status_string()));
-    return connector.take_error();
-  }
-
-  fdf::DevfsAddArgs devfs;
-  devfs.connector(std::move(connector.value()));
-  devfs.class_name("overnet-usb");
-
   fdf::NodeAddArgs args;
-  args.devfs_args(std::move(devfs));
   args.name("overnet_usb");
 
   auto controller_eps = fidl::CreateEndpoints<fdf::NodeController>();
@@ -165,6 +153,17 @@ zx::result<> OvernetUsb::Start() {
     FDF_SLOG(ERROR, "Could not add child node",
              KV("error", result.error_value().FormatDescription()));
     return zx::error(ZX_ERR_INTERNAL);
+  }
+
+  fuchsia_hardware_overnet::Service::InstanceHandler handler({
+      .device = fit::bind_member<&OvernetUsb::FidlConnect>(this),
+  });
+
+  auto service_result =
+      outgoing()->AddService<fuchsia_hardware_overnet::Service>(std::move(handler));
+  if (result.is_error()) {
+    FDF_LOG(ERROR, "Failed to add service: %s", service_result.status_string());
+    return service_result.take_error();
   }
 
   return zx::ok();

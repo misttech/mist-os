@@ -20,3 +20,7 @@ closed protocol Device {
         callback client_end:Callback;
     }) -> ();
 };
+
+service Service {
+    device client_end:Device;
+};
