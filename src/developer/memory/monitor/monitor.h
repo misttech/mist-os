@@ -35,17 +35,16 @@ class MemoryBandwidthInspectTest;
 class Monitor : public fidl::Server<fuchsia_memory_inspection::Collector>,
                 public fidl::Server<fuchsia_memorypressure::Watcher> {
  public:
-  Monitor(const fxl::CommandLine& command_line, async_dispatcher_t* dispatcher,
-          memory_monitor_config::Config config, memory::CaptureMaker capture_maker,
-          std::optional<fidl::Client<fuchsia_memorypressure::Provider>> pressure_provider =
-              std::nullopt,
-          std::optional<zx_handle_t> root_job = std::nullopt,
-          std::optional<fidl::Client<fuchsia_metrics::MetricEventLoggerFactory>>
-              metric_event_logger_factory = std::nullopt);
+  Monitor(
+      const fxl::CommandLine& command_line, async_dispatcher_t* dispatcher,
+      memory_monitor_config::Config config, memory::CaptureMaker capture_maker,
+      std::optional<fidl::Client<fuchsia_memorypressure::Provider>> pressure_provider =
+          std::nullopt,
+      std::optional<zx_handle_t> root_job = std::nullopt,
+      std::optional<fidl::Client<fuchsia_metrics::MetricEventLoggerFactory>>
+          metric_event_logger_factory = std::nullopt,
+      std::optional<fidl::Client<fuchsia_hardware_ram_metrics::Device>> ram_device = std::nullopt);
   ~Monitor() override = default;
-
-  // For memory bandwidth measurement, SetRamDevice should be called once
-  void SetRamDevice(fidl::Client<fuchsia_hardware_ram_metrics::Device> device);
 
   // Writes a memory capture and the bucket definition to |socket| in JSON,
   // in UTF-8.
@@ -100,7 +99,7 @@ class Monitor : public fidl::Server<fuchsia_memory_inspection::Collector>,
   std::vector<memory::BucketMatch> bucket_matches_;
   memory::Digester digester_;
   std::mutex digester_mutex_;
-  fidl::Client<fuchsia_hardware_ram_metrics::Device> ram_device_;
+  std::optional<fidl::Client<fuchsia_hardware_ram_metrics::Device>> ram_device_;
   uint64_t pending_bandwidth_measurements_ = 0;
   pressure_signaler::Level level_;
 

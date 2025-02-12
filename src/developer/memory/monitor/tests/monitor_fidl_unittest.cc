@@ -100,27 +100,20 @@ class MockLoggerFactory : public fidl::Server<fuchsia_metrics::MetricEventLogger
 class MemoryBandwidthInspectTest : public gtest::TestLoopFixture {
  public:
   MemoryBandwidthInspectTest() : executor_(dispatcher()), logger_factory_(dispatcher()) {
-    // Create metrics
-    {
-      auto endpoints = fidl::CreateEndpoints<fuchsia_metrics::MetricEventLoggerFactory>();
-      fidl::BindServer<fuchsia_metrics::MetricEventLoggerFactory>(
-          dispatcher(), std::move(endpoints->server), &logger_factory_);
-      monitor_ = std::make_unique<Monitor>(
-          fxl::CommandLine{}, dispatcher(), memory_monitor_config::Config{},
-          *memory::CaptureMaker::Create(memory::CreateDefaultOS()),
-          /* pressure_provider */ std::nullopt, /* root_job */ std::nullopt,
-          fidl::Client<fuchsia_metrics::MetricEventLoggerFactory>{std::move(endpoints->client),
-                                                                  dispatcher()});
-      RunLoopUntilIdle();
-    }
-    // Set RamDevice
-    {
-      auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_ram_metrics::Device>();
-      fidl::BindServer<fuchsia_hardware_ram_metrics::Device>(
-          dispatcher(), std::move(endpoints->server), &fake_device_);
-      monitor_->SetRamDevice(fidl::Client(std::move(endpoints->client), dispatcher()));
-      RunLoopUntilIdle();
-    }
+    auto logger_endpoints = fidl::CreateEndpoints<fuchsia_metrics::MetricEventLoggerFactory>();
+    fidl::BindServer<fuchsia_metrics::MetricEventLoggerFactory>(
+        dispatcher(), std::move(logger_endpoints->server), &logger_factory_);
+    auto ram_endpoints = fidl::CreateEndpoints<fuchsia_hardware_ram_metrics::Device>();
+    fidl::BindServer<fuchsia_hardware_ram_metrics::Device>(
+        dispatcher(), std::move(ram_endpoints->server), &fake_device_);
+    monitor_ =
+        std::make_unique<Monitor>(fxl::CommandLine{}, dispatcher(), memory_monitor_config::Config{},
+                                  *memory::CaptureMaker::Create(memory::CreateDefaultOS()),
+                                  /* pressure_provider */ std::nullopt, /* root_job */ std::nullopt,
+                                  fidl::Client<fuchsia_metrics::MetricEventLoggerFactory>{
+                                      std::move(logger_endpoints->client), dispatcher()},
+                                  fidl::Client(std::move(ram_endpoints->client), dispatcher()));
+    RunLoopUntilIdle();
   }
 
   void RunPromiseToCompletion(fpromise::promise<> promise) {

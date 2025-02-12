@@ -131,7 +131,8 @@ Monitor::Monitor(const fxl::CommandLine& command_line, async_dispatcher_t* dispa
                  memory_monitor_config::Config config, memory::CaptureMaker capture_maker,
                  std::optional<fidl::Client<fuchsia_memorypressure::Provider>> pressure_provider,
                  std::optional<zx_handle_t> root_job,
-                 std::optional<fidl::Client<fuchsia_metrics::MetricEventLoggerFactory>> factory)
+                 std::optional<fidl::Client<fuchsia_metrics::MetricEventLoggerFactory>> factory,
+                 std::optional<fidl::Client<fuchsia_hardware_ram_metrics::Device>> ram_device)
     : capture_maker_(std::move(capture_maker)),
       high_water_(
           "/cache", kHighWaterPollFrequency, kHighWaterThreshold, dispatcher,
@@ -152,6 +153,7 @@ Monitor::Monitor(const fxl::CommandLine& command_line, async_dispatcher_t* dispa
       metric_event_logger_factory_(std::move(factory)),
       bucket_matches_(CreateBucketMatchesFromConfigData()),
       digester_(bucket_matches_),
+      ram_device_(std::move(ram_device)),
       level_(pressure_signaler::Level::kNumLevels) {
   if (metric_event_logger_factory_)
     CreateMetrics();
@@ -245,13 +247,11 @@ Monitor::Monitor(const fxl::CommandLine& command_line, async_dispatcher_t* dispa
     watch_task_.Post(imminent_oom_loop_.dispatcher());
   }
 
-  SampleAndPost();
-}
-
-void Monitor::SetRamDevice(fidl::Client<fuchsia_hardware_ram_metrics::Device> device) {
-  ram_device_ = std::move(device);
-  if (ram_device_.is_valid())
+  // Bandwidth monitoring
+  if (ram_device_) {
     PeriodicMeasureBandwidth();
+  }
+  SampleAndPost();
 }
 
 void Monitor::CreateMetrics() {
@@ -462,6 +462,8 @@ void Monitor::SampleAndPost() {
 }
 
 void Monitor::MeasureBandwidthAndPost() {
+  if (!ram_device_)
+    return;
   // Bandwidth measurements are cheap but they take some time to
   // perform as they run over a number of memory cycles. In order to
   // support a relatively small cycle count for measurements, we keep
@@ -481,7 +483,8 @@ void Monitor::MeasureBandwidthAndPost() {
       cycles_to_measure = kMemCyclesToMeasureHighPrecision;
     }
     ++pending_bandwidth_measurements_;
-    ram_device_->MeasureBandwidth({{BuildConfig(cycles_to_measure, trace_high_precision)}})
+    (*ram_device_)
+        ->MeasureBandwidth({{BuildConfig(cycles_to_measure, trace_high_precision)}})
         .Then([this, cycles_to_measure, trace_high_precision_camera](
                   fidl::Result<fuchsia_hardware_ram_metrics::Device::MeasureBandwidth>& result) {
           --pending_bandwidth_measurements_;
@@ -532,6 +535,8 @@ void Monitor::MeasureBandwidthAndPost() {
 }
 
 void Monitor::PeriodicMeasureBandwidth() {
+  if (!ram_device_)
+    return;
   std::chrono::seconds seconds_to_sleep = std::chrono::seconds(1);
   async::PostDelayedTask(
       dispatcher_, [this]() { PeriodicMeasureBandwidth(); }, zx::sec(seconds_to_sleep.count()));
@@ -541,7 +546,8 @@ void Monitor::PeriodicMeasureBandwidth() {
     return;
 
   uint64_t cycles_to_measure = kMemCyclesToMeasure;
-  ram_device_->MeasureBandwidth({{BuildConfig(cycles_to_measure)}})
+  (*ram_device_)
+      ->MeasureBandwidth({{BuildConfig(cycles_to_measure)}})
       .Then([this, cycles_to_measure](
                 fidl::Result<fuchsia_hardware_ram_metrics::Device::MeasureBandwidth>& result) {
         if (result.is_error()) {
@@ -579,7 +585,7 @@ void Monitor::UpdateState() {
         if (!logging_) {
           SampleAndPost();
         }
-        if (ram_device_.is_valid()) {
+        if (ram_device_) {
           MeasureBandwidthAndPost();
         }
       }
