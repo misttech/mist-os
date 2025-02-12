@@ -26,7 +26,7 @@ func TestFFXInstance(t *testing.T) {
 	}
 	fakeClock := clock.NewFakeClock()
 	ctx := clock.NewContext(context.Background(), fakeClock)
-	ffx, _ := NewFFXInstance(ctx, ffxPath, tmpDir, []string{}, "target", filepath.Join(tmpDir, "sshKey"), filepath.Join(tmpDir, "out"))
+	ffx, _ := NewFFXInstance(ctx, ffxPath, tmpDir, []string{}, "target", filepath.Join(tmpDir, "sshKey"), filepath.Join(tmpDir, "out"), UseFFXLegacy)
 
 	var buf []byte
 	stdout := bytes.NewBuffer(buf)
