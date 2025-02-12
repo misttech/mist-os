@@ -113,12 +113,10 @@ const std::unordered_map<std::string_view, ServiceEntry> kClassNameToService = {
     {"registers", {ServiceEntry::kDevfsAndService, "fuchsia.hardware.registers.Service", "device"}},
     {"rtc", {ServiceEntry::kDevfsAndService, "fuchsia.hardware.rtc.Service", "device"}},
     {"sdio", {ServiceEntry::kDevfsAndService, "fuchsia.hardware.sdio.DriverService", "device"}},
-    // {"securemem", {ServiceEntry::kDevfs, "", ""}},  // Proto: fuchsia.hardware.securemem.Device
     {"serial", {ServiceEntry::kDevfs, "", ""}},
     {"skip-block",
      {ServiceEntry::kDevfs, "", ""}},  // Protocol: "fuchsia.hardware.skipblock.SkipBlock",
     {"spi", {ServiceEntry::kDevfs, "", ""}},
-    {"sysmem", {ServiceEntry::kDevfs, "", ""}},
     {"tee", {ServiceEntry::kDevfs, "fuchsia.hardware.tee.Service", "device_connector"}},
     {"temperature", {ServiceEntry::kDevfs, "", ""}},  // Proto: fuchsia.hardware.temperature.Device
     {"test", {ServiceEntry::kDevfs, "", ""}},
@@ -166,9 +164,6 @@ std::unordered_map<std::string_view, uint8_t> classes_that_assume_ordering({
 
     // TODO(https://fxbug.dev/42065072): Remove.
     {"ot-radio", 0},
-
-    // TODO(https://fxbug.dev/42065076): Remove.
-    {"securemem", 0},
 
     // TODO(https://fxbug.dev/42065009): Remove.
     // TODO(https://fxbug.dev/42065080): Remove.
