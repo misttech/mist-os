@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::device::DeviceMode;
+use crate::fs::proc::cgroups::cgroups_node;
 use crate::fs::proc::cpuinfo::CpuinfoFile;
 use crate::fs::proc::device_tree::device_tree_node;
 use crate::fs::proc::devices::devices_node;
@@ -80,11 +81,7 @@ impl ProcDirectory {
             "kmsg".into() => kmsg_node(current_task, fs),
             "kallsyms".into() => kallsyms_node(current_task, fs),
             "mounts".into() => MountsSymlink::new_node(current_task, fs),
-            "cgroups".into() => fs.create_node(
-                current_task,
-                BytesFile::new_node(vec![]),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
+            "cgroups".into() => cgroups_node(current_task, fs),
             "stat".into() => fs.create_node(
                 current_task,
                 StatFile::new_node(&kernel.stats),

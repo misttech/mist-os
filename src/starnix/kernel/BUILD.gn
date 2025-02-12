@@ -144,6 +144,7 @@ rustc_library("starnix_core") {
     "fs/nmfs/fs.rs",
     "fs/nmfs/manager.rs",
     "fs/nmfs/mod.rs",
+    "fs/proc/cgroups.rs",
     "fs/proc/cpuinfo.rs",
     "fs/proc/device_tree.rs",
     "fs/proc/devices.rs",
