@@ -20,7 +20,6 @@ def _fuchsia_toolchain_info_impl(ctx):
         cmc_manifest = ctx.file.cmc_manifest,
         cmc_includes = ctx.attr.cmc_includes or None,
         elf_test_runner_shard = ctx.attr.elf_test_runner_shard,
-        far = ctx.executable.far,
         ffx = ctx.executable.ffx,
         ffx_assembly = ctx.executable.ffx_assembly or None,
         ffx_assembly_fho_meta = ctx.file.ffx_assembly_fho_meta or None,
@@ -138,13 +137,6 @@ included in the Fuchsia IDK.
         "elf_test_runner_shard": attr.string(
             doc = "The path to the elf test runner's cml shard.",
             mandatory = True,
-        ),
-        "far": attr.label(
-            doc = "far tool executable.",
-            mandatory = True,
-            cfg = "exec",
-            executable = True,
-            allow_single_file = True,
         ),
         "ffx": attr.label(
             doc = "ffx tool executable.",
