@@ -2,10 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/42169836): Refactor these into a generic ValueList
-mod selector_list;
-mod string_list;
-
 use anyhow::{bail, Context as _, Error};
 use fuchsia_inspect as inspect;
 use futures::FutureExt;
@@ -17,9 +13,17 @@ use serde::Deserialize;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use string_list::StringList;
+
+// TODO(https://fxbug.dev/42169836): Refactor these into a generic ValueList
+mod common;
+pub mod runtime;
+mod selector_list;
+mod string_list;
+pub mod user_facing;
+mod utils;
 
 pub use selector_list::{ParsedSelector, SelectorList};
+use string_list::StringList;
 
 const MONIKER_INTERPOLATION: &str = "{MONIKER}";
 const INSTANCE_ID_INTERPOLATION: &str = "{INSTANCE_ID}";
@@ -758,7 +762,10 @@ mod tests {
             .sampler_dir(load_path)
             .load();
         assert!(config.is_ok());
-        assert_eq!(config.as_ref().unwrap().project_configs[0].metrics[0].event_codes, vec![]);
+        assert_eq!(
+            config.as_ref().unwrap().project_configs[0].metrics[0].event_codes,
+            Vec::<u32>::new()
+        );
     }
 
     #[fuchsia::test]

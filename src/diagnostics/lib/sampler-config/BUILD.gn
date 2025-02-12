@@ -39,9 +39,13 @@ rustc_library("sampler-config") {
   ]
 
   sources = [
+    "src/common.rs",
     "src/lib.rs",
+    "src/runtime/mod.rs",
     "src/selector_list.rs",
     "src/string_list.rs",
+    "src/user_facing/mod.rs",
+    "src/utils.rs",
   ]
 
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
