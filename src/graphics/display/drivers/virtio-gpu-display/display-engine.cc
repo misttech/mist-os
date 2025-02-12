@@ -425,14 +425,13 @@ zx_status_t DisplayEngine::Start() {
   FDF_LOG(INFO,
           "Found display at (%" PRIu32 ", %" PRIu32 ") size %" PRIu32 "x%" PRIu32
           ", flags 0x%08" PRIx32,
-          current_display_.scanout_info.geometry.placement_x,
-          current_display_.scanout_info.geometry.placement_y,
+          current_display_.scanout_info.geometry.x, current_display_.scanout_info.geometry.y,
           current_display_.scanout_info.geometry.width,
           current_display_.scanout_info.geometry.height, current_display_.scanout_info.flags);
 
   // Set the mouse cursor position to (0,0); the result is not critical.
   zx::result<uint32_t> move_cursor_result =
-      gpu_device_->SetCursorPosition(current_display_.scanout_id, 0, 0, 0);
+      gpu_device_->SetCursorPosition(current_display_.scanout_id, 0, 0);
   if (move_cursor_result.is_error()) {
     FDF_LOG(WARNING, "Failed to move cursor: %s", move_cursor_result.status_string());
   }

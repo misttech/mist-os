@@ -48,11 +48,11 @@ zx::result<uint32_t> VirtioGpuDevice::UpdateCursor() {
   return zx::ok(command.resource_id);
 }
 
-zx::result<uint32_t> VirtioGpuDevice::SetCursorPosition(uint32_t scanout_id, uint32_t x, uint32_t y,
-                                                        uint32_t padding) {
+zx::result<uint32_t> VirtioGpuDevice::SetCursorPosition(uint32_t scanout_id, uint32_t x,
+                                                        uint32_t y) {
   const virtio_abi::UpdateCursorCommand command = {
       .header = {.type = virtio_abi::ControlType::kMoveCursorCommand},
-      .pos = {.scanout_id = scanout_id, .x = x, .y = y, .padding = padding},
+      .position = {.scanout_id = scanout_id, .x = x, .y = y},
       // The fields below are ignored by the Move Cursor command.
       .resource_id = 0,
       .hot_x = 0,
@@ -108,7 +108,7 @@ zx::result<fbl::Vector<DisplayInfo>> VirtioGpuDevice::GetDisplayInfo() {
     FDF_LOG(TRACE,
             "Scanout %d: placement (%" PRIu32 ", %" PRIu32 "), resolution %" PRIu32 "x%" PRIu32
             " flags 0x%08" PRIx32,
-            i, scanout.geometry.placement_x, scanout.geometry.placement_y, scanout.geometry.width,
+            i, scanout.geometry.x, scanout.geometry.y, scanout.geometry.width,
             scanout.geometry.height, scanout.flags);
 
     ZX_DEBUG_ASSERT(display_infos.size() < enabled_scanout_count);
@@ -195,13 +195,7 @@ zx::result<> VirtioGpuDevice::SetScanoutProperties(uint32_t scanout_id, uint32_t
 
   const virtio_abi::SetScanoutCommand command = {
       .header = {.type = virtio_abi::ControlType::kSetScanoutCommand},
-      .geometry =
-          {
-              .placement_x = 0,
-              .placement_y = 0,
-              .width = width,
-              .height = height,
-          },
+      .image_source = {.x = 0, .y = 0, .width = width, .height = height},
       .scanout_id = scanout_id,
       .resource_id = resource_id,
   };
@@ -222,7 +216,7 @@ zx::result<> VirtioGpuDevice::FlushResource(uint32_t resource_id, uint32_t width
 
   virtio_abi::FlushResourceCommand command = {
       .header = {.type = virtio_abi::ControlType::kFlushResourceCommand},
-      .geometry = {.placement_x = 0, .placement_y = 0, .width = width, .height = height},
+      .image_source = {.x = 0, .y = 0, .width = width, .height = height},
       .resource_id = resource_id,
   };
 
@@ -243,13 +237,7 @@ zx::result<> VirtioGpuDevice::TransferToHost2D(uint32_t resource_id, uint32_t wi
 
   virtio_abi::Transfer2DResourceToHostCommand command = {
       .header = {.type = virtio_abi::ControlType::kTransfer2DResourceToHostCommand},
-      .geometry =
-          {
-              .placement_x = 0,
-              .placement_y = 0,
-              .width = width,
-              .height = height,
-          },
+      .image_source = {.x = 0, .y = 0, .width = width, .height = height},
       .destination_offset = 0,
       .resource_id = resource_id,
   };

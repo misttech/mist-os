@@ -25,9 +25,9 @@ static_assert(std::is_standard_layout_v<EmptyResponse>);
 static_assert(sizeof(EmptyResponse) == 24);
 static_assert(alignof(EmptyResponse) == 8);
 
-static_assert(std::is_standard_layout_v<ScanoutGeometry>);
-static_assert(sizeof(ScanoutGeometry) == 16);
-static_assert(alignof(ScanoutGeometry) == 4);
+static_assert(std::is_standard_layout_v<Rectangle>);
+static_assert(sizeof(Rectangle) == 16);
+static_assert(alignof(Rectangle) == 4);
 
 static_assert(std::is_standard_layout_v<ScanoutInfo>);
 static_assert(sizeof(ScanoutInfo) == 24);

@@ -9,7 +9,7 @@
 // Device (VIRTIO) specification, which can be downloaded from
 // https://docs.oasis-open.org/virtio/virtio/
 //
-// virtio12 is Version 1.2, Committee Specification 01, dated 01 July 2022.
+// virtio13 is Version 1.3, Committee Specification 01, dated 06 October 2023.
 
 // We map the specification types "le32" and "le64" (little-endian 32/64-bit
 // integers) to uint32_t and uint64_t, because Fuchsia only supports
@@ -39,11 +39,18 @@ enum class CapsetId : uint32_t {
 
 // GPU device configuration.
 //
-// struct virtio_gpu_config in virtio12 5.7.4 "Device configuration layout"
+// struct virtio_gpu_config in virtio13 5.7.4 "Device configuration layout"
 struct GpuDeviceConfig {
   using Events = uint32_t;
 
-  // VIRTIO_GPU_EVENT_DISPLAY
+  // Informs the driver that the display configuration has changed.
+  //
+  // The driver is recommended to issue a `ControlType::kGetDisplayInfoCommand`
+  // command and update its internal state to reflect changes. If the driver
+  // supports EDID, it is also recommended to issue a
+  // `ControlType::kGetExtendedDisplayIdCommand` to update its EDID information.
+  //
+  // VIRTIO_GPU_EVENT_DISPLAY in virtio13 5.7.4.2 "Events"
   static constexpr Events kDisplayConfigChanged = 1 << 0;
 
   // The driver must not write to this field.
@@ -63,8 +70,10 @@ struct GpuDeviceConfig {
 
 // Type discriminant for driver commands and device responses.
 //
-// enum virtio_gpu_ctrl_type in virtio12 5.7.6.7 "Device Operation: Request
+// enum virtio_gpu_ctrl_type in virtio13 5.7.6.7 "Device Operation: Request
 // header"
+//
+// NOLINTNEXTLINE(performance-enum-size): The enum size follows a standard.
 enum class ControlType : uint32_t {
   // Command encoded by `GetDisplayInfoCommand`.
   //
@@ -120,6 +129,16 @@ enum class ControlType : uint32_t {
   // VIRTIO_GPU_CMD_SET_SCANOUT_BLOB
   kSetScanoutBlobCommand = 0x010d,
 
+  // Command encoded by `UpdateCursorCommand`.
+  //
+  // VIRTIO_GPU_CMD_UPDATE_CURSOR
+  kUpdateCursorCommand = 0x0300,
+
+  // Command encoding reuses the `UpdateCursorCommand` structure.
+  //
+  // VIRTIO_GPU_CMD_MOVE_CURSOR
+  kMoveCursorCommand = 0x0301,
+
   // Response encoded by `EmptyResponse`.
   //
   // VIRTIO_GPU_RESP_OK_NODATA
@@ -162,22 +181,12 @@ enum class ControlType : uint32_t {
 
   // VIRTIO_GPU_RESP_ERR_INVALID_PARAMETER
   kInvalidParameterError = 0x1205,
-
-  // Command encoded by `UpdateCursorCommand`.
-  //
-  // VIRTIO_GPU_CMD_UPDATE_CURSOR
-  kUpdateCursorCommand = 0x0300,
-
-  // Command encoding reuses the `UpdateCursorCommand` structure.
-  //
-  // VIRTIO_GPU_CMD_MOVE_CURSOR
-  kMoveCursorCommand = 0x0301,
 };
 
 // Descriptor for logging and debugging.
 const char* ControlTypeToString(ControlType type);
 
-// struct virtio_gpu_ctrl_hdr in virtio12 5.7.6.7 "Device Operation: Request
+// struct virtio_gpu_ctrl_hdr in virtio13 5.7.6.7 "Device Operation: Request
 // header"
 struct ControlHeader {
   using Flags = uint32_t;
@@ -228,30 +237,37 @@ struct EmptyResponse {
 // Populates a `DisplayInfoResponse` with the current output configuration.
 using GetDisplayInfoCommand = EmptyCommand;
 
-// struct virtio_gpu_rect in virtio12 5.7.6.8 "Device Operation: controlq",
+// struct virtio_gpu_rect in virtio13 5.7.6.8 "Device Operation: controlq",
 // under the VIRTIO_GPU_CMD_GET_DISPLAY_INFO command description
-struct ScanoutGeometry {
-  // Placement relative to other displays.
+struct Rectangle {
+  // The x coordinate of the top-left corner.
   //
-  // 0 is the left, axis points to the right.
-  uint32_t placement_x;
+  // 0 is the origin, the X axis points to the right.
+  uint32_t x;
 
   // Position relative to other displays.
   //
-  // 0 is the top, axis points down.
-  uint32_t placement_y;
+  // 0 is the origin, the Y axis points down.
+  uint32_t y;
 
-  // The display's horizontal resolution, in pixels.
+  // The horizontal size, in pixels.
   uint32_t width;
 
-  // The display's vertical resolution, in pixels.
+  // The vertical size, in pixels.
   uint32_t height;
 };
 
-// struct virtio_gpu_display_one in virtio12 5.7.6.8 "Device Operation:
+// struct virtio_gpu_display_one in virtio13 5.7.6.8 "Device Operation:
 // controlq", under the VIRTIO_GPU_CMD_GET_DISPLAY_INFO command description
 struct ScanoutInfo {
-  ScanoutGeometry geometry;
+  // The scanout's dimensions and placement relative to other scanouts.
+  //
+  // The width and height represent the display's dimensions. The dimensions can
+  // change, because the user can resize the window representing the scanout.
+  //
+  // The position can be used to reason about the scanout's position, in
+  // relation to other scanouts.
+  Rectangle geometry;
 
   // True as long as the display is "connected" (enabled by the user).
   //
@@ -265,14 +281,7 @@ struct ScanoutInfo {
   uint32_t flags;
 };
 
-struct CursorPos {
-  uint32_t scanout_id;
-  uint32_t x;
-  uint32_t y;
-  uint32_t padding;
-};
-
-// VIRTIO_GPU_MAX_SCANOUTS in virtio12 5.7.6.8 "Device Operation: controlq",
+// VIRTIO_GPU_MAX_SCANOUTS in virtio13 5.7.6.8 "Device Operation: controlq",
 // under the VIRTIO_GPU_CMD_GET_DISPLAY_INFO command description
 constexpr int kMaxScanouts = 16;
 
@@ -287,10 +296,12 @@ struct DisplayInfoResponse {
   ScanoutInfo scanouts[kMaxScanouts];
 };
 
-// enum virtio_gpu_formats in virtio12 5.7.6.8 "Device Operation:
+// enum virtio_gpu_formats in virtio13 5.7.6.8 "Device Operation:
 // controlq", under the VIRTIO_GPU_CMD_RESOURCE_CREATE_2D command description
+//
+// NOLINTNEXTLINE(performance-enum-size): The enum size follows a standard.
 enum class ResourceFormat : uint32_t {
-  // Equivalent to [`fuchsia.images2/PixelFormat.BGRA32`]
+  // Equivalent to [`fuchsia.images2/PixelFormat.B8G8R8A8`]
   //
   // VIRTIO_GPU_FORMAT_B8G8R8A8_UNORM
   kBgra32 = 1,
@@ -315,18 +326,18 @@ enum class ResourceFormat : uint32_t {
   // VIRTIO_GPU_FORMAT_A8B8G8R8_UNORM
   kAbgr32 = 121,
 
-  // VIRTIO_GPU_FORMAT_A8B8G8R8_UNORM
+  // VIRTIO_GPU_FORMAT_R8G8B8X8_UNORM
   kRgbx32 = 134,
 };
 
 // Resource ID that has a special meaning in at least one operation.
 //
-// virtio12 5.7.6.8 "Device Operation: controlq", the
+// virtio13 5.7.6.8 "Device Operation: controlq", the
 // VIRTIO_GPU_CMD_SET_SCANOUT command description states that using a resource
 // ID with this value disables the scanout.
 constexpr uint32_t kInvalidResourceId = 0;
 
-// struct virtio_gpu_resource_create_2d in virtio12 5.7.6.8 "Device Operation:
+// struct virtio_gpu_resource_create_2d in virtio13 5.7.6.8 "Device Operation:
 // controlq", under the VIRTIO_GPU_CMD_RESOURCE_CREATE_2D command description
 struct Create2DResourceCommand {
   // `type` must be `kCreate2DResourceCommand`.
@@ -338,32 +349,21 @@ struct Create2DResourceCommand {
   uint32_t height;
 };
 
-// struct virtio_gpu_update_cursor in virtio12 5.7.6.10 "Device Operation:
-// cursorq", under the VIRTIO_GPU_CMD_UPDATE_CURSOR and
-// VIRTIO_GPU_CMD_MOVE_CURSOR command descriptions.
-struct UpdateCursorCommand {
-  // `type` must be `kUpdateCursorCommand` or `kMoveCursorCommand`.
-  ControlHeader header;
-  CursorPos pos;
-
-  // Ignored when `type` is `kMoveCursorCommand`
-  uint32_t resource_id;
-  uint32_t hot_x;
-  uint32_t hot_y;
-  uint32_t padding;
-};
-
 // Sets scanout parameters for a single output.
 //
 // The response does not have any data.
 //
-// struct virtio_gpu_set_scanout in virtio12 5.7.6.8 "Device Operation:
+// struct virtio_gpu_set_scanout in virtio13 5.7.6.8 "Device Operation:
 // controlq", under the VIRTIO_GPU_CMD_SET_SCANOUT command description
 struct SetScanoutCommand {
   // `type` must be `kSetScanoutCommand`.
   ControlHeader header;
 
-  ScanoutGeometry geometry;
+  // The area of the `resource_id` image used by the scanout.
+  //
+  // The area must be entirely contained within the resource's dimensions.
+  Rectangle image_source;
+
   uint32_t scanout_id;
 
   // kInvalidResourceId means that the scanout is disabled.
@@ -374,13 +374,18 @@ struct SetScanoutCommand {
 //
 // The response does not have any data.
 //
-// struct virtio_gpu_resource_flush in virtio12 5.7.6.8 "Device Operation:
+// struct virtio_gpu_resource_flush in virtio13 5.7.6.8 "Device Operation:
 // controlq", under the VIRTIO_GPU_CMD_RESOURCE_FLUSH command description
 struct FlushResourceCommand {
   // `type` must be `kFlushResourceCommand`.
   ControlHeader header;
 
-  ScanoutGeometry geometry;
+  // The area of the `resource_id` image to be flushed.
+  //
+  // The area must be entirely contained within the resource's dimensions.
+  //
+  // All scanouts that use this area of `resource_id` will be updated.
+  Rectangle image_source;
 
   // Any scanouts that use this resource will be flushed.
   uint32_t resource_id;
@@ -390,14 +395,14 @@ struct FlushResourceCommand {
 //
 // The response does not have any data.
 //
-// struct virtio_gpu_transfer_to_host_2d in virtio12 5.7.6.8 "Device Operation:
+// struct virtio_gpu_transfer_to_host_2d in virtio13 5.7.6.8 "Device Operation:
 // controlq", under the VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D command description
 struct Transfer2DResourceToHostCommand {
   // `type` must be `kTransfer2DResourceToHostCommand`.
   ControlHeader header;
 
-  // Box to be transferred to the host.
-  ScanoutGeometry geometry;
+  // The area of the `resource_id` image to be transferred to the host.
+  Rectangle image_source;
 
   uint64_t destination_offset;
   uint32_t resource_id;
@@ -407,7 +412,7 @@ struct Transfer2DResourceToHostCommand {
 //
 // The response does not have any data.
 //
-// struct virtio_gpu_mem_entry in virtio12 5.7.6.8 "Device Operation:
+// struct virtio_gpu_mem_entry in virtio13 5.7.6.8 "Device Operation:
 // controlq", under the VIRTIO_GPU_CMD_RESOURCE_ATTACH_BACKING command
 // description
 struct MemoryEntry {
@@ -420,7 +425,7 @@ struct MemoryEntry {
 // The response does not have any data.
 //
 // Typesafe combination of struct virtio_gpu_resource_attach_backing and
-// struct virtio_gpu_mem_entry in virtio12 5.7.6.8 "Device Operation: controlq",
+// struct virtio_gpu_mem_entry in virtio13 5.7.6.8 "Device Operation: controlq",
 // under the VIRTIO_GPU_CMD_RESOURCE_ATTACH_BACKING command
 template <uint32_t N>
 struct AttachResourceBackingCommand {
@@ -434,7 +439,7 @@ struct AttachResourceBackingCommand {
 struct GetCapsetInfoCommand {
   ControlHeader header;
   uint32_t capset_index;
-  uint32_t padding;
+  uint32_t padding = 0;
 };
 
 struct GetCapsetInfoResponse {
@@ -442,7 +447,7 @@ struct GetCapsetInfoResponse {
   uint32_t capset_id;
   uint32_t capset_max_version;
   uint32_t capset_max_size;
-  uint32_t padding;
+  uint32_t padding = 0;
 };
 
 struct GetCapsetCommand {
@@ -455,6 +460,28 @@ struct GetCapsetResponse {
   ControlHeader header;
   // Variable length response.
   uint8_t capset_data[];
+};
+
+// struct virtio_gpu_cursor_pos in virtio13 5.7.6.10 "Device Operation: cursorq"
+struct CursorPosition {
+  uint32_t scanout_id;
+  uint32_t x;
+  uint32_t y;
+  uint32_t padding = 0;
+};
+
+// struct virtio_gpu_update_cursor in virtio13 5.7.6.10 "Device Operation:
+// cursorq"
+struct UpdateCursorCommand {
+  // `type` must be `kUpdateCursorCommand` or `kMoveCursorCommand`.
+  ControlHeader header;
+  CursorPosition position;
+
+  // Ignored when `type` is `kMoveCursorCommand`
+  uint32_t resource_id;
+  uint32_t hot_x;
+  uint32_t hot_y;
+  uint32_t padding = 0;
 };
 
 }  // namespace virtio_abi
