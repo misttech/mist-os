@@ -76,6 +76,15 @@ if (is_ubsan) {
   ]
 }
 
+# The CMake builds of llvm-libc use `__llvm_libc`, so leave that for any
+# potential future case of building that code for testing or overlay cases
+# independent of the Fuchsia libc build, e.g. from a different LLVM source
+# version.  This name is used by the production libc that winds up in the
+# Fuchsia SDK sysroot that someone doing a local LLVM CMake build might be
+# using as the baseline system.  That will only be visible to users with a
+# statically-linked libc, but that will happen eventually.
+libc_namespace = "__fuchsia_libc"
+
 # Define source_set() targets for some libc code.
 #
 # This defines two source_set() targets, one with the main target name and one
@@ -86,7 +95,7 @@ if (is_ubsan) {
 # A libc_test() target should have the corresponding ".testonly" target in its
 # $deps while the main target rolls up into the deps of libc proper.
 #
-# Paramaters
+# Parameters
 #
 #   * basic_abi
 #     - Optional: If true, $sources must be compiled for the basic machine ABI.
@@ -146,9 +155,10 @@ if (is_ubsan) {
 #     - Default: "."
 #
 #   * public
-#     - Optional: As for source_set(), but $dir is prefixed if set.
-#     This should list the headers intended to be used for other parts
-#     of libc and for unit tests.  Those targets will have deps on this one.
+#     - Optional: As for source_set(), but if $dir is set, it's prepended to
+#     relative paths.  This should list the headers intended to be used for
+#     other parts of libc and for unit tests.  Those targets will have deps on
+#     this one.
 #     - Type: list(file)
 #
 #   * sources
@@ -215,7 +225,10 @@ template("libc_source_set") {
       if (defined(invoker.dir)) {
         public = []
         foreach(file, invoker.public) {
-          public += [ "${invoker.dir}/$file" ]
+          if (file != get_path_info(file, "abspath")) {
+            file = "${invoker.dir}/$file"
+          }
+          public += [ file ]
         }
       } else {
         public = invoker.public
@@ -442,27 +455,45 @@ variant_replaces_allocator = toolchain_variant.tags + [ "replaces-allocator" ] -
 #     - Type: relative dir
 #     - Default: get_path_info(target_out_dir, "name")
 #
+#   * asm_functions
+#     - Optional: A subset of $functions implemented in "$function.S" files.
+#       Note that this affects only the extension; the $cpu_functions and
+#       $os_functions still affect what directory will be used.
+#     - Type: list(string)
+#     - Default: []
+#
 #   * cpu_functions
-#     - Optional: A subset of $functions that whose implementations come from
+#     - Optional: A subset of $functions whose implementations come from
 #       the $llvm_libc/src/$dir/$clang_cpu directory instead.
 #     - Type: list(string)
 #     - Default: []
 #
 #   * os_functions
 #     - Optional: A subset of $functions that whose implementations come from
-#       the $llvm_libc/src/$dir/$current_os directory instead.
-#       When $current_os is "fuchsia", this uses "$function.cc" to get a local
-#       implementation source file in the Fuchsia tree rather than
+#       the $llvm_libc/src/$dir/$current_os directory instead.  When
+#       $current_os is "fuchsia", this uses "fuchsia/$function.cc" to get a
+#       local implementation source file in the Fuchsia tree rather than
 #       "$dir/$function.cpp" to get the llvm-libc implementation source file.
+#       When a function is also in asm_functions or cpu_functions the local
+#       path will also use "fuchsia/$clang_cpu/..." and/or the ".S" extension.
 #     - Type: list(string)
 #     - Default: []
 #
 #   * noncpu_dir
 #     - Optional: Subdir of $llvm_libc/src/$dir where implementations are found
 #       for $functions not found in $cpu_functions.
+#     - Type: string
 #
 #   * no_test_functions
 #     - Optional: A subset of $functions that don't have tests.
+#     - Type: list(string)
+#     - Default: []
+#
+#   * preempt_header_functions
+#     - Optional: A subset of $functions whose public header files are found
+#       in "$libc/include-preempt/..." instead of "$llvm_libc/...".
+#     - Type: list(string)
+#     - Default: []
 #
 #   * deps
 #     - Optional: Other llvm_libc_source_set() targets this one depends on.
@@ -476,9 +507,10 @@ variant_replaces_allocator = toolchain_variant.tags + [ "replaces-allocator" ] -
 #     - Type: list(label)
 #
 #   * allow_fini, allow_init, basic_abi, configs, global_symbols, non_test_deps, testonly_deps, undefined_symbols
-#     - Optional: See libc_source_set().
+#     - Optional: See libc_source_set().  If $global_symbols is omitted
+#     and $basic_abi is true, then it defaults to $functions.
 #
-#   * sources, public
+#   * local_sources, sources, public
 #     - Optional: See libc_source_set().
 #      These are combined with entries derived from `functions` et al.
 #
@@ -490,7 +522,7 @@ variant_replaces_allocator = toolchain_variant.tags + [ "replaces-allocator" ] -
 #   * deps, test_deps
 #     - Optional: See llvm_libc_group().
 #
-#   * defines, include_dirs, public_configs, visibility
+#   * defines, include_dirs, public_configs, public_deps, visibility
 #     - Optional: See source_set().
 #
 template("llvm_libc_source_set") {
@@ -503,6 +535,13 @@ template("llvm_libc_source_set") {
     # This doesn't affect the logic above, but overrides the subdir used below.
     source_dir = invoker.dir
   }
+
+  asm_functions = []
+  if (defined(invoker.asm_functions)) {
+    asm_functions = invoker.asm_functions
+  }
+  assert(asm_functions + invoker.functions - invoker.functions == [],
+         "asm_functions must be a subset of functions")
 
   cpu_functions = []
   if (defined(invoker.cpu_functions)) {
@@ -525,6 +564,13 @@ template("llvm_libc_source_set") {
   assert(no_test_functions + invoker.functions - invoker.functions == [],
          "no_test_functions must be a subset of functions")
 
+  preempt_header_functions = []
+  if (defined(invoker.preempt_header_functions)) {
+    preempt_header_functions = invoker.preempt_header_functions
+  }
+  assert(preempt_header_functions + invoker.functions - invoker.functions == [],
+         "preempt_header_functions must be a subset of functions")
+
   libc_source_set(main_target) {
     forward_variables_from(invoker,
                            [
@@ -535,15 +581,21 @@ template("llvm_libc_source_set") {
                              "defines",
                              "global_symbols",
                              "include_dirs",
+                             "local_sources",
                              "non_test_deps",
                              "non_test_vars",
                              "public",
                              "public_configs",
+                             "public_deps",
                              "sources",
                              "testonly_deps",
                              "undefined_symbols",
                              "visibility",
                            ])
+
+    if (defined(basic_abi) && basic_abi && !defined(global_symbols)) {
+      global_symbols = invoker.functions
+    }
 
     dir = "$llvm_libc/src/$source_dir"
 
@@ -553,12 +605,23 @@ template("llvm_libc_source_set") {
     if (!defined(invoker.sources)) {
       sources = []
     }
-    local_sources = []
+    if (!defined(invoker.local_sources)) {
+      local_sources = []
+    }
 
     foreach(function, invoker.functions) {
-      public += [ "$function.h" ]
+      if (asm_functions + [ function ] - [ function ] != asm_functions) {
+        public += [ "$libc/include-preempt/src/$source_dir/$function.h" ]
+      } else {
+        public += [ "$function.h" ]
+      }
 
       prefix = ""
+      if (asm_functions + [ function ] - [ function ] != asm_functions) {
+        extension = "S"
+      } else {
+        extension = "cc"
+      }
 
       if (os_functions + [ function ] - [ function ] != os_functions) {
         prefix += "$current_os/"
@@ -572,11 +635,14 @@ template("llvm_libc_source_set") {
       }
 
       if (prefix == "fuchsia/") {
-        local_sources += [ "$function.cc" ]
+        local_sources += [ "$function.$extension" ]
       } else if (prefix == "fuchsia/$clang_cpu/") {
-        local_sources += [ "$clang_cpu/$function.cc" ]
+        local_sources += [ "fuchsia/$clang_cpu/$function.$extension" ]
       } else {
-        sources += [ "$prefix$function.cpp" ]
+        if (extension == "cc") {
+          extension = "cpp"
+        }
+        sources += [ "$prefix$function.$extension" ]
       }
     }
 

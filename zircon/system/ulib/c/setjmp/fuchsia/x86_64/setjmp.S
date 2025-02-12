@@ -5,13 +5,15 @@
 #include <lib/arch/asm.h>
 #include <zircon/tls.h>
 
-#include "setjmp_impl.h"
+#include "asm-linkage.h"
+#include "../jmp_buf.h"
+
 
 .macro mangle index, reg
-  xor __setjmp_manglers+8*\index(%rip), \reg
+  xor LIBC_ASM_LINKAGE(gJmpBufManglers)+8*\index(%rip), \reg
 .endm
 
-.function setjmp, export
+jmp_buf.llvm_libc_function setjmp
 
   // Copy the values that need mangling into temporaries.
   mov (%rsp), %rax                            // PC
@@ -44,6 +46,3 @@
   ret
 
 .end_function
-
-.label _setjmp, export, function, setjmp
-.label sigsetjmp, weak, function, setjmp

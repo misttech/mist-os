@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_THIRD_PARTY_ULIB_MUSL_SRC_INTERNAL_SETJMP_IMPL_H_
-#define ZIRCON_THIRD_PARTY_ULIB_MUSL_SRC_INTERNAL_SETJMP_IMPL_H_
+#ifndef ZIRCON_SYSTEM_ULIB_C_SETJMP_FUCHSIA_JMP_BUF_H_
+#define ZIRCON_SYSTEM_ULIB_C_SETJMP_FUCHSIA_JMP_BUF_H_
+
+#include "asm-linkage.h"
 
 // These get mangled so the raw pointer values don't leak into the heap.
 #define JB_PC 0
@@ -41,7 +43,7 @@
 #define JB_ARCH_MANGLE_COUNT 1
 
 // Callee-saves registers are s0..s11, but s0 is FP and so handled above.
-#define JB_S(n) (JB_MANGLE_COUNT + (n)-1)
+#define JB_S(n) (JB_MANGLE_COUNT + (n) - 1)
 
 // FP registers fs0..fs11 are also callee-saves.
 #define JB_FS(n) (JB_S(12) + (n))
@@ -59,12 +61,38 @@
 
 #ifndef __ASSEMBLER__
 
-#include <stdint.h>
+#include <setjmp.h>
 
-extern struct setjmp_manglers {
-  uintptr_t mangle[JB_MANGLE_COUNT];
-} __setjmp_manglers __attribute__((visibility("hidden")));
+#include <array>
+#include <cstdint>
 
-#endif
+namespace LIBC_NAMESPACE_DECL {
 
-#endif  // ZIRCON_THIRD_PARTY_ULIB_MUSL_SRC_INTERNAL_SETJMP_IMPL_H_
+// This is used by the assembly code via LIBC_ASM_LINKAGE(gJmpBufManglers).
+// Early startup initializes it with random bits.
+[[gnu::visibility("hidden")]] extern std::array<uint64_t, JB_MANGLE_COUNT> gJmpBufManglers
+    LIBC_ASM_LINKAGE_DECLARE(gJmpBufManglers);
+
+// TODO(https://fxbug.dev/42076381): The size has been expanded to accommodate a checksum
+// word, but this is not yet used until callers can be expected to use the new
+// larger size.
+#define JB_COUNT_UNUSED 1
+
+static_assert(sizeof(__jmp_buf) == sizeof(uint64_t) * (JB_COUNT + JB_COUNT_UNUSED),
+              "fix __jmp_buf definition");
+
+}  // namespace LIBC_NAMESPACE_DECL
+
+#else  // clang-format off
+
+// This is just a shorthand to define all the variants of the names.
+.macro jmp_buf.llvm_libc_function name
+  .llvm_libc_function \name
+  .llvm_libc_public \name
+  .llvm_libc_public \name, _\name
+  .llvm_libc_public \name, sig\name, weak
+.endm
+
+#endif // clang-format off
+
+#endif  // ZIRCON_SYSTEM_ULIB_C_SETJMP_FUCHSIA_JMP_BUF_H_

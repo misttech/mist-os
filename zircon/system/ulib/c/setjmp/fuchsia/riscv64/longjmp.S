@@ -5,9 +5,9 @@
 #include <lib/arch/asm.h>
 #include <zircon/tls.h>
 
-#include "setjmp_impl.h"
+#include "../jmp_buf.h"
 
-.function longjmp, export
+jmp_buf.llvm_libc_function longjmp
 
   // The sanitizer runtime wants to be informed of non-local exits.
   // Call __asan_handle_no_return() before doing the actual longjmp.
@@ -34,7 +34,7 @@
 #endif
 
   // Find the manglers.
-  lla a2, __setjmp_manglers
+  lla a2, LIBC_ASM_LINKAGE(gJmpBufManglers)
 
   // Load the words that need to be demangled into temporaries.
   // These just hold values that were in the jmp_buf, so we don't
@@ -190,6 +190,3 @@
   ret
 
 .end_function
-
-.label _longjmp, export, function, longjmp
-.label siglongjmp, weak, function, longjmp

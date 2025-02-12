@@ -5,10 +5,11 @@
 #include <lib/arch/asm.h>
 #include <zircon/tls.h>
 
-#include "setjmp_impl.h"
+#include "asm-linkage.h"
+#include "../jmp_buf.h"
 
 
-.function setjmp, export
+jmp_buf.llvm_libc_function setjmp
 
   // Move the jmp_buf pointer to a temporary register.
   // We'll use x0 as a scratch register since we clobber it on return anyway.
@@ -16,7 +17,7 @@
 
   // Load the manglers into temporary registers.  We'll ensure that by return
   // no registers contain the raw manglers, so those values never leak.
-  adr_global x0, __setjmp_manglers
+  adr_global x0, LIBC_ASM_LINKAGE(gJmpBufManglers)
   ldp x1, x2, [x0, #8*JB_PC]
   ldp x3, x4, [x0, #8*JB_FP]
   ldr x5, [x0, #8*JB_X(18)]
@@ -57,6 +58,3 @@
   ret
 
 .end_function
-
-.label _setjmp, export, function, setjmp
-.label sigsetjmp, weak, function, setjmp

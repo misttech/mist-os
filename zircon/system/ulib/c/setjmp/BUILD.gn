@@ -2,16 +2,58 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/config/clang/clang_cpu.gni")
+import("../libc.gni")
 
-source_set("setjmp") {
-  sources = [
-    "${clang_cpu}/longjmp.S",
-    "${clang_cpu}/setjmp.S",
-    "setjmp.c",
+llvm_libc_source_set("setjmp") {
+  functions = [
+    "longjmp",
+    "setjmp",
   ]
-  deps = [
-    "//zircon/kernel/lib/arch",
-    "//zircon/third_party/ulib/musl:musl_internal",
+  cpu_functions = functions
+  no_test_functions = [ "longjmp" ]  # setjmp_test.cpp tests both
+
+  # The Fuchsia versions are implemented locally in assembly and have
+  # internal preempt headers to use LIBC_ASM_LINKAGE.
+  if (is_fuchsia) {
+    asm_functions = functions
+    os_functions = functions
+
+    local_sources = [ "fuchsia/manglers.cc" ]
+    local_deps = [
+      ":jmp_buf",
+      "//zircon/kernel/lib/arch",
+    ]
+
+    # The llvm-libc internal headers for the LIBC_NAMESPACE_DECL declarations
+    # need to be preempted with wrappers that apply LIBC_ASM_LINKAGE.  There is
+    # a preempting "src/setjmp/setjmp.h" following the usual schema too just
+    # for uniformity, but llvm-libc actually uses "setjmp_impl.h" so list that
+    # wrapper header separately.  Listing the original headers in local_sources
+    # rather than public "claims" them so `gn check` will catch anything using
+    # them directly rather than the wrappers listed in public.  Without the
+    # wrappers, the normal C++ names in LIBC_NAMESPACE will be mangled for
+    # linkage names; but the assembly implementations don't define those names,
+    # only the LIBC_ASM_LINKAGE names.
+    preempt_header_functions = functions
+    public_deps = [ "..:asm-linkage" ]
+    public = [
+      # Producing the //... path prevents adding in $llvm_libc/setjmp.
+      get_path_info("../include-preempt/src/setjmp/setjmp_impl.h", "abspath"),
+    ]
+    local_sources += [
+      "$llvm_libc/src/setjmp/longjmp.h",
+      "$llvm_libc/src/setjmp/setjmp_impl.h",
+    ]
+  }
+}
+
+source_set("jmp_buf") {
+  visibility = [
+    ":*",
+
+    # TODO(mcgrathr): only needed while manglers init is explicit
+    "../startup:*",
   ]
+  public = [ "fuchsia/jmp_buf.h" ]
+  deps = [ "..:asm-linkage" ]
 }

@@ -5,7 +5,8 @@
 #include <lib/arch/asm.h>
 #include <zircon/tls.h>
 
-#include "setjmp_impl.h"
+#include "asm-linkage.h"
+#include "../jmp_buf.h"
 
 
 // CFI to find regno at [x16, #8*index].
@@ -43,7 +44,7 @@
   .cfi_same_value \reg2
 .endm
 
-.function longjmp, export
+jmp_buf.llvm_libc_function longjmp
 
   // The sanitizer runtime wants to be informed of non-local exits.
   // Call __asan_handle_no_return() before doing the actual longjmp.
@@ -64,7 +65,7 @@
   .cfi_register x0, x16
 
   // Find the manglers.
-  adr_global x0, __setjmp_manglers
+  adr_global x0, LIBC_ASM_LINKAGE(gJmpBufManglers)
 
   // Load the words that need to be demangled into temporaries.
   // These just hold values that were in the jmp_buf, so we don't
@@ -117,7 +118,7 @@
   jb_cfi_mangled_reg 18, 8, 9        // x18 = x8 ^ x9
 
   // Get the thread pointer, where the unsafe SP is stored.
-  // Reuse x0 so the address of __setjmp_manglers is not leaked.
+  // Reuse x0 so the address of gJmpBufManglers is not leaked.
   mrs x0, TPIDR_EL0
 
   // Demangle in place.
@@ -161,6 +162,3 @@
   ret
 
 .end_function
-
-.label _longjmp, export, function, longjmp
-.label siglongjmp, weak, function, longjmp

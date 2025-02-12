@@ -5,9 +5,9 @@
 #include <lib/arch/asm.h>
 #include <zircon/tls.h>
 
-#include "setjmp_impl.h"
+#include "../jmp_buf.h"
 
-.function setjmp, export
+jmp_buf.llvm_libc_function setjmp
 
 #ifndef __riscv_float_abi_soft
   // Store call-saved FP registers.
@@ -26,7 +26,7 @@
 #endif
 
   // Load the manglers into registers, as well as the unsafe SP.
-  lla a1, __setjmp_manglers
+  lla a1, LIBC_ASM_LINKAGE(gJmpBufManglers)
   ld a7, ZX_TLS_UNSAFE_SP_OFFSET(tp)
   ld a2, JB_PC*8(a1)
   ld a3, JB_SP*8(a1)
@@ -63,6 +63,3 @@
   ret
 
 .end_function
-
-.label _setjmp, export, function, setjmp
-.label sigsetjmp, weak, function, setjmp

@@ -5,7 +5,9 @@
 #include <lib/arch/asm.h>
 #include <zircon/tls.h>
 
-#include "setjmp_impl.h"
+#include "asm-linkage.h"
+#include "../jmp_buf.h"
+
 
 // CFI to find regno at 8*index(%rdi).
 .macro jb_cfi regno, index
@@ -22,10 +24,10 @@
 .endm
 
 .macro demangle index, reg
-  xor __setjmp_manglers+8*\index(%rip), \reg
+  xor LIBC_ASM_LINKAGE(gJmpBufManglers)+8*\index(%rip), \reg
 .endm
 
-.function longjmp, export
+jmp_buf.llvm_libc_function longjmp
 
   // The sanitizer runtime wants to be informed of non-local exits.
   // Call __asan_handle_no_return() before doing the actual longjmp.
@@ -105,6 +107,3 @@
   ret
 
 .end_function
-
-.label _longjmp, export, function, longjmp
-.label siglongjmp, weak, function, longjmp

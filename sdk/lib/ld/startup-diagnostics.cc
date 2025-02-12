@@ -26,8 +26,9 @@ void DiagnosticsReport::Printf(const char* format, ...) const {
 // The formatted message from elfldltl::PrintfDiagnosticsReport should be a
 // single line with no newline, so append one.
 void DiagnosticsReport::Printf(const char* format, va_list args) const {
-  __llvm_libc::printf_core::Printf<Log::kBufferSize, __llvm_libc::printf_core::PrintfNewline::kYes>(
-      startup_.log, format, args);
+  using LIBC_NAMESPACE::printf_core::Printf;
+  using LIBC_NAMESPACE::printf_core::PrintfNewline;
+  Printf<Log::kBufferSize, PrintfNewline::kYes>(startup_.log, format, args);
 }
 
 template <>

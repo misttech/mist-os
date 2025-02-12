@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/zircon/c_utils.gni")
+import("//src/zircon/lib/zircon/libzircon.gni")
 import("../libc.gni")
 
 # This will go into the new libc.so, but will never go into the legacy libc.so
@@ -118,4 +119,37 @@ basic_source_set("nostartfiles.basic") {
   # the underlying file gets built (and triggers relinks via depfile).
   deps = [ ":nostartfiles.ldscript" ]
   libs = get_target_outputs(deps[0])
+}
+
+# This is linked into the legacy libc.so to satisfy references from the old
+# musl implementation code.
+libc_source_set("startup-random") {
+  public = [ "startup-random.h" ]
+  public_deps = [ "..:asm-linkage" ]
+
+  # This is called too early in startup to use the compiler ABI.
+  basic_abi = true
+  global_symbols = [ "${libc_namespace}_InitStartupRandom" ]
+
+  # All the vDSO's symbols are safe since it uses only the basic ABI anyway.
+  undefined_symbols = libzircon_linkage_names
+
+  # This helps the legacy C code call the function declared only in C++.
+  public_configs = [ ":startup-random.musl_glue" ]
+  visibility = [ "//zircon/third_party/ulib/musl/src/env:start-main" ]
+
+  sources = [ "startup-random.cc" ]
+  deps = [
+    "//sdk/lib/ld:headers",
+    "//src/zircon/lib/zircon:zircon.as-needed",
+  ]
+
+  # TODO(mcgrathr): only needed while manglers init is explicit
+  deps += [ "../setjmp:jmp_buf" ]
+  undefined_symbols += [ "${libc_namespace}_gJmpBufManglers" ]
+}
+
+config("startup-random.musl_glue") {
+  visibility = [ ":*" ]
+  defines = [ "__libc_init_randoms=${libc_namespace}_InitStartupRandom" ]
 }
