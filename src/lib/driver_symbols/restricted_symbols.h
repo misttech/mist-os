@@ -1173,7 +1173,6 @@ const std::set<std::string> kRestrictedLibcSymbols = {
     "srand",
     "srand48",
     "srandom",
-    "__stack_chk_guard",
     "statfs",
     "statvfs",
     "stime",

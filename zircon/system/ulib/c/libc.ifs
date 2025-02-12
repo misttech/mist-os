@@ -126,7 +126,6 @@ Symbols:
   - { Name: __sindf, Type: Func }
   - { Name: __sinl, Type: Func }
   - { Name: __stack_chk_fail, Type: Func }
-  - { Name: __stack_chk_guard, Type: Object }
   - { Name: __strftime_fmt_1, Type: Func }
   - { Name: __sysv_signal, Type: Func, Weak: true }
   - { Name: __tan, Type: Func }
