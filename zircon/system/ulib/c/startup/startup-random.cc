@@ -8,33 +8,40 @@
 #include <zircon/syscalls.h>
 #include <zircon/tls.h>
 
+#include <cstddef>
 #include <cstdint>
-
-#include "../setjmp/fuchsia/jmp_buf.h"
+#include <span>
+#include <utility>
 
 namespace LIBC_NAMESPACE_DECL {
 
+// These are defined implicitly by the linker.  Together they form an array
+// containing all the LIBC_STARTUP_RANDOM_VAR variables.  There will always be
+// at least one the static one defined here for the stack guard, so these
+// declarations are not weak and thus can use direct PC-relative references.
+// Apparently when using explicit linkage names, GCC also needs the visibility
+// attribute on each variable despite the namespace-scope attribute.
+[[gnu::visibility("hidden")]]
+extern std::byte kBegin[] LIBC_ASM_LINKAGE_DECLARE(StartupRandom, __start_);
+[[gnu::visibility("hidden")]]
+extern std::byte kEnd[] LIBC_ASM_LINKAGE_DECLARE(StartupRandom, __stop_);
+
 void InitStartupRandom() {
-  // Initialize stack-protector canary value first thing.  It never lives
-  // permanently anywhere except in every thread descriptor, where it's found
-  // via the <zircon/tls.h> Fuchsia Compiler ABI layout.  The main thread
-  // gets a random value here, and thread creation copies it from the
-  // creating thread into the new thread.  Do the setjmp manglers in the same
-  // call to avoid the overhead of two system calls.  That means we need a
-  // temporary buffer on the stack, which we then want to clear out so the
-  // values don't leak there.
-  struct randoms {
-    uintptr_t stack_guard;
-    decltype(gJmpBufManglers) setjmp_manglers;
-  } randoms;
-  _zx_cprng_draw(&randoms, sizeof(randoms));
-  *ld::TpRelative<uintptr_t>(ZX_TLS_STACK_GUARD_OFFSET) = randoms.stack_guard;
-  gJmpBufManglers = randoms.setjmp_manglers;
-  // Zero the stack temporaries.
-  randoms = (struct randoms){};
-  // Tell the compiler that the value is used, so it doesn't optimize
-  // out the zeroing as dead stores.
-  __asm__("# keepalive %0" ::"m"(randoms));
+  // Fill it all with random bits.
+  std::span bytes{kBegin, kEnd};
+  zx_cprng_draw(bytes.data(), bytes.size_bytes());
+
+  // That just filled this variable too.  Make sure the compiler thinks
+  // something did, so it doesn't presume that the value is zero.
+  LIBC_STARTUP_RANDOM_VAR static uintptr_t stack_guard;
+  __asm__ volatile("" : "=m"(stack_guard));
+
+  // Move the random value into the ABI slot, but don't leave it behind to be
+  // seen in the static variable.
+  *ld::TpRelative<uintptr_t>(ZX_TLS_STACK_GUARD_OFFSET) = std::exchange(stack_guard, 0);
+
+  // Make sure the compiler doesn't think it can elide the zero store.
+  __asm__ volatile("" : : "m"(stack_guard));
 }
 
 }  // namespace LIBC_NAMESPACE_DECL

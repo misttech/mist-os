@@ -96,6 +96,8 @@ config("compiler") {
   }
 
   if (is_fuchsia) {
+    ldflags += [ "-Wl,-z,start-stop-visibility=hidden" ]
+
     # ld.bfd doesn't support -z relro for the targets we use it for.
     if (!is_gcc || linker == "gold") {
       ldflags += [ "-Wl,-z,relro" ]

@@ -9,8 +9,15 @@
 
 namespace LIBC_NAMESPACE_DECL {
 
-// This initializes the ZX_TLS_STACK_GUARD_OFFSET slot in the current (main)
-// thread, as well as the setjmp manglers.
+// Use this as an attribute to define an uninitialized variable of trivial
+// type.  It will be filled with random bits by InitStartupRandom().
+#define LIBC_STARTUP_RANDOM_VAR [[gnu::section(LIBC_ASM_LINKAGE_STRING(StartupRandom))]]
+
+// This fills all LIBC_STARTUP_RANDOM_VAR objects with random bits.  This is
+// called very early, before the compiler ABI is set up.  In fact, it's also
+// what initializes the main thread's ZX_TLS_STACK_GUARD_OFFSET slot with
+// random bits.  Therefore it's built with an hermetic partial link, and so
+// needs LIBC_ASM_LINKAGE.
 void InitStartupRandom() LIBC_ASM_LINKAGE_DECLARE(InitStartupRandom);
 
 }  // namespace LIBC_NAMESPACE_DECL

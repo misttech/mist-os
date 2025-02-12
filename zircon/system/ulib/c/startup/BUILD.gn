@@ -11,6 +11,16 @@ import("../libc.gni")
 # target in this directory.
 libc_source_set("startup") {
   sources = []
+  non_test_deps = []
+  testonly_deps = []
+  foreach(label,
+          [
+            # TODO(mcgrathr): more later
+            ":startup-random-impl",
+          ]) {
+    non_test_deps += [ label ]
+    testonly_deps += [ "$label.testonly" ]
+  }
 }
 
 # This doesn't go into libc, but becomes the Scrt1.o linked into executables.
@@ -121,35 +131,53 @@ basic_source_set("nostartfiles.basic") {
   libs = get_target_outputs(deps[0])
 }
 
-# This is linked into the legacy libc.so to satisfy references from the old
-# musl implementation code.
-libc_source_set("startup-random") {
+# :startup-random-impl is a basic ABI hermetic_source_set() defining this
+# symbol.  It's directly in deps of :startup to get into the outer link.  The
+# symbol will be used by other basic ABI hermetic partial link targets but they
+# don't have deps on :startup-random-impl to get it into each hermetic link.
+# If they did, those hermetic links would need to include the undefined_symbols
+# list here and wouldn't distinguish where the references came from.  Instead,
+# they just need to add startup_random_symbols to undefined_symbols and the
+# expected references from startup-random.cc are checked by each separate
+# hermetic link.  Both hermetic and non-hermetic users of startup-random.h need
+# deps on :startup-random just for the header visibility.
+startup_random_symbols = [ "${libc_namespace}_InitStartupRandom" ]
+
+source_set("startup-random") {
+  visibility = [ "../*" ]
   public = [ "startup-random.h" ]
-  public_deps = [ "..:asm-linkage" ]
+  deps = [ "..:asm-linkage" ]
+}
+
+libc_source_set("startup-random-impl") {
+  visibility = [ ":startup" ]
 
   # This is called too early in startup to use the compiler ABI.
   basic_abi = true
-  global_symbols = [ "${libc_namespace}_InitStartupRandom" ]
+  global_symbols = startup_random_symbols
+
+  # These will be defined implicitly by the linker in the outer link.
+  undefined_symbols = [
+    "__start_${libc_namespace}_StartupRandom",
+    "__stop_${libc_namespace}_StartupRandom",
+  ]
 
   # All the vDSO's symbols are safe since it uses only the basic ABI anyway.
-  undefined_symbols = libzircon_linkage_names
+  undefined_symbols += libzircon_linkage_names
 
   # This helps the legacy C code call the function declared only in C++.
   public_configs = [ ":startup-random.musl_glue" ]
-  visibility = [ "//zircon/third_party/ulib/musl/src/env:start-main" ]
+  visibility += [ "//zircon/third_party/ulib/musl/src/env:start-main" ]
 
   sources = [ "startup-random.cc" ]
   deps = [
+    ":startup-random",
     "//sdk/lib/ld:headers",
     "//src/zircon/lib/zircon:zircon.as-needed",
   ]
-
-  # TODO(mcgrathr): only needed while manglers init is explicit
-  deps += [ "../setjmp:jmp_buf" ]
-  undefined_symbols += [ "${libc_namespace}_gJmpBufManglers" ]
 }
 
 config("startup-random.musl_glue") {
   visibility = [ ":*" ]
-  defines = [ "__libc_init_randoms=${libc_namespace}_InitStartupRandom" ]
+  defines = [ "__libc_init_randoms=${startup_random_symbols[0]}" ]
 }

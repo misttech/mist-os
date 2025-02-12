@@ -21,6 +21,7 @@ llvm_libc_source_set("setjmp") {
     local_sources = [ "fuchsia/manglers.cc" ]
     local_deps = [
       ":jmp_buf",
+      "../startup:startup-random",
       "//zircon/kernel/lib/arch",
     ]
 
@@ -48,12 +49,7 @@ llvm_libc_source_set("setjmp") {
 }
 
 source_set("jmp_buf") {
-  visibility = [
-    ":*",
-
-    # TODO(mcgrathr): only needed while manglers init is explicit
-    "../startup:*",
-  ]
+  visibility = [ ":*" ]
   public = [ "fuchsia/jmp_buf.h" ]
   deps = [ "..:asm-linkage" ]
 }
