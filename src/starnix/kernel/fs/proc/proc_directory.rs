@@ -15,6 +15,7 @@ use crate::fs::proc::pid_directory::pid_directory;
 use crate::fs::proc::pressure_directory::pressure_directory;
 use crate::fs::proc::self_symlink::self_node;
 use crate::fs::proc::stat::stat_node;
+use crate::fs::proc::swaps::swaps_node;
 use crate::fs::proc::sysctl::{net_directory, sysctl_directory};
 use crate::fs::proc::sysrq::SysRqNode;
 use crate::fs::proc::thread_self::thread_self_node;
@@ -71,11 +72,7 @@ impl ProcDirectory {
             "mounts".into() => MountsSymlink::new_node(current_task, fs),
             "cgroups".into() => cgroups_node(current_task, fs),
             "stat".into() => stat_node(current_task, fs),
-            "swaps".into() => fs.create_node(
-                current_task,
-                SwapsFile::new_node(kernel),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
+            "swaps".into() => swaps_node(current_task, fs),
             "sys".into() => sysctl_directory(current_task, fs),
             "net".into() => net_directory(current_task, fs),
             "uptime".into() => fs.create_node(
@@ -555,23 +552,6 @@ impl DynamicFileSource for LoadavgFile {
 
         track_stub!(TODO("https://fxbug.dev/322874486"), "/proc/loadavg load stats");
         writeln!(sink, "0.50 0.50 0.50 {}/{} {}", runnable_tasks, existing_tasks, last_pid)?;
-        Ok(())
-    }
-}
-
-#[derive(Clone)]
-// Tuple member is never used
-#[allow(dead_code)]
-struct SwapsFile(Weak<Kernel>);
-impl SwapsFile {
-    pub fn new_node(kernel: &Arc<Kernel>) -> impl FsNodeOps {
-        DynamicFile::new_node(Self(Arc::downgrade(kernel)))
-    }
-}
-impl DynamicFileSource for SwapsFile {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        track_stub!(TODO("https://fxbug.dev/322874154"), "/proc/swaps includes Kernel::swap_files");
-        writeln!(sink, "Filename\t\t\t\tType\t\tSize\t\tUsed\t\tPriority")?;
         Ok(())
     }
 }
