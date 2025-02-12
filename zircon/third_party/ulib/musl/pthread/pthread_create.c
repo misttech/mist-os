@@ -94,9 +94,17 @@ int __pthread_create(pthread_t* restrict res, const pthread_attr_t* restrict att
   if (new == NULL)
     return EAGAIN;
 
+  // This is the same in every thread, with the initial thread's slot holding
+  // the original source of truth rather than any global location.
+  new->abi.stack_guard = __pthread_self()->abi.stack_guard;
+
+  // This is inherited from the creating thread, but might be changed with
+  // thrd_set_zx_process.
+  new->process_handle = __pthread_self()->process_handle;
+
   const char* name = attr.__name != NULL ? attr.__name : thread_name;
   zx_status_t status =
-      zxr_thread_create(__pthread_self()->process_handle, name, attr._a_detach, &new->zxr_thread);
+      zxr_thread_create(new->process_handle, name, attr._a_detach, &new->zxr_thread);
   if (status != ZX_OK)
     goto fail_after_alloc;
 
@@ -120,7 +128,7 @@ int __pthread_create(pthread_t* restrict res, const pthread_attr_t* restrict att
   // This will (hopefully) start the new thread. It could instantly
   // run to completion and deallocate it self. As such, we can't
   // access new->anything after this point.
-  status = zxr_thread_start(&new->zxr_thread, (uintptr_t) new->safe_stack.iov_base,
+  status = zxr_thread_start(&new->zxr_thread, (uintptr_t)new->safe_stack.iov_base,
                             new->safe_stack.iov_len, start, new);
 
   if (status == ZX_OK) {

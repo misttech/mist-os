@@ -95,9 +95,6 @@ void __libc_extensions_init(uint32_t handle_count, zx_handle_t handle[], uint32_
 // and quick_exit handlers.
 void __libc_extensions_fini(void) __attribute__((weak));
 
-extern uintptr_t __stack_chk_guard;
-void __stack_chk_fail(void);
-
 int __lockfile(FILE*) ATTR_LIBC_VISIBILITY;
 void __unlockfile(FILE*) ATTR_LIBC_VISIBILITY;
 

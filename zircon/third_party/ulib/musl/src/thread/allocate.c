@@ -14,14 +14,13 @@
 // in and of itself at this point (unlike in dynlink.c).  But they might also
 // use ShadowCallStack, which is not set up yet.  So make sure references here
 // only use the libc-internal symbols, which don't have any setup requirements.
-__asan_weak_ref("memcpy")
-__asan_weak_ref("memset")
+__asan_weak_ref("memcpy") __asan_weak_ref("memset")
 
-enum lock_state {
-  LOCK_UNLOCKED,
-  LOCK_LOCKED,
-  LOCK_CONTENDED,
-};
+    enum lock_state {
+      LOCK_UNLOCKED,
+      LOCK_LOCKED,
+      LOCK_CONTENDED,
+    };
 
 static struct pthread* all_threads;
 static zx_futex_t all_threads_lock = LOCK_UNLOCKED;
@@ -285,11 +284,6 @@ __asan_weak_ref("memcpy")
   }
 
   thrd_t td = copy_tls(tcb.iov_base, tcb.iov_len);
-  if (initial_thread) {
-    td->process_handle = _zx_process_self();
-  } else {
-    td->process_handle = __pthread_self()->process_handle;
-  }
 
   // At this point all our access to global TLS state is done, so we
   // can allow dlopen again.
@@ -348,7 +342,6 @@ __asan_weak_ref("memcpy")
   td->tcb_region = tcb_region;
   td->locale = &libc.global_locale;
   td->head.tp = (uintptr_t)pthread_to_tp(td);
-  td->abi.stack_guard = __stack_chk_guard;
   td->abi.unsafe_sp = (uintptr_t)td->unsafe_stack.iov_base + td->unsafe_stack.iov_len;
 
   struct pthread** prevp = __thread_list_acquire();
