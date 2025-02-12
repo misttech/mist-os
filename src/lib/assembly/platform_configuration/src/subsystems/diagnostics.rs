@@ -5,12 +5,17 @@
 use crate::common::DomainConfigDirectoryBuilder;
 use crate::subsystems::prelude::*;
 use anyhow::{anyhow, Context};
+use assembly_component_id_index::ComponentIdIndexBuilder;
 use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType};
 use assembly_config_schema::platform_config::diagnostics_config::{
     ArchivistConfig, ArchivistPipeline, DiagnosticsConfig, PipelineType, Severity,
 };
-use assembly_constants::{BootfsPackageDestination, FileEntry, PackageSetDestination};
+use assembly_config_schema::platform_config::storage_config::StorageConfig;
+use assembly_constants::{
+    BootfsDestination, BootfsPackageDestination, FileEntry, PackageSetDestination,
+};
 use assembly_util::read_config;
+use camino::{Utf8Path, Utf8PathBuf};
 use sampler_config::ComponentIdInfoList;
 use std::collections::BTreeSet;
 
@@ -27,11 +32,16 @@ const ALLOWED_SERIAL_LOG_COMPONENTS: &[&str] = &[
 
 const DENIED_SERIAL_LOG_TAGS: &[&str] = &["NUD"];
 
+pub(crate) struct DiagnosticsSubsystemConfig<'a> {
+    pub diagnostics: &'a DiagnosticsConfig,
+    pub storage: &'a StorageConfig,
+}
+
 pub(crate) struct DiagnosticsSubsystem;
-impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
+impl<'a> DefineSubsystemConfiguration<DiagnosticsSubsystemConfig<'a>> for DiagnosticsSubsystem {
     fn define_configuration(
         context: &ConfigurationContext<'_>,
-        diagnostics_config: &DiagnosticsConfig,
+        config: &DiagnosticsSubsystemConfig<'a>,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
         // Unconditionally include console AIB for now. In the future, we may add an option to
@@ -48,7 +58,7 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
             sampler,
             memory_monitor,
             component_log_initial_interests,
-        } = diagnostics_config;
+        } = config.diagnostics;
         // LINT.IfChange
         let mut bind_services = BTreeSet::from([
             "fuchsia.component.PersistenceBinder",
@@ -211,6 +221,24 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
             }
         }
 
+        // Build the component id index and add it as a bootfs file.
+        let gendir = context.get_gendir().context("Getting gendir for diagnostics subsystem")?;
+        let index_path = build_index(context, config.storage, gendir)?;
+        builder
+            .bootfs()
+            .file(FileEntry {
+                destination: BootfsDestination::ComponentIdIndex,
+                source: index_path.clone(),
+            })
+            .with_context(|| format!("Adding bootfs file {}", &index_path))?;
+        builder
+            .package("sampler")
+            .config_data(FileEntry {
+                source: index_path,
+                destination: "component_id_index".to_string(),
+            })
+            .context("Adding component id index to sampler".to_string())?;
+
         for metrics_config in &sampler.metrics_configs {
             let filename = metrics_config.as_utf8_pathbuf().file_name().ok_or_else(|| {
                 anyhow!("Failed to get filename for metrics config: {}", &metrics_config)
@@ -271,6 +299,27 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
     }
 }
 
+fn build_index(
+    context: &ConfigurationContext<'_>,
+    storage_config: &StorageConfig,
+    gendir: impl AsRef<Utf8Path>,
+) -> anyhow::Result<Utf8PathBuf> {
+    // Build and add the component id index.
+    let mut index_builder = ComponentIdIndexBuilder::default();
+
+    // Find the default platform id index and add it to the builder.
+    // The "resources" directory is built and shipped alonside the platform
+    // AIBs which is how it becomes available to subsystems.
+    let core_index = context.get_resource("core_component_id_index.json5");
+    index_builder.index(core_index);
+
+    // If the product provided their own index, add it to the builder.
+    if let Some(product_index) = &storage_config.component_id_index.product_index {
+        index_builder.index(product_index);
+    }
+    index_builder.build(gendir).context("Building component id index")
+}
+
 fn insert_disabled<T>(pipelines: &mut T, name: &PipelineType) -> anyhow::Result<()>
 where
     T: DomainConfigDirectoryBuilder + ?Sized,
@@ -295,24 +344,63 @@ mod tests {
     };
     use camino::Utf8PathBuf;
     use serde_json::{json, Number, Value};
+    use std::fs::File;
     use tempfile::TempDir;
+
+    struct ResourceDir(TempDir);
+
+    impl ResourceDir {
+        fn new() -> Self {
+            let temp_dir = TempDir::new().unwrap();
+            let this = Self(temp_dir);
+            this.write(
+                "core_component_id_index.json5",
+                json!({
+                    "instances": [
+                         {
+                            "instance_id": "8775ff0afe12ca578135014a5d36a7733b0f9982bcb62a888b007cb2c31a7046",
+                            "moniker": "/core/foo/bar",
+                        },
+                    ]
+                }),
+            );
+            this
+        }
+
+        fn write(&self, filename: &str, content: serde_json::Value) -> Utf8PathBuf {
+            let path = self.path().join(filename);
+            let mut file = File::create(&path).unwrap();
+            serde_json::to_writer(&mut file, &content).unwrap();
+            path
+        }
+
+        fn path(&self) -> Utf8PathBuf {
+            Utf8PathBuf::from_path_buf(self.0.path().to_path_buf()).unwrap()
+        }
+    }
 
     #[test]
     fn test_define_configuration_default() {
-        let temp_dir = TempDir::new().unwrap();
-        let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
-
+        let resource_dir = ResourceDir::new();
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Standard,
             build_type: &BuildType::Eng,
-            resource_dir,
+            resource_dir: resource_dir.path(),
             ..ConfigurationContext::default_for_tests()
         };
         let diagnostics =
             DiagnosticsConfig { archivist: Some(ArchivistConfig::Default), ..Default::default() };
         let mut builder = ConfigurationBuilderImpl::default();
 
-        DiagnosticsSubsystem::define_configuration(&context, &diagnostics, &mut builder).unwrap();
+        DiagnosticsSubsystem::define_configuration(
+            &context,
+            &DiagnosticsSubsystemConfig {
+                diagnostics: &diagnostics,
+                storage: &StorageConfig::default(),
+            },
+            &mut builder,
+        )
+        .unwrap();
         let config = builder.build();
         assert_eq!(
             config.configuration_capabilities["fuchsia.diagnostics.BindServices"].value(),
@@ -346,13 +434,11 @@ mod tests {
 
     #[test]
     fn test_define_configuration_additional_serial_log_components() {
-        let temp_dir = TempDir::new().unwrap();
-        let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
-
+        let resource_dir = ResourceDir::new();
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Standard,
             build_type: &BuildType::Eng,
-            resource_dir,
+            resource_dir: resource_dir.path(),
             ..ConfigurationContext::default_for_tests()
         };
         let diagnostics = DiagnosticsConfig {
@@ -361,7 +447,15 @@ mod tests {
         };
         let mut builder = ConfigurationBuilderImpl::default();
 
-        DiagnosticsSubsystem::define_configuration(&context, &diagnostics, &mut builder).unwrap();
+        DiagnosticsSubsystem::define_configuration(
+            &context,
+            &DiagnosticsSubsystemConfig {
+                diagnostics: &diagnostics,
+                storage: &StorageConfig::default(),
+            },
+            &mut builder,
+        )
+        .unwrap();
         let config = builder.build();
 
         let mut serial_log_components = BTreeSet::from_iter(["/core/foo".to_string()]);
@@ -375,20 +469,26 @@ mod tests {
 
     #[test]
     fn test_define_configuration_low_mem() {
-        let temp_dir = TempDir::new().unwrap();
-        let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
-
+        let resource_dir = ResourceDir::new();
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Standard,
             build_type: &BuildType::Eng,
-            resource_dir,
+            resource_dir: resource_dir.path(),
             ..ConfigurationContext::default_for_tests()
         };
         let diagnostics =
             DiagnosticsConfig { archivist: Some(ArchivistConfig::LowMem), ..Default::default() };
         let mut builder = ConfigurationBuilderImpl::default();
 
-        DiagnosticsSubsystem::define_configuration(&context, &diagnostics, &mut builder).unwrap();
+        DiagnosticsSubsystem::define_configuration(
+            &context,
+            &DiagnosticsSubsystemConfig {
+                diagnostics: &diagnostics,
+                storage: &StorageConfig::default(),
+            },
+            &mut builder,
+        )
+        .unwrap();
         let config = builder.build();
 
         assert_eq!(
@@ -406,20 +506,21 @@ mod tests {
 
     #[test]
     fn test_default_on_bootstrap() {
-        let temp_dir = TempDir::new().unwrap();
-        let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
-
+        let resource_dir = ResourceDir::new();
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Bootstrap,
             build_type: &BuildType::Eng,
-            resource_dir,
+            resource_dir: resource_dir.path(),
             ..ConfigurationContext::default_for_tests()
         };
         let mut builder = ConfigurationBuilderImpl::default();
 
         DiagnosticsSubsystem::define_configuration(
             &context,
-            &DiagnosticsConfig::default(),
+            &DiagnosticsSubsystemConfig {
+                diagnostics: &DiagnosticsConfig::default(),
+                storage: &StorageConfig::default(),
+            },
             &mut builder,
         )
         .unwrap();
@@ -433,20 +534,21 @@ mod tests {
 
     #[test]
     fn test_default_for_user() {
-        let temp_dir = TempDir::new().unwrap();
-        let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
-
+        let resource_dir = ResourceDir::new();
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Standard,
             build_type: &BuildType::User,
-            resource_dir,
+            resource_dir: resource_dir.path(),
             ..ConfigurationContext::default_for_tests()
         };
         let mut builder = ConfigurationBuilderImpl::default();
 
         DiagnosticsSubsystem::define_configuration(
             &context,
-            &DiagnosticsConfig::default(),
+            &DiagnosticsSubsystemConfig {
+                diagnostics: &DiagnosticsConfig::default(),
+                storage: &StorageConfig::default(),
+            },
             &mut builder,
         )
         .unwrap();
@@ -462,27 +564,22 @@ mod tests {
 
     #[test]
     fn test_fire_config() {
-        let temp_dir = TempDir::new().unwrap();
-        let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
-
-        let fire_config_path = resource_dir.join("fire_config.json");
-        let mut fire_config = std::fs::File::create(&fire_config_path).unwrap();
-        serde_json::to_writer(
-            &mut fire_config,
-            &json!([
-                {
-                    "id": 1234,
-                    "label": "my_label",
-                    "moniker": "my_moniker",
-                }
+        let resource_dir = ResourceDir::new();
+        let fire_config_path = resource_dir.write(
+            "fire_config.json",
+            json!([
+                    {
+                        "id": 1234,
+                        "label": "my_label",
+                        "moniker": "my_moniker",
+                    }
             ]),
-        )
-        .unwrap();
+        );
 
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Standard,
             build_type: &BuildType::User,
-            resource_dir,
+            resource_dir: resource_dir.path(),
             ..ConfigurationContext::default_for_tests()
         };
         let diagnostics = DiagnosticsConfig {
@@ -493,29 +590,31 @@ mod tests {
             ..Default::default()
         };
         let mut builder = ConfigurationBuilderImpl::default();
-        assert!(DiagnosticsSubsystem::define_configuration(&context, &diagnostics, &mut builder)
-            .is_ok());
+        assert!(DiagnosticsSubsystem::define_configuration(
+            &context,
+            &DiagnosticsSubsystemConfig {
+                diagnostics: &diagnostics,
+                storage: &StorageConfig::default()
+            },
+            &mut builder
+        )
+        .is_ok());
     }
 
     #[test]
     fn test_invalid_fire_config() {
-        let temp_dir = TempDir::new().unwrap();
-        let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
-
-        let fire_config_path = resource_dir.join("fire_config.json");
-        let mut fire_config = std::fs::File::create(&fire_config_path).unwrap();
-        serde_json::to_writer(
-            &mut fire_config,
-            &json!({
-                "invalid": [],
+        let resource_dir = ResourceDir::new();
+        let fire_config_path = resource_dir.write(
+            "fire_config.json",
+            json!({
+                "invalid": []
             }),
-        )
-        .unwrap();
+        );
 
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Standard,
             build_type: &BuildType::User,
-            resource_dir,
+            resource_dir: resource_dir.path(),
             ..ConfigurationContext::default_for_tests()
         };
         let diagnostics = DiagnosticsConfig {
@@ -526,19 +625,24 @@ mod tests {
             ..Default::default()
         };
         let mut builder = ConfigurationBuilderImpl::default();
-        assert!(DiagnosticsSubsystem::define_configuration(&context, &diagnostics, &mut builder)
-            .is_err());
+        assert!(DiagnosticsSubsystem::define_configuration(
+            &context,
+            &DiagnosticsSubsystemConfig {
+                diagnostics: &diagnostics,
+                storage: &StorageConfig::default()
+            },
+            &mut builder
+        )
+        .is_err());
     }
 
     #[test]
     fn test_define_configuration_initial_log_interests() {
-        let temp_dir = TempDir::new().unwrap();
-        let resource_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
-
+        let resource_dir = ResourceDir::new();
         let context = ConfigurationContext {
             feature_set_level: &FeatureSupportLevel::Standard,
             build_type: &BuildType::Eng,
-            resource_dir,
+            resource_dir: resource_dir.path(),
             ..ConfigurationContext::default_for_tests()
         };
         let diagnostics = DiagnosticsConfig {
@@ -558,7 +662,15 @@ mod tests {
         };
         let mut builder = ConfigurationBuilderImpl::default();
 
-        DiagnosticsSubsystem::define_configuration(&context, &diagnostics, &mut builder).unwrap();
+        DiagnosticsSubsystem::define_configuration(
+            &context,
+            &DiagnosticsSubsystemConfig {
+                diagnostics: &diagnostics,
+                storage: &StorageConfig::default(),
+            },
+            &mut builder,
+        )
+        .unwrap();
         let config = builder.build();
         assert_eq!(
             config.configuration_capabilities["fuchsia.diagnostics.ComponentInitialInterests"]

@@ -322,9 +322,13 @@ fn configure_subsystems(
     )
     .context("Configuring the 'development' subsystem")?;
 
+    let diagnostics_config = diagnostics::DiagnosticsSubsystemConfig {
+        diagnostics: &platform.diagnostics,
+        storage: &platform.storage,
+    };
     diagnostics::DiagnosticsSubsystem::define_configuration(
         &context_base.for_subsystem("diagnostics"),
-        &platform.diagnostics,
+        &diagnostics_config,
         builder,
     )
     .context("Configuring the 'diagnostics' subsystem")?;
