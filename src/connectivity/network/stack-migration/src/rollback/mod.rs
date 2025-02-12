@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::pin::pin;
 use std::time::Duration;
 
 use fidl_fuchsia_net_http as fnet_http;
@@ -183,11 +182,22 @@ enum HealthcheckResult {
     Failure,
 }
 
-trait HttpFetcher {
-    async fn fetch(&mut self, request: fnet_http::Request) -> fidl::Result<fnet_http::Response>;
+pub(crate) trait HttpFetcher {
+    fn fetch(
+        &mut self,
+        request: fnet_http::Request,
+    ) -> impl std::future::Future<Output = fidl::Result<fnet_http::Response>> + Send;
 }
 
-struct FidlHttpFetcher(fnet_http::LoaderProxy);
+pub(crate) struct FidlHttpFetcher(fnet_http::LoaderProxy);
+
+impl FidlHttpFetcher {
+    pub(crate) fn new() -> Self {
+        let loader = fuchsia_component::client::connect_to_protocol::<fnet_http::LoaderMarker>()
+            .expect("unable to connect to fuchsia.net.http.Loader");
+        FidlHttpFetcher(loader)
+    }
+}
 
 impl HttpFetcher for FidlHttpFetcher {
     async fn fetch(&mut self, request: fnet_http::Request) -> fidl::Result<fnet_http::Response> {
@@ -251,36 +261,18 @@ where
     }
 }
 
+pub(crate) fn new_healthcheck_stream() -> impl futures::stream::Stream<Item = ()> {
+    futures::stream::once(fuchsia_async::Timer::new(HEALTHCHECK_STARTUP_DELAY))
+        .chain(fuchsia_async::Interval::new(HEALTHCHECK_INTERVAL.into()))
+}
+
 /// Implements the full Netstack3 rollback lifecycle.
 ///
 /// Scheduling and canceling reboots is delegated to the main stack migration
 /// code, which has a wider view of the world.
-pub(crate) async fn run(
-    state: State,
-    desired_version_updates: futures::channel::mpsc::UnboundedReceiver<NetstackVersion>,
-    persistance_updates: futures::channel::mpsc::UnboundedSender<Persisted>,
-) {
-    let loader = fuchsia_component::client::connect_to_protocol::<fnet_http::LoaderMarker>()
-        .expect("unable to connect to fuchsia.net.http.Loader");
-
-    let fut = futures::stream::once(fuchsia_async::Timer::new(HEALTHCHECK_STARTUP_DELAY))
-        .chain(fuchsia_async::Interval::new(HEALTHCHECK_INTERVAL.into()));
-
-    run_internal(
-        state,
-        HttpHealthchecker { requester: FidlHttpFetcher(loader) },
-        desired_version_updates,
-        persistance_updates,
-        pin!(fut),
-    )
-    .await
-}
-
-/// Actually implements the full Netstack3 rollback lifecycle that's used in
-/// [`run`], but with points for adding fake implementations.
-async fn run_internal<H, T>(
+pub(crate) async fn run<H, T>(
     mut state: State,
-    mut health_checker: HttpHealthchecker<H>,
+    http_fetcher: H,
     desired_version_updates: futures::channel::mpsc::UnboundedReceiver<NetstackVersion>,
     persistance_updates: futures::channel::mpsc::UnboundedSender<Persisted>,
     healthcheck_tick: T,
@@ -288,6 +280,7 @@ async fn run_internal<H, T>(
     H: HttpFetcher,
     T: Stream<Item = ()> + Unpin,
 {
+    let mut health_checker = HttpHealthchecker { requester: http_fetcher };
     enum Action {
         Healthcheck,
         NewDesiredVersion(NetstackVersion),
@@ -318,6 +311,26 @@ async fn run_internal<H, T>(
 }
 
 #[cfg(test)]
+pub(crate) mod testutil {
+    use super::*;
+
+    pub(crate) struct MockHttpRequester<F>(pub(crate) F);
+
+    impl<F> HttpFetcher for MockHttpRequester<F>
+    where
+        F: FnMut() -> fidl::Result<fidl_fuchsia_net_http::Response>,
+    {
+        fn fetch(
+            &mut self,
+            _request: fnet_http::Request,
+        ) -> impl futures::future::Future<Output = fidl::Result<fidl_fuchsia_net_http::Response>> + Send
+        {
+            futures::future::ready(self.0())
+        }
+    }
+}
+
+#[cfg(test)]
 mod test {
     use super::*;
 
@@ -328,21 +341,8 @@ mod test {
     use futures::SinkExt;
     use test_case::test_case;
 
+    use crate::rollback::testutil::MockHttpRequester;
     use crate::NetstackVersion;
-
-    struct MockHttpRequester<F>(F);
-
-    impl<F> HttpFetcher for MockHttpRequester<F>
-    where
-        F: FnMut() -> fidl::Result<fidl_fuchsia_net_http::Response>,
-    {
-        async fn fetch(
-            &mut self,
-            _request: fnet_http::Request,
-        ) -> fidl::Result<fidl_fuchsia_net_http::Response> {
-            self.0()
-        }
-    }
 
     #[test_case(None, NetstackVersion::Netstack2 => State::Netstack2)]
     #[test_case(None, NetstackVersion::Netstack3 => State::Checking(0))]
@@ -544,9 +544,9 @@ mod test {
         let (mut desired_version_sender, desired_version_receiver) = mpsc::unbounded();
         let (persistence_sender, mut persistence_receiver) = mpsc::unbounded();
 
-        let task = Task::spawn(super::run_internal(
+        let task = Task::spawn(super::run(
             state,
-            HttpHealthchecker { requester: r },
+            r,
             desired_version_receiver,
             persistence_sender,
             healthcheck_timer_receiver,

@@ -4,7 +4,7 @@
 
 mod rollback;
 
-use std::pin::Pin;
+use std::pin::{pin, Pin};
 
 use cobalt_client::traits::AsEventCode as _;
 use fuchsia_async::Task;
@@ -482,7 +482,27 @@ pub async fn main() {
         fs.take_and_serve_directory_handle().expect("failed to take out directory handle");
 
     let mut migration = Migration::new(DataPersistenceProvider {}, Scheduler {});
+    main_inner(
+        &mut migration,
+        fs.fuse().flatten_unordered(None),
+        rollback::FidlHttpFetcher::new(),
+        rollback::new_healthcheck_stream(),
+    )
+    .await
+}
 
+async fn main_inner<
+    P: PersistenceProvider,
+    CR: CollaborativeRebootScheduler,
+    H: rollback::HttpFetcher + Send + 'static,
+    T: Stream<Item = ()> + Send + 'static,
+    SR: Stream<Item = Result<ServiceRequest, fidl::Error>>,
+>(
+    migration: &mut Migration<P, CR>,
+    service_request_stream: SR,
+    http_fetcher: H,
+    healthcheck_tick: T,
+) {
     let inspector = fuchsia_inspect::component::inspector();
     let _inspect_server =
         inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default())
@@ -508,8 +528,17 @@ pub async fn main() {
     //    a reboot because the persisted failures are above the limit.
     migration.update_rollback_state(rollback_state.persisted()).await;
 
-    Task::spawn(rollback::run(rollback_state, desired_version_receiver, rollback_state_sender))
-        .detach();
+    Task::spawn(async move {
+        rollback::run(
+            rollback_state,
+            http_fetcher,
+            desired_version_receiver,
+            rollback_state_sender,
+            pin!(healthcheck_tick),
+        )
+        .await
+    })
+    .detach();
 
     enum Action {
         ServiceRequest(Result<ServiceRequest, fidl::Error>),
@@ -529,9 +558,7 @@ pub async fn main() {
             .chain(fuchsia_async::Interval::new(metrics_logging_interval))
             .map(|()| Action::LogMetrics),
     )));
-    stream.push(Box::pin(Box::new(Box::pin(
-        fs.fuse().flatten_unordered(None).map(Action::ServiceRequest),
-    ))));
+    stream.push(Box::pin(Box::new(Box::pin(service_request_stream.map(Action::ServiceRequest)))));
     stream.push(Box::pin(rollback_state_receiver.map(|state| Action::UpdateRollbackState(state))));
 
     while let Some(action) = stream.next().await {
@@ -576,10 +603,14 @@ pub async fn main() {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
+    use async_utils::event::{Event, EventWait};
     use diagnostics_assertions::assert_data_tree;
     use fidl::Peered as _;
+    use fidl_fuchsia_net_http as fnet_http;
+    use futures::FutureExt;
     use std::cell::RefCell;
     use std::rc::Rc;
+    use std::time::Duration;
     use test_case::test_case;
 
     #[derive(Default, Clone)]
@@ -1165,5 +1196,143 @@ mod tests {
             }
         })
         .await;
+    }
+
+    /// An in-memory mock-persistence that triggers an event once the target
+    /// state has been persisted.
+    #[derive(Clone)]
+    struct AwaitPersisted {
+        file: Rc<RefCell<Option<Vec<u8>>>>,
+        target: Vec<u8>,
+        event: Event,
+    }
+
+    impl AwaitPersisted {
+        fn with_persisted(start: Persisted, target: &Persisted) -> (Self, EventWait) {
+            let event = Event::new();
+            let wait = event.wait();
+            let target_bytes = serde_json::to_vec(target).expect("failed to serialize target");
+            let mut s = Self { file: Default::default(), target: target_bytes, event };
+            start.save(s.open_writer().unwrap());
+            (s, wait)
+        }
+    }
+
+    impl PersistenceProvider for AwaitPersisted {
+        type Writer = Self;
+        type Reader = std::io::Cursor<Vec<u8>>;
+
+        fn open_writer(&mut self) -> std::io::Result<Self::Writer> {
+            *self.file.borrow_mut() = Some(Vec::new());
+            Ok(self.clone())
+        }
+
+        fn open_reader(&self) -> std::io::Result<Self::Reader> {
+            self.file
+                .borrow()
+                .clone()
+                .map(std::io::Cursor::new)
+                .ok_or(std::io::ErrorKind::NotFound.into())
+        }
+    }
+
+    impl std::io::Write for AwaitPersisted {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            let r = self.file.borrow_mut().as_mut().expect("no file open").write(buf);
+            if self.file.borrow().as_ref().expect("no_file_open") == &self.target {
+                let _: bool = self.event.signal();
+            }
+            r
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[fuchsia::test]
+    async fn migrate_to_ns3_success() {
+        let start =
+            Persisted { user: None, automated: Some(NetstackVersion::Netstack3), rollback: None };
+        let target = Persisted {
+            user: None,
+            automated: Some(NetstackVersion::Netstack3),
+            rollback: Some(rollback::Persisted::Success),
+        };
+
+        let (persistence, mut wait) = AwaitPersisted::with_persisted(start, &target);
+        let mut migration = Migration::new(persistence, NoCollaborativeReboot);
+        // No service requests.
+        let service_request_stream = futures::stream::pending();
+        // A health check that always succeeds.
+        let mock_healthcheck = rollback::testutil::MockHttpRequester(|| {
+            Ok(fnet_http::Response { error: None, status_code: Some(204), ..Default::default() })
+        });
+        let healthcheck_tick = futures::stream::once(futures::future::ready(()));
+
+        {
+            let main_fut = main_inner(
+                &mut migration,
+                service_request_stream,
+                mock_healthcheck,
+                healthcheck_tick,
+            )
+            .fuse();
+            futures::pin_mut!(main_fut);
+            futures::select!(
+                () = main_fut => unreachable!("main fut should never exit"),
+                () = wait => {}
+            );
+        }
+
+        assert_eq!(migration.persisted.rollback, Some(rollback::Persisted::Success));
+    }
+
+    #[fuchsia::test]
+    async fn migrate_to_ns3_fails() {
+        let start =
+            Persisted { user: None, automated: Some(NetstackVersion::Netstack3), rollback: None };
+        let target = Persisted {
+            user: None,
+            automated: Some(NetstackVersion::Netstack3),
+            rollback: Some(rollback::Persisted::HealthcheckFailures(
+                rollback::MAX_FAILED_HEALTHCHECKS,
+            )),
+        };
+
+        let (persistence, mut wait) = AwaitPersisted::with_persisted(start, &target);
+        let mut migration = Migration::new(persistence, FakeCollaborativeReboot::default());
+        // No service requests.
+        let service_request_stream = futures::stream::pending();
+        // A health check that always fails.
+        let mock_healthcheck = rollback::testutil::MockHttpRequester(|| {
+            Ok(fnet_http::Response { error: None, status_code: Some(500), ..Default::default() })
+        });
+        // Use a non-zero interval so that the Healthcheck code doesn't hog the scheduler.
+        let healthcheck_tick = fuchsia_async::Interval::new(Duration::from_millis(1).into());
+
+        {
+            let main_fut = main_inner(
+                &mut migration,
+                service_request_stream,
+                mock_healthcheck,
+                healthcheck_tick,
+            )
+            .fuse();
+            futures::pin_mut!(main_fut);
+            futures::select!(
+                () = main_fut => unreachable!("main fut should never exit"),
+                () = wait => {}
+            );
+        }
+
+        assert_matches!(
+            migration.persisted.rollback,
+            Some(rollback::Persisted::HealthcheckFailures(f)) if
+            f >= rollback::MAX_FAILED_HEALTHCHECKS
+        );
+        // Verify a failed migration schedules a collaborative reboot.
+        let cr_req = &migration.collaborative_reboot.scheduler.req;
+        assert_eq!(Ok(false), cr_req.as_ref().expect("there should be a request").is_closed())
     }
 }
