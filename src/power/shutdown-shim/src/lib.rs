@@ -95,7 +95,7 @@ pub async fn main(
         abort_tx,
         collaborative_reboot: cr_state,
         shutdown_pending: Arc::new(AMutex::new(false)),
-        shutdown_watcher: ShutdownWatcher::new(),
+        shutdown_watcher: ShutdownWatcher::new_with_inspector(&inspector),
     };
 
     let shutdown_watcher = ctx.shutdown_watcher.clone();
