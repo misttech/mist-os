@@ -6,6 +6,9 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.hrtimer") {
   sources = [ "hrtimer.fidl" ]
+  sdk_category = "partner"
+  stable = false
+  sdk_area = "Drivers"
   public_deps = [
     "//sdk/fidl/fuchsia.power.broker",
     "//sdk/fidl/fuchsia.power.system",

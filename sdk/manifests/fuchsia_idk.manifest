@@ -263,6 +263,7 @@ fidl_library://fidl/fuchsia.hardware.clock
 fidl_library://fidl/fuchsia.hardware.clockimpl
 fidl_library://fidl/fuchsia.hardware.cpu.ctrl (unstable)
 fidl_library://fidl/fuchsia.hardware.gpio
+fidl_library://fidl/fuchsia.hardware.hrtimer (unstable)
 fidl_library://fidl/fuchsia.hardware.i2c
 fidl_library://fidl/fuchsia.hardware.i2c.businfo (unstable)
 fidl_library://fidl/fuchsia.hardware.i2cimpl (unstable)
