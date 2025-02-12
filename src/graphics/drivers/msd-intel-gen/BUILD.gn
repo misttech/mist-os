@@ -59,7 +59,6 @@ driver_bind_rules("msd_intel_bind") {
 
 driver_bind_rules("msd_intel_test_bind") {
   rules = "meta/msd_intel_test.bind"
-  disable_autobind = true
   deps = [ "//src/devices/bind/fuchsia.intel.platform.gpucore" ]
 }
 

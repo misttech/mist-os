@@ -18,5 +18,11 @@
             path: "/dev/class",
         },
         { protocol: "fuchsia.tracing.provider.Registry" },
+        {
+            protocol: [
+                "fuchsia.driver.development.Manager",
+                "fuchsia.driver.registrar.DriverRegistrar",
+            ],
+        },
     ],
 }
