@@ -14,6 +14,7 @@ use crate::fs::proc::meminfo::meminfo_node;
 use crate::fs::proc::pid_directory::pid_directory;
 use crate::fs::proc::pressure_directory::pressure_directory;
 use crate::fs::proc::self_symlink::self_node;
+use crate::fs::proc::stat::stat_node;
 use crate::fs::proc::sysctl::{net_directory, sysctl_directory};
 use crate::fs::proc::sysrq::SysRqNode;
 use crate::fs::proc::thread_self::thread_self_node;
@@ -30,7 +31,6 @@ use crate::vfs::{
 use maplit::btreemap;
 use starnix_logging::{bug_ref, log_error, track_stub};
 use starnix_sync::{FileOpsCore, Locked};
-use starnix_types::time::duration_to_scheduler_clock;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::{DeviceType, MISC_MAJOR};
 use starnix_uapi::errors::Errno;
@@ -41,7 +41,6 @@ use starnix_uapi::{errno, off_t, pid_t};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Weak};
-use std::time::SystemTime;
 
 /// `ProcDirectory` represents the top-level directory in `procfs`.
 ///
@@ -71,11 +70,7 @@ impl ProcDirectory {
             "kallsyms".into() => kallsyms_node(current_task, fs),
             "mounts".into() => MountsSymlink::new_node(current_task, fs),
             "cgroups".into() => cgroups_node(current_task, fs),
-            "stat".into() => fs.create_node(
-                current_task,
-                StatFile::new_node(&kernel.stats),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
+            "stat".into() => stat_node(current_task, fs),
             "swaps".into() => fs.create_node(
                 current_task,
                 SwapsFile::new_node(kernel),
@@ -525,88 +520,6 @@ impl DynamicFileSource for VmStatFile {
         writeln!(sink, "nr_active_file {}", nr_active_file)?;
         writeln!(sink, "pgscan_direct {}", 0)?;
         writeln!(sink, "pgscan_kswapd {}", 0)?;
-
-        Ok(())
-    }
-}
-
-#[derive(Clone)]
-struct StatFile {
-    kernel_stats: Arc<KernelStats>,
-}
-impl StatFile {
-    pub fn new_node(kernel_stats: &Arc<KernelStats>) -> impl FsNodeOps {
-        DynamicFile::new_node(Self { kernel_stats: kernel_stats.clone() })
-    }
-}
-impl DynamicFileSource for StatFile {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let uptime = zx::MonotonicInstant::get() - zx::MonotonicInstant::ZERO;
-
-        let cpu_stats =
-            self.kernel_stats.get().get_cpu_stats(zx::MonotonicInstant::INFINITE).map_err(|e| {
-                log_error!("FIDL error getting cpu stats: {e}");
-                errno!(EIO)
-            })?;
-
-        // Number of values reported per CPU. See `get_cpu_stats_row` below for the list of values.
-        const NUM_CPU_STATS: usize = 10;
-
-        let get_cpu_stats_row = |cpu_stats: &fidl_fuchsia_kernel::PerCpuStats| {
-            let idle = zx::MonotonicDuration::from_nanos(cpu_stats.idle_time.unwrap_or(0));
-
-            // Assume that all non-idle time is spent in user mode.
-            let user = uptime - idle;
-
-            // Zircon currently reports only number of various interrupts, but not the time spent
-            // handling them. Return zeros.
-            let nice: u64 = 0;
-            let system: u64 = 0;
-            let iowait: u64 = 0;
-            let irq: u64 = 0;
-            let softirq: u64 = 0;
-            let steal: u64 = 0;
-            let quest: u64 = 0;
-            let quest_nice: u64 = 0;
-
-            [
-                duration_to_scheduler_clock(user) as u64,
-                nice,
-                system,
-                duration_to_scheduler_clock(idle) as u64,
-                iowait,
-                irq,
-                softirq,
-                steal,
-                quest,
-                quest_nice,
-            ]
-        };
-        let per_cpu_stats = cpu_stats.per_cpu_stats.unwrap_or(vec![]);
-        let mut cpu_total_row = [0u64; NUM_CPU_STATS];
-        for row in per_cpu_stats.iter().map(get_cpu_stats_row) {
-            for (i, value) in row.iter().enumerate() {
-                cpu_total_row[i] += value
-            }
-        }
-
-        writeln!(sink, "cpu {}", cpu_total_row.map(|n| n.to_string()).join(" "))?;
-        for (i, row) in per_cpu_stats.iter().map(get_cpu_stats_row).enumerate() {
-            writeln!(sink, "cpu{} {}", i, row.map(|n| n.to_string()).join(" "))?;
-        }
-
-        let context_switches: u64 =
-            per_cpu_stats.iter().map(|s| s.context_switches.unwrap_or(0)).sum();
-        writeln!(sink, "ctxt {}", context_switches)?;
-
-        let num_interrupts: u64 = per_cpu_stats.iter().map(|s| s.ints.unwrap_or(0)).sum();
-        writeln!(sink, "intr {}", num_interrupts)?;
-
-        let epoch_time = zx::MonotonicDuration::from(
-            SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap_or_default(),
-        );
-        let boot_time_epoch = epoch_time - uptime;
-        writeln!(sink, "btime {}", boot_time_epoch.into_seconds())?;
 
         Ok(())
     }

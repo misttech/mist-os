@@ -15,6 +15,7 @@ pub mod pid_directory;
 mod pressure_directory;
 mod proc_directory;
 pub mod self_symlink;
+pub mod stat;
 mod sysctl;
 mod sysrq;
 pub mod thread_self;

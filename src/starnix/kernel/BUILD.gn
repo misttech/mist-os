@@ -158,6 +158,7 @@ rustc_library("starnix_core") {
     "fs/proc/pressure_directory.rs",
     "fs/proc/proc_directory.rs",
     "fs/proc/self_symlink.rs",
+    "fs/proc/stat.rs",
     "fs/proc/sysctl.rs",
     "fs/proc/sysrq.rs",
     "fs/proc/thread_self.rs",
