@@ -37,13 +37,18 @@ source_set("layer_common") {
     "$validation_layer_dir/layers/containers/custom_containers.h",
     "$validation_layer_dir/layers/utils/vk_layer_extension_utils.cpp",
     "$validation_layer_dir/layers/utils/vk_layer_extension_utils.h",
+    "$validation_layer_dir/layers/vulkan/generated/error_location_helper.cpp",
+    "$validation_layer_dir/layers/vulkan/generated/error_location_helper.h",
     "$validation_layer_dir/layers/vulkan/generated/vk_api_version.h",
     "$validation_layer_dir/layers/vulkan/generated/vk_dispatch_table_helper.h",
     "$validation_layer_dir/layers/vulkan/generated/vk_extension_helper.h",
     "$validation_layer_dir/layers/vulkan/generated/vk_layer_dispatch_table.h",
   ]
 
-  public_deps = [ "//third_party/Vulkan-Headers/src:vulkan_headers" ]
+  public_deps = [
+    "//third_party/Vulkan-Headers/src:vulkan_headers",
+    "//third_party/Vulkan-Utility-Libraries/src:vulkan_layer_settings",
+  ]
 }
 
 loadable_module("swapchain") {
