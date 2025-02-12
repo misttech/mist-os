@@ -388,14 +388,8 @@ def type_annotation(type_ir, root_ir, recurse_guard=None) -> type:
         return wrap_optional(str)
     elif kind == "vector" or kind == "array":
         element_type = type_ir["element_type"]
-        if (
-            element_type["kind_v2"] == "primitive"
-            and element_type["subtype"] == "uint8"
-        ):
-            return wrap_optional(bytes)
-        else:
-            ty = type_annotation(element_type, root_ir, recurse_guard)
-            return wrap_optional(Sequence[ty])
+        ty = type_annotation(element_type, root_ir, recurse_guard)
+        return wrap_optional(Sequence[ty])
     elif kind == "endpoint":
         # TODO(https://fxbug.dev/383175226): This inconsistency between client
         # and server may not be correct. Add test coverage for `client_end`.
