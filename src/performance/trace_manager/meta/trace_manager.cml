@@ -56,7 +56,10 @@
         {
             protocol: "fuchsia.kernel.DebugResource",
             from: "parent",
-            to: "#cpuperf_provider",
+            to: [
+                "#cpuperf_provider",
+                "#ktrace_provider",
+            ],
         },
         {
             storage: "tmp",
@@ -66,7 +69,6 @@
         {
             protocol: [
                 "fuchsia.boot.ReadOnlyLog",
-                "fuchsia.tracing.kernel.Controller",
                 "fuchsia.tracing.kernel.Reader",
             ],
             from: "parent",

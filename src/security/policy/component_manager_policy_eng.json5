@@ -62,6 +62,7 @@
                     "/core/sshd-host/shell:**",
                     "/core/testing/vfs-compliance-tests:**",
                     "/core/trace_manager/cpuperf_provider/cpu-trace",
+                    "/core/trace_manager/ktrace_provider",
                 ],
             },
             {

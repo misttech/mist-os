@@ -45,15 +45,15 @@ struct DrainContext {
 
 class App {
  public:
-  explicit App(const fxl::CommandLine& command_line);
+  explicit App(zx::resource debug_resource, const fxl::CommandLine& command_line);
   ~App();
 
  private:
-  void UpdateState();
+  zx::result<> UpdateState();
 
-  void StartKTrace(uint32_t group_mask, trace_buffering_mode_t buffering_mode,
-                   bool retain_current_data);
-  void StopKTrace();
+  zx::result<> StartKTrace(uint32_t group_mask, trace_buffering_mode_t buffering_mode,
+                           bool retain_current_data);
+  zx::result<> StopKTrace();
 
   trace::TraceObserver trace_observer_;
   LogImporter log_importer_;
@@ -61,6 +61,7 @@ class App {
   // This context keeps the trace context alive until we've written our trace
   // records, which doesn't happen until after tracing has stopped.
   trace_prolonged_context_t* context_ = nullptr;
+  zx::resource debug_resource_;
 
   App(const App&) = delete;
   App(App&&) = delete;

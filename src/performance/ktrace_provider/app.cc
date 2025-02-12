@@ -8,6 +8,7 @@
 #include <lib/async/cpp/task.h>
 #include <lib/async/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/fit/defer.h>
 #include <lib/fxt/fields.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-engine/instrumentation.h>
@@ -19,7 +20,6 @@
 
 #include <iterator>
 
-#include "lib/fit/defer.h"
 #include "src/performance/ktrace_provider/device_reader.h"
 
 namespace ktrace_provider {
@@ -62,44 +62,31 @@ void LogFidlFailure(const char* rqst_name, const fidl::Result<T>& result) {
   }
 }
 
-void RequestKtraceStop(const fidl::SyncClient<fuchsia_tracing_kernel::Controller>& controller) {
-  fidl::Result result = controller->Stop();
-  LogFidlFailure("stop", result);
+zx::result<> RequestKtraceStop(const zx::resource& debug_resource) {
+  return zx::make_result(zx_ktrace_control(debug_resource.get(), KTRACE_ACTION_STOP, 0, nullptr));
 }
 
-void RequestKtraceRewind(const fidl::SyncClient<fuchsia_tracing_kernel::Controller>& controller) {
-  fidl::Result result = controller->Rewind();
-  LogFidlFailure("rewind", result);
+zx::result<> RequestKtraceRewind(const zx::resource& debug_resource) {
+  return zx::make_result(zx_ktrace_control(debug_resource.get(), KTRACE_ACTION_REWIND, 0, nullptr));
 }
 
-void RequestKtraceStart(const fidl::SyncClient<fuchsia_tracing_kernel::Controller>& controller,
-                        trace_buffering_mode_t buffering_mode, uint32_t group_mask) {
-  using BufferingMode = fuchsia_tracing::BufferingMode;
-
-  BufferingMode fidl_buffering_mode = BufferingMode::kOneshot;
+zx::result<> RequestKtraceStart(const zx::resource& debug_resource,
+                                trace_buffering_mode_t buffering_mode, uint32_t group_mask) {
   switch (buffering_mode) {
     // ktrace does not currently support streaming, so for now we preserve the
     // legacy behavior of falling back on one-shot mode.
-    case TRACE_BUFFERING_MODE_STREAMING:
-    case TRACE_BUFFERING_MODE_ONESHOT:
-      fidl_buffering_mode = BufferingMode::kOneshot;
-      break;
+    case trace_buffering_mode_t::TRACE_BUFFERING_MODE_STREAMING:
+    case trace_buffering_mode_t::TRACE_BUFFERING_MODE_ONESHOT:
+      return zx::make_result(
+          zx_ktrace_control(debug_resource.get(), KTRACE_ACTION_START, group_mask, nullptr));
 
-    case TRACE_BUFFERING_MODE_CIRCULAR:
-      fidl_buffering_mode = BufferingMode::kCircular;
-      break;
-
+    case trace_buffering_mode_t::TRACE_BUFFERING_MODE_CIRCULAR:
+      return zx::make_result(zx_ktrace_control(debug_resource.get(), KTRACE_ACTION_START_CIRCULAR,
+                                               group_mask, nullptr));
     default:
-      FX_PLOGS(ERROR, ZX_ERR_INVALID_ARGS) << "Invalid buffering mode: " << buffering_mode;
-      return;
-  }
-
-  fidl::Result status =
-      controller->Start({{.group_mask = group_mask, .buffering_mode = fidl_buffering_mode}});
-
-  LogFidlFailure("start", status);
+      return zx::error(ZX_ERR_INVALID_ARGS);
+  };
 }
-
 }  // namespace
 
 std::vector<trace::KnownCategory> GetKnownCategories() {
@@ -115,13 +102,18 @@ std::vector<trace::KnownCategory> GetKnownCategories() {
   return known_categories;
 }
 
-App::App(const fxl::CommandLine& command_line) {
-  trace_observer_.Start(async_get_default_dispatcher(), [this] { UpdateState(); });
+App::App(zx::resource debug_resource, const fxl::CommandLine& command_line)
+    : debug_resource_(std::move(debug_resource)) {
+  trace_observer_.Start(async_get_default_dispatcher(), [this] {
+    if (zx::result res = UpdateState(); res.is_error()) {
+      FX_PLOGS(ERROR, res.error_value()) << "Update state failed";
+    }
+  });
 }
 
 App::~App() = default;
 
-void App::UpdateState() {
+zx::result<> App::UpdateState() {
   uint32_t group_mask = 0;
   bool capture_log = false;
   bool retain_current_data = false;
@@ -148,8 +140,14 @@ void App::UpdateState() {
   if (current_group_mask_ != group_mask) {
     trace_context_t* ctx = trace_acquire_context();
 
-    StopKTrace();
-    StartKTrace(group_mask, trace_context_get_buffering_mode(ctx), retain_current_data);
+    if (zx::result res = StopKTrace(); res.is_error()) {
+      return res.take_error();
+    }
+    if (zx::result res =
+            StartKTrace(group_mask, trace_context_get_buffering_mode(ctx), retain_current_data);
+        res.is_error()) {
+      return res.take_error();
+    }
 
     if (ctx != nullptr) {
       trace_release_context(ctx);
@@ -161,38 +159,40 @@ void App::UpdateState() {
   } else {
     log_importer_.Stop();
   }
+  return zx::ok();
 }
 
-void App::StartKTrace(uint32_t group_mask, trace_buffering_mode_t buffering_mode,
-                      bool retain_current_data) {
+zx::result<> App::StartKTrace(uint32_t group_mask, trace_buffering_mode_t buffering_mode,
+                              bool retain_current_data) {
   FX_DCHECK(!context_);
   if (!group_mask) {
-    return;  // nothing to trace
+    return zx::ok();  // nothing to trace
   }
 
   FX_LOGS(INFO) << "Starting ktrace";
 
-  zx::result client_end = component::Connect<fuchsia_tracing_kernel::Controller>();
-  if (client_end.is_error()) {
-    FX_PLOGS(ERROR, client_end.error_value()) << " failed to connect to ktrace controller";
-    return;
-  }
-  auto ktrace_controller = fidl::SyncClient{std::move(*client_end)};
-
   context_ = trace_acquire_prolonged_context();
   if (!context_) {
     // Tracing was disabled in the meantime.
-    return;
+    return zx::ok();
   }
   current_group_mask_ = group_mask;
 
-  RequestKtraceStop(ktrace_controller);
-  if (!retain_current_data) {
-    RequestKtraceRewind(ktrace_controller);
+  if (zx::result res = RequestKtraceStop(debug_resource_); res.is_error()) {
+    return res.take_error();
   }
-  RequestKtraceStart(ktrace_controller, buffering_mode, group_mask);
+  if (!retain_current_data) {
+    if (zx::result res = RequestKtraceRewind(debug_resource_); res.is_error()) {
+      return res.take_error();
+    }
+  }
+  if (zx::result res = RequestKtraceStart(debug_resource_, buffering_mode, group_mask);
+      res.is_error()) {
+    return res.take_error();
+  }
 
   FX_LOGS(DEBUG) << "Ktrace started";
+  return zx::ok();
 }
 
 void DrainBuffer(std::unique_ptr<DrainContext> drain_context) {
@@ -251,9 +251,9 @@ void DrainBuffer(std::unique_ptr<DrainContext> drain_context) {
   FX_LOGS(DEBUG) << "Ktrace stopped";
 }
 
-void App::StopKTrace() {
+zx::result<> App::StopKTrace() {
   if (!context_) {
-    return;  // not currently tracing
+    return zx::ok();  // not currently tracing
   }
   auto d = fit::defer([this]() {
     trace_release_prolonged_context(context_);
@@ -264,20 +264,14 @@ void App::StopKTrace() {
 
   FX_LOGS(INFO) << "Stopping ktrace";
 
-  {
-    zx::result client_end = component::Connect<fuchsia_tracing_kernel::Controller>();
-    if (client_end.is_error()) {
-      FX_PLOGS(ERROR, client_end.error_value()) << " failed to connect to ktrace controller";
-      return;
-    }
-    auto ktrace_controller = fidl::SyncClient{std::move(*client_end)};
-    RequestKtraceStop(ktrace_controller);
+  if (zx::result res = RequestKtraceStop(debug_resource_); res.is_error()) {
+    return res;
   }
 
   auto drain_context = DrainContext::Create();
   if (!drain_context) {
     FX_LOGS(ERROR) << "Failed to start reading kernel buffer";
-    return;
+    return zx::error(ZX_ERR_NO_RESOURCES);
   }
   zx_status_t result = async::PostTask(async_get_default_dispatcher(),
                                        [drain_context = std::move(drain_context)]() mutable {
@@ -285,7 +279,9 @@ void App::StopKTrace() {
                                        });
   if (result != ZX_OK) {
     FX_PLOGS(ERROR, result) << "Failed to schedule buffer writer";
+    return zx::error(result);
   }
+  return zx::ok();
 }
 
 }  // namespace ktrace_provider
