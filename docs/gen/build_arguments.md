@@ -43,7 +43,7 @@ the //:default target
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:138
+From //BUILD.gn:139
 
 ### all_cpu_kernel_boot_tests
 
@@ -136,7 +136,7 @@ The result will be built and uploaded to CIPD by infra.
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:130
+From //BUILD.gn:131
 
 ### assembly_generate_fvm_fastboot
 
@@ -167,7 +167,7 @@ The result will be built and uploaded to CIPD by infra.
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:134
+From //BUILD.gn:135
 
 ### authorized_ssh_keys_label
 
@@ -235,7 +235,7 @@ From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:39
+From //BUILD.gn:40
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -243,7 +243,7 @@ From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:39
+From //BUILD.gn:40
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -251,7 +251,7 @@ From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:39
+From //BUILD.gn:40
 
 ### basic_env_names
 
@@ -731,7 +731,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8723230422093070353"`
+**Current value for `target_cpu = "arm64"`:** `"8723185118418309329"`
 
 From //out/not-default/args.gn:10
 
@@ -739,7 +739,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8723230422093070353"`
+**Current value for `target_cpu = "riscv64"`:** `"8723185118418309329"`
 
 From //out/not-default/args.gn:10
 
@@ -747,7 +747,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8723230422093070353"`
+**Current value for `target_cpu = "x64"`:** `"8723185118418309329"`
 
 From //out/not-default/args.gn:10
 
@@ -770,7 +770,7 @@ From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:146
+From //BUILD.gn:147
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -778,7 +778,7 @@ From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:146
+From //BUILD.gn:147
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -786,7 +786,7 @@ From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:146
+From //BUILD.gn:147
 
 ### build_should_trace_actions
 
@@ -848,7 +848,7 @@ From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:48
+From //BUILD.gn:49
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -856,7 +856,7 @@ From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:48
+From //BUILD.gn:49
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -864,7 +864,7 @@ From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:48
+From //BUILD.gn:49
 
 ### camera_debug
 
@@ -965,7 +965,7 @@ be built, they should be included in the build graph through other means.
 
 **Current value (from the default):** `["//build/images:main_assembly"]`
 
-From //build/product.gni:50
+From //build/product.gni:43
 
 ### clang_embed_bitcode
 
@@ -2334,7 +2334,7 @@ From //out/not-default/args.gn:27
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:109
+From //BUILD.gn:110
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -2342,7 +2342,7 @@ From //out/not-default/args.gn:27
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:109
+From //BUILD.gn:110
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -2350,7 +2350,7 @@ From //out/not-default/args.gn:27
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:109
+From //BUILD.gn:110
 
 ### disable_boot_tests
 
@@ -2397,7 +2397,7 @@ From //products/core.gni:29
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:69
+From //BUILD.gn:70
 
 **Current value for `target_cpu = "riscv64"`:** `["//src/developer/debug/debug_agent"]`
 
@@ -2405,7 +2405,7 @@ From //products/minimal.gni:36
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:69
+From //BUILD.gn:70
 
 **Current value for `target_cpu = "x64"`:** `["//bundles/tools"]`
 
@@ -2413,7 +2413,7 @@ From //products/core.gni:29
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:69
+From //BUILD.gn:70
 
 ### dont_profile_source_files
 
@@ -2443,7 +2443,7 @@ From //out/not-default/args.gn:23
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:98
+From //BUILD.gn:99
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -2451,7 +2451,7 @@ From //out/not-default/args.gn:23
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:98
+From //BUILD.gn:99
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -2459,13 +2459,13 @@ From //out/not-default/args.gn:23
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:98
+From //BUILD.gn:99
 
 ### emu_window_size_height
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:42
+From //build/product.gni:35
 
 ### emu_window_size_width
 
@@ -2473,7 +2473,7 @@ Configuration to override the default window size for the virtual device in pixe
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:41
+From //build/product.gni:34
 
 ### enable_bazel_remote_rbe
 
@@ -2852,7 +2852,7 @@ packages instead of explicitly adding the labels of the
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:83
+From //BUILD.gn:84
 
 ### extra_bazel_assembly_targets
 
@@ -2983,7 +2983,7 @@ TODO(https://fxbug.dev/42161120) move this to a toolchain to allow multiple prod
 
 **Current value (from the default):** `true`
 
-From //build/product.gni:23
+From //build/product.gni:16
 
 ### fuchsia_product_assembly_config_label
 
@@ -2998,11 +2998,11 @@ From //products/core.gni:26
 
 **Overridden from the default:** `false`
 
-From //build/product.gni:29
+From //build/product.gni:22
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:29
+From //build/product.gni:22
 
 ### fuchsia_sdk_root
 
@@ -3160,7 +3160,7 @@ From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:90
+From //BUILD.gn:91
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -3168,7 +3168,7 @@ From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:90
+From //BUILD.gn:91
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3176,7 +3176,7 @@ From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:90
+From //BUILD.gn:91
 
 ### host_byteorder
 
@@ -3202,7 +3202,7 @@ From //out/not-default/args.gn:11
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:116
+From //BUILD.gn:117
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -3210,7 +3210,7 @@ From //out/not-default/args.gn:11
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:116
+From //BUILD.gn:117
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3218,7 +3218,7 @@ From //out/not-default/args.gn:11
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:116
+From //BUILD.gn:117
 
 ### host_os
 
@@ -3237,7 +3237,7 @@ From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:104
+From //BUILD.gn:105
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -3245,7 +3245,7 @@ From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:104
+From //BUILD.gn:105
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3253,7 +3253,7 @@ From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:104
+From //BUILD.gn:105
 
 ### host_tools_base_path_override
 
@@ -3859,13 +3859,13 @@ From //build/config/BUILDCONFIG.gn:1684
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:40
+From //BUILD.gn:41
 
 ### legacy_cache_package_labels
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:49
+From //BUILD.gn:50
 
 ### link_rbe_check
 
@@ -5021,36 +5021,29 @@ assembly defined, then a GN error will be generated.
 
 From //build/assembly/developer_overrides.gni:405
 
-### product_bootfs_packages
-
-A list of packages to be included in the bootfs as
-meta.fars and content-id'd blobs.
-
-**Current value (from the default):** `[]`
-
-From //build/product.gni:15
-
 ### product_bundle_labels
 
 Labels for product bundles to assemble in addition to the main product bundle.
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:149
+From //BUILD.gn:150
+
+### product_bundle_test_groups
+
+List of product_bundle_test_group() targets.
+We declare them in the top-level BUILD.gn so that the generated_file()s
+within get resolved at gn-gen time.
+
+**Current value (from the default):** `[]`
+
+From //build/product.gni:48
 
 ### product_description
 
 A human readable product description.
 
 **Current value (from the default):** `""`
-
-From //build/product.gni:18
-
-### product_host_labels
-
-A list of binary host tool labels to also build.
-
-**Current value (from the default):** `[]`
 
 From //build/product.gni:11
 
@@ -5525,7 +5518,7 @@ extension mechanism for IDK bits outside of the main repository.
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:126
+From //BUILD.gn:127
 
 ### sdk_cross_compile_host_tools
 
@@ -6126,7 +6119,7 @@ afterwards.
 
 **Current value (from the default):** `""`
 
-From //BUILD.gn:122
+From //BUILD.gn:123
 
 ### test_package_labels
 
@@ -6139,7 +6132,7 @@ From //out/not-default/args.gn:22
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:94
+From //BUILD.gn:95
 
 **Current value for `target_cpu = "riscv64"`:** `[]`
 
@@ -6147,7 +6140,7 @@ From //out/not-default/args.gn:22
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:94
+From //BUILD.gn:95
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -6155,7 +6148,7 @@ From //out/not-default/args.gn:22
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:94
+From //BUILD.gn:95
 
 ### testonly_in_containers
 
@@ -6279,7 +6272,7 @@ From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:57
+From //BUILD.gn:58
 
 **Current value for `target_cpu = "riscv64"`:** `["//bundles/buildbot/minimal"]`
 
@@ -6287,7 +6280,7 @@ From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:57
+From //BUILD.gn:58
 
 **Current value for `target_cpu = "x64"`:** `["//bundles/kitchen_sink"]`
 
@@ -6295,7 +6288,7 @@ From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:57
+From //BUILD.gn:58
 
 ### update_goldens
 
@@ -6616,7 +6609,7 @@ between similar virtual device's using different configuration's such as
 
 **Current value (from the default):** `""`
 
-From //build/product.gni:38
+From //build/product.gni:31
 
 ### vm_tracing_level
 
@@ -6700,11 +6693,11 @@ From //products/core.gni:27
 
 **Overridden from the default:** `false`
 
-From //build/product.gni:32
+From //build/product.gni:25
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:32
+From //build/product.gni:25
 
 ### zircon_a_partition
 
