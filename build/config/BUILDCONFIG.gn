@@ -188,6 +188,7 @@ if (toolchain_variant.instrumented) {
 
 # [START toolchain_is_variables]
 is_android = false
+is_apple = false
 is_chromeos = false
 is_fuchsia = false
 is_fuchsia_host = false
