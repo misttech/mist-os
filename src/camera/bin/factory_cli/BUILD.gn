@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/components/fuchsia_shell_package.gni")
+import("//build/components/fuchsia_package.gni")
 
 group("factory_cli") {
   deps = [ ":camera_factory_cli" ]
@@ -24,6 +24,6 @@ executable("camera_factory_cli_bin") {
   configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
-fuchsia_shell_package("camera_factory_cli") {
+fuchsia_package("camera_factory_cli") {
   deps = [ ":camera_factory_cli_bin" ]
 }
