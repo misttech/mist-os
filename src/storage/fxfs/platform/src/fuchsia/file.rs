@@ -427,12 +427,13 @@ impl vfs::node::Node for FxFile {
         let props = self.handle.get_properties().await.map_err(map_to_status)?;
         let descriptor =
             self.handle.uncached_handle().get_descriptor().await.map_err(map_to_status)?;
-        // Unnamed temporary files live in the graveyard. Fxfs treats this is as a reference.
-        // However, the hard link count for an unnamed temporary file should be zero.
-        // TODO(https://fxbug.dev/391458506): we should also check the expected link_count for
-        // unlinked files.
-        let Flags { is_unnamed_temporary, .. } = self.state.get_flags();
-        let link_count = if is_unnamed_temporary { 0 } else { props.refs };
+        // In most cases, the reference count of objects can be used as the link count. There are
+        // two cases where this is not the case - for unnamed temporary files and unlink files with
+        // no more open references to it. For these two cases, the link count should be zero (the
+        // object reference count is one as they live in the graveyard). In both cases,
+        // `TO_BE_PURGED` will be set and `refs` is one.
+        let Flags { to_be_purged, .. } = self.state.get_flags();
+        let link_count = if to_be_purged && props.refs == 1 { 0 } else { props.refs };
         Ok(attributes!(
             requested_attributes,
             Mutable {

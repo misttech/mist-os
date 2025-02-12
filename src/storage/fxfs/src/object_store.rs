@@ -1056,6 +1056,8 @@ impl ObjectStore {
                 *refs = 1;
                 transaction.add(self.store_object_id, Mutation::ObjectStore(mutation));
             }
+            // Otherwise, we don't commit the mutation as we want to keep reference count as 1 for
+            // objects in graveyard.
             Ok(true)
         } else {
             transaction.add(self.store_object_id, Mutation::ObjectStore(mutation));
