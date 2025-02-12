@@ -1220,18 +1220,19 @@ impl<Inst: Instant> Inspectable for Ipv6AddressState<Inst> {
         inspector.record_bool("Assigned", *assigned);
 
         if let Some(config) = config {
-            let is_slaac = match config {
-                Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { .. }) => false,
+            match config {
+                Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { .. }) => {}
                 Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, preferred_lifetime: _ }) => {
                     match inner {
                         SlaacConfig::Stable {
                             valid_until: _,
-                            creation_time: _,
-                            regen_counter: _,
-                            dad_counter: _,
+                            creation_time,
+                            regen_counter,
+                            dad_counter,
                         } => {
-                            // TODO(https://fxbug.dev/394169211): record stable SLAAC address
-                            // properties in inspect.
+                            inspector.record_inspectable_value("CreationTime", creation_time);
+                            inspector.record_uint("RegenCounter", *regen_counter);
+                            inspector.record_uint("DadCounter", *dad_counter);
                         }
                         SlaacConfig::Temporary(TemporarySlaacConfig {
                             valid_until: _,
@@ -1239,18 +1240,15 @@ impl<Inst: Instant> Inspectable for Ipv6AddressState<Inst> {
                             creation_time,
                             dad_counter,
                         }) => {
-                            // Record the extra temporary slaac configuration before
-                            // returning.
                             inspector
                                 .record_double("DesyncFactorSecs", desync_factor.as_secs_f64());
                             inspector.record_uint("DadCounter", *dad_counter);
                             inspector.record_inspectable_value("CreationTime", creation_time);
                         }
                     }
-                    true
                 }
             };
-            inspector.record_bool("IsSlaac", is_slaac);
+            inspector.record_bool("IsSlaac", config.is_slaac());
             inspector.record_inspectable_value("ValidUntil", &config.valid_until());
             inspector.record_inspectable_value("PreferredLifetime", &config.preferred_lifetime());
             inspector.record_bool("Temporary", config.is_temporary());

@@ -875,6 +875,9 @@ async fn inspect_devices(name: &str) {
                             // the number of DAD transmits to `u16::MAX` above.
                             Assigned: false,
                             Temporary: false,
+                            CreationTime: diagnostics_assertions::AnyUintProperty,
+                            DadCounter: diagnostics_assertions::AnyUintProperty,
+                            RegenCounter: 0u64,
                         }
                     },
                     Configuration: {
