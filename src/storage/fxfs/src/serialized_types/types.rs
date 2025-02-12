@@ -26,7 +26,7 @@ use crate::serialized_types::{versioned_type, Version, Versioned, VersionedLates
 ///
 /// IMPORTANT: When changing this (major or minor), update the list of possible versions at
 /// https://cs.opensource.google/fuchsia/fuchsia/+/main:third_party/cobalt_config/fuchsia/local_storage/versions.txt.
-pub const LATEST_VERSION: Version = Version { major: 44, minor: 0 };
+pub const LATEST_VERSION: Version = Version { major: 45, minor: 0 };
 
 /// The earliest supported version of the on-disk filesystem format.
 ///
@@ -41,6 +41,10 @@ pub const EARLIEST_SUPPORTED_VERSION: Version = Version { major: 40, minor: 0 };
 /// From this version of the filesystem, we shrink the size of the extents that are reserved for
 /// the superblock and root-parent store to a single block.
 pub const SMALL_SUPERBLOCK_VERSION: Version = Version { major: 44, minor: 0 };
+
+/// From this version of the filesystem, the superblock explicitly includes a record for it's
+/// first extent. Prior to this, the first extent was assumed based on hard-coded location.
+pub const FIRST_EXTENT_IN_SUPERBLOCK_VERSION: Version = Version { major: 45, minor: 0 };
 
 versioned_type! {
     32.. => AllocatorInfo,

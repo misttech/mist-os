@@ -16,7 +16,7 @@ use storage_device::buffer::{BufferFuture, MutableBufferRef};
 use storage_device::Device;
 
 // Extents are logically contiguous, so we don't need to store their start offset.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Extent {
     // Keep track of the offset of the transaction in which the extent was added, which is necessary
     // for discard_extents.
@@ -30,20 +30,27 @@ pub struct BootstrapObjectHandle {
     device: Arc<dyn Device>,
     start_offset: u64,
     end_offset: u64,
-    // A list of extents we know of for the handle; they are logically contiguous from
-    // `start_offset`.
+
+    /// A list of extents we know of for the handle; they are logically contiguous from
+    /// `start_offset`.
     extents: Vec<Extent>,
+
+    /// An extent that is used to bootstrap reading this handle but will be replaced
+    /// on the first call to 'push_extent'. This lets us bootstrap reading of a superblock that
+    /// self-describes its own extents.
+    initial_extent: Option<Extent>,
     trace: AtomicBool,
 }
 
 impl BootstrapObjectHandle {
-    pub fn new(object_id: u64, device: Arc<dyn Device>) -> Self {
+    pub fn new(object_id: u64, device: Arc<dyn Device>, initial_extent: Range<u64>) -> Self {
         Self {
             object_id,
             device,
             start_offset: 0,
-            end_offset: 0,
+            end_offset: initial_extent.end - initial_extent.start,
             extents: Vec::new(),
+            initial_extent: Some(Extent { added_offset: 0, device_range: initial_extent }),
             trace: AtomicBool::new(false),
         }
     }
@@ -59,6 +66,7 @@ impl BootstrapObjectHandle {
             start_offset,
             end_offset: start_offset,
             extents: Vec::new(),
+            initial_extent: None,
             trace: AtomicBool::new(false),
         }
     }
@@ -96,7 +104,12 @@ impl ReadObjectHandle for BootstrapObjectHandle {
         let len = buf.len();
         let mut buf_offset = 0;
         let mut file_offset = self.start_offset;
-        for extent in &self.extents {
+        let extents = if let Some(initial_extent) = &self.initial_extent {
+            std::slice::from_ref(initial_extent)
+        } else {
+            &self.extents
+        };
+        for extent in extents {
             let device_range = &extent.device_range;
             let extent_len = device_range.end - device_range.start;
             if offset < file_offset + extent_len {
@@ -135,6 +148,10 @@ impl JournalHandle for BootstrapObjectHandle {
     }
 
     fn push_extent(&mut self, added_offset: u64, device_range: Range<u64>) {
+        if self.initial_extent.is_some() {
+            self.initial_extent = None;
+            self.end_offset = 0;
+        }
         self.end_offset += device_range.length().unwrap();
         debug_assert!(
             self.extents.last().map_or(true, |e| e.added_offset <= added_offset),
@@ -170,9 +187,32 @@ mod tests {
     use storage_device::Device as _;
 
     #[fuchsia::test]
+    async fn test_initial_extent() {
+        let device = Arc::new(FakeDevice::new(64, 512));
+        let mut buffer = device.allocate_buffer(1024).await;
+        buffer.as_mut_slice().fill(1);
+        device.write(0, buffer.as_ref()).await.unwrap();
+        buffer.as_mut_slice().fill(2);
+        device.write(1024, buffer.as_ref()).await.unwrap();
+        buffer.as_mut_slice().fill(0);
+
+        let handle = BootstrapObjectHandle::new(1, device.clone(), 0..0);
+        assert_eq!(handle.get_size(), 0);
+        assert_eq!(handle.read(0, buffer.as_mut()).await.expect("no initial data"), 0);
+
+        let mut handle = BootstrapObjectHandle::new(1, device.clone(), 1024..2048);
+        assert_eq!(handle.get_size(), 1024);
+        handle.read(0, buffer.as_mut()).await.expect("read implicit extent");
+        assert_eq!(buffer.as_slice(), &[2u8; 1024]);
+        handle.push_extent(0, 0..1024);
+        handle.read(0, buffer.as_mut()).await.expect("read first explicit extent");
+        assert_eq!(buffer.as_slice(), &[1u8; 1024]);
+    }
+
+    #[fuchsia::test]
     async fn test_discard_extents() {
         let device = Arc::new(FakeDevice::new(64, 512));
-        let mut handle = BootstrapObjectHandle::new(1, device.clone());
+        let mut handle = BootstrapObjectHandle::new(1, device.clone(), 0..0);
 
         let mut buffer = device.allocate_buffer(1024).await;
         buffer.as_mut_slice().fill(1);

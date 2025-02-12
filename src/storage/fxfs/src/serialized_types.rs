@@ -72,7 +72,10 @@ mod tests;
 
 // Re-export all Fxfs types.
 mod types;
-pub use types::{EARLIEST_SUPPORTED_VERSION, LATEST_VERSION, SMALL_SUPERBLOCK_VERSION};
+pub use types::{
+    EARLIEST_SUPPORTED_VERSION, FIRST_EXTENT_IN_SUPERBLOCK_VERSION, LATEST_VERSION,
+    SMALL_SUPERBLOCK_VERSION,
+};
 
 // TODO(https://fxbug.dev/42073113): This should be versioned.  Whether we reused serialized_types is up for
 // debate (since this version might be better off as independent from the journal version).
