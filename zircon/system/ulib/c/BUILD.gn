@@ -27,7 +27,6 @@ libc_components = [
   "math",
   "pthread",
   "scudo",
-  "startup",
   "stdio",
   "stdlib",
 ]
@@ -330,6 +329,12 @@ if (zircon_toolchain != false) {
       ":legacy-components",
       "ld:musl-glue",
       "//zircon/third_party/ulib/musl:legacy-impl",
+    ]
+
+    # These things are only used in the new implementation.
+    assert_no_deps = [
+      "ld",
+      "startup",
     ]
 
     if (!is_gcc && current_cpu == "riscv64" &&

@@ -74,6 +74,7 @@ if (toolchain_variant.base == "//zircon/system/ulib/c:user.libc_$target_cpu") {
     deps = [
       ":common-impl",
       "ldso",
+      "src/thread:tls_get_addr",
     ]
   }
 

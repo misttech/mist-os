@@ -5,6 +5,13 @@
 import("//build/zircon/c_utils.gni")
 import("../libc.gni")
 
+# This will go into the new libc.so, but will never go into the legacy libc.so
+# and so is not in the $components list in ../BUILD.gn; there is no unittests
+# target in this directory.
+libc_source_set("startup") {
+  sources = []
+}
+
 # This doesn't go into libc, but becomes the Scrt1.o linked into executables.
 # It defines the _start entry point symbol the linker looks for, and calls
 # __libc_start_main using only the basic machine ABI.
@@ -111,13 +118,4 @@ basic_source_set("nostartfiles.basic") {
   # the underlying file gets built (and triggers relinks via depfile).
   deps = [ ":nostartfiles.ldscript" ]
   libs = get_target_outputs(deps[0])
-}
-
-# This reset is for code that goes into libc proper like other subdirectories.
-
-group("startup") {
-}
-
-group("unittests") {
-  testonly = true
 }
