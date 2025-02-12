@@ -19,6 +19,9 @@ mod common;
 pub mod runtime;
 mod selector_list;
 mod string_list;
+// The user facing configuration must not be available in the target device. Only runtime types
+// are.
+#[cfg(not(target_os = "fuchsia"))]
 pub mod user_facing;
 mod utils;
 

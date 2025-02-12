@@ -58,5 +58,8 @@ fuchsia_unittest_package("sampler-config-tests") {
 
 group("tests") {
   testonly = true
-  deps = [ ":sampler-config-tests" ]
+  deps = [
+    ":sampler-config-tests",
+    ":sampler-config_test($host_toolchain)",
+  ]
 }

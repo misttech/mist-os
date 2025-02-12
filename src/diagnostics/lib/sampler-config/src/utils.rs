@@ -2,12 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use component_id_index::InstanceId;
-use moniker::ExtendedMoniker;
 use serde::{de, Deserialize, Deserializer};
 use std::fmt;
 use std::marker::PhantomData;
-use std::str::FromStr;
 
 pub fn greater_than_zero<'de, D>(deserializer: D) -> Result<i64, D::Error>
 where
@@ -57,27 +54,6 @@ where
     }
 
     deserializer.deserialize_any(StringVec(PhantomData))
-}
-
-pub fn moniker_deserialize<'de, D>(deserializer: D) -> Result<ExtendedMoniker, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let moniker_str = String::deserialize(deserializer)?;
-    ExtendedMoniker::parse_str(&moniker_str).map_err(de::Error::custom)
-}
-
-pub fn instance_id_deserialize<'de, D>(deserializer: D) -> Result<Option<InstanceId>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    match Option::<String>::deserialize(deserializer)? {
-        None => Ok(None),
-        Some(instance_id) => {
-            let instance_id = InstanceId::from_str(&instance_id).map_err(de::Error::custom)?;
-            Ok(Some(instance_id))
-        }
-    }
 }
 
 #[cfg(test)]
