@@ -1,16 +1,20 @@
-// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{Result, SimpleWriter, TestBuffers, ToolIO};
+
+use crate::{Format, Result, TestBuffers, Writer};
 use serde::Serialize;
 use std::fmt::Display;
 use std::io::Write;
-use writer::{Format, JsonWriter};
 
 /// Type-safe machine output implementation of [`crate::ToolIO`]
-pub struct MachineWriter<T>(JsonWriter<T>);
+pub struct JsonWriter<T> {
+    format: Option<Format>,
+    simple_writer: Writer,
+    _p: std::marker::PhantomData<fn(T)>,
+}
 
-impl<T> MachineWriter<T> {
+impl<T> JsonWriter<T> {
     /// Create a new writer that doesn't support machine output at all, with the
     /// given streams underlying it.
     pub fn new_buffers<'a, O, E>(format: Option<Format>, stdout: O, stderr: E) -> Self
@@ -18,14 +22,18 @@ impl<T> MachineWriter<T> {
         O: Write + 'static,
         E: Write + 'static,
     {
-        Self(JsonWriter::new_buffers(format, stdout, stderr))
+        let simple_writer = Writer::new_buffers(stdout, stderr);
+        let _p = Default::default();
+        Self { format, simple_writer, _p }
     }
 
     /// Create a new Writer with the specified format.
     ///
     /// Passing None for format implies no output via the machine function.
     pub fn new(format: Option<Format>) -> Self {
-        Self(JsonWriter::new(format))
+        let simple_writer = Writer::new();
+        let _p = Default::default();
+        Self { format, simple_writer, _p }
     }
 
     /// Returns a writer backed by string buffers that can be extracted after
@@ -35,13 +43,17 @@ impl<T> MachineWriter<T> {
     }
 
     /// Allow using this writer as a SimpleWriter.
-    /// This is useful for calling other tools that do not use MachineWriter.
-    pub fn simple_writer(self) -> SimpleWriter {
-        self.0.simple_writer().into()
+    /// This is useful for calling other tools that do not use JsonWriter.
+    pub fn simple_writer(self) -> Writer {
+        self.simple_writer
+    }
+
+    pub fn stderr(&mut self) -> &'_ mut Box<dyn Write> {
+        self.simple_writer.stderr()
     }
 }
 
-impl<T> MachineWriter<T>
+impl<T> JsonWriter<T>
 where
     T: Serialize,
 {
@@ -49,26 +61,43 @@ where
     ///
     /// This is a no-op if `is_machine` returns false.
     pub fn machine_many<I: IntoIterator<Item = T>>(&mut self, output: I) -> Result<()> {
-        self.0.machine_many(output)
+        if self.format.is_some() {
+            for output in output {
+                self.machine(&output)?;
+            }
+        }
+        Ok(())
     }
 
     /// Write the item to standard output.
     ///
     /// This is a no-op if `is_machine` returns false.
     pub fn machine(&mut self, output: &T) -> Result<()> {
-        self.0.machine(output)
+        if let Some(format) = self.format {
+            format_output(format, &mut self.simple_writer, output)
+        } else {
+            Ok(())
+        }
     }
 
     /// If this object is outputting machine output, print the item's machine
     /// representation to stdout. Otherwise, print the display item given.
     pub fn machine_or<D: Display>(&mut self, value: &T, or: D) -> Result<()> {
-        self.0.machine_or(value, or)
+        match self.format {
+            Some(format) => format_output(format, &mut self.simple_writer, value)?,
+            None => writeln!(self, "{or}")?,
+        }
+        Ok(())
     }
 
     /// If this object is outputting machine output, print the item's machine
     /// representation to stdout. Otherwise, `write!` the display item given.
     pub fn machine_or_write<D: Display>(&mut self, value: &T, or: D) -> Result<()> {
-        self.0.machine_or_write(value, or)
+        match self.format {
+            Some(format) => format_output(format, &mut self.simple_writer, value)?,
+            None => write!(self, "{or}")?,
+        }
+        Ok(())
     }
 
     /// If this object is outputting machine output, prints the item's machine
@@ -79,60 +108,60 @@ where
         F: FnOnce() -> R,
         R: Display,
     {
-        self.0.machine_or_else(value, f)
+        match self.format {
+            Some(format) => format_output(format, &mut self.simple_writer, value)?,
+            None => writeln!(self, "{}", f())?,
+        }
+        Ok(())
     }
+
+    pub fn format(&self) -> Option<Format> {
+        self.format
+    }
+
     pub fn formatted<J: Serialize>(&mut self, output: &J) -> Result<()> {
-        self.0.formatted(output)
+        if let Some(format) = self.format {
+            format_output(format, &mut self.simple_writer, output)
+        } else {
+            Ok(())
+        }
     }
 }
 
-impl<T> ToolIO for MachineWriter<T>
+pub fn format_output<W: Write, T>(format: Format, mut out: W, output: &T) -> Result<()>
 where
     T: Serialize,
 {
-    type OutputItem = T;
-
-    fn is_machine_supported() -> bool {
-        true
-    }
-
-    fn is_machine(&self) -> bool {
-        self.0.format().is_some()
-    }
-
-    fn item(&mut self, value: &T) -> Result<()>
-    where
-        T: Display,
-    {
-        if self.is_machine() {
-            self.machine(value)
-        } else {
-            self.line(value)
+    match format {
+        Format::Json => {
+            serde_json::to_writer(&mut out, output)?;
+            writeln!(out)?;
+            out.flush()?;
+        }
+        Format::JsonPretty => {
+            serde_json::to_writer_pretty(&mut out, output)?;
         }
     }
-
-    fn stderr(&mut self) -> &'_ mut Box<dyn Write> {
-        self.0.stderr()
-    }
+    Ok(())
 }
 
-impl<T> Write for MachineWriter<T>
+impl<T> Write for JsonWriter<T>
 where
     T: Serialize,
 {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        if self.is_machine() {
+        if self.format.is_some() {
             Ok(buf.len())
         } else {
-            self.0.write(buf)
+            self.simple_writer.write(buf)
         }
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
-        if self.is_machine() {
+        if self.format.is_some() {
             Ok(())
         } else {
-            self.0.flush()
+            self.simple_writer.flush()
         }
     }
 }
@@ -143,7 +172,7 @@ mod test {
     #[test]
     fn test_not_machine_is_ok() {
         let test_buffers = TestBuffers::default();
-        let mut writer: MachineWriter<&str> = MachineWriter::new_test(None, &test_buffers);
+        let mut writer: JsonWriter<&str> = JsonWriter::new_test(None, &test_buffers);
         let res = writer.machine(&"ehllo");
         assert!(res.is_ok());
     }
@@ -151,8 +180,7 @@ mod test {
     #[test]
     fn test_machine_valid_json_is_ok() {
         let test_buffers = TestBuffers::default();
-        let mut writer: MachineWriter<&str> =
-            MachineWriter::new_test(Some(Format::Json), &test_buffers);
+        let mut writer: JsonWriter<&str> = JsonWriter::new_test(Some(Format::Json), &test_buffers);
         let res = writer.machine(&"ehllo");
         assert!(res.is_ok());
     }
@@ -160,7 +188,7 @@ mod test {
     #[test]
     fn writer_implements_write() {
         let test_buffers = TestBuffers::default();
-        let mut writer: MachineWriter<&str> = MachineWriter::new_test(None, &test_buffers);
+        let mut writer: JsonWriter<&str> = JsonWriter::new_test(None, &test_buffers);
         writer.write_all(b"foobar").unwrap();
 
         let (stdout, stderr) = test_buffers.into_strings();
@@ -171,8 +199,7 @@ mod test {
     #[test]
     fn writer_implements_write_ignored_on_machine() {
         let test_buffers = TestBuffers::default();
-        let mut writer: MachineWriter<&str> =
-            MachineWriter::new_test(Some(Format::Json), &test_buffers);
+        let mut writer: JsonWriter<&str> = JsonWriter::new_test(Some(Format::Json), &test_buffers);
         writer.write_all(b"foobar").unwrap();
 
         let (stdout, stderr) = test_buffers.into_strings();
@@ -183,8 +210,7 @@ mod test {
     #[test]
     fn test_item_for_test_as_machine() {
         let test_buffers = TestBuffers::default();
-        let mut writer: MachineWriter<&str> =
-            MachineWriter::new_test(Some(Format::Json), &test_buffers);
+        let mut writer: JsonWriter<&str> = JsonWriter::new_test(Some(Format::Json), &test_buffers);
         writer.item(&"hello").unwrap();
         writer.machine_or(&"hello again", "but what if").unwrap();
         writer.machine_or_else(&"hello forever", || "but what if else").unwrap();
@@ -198,7 +224,7 @@ mod test {
     #[test]
     fn test_item_for_test_as_not_machine() {
         let test_buffers = TestBuffers::default();
-        let mut writer: MachineWriter<&str> = MachineWriter::new_test(None, &test_buffers);
+        let mut writer: JsonWriter<&str> = JsonWriter::new_test(None, &test_buffers);
         writer.item(&"hello").unwrap();
         writer.machine_or(&"hello again", "but what if").unwrap();
         writer.machine_or_else(&"hello forever", || "but what if else").unwrap();
@@ -209,8 +235,7 @@ mod test {
     #[test]
     fn test_machine_for_test() {
         let test_buffers = TestBuffers::default();
-        let mut writer: MachineWriter<&str> =
-            MachineWriter::new_test(Some(Format::Json), &test_buffers);
+        let mut writer: JsonWriter<&str> = JsonWriter::new_test(Some(Format::Json), &test_buffers);
         writer.machine(&"hello").unwrap();
 
         assert_eq!(test_buffers.into_stdout_str(), "\"hello\"\n");
@@ -219,7 +244,7 @@ mod test {
     #[test]
     fn test_not_machine_for_test_is_empty() {
         let test_buffers = TestBuffers::default();
-        let mut writer: MachineWriter<&str> = MachineWriter::new_test(None, &test_buffers);
+        let mut writer: JsonWriter<&str> = JsonWriter::new_test(None, &test_buffers);
         writer.machine(&"hello").unwrap();
 
         assert!(test_buffers.into_stdout_str().is_empty());
@@ -228,23 +253,21 @@ mod test {
     #[test]
     fn test_machine_makes_is_machine_true() {
         let test_buffers = TestBuffers::default();
-        let writer: MachineWriter<&str> =
-            MachineWriter::new_test(Some(Format::Json), &test_buffers);
+        let writer: JsonWriter<&str> = JsonWriter::new_test(Some(Format::Json), &test_buffers);
         assert!(writer.is_machine());
     }
 
     #[test]
     fn test_not_machine_makes_is_machine_false() {
         let test_buffers = TestBuffers::default();
-        let writer: MachineWriter<&str> = MachineWriter::new_test(None, &test_buffers);
+        let writer: JsonWriter<&str> = JsonWriter::new_test(None, &test_buffers);
         assert!(!writer.is_machine());
     }
 
     #[test]
     fn line_writer_for_machine_is_ok() {
         let test_buffers = TestBuffers::default();
-        let mut writer: MachineWriter<&str> =
-            MachineWriter::new_test(Some(Format::Json), &test_buffers);
+        let mut writer: JsonWriter<&str> = JsonWriter::new_test(Some(Format::Json), &test_buffers);
         writer.line("hello").unwrap();
 
         let (stdout, stderr) = test_buffers.into_strings();
@@ -255,8 +278,7 @@ mod test {
     #[test]
     fn writer_write_for_machine_is_ok() {
         let test_buffers = TestBuffers::default();
-        let mut writer: MachineWriter<&str> =
-            MachineWriter::new_test(Some(Format::Json), &test_buffers);
+        let mut writer: JsonWriter<&str> = JsonWriter::new_test(Some(Format::Json), &test_buffers);
         writer.print("foobar").unwrap();
 
         let (stdout, stderr) = test_buffers.into_strings();
@@ -267,7 +289,7 @@ mod test {
     #[test]
     fn writer_print_output_has_no_newline() {
         let test_buffers = TestBuffers::default();
-        let mut writer: MachineWriter<&str> = MachineWriter::new_test(None, &test_buffers);
+        let mut writer: JsonWriter<&str> = JsonWriter::new_test(None, &test_buffers);
         writer.print("foobar").unwrap();
 
         let (stdout, stderr) = test_buffers.into_strings();
@@ -278,7 +300,7 @@ mod test {
     #[test]
     fn writing_errors_goes_to_the_right_stream() {
         let test_buffers = TestBuffers::default();
-        let mut writer: MachineWriter<&str> = MachineWriter::new_test(None, &test_buffers);
+        let mut writer: JsonWriter<&str> = JsonWriter::new_test(None, &test_buffers);
         writeln!(writer.stderr(), "hello").unwrap();
 
         let (stdout, stderr) = test_buffers.into_strings();
@@ -289,8 +311,8 @@ mod test {
     #[test]
     fn test_machine_writes_pretty_json() {
         let test_buffers = TestBuffers::default();
-        let mut writer: MachineWriter<serde_json::Value> =
-            MachineWriter::new_test(Some(Format::JsonPretty), &test_buffers);
+        let mut writer: JsonWriter<serde_json::Value> =
+            JsonWriter::new_test(Some(Format::JsonPretty), &test_buffers);
         let test_input = serde_json::json!({
             "object1": {
                 "line1": "hello",

@@ -34,24 +34,7 @@ pub use metrics::{analytics_command, send_enhanced_analytics, MetricsSession};
 pub use subcommand::ExternalSubToolSuite;
 pub use tools::{FfxToolInfo, FfxToolSource, ToolRunner, ToolSuite};
 
-/// The valid formats possible to output for machine consumption.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Format {
-    Json,
-    JsonPretty,
-}
-
-impl std::str::FromStr for Format {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_ref() {
-            "json-pretty" => Ok(Format::JsonPretty),
-            "json" | "j" => Ok(Format::Json),
-            other => Err(user_error!("Invalid format name: {other}")),
-        }
-    }
-}
+pub use writer::Format;
 
 fn stamp_file(stamp: &Option<String>) -> Result<Option<File>> {
     let Some(stamp) = stamp else { return Ok(None) };

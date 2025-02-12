@@ -16,23 +16,16 @@ rustc_library("lib") {
     "src/lib.rs",
     "src/machine_writer.rs",
     "src/simple_writer.rs",
-    "src/test_buffer.rs",
     "src/tool_io.rs",
     "src/verified_machine_writer.rs",
   ]
   deps = [
-    "//src/developer/ffx/command/error:lib",
-    "//third_party/rust_crates:event-listener",
-    "//third_party/rust_crates:futures",
+    "//src/developer/lib/writer:lib",
     "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
-    "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:valico",
   ]
-  if (is_host) {
-    deps += [ "//src/developer/ffx/command:lib" ]
-  }
 }
 
 group("tests") {

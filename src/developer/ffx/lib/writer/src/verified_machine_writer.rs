@@ -1,11 +1,12 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{format_output, Format, MachineWriter, Result, SimpleWriter, TestBuffers, ToolIO};
+use crate::{MachineWriter, Result, SimpleWriter, TestBuffers, ToolIO};
 use serde::Serialize;
 use serde_json::Value;
 use std::fmt::Display;
 use std::io::Write;
+use writer::{format_output, Format};
 
 /// Structured output writer with schema.
 /// [`VerifiedMachineWriter`] is used to provide

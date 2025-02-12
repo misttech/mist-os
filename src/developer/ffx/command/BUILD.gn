@@ -16,9 +16,6 @@ rustc_library("lib") {
     ":*",
     "//src/developer/ffx/frontends/*",
 
-    # Writer reuses the Format enum. Maybe there is a better place?
-    "//src/developer/ffx/lib/writer:*",
-
     # TODO(b/386792198) Move ToolSuite to internal crate.
     "//src/developer/ffx/lib/fho:*",
 
@@ -45,6 +42,7 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/metrics:lib",
     "//src/developer/ffx/lib/netext:lib",
     "//src/developer/ffx/lib/timeout:lib",
+    "//src/developer/lib/writer:lib",
     "//src/lib/analytics/rust:lib",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
