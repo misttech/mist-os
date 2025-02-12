@@ -68,6 +68,7 @@ fuchsia_product(
     name = "assembly_eng.x64",
     board_config = "//boards:x64",
     legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
+    legacy_bundle_must_be_empty = True,
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":assembly_config_eng",
 )
@@ -76,6 +77,7 @@ fuchsia_product(
     name = "assembly_eng.arm64",
     board_config = "//boards:arm64",
     legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
+    legacy_bundle_must_be_empty = True,
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":assembly_config_eng",
 )
@@ -84,6 +86,7 @@ fuchsia_product(
     name = "assembly_eng.vim3",
     board_config = "//boards:vim3",
     legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
+    legacy_bundle_must_be_empty = True,
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":assembly_config_eng",
 )
