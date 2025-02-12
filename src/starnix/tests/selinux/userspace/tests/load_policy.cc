@@ -22,11 +22,9 @@ std::string RemoveTailNull(std::string in) {
 
 void RunTest() {
   LoadPolicy("minimal_policy.pp");
-  // Apparently Linux and Starnix disagree on the initial label for our process, but that may come
-  // from being launched from different contexts.
-  WriteContents("/proc/thread-self/attr/current", "system_u:unconfined_r:unconfined_t:s0");
 
   std::string s = ReadFile("/proc/thread-self/attr/current");
+  // All processes created prior to policy loading are labeled with the kernel SID.
   EXPECT_EQ(RemoveTailNull(ReadFile("/proc/thread-self/attr/current")),
             "system_u:unconfined_r:unconfined_t:s0");
 }

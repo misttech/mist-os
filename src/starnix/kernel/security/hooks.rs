@@ -536,14 +536,12 @@ pub fn task_alloc_for_kernel() -> TaskState {
 /// Corresponds to the `task_alloc()` LSM hook.
 pub fn task_alloc(task: &Task, clone_flags: u64) -> TaskState {
     profile_duration!("security.hooks.task_alloc");
-    TaskState(
-        if_selinux_else(
-            task,
-            |_| selinux_hooks::task::task_alloc(&task, clone_flags),
-            || selinux_hooks::TaskAttrs::for_selinux_disabled(),
-        )
-        .into(),
-    )
+    let attrs = if task.kernel().security_state.state.is_some() {
+        selinux_hooks::task::task_alloc(&task, clone_flags)
+    } else {
+        selinux_hooks::TaskAttrs::for_selinux_disabled()
+    };
+    TaskState(attrs.into())
 }
 
 /// Labels an [`crate::vfs::FsNode`], by attaching a pseudo-label to the `fs_node`, which allows
