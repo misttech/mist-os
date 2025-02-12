@@ -28,6 +28,16 @@ class VmObjectPhysical final : public VmObject, public VmDeferredDeleter<VmObjec
  public:
   static zx_status_t Create(paddr_t base, uint64_t size, fbl::RefPtr<VmObjectPhysical>* vmo);
 
+  Lock<VmoLockType>* lock() const override TA_RET_CAP(hierarchy_state_ptr_->lock_ref())
+      TA_RET_CAP(lock()) {
+    return hierarchy_state_ptr_->lock();
+  }
+  Lock<VmoLockType>& lock_ref() const override TA_RET_CAP(hierarchy_state_ptr_->lock_ref())
+      TA_RET_CAP(lock()) {
+    return hierarchy_state_ptr_->lock_ref();
+  }
+  VmObject* self_locked() TA_REQ(lock()) TA_ASSERT(self_locked()->lock()) { return this; }
+
   zx_status_t CreateChildSlice(uint64_t offset, uint64_t size, bool copy_name,
                                fbl::RefPtr<VmObject>* child_vmo) override
       // This function reaches into the created child, which confuses analysis.

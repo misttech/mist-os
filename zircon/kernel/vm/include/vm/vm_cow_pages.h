@@ -106,6 +106,13 @@ class VmCowPages final : public VmHierarchyBase,
                                     fbl::RefPtr<VmHierarchyState> root_lock, uint64_t size,
                                     fbl::RefPtr<VmCowPages>* cow_pages);
 
+  Lock<VmoLockType>* lock() const TA_RET_CAP(hierarchy_state_ptr_->lock_ref()) {
+    return hierarchy_state_ptr_->lock();
+  }
+  Lock<VmoLockType>& lock_ref() const TA_RET_CAP(hierarchy_state_ptr_->lock_ref()) {
+    return hierarchy_state_ptr_->lock_ref();
+  }
+
   // Creates a copy-on-write clone with the desired parameters. This can fail due to various
   // internal states not being correct.
   zx_status_t CreateCloneLocked(SnapshotType type, bool require_unidirection, VmCowRange range,

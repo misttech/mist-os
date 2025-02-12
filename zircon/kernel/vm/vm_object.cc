@@ -95,7 +95,7 @@ void VmObject::RemoveMappingLocked(VmMapping* r) {
 uint32_t VmObject::num_mappings() const {
   canary_.Assert();
   Guard<VmoLockType> guard{lock()};
-  return mapping_list_len_;
+  return num_mappings_locked();
 }
 
 bool VmObject::IsMappedByUser() const {

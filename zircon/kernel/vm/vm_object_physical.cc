@@ -265,7 +265,7 @@ zx_status_t VmObjectPhysical::SetMappingCachePolicy(const uint32_t cache_policy)
 
   Guard<CriticalMutex> list_guard{ChildListLock::Get()};
   // If this VMO is mapped already it is not safe to allow its caching policy to change
-  if (mapping_list_len_ != 0 || children_list_len_ != 0 || parent_) {
+  if (self_locked()->num_mappings_locked() != 0 || children_list_len_ != 0 || parent_) {
     LTRACEF(
         "Warning: trying to change cache policy while this vmo has mappings, children or a "
         "parent!\n");

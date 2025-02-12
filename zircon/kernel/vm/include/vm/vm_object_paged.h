@@ -42,6 +42,15 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   static constexpr uint32_t kReference = (1u << 6);
   static constexpr uint32_t kCanBlockOnPageRequests = (1u << 31);
 
+  Lock<VmoLockType>* lock() const override TA_RET_CAP(cow_pages_->lock_ref()) {
+    return cow_pages_->lock();
+  }
+  Lock<VmoLockType>& lock_ref() const override TA_RET_CAP(cow_pages_->lock_ref()) {
+    return cow_pages_->lock_ref();
+  }
+
+  VmObject* self_locked() TA_REQ(lock()) TA_ASSERT(self_locked()->lock()) { return this; }
+
   static zx_status_t Create(uint32_t pmm_alloc_flags, uint32_t options, uint64_t size,
                             fbl::RefPtr<VmObjectPaged>* vmo);
 

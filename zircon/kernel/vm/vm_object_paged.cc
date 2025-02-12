@@ -2035,7 +2035,7 @@ zx_status_t VmObjectPaged::SetMappingCachePolicy(const uint32_t cache_policy) {
     return ZX_ERR_BAD_STATE;
   }
 
-  if (!mapping_list_.is_empty()) {
+  if (self_locked()->num_mappings_locked() != 0) {
     return ZX_ERR_BAD_STATE;
   }
 
@@ -2098,7 +2098,7 @@ void VmObjectPaged::RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op) 
                    &aligned_len)) {
     // Found the intersection in cow space, convert back to object space.
     aligned_offset -= cow_range_.offset;
-    RangeChangeUpdateMappingsLocked(aligned_offset, aligned_len, op);
+    self_locked()->RangeChangeUpdateMappingsLocked(aligned_offset, aligned_len, op);
   }
 
   // Propagate the change to reference children as well. This is done regardless of intersection as

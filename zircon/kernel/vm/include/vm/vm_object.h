@@ -164,13 +164,6 @@ class VmHierarchyBase : public fbl::RefCountedUpgradeable<VmHierarchyBase> {
  public:
   explicit VmHierarchyBase(fbl::RefPtr<VmHierarchyState> state);
 
-  Lock<VmoLockType>* lock() const TA_RET_CAP(hierarchy_state_ptr_->lock_ref()) {
-    return hierarchy_state_ptr_->lock();
-  }
-  Lock<VmoLockType>& lock_ref() const TA_RET_CAP(hierarchy_state_ptr_->lock_ref()) {
-    return hierarchy_state_ptr_->lock_ref();
-  }
-
  protected:
   // private destructor, only called from refptr
   virtual ~VmHierarchyBase() = default;
@@ -295,6 +288,9 @@ class VmObject : public VmHierarchyBase,
  public:
   // public API
   virtual zx_status_t Resize(uint64_t size) { return ZX_ERR_NOT_SUPPORTED; }
+
+  virtual Lock<VmoLockType>* lock() const = 0;
+  virtual Lock<VmoLockType>& lock_ref() const = 0;
 
   virtual uint64_t size_locked() const TA_REQ(lock()) = 0;
   uint64_t size() const TA_EXCL(lock()) {
@@ -659,6 +655,7 @@ class VmObject : public VmHierarchyBase,
   void AddMappingLocked(VmMapping* r) TA_REQ(lock());
   void RemoveMappingLocked(VmMapping* r) TA_REQ(lock());
   uint32_t num_mappings() const;
+  uint32_t num_mappings_locked() const TA_REQ(lock()) { return mapping_list_len_; }
 
   // Returns true if this VMO is mapped into any VmAspace whose is_user()
   // returns true.
