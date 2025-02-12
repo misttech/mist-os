@@ -133,7 +133,7 @@ impl Timer {
             // SAFETY: This is safe because we know the timer isn't registered which means we truly
             // have exclusive access to TimerState.
             unsafe { *self.0.nanos.get() = nanos };
-            self.0.state.store(0, Ordering::Relaxed);
+            self.0.state.store(UNREGISTERED, Ordering::Relaxed);
         }
     }
 }
@@ -178,6 +178,9 @@ struct TimerState {
 // SAFETY: TimerState is thread-safe.  See the safety comments elsewhere.
 unsafe impl Send for TimerState {}
 unsafe impl Sync for TimerState {}
+
+// Set when the timer is not registered in the heap.
+const UNREGISTERED: u8 = 0;
 
 // Set when the timer is in the heap.
 const REGISTERED: u8 = 1;
@@ -237,14 +240,14 @@ impl StateRef {
     fn into_waker(self, _inner: &mut Inner) -> Option<Waker> {
         // SAFETY: `inner` is locked.
         unsafe {
-            let waker = (*self.0).waker.take();
-            // As soon as we do this, we no longer own the timer and it can be reused.  This is safe
-            // to be Relaxed.  It doesn't matter if the load and store of the waker is reordered
-            // past here because it can't move past when `inner` is unlocked, and the waker cannot
-            // be set again until the lock on `inner` is taken again if/when the timer is registered
-            // again.
+            // As soon as we set the state to FIRED, the heap no longer owns the timer and it might
+            // be re-registered.  This store is safe to be Relaxed because `AtomicWaker::take` has a
+            // Release barrier, so the store can't be reordered after it, and therefore we can be
+            // certain that another thread which re-registers the waker will see the state is FIRED
+            // (and will interpret that as meaning that the task should not block and instead
+            // immediately complete; see `Timers::poll`).
             (*self.0).state.store(FIRED, Ordering::Relaxed);
-            waker
+            (*self.0).waker.take()
         }
     }
 
@@ -360,7 +363,7 @@ impl<T: TimeInterface> Timers<T> {
             timers: self.clone(),
             nanos: UnsafeCell::new(nanos),
             waker: AtomicWaker::new(),
-            state: AtomicU8::new(0),
+            state: AtomicU8::new(UNREGISTERED),
             index: UnsafeCell::new(HeapIndex::NULL),
             _pinned: PhantomPinned,
         })
@@ -512,8 +515,8 @@ impl<T: TimeInterface> TimersInterface for Timers<T> {
             return Poll::Ready(());
         }
 
-        if state == 0 {
-            // SAFETY: The state is 0, so we have exclusive access.
+        if state == UNREGISTERED {
+            // SAFETY: The state is UNREGISTERED, so we have exclusive access.
             let nanos = unsafe { *timer.0.nanos.get() };
             if nanos <= T::now() {
                 timer.0.state.store(FIRED, Ordering::Relaxed);
@@ -534,20 +537,37 @@ impl<T: TimeInterface> TimersInterface for Timers<T> {
 
         timer.0.waker.register(cx.waker());
 
-        // Need to check condition **after** `register` to avoid a race
-        // condition that would result in lost notifications.
-        if timer.0.state.load(Ordering::Relaxed) == FIRED {
-            timer.0.state.store(TERMINATED, Ordering::Relaxed);
-            Poll::Ready(())
-        } else {
-            Poll::Pending
+        // Now that we've registered a waker, we need to check to see if the timer has been marked
+        // as FIRED by another thread in the meantime (e.g. in StateRef::into_waker).  In that case
+        // the timer is never going to fire again as it is no longer managed by the timer heap, so
+        // the timer's task would become Pending but nothing would wake it up later.
+        // Loading the state *must* happen after the above `AtomicWaker::register` (which
+        // establishes an Acquire barrier, preventing the below load from being reordered above it),
+        // or else we could racily hit the above scenario.
+        let state = timer.0.state.load(Ordering::Relaxed);
+        match state {
+            FIRED => {
+                timer.0.state.store(TERMINATED, Ordering::Relaxed);
+                Poll::Ready(())
+            }
+            REGISTERED => Poll::Pending,
+            // TERMINATED is only set in `poll` which has exclusive access to the task (&mut
+            // Context).
+            // UNREGISTERED would indicate a logic bug somewhere.
+            _ => {
+                unreachable!();
+            }
         }
     }
 
     fn unregister(&self, timer: &TimerState) {
-        // This is safe to be Relaxed because we take the lock on `inner` immediately afterwards
-        // which will include a barrier.
-        if timer.state.load(Ordering::Relaxed) != REGISTERED {
+        if timer.state.load(Ordering::Relaxed) == UNREGISTERED {
+            // If the timer was never registered, then we have exclusive access and we can skip the
+            // rest of this (avoiding the lock on `inner`).
+            // We cannot early-exit if the timer is FIRED or TERMINATED because then we could race
+            // with another thread that is actively using the timer object, and if this call
+            // completes before it blocks on `inner`, then the timer's resources could be
+            // deallocated, which would result in a use-after-free on the other thread.
             return;
         }
         let mut inner = self.inner.lock();
@@ -565,10 +585,7 @@ impl<T: TimeInterface> TimersInterface for Timers<T> {
                     None => self.timer.cancel().unwrap(),
                 }
             }
-            timer.state.store(0, Ordering::Relaxed);
-        } else {
-            // We must have raced.
-            assert_eq!(timer.state.load(Ordering::Relaxed), FIRED);
+            timer.state.store(UNREGISTERED, Ordering::Relaxed);
         }
     }
 
