@@ -46,7 +46,11 @@ graphics_compute_vulkan_executable("bench-vk") {
   deps = [ ":bench_vk_sources" ]
 
   if (is_fuchsia && host_os == "linux") {
-    data_deps = [ ":bench-vk($host_toolchain)" ]
+    data_deps = [
+      # TODO(https://fxbug.dev/379153784): Re-enable when the host Vulkan
+      # toolchain is updated.
+      # ":bench-vk($host_toolchain)"
+    ]
   }
 }
 
