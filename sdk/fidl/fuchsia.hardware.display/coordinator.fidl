@@ -239,14 +239,27 @@ closed protocol Coordinator {
         postoffsets array<float32, 3>;
     });
 
-    /// Sets which layers are on a display. The list is in increasing z-order.
-    ///
-    /// It is illegal to use a layer on multiple displays concurrently. If a layer
-    /// needs to be moved between displays, it must be removed from the first display's
-    /// pending config before being added to the second display's pending config. It
-    /// is also illegal to pass an invalid layer id.
+    /// Assigns a list of layers to be composited on a display.
     strict SetDisplayLayers(struct {
+        /// The display that will show the result of compositing the layers.
+        ///
+        /// The call is ignored if the display ID does not belong to a display
+        /// known by the Coordinator. This can happen if a client issues a call
+        /// to [`Coordinator.SetDisplayLayers`] before it receives a
+        /// notification that the display was removed.
         display_id fuchsia.hardware.display.types.DisplayId;
+
+        // The layers to be composited on the display.
+        //
+        // The layers are listed in increasing Z-order.
+        //
+        // The list must not be empty, and each ID must be valid.
+        //
+        // Each layer ID must not be composited on any another display. Moving a
+        // layer between displays is accomplished by first removing the layer
+        // from its current display, via a call to
+        // [`Coordinator.SetDisplayLayers`] that does not include the layer's
+        // ID.
         layer_ids vector<LayerId>:MAX;
     });
 
