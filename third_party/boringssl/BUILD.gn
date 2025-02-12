@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/dist/resource.gni")
 import("BUILD.generated.gni")
 import("BUILD.generated_tests.gni")
 
@@ -190,38 +191,53 @@ if (!is_kernel) {
   ##############
 
   crypto_tests = []
-  common_crypto_test_sources = [
-    # This test does nothing when BORINGSSL_SHARED_LIBRARY is defined and is
-    # needed to resolve missing symbols. /shrug
+
+  # TODO(https://fxbug.dev/339028859): Delete this fiddling. With the roll,
+  # the need for crypto_test_data.cc will go away (it's just a stub now), and
+  # file_test_gtest.cc will be be auto-generated into `test_support_sources`,
+  # where it should have been originally.
+  crypto_test_source_outliers = [
+    "crypto_test_data.cc",
     "src/crypto/test/file_test_gtest.cc",
-    "src/crypto/test/gtest_main.cc",
   ]
-  shared_library("crypto_test_data") {
-    # This file is enormous (embeds ~27MiB of data as of when this was written)
-    # and simply including it as a source file with each test results in debug
-    # builds taking up hundreds of megabytes after compression, since each
-    # binary embeds the full file contents.  To avoid excessive binary size
-    # bloat, we compile this as a shared library, so that each test binary will
-    # share a single copy of the test data.
-    sources = [ "crypto_test_data.cc" ]
-    configs += [ ":test_config" ]
+  crypto_test_sources -= crypto_test_source_outliers
+  test_support_sources += crypto_test_source_outliers
+
+  crypto_test_main = "src/crypto/test/gtest_main.cc"
+  source_set("crypto_test_main") {
     visibility = [ ":*" ]
+    testonly = true
+    sources = [ crypto_test_main ]
+    deps = [
+      ":crypto",
+      "//third_party/googletest:gmock",
+      "//third_party/googletest:gtest",
+    ]
   }
-  _crypto_test_sources = crypto_test_sources - common_crypto_test_sources -
-                         [ "crypto_test_data.cc" ]
-  foreach(crypto_test_source, _crypto_test_sources) {
+
+  static_library("test_support") {
+    visibility = [ ":*" ]
+    testonly = true
+
+    # get_test_data.cc provides our own definition of GetTestData(), which is
+    # declared somewhere in test_support_sources.
+    sources = test_support_sources + [ "get_test_data.cc" ]
+    deps = [ "//third_party/googletest:gtest" ]
+    configs += [ ":test_config" ]
+  }
+
+  foreach(crypto_test_source, crypto_test_sources - [ crypto_test_main ]) {
     name = get_path_info(crypto_test_source, "name")
     target_name = "${name}_crypto_test"
     crypto_tests += [ target_name ]
     test(target_name) {
       visibility = [ ":*" ]
-      sources = [ crypto_test_source ] + common_crypto_test_sources +
-                test_support_sources
+      sources = [ crypto_test_source ]
       configs += [ ":test_config" ]
       deps = [
         ":crypto",
-        ":crypto_test_data",
-        "//third_party/googletest:gmock",
+        ":crypto_test_main",
+        ":test_support",
         "//third_party/googletest:gtest",
       ]
     }
@@ -229,14 +245,25 @@ if (!is_kernel) {
 
   test("ssl_test") {
     visibility = [ ":*" ]
-    sources = ssl_test_sources + test_support_sources
+    sources = ssl_test_sources
     configs += [ ":test_config" ]
     deps = [
       ":crypto",
       ":ssl",
+      ":test_support",
       "//third_party/googletest:gmock",
       "//third_party/googletest:gtest",
     ]
+  }
+
+  test_data_deps = []
+  foreach(test_data, crypto_test_data) {
+    target_name = "test_data.${test_data}"
+    resource(target_name) {
+      sources = [ test_data ]
+      outputs = [ "data/" + rebase_path(test_data, "src") ]
+    }
+    test_data_deps += [ ":${target_name}" ]
   }
 
   if (is_fuchsia) {
@@ -262,6 +289,7 @@ if (!is_kernel) {
         "//src/connectivity/network/netstack:component",
         "//src/sys/stash:stash_secure_v2",
       ]
+      deps += test_data_deps
     }
   }
 
