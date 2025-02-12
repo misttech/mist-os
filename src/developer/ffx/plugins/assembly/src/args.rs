@@ -268,6 +268,10 @@ pub struct ProductArgs {
     #[argh(option)]
     pub legacy_bundle: Option<Utf8PathBuf>,
 
+    /// enforce that the legacy AIB is empty
+    #[argh(switch)]
+    pub legacy_bundle_must_be_empty: bool,
+
     /// disable validation of the assembly's packages
     #[argh(option, default = "Default::default()")]
     pub package_validation: PackageValidationHandling,

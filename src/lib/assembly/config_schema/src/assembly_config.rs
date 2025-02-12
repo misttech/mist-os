@@ -125,6 +125,50 @@ pub struct AssemblyInputBundle {
     pub memory_buckets: Vec<FileRelativePathBuf>,
 }
 
+impl AssemblyInputBundle {
+    /// Are all containers in this AIB empty.
+    pub fn is_empty(&self) -> bool {
+        // destructure to ensure that when new fields are added, they require this function
+        // to be touched.
+        let Self {
+            kernel,
+            qemu_kernel,
+            boot_args,
+            bootfs_packages,
+            bootfs_files,
+            packages,
+            config_data,
+            blobs,
+            base_drivers,
+            boot_drivers,
+            bootfs_shell_commands,
+            shell_commands,
+            packages_to_compile,
+            bootfs_files_package,
+            memory_buckets,
+        } = &self;
+
+        qemu_kernel.is_none()
+            && boot_args.is_empty()
+            && bootfs_packages.is_empty()
+            && bootfs_files.is_empty()
+            && packages.is_empty()
+            && config_data.is_empty()
+            && blobs.is_empty()
+            && base_drivers.is_empty()
+            && boot_drivers.is_empty()
+            && bootfs_shell_commands.is_empty()
+            && shell_commands.is_empty()
+            && packages_to_compile.is_empty()
+            && bootfs_files_package.is_none()
+            && memory_buckets.is_empty()
+            && (match &kernel {
+                Some(kernel) => kernel.args.is_empty() && kernel.path.is_none(),
+                None => true,
+            })
+    }
+}
+
 /// Contents of a compiled package. The contents provided by all
 /// selected AIBs are merged by `name` into a single package
 /// at assembly time.

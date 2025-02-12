@@ -208,6 +208,19 @@ def main() -> None:
         bootfs_packages_list = json.load(args.bootfs_packages_list)
         bootfs_packages = bootfs_packages_list
 
+    # Only include a bootfs files package if it's not empty.
+    bootfs_files_package = None
+    if args.bootfs_files_package:
+        with open(args.bootfs_files_package, "r") as fname:
+            bootfs_files_package_manifest = json_load(PackageManifest, fname)
+            if [
+                path
+                for path in bootfs_files_package_manifest.blobs_by_path().keys()
+                if path != "meta/"
+            ]:
+                # there are bootfs files, so include the package:
+                bootfs_files_package = args.bootfs_files_package
+
     # Create an Assembly Input Bundle from the remaining contents
     (
         assembly_input_bundle,
@@ -226,7 +239,7 @@ def main() -> None:
             for (package, components) in shell_commands.items()
         },
         core_realm_shards,
-        args.bootfs_files_package,
+        bootfs_files_package,
     )
 
     deps.update(shell_deps)

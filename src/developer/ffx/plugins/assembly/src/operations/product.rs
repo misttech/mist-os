@@ -5,7 +5,7 @@
 use crate::operations::product::assembly_builder::ImageAssemblyConfigBuilder;
 use anyhow::{bail, Context, Result};
 use assembly_config_schema::assembly_config::{
-    CompiledComponentDefinition, CompiledPackageDefinition,
+    AssemblyInputBundle, CompiledComponentDefinition, CompiledPackageDefinition,
 };
 use assembly_config_schema::developer_overrides::DeveloperOverrides;
 use assembly_config_schema::{
@@ -31,6 +31,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         gendir: _,
         input_bundles_dir,
         legacy_bundle,
+        legacy_bundle_must_be_empty,
         package_validation,
         custom_kernel_aib,
         suppress_overrides_warning,
@@ -251,9 +252,20 @@ Resulting product is not supported and may misbehave!
     // Add the legacy bundle.
     if let Some(legacy_bundle) = legacy_bundle {
         let legacy_bundle_path = legacy_bundle.join("assembly_config.json");
-        builder
-            .add_bundle(&legacy_bundle_path)
-            .context(format!("Adding legacy bundle: {legacy_bundle_path}"))?;
+
+        if legacy_bundle_must_be_empty {
+            // if the bundle must be empty, parse it and validate that.  It won't be added
+            // to the product if empty (because it's empty), and if it's not empty, that's
+            // an error.
+            let bundle: AssemblyInputBundle = read_config(&legacy_bundle_path)?;
+            if !bundle.is_empty() {
+                bail!("Legacy AIB was found to be non-empty in a configuration that requires it to be empty: {:#?}", bundle);
+            }
+        } else {
+            builder
+                .add_bundle(&legacy_bundle_path)
+                .context(format!("Adding legacy bundle: {legacy_bundle_path}"))?;
+        }
     }
 
     // Add the bootfs files.

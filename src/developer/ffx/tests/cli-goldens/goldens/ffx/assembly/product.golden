@@ -84,6 +84,14 @@
       "hidden": false
     },
     {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--legacy-bundle-must-be-empty",
+      "short": null,
+      "description": "enforce that the legacy AIB is empty",
+      "hidden": false
+    },
+    {
       "kind": {
         "Option": {
           "arg_name": "package-validation"

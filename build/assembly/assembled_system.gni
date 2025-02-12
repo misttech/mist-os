@@ -75,6 +75,10 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     [bool] When true, a legacy bundle will be generated and included in product
 #     assembly. This will automatically be set to 'true' if legacy_bundle_only = true
 #
+#   legacy_bundle_must_be_empty (optional; default=false):
+#      [bool] When true, generate an error if the legacy bundle isn't empty.  This
+#      is a check for transitional products that no longer need the legacy bundle.
+#
 #   legacy_bundle_only (optional)
 #     [bool] When true, this template is reduced to provide the legacy bundle
 #     only. This can be set in Bazel assembly to ensure the build graph don't
@@ -689,6 +693,11 @@ template("assembled_system") {
         ]
         deps += [ ":${labels.legacy_assembly_input_bundle}" ]
         inputs += [ files.legacy_assembly_input_bundle_manifest ]
+
+        if (defined(invoker.legacy_bundle_must_be_empty) &&
+            invoker.legacy_bundle_must_be_empty) {
+          args += [ "--legacy-bundle-must-be-empty" ]
+        }
       }
 
       if (defined(files.board_config)) {
