@@ -81,7 +81,7 @@ void VmObjectPaged::DestructorHelper() {
   }
 
   {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
 
     // Only clear the backlink if we are not a reference. A reference does not "own" the VmCowPages,
     // so in the typical case, the VmCowPages will not have its backlink set to a reference. There
@@ -178,7 +178,7 @@ zx_status_t VmObjectPaged::HintRange(uint64_t offset, uint64_t len, EvictionHint
     lockdep::AssertNoLocksHeld();
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   // Ignore hints for non user-pager-backed VMOs. We choose to silently ignore hints for
   // incompatible combinations instead of failing. This is because the kernel does not make any
@@ -210,7 +210,7 @@ zx_status_t VmObjectPaged::HintRange(uint64_t offset, uint64_t len, EvictionHint
 }
 
 zx_status_t VmObjectPaged::PrefetchRangeLocked(uint64_t offset, uint64_t len,
-                                               Guard<CriticalMutex>* guard) {
+                                               Guard<VmoLockType>* guard) {
   auto cow_range = GetCowRangeSizeCheckLocked(offset, len);
   if (!cow_range) {
     return ZX_ERR_OUT_OF_RANGE;
@@ -235,7 +235,7 @@ zx_status_t VmObjectPaged::PrefetchRange(uint64_t offset, uint64_t len) {
   if (can_block_on_page_requests()) {
     lockdep::AssertNoLocksHeld();
   }
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   // Round offset and len to be page aligned. Use a sub-scope to validate that temporary end
   // calculations cannot be accidentally used later on.
@@ -257,7 +257,7 @@ zx_status_t VmObjectPaged::PrefetchRange(uint64_t offset, uint64_t len) {
 }
 
 void VmObjectPaged::CommitHighPriorityPages(uint64_t offset, uint64_t len) {
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
   if (!cow_pages_locked()->is_high_memory_priority_locked()) {
     return;
   }
@@ -331,7 +331,7 @@ zx_status_t VmObjectPaged::CreateCommon(uint32_t pmm_alloc_flags, uint32_t optio
     if (status != ZX_OK) {
       return status;
     }
-    Guard<CriticalMutex> guard{cow_pages->lock()};
+    Guard<VmoLockType> guard{cow_pages->lock()};
     // Add all the preallocated pages to the object, this takes ownership of all pages regardless
     // of the outcome. This is a new VMO, but this call could fail due to OOM.
     status = cow_pages->AddNewPagesLocked(0, &prealloc_pages, VmCowPages::CanOverwriteContent::Zero,
@@ -348,7 +348,7 @@ zx_status_t VmObjectPaged::CreateCommon(uint32_t pmm_alloc_flags, uint32_t optio
       new (&ac) VmObjectPaged(options, ktl::move(state), ktl::move(cow_pages)));
   if (!ac.check()) {
     if (options & kAlwaysPinned) {
-      Guard<CriticalMutex> guard{cow_pages->lock()};
+      Guard<VmoLockType> guard{cow_pages->lock()};
       cow_pages->UnpinLocked(VmCowRange(0, size));
     }
     return ZX_ERR_NO_MEMORY;
@@ -356,7 +356,7 @@ zx_status_t VmObjectPaged::CreateCommon(uint32_t pmm_alloc_flags, uint32_t optio
 
   // This creation has succeeded. Must wire up the cow pages and *then* place in the globals list.
   {
-    Guard<CriticalMutex> guard{vmo->lock()};
+    Guard<VmoLockType> guard{vmo->lock()};
     vmo->cow_pages_locked()->set_paged_backlink_locked(vmo.get());
     vmo->cow_pages_locked()->TransitionToAliveLocked();
   }
@@ -430,7 +430,7 @@ zx_status_t VmObjectPaged::CreateContiguous(uint32_t pmm_alloc_flags, uint64_t s
     LTRACEF("failed to allocate enough pages (asked for %zu)\n", num_pages);
     return ZX_ERR_NO_MEMORY;
   }
-  Guard<CriticalMutex> guard{vmo->lock()};
+  Guard<VmoLockType> guard{vmo->lock()};
   // Add them to the appropriate range of the object, this takes ownership of all the pages
   // regardless of outcome.
   // This is a newly created VMO with a page source, so we don't expect to be overwriting anything
@@ -472,7 +472,7 @@ zx_status_t VmObjectPaged::CreateFromWiredPages(const void* data, size_t size, b
     paddr_t start_paddr = vaddr_to_paddr(data);
     ASSERT(start_paddr != 0);
 
-    Guard<CriticalMutex> guard{vmo->lock()};
+    Guard<VmoLockType> guard{vmo->lock()};
 
     for (size_t count = 0; count < size / PAGE_SIZE; count++) {
       paddr_t pa = start_paddr + count * PAGE_SIZE;
@@ -585,7 +585,7 @@ zx_status_t VmObjectPaged::CreateWithSourceCommon(fbl::RefPtr<PageSource> src,
 
   // This creation has succeeded. Must wire up the cow pages and *then* place in the globals list.
   {
-    Guard<CriticalMutex> guard{vmo->lock()};
+    Guard<VmoLockType> guard{vmo->lock()};
     vmo->cow_pages_locked()->set_paged_backlink_locked(vmo.get());
     vmo->cow_pages_locked()->TransitionToAliveLocked();
   }
@@ -619,7 +619,7 @@ zx_status_t VmObjectPaged::CreateChildSlice(uint64_t offset, uint64_t size, bool
   // acquisition is correct as we must drop the lock in order to perform the allocations.
   VmCowRange range;
   {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     auto cow_range = GetCowRangeSizeCheckLocked(offset, size);
     if (!cow_range) {
       return ZX_ERR_INVALID_ARGS;
@@ -708,7 +708,7 @@ zx_status_t VmObjectPaged::CreateChildReferenceCommon(uint32_t options, VmCowRan
   }
 
   {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     AssertHeld(vmo->lock_ref());
 
     // We know that we are not contiguous so we should not be uncached either.
@@ -789,7 +789,7 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, SnapshotType type
     // Declare these prior to the guard so that any failure paths destroy these without holding
     // the lock.
     fbl::RefPtr<VmCowPages> clone_cow_pages;
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     // check that we're not uncached in some way
     if (cache_policy_ != ARCH_MMU_FLAG_CACHED) {
       return ZX_ERR_BAD_STATE;
@@ -916,7 +916,7 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
   // We only expect write to be set if this a pin. All non-pin commits are reads.
   DEBUG_ASSERT(!write || pin);
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   // Child slices of VMOs are currently not resizable, nor can they be made
   // from resizable parents.  If this ever changes, the logic surrounding what
@@ -1223,7 +1223,7 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
 zx_status_t VmObjectPaged::DecommitRange(uint64_t offset, uint64_t len) {
   canary_.Assert();
   LTRACEF("offset %#" PRIx64 ", len %#" PRIx64 "\n", offset, len);
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
   if (is_contiguous() && !pmm_physical_page_borrowing_config()->is_loaning_enabled()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -1247,7 +1247,7 @@ zx_status_t VmObjectPaged::DecommitRangeLocked(uint64_t offset, uint64_t len) {
 zx_status_t VmObjectPaged::ZeroPartialPageLocked(uint64_t page_base_offset,
                                                  uint64_t zero_start_offset,
                                                  uint64_t zero_end_offset,
-                                                 Guard<CriticalMutex>* guard) {
+                                                 Guard<VmoLockType>* guard) {
   DEBUG_ASSERT(zero_start_offset <= zero_end_offset);
   DEBUG_ASSERT(zero_end_offset <= PAGE_SIZE);
   DEBUG_ASSERT(IS_PAGE_ALIGNED(page_base_offset));
@@ -1278,7 +1278,7 @@ zx_status_t VmObjectPaged::ZeroRangeInternal(uint64_t offset, uint64_t len, bool
   if (can_block_on_page_requests()) {
     lockdep::AssertNoLocksHeld();
   }
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   // Zeroing a range behaves as if it were an efficient zx_vmo_write. As we cannot write to uncached
   // vmo, we also cannot zero an uncahced vmo.
@@ -1416,7 +1416,7 @@ zx_status_t VmObjectPaged::Resize(uint64_t s) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   zx_status_t status = cow_pages_locked()->ResizeLocked(s);
   if (status != ZX_OK) {
@@ -1429,14 +1429,14 @@ zx_status_t VmObjectPaged::Resize(uint64_t s) {
 
 // perform some sort of copy in/out on a range of the object using a passed in lambda for the copy
 // routine. The copy routine has the expected type signature of: (uint64_t src_offset, uint64_t
-// dest_offset, bool write, Guard<CriticalMutex> *guard) -> zx_status_t The passed in guard may have
+// dest_offset, bool write, Guard<VmoLockType> *guard) -> zx_status_t The passed in guard may have
 // its CallUnlocked member used, but if it does then ZX_OK must not be the return value. A return of
 // ZX_ERR_SHOULD_WAIT implies that the attempted copy should be tried again at the exact same
 // offsets.
 template <typename T>
 zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, bool write,
                                                    VmObjectReadWriteOptions options, T copyfunc,
-                                                   Guard<CriticalMutex>* guard) {
+                                                   Guard<VmoLockType>* guard) {
   canary_.Assert();
 
   uint64_t end_offset;
@@ -1643,7 +1643,7 @@ zx_status_t VmObjectPaged::Read(void* _ptr, uint64_t offset, size_t len) {
     lockdep::AssertNoLocksHeld();
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   return ReadWriteInternalLocked(offset, len, false, VmObjectReadWriteOptions::None, read_routine,
                                  &guard);
@@ -1668,7 +1668,7 @@ zx_status_t VmObjectPaged::Write(const void* _ptr, uint64_t offset, size_t len) 
     lockdep::AssertNoLocksHeld();
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   return ReadWriteInternalLocked(offset, len, true, VmObjectReadWriteOptions::None, write_routine,
                                  &guard);
@@ -1680,7 +1680,7 @@ zx_status_t VmObjectPaged::CacheOp(uint64_t offset, uint64_t len, CacheOpType ty
     return ZX_ERR_INVALID_ARGS;
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   // verify that the range is within the object
   auto cow_range = GetCowRangeSizeCheckLocked(offset, len);
@@ -1727,7 +1727,7 @@ zx_status_t VmObjectPaged::Lookup(uint64_t offset, uint64_t len,
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   return cow_pages_locked()->LookupLocked(
       *cow_range, [&lookup_fn, undo_offset = cow_range_.offset](uint64_t offset, paddr_t pa) {
@@ -1746,7 +1746,7 @@ zx_status_t VmObjectPaged::LookupContiguous(uint64_t offset, uint64_t len, paddr
     return ZX_ERR_INVALID_ARGS;
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   auto cow_range = GetCowRangeSizeCheckLocked(offset, len);
   if (!cow_range) {
@@ -1812,7 +1812,7 @@ zx_status_t VmObjectPaged::ReadUser(user_out_ptr<char> ptr, uint64_t offset, siz
     lockdep::AssertNoLocksHeld();
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   return ReadWriteInternalLocked(offset, len, false, options, read_routine, &guard);
 }
@@ -1848,7 +1848,7 @@ zx_status_t VmObjectPaged::WriteUser(user_in_ptr<const char> ptr, uint64_t offse
     lockdep::AssertNoLocksHeld();
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   return ReadWriteInternalLocked(offset, len, true, options, write_routine, &guard);
 }
@@ -1872,7 +1872,7 @@ zx_status_t VmObjectPaged::TakePages(uint64_t offset, uint64_t len, VmPageSplice
 
   __UNINITIALIZED MultiPageRequest page_request;
   while (!range.is_empty()) {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
 
     uint64_t taken_len = 0;
     zx_status_t status =
@@ -1918,7 +1918,7 @@ zx_status_t VmObjectPaged::SupplyPages(uint64_t offset, uint64_t len, VmPageSpli
 
   __UNINITIALIZED MultiPageRequest page_request;
   while (!range.is_empty()) {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
 
     uint64_t supply_len = 0;
     zx_status_t status =
@@ -1958,7 +1958,7 @@ zx_status_t VmObjectPaged::DirtyPages(uint64_t offset, uint64_t len) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
   // Initialize a list of allocated pages that DirtyPagesLocked will allocate any new pages into
   // before inserting them in the VMO. Allocated pages can therefore be shared across multiple calls
   // to DirtyPagesLocked. Instead of having to allocate and free pages in case DirtyPagesLocked
@@ -1990,7 +1990,7 @@ zx_status_t VmObjectPaged::DirtyPages(uint64_t offset, uint64_t len) {
 
 zx_status_t VmObjectPaged::EnumerateDirtyRanges(uint64_t offset, uint64_t len,
                                                 DirtyRangeEnumerateFunction&& dirty_range_fn) {
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
   if (auto cow_range = GetCowRange(offset, len)) {
     // Need to wrap the callback to translate the cow pages offsets back into offsets as seen by
     // this object.
@@ -2009,7 +2009,7 @@ zx_status_t VmObjectPaged::SetMappingCachePolicy(const uint32_t cache_policy) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
 
   // conditions for allowing the cache policy to be set:
   // 1) vmo either has no pages committed currently or is transitioning from being cached
@@ -2133,7 +2133,7 @@ zx_status_t VmObjectPaged::LockRange(uint64_t offset, uint64_t len,
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
   return cow_pages_locked()->LockRangeLocked(*cow_range, lock_state_out);
 }
 
@@ -2146,7 +2146,7 @@ zx_status_t VmObjectPaged::TryLockRange(uint64_t offset, uint64_t len) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
   return cow_pages_locked()->TryLockRangeLocked(*cow_range);
 }
 
@@ -2159,13 +2159,13 @@ zx_status_t VmObjectPaged::UnlockRange(uint64_t offset, uint64_t len) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
   return cow_pages_locked()->UnlockRangeLocked(*cow_range);
 }
 
 zx_status_t VmObjectPaged::GetPage(uint64_t offset, uint pf_flags, list_node* alloc_list,
                                    MultiPageRequest* page_request, vm_page_t** page, paddr_t* pa) {
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
   const bool write = pf_flags & VMM_PF_FLAG_WRITE;
   zx::result<VmCowPages::LookupCursor> cursor = GetLookupCursorLocked(offset, PAGE_SIZE);
   if (cursor.is_error()) {

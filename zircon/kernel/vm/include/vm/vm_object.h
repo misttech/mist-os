@@ -35,6 +35,7 @@
 #include <vm/content_size_manager.h>
 #include <vm/page.h>
 #include <vm/vm.h>
+#include <vm/vm_object_lock.h>
 #include <vm/vm_page_list.h>
 
 class VmMapping;
@@ -149,11 +150,11 @@ class VmHierarchyState : public fbl::RefCounted<VmHierarchyState> {
   VmHierarchyState() = default;
   ~VmHierarchyState() = default;
 
-  Lock<CriticalMutex>* lock() const TA_RET_CAP(lock_) { return &lock_; }
-  Lock<CriticalMutex>& lock_ref() const TA_RET_CAP(lock_) { return lock_; }
+  Lock<VmoLockType>* lock() const TA_RET_CAP(lock_) { return &lock_; }
+  Lock<VmoLockType>& lock_ref() const TA_RET_CAP(lock_) { return lock_; }
 
  private:
-  mutable DECLARE_CRITICAL_MUTEX(VmHierarchyState) lock_;
+  mutable LOCK_DEP_INSTRUMENT(VmHierarchyState, VmoLockType) lock_;
 };
 
 // Base class for any objects that want to be part of the VMO hierarchy and share some state,
@@ -163,10 +164,10 @@ class VmHierarchyBase : public fbl::RefCountedUpgradeable<VmHierarchyBase> {
  public:
   explicit VmHierarchyBase(fbl::RefPtr<VmHierarchyState> state);
 
-  Lock<CriticalMutex>* lock() const TA_RET_CAP(hierarchy_state_ptr_->lock_ref()) {
+  Lock<VmoLockType>* lock() const TA_RET_CAP(hierarchy_state_ptr_->lock_ref()) {
     return hierarchy_state_ptr_->lock();
   }
-  Lock<CriticalMutex>& lock_ref() const TA_RET_CAP(hierarchy_state_ptr_->lock_ref()) {
+  Lock<VmoLockType>& lock_ref() const TA_RET_CAP(hierarchy_state_ptr_->lock_ref()) {
     return hierarchy_state_ptr_->lock_ref();
   }
 
@@ -297,7 +298,7 @@ class VmObject : public VmHierarchyBase,
 
   virtual uint64_t size_locked() const TA_REQ(lock()) = 0;
   uint64_t size() const TA_EXCL(lock()) {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     return size_locked();
   }
   virtual uint32_t create_options() const { return 0; }
@@ -592,7 +593,7 @@ class VmObject : public VmHierarchyBase,
   }
 
   virtual uint32_t GetMappingCachePolicy() const {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     return GetMappingCachePolicyLocked();
   }
   virtual uint32_t GetMappingCachePolicyLocked() const = 0;

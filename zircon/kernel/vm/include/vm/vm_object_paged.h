@@ -119,25 +119,25 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   }
 
   uint64_t HeapAllocationBytes() const override {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     return cow_pages_locked()->HeapAllocationBytesLocked();
   }
 
   uint64_t ReclamationEventCount() const override {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
 
     return cow_pages_locked()->ReclamationEventCountLocked();
   }
 
   AttributionCounts GetAttributedMemoryInRange(uint64_t offset_bytes,
                                                uint64_t len_bytes) const override {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     return GetAttributedMemoryInRangeLocked(offset_bytes, len_bytes);
   }
 
   AttributionCounts GetAttributedMemoryInReferenceOwner() const override {
     DEBUG_ASSERT(is_reference());
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     return cow_pages_locked()->GetAttributedMemoryInRangeLocked(VmCowRange(0, size_locked()));
   }
 
@@ -162,7 +162,7 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   }
 
   void Unpin(uint64_t offset, uint64_t len) override {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     auto cow_range = GetCowRange(offset, len);
     ASSERT(cow_range);
     cow_pages_locked()->UnpinLocked(*cow_range);
@@ -170,7 +170,7 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
 
   // See VmObject::DebugIsRangePinned
   bool DebugIsRangePinned(uint64_t offset, uint64_t len) override {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     if (auto cow_range = GetCowRange(offset, len)) {
       return cow_pages_locked()->DebugIsRangePinnedLocked(*cow_range);
     }
@@ -196,7 +196,7 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   zx_status_t SupplyPages(uint64_t offset, uint64_t len, VmPageSpliceList* pages,
                           SupplyOptions options) override;
   zx_status_t FailPageRequests(uint64_t offset, uint64_t len, zx_status_t error_status) override {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     if (auto cow_range = GetCowRange(offset, len)) {
       return cow_pages_locked()->FailPageRequestsLocked(*cow_range, error_status);
     }
@@ -208,24 +208,24 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
                                    DirtyRangeEnumerateFunction&& dirty_range_fn) override;
 
   zx_status_t QueryPagerVmoStats(bool reset, zx_pager_vmo_stats_t* stats) override {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     return cow_pages_locked()->QueryPagerVmoStatsLocked(reset, stats);
   }
 
   void ResetPagerVmoStats() {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     cow_pages_locked()->ResetPagerVmoStatsLocked();
   }
 
   zx_status_t WritebackBegin(uint64_t offset, uint64_t len, bool is_zero_range) override {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     if (auto cow_range = GetCowRange(offset, len)) {
       return cow_pages_locked()->WritebackBeginLocked(*cow_range, is_zero_range);
     }
     return ZX_ERR_OUT_OF_RANGE;
   }
   zx_status_t WritebackEnd(uint64_t offset, uint64_t len) override {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     if (auto cow_range = GetCowRange(offset, len)) {
       return cow_pages_locked()->WritebackEndLocked(*cow_range);
     }
@@ -234,17 +234,17 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
 
   // See VmObject::SetUserContentSize
   void SetUserContentSize(fbl::RefPtr<ContentSizeManager> csm) override {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     user_content_size_ = ktl::move(csm);
   }
 
   void Dump(uint depth, bool verbose) override {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     DumpLocked(depth, verbose);
   }
 
   uint32_t DebugLookupDepth() const override {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     return cow_pages_locked()->DebugLookupDepthLocked();
   }
 
@@ -277,7 +277,7 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   zx_status_t SetMappingCachePolicy(const uint32_t cache_policy) override;
 
   void DetachSource() override {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
 
     cow_pages_locked()->DetachSourceLocked();
   }
@@ -299,18 +299,18 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   // that the VMO hierarchy is corrupt and the system should probably panic as soon as possible. As
   // a result, if false is returned this may write various additional information to the debuglog.
   bool DebugValidatePageSharing() const {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     return cow_pages_locked()->DebugValidatePageSharingLocked();
   }
 
   // Exposed for testing.
   fbl::RefPtr<VmCowPages> DebugGetCowPages() const {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     return cow_pages_;
   }
 
   vm_page_t* DebugGetPage(uint64_t offset) const {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     if (auto cow_range = GetCowRange(offset, PAGE_SIZE)) {
       return cow_pages_locked()->DebugGetPageLocked(cow_range->offset);
     }
@@ -374,7 +374,7 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   zx_status_t DecommitRangeLocked(uint64_t offset, uint64_t len) TA_REQ(lock());
 
   // Internal prefetch range helper that expects the lock to be held.
-  zx_status_t PrefetchRangeLocked(uint64_t offset, uint64_t len, Guard<CriticalMutex>* guard)
+  zx_status_t PrefetchRangeLocked(uint64_t offset, uint64_t len, Guard<VmoLockType>* guard)
       TA_REQ(lock());
 
   // see GetAttributedMemoryInRange
@@ -385,14 +385,14 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   template <typename T>
   zx_status_t ReadWriteInternalLocked(uint64_t offset, size_t len, bool write,
                                       VmObjectReadWriteOptions options, T copyfunc,
-                                      Guard<CriticalMutex>* guard) TA_REQ(lock());
+                                      Guard<VmoLockType>* guard) TA_REQ(lock());
 
   // Zeroes a partial range in a page. May use CallUnlocked on the passed in guard. The page to zero
   // is looked up using page_base_offset, and will be committed if needed. The range of
   // [zero_start_offset, zero_end_offset) is relative to the page and so [0, PAGE_SIZE) would zero
   // the entire page.
   zx_status_t ZeroPartialPageLocked(uint64_t page_base_offset, uint64_t zero_start_offset,
-                                    uint64_t zero_end_offset, Guard<CriticalMutex>* guard)
+                                    uint64_t zero_end_offset, Guard<VmoLockType>* guard)
       TA_REQ(lock());
 
   // Internal helper for ZeroRange*.

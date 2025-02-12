@@ -387,7 +387,7 @@ zx_status_t VmObjectDispatcher::SetStreamSize(uint64_t stream_size) {
   VmObjectPaged* paged = DownCastVmObject<VmObjectPaged>(vmo_.get());
   DEBUG_ASSERT(paged);
   {
-    Guard<CriticalMutex> vmo_guard{paged->lock()};
+    Guard<VmoLockType> vmo_guard{paged->lock()};
     paged->ForwardRangeChangeUpdateLocked(zero_start, vmo_size - zero_start,
                                           VmCowPages::RangeChangeOp::Unmap);
     op.CommitLocked();

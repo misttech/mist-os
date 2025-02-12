@@ -94,13 +94,13 @@ void VmObject::RemoveMappingLocked(VmMapping* r) {
 
 uint32_t VmObject::num_mappings() const {
   canary_.Assert();
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
   return mapping_list_len_;
 }
 
 bool VmObject::IsMappedByUser() const {
   canary_.Assert();
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
   return ktl::any_of(mapping_list_.cbegin(), mapping_list_.cend(),
                      [](const VmMapping& m) -> bool { return m.aspace()->is_user(); });
 }
@@ -108,7 +108,7 @@ bool VmObject::IsMappedByUser() const {
 uint32_t VmObject::share_count() const {
   canary_.Assert();
 
-  Guard<CriticalMutex> guard{lock()};
+  Guard<VmoLockType> guard{lock()};
   if (mapping_list_len_ < 2) {
     return 1;
   }

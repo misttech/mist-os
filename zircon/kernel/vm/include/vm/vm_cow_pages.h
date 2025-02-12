@@ -599,12 +599,12 @@ class VmCowPages final : public VmHierarchyBase,
   // the range will still be operated on. If this flag is not set then any kind of error causes an
   // immediate abort.
   zx_status_t ProtectRangeFromReclamationLocked(VmCowRange range, bool set_always_need,
-                                                bool ignore_errors, Guard<CriticalMutex>* guard)
+                                                bool ignore_errors, Guard<VmoLockType>* guard)
       TA_REQ(lock());
 
   // Ensures any pages in the specified range are not compressed, but does not otherwise commit any
   // pages. In order to handle delayed memory allocations, |guard| may be dropped one or more times.
-  zx_status_t DecompressInRangeLocked(VmCowRange range, Guard<CriticalMutex>* guard) TA_REQ(lock());
+  zx_status_t DecompressInRangeLocked(VmCowRange range, Guard<VmoLockType>* guard) TA_REQ(lock());
 
   // See VmObject::ChangeHighPriorityCountLocked
   void ChangeHighPriorityCountLocked(int64_t delta) TA_REQ(lock());
@@ -648,7 +648,7 @@ class VmCowPages final : public VmHierarchyBase,
   zx_status_t ReplacePage(vm_page_t* before_page, uint64_t offset, bool with_loaned,
                           vm_page_t** after_page, AnonymousPageRequest* page_request)
       TA_EXCL(lock()) {
-    Guard<CriticalMutex> guard{lock()};
+    Guard<VmoLockType> guard{lock()};
     return ReplacePageLocked(before_page, offset, with_loaned, after_page, page_request);
   }
 
@@ -660,7 +660,7 @@ class VmCowPages final : public VmHierarchyBase,
   // Potentially transitions from Alive->Dead if the cow pages is unreachable (i.e. has no
   // paged_ref_ and no children). Used by the VmObjectPaged when it unlinks the paged_ref_, but
   // prior to dropping the RefPtr, giving the VmCowPages a chance to transition.
-  void MaybeDeadTransitionLocked(Guard<CriticalMutex>& guard) TA_REQ(lock());
+  void MaybeDeadTransitionLocked(Guard<VmoLockType>& guard) TA_REQ(lock());
 
   // Unlocked helper around MaybeDeadTransitionLocked
   void MaybeDeadTransition();
@@ -724,7 +724,7 @@ class VmCowPages final : public VmHierarchyBase,
   // Transitions from Alive->Dead, freeing pages and cleaning up state. Responsibility of the caller
   // to validate that it is correct to be doing this transition. May drop the lock during its
   // execution.
-  void DeadTransition(Guard<CriticalMutex>& guard) TA_REQ(lock());
+  void DeadTransition(Guard<VmoLockType>& guard) TA_REQ(lock());
 
   bool is_hidden() const { return !!(options_ & VmCowPagesOptions::kHidden); }
   bool can_decommit_zero_pages() const {
@@ -1359,8 +1359,8 @@ class VmCowPages final : public VmHierarchyBase,
   //
   // Borrows the guard for |lock_| and may drop the lock temporarily during execution.
   ReclaimCounts ReclaimPageForCompressionLocked(vm_page_t* page, uint64_t offset,
-                                                VmCompressor* compressor,
-                                                Guard<CriticalMutex>& guard) TA_REQ(lock());
+                                                VmCompressor* compressor, Guard<VmoLockType>& guard)
+      TA_REQ(lock());
 
   // Internal helper for performing reclamation against a discardable VMO. Assumes that the page is
   // owned by this VMO at the specified offset. If any discarding happens the number of pages is
@@ -1594,8 +1594,8 @@ class VmCowPages::LookupCursor {
   void DisableMarkAccessed() { mark_accessed_ = false; }
 
   // Exposed for lock assertions.
-  Lock<CriticalMutex>* lock() const TA_RET_CAP(target_->lock_ref()) { return target_->lock(); }
-  Lock<CriticalMutex>& lock_ref() const TA_RET_CAP(target_->lock_ref()) {
+  Lock<VmoLockType>* lock() const TA_RET_CAP(target_->lock_ref()) { return target_->lock(); }
+  Lock<VmoLockType>& lock_ref() const TA_RET_CAP(target_->lock_ref()) {
     return target_->lock_ref();
   }
 

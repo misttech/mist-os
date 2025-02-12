@@ -3788,7 +3788,7 @@ static bool vmo_high_priority_reclaim_test() {
   ASSERT_EQ(ZX_OK, status);
 
   auto change_priority = [&vmo](int64_t delta) {
-    Guard<CriticalMutex> guard{vmo->lock()};
+    Guard<VmoLockType> guard{vmo->lock()};
     vmo->ChangeHighPriorityCountLocked(delta);
   };
 
@@ -4230,7 +4230,7 @@ static bool vmo_skip_range_update_test() {
     }
     // Perform the requested range update.
     {
-      Guard<CriticalMutex> guard{hidden_parent->lock()};
+      Guard<VmoLockType> guard{hidden_parent->lock()};
       hidden_parent->RangeChangeUpdateLocked(
           VmCowRange(range.page_start * PAGE_SIZE, range.num_pages * PAGE_SIZE),
           VmCowPages::RangeChangeOp::Unmap);
@@ -4270,7 +4270,7 @@ static bool vmo_user_stream_size_test() {
   ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, 4 * PAGE_SIZE, &vmo));
 
   {
-    Guard<CriticalMutex> guard{vmo->lock()};
+    Guard<VmoLockType> guard{vmo->lock()};
     EXPECT_EQ(vmo->size_locked(), (uint64_t)4 * PAGE_SIZE);
     // Should not have an allocated stream size.
     auto result = vmo->user_content_size_locked();
@@ -4286,7 +4286,7 @@ static bool vmo_user_stream_size_test() {
   vmo->SetUserContentSize(csm);
 
   {
-    Guard<CriticalMutex> guard{vmo->lock()};
+    Guard<VmoLockType> guard{vmo->lock()};
     auto result = vmo->user_content_size_locked();
     ASSERT_TRUE(result.has_value());
     const uint64_t stream_size = result.value();

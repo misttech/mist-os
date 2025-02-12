@@ -74,7 +74,7 @@ class DiscardableVmoTracker final
 
   // Debug functions exposed for testing.
   uint64_t DebugGetLockCount() const {
-    Guard<CriticalMutex> guard{cow_->lock()};
+    Guard<VmoLockType> guard{cow_->lock()};
     return lock_count_;
   }
   bool DebugIsReclaimable() const;
