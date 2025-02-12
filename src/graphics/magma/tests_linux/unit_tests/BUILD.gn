@@ -34,18 +34,6 @@ compiled_action("basic_compute") {
   ]
 }
 
-cc_test_executable("virtmagma_image_tests") {
-  testonly = true
-
-  sources = [ "virtmagma_image_tests.cc" ]
-
-  deps = [
-    "//src/graphics/lib/magma/src/libmagma_virt",
-    "//src/lib/fxl/test:gtest_main",
-    "//third_party/mesa/include:drm-uapi",
-  ]
-}
-
 cc_test_executable("virtmagma_unit_tests") {
   testonly = true
 

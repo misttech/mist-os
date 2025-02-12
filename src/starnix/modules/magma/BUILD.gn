@@ -18,22 +18,16 @@ rustc_library("magma") {
     "init.rs",
     "lib.rs",
     "magma.rs",
-    "vulkan.rs",
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.images2:fuchsia.images2_rust",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
-    "//sdk/fidl/fuchsia.math:fuchsia.math_rust",
-    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_rust",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
     "//sdk/rust/zx",
     "//src/graphics/lib/magma/src/libmagma",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-component",
-    "//src/lib/fuchsia-image-format",
-    "//src/lib/ui/fuchsia-vulkan",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",
     "//src/starnix/lib/magma",
@@ -43,7 +37,6 @@ rustc_library("magma") {
     "//src/starnix/lib/starnix-types",
     "//src/starnix/lib/starnix-uapi",
     "//third_party/rust_crates:bstr",
-    "//third_party/rust_crates:vk-sys",
     "//third_party/rust_crates:zerocopy",
   ]
 }
