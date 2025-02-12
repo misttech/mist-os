@@ -7,6 +7,9 @@
 // https://fxbug.dev/375036278 - HALs implemented via "remote_binder" fail "entrypoint" checks.
 todo_deny https://fxbug.dev/375036278 hal_gnss_default vendor_file file
 
+// https://fxbug.dev/390458405 - HALs implemented via "remote_binder" fail "entrypoint" checks.
+todo_deny https://fxbug.dev/390458405 update_engine vendor_file file
+
 // https://fxbug.dev/392857781 - Some HAL tests/pre-run steps are launched with bad labels.
 todo_deny https://fxbug.dev/392857781 init system_file file
 todo_deny https://fxbug.dev/392857781 init vendor_file file
