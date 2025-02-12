@@ -78,6 +78,10 @@ template("generate_fuchsia_bazel_sdk") {
       "--depfile",
       rebase_path(depfile, root_build_dir),
     ]
+    if (defined(invoker.use_rules_fuchsia) && invoker.use_rules_fuchsia) {
+      args += [ "--use-rules_fuchsia" ]
+    }
+
     deps = [ invoker.idk_export_target ]
     hermetic_deps = false
 

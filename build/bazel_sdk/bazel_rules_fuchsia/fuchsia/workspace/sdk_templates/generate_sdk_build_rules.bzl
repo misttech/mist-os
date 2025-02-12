@@ -1742,6 +1742,7 @@ def _merge_rules_fuchsia(runtime, use_rules_fuchsia):
         child_directories = [
             "fuchsia/constraints/platforms",
             "fuchsia/constraints",
+            "fuchsia/toolchains",
             "fuchsia",
         ]
         for child_dir in child_directories:
@@ -1784,11 +1785,6 @@ alias(
 
         # Needed by the SDK test suite.
         ctx.symlink(rules_fuchsia_root.get_child("fuchsia", "tools"), "fuchsia/tools")
-
-        # Until we completely remove the toolchain types from the fuchsia_sdk we need
-        # to make sure we have them defined. We copy over the build file for the
-        # toolchains for now.
-        ctx.symlink(rules_fuchsia_root.get_child("fuchsia", "toolchains", "BUILD.bazel"), "fuchsia/toolchains/BUILD.bazel")
     else:
         # Simply symlink the content of @rules_fuchsia into the current
         # repository instead.

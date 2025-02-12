@@ -232,6 +232,7 @@ run_fuchsia_bazel_sdk_tests("final_fuchsia_idk_bazel_sdk_tests") {
 generate_fuchsia_bazel_sdk("final_fuchsia_sdk") {
   idk_export_target = "//sdk:final_fuchsia_idk.exported"
   idk_export_dir = "$root_build_dir/sdk/exported/fuchsia_idk"
+  use_rules_fuchsia = true
 }
 
 # Verify the content of the final_fuchsia_sdk target by running
