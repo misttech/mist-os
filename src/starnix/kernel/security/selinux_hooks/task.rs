@@ -4,13 +4,16 @@
 
 use crate::security::selinux_hooks::{
     check_permission, check_self_permission, fs_node_effective_sid_and_class, fs_node_ensure_class,
-    fs_node_set_label_with_task, has_file_permissions, PermissionCheck, ProcessPermission,
-    TaskAttrs,
+    fs_node_set_label_with_task, has_file_permissions, Permission, PermissionCheck,
+    ProcessPermission, TaskAttrs,
 };
 use crate::security::{Arc, ProcAttr, ResolvedElfState, SecurityId, SecurityServer};
 use crate::task::{CurrentTask, Task};
 use crate::vfs::FsNode;
-use selinux::{FilePermission, NullessByteStr, ObjectClass};
+use selinux::{
+    Cap2Class, CapClass, CommonCap2Permission, CommonCapPermission, FilePermission, NullessByteStr,
+    ObjectClass,
+};
 use starnix_types::ownership::TempRef;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::resource_limits::Resource;
@@ -273,6 +276,132 @@ pub fn task_get_context(
 ) -> Result<Vec<u8>, Errno> {
     let sid = target.security_state.lock().current_sid;
     Ok(security_server.sid_to_security_context(sid).unwrap_or_default())
+}
+
+fn permission_from_capability(capabilities: starnix_uapi::auth::Capabilities) -> Permission {
+    // TODO: https://fxbug.dev/297313673 - CapClass::CapUserns will play a role here if-and-after
+    // user namespaces are implemented in Starnix.
+    match capabilities {
+        starnix_uapi::auth::CAP_AUDIT_CONTROL => {
+            CommonCapPermission::AuditControl.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_AUDIT_WRITE => {
+            CommonCapPermission::AuditWrite.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_CHOWN => CommonCapPermission::Chown.for_class(CapClass::Capability),
+        starnix_uapi::auth::CAP_DAC_OVERRIDE => {
+            CommonCapPermission::DacOverride.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_DAC_READ_SEARCH => {
+            CommonCapPermission::DacReadSearch.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_FOWNER => {
+            CommonCapPermission::Fowner.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_FSETID => {
+            CommonCapPermission::Fsetid.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_IPC_LOCK => {
+            CommonCapPermission::IpcLock.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_IPC_OWNER => {
+            CommonCapPermission::IpcOwner.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_KILL => CommonCapPermission::Kill.for_class(CapClass::Capability),
+        starnix_uapi::auth::CAP_LEASE => CommonCapPermission::Lease.for_class(CapClass::Capability),
+        starnix_uapi::auth::CAP_LINUX_IMMUTABLE => {
+            CommonCapPermission::LinuxImmutable.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_MKNOD => CommonCapPermission::Mknod.for_class(CapClass::Capability),
+        starnix_uapi::auth::CAP_NET_ADMIN => {
+            CommonCapPermission::NetAdmin.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_NET_BIND_SERVICE => {
+            CommonCapPermission::NetBindService.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_NET_BROADCAST => {
+            CommonCapPermission::NetBroadcast.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_NET_RAW => {
+            CommonCapPermission::NetRaw.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_SETFCAP => {
+            CommonCapPermission::Setfcap.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_SETGID => {
+            CommonCapPermission::Setgid.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_SETPCAP => {
+            CommonCapPermission::Setpcap.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_SETUID => {
+            CommonCapPermission::Setuid.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_SYS_ADMIN => {
+            CommonCapPermission::SysAdmin.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_SYS_BOOT => {
+            CommonCapPermission::SysBoot.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_SYS_CHROOT => {
+            CommonCapPermission::SysChroot.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_SYS_MODULE => {
+            CommonCapPermission::SysModule.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_SYS_NICE => {
+            CommonCapPermission::SysNice.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_SYS_PACCT => {
+            CommonCapPermission::SysPacct.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_SYS_PTRACE => {
+            CommonCapPermission::SysPtrace.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_SYS_RAWIO => {
+            CommonCapPermission::SysRawio.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_SYS_RESOURCE => {
+            CommonCapPermission::SysResource.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_SYS_TIME => {
+            CommonCapPermission::SysTime.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_SYS_TTY_CONFIG => {
+            CommonCapPermission::SysTtyConfig.for_class(CapClass::Capability)
+        }
+        starnix_uapi::auth::CAP_AUDIT_READ => {
+            CommonCap2Permission::AuditRead.for_class(Cap2Class::Capability2)
+        }
+        starnix_uapi::auth::CAP_BLOCK_SUSPEND => {
+            CommonCap2Permission::BlockSuspend.for_class(Cap2Class::Capability2)
+        }
+        starnix_uapi::auth::CAP_MAC_ADMIN => {
+            CommonCap2Permission::MacAdmin.for_class(Cap2Class::Capability2)
+        }
+        starnix_uapi::auth::CAP_MAC_OVERRIDE => {
+            CommonCap2Permission::MacOverride.for_class(Cap2Class::Capability2)
+        }
+        starnix_uapi::auth::CAP_SYSLOG => {
+            CommonCap2Permission::Syslog.for_class(Cap2Class::Capability2)
+        }
+        starnix_uapi::auth::CAP_WAKE_ALARM => {
+            CommonCap2Permission::WakeAlarm.for_class(Cap2Class::Capability2)
+        }
+        _ => {
+            panic!("Unrecognized capabilities \"{:?}\" passed to check_capable!", capabilities)
+        }
+    }
+}
+
+pub fn check_task_capable(
+    permission_check: &PermissionCheck<'_>,
+    current_task: &CurrentTask,
+    capabilities: starnix_uapi::auth::Capabilities,
+) -> Result<(), Errno> {
+    let sid = current_task.security_state.lock().current_sid;
+    let permission = permission_from_capability(capabilities);
+    check_self_permission(&permission_check, sid, permission)
 }
 
 /// Checks if the task with `source_sid` has the permission to get and/or set limits on the task with `target_sid`.

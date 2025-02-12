@@ -604,7 +604,13 @@ pub fn check_task_capable(
     if !current_task.creds().has_capability(capabilities) {
         return error!(EPERM);
     }
-    Ok(()) // TODO: https://fxbug.dev/364569559 - add an `if_selinux_else_default_ok` call here.
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::task::check_task_capable(
+            &security_server.as_permission_check(),
+            &current_task,
+            capabilities,
+        )
+    })
 }
 
 /// Checks if creating a task is allowed.

@@ -78,6 +78,10 @@ enumerable_enum! {
         AnonFsNode,
         /// The SELinux "blk_file" object class.
         Block,
+        /// The SELinux "capability" object class.
+        Capability,
+        /// The SELinux "capability2" object class.
+        Capability2,
         /// The SELinux "chr_file" object class.
         Character,
         /// The SELinux "dir" object class.
@@ -109,6 +113,8 @@ impl ObjectClass {
             // keep-sorted start
             Self::AnonFsNode => "anon_inode",
             Self::Block => "blk_file",
+            Self::Capability => "capability",
+            Self::Capability2 => "capability2",
             Self::Character => "chr_file",
             Self::Dir => "dir",
             Self::Fd => "fd",
@@ -133,6 +139,50 @@ impl From<ObjectClass> for AbstractObjectClass {
 impl From<String> for AbstractObjectClass {
     fn from(name: String) -> Self {
         Self::Custom(name)
+    }
+}
+
+enumerable_enum! {
+    /// Covers the set of classes that inherit from the common "cap" symbol (e.g. "capability" for
+    /// now and "cap_userns" after Starnix gains user namespacing support).
+    #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+    CapClass {
+        // keep-sorted start
+        /// The SELinux "capability" object class.
+        Capability,
+        // keep-sorted end
+    }
+}
+
+impl From<CapClass> for ObjectClass {
+    fn from(cap_class: CapClass) -> Self {
+        match cap_class {
+            // keep-sorted start
+            CapClass::Capability => Self::Capability,
+            // keep-sorted end
+        }
+    }
+}
+
+enumerable_enum! {
+    /// Covers the set of classes that inherit from the common "cap2" symbol (e.g. "capability2" for
+    /// now and "cap2_userns" after Starnix gains user namespacing support).
+    #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+    Cap2Class {
+        // keep-sorted start
+        /// The SELinux "capability2" object class.
+        Capability2,
+        // keep-sorted end
+    }
+}
+
+impl From<Cap2Class> for ObjectClass {
+    fn from(cap2_class: Cap2Class) -> Self {
+        match cap2_class {
+            // keep-sorted start
+            Cap2Class::Capability2 => Self::Capability2,
+            // keep-sorted end
+        }
     }
 }
 
@@ -254,6 +304,10 @@ permission_enum! {
         AnonFsNode(AnonFsNodePermission),
         /// Permissions for the well-known SELinux "blk_file" file-like object class.
         Block(BlockFilePermission),
+        /// Permissions for the well-known SELinux "capability" object class.
+        Capability(CapabilityPermission),
+        /// Permissions for the well-known SELinux "capability2" object class.
+        Capability2(Capability2Permission),
         /// Permissions for the well-known SELinux "chr_file" file-like object class.
         Character(CharacterFilePermission),
         /// Permissions for the well-known SELinux "dir" file-like object class.
@@ -322,6 +376,108 @@ macro_rules! class_permission_enum {
             fn class(&self) -> ObjectClass {
                 Permission::from(self.clone()).class()
             }
+        }
+    }
+}
+
+common_permission_enum! {
+    /// Permissions common to all cap-like object classes (e.g. "capability" for now and
+    /// "cap_userns" after Starnix gains user namespacing support). These are combined with a
+    /// specific `CapabilityClass` by policy enforcement hooks, to obtain class-affine permission
+    /// values to check.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    CommonCapPermission {
+        // keep-sorted start
+
+        AuditControl("audit_control"),
+        AuditWrite("audit_write"),
+        Chown("chown"),
+        DacOverride("dac_override"),
+        DacReadSearch("dac_read_search"),
+        Fowner("fowner"),
+        Fsetid("fsetid"),
+        IpcLock("ipc_lock"),
+        IpcOwner("ipc_owner"),
+        Kill("kill"),
+        Lease("lease"),
+        LinuxImmutable("linux_immutable"),
+        Mknod("mknod"),
+        NetAdmin("net_admin"),
+        NetBindService("net_bind_service"),
+        NetBroadcast("net_broadcast"),
+        NetRaw("net_raw"),
+        Setfcap("setfcap"),
+        Setgid("setgid"),
+        Setpcap("setpcap"),
+        Setuid("setuid"),
+        SysAdmin("sys_admin"),
+        SysBoot("sys_boot"),
+        SysChroot("sys_chroot"),
+        SysModule("sys_module"),
+        SysNice("sys_nice"),
+        SysPacct("sys_pacct"),
+        SysPtrace("sys_ptrace"),
+        SysRawio("sys_rawio"),
+        SysResource("sys_resource"),
+        SysTime("sys_time"),
+        SysTtyConfig("sys_tty_config"),
+
+        // keep-sorted end
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "capability" class permission in SELinux policy that has a particular meaning
+    /// in policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    CapabilityPermission extends CommonCapPermission {}
+}
+
+impl CommonCapPermission {
+    /// Returns the `class`-affine `Permission` value corresponding to this common permission.
+    /// This is used to allow hooks to resolve e.g. common "sys_nice" permission access based on the
+    /// "allow" rules for the correct target object class.
+    pub fn for_class(&self, class: CapClass) -> Permission {
+        match class {
+            CapClass::Capability => CapabilityPermission::Common(self.clone()).into(),
+        }
+    }
+}
+
+common_permission_enum! {
+    /// Permissions common to all cap2-like object classes (e.g. "capability2" for now and
+    /// "cap2_userns" after Starnix gains user namespacing support). These are combined with a
+    /// specific `Capability2Class` by policy enforcement hooks, to obtain class-affine permission
+    /// values to check.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    CommonCap2Permission {
+        // keep-sorted start
+
+        AuditRead("audit_read"),
+        BlockSuspend("block_suspend"),
+        MacAdmin("mac_admin"),
+        MacOverride("mac_override"),
+        Syslog("syslog"),
+        WakeAlarm("wake_alarm"),
+
+        // keep-sorted end
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "capability2" class permission in SELinux policy that has a particular meaning
+    /// in policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    Capability2Permission extends CommonCap2Permission {}
+}
+
+impl CommonCap2Permission {
+    /// Returns the `class`-affine `Permission` value corresponding to this common permission.
+    /// This is used to allow hooks to resolve e.g. common "mac_admin" permission access based on
+    /// the "allow" rules for the correct target object class.
+    pub fn for_class(&self, class: Cap2Class) -> Permission {
+        match class {
+            Cap2Class::Capability2 => Capability2Permission::Common(self.clone()).into(),
         }
     }
 }

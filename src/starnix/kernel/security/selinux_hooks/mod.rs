@@ -419,7 +419,7 @@ macro_rules! TODO_DENY {
 }
 
 /// Perform the specified check as would `check_permission()`, but report denials as "todo_deny" in
-/// the audit output, without actually denying access.fx build
+/// the audit output, without actually denying access.
 pub(super) fn todo_check_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
     todo_deny: TodoDeny,
     permission_check: &PermissionCheck<'_>,
@@ -1300,10 +1300,10 @@ fn check_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
 }
 
 /// Checks that `subject_sid` has the specified process `permission` on `self`.
-fn check_self_permission(
+fn check_self_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
     permission_check: &PermissionCheck<'_>,
     subject_sid: SecurityId,
-    permission: ProcessPermission,
+    permission: P,
 ) -> Result<(), Errno> {
     check_permission(permission_check, subject_sid, subject_sid, permission)
 }
