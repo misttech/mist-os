@@ -93,6 +93,20 @@ shadow_call_sp .req x18
 #endif
 .endm
 
+.macro stp.spill reg1, reg2
+  stp \reg1, \reg2, [sp, #-16]!
+  .cfi_adjust_cfa_offset 16
+  .cfi_rel_offset \reg1, 0
+  .cfi_rel_offset \reg2, 8
+.endm
+
+.macro ldp.reload reg1, reg2
+  ldp \reg1, \reg2, [sp], #16
+  .cfi_adjust_cfa_offset -16
+  .cfi_same_value \reg1
+  .cfi_same_value \reg2
+.endm
+
 /// Fill a register with a wide integer literal.
 ///
 /// This emits the one to four instructions required to fill a 64-bit

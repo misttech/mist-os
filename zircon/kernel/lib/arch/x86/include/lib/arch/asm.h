@@ -57,6 +57,18 @@
   .cfi_adjust_cfa_offset -SIZEOF_LP
 .endm
 
+.macro push.spill reg
+  pushq \reg
+  .cfi_adjust_cfa_offset 8
+  .cfi_rel_offset \reg, 0
+.endm
+
+.macro pop.reload reg
+  popq \reg
+  .cfi_adjust_cfa_offset -8
+  .cfi_same_value \reg
+.endm
+
 #endif  // clang-format on
 
 #endif  // ZIRCON_KERNEL_LIB_ARCH_X86_INCLUDE_LIB_ARCH_ASM_H_

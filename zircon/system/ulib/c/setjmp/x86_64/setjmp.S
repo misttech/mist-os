@@ -2,43 +2,48 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "asm.h"
-#include "setjmp_impl.h"
+#include <lib/arch/asm.h>
 #include <zircon/tls.h>
 
-ENTRY(setjmp)
+#include "setjmp_impl.h"
 
-    // Copy the values that need mangling into temporaries.
-    mov (%rsp), %rax                            // PC
-    mov %rsp, %rcx                              // SP
-    mov %rbp, %rdx                              // FP
-    mov %fs:ZX_TLS_UNSAFE_SP_OFFSET, %rsi       // Unsafe SP
+.macro mangle index, reg
+  xor __setjmp_manglers+8*\index(%rip), \reg
+.endm
 
-    // Store all the vanilla callee-saves registers.
-    mov %rbx, 8*JB_RBX(%rdi)
-    mov %r12, 8*JB_R12(%rdi)
-    mov %r13, 8*JB_R13(%rdi)
-    mov %r14, 8*JB_R14(%rdi)
-    mov %r15, 8*JB_R15(%rdi)
+.function setjmp, export
 
-    // Mangle each temporary.
-    xor __setjmp_manglers+8*JB_PC(%rip), %rax
-    xor __setjmp_manglers+8*JB_SP(%rip), %rcx
-    xor __setjmp_manglers+8*JB_FP(%rip), %rdx
-    xor __setjmp_manglers+8*JB_USP(%rip), %rsi
+  // Copy the values that need mangling into temporaries.
+  mov (%rsp), %rax                            // PC
+  mov %rsp, %rcx                              // SP
+  mov %rbp, %rdx                              // FP
+  mov %fs:ZX_TLS_UNSAFE_SP_OFFSET, %rsi       // Unsafe SP
 
-    // Store the mangled values.
-    mov %rax, 8*JB_PC(%rdi)
-    mov %rcx, 8*JB_SP(%rdi)
-    mov %rdx, 8*JB_FP(%rdi)
-    mov %rsi, 8*JB_USP(%rdi)
+  // Store all the vanilla callee-saves registers.
+  mov %rbx, 8*JB_RBX(%rdi)
+  mov %r12, 8*JB_R12(%rdi)
+  mov %r13, 8*JB_R13(%rdi)
+  mov %r14, 8*JB_R14(%rdi)
+  mov %r15, 8*JB_R15(%rdi)
 
-    // %rax = 0
-    xor %eax, %eax
+  // Mangle each temporary.
+  mangle JB_PC, %rax
+  mangle JB_SP, %rcx
+  mangle JB_FP, %rdx
+  mangle JB_USP, %rsi
 
-    ret
+  // Store the mangled values.
+  mov %rax, 8*JB_PC(%rdi)
+  mov %rcx, 8*JB_SP(%rdi)
+  mov %rdx, 8*JB_FP(%rdi)
+  mov %rsi, 8*JB_USP(%rdi)
 
-END(setjmp)
+  // %rax = 0
+  xor %eax, %eax
 
-ALIAS(setjmp, _setjmp)
-WEAK_ALIAS(setjmp, sigsetjmp)
+  ret
+
+.end_function
+
+.label _setjmp, export, function, setjmp
+.label sigsetjmp, weak, function, setjmp
