@@ -66,22 +66,3 @@ link_output_rspfile("ctf_unstripped_binaries_list") {
     ":tests",
   ]
 }
-
-action("fidl_mangled_to_api_mapping") {
-  testonly = true
-  sources = [ ctf_unstripped_binaries_file ]
-  deps = [ ":ctf_unstripped_binaries_list" ]
-  script = "//sdk/ctf/build/scripts/fidl_api_mapper.py"
-  depfile = "$target_gen_dir/$target_name.dd"
-  outputs = [ "$root_out_dir/fidl_mangled_to_api_mapping.json" ]
-  args = [
-    "--input",
-    rebase_path(sources[0], root_build_dir),
-    "--output",
-    rebase_path(outputs[0], root_build_dir),
-    "--depfile",
-    rebase_path(depfile, root_build_dir),
-    "--dwarfdump",
-    rebase_path("$clang_prefix/llvm-dwarfdump", root_build_dir),
-  ]
-}
