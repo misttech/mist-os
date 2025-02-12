@@ -33,6 +33,37 @@
             from: "parent",
             to: "#kernel",
         },
+        {
+            protocol: [
+                "fuchsia.diagnostics.ArchiveAccessor",
+                "fuchsia.feedback.CrashReporter",
+                "fuchsia.starnix.psi.PsiProvider",
+                "fuchsia.starnix.runner.Manager",
+                "fuchsia.sysmem2.Allocator",
+                "fuchsia.time.alarms.Wake",
+                "fuchsia.tracing.provider.Registry",
+                "fuchsia.ui.composition.Allocator",
+                "fuchsia.ui.composition.Flatland",
+                "fuchsia.ui.display.singleton.Info",
+                "fuchsia.ui.input3.Keyboard",
+                "fuchsia.ui.policy.DeviceListenerRegistry",
+            ],
+            from: "void",
+            to: "#kernel",
+            availability: "optional",
+        },
+        {
+            protocol: [ "fuchsia.session.power.Handoff" ],
+            from: "void",
+            to: "#debian_container",
+            availability: "optional",
+        },
+        {
+            directory: "dev-gpu",
+            from: "void",
+            to: "#kernel",
+            availability: "optional",
+        },
     ],
     expose: [
         {
