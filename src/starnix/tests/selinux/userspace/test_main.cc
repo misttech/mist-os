@@ -11,12 +11,14 @@
 extern void RunTest();
 
 void PrepareTestEnvironment() {
-  ASSERT_SUCCESS(mkdir("/sys", 0755));
-  ASSERT_SUCCESS(mkdir("/proc", 0755));
-  ASSERT_SUCCESS(mount("proc", "/proc", "proc", MS_NOEXEC | MS_NOSUID | MS_NODEV, 0));
-  ASSERT_SUCCESS(mount("sysfs", "/sys", "sysfs", MS_NOEXEC | MS_NOSUID | MS_NODEV, 0));
-  ASSERT_SUCCESS(
-      mount("selinuxfs", "/sys/fs/selinux", "selinuxfs", MS_NOEXEC | MS_NOSUID, nullptr));
+  EXPECT_THAT(mkdir("/sys", 0755), SyscallSucceeds());
+  EXPECT_THAT(mkdir("/proc", 0755), SyscallSucceeds());
+  EXPECT_THAT(mount("proc", "/proc", "proc", MS_NOEXEC | MS_NOSUID | MS_NODEV, 0),
+              SyscallSucceeds());
+  EXPECT_THAT(mount("sysfs", "/sys", "sysfs", MS_NOEXEC | MS_NOSUID | MS_NODEV, 0),
+              SyscallSucceeds());
+  EXPECT_THAT(mount("selinuxfs", "/sys/fs/selinux", "selinuxfs", MS_NOEXEC | MS_NOSUID, nullptr),
+              SyscallSucceeds());
 }
 
 // Wrap running the test function in a gtest test to get access to the nice EXPECT/ASSERT magic.

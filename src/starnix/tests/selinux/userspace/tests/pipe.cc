@@ -18,9 +18,11 @@ void RunTest() {
   WriteContents("/proc/thread-self/attr/current", "system_u:object_r:unlabeled_t:s0");
 
   int ends[2];
-  ASSERT_SUCCESS(pipe(ends));
+  EXPECT_THAT(pipe(ends), SyscallSucceeds());
 
-  char label[256];
-  ASSERT_SUCCESS(fgetxattr(ends[0], "security.selinux", label, sizeof(label)));
+  char label[256] = {};
+  // TODO: https://fxbug.dev/395625171 - This ignores the final '\0' added by Linux. Instead, we
+  // ensure that zero-initialized, leave a '\0' at the end and treat the string as null-terminated.
+  EXPECT_THAT(fgetxattr(ends[0], "security.selinux", label, sizeof(label) - 1), SyscallSucceeds());
   EXPECT_EQ(std::string(label), "system_u:object_r:unlabeled_t:s0");
 }
