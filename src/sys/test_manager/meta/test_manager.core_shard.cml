@@ -422,11 +422,7 @@
 
         // Profiling tests need access to the ktrace data
         {
-            protocol: [
-                "fuchsia.kernel.Counter",
-                "fuchsia.tracing.kernel.Controller",
-                "fuchsia.tracing.kernel.Reader",
-            ],
+            protocol: [ "fuchsia.kernel.Counter" ],
             from: "parent",
             to: "#test_manager",
             availability: "same_as_target",

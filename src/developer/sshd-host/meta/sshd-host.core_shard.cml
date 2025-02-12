@@ -118,8 +118,6 @@
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.thermal.ClientStateConnector",
                 "fuchsia.time.Maintenance",
-                "fuchsia.tracing.kernel.Controller",
-                "fuchsia.tracing.kernel.Reader",
             ],
             from: "parent",
             to: "#sshd-host",

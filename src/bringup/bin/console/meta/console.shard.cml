@@ -153,8 +153,6 @@
             protocol: [
                 "fuchsia.kernel.Counter",
                 "fuchsia.kernel.DebugBroker",
-                "fuchsia.tracing.kernel.Controller",
-                "fuchsia.tracing.kernel.Reader",
             ],
             from: "#kernel_debug_broker",
             to: "#console-launcher",

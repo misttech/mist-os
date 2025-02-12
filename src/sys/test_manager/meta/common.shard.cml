@@ -600,11 +600,7 @@
 
         // CPU Profiling tests require access to ktrace data to parse results
         {
-            protocol: [
-                "fuchsia.kernel.Counter",
-                "fuchsia.tracing.kernel.Controller",
-                "fuchsia.tracing.kernel.Reader",
-            ],
+            protocol: [ "fuchsia.kernel.Counter" ],
             from: "parent",
             to: [ "#system-tests" ],
             availability: "same_as_target",

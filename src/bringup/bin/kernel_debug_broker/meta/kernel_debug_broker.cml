@@ -15,8 +15,6 @@
             protocol: [
                 "fuchsia.kernel.Counter",
                 "fuchsia.kernel.DebugBroker",
-                "fuchsia.tracing.kernel.Controller",
-                "fuchsia.tracing.kernel.Reader",
             ],
         },
     ],
@@ -38,8 +36,6 @@
             protocol: [
                 "fuchsia.kernel.Counter",
                 "fuchsia.kernel.DebugBroker",
-                "fuchsia.tracing.kernel.Controller",
-                "fuchsia.tracing.kernel.Reader",
             ],
             from: "self",
         },

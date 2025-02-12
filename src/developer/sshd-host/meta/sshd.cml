@@ -182,8 +182,6 @@
                 "fuchsia.sysmem2.Allocator",
                 "fuchsia.thermal.ClientStateConnector",
                 "fuchsia.time.Maintenance",
-                "fuchsia.tracing.kernel.Controller",
-                "fuchsia.tracing.kernel.Reader",
                 "fuchsia.ui.activity.control.Control",
                 "fuchsia.ui.activity.Provider",
                 "fuchsia.update.CommitStatusProvider",

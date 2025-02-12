@@ -186,7 +186,6 @@
             protocol: [
                 "fuchsia.kernel.Counter",
                 "fuchsia.kernel.DebugBroker",
-                "fuchsia.tracing.kernel.Controller",
             ],
 
             // The source of this protocol, kernel_debug_broker,
