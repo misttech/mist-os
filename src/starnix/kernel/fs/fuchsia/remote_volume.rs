@@ -117,8 +117,15 @@ pub fn new_remote_vol(
 
     volume_provider
         .mount(crypt_client_end, exposed_dir_server, zx::MonotonicInstant::INFINITE)
-        .map_err(|_| errno!(ENOENT))?
-        .map_err(|_| errno!(EIO))?;
+        .map_err(|e| {
+            log_error!("FIDL transport error on StarnixVolumeProvider.Mount {:?}", e);
+            errno!(ENOENT)
+        })?
+        .map_err(|e| {
+            let err = from_status_like_fdio!(zx::Status::from_raw(e));
+            log_error!("StarnixVolumeProvider.Mount failed with {:?}", err);
+            err
+        })?;
 
     let root = syncio::directory_open_directory_async(
         &exposed_dir_client_end.into_sync_proxy(),
