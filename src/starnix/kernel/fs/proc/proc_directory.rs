@@ -4,6 +4,7 @@
 
 use crate::device::DeviceMode;
 use crate::fs::proc::cgroups::cgroups_node;
+use crate::fs::proc::cmdline::cmdline_node;
 use crate::fs::proc::cpuinfo::CpuinfoFile;
 use crate::fs::proc::device_tree::device_tree_node;
 use crate::fs::proc::devices::devices_node;
@@ -64,15 +65,7 @@ impl ProcDirectory {
                 CpuinfoFile::new_node(),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
-            "cmdline".into() => {
-                let mut cmdline = Vec::from(kernel.cmdline.clone());
-                cmdline.push(b'\n');
-                fs.create_node(
-                    current_task,
-                    BytesFile::new_node(cmdline),
-                    FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-                )
-            },
+            "cmdline".into() => cmdline_node(current_task, fs),
             "devices".into() => devices_node(current_task, fs),
             "device-tree".into() => device_tree_node(current_task, fs),
             "self".into() => self_node(current_task, fs),
