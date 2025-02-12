@@ -4,7 +4,7 @@
 
 //! AES cryptography.
 //!
-//! This module exposes AES primitives provided by `boringssl-sys`. Namely, RSN requires the AES
+//! This module exposes AES primitives provided by `bssl-sys`. Namely, RSN requires the AES
 //! cipher for protocols employing RFC 3394 AES key wrapping and RFC 4493 AES-CMAC.
 //!
 //! # Security
