@@ -46,7 +46,7 @@ bincode = "1.3"
 bit-set = "0.5.3"
 bit-vec = { version = "0.6.3", features = [ "serde" ] }
 bitfield = "0.14.0"
-bitflags = { version = "2.7.0", features = ["serde"] }
+bitflags = { version = "2.8.0", features = ["serde"] }
 blocking = "1.0.2"
 bstr = { version = "1.5.0", default-features = false, features = [ "std" ] }
 bumpalo = { version = "3.2.1", features = [ "collections" ] }
@@ -509,7 +509,7 @@ env_vars = [
 visibility = [":*", "//third_party/alacritty/alacritty_terminal:*" ]
 reviewed_features = ["default"]
 
-[gn.package.bitflags."2.7.0"]
+[gn.package.bitflags."2.8.0"]
 reviewed_features = ["serde"]
 
 # The unicode feature is excluded so we don't need to spend time auditing it.
