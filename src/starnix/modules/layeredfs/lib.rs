@@ -9,7 +9,7 @@ use starnix_core::vfs::{
     fileops_impl_directory, fileops_impl_noop_sync, fs_node_impl_dir_readonly, unbounded_seek,
     CacheMode, DirectoryEntryType, DirentSink, FileHandle, FileObject, FileOps, FileSystem,
     FileSystemHandle, FileSystemOps, FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString, MountInfo,
-    SeekTarget,
+    SeekTarget, ValueOrSize, XattrOp,
 };
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::errors::Errno;
@@ -100,6 +100,63 @@ impl FsNodeOps for LayeredNodeOps {
         } else {
             self.fs.base_fs.root().node.lookup(locked, current_task, &MountInfo::detached(), name)
         }
+    }
+
+    fn get_xattr(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _node: &FsNode,
+        current_task: &CurrentTask,
+        name: &FsStr,
+        max_size: usize,
+    ) -> Result<ValueOrSize<FsString>, Errno> {
+        self.fs.base_fs.root().node.ops().get_xattr(
+            locked,
+            &*self.fs.base_fs.root().node,
+            current_task,
+            name,
+            max_size,
+        )
+    }
+
+    /// Set an extended attribute on the node.
+    fn set_xattr(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _node: &FsNode,
+        current_task: &CurrentTask,
+        name: &FsStr,
+        value: &FsStr,
+        op: XattrOp,
+    ) -> Result<(), Errno> {
+        self.fs.base_fs.root().node.set_xattr(
+            locked,
+            current_task,
+            &MountInfo::detached(),
+            name,
+            value,
+            op,
+        )
+    }
+
+    fn remove_xattr(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _node: &FsNode,
+        current_task: &CurrentTask,
+        name: &FsStr,
+    ) -> Result<(), Errno> {
+        self.fs.base_fs.root().node.remove_xattr(locked, current_task, &MountInfo::detached(), name)
+    }
+
+    fn list_xattrs(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _node: &FsNode,
+        current_task: &CurrentTask,
+        max_size: usize,
+    ) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
+        self.fs.base_fs.root().node.list_xattrs(locked, current_task, max_size)
     }
 }
 
