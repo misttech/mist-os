@@ -160,6 +160,11 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   const inspect::Inspector& inspector() const { return inspector_; }
 
   size_t ImportedImagesCountForTesting() const;
+
+  // Identifies the most recent completely applied display configuration.
+  //
+  // The returned stamp is updated after the display engine driver acknowledges
+  // having applied the configuration.
   display::DriverConfigStamp last_applied_driver_config_stamp() const;
 
   // Typically called by OpenController/OpenVirtconController. However, this is made public

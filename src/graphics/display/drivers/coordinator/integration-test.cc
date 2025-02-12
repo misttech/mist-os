@@ -1012,14 +1012,17 @@ class IntegrationTest : public TestBase {
   // |TestBase|
   void SetUp() override {
     TestBase::SetUp();
-    auto sysmem = fidl::SyncClient(ConnectToSysmemAllocatorV2());
-    EXPECT_TRUE(sysmem.is_valid());
+    fidl::SyncClient sysmem_client(ConnectToSysmemAllocatorV2());
+    EXPECT_TRUE(sysmem_client.is_valid());
+
     fuchsia_sysmem2::AllocatorSetDebugClientInfoRequest request;
     request.name() = fsl::GetCurrentProcessName();
     request.id() = fsl::GetCurrentProcessKoid();
-    auto set_debug_result = sysmem->SetDebugClientInfo(std::move(request));
+    fit::result<fidl::OneWayStatus> set_debug_result =
+        sysmem_client->SetDebugClientInfo(std::move(request));
     EXPECT_TRUE(set_debug_result.is_ok());
-    sysmem_client_ = fidl::WireSyncClient<fuchsia_sysmem2::Allocator>(sysmem.TakeClientEnd());
+    sysmem_client_ =
+        fidl::WireSyncClient<fuchsia_sysmem2::Allocator>(sysmem_client.TakeClientEnd());
   }
 
   // |TestBase|
@@ -1794,9 +1797,9 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   EXPECT_EQ(kImageWithoutFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(2u, primary_client->state().vsync_count());
 
-  // Present an image layer with a wait event that's not signaled (ready) yet. So the
-  // configuration applied to display device will be still the old one. VSync events
-  // must report the previously applied config stamp.
+  // Present an image layer whose image is not ready yet. The Display
+  // Coordinator must wait on the fence. VSync events must report the previous
+  // configuration.
   static constexpr display::ConfigStamp kImageWithFenceConfigStamp(3);
   ASSERT_OK(primary_client->ApplyLayers(kImageWithFenceConfigStamp,
                                         {{.layer_id = layer1_id,
@@ -1809,18 +1812,17 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   EXPECT_EQ(kImageWithoutFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(3u, primary_client->state().vsync_count());
 
-  // Signal the event. Display Fence callback will be signaled, and new
-  // configuration with new config stamp (config_stamp_2) will be used.
-  // On next Vsync, the |presented_config_stamp| will be updated.
-  auto old_controller_stamp = CoordinatorController()->last_applied_driver_config_stamp();
+  // Signal the event, marking the image ready. The Coordinator must apply the
+  // configuration kImageWithFenceConfigStamp, which includes the image that is
+  // now ready. Once the configuration is applied, the next VSync must reflect
+  // it.
+  display::DriverConfigStamp image_without_fence_driver_config_stamp =
+      CoordinatorController()->last_applied_driver_config_stamp();
   image_ready_fence.event.signal(0u, ZX_EVENT_SIGNALED);
-  ASSERT_TRUE(PollUntilOnLoop([controller = CoordinatorController(), old_controller_stamp]() {
-    return controller->last_applied_driver_config_stamp() > old_controller_stamp;
+  ASSERT_TRUE(PollUntilOnLoop([&]() {
+    return CoordinatorController()->last_applied_driver_config_stamp() >
+           image_without_fence_driver_config_stamp;
   }));
-  // TODO(https://fxbug.dev/388885807): The check above is racy. Although the
-  // Coordinator processed the new configuration, there is no guarantee that it
-  // was submitted to the display engine driver. The raciness will get worse
-  // when we migrate from Banjo to FIDL.
 
   ASSERT_EQ(3u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
@@ -1898,9 +1900,9 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   EXPECT_EQ(kImageWithoutFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(2u, primary_client->state().vsync_count());
 
-  // Present another image layer; but the image is not ready yet. Display
-  // controller will wait on the fence and Vsync will return the previous
-  // configuration instead.
+  // Present an image layer whose image is not ready yet. The Display
+  // Coordinator must wait on the event. VSync events must report the previous
+  // configuration.
   static constexpr display::ConfigStamp kImageWithFenceConfigStamp(3);
   ASSERT_OK(primary_client->ApplyLayers(kImageWithFenceConfigStamp,
                                         {{.layer_id = layer1_id,
@@ -1913,8 +1915,9 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   EXPECT_EQ(kImageWithoutFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(3u, primary_client->state().vsync_count());
 
-  // Hide the image layer. Display controller will not care about the fence
-  // and thus use the latest configuration stamp.
+  // Replace the image layer with a solid color fill layer. The Coordinator must
+  // "skip over" the image layer that is not ready, and apply the configuration
+  // with the color layer.
   static constexpr display::ConfigStamp kNoImageConfigStamp(4);
   ASSERT_OK(primary_client->ApplyLayers(kNoImageConfigStamp, {{.layer_id = color_layer_id}}));
 
@@ -2000,7 +2003,7 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
   EXPECT_EQ(1u, primary_client->state().vsync_count());
 
   // Present an image layer whose image is not ready yet. The Display
-  // Coordinator must wait on the fence. VSync events must report the previous
+  // Coordinator must wait on the event. VSync events must report the previous
   // configuration.
   static constexpr display::ConfigStamp kImageWithFence1ConfigStamp(3);
   ASSERT_OK(primary_client->ApplyLayers(kImageWithFence1ConfigStamp,
@@ -2029,14 +2032,16 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
   EXPECT_EQ(kImageWithoutFenceConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(3u, primary_client->state().vsync_count());
 
-  // Signal the second image's event. VSync events must report the second
-  // image's configuration.
-  display::DriverConfigStamp previous_driver_config_stamp =
+  // Signal the second image's event. The Coordinator must "skip over" the
+  // configuration that includes the first image, and apply the configuration
+  // that includes the second image. Once the configuration is applied, the next
+  // VSync must reflect it.
+  display::DriverConfigStamp image_without_fence_driver_config_stamp =
       CoordinatorController()->last_applied_driver_config_stamp();
   image_ready_fence2.event.signal(0u, ZX_EVENT_SIGNALED);
   ASSERT_TRUE(PollUntilOnLoop([&]() {
     return CoordinatorController()->last_applied_driver_config_stamp() >
-           previous_driver_config_stamp;
+           image_without_fence_driver_config_stamp;
   }));
 
   ASSERT_EQ(3u, primary_client->state().vsync_count());
@@ -2045,14 +2050,27 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
   EXPECT_EQ(kImageWithFence2ConfigStamp, primary_client->state().last_vsync_config_stamp());
   EXPECT_EQ(4u, primary_client->state().vsync_count());
 
-  // Signal the event #0. Since we have displayed a newer image, signaling the
+  // Signal the first image's event. Since we have displayed a newer image, signaling the
   // old event associated with the old image shouldn't trigger ReapplyConfig().
   // We should still see |apply_config_stamp_2| as the latest presented config
   // stamp in the client.
-  previous_driver_config_stamp = CoordinatorController()->last_applied_driver_config_stamp();
+  display::DriverConfigStamp image_with_fence2_driver_config_stamp =
+      CoordinatorController()->last_applied_driver_config_stamp();
   image_ready_fence1.event.signal(0u, ZX_EVENT_SIGNALED);
-  // TODO(https://fxbug.dev/388885807): This test is racy. There's no guarantee
-  // that the fence's ready event was processed by the Display Coordinator.
+
+  // TODO(https://fxbug.dev/388885807): This check can have a false positive
+  // pass, due to using a hard-coded timeout.
+  {
+    zx::time deadline = zx::deadline_after(zx::sec(1));
+    PollUntilOnLoop([&]() {
+      if (zx::clock::get_monotonic() >= deadline)
+        return true;
+      return CoordinatorController()->last_applied_driver_config_stamp() >
+             image_with_fence2_driver_config_stamp;
+    });
+  }
+  EXPECT_EQ(image_with_fence2_driver_config_stamp,
+            CoordinatorController()->last_applied_driver_config_stamp());
 
   ASSERT_EQ(4u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
