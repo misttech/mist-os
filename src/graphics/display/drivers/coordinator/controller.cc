@@ -346,8 +346,8 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
       info->pending_layer_change_driver_config_stamp = display::kInvalidDriverConfigStamp;
       info->switching_client = false;
 
-      if (active_client_ && info->delayed_apply) {
-        active_client_->ReapplyConfig();
+      if (client_owning_displays_ && info->delayed_apply) {
+        client_owning_displays_->ReapplyConfig();
       }
     }
   }
@@ -578,12 +578,12 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
     applied_layer_stamp_ = layer_stamp;
     applied_client_id_ = client_id;
 
-    if (active_client_) {
+    if (client_owning_displays_ != nullptr) {
       if (switching_client) {
-        active_client_->ReapplySpecialConfigs();
+        client_owning_displays_->ReapplySpecialConfigs();
       }
 
-      active_client_->UpdateConfigStampMapping({
+      client_owning_displays_->UpdateConfigStampMapping({
           .driver_stamp = driver_config_stamp,
           .client_stamp = client_config_stamp,
       });
@@ -627,22 +627,22 @@ void Controller::SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode virt
 }
 
 void Controller::HandleClientOwnershipChanges() {
-  ClientProxy* new_active;
+  ClientProxy* new_client_owning_displays;
   if (virtcon_mode_ == fidl_display::wire::VirtconMode::kForced ||
       (virtcon_mode_ == fidl_display::wire::VirtconMode::kFallback && primary_client_ == nullptr)) {
-    new_active = virtcon_client_;
+    new_client_owning_displays = virtcon_client_;
   } else {
-    new_active = primary_client_;
+    new_client_owning_displays = primary_client_;
   }
 
-  if (new_active != active_client_) {
-    if (active_client_) {
-      active_client_->SetOwnership(false);
+  if (new_client_owning_displays != client_owning_displays_) {
+    if (client_owning_displays_ != nullptr) {
+      client_owning_displays_->SetOwnership(false);
     }
-    if (new_active) {
-      new_active->SetOwnership(true);
+    if (new_client_owning_displays) {
+      new_client_owning_displays->SetOwnership(true);
     }
-    active_client_ = new_active;
+    client_owning_displays_ = new_client_owning_displays;
   }
 }
 

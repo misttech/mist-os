@@ -944,7 +944,7 @@ class IntegrationTest : public TestBase {
 
   void SendVsyncAfterUnbind(std::unique_ptr<TestFidlClient> client, display::DisplayId display_id) {
     fbl::AutoLock<fbl::Mutex> controller_lock(CoordinatorController()->mtx());
-    ClientProxy* client_proxy = CoordinatorController()->active_client_;
+    ClientProxy* client_proxy = CoordinatorController()->client_owning_displays_;
 
     // Resetting the client will *start* client tear down.
     //
@@ -952,7 +952,7 @@ class IntegrationTest : public TestBase {
     // threading model of its fidl server binding), but that doesn't sync with the client end
     // (intentionally).
     client.reset();
-    ZX_ASSERT_MSG(CoordinatorController()->active_client_ == client_proxy,
+    ZX_ASSERT_MSG(CoordinatorController()->client_owning_displays_ == client_proxy,
                   "The display owner changed while holding the controller mutex");
     EXPECT_OK(
         sync_completion_wait(client_proxy->FidlUnboundCompletionForTesting(), zx::sec(1).get()));
@@ -969,8 +969,8 @@ class IntegrationTest : public TestBase {
 
   void SendVsyncFromCoordinatorClientProxy() {
     fbl::AutoLock<fbl::Mutex> controller_lock(CoordinatorController()->mtx());
-    CoordinatorController()->active_client_->OnDisplayVsync(display::kInvalidDisplayId, 0,
-                                                            display::kInvalidDriverConfigStamp);
+    CoordinatorController()->client_owning_displays_->OnDisplayVsync(
+        display::kInvalidDisplayId, 0, display::kInvalidDriverConfigStamp);
   }
 
   void SendVsyncFromDisplayEngine() { FakeDisplayEngine().SendVsync(); }

@@ -226,7 +226,7 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   ClientId next_client_id_ __TA_GUARDED(mtx()) = ClientId(1);
 
   // Pointers to instances owned by `clients_`.
-  ClientProxy* active_client_ __TA_GUARDED(mtx()) = nullptr;
+  ClientProxy* client_owning_displays_ __TA_GUARDED(mtx()) = nullptr;
   ClientProxy* virtcon_client_ __TA_GUARDED(mtx()) = nullptr;
   ClientProxy* primary_client_ __TA_GUARDED(mtx()) = nullptr;
 
