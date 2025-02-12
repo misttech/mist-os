@@ -90,6 +90,7 @@ const std::unordered_map<std::string_view, ServiceEntry> kClassNameToService = {
     {"goldfish-pipe",
      {ServiceEntry::kDevfs, "", ""}},  // Protocol:  "fuchsia.hardware.goldfish.PipeDevice",
     {"goldfish-sync", {ServiceEntry::kDevfs, "", ""}},
+    {"gpio", {ServiceEntry::kDevfs, "", ""}},
     {"gpu-dependency-injection", {ServiceEntry::kDevfs, "", ""}},
     {"gpu-performance-counters", {ServiceEntry::kDevfs, "", ""}},
     {"gpu", {ServiceEntry::kDevfs, "", ""}},
