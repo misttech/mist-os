@@ -20,7 +20,7 @@
       "optionality": "optional",
       "long": "--repository",
       "short": "r",
-      "description": "list packages from this repository.",
+      "description": "list packages from a running repository with this name.",
       "hidden": false
     },
     {
@@ -33,6 +33,18 @@
       "long": "--port",
       "short": "p",
       "description": "repository server port number. Required needed to disambiguate multiple repositories with the same name.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "repo-path"
+        }
+      },
+      "optionality": "optional",
+      "long": "--repo-path",
+      "short": null,
+      "description": "list packages stored in the repository stored on disk.",
       "hidden": false
     },
     {

@@ -19,15 +19,16 @@ use fuchsia_hash::Hash;
 use fuchsia_hyper::new_https_client;
 use fuchsia_pkg::PackageArchiveBuilder;
 use fuchsia_repo::repo_client::{PackageEntry, RepoClient};
-use fuchsia_repo::repository::{PmRepository, RepoProvider};
+use fuchsia_repo::repository::{PmRepository, RepoProvider, RepositorySpec};
 use humansize::{file_size_opts, FileSize};
 use pkg::repo::repo_spec_to_backend;
 use pkg::{PkgServerInstanceInfo as _, PkgServerInstances};
 use prettytable::format::{FormatBuilder, TableFormat};
 use prettytable::{cell, row, Row, Table};
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::fs::File;
 use std::io::{BufWriter, Cursor, Read};
+use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
 const MAX_HASH: usize = 11;
@@ -70,6 +71,12 @@ pub struct RepositoryPackage {
     entries: Option<Vec<PackageEntry>>,
 }
 
+pub(crate) enum RepoIdArgs {
+    Name(String, Option<u16>),
+    Path(PathBuf),
+    Default,
+}
+
 async fn packages_impl(
     cmd: PackagesCommand,
     context: EnvironmentContext,
@@ -87,9 +94,16 @@ async fn show_impl(
     context: EnvironmentContext,
     writer: &mut PackagesWriter,
 ) -> Result<()> {
-    let repo = connect_to_repo(cmd.repository.clone(), cmd.port, context)
-        .await
-        .context("connect to repo")?;
+    let repo_id = match (&cmd.repository, &cmd.repo_path) {
+        (Some(name), None) => RepoIdArgs::Name(name.clone(), cmd.port.clone()),
+        (None, Some(path)) => RepoIdArgs::Path(path.clone()),
+        (None, None) => RepoIdArgs::Default,
+        _ => anyhow::bail!(
+            "Invalid options: Specify either `--repository` or `--repo-path`, not both."
+        ),
+    };
+
+    let repo = connect_to_repo(repo_id, context).await.context("connect to repo")?;
 
     let Some(mut blobs) = repo
         .show_package(&cmd.package, cmd.include_subpackages)
@@ -166,12 +180,18 @@ async fn list_impl(
     context: EnvironmentContext,
     writer: &mut PackagesWriter,
 ) -> Result<()> {
-    let repo = connect_to_repo(cmd.repository.clone(), cmd.port, context)
-        .await
-        .context("connect to repo")?;
+    let repo_id = match (&cmd.repository, &cmd.repo_path) {
+        (Some(name), None) => RepoIdArgs::Name(name.clone(), cmd.port.clone()),
+        (None, Some(path)) => RepoIdArgs::Path(path.clone()),
+        (None, None) => RepoIdArgs::Default,
+        _ => anyhow::bail!(
+            "Invalid options: Specify either `--repository` or `--repo-path`, not both."
+        ),
+    };
+    let repo = connect_to_repo(repo_id, context).await.context("connect to repo")?;
 
     let mut packages = vec![];
-    for package in repo.list_packages().await? {
+    for package in repo.list_packages().await.context("listing packages")? {
         let mut package = RepositoryPackage {
             name: package.name,
             hash: package.hash.to_string(),
@@ -293,36 +313,62 @@ fn to_rfc2822(time: SystemTime) -> String {
 }
 
 async fn connect_to_repo(
-    repo_name: Option<String>,
-    repo_port: Option<u16>,
+    repo_id: RepoIdArgs,
     context: EnvironmentContext,
 ) -> Result<RepoClient<Box<dyn RepoProvider>>> {
     // If we specified a repository on the CLI, try to look up its repository spec.
-    let repo_spec = if let Some(repo_name) = repo_name {
-        // Read repo instances
-        let instance_root = context
-            .get("repository.process_dir")
-            .map_err(|e: ffx_config::api::ConfigError| bug!(e))?;
-        let mgr = PkgServerInstances::new(instance_root);
-        if let Some(info) = mgr
-            .get_instance(repo_name.clone(), repo_port)
-            .with_context(|| format!("Getting server instance for {repo_name}"))?
-        {
-            Some(info.repo_spec())
-        } else if let Some(repo_spec) = pkg::config::get_repository(&repo_name)
-            .with_context(|| format!("Finding repo spec for {repo_name}"))?
-        {
-            Some(repo_spec)
-        } else {
-            ffx_bail!("No configuration found for {repo_name}")
+    let repo_spec = match repo_id {
+        RepoIdArgs::Name(repo_name, repo_port) => {
+            if let Some(spec) =
+                repo_spec_from_running_server(&context, repo_name.clone(), repo_port)?
+            {
+                Some(spec)
+            } else {
+                let spec = pkg::config::get_repository(&repo_name)
+                    .with_context(|| format!("Finding repo spec for {repo_name}"))?;
+                if spec.is_none() {
+                    ffx_bail!("No configuration found for {repo_name}")
+                }
+                spec
+            }
         }
-    } else if let Some(repo_name) = pkg::config::get_default_repository().await? {
-        // Otherwise, check if the default repository exists. Don't error out if
-        // it doesn't.
-        pkg::config::get_repository(&repo_name)
-            .with_context(|| format!("Finding repo spec for {repo_name}"))?
-    } else {
-        None
+        RepoIdArgs::Path(path_buf) => {
+            let path_buf = Utf8Path::from_path(&path_buf)
+                .with_context(|| format!("converting repo path to UTF-8 {:?}", path_buf))?;
+            let metadata = path_buf.join("repository");
+            if metadata.exists() {
+                // Get the blobs
+                let blobs = path_buf.join("blobs");
+                if blobs.exists() {
+                    Some(RepositorySpec::FileSystem {
+                        metadata_repo_path: metadata,
+                        blob_repo_path: blobs.into(),
+                        aliases: BTreeSet::new(),
+                    })
+                } else {
+                    Some(RepositorySpec::Pm { path: path_buf.into(), aliases: BTreeSet::new() })
+                }
+            } else {
+                ffx_bail!("repo_path {path_buf:?} does not exist")
+            }
+        }
+        RepoIdArgs::Default => {
+            if let Some(repo_name) = pkg::config::get_default_repository().await? {
+                // Otherwise, check if the default repository exists. Don't error out if
+                // it doesn't.
+                if let Some(spec) =
+                    repo_spec_from_running_server(&context, repo_name.clone(), None)?
+                {
+                    Some(spec)
+                } else {
+                    // return None here too, so we can fall through and check the in-tree case.
+                    pkg::config::get_repository(&repo_name)
+                        .with_context(|| format!("Finding repo spec for {repo_name}"))?
+                }
+            } else {
+                None
+            }
+        }
     };
 
     // If we have a repository spec, create a backend for it. Otherwise we'll
@@ -352,13 +398,38 @@ async fn connect_to_repo(
     Ok(repo)
 }
 
+fn repo_spec_from_running_server(
+    context: &EnvironmentContext,
+    repo_name: String,
+    repo_port: Option<u16>,
+) -> Result<Option<RepositorySpec>> {
+    // Read repo instances
+    let instance_root =
+        context.get("repository.process_dir").map_err(|e: ffx_config::api::ConfigError| bug!(e))?;
+    let mgr = PkgServerInstances::new(instance_root);
+    if let Some(info) = mgr
+        .get_instance(repo_name.clone(), repo_port)
+        .with_context(|| format!("Getting server instance for {repo_name}"))?
+    {
+        Ok(Some(info.repo_spec()))
+    } else {
+        Ok(None)
+    }
+}
+
 async fn extract_archive_impl(
     cmd: ExtractArchiveSubCommand,
     context: EnvironmentContext,
 ) -> Result<()> {
-    let repo = connect_to_repo(cmd.repository.clone(), cmd.port, context)
-        .await
-        .context("connect to repo")?;
+    let repo_id = match (&cmd.repository, &cmd.repo_path) {
+        (Some(name), None) => RepoIdArgs::Name(name.clone(), cmd.port.clone()),
+        (None, Some(path)) => RepoIdArgs::Path(path.clone()),
+        (None, None) => RepoIdArgs::Default,
+        _ => anyhow::bail!(
+            "Invalid options: Specify either `--repository` or `--repo-path`, not both."
+        ),
+    };
+    let repo = connect_to_repo(repo_id, context).await.context("connect to repo")?;
 
     let Some(entries) = repo
         .show_package(&cmd.package, true)
@@ -484,6 +555,56 @@ mod test {
     }
 
     #[fasync::run_singlethreaded(test)]
+    async fn test_package_list_repo_path() {
+        let tmp = tempfile::tempdir().unwrap();
+        let env = setup_repo(tmp.path()).await;
+
+        // This test is only testing with daemon based repo.
+        env.context
+            .query("repository.process_dir")
+            .level(Some(ConfigLevel::User))
+            .set(env.isolate_root.path().join("repo_data").to_string_lossy().into())
+            .await
+            .unwrap();
+
+        let test_buffers = run_impl(
+            ListSubCommand {
+                repository: None,
+                port: None,
+                full_hash: false,
+                include_components: false,
+                include_size: false,
+                repo_path: Some(tmp.path().into()),
+            },
+            env.context.clone(),
+        )
+        .await;
+
+        let blobs_path = tmp.path().join("repository/blobs/1");
+
+        let pkg1_hash = &PKG1_HASH[..MAX_HASH];
+        let pkg1_path = blobs_path.join(PKG1_HASH);
+        let pkg1_modified = to_rfc2822(std::fs::metadata(pkg1_path).unwrap().modified().unwrap());
+
+        let pkg2_hash = &PKG2_HASH[..MAX_HASH];
+        let pkg2_path = blobs_path.join(PKG2_HASH);
+        let pkg2_modified = to_rfc2822(std::fs::metadata(pkg2_path).unwrap().modified().unwrap());
+
+        let (stdout, stderr) = test_buffers.into_strings();
+        assert_eq!(
+            stdout,
+            format!(
+                "\
+NAME       HASH        MODIFIED \n\
+package1/0 {pkg1_hash} {pkg1_modified} \n\
+package2/0 {pkg2_hash} {pkg2_modified} \n",
+            ),
+        );
+
+        assert_eq!(stderr, "");
+    }
+
+    #[fasync::run_singlethreaded(test)]
     async fn test_package_list_truncated_hash() {
         let tmp = tempfile::tempdir().unwrap();
         let env = setup_repo(tmp.path()).await;
@@ -503,6 +624,7 @@ mod test {
                 full_hash: false,
                 include_components: false,
                 include_size: false,
+                repo_path: None,
             },
             env.context.clone(),
         )
@@ -552,6 +674,7 @@ package2/0 {pkg2_hash} {pkg2_modified} \n",
                 full_hash: true,
                 include_components: false,
                 include_size: false,
+                repo_path: None,
             },
             env.context.clone(),
         )
@@ -601,6 +724,7 @@ package2/0 {pkg2_hash} {pkg2_modified} \n",
                 full_hash: false,
                 include_components: true,
                 include_size: false,
+                repo_path: None,
             },
             env.context.clone(),
         )
@@ -652,6 +776,7 @@ package2/0 {pkg2_hash} {pkg2_modified} meta/package2.cm \n",
                 full_hash: false,
                 include_components: false,
                 include_size: true,
+                repo_path: None,
             },
             env.context.clone(),
         )
@@ -700,6 +825,7 @@ package2/0 {pkg2_hash} {pkg2_modified} 24.03 KB \n",
             ShowSubCommand {
                 repository: Some("devhost".to_string()),
                 port: None,
+                repo_path: None,
                 full_hash: false,
                 include_subpackages: false,
                 package: "package1/0".to_string(),
@@ -761,6 +887,7 @@ meta/package1.cmx             12 B  <unknown>   {pkg1_modified} \n"
             ShowSubCommand {
                 repository: Some("devhost".to_string()),
                 port: None,
+                repo_path: None,
                 full_hash: true,
                 include_subpackages: false,
                 package: "package1/0".to_string(),
@@ -820,6 +947,7 @@ meta/package1.cmx             12 B  <unknown>                                   
             ShowSubCommand {
                 repository: Some("devhost".to_string()),
                 port: None,
+                repo_path: None,
                 full_hash: false,
                 include_subpackages: true,
                 package: "package1/0".to_string(),
@@ -883,6 +1011,7 @@ meta/package1.cmx             <root>     12 B  <unknown>   {pkg1_modified} \n"
                 out: archive_path.clone(),
                 repository: Some("devhost".to_string()),
                 port: None,
+                repo_path: None,
                 package: "package1/0".to_string(),
             },
             env.context.clone(),
