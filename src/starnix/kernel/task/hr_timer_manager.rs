@@ -316,6 +316,10 @@ impl HrTimerManager {
             // The hrtimer client is responsible for clearing the timer fired
             // signal, so we clear it here right before starting the next
             // timer.
+            //
+            // This sets R=0 to allow wakes since `set_and_wait` above is
+            // already scheduled. Also sets K=1 which acknowledges the wake
+            // proxy FIDL message from the *previous* iteration.
             guard.clear_wake_proxy_signal();
             drop(guard);
 
@@ -365,10 +369,19 @@ impl HrTimerManager {
                     fta::WakeError::Dropped => {
                         fuchsia_trace::duration!(c"alarms", c"alarm:drop");
                         let mut guard = self.lock();
+
+                        // A dropped alarm should be removed from the heap too.
+                        guard.timer_heap.retain(|t| {
+                            !(t.deadline == new_deadline && Arc::ptr_eq(&t.hr_timer, &hrtimer_ref))
+                        });
                         if guard.timer_heap.is_empty() {
                             // Clear the timer event if there are no more timers to start.
                             // Event if the previous timer is an interval, it is stopped
                             // intentionally.
+                            //
+                            // Also acks the Dropped message here (K=1). In case no other
+                            // alarms are incoming, allows outbound messages on the wake
+                            // proxy.
                             guard.clear_wake_proxy_signal();
                         }
                         log_debug!(
