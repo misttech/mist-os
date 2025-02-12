@@ -52,5 +52,6 @@ group("vulkan-tests") {
     "vkpriority",
     "vkreadback",
     "//sdk/ctf/tests/pkg/vulkan:tests",
+    "//third_party/volk:tests",
   ]
 }
