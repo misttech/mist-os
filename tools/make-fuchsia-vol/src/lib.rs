@@ -297,10 +297,10 @@ pub fn run(mut args: TopLevel) -> Result<(), Error> {
     let block_size: u64 = gpt_disk.logical_block_size().clone().into();
 
     let fvm_part = if !args.ramdisk_only && !args.use_fxfs {
-        let size = args.system_disk_size.unwrap_or_else(|| {
+        let avail =
             gpt_disk.find_free_sectors().iter().map(|(_offset, length)| length).max().unwrap()
-                * block_size
-        });
+                * block_size;
+        let size = std::cmp::min(avail, args.system_disk_size.unwrap_or(avail));
         if args.use_sparse_fvm {
             Some(add_partition(&mut gpt_disk, "storage-sparse", size, INSTALLER_GUID)?)
         } else {

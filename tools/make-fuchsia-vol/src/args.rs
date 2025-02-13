@@ -8,6 +8,7 @@ use std::str::FromStr;
 
 pub const ABR_SIZE: u64 = 256 * 1024 * 1024;
 pub const EFI_SIZE: u64 = 63 * 1024 * 1024;
+pub const SYSTEM_PART_SIZE: u64 = 16 * 1024 * 1024 * 1024;
 pub const VBMETA_SIZE: u64 = 64 * 1024;
 
 #[derive(Debug, PartialEq)]

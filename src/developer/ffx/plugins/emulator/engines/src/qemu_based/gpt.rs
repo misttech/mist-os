@@ -20,6 +20,7 @@ bootloader.timeout=5"#;
 // By default, the image will be resized to 20G.
 // TODO(https://fxbug.dev/380879811): Calculate this dynamically.
 pub(crate) const DEFAULT_IMAGE_SIZE: u64 = 20 * 1024 * 1024 * 1024;
+const SYSTEM_PART_SIZE: u64 = 16 * 1024 * 1024 * 1024;
 
 /// Holds the args needed to construct a full GPT disk image
 #[derive(Debug, Default, PartialEq)]
@@ -81,6 +82,7 @@ impl FuchsiaFullDiskImageBuilder {
             vbmeta_a: self.vbmeta.clone(),
             vbmeta_b: self.vbmeta.clone(),
             vbmeta_size: VBMETA_SIZE,
+            system_disk_size: Some(SYSTEM_PART_SIZE),
             // make_fuchsia_vol uses zbi for both A and B partitions unless specified otherwise:
             // //tools/make-fuchsia-vol/src/args.rs
             zbi: self.zbi,
