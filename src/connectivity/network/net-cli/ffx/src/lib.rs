@@ -233,7 +233,7 @@ impl NetTool {
     async fn net(&self, writer: <Self as fho::FfxMain>::Writer) -> fho::Result<()> {
         let realm = self.cmd.realm.as_deref().unwrap_or(NETWORK_REALM);
         let res = net_cli::do_root(
-            writer,
+            writer.into(),
             net_cli::Command { cmd: self.cmd.cmd.clone() },
             &FfxConnector { remote_control: self.remote_control.deref().clone(), realm },
         )

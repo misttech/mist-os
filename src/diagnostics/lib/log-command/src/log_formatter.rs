@@ -13,7 +13,6 @@ use diagnostics_data::{
     Data, LogTextColor, LogTextDisplayOptions, LogTextPresenter, LogTimeDisplayFormat, Logs,
     LogsData, LogsDataBuilder, LogsField, LogsProperty, Severity, Timezone,
 };
-use ffx_writer::ToolIO;
 use futures_util::future::Either;
 use futures_util::stream::FuturesUnordered;
 use futures_util::{select, StreamExt};
@@ -22,6 +21,7 @@ use std::fmt::Display;
 use std::io::Write;
 use std::time::Duration;
 use thiserror::Error;
+use writer::ToolIO;
 
 pub use diagnostics_data::Timestamp;
 
@@ -457,8 +457,8 @@ mod test {
     use crate::parse_time;
     use assert_matches::assert_matches;
     use diagnostics_data::{LogsDataBuilder, Severity};
-    use ffx_writer::{Format, MachineWriter, TestBuffers};
     use std::cell::Cell;
+    use writer::{Format, JsonWriter, TestBuffers};
 
     use super::*;
 
@@ -555,7 +555,7 @@ mod test {
     #[fuchsia::test]
     async fn test_boot_timestamp_setter() {
         let buffers = TestBuffers::default();
-        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let stdout = JsonWriter::<LogEntry>::new_test(None, &buffers);
         let options = LogFormatterOptions {
             display: Some(LogTextDisplayOptions {
                 time_format: LogTimeDisplayFormat::WallTime { tz: Timezone::Utc, offset: 0 },
@@ -570,7 +570,7 @@ mod test {
 
         // Boot timestamp is supported when using JSON output (for filtering)
         let buffers = TestBuffers::default();
-        let output = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let output = JsonWriter::<LogEntry>::new_test(None, &buffers);
         let options = LogFormatterOptions { display: None, ..Default::default() };
         let mut formatter = DefaultLogFormatter::new(LogFilterCriteria::default(), output, options);
         formatter.set_boot_timestamp(Timestamp::from_nanos(1234));
@@ -711,7 +711,7 @@ mod test {
         // test since and until args for the LogFormatter
         let symbolizer = NoOpSymbolizer {};
         let buffers = TestBuffers::default();
-        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let stdout = JsonWriter::<LogEntry>::new_test(None, &buffers);
         let mut formatter = DefaultLogFormatter::new(
             LogFilterCriteria::default(),
             stdout,
@@ -812,7 +812,7 @@ mod test {
         // test since and until args for the LogFormatter
         let symbolizer = NoOpSymbolizer {};
         let buffers = TestBuffers::default();
-        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let stdout = JsonWriter::<LogEntry>::new_test(None, &buffers);
         let mut formatter = DefaultLogFormatter::new(
             LogFilterCriteria::default(),
             stdout,
@@ -881,7 +881,7 @@ mod test {
     #[fuchsia::test]
     async fn test_default_formatter() {
         let buffers = TestBuffers::default();
-        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let stdout = JsonWriter::<LogEntry>::new_test(None, &buffers);
         let options = LogFormatterOptions::default();
         let mut formatter =
             DefaultLogFormatter::new(LogFilterCriteria::default(), stdout, options.clone());
@@ -896,7 +896,7 @@ mod test {
     #[fuchsia::test]
     async fn test_default_formatter_with_hidden_metadata() {
         let buffers = TestBuffers::default();
-        let stdout = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let stdout = JsonWriter::<LogEntry>::new_test(None, &buffers);
         let options = LogFormatterOptions {
             display: Some(LogTextDisplayOptions { show_metadata: false, ..Default::default() }),
             ..LogFormatterOptions::default()
@@ -914,7 +914,7 @@ mod test {
     #[fuchsia::test]
     async fn test_default_formatter_with_json() {
         let buffers = TestBuffers::default();
-        let stdout = MachineWriter::<LogEntry>::new_test(Some(Format::Json), &buffers);
+        let stdout = JsonWriter::<LogEntry>::new_test(Some(Format::Json), &buffers);
         let options = LogFormatterOptions { display: None, ..Default::default() };
         {
             let mut formatter =
@@ -988,7 +988,7 @@ mod test {
     async fn test_symbolized_output() {
         let symbolizer = FakeFuchsiaSymbolizer;
         let buffers = TestBuffers::default();
-        let output = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let output = JsonWriter::<LogEntry>::new_test(None, &buffers);
         let mut formatter = DefaultLogFormatter::new(
             LogFilterCriteria::default(),
             output,

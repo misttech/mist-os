@@ -26,6 +26,7 @@ rustc_library("lib") {
     "src/json_writer.rs",
     "src/lib.rs",
     "src/test_buffer.rs",
+    "src/tool_io.rs",
     "src/writer.rs",
   ]
 }

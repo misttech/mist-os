@@ -261,8 +261,7 @@ impl ListTool {
 #[cfg(test)]
 mod test {
     use super::*;
-    use ffx_writer::Format;
-    use fho::macro_deps::ffx_writer::TestBuffers;
+    use ffx_writer::{Format, TestBuffers};
     use fidl_fuchsia_developer_ffx::{
         RepositoryRegistryRequest, RepositoryStorageType, RepositoryTarget,
         RepositoryTargetsIteratorRequest,

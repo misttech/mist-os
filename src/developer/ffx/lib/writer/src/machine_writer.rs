@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use crate::{Result, SimpleWriter, TestBuffers, ToolIO};
+use async_trait::async_trait;
+use fho::{FhoEnvironment, TryFromEnv};
 use serde::Serialize;
 use std::fmt::Display;
 use std::io::Write;
@@ -136,6 +138,23 @@ where
         }
     }
 }
+
+impl<T> Into<JsonWriter<T>> for MachineWriter<T>
+where
+    T: Serialize,
+{
+    fn into(self) -> JsonWriter<T> {
+        self.0
+    }
+}
+
+#[async_trait(?Send)]
+impl<T: serde::Serialize> TryFromEnv for MachineWriter<T> {
+    async fn try_from_env(env: &FhoEnvironment) -> fho::Result<Self> {
+        Ok(MachineWriter::new(env.ffx_command().global.machine))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

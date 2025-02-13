@@ -57,52 +57,6 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_not_machine_is_ok() {
-        let test_buffers = TestBuffers::default();
-        let mut writer = Writer::new_test(&test_buffers);
-        let res = writer.item(&"ehllo".to_owned());
-        assert!(res.is_ok());
-    }
-
-    #[test]
-    fn test_item_for_test() {
-        let test_buffers = TestBuffers::default();
-        let mut writer = Writer::new_test(&test_buffers);
-        writer.item(&"hello".to_owned()).unwrap();
-
-        assert_eq!(test_buffers.into_stdout_str(), "hello\n");
-    }
-
-    #[test]
-    fn test_is_machine_false() {
-        let test_buffers = TestBuffers::default();
-        let writer = Writer::new_test(&test_buffers);
-        assert!(!writer.is_machine());
-    }
-
-    #[test]
-    fn line_writer_for_machine_is_ok() {
-        let test_buffers = TestBuffers::default();
-        let mut writer = Writer::new_test(&test_buffers);
-        writer.line("hello").unwrap();
-
-        let (stdout, stderr) = test_buffers.into_strings();
-        assert_eq!(stdout, "hello\n");
-        assert_eq!(stderr, "");
-    }
-
-    #[test]
-    fn writer_print_output_has_no_newline() {
-        let test_buffers = TestBuffers::default();
-        let mut writer = Writer::new_test(&test_buffers);
-        writer.print("foobar").unwrap();
-
-        let (stdout, stderr) = test_buffers.into_strings();
-        assert_eq!(stdout, "foobar");
-        assert_eq!(stderr, "");
-    }
-
-    #[test]
     fn writer_implements_write() {
         let test_buffers = TestBuffers::default();
         let mut writer = Writer::new_test(&test_buffers);

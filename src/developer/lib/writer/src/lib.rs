@@ -4,10 +4,12 @@
 
 mod json_writer;
 mod test_buffer;
+mod tool_io;
 mod writer;
 
 pub use json_writer::{format_output, JsonWriter};
 pub use test_buffer::{TestBuffer, TestBuffers};
+pub use tool_io::ToolIO;
 pub use writer::Writer;
 
 /// Enum indicating output formatting.

@@ -11,12 +11,12 @@ use ffx_command::{
 };
 use ffx_config::environment::ExecutableKind;
 use ffx_config::EnvironmentContext;
-use ffx_writer::ToolIO;
 use fho_metadata::FhoToolMetadata;
 use std::fs::File;
 use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
 use std::process::ExitStatus;
+use writer::ToolIO;
 
 /// The main trait for defining an ffx tool. This is not intended to be implemented directly
 /// by the user, but instead derived via `#[derive(FfxTool)]`.
@@ -241,10 +241,9 @@ mod tests {
     use super::*;
     use crate::adapters::tests::SimpleCheck;
     // This keeps the macros from having compiler errors.
-    use crate::adapters::tests::{FakeCommand, FakeTool, SIMPLE_CHECK_COUNTER};
+    use crate::adapters::tests::{FakeCommand, FakeTool, TestWriter, SIMPLE_CHECK_COUNTER};
     use crate::{self as fho};
     use async_trait::async_trait;
-    use ffx_writer::SimpleWriter;
     use fho_macro::FfxTool;
     use fho_metadata::{FhoDetails, Only};
 
@@ -254,7 +253,7 @@ mod tests {
         let config_env = ffx_config::test_init().await.unwrap();
         let ffx = FfxCommandLine::new(None, &["ffx", "fake", "stuff"]).expect("test ffx cmd");
         let fho_env = FhoEnvironment::new(&config_env.context, &ffx);
-        let writer = SimpleWriter::new_buffers(Vec::new(), Vec::new());
+        let writer = TestWriter;
         let fake_tool: FakeTool = build_tool(fho_env).await.expect("build fake tool");
         assert_eq!(
             SIMPLE_CHECK_COUNTER.with(|counter| *counter.borrow()),
@@ -274,7 +273,7 @@ mod tests {
         }
         #[async_trait(?Send)]
         impl FfxMain for FakeToolWillFail {
-            type Writer = SimpleWriter;
+            type Writer = TestWriter;
             async fn main(self, _writer: Self::Writer) -> Result<()> {
                 panic!("This should never get called")
             }

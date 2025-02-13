@@ -9,7 +9,6 @@
 
 use anyhow::Error;
 use async_trait::async_trait;
-use ffx_writer::{Format, MachineWriter, ToolIO};
 use fidl_fuchsia_diagnostics::{LogSettingsMarker, StreamParameters};
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
 use fidl_fuchsia_sys2::RealmQueryMarker;
@@ -22,6 +21,7 @@ use log_command::{
 use log_utils::{BootTimeAccessor, LogCommand, LogSubCommand};
 use std::future::pending;
 use std::io::Write;
+use writer::{Format, JsonWriter};
 
 /// Target-side symbolizer implementation.
 /// Does nothing as no symbols are available on the target.
@@ -81,9 +81,9 @@ async fn main() -> Result<(), Error> {
     let boot_ts = Timestamp::from_nanos(
         fuchsia_runtime::utc_time().into_nanos() - zx::BootInstant::get().into_nanos(),
     );
-    let mut formatter = DefaultLogFormatter::<MachineWriter<LogEntry>>::new_from_args(
+    let mut formatter = DefaultLogFormatter::<JsonWriter<LogEntry>>::new_from_args(
         &cmd,
-        MachineWriter::new(if cmd.json { Some(Format::Json) } else { None }),
+        JsonWriter::new(if cmd.json { Some(Format::Json) } else { None }),
     );
     formatter.expand_monikers(&realm_proxy).await?;
     for warning in cmd.validate_cmd_flags_with_warnings()? {

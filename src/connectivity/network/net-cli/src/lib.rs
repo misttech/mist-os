@@ -7,7 +7,6 @@ mod opts;
 mod ser;
 
 use anyhow::{anyhow, Context as _, Error};
-use ffx_writer::ToolIO as _;
 use fidl_fuchsia_net_stack_ext::{self as fstack_ext, FidlReturn as _};
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use itertools::Itertools as _;
@@ -25,6 +24,7 @@ use std::iter::FromIterator as _;
 use std::ops::Deref;
 use std::pin::pin;
 use std::str::FromStr as _;
+use writer::ToolIO as _;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_debug as fdebug, fidl_fuchsia_net_dhcp as fdhcp,
     fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_filter as fnet_filter,
@@ -106,7 +106,7 @@ impl<O> NetCliDepsConnector for O where
 }
 
 pub async fn do_root<C: NetCliDepsConnector>(
-    mut out: ffx_writer::MachineWriter<serde_json::Value>,
+    mut out: writer::JsonWriter<serde_json::Value>,
     Command { cmd }: Command,
     connector: &C,
 ) -> Result<(), Error> {
@@ -363,7 +363,7 @@ fn extract_nud_config(
 }
 
 async fn do_if<C: NetCliDepsConnector>(
-    out: &mut ffx_writer::MachineWriter<serde_json::Value>,
+    out: &mut writer::JsonWriter<serde_json::Value>,
     cmd: opts::IfEnum,
     connector: &C,
 ) -> Result<(), Error> {
@@ -949,7 +949,7 @@ async fn do_if_config_set(
 }
 
 async fn do_route<C: NetCliDepsConnector>(
-    out: &mut ffx_writer::MachineWriter<serde_json::Value>,
+    out: &mut writer::JsonWriter<serde_json::Value>,
     cmd: opts::RouteEnum,
     connector: &C,
 ) -> Result<(), Error> {
@@ -978,7 +978,7 @@ async fn do_route<C: NetCliDepsConnector>(
 }
 
 async fn do_route_list<C: NetCliDepsConnector>(
-    out: &mut ffx_writer::MachineWriter<serde_json::Value>,
+    out: &mut writer::JsonWriter<serde_json::Value>,
     connector: &C,
 ) -> Result<(), Error> {
     let ipv4_route_event_stream = pin!({
@@ -1059,7 +1059,7 @@ async fn do_route_list<C: NetCliDepsConnector>(
 }
 
 async fn do_rule<C: NetCliDepsConnector>(
-    out: &mut ffx_writer::MachineWriter<serde_json::Value>,
+    out: &mut writer::JsonWriter<serde_json::Value>,
     cmd: opts::RuleEnum,
     connector: &C,
 ) -> Result<(), Error> {
@@ -1069,7 +1069,7 @@ async fn do_rule<C: NetCliDepsConnector>(
 }
 
 async fn do_rule_list<C: NetCliDepsConnector>(
-    out: &mut ffx_writer::MachineWriter<serde_json::Value>,
+    out: &mut writer::JsonWriter<serde_json::Value>,
     connector: &C,
 ) -> Result<(), Error> {
     let ipv4_rule_event_stream = pin!({
@@ -1365,7 +1365,7 @@ async fn do_dhcpd<C: NetCliDepsConnector>(
 }
 
 async fn do_neigh<C: NetCliDepsConnector>(
-    out: ffx_writer::MachineWriter<serde_json::Value>,
+    out: writer::JsonWriter<serde_json::Value>,
     cmd: opts::NeighEnum,
     connector: &C,
 ) -> Result<(), Error> {
@@ -1557,7 +1557,7 @@ fn jsonify_neigh_iter_item(
 }
 
 async fn print_neigh_entries(
-    mut out: ffx_writer::MachineWriter<serde_json::Value>,
+    mut out: writer::JsonWriter<serde_json::Value>,
     watch_for_changes: bool,
     view: fneighbor::ViewProxy,
 ) -> Result<(), Error> {
@@ -1664,7 +1664,7 @@ fn write_tabular_neigh_entry<W: std::io::Write>(
 }
 
 fn write_neigh_entry(
-    f: &mut ffx_writer::MachineWriter<serde_json::Value>,
+    f: &mut writer::JsonWriter<serde_json::Value>,
     item: fneighbor::EntryIteratorItem,
     include_entry_state: bool,
 ) -> Result<(), Error> {
@@ -2145,8 +2145,8 @@ mod tests {
             |c| extract_ip_forwarding(c, ip_version).expect("extract IP forwarding configuration"),
             enable,
         );
-        let buf = ffx_writer::TestBuffers::default();
-        let mut out = ffx_writer::MachineWriter::new_test(None, &buf);
+        let buf = writer::TestBuffers::default();
+        let mut out = writer::JsonWriter::new_test(None, &buf);
         let do_if_fut = do_if(
             &mut out,
             opts::IfEnum::IpForward(opts::IfIpForward {
@@ -2167,8 +2167,8 @@ mod tests {
             interface1.nicid,
             configuration_with_ip_forwarding_set(ip_version, enable),
         );
-        let buf = ffx_writer::TestBuffers::default();
-        let mut out = ffx_writer::MachineWriter::new_test(None, &buf);
+        let buf = writer::TestBuffers::default();
+        let mut out = writer::JsonWriter::new_test(None, &buf);
         let do_if_fut = do_if(
             &mut out,
             opts::IfEnum::IpForward(opts::IfIpForward {
@@ -2266,8 +2266,8 @@ mod tests {
             |c| extract_igmp_version(c).unwrap(),
             Some(igmp_version),
         );
-        let buffers = ffx_writer::TestBuffers::default();
-        let mut out = ffx_writer::MachineWriter::new_test(None, &buffers);
+        let buffers = writer::TestBuffers::default();
+        let mut out = writer::JsonWriter::new_test(None, &buffers);
         let do_if_fut = do_if(
             &mut out,
             opts::IfEnum::Igmp(opts::IfIgmp {
@@ -2296,8 +2296,8 @@ mod tests {
                 ..Default::default()
             },
         );
-        let buffers = ffx_writer::TestBuffers::default();
-        let mut output_buf = ffx_writer::MachineWriter::new_test(None, &buffers);
+        let buffers = writer::TestBuffers::default();
+        let mut output_buf = writer::JsonWriter::new_test(None, &buffers);
         let do_if_fut = do_if(
             &mut output_buf,
             opts::IfEnum::Igmp(opts::IfIgmp {
@@ -2337,8 +2337,8 @@ mod tests {
             |c| extract_mld_version(c).unwrap(),
             Some(mld_version),
         );
-        let buffers = ffx_writer::TestBuffers::default();
-        let mut out = ffx_writer::MachineWriter::new_test(None, &buffers);
+        let buffers = writer::TestBuffers::default();
+        let mut out = writer::JsonWriter::new_test(None, &buffers);
         let do_if_fut = do_if(
             &mut out,
             opts::IfEnum::Mld(opts::IfMld {
@@ -2367,8 +2367,8 @@ mod tests {
                 ..Default::default()
             },
         );
-        let buffers = ffx_writer::TestBuffers::default();
-        let mut output_buf = ffx_writer::MachineWriter::new_test(None, &buffers);
+        let buffers = writer::TestBuffers::default();
+        let mut output_buf = writer::JsonWriter::new_test(None, &buffers);
         let do_if_fut = do_if(
             &mut output_buf,
             opts::IfEnum::Mld(opts::IfMld {
@@ -2468,8 +2468,8 @@ mod tests {
 
         let connector =
             TestConnector { root_interfaces: Some(root_interfaces), ..Default::default() };
-        let buffers = ffx_writer::TestBuffers::default();
-        let mut out = ffx_writer::MachineWriter::new_test(None, &buffers);
+        let buffers = writer::TestBuffers::default();
+        let mut out = writer::JsonWriter::new_test(None, &buffers);
         let do_if_fut = do_if(
             &mut out,
             opts::IfEnum::Addr(opts::IfAddr {
@@ -2588,8 +2588,8 @@ mod tests {
             ..Default::default()
         };
 
-        let buffers = ffx_writer::TestBuffers::default();
-        let mut out = ffx_writer::MachineWriter::new_test(None, &buffers);
+        let buffers = writer::TestBuffers::default();
+        let mut out = writer::JsonWriter::new_test(None, &buffers);
         // Make the first request.
         let succeeds = do_if(
             &mut out,
@@ -2629,8 +2629,8 @@ mod tests {
             ((), ()) = futures::future::join(handler_fut, succeeds).fuse() => {},
         }
 
-        let buffers = ffx_writer::TestBuffers::default();
-        let mut out = ffx_writer::MachineWriter::new_test(None, &buffers);
+        let buffers = writer::TestBuffers::default();
+        let mut out = writer::JsonWriter::new_test(None, &buffers);
         // Make the second request.
         let fails = do_if(
             &mut out,
@@ -2783,8 +2783,8 @@ mod tests {
 
         let connector =
             TestConnector { interfaces_state: Some(interfaces_state), ..Default::default() };
-        let buffers = ffx_writer::TestBuffers::default();
-        let mut out = ffx_writer::MachineWriter::new_test(None, &buffers);
+        let buffers = writer::TestBuffers::default();
+        let mut out = writer::JsonWriter::new_test(None, &buffers);
         let run_command = do_if(
             &mut out,
             opts::IfEnum::Addr(opts::IfAddr {
@@ -2941,11 +2941,11 @@ mac               -
         let (interfaces_state, interfaces_state_stream) =
             fidl::endpoints::create_proxy_and_stream::<finterfaces::StateMarker>();
 
-        let buffers = ffx_writer::TestBuffers::default();
+        let buffers = writer::TestBuffers::default();
         let mut output = if json {
-            ffx_writer::MachineWriter::new_test(Some(ffx_writer::Format::Json), &buffers)
+            writer::JsonWriter::new_test(Some(writer::Format::Json), &buffers)
         } else {
-            ffx_writer::MachineWriter::new_test(None, &buffers)
+            writer::JsonWriter::new_test(None, &buffers)
         };
         let output_ref = &mut output;
 
@@ -3148,8 +3148,8 @@ mac               -
         let (stack, mut requests) =
             fidl::endpoints::create_proxy_and_stream::<fstack::StackMarker>();
         let connector = TestConnector { stack: Some(stack), ..Default::default() };
-        let buffers = ffx_writer::TestBuffers::default();
-        let mut out = ffx_writer::MachineWriter::new_test(None, &buffers);
+        let buffers = writer::TestBuffers::default();
+        let mut out = writer::JsonWriter::new_test(None, &buffers);
         let op = do_route(&mut out, cmd.clone(), &connector);
         let op_succeeds = async move {
             let () = match cmd {
@@ -3265,11 +3265,11 @@ mac               -
             ..Default::default()
         };
 
-        let buffers = ffx_writer::TestBuffers::default();
+        let buffers = writer::TestBuffers::default();
         let mut output = if json {
-            ffx_writer::MachineWriter::new_test(Some(ffx_writer::Format::Json), &buffers)
+            writer::JsonWriter::new_test(Some(writer::Format::Json), &buffers)
         } else {
-            ffx_writer::MachineWriter::new_test(None, &buffers)
+            writer::JsonWriter::new_test(None, &buffers)
         };
 
         let do_route_fut =
@@ -3416,8 +3416,8 @@ mac               -
             always_answer_with_interfaces(interfaces_state_requests, interface_fidls);
 
         let bridge_id = 4;
-        let buffers = ffx_writer::TestBuffers::default();
-        let mut out = ffx_writer::MachineWriter::new_test(None, &buffers);
+        let buffers = writer::TestBuffers::default();
+        let mut out = writer::JsonWriter::new_test(None, &buffers);
         let bridge = do_if(
             &mut out,
             opts::IfEnum::Bridge(opts::IfBridge {
@@ -3493,8 +3493,8 @@ mac               -
             let mut stream = neigh_entry_stream(it, watch_for_changes);
 
             let item_to_string = |item| {
-                let buffers = ffx_writer::TestBuffers::default();
-                let mut buf = ffx_writer::MachineWriter::new_test(None, &buffers);
+                let buffers = writer::TestBuffers::default();
+                let mut buf = writer::JsonWriter::new_test(None, &buffers);
                 let () = write_neigh_entry(&mut buf, item, watch_for_changes)
                     .expect("write_neigh_entry should succeed");
                 buffers.into_stdout_str()
@@ -3700,11 +3700,11 @@ mac               -
             ..Default::default()
         });
 
-        let buffers = ffx_writer::TestBuffers::default();
+        let buffers = writer::TestBuffers::default();
         let mut output = if json {
-            ffx_writer::MachineWriter::new_test(Some(ffx_writer::Format::Json), &buffers)
+            writer::JsonWriter::new_test(Some(writer::Format::Json), &buffers)
         } else {
-            ffx_writer::MachineWriter::new_test(None, &buffers)
+            writer::JsonWriter::new_test(None, &buffers)
         };
         write_neigh_entry(&mut output, entry, include_entry_state)
             .expect("write_neigh_entry should succeed");

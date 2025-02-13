@@ -48,7 +48,7 @@ impl FfxMain for EchoTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fho::macro_deps::ffx_writer::TestBuffer;
+    use ffx_writer::TestBuffer;
     use futures_lite::stream::StreamExt;
 
     // [START fake_proxy]

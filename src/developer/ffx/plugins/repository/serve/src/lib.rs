@@ -638,7 +638,7 @@ mod test {
     use ffx_config::keys::TARGET_DEFAULT_KEY;
     use ffx_config::{ConfigLevel, TestEnv};
     use ffx_target::TargetProxy;
-    use fho::macro_deps::ffx_writer::TestBuffer;
+    use ffx_writer::TestBuffer;
     use fho::{user_error, FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
     use fidl::endpoints::DiscoverableProtocolMarker;
     use fidl_fuchsia_developer_ffx::{

@@ -4,12 +4,10 @@
 
 mod machine_writer;
 mod simple_writer;
-mod tool_io;
 mod verified_machine_writer;
 
 pub use machine_writer::*;
 pub use simple_writer::*;
-pub use tool_io::*;
 pub use verified_machine_writer::*;
 
-pub use writer::{Error, Format, Result, TestBuffer, TestBuffers};
+pub use writer::{Error, Format, Result, TestBuffer, TestBuffers, ToolIO};

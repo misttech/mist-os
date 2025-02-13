@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::io::Write;
-
 use crate::{Result, ToolIO};
+use async_trait::async_trait;
+use fho::{FhoEnvironment, TryFromEnv};
+use std::io::Write;
 use writer::{TestBuffers, Writer};
+
 /// An object that can be used to produce output, with no support for outputting
 /// structured machine-interpretable output.
 pub struct SimpleWriter(Writer);
@@ -66,6 +68,13 @@ impl Write for SimpleWriter {
 
     fn flush(&mut self) -> std::io::Result<()> {
         self.0.flush()
+    }
+}
+
+#[async_trait(?Send)]
+impl TryFromEnv for SimpleWriter {
+    async fn try_from_env(_env: &FhoEnvironment) -> fho::Result<Self> {
+        Ok(SimpleWriter::new())
     }
 }
 

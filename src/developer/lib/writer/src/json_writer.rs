@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{Format, Result, TestBuffers, Writer};
+use crate::{Format, Result, TestBuffers, ToolIO, Writer};
 use serde::Serialize;
 use std::fmt::Display;
 use std::io::Write;
@@ -143,6 +143,36 @@ where
         }
     }
     Ok(())
+}
+
+impl<T> ToolIO for JsonWriter<T>
+where
+    T: Serialize,
+{
+    type OutputItem = T;
+
+    fn is_machine_supported() -> bool {
+        true
+    }
+
+    fn is_machine(&self) -> bool {
+        self.format.is_some()
+    }
+
+    fn stderr(&mut self) -> &'_ mut Box<dyn Write> {
+        self.stderr()
+    }
+
+    fn item(&mut self, value: &T) -> Result<()>
+    where
+        T: Display,
+    {
+        if self.is_machine() {
+            self.machine(value)
+        } else {
+            self.line(value)
+        }
+    }
 }
 
 impl<T> Write for JsonWriter<T>
