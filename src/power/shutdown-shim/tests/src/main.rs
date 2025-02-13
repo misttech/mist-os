@@ -174,57 +174,11 @@ async fn test_poweroff(is_power_framework_available: bool) -> Result<(), Error> 
     let shim_statecontrol =
         realm_instance.root.connect_to_protocol_at_exposed_dir::<fstatecontrol::AdminMarker>()?;
 
-    // We don't expect this task to ever complete, as the shutdown shim isn't actually killed (the
-    // shutdown methods it calls are mocks after all).
     let _task = fasync::Task::spawn(async move {
         shim_statecontrol.poweroff().await.expect_err(
             "the shutdown shim should close the channel when manual shutdown driving is complete",
         );
     });
-    if is_power_framework_available {
-        assert_matches!(
-            recv_signals.next().await,
-            Some(Signal::ShutdownControlLease(LeaseState::Acquired))
-        );
-    }
-    assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
-    if is_power_framework_available {
-        assert_matches!(
-            recv_signals.next().await,
-            Some(Signal::ShutdownControlLease(LeaseState::Dropped))
-        );
-    }
-    Ok(())
-}
-
-#[test_matrix(
-    [true, false],
-    [RebootType::Reboot, RebootType::PerformReboot]
-)]
-#[fuchsia::test]
-async fn test_reboot_system_update(
-    is_power_framework_available: bool,
-    reboot_type: RebootType,
-) -> Result<(), Error> {
-    let reason = RebootReason::SystemUpdate;
-    let (realm_instance, mut recv_signals) = new_realm(is_power_framework_available).await?;
-    let shim_statecontrol =
-        realm_instance.root.connect_to_protocol_at_exposed_dir::<fstatecontrol::AdminMarker>()?;
-
-    // We don't expect this task to ever complete, as the shutdown shim isn't actually killed (the
-    // shutdown methods it calls are mocks after all).
-    let _task = fasync::Task::spawn(async move {
-        match reboot_type {
-            RebootType::Reboot => shim_statecontrol.reboot(reason.as_reboot_reason()).await,
-            RebootType::PerformReboot => {
-                shim_statecontrol.perform_reboot(&reason.as_reboot_options()).await
-            }
-        }
-        .expect_err(
-            "the shutdown shim should close the channel when manual shutdown driving is complete",
-        );
-    });
-
     if is_power_framework_available {
         assert_matches!(
             recv_signals.next().await,
@@ -249,8 +203,6 @@ async fn test_mexec(is_power_framework_available: bool) -> Result<(), Error> {
     let shim_statecontrol =
         realm_instance.root.connect_to_protocol_at_exposed_dir::<fstatecontrol::AdminMarker>()?;
 
-    // We don't expect this task to ever complete, as the shutdown shim isn't actually killed (the
-    // shutdown methods it calls are mocks after all).
     let _task = fasync::Task::spawn(async move {
         let kernel_zbi = zx::Vmo::create(0).unwrap();
         let data_zbi = zx::Vmo::create(0).unwrap();
@@ -258,37 +210,6 @@ async fn test_mexec(is_power_framework_available: bool) -> Result<(), Error> {
             "the shutdown shim should close the channel when manual shutdown driving is complete",
         );
     });
-
-    if is_power_framework_available {
-        assert_matches!(
-            recv_signals.next().await,
-            Some(Signal::ShutdownControlLease(LeaseState::Acquired))
-        );
-    }
-    assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
-    if is_power_framework_available {
-        assert_matches!(
-            recv_signals.next().await,
-            Some(Signal::ShutdownControlLease(LeaseState::Dropped))
-        );
-    }
-    Ok(())
-}
-
-#[test_case(true; "with_power_framework")]
-#[test_case(false; "without_power_framework")]
-#[fuchsia::test]
-async fn test_poweroff_detach(is_power_framework_available: bool) -> Result<(), Error> {
-    let (realm_instance, mut recv_signals) = new_realm(is_power_framework_available).await?;
-    let shim_statecontrol =
-        realm_instance.root.connect_to_protocol_at_exposed_dir::<fstatecontrol::AdminMarker>()?;
-
-    fasync::Task::spawn(async move {
-        shim_statecontrol.poweroff().await.expect_err(
-            "the shutdown shim should close the channel when manual shutdown driving is complete",
-        );
-    })
-    .detach();
 
     if is_power_framework_available {
         assert_matches!(
@@ -329,39 +250,6 @@ async fn test_reboot(
             }
         }
         .expect_err(
-            "the shutdown shim should close the channel when manual shutdown driving is complete",
-        );
-    })
-    .detach();
-
-    if is_power_framework_available {
-        assert_matches!(
-            recv_signals.next().await,
-            Some(Signal::ShutdownControlLease(LeaseState::Acquired))
-        );
-    }
-    assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
-    if is_power_framework_available {
-        assert_matches!(
-            recv_signals.next().await,
-            Some(Signal::ShutdownControlLease(LeaseState::Dropped))
-        );
-    }
-    Ok(())
-}
-
-#[test_case(true; "with_power_framework")]
-#[test_case(false; "without_power_framework")]
-#[fuchsia::test]
-async fn test_mexec_detach(is_power_framework_available: bool) -> Result<(), Error> {
-    let (realm_instance, mut recv_signals) = new_realm(is_power_framework_available).await?;
-    let shim_statecontrol =
-        realm_instance.root.connect_to_protocol_at_exposed_dir::<fstatecontrol::AdminMarker>()?;
-
-    fasync::Task::spawn(async move {
-        let kernel_zbi = zx::Vmo::create(0).unwrap();
-        let data_zbi = zx::Vmo::create(0).unwrap();
-        shim_statecontrol.mexec(kernel_zbi, data_zbi).await.expect_err(
             "the shutdown shim should close the channel when manual shutdown driving is complete",
         );
     })
