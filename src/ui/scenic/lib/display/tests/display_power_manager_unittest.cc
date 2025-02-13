@@ -5,7 +5,6 @@
 #include "src/ui/scenic/lib/display/display_power_manager.h"
 
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
-#include <fuchsia/ui/display/internal/cpp/fidl.h>
 #include <lib/async/default.h>
 #include <lib/async/time.h>
 #include <lib/inspect/cpp/inspect.h>

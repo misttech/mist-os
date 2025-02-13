@@ -5,7 +5,6 @@
 #include "src/ui/scenic/lib/display/display_power_manager.h"
 
 #include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
-#include <fuchsia/ui/display/internal/cpp/fidl.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
 

@@ -589,9 +589,6 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     display_power_manager_.emplace(display_manager_.value(), inspect_node_);
     FX_CHECK(app_context_->outgoing()->AddProtocol<fuchsia_ui_display_singleton::DisplayPower>(
                  display_power_manager_->GetHandler()) == ZX_OK);
-    display_power_manager_deprecated_.emplace(display_manager_.value(), inspect_node_);
-    FX_CHECK(app_context_->outgoing()->AddPublicService(
-                 display_power_manager_deprecated_->GetHandler()) == ZX_OK);
   }
 }
 
