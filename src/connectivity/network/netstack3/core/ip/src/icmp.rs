@@ -17,7 +17,7 @@ use net_types::ip::{
 use net_types::{
     LinkLocalAddress, LinkLocalUnicastAddr, MulticastAddress, SpecifiedAddr, UnicastAddr, Witness,
 };
-use netstack3_base::socket::{AddrIsMappedError, SocketIpAddr};
+use netstack3_base::socket::{AddrIsMappedError, SocketIpAddr, SocketIpAddrExt as _};
 use netstack3_base::sync::Mutex;
 use netstack3_base::{
     AnyDevice, Counter, CounterContext, DeviceIdContext, EitherDeviceId, FrameDestination,
@@ -838,16 +838,15 @@ impl<
                     let code = echo_request.code();
                     let (local_ip, remote_ip) = (dst_ip, src_ip);
                     debug!(
-                        "replying to ICMP echo request from {remote_ip}: id={}, seq={}",
+                        "replying to ICMP echo request from {remote_ip} to {local_ip}%{device:?}: \
+                        id={}, seq={}",
                         req.id(),
                         req.seq()
                     );
-                    // TODO(joshlf): Do something if send_icmp_reply returns an
-                    // error?
-                    let _ = send_icmp_reply(
+                    send_icmp_reply(
                         core_ctx,
                         bindings_ctx,
-                        Some(device),
+                        device,
                         SocketIpAddr::new_ipv4_specified(remote_ip),
                         SocketIpAddr::new_ipv4_specified(local_ip),
                         |src_ip| {
@@ -921,12 +920,10 @@ impl<
                         // bodies, but until that happens, we need to give it an
                         // empty buffer.
                         buffer.shrink_front_to(0);
-                        // TODO(joshlf): Do something if send_icmp_reply returns
-                        // an error?
-                        let _ = send_icmp_reply(
+                        send_icmp_reply(
                             core_ctx,
                             bindings_ctx,
-                            Some(device),
+                            device,
                             SocketIpAddr::new_ipv4_specified(remote_ip),
                             SocketIpAddr::new_ipv4_specified(local_ip),
                             |src_ip| {
@@ -1686,12 +1683,10 @@ impl<
                                 req.id(),
                                 req.seq()
                             );
-                            // TODO(joshlf): Do something if send_icmp_reply returns an
-                            // error?
-                            let _ = send_icmp_reply(
+                            send_icmp_reply(
                                 core_ctx,
                                 bindings_ctx,
-                                Some(device),
+                                device,
                                 remote_ip,
                                 local_ip,
                                 |src_ip| {
@@ -1792,9 +1787,7 @@ impl<
 /// Sends an ICMP reply to a remote host.
 ///
 /// `send_icmp_reply` sends a reply to a non-error message (e.g., "echo request"
-/// or "timestamp request" messages). It takes the ingress device, source IP,
-/// and destination IP of the packet *being responded to*. It uses ICMP-specific
-/// logic to figure out whether and how to send an ICMP reply.
+/// or "timestamp request" messages).
 ///
 /// `get_body_from_src_ip` returns a `Serializer` with the bytes of the ICMP
 /// packet, and, when called, is given the source IP address chosen for the
@@ -1804,7 +1797,7 @@ impl<
 fn send_icmp_reply<I, BC, CC, S, F>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
-    device: Option<&CC::DeviceId>,
+    device: &CC::DeviceId,
     original_src_ip: SocketIpAddr<I::Addr>,
     original_dst_ip: SocketIpAddr<I::Addr>,
     get_body_from_src_ip: F,
@@ -1819,10 +1812,18 @@ fn send_icmp_reply<I, BC, CC, S, F>(
     trace!("send_icmp_reply({:?}, {}, {})", device, original_src_ip, original_dst_ip);
     core_ctx.increment(|counters| &counters.reply);
     let tx_metadata: BC::TxMetadata = Default::default();
+
+    // Force the egress device if the original destination is multicast or
+    // requires a zone (i.e. link-local non-loopback), ensuring we pick the
+    // correct return route.
+    let egress_device = (original_dst_ip.as_ref().is_multicast()
+        || original_dst_ip.as_ref().must_have_zone())
+    .then_some(EitherDeviceId::Strong(device));
+
     core_ctx
         .send_oneshot_ip_packet(
             bindings_ctx,
-            None,
+            egress_device,
             IpDeviceAddr::new_from_socket_ip_addr(original_dst_ip),
             original_src_ip,
             I::ICMP_IP_PROTO,

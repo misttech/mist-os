@@ -16,6 +16,15 @@ use netstack3_base::{BroadcastIpExt, IpDeviceAddr};
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct RawMetric(pub u32);
 
+impl RawMetric {
+    /// The highest possible preference for a metric value, i.e., the lowest
+    /// numerical value.
+    pub const HIGHEST_PREFERENCE: Self = Self(u32::MIN);
+    /// The lowest possible preference for a metric value, i.e., the highest
+    /// numerical value.
+    pub const LOWEST_PREFERENCE: Self = Self(u32::MAX);
+}
+
 impl Display for RawMetric {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), core::fmt::Error> {
         let RawMetric(metric) = self;

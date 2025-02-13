@@ -1535,7 +1535,17 @@ impl<
                 },
             )
         });
-        resolve_output_route_to_destination(self, device, src_ip_and_policy, Some(addr), marks)
+        let res =
+            resolve_output_route_to_destination(self, device, src_ip_and_policy, Some(addr), marks);
+        trace!(
+            "lookup_route(\
+                device={device:?}, \
+                local_ip={local_ip:?}, \
+                addr={addr:?}, \
+                transparent={transparent:?}, \
+                marks={marks:?}) => {res:?}"
+        );
+        res
     }
 
     fn send_ip_packet<S>(

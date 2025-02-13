@@ -8,15 +8,17 @@ use core::fmt::Debug;
 use core::num::NonZeroU16;
 
 use assert_matches::assert_matches;
-use net_types::ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+use ip_test_macro::ip_test;
+use net_declare::{net_ip_v4, net_ip_v6};
+use net_types::ip::{IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet};
 use net_types::{SpecifiedAddr, Witness};
 use packet::{Buf, Serializer};
 use packet_formats::ethernet::EthernetFrameLengthCheck;
 use packet_formats::icmp::{
-    IcmpDestUnreachable, IcmpEchoRequest, IcmpMessage, IcmpPacket, IcmpPacketBuilder,
-    IcmpTimeExceeded, IcmpZeroCode, Icmpv4DestUnreachableCode, Icmpv4TimeExceededCode,
-    Icmpv4TimestampRequest, Icmpv6DestUnreachableCode, Icmpv6TimeExceededCode, MessageBody,
-    OriginalPacket,
+    IcmpDestUnreachable, IcmpEchoReply, IcmpEchoRequest, IcmpMessage, IcmpPacket,
+    IcmpPacketBuilder, IcmpTimeExceeded, IcmpZeroCode, Icmpv4DestUnreachableCode,
+    Icmpv4TimeExceededCode, Icmpv4TimestampRequest, Icmpv6DestUnreachableCode,
+    Icmpv6TimeExceededCode, MessageBody, OriginalPacket,
 };
 use packet_formats::ip::{FragmentOffset, IpPacketBuilder as _, IpProto, Ipv4Proto, Ipv6Proto};
 use packet_formats::testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame;
@@ -28,6 +30,7 @@ use netstack3_core::device::DeviceId;
 use netstack3_core::testutil::{Ctx, CtxPairExt as _, FakeBindingsCtx, FakeCtxBuilder};
 use netstack3_core::{IpExt, StackStateBuilder};
 use netstack3_ip::icmp::Icmpv4StateBuilder;
+use netstack3_ip::{AddableEntry, AddableMetric, RawMetric};
 
 /// Test that receiving a particular IP packet results in a particular ICMP
 /// response.
@@ -407,4 +410,93 @@ fn test_ttl_expired() {
         None,
         |_| {},
     );
+}
+
+// Regression test for https://fxbug.dev/395320917. Test that, when receiving an
+// echo request, we respond with an echo reply coming out the exact same
+// interface.
+#[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
+#[ip_test(I)]
+fn icmp_reply_follows_request_interface<I: TestIpExt + IpExt>() {
+    set_logger_for_test();
+
+    let req_body = &mut [1, 2, 3, 4];
+    const TTL: u8 = 1;
+
+    let multicast_addr =
+        I::map_ip_out((), |()| net_ip_v4!("224.0.0.1"), |()| net_ip_v6!("ff02::1"));
+
+    let buffer = Buf::new(req_body, ..)
+        .encapsulate(IcmpPacketBuilder::<I, _>::new(
+            I::TEST_ADDRS.remote_ip.get(),
+            multicast_addr,
+            IcmpZeroCode,
+            IcmpEchoRequest::new(0, 0),
+        ))
+        .encapsulate(<I as packet_formats::ip::IpExt>::PacketBuilder::new(
+            I::TEST_ADDRS.remote_ip.get(),
+            multicast_addr,
+            TTL,
+            I::ICMP_IP_PROTO,
+        ))
+        .serialize_vec_outer()
+        .unwrap();
+
+    let mut builder = FakeCtxBuilder::with_addrs(I::TEST_ADDRS);
+    let extra_index = builder.add_device_with_ip(
+        I::TEST_ADDRS.local_mac,
+        I::get_other_ip_address(20).get(),
+        I::TEST_ADDRS.subnet,
+    );
+    // Add a neighbor entry for the extra device to get better errors in case
+    // we're not going out the right device.
+    builder.add_arp_or_ndp_table_entry(
+        extra_index,
+        I::TEST_ADDRS.remote_ip,
+        I::TEST_ADDRS.remote_mac,
+    );
+    let (mut ctx, device_ids) = builder.build();
+
+    let configured_device = &device_ids[0];
+    let extra_device: DeviceId<_> = device_ids[extra_index].clone().into();
+
+    // Add a route that would make the reply go out the extra device.
+    ctx.test_api()
+        .add_route(
+            AddableEntry {
+                subnet: Subnet::new(
+                    I::TEST_ADDRS.remote_ip.get(),
+                    <I::Addr as IpAddress>::BYTES * 8,
+                )
+                .unwrap(),
+                device: extra_device,
+                gateway: None,
+                metric: AddableMetric::ExplicitMetric(RawMetric::HIGHEST_PREFERENCE),
+            }
+            .into(),
+        )
+        .expect("add route");
+
+    ctx.test_api().receive_ip_packet::<I, _>(
+        &configured_device.clone().into(),
+        Some(FrameDestination::Multicast),
+        buffer,
+    );
+
+    let Ctx { core_ctx: _, bindings_ctx } = &mut ctx;
+    let frames = bindings_ctx.take_ethernet_frames();
+    let (dev, frame) = assert_matches!(&frames[..], [frame] => frame);
+    let (src_mac, dst_mac, src_ip, dst_ip, _ttl, _message, _code) =
+        parse_icmp_packet_in_ip_packet_in_ethernet_frame::<I, _, IcmpEchoReply, _>(
+            &frame,
+            EthernetFrameLengthCheck::NoCheck,
+            |_echo| {},
+        )
+        .unwrap();
+
+    assert_eq!(dev, configured_device);
+    assert_eq!(src_mac, I::TEST_ADDRS.local_mac.get());
+    assert_eq!(dst_mac, I::TEST_ADDRS.remote_mac.get());
+    assert_eq!(src_ip, I::TEST_ADDRS.local_ip.get());
+    assert_eq!(dst_ip, I::TEST_ADDRS.remote_ip.get());
 }
