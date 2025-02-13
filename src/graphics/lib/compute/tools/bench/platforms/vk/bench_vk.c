@@ -280,14 +280,14 @@ bench_calibration(struct bench_config const *         config,
   //
   // Bias to VK_TIME_DOMAIN_CLOCK_MONOTONIC_RAW_EXY
   //
-  enum VkTimeDomainEXT const time_domain = config->vk.time_domains.is_clock_monotonic_raw
-                                             ? VK_TIME_DOMAIN_CLOCK_MONOTONIC_RAW_EXT
-                                             : VK_TIME_DOMAIN_CLOCK_MONOTONIC_EXT;
+  VkTimeDomainEXT const time_domain = config->vk.time_domains.is_clock_monotonic_raw
+                                        ? VK_TIME_DOMAIN_CLOCK_MONOTONIC_RAW_EXT
+                                        : VK_TIME_DOMAIN_CLOCK_MONOTONIC_EXT;
 #else
   //
   // WIN32
   //
-  enum VkTimeDomainEXT const time_domain = VK_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER_EXT;
+  VkTimeDomainEXT const time_domain = VK_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER_EXT;
 #endif
 
   //
@@ -330,13 +330,13 @@ bench_calibration(struct bench_config const *         config,
     qpc_frequency = (double)freq.QuadPart;                                                         \
   }
 
-#define BENCH_HOST_NS(host_) (((double)(host_)*1e9) / qpc_frequency)
+#define BENCH_HOST_NS(host_) (((double)(host_) * 1e9) / qpc_frequency)
 #endif
 
 //
 //
 //
-#define BENCH_DEVICE_NS(device_) ((double)(device_)*config->vk.pdp.limits.timestampPeriod)
+#define BENCH_DEVICE_NS(device_) ((double)(device_) * config->vk.pdp.limits.timestampPeriod)
 
 //
 //
