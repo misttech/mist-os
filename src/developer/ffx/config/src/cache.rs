@@ -17,17 +17,26 @@ struct CacheItem<T> {
 }
 
 impl<T> CacheItem<T> {
-    fn is_cache_item_expired(&self, now: Instant) -> bool {
-        now.checked_duration_since(self.created).map_or(false, |t| t > CONFIG_CACHE_TIMEOUT)
+    fn is_cache_item_expired(&self, now: Instant, timeout: Duration) -> bool {
+        now.checked_duration_since(self.created).map_or(false, |t| t > timeout)
     }
 }
 
 #[derive(Debug)]
-pub(crate) struct Cache<T>(RwLock<Option<CacheItem<T>>>);
+pub(crate) struct Cache<T> {
+    locker: RwLock<Option<CacheItem<T>>>,
+    cache_timeout: Option<Duration>,
+}
+
+impl<T> Cache<T> {
+    pub fn new(cache_timeout: Option<Duration>) -> Self {
+        Self { locker: RwLock::default(), cache_timeout }
+    }
+}
 
 impl<T> Default for Cache<T> {
     fn default() -> Self {
-        Cache(RwLock::default())
+        Self { locker: RwLock::default(), cache_timeout: Some(CONFIG_CACHE_TIMEOUT) }
     }
 }
 
@@ -39,7 +48,7 @@ impl<T: AssertNoEnv + Default> AssertNoEnv for Cache<T> {
     ) -> Result<(), AssertNoEnvError> {
         load_config(self, || Ok(T::default()))
             .map_err(|e| AssertNoEnvError::Unexpected(e.into()))?;
-        let config = self.0.read().expect("cache read mutex poisoned");
+        let config = self.locker.read().expect("cache read mutex poisoned");
         let defaults = config.as_ref().expect("config did not load");
         let default_config = defaults.config.read().expect("config read mutex poisoned");
         default_config.assert_no_env(preamble, ctx)
@@ -51,7 +60,7 @@ impl Cache<crate::storage::Config> {
     /// in which the config needs flattening.
     pub(crate) fn overwrite_default(&self, overwrite: &crate::storage::ConfigMap) -> Result<()> {
         load_config(self, || Ok(crate::storage::Config::default()))?;
-        let config = self.0.read().expect("cache read mutex poisoned");
+        let config = self.locker.read().expect("cache read mutex poisoned");
         let defaults = config.as_ref().expect("config did not load");
         let mut defaults_config = defaults.config.write().expect("config write mutex poisoned");
         crate::api::value::merge_map(&mut defaults_config.default, overwrite);
@@ -63,14 +72,21 @@ impl Cache<crate::storage::Config> {
 /// Invalidate the cache. Call this if you do anything that might make a cached config go stale
 /// in a critical way, like changing the environment.
 pub(crate) async fn invalidate<T>(cache: &Cache<T>) {
-    *cache.0.write().expect("config write guard") = None;
+    *cache.locker.write().expect("config write guard") = None;
 }
 
 fn read_cache<T>(
     guard: &impl std::ops::Deref<Target = Option<CacheItem<T>>>,
     now: Instant,
+    timeout: Option<Duration>,
 ) -> Option<Arc<RwLock<T>>> {
-    guard.as_ref().filter(|item| !item.is_cache_item_expired(now)).map(|item| item.config.clone())
+    guard
+        .as_ref()
+        .filter(|item| match timeout {
+            None => true,
+            Some(t) => !item.is_cache_item_expired(now, t),
+        })
+        .map(|item| item.config.clone())
 }
 
 pub(crate) fn load_config<T>(
@@ -86,13 +102,13 @@ fn load_config_with_instant<T>(
     new_config: impl FnOnce() -> Result<T>,
 ) -> Result<Arc<RwLock<T>>> {
     let cache_hit = {
-        let guard = cache.0.read().map_err(|_| anyhow!("config read guard"))?;
-        read_cache(&guard, now)
+        let guard = cache.locker.read().map_err(|_| anyhow!("config read guard"))?;
+        read_cache(&guard, now, cache.cache_timeout)
     };
     match cache_hit {
         Some(h) => Ok(h),
         None => {
-            let mut guard = cache.0.write().map_err(|_| anyhow!("config write guard"))?;
+            let mut guard = cache.locker.write().map_err(|_| anyhow!("config write guard"))?;
             let config = Arc::new(RwLock::new(new_config()?));
 
             *guard = Some(CacheItem { created: now, config: config.clone() });
@@ -126,12 +142,12 @@ mod test {
         cache: &Cache<usize>,
     ) {
         {
-            let read_guard = cache.0.read().expect("config read guard");
+            let read_guard = cache.locker.read().expect("config read guard");
             assert_eq!(expected_before, (*read_guard).is_some());
         }
         load(now, cache).await;
         {
-            let read_guard = cache.0.read().expect("config read guard");
+            let read_guard = cache.locker.read().expect("config read guard");
             assert_eq!(expected_after, (*read_guard).is_some());
         }
     }
@@ -154,7 +170,7 @@ mod test {
         let now = Instant::now();
         let later = now.checked_add(Duration::from_millis(1)).expect("timeout should not overflow");
         let item = CacheItem { created: later, config: Arc::new(RwLock::new(1)) };
-        assert!(!item.is_cache_item_expired(now));
+        assert!(!item.is_cache_item_expired(now, CONFIG_CACHE_TIMEOUT));
         Ok(())
     }
 }

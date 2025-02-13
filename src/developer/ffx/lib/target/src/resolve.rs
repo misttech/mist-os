@@ -246,7 +246,7 @@ async fn try_get_target_info(
 impl RetrievedTargetInfo {
     async fn get(context: &EnvironmentContext, addrs: &[addr::TargetAddr]) -> Result<Self> {
         let ssh_timeout: u64 =
-            ffx_config::get(CONFIG_TARGET_SSH_TIMEOUT).unwrap_or(DEFAULT_SSH_TIMEOUT_MS);
+            context.get(CONFIG_TARGET_SSH_TIMEOUT).unwrap_or(DEFAULT_SSH_TIMEOUT_MS);
         let ssh_timeout = Duration::from_millis(ssh_timeout);
         for addr in addrs {
             // Ensure there's a port
@@ -559,8 +559,7 @@ impl QueryResolverT for QueryResolver {
         // This is something that is often mocked for testing. An improvement here would be to use the
         // environment context for locating manual targets.
         let finder = manual_targets::Config::default();
-        let ssh_timeout: u64 =
-            ffx_config::get(CONFIG_TARGET_SSH_TIMEOUT).unwrap_or(DEFAULT_SSH_TIMEOUT_MS);
+        let ssh_timeout: u64 = ctx.get(CONFIG_TARGET_SSH_TIMEOUT).unwrap_or(DEFAULT_SSH_TIMEOUT_MS);
         let ssh_timeout = Duration::from_millis(ssh_timeout);
         let mut res = None;
         for t in manual_targets::watcher::parse_manual_targets(&finder).await.into_iter() {

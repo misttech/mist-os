@@ -4,6 +4,7 @@
 
 use crate::api::value::{TryConvert, ValueStrategy};
 use crate::api::ConfigError;
+use crate::cache::Cache;
 use crate::storage::{AssertNoEnv, Config};
 use crate::{is_analytics_disabled, ConfigMap, ConfigQuery, Environment};
 use anyhow::{Context, Result};
@@ -92,7 +93,7 @@ impl EnvironmentContext {
     /// Initializes an environment type that is just the bare minimum, containing no ambient configuration, only
     /// the runtime args.
     pub fn strict(exe_kind: ExecutableKind, runtime_args: ConfigMap) -> Result<Self> {
-        let cache = Arc::default();
+        let cache = Arc::new(Cache::<Config>::new(None));
         let res = Self {
             kind: EnvironmentKind::StrictContext,
             exe_kind: exe_kind.clone(),
