@@ -448,8 +448,9 @@ pub fn update_info_from_attrs(info: &mut FsNodeInfo, attrs: &zxio_node_attribute
         info.size = attrs.content_size.try_into().unwrap_or(std::usize::MAX);
     }
     if attrs.has.storage_size {
-        info.blocks = usize::try_from(attrs.storage_size).unwrap_or(std::usize::MAX)
-            / DEFAULT_BYTES_PER_BLOCK;
+        info.blocks = usize::try_from(attrs.storage_size)
+            .unwrap_or(std::usize::MAX)
+            .div_ceil(DEFAULT_BYTES_PER_BLOCK)
     }
     info.blksize = DEFAULT_BYTES_PER_BLOCK;
     if attrs.has.link_count {

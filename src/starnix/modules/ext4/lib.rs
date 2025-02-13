@@ -16,7 +16,7 @@ use starnix_core::vfs::{
     fs_node_impl_not_dir, fs_node_impl_symlink, fs_node_impl_xattr_delegate, CacheConfig,
     CacheMode, DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle,
     FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-    MemoryFileObject, SeekTarget, SymlinkTarget, XattrOp, XattrStorage,
+    MemoryFileObject, SeekTarget, SymlinkTarget, XattrOp, XattrStorage, DEFAULT_BYTES_PER_BLOCK,
 };
 use starnix_logging::{impossible_error, track_stub};
 use starnix_sync::{FileOpsCore, Locked};
@@ -223,6 +223,8 @@ impl FsNodeOps for ExtDirectory {
             child.update_info(|info| {
                 info.size = size;
                 info.link_count = nlink;
+                info.blksize = DEFAULT_BYTES_PER_BLOCK;
+                info.blocks = size.div_ceil(DEFAULT_BYTES_PER_BLOCK);
             });
             Ok(child)
         })

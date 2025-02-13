@@ -194,10 +194,11 @@ impl FsNodeOps for File {
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
         let memory = self.inner.lock().unwrap().get_memory()?;
+        let content_size = memory.get_content_size();
         let attrs = zxio_node_attributes_t {
-            content_size: memory.get_content_size(),
+            content_size: content_size,
             // TODO(https://fxbug.dev/293607051): Plumb through storage size from underlying connection.
-            storage_size: 0,
+            storage_size: content_size,
             link_count: 1,
             has: zxio_node_attr_has_t {
                 content_size: true,
