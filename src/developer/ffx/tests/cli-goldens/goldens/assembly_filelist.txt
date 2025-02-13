@@ -1,5 +1,4 @@
 ffx/assembly.golden
-ffx/assembly/board-input-bundle.golden
 ffx/assembly/create-system.golden
 ffx/assembly/create-update.golden
 ffx/assembly/product.golden
