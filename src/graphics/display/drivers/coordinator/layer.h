@@ -57,17 +57,17 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
 
   bool in_use() const {
     return applied_display_config_list_node_.InContainer() ||
-           pending_display_config_list_node_.InContainer();
+           draft_display_config_list_node_.InContainer();
   }
 
-  const image_metadata_t& pending_image_metadata() const {
-    return pending_layer_config_.image_metadata;
+  const image_metadata_t& draft_image_metadata() const {
+    return draft_layer_config_.image_metadata;
   }
-  uint64_t pending_image_handle() const { return pending_layer_config_.image_handle; }
+  uint64_t draft_image_handle() const { return draft_layer_config_.image_handle; }
 
-  // If the layer properties were changed in the pending configuration, this
+  // If the layer properties were changed in the draft configuration, this
   // retires all images as they are invalidated with layer properties change.
-  bool ResolvePendingLayerProperties();
+  bool ResolveDraftLayerProperties();
 
   // This sets up the fence and config stamp for pending images on this layer.
   //
@@ -80,40 +80,40 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
   //   layers to determine the current frame state.
   //
   // Returns false if there were any errors.
-  bool ResolvePendingImage(FenceCollection* fence,
-                           display::ConfigStamp stamp = display::kInvalidConfigStamp);
+  bool ResolveDraftImage(FenceCollection* fence,
+                         display::ConfigStamp stamp = display::kInvalidConfigStamp);
 
-  // Set the applied layer configuration to the pending layer configuration.
+  // Set the applied layer configuration to the draft layer configuration.
   void ApplyChanges();
 
-  // Set the pending layer configuration to the applied layer configuration.
+  // Set the draft layer configuration to the applied layer configuration.
   //
-  // This discards any changes in the pending layer configuration.
+  // This discards any changes in the draft layer configuration.
   void DiscardChanges();
 
   // Removes references to all Images associated with this Layer.
-  // Returns true if the current config has been affected.
+  // Returns true if the applied config has been affected.
   bool CleanUpAllImages() __TA_REQUIRES(mtx());
 
   // Removes references to the provided Image. `image` must be valid.
-  // Returns true if the current config has been affected.
+  // Returns true if the applied config has been affected.
   bool CleanUpImage(const Image& image) __TA_REQUIRES(mtx());
 
-  // If a new image is available, retire current_image() and other pending images. Returns false if
+  // If a new image is available, retire applied_image() and other pending images. Returns false if
   // no images were ready.
   bool ActivateLatestReadyImage();
 
-  // Get the stamp of configuration that is associated (at ResolvePendingImage)
+  // Get the stamp of configuration that is associated (at ResolveDraftImage)
   // with the image that is currently being displayed on the device.
   // If no image is being displayed on this layer, returns nullopt.
   std::optional<display::ConfigStamp> GetCurrentClientConfigStamp() const;
 
-  // Adds the layer's pending config to a display configuration's layer list.
+  // Adds the layer's draft config to a display configuration's layer list.
   //
-  // Returns true if the method succeeds. The layer's pending config is be at
+  // Returns true if the method succeeds. The layer's draft config is be at
   // the end of the display configuration's list of layer configs.
   //
-  // Returns false if the layer's pending config is already in a display
+  // Returns false if the layer's draft config is already in a display
   // configuration's layer list. No changes are made.
   bool AppendToConfigLayerList(fbl::DoublyLinkedList<LayerNode*>& config_layer_list);
 
@@ -137,8 +137,8 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
   fbl::Mutex* mtx() const;
 
  private:
-  // Retires the `pending_image_`.
-  void RetirePendingImage();
+  // Retires the `draft_image_`.
+  void RetireDraftImage();
 
   // Retires the `image` from the `waiting_images_` list.
   // Does nothing if `image` is not in the list.
@@ -151,17 +151,17 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
 
   Controller& controller_;
 
-  layer_t pending_layer_config_;
+  layer_t draft_layer_config_;
   layer_t applied_layer_config_;
 
-  // True if `pending_layer_` is different from `applied_layer_`.
-  bool pending_layer_config_differs_from_applied_;
+  // True if `draft_layer_` is different from `applied_layer_`.
+  bool draft_layer_config_differs_from_applied_;
 
   // The event passed to SetLayerImage which hasn't been applied yet.
-  display::EventId pending_image_wait_event_id_ = display::kInvalidEventId;
+  display::EventId draft_image_wait_event_id_ = display::kInvalidEventId;
 
   // The image given to SetLayerImage which hasn't been applied yet.
-  fbl::RefPtr<Image> pending_image_;
+  fbl::RefPtr<Image> draft_image_;
 
   // Manages images which are waiting to be displayed. Each one has an optional wait fence which
   // may not have been signaled yet.
@@ -173,10 +173,10 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
   fbl::RefPtr<Image> applied_image_;
 
   // Counters used for keeping track of when the layer's images need to be dropped.
-  uint64_t pending_image_config_gen_ = 0;
+  uint64_t draft_image_config_gen_ = 0;
   uint64_t applied_image_config_gen_ = 0;
 
-  LayerNode pending_display_config_list_node_;
+  LayerNode draft_display_config_list_node_;
   LayerNode applied_display_config_list_node_;
 
   // Identifies the display that this layer was last applied to.

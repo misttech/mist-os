@@ -155,7 +155,7 @@ TEST_F(LayerTest, CleanUpImage) {
   layer->ApplyChanges();
 
   ASSERT_TRUE(RunOnControllerLoop<bool>(
-      [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(1)); }));
+      [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(1)); }));
 
   zx::event event;
   ASSERT_OK(zx::event::create(0, &event));
@@ -168,10 +168,10 @@ TEST_F(LayerTest, CleanUpImage) {
   auto waiting_image = CreateReadyImage();
   layer->SetImage(waiting_image, kWaitFenceId);
   ASSERT_TRUE(RunOnControllerLoop<bool>(
-      [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(2)); }));
+      [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(2)); }));
 
-  auto pending_image = CreateReadyImage();
-  layer->SetImage(pending_image, display::kInvalidEventId);
+  auto draft_image = CreateReadyImage();
+  layer->SetImage(draft_image, display::kInvalidEventId);
 
   ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
@@ -194,11 +194,11 @@ TEST_F(LayerTest, CleanUpImage) {
   }));
   EXPECT_TRUE(layer->applied_image());
 
-  // Test cleaning up a pending image.
+  // Test cleaning up a draft image.
   EXPECT_FALSE(RunOnControllerLoop<bool>([&]() {
     fbl::AutoLock lock(CoordinatorController()->mtx());
     CoordinatorController()->AssertMtxAliasHeld(*layer->mtx());
-    return layer->CleanUpImage(*pending_image);
+    return layer->CleanUpImage(*draft_image);
   }));
   EXPECT_TRUE(layer->applied_image());
 
@@ -234,7 +234,7 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
     layer->SetImage(image, display::kInvalidEventId);
     layer->ApplyChanges();
     ASSERT_TRUE(RunOnControllerLoop<bool>(
-        [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(1)); }));
+        [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(1)); }));
     ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
     EXPECT_TRUE(layer->applied_image());
@@ -256,7 +256,7 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
     layer->SetImage(image, display::kInvalidEventId);
     layer->ApplyChanges();
     ASSERT_TRUE(RunOnControllerLoop<bool>(
-        [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(2)); }));
+        [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(2)); }));
     ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
     EXPECT_TRUE(layer->applied_image());
@@ -290,7 +290,7 @@ TEST_F(LayerTest, CleanUpAllImages) {
   layer->SetImage(displayed_image, display::kInvalidEventId);
   layer->ApplyChanges();
   ASSERT_TRUE(RunOnControllerLoop<bool>(
-      [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(1)); }));
+      [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(1)); }));
 
   zx::event event;
   ASSERT_OK(zx::event::create(0, &event));
@@ -303,10 +303,10 @@ TEST_F(LayerTest, CleanUpAllImages) {
   auto waiting_image = CreateReadyImage();
   layer->SetImage(waiting_image, kWaitFenceId);
   ASSERT_TRUE(RunOnControllerLoop<bool>(
-      [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(2)); }));
+      [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(2)); }));
 
-  auto pending_image = CreateReadyImage();
-  layer->SetImage(pending_image, display::kInvalidEventId);
+  auto draft_image = CreateReadyImage();
+  layer->SetImage(draft_image, display::kInvalidEventId);
 
   ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
@@ -340,7 +340,7 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
     layer->SetImage(image, display::kInvalidEventId);
     layer->ApplyChanges();
     ASSERT_TRUE(RunOnControllerLoop<bool>(
-        [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(1)); }));
+        [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(1)); }));
     ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
     EXPECT_TRUE(layer->applied_image());
@@ -362,7 +362,7 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
     layer->SetImage(image, display::kInvalidEventId);
     layer->ApplyChanges();
     ASSERT_TRUE(RunOnControllerLoop<bool>(
-        [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(2)); }));
+        [&]() { return layer->ResolveDraftImage(fences_.get(), display::ConfigStamp(2)); }));
     ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
 
     EXPECT_TRUE(layer->applied_image());

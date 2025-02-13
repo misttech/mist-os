@@ -64,12 +64,12 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, display:
     return ret;
   }
 
-  // Discards all the pending config (except for pending layers lists)
+  // Discards all the draft changes (except for draft layers lists)
   // of a Display's `config`.
   //
-  // The display pending layers' pending config must be discarded before
-  // `DiscardNonLayerPendingConfig()` is called.
-  void DiscardNonLayerPendingConfig();
+  // The display draft layers' draft configs must be discarded before
+  // `DiscardNonLayerDraftConfig()` is called.
+  void DiscardNonLayerDraftConfig();
 
   int applied_layer_count() const { return static_cast<int>(applied_.layer_count); }
   const display_config_t* applied_config() const { return &applied_; }
@@ -80,14 +80,14 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, display:
   display_config_t applied_;
 
   // The display configuration modified by client calls.
-  display_config_t pending_;
+  display_config_t draft_;
 
-  // If true, the pending configuration's layer list may differ from the current
+  // If true, the draft configuration's layer list may differ from the current
   // configuration's list.
-  bool pending_has_layer_list_change_;
+  bool draft_has_layer_list_change_ = false;
 
   bool pending_apply_layer_change_;
-  fbl::DoublyLinkedList<LayerNode*> pending_layers_;
+  fbl::DoublyLinkedList<LayerNode*> draft_layers_;
   fbl::DoublyLinkedList<LayerNode*> applied_layers_;
 
   fbl::Array<CoordinatorPixelFormat> pixel_formats_;
@@ -98,8 +98,8 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, display:
   friend ClientProxy;
 
   inspect::Node node_;
-  // Reflects `pending_has_layer_list_change_`.
-  inspect::BoolProperty pending_has_layer_list_change_property_;
+  // Reflects `draft_has_layer_list_change_`.
+  inspect::BoolProperty draft_has_layer_list_change_property_;
   // Reflects `pending_apply_layer_change_`.
   inspect::BoolProperty pending_apply_layer_change_property_;
 };
@@ -230,12 +230,11 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   bool CleanUpImage(Image& image);
   void CleanUpCaptureImage(display::ImageId id);
 
-  // Displays' pending layers list may have been changed by pending
-  // SetDisplayLayers() operations.
+  // Displays' draft layers list may have been changed by SetDisplayLayers().
   //
-  // Restores the pending layer lists of all the Displays to their applied layer
-  // list state respectively, undoing all pending changes to the layer lists.
-  void SetAllConfigPendingLayersToAppliedLayers();
+  // Restores the draft layer lists of all the displays to their applied layer
+  // list state respectively, undoing all draft changes to the layer lists.
+  void SetAllConfigDraftLayersToAppliedLayers();
 
   // `fuchsia.hardware.display/Coordinator.ImportImage()` helper for display
   // images.
@@ -253,7 +252,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   zx_status_t ImportImageForCapture(const display::ImageMetadata& image_metadata,
                                     display::BufferId buffer_id, display::ImageId image_id);
 
-  // Discards all the pending config on all Displays and Layers.
+  // Discards all the draft configs on all displays and layers.
   void DiscardConfig();
 
   void SetLayerImageImpl(display::LayerId layer_id, display::ImageId image_id,
@@ -269,7 +268,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   CaptureImage::Map capture_images_;
 
   DisplayConfig::Map configs_;
-  bool pending_config_valid_ = false;
+  bool draft_config_valid_ = false;
   bool is_owner_ = false;
 
   // A counter for the number of times the client has successfully applied
