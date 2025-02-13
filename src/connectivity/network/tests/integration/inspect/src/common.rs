@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use itertools::Itertools as _;
+use std::path::PathBuf;
 
 /// The location where [`inspect_for_sampler_test_inner`] will pull Sampler
 /// config from. All tests must make sure to output sampler config into that
@@ -18,17 +19,16 @@ pub(crate) trait InspectDataGetter {
 /// The core part of the NS2 and NS3 test that validates that the selectors used
 /// in the Sampler config are present in the inspect data.
 pub(crate) async fn inspect_for_sampler_test_inner<S: InspectDataGetter>(getter: &S) {
-    let sampler_config = sampler_config::SamplerConfigBuilder::default()
-        .sampler_dir(SAMPLER_CONFIG_DIR)
-        .load()
-        .expect("SamplerConfig load failed");
-    let project_config = match &sampler_config.project_configs[..] {
+    let project_configs =
+        sampler_config::load_project_configs(PathBuf::from(SAMPLER_CONFIG_DIR), None)
+            .expect("SamplerConfig load failed");
+    let project_config = match &project_configs[..] {
         [project_config] => project_config,
         project_configs => panic!("expected one project_config but got {:#?}", project_configs),
     };
     for metric_config in &project_config.metrics {
         let selector = match &metric_config.selectors[..] {
-            [selector] => &selector.selector,
+            [selector] => selector,
             selectors => panic!("expected one selector but got {:#?}", selectors),
         };
         let fidl_fuchsia_diagnostics::Selector { tree_selector, .. } = selector;

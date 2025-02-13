@@ -246,9 +246,7 @@ async fn sampler_inspect_test() {
             .expect("got inspect data");
 
         let hierarchy = data.pop().expect("one result").payload.expect("payload is not none");
-        if hierarchy.get_child("sampler_executor_stats").is_none()
-            || hierarchy.get_child("metrics_sent").is_none()
-        {
+        if hierarchy.get_child("sampler_executor_stats").is_none() {
             fasync::Timer::new(fasync::MonotonicInstant::after(
                 zx::MonotonicDuration::from_millis(100),
             ))
@@ -276,77 +274,8 @@ async fn sampler_inspect_test() {
                 },
                 project_13: {
                     project_sampler_count: 3u64,
-                    metrics_configured: 12u64,
+                    metrics_configured: 10u64,
                     cobalt_logs_sent: AnyProperty,
-                },
-            },
-            metrics_sent: {
-                "fire_1.json5":
-                {
-                    "0": {
-                        selector: "single_counter:root/samples:integer_1",
-                        upload_count: 0u64
-                    },
-                    "1": {
-                        selector: "single_counter:root/samples:integer_1",
-                        upload_count: 0u64
-                    },
-                    "2": {
-                        selector: "single_counter:root/samples:integer_2",
-                        upload_count: 0u64
-                    },
-                    "3": {
-                        selector: "single_counter:root/samples:integer_2",
-                        upload_count: 0u64
-                    },
-                    "4": {
-                        selector: "single_counter:root/samples:integer_42",
-                        upload_count: 0u64
-                    },
-                    "5": {
-                        selector: "single_counter:root/samples:integer_42",
-                        upload_count: 0u64
-                    }
-                },
-                "fire_2.json5": {
-                    "0": {
-                        selector: "single_counter:root/samples:integer_1",
-                        upload_count: 0u64
-                    },
-                    "1": {
-                        selector: "single_counter:root/samples:integer_2",
-                        upload_count: 0u64
-                    },
-                    "2": {
-                        selector: "single_counter:root/samples:integer_42",
-                        upload_count: 0u64
-                    }
-                },
-                "fire_3.json5": {
-                    "0": {
-                        selector: "single_counter:root/samples:1111222233334444111111111111111111111111111111111111111111111111",
-                        upload_count: 0u64
-                    }
-                },
-                "reboot_required_config.json": {
-                    "0": {
-                        selector: "single_counter:root/samples:counter",
-                        upload_count: 0u64
-                    }
-                },
-                "test_config.json": {
-                    "0": {
-                        selector: "single_counter:root/samples:counter",
-                        upload_count: 0u64
-                        },
-                    "1": {
-                        selector: "single_counter:root/samples:integer_1",
-                        upload_count: 0u64
-                        },
-                    "2": {
-                        selector: "single_counter:root/samples:integer_2",
-                        upload_count: 0u64
-                    }
                 },
             },
             "fuchsia.inspect.Health": {

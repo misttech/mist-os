@@ -3,10 +3,17 @@
 // found in the LICENSE file.
 
 use serde::Deserialize;
+use std::fmt;
 use std::ops::Deref;
 
-#[derive(Copy, Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Default, Deserialize, Hash, PartialEq, Eq)]
 pub struct ProjectId(pub u32);
+
+impl fmt::Display for ProjectId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 impl Deref for ProjectId {
     type Target = u32;
@@ -16,8 +23,14 @@ impl Deref for ProjectId {
     }
 }
 
-#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Hash, Eq)]
 pub struct CustomerId(pub u32);
+
+impl fmt::Display for CustomerId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 impl Default for CustomerId {
     fn default() -> Self {
@@ -33,8 +46,14 @@ impl Deref for CustomerId {
     }
 }
 
-#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Deserialize, Hash, PartialEq, Eq)]
 pub struct MetricId(pub u32);
+
+impl fmt::Display for MetricId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 impl Deref for MetricId {
     type Target = u32;
@@ -44,8 +63,14 @@ impl Deref for MetricId {
     }
 }
 
-#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Deserialize, Hash, PartialEq, Eq)]
 pub struct EventCode(pub u32);
+
+impl fmt::Display for EventCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 impl Deref for EventCode {
     type Target = u32;
@@ -56,7 +81,7 @@ impl Deref for EventCode {
 }
 
 /// Supported Cobalt Metric types
-#[derive(Deserialize, Debug, PartialEq, Eq, Copy, Clone)]
+#[derive(Deserialize, Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum MetricType {
     /// Maps cached diffs from Uint or Int Inspect types.
     /// NOTE: This does not use duration tracking. Durations are always set to 0.

@@ -18,14 +18,11 @@ rustc_library("sampler-config") {
 
   deps = [
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
-    "//src/lib/diagnostics/inspect/rust",
     "//src/lib/diagnostics/selectors",
     "//src/sys/lib/component_id_index",
     "//src/sys/lib/moniker",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:futures",
     "//third_party/rust_crates:glob",
-    "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:log",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json5",
@@ -34,17 +31,13 @@ rustc_library("sampler-config") {
 
   test_deps = [
     "//src/lib/fuchsia",
-    "//src/lib/fuchsia",
     "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:tempfile",
   ]
 
   sources = [
     "src/common.rs",
     "src/lib.rs",
     "src/runtime/mod.rs",
-    "src/selector_list.rs",
-    "src/string_list.rs",
     "src/user_facing/mod.rs",
     "src/utils.rs",
   ]
