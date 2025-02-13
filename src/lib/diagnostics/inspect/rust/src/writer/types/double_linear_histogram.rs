@@ -4,11 +4,12 @@
 
 use crate::writer::{
     ArithmeticArrayProperty, ArrayProperty, DoubleArrayProperty, HistogramProperty, InspectType,
-    Node, StringReference,
+    Node,
 };
 use diagnostics_hierarchy::{ArrayFormat, LinearHistogramParams};
 use inspect_format::constants;
 use log::error;
+use std::borrow::Cow;
 
 #[derive(Debug, Default)]
 /// A linear histogram property for double values.
@@ -23,7 +24,7 @@ impl InspectType for DoubleLinearHistogramProperty {}
 
 impl DoubleLinearHistogramProperty {
     pub(crate) fn new(
-        name: StringReference,
+        name: Cow<'_, str>,
         params: LinearHistogramParams<f64>,
         parent: &Node,
     ) -> Self {

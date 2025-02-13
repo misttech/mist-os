@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use super::WriteInspect;
-use fuchsia_inspect::{ArrayProperty, Node, StringReference};
+use fuchsia_inspect::{ArrayProperty, Node};
+use std::borrow::Cow;
 use std::marker::PhantomData;
 
 /// Wrapper to log bytes in an `inspect_log!` or `inspect_insert!` macro.
@@ -14,7 +15,7 @@ use std::marker::PhantomData;
 pub struct InspectBytes<T: AsRef<[u8]>>(pub T);
 
 impl<T: AsRef<[u8]>> WriteInspect for InspectBytes<T> {
-    fn write_inspect(&self, writer: &Node, key: impl Into<StringReference>) {
+    fn write_inspect<'a>(&self, writer: &Node, key: impl Into<Cow<'a, str>>) {
         writer.record_bytes(key, self.0.as_ref());
     }
 }
@@ -41,7 +42,7 @@ impl<T> WriteInspect for InspectList<'_, T>
 where
     T: WriteInspect,
 {
-    fn write_inspect(&self, writer: &Node, key: impl Into<StringReference>) {
+    fn write_inspect<'a>(&self, writer: &Node, key: impl Into<Cow<'a, str>>) {
         let child = writer.create_child(key);
         for (i, val) in self.0.iter().enumerate() {
             val.write_inspect(&child, i.to_string());
@@ -79,7 +80,7 @@ impl<T, F> WriteInspect for InspectListClosure<'_, T, F>
 where
     F: Fn(&Node, &str, &T),
 {
-    fn write_inspect(&self, writer: &Node, key: impl Into<StringReference>) {
+    fn write_inspect<'a>(&self, writer: &Node, key: impl Into<Cow<'a, str>>) {
         let child = writer.create_child(key);
         for (i, val) in self.0.iter().enumerate() {
             self.1(&child, &i.to_string(), val);
@@ -102,7 +103,7 @@ impl<T: AsRef<[I]>, I: Into<u64> + Clone> InspectUintArray<T, I> {
 }
 
 impl<T: AsRef<[I]>, I: Into<u64> + Clone> WriteInspect for InspectUintArray<T, I> {
-    fn write_inspect(&self, node: &Node, key: impl Into<StringReference>) {
+    fn write_inspect<'a>(&self, node: &Node, key: impl Into<Cow<'a, str>>) {
         let iter = self.items.as_ref().iter();
         let inspect_array = node.create_uint_array(key, iter.len());
         for (i, c) in iter.enumerate() {

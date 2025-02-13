@@ -13,7 +13,7 @@ use crate::config_management::{
 use crate::telemetry::{self, TelemetryEvent, TelemetrySender};
 use anyhow::format_err;
 use async_trait::async_trait;
-use fuchsia_inspect::{Node as InspectNode, StringReference};
+use fuchsia_inspect::Node as InspectNode;
 use fuchsia_inspect_auto_persist::{self as auto_persist, AutoPersist};
 use fuchsia_inspect_contrib::inspect_insert;
 use fuchsia_inspect_contrib::log::WriteInspect;
@@ -23,6 +23,7 @@ use futures::lock::Mutex;
 use futures::select;
 use futures::stream::StreamExt;
 use log::{debug, error, info, warn};
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::Arc;
@@ -561,7 +562,7 @@ impl types::ScannedCandidate {
 }
 
 impl WriteInspect for types::ScannedCandidate {
-    fn write_inspect(&self, writer: &InspectNode, key: impl Into<StringReference>) {
+    fn write_inspect<'a>(&self, writer: &InspectNode, key: impl Into<Cow<'a, str>>) {
         inspect_insert!(writer, var key: {
             ssid: self.network.ssid.to_string(),
             bssid: self.bss.bssid.to_string(),

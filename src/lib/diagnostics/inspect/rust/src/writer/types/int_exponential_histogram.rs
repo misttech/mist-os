@@ -4,11 +4,11 @@
 
 use crate::writer::{
     ArithmeticArrayProperty, ArrayProperty, HistogramProperty, InspectType, IntArrayProperty, Node,
-    StringReference,
 };
 use diagnostics_hierarchy::{ArrayFormat, ExponentialHistogramParams};
 use inspect_format::constants;
 use log::error;
+use std::borrow::Cow;
 
 #[derive(Debug, Default)]
 /// An exponential histogram property for int values.
@@ -24,7 +24,7 @@ impl InspectType for IntExponentialHistogramProperty {}
 
 impl IntExponentialHistogramProperty {
     pub(crate) fn new(
-        name: StringReference,
+        name: Cow<'_, str>,
         params: ExponentialHistogramParams<i64>,
         parent: &Node,
     ) -> Self {

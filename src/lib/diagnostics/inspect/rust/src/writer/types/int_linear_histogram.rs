@@ -4,11 +4,11 @@
 
 use crate::writer::{
     ArithmeticArrayProperty, ArrayProperty, HistogramProperty, InspectType, IntArrayProperty, Node,
-    StringReference,
 };
 use diagnostics_hierarchy::{ArrayFormat, LinearHistogramParams};
 use inspect_format::constants;
 use log::error;
+use std::borrow::Cow;
 
 #[derive(Debug, Default)]
 /// A linear histogram property for integer values.
@@ -23,7 +23,7 @@ impl InspectType for IntLinearHistogramProperty {}
 
 impl IntLinearHistogramProperty {
     pub(crate) fn new(
-        name: StringReference,
+        name: Cow<'_, str>,
         params: LinearHistogramParams<i64>,
         parent: &Node,
     ) -> Self {

@@ -19,7 +19,6 @@ use futures::lock::Mutex;
 use futures::{FutureExt, StreamExt};
 use hooks::{Event, EventPayload, EventType, HasEventType, Hook, HooksRegistration};
 use injectable_time::{BootInstant, TimeSource};
-use lazy_static::lazy_static;
 use log::warn;
 use moniker::{ExtendedMoniker, Moniker};
 use std::collections::{BTreeMap, VecDeque};
@@ -38,9 +37,7 @@ macro_rules! maybe_return {
 
 const MAX_INSPECT_SIZE : usize = 2 * 1024 * 1024 /* 2MB */;
 
-lazy_static! {
-    static ref AGGREGATE_SAMPLES: inspect::StringReference = "@aggregated".into();
-}
+const AGGREGATE_SAMPLES: &'static str = "@aggregated";
 
 /// Provides stats for all components running in the system.
 pub struct ComponentTreeStats<T: RuntimeStatsSource + Debug> {

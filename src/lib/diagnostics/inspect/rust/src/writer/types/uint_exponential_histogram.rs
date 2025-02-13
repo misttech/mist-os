@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use crate::writer::{
-    ArithmeticArrayProperty, ArrayProperty, HistogramProperty, InspectType, Node, StringReference,
-    UintArrayProperty,
+    ArithmeticArrayProperty, ArrayProperty, HistogramProperty, InspectType, Node, UintArrayProperty,
 };
 use diagnostics_hierarchy::{ArrayFormat, ExponentialHistogramParams};
 use inspect_format::constants;
 use log::error;
+use std::borrow::Cow;
 
 #[derive(Debug, Default)]
 /// An exponential histogram property for uint values.
@@ -24,7 +24,7 @@ impl InspectType for UintExponentialHistogramProperty {}
 
 impl UintExponentialHistogramProperty {
     pub(crate) fn new(
-        name: StringReference,
+        name: Cow<'_, str>,
         params: ExponentialHistogramParams<u64>,
         parent: &Node,
     ) -> Self {

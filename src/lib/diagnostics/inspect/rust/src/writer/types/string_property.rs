@@ -4,6 +4,7 @@
 
 use crate::writer::{Inner, InnerPropertyType, InspectType, Property};
 use log::error;
+use std::borrow::Cow;
 
 /// Inspect String Property data type.
 ///
@@ -24,7 +25,9 @@ impl<'t> Property<'t> for StringProperty {
             inner_ref
                 .state
                 .try_lock()
-                .and_then(|mut state| state.set_string_property(inner_ref.block_index, value))
+                .and_then(|mut state| {
+                    state.set_string_property(inner_ref.block_index, Cow::Borrowed(value))
+                })
                 .unwrap_or_else(|e| error!("Failed to set property. Error: {:?}", e));
         }
     }

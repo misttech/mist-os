@@ -4,11 +4,12 @@
 
 use crate::mode_management::{Defect, EventHistory, IfaceFailure, PhyFailure};
 use crate::telemetry;
-use fuchsia_inspect::{Node as InspectNode, StringReference};
+use fuchsia_inspect::Node as InspectNode;
 use fuchsia_inspect_contrib::inspect_insert;
 use fuchsia_inspect_contrib::log::WriteInspect;
 use futures::channel::mpsc;
 use log::warn;
+use std::borrow::Cow;
 
 // As a general note, recovery is intended to be a method of last resort.  It should be used in
 // circumstances where it is thought that WLAN firmware or the interface with the WLAN peripheral
@@ -131,7 +132,7 @@ impl RecoveryAction {
 }
 
 impl WriteInspect for RecoveryAction {
-    fn write_inspect(&self, writer: &InspectNode, key: impl Into<StringReference>) {
+    fn write_inspect<'a>(&self, writer: &InspectNode, key: impl Into<Cow<'a, str>>) {
         match self {
             RecoveryAction::PhyRecovery(PhyRecoveryOperation::DestroyIface { iface_id }) => {
                 inspect_insert!(writer, var key: {DestroyIface: {iface_id: iface_id}})
@@ -202,7 +203,7 @@ impl RecoverySummary {
 }
 
 impl WriteInspect for RecoverySummary {
-    fn write_inspect(&self, writer: &InspectNode, key: impl Into<StringReference>) {
+    fn write_inspect<'a>(&self, writer: &InspectNode, key: impl Into<Cow<'a, str>>) {
         inspect_insert!(writer, var key: {
             defect: self.defect,
             action: self.action,

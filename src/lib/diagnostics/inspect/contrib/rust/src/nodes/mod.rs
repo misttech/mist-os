@@ -4,16 +4,16 @@
 
 //! Utilities and wrappers providing higher level functionality for Inspect Nodes and properties.
 
+use fuchsia_inspect::{InspectType, IntProperty, Node, Property};
+use std::borrow::Cow;
 use std::{fmt, marker};
+pub use zx::{BootTimeline, MonotonicTimeline};
 
 mod list;
 mod lru_cache;
 
 pub use list::BoundedListNode;
 pub use lru_cache::LruCacheNode;
-pub use zx::{BootTimeline, MonotonicTimeline};
-
-use fuchsia_inspect::{InspectType, IntProperty, Node, Property, StringReference};
 
 /// Implemented by timelines for which we can get the current time.
 pub trait GetCurrentTime: zx::Timeline + Sized {
@@ -44,32 +44,32 @@ pub struct CreateTimeResult<T> {
 pub trait NodeTimeExt<T: zx::Timeline> {
     /// Creates a new property holding the current timestamp on the given timeline. Returns the
     /// current timestamp that was used for the returned property too.
-    fn create_time(&self, name: impl Into<StringReference>) -> CreateTimeResult<T>;
+    fn create_time<'a>(&self, name: impl Into<Cow<'a, str>>) -> CreateTimeResult<T>;
 
     /// Creates a new property holding the given timestamp.
-    fn create_time_at(
+    fn create_time_at<'a>(
         &self,
-        name: impl Into<StringReference>,
+        name: impl Into<Cow<'a, str>>,
         timestamp: zx::Instant<T>,
     ) -> TimeProperty<T>;
 
     /// Records a new property holding the current timestamp and returns the instant that was
     /// recorded.
-    fn record_time(&self, name: impl Into<StringReference>) -> zx::Instant<T>;
+    fn record_time<'a>(&self, name: impl Into<Cow<'a, str>>) -> zx::Instant<T>;
 }
 
 impl<T> NodeTimeExt<T> for Node
 where
     T: zx::Timeline + GetCurrentTime,
 {
-    fn create_time(&self, name: impl Into<StringReference>) -> CreateTimeResult<T> {
+    fn create_time<'a>(&self, name: impl Into<Cow<'a, str>>) -> CreateTimeResult<T> {
         let timestamp = T::get_current_time();
         CreateTimeResult { timestamp, property: self.create_time_at(name, timestamp) }
     }
 
-    fn create_time_at(
+    fn create_time_at<'a>(
         &self,
-        name: impl Into<StringReference>,
+        name: impl Into<Cow<'a, str>>,
         timestamp: zx::Instant<T>,
     ) -> TimeProperty<T> {
         TimeProperty {
@@ -78,7 +78,7 @@ where
         }
     }
 
-    fn record_time(&self, name: impl Into<StringReference>) -> zx::Instant<T> {
+    fn record_time<'a>(&self, name: impl Into<Cow<'a, str>>) -> zx::Instant<T> {
         let instant = T::get_current_time();
         self.record_int(name, instant.into_nanos());
         instant

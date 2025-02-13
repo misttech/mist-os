@@ -424,7 +424,7 @@ mod tests {
     use super::*;
     use crate::types::private::InspectTypeInternal;
     use crate::writer::testing_utils::GetBlockExt;
-    use crate::{ArrayProperty, HistogramProperty, Inspector, StringReference};
+    use crate::{ArrayProperty, HistogramProperty, Inspector};
     use anyhow::Error;
     use diagnostics_assertions::{assert_data_tree, assert_json_diff};
     use futures::prelude::*;
@@ -435,13 +435,13 @@ mod tests {
         let inspector = Inspector::default();
         let root = inspector.root();
 
-        let name_value = StringReference::from("abc");
-        let longer_name_value = StringReference::from("abcdefg");
+        let name_value = "abc";
+        let longer_name_value = "abcdefg";
 
-        let child = root.create_child(&name_value);
-        child.record_int(&name_value, 5);
+        let child = root.create_child(name_value);
+        child.record_int(name_value, 5);
 
-        root.record_bool(&longer_name_value, false);
+        root.record_bool(longer_name_value, false);
 
         let result = read(&inspector).await.unwrap();
         assert_json_diff!(result, root: {
@@ -458,21 +458,27 @@ mod tests {
         let root = inspector.root();
 
         let zero = (0..3000).map(|_| '0').collect::<String>();
-        let one: String = "1".into();
-        let two: String = "two".into();
-        let three: String = "three three three".into();
-        let four: String = "fourth".into();
+        let one = "1";
+        let two = "two";
+        let three = "three three three";
+        let four = "fourth";
 
         let array = root.create_string_array("array", 5);
-        array.set(0, &zero);
-        array.set(1, &one);
-        array.set(2, &two);
-        array.set(3, &three);
-        array.set(4, &four);
+        array.set(0, zero.as_str());
+        array.set(1, one);
+        array.set(2, two);
+        array.set(3, three);
+        array.set(4, four);
 
         let result = read(&inspector).await.unwrap();
         assert_json_diff!(result, root: {
-            "array": vec![zero, one, two, three, four],
+            "array": vec![
+                zero,
+                one.to_string(),
+                two.to_string(),
+                three.to_string(),
+                four.to_string(),
+            ],
         });
     }
 
@@ -482,17 +488,17 @@ mod tests {
         let root = inspector.root();
 
         let zero = (0..3000).map(|_| '0').collect::<String>();
-        let one: String = "1".into();
-        let four: String = "fourth".into();
+        let one = "1";
+        let four = "fourth";
 
         let array = root.create_string_array("array", 5);
-        array.set(0, &zero);
-        array.set(1, &one);
-        array.set(4, &four);
+        array.set(0, zero.as_str());
+        array.set(1, one);
+        array.set(4, four);
 
         let result = read(&inspector).await.unwrap();
         assert_json_diff!(result, root: {
-            "array": vec![zero, one, "".into(), "".into(), four],
+            "array": vec![zero, one.to_string(), "".into(), "".into(), four.to_string()],
         });
     }
 
@@ -587,12 +593,12 @@ mod tests {
     async fn siblings_with_same_name() {
         let inspector = Inspector::default();
 
-        let foo: StringReference = "foo".into();
+        let foo = "foo";
 
         inspector.root().record_int("foo", 0);
         inspector.root().record_int("foo", 1);
-        inspector.root().record_int(&foo, 2);
-        inspector.root().record_int(&foo, 3);
+        inspector.root().record_int(foo, 2);
+        inspector.root().record_int(foo, 3);
 
         let dh = read(&inspector).await.unwrap();
         assert_eq!(dh.properties.len(), 4);

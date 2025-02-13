@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 
 use crate::writer::private::InspectTypeInternal;
-use crate::writer::{ArrayProperty, Inner, InnerValueType, InspectType, State, StringReference};
+use crate::writer::{ArrayProperty, Inner, InnerValueType, InspectType, State};
 use inspect_format::BlockIndex;
+use std::borrow::Cow;
 
 #[derive(Debug, PartialEq, Eq, Default)]
 pub struct StringArrayProperty {
@@ -55,9 +56,9 @@ impl InspectTypeInternal for StringArrayProperty {
 }
 
 impl ArrayProperty for StringArrayProperty {
-    type Type = StringReference;
+    type Type<'a> = Cow<'a, str>;
 
-    fn set(&self, index: usize, value: impl Into<Self::Type>) {
+    fn set<'a>(&self, index: usize, value: impl Into<Self::Type<'a>>) {
         if let Some(ref inner_ref) = self.inner.inner_ref() {
             inner_ref
                 .state

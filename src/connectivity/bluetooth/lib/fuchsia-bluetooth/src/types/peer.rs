@@ -127,7 +127,7 @@ impl IsInspectable for Peer {
 
 #[cfg(target_os = "fuchsia")]
 impl WriteInspect for Peer {
-    fn write_inspect(&self, writer: &Node, key: impl Into<fuchsia_inspect::StringReference>) {
+    fn write_inspect<'a>(&self, writer: &Node, key: impl Into<std::borrow::Cow<'a, str>>) {
         writer.record_child(key, |node| {
             self.record_inspect(node);
         });
