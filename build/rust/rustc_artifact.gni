@@ -95,6 +95,7 @@ import("//build/toolchain/rbe.gni")
 #   deps
 #   inputs
 #   metadata
+#   public_configs
 #   public_deps
 #   sources
 #   testonly
@@ -219,6 +220,7 @@ template("rustc_artifact") {
                                "metadata",
                                "output_prefix_override",
                                "pool",
+                               "public_configs",
                                "public_deps",
                                "rustenv",
                                "testonly",
