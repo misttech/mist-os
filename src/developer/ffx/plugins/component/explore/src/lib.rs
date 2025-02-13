@@ -4,7 +4,7 @@
 
 use async_trait::async_trait;
 use component_debug::cli::explore_cmd;
-use errors::FfxError;
+use errors::ffx_error;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_explore_args::ExploreComponentCommand;
 use ffx_writer::SimpleWriter;
@@ -45,7 +45,7 @@ impl FfxMain for ExploreTool {
             stdout,
         )
         .await
-        .map_err(|e| FfxError::Error(e, 1))?;
+        .map_err(|e| ffx_error!(e))?;
         Ok(())
     }
 }

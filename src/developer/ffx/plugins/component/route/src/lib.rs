@@ -5,7 +5,7 @@
 use async_trait::async_trait;
 use component_debug::cli;
 use component_debug::route::RouteReport;
-use errors::FfxError;
+use errors::ffx_error;
 use ffx_component::rcs;
 use ffx_component_route_args::RouteCommand;
 use ffx_writer::{MachineWriter, ToolIO as _};
@@ -38,7 +38,7 @@ impl FfxMain for RouteTool {
                 realm_query,
             )
             .await
-            .map_err(|e| FfxError::Error(e, 1))?;
+            .map_err(|e| ffx_error!(e))?;
             writer.machine(&output)?;
         } else {
             cli::route_cmd_print(
@@ -49,7 +49,7 @@ impl FfxMain for RouteTool {
                 writer,
             )
             .await
-            .map_err(|e| FfxError::Error(e, 1))?;
+            .map_err(|e| ffx_error!(e))?;
         }
         Ok(())
     }

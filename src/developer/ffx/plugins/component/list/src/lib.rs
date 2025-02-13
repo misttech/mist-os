@@ -5,7 +5,7 @@
 use async_trait::async_trait;
 use component_debug::cli::{list_cmd_print, list_cmd_serialized};
 use component_debug::realm::Instance;
-use errors::FfxError;
+use errors::ffx_error;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_list_args::ComponentListCommand;
 use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
@@ -39,13 +39,13 @@ impl FfxMain for ListTool {
         if writer.is_machine() {
             let instances = list_cmd_serialized(self.cmd.filter, realm_query)
                 .await
-                .map_err(|e| FfxError::Error(e, 1))?;
+                .map_err(|e| ffx_error!(e))?;
             let output = ListOutput { instances };
             writer.machine(&output)?;
         } else {
             list_cmd_print(self.cmd.filter, self.cmd.verbose, realm_query, writer)
                 .await
-                .map_err(|e| FfxError::Error(e, 1))?;
+                .map_err(|e| ffx_error!(e))?;
         }
         Ok(())
     }

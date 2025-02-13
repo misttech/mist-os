@@ -4,7 +4,7 @@
 
 use async_trait::async_trait;
 use component_debug::cli::graph_cmd;
-use errors::FfxError;
+use errors::ffx_error;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_graph_args::ComponentGraphCommand;
 use ffx_writer::SimpleWriter;
@@ -30,7 +30,7 @@ impl FfxMain for GraphTool {
         // All errors from component_debug library are user-visible.
         graph_cmd(self.cmd.filter, self.cmd.orientation, realm_query, writer)
             .await
-            .map_err(|e| FfxError::Error(e, 1))?;
+            .map_err(|e| ffx_error!(e))?;
         Ok(())
     }
 }

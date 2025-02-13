@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use component_debug::cli::format::format_start_error;
 use component_debug::lifecycle::start_instance;
 use component_debug::query::get_cml_moniker_from_query;
-use errors::FfxError;
+use errors::ffx_error;
 use ffx_component::rcs::{connect_to_lifecycle_controller, connect_to_realm_query};
 use ffx_component_start_args::ComponentStartCommand;
 use ffx_writer::SimpleWriter;
@@ -33,7 +33,7 @@ impl FfxMain for StartTool {
     type Writer = SimpleWriter;
 
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
-        start_tool_impl(self).await.map_err(|e| FfxError::Error(e, 1))?;
+        start_tool_impl(self).await.map_err(|e| ffx_error!(e))?;
         Ok(())
     }
 }

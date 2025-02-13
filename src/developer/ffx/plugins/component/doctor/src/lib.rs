@@ -5,7 +5,7 @@
 use async_trait::async_trait;
 use component_debug::cli::{doctor_cmd_print, doctor_cmd_serialized};
 use component_debug::doctor::RouteReport;
-use errors::FfxError;
+use errors::ffx_error;
 use ffx_component::rcs::{connect_to_realm_query, connect_to_route_validator};
 use ffx_component_doctor_args::DoctorCommand;
 use ffx_writer::{MachineWriter, ToolIO as _};
@@ -33,12 +33,12 @@ impl FfxMain for DoctorTool {
         if writer.is_machine() {
             let output = doctor_cmd_serialized(self.cmd.query, route_validator, realm_query)
                 .await
-                .map_err(|e| FfxError::Error(e, 1))?;
+                .map_err(|e| ffx_error!(e))?;
             writer.machine(&output)?;
         } else {
             doctor_cmd_print(self.cmd.query, route_validator, realm_query, writer)
                 .await
-                .map_err(|e| FfxError::Error(e, 1))?;
+                .map_err(|e| ffx_error!(e))?;
         }
         Ok(())
     }

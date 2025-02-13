@@ -4,7 +4,7 @@
 
 use async_trait::async_trait;
 use component_debug::cli::{collection_list_cmd, collection_show_cmd};
-use errors::FfxError;
+use errors::ffx_error;
 use ffx_component::rcs::connect_to_realm_query;
 use ffx_component_collection_args::{CollectionCommand, ShowArgs, SubCommandEnum};
 use ffx_writer::SimpleWriter;
@@ -32,7 +32,7 @@ impl FfxMain for CollectionTool {
                 collection_show_cmd(query, realm_query, writer).await
             }
         }
-        .map_err(|e| FfxError::Error(e, 1))?;
+        .map_err(|e| ffx_error!(e))?;
 
         Ok(())
     }
