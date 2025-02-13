@@ -79,6 +79,8 @@ namespace fuchsia_wlan_phyimpl_wire = fuchsia_wlan_phyimpl::wire;
 
 // WME error threshold to trigger a deauth.
 #define BRCMF_WME_BAD_PKT_THRESHOLD       (0.4)   // 40% of rx packets.
+// WME error threshold to trigger logging error counter 
+#define BRCMF_WME_BAD_PKT_LOG_THRESHOLD       (0.1)   // 10% of rx packets.
 
 #define WL_ESCAN_ACTION_START      1
 #define WL_ESCAN_ACTION_CONTINUE   2

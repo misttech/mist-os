@@ -2389,6 +2389,7 @@ static void brcmf_log_client_stats(struct brcmf_cfg80211_info* cfg) {
 
   // Get the WME counters
   wl_wme_cnt_t wme_cnt;
+  float wme_periodic_rx_err_rate = 0;
   err = brcmf_fil_iovar_data_get(ifp, "wme_counters", &wme_cnt, sizeof(wl_wme_cnt_t), &fw_err);
   if (err != ZX_OK) {
     BRCMF_INFO("Unable to get WME counters err: %s fw err %s", zx_status_get_string(err),
@@ -2403,7 +2404,6 @@ static void brcmf_log_client_stats(struct brcmf_cfg80211_info* cfg) {
                            wme_cnt.tx[AC_BE].packets + wme_cnt.tx[AC_BK].packets;
     int wme_tx_bad_pkts = wme_cnt.tx_failed[AC_VO].packets + wme_cnt.tx_failed[AC_VI].packets +
                           wme_cnt.tx_failed[AC_BE].packets + wme_cnt.tx_failed[AC_BK].packets;
-    float wme_periodic_rx_err_rate = 0;
 
     if (wme_total_rx_pkts > ndev->stats.wme_total_rx_pkts_prev) {
       wme_periodic_rx_err_rate = (float)(wme_rx_bad_pkts - ndev->stats.wme_rx_bad_pkts_prev) /
@@ -2493,7 +2493,8 @@ static void brcmf_log_client_stats(struct brcmf_cfg80211_info* cfg) {
       periodic_err_rate_rx >= BRCMF_HIGH_ERR_RATE_THRESHOLD ||
       periodic_err_rate_tx >= BRCMF_HIGH_ERR_RATE_THRESHOLD ||
       lifetime_err_rate_rx >= BRCMF_HIGH_ERR_RATE_THRESHOLD ||
-      lifetime_err_rate_tx >= BRCMF_HIGH_ERR_RATE_THRESHOLD) {
+      lifetime_err_rate_tx >= BRCMF_HIGH_ERR_RATE_THRESHOLD ||
+      wme_periodic_rx_err_rate >= BRCMF_WME_BAD_PKT_LOG_THRESHOLD) {
     uint8_t cnt_buf[BRCMF_DCMD_MAXLEN] = {0};
     // If data rate is at or below threshold, increment the counter.
     if (real_rate != 0.0 && (real_rate <= BRCMF_LOW_DATA_RATE_THRESHOLD)) {
@@ -2531,10 +2532,16 @@ static void brcmf_log_client_stats(struct brcmf_cfg80211_info* cfg) {
           counters->txnoassoc, counters->txnoack);
       BRCMF_INFO(
           "FW Err Counts: Rx: err %u oflo %u nobuf %u runt %u fragerr %u badplcp %u "
-          "crsglitch %u badfcs %u giant %u noscb %u badsrcmac %u rxundec %u",
+          "crsglitch %u badfcs %u giant %u noscb %u badsrcmac %u",
           counters->rxerror, counters->rxoflo, counters->rxnobuf, counters->rxrunt,
           counters->rxfragerr, counters->rxbadplcp, counters->rxcrsglitch, counters->rxbadfcs,
-          counters->rxgiant, counters->rxnoscb, counters->rxbadsrcmac, counters->rxundec);
+          counters->rxgiant, counters->rxnoscb, counters->rxbadsrcmac);
+      BRCMF_INFO(
+          "FW Sec Counts: rxundec %u tkipmicfaill %u tkipcntrmsr %u tkipreplay %u "
+          "ccmpfmterr %u ccmpreplay %u ccmpundec %u fourwayfail %u tkipicverr %u",
+          counters->rxundec, counters->tkipmicfaill, counters->tkipcntrmsr, counters->tkipreplay,
+          counters->ccmpfmterr, counters->ccmpreplay, counters->ccmpundec, counters->fourwayfail,
+          counters->tkipicverr);
     }
   }
   ndev->client_stats_log_count++;
