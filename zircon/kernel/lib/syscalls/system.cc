@@ -83,6 +83,8 @@
 // to fill in with platform specific boot structures.
 const size_t kBootdataPlatformExtraBytes = PAGE_SIZE * 4;
 
+constexpr zx_duration_mono_t kMemoryStallMaxWindow = ZX_SEC(10);
+
 __BEGIN_CDECLS
 extern void mexec_asm(void);
 extern void mexec_asm_end(void);
@@ -592,6 +594,35 @@ zx_status_t sys_system_get_event(zx_handle_t root_job, uint32_t kind, zx_handle_
     default:
       return ZX_ERR_INVALID_ARGS;
   }
+}
+
+// zx_status_t zx_system_watch_memory_stall
+zx_status_t sys_system_watch_memory_stall(zx_handle_t resource, zx_system_memory_stall_type_t kind,
+                                          zx_duration_mono_t threshold, zx_duration_mono_t window,
+                                          zx_handle_t* out) {
+  auto up = ProcessDispatcher::GetCurrent();
+  zx_status_t res = up->EnforceBasicPolicy(ZX_POL_NEW_EVENT);
+  if (res != ZX_OK)
+    return res;
+
+  zx_status_t status =
+      validate_ranged_resource(resource, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_STALL_BASE, 1);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  if (window > kMemoryStallMaxWindow) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  KernelHandle<EventDispatcher> handle;
+  zx_rights_t rights;
+  status = MemoryStallEventDispatcher::Create(kind, threshold, window, &handle, &rights);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  return up->MakeAndAddHandle(ktl::move(handle), rights, out);
 }
 
 zx_status_t sys_system_set_performance_info(zx_handle_t resource, uint32_t topic,

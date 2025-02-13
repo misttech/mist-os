@@ -33,3 +33,64 @@ EventDispatcher::EventDispatcher(uint32_t options) {
 }
 
 EventDispatcher::~EventDispatcher() { kcounter_add(dispatcher_event_destroy_count, 1); }
+
+zx_status_t MemoryStallEventDispatcher::Create(zx_system_memory_stall_type_t kind,
+                                               zx_duration_mono_t threshold,
+                                               zx_duration_mono_t window,
+                                               KernelHandle<EventDispatcher>* handle,
+                                               zx_rights_t* rights) {
+  fbl::AllocChecker ac;
+  KernelHandle dispatcher(fbl::AdoptRef(new (&ac) MemoryStallEventDispatcher(kind)));
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
+
+  zx::result<ktl::unique_ptr<StallObserver>> observer =
+      StallObserver::Create(threshold, window, dispatcher.dispatcher().get());
+  if (observer.is_error()) {
+    return observer.error_value();
+  }
+
+  StallAggregator* aggregator = StallAggregator::GetStallAggregator();
+  switch (kind) {
+    case ZX_SYSTEM_MEMORY_STALL_SOME:
+      aggregator->AddObserverSome((*observer).get());
+      break;
+    case ZX_SYSTEM_MEMORY_STALL_FULL:
+      aggregator->AddObserverFull((*observer).get());
+      break;
+    default:
+      return ZX_ERR_INVALID_ARGS;
+  }
+
+  dispatcher.dispatcher()->observer_ = ktl::move(*observer);
+
+  *rights = ZX_DEFAULT_SYSTEM_MEMORY_STALL_EVENT_RIGHTS;
+  *handle = ktl::move(dispatcher);
+  return ZX_OK;
+}
+
+MemoryStallEventDispatcher::~MemoryStallEventDispatcher() {
+  if (!observer_) {
+    return;
+  }
+
+  StallAggregator* aggregator = StallAggregator::GetStallAggregator();
+  switch (kind_) {
+    case ZX_SYSTEM_MEMORY_STALL_SOME:
+      aggregator->RemoveObserverSome(observer_.get());
+      break;
+    case ZX_SYSTEM_MEMORY_STALL_FULL:
+      aggregator->RemoveObserverFull(observer_.get());
+      break;
+    default:
+      ZX_PANIC("Impossible stall kind value");
+  }
+}
+
+MemoryStallEventDispatcher::MemoryStallEventDispatcher(zx_system_memory_stall_type_t kind)
+    : EventDispatcher(0), kind_(kind) {}
+
+void MemoryStallEventDispatcher::OnAboveThreshold() { UpdateState(0, ZX_EVENT_SIGNALED); }
+
+void MemoryStallEventDispatcher::OnBelowThreshold() { UpdateState(ZX_EVENT_SIGNALED, 0); }

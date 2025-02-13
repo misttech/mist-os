@@ -238,6 +238,15 @@ typedef struct zx_info_memory_stall {
 
 #define ZX_INFO_MEMORY_STALL ((zx_object_info_topic_t)38u)  // zx_info_memory_stall_t[1]
 
+// Specifies a type of stall to be observed.
+typedef uint32_t zx_system_memory_stall_type_t;
+
+#define ZX_SYSTEM_MEMORY_STALL_SOME ((zx_system_memory_stall_type_t)(0u))
+#define ZX_SYSTEM_MEMORY_STALL_FULL ((zx_system_memory_stall_type_t)(1u))
+
+#define ZX_DEFAULT_SYSTEM_MEMORY_STALL_EVENT_RIGHTS \
+  (ZX_RIGHT_WAIT | ZX_RIGHT_DUPLICATE | ZX_RIGHT_TRANSFER)
+
 // ====== End stall measurement and notification ====== //
 
 #ifndef _KERNEL

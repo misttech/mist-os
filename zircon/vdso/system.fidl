@@ -472,6 +472,91 @@ closed protocol System {
 
     /// ## Summary
     ///
+    /// Retrieve an event that becomes signaled if the memory stall level
+    /// exceeds a given threshold over a time window.
+    ///
+    /// ## Declaration
+    ///
+    /// ```c
+    /// #include <zircon/syscalls-next.h>
+    ///
+    /// zx_status_t zx_system_watch_memory_stall(zx_handle_t resource,
+    ///                                          zx_system_memory_stall_type_t kind,
+    ///                                          zx_duration_mono_t threshold,
+    ///                                          zx_duration_mono_t window,
+    ///                                          zx_handle_t* event);
+    /// ```
+    ///
+    /// ## Description
+    ///
+    /// *resource* must be a handle to the stall resource.
+    ///
+    /// *kind* must be one of the following (see the `ZX_INFO_MEMORY_STALL`
+    /// in [`zx_object_get_info()`]):
+    ///
+    /// - `ZX_SYSTEM_MEMORY_STALL_SOME`
+    /// - `ZX_SYSTEM_MEMORY_STALL_FULL`
+    ///
+    /// *threshold* is minimum stall time that will trigger the signal.
+    ///
+    /// *window* is the duration of the observation window.
+    ///
+    /// It must hold that 0 < *threshold* <= *window* <= 10 seconds.
+    ///
+    /// The kernel will set (`ZX_EVENT_SIGNALED`) on the returned event if the
+    /// watched stall timer grew by at least *threshold* during the last
+    /// *window*, and clear it once it is no longer the case.
+    ///
+    /// ## Rights
+    ///
+    /// Caller job policy must allow `ZX_POL_NEW_EVENT`.
+    ///
+    /// ## Return value
+    ///
+    /// `zx_system_watch_memory_stall()` returns ZX_OK on success, and *event*
+    /// will be a valid handle, or an error code from below on failure.
+    ///
+    /// ## Errors
+    ///
+    /// `ZX_ERR_BAD_HANDLE`  *resource* is not a valid handle.
+    ///
+    /// `ZX_ERR_WRONG_TYPE`  *resource* is not resource kind
+    /// `ZX_RSRC_KIND_SYSTEM`.
+    ///
+    /// `ZX_ERR_OUT_OF_RANGE`  *resource* is not in the range
+    /// [`ZX_RSRC_SYSTEM_STALL_BASE`, `ZX_RSRC_SYSTEM_STALL_BASE`+1).
+    ///
+    /// `ZX_ERR_INVALID_ARGS`  *kind* is not one of the above values.
+    ///
+    /// `ZX_ERR_INVALID_ARGS`  *threshold* or *window* are not in the allowed
+    /// range.
+    ///
+    /// `ZX_ERR_NO_MEMORY`  Failure due to lack of memory.
+    /// There is no good way for userspace to handle this (unlikely) error.
+    /// In a future build this error will no longer occur.
+    ///
+    /// ## Notes
+    ///
+    /// Even the API defines *threshold* and *window* as the duration type (that
+    /// is, in nanoseconds), the kernel may not use the full precision of the
+    /// requested values.
+    ///
+    /// ## See also
+    ///
+    ///  - `ZX_INFO_MEMORY_STALL` topic in [`zx_object_get_info()`]
+    ///
+    /// [`zx_object_get_info()`]: object_get_info.md
+    strict WatchMemoryStall(resource struct {
+        resource Handle:RESOURCE;
+        kind uint32;
+        threshold Duration;
+        window Duration;
+    }) -> (resource struct {
+        event Handle:EVENT;
+    }) error Status;
+
+    /// ## Summary
+    ///
     /// Set CPU performance parameters.
     ///
     /// ## Declaration

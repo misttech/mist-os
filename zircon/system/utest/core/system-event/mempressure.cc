@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/maybe-standalone-test/maybe-standalone.h>
 #include <lib/zx/event.h>
 #include <lib/zx/job.h>
+#include <zircon/syscalls-next.h>
 
 #include <zxtest/zxtest.h>
 
@@ -131,4 +133,140 @@ TEST(SystemEvent, ExactlyOneMemoryEventSignaled) {
   }
 
   ASSERT_EQ(events_signaled, 1, "exactly one memory event signaled");
+}
+
+// Creates a 1 MiB discardable VMO filled with random data.
+static void CreateDiscardableVmo(zx::vmo& vmo) {
+  ASSERT_OK(zx::vmo::create(1024ul * 1024, ZX_VMO_DISCARDABLE, &vmo));
+
+  uint64_t size;
+  ASSERT_OK(vmo.get_size(&size));
+
+  zx_vmo_lock_state_t lock_state;
+  ASSERT_OK(vmo.op_range(ZX_VMO_OP_LOCK, 0, size, &lock_state, sizeof(lock_state)));
+
+  zx_vaddr_t addr;
+  ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_ALLOW_FAULTS, 0,
+                                       vmo, 0, size, &addr));
+  zx_cprng_draw(reinterpret_cast<void*>(addr), size);
+  ASSERT_OK(zx::vmar::root_self()->unmap(addr, size));
+
+  ASSERT_OK(vmo.op_range(ZX_VMO_OP_UNLOCK, 0, size, nullptr, 0));
+}
+
+TEST(SystemEvent, MemoryStallEvent) {
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
+    return;
+  }
+
+  // Retrieve the total amount of memory in the system.
+  zx::result<zx::resource> info_resource =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_INFO_BASE);
+  ASSERT_OK(info_resource.status_value());
+  zx_info_kmem_stats_t kmem_stats;
+  ASSERT_OK(info_resource->get_info(ZX_INFO_KMEM_STATS, &kmem_stats, sizeof(kmem_stats), nullptr,
+                                    nullptr));
+  size_t total_bytes_mb = kmem_stats.total_bytes / (1024ul * 1024);
+
+  zx::result<zx::resource> stall_resource =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_STALL_BASE);
+  ASSERT_OK(stall_resource.status_value());
+
+  // Start observing memory pressure with a very low threshold.
+  zx::event stall_event;
+  zx_status_t status =
+      zx_system_watch_memory_stall(stall_resource->get(), ZX_SYSTEM_MEMORY_STALL_SOME, 1,
+                                   ZX_MSEC(100), stall_event.reset_and_get_address());
+  ASSERT_OK(status);
+
+  // Keep hoarding discardable VMOs until a stall is reported (=success) or we hit a safety limit
+  // (=failure).
+  size_t safety_limit_vmo_count =
+      total_bytes_mb + total_bytes_mb / 20;  // 105% the total amount of memory
+  std::vector<zx::vmo> vmos;
+  zx_signals_t pending = 0;
+  while ((pending & ZX_EVENT_SIGNALED) == 0) {
+    status = stall_event.wait_one(0, zx::time::infinite_past(), &pending);
+    ASSERT_EQ(ZX_ERR_TIMED_OUT, status);
+
+    ASSERT_LE(vmos.size(), safety_limit_vmo_count, "Safety limit was hit, giving up");
+
+    zx::vmo vmo;
+    ASSERT_NO_FATAL_FAILURE(CreateDiscardableVmo(vmo));
+    vmos.push_back(std::move(vmo));
+  }
+
+  printf("Got stall signal with VMO # %zu\n", vmos.size());
+}
+
+TEST(SystemEvent, CannotSignalMemoryStallEventFromUserspace) {
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
+    return;
+  }
+
+  zx::result<zx::resource> stall_resource =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_STALL_BASE);
+  ASSERT_OK(stall_resource.status_value());
+
+  // Obtain a memory stall event.
+  zx::event stall_event;
+  zx_status_t status =
+      zx_system_watch_memory_stall(stall_resource->get(), ZX_SYSTEM_MEMORY_STALL_SOME, 1,
+                                   ZX_MSEC(100), stall_event.reset_and_get_address());
+  ASSERT_OK(status);
+
+  ASSERT_EQ(ZX_ERR_ACCESS_DENIED, stall_event.signal(0, ZX_EVENT_SIGNALED),
+            "shouldn't be able to signal");
+}
+
+TEST(SystemEvent, MemoryStallThresholds) {
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
+    return;
+  }
+
+  zx::result<zx::resource> stall_resource =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_STALL_BASE);
+  ASSERT_OK(stall_resource.status_value());
+
+  zx::event stall_event;
+
+  // Verify we can request a threshold that is equal to the window, but not greater than that.
+  ASSERT_OK(zx_system_watch_memory_stall(stall_resource->get(), ZX_SYSTEM_MEMORY_STALL_SOME,
+                                         ZX_MSEC(100), ZX_MSEC(100),
+                                         stall_event.reset_and_get_address()));
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS,
+            zx_system_watch_memory_stall(stall_resource->get(), ZX_SYSTEM_MEMORY_STALL_SOME,
+                                         ZX_MSEC(100) + 1, ZX_MSEC(100),
+                                         stall_event.reset_and_get_address()));
+
+  // Verify that we cannot request a threshold less than or equal to zero.
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS,
+            zx_system_watch_memory_stall(stall_resource->get(), ZX_SYSTEM_MEMORY_STALL_SOME, 0,
+                                         ZX_MSEC(100), stall_event.reset_and_get_address()));
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS,
+            zx_system_watch_memory_stall(stall_resource->get(), ZX_SYSTEM_MEMORY_STALL_SOME, -1,
+                                         ZX_MSEC(100), stall_event.reset_and_get_address()));
+
+  // Verify we cannot request a zero or negative window.
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS,
+            zx_system_watch_memory_stall(stall_resource->get(), ZX_SYSTEM_MEMORY_STALL_SOME, 0, 0,
+                                         stall_event.reset_and_get_address()));
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS,
+            zx_system_watch_memory_stall(stall_resource->get(), ZX_SYSTEM_MEMORY_STALL_SOME, -1, -1,
+                                         stall_event.reset_and_get_address()));
+
+  // Verify that we can request a window of 10 seconds, but no more.
+  ASSERT_OK(zx_system_watch_memory_stall(stall_resource->get(), ZX_SYSTEM_MEMORY_STALL_SOME,
+                                         ZX_MSEC(100), ZX_SEC(10),
+                                         stall_event.reset_and_get_address()));
+  ASSERT_EQ(
+      ZX_ERR_INVALID_ARGS,
+      zx_system_watch_memory_stall(stall_resource->get(), ZX_SYSTEM_MEMORY_STALL_SOME, ZX_MSEC(100),
+                                   ZX_SEC(10) + 1, stall_event.reset_and_get_address()));
 }

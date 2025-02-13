@@ -161,6 +161,7 @@
     "zx_system_set_processor_power_domain",
     "zx_system_set_processor_power_state",
     "zx_system_suspend_enter",
+    "zx_system_watch_memory_stall",
     "zx_task_create_exception_channel",
     "zx_task_kill",
     "zx_task_suspend",
