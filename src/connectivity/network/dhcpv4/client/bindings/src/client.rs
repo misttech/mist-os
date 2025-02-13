@@ -254,13 +254,22 @@ impl Client {
         for option in parameters {
             match option {
                 dhcp_protocol::DhcpOption::SubnetMask(len) => {
-                    assert_eq!(prefix_len.replace(len), None);
+                    let previous_prefix_len = prefix_len.replace(len);
+                    if let Some(prev) = previous_prefix_len {
+                        log::warn!("expected previous_prefix_len to be None, got {prev:?}");
+                    }
                 }
                 dhcp_protocol::DhcpOption::DomainNameServer(list) => {
-                    assert_eq!(dns_servers.replace(list.into()), None);
+                    let previous_dns_servers = dns_servers.replace(list.into());
+                    if let Some(prev) = previous_dns_servers {
+                        log::warn!("expected previous_dns_servers to be None, got {prev:?}");
+                    }
                 }
                 dhcp_protocol::DhcpOption::Router(list) => {
-                    assert_eq!(routers.replace(list.into()), None);
+                    let previous_routers = routers.replace(list.into());
+                    if let Some(prev) = previous_routers {
+                        log::warn!("expected previous_routers to be None, got {prev:?}");
+                    }
                 }
                 _ => {
                     unrequested_options.push(option);
@@ -351,10 +360,16 @@ impl Client {
                     );
                 }
                 dhcp_protocol::DhcpOption::DomainNameServer(list) => {
-                    assert_eq!(dns_servers.replace(list.into()), None);
+                    let prev = dns_servers.replace(list.into());
+                    if let Some(prev) = prev {
+                        log::warn!("expected prev_dns_servers to be None, got {prev:?}");
+                    }
                 }
                 dhcp_protocol::DhcpOption::Router(list) => {
-                    assert_eq!(routers.replace(list.into()), None);
+                    let prev = routers.replace(list.into());
+                    if let Some(prev) = prev {
+                        log::warn!("expected prev_routers to be None, got {prev:?}");
+                    }
                 }
                 option => {
                     unrequested_options.push(option);
