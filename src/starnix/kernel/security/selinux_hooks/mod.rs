@@ -1034,6 +1034,23 @@ pub(super) fn fs_node_copy_up<'a>(
     scoped_fs_create(current_task, file_sid)
 }
 
+/// Returns whether `current_task` can perform a lock operation on the given `file`.
+pub(super) fn check_file_lock_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    file: &FileObject,
+) -> Result<(), Errno> {
+    let permission_check = security_server.as_permission_check();
+    let subject_sid = current_task.security_state.lock().current_sid;
+    let fs_node_class = file.node().security_state.lock().class;
+    has_file_permissions(
+        &permission_check,
+        subject_sid,
+        file,
+        &[CommonFilePermission::Lock.for_class(fs_node_class)],
+    )
+}
+
 /// This hook is called by the `fcntl` syscall. Returns whether `current_task` can perform
 /// `fcntl_cmd` on the given file.
 pub(super) fn check_file_fcntl_access(

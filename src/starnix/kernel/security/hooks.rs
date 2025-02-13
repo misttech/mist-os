@@ -505,6 +505,20 @@ pub fn fs_node_copy_up<'a>(
     })
 }
 
+/// This hook is called by the `flock` syscall. Returns whether `current_task` can perform
+/// a lock operation on the given file.
+///
+/// See also `check_file_fcntl_access()` for `lock` permission checks performed after an
+/// fcntl lock request.
+///
+/// Corresponds to the `file_lock()` LSM hook.
+pub fn check_file_lock_access(current_task: &CurrentTask, file: &FileObject) -> Result<(), Errno> {
+    profile_duration!("security.hooks.check_file_lock_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_file_lock_access(security_server, current_task, file)
+    })
+}
+
 /// Returns whether `current_task` has the permissions to execute this fcntl syscall.
 /// Corresponds to the `file_fcntl()` LSM hook.
 pub fn check_file_fcntl_access(
