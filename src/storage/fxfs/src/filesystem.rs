@@ -18,7 +18,7 @@ use crate::object_store::transaction::{
 use crate::object_store::volume::{root_volume, VOLUMES_DIRECTORY};
 use crate::object_store::ObjectStore;
 use crate::range::RangeExt;
-use crate::serialized_types::Version;
+use crate::serialized_types::{Version, LATEST_VERSION};
 use crate::{debug_assert_not_too_long, metrics};
 use anyhow::{bail, ensure, Context, Error};
 use async_trait::async_trait;
@@ -199,6 +199,7 @@ impl OpenFxFilesystem {
             self.journal().image_builder_mode(),
             "finalize() only valid in image_builder_mode."
         );
+        self.journal().allocate_journal().await?;
         self.journal().set_image_builder_mode(false);
         self.journal().compact().await?;
         let actual_size = self.allocator().maximum_offset();
@@ -416,9 +417,10 @@ impl FxFilesystemBuilder {
                 // The filesystem isn't valid until superblocks are written but we want to defer
                 // that until last when migrating filesystems or building system images.
                 filesystem.journal.init_superblocks().await?;
+
+                // Start the graveyard's background reaping task.
+                filesystem.graveyard.clone().reap_async();
             }
-            // Start the graveyard's background reaping task.
-            filesystem.graveyard.clone().reap_async();
 
             // Create the root volume directory.
             let root_store = filesystem.root_store();
@@ -648,7 +650,24 @@ impl FxFilesystem {
         debug_assert_not_too_long!(self.lock_manager.commit_prepare(&transaction));
         self.maybe_start_flush_task();
         let _guard = debug_assert_not_too_long!(self.commit_mutex.lock());
-        let journal_offset = self.journal.commit(transaction).await?;
+        let journal_offset = if self.journal().image_builder_mode() {
+            let journal_checkpoint =
+                JournalCheckpoint { file_offset: 0, checksum: 0, version: LATEST_VERSION };
+            let maybe_mutation = self
+                .object_manager()
+                .apply_transaction(transaction, &journal_checkpoint)
+                .expect("Transactions must not fail in image_builder_mode");
+            if let Some(mutation) = maybe_mutation {
+                assert!(matches!(mutation, Mutation::UpdateBorrowed(_)));
+                // These are Mutation::UpdateBorrowed which are normally used to track borrowing of
+                // metadata reservations. As we are image-building and not using the journal,
+                // we don't track this.
+            }
+            self.object_manager().did_commit_transaction(transaction, &journal_checkpoint, 0);
+            0
+        } else {
+            self.journal.commit(transaction).await?
+        };
         self.completed_transactions.add(1);
 
         // For now, call the callback whilst holding the lock.  Technically, we don't need to do
@@ -767,6 +786,11 @@ impl FxFilesystem {
         self: &Arc<Self>,
         options: transaction::Options<'a>,
     ) -> Result<(MetadataReservation, Option<&'a Reservation>, Option<Hold<'a>>), Error> {
+        if self.options.image_builder_mode {
+            // Image builder mode avoids the journal so reservation tracking for metadata overheads
+            // doesn't make sense and so we essentially have 'all or nothing' semantics instead.
+            return Ok((MetadataReservation::Borrowed, None, None));
+        }
         if !options.skip_journal_checks {
             self.maybe_start_flush_task();
             self.journal.check_journal_space().await?;
@@ -936,12 +960,14 @@ mod tests {
     use crate::object_store::journal::JournalOptions;
     use crate::object_store::transaction::{lock_keys, LockKey, Options};
     use crate::object_store::volume::root_volume;
-    use crate::object_store::{HandleOptions, ObjectStore};
+    use crate::object_store::{HandleOptions, ObjectDescriptor, ObjectStore};
+    use crate::range::RangeExt;
     use fuchsia_async as fasync;
     use futures::future::join_all;
     use futures::stream::{FuturesUnordered, TryStreamExt};
     use fxfs_insecure_crypto::InsecureCrypt;
     use rustc_hash::FxHashMap as HashMap;
+    use std::ops::Range;
     use std::sync::{Arc, Mutex};
     use std::time::Duration;
     use storage_device::fake_device::FakeDevice;
@@ -1465,5 +1491,99 @@ mod tests {
 
             fs.close().await.expect("close failed");
         }
+    }
+
+    #[fuchsia::test]
+    async fn test_image_builder_mode_no_early_writes() {
+        const BLOCK_SIZE: u32 = 4096;
+        let device = DeviceHolder::new(FakeDevice::new(2048, BLOCK_SIZE));
+        device.reopen(true);
+        let fs = FxFilesystemBuilder::new()
+            .format(true)
+            .image_builder_mode(true)
+            .open(device)
+            .await
+            .expect("open failed");
+        // Image builder mode only writes when data is written or fs.finalize() is called, so
+        // we shouldn't see any errors here.
+        fs.close().await.expect("closed");
+    }
+
+    #[fuchsia::test]
+    async fn test_image_builder_mode() {
+        const BLOCK_SIZE: u32 = 4096;
+        const EXISTING_FILE_RANGE: Range<u64> = 4096 * 1024..4096 * 1025;
+        let device = DeviceHolder::new(FakeDevice::new(2048, BLOCK_SIZE));
+
+        // Write some fake file data at an offset in the image and confirm it as an fxfs file below.
+        {
+            let mut write_buf =
+                device.allocate_buffer(EXISTING_FILE_RANGE.length().unwrap() as usize).await;
+            write_buf.as_mut_slice().fill(0xf0);
+            device.write(EXISTING_FILE_RANGE.start, write_buf.as_ref()).await.expect("write");
+        }
+
+        device.reopen(true);
+
+        let device = {
+            let fs = FxFilesystemBuilder::new()
+                .format(true)
+                .image_builder_mode(true)
+                .open(device)
+                .await
+                .expect("open failed");
+            {
+                let root_store = fs.root_store();
+                let root_directory =
+                    Directory::open(&root_store, root_store.root_directory_object_id())
+                        .await
+                        .expect("open failed");
+                // Create a file referencing existing data on device.
+                let handle;
+                {
+                    let mut transaction = fs
+                        .clone()
+                        .new_transaction(
+                            lock_keys![LockKey::object(
+                                root_directory.store().store_object_id(),
+                                root_directory.object_id()
+                            )],
+                            Options::default(),
+                        )
+                        .await
+                        .expect("new transaction");
+                    handle = root_directory
+                        .create_child_file(&mut transaction, "test")
+                        .await
+                        .expect("create file");
+                    handle.extend(&mut transaction, EXISTING_FILE_RANGE).await.expect("extend");
+                    transaction.commit().await.expect("commit");
+                }
+            }
+            fs.device().reopen(false);
+            let (device, _size) = fs.finalize().await.expect("finalize");
+            device
+        };
+        device.reopen(false);
+        let fs = FxFilesystem::open(device).await.expect("open failed");
+        fsck(fs.clone()).await.expect("fsck failed");
+
+        // Confirm that the test file points at the correct data.
+        let root_store = fs.root_store();
+        let root_directory = Directory::open(&root_store, root_store.root_directory_object_id())
+            .await
+            .expect("open failed");
+        let (object_id, descriptor) =
+            root_directory.lookup("test").await.expect("lookup failed").unwrap();
+        assert_eq!(descriptor, ObjectDescriptor::File);
+        let test_file =
+            ObjectStore::open_object(&root_store, object_id, HandleOptions::default(), None)
+                .await
+                .expect("open failed");
+        let mut read_buf =
+            test_file.allocate_buffer(EXISTING_FILE_RANGE.length().unwrap() as usize).await;
+        test_file.read(0, read_buf.as_mut()).await.expect("read failed");
+        assert_eq!(read_buf.as_slice(), [0xf0; 4096]);
+        fs.close().await.expect("closed");
     }
 }

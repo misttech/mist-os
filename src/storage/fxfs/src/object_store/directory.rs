@@ -688,6 +688,7 @@ impl<S: HandleOwner> Directory<S> {
         name: &str,
     ) -> Result<Directory<S>, Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
+
         let handle = Directory::create_with_options(
             transaction,
             self.owner(),

@@ -619,7 +619,14 @@ impl ObjectStore {
             buf
         };
 
-        self.store_info_handle.get().unwrap().txn_write(transaction, 0u64, buf.as_ref()).await
+        if self.filesystem().options().image_builder_mode {
+            // If we're in image builder mode, we want to avoid writing to disk unless explicitly
+            // asked to. New object stores will have their StoreInfo written when we compact in
+            // FxFilesystem::finalize().
+            Ok(())
+        } else {
+            self.store_info_handle.get().unwrap().txn_write(transaction, 0u64, buf.as_ref()).await
+        }
     }
 
     pub fn set_trace(&self, trace: bool) {

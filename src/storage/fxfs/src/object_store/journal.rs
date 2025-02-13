@@ -45,7 +45,7 @@ use crate::object_store::journal::writer::JournalWriter;
 use crate::object_store::object_manager::ObjectManager;
 use crate::object_store::object_record::{AttributeKey, ObjectKey, ObjectKeyData, ObjectValue};
 use crate::object_store::transaction::{
-    lock_keys, AllocatorMutation, Mutation, MutationV40, MutationV41, MutationV43,
+    lock_keys, AllocatorMutation, LockKey, Mutation, MutationV40, MutationV41, MutationV43,
     ObjectStoreMutation, Options, Transaction, TxnMutation, TRANSACTION_MAX_JOURNAL_USAGE,
 };
 use crate::object_store::{
@@ -1185,13 +1185,15 @@ impl Journal {
         )
         .await
         .context("create journal")?;
-        let mut file_range = 0..self.chunk_size();
-        journal_handle
-            .preallocate_range(&mut transaction, &mut file_range)
-            .await
-            .context("preallocate journal")?;
-        if file_range.start < file_range.end {
-            bail!("preallocate_range returned too little space");
+        if !self.inner.lock().unwrap().image_builder_mode {
+            let mut file_range = 0..self.chunk_size();
+            journal_handle
+                .preallocate_range(&mut transaction, &mut file_range)
+                .await
+                .context("preallocate journal")?;
+            if file_range.start < file_range.end {
+                bail!("preallocate_range returned too little space");
+            }
         }
 
         // Write the root store object info.
@@ -1215,6 +1217,32 @@ impl Journal {
 
         // Initialize the journal writer.
         let _ = self.handle.set(journal_handle);
+        Ok(())
+    }
+
+    /// Normally we allocate the journal when creating the filesystem.
+    /// This is used image_builder_mode when journal allocation is done last.
+    pub async fn allocate_journal(&self) -> Result<(), Error> {
+        let handle = self.handle.get().unwrap();
+        let filesystem = handle.store().filesystem();
+        let mut transaction = filesystem
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(handle.store().store_object_id(), handle.object_id()),],
+                Options { skip_journal_checks: true, ..Default::default() },
+            )
+            .await?;
+        let mut file_range = 0..self.chunk_size();
+        self.handle
+            .get()
+            .unwrap()
+            .preallocate_range(&mut transaction, &mut file_range)
+            .await
+            .context("preallocate journal")?;
+        if file_range.start < file_range.end {
+            bail!("preallocate_range returned too little space");
+        }
+        transaction.commit().await?;
         Ok(())
     }
 
