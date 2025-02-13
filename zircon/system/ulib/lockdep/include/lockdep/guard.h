@@ -440,6 +440,20 @@ class Guard<LockType, Option, internal::EnableIfNotShared<LockType, Option>>::Ad
   }
   ~Adoptable() { ZX_ASSERT(!state_.has_value()); }
 
+  // Returns true if the adoptable holds an actively acquired lock.
+  explicit operator bool() const { return state_.has_value(); }
+
+  // Returns true if this adoptable originates from |lock|.
+  bool wraps_lock(const LockType& lock) const {
+    return state_.has_value() && &lock == state_->first.lock();
+  }
+
+  // Read-only access to the underlying |lock|.
+  const LockType* lock() const {
+    DEBUG_ASSERT(*this);
+    return state_->first.lock();
+  }
+
  private:
   Adoptable(Validator&& v, State&& s) : state_({std::move(v), std::move(s)}) {}
   friend Guard;
