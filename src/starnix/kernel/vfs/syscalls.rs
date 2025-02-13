@@ -170,6 +170,22 @@ pub fn sys_fcntl(
     cmd: u32,
     arg: u64,
 ) -> Result<SyscallResult, Errno> {
+    let file = match cmd {
+        F_DUPFD | F_DUPFD_CLOEXEC | F_GETFD | F_SETFD | F_GETFL => {
+            current_task.files.get_allowing_opath(fd)?
+        }
+        _ => current_task.files.get(fd)?,
+    };
+
+    match cmd {
+        // For the following values of cmd we need to perform more checks before running the
+        // `check_file_fcntl_access` LSM hook.
+        F_SETOWN | F_SETOWN_EX | F_ADD_SEALS | F_SETLEASE => {}
+        _ => {
+            security::check_file_fcntl_access(current_task, &file, cmd, arg)?;
+        }
+    };
+
     match cmd {
         F_DUPFD | F_DUPFD_CLOEXEC => {
             let fd_number = arg as i32;
@@ -182,18 +198,13 @@ pub fn sys_fcntl(
             )?;
             Ok(newfd.into())
         }
-        F_GETOWN => {
-            let file = current_task.files.get(fd)?;
-            security::check_file_fcntl_access(current_task, &file, cmd, arg)?;
-            match file.get_async_owner() {
-                FileAsyncOwner::Unowned => Ok(0.into()),
-                FileAsyncOwner::Thread(tid) => Ok(tid.into()),
-                FileAsyncOwner::Process(pid) => Ok(pid.into()),
-                FileAsyncOwner::ProcessGroup(pgid) => Ok((-pgid).into()),
-            }
-        }
+        F_GETOWN => match file.get_async_owner() {
+            FileAsyncOwner::Unowned => Ok(0.into()),
+            FileAsyncOwner::Thread(tid) => Ok(tid.into()),
+            FileAsyncOwner::Process(pid) => Ok(pid.into()),
+            FileAsyncOwner::ProcessGroup(pgid) => Ok((-pgid).into()),
+        },
         F_GETOWN_EX => {
-            let file = current_task.files.get(fd)?;
             let maybe_owner = match file.get_async_owner() {
                 FileAsyncOwner::Unowned => None,
                 FileAsyncOwner::Thread(tid) => {
@@ -214,7 +225,6 @@ pub fn sys_fcntl(
             Ok(SUCCESS)
         }
         F_SETOWN => {
-            let file = current_task.files.get(fd)?;
             let pid = (arg as u32) as i32;
             let owner = match pid.cmp(&0) {
                 Ordering::Equal => FileAsyncOwner::Unowned,
@@ -229,7 +239,6 @@ pub fn sys_fcntl(
             Ok(SUCCESS)
         }
         F_SETOWN_EX => {
-            let file = current_task.files.get(fd)?;
             let user_owner = UserRef::<uapi::f_owner_ex>::new(UserAddress::from(arg));
             let requested_owner = current_task.read_object(user_owner)?;
             let mut owner = match requested_owner.type_ as u32 {
@@ -242,6 +251,7 @@ pub fn sys_fcntl(
                 owner = FileAsyncOwner::Unowned;
             }
             owner.validate(current_task)?;
+            security::check_file_fcntl_access(current_task, &file, cmd, arg)?;
             file.set_async_owner(owner);
             Ok(SUCCESS)
         }
@@ -260,8 +270,6 @@ pub fn sys_fcntl(
             //   bit O_PATH.
             //
             // See https://man7.org/linux/man-pages/man2/open.2.html
-            let file = current_task.files.get_allowing_opath(fd)?;
-            security::check_file_fcntl_access(current_task, &file, cmd, arg)?;
             Ok(file.flags().into())
         }
         F_SETFL => {
@@ -272,8 +280,6 @@ pub fn sys_fcntl(
                 | OpenFlags::ASYNC;
             let requested_flags =
                 OpenFlags::from_bits_truncate((arg as u32) & settable_flags.bits());
-            let file = current_task.files.get(fd)?;
-            security::check_file_fcntl_access(current_task, &file, cmd, arg)?;
 
             // If `NOATIME` flag is being set then check that it's allowed.
             if requested_flags.contains(OpenFlags::NOATIME)
@@ -286,8 +292,6 @@ pub fn sys_fcntl(
             Ok(SUCCESS)
         }
         F_SETLK | F_SETLKW | F_GETLK | F_OFD_GETLK | F_OFD_SETLK | F_OFD_SETLKW => {
-            let file = current_task.files.get(fd)?;
-            security::check_file_fcntl_access(current_task, &file, cmd, arg)?;
             let flock_ref = UserRef::<uapi::flock>::new(arg.into());
             let flock = current_task.read_object(flock_ref)?;
             let cmd = RecordLockCommand::from_raw(cmd).ok_or_else(|| errno!(EINVAL))?;
@@ -297,42 +301,32 @@ pub fn sys_fcntl(
             Ok(SUCCESS)
         }
         F_ADD_SEALS => {
-            let file = current_task.files.get(fd)?;
-
             if !file.can_write() {
                 // Cannot add seals if the file is not writable
                 return error!(EPERM);
             }
-
+            security::check_file_fcntl_access(current_task, &file, cmd, arg)?;
             let mut state = file.name.entry.node.write_guard_state.lock();
             let flags = SealFlags::from_bits_truncate(arg as u32);
             state.try_add_seal(flags)?;
             Ok(SUCCESS)
         }
         F_GET_SEALS => {
-            let file = current_task.files.get(fd)?;
             let state = file.name.entry.node.write_guard_state.lock();
             Ok(state.get_seals()?.into())
         }
         F_SETLEASE => {
-            let file = current_task.files.get(fd)?;
-
             let creds = current_task.creds();
             if !creds.has_capability(CAP_LEASE) && creds.fsuid != file.node().info().uid {
                 return error!(EPERM);
             }
             let lease = FileLeaseType::from_bits(arg as u32)?;
+            security::check_file_fcntl_access(current_task, &file, cmd, arg)?;
             file.set_lease(current_task, lease)?;
             Ok(SUCCESS)
         }
-        F_GETLEASE => {
-            let file = current_task.files.get(fd)?;
-            Ok(file.get_lease(current_task).into())
-        }
-        _ => {
-            let file = current_task.files.get(fd)?;
-            file.fcntl(current_task, cmd, arg)
-        }
+        F_GETLEASE => Ok(file.get_lease(current_task).into()),
+        _ => file.fcntl(current_task, cmd, arg),
     }
 }
 

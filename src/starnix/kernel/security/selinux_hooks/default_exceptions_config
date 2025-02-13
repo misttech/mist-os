@@ -25,3 +25,7 @@ todo_deny https://fxbug.dev/391664952 init shell_exec file
 // https://fxbug.dev/390739936 - SEStarnix tests mis-label some files.
 todo_deny https://fxbug.dev/390739936 test_ioctl_t user_tmp_t file
 todo_deny https://fxbug.dev/390739936 test_noioctl_t user_tmp_t file
+
+// https://fxbug.dev/395085164 - Enabling file_fcntl hook checks leads to failures.
+todo_deny https://fxbug.dev/395085164 init hal_graphics_allocator_default fd
+todo_deny https://fxbug.dev/395085164 gmscore_app hal_bluetooth_default fd

@@ -35,8 +35,7 @@ use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{
     errno, error, FIGETBSZ, FIOASYNC, FIONBIO, FIONREAD, FS_IOC_GETFLAGS, FS_IOC_GETVERSION,
-    FS_IOC_SETFLAGS, FS_IOC_SETVERSION, F_GETFL, F_GETLK, F_GETOWN, F_SETFL, F_SETLK, F_SETLKW,
-    F_SETOWN,
+    FS_IOC_SETFLAGS, FS_IOC_SETVERSION, F_GETLK, F_SETFL, F_SETLK, F_SETLKW,
 };
 use std::collections::HashSet;
 use std::sync::{Arc, OnceLock};
@@ -1058,11 +1057,10 @@ pub(super) fn check_file_fcntl_access(
                 &[CommonFilePermission::Lock.for_class(fs_node_class)],
             )?;
         }
-        F_SETFL | F_SETOWN | F_GETFL | F_GETOWN => {
+        _ => {
             // Only checks the Use permission.
             has_file_permissions(&permission_check, subject_sid, file, &[])?;
         }
-        _ => {}
     }
 
     if fcntl_cmd != F_SETFL {
