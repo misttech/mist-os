@@ -10,6 +10,10 @@
 
 namespace unwinder {
 
+Error PltUnwinder::Step(Memory* stack, const Frame& current, Frame& next) {
+  return Step(stack, current.regs, next.regs);
+}
+
 Error PltUnwinder::Step(Memory* stack, const Registers& current, Registers& next) {
   switch (current.arch()) {
     case Registers::Arch::kX64:

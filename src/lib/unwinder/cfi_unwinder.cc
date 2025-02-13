@@ -15,17 +15,24 @@
 
 namespace unwinder {
 
-CfiUnwinder::CfiUnwinder(const std::vector<Module>& modules) {
+CfiUnwinder::CfiUnwinder(const std::vector<Module>& modules) : UnwinderBase(this) {
   for (const auto& module : modules) {
     module_map_.emplace(module.load_address, std::make_pair(module, nullptr));
   }
 }
 
-Error CfiUnwinder::Step(Memory* stack, Registers current, Registers& next, bool is_return_address) {
+Error CfiUnwinder::Step(Memory* stack, const Frame& current, Frame& next) {
+  return Step(stack, current.regs, next.regs, current.pc_is_return_address);
+}
+
+Error CfiUnwinder::Step(Memory* stack, const Registers& current, Registers& next,
+                        bool is_return_address) {
   uint64_t pc;
   if (auto err = current.GetPC(pc); err.has_err()) {
     return err;
   }
+
+  Registers regs = current;
 
   // is_return_address indicates whether pc in the current registers is a return address from a
   // previous "Step". If it is, we need to subtract 1 to find the call site because "call" could
@@ -37,14 +44,15 @@ Error CfiUnwinder::Step(Memory* stack, Registers current, Registers& next, bool 
   // instruction.
   if (is_return_address) {
     pc -= 1;
-    current.SetPC(pc);
+    regs.SetPC(pc);
   }
 
   CfiModule* cfi;
   if (auto err = GetCfiModuleFor(pc, &cfi); err.has_err()) {
     return err;
   }
-  if (auto err = cfi->Step(stack, current, next); err.has_err()) {
+
+  if (auto err = cfi->Step(stack, regs, next); err.has_err()) {
     return err;
   }
   return Success();

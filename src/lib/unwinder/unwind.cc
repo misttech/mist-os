@@ -20,6 +20,7 @@
 #include "src/lib/unwinder/plt_unwinder.h"
 #include "src/lib/unwinder/registers.h"
 #include "src/lib/unwinder/scs_unwinder.h"
+#include "src/lib/unwinder/unwinder_base.h"
 
 namespace unwinder {
 
@@ -42,6 +43,24 @@ bool PcIsReturnAddress(const Registers& regs) {
   }
   uint64_t val;
   return regs.Get(reg_id, val).has_err();
+}
+
+Error TryUnwinder(UnwinderBase* unwinder, Frame::Trust trust, Memory* stack, const Frame& current,
+                  Frame& next) {
+  auto err = unwinder->Step(stack, current, next);
+
+  if (err.has_err()) {
+    return err;
+  }
+
+  next.trust = trust;
+  if (trust == Frame::Trust::kCFI) {
+    next.pc_is_return_address = PcIsReturnAddress(next.regs);
+  } else {
+    next.pc_is_return_address = true;
+  }
+
+  return Success();
 }
 
 }  // namespace
@@ -118,21 +137,17 @@ void Unwinder::Step(Memory* stack, Frame& current, Frame& next) {
   // Try CFI first because it's the most accurate one.
   // TODO(https://fxbug.dev/316047562): Make CFI work on RISC-V.
   if (current.regs.arch() != Registers::Arch::kRiscv64) {
-    if (auto err = cfi_unwinder_.Step(stack, current.regs, next.regs, current.pc_is_return_address);
+    if (auto err = TryUnwinder(&cfi_unwinder_, Frame::Trust::kCFI, stack, current, next);
         err.ok()) {
-      next.trust = Frame::Trust::kCFI;
-      next.pc_is_return_address = PcIsReturnAddress(next.regs);
       success = true;
     } else {
-      err_msg = "CFI: " + err.msg();
+      err_msg += "CFI: " + err.msg();
     }
   }
 
   if (!success && !current.pc_is_return_address) {
     // PLT unwinder only works for the first frame.
-    if (auto err = plt_unwinder.Step(stack, current.regs, next.regs); err.ok()) {
-      next.trust = Frame::Trust::kPLT;
-      next.pc_is_return_address = true;
+    if (auto err = TryUnwinder(&plt_unwinder, Frame::Trust::kPLT, stack, current, next); err.ok()) {
       success = true;
     } else {
       err_msg += "; PLT: " + err.msg();
@@ -141,9 +156,7 @@ void Unwinder::Step(Memory* stack, Frame& current, Frame& next) {
 
   // Try frame pointers before SCS because it plays well with the CFI.
   if (!success) {
-    if (auto err = fp_unwinder.Step(stack, current.regs, next.regs); err.ok()) {
-      next.trust = Frame::Trust::kFP;
-      next.pc_is_return_address = true;
+    if (auto err = TryUnwinder(&fp_unwinder, Frame::Trust::kFP, stack, current, next); err.ok()) {
       success = true;
     } else {
       err_msg += "; FP: " + err.msg();
@@ -152,9 +165,7 @@ void Unwinder::Step(Memory* stack, Frame& current, Frame& next) {
 
   // Try shadow call stacks last because it can only recover PC.
   if (!success) {
-    if (auto err = scs_unwinder.Step(stack, current.regs, next.regs); err.ok()) {
-      next.trust = Frame::Trust::kSCS;
-      next.pc_is_return_address = true;
+    if (auto err = TryUnwinder(&scs_unwinder, Frame::Trust::kSCS, stack, current, next); err.ok()) {
       success = true;
     } else {
       err_msg += "; SCS: " + err.msg();
