@@ -7,7 +7,7 @@ received from the local controller.
 
 Include the `bt-snoop-cli` package in your build. For example, if using `fx set`, add:
 ```
---with "//src/connectivity/bluetooth/tools/bt-snoop-cli`
+--with //src/connectivity/bluetooth/tools/bt-snoop-cli
 ```
 
 `bt-snoop-cli` requires `fuchsia.bluetooth.snoop.Snoop` which is provided by the `bt-snoop`
