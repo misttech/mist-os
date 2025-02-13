@@ -174,12 +174,12 @@ bool Layer::ActivateLatestReadyImage() {
   return true;
 }
 
-bool Layer::AppendToConfig(fbl::DoublyLinkedList<LayerNode*>* list) {
+bool Layer::AppendToConfigLayerList(fbl::DoublyLinkedList<LayerNode*>& config_layer_list) {
   if (pending_node_.InContainer()) {
     return false;
   }
 
-  list->push_front(&pending_node_);
+  config_layer_list.push_back(&pending_node_);
   return true;
 }
 

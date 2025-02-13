@@ -488,27 +488,28 @@ void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
   const display::DisplayId display_id = display::ToDisplayId(request->display_id);
   auto config = configs_.find(display_id);
   if (!config.IsValid()) {
-    FDF_LOG(WARNING, "SetDisplayLayers on invalid display ID %" PRIu64, display_id.value());
+    FDF_LOG(WARNING, "SetDisplayLayers called with unknown display ID: %" PRIu64,
+            display_id.value());
     return;
   }
 
   config->pending_layer_change_ = true;
   config->pending_layer_change_property_.Set(true);
   config->pending_layers_.clear();
-  for (uint64_t i = request->layer_ids.count() - 1; i != UINT64_MAX; i--) {
-    display::LayerId layer_id = display::ToLayerId(request->layer_ids[i]);
+  for (fuchsia_hardware_display::wire::LayerId fidl_layer_id : request->layer_ids) {
+    display::LayerId layer_id = display::ToLayerId(fidl_layer_id);
 
     // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs,
     // the driver-side ID will have to be looked up in a map.
     display::DriverLayerId driver_layer_id(layer_id.value());
     auto layer = layers_.find(driver_layer_id);
     if (!layer.IsValid()) {
-      FDF_LOG(ERROR, "SetDisplayLayers: unknown layer %lu", request->layer_ids[i].value);
+      FDF_LOG(ERROR, "SetDisplayLayers called with unknown layer ID: %" PRIu64, layer_id.value());
       TearDown(ZX_ERR_INVALID_ARGS);
       return;
     }
 
-    if (!layer->AppendToConfig(&config->pending_layers_)) {
+    if (!layer->AppendToConfigLayerList(config->pending_layers_)) {
       FDF_LOG(ERROR, "Tried to reuse an in-use layer");
       TearDown(ZX_ERR_BAD_STATE);
       return;
