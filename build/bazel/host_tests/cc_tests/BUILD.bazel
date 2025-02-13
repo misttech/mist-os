@@ -1,0 +1,31 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# A simple statically linked test executable that does not use a runfiles library.
+cc_test(
+    name = "static_test",
+    srcs = ["main.cc"],
+    deps = [":foo"],
+)
+
+cc_library(
+    name = "foo",
+    srcs = ["foo.cc"],
+    hdrs = ["foo.h"],
+    # includes = [ "." ],
+)
+
+# A simple dynamically linked test executable, which calls a shared library function.
+# Does not use a runfiles library.
+cc_test(
+    name = "dynamic_test",
+    srcs = ["main.cc"],
+    dynamic_deps = [":foo_shared"],
+    deps = [":foo"],
+)
+
+cc_shared_library(
+    name = "foo_shared",
+    deps = [":foo"],
+)
