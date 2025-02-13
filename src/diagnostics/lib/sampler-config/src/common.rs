@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::ops::Deref;
 
-#[derive(Copy, Clone, Debug, Default, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Default, Deserialize, Hash, PartialEq, Eq, Serialize)]
 pub struct ProjectId(pub u32);
 
 impl fmt::Display for ProjectId {
@@ -23,7 +23,7 @@ impl Deref for ProjectId {
     }
 }
 
-#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Hash, Eq)]
+#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Hash, Eq, Serialize)]
 pub struct CustomerId(pub u32);
 
 impl fmt::Display for CustomerId {
@@ -46,7 +46,7 @@ impl Deref for CustomerId {
     }
 }
 
-#[derive(Copy, Clone, Debug, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Deserialize, Hash, PartialEq, Eq, Serialize)]
 pub struct MetricId(pub u32);
 
 impl fmt::Display for MetricId {
@@ -63,7 +63,7 @@ impl Deref for MetricId {
     }
 }
 
-#[derive(Copy, Clone, Debug, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Deserialize, Hash, PartialEq, Eq, Serialize)]
 pub struct EventCode(pub u32);
 
 impl fmt::Display for EventCode {
@@ -81,7 +81,7 @@ impl Deref for EventCode {
 }
 
 /// Supported Cobalt Metric types
-#[derive(Deserialize, Debug, PartialEq, Eq, Hash, Copy, Clone)]
+#[derive(Deserialize, Debug, PartialEq, Eq, Hash, Copy, Clone, Serialize)]
 pub enum MetricType {
     /// Maps cached diffs from Uint or Int Inspect types.
     /// NOTE: This does not use duration tracking. Durations are always set to 0.

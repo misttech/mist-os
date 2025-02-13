@@ -49,6 +49,7 @@ pub fn load_project_configs(
                 );
             }
         };
+        let fire_components = ComponentIdInfoList::new(fire_components);
         project_configs.append(&mut expand_fire_projects(fire_project_templates, fire_components)?);
     }
     Ok(project_configs)
@@ -81,7 +82,7 @@ fn add_instance_ids(ids: component_id_index::Index, fire_components: &mut Vec<Co
 }
 fn expand_fire_projects(
     projects: Vec<ProjectTemplate>,
-    components: Vec<ComponentIdInfo>,
+    components: ComponentIdInfoList,
 ) -> Result<Vec<ProjectConfig>, Error> {
     projects.into_iter().map(|project| project.expand(&components)).collect::<Result<Vec<_>, _>>()
 }

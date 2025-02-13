@@ -4,10 +4,12 @@
 
 use crate::common::{CustomerId, EventCode, MetricId, MetricType, ProjectId};
 use fidl_fuchsia_diagnostics::Selector;
-use serde::Deserialize;
+use selectors::SelectorDisplayOptions;
+use serde::ser::{Error, SerializeSeq};
+use serde::{Deserialize, Serialize, Serializer};
 
 /// Configuration for a single project to map Inspect data to its Cobalt metrics.
-#[derive(Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct ProjectConfig {
     /// Project ID that metrics are being sampled and forwarded on behalf of.
     pub project_id: ProjectId,
@@ -26,10 +28,14 @@ pub struct ProjectConfig {
 }
 
 /// Configuration for a single metric to map from an Inspect property to a Cobalt metric.
-#[derive(Clone, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct MetricConfig {
     /// Selector identifying the metric to sample via the diagnostics platform.
-    #[serde(rename = "selector", deserialize_with = "crate::utils::one_or_many_selectors")]
+    #[serde(
+        rename = "selector",
+        deserialize_with = "crate::utils::one_or_many_selectors",
+        serialize_with = "selectors_to_string"
+    )]
     pub selectors: Vec<Selector>,
 
     /// Cobalt metric id to map the selector to.
@@ -53,6 +59,20 @@ pub struct MetricConfig {
     /// project id.
     // TODO(https://fxbug.dev/42071858): remove this when we support batching.
     pub project_id: Option<ProjectId>,
+}
+
+pub fn selectors_to_string<S>(selectors: &[Selector], serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut seq = serializer.serialize_seq(Some(selectors.len()))?;
+    for selector in selectors {
+        let selector_string =
+            selectors::selector_to_string(selector, SelectorDisplayOptions::never_wrap_in_quotes())
+                .map_err(S::Error::custom)?;
+        seq.serialize_element(&selector_string)?;
+    }
+    seq.end()
 }
 
 #[cfg(test)]

@@ -37,10 +37,10 @@ pub struct ProjectTemplate {
 }
 
 impl ProjectTemplate {
-    pub fn expand(self, components: &[ComponentIdInfo]) -> Result<ProjectConfig, anyhow::Error> {
+    pub fn expand(self, components: &ComponentIdInfoList) -> Result<ProjectConfig, anyhow::Error> {
         let ProjectTemplate { project_id, customer_id, poll_rate_sec, metrics } = self;
         let mut metric_configs = Vec::with_capacity(metrics.len() * components.len());
-        for component in components {
+        for component in components.iter() {
             for metric in metrics.iter() {
                 if let Some(metric_config) = metric.expand(component)? {
                     metric_configs.push(metric_config);
@@ -89,9 +89,6 @@ pub struct MetricTemplate {
 }
 
 #[derive(Deserialize, Debug, PartialEq, Eq)]
-pub struct ComponentIdInfoList(Vec<ComponentIdInfo>);
-
-#[derive(Deserialize, Debug, PartialEq, Eq)]
 pub struct ComponentIdInfo {
     /// The component's moniker
     #[serde(deserialize_with = "moniker_deserialize")]
@@ -107,6 +104,27 @@ pub struct ComponentIdInfo {
 
     /// Human-readable label, not used by Sampler, only for human configs.
     pub label: String,
+}
+
+#[derive(Deserialize, Debug, PartialEq, Eq)]
+pub struct ComponentIdInfoList(Vec<ComponentIdInfo>);
+
+impl ComponentIdInfoList {
+    pub fn new(infos: Vec<ComponentIdInfo>) -> Self {
+        Self(infos)
+    }
+
+    pub fn add_instance_ids(&mut self, index: &component_id_index::Index) {
+        for component in self.0.iter_mut() {
+            if let ExtendedMoniker::ComponentInstance(moniker) = &component.moniker {
+                component.instance_id = index.id_for_moniker(moniker).cloned();
+            }
+        }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &ComponentIdInfo> {
+        self.0.iter()
+    }
 }
 
 impl std::ops::Deref for ComponentIdInfoList {
@@ -505,7 +523,7 @@ mod tests {
                 .unwrap(),
         )
         .unwrap();
-        let mut components = vec![
+        let mut components = ComponentIdInfoList(vec![
             ComponentIdInfo {
                 moniker: "baz/quux".try_into().unwrap(),
                 event_id: EventCode(101),
@@ -518,8 +536,8 @@ mod tests {
                 label: "fb".into(),
                 instance_id: None,
             },
-        ];
-        add_instance_ids(ids, &mut components);
+        ]);
+        components.add_instance_ids(&ids);
         let moniker_template = "fizz/buzz:root/info/{MONIKER}/data";
         let id_template = "fizz/buzz:root/info/{INSTANCE_ID}/data";
         assert_eq!(
@@ -535,17 +553,6 @@ mod tests {
                 interpolate_template(id_template, &components[1]).unwrap().unwrap(),
                 "fizz/buzz:root/info/1234123412341234123412341234123412341234123412341234123412341234/data"
             );
-    }
-
-    fn add_instance_ids(
-        ids: component_id_index::Index,
-        fire_components: &mut Vec<ComponentIdInfo>,
-    ) {
-        for component in fire_components {
-            if let ExtendedMoniker::ComponentInstance(moniker) = &component.moniker {
-                component.instance_id = ids.id_for_moniker(moniker).cloned();
-            }
-        }
     }
 
     #[derive(Debug, Deserialize, Eq, PartialEq)]
