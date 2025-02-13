@@ -34,6 +34,38 @@ fuchsia_cc_driver("root_driver") {
   ]
 }
 
+driver_bind_rules("v1_driver_bind") {
+  rules = "meta/v1_driver.bind"
+  bind_output = "v1_driver.bindbc"
+  deps = [ "//src/devices/bind/fuchsia.test" ]
+}
+
+fuchsia_cc_driver("v1_driver") {
+  testonly = true
+  legacy = true
+  output_name = "v1_driver"
+  sources = [ "v1_driver.cc" ]
+  deps = [
+    ":fuchsia.services.test_cpp",
+    ":v1_driver_bind",
+    "//src/devices/lib/driver",
+    "//src/devices/lib/driver:driver_runtime",
+    "//src/lib/ddk",
+    "//src/lib/ddktl",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/inspect",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+fuchsia_driver_component("v1_driver_component") {
+  testonly = true
+  component_name = "v1_driver"
+  deps = [ ":v1_driver" ]
+  info = "meta/v1-driver-info.json"
+  manifest = "meta/v1_driver.cml"
+}
+
 fuchsia_driver_component("root") {
   testonly = true
   manifest = "meta/root.cml"
@@ -62,6 +94,7 @@ fuchsia_unittest_package("services_test") {
   deps = [
     ":bin",
     ":root",
+    ":v1_driver_component",
     "//sdk/lib/driver_test_realm:driver_test_realm_component",
     "//src/devices/bin/driver_host:component",
   ]

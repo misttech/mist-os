@@ -272,6 +272,7 @@
 //src/devices/tests/v2/runtime-protocol:leaf-driver
 //src/devices/tests/v2/runtime-protocol:root-driver
 //src/devices/tests/v2/services:root_driver
+//src/devices/tests/v2/services:v1_driver
 //src/devices/thermal/drivers/aml-thermal-s905d2g-legacy:aml-thermal-s905d2g-legacy-driver
 //src/devices/thermal/drivers/aml-thermal:aml-thermal-driver
 //src/devices/thermal/drivers/aml-thermistor:aml-thermistor-driver
@@ -334,8 +335,8 @@
 //src/media/audio/drivers/testing/realm:codec-test-driver2
 //src/media/audio/drivers/testing/realm:dai-test-driver
 //src/media/audio/drivers/usb-audio:usb-audio-driver
-//src/media/audio/drivers/virtual_audio:virtual_audio_driver-driver
 //src/media/audio/drivers/virtual-audio-dfv2:virtual-audio-dfv2-driver
+//src/media/audio/drivers/virtual_audio:virtual_audio_driver-driver
 //src/power/fake-powersource:fake_battery_driver
 //src/power/power-manager/testing/fake_driver:fake-cpu-ctrl
 //src/power/power-manager/testing/fake_driver:fake-temperature

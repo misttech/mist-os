@@ -29,6 +29,7 @@ source_set("ddktl") {
     "include/ddktl/metadata.h",
     "include/ddktl/metadata_server.h",
     "include/ddktl/resume-txn.h",
+    "include/ddktl/service.h",
     "include/ddktl/suspend-txn.h",
     "include/ddktl/unbind-txn.h",
   ]
@@ -258,6 +259,7 @@ source_set("ddktl") {
     "//src/devices/tests/v2/ddk-init-test:*",
     "//src/devices/tests/v2/init-child-first:*",
     "//src/devices/tests/v2/inspect:*",
+    "//src/devices/tests/v2/services:*",
     "//src/devices/thermal/drivers/aml-thermal:*",
     "//src/devices/thermal/drivers/aml-thermal-s905d2g-legacy:*",
     "//src/devices/thermal/drivers/aml-thermistor:*",

@@ -61,5 +61,6 @@ group("drivers") {
     "runtime-protocol:leaf",
     "runtime-protocol:root",
     "services:root",
+    "services:v1_driver_component",
   ]
 }

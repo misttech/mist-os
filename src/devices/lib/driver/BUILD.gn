@@ -195,6 +195,7 @@ shared_library("driver") {
     "//src/devices/tests/v2/init-child-first:*",
     "//src/devices/tests/v2/inspect:*",
     "//src/devices/tests/v2/interop:*",
+    "//src/devices/tests/v2/services:*",
     "//src/devices/thermal/drivers/aml-thermal:*",
     "//src/devices/thermal/drivers/aml-thermal-s905d2g-legacy:*",
     "//src/devices/thermal/drivers/aml-thermistor:*",

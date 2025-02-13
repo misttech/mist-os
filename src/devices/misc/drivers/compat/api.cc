@@ -160,6 +160,14 @@ __EXPORT zx_status_t device_get_fragment_metadata(zx_device_t* dev, const char* 
   return dev->GetMetadata(type, buf, buflen, actual);
 }
 
+__EXPORT zx_status_t device_register_service_member(zx_device_t* dev, void* handler,
+                                                    const char* service_name,
+                                                    const char* instance_name,
+                                                    const char* member_name) {
+  return dev->RegisterServiceMember(std::move(*reinterpret_cast<component::AnyHandler*>(handler)),
+                                    service_name, instance_name, member_name);
+}
+
 __EXPORT zx_status_t device_connect_fidl_protocol2(zx_device_t* device, const char* service_name,
                                                    const char* protocol_name, zx_handle_t request) {
   return device->ConnectFragmentFidl("default", service_name, protocol_name, zx::channel(request));

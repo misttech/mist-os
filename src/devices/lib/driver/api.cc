@@ -111,6 +111,13 @@ __EXPORT zx_status_t device_get_fragment_metadata(zx_device_t* dev, const char* 
   return ZX_ERR_NOT_SUPPORTED;
 }
 
+__EXPORT zx_status_t device_register_service_member(zx_device_t* dev, void* handler,
+                                                    const char* service_name,
+                                                    const char* instance_name,
+                                                    const char* member_name) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
 __EXPORT zx_status_t device_connect_fidl_protocol(zx_device_t* device, const char* protocol_name,
                                                   zx_handle_t request) {
   return ZX_ERR_NOT_SUPPORTED;

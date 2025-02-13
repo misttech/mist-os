@@ -357,6 +357,18 @@ zx_status_t device_get_fragment_protocol(zx_device_t* dev, const char* name, uin
 zx_status_t device_get_fragment_metadata(zx_device_t* dev, const char* name, uint32_t type,
                                          void* buf, size_t buflen, size_t* actual);
 
+// Adds a service member protocol to the outgoing directory of |dev|
+//
+// May be called by the device ONLY AFTER device_add is called.
+// |handler| is a function pointer castable to an AnyHandler object.  The handler is called when
+// a client connects to the protocol.
+// The protocol will be added to /svc/|service_name|/|instance_name|/|member_name|
+// This call only supports the zircon channel transport, as it is intended to be used to
+// advertise a service to non-drivers.
+zx_status_t device_register_service_member(zx_device_t* dev, void* handler,
+                                           const char* service_name, const char* instance_name,
+                                           const char* member_name);
+
 // Device State Change Functions.  These match up with the signals defined in
 // the fuchsia.device.Controller interface.
 //
