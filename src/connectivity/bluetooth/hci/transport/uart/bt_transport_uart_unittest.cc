@@ -8,7 +8,6 @@
 #include <lib/async/cpp/task.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/fdio/directory.h>
-#include <zircon/device/bt-hci.h>
 
 #include <queue>
 

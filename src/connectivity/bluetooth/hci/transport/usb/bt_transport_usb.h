@@ -11,7 +11,6 @@
 #include <lib/async/cpp/task.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/sync/completion.h>
-#include <zircon/device/bt-hci.h>
 
 #include <queue>
 
@@ -120,6 +119,14 @@ class Device final : public DeviceType,
     usb_endpoint_descriptor_t out;
   };
 
+  enum class SnoopPacketType {
+    kCommand,
+    kEvent,
+    kAclData,
+    kScoData,
+    kIsoData,
+  };
+
   using usb_callback_t = void (*)(void*, usb_request_t*);
 
   void ReadIsocInterfaces(usb_desc_iter_t* config_desc_iter);
@@ -139,7 +146,7 @@ class Device final : public DeviceType,
 
   void QueueInterruptRequestsLocked() __TA_REQUIRES(mutex_);
 
-  void SnoopChannelWriteLocked(bt_hci_snoop_type_t type, bool is_received, const uint8_t* bytes,
+  void SnoopChannelWriteLocked(enum SnoopPacketType type, bool is_received, const uint8_t* bytes,
                                size_t length) __TA_REQUIRES(mutex_);
 
   // Requests removal of this device. Idempotent.

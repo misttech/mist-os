@@ -12,7 +12,6 @@
 #include <lib/fit/thread_checker.h>
 #include <lib/sync/condition.h>
 #include <lib/sync/mutex.h>
-#include <zircon/device/bt-hci.h>
 
 #include <bind/fuchsia/bluetooth/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
