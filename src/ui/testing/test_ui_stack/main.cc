@@ -89,6 +89,8 @@ int run_test_ui_stack(int argc, const char** argv) {
   AddPublicService<fuchsia_ui_composition::ScreenCapture>(context.get(),
                                                           realm_exposed_services.get());
   AddPublicService<fuchsia_ui_composition::Screenshot>(context.get(), realm_exposed_services.get());
+  AddPublicService<fuchsia_ui_display_singleton::DisplayPower>(context.get(),
+                                                               realm_exposed_services.get());
   AddPublicService<fuchsia_ui_display_singleton::Info>(context.get(), realm_exposed_services.get());
 
   // Helper services.
