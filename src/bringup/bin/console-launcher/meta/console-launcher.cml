@@ -175,6 +175,11 @@
             availability: "optional",
         },
         {
+            // Used by usbctl
+            service: "fuchsia.hardware.usb.peripheral.Service",
+            availability: "optional",
+        },
+        {
             service: "fuchsia.hardware.nfc.Service",
             availability: "optional",
         },

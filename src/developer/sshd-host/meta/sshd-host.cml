@@ -317,6 +317,7 @@
             service: [
                 "fuchsia.hardware.cpu.ctrl.Service",
                 "fuchsia.hardware.suspend.SuspendService",
+                "fuchsia.hardware.usb.peripheral.Service",
             ],
             from: "parent",
             to: "#shell",

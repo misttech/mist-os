@@ -570,7 +570,10 @@
             to: "#sshd-host",
         },
         {
-            service: "fuchsia.hardware.nfc.Service",
+            service: [
+                "fuchsia.hardware.nfc.Service",
+                "fuchsia.hardware.usb.peripheral.Service",
+            ],
             from: "parent",
             to: "#sshd-host",
         },

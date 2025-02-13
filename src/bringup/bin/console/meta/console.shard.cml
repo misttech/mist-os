@@ -260,6 +260,11 @@
             to: "#console-launcher",
         },
         {
+            service: "fuchsia.hardware.usb.peripheral.Service",
+            from: "#boot-drivers",
+            to: "#console-launcher",
+        },
+        {
             service: "fuchsia.gpu.magma.Service",
             from: "#boot-drivers",
             to: "#console-launcher",
