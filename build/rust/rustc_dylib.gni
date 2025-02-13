@@ -96,6 +96,9 @@ import("//build/rust/rustc_test.gni")
 # See //examples/rust/dylib/rust-shared/BUILD.gn for an example of using this template.
 #
 template("rustc_dylib") {
+  assert(is_fuchsia,
+         "Rust dylibs are currently only supported when targeting Fuchsia")
+
   if (defined(invoker.original_target_name)) {
     _original_target_name = invoker.original_target_name
   } else {
@@ -111,7 +114,12 @@ template("rustc_dylib") {
         name = invoker.name + "_dylib_test"
       }
       original_target_name = _original_target_name
-      forward_variables_from(invoker, "*", [ "name" ])
+      forward_variables_from(invoker,
+                             "*",
+                             [
+                               "name",
+                               "public_deps",
+                             ])
     }
   }
 
@@ -125,7 +133,10 @@ template("rustc_dylib") {
                              "enforce_source_listing",
                              "features",
                              "inputs",
+                             "public_deps",
                              "sources",
+                             "testonly",
+                             "visibility",
                            ])
 
     target_type = "shared_library"
@@ -146,8 +157,6 @@ template("rustc_dylib") {
                                "data_deps",
                                "exclude_toolchain_tags",
                                "output_dir",
-                               "testonly",
-                               "visibility",
                              ])
 
       # Due to what is arguably a bug in the Rust compiler, if it sees libfoo.so
@@ -171,6 +180,9 @@ template("rustc_dylib") {
 
     # Avoid walking into data_deps when checking component manifest expected includes.
     metadata = {
+      if (defined(invoker.metadata)) {
+        forward_variables_from(invoker.metadata, "*")
+      }
       expect_includes_barrier = deps
     }
   }

@@ -4,9 +4,9 @@
 
 import("//build/components.gni")
 import("//build/config/fuchsia/target_api_level.gni")
-import("//build/rust/rustc_library.gni")
+import("//build/rust/rustc_dylib.gni")
 
-rustc_library("vfs") {
+common_vfs_args = {
   version = "0.1.0"
   edition = "2021"
   deps = [
@@ -29,23 +29,6 @@ rustc_library("vfs") {
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:thiserror",
   ]
-
-  if (is_fuchsia) {
-    deps += [ "//sdk/rust/zx" ]
-  }
-
-  if (is_host) {
-    # Avoid proliferation from where it is used already
-    visibility = [
-      "../*",
-      "//sdk/lib/device-watcher/rust:*",
-      "//src/developer/ffx/playground:*",
-      "//src/developer/ffx/tools/playground:*",
-      "//src/lib/fuchsia-fs:*",
-      "//src/storage/fvm:*",
-      "//src/sys/pkg/lib/update-package:*",
-    ]
-  }
 
   sources = [
     "src/common.rs",
@@ -106,6 +89,49 @@ rustc_library("vfs") {
     "//src/testing/fidl:placeholders_rust",
     "//third_party/rust_crates:assert_matches",
   ]
+}
+
+if (is_fuchsia) {
+  rustc_dylib("vfs") {
+    forward_variables_from(common_vfs_args, "*")
+
+    deps += [ "//sdk/rust/zx" ]
+    public_deps = [
+      # TODO(https://fxbug.dev/42137337): Figure out why this is not properly
+      # propagated to dependents.
+      #
+      # Without this public dep, libtrace-engine doesn't seem to be properly
+      # propagated to dependents even it's a transitive dependency. E.g. There's
+      # the following dep path.
+      #
+      #   //src/storage/lib/vfs/rust:vfs --[public]-->
+      #   //src/storage/lib/vfs/rust:vfs.actual --[private]-->
+      #   //src/storage/lib/trace:trace --[public]-->
+      #   //src/storage/lib/trace:trace.actual --[private]-->
+      #   //src/lib/trace/rust:trace --[public]-->
+      #   //src/lib/trace/rust:trace.actual --[private]-->
+      #   //zircon/system/ulib/trace-engine:trace-engine
+      #
+      "//zircon/system/ulib/trace-engine",
+    ]
+  }
+}
+
+if (is_host) {
+  rustc_library("vfs") {
+    forward_variables_from(common_vfs_args, "*")
+
+    # Avoid proliferation from where it is used already
+    visibility = [
+      "../*",
+      "//sdk/lib/device-watcher/rust:*",
+      "//src/developer/ffx/playground:*",
+      "//src/developer/ffx/tools/playground:*",
+      "//src/lib/fuchsia-fs:*",
+      "//src/storage/fvm:*",
+      "//src/sys/pkg/lib/update-package:*",
+    ]
+  }
 }
 
 fuchsia_unittest_package("vfs-tests") {

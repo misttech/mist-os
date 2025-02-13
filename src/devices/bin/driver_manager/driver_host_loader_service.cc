@@ -33,6 +33,7 @@ constexpr std::array kDriverAllowlist{
     "libunwind.so.1",
     "libsvc.so",
     "libvfs_internal.so",
+    "libvfs.so",
 };
 
 // Do NOT add to this list when predictable library names can be added to

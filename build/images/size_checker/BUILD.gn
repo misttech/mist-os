@@ -54,7 +54,7 @@ if (!use_bazel_images_only) {
         "--blobfs-creep-budget",
         "$blobfs_size_creep_limit",
         "--platform-resources-budget",
-        "6657271",
+        "8013047",
       ]
       outputs += [ "$target_out_dir/size_report_product.json" ]
     }

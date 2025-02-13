@@ -38,6 +38,9 @@ _EXEC_PERMS = (
     stat.S_IRWXU | (stat.S_IRGRP | stat.S_IXGRP) | (stat.S_IROTH | stat.S_IXOTH)
 )
 
+# This is a list of known dylibs built in Fuchsia.
+_KNOWN_FUCHSIA_DYLIBS = ("libvfs",)
+
 
 def msg(text: str) -> None:
     print(f"[{_SCRIPT_BASENAME}] {text}")
@@ -582,6 +585,15 @@ class RustRemoteAction(object):
         remote_depfile_inputs = [
             target for paths in target_paths for target in paths
         ]
+
+        # TODO(https://fxbug.dev/395778407): binary-dep-depinfo only emits
+        # .rmeta for Fuchsia dylibs, figure out a better way to include .so
+        # files here, which are necessary in linking.
+        for p in remote_depfile_inputs:
+            libname = p.name.removesuffix(".rmeta")
+            if libname in _KNOWN_FUCHSIA_DYLIBS:
+                remote_depfile_inputs += [p.parent.joinpath(f"{libname}.so")]
+                break
 
         # Expand some .rmeta deps for .rlib compilation.
         expanded_remote_inputs = list(
