@@ -63,16 +63,20 @@ class WakeupMetricsProcessor(trace_metrics.MetricsProcessor):
             # An instance of `event_names[0]` will start tracking a new sequence. If one was
             # already in progress, it is discarded.
             if e.name == self._event_names[0]:
+                # We might be looking for a duration event that's coupled to a flow event, so if we
+                # see a non-duration event, just skip it.
                 if not isinstance(e, trace_model.DurationEvent):
-                    raise RuntimeError(f"Event {e} is not a duration event.")
+                    continue
                 if e.duration is None:
                     raise RuntimeError(f"Event {e} has no duration.")
 
                 wakeup_start = e.start + e.duration
                 next_event_index = 1
             elif e.name == self._event_names[next_event_index]:
+                # We might be looking for a duration event that's coupled to a flow event, so if we
+                # see a non-duration event, just skip it.
                 if not isinstance(e, trace_model.DurationEvent):
-                    raise RuntimeError(f"Event {e} is not a duration event.")
+                    continue
                 if e.duration is None:
                     raise RuntimeError(f"Event {e} has no duration.")
 
