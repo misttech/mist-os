@@ -1196,10 +1196,9 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Helper function for |CloneBidirectionalLocked|.
   //
-  // Adds the newly created bidirectionally cloned |child| as a child of this node at the location
-  // specified by |location|. The |location.parent| field must be |this| object. Also, updates the
-  // appropriate share counts for the pages that are now shared by the new child.
-  void AddBidirectionallyClonedChildLocked(ParentAndRange location, VmCowPages* child)
+  // Adds the newly created bidirectionally cloned |child| as a child of this node. Also, updates
+  // the appropriate share counts for the pages that are now shared by the new child.
+  void AddBidirectionallyClonedChildLocked(uint64_t offset, uint64_t limit, VmCowPages* child)
       TA_REQ(lock()) TA_REQ(child->lock());
 
   // Helper function for |CreateCloneLocked|.
@@ -1214,12 +1213,7 @@ class VmCowPages final : public VmHierarchyBase,
   // Unlike a unidirectional clone, the snapshot taken by the child is guaranteed to never contain
   // any writes or newly committed pages made by ancestor nodes after the clone operation is
   // performed.
-  //
-  // This node may not end up being the parent of the child, see |FindParentAndRangeForCloneLocked|.
-  // However if this node does end up being the parent, then this method will create a second new
-  // child node with the same properties as this node and this node will become the hidden parent of
-  // both new children.
-  zx_status_t CloneBidirectionalLocked(uint64_t offset, uint64_t size,
+  zx_status_t CloneBidirectionalLocked(uint64_t offset, uint64_t limit, uint64_t size,
                                        fbl::RefPtr<VmCowPages>* cow_child) TA_REQ(lock());
 
   // Helper function for |CreateCloneLocked|.
@@ -1235,9 +1229,7 @@ class VmCowPages final : public VmHierarchyBase,
   // clone operation is performed, but this is not guaranteed. This includes pages which ancestors
   // have newly committed since this clone operation was performed - the clone may see these pages
   // to snapshot them but it is not guaranteed.
-  //
-  // This node may not end up being the parent of the child, see |FindParentAndRangeForCloneLocked|.
-  zx_status_t CloneUnidirectionalLocked(uint64_t offset, uint64_t size,
+  zx_status_t CloneUnidirectionalLocked(uint64_t offset, uint64_t limit, uint64_t size,
                                         fbl::RefPtr<VmCowPages>* cow_child) TA_REQ(lock());
 
   // Release any pages this VMO can reference from the provided start offset till the end of the
