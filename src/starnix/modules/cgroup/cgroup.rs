@@ -22,6 +22,7 @@ use starnix_uapi::file_mode::mode;
 use starnix_uapi::{errno, error, pid_t};
 use std::collections::{btree_map, hash_map, BTreeMap, HashMap};
 use std::ops::Deref;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock, Weak};
 
 use crate::directory::CgroupDirectory;
@@ -52,6 +53,10 @@ pub struct CgroupFreezerState {
 
 /// Common operations of all cgroups.
 pub trait CgroupOps: Send + Sync + 'static {
+    /// Returns the unique ID of the cgroup. ID of root cgroup is 0.
+    #[allow(dead_code)]
+    fn id(&self) -> u64;
+
     /// Add a process to a cgroup. Errors if the cgroup has been deleted.
     fn add_process(&self, pid: pid_t, thread_group: &TempRef<'_, ThreadGroup>)
         -> Result<(), Errno>;
@@ -119,6 +124,9 @@ pub struct CgroupRoot {
 
     /// Weak reference to self, used when creating child cgroups.
     weak_self: Weak<CgroupRoot>,
+
+    /// Used to generate IDs for descendent Cgroups.
+    next_id: AtomicU64,
 }
 impl CgroupRoot {
     /// Since `CgroupRoot` is part of the `FileSystem` (see `CgroupFsV1::new_fs` and
@@ -130,6 +138,7 @@ impl CgroupRoot {
         Arc::new_cyclic(|weak_self| Self {
             weak_self: weak_self.clone(),
             kernel,
+            next_id: AtomicU64::new(1),
             ..Default::default()
         })
     }
@@ -162,12 +171,20 @@ impl CgroupRoot {
         fs.set_root(CgroupDirectory::new(weak_ops));
     }
 
+    fn get_next_id(&self) -> u64 {
+        self.next_id.fetch_add(1, Ordering::Relaxed)
+    }
+
     fn kernel(&self) -> Arc<Kernel> {
         self.kernel.upgrade().expect("kernel is available for cgroup operations")
     }
 }
 
 impl CgroupOps for CgroupRoot {
+    fn id(&self) -> u64 {
+        0
+    }
+
     fn add_process(
         &self,
         pid: pid_t,
@@ -195,7 +212,8 @@ impl CgroupOps for CgroupRoot {
         fs: &FileSystemHandle,
         name: &FsStr,
     ) -> Result<CgroupHandle, Errno> {
-        let new_child = Cgroup::new(current_task, fs, name, &self.weak_self, None);
+        let id = self.get_next_id();
+        let new_child = Cgroup::new(current_task, fs, id, name, &self.weak_self, None);
         let mut children = self.children.lock();
         children.insert_child(name.into(), new_child)
     }
@@ -446,6 +464,9 @@ impl CgroupState {
 pub struct Cgroup {
     root: Weak<CgroupRoot>,
 
+    /// ID of the cgroup.
+    id: u64,
+
     /// Name of the cgroup.
     name: FsString,
 
@@ -482,6 +503,7 @@ impl Cgroup {
     pub fn new(
         current_task: &CurrentTask,
         fs: &FileSystemHandle,
+        id: u64,
         name: &FsStr,
         root: &Weak<CgroupRoot>,
         parent: Option<Weak<Cgroup>>,
@@ -489,6 +511,7 @@ impl Cgroup {
         Arc::new_cyclic(|weak| {
             let weak_ops = weak.clone() as Weak<dyn CgroupOps>;
             Self {
+                id,
                 root: root.clone(),
                 name: name.to_owned(),
                 parent,
@@ -553,6 +576,10 @@ impl Cgroup {
 }
 
 impl CgroupOps for Cgroup {
+    fn id(&self) -> u64 {
+        self.id
+    }
+
     fn add_process(
         &self,
         pid: pid_t,
@@ -592,8 +619,9 @@ impl CgroupOps for Cgroup {
         fs: &FileSystemHandle,
         name: &FsStr,
     ) -> Result<CgroupHandle, Errno> {
+        let id = self.root()?.get_next_id();
         let new_child =
-            Cgroup::new(current_task, fs, name, &self.root, Some(self.weak_self.clone()));
+            Cgroup::new(current_task, fs, id, name, &self.root, Some(self.weak_self.clone()));
         let mut state = self.state.lock();
         if state.deleted {
             return error!(ENOENT);
