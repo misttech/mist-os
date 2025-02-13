@@ -2196,8 +2196,8 @@ struct_decl_macro! {
     #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
     #[derive(zerocopy::FromBytes, zerocopy::Immutable, zerocopy::IntoBytes)]
     pub struct <zx_info_memory_stall_t> {
-        pub stall_time_some: zx_duration_t,
-        pub stall_time_full: zx_duration_t,
+        pub stall_time_some: zx_duration_mono_t,
+        pub stall_time_full: zx_duration_mono_t,
     }
 }
 

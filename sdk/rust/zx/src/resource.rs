@@ -11,7 +11,7 @@ use crate::{
     ObjectQuery, Status, Topic,
 };
 use bitflags::bitflags;
-use zx_sys::{self as sys, zx_duration_t, ZX_MAX_NAME_LEN};
+use zx_sys::{self as sys, zx_duration_mono_t, zx_duration_t, ZX_MAX_NAME_LEN};
 
 /// An object representing a Zircon resource.
 ///
