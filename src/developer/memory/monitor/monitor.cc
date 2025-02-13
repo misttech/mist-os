@@ -12,16 +12,11 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 #include <lib/zx/time.h>
-#include <lib/zx/vmo.h>
 #include <string.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
 
 #include <filesystem>
-#include <iostream>
-#include <iterator>
-#include <memory>
-#include <mutex>
 #include <sstream>
 #include <utility>
 
@@ -44,8 +39,6 @@ namespace monitor {
 using memory::Capture;
 using memory::CaptureLevel;
 using memory::Digest;
-using memory::Digester;
-using memory::SORTED;
 using memory::Summary;
 using memory::TextPrinter;
 
@@ -57,7 +50,7 @@ const std::string kBucketConfigPath = "/config/data/buckets.json";
 constexpr std::string kLoggerInspectKey = "logger";
 const zx::duration kHighWaterPollFrequency = zx::sec(10);
 const uint64_t kHighWaterThreshold = 10ul * 1024 * 1024;
-const zx::duration kMetricsPollFrequency = zx::min(5);
+constexpr zx::duration kMetricsPollFrequency = zx::min(5);
 const char kTraceNameHighPrecisionBandwidth[] = "memory_monitor:high_precision_bandwidth";
 const char kTraceNameHighPrecisionBandwidthCamera[] =
     "memory_monitor:high_precision_bandwidth_camera";
@@ -148,7 +141,7 @@ Monitor::Monitor(const fxl::CommandLine& command_line, async_dispatcher_t* dispa
       logger_(
           dispatcher_, &high_water_,
           [this](Capture* c) { return capture_maker_.GetCapture(c, CaptureLevel::VMO); },
-          [this](const Capture& c, Digest* d) { GetDigest(c, d); }, &config_,
+          [this](const Capture& c, Digest* d) { digester_.Digest(c, d); }, &config_,
           inspector_.root().CreateChild(kLoggerInspectKey)),
       metric_event_logger_factory_(std::move(factory)),
       bucket_matches_(CreateBucketMatchesFromConfigData()),
@@ -274,7 +267,7 @@ void Monitor::CreateMetrics() {
             bucket_matches_, kMetricsPollFrequency, dispatcher_, &inspector_,
             fidl::Client<fuchsia_metrics::MetricEventLogger>(std::move(client), dispatcher_),
             [this](Capture* c) { return capture_maker_.GetCapture(c, CaptureLevel::VMO); },
-            [this](const Capture& c, Digest* d) { GetDigest(c, d); });
+            [this](const Capture& c, Digest* d) { digester_.Digest(c, d); });
       });
 }
 
@@ -360,7 +353,7 @@ inspect::Inspector Monitor::Inspect() {
     Summary summary(capture, Summary::kNameMatches);
     std::ostringstream summary_stream;
     TextPrinter summary_printer(summary_stream);
-    summary_printer.PrintSummary(summary, CaptureLevel::VMO, SORTED);
+    summary_printer.PrintSummary(summary, CaptureLevel::VMO, memory::SORTED);
     auto current_string = summary_stream.str();
     if (!current_string.empty()) {
       root.RecordString("current", current_string);
@@ -596,11 +589,6 @@ void Monitor::UpdateState() {
       tracing_ = false;
     }
   }
-}
-
-void Monitor::GetDigest(const memory::Capture& capture, memory::Digest* digest) {
-  std::lock_guard<std::mutex> lock(digester_mutex_);
-  digester_.Digest(capture, digest);
 }
 
 namespace {

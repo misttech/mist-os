@@ -9,14 +9,10 @@
 #include <fidl/fuchsia.memory.inspection/cpp/fidl.h>
 #include <fidl/fuchsia.memorypressure/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
-#include <lib/fidl/cpp/binding_set.h>
 #include <lib/inspect/component/cpp/component.h>
 #include <lib/trace/observer.h>
 #include <lib/zx/socket.h>
-#include <lib/zx/vmo.h>
 #include <zircon/types.h>
-
-#include <memory>
 
 #include "src/developer/memory/metrics/capture.h"
 #include "src/developer/memory/metrics/digest.h"
@@ -76,8 +72,6 @@ class Monitor : public fidl::Server<fuchsia_memory_inspection::Collector>,
   static void PrintHelp();
   inspect::Inspector Inspect();
 
-  void GetDigest(const memory::Capture& capture, memory::Digest* digest);
-
   void OnLevelChanged(pressure_signaler::Level level);
 
   memory::CaptureMaker capture_maker_;
@@ -98,7 +92,6 @@ class Monitor : public fidl::Server<fuchsia_memory_inspection::Collector>,
   std::optional<Metrics> metrics_;
   std::vector<memory::BucketMatch> bucket_matches_;
   memory::Digester digester_;
-  std::mutex digester_mutex_;
   std::optional<fidl::Client<fuchsia_hardware_ram_metrics::Device>> ram_device_;
   uint64_t pending_bandwidth_measurements_ = 0;
   pressure_signaler::Level level_;
@@ -106,7 +99,6 @@ class Monitor : public fidl::Server<fuchsia_memory_inspection::Collector>,
   // Imminent OOM monitoring
   void WaitForImminentOom();
   void WatchForImminentOom();
-
   zx_handle_t imminent_oom_event_handle_;
   async::TaskClosureMethod<Monitor, &Monitor::WatchForImminentOom> watch_task_{this};
   async::Loop imminent_oom_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};

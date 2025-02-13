@@ -52,37 +52,30 @@ int main(int argc, const char** argv) {
   zx_status_t status = fuchsia_scheduler::SetRoleForThisThread("fuchsia.memory-monitor.main");
   FX_CHECK(status == ZX_OK) << "Set scheduler role status: " << zx_status_get_string(status);
 
-  auto maker_result = memory::CaptureMaker::Create(memory::CreateDefaultOS());
-  if (maker_result.is_error()) {
-    FX_LOGS(ERROR) << "Error getting capture state: "
-                   << zx_status_get_string(maker_result.error_value());
+  auto maker = memory::CaptureMaker::Create(memory::CreateDefaultOS());
+  if (maker.is_error()) {
+    FX_LOGS(ERROR) << "Error getting capture state: " << zx_status_get_string(maker.error_value());
     exit(EXIT_FAILURE);
   }
 
-  std::optional<fidl::Client<fuchsia_memorypressure::Provider>> pressure_provider;
-  {
-    zx::result client_end = component::Connect<fuchsia_memorypressure::Provider>();
-    if (!client_end.is_ok()) {
-      FX_LOGS(ERROR) << "Error connecting to FIDL fuchsia.memorypressure.Provider: "
-                     << client_end.status_string();
-      exit(-1);
-    }
-    pressure_provider = fidl::Client{std::move(*client_end), loop.dispatcher()};
+  zx::result pressure_client_end = component::Connect<fuchsia_memorypressure::Provider>();
+  if (!pressure_client_end.is_ok()) {
+    FX_LOGS(ERROR) << "Error connecting to FIDL fuchsia.memorypressure.Provider: "
+                   << pressure_client_end.status_string();
+    exit(-1);
+  }
+  auto pressure_provider = fidl::Client{std::move(*pressure_client_end), loop.dispatcher()};
+
+  auto root_job_client_end = component::Connect<fuchsia_kernel::RootJobForInspect>();
+  if (!root_job_client_end.is_ok()) {
+    FX_LOGS(ERROR) << "Error connecting to root job: " << root_job_client_end.error_value();
+    exit(-1);
   }
 
-  std::optional<zx_handle_t> root_job;
-  {
-    auto client_end = component::Connect<fuchsia_kernel::RootJobForInspect>();
-    if (!client_end.is_ok()) {
-      FX_LOGS(ERROR) << "Error connecting to root job: " << client_end.error_value();
-      exit(-1);
-    }
-
-    auto result = fidl::WireCall(*client_end)->Get();
-    if (result.status() != ZX_OK) {
-      FX_LOGS(ERROR) << "Error getting root job: " << result.status();
-      exit(-1);
-    }
+  auto root_job = fidl::WireCall(*root_job_client_end)->Get();
+  if (root_job.status() != ZX_OK) {
+    FX_LOGS(ERROR) << "Error getting root job: " << root_job.status();
+    exit(-1);
   }
 
   std::optional<fidl::Client<fuchsia_metrics::MetricEventLoggerFactory>> factory;
@@ -96,7 +89,7 @@ int main(int argc, const char** argv) {
   }
   auto app = std::make_unique<monitor::Monitor>(
       command_line, loop.dispatcher(), memory_monitor_config::Config::TakeFromStartupHandle(),
-      std::move(maker_result.value()), std::move(pressure_provider), root_job, std::move(factory),
+      std::move(*maker), std::move(pressure_provider), root_job->job.get(), std::move(factory),
       GetRamDevice(loop.dispatcher()));
   component::OutgoingDirectory outgoing = component::OutgoingDirectory(loop.dispatcher());
   zx::result result = outgoing.AddProtocol<fuchsia_memory_inspection::Collector>(std::move(app));
