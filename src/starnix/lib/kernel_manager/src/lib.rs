@@ -398,7 +398,7 @@ pub async fn serve_starnix_manager(
                             .resume_event
                             .duplicate_handle(zx::Rights::SAME_RIGHTS)
                             .expect("failed"),
-                        name: name,
+                        name,
                     },
                 );
                 sender.try_send((proxy, suspend_context.resume_events.clone())).unwrap();
@@ -471,11 +471,13 @@ async fn start_proxy(
     >,
 ) {
     // This enum tells us which wait finished first.
+    #[derive(Debug)]
     enum WaitReturn {
         Container,
         Remote,
     }
     'outer: loop {
+        fuchsia_trace::duration!(c"power", c"starnix-runner:start-proxy:loop", "name" => proxy.name.as_str());
         // Wait on messages from both the container and remote channel endpoints.
         let mut container_wait = fasync::OnSignals::new(
             proxy.container_channel.as_handle_ref(),
@@ -489,14 +491,38 @@ async fn start_proxy(
         .fuse();
 
         let (signals, finished_wait) = {
-            fuchsia_trace::duration!(c"power", c"starnix-runner:proxy-waiting-for-messages", "name" => proxy.name.as_str());
+            fuchsia_trace::duration!(c"power", c"starnix-runner:start_proxy:wait_for_messages", "name" => proxy.name.as_str());
             let result = futures::select! {
-                res = container_wait => res.map(|s| (s, WaitReturn::Container)),
-                res = remote_wait => res.map(|s| (s, WaitReturn::Remote)),
+                res = container_wait => {
+                    fuchsia_trace::instant!(
+                        c"power",
+                        c"starnix-runner:start_proxy:channel_readable",
+                        fuchsia_trace::Scope::Process,
+                        "name" => proxy.name.as_str(),
+                        "endpoint" => "container"
+                    );
+                    res.map(|s| (s, WaitReturn::Container))
+                },
+                res = remote_wait => {
+                    fuchsia_trace::instant!(
+                        c"power",
+                        c"starnix-runner:start_proxy:channel_readable",
+                        fuchsia_trace::Scope::Process,
+                        "name" => proxy.name.as_str(),
+                        "endpoint" => "remote"
+                    );
+                    res.map(|s| (s, WaitReturn::Remote))
+                },
             };
             match result {
                 Ok(result) => result,
                 Err(e) => {
+                    fuchsia_trace::instant!(
+                        c"power",
+                        c"starnix-runner:start_proxy:result:error",
+                        fuchsia_trace::Scope::Process,
+                        "name" => proxy.name.as_str()
+                    );
                     log::warn!("Failed to wait on proxied channels in runner: {:?}", e);
                     break 'outer;
                 }
@@ -506,7 +532,7 @@ async fn start_proxy(
         // Forward messages in both directions. Only messages that are entering the container
         // should signal `proxy.resume_event`, since those are the only messages that should
         // wake the container if it's suspended.
-        fuchsia_trace::duration!(c"power", c"starnix-runner:proxy-forwarding-messages", "name" => proxy.name.as_str());
+        fuchsia_trace::duration!(c"power", c"starnix-runner:start_proxy:forwarding", "name" => proxy.name.as_str());
         let name = proxy.name.as_str();
         let result = match finished_wait {
             WaitReturn::Container => forward_message(
@@ -542,6 +568,12 @@ async fn start_proxy(
             break 'outer;
         }
     }
+    fuchsia_trace::instant!(
+        c"power",
+        c"starnix-runner:start-proxy:loop:exit",
+        fuchsia_trace::Scope::Process,
+        "name" => proxy.name.as_str()
+    );
 
     if let Ok(koid) = proxy.resume_event.get_koid() {
         resume_events.lock().events.remove(&koid);
@@ -562,11 +594,25 @@ fn forward_message(
     handles: &mut [MaybeUninit<zx::Handle>; zx::sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize],
     name: &str,
 ) -> Result<(), Error> {
+    fuchsia_trace::duration!(c"power", c"starnix-runner:forward_message", "name" => name);
     if signals.contains(zx::Signals::CHANNEL_READABLE) {
+        fuchsia_trace::instant!(
+            c"power",
+            c"starnix-runner:forward_message:channel_readable",
+            fuchsia_trace::Scope::Process,
+            "name" => name
+        );
         debug!("runner_proxy: {}: 1: entry, event={:?}", name, event);
-        let (actual_bytes, actual_handles) = match read_channel.read_uninit(bytes, handles) {
-            zx::ChannelReadResult::Ok(r) => r,
-            _ => return Err(anyhow!("Failed to read from channel")),
+        let (actual_bytes, actual_handles) = {
+            fuchsia_trace::duration!(
+                c"power",
+                c"starnix-runner:forward_message:read",
+                "name" => name
+            );
+            match read_channel.read_uninit(bytes, handles) {
+                zx::ChannelReadResult::Ok(r) => r,
+                _ => return Err(anyhow!("Failed to read from channel")),
+            }
         };
 
         if let Some(event) = event {
@@ -575,12 +621,30 @@ fn forward_message(
             let (clear_mask, set_mask) = (KERNEL_SIGNAL, RUNNER_SIGNAL);
             event.signal_handle(clear_mask, set_mask)?;
             debug!("runner_proxy: {}: 4: K=0, R=1", name);
+            fuchsia_trace::instant!(
+                c"power",
+                c"starnix-runner:forward_message:signal",
+                fuchsia_trace::Scope::Process,
+                "name" => name,
+                "effect" => "K=0,R=1"
+            );
         }
 
-        write_channel.write(actual_bytes, actual_handles)?;
+        {
+            let event_str = format!("{:?}", event);
+            fuchsia_trace::duration!(c"power", c"forward_message", "name" => name, "event" => &event_str[..]);
+            write_channel.write(actual_bytes, actual_handles)?;
+        }
 
         if let Some(event) = event {
             debug!("{}: 5: wait for K=1", name);
+            fuchsia_trace::instant!(
+            c"power",
+            c"starnix-runner:forward_message:wait_handle",
+            fuchsia_trace::Scope::Process,
+            "name" => name,
+            "wait_for" => "K=1"
+            );
             // Wait for the kernel endpoint to signal that the event has been handled, and
             // that it is now safe to suspend the container again.
             match event.wait_handle(
@@ -598,11 +662,25 @@ fn forward_message(
                 }
             };
             debug!("runner_proxy: {} 6: K=1, R=0", name);
+            fuchsia_trace::instant!(
+                c"power",
+                c"starnix-runner:forward_message:received_signal",
+                fuchsia_trace::Scope::Process,
+                "name" => name,
+                "effect" => "K=1,R=0"
+            );
             // Clear the kernel signal for this message before continuing.
             let (clear_mask, set_mask) = (KERNEL_SIGNAL, zx::Signals::NONE);
             event.signal_handle(clear_mask, set_mask)?;
 
             debug!("runner_proxy: {}: 7: K=0, R=0", name);
+            fuchsia_trace::instant!(
+                c"power",
+                c"starnix-runner:forward_message:clear_signal",
+                fuchsia_trace::Scope::Process,
+                "name" => name,
+                "effect" => "K=0,R=0"
+            );
         }
         debug!("runner_proxy: {}: 9: loop done: event={:?}", name, event);
     }
@@ -651,6 +729,7 @@ async fn suspend_kernel(kernel_job: &zx::Job) -> Result<Vec<zx::Handle>, Error> 
         for process in processes {
             let threads = process.threads().expect("failed to get threads");
             for thread_koid in &threads {
+                fuchsia_trace::duration!(c"power", c"starnix-runner:suspend_kernel", "thread_koid" => *thread_koid);
                 if let Ok(thread) = process.get_child(&thread_koid, zx::Rights::SAME_RIGHTS) {
                     match thread.wait_handle(
                         zx::Signals::THREAD_SUSPENDED,

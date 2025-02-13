@@ -220,6 +220,7 @@ impl SuspendResumeManager {
 
         let manager = connect_to_protocol_sync::<frunner::ManagerMarker>()
             .expect("Failed to connect to manager");
+        fuchsia_trace::duration!(c"power", c"suspend_container:fidl");
         match manager.suspend_container(
             frunner::ManagerSuspendContainerRequest {
                 container_job: Some(
@@ -244,6 +245,11 @@ impl SuspendResumeManager {
                 self.lock().inspect_node.add_entry(|node| {
                     node.record_int(fobs::SUSPEND_RESUMED_AT, wake_time.into_nanos());
                 });
+                fuchsia_trace::instant!(
+                    c"power",
+                    c"suspend_container:done",
+                    fuchsia_trace::Scope::Process
+                );
             }
             _ => {
                 let wake_time = zx::BootInstant::get();
@@ -254,6 +260,11 @@ impl SuspendResumeManager {
                 self.lock().inspect_node.add_entry(|node| {
                     node.record_int(fobs::SUSPEND_FAILED_AT, wake_time.into_nanos());
                 });
+                fuchsia_trace::instant!(
+                    c"power",
+                    c"suspend_container:error",
+                    fuchsia_trace::Scope::Process
+                );
                 return error!(EINVAL);
             }
         }

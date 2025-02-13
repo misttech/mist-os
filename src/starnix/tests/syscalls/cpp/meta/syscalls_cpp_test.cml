@@ -6,6 +6,7 @@
         "//src/power/system-activity-governor/meta/no-suspender-for-test-sag.shard.cml",
         "//src/starnix/containers/debian/meta/debian_container_for_test.shard.cml",
         "//src/starnix/tests/starnix_test_with_expectations.shard.cml",
+        "trace/offer.shard.cml",
     ],
     program: {
         uid: "0",
