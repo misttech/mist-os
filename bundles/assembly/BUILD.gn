@@ -1986,8 +1986,8 @@ assembly_input_bundle("common_standard") {
 
   config_data_labels = [
     "//src/diagnostics/config/sampler:sampler_config_internal",
-    "//src/diagnostics/config/fire:fire_config_component_list",
-    "//src/diagnostics/config/fire/projects:fire_config_projects",
+    "//src/diagnostics/config/sampler:fire_config_component_list",
+    "//src/diagnostics/config/sampler:fire_config_projects",
   ]
 
   compiled_packages = [
