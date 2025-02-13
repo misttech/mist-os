@@ -27,6 +27,7 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
     "//src/lib/fuchsia-sync",
+    "//src/lib/trace/rust:trace-provider",
     "//src/performance/lib/fuchsiaperf",
     "//src/sys/lib/namespace",
     "//src/sys/lib/runner",

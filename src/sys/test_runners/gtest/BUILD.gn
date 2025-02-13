@@ -37,6 +37,7 @@ common_deps = [
   "//src/lib/fuchsia-component",
   "//src/lib/fuchsia-fs",
   "//src/lib/fuchsia-runtime",
+  "//src/lib/trace/rust:trace-provider",
   "//src/sys/lib/namespace",
   "//src/sys/test_runners:lib",
   "//third_party/rust_crates:anyhow",

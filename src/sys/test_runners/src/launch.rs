@@ -6,6 +6,7 @@
 
 use crate::logs::{create_log_stream, create_std_combined_log_stream, LoggerError, LoggerStream};
 use anyhow::Error;
+use fidl_fuchsia_component::IntrospectorMarker;
 use fuchsia_component::client::connect_to_protocol;
 use namespace::Namespace;
 use runtime::{HandleInfo, HandleType};
@@ -75,6 +76,10 @@ pub struct LaunchProcessArgs<'a> {
     pub options: zx::ProcessOptions,
     // The structured config vmo.
     pub config_vmo: Option<zx::Vmo>,
+    // The component instance, used only in tracing
+    pub component_instance: Option<fidl::Event>,
+    // The component URL, used only in tracing
+    pub url: Option<String>,
 }
 
 /// Launches process, assigns a combined logger stream as stdout/stderr to launched process.
@@ -137,21 +142,36 @@ async fn launch_process_impl(
         });
     }
 
+    let LaunchProcessArgs {
+        bin_path,
+        process_name,
+        args,
+        options,
+        ns,
+        job,
+        name_infos,
+        environs,
+        loader_proxy_chan,
+        executable_vmo,
+        component_instance,
+        url,
+        ..
+    } = args;
     // Load the component
     let launch_info =
         runner::component::configure_launcher(runner::component::LauncherConfigArgs {
-            bin_path: args.bin_path,
-            name: args.process_name,
-            args: args.args,
-            options: args.options,
-            ns: args.ns,
-            job: args.job,
+            bin_path,
+            name: process_name,
+            args,
+            options,
+            ns,
+            job,
             handle_infos: Some(handle_infos),
-            name_infos: args.name_infos,
-            environs: args.environs,
+            name_infos,
+            environs,
             launcher: &launcher,
-            loader_proxy_chan: args.loader_proxy_chan,
-            executable_vmo: args.executable_vmo,
+            loader_proxy_chan,
+            executable_vmo,
         })
         .await
         .map_err(LaunchError::LoadInfo)?;
@@ -171,7 +191,54 @@ async fn launch_process_impl(
 
     let process = process.ok_or_else(|| LaunchError::UnExpectedError)?;
 
+    trace_component_start(&process, component_instance, url).await;
+
     Ok((process, ScopedJob::new(zx::Job::from_handle(component_job))))
+}
+
+/// Reports the component starting to the trace system, if tracing is enabled.
+/// Uses the Introspector protocol, which must be routed to the component to
+/// report the moniker correctly.
+async fn trace_component_start(
+    process: &Process,
+    component_instance: Option<fidl::Event>,
+    url: Option<String>,
+) {
+    if fuchsia_trace::category_enabled(c"component:start") {
+        let pid = process.get_koid().unwrap().raw_koid();
+        let moniker = match component_instance {
+            None => "Missing component instance".to_string(),
+            Some(component_instance) => match connect_to_protocol::<IntrospectorMarker>() {
+                Ok(introspector) => {
+                    let component_instance =
+                        component_instance.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
+                    match introspector.get_moniker(component_instance).await {
+                        Ok(Ok(moniker)) => moniker,
+                        Ok(Err(e)) => {
+                            format!("Couldn't get moniker: {e:?}")
+                        }
+                        Err(e) => {
+                            format!("Couldn't get the moniker: {e:?}")
+                        }
+                    }
+                }
+                Err(e) => {
+                    format!("Couldn't get introspector: {e:?}")
+                }
+            },
+        };
+        let url = url.unwrap_or_else(|| "Missing URL".to_string());
+        fuchsia_trace::instant!(
+            c"component:start",
+            // If you change this name, include the string "-test-".
+            // Scripts will match that to detect processes started by a test runner.
+            c"-test-",
+            fuchsia_trace::Scope::Thread,
+            "moniker" => format!("{}", moniker).as_str(),
+            "url" => url.as_str(),
+            "pid" => pid
+        );
+    }
 }
 
 // Structure to guard job and kill it when going out of scope.
@@ -279,6 +346,8 @@ mod tests {
             executable_vmo: None,
             options: zx::ProcessOptions::empty(),
             config_vmo: None,
+            url: None,
+            component_instance: None,
         };
         let (mock_proxy, mut mock_stream) = create_proxy_and_stream::<fproc::LauncherMarker>();
         let mock_fut = async move {

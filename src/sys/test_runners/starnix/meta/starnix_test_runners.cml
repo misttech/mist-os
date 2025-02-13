@@ -17,6 +17,11 @@
     ],
     offer: [
         {
+            protocol: [ "fuchsia.component.Introspector" ],
+            from: "parent",
+            to: [ "#starnix_test_runner" ],
+        },
+        {
             dictionary: [ "diagnostics" ],
             from: "parent",
             to: [

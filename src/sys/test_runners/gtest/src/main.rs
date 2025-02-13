@@ -40,6 +40,8 @@ async fn main_impl() -> Result<(), anyhow::Error> {
     info!("started");
 
     let args = argh::from_env::<Args>();
+    fuchsia_trace_provider::trace_provider_create_with_fdio();
+    fuchsia_trace_provider::trace_provider_wait_for_init();
     // We will divide this directory up and pass to  tests as /test_result so that they can write
     // their json output
     let path = Path::new("/data/test_data");

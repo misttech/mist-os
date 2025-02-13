@@ -245,7 +245,6 @@
                 target_monikers: [
                     "/core/memory_monitor",
                     "/core/memory_monitor2",
-                    "/core/testing/rust_test_runner",
                 ],
             },
             {

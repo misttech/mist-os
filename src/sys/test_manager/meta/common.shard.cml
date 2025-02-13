@@ -235,7 +235,15 @@
         {
             protocol: [ "fuchsia.component.Introspector" ],
             from: "parent",
-            to: [ "#rust_test_runner" ],
+            to: [
+                "#elf_test_runner",
+                "#fuzz_test_runner",
+                "#go_test_runner",
+                "#gtest_runner",
+                "#gunit_runner",
+                "#rust_test_runner",
+                "#zxtest_runner",
+            ],
         },
         {
             event_stream: [

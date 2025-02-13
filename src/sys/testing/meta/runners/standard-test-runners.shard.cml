@@ -92,14 +92,11 @@
             from: "parent",
             as: "fuchsia.component.Introspector",
             to: [
-                "#elf_test_ambient_exec_runner",
-                "#elf_test_create_raw_processes_ambient_exec_runner",
-                "#elf_test_create_raw_processes_runner",
+                // Give Introspector to test runners that need it to support the component:start trace category.
                 "#elf_test_runner",
+                "#go_test_runner",
                 "#gtest_runner",
                 "#gunit_runner",
-                "#rust_test_create_raw_processes_runner",
-                "#rust_test_next_vdso_runner",
                 "#rust_test_runner",
                 "#zxtest_runner",
             ],

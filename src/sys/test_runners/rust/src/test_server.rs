@@ -3,15 +3,12 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use fidl::AsHandleRef;
-use fidl_fuchsia_component::IntrospectorMarker;
 use ftest::{Invocation, RunListenerProxy};
-use fuchsia_component::client::connect_to_protocol;
 use futures::future::{abortable, join3, AbortHandle, FutureExt as _};
 use futures::lock::Mutex;
 use futures::prelude::*;
 use lazy_static::lazy_static;
-use log::{debug, error, warn};
+use log::{debug, error};
 use namespace::NamespaceError;
 use regex::Regex;
 use std::collections::HashSet;
@@ -355,43 +352,6 @@ impl TestServer {
         let (process, job, stdout_logger, stderr_logger) =
             launch_component_process::<RunTestError>(&test_component, args, test_invoke).await?;
 
-        let pid = process.get_koid().unwrap().raw_koid();
-        if fuchsia_trace::category_enabled(c"component:start") {
-            let moniker = match connect_to_protocol::<IntrospectorMarker>() {
-                Ok(introspector) => {
-                    let component_instance = test_component
-                        .component_instance
-                        .as_ref()
-                        .unwrap()
-                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                        .unwrap();
-                    match introspector.get_moniker(component_instance).await {
-                        Ok(Ok(moniker)) => moniker,
-                        Ok(Err(oops)) => {
-                            warn!("Couldn't get moniker: {:?}", oops);
-                            format!("Couldn't get moniker: {oops:?}")
-                        }
-                        Err(oops) => {
-                            warn!("Couldn't get moniker: {:?}", oops);
-                            format!("Couldn't get moniker: {oops:?}")
-                        }
-                    }
-                }
-                Err(oops) => {
-                    warn!("Couldn't get introspector: {:?}", oops);
-                    format!("Couldn't get introspector: {oops:?}")
-                }
-            };
-            fuchsia_trace::instant!(
-                c"component:start",
-                c"rust-test",
-                fuchsia_trace::Scope::Thread,
-                "moniker" => format!("{}", moniker).as_str(),
-                "url" => test_component.url.as_str(),
-                "pid" => pid
-            );
-        }
-
         let test_exit_task = async {
             // Wait for the test process to exit
             fasync::OnSignals::new(&process, zx::Signals::PROCESS_TERMINATED)
@@ -570,6 +530,11 @@ where
         executable_vmo,
         options: component.options,
         config_vmo: component.config_vmo()?,
+        component_instance: component
+            .component_instance
+            .as_ref()
+            .map(|c| c.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap()),
+        url: Some(component.url.clone()),
     })
     .await?)
 }
