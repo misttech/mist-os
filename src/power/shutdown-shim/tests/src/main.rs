@@ -169,7 +169,7 @@ impl RebootReason {
 #[test_case(true; "with_power_framework")]
 #[test_case(false; "without_power_framework")]
 #[fuchsia::test]
-async fn power_manager_missing_poweroff(is_power_framework_available: bool) -> Result<(), Error> {
+async fn test_poweroff(is_power_framework_available: bool) -> Result<(), Error> {
     let (realm_instance, mut recv_signals) = new_realm(is_power_framework_available).await?;
     let shim_statecontrol =
         realm_instance.root.connect_to_protocol_at_exposed_dir::<fstatecontrol::AdminMarker>()?;
@@ -202,7 +202,7 @@ async fn power_manager_missing_poweroff(is_power_framework_available: bool) -> R
     [RebootType::Reboot, RebootType::PerformReboot]
 )]
 #[fuchsia::test]
-async fn power_manager_missing_reboot_system_update(
+async fn test_reboot_system_update(
     is_power_framework_available: bool,
     reboot_type: RebootType,
 ) -> Result<(), Error> {
@@ -244,7 +244,7 @@ async fn power_manager_missing_reboot_system_update(
 #[test_case(true; "with_power_framework")]
 #[test_case(false; "without_power_framework")]
 #[fuchsia::test]
-async fn power_manager_missing_mexec(is_power_framework_available: bool) -> Result<(), Error> {
+async fn test_mexec(is_power_framework_available: bool) -> Result<(), Error> {
     let (realm_instance, mut recv_signals) = new_realm(is_power_framework_available).await?;
     let shim_statecontrol =
         realm_instance.root.connect_to_protocol_at_exposed_dir::<fstatecontrol::AdminMarker>()?;
@@ -275,14 +275,10 @@ async fn power_manager_missing_mexec(is_power_framework_available: bool) -> Resu
     Ok(())
 }
 
-// TODO(https://fxrev.dev/1188554): rename the tests with power_manager prefix since there is no
-// dependency on power manager anymore.
 #[test_case(true; "with_power_framework")]
 #[test_case(false; "without_power_framework")]
 #[fuchsia::test]
-async fn power_manager_not_present_poweroff(
-    is_power_framework_available: bool,
-) -> Result<(), Error> {
+async fn test_poweroff_detach(is_power_framework_available: bool) -> Result<(), Error> {
     let (realm_instance, mut recv_signals) = new_realm(is_power_framework_available).await?;
     let shim_statecontrol =
         realm_instance.root.connect_to_protocol_at_exposed_dir::<fstatecontrol::AdminMarker>()?;
@@ -310,14 +306,13 @@ async fn power_manager_not_present_poweroff(
     Ok(())
 }
 
-// TODO: rename the test
 #[test_matrix(
     [true, false],
     [RebootType::Reboot, RebootType::PerformReboot],
     [RebootReason::SystemUpdate, RebootReason::Oom, RebootReason::SessionFailure]
 )]
 #[fuchsia::test]
-async fn power_manager_not_present_reboot(
+async fn test_reboot(
     is_power_framework_available: bool,
     reboot_type: RebootType,
     reason: RebootReason,
@@ -355,11 +350,10 @@ async fn power_manager_not_present_reboot(
     Ok(())
 }
 
-// TODO: rename the test
 #[test_case(true; "with_power_framework")]
 #[test_case(false; "without_power_framework")]
 #[fuchsia::test]
-async fn power_manager_not_present_mexec(is_power_framework_available: bool) -> Result<(), Error> {
+async fn test_mexec_detach(is_power_framework_available: bool) -> Result<(), Error> {
     let (realm_instance, mut recv_signals) = new_realm(is_power_framework_available).await?;
     let shim_statecontrol =
         realm_instance.root.connect_to_protocol_at_exposed_dir::<fstatecontrol::AdminMarker>()?;
@@ -392,9 +386,7 @@ async fn power_manager_not_present_mexec(is_power_framework_available: bool) -> 
 #[test_case(true; "with_power_framework")]
 #[test_case(false; "without_power_framework")]
 #[fuchsia::test]
-async fn power_manager_not_present_collaborative_reboot(
-    is_power_framework_available: bool,
-) -> Result<(), Error> {
+async fn test_collaborative_reboot(is_power_framework_available: bool) -> Result<(), Error> {
     let (realm_instance, mut recv_signals) = new_realm(is_power_framework_available).await?;
     let shim_scheduler = realm_instance
         .root

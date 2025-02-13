@@ -165,14 +165,11 @@ impl ShutdownWatcher {
     }
 
     async fn notify_reboot_watchers(&self, reasons: RebootReasons, timeout: zx::MonotonicDuration) {
-        // TODO(https://fxbug.dev/42120903): This string must live for the duration of the function because the
-        // trace macro uses it when the function goes out of scope. Therefore, it must be bound here
-        // and not used anonymously at the macro callsite.
-        let reasons_str = format!("{:?}", reasons);
-        fuchsia_trace::duration!(
+        // Instead of waiting for https://fxbug.dev/42120903, use begin and end pair of macros.
+        fuchsia_trace::duration_begin!(
             c"shutdown-shim",
             c"ShutdownWatcher::notify_reboot_watchers",
-            "reasons" => reasons_str.as_str()
+            "reasons" => format!("{:?}", reasons).as_str()
         );
 
         // Create a future for each watcher that calls the watcher's `on_reboot` method and returns
@@ -216,6 +213,12 @@ impl ShutdownWatcher {
 
         // Repopulate the successful watcher proxies back into the `reboot_watchers` RefCell
         *self.reboot_watchers.lock().await = new_watchers;
+
+        fuchsia_trace::duration_end!(
+            c"shutdown-shim",
+            c"ShutdownWatcher::notify_reboot_watchers",
+            "reasons" => format!("{:?}", reasons).as_str()
+        );
     }
 }
 
