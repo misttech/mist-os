@@ -31,7 +31,7 @@ namespace optee {
 // allocated shared memory buffers and sessions that were created by that client without interfering
 // with other active clients.
 
-class OpteeClient : public fidl::WireServer<fuchsia_tee::Application> {
+class OpteeClient final : public fidl::WireServer<fuchsia_tee::Application> {
  public:
   OpteeClient(OpteeControllerBase* controller,
               fidl::ClientEnd<fuchsia_tee_manager::Provider> provider, Uuid application_uuid)
@@ -123,9 +123,16 @@ class OpteeClient : public fidl::WireServer<fuchsia_tee::Application> {
   //
   // Parameters:
   //  * path:                 The path of the directory, relative to the root storage directory.
-  //  * create:               Flag specifying whether to create directories if they don't exist.
   zx::result<fidl::ClientEnd<fuchsia_io::Directory>> GetStorageDirectory(
-      const std::filesystem::path& path, bool create);
+      const std::filesystem::path& path);
+
+  // Creates a new storage directory pointed to by the path and returns a connection to it.
+  // Does not fail if the directory already exists.
+  //
+  // Parameters:
+  //  * path:                 The path of the directory, relative to the root storage directory.
+  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> CreateStorageDirectory(
+      const std::filesystem::path& path);
 
   // Inits the Rpmb client from `OpteeController` and caches it in `rpmb_client_`.
   //
