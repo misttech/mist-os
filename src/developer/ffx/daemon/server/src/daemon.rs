@@ -121,7 +121,11 @@ impl DaemonEventHandler {
                 TargetUpdateFilter::NetAddrs(&addrs),
             ],
             update.build(),
-            false,
+            // It was never made clear why we don't want to make a new target here, which is what
+            // this flag represents. This was previously set to false, but this no longer applies
+            // to the structure of overnet in a world with USB, which doesn't rely on an underlying
+            // host_pipe/fidl_pipe connection.
+            true,
         ) {
             // Print out better Peer information in logs
             0 => {
