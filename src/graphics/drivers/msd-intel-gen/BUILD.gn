@@ -8,16 +8,17 @@ import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
 # The gpu device
 fuchsia_cc_driver("msd_intel-driver") {
-  legacy = true
   output_name = "libmsd_intel"
 
   deps = [
     ":msd_intel_entry",
     "src",
-    "//src/graphics/magma/lib/magma/platform:logger_for_system_drivers",
   ]
 
-  assert_no_deps = [ "//zircon/system/ulib/trace-engine:trace-engine-static" ]
+  assert_no_deps = [
+    "//src/devices/lib/driver",
+    "//zircon/system/ulib/trace-engine:trace-engine-static",
+  ]
 }
 
 fuchsia_driver_component("msd_intel") {
@@ -29,7 +30,6 @@ fuchsia_driver_component("msd_intel") {
 
 # The gpu device; runs gtests at startup
 fuchsia_cc_driver("msd_intel_test-driver") {
-  legacy = true
   testonly = true
 
   output_name = "libmsd_intel_test"
@@ -37,7 +37,6 @@ fuchsia_cc_driver("msd_intel_test-driver") {
   deps = [
     ":msd_intel_test_entry",
     "src",
-    "//src/graphics/magma/lib/magma/platform:logger_for_system_drivers",
   ]
 
   assert_no_deps = [ "//zircon/system/ulib/trace-engine:trace-engine-static" ]
@@ -71,13 +70,15 @@ source_set("msd_intel_entry") {
     ":msd_intel_bind",
     "src",
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp",
-    "//src/devices/lib/driver",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//src/devices/bin/driver_runtime",
+    "//src/graphics/magma/lib/magma/platform:bus_mapper_header",
     "//src/graphics/magma/lib/magma/platform:trace",
     "//src/graphics/magma/lib/magma/platform/zircon:status",
     "//src/graphics/magma/lib/magma/util:macros",
     "//src/graphics/magma/lib/magma_service/sys_driver",
-    "//src/graphics/magma/lib/magma_service/sys_driver/dfv1:device_impl",
-    "//src/lib/ddk",
+    "//src/graphics/magma/lib/magma_service/sys_driver:magma_driver_base",
     "//src/zircon/lib/zircon",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/trace-vthread",
@@ -97,13 +98,14 @@ source_set("msd_intel_test_entry") {
     ":msd_intel_test_bind",
     "src",
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp",
-    "//src/devices/lib/driver",
+    "//sdk/lib/driver/compat/cpp",
+    "//src/devices/bin/driver_runtime",
+    "//src/graphics/magma/lib/magma/platform:bus_mapper_header",
     "//src/graphics/magma/lib/magma/platform:trace",
     "//src/graphics/magma/lib/magma/platform/zircon:status",
     "//src/graphics/magma/lib/magma/util:macros",
     "//src/graphics/magma/lib/magma_service/sys_driver",
-    "//src/graphics/magma/lib/magma_service/sys_driver/dfv1:device_impl",
-    "//src/lib/ddk",
+    "//src/graphics/magma/lib/magma_service/sys_driver:magma_driver_base",
     "//src/zircon/lib/zircon",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/trace-vthread",

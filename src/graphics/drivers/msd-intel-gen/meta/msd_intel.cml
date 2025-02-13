@@ -3,19 +3,19 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/driver/compat/compat.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         runner: "driver",
+        binary: "driver/libmsd_intel.so",
         bind: "meta/bind/msd_intel_bind.bindbc",
         colocate: "true",
-        compat: "driver/libmsd_intel.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
     use: [
+        { service: 'fuchsia.driver.compat.Service' },
         {
             protocol: [
                 "fuchsia.kernel.InfoResource",
