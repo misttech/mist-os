@@ -39,7 +39,8 @@ zx_status_t ServiceWatcher::Begin(std::string_view service_name, ServiceWatcher:
                                   async_dispatcher_t* dispatcher) {
   std::string path = service_path_ + "/" + std::string(service_name);
   auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  zx_status_t status = fdio_service_connect(path.c_str(), server.TakeChannel().release());
+  zx_status_t status = fdio_open3(path.c_str(), uint64_t{fuchsia_io::wire::kPermReadable},
+                                  server.TakeChannel().release());
   if (status != ZX_OK) {
     return status;
   }

@@ -24,6 +24,8 @@ namespace {
 
 constexpr char kSvcDirectoryPath[] = "/svc";
 
+constexpr uint64_t kSvcDirectoryFlags = uint64_t{fuchsia::io::PERM_READABLE};
+
 #define ZX_SYS_COMPONENT_REPLACE_CONFIG_SINGLE_VALUE_DEF(MethodName, Type, FidlType) \
   ConfigValue ConfigValue::MethodName(Type value) {                                  \
     fuchsia::component::decl::ConfigValueSpec spec;                                  \
@@ -118,9 +120,9 @@ sys::ServiceDirectory LocalHlcppComponent::svc() {
   zx::channel remote;
   ZX_COMPONENT_ASSERT_STATUS_OK("zx::channel/create", zx::channel::create(0, &local, &remote));
 
-  auto status = fdio_ns_service_connect(namespace_, kSvcDirectoryPath, remote.release());
+  auto status = fdio_ns_open3(namespace_, kSvcDirectoryPath, kSvcDirectoryFlags, remote.release());
   ZX_ASSERT_MSG(status == ZX_OK,
-                "fdio_ns_service_connect on LocalComponent's /svc directory failed: %s\nThis most"
+                "fdio_ns_open3 on LocalComponent's /svc directory failed: %s\nThis most"
                 "often occurs when a component has no FIDL protocols routed to it.",
                 zx_status_get_string(status));
 
@@ -178,9 +180,9 @@ sys::ServiceDirectory LocalComponentHandles::svc() {
   zx::channel remote;
   ZX_COMPONENT_ASSERT_STATUS_OK("zx::channel/create", zx::channel::create(0, &local, &remote));
 
-  auto status = fdio_ns_service_connect(namespace_, kSvcDirectoryPath, remote.release());
+  auto status = fdio_ns_open3(namespace_, kSvcDirectoryPath, kSvcDirectoryFlags, remote.release());
   ZX_ASSERT_MSG(status == ZX_OK,
-                "fdio_ns_service_connect on LocalComponent's /svc directory failed: %s\nThis most"
+                "fdio_ns_open3 on LocalComponent's /svc directory failed: %s\nThis most"
                 "often occurs when a component has no FIDL protocols routed to it.",
                 zx_status_get_string(status));
 

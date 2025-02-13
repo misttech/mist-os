@@ -35,16 +35,15 @@ class IncomingTest : public gtest::RealLoopFixture {
   component::OutgoingDirectory* outgoing() { return &outgoing_; }
 
   fidl::ClientEnd<fuchsia_io::Directory> TakeSvcDirectoryRoot() {
-    // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
     return PerformBlockingWork([&]() {
       auto [client, server] = fidl::Endpoints<fuchsia_io::Node>::Create();
-      fidl::Request<fuchsia_io::Directory::DeprecatedOpen> request(
-          /*flags=*/fuchsia_io::OpenFlags{},
-          /*mode=*/fuchsia_io::ModeType{},
+      fidl::Request<fuchsia_io::Directory::Open> request(
           /*path=*/component::OutgoingDirectory::kServiceDirectory,
-          /*object=*/std::move(server));
-      fit::result status = outgoing_client_->DeprecatedOpen(std::move(request));
-      ZX_ASSERT_MSG(status.is_ok(), "Failed to invoke fuchsia.io/Directory.DeprecatedOpen: %s",
+          /*flags=*/fuchsia_io::kPermReadable | fuchsia_io::Flags::kProtocolDirectory,
+          /*options=*/{},
+          /*object=*/server.TakeChannel());
+      fit::result status = outgoing_client_->Open(std::move(request));
+      ZX_ASSERT_MSG(status.is_ok(), "Failed to invoke fuchsia.io/Directory.Open: %s",
                     status.error_value().FormatDescription().c_str());
       return fidl::ClientEnd<fuchsia_io::Directory>(client.TakeChannel());
     });

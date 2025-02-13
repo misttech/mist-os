@@ -54,8 +54,9 @@ fidl::InterfaceHandle<fuchsia::io::Directory> OpenNamedServiceAggregateAt(
   }
 
   fidl::InterfaceHandle<fuchsia::io::Directory> dir;
-  zx_status_t status = fdio_service_connect_at(handle.channel().get(), service_path.data(),
-                                               dir.NewRequest().TakeChannel().release());
+  zx_status_t status =
+      fdio_open3_at(handle.channel().get(), service_path.data(),
+                    uint64_t{fuchsia::io::PERM_READABLE}, dir.NewRequest().TakeChannel().release());
   if (status != ZX_OK) {
     return nullptr;
   }
@@ -71,8 +72,8 @@ fidl::InterfaceHandle<fuchsia::io::Directory> OpenNamedServiceAggregateIn(
   path += service_path;
 
   fidl::InterfaceHandle<fuchsia::io::Directory> dir;
-  zx_status_t status =
-      fdio_ns_service_connect(ns, path.data(), dir.NewRequest().TakeChannel().release());
+  zx_status_t status = fdio_ns_open3(ns, path.data(), uint64_t{fuchsia::io::PERM_READABLE},
+                                     dir.NewRequest().TakeChannel().release());
   if (status != ZX_OK) {
     return nullptr;
   }

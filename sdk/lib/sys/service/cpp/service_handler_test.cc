@@ -43,8 +43,8 @@ TEST(ServiceHandlerTest, ConnectAndInvoke) {
 
   // Setup client.
   fidl::InterfaceHandle<fuchsia::io::Directory> svc;
-  status = fdio_service_connect_at(root.channel().get(), "svc",
-                                   svc.NewRequest().TakeChannel().release());
+  status = fdio_open3_at(root.channel().get(), "svc", uint64_t{fuchsia::io::PERM_READABLE},
+                         svc.NewRequest().TakeChannel().release());
   ASSERT_EQ(ZX_OK, status);
 
   auto service = OpenServiceAt<fuchsia::examples::EchoService>(svc);
