@@ -19,7 +19,7 @@ use starnix_core::vfs::{BytesFile, BytesFileOps, FsNodeOps};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
 
-use crate::cgroup::{Cgroup, CgroupOps, FreezerState};
+use crate::cgroup::{CgroupOps, FreezerState};
 
 impl std::fmt::Display for FreezerState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -37,15 +37,15 @@ impl Default for FreezerState {
 }
 
 pub struct FreezeFile {
-    cgroup: Weak<Cgroup>,
+    cgroup: Weak<dyn CgroupOps>,
 }
 
 impl FreezeFile {
-    pub fn new_node(cgroup: Weak<Cgroup>) -> impl FsNodeOps {
+    pub fn new_node(cgroup: Weak<dyn CgroupOps>) -> impl FsNodeOps {
         BytesFile::new_node(Self { cgroup })
     }
 
-    fn cgroup(&self) -> Result<Arc<Cgroup>, Errno> {
+    fn cgroup(&self) -> Result<Arc<dyn CgroupOps>, Errno> {
         self.cgroup.upgrade().ok_or_else(|| errno!(ENODEV))
     }
 }

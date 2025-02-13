@@ -23,18 +23,18 @@ use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::vfs::FdEvents;
 
-use crate::cgroup::{Cgroup, CgroupOps};
+use crate::cgroup::CgroupOps;
 
 pub struct EventsFile {
-    cgroup: Weak<Cgroup>,
+    cgroup: Weak<dyn CgroupOps>,
 }
 
 impl EventsFile {
-    pub fn new_node(cgroup: Weak<Cgroup>) -> impl FsNodeOps {
+    pub fn new_node(cgroup: Weak<dyn CgroupOps>) -> impl FsNodeOps {
         SimpleFileNode::new(move || Ok(Self { cgroup: cgroup.clone() }))
     }
 
-    fn cgroup(&self) -> Result<Arc<Cgroup>, Errno> {
+    fn cgroup(&self) -> Result<Arc<dyn CgroupOps>, Errno> {
         self.cgroup.upgrade().ok_or_else(|| errno!(ENODEV))
     }
 }

@@ -9,41 +9,143 @@
 //!
 //! Full details at https://docs.kernel.org/admin-guide/cgroup-v2.html
 
+use std::collections::BTreeMap;
 use std::ops::Deref;
 use std::sync::{Arc, Weak};
 
 use starnix_core::task::CurrentTask;
-use starnix_core::vfs::{FileOps, FsNode, FsNodeHandle, FsNodeOps, FsStr, VecDirectory};
-use starnix_sync::{FileOpsCore, Locked};
+use starnix_core::vfs::{
+    BytesFile, DirectoryEntryType, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo,
+    FsNodeOps, FsStr, FsString, VecDirectory, VecDirectoryEntry,
+};
+use starnix_sync::{FileOpsCore, Locked, Mutex};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::{errno, error};
+use starnix_uapi::{errno, error, mode};
 
-use crate::cgroup::CgroupOps;
+use crate::cgroup::{CgroupOps, CgroupRoot};
+use crate::events::EventsFile;
+use crate::freeze::FreezeFile;
+use crate::procs::ControlGroupNode;
+use crate::Hierarchy;
+
+const CONTROLLERS_FILE: &str = "cgroup.controllers";
+const PROCS_FILE: &str = "cgroup.procs";
+const FREEZE_FILE: &str = "cgroup.freeze";
+const EVENTS_FILE: &str = "cgroup.events";
 
 #[derive(Debug)]
 pub struct CgroupDirectory {
     /// The associated cgroup.
     cgroup: Weak<dyn CgroupOps>,
+
+    /// Weak reference to the hierarchy.
+    hierarchy: Weak<Hierarchy>,
+
+    /// Interface files of the current cgroup directory. Files can be added or removed when resource
+    /// controllers are enabled and disabled on the cgroup, respectively.
+    interface_files: Mutex<BTreeMap<FsString, FsNodeHandle>>,
 }
 
 impl CgroupDirectory {
-    pub fn new(cgroup: Weak<dyn CgroupOps>) -> CgroupDirectoryHandle {
-        CgroupDirectoryHandle(Arc::new(Self { cgroup }))
+    /// 2-step initialization to create a new root directory. `FileSystem` is instantiated with
+    /// the `Directory`, which is then used to create the interface files of the `Directory` using
+    /// `create_root_interface_files()`.
+    pub fn new_root(cgroup: Weak<CgroupRoot>, hierarchy: Weak<Hierarchy>) -> CgroupDirectoryHandle {
+        CgroupDirectoryHandle(Arc::new(Self {
+            cgroup: cgroup as Weak<dyn CgroupOps>,
+            interface_files: Mutex::new(BTreeMap::new()),
+            hierarchy,
+        }))
     }
-}
 
-/// `CgroupDirectoryHandle` is needed to implement a trait for an Arc.
-#[derive(Debug, Clone)]
-pub struct CgroupDirectoryHandle(Arc<CgroupDirectory>);
-impl CgroupDirectoryHandle {
+    /// Can only be called on a newly initialized root directory created by `new_root`, and can only
+    /// be called once. Creates interface files for the root directory, which can only be done after
+    /// the `FileSystem` is initialized.
+    pub fn create_root_interface_files(&self, current_task: &CurrentTask, fs: &FileSystemHandle) {
+        let mut interface_files = self.interface_files.lock();
+        assert!(interface_files.is_empty(), "init is only called once");
+        interface_files.insert(
+            PROCS_FILE.into(),
+            fs.create_node(
+                current_task,
+                ControlGroupNode::new(self.cgroup.clone()),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+            ),
+        );
+        interface_files.insert(
+            CONTROLLERS_FILE.into(),
+            fs.create_node(
+                current_task,
+                BytesFile::new_node(b"".to_vec()),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
+        );
+    }
+
+    /// Creates a new non-root directory, along with its core interface files.
+    pub fn new(
+        cgroup: Weak<dyn CgroupOps>,
+        current_task: &CurrentTask,
+        fs: &FileSystemHandle,
+        hierarchy: Weak<Hierarchy>,
+    ) -> CgroupDirectoryHandle {
+        let interface_files = BTreeMap::from([
+            (
+                PROCS_FILE.into(),
+                fs.create_node(
+                    current_task,
+                    ControlGroupNode::new(cgroup.clone()),
+                    FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+                ),
+            ),
+            (
+                CONTROLLERS_FILE.into(),
+                fs.create_node(
+                    current_task,
+                    BytesFile::new_node(b"".to_vec()),
+                    FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                ),
+            ),
+            (
+                FREEZE_FILE.into(),
+                fs.create_node(
+                    current_task,
+                    FreezeFile::new_node(cgroup.clone()),
+                    FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+                ),
+            ),
+            (
+                EVENTS_FILE.into(),
+                fs.create_node(
+                    current_task,
+                    EventsFile::new_node(cgroup.clone()),
+                    FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+                ),
+            ),
+        ]);
+        CgroupDirectoryHandle(Arc::new(Self {
+            cgroup,
+            interface_files: Mutex::new(interface_files),
+            hierarchy,
+        }))
+    }
+
     fn cgroup(&self) -> Result<Arc<dyn CgroupOps>, Errno> {
         self.cgroup.upgrade().ok_or_else(|| errno!(ENODEV))
     }
+
+    fn hierarchy(&self) -> Result<Arc<Hierarchy>, Errno> {
+        self.hierarchy.upgrade().ok_or_else(|| errno!(ENODEV))
+    }
 }
+
+/// `CgroupDirectoryHandle` is needed to implement a starnix_core trait for an `Arc<CgroupDirectory>`.
+#[derive(Debug, Clone)]
+pub struct CgroupDirectoryHandle(Arc<CgroupDirectory>);
 
 impl Deref for CgroupDirectoryHandle {
     type Target = CgroupDirectory;
@@ -61,7 +163,32 @@ impl FsNodeOps for CgroupDirectoryHandle {
         _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(VecDirectory::new_file(self.cgroup()?.get_entries()))
+        let children = self.cgroup()?.get_children()?;
+        let nodes = self.hierarchy()?.get_nodes(&children);
+        assert_eq!(children.len(), nodes.len());
+
+        let children_entries =
+            children.into_iter().zip(nodes.into_iter()).filter_map(|(cgroup, maybe_node)| {
+                // Ignore cgroups that hasn't been created or has been deleted from the hierarchy.
+                let Some(node) = maybe_node else {
+                    return None;
+                };
+                let ino = node.info().ino;
+                Some(VecDirectoryEntry {
+                    entry_type: DirectoryEntryType::DIR,
+                    name: cgroup.name().into(),
+                    inode: Some(ino),
+                })
+            });
+
+        let interface_files = self.interface_files.lock();
+        let interface_entries = interface_files.iter().map(|(name, child)| VecDirectoryEntry {
+            entry_type: DirectoryEntryType::REG,
+            name: name.clone(),
+            inode: Some(child.info().ino),
+        });
+
+        Ok(VecDirectory::new_file(children_entries.chain(interface_entries).collect()))
     }
 
     fn mkdir(
@@ -73,11 +200,21 @@ impl FsNodeOps for CgroupDirectoryHandle {
         _mode: FileMode,
         _owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        let child = self.cgroup()?.new_child(current_task, &node.fs(), name)?;
+        let hierarchy = self.hierarchy()?;
+        let cgroup = self.cgroup()?.new_child(name)?;
+        let directory = CgroupDirectory::new(
+            Arc::downgrade(&cgroup) as Weak<dyn CgroupOps>,
+            current_task,
+            &node.fs(),
+            self.hierarchy.clone(),
+        );
+        let child = hierarchy.add_node(&cgroup, directory, current_task, &node.fs());
+
         node.update_info(|info| {
             info.link_count += 1;
         });
-        Ok(child.directory_node.clone())
+
+        Ok(child)
     }
 
     fn mknod(
@@ -101,16 +238,17 @@ impl FsNodeOps for CgroupDirectoryHandle {
         name: &FsStr,
         child: &FsNodeHandle,
     ) -> Result<(), Errno> {
-        let cgroup = self.cgroup()?;
-
         // Only cgroup directories can be removed. Cgroup interface files cannot be removed.
-        let Some(child_dir) = child.downcast_ops::<CgroupDirectoryHandle>() else {
+        let Some(child_node) = child.downcast_ops::<CgroupDirectoryHandle>() else {
             return error!(EPERM);
         };
-        let child_cgroup = child_dir.cgroup()?;
 
-        let removed = cgroup.remove_child(name)?;
-        assert!(Arc::ptr_eq(&(removed as Arc<dyn CgroupOps>), &child_cgroup));
+        let hierarchy = self.hierarchy()?;
+        let child_cgroup = child_node.cgroup()?;
+        let removed = self.cgroup()?.remove_child(name)?;
+        assert!(Arc::ptr_eq(&(removed.clone() as Arc<dyn CgroupOps>), &child_cgroup));
+
+        hierarchy.remove_node(&removed)?;
 
         node.update_info(|info| {
             info.link_count -= 1;
@@ -138,6 +276,12 @@ impl FsNodeOps for CgroupDirectoryHandle {
         _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        self.cgroup()?.get_node(name)
+        let interface_files = self.interface_files.lock();
+        if let Some(node) = interface_files.get(name) {
+            Ok(node.clone())
+        } else {
+            let cgroup = self.cgroup()?.get_child(name)?;
+            self.hierarchy()?.get_node(&cgroup)
+        }
     }
 }

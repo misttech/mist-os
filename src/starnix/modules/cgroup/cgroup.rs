@@ -8,32 +8,17 @@
 //! to a control group (for the duration of their lifetime).
 
 use starnix_core::signals::send_freeze_signal;
-use starnix_core::task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter};
-use starnix_core::vfs::{
-    BytesFile, DirectoryEntryType, FileSystemHandle, FsNodeHandle, FsNodeInfo, FsStr, FsString,
-    PathBuilder, VecDirectoryEntry,
-};
+use starnix_core::task::{Kernel, ThreadGroup, WaitQueue, Waiter};
+use starnix_core::vfs::{FsStr, FsString, PathBuilder};
 use starnix_logging::{log_warn, track_stub};
 use starnix_sync::Mutex;
 use starnix_types::ownership::{TempRef, WeakRef};
-use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::file_mode::mode;
 use starnix_uapi::{errno, error, pid_t};
 use std::collections::{btree_map, hash_map, BTreeMap, HashMap};
 use std::ops::Deref;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, OnceLock, Weak};
-
-use crate::directory::CgroupDirectory;
-use crate::events::EventsFile;
-use crate::freeze::FreezeFile;
-use crate::procs::ControlGroupNode;
-
-const CONTROLLERS_FILE: &str = "cgroup.controllers";
-const PROCS_FILE: &str = "cgroup.procs";
-const FREEZE_FILE: &str = "cgroup.freeze";
-const EVENTS_FILE: &str = "cgroup.events";
+use std::sync::{Arc, Weak};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum FreezerState {
@@ -63,23 +48,17 @@ pub trait CgroupOps: Send + Sync + 'static {
 
     /// Create a new sub-cgroup as a child of this cgroup. Errors if the cgroup is deleted, or a
     /// child with `name` already exists.
-    fn new_child(
-        &self,
-        current_task: &CurrentTask,
-        fs: &FileSystemHandle,
-        name: &FsStr,
-    ) -> Result<CgroupHandle, Errno>;
+    fn new_child(&self, name: &FsStr) -> Result<CgroupHandle, Errno>;
+
+    /// Gets all children of this cgroup.
+    fn get_children(&self) -> Result<Vec<CgroupHandle>, Errno>;
+
+    /// Gets the child with `name`, errors if not found.
+    fn get_child(&self, name: &FsStr) -> Result<CgroupHandle, Errno>;
 
     /// Remove a child from this cgroup and return it, if found. Errors if cgroup is deleted, or a
     /// child with `name` is not found.
     fn remove_child(&self, name: &FsStr) -> Result<CgroupHandle, Errno>;
-
-    /// Return a `VecDirectoryEntry` for each interface file and each child.
-    fn get_entries(&self) -> Vec<VecDirectoryEntry>;
-
-    /// Find a child or interface file with the given name and return its `node`, if exists. Errors
-    /// if such a node was not found.
-    fn get_node(&self, name: &FsStr) -> Result<FsNodeHandle, Errno>;
 
     /// Return all pids that belong to this cgroup.
     fn get_pids(&self) -> Vec<pid_t>;
@@ -116,9 +95,6 @@ pub struct CgroupRoot {
     /// Sub-cgroups of this cgroup.
     children: Mutex<CgroupChildren>,
 
-    /// Interface nodes of the root cgroup. Lazily by `init()` and immutable after.
-    interface_nodes: OnceLock<BTreeMap<FsString, FsNodeHandle>>,
-
     /// Weak reference to Kernel, used to get processes and tasks.
     kernel: Weak<Kernel>,
 
@@ -129,11 +105,6 @@ pub struct CgroupRoot {
     next_id: AtomicU64,
 }
 impl CgroupRoot {
-    /// Since `CgroupRoot` is part of the `FileSystem` (see `CgroupFsV1::new_fs` and
-    /// `CgroupFsV2::new_fs`), initializing a `CgroupRoot` has two steps:
-    ///
-    /// - new() to create a `FileSystem`,
-    /// - init() to use the newly created `FileSystem` to create the `FsNode`s of the `CgroupRoot`.
     pub fn new(kernel: Weak<Kernel>) -> Arc<CgroupRoot> {
         Arc::new_cyclic(|weak_self| Self {
             weak_self: weak_self.clone(),
@@ -141,34 +112,6 @@ impl CgroupRoot {
             next_id: AtomicU64::new(1),
             ..Default::default()
         })
-    }
-
-    /// Populate `interface_nodes` with nodes of the cgroup root directory, then set
-    /// `CgroupDirectoryHandle` to be the root node of the `FileSystem`. Can only be called once.
-    pub fn init(self: &Arc<Self>, current_task: &CurrentTask, fs: &FileSystemHandle) {
-        let cloned = self.clone();
-        let weak_ops = Arc::downgrade(&(cloned as Arc<dyn CgroupOps>));
-        self.interface_nodes
-            .set(BTreeMap::from([
-                (
-                    PROCS_FILE.into(),
-                    fs.create_node(
-                        current_task,
-                        ControlGroupNode::new(weak_ops.clone()),
-                        FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
-                    ),
-                ),
-                (
-                    CONTROLLERS_FILE.into(),
-                    fs.create_node(
-                        current_task,
-                        BytesFile::new_node(b"".to_vec()),
-                        FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-                    ),
-                ),
-            ]))
-            .expect("CgroupRoot is only initialized once");
-        fs.set_root(CgroupDirectory::new(weak_ops));
     }
 
     fn get_next_id(&self) -> u64 {
@@ -206,16 +149,16 @@ impl CgroupOps for CgroupRoot {
         Ok(())
     }
 
-    fn new_child(
-        &self,
-        current_task: &CurrentTask,
-        fs: &FileSystemHandle,
-        name: &FsStr,
-    ) -> Result<CgroupHandle, Errno> {
+    fn new_child(&self, name: &FsStr) -> Result<CgroupHandle, Errno> {
         let id = self.get_next_id();
-        let new_child = Cgroup::new(current_task, fs, id, name, &self.weak_self, None);
+        let new_child = Cgroup::new(id, name, &self.weak_self, None);
         let mut children = self.children.lock();
         children.insert_child(name.into(), new_child)
+    }
+
+    fn get_child(&self, name: &FsStr) -> Result<CgroupHandle, Errno> {
+        let children = self.children.lock();
+        children.get_child(name).ok_or_else(|| errno!(ENOENT))
     }
 
     fn remove_child(&self, name: &FsStr) -> Result<CgroupHandle, Errno> {
@@ -223,26 +166,9 @@ impl CgroupOps for CgroupRoot {
         children.remove_child(name)
     }
 
-    fn get_entries(&self) -> Vec<VecDirectoryEntry> {
-        let entries = self.interface_nodes.get().expect("CgroupRoot is initialized").iter().map(
-            |(name, child)| VecDirectoryEntry {
-                entry_type: DirectoryEntryType::REG,
-                name: name.clone(),
-                inode: Some(child.info().ino),
-            },
-        );
+    fn get_children(&self) -> Result<Vec<CgroupHandle>, Errno> {
         let children = self.children.lock();
-        entries.chain(children.get_entries()).collect()
-    }
-
-    fn get_node(&self, name: &FsStr) -> Result<FsNodeHandle, Errno> {
-        if let Some(node) = self.interface_nodes.get().expect("CgroupRoot is initialized").get(name)
-        {
-            Ok(node.clone())
-        } else {
-            let children = self.children.lock();
-            children.get_node(name)
-        }
+        Ok(children.get_children())
     }
 
     fn get_pids(&self) -> Vec<pid_t> {
@@ -311,20 +237,12 @@ impl CgroupChildren {
         Ok(child_entry.remove())
     }
 
-    fn get_entries(&self) -> impl IntoIterator<Item = VecDirectoryEntry> + '_ {
-        self.0.iter().map(|(name, child)| VecDirectoryEntry {
-            entry_type: DirectoryEntryType::DIR,
-            name: name.clone(),
-            inode: Some(child.directory_node.info().ino),
-        })
+    fn get_child(&self, name: &FsStr) -> Option<CgroupHandle> {
+        self.0.get(name).cloned()
     }
 
     fn get_children(&self) -> Vec<CgroupHandle> {
         self.0.values().cloned().collect()
-    }
-
-    fn get_node(&self, name: &FsStr) -> Result<FsNodeHandle, Errno> {
-        self.0.get(name).map(|child| child.directory_node.clone()).ok_or_else(|| errno!(ENOENT))
     }
 }
 
@@ -477,12 +395,6 @@ pub struct Cgroup {
     /// Internal state of the Cgroup.
     state: Mutex<CgroupState>,
 
-    /// The directory node associated with this control group.
-    pub directory_node: FsNodeHandle,
-
-    /// The interface nodes associated with this control group.
-    interface_nodes: BTreeMap<FsString, FsNodeHandle>,
-
     weak_self: Weak<Cgroup>,
 }
 pub type CgroupHandle = Arc<Cgroup>;
@@ -501,66 +413,22 @@ pub fn path_from_root(cgroup: CgroupHandle) -> Result<FsString, Errno> {
 
 impl Cgroup {
     pub fn new(
-        current_task: &CurrentTask,
-        fs: &FileSystemHandle,
         id: u64,
         name: &FsStr,
         root: &Weak<CgroupRoot>,
         parent: Option<Weak<Cgroup>>,
     ) -> CgroupHandle {
-        Arc::new_cyclic(|weak| {
-            let weak_ops = weak.clone() as Weak<dyn CgroupOps>;
-            Self {
-                id,
-                root: root.clone(),
-                name: name.to_owned(),
-                parent,
-                state: Default::default(),
-                directory_node: fs.create_node(
-                    current_task,
-                    CgroupDirectory::new(weak_ops.clone()),
-                    FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
-                ),
-                interface_nodes: BTreeMap::from([
-                    (
-                        PROCS_FILE.into(),
-                        fs.create_node(
-                            current_task,
-                            ControlGroupNode::new(weak_ops.clone()),
-                            FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
-                        ),
-                    ),
-                    (
-                        CONTROLLERS_FILE.into(),
-                        fs.create_node(
-                            current_task,
-                            BytesFile::new_node(b"".to_vec()),
-                            FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-                        ),
-                    ),
-                    (
-                        FREEZE_FILE.into(),
-                        fs.create_node(
-                            current_task,
-                            FreezeFile::new_node(weak.clone() as Weak<Self>),
-                            FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
-                        ),
-                    ),
-                    (
-                        EVENTS_FILE.into(),
-                        fs.create_node(
-                            current_task,
-                            EventsFile::new_node(weak.clone() as Weak<Self>),
-                            FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
-                        ),
-                    ),
-                ]),
-                weak_self: weak.clone(),
-            }
+        Arc::new_cyclic(|weak| Self {
+            id,
+            root: root.clone(),
+            name: name.to_owned(),
+            parent,
+            state: Default::default(),
+            weak_self: weak.clone(),
         })
     }
 
-    fn name(&self) -> &FsStr {
+    pub fn name(&self) -> &FsStr {
         self.name.as_ref()
     }
 
@@ -613,15 +481,9 @@ impl CgroupOps for Cgroup {
         Ok(())
     }
 
-    fn new_child(
-        &self,
-        current_task: &CurrentTask,
-        fs: &FileSystemHandle,
-        name: &FsStr,
-    ) -> Result<CgroupHandle, Errno> {
+    fn new_child(&self, name: &FsStr) -> Result<CgroupHandle, Errno> {
         let id = self.root()?.get_next_id();
-        let new_child =
-            Cgroup::new(current_task, fs, id, name, &self.root, Some(self.weak_self.clone()));
+        let new_child = Cgroup::new(id, name, &self.root, Some(self.weak_self.clone()));
         let mut state = self.state.lock();
         if state.deleted {
             return error!(ENOENT);
@@ -629,6 +491,11 @@ impl CgroupOps for Cgroup {
         // New child should inherit the effective freezer state of the current cgroup.
         new_child.state.lock().inherited_freezer_state = state.get_effective_freezer_state();
         state.children.insert_child(name.into(), new_child)
+    }
+
+    fn get_child(&self, name: &FsStr) -> Result<CgroupHandle, Errno> {
+        let state = self.state.lock();
+        state.children.get_child(name).ok_or_else(|| errno!(ENOENT))
     }
 
     fn remove_child(&self, name: &FsStr) -> Result<CgroupHandle, Errno> {
@@ -639,23 +506,12 @@ impl CgroupOps for Cgroup {
         state.children.remove_child(name)
     }
 
-    fn get_entries(&self) -> Vec<VecDirectoryEntry> {
-        let entries = self.interface_nodes.iter().map(|(name, child)| VecDirectoryEntry {
-            entry_type: DirectoryEntryType::REG,
-            name: name.clone(),
-            inode: Some(child.info().ino),
-        });
+    fn get_children(&self) -> Result<Vec<CgroupHandle>, Errno> {
         let state = self.state.lock();
-        entries.chain(state.children.get_entries()).collect()
-    }
-
-    fn get_node(&self, name: &FsStr) -> Result<FsNodeHandle, Errno> {
-        if let Some(node) = self.interface_nodes.get(name) {
-            Ok(node.clone())
-        } else {
-            let state = self.state.lock();
-            state.children.get_node(name)
+        if state.deleted {
+            return error!(ENOENT);
         }
+        Ok(state.children.get_children())
     }
 
     fn get_pids(&self) -> Vec<pid_t> {
@@ -718,8 +574,8 @@ mod test {
             .expect("");
         let root = fs.downcast_ops::<CgroupV2Fs>().expect("").root.clone();
 
-        let test_cgroup = root.new_child(&current_task, &fs, "test".into()).expect("");
-        let child_cgroup = test_cgroup.new_child(&current_task, &fs, "child".into()).expect("");
+        let test_cgroup = root.new_child("test".into()).expect("");
+        let child_cgroup = test_cgroup.new_child("child".into()).expect("");
 
         assert_eq!(path_from_root(test_cgroup), Ok("/test".into()));
         assert_eq!(path_from_root(child_cgroup), Ok("/test/child".into()));
