@@ -116,16 +116,17 @@ namespace display_coordinator {
 void DisplayConfig::InitializeInspect(inspect::Node* parent) {
   static std::atomic_uint64_t inspect_count;
   node_ = parent->CreateChild(fbl::StringPrintf("display-config-%ld", inspect_count++).c_str());
-  pending_layer_change_property_ = node_.CreateBool("pending_layer_change", pending_layer_change_);
+  pending_has_layer_list_change_property_ =
+      node_.CreateBool("pending_has_layer_list_change", pending_has_layer_list_change_);
   pending_apply_layer_change_property_ =
       node_.CreateBool("pending_apply_layer_change", pending_apply_layer_change_);
 }
 
 void DisplayConfig::DiscardNonLayerPendingConfig() {
-  pending_layer_change_ = false;
-  pending_layer_change_property_.Set(false);
+  pending_has_layer_list_change_ = false;
+  pending_has_layer_list_change_property_.Set(false);
 
-  pending_ = current_;
+  pending_ = applied_;
   display_config_change_ = false;
 }
 
@@ -493,8 +494,9 @@ void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
     return;
   }
 
-  config->pending_layer_change_ = true;
-  config->pending_layer_change_property_.Set(true);
+  config->pending_has_layer_list_change_ = true;
+  config->pending_has_layer_list_change_property_.Set(true);
+
   config->pending_layers_.clear();
   for (fuchsia_hardware_display::wire::LayerId fidl_layer_id : request->layer_ids) {
     display::LayerId layer_id = display::ToLayerId(fidl_layer_id);
@@ -719,69 +721,71 @@ void Client::ApplyConfigFromFidl(display::ConfigStamp new_config_stamp) {
   }
   latest_config_stamp_ = new_config_stamp;
 
-  // First go through and reset any current layer lists that are changing, so
-  // we don't end up trying to put an image into two lists.
-  for (auto& display_config : configs_) {
-    if (display_config.pending_layer_change_) {
-      // This guarantees that all nodes in `current_layers_` will be detached
-      // so that a node can be put into another `current_layers_` list.
-      display_config.current_layers_.clear();
+  // Empty applied layer lists for all displays whose layer lists are changing.
+  //
+  // This guarantees that layers moved between displays don't end up in two
+  // layer lists while each display's applied configuration is updated to match
+  // its pending configuration.
+  for (DisplayConfig& display_config : configs_) {
+    if (display_config.pending_has_layer_list_change_) {
+      display_config.applied_layers_.clear();
     }
   }
 
-  for (auto& display_config : configs_) {
+  for (DisplayConfig& display_config : configs_) {
     if (display_config.display_config_change_) {
-      display_config.current_ = display_config.pending_;
+      display_config.applied_ = display_config.pending_;
       display_config.display_config_change_ = false;
     }
 
     // Update any image layers. This needs to be done before migrating layers, as
     // that needs to know if there are any waiting images.
-    for (auto& layer_node : display_config.pending_layers_) {
-      if (!layer_node.layer->ResolvePendingLayerProperties()) {
+    for (LayerNode& pending_layer_node : display_config.pending_layers_) {
+      if (!pending_layer_node.layer->ResolvePendingLayerProperties()) {
         FDF_LOG(ERROR, "Failed to resolve pending layer properties for layer %" PRIu64,
-                layer_node.layer->id.value());
+                pending_layer_node.layer->id.value());
         TearDown(ZX_ERR_BAD_STATE);
         return;
       }
-      if (!layer_node.layer->ResolvePendingImage(&fences_, latest_config_stamp_)) {
+      if (!pending_layer_node.layer->ResolvePendingImage(&fences_, latest_config_stamp_)) {
         FDF_LOG(ERROR, "Failed to resolve pending images for layer %" PRIu64,
-                layer_node.layer->id.value());
+                pending_layer_node.layer->id.value());
         TearDown(ZX_ERR_BAD_STATE);
         return;
       }
     }
 
-    // If there was a layer change, update the current layers list.
-    if (display_config.pending_layer_change_) {
-      for (LayerNode& layer_node : display_config.pending_layers_) {
-        Layer* layer = layer_node.layer;
-        // Rebuild current layer lists from pending layer lists.
-        display_config.current_layers_.push_back(&layer->current_node_);
+    // Build applied layer lists that were emptied above.
+    if (display_config.pending_has_layer_list_change_) {
+      // Rebuild the applied layer list from the pending layer list.
+      for (LayerNode& pending_layer_node : display_config.pending_layers_) {
+        Layer* pending_layer = pending_layer_node.layer;
+        display_config.applied_layers_.push_back(&pending_layer->applied_display_config_list_node_);
       }
-      for (LayerNode& layer_node : display_config.current_layers_) {
-        Layer* layer = layer_node.layer;
+
+      for (LayerNode& applied_layer_node : display_config.applied_layers_) {
+        Layer* applied_layer = applied_layer_node.layer;
         // Don't migrate images between displays if there are pending images. See
         // `Controller::ApplyConfig` for more details.
-        if (layer->current_display_id_ != display_config.id && layer->displayed_image_ &&
-            layer->HasWaitingImages()) {
-          layer->displayed_image_ = nullptr;
+        if (applied_layer->applied_to_display_id_ != display_config.id &&
+            applied_layer->applied_image_ != nullptr && applied_layer->HasWaitingImages()) {
+          applied_layer->applied_image_ = nullptr;
 
           // This doesn't need to be reset anywhere, since we really care about the last
           // display this layer was shown on. Ignoring the 'null' display could cause
           // unusual layer changes to trigger this unnecessary, but that's not wrong.
-          layer->current_display_id_ = display_config.id;
+          applied_layer->applied_to_display_id_ = display_config.id;
         }
       }
-      display_config.pending_layer_change_ = false;
-      display_config.pending_layer_change_property_.Set(false);
+      display_config.pending_has_layer_list_change_ = false;
+      display_config.pending_has_layer_list_change_property_.Set(false);
       display_config.pending_apply_layer_change_ = true;
       display_config.pending_apply_layer_change_property_.Set(true);
     }
 
     // Apply any pending configuration changes to active layers.
-    for (auto& layer_node : display_config.current_layers_) {
-      layer_node.layer->ApplyChanges();
+    for (LayerNode& applied_layer_node : display_config.applied_layers_) {
+      applied_layer_node.layer->ApplyChanges();
     }
   }
   // Overflow doesn't matter, since stamps only need to be unique until
@@ -987,7 +991,7 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
       layer_t& banjo_layer = layers[layer_idx];
       ++layer_idx;
 
-      banjo_layer = source_layer_node.layer->pending_layer_;
+      banjo_layer = source_layer_node.layer->pending_layer_config_;
       ++layer_composition_operations_count;
 
       bool invalid = false;
@@ -1144,19 +1148,19 @@ void Client::ApplyConfig() {
   //
   // The final config_stamp sent to `Controller` will be the minimum of all
   // per-layer stamps.
-  display::ConfigStamp current_applied_config_stamp = latest_config_stamp_;
+  display::ConfigStamp applied_config_stamp = latest_config_stamp_;
 
   for (auto& display_config : configs_) {
-    display_config.current_.layer_count = 0;
-    display_config.current_.layer_list = layers + layer_idx;
+    display_config.applied_.layer_count = 0;
+    display_config.applied_.layer_list = layers + layer_idx;
 
     // Displays with no current layers are filtered out in `Controller::ApplyConfig`,
     // after it updates its own image tracking logic.
 
-    for (auto& layer_node : display_config.current_layers_) {
+    for (auto& layer_node : display_config.applied_layers_) {
       Layer* layer = layer_node.layer;
       const bool activated = layer->ActivateLatestReadyImage();
-      if (activated && layer->current_image()) {
+      if (activated && layer->applied_image()) {
         display_config.pending_apply_layer_change_ = true;
         display_config.pending_apply_layer_change_property_.Set(true);
       }
@@ -1169,17 +1173,16 @@ void Client::ApplyConfig() {
       // images in the config have appeared on-screen.
       std::optional<display::ConfigStamp> layer_client_config_stamp =
           layer->GetCurrentClientConfigStamp();
-      if (layer_client_config_stamp) {
-        current_applied_config_stamp =
-            std::min(current_applied_config_stamp, *layer_client_config_stamp);
+      if (layer_client_config_stamp != std::nullopt) {
+        applied_config_stamp = std::min(applied_config_stamp, *layer_client_config_stamp);
       }
 
-      display_config.current_.layer_count++;
-      layers[layer_idx++] = layer->current_layer_;
-      bool is_solid_color_fill = layer->current_layer_.image_source.width == 0 ||
-                                 layer->current_layer_.image_source.height == 0;
+      display_config.applied_.layer_count++;
+      layers[layer_idx++] = layer->applied_layer_config_;
+      bool is_solid_color_fill = layer->applied_layer_config_.image_source.width == 0 ||
+                                 layer->applied_layer_config_.image_source.height == 0;
       if (!is_solid_color_fill) {
-        if (layer->current_image() == nullptr) {
+        if (layer->applied_image() == nullptr) {
           config_missing_image = true;
         }
       }
@@ -1193,8 +1196,7 @@ void Client::ApplyConfig() {
       dc_configs[dc_idx++] = &c;
     }
 
-    controller_.ApplyConfig(dc_configs, dc_idx, current_applied_config_stamp, client_apply_count_,
-                            id_);
+    controller_.ApplyConfig(dc_configs, dc_idx, applied_config_stamp, client_apply_count_, id_);
   }
 }
 
@@ -1293,18 +1295,18 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
       continue;
     }
 
-    config->current_.display_id = ToBanjoDisplayId(config->id);
-    config->current_.layer_list = nullptr;
-    config->current_.layer_count = 0;
+    config->applied_.display_id = ToBanjoDisplayId(config->id);
+    config->applied_.layer_list = nullptr;
+    config->applied_.layer_count = 0;
 
     std::span<const display::DisplayTiming> display_timings =
         std::move(display_timings_result).value();
     ZX_DEBUG_ASSERT(!display_timings.empty());
-    config->current_.mode = ToBanjoDisplayMode(display_timings[0]);
+    config->applied_.mode = ToBanjoDisplayMode(display_timings[0]);
 
-    config->current_.cc_flags = 0;
+    config->applied_.cc_flags = 0;
 
-    config->pending_ = config->current_;
+    config->pending_ = config->applied_;
 
     config->InitializeInspect(&proxy_->node());
 
@@ -1395,11 +1397,11 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
   fidl_removed_display_ids.reserve(removed_display_ids.size());
 
   for (display::DisplayId removed_display_id : removed_display_ids) {
-    auto display = configs_.erase(removed_display_id);
-    if (display) {
-      display->pending_layers_.clear();
-      display->current_layers_.clear();
-      fidl_removed_display_ids.push_back(ToFidlDisplayId(display->id));
+    std::unique_ptr<DisplayConfig> display_config = configs_.erase(removed_display_id);
+    if (display_config != nullptr) {
+      display_config->pending_layers_.clear();
+      display_config->applied_layers_.clear();
+      fidl_removed_display_ids.push_back(ToFidlDisplayId(display_config->id));
     }
   }
 
@@ -1479,9 +1481,9 @@ void Client::TearDown(zx_status_t epitaph) {
 
   fences_.Clear();
 
-  for (auto& config : configs_) {
-    config.pending_layers_.clear();
-    config.current_layers_.clear();
+  for (DisplayConfig& display_config : configs_) {
+    display_config.pending_layers_.clear();
+    display_config.applied_layers_.clear();
   }
 
   // The layer's images have already been handled in `CleanUpImageLayerState`.
@@ -1539,7 +1541,7 @@ void Client::CleanUpCaptureImage(display::ImageId id) {
   }
 }
 
-void Client::SetAllConfigPendingLayersToCurrentLayers() {
+void Client::SetAllConfigPendingLayersToAppliedLayers() {
   // Layers may have been moved between displays, so we must be extra careful
   // to avoid inserting a Layer in a display's pending list while it's
   // already moved to another Display's pending list.
@@ -1547,13 +1549,14 @@ void Client::SetAllConfigPendingLayersToCurrentLayers() {
   // We side-step this problem by clearing all pending lists before inserting
   // any Layer in them, so that we can guarantee that for every Layer, its
   // `pending_node_` is not in any Display's pending list.
-  for (auto& config : configs_) {
-    config.pending_layers_.clear();
+  for (DisplayConfig& display_config : configs_) {
+    display_config.pending_layers_.clear();
   }
-  for (auto& config : configs_) {
+  for (DisplayConfig& display_config : configs_) {
     // Rebuild the pending layers list from current layers list.
-    for (LayerNode& layer_node : config.current_layers_) {
-      config.pending_layers_.push_back(&layer_node.layer->pending_node_);
+    for (LayerNode& layer_node : display_config.applied_layers_) {
+      display_config.pending_layers_.push_back(
+          &layer_node.layer->pending_display_config_list_node_);
     }
   }
 }
@@ -1564,14 +1567,12 @@ void Client::DiscardConfig() {
     layer.DiscardChanges();
   }
 
-  // Discard the changes to Display layers lists.
-  //
-  // Reset pending layers lists of all displays to their current layers, respectively.
-  SetAllConfigPendingLayersToCurrentLayers();
+  // Discard layer list changes.
+  SetAllConfigPendingLayersToAppliedLayers();
 
   // Discard the rest of the Display changes.
-  for (DisplayConfig& config : configs_) {
-    config.DiscardNonLayerPendingConfig();
+  for (DisplayConfig& display_config : configs_) {
+    display_config.DiscardNonLayerPendingConfig();
   }
   pending_config_valid_ = true;
 }

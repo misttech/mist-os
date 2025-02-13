@@ -516,8 +516,8 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
     driver_config_stamp = last_issued_driver_config_stamp_;
 
     for (int i = 0; i < count; i++) {
-      auto* config = configs[i];
-      auto display = displays_.find(config->id);
+      DisplayConfig* display_config = configs[i];
+      auto display = displays_.find(display_config->id);
       if (!display.IsValid()) {
         continue;
       }
@@ -526,35 +526,35 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
       config_image_queue.push({.config_stamp = driver_config_stamp, .images = {}});
 
       display->switching_client = switching_client;
-      display->pending_layer_change = config->apply_layer_change();
+      display->pending_layer_change = display_config->apply_layer_change();
       if (display->pending_layer_change) {
         display->pending_layer_change_driver_config_stamp = driver_config_stamp;
       }
-      display->layer_count = config->current_layer_count();
+      display->layer_count = display_config->applied_layer_count();
       display->delayed_apply = false;
 
       if (display->layer_count == 0) {
         continue;
       }
 
-      display_configs[display_count++] = *config->current_config();
+      display_configs[display_count++] = *display_config->applied_config();
 
-      for (auto& layer_node : config->get_current_layers()) {
-        Layer* layer = layer_node.layer;
-        fbl::RefPtr<Image> image = layer->current_image();
+      for (const LayerNode& applied_layer_node : display_config->get_applied_layers()) {
+        const Layer* applied_layer = applied_layer_node.layer;
+        fbl::RefPtr<Image> applied_image = applied_layer->applied_image();
 
-        if (layer->is_skipped() || !image) {
+        if (applied_layer->is_skipped() || applied_image == nullptr) {
           continue;
         }
 
         // Set the image controller config stamp so vsync knows what config the
         // image was used at.
-        AssertMtxAliasHeld(*image->mtx());
-        image->set_latest_driver_config_stamp(driver_config_stamp);
+        AssertMtxAliasHeld(*applied_image->mtx());
+        applied_image->set_latest_driver_config_stamp(driver_config_stamp);
 
         // NOTE: If changing this flow name or ID, please also do so in the
         // corresponding FLOW_END.
-        TRACE_FLOW_BEGIN("gfx", "present_image", image->id.value());
+        TRACE_FLOW_BEGIN("gfx", "present_image", applied_image->id.value());
 
         // It's possible that the image's layer was moved between displays. The logic around
         // pending_layer_change guarantees that the old display will be done with the image
@@ -566,12 +566,12 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
         //
         // TODO(https://fxbug.dev/317914671): investigate whether storing Images in doubly-linked
         //                                    lists continues to be desirable.
-        if (image->InDoublyLinkedList()) {
-          image->RemoveFromDoublyLinkedList();
+        if (applied_image->InDoublyLinkedList()) {
+          applied_image->RemoveFromDoublyLinkedList();
         }
-        display->images.push_back(image);
+        display->images.push_back(applied_image);
 
-        config_image_queue.back().images.push_back({image->id, image->client_id()});
+        config_image_queue.back().images.push_back({applied_image->id, applied_image->client_id()});
       }
     }
 

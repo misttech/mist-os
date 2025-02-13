@@ -71,18 +71,24 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, display:
   // `DiscardNonLayerPendingConfig()` is called.
   void DiscardNonLayerPendingConfig();
 
-  int current_layer_count() const { return static_cast<int>(current_.layer_count); }
-  const display_config_t* current_config() const { return &current_; }
-  const fbl::DoublyLinkedList<LayerNode*>& get_current_layers() const { return current_layers_; }
+  int applied_layer_count() const { return static_cast<int>(applied_.layer_count); }
+  const display_config_t* applied_config() const { return &applied_; }
+  const fbl::DoublyLinkedList<LayerNode*>& get_applied_layers() const { return applied_layers_; }
 
  private:
-  display_config_t current_;
+  // The last configuration sent to the display engine.
+  display_config_t applied_;
+
+  // The display configuration modified by client calls.
   display_config_t pending_;
 
-  bool pending_layer_change_;
+  // If true, the pending configuration's layer list may differ from the current
+  // configuration's list.
+  bool pending_has_layer_list_change_;
+
   bool pending_apply_layer_change_;
   fbl::DoublyLinkedList<LayerNode*> pending_layers_;
-  fbl::DoublyLinkedList<LayerNode*> current_layers_;
+  fbl::DoublyLinkedList<LayerNode*> applied_layers_;
 
   fbl::Array<CoordinatorPixelFormat> pixel_formats_;
 
@@ -92,7 +98,9 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, display:
   friend ClientProxy;
 
   inspect::Node node_;
-  inspect::BoolProperty pending_layer_change_property_;
+  // Reflects `pending_has_layer_list_change_`.
+  inspect::BoolProperty pending_has_layer_list_change_property_;
+  // Reflects `pending_apply_layer_change_`.
   inspect::BoolProperty pending_apply_layer_change_property_;
 };
 
@@ -225,10 +233,9 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   // Displays' pending layers list may have been changed by pending
   // SetDisplayLayers() operations.
   //
-  // Restores the pending layer lists of all the Displays to their current
-  // (applied) layer list state respectively, undoing all pending changes to
-  // the layer lists.
-  void SetAllConfigPendingLayersToCurrentLayers();
+  // Restores the pending layer lists of all the Displays to their applied layer
+  // list state respectively, undoing all pending changes to the layer lists.
+  void SetAllConfigPendingLayersToAppliedLayers();
 
   // `fuchsia.hardware.display/Coordinator.ImportImage()` helper for display
   // images.

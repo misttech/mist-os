@@ -11,6 +11,7 @@
 #include <fidl/fuchsia.math/cpp/wire.h>
 #include <zircon/types.h>
 
+#include <cstdint>
 #include <memory>
 
 #include <fbl/intrusive_double_list.h>
@@ -44,7 +45,9 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
   explicit Layer(Controller* controller, display::DriverLayerId id);
   ~Layer();
 
-  fbl::RefPtr<Image> current_image() const { return displayed_image_; }
+  // The most recent image sent to the display engine for this layer.
+  fbl::RefPtr<Image> applied_image() const { return applied_image_; }
+
   bool is_skipped() const { return is_skipped_; }
 
   // TODO(https://fxbug.dev/42118906) Although this is nominally a POD, the state management and
@@ -52,10 +55,15 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
   friend Client;
   friend LayerTest;
 
-  bool in_use() const { return current_node_.InContainer() || pending_node_.InContainer(); }
+  bool in_use() const {
+    return applied_display_config_list_node_.InContainer() ||
+           pending_display_config_list_node_.InContainer();
+  }
 
-  const image_metadata_t& pending_image_metadata() const { return pending_layer_.image_metadata; }
-  uint64_t pending_image_handle() const { return pending_layer_.image_handle; }
+  const image_metadata_t& pending_image_metadata() const {
+    return pending_layer_config_.image_metadata;
+  }
+  uint64_t pending_image_handle() const { return pending_layer_config_.image_handle; }
 
   // If the layer properties were changed in the pending configuration, this
   // retires all images as they are invalidated with layer properties change.
@@ -75,10 +83,12 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
   bool ResolvePendingImage(FenceCollection* fence,
                            display::ConfigStamp stamp = display::kInvalidConfigStamp);
 
-  // Make the staged config current.
+  // Set the applied layer configuration to the pending layer configuration.
   void ApplyChanges();
 
-  // Discard the pending changes
+  // Set the pending layer configuration to the applied layer configuration.
+  //
+  // This discards any changes in the pending layer configuration.
   void DiscardChanges();
 
   // Removes references to all Images associated with this Layer.
@@ -134,20 +144,21 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
   // Does nothing if `image` is not in the list.
   void RetireWaitingImage(const Image& image);
 
-  // Retires the image that is being displayed.
-  // Returns true if this affects the current display config.
-  bool RetireDisplayedImage() __TA_REQUIRES(mtx());
+  // Retires the image most recently sent to the display engine driver.
+  //
+  // Returns true if this changes the applied display configuration.
+  bool RetireAppliedImage() __TA_REQUIRES(mtx());
 
   Controller& controller_;
 
-  layer_t pending_layer_;
-  layer_t current_layer_;
-  // flag indicating that there are changes in pending_layer that
-  // need to be applied to current_layer.
-  bool config_change_;
+  layer_t pending_layer_config_;
+  layer_t applied_layer_config_;
+
+  // True if `pending_layer_` is different from `applied_layer_`.
+  bool pending_layer_config_differs_from_applied_;
 
   // The event passed to SetLayerImage which hasn't been applied yet.
-  display::EventId pending_wait_event_id_ = display::kInvalidEventId;
+  display::EventId pending_image_wait_event_id_ = display::kInvalidEventId;
 
   // The image given to SetLayerImage which hasn't been applied yet.
   fbl::RefPtr<Image> pending_image_;
@@ -159,18 +170,19 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
   // `ZX_DEBUG_ASSERT(controller_.IsRunningOnClientDispatcher())`.
   WaitingImageList waiting_images_;
 
-  // The image which has most recently been sent to the display controller impl
-  fbl::RefPtr<Image> displayed_image_;
+  fbl::RefPtr<Image> applied_image_;
 
   // Counters used for keeping track of when the layer's images need to be dropped.
   uint64_t pending_image_config_gen_ = 0;
-  uint64_t current_image_config_gen_ = 0;
+  uint64_t applied_image_config_gen_ = 0;
 
-  LayerNode pending_node_;
-  LayerNode current_node_;
+  LayerNode pending_display_config_list_node_;
+  LayerNode applied_display_config_list_node_;
 
-  // The display this layer was most recently displayed on
-  display::DisplayId current_display_id_;
+  // Identifies the display that this layer was last applied to.
+  //
+  // Invalid if this layer never belonged to an applied display configuration.
+  display::DisplayId applied_to_display_id_ = display::kInvalidDisplayId;
 
   bool is_skipped_;
 };
