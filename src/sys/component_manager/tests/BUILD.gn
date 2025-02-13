@@ -41,6 +41,7 @@ group("hermetic_tests") {
     "introspector:tests",
     "lifecycle_controller:tests",
     "namespace_capabilities:tests",
+    "ota_health_verification:tests",
     "panic-test:component_manager_panic_test",
     "pkg_from_framework:tests",
     "realm:tests",
