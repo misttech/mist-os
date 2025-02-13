@@ -67,7 +67,7 @@ toc:
     path: /docs/development/diagnostics/triage/fx_triage.md
   - title: "Codelab: Using Triage"
     path: /docs/development/diagnostics/triage/codelab.md
-- title: "Reference"
+- title: "Diagnostics reference"
   section:
   - title: "Diagnostics schema"
     path: /docs/reference/platform-spec/diagnostics/schema.md
