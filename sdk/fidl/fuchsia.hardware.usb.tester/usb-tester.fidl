@@ -100,3 +100,8 @@ closed protocol Device {
         minor_version uint8;
     });
 };
+
+// Added to allow service connection to replace devfs
+service Service {
+    device client_end:Device;
+};

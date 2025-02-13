@@ -73,3 +73,7 @@ open protocol Debug {
         server server_end:fuchsia.hardware.gpio.Gpio;
     }) -> () error zx.Status;
 };
+
+service DebugService {
+    device client_end:Debug;
+};

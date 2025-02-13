@@ -203,3 +203,8 @@ closed protocol Light {
     // TODO: Ideas for future expansion
     // - Hardware blinking configuration, for lights that have hardware or MCU support for blinking.
 };
+
+// Added to allow service connection to replace devfs
+service LightService {
+    light client_end:Light;
+};

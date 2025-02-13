@@ -91,3 +91,8 @@ closed protocol Source {
         info BatteryInfo;
     });
 };
+
+// Added to allow service connection to replace devfs
+service Service {
+    source client_end:Source;
+};

@@ -102,3 +102,8 @@ closed protocol Pipe {
         actual uint64;
     });
 };
+
+// Added to allow service connection to replace devfs
+service ControllerService {
+    device client_end:Controller;
+};

@@ -78,3 +78,8 @@ open protocol InputDevice {
         report InputReport;
     }) error zx.Status;
 };
+
+// Added to allow service connection to replace devfs
+service Service {
+    input_device client_end:InputDevice;
+};

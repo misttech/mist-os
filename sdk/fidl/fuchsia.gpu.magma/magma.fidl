@@ -441,6 +441,11 @@ closed protocol PerformanceCounterAccess {
     });
 };
 
+// Added to allow service connection to replace devfs
+service PerformanceCounterService {
+    access client_end:PerformanceCounterAccess;
+};
+
 closed protocol PerformanceCounterEvents {
     /// Signals that a performance counter buffer has data. These will be output in the order of
     /// when the reads are completed.
@@ -471,6 +476,12 @@ closed protocol DependencyInjection {
         provider client_end:fuchsia.memorypressure.Provider;
     });
 };
+
+// Added to allow service connection to replace devfs
+service DependencyInjectionService {
+    device client_end:DependencyInjection;
+};
+
 
 /// Each element of this enum represents a high-level goal of a specific power state.
 @available(added=HEAD)

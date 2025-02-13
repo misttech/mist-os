@@ -80,3 +80,8 @@ closed protocol Provider {
         args string:<MAX_ARGS_LENGTH, optional>;
     }) -> () error zx.Status;
 };
+
+// Added to allow service connection to replace devfs
+service Service {
+    adb client_end:Device;
+};

@@ -66,3 +66,8 @@ closed protocol Device {
         listener client_end:Events;
     });
 };
+
+// Added to allow service connection to replace devfs
+service Service {
+    device client_end:Device;
+};

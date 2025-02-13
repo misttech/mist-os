@@ -22,3 +22,8 @@ closed protocol Device {
         service_directory client_end:fuchsia.io.Directory;
     });
 };
+
+// Added to allow service connection to replace devfs
+service Service {
+    device client_end:Device;
+};

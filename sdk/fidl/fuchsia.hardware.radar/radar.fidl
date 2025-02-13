@@ -279,3 +279,8 @@ closed protocol RadarBurstInjector {
     /// *     method is still pending.
     strict StopBurstInjection() -> () error StatusCode;
 };
+
+// Added to allow service connection to replace devfs
+service Service {
+    device client_end:RadarBurstReaderProvider;
+};

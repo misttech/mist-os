@@ -101,3 +101,8 @@ closed protocol Device {
         s zx.Status;
     });
 };
+
+// Added to allow service connection to replace devfs
+service Service {
+    device client_end:Device;
+};

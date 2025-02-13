@@ -142,3 +142,8 @@ closed protocol SkipBlock {
         status zx.Status;
     });
 };
+
+// Added to allow service connection to replace devfs
+service Service {
+    skipblock client_end:SkipBlock;
+};

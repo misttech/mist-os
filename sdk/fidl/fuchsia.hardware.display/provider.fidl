@@ -47,3 +47,8 @@ closed protocol Provider {
         2: coordinator_listener client_end:CoordinatorListener;
     }) -> () error zx.Status;
 };
+
+// Added to allow service connection to replace devfs
+service Service {
+    provider client_end:Provider;
+};

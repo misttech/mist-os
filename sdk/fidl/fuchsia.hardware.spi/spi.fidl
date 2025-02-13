@@ -66,3 +66,7 @@ closed protocol Controller {
 service Service {
     device client_end:Device;
 };
+
+service ControllerService {
+    device client_end:Controller;
+};
