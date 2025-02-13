@@ -492,12 +492,13 @@ impl MetricsLogger {
             None => metrics_registry::StackMigrationAutomatedSettingMetricDimensionNetstackVersion::NoSelection,
             Some(NetstackVersion::Netstack2) => metrics_registry::StackMigrationAutomatedSettingMetricDimensionNetstackVersion::Netstack2,
             Some(NetstackVersion::Netstack3) => metrics_registry::StackMigrationAutomatedSettingMetricDimensionNetstackVersion::Netstack3,
-        }
-        .as_event_code();
+        }.as_event_code();
+        let rollback_state = compute_state_metric(migration).as_event_code();
         for (metric_id, event_code) in [
             (metrics_registry::STACK_MIGRATION_CURRENT_BOOT_METRIC_ID, current_boot),
             (metrics_registry::STACK_MIGRATION_USER_SETTING_METRIC_ID, user),
             (metrics_registry::STACK_MIGRATION_AUTOMATED_SETTING_METRIC_ID, automated),
+            (metrics_registry::STACK_MIGRATION_STATE_METRIC_ID, rollback_state),
         ] {
             let occurrence_count = 1;
             logger
@@ -510,6 +511,50 @@ impl MetricsLogger {
                     warn!("error logging metric {metric_id} {fidl_error:?}")
                 });
         }
+    }
+}
+
+fn compute_state_metric<P, CR>(
+    migration: &Migration<P, CR>,
+) -> metrics_registry::StackMigrationStateMetricDimensionMigrationState {
+    use metrics_registry::StackMigrationStateMetricDimensionMigrationState as state_metric;
+    let Migration {
+        current_boot,
+        persisted: Persisted { automated, user: _, rollback },
+        persistence: _,
+        collaborative_reboot: _,
+    } = migration;
+
+    match (current_boot, automated, rollback) {
+        (RollbackNetstackVersion::Netstack2, Some(NetstackVersion::Netstack2) | None, _) => {
+            state_metric::NotStarted
+        }
+        (RollbackNetstackVersion::Netstack2, Some(NetstackVersion::Netstack3), _) => {
+            state_metric::Scheduled
+        }
+        (RollbackNetstackVersion::ForceNetstack2, _, _) => state_metric::RolledBack,
+        (RollbackNetstackVersion::Netstack3, Some(NetstackVersion::Netstack2) | None, _) => {
+            state_metric::Canceled
+        }
+        (RollbackNetstackVersion::Netstack3, Some(NetstackVersion::Netstack3), None) => {
+            state_metric::InProgress
+        }
+        (
+            RollbackNetstackVersion::Netstack3,
+            Some(NetstackVersion::Netstack3),
+            Some(rollback::Persisted::HealthcheckFailures(f)),
+        ) => {
+            if *f >= rollback::MAX_FAILED_HEALTHCHECKS {
+                state_metric::Failed
+            } else {
+                state_metric::InProgress
+            }
+        }
+        (
+            RollbackNetstackVersion::Netstack3,
+            Some(NetstackVersion::Netstack3),
+            Some(rollback::Persisted::Success),
+        ) => state_metric::Success,
     }
 }
 
@@ -1225,15 +1270,22 @@ mod tests {
             let expect = [
                 (
                     metrics_registry::STACK_MIGRATION_CURRENT_BOOT_METRIC_ID,
-                    current_boot_expect.as_event_code(),
+                    Some(current_boot_expect.as_event_code()),
                 ),
                 (
                     metrics_registry::STACK_MIGRATION_USER_SETTING_METRIC_ID,
-                    user_expect.as_event_code(),
+                    Some(user_expect.as_event_code()),
                 ),
                 (
                     metrics_registry::STACK_MIGRATION_AUTOMATED_SETTING_METRIC_ID,
-                    automated_expect.as_event_code(),
+                    Some(automated_expect.as_event_code()),
+                ),
+                (
+                    metrics_registry::STACK_MIGRATION_STATE_METRIC_ID,
+                    // Note: The rollback state doesn't have a flat expectation.
+                    // Don't assert on its value here, and instead we directly
+                    // test it in a separate test case.
+                    None,
                 ),
             ];
             for (id, ev) in expect {
@@ -1246,11 +1298,86 @@ mod tests {
                     .expect("bad request");
                 assert_eq!(metric, id);
                 assert_eq!(occurences, 1);
-                assert_eq!(codes, vec![ev]);
+                if let Some(ev) = ev {
+                    assert_eq!(codes, vec![ev]);
+                }
                 responder.send(Ok(())).unwrap();
             }
         })
         .await;
+    }
+
+    #[test_case(
+        RollbackNetstackVersion::Netstack2, None, None =>
+        metrics_registry::StackMigrationStateMetricDimensionMigrationState::NotStarted;
+        "not_started_none"
+    )]
+    #[test_case(
+        RollbackNetstackVersion::Netstack2, Some(NetstackVersion::Netstack2), None =>
+        metrics_registry::StackMigrationStateMetricDimensionMigrationState::NotStarted;
+        "not_started_ns2"
+    )]
+    #[test_case(
+        RollbackNetstackVersion::Netstack2, Some(NetstackVersion::Netstack3), None =>
+        metrics_registry::StackMigrationStateMetricDimensionMigrationState::Scheduled;
+        "scheduled"
+    )]
+    #[test_case(
+        RollbackNetstackVersion::Netstack3, Some(NetstackVersion::Netstack3), None =>
+        metrics_registry::StackMigrationStateMetricDimensionMigrationState::InProgress;
+        "in_progress_none"
+    )]
+    #[test_case(
+        RollbackNetstackVersion::Netstack3, Some(NetstackVersion::Netstack3),
+        Some(rollback::Persisted::HealthcheckFailures(rollback::MAX_FAILED_HEALTHCHECKS - 1)) =>
+        metrics_registry::StackMigrationStateMetricDimensionMigrationState::InProgress;
+        "in_progress_some"
+    )]
+    #[test_case(
+        RollbackNetstackVersion::Netstack3, Some(NetstackVersion::Netstack3),
+        Some(rollback::Persisted::HealthcheckFailures(rollback::MAX_FAILED_HEALTHCHECKS)) =>
+        metrics_registry::StackMigrationStateMetricDimensionMigrationState::Failed;
+        "failed_exact"
+    )]
+    #[test_case(
+        RollbackNetstackVersion::Netstack3, Some(NetstackVersion::Netstack3),
+        Some(rollback::Persisted::HealthcheckFailures(rollback::MAX_FAILED_HEALTHCHECKS + 1)) =>
+        metrics_registry::StackMigrationStateMetricDimensionMigrationState::Failed;
+        "failed_more"
+    )]
+    #[test_case(
+        RollbackNetstackVersion::Netstack3, Some(NetstackVersion::Netstack3),
+        Some(rollback::Persisted::Success) =>
+        metrics_registry::StackMigrationStateMetricDimensionMigrationState::Success;
+        "success"
+    )]
+    #[test_case(
+        RollbackNetstackVersion::Netstack3, None, None =>
+        metrics_registry::StackMigrationStateMetricDimensionMigrationState::Canceled;
+        "canceled_none"
+    )]
+    #[test_case(
+        RollbackNetstackVersion::Netstack3, Some(NetstackVersion::Netstack2), None =>
+        metrics_registry::StackMigrationStateMetricDimensionMigrationState::Canceled;
+        "canceled_ns2"
+    )]
+    #[test_case(
+        RollbackNetstackVersion::ForceNetstack2, Some(NetstackVersion::Netstack3), None =>
+        metrics_registry::StackMigrationStateMetricDimensionMigrationState::RolledBack;
+        "rolled_back"
+    )]
+    #[fuchsia::test]
+    fn test_state_metric(
+        current_boot: RollbackNetstackVersion,
+        automated: Option<NetstackVersion>,
+        rollback: Option<rollback::Persisted>,
+    ) -> metrics_registry::StackMigrationStateMetricDimensionMigrationState {
+        let mut migration = Migration::new(
+            InMemory::with_persisted(Persisted { user: None, automated, rollback }),
+            NoCollaborativeReboot,
+        );
+        migration.current_boot = current_boot;
+        compute_state_metric(&migration)
     }
 
     /// An in-memory mock-persistence that triggers an event once the target
