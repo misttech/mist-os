@@ -21,16 +21,16 @@ use thiserror::Error;
 /// removed. After an upload_once is uploaded, all selectors are removed.
 /// On initial parse, all elements will be Some<_>.
 #[derive(Clone, Debug, PartialEq)]
-pub struct SelectorList(Vec<Option<ParsedSelector>>);
+pub struct SelectorList(Vec<ParsedSelector>);
 
-impl<I: IntoIterator<Item = Option<ParsedSelector>>> From<I> for SelectorList {
+impl<I: IntoIterator<Item = ParsedSelector>> From<I> for SelectorList {
     fn from(list: I) -> Self {
         SelectorList(list.into_iter().collect())
     }
 }
 
 impl std::ops::Deref for SelectorList {
-    type Target = Vec<Option<ParsedSelector>>;
+    type Target = Vec<ParsedSelector>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -154,10 +154,10 @@ impl<'de> Deserialize<'de> for SelectorList {
     where
         D: Deserializer<'de>,
     {
-        struct SelectorVec(std::marker::PhantomData<Vec<Option<ParsedSelector>>>);
+        struct SelectorVec(std::marker::PhantomData<Vec<ParsedSelector>>);
 
         impl<'de> serde::de::Visitor<'de> for SelectorVec {
-            type Value = Vec<Option<ParsedSelector>>;
+            type Value = Vec<ParsedSelector>;
 
             fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 f.write_str("either a single selector or an array of selectors")
@@ -167,7 +167,7 @@ impl<'de> Deserialize<'de> for SelectorList {
             where
                 E: serde::de::Error,
             {
-                Ok(vec![Some(parse_selector(value).map_err(E::custom)?)])
+                Ok(vec![parse_selector(value).map_err(E::custom)?])
             }
 
             fn visit_seq<A>(self, mut value: A) -> Result<Self::Value, A::Error>
@@ -178,7 +178,7 @@ impl<'de> Deserialize<'de> for SelectorList {
 
                 let mut out = vec![];
                 while let Some(s) = value.next_element::<String>()? {
-                    out.push(Some(parse_selector(&s).map_err(A::Error::custom)?));
+                    out.push(parse_selector(&s).map_err(A::Error::custom)?);
                 }
                 if out.is_empty() {
                     Err(A::Error::invalid_length(0, &"expected at least one selector"))
@@ -218,7 +218,7 @@ mod tests {
         let json = "\"core/foo:root/branch:leaf\"";
         let selectors: SelectorList = serde_json5::from_str(json)?;
         assert_eq!(selectors.len(), 1);
-        let ParsedSelector { selector_string, selector, .. } = selectors[0].as_ref().unwrap();
+        let ParsedSelector { selector_string, selector, .. } = &selectors[0];
         assert_eq!(selector_string, "core/foo:root/branch:leaf");
         match &selector.tree_selector {
             Some(TreeSelector::PropertySelector(selector)) => {
@@ -235,7 +235,7 @@ mod tests {
         let json = "[ \"core/foo:root/branch:leaf\", \"core/bar:root/twig:leaf\"]";
         let selectors: SelectorList = serde_json5::from_str(json)?;
         assert_eq!(selectors.len(), 2);
-        let ParsedSelector { selector_string, selector, .. } = selectors[0].as_ref().unwrap();
+        let ParsedSelector { selector_string, selector, .. } = &selectors[0];
         assert_eq!(selector_string, "core/foo:root/branch:leaf");
         match &selector.tree_selector {
             Some(TreeSelector::PropertySelector(selector)) => {
@@ -244,7 +244,7 @@ mod tests {
             }
             _ => unreachable!("Expected a property selector"),
         }
-        let ParsedSelector { selector_string, selector, .. } = selectors[1].as_ref().unwrap();
+        let ParsedSelector { selector_string, selector, .. } = &selectors[1];
         assert_eq!(selector_string, "core/bar:root/twig:leaf");
         match &selector.tree_selector {
             Some(TreeSelector::PropertySelector(selector)) => {

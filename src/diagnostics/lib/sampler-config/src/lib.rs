@@ -6,6 +6,7 @@ use anyhow::{bail, Context as _, Error};
 use fuchsia_inspect as inspect;
 use futures::FutureExt;
 use glob::{GlobError, Paths};
+use itertools::Itertools;
 use log::warn;
 use moniker::ExtendedMoniker;
 use serde::de::DeserializeOwned;
@@ -172,8 +173,8 @@ pub enum DataType {
 }
 
 // #[cfg(test)] won't work because it's used outside the library.
-pub fn parse_selector_for_test(selector_str: &str) -> Option<ParsedSelector> {
-    Some(selector_list::parse_selector(selector_str).unwrap())
+pub fn parse_selector_for_test(selector_str: &str) -> ParsedSelector {
+    selector_list::parse_selector(selector_str).unwrap()
 }
 
 // TODO(https://fxbug.dev/42169836): Maybe refactor this into a generic ValueList - but remember that
@@ -370,7 +371,8 @@ impl MetricConfig {
                         }
                     }
                 })
-                .collect::<Result<Vec<Option<_>>, _>>()?,
+                .filter_map_ok(|s| s)
+                .collect::<Result<Vec<_>, _>>()?,
         );
         let event_codes = match event_codes {
             None => vec![component.event_id],
@@ -530,7 +532,7 @@ impl SamplerConfig {
                 let source_name = config.source_name.clone();
                 top_node.record_child(source_name, |file_node| {
                     for metric in config.metrics.iter() {
-                        for selector in metric.selectors.iter().flatten() {
+                        for selector in metric.selectors.iter() {
                             file_node.record_child(
                                 format!("{}", next_selector_index),
                                 |selector_node| {
@@ -892,36 +894,20 @@ mod tests {
         assert_eq!(config_8.metrics.len(), 2);
         // Make sure all metrics have the right selectors
         assert_eq!(
-            metric_6
-                .selectors
-                .iter()
-                .map(|s| s.as_ref().unwrap().selector_string.to_owned())
-                .collect::<Vec<_>>(),
+            metric_6.selectors.iter().map(|s| s.selector_string.to_owned()).collect::<Vec<_>>(),
             vec!["bootstrap/archivist:root/all_archive_accessor:requests"]
         );
         assert_eq!(metric_6.project_id, Some(4));
         assert_eq!(
-            metric_7_42
-                .selectors
-                .iter()
-                .map(|s| s.as_ref().unwrap().selector_string.to_owned())
-                .collect::<Vec<_>>(),
+            metric_7_42.selectors.iter().map(|s| s.selector_string.to_owned()).collect::<Vec<_>>(),
             vec!["core/foo42:root/path:leaf"]
         );
         assert_eq!(
-            metric_7_43
-                .selectors
-                .iter()
-                .map(|s| s.as_ref().unwrap().selector_string.to_owned())
-                .collect::<Vec<_>>(),
+            metric_7_43.selectors.iter().map(|s| s.selector_string.to_owned()).collect::<Vec<_>>(),
             vec!["bar43:root/path:leaf"]
         );
         assert_eq!(
-            metric_8_42
-                .selectors
-                .iter()
-                .map(|s| s.as_ref().unwrap().selector_string.to_owned())
-                .collect::<Vec<_>>(),
+            metric_8_42.selectors.iter().map(|s| s.selector_string.to_owned()).collect::<Vec<_>>(),
             vec![
                 "core/foo42:root/path2:leaf2",
                 "foo/bar:root/core\\/foo42:leaf3",
@@ -929,11 +915,7 @@ mod tests {
             ]
         );
         assert_eq!(
-            metric_8_43
-                .selectors
-                .iter()
-                .map(|s| s.as_ref().unwrap().selector_string.to_owned())
-                .collect::<Vec<_>>(),
+            metric_8_43.selectors.iter().map(|s| s.selector_string.to_owned()).collect::<Vec<_>>(),
             vec![
                 "bar43:root/path2:leaf2",
                 "foo/bar:root/bar43:leaf3",

@@ -108,7 +108,7 @@ use futures::stream::FuturesUnordered;
 use futures::{select, StreamExt};
 use log::{info, warn};
 use moniker::ExtendedMoniker;
-use sampler_config::{DataType, MetricConfig, ProjectConfig, SamplerConfig, SelectorList};
+use sampler_config::{DataType, MetricConfig, ProjectConfig, SamplerConfig};
 use selectors::SelectorExt;
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::hash_map::Entry;
@@ -150,7 +150,7 @@ impl TaskCancellation {
 
         for project_sampler in &project_samplers {
             for metric in &project_sampler.metrics {
-                for selector in metric.borrow().selectors.iter().flatten() {
+                for selector in metric.borrow().selectors.iter() {
                     reader.add_selector(selector.selector_string.as_str());
                 }
             }
@@ -606,22 +606,10 @@ impl ProjectSampler {
     fn rebuild_selector_data_structures(&mut self) {
         self.archive_reader = ArchiveReader::new();
         for metric in &self.metrics {
-            // TODO(https://fxbug.dev/42168860): Using Box<ParsedSelector> could reduce copying.
-            let active_selectors = metric
-                .borrow()
-                .selectors
-                .iter()
-                .filter_map(|s| if s.is_some() { Some(s.as_ref().cloned()) } else { None })
-                .collect::<Vec<_>>();
-
-            for selector in &active_selectors {
-                let Some(selector) = selector.as_ref() else {
-                    continue;
-                };
-                self.archive_reader.add_selector(selector.selector_string.as_str());
+            for selector in metric.borrow().selectors.iter().cloned() {
+                self.archive_reader.add_selector(selector.selector);
                 self.all_done = false;
             }
-            metric.borrow_mut().selectors = SelectorList::from(active_selectors);
         }
         self.archive_reader.retry(RetryConfig::never());
     }
@@ -635,12 +623,7 @@ impl ProjectSampler {
             moniker
                 .match_against_selectors_and_tree_name(
                     tree_name,
-                    metric
-                        .borrow()
-                        .selectors
-                        .iter()
-                        .filter_map(|s| s.as_ref())
-                        .map(|s| &s.selector),
+                    metric.borrow().selectors.iter().map(|s| &s.selector),
                 )
                 .next()
                 .is_some()
@@ -660,11 +643,7 @@ impl ProjectSampler {
         for metric in filtered_metrics {
             let mut selector_to_keep = None;
             let project_id = metric.borrow().project_id.unwrap_or(self.project_id);
-            for (selector_idx, selector) in metric.borrow().selectors.iter().enumerate() {
-                // It's fine if a selector has been removed and is None.
-                let Some(parsed_selector) = selector else {
-                    continue;
-                };
+            for (selector_idx, parsed_selector) in metric.borrow().selectors.iter().enumerate() {
                 let found_properties = diagnostics_hierarchy::select_from_hierarchy(
                     payload,
                     &parsed_selector.selector,
@@ -714,18 +693,11 @@ impl ProjectSampler {
         selector_idx: usize,
     ) -> bool {
         if let Some(true) = metric.upload_once {
-            for selector in metric.selectors.iter_mut() {
-                *selector = None;
-            }
+            *metric.selectors = Vec::new();
             return true;
         }
-        let mut deleted = false;
-        for (index, selector) in metric.selectors.iter_mut().enumerate() {
-            if index != selector_idx && selector.is_some() {
-                *selector = None;
-                deleted = true;
-            }
-        }
+        let deleted = metric.selectors.len() > 1;
+        *metric.selectors = vec![metric.selectors.remove(selector_idx)];
         deleted
     }
 
@@ -1218,6 +1190,7 @@ mod tests {
     use diagnostics_data::{InspectDataBuilder, Timestamp};
     use diagnostics_hierarchy::hierarchy;
     use fidl_fuchsia_inspect::DEFAULT_TREE_NAME;
+    use sampler_config::SelectorList;
 
     #[fuchsia::test]
     fn test_filter_metrics() {

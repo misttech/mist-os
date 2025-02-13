@@ -28,12 +28,7 @@ pub(crate) async fn inspect_for_sampler_test_inner<S: InspectDataGetter>(getter:
     };
     for metric_config in &project_config.metrics {
         let selector = match &metric_config.selectors[..] {
-            [selector] => {
-                &selector
-                    .as_ref()
-                    .expect("SamplerConfig load should never return None for selectors")
-                    .selector
-            }
+            [selector] => &selector.selector,
             selectors => panic!("expected one selector but got {:#?}", selectors),
         };
         let fidl_fuchsia_diagnostics::Selector { tree_selector, .. } = selector;
