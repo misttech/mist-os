@@ -30,9 +30,15 @@ class CfiParser {
   // before the FDE instructions are parsed.
   void Snapshot() { initial_register_locations_ = register_locations_; }
 
-  // Apply the frame info to unwind one frame.
+  // Apply the frame info to unwind one frame. |maybe_cfa| can be supplied if |PrepareToStep| has
+  // been called before this function, which is typically the case of the |AsyncStep| function
+  // before fetching necessary memory ahead of calling this synchronous method.
   [[nodiscard]] Error Step(Memory* stack, RegisterID return_address_register,
-                           const Registers& current, Registers& next);
+                           const Registers& current, Registers& next,
+                           std::optional<uint64_t> maybe_cfa = std::nullopt);
+
+  void AsyncStep(AsyncMemory* stack, RegisterID return_address_register, const Registers& current,
+                 fit::callback<void(Error, Registers)> cb);
 
  private:
   struct RegisterLocation {
@@ -73,6 +79,10 @@ class CfiParser {
     // Only valid when type is kValExpression.
     DwarfExpr expression;
   } cfa_location_;
+
+  // Compute the CFA from |cfa_location_|, which should already be populated via |ParseInstructions|
+  // before calling this method.
+  [[nodiscard]] Error PrepareToStep(Memory* stack, const Registers& current, uint64_t& cfa);
 
   using RegisterLocations = std::map<RegisterID, RegisterLocation>;
   RegisterLocations register_locations_;

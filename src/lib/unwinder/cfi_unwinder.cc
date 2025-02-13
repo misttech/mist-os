@@ -58,6 +58,45 @@ Error CfiUnwinder::Step(Memory* stack, const Registers& current, Registers& next
   return Success();
 }
 
+void CfiUnwinder::AsyncStep(AsyncMemory* stack, const Frame& current,
+                            fit::callback<void(Error, Registers)> cb) {
+  // TODO(https://fxbug.dev/316047562): Make CFI work on RISC-V.
+  if (current.regs.arch() == Registers::Arch::kRiscv64) {
+    return cb(Error("RISC-V is not supported with the CFI Unwinder."),
+              Registers(current.regs.arch()));
+  }
+
+  AsyncStep(stack, current.regs, current.pc_is_return_address, std::move(cb));
+}
+
+void CfiUnwinder::AsyncStep(AsyncMemory* stack, Registers current, bool is_return_address,
+                            fit::callback<void(Error, Registers)> cb) {
+  uint64_t pc;
+  if (auto err = current.GetPC(pc); err.has_err()) {
+    return cb(err, Registers(current.arch()));
+  }
+
+  // is_return_address indicates whether pc in the current registers is a return address from a
+  // previous "Step". If it is, we need to subtract 1 to find the call site because "call" could
+  // be the last instruction of a nonreturn function and now the PC is pointing outside of the
+  // valid code boundary.
+  //
+  // Subtracting 1 is sufficient here because in CfiParser::ParseInstructions, we scan CFI until
+  // pc > pc_limit. So it's still correct even if pc_limit is not pointing to the beginning of an
+  // instruction.
+  if (is_return_address) {
+    pc -= 1;
+    current.SetPC(pc);
+  }
+
+  CfiModule* cfi;
+  if (auto err = GetCfiModuleFor(pc, &cfi); err.has_err()) {
+    return cb(err, Registers(current.arch()));
+  }
+
+  cfi->AsyncStep(stack, current, std::move(cb));
+}
+
 bool CfiUnwinder::IsValidPC(uint64_t pc) {
   CfiModule* cfi;
   return GetCfiModuleFor(pc, &cfi).ok();

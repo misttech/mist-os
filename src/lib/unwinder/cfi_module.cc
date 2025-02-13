@@ -229,6 +229,30 @@ Error CfiModule::Load() {
 }
 
 Error CfiModule::Step(Memory* stack, const Registers& current, Registers& next) {
+  DwarfCie cie;
+  if (auto err = PrepareToStep(current, cie); err.has_err()) {
+    return err;
+  }
+
+  if (auto err = cfi_parser_->Step(stack, cie.return_address_register, current, next);
+      err.has_err()) {
+    return err;
+  }
+
+  return Success();
+}
+
+void CfiModule::AsyncStep(AsyncMemory* stack, const Registers& current,
+                          fit::callback<void(Error, Registers)> cb) {
+  DwarfCie cie;
+  if (auto err = PrepareToStep(current, cie); err.has_err()) {
+    return cb(err, Registers(current.arch()));
+  }
+
+  cfi_parser_->AsyncStep(stack, cie.return_address_register, current, std::move(cb));
+}
+
+Error CfiModule::PrepareToStep(const Registers& current, DwarfCie& cie) {
   uint64_t pc;
   if (auto err = current.GetPC(pc); err.has_err()) {
     return err;
@@ -237,7 +261,6 @@ Error CfiModule::Step(Memory* stack, const Registers& current, Registers& next) 
     return Error("pc %#" PRIx64 " is outside of the executable area", pc);
   }
 
-  DwarfCie cie;
   DwarfFde fde;
   // Search for .eh_frame first.
   if (auto err = SearchEhFrame(pc, cie, fde); err.has_err()) {
@@ -247,25 +270,21 @@ Error CfiModule::Step(Memory* stack, const Registers& current, Registers& next) 
     }
   }
 
-  CfiParser cfi_parser(current.arch(), cie.code_alignment_factor, cie.data_alignment_factor);
+  cfi_parser_ = std::make_unique<CfiParser>(current.arch(), cie.code_alignment_factor,
+                                            cie.data_alignment_factor);
 
   // Parse instructions in CIE first.
   if (auto err =
-          cfi_parser.ParseInstructions(elf_, cie.instructions_begin, cie.instructions_end, -1);
+          cfi_parser_->ParseInstructions(elf_, cie.instructions_begin, cie.instructions_end, -1);
       err.has_err()) {
     return err;
   }
 
-  cfi_parser.Snapshot();
+  cfi_parser_->Snapshot();
 
   // Parse instructions in FDE until pc.
-  if (auto err = cfi_parser.ParseInstructions(elf_, fde.instructions_begin, fde.instructions_end,
-                                              pc - fde.pc_begin);
-      err.has_err()) {
-    return err;
-  }
-
-  if (auto err = cfi_parser.Step(stack, cie.return_address_register, current, next);
+  if (auto err = cfi_parser_->ParseInstructions(elf_, fde.instructions_begin, fde.instructions_end,
+                                                pc - fde.pc_begin);
       err.has_err()) {
     return err;
   }

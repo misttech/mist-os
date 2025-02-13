@@ -13,6 +13,10 @@ namespace unwinder {
 // of this function call. This function is not available on macOS.
 std::vector<Frame> UnwindLocal();
 
+// Asynchronous version of the above.
+void UnwindLocalAsync(Memory* local_memory, AsyncMemory::Delegate* delegate,
+                      fit::callback<void(std::vector<Frame> frames)> on_done);
+
 }  // namespace unwinder
 
 #endif  // SRC_LIB_UNWINDER_UNWIND_LOCAL_H_

@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "sdk/lib/fit/include/lib/fit/function.h"
 #include "src/lib/unwinder/cfi_unwinder.h"
 #include "src/lib/unwinder/frame.h"
 #include "src/lib/unwinder/memory.h"
@@ -41,6 +42,24 @@ class Unwinder {
   // If |current.fatal_error| is false, |next.regs| and |next.trust| will be populated.
   void Step(Memory* stack, Frame& current, Frame& next);
 
+  CfiUnwinder cfi_unwinder_;
+};
+
+class AsyncUnwinder {
+ public:
+  explicit AsyncUnwinder(const std::vector<Module>& modules);
+
+  void Unwind(AsyncMemory::Delegate* delegate, const Registers& registers, size_t max_depth,
+              fit::callback<void(std::vector<Frame>)> cb);
+
+ private:
+  void Step(Frame& current);
+  void OnStep(Frame next);
+
+  fit::callback<void(std::vector<Frame>)> on_done_;
+  size_t max_depth_;
+  std::vector<Frame> result_;
+  std::unique_ptr<AsyncMemory> stack_;
   CfiUnwinder cfi_unwinder_;
 };
 

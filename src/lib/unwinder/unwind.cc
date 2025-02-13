@@ -7,6 +7,7 @@
 #include <cinttypes>
 #include <cstdint>
 #include <cstdio>
+#include <memory>
 #include <set>
 #include <unordered_map>
 #include <utility>
@@ -176,6 +177,105 @@ void Unwinder::Step(Memory* stack, Frame& current, Frame& next) {
   if (!err_msg.empty()) {
     current.error = Error(err_msg);
   }
+}
+
+AsyncUnwinder::AsyncUnwinder(const std::vector<Module>& modules) : cfi_unwinder_(modules) {}
+
+void AsyncUnwinder::Unwind(AsyncMemory::Delegate* delegate, const Registers& registers,
+                           size_t max_depth, fit::callback<void(std::vector<Frame>)> cb) {
+  if (!delegate) {
+    // Memory delegate must be provided.
+    return cb({});
+  }
+
+  stack_ = std::make_unique<AsyncMemory>(delegate);
+  max_depth_ = max_depth;
+  on_done_ = std::move(cb);
+
+  result_ = {{registers, false, Frame::Trust::kContext}};
+
+  uint64_t sp;
+  if (auto err = registers.GetSP(sp); err.has_err()) {
+    return cb(std::move(result_));
+  }
+
+  constexpr uint32_t kDefaultStackSize = 8192;
+
+  // We'll mostly be working with the stack, so we request a chunk to start off with. 8KiB should be
+  // plenty.
+  stack_->FetchMemoryRanges({{sp, kDefaultStackSize}}, [this]() {
+    // Now we can kick everything off with the contextual first frame.
+    Step(result_.back());
+  });
+}
+
+void AsyncUnwinder::Step(Frame& current) {
+  // TODO(https://fxbug.dev/316047562): Make CFI work on RISC-V.
+  return cfi_unwinder_.AsyncStep(
+      stack_.get(), current, [this, current](const Error& async_err, Registers regs) mutable {
+        Frame next(std::move(regs), PcIsReturnAddress(regs), Frame::Trust::kCFI);
+
+        bool success = async_err.ok();
+        std::string err_msg = async_err.msg();
+
+        if (!success && !current.pc_is_return_address) {
+          // PLT unwinder only works for the first frame.
+          PltUnwinder plt_unwinder(&cfi_unwinder_);
+          if (auto err =
+                  TryUnwinder(&plt_unwinder, Frame::Trust::kPLT, stack_.get(), current, next);
+              err.ok()) {
+            success = true;
+          } else {
+            err_msg += "; PLT: " + err.msg();
+          }
+        }
+
+        // Try FP unwinder, this recovers enough information that we may be able to unwind with
+        // CFI in the next frame, so we also try here.
+        if (!success) {
+          FramePointerUnwinder fp_unwinder(&cfi_unwinder_);
+          if (auto err = TryUnwinder(&fp_unwinder, Frame::Trust::kFP, stack_.get(), current, next);
+              err.ok()) {
+            success = true;
+          } else {
+            err_msg += ";FP:" + err.msg();
+          }
+        }
+
+        // If the shadow call stack unwinder works, all bets are off as to where the stack pointer
+        // is pointing.
+        if (!success) {
+          ShadowCallStackUnwinder scs_unwinder(&cfi_unwinder_);
+          if (auto err =
+                  TryUnwinder(&scs_unwinder, Frame::Trust::kSCS, stack_.get(), current, next);
+              err.ok()) {
+            success = true;
+          } else {
+            err_msg += ";SCS:" + err.msg();
+          }
+        }
+
+        if (!success) {
+          next.error = Error(err_msg);
+          next.fatal_error = true;
+        }
+
+        OnStep(std::move(next));
+      });
+}
+
+void AsyncUnwinder::OnStep(Frame next) {
+  // An undefined PC (e.g. on Linux) or 0 PC (e.g. on Fuchsia) marks the end of the unwinding.
+  // Don't include this in the output because it's not a real frame and provides no
+  // information. A failed unwinding will also end up with an undefined PC.
+  if (uint64_t pc; next.regs.GetPC(pc).has_err() || pc == 0 || max_depth_ == 0) {
+    return on_done_(std::move(result_));
+  }
+
+  result_.push_back(std::move(next));
+
+  max_depth_--;
+  Step(result_.back());
 }
 
 std::vector<Frame> Unwind(Memory* memory, const std::vector<uint64_t>& modules,

@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "sdk/lib/fit/include/lib/fit/function.h"
 #include "src/lib/unwinder/cfi_module.h"
 #include "src/lib/unwinder/memory.h"
 #include "src/lib/unwinder/module.h"
@@ -25,6 +26,9 @@ class CfiUnwinder : public UnwinderBase {
 
   Error Step(Memory* stack, const Frame& current, Frame& next) override;
 
+  void AsyncStep(AsyncMemory* stack, const Frame& current,
+                 fit::callback<void(Error, Registers)> cb) override;
+
   // For other unwinders that want to check whether a value looks like a valid PC.
   bool IsValidPC(uint64_t pc);
 
@@ -34,6 +38,9 @@ class CfiUnwinder : public UnwinderBase {
   // |is_return_address| indicates whether the current PC is pointing to a return address,
   // in which case it'll be adjusted to find the correct CFI entry.
   Error Step(Memory* stack, const Registers& current, Registers& next, bool is_return_address);
+
+  void AsyncStep(AsyncMemory* stack, Registers current, bool is_return_address,
+                 fit::callback<void(Error, Registers)> cb);
 
   // Mapping from module load addresses to a pair of (module description, lazily-initialized CFI).
   std::map<uint64_t, std::pair<Module, std::unique_ptr<CfiModule>>> module_map_;

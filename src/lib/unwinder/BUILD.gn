@@ -37,7 +37,7 @@ static_library("unwinder") {
     "unwind.cc",
     "unwinder_base.h",
   ]
-  deps = []
+  deps = [ "//sdk/lib/fit" ]
   friend = [ ":tests" ]
 
   if (is_mac) {

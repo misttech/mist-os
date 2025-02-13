@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <map>
 
+#include "src/lib/unwinder/cfi_parser.h"
 #include "src/lib/unwinder/error.h"
 #include "src/lib/unwinder/memory.h"
 #include "src/lib/unwinder/module.h"
@@ -31,6 +32,9 @@ class CfiModule {
 
   // Unwind one frame.
   [[nodiscard]] Error Step(Memory* stack, const Registers& current, Registers& next);
+
+  void AsyncStep(AsyncMemory* stack, const Registers& current,
+                 fit::callback<void(Error, Registers)> cb);
 
   // Check whether a given PC is in the valid range.
   bool IsValidPC(uint64_t pc) const { return pc >= pc_begin_ && pc < pc_end_; }
@@ -57,6 +61,9 @@ class CfiModule {
     uint64_t instructions_begin = 0;
     uint64_t instructions_end = 0;  // exclusive.
   };
+
+  // Common code before using the cfi_parser to perform the actual step.
+  [[nodiscard]] Error PrepareToStep(const Registers& current, DwarfCie& cie);
 
   // Search for CIE and FDE in .eh_frame section.
   [[nodiscard]] Error SearchEhFrame(uint64_t pc, DwarfCie& cie, DwarfFde& fde);
@@ -88,6 +95,9 @@ class CfiModule {
   // .debug_frame info.
   uint64_t debug_frame_ptr_ = 0;
   uint64_t debug_frame_end_ = 0;
+
+  std::unique_ptr<CfiParser> cfi_parser_;
+
   // Binary search table for .debug_frame, similar to .eh_frame_hdr.
   // To save space, we only store the mapping from pc to the start of FDE.
   std::map<uint64_t, uint64_t> debug_frame_map_;
