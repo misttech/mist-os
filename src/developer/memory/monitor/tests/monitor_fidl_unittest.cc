@@ -107,7 +107,7 @@ class MemoryBandwidthInspectTest : public gtest::TestLoopFixture {
     fidl::BindServer<fuchsia_hardware_ram_metrics::Device>(
         dispatcher(), std::move(ram_endpoints->server), &fake_device_);
     monitor_ =
-        std::make_unique<Monitor>(fxl::CommandLine{}, dispatcher(), memory_monitor_config::Config{},
+        std::make_unique<Monitor>(dispatcher(), memory_monitor_config::Config{},
                                   *memory::CaptureMaker::Create(memory::CreateDefaultOS()),
                                   /* pressure_provider */ std::nullopt, /* root_job */ std::nullopt,
                                   fidl::Client<fuchsia_metrics::MetricEventLoggerFactory>{

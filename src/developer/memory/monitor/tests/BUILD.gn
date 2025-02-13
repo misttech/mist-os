@@ -54,7 +54,6 @@ executable("bin-monitor") {
     "//sdk/lib/sys/cpp",
     "//src/developer/memory/metrics/tests:utils",
     "//src/developer/memory/monitor:lib",
-    "//src/lib/fxl:fxl_cli",
   ]
 }
 

@@ -12,8 +12,6 @@
 #include "src/developer/memory/metrics/tests/test_utils.h"
 #include "src/developer/memory/monitor/memory_monitor_config.h"
 #include "src/developer/memory/monitor/monitor.h"
-#include "src/lib/fxl/command_line.h"
-#include "src/lib/fxl/log_settings_command_line.h"
 #include "zircon/syscalls/object.h"
 namespace {
 std::unique_ptr<memory::MockOS> CreateMockOS() {
@@ -108,7 +106,7 @@ int main(int argc, const char** argv) {
   auto os = CreateMockOS();
   auto capture_maker = memory::CaptureMaker::Create(CreateMockOS()).value();
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  monitor::Monitor app{fxl::CommandLine{}, loop.dispatcher(), memory_monitor_config::Config{},
+  monitor::Monitor app{loop.dispatcher(), memory_monitor_config::Config{},
                        std::move(capture_maker)};
   loop.Run();
   return 0;

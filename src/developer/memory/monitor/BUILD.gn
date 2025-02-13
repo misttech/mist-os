@@ -39,7 +39,6 @@ source_set("lib") {
     "//src/developer/memory/pressure_signaler:lib",
     "//src/devices/lib/amlogic",
     "//src/lib/fsl",
-    "//src/lib/fxl:fxl_cli",
     "//zircon/system/ulib/trace-provider",
     "//zircon/system/ulib/trace-vthread",
   ]

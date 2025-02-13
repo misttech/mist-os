@@ -31,8 +31,6 @@
 #include "src/developer/memory/monitor/memory_metrics_registry.cb.h"
 #include "src/developer/memory/pressure_signaler/pressure_observer.h"
 #include "src/lib/files/file.h"
-#include "src/lib/fxl/command_line.h"
-#include "src/lib/fxl/strings/string_number_conversions.h"
 
 namespace monitor {
 
@@ -54,6 +52,7 @@ constexpr zx::duration kMetricsPollFrequency = zx::min(5);
 const char kTraceNameHighPrecisionBandwidth[] = "memory_monitor:high_precision_bandwidth";
 const char kTraceNameHighPrecisionBandwidthCamera[] =
     "memory_monitor:high_precision_bandwidth_camera";
+constexpr zx::duration kTracingDelay = zx::sec(1);
 constexpr uint64_t kMaxPendingBandwidthMeasurements = 4;
 constexpr uint64_t kMemCyclesToMeasure = 792000000 / 20;                 // 50 ms on sherlock
 constexpr uint64_t kMemCyclesToMeasureHighPrecision = 792000000 / 1000;  // 1 ms
@@ -120,8 +119,8 @@ std::vector<memory::BucketMatch> CreateBucketMatchesFromConfigData() {
 
 }  // namespace
 
-Monitor::Monitor(const fxl::CommandLine& command_line, async_dispatcher_t* dispatcher,
-                 memory_monitor_config::Config config, memory::CaptureMaker capture_maker,
+Monitor::Monitor(async_dispatcher_t* dispatcher, memory_monitor_config::Config config,
+                 memory::CaptureMaker capture_maker,
                  std::optional<fidl::Client<fuchsia_memorypressure::Provider>> pressure_provider,
                  std::optional<zx_handle_t> root_job,
                  std::optional<fidl::Client<fuchsia_metrics::MetricEventLoggerFactory>> factory,
@@ -131,10 +130,7 @@ Monitor::Monitor(const fxl::CommandLine& command_line, async_dispatcher_t* dispa
           "/cache", kHighWaterPollFrequency, kHighWaterThreshold, dispatcher,
           [this](Capture* c, CaptureLevel l) { return capture_maker_.GetCapture(c, l); },
           [this](const Capture& c, Digest* d) { digester_.Digest(c, d); }),
-      prealloc_size_(0),
-      logging_(command_line.HasOption("log")),
       tracing_(false),
-      delay_(zx::sec(1)),
       dispatcher_(dispatcher),
       config_(config),
       inspector_(dispatcher_, {}),
@@ -158,60 +154,7 @@ Monitor::Monitor(const fxl::CommandLine& command_line, async_dispatcher_t* dispa
   inspect::Node config_node = inspector_.root().CreateChild("config");
   config_.RecordInspect(&config_node);
 
-  if (command_line.HasOption("help")) {
-    PrintHelp();
-    exit(EXIT_SUCCESS);
-  }
-  std::string delay_as_string;
-  if (command_line.GetOptionValue("delay", &delay_as_string)) {
-    unsigned delay_as_int;
-    if (!fxl::StringToNumberWithError<unsigned>(delay_as_string, &delay_as_int)) {
-      FX_LOGS(ERROR) << "Invalid value for delay: " << delay_as_string;
-      exit(-1);
-    }
-    delay_ = zx::msec(delay_as_int);
-  }
-  std::string prealloc_as_string;
-  if (command_line.GetOptionValue("prealloc", &prealloc_as_string)) {
-    FX_LOGS(INFO) << "prealloc_string: " << prealloc_as_string;
-    if (!fxl::StringToNumberWithError<uint64_t>(prealloc_as_string, &prealloc_size_)) {
-      FX_LOGS(ERROR) << "Invalid value for prealloc: " << prealloc_as_string;
-      exit(-1);
-    }
-    prealloc_size_ *= 1024ul * 1024;
-    zx_status_t status = zx::vmo::create(prealloc_size_, 0, &prealloc_vmo_);
-    if (status != ZX_OK) {
-      FX_LOGS(ERROR) << "zx::vmo::create() returns " << zx_status_get_string(status);
-      exit(-1);
-    }
-    prealloc_vmo_.get_size(&prealloc_size_);
-    uintptr_t prealloc_addr = 0;
-    status = zx::vmar::root_self()->map(ZX_VM_PERM_READ, 0, prealloc_vmo_, 0, prealloc_size_,
-                                        &prealloc_addr);
-    if (status != ZX_OK) {
-      FX_LOGS(ERROR) << "zx::vmar::map() returns " << zx_status_get_string(status);
-      exit(-1);
-    }
-
-    status = prealloc_vmo_.op_range(ZX_VMO_OP_COMMIT, 0, prealloc_size_, nullptr, 0);
-    if (status != ZX_OK) {
-      FX_LOGS(ERROR) << "zx::vmo::op_range() returns " << zx_status_get_string(status);
-      exit(-1);
-    }
-  }
-
   trace_observer_.Start(dispatcher_, [this] { UpdateState(); });
-  if (logging_) {
-    Capture capture;
-    auto s = capture_maker_.GetCapture(&capture, CaptureLevel::KMEM);
-    if (s != ZX_OK) {
-      FX_LOGS(ERROR) << "Error getting capture: " << zx_status_get_string(s);
-      exit(EXIT_FAILURE);
-    }
-    const auto& kmem = capture.kmem();
-    FX_LOGS(INFO) << "Total: " << kmem.total_bytes << " Wired: " << kmem.wired_bytes
-                  << " Total Heap: " << kmem.total_heap_bytes;
-  }
 
   // Pressure monitoring
   if (pressure_provider) {
@@ -244,7 +187,6 @@ Monitor::Monitor(const fxl::CommandLine& command_line, async_dispatcher_t* dispa
   if (ram_device_) {
     PeriodicMeasureBandwidth();
   }
-  SampleAndPost();
 }
 
 void Monitor::CreateMetrics() {
@@ -306,14 +248,6 @@ void Monitor::CollectJsonStatsWithOptions(zx::socket socket) {
   }
   memory::JsonPrinter printer(socket);
   printer.PrintCaptureAndBucketConfig(capture, configuration_str);
-}
-
-void Monitor::PrintHelp() {
-  std::cout << "memory_monitor [options]\n";
-  std::cout << "Options:\n";
-  std::cout << "  --log\n";
-  std::cout << "  --prealloc=kbytes\n";
-  std::cout << "  --delay=msecs\n";
 }
 
 inspect::Inspector Monitor::Inspect() {
@@ -431,27 +365,19 @@ inspect::Inspector Monitor::Inspect() {
 }
 
 void Monitor::SampleAndPost() {
-  if (logging_ || tracing_) {
-    Capture capture;
-    auto s = capture_maker_.GetCapture(&capture, CaptureLevel::KMEM);
-    if (s != ZX_OK) {
-      FX_LOGS(ERROR) << "Error getting capture: " << zx_status_get_string(s);
-      return;
-    }
-    const auto& kmem = capture.kmem();
-    if (logging_) {
-      FX_LOGS(INFO) << "Free: " << kmem.free_bytes << " Free Heap: " << kmem.free_heap_bytes
-                    << " VMO: " << kmem.vmo_bytes << " MMU: " << kmem.mmu_overhead_bytes
-                    << " IPC: " << kmem.ipc_bytes;
-    }
-    if (tracing_) {
-      TRACE_COUNTER(kTraceName, "allocated", 0, "vmo", kmem.vmo_bytes, "mmu_overhead",
-                    kmem.mmu_overhead_bytes, "ipc", kmem.ipc_bytes);
-      TRACE_COUNTER(kTraceName, "free", 0, "free", kmem.free_bytes, "free_heap",
-                    kmem.free_heap_bytes);
-    }
-    async::PostDelayedTask(dispatcher_, [this] { SampleAndPost(); }, delay_);
+  if (!tracing_)
+    return;
+  Capture capture;
+  auto s = capture_maker_.GetCapture(&capture, CaptureLevel::KMEM);
+  if (s != ZX_OK) {
+    FX_LOGS(ERROR) << "Error getting capture: " << zx_status_get_string(s);
+    return;
   }
+  const auto& kmem = capture.kmem();
+  TRACE_COUNTER(kTraceName, "allocated", 0, "vmo", kmem.vmo_bytes, "mmu_overhead",
+                kmem.mmu_overhead_bytes, "ipc", kmem.ipc_bytes);
+  TRACE_COUNTER(kTraceName, "free", 0, "free", kmem.free_bytes, "free_heap", kmem.free_heap_bytes);
+  async::PostDelayedTask(dispatcher_, [this] { SampleAndPost(); }, kTracingDelay);
 }
 
 void Monitor::MeasureBandwidthAndPost() {
@@ -575,9 +501,7 @@ void Monitor::UpdateState() {
         TRACE_COUNTER(kTraceName, "fixed", 0, "total", kmem.total_bytes, "wired", kmem.wired_bytes,
                       "total_heap", kmem.total_heap_bytes);
         tracing_ = true;
-        if (!logging_) {
-          SampleAndPost();
-        }
+        SampleAndPost();
         if (ram_device_) {
           MeasureBandwidthAndPost();
         }

@@ -20,7 +20,6 @@
 #include "src/developer/memory/monitor/logger.h"
 #include "src/developer/memory/monitor/memory_monitor_config.h"
 #include "src/developer/memory/monitor/metrics.h"
-#include "src/lib/fxl/command_line.h"
 
 namespace monitor {
 
@@ -32,8 +31,8 @@ class Monitor : public fidl::Server<fuchsia_memory_inspection::Collector>,
                 public fidl::Server<fuchsia_memorypressure::Watcher> {
  public:
   Monitor(
-      const fxl::CommandLine& command_line, async_dispatcher_t* dispatcher,
-      memory_monitor_config::Config config, memory::CaptureMaker capture_maker,
+      async_dispatcher_t* dispatcher, memory_monitor_config::Config config,
+      memory::CaptureMaker capture_maker,
       std::optional<fidl::Client<fuchsia_memorypressure::Provider>> pressure_provider =
           std::nullopt,
       std::optional<zx_handle_t> root_job = std::nullopt,
@@ -69,18 +68,13 @@ class Monitor : public fidl::Server<fuchsia_memory_inspection::Collector>,
   void SampleAndPost();
   void MeasureBandwidthAndPost();
   void PeriodicMeasureBandwidth();
-  static void PrintHelp();
   inspect::Inspector Inspect();
 
   void OnLevelChanged(pressure_signaler::Level level);
 
   memory::CaptureMaker capture_maker_;
   HighWater high_water_;
-  uint64_t prealloc_size_;
-  zx::vmo prealloc_vmo_;
-  bool logging_;
   bool tracing_;
-  zx::duration delay_;
   zx_handle_t root_;
   async_dispatcher_t* dispatcher_;
   trace::TraceObserver trace_observer_;
