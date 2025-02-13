@@ -26,6 +26,9 @@
             protocol: [ "fuchsia.update.verify.BlobfsVerifier" ],
         },
         {
+            protocol: [ "fuchsia.update.verify.ComponentOtaHealthCheck" ],
+        },
+        {
             protocol: "fuchsia.fshost.StarnixVolumeProvider",
             path: "/user_volumes/starnix",
         },
@@ -94,6 +97,15 @@
         },
         {
             protocol: "fuchsia.update.verify.BlobfsVerifier",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.update.verify.ComponentOtaHealthCheck",
+            from: "self",
+            to: "framework",
+        },
+        {
+            protocol: "fuchsia.update.verify.ComponentOtaHealthCheck",
             from: "self",
         },
         {

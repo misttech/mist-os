@@ -93,6 +93,11 @@
             ],
             from: "self",
         },
+        {
+            protocol: "fuchsia.update.verify.ComponentOtaHealthCheck",
+            from: "self",
+            to: "framework",
+        },
     ],
     config: {
         // The number of pager threads to spawn.  Setting to <= 0 will result in an
