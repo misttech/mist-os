@@ -836,7 +836,10 @@ build_api_module("images") {
 build_api_module("ninja_subbuilds") {
   testonly = true
   data_keys = [ "ninja_subbuilds" ]
-  deps = [ "//sdk:final_fuchsia_idk" ] + sdk_archive_labels
+  deps = [
+           "//sdk:bazel_in_tree_idk",
+           "//sdk:final_fuchsia_idk",
+         ] + sdk_archive_labels
 }
 
 # Describes the SDK archives that can be built, in the file:

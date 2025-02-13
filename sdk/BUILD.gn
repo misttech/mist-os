@@ -993,6 +993,7 @@ if (current_toolchain == default_toolchain) {
       ":bazel_in_tree_idk_tests_arm64",
       ":bazel_in_tree_idk_tests_riscv64",
       ":bazel_in_tree_idk_tests_x64",
+      "//:ninja_subbuilds",
       "//build/bazel:fuchsia_in_tree_idk.hash",
       "//build/bazel:generate_main_workspace",
       "//build/bazel/bazel_sdk:bazel_in_tree_idk.bazel_input",
