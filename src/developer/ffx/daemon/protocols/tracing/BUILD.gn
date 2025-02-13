@@ -12,9 +12,11 @@ if (is_host) {
 
     deps = [
       "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller_rust",
+      "//src/developer/ffx/config:lib",
       "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
       "//src/developer/ffx/lib/protocols:lib",
       "//src/developer/ffx/lib/tasks:lib",
+      "//src/developer/ffx/lib/trace:lib",
       "//src/lib/fidl/rust/fidl",
       "//src/lib/fuchsia-async",
       "//third_party/rust_crates:anyhow",

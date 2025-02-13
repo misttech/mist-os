@@ -254,7 +254,7 @@ impl TraceProcessor {
                     ffx_bail!(
                         "{}WARNING: The trace file is empty. Please verify that the input categories are valid. Input categories are: {:?}.{}",
                         color::Fg(color::Yellow),
-                        event_per_category_counter.category_counter.keys(),
+                        event_per_category_counter.input_categories,
                         style::Reset
                     );
                 }
@@ -436,15 +436,20 @@ impl Drop for Symbolizer {
 
 struct CategoryCounter {
     category_counter: HashMap<String, usize>,
+    input_categories: Vec<String>,
 }
 
 impl CategoryCounter {
     fn new(input_categories: Vec<String>) -> Self {
         let mut category_counter = HashMap::new();
         for category in &input_categories {
-            category_counter.insert(category.clone(), 0);
+            // Skip categories starting with '#' since they represent groups.
+            // We don't check them because it's not explicitly specified.
+            if !category.starts_with("#") {
+                category_counter.insert(category.clone(), 0);
+            }
         }
-        Self { category_counter }
+        Self { category_counter, input_categories }
     }
 
     fn increment_category(&mut self, record: &Result<TraceRecord, ParseError>) {
@@ -557,10 +562,10 @@ pub async fn trace(
                 );
             }
             let expanded_categories =
-                ffx_trace::expand_categories(&context, opts.categories).await?;
+                ffx_trace::expand_categories(&context, opts.categories.clone()).await?;
             let trace_config = TraceConfig {
                 buffer_size_megabytes_hint: Some(opts.buffer_size),
-                categories: Some(expanded_categories.clone()),
+                categories: Some(opts.categories),
                 buffering_mode: Some(opts.buffering_mode),
                 ..ffx_trace::map_categories_to_providers(&expanded_categories)
             };
@@ -728,9 +733,10 @@ async fn stop_tracing(
             for line in output {
                 writer.line(line)?;
             }
-
+            let expanded_categories =
+                ffx_trace::expand_categories(context, categories.clone()).await?;
             let skip_symbolization =
-                skip_symbolization || !categories.contains(&"kernel:ipc".to_string());
+                skip_symbolization || !expanded_categories.contains(&"kernel:ipc".to_string());
             if !no_verify_trace || !skip_symbolization {
                 let mut processor = TraceProcessor::new(output_file.clone())?;
 
