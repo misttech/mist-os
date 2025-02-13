@@ -76,7 +76,7 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
                            display::ConfigStamp stamp = display::kInvalidConfigStamp);
 
   // Make the staged config current.
-  void ApplyChanges(const display_mode_t& mode);
+  void ApplyChanges();
 
   // Discard the pending changes
   void DiscardChanges();

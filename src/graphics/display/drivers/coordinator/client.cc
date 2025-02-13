@@ -781,7 +781,7 @@ void Client::ApplyConfigFromFidl(display::ConfigStamp new_config_stamp) {
 
     // Apply any pending configuration changes to active layers.
     for (auto& layer_node : display_config.current_layers_) {
-      layer_node.layer->ApplyChanges(display_config.current_.mode);
+      layer_node.layer->ApplyChanges();
     }
   }
   // Overflow doesn't matter, since stamps only need to be unique until

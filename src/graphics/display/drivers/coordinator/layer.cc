@@ -104,7 +104,7 @@ bool Layer::ResolvePendingImage(FenceCollection* fences, display::ConfigStamp st
   return true;
 }
 
-void Layer::ApplyChanges(const display_mode_t& mode) {
+void Layer::ApplyChanges() {
   if (!config_change_) {
     return;
   }

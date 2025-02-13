@@ -134,7 +134,7 @@ TEST_F(LayerTest, PrimaryBasic) {
   layer->SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
   auto image = CreateReadyImage();
   layer->SetImage(image, display::kInvalidEventId);
-  layer->ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
+  layer->ApplyChanges();
 }
 
 TEST_F(LayerTest, CleanUpImage) {
@@ -151,7 +151,7 @@ TEST_F(LayerTest, CleanUpImage) {
 
   auto displayed_image = CreateReadyImage();
   layer->SetImage(displayed_image, display::kInvalidEventId);
-  layer->ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
+  layer->ApplyChanges();
 
   ASSERT_TRUE(RunOnControllerLoop<bool>(
       [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(1)); }));
@@ -229,7 +229,7 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
   {
     auto image = CreateReadyImage();
     layer->SetImage(image, display::kInvalidEventId);
-    layer->ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
+    layer->ApplyChanges();
     ASSERT_TRUE(RunOnControllerLoop<bool>(
         [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(1)); }));
     ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
@@ -251,7 +251,7 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
 
     auto image = CreateReadyImage();
     layer->SetImage(image, display::kInvalidEventId);
-    layer->ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
+    layer->ApplyChanges();
     ASSERT_TRUE(RunOnControllerLoop<bool>(
         [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(2)); }));
     ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
@@ -283,7 +283,7 @@ TEST_F(LayerTest, CleanUpAllImages) {
 
   auto displayed_image = CreateReadyImage();
   layer->SetImage(displayed_image, display::kInvalidEventId);
-  layer->ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
+  layer->ApplyChanges();
   ASSERT_TRUE(RunOnControllerLoop<bool>(
       [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(1)); }));
 
@@ -332,7 +332,7 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
   {
     auto image = CreateReadyImage();
     layer->SetImage(image, display::kInvalidEventId);
-    layer->ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
+    layer->ApplyChanges();
     ASSERT_TRUE(RunOnControllerLoop<bool>(
         [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(1)); }));
     ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
@@ -354,7 +354,7 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
 
     auto image = CreateReadyImage();
     layer->SetImage(image, display::kInvalidEventId);
-    layer->ApplyChanges({.h_addressable = kDisplayWidth, .v_addressable = kDisplayHeight});
+    layer->ApplyChanges();
     ASSERT_TRUE(RunOnControllerLoop<bool>(
         [&]() { return layer->ResolvePendingImage(fences_.get(), display::ConfigStamp(2)); }));
     ASSERT_TRUE(RunOnControllerLoop<bool>([&]() { return layer->ActivateLatestReadyImage(); }));
