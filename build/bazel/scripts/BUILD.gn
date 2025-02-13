@@ -28,6 +28,11 @@ python_build_time_tests("workspace_utils_test") {
   inputs = [ "workspace_utils.py" ]
 }
 
+python_build_time_tests("runfiles_utils_test") {
+  tests = [ "runfiles_utils_test.py" ]
+  inputs = [ "runfiles_utils.py" ]
+}
+
 if (is_host) {
   python_host_test("minimal_workspace_test") {
     main_source = "minimal_workspace_test.py"
@@ -47,6 +52,7 @@ group("tests") {
   deps = [
     ":minimal_workspace_test($host_toolchain)",
     ":remote_services_utils_test",
+    ":runfiles_utils_test($host_toolchain)",
     ":workspace_utils_test($host_toolchain)",
   ]
 
@@ -54,8 +60,9 @@ group("tests") {
   # CI bots can run git commands properly.
   if (false) {
     deps += [
-      ":compute_content_hash_tests",
-      ":get_git_head_commit_tests",
+      ":compute_content_hash_test",
+      ":get_git_head_commit_test",
+      ":runfiles_utils_test",
     ]
   }
 }
