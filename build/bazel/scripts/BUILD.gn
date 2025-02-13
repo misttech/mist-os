@@ -33,6 +33,15 @@ python_build_time_tests("runfiles_utils_test") {
   inputs = [ "runfiles_utils.py" ]
 }
 
+python_build_time_tests("export_host_tests_test") {
+  tests = [ "export_host_tests_test.py" ]
+  inputs = [
+    "export_host_tests.py",
+    "runfiles_utils.py",
+    "workspace_utils.py",
+  ]
+}
+
 if (is_host) {
   python_host_test("minimal_workspace_test") {
     main_source = "minimal_workspace_test.py"
@@ -50,6 +59,7 @@ if (is_host) {
 group("tests") {
   testonly = true
   deps = [
+    ":export_host_tests_test($host_toolchain)",
     ":minimal_workspace_test($host_toolchain)",
     ":remote_services_utils_test",
     ":runfiles_utils_test($host_toolchain)",
