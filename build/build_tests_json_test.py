@@ -50,19 +50,19 @@ class BuildTestsJsonTest(unittest.TestCase):
         )
         test_groups_path.write_text(test_groups)
 
-        inputs = build_tests_json.build_tests_json(self.build_dir)
+        build_tests_json.build_tests_json(self.build_dir)
 
         tests_string = (self.build_dir / "tests.json").read_text()
         tests = json.loads(tests_string)
 
-        return (inputs, tests)
+        return tests
 
     def test_only_tests_from_metadata(self):
         tests_from_metadata = [
             {"test": {"name": "test1"}},
             {"test": {"name": "test2"}},
         ]
-        (_, tests) = self._test(tests_from_metadata, [])
+        tests = self._test(tests_from_metadata, [])
         self.assertEqual(tests_from_metadata, tests)
 
     def test_only_test_groups(self):
@@ -74,7 +74,7 @@ class BuildTestsJsonTest(unittest.TestCase):
         test_groups = [
             {"product_bundle_name": "my_pb", "tests_json": str(tests_json_path)}
         ]
-        (_, tests) = self._test([], test_groups)
+        tests = self._test([], test_groups)
 
         expected_tests_json = [
             {"product_bundle": "my_pb", "test": {"name": "test1-my_pb"}},
@@ -95,7 +95,7 @@ class BuildTestsJsonTest(unittest.TestCase):
         test_groups = [
             {"product_bundle_name": "my_pb", "tests_json": str(tests_json_path)}
         ]
-        (_, tests) = self._test(tests_from_metadata, test_groups)
+        tests = self._test(tests_from_metadata, test_groups)
 
         expected_tests_json = [
             {"test": {"name": "test1"}},
@@ -104,21 +104,6 @@ class BuildTestsJsonTest(unittest.TestCase):
             {"product_bundle": "my_pb", "test": {"name": "test2-my_pb"}},
         ]
         self.assertEqual(expected_tests_json, tests)
-
-    def test_ninja_inputs(self):
-        (inputs, _) = self._test([], [])
-        self.assertEqual(
-            {
-                Path(self.build_dir / "tests_from_metadata.json"),
-                Path(
-                    self.build_dir
-                    / "obj"
-                    / "tests"
-                    / "product_bundle_test_groups.json"
-                ),
-            },
-            inputs,
-        )
 
     def test_only_write_if_changed(self):
         tests_from_metadata = [
