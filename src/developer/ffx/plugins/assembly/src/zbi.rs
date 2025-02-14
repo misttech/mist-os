@@ -198,6 +198,7 @@ mod tests {
     use fuchsia_hash::Hash;
     use regex::Regex;
     use serde_json::json;
+    use std::collections::BTreeMap;
     use std::fs::File;
     use std::io::Write;
     use std::str::FromStr;
@@ -343,6 +344,7 @@ mod tests {
                 path: Some(Utf8PathBuf::from("fake")),
                 board_script_path: None,
                 args: vec!["arg1".into(), "arg2".into()],
+                inputs: BTreeMap::default(),
             }),
         };
 

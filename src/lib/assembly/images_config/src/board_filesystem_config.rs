@@ -6,6 +6,7 @@ use anyhow::anyhow;
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use camino::Utf8PathBuf;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 /// The board options for configuring the filesystem.
 /// The options include those derived from the partition table and what the bootloader expects.
@@ -215,6 +216,15 @@ pub struct PostProcessingScript {
     /// Additional arguments to pass to the script after the above arguments.
     #[serde(default)]
     pub args: Vec<String>,
+
+    /// The input files needed by `board_script_path` at runtime.
+    /// These are expected to be a sibling to `board_script_path`.
+    ///
+    /// This is a map of the path that is expected by `board_script_path` to
+    /// the path in the container.
+    #[serde(default)]
+    #[file_relative_paths]
+    pub inputs: BTreeMap<Utf8PathBuf, FileRelativePathBuf>,
 }
 
 /// The parameters describing how to create a VBMeta image.

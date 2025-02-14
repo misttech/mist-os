@@ -305,29 +305,6 @@ template("board_configuration") {
     creation_deps += [ ":${target_name}.devicetree" ]
   }
 
-  if (defined(invoker.board_script_path)) {
-    _filesystems.zbi = {
-      postprocessing_script = {
-        board_script_path = "scripts/${invoker.board_script_path}"
-        args = invoker.script_args
-      }
-    }
-
-    foreach(resource, invoker.script_resources) {
-      copy("${target_name}.${resource.destination}") {
-        visibility = [ ":${labels.main_target}" ]
-        sources = [ resource.source ]
-        outputs = [
-          "${files.board_configuration_dir}/scripts/${resource.destination}",
-        ]
-        if (defined(resource.label)) {
-          deps = [ resource.label ]
-        }
-      }
-      creation_deps += [ ":${target_name}.${resource.destination}" ]
-    }
-  }
-
   base_info_contents = {
     name = board_name
 

@@ -113,15 +113,6 @@ def _fuchsia_board_configuration_impl(ctx):
     args = []
     if ctx.attr.post_processing_script:
         script = ctx.attr.post_processing_script[FuchsiaPostProcessingScriptInfo]
-        filesystems = board_config.get("filesystems", {})
-        board_config["filesystems"] = filesystems
-
-        zbi = filesystems.get("zbi", {})
-        zbi["postprocessing_script"] = {
-            "board_script_path": "scripts/" + script.post_processing_script_path,
-            "args": script.post_processing_script_args,
-        }
-        board_config["filesystems"]["zbi"] = zbi
 
         paths_map = {}
         for source, dest in script.post_processing_script_inputs.items():
@@ -134,7 +125,18 @@ def _fuchsia_board_configuration_impl(ctx):
                 source_file = source.files.to_list()[0]
 
             board_files.append(source_file)
-            paths_map[source_file.path] = dest
+            paths_map[dest] = source_file.path
+
+        filesystems = board_config.get("filesystems", {})
+        board_config["filesystems"] = filesystems
+
+        zbi = filesystems.get("zbi", {})
+        zbi["postprocessing_script"] = {
+            "board_script_path": "scripts/" + script.post_processing_script_path,
+            "args": script.post_processing_script_args,
+            "inputs": paths_map,
+        }
+        board_config["filesystems"]["zbi"] = zbi
 
         board_scripts_input_file = ctx.actions.declare_file(ctx.label.name + "_script_inputs.json")
         ctx.actions.write(board_scripts_input_file, json.encode(paths_map))

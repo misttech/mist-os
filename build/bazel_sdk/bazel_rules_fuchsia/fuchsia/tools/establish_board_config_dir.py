@@ -89,7 +89,7 @@ def main():
     if args.script_inputs_path:
         with open(args.script_inputs_path, "r") as f:
             script_maps = json.load(f)
-        for source, relative_dest in script_maps.items():
+        for relative_dest, source in script_maps.items():
             dest = os.path.join(output_dir, "scripts", relative_dest)
             dest_dir = os.path.dirname(dest)
 

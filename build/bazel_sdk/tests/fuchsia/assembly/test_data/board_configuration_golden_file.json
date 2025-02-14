@@ -13,7 +13,11 @@
                     "-p",
                     "fuchsia-vendored-python"
                 ],
-                "board_script_path": "scripts/zbi_signing_script"
+                "board_script_path": "scripts/zbi_signing_script",
+                "inputs": {
+                    "fake_dep": "fuchsia/assembly/test_data/fake_dep",
+                    "test.dtb": "fuchsia/assembly/test_data/test.dtb"
+                }
             }
         }
     },
