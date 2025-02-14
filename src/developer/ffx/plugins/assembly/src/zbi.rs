@@ -190,6 +190,7 @@ mod tests {
     use crate::base_package::BasePackage;
     use assembly_config_schema::ImageAssemblyConfig;
     use assembly_constants::BootfsDestination;
+    use assembly_file_relative_path::FileRelativePathBuf;
     use assembly_images_config::{PostProcessingScript, Zbi, ZbiCompression};
     use assembly_manifest::AssemblyManifest;
     use assembly_tool::testing::FakeToolProvider;
@@ -341,7 +342,7 @@ mod tests {
             name: "fuchsia".into(),
             compression: ZbiCompression::ZStd,
             postprocessing_script: Some(PostProcessingScript {
-                path: Some(Utf8PathBuf::from("fake")),
+                path: Some(FileRelativePathBuf::FileRelative(Utf8PathBuf::from("fake"))),
                 board_script_path: None,
                 args: vec!["arg1".into(), "arg2".into()],
                 inputs: BTreeMap::default(),

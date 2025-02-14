@@ -187,7 +187,7 @@ pub trait AssemblyContainer {
 }
 
 /// The type of the file, which is passed to the `found` function in WalkPaths.
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum FileType {
     /// An unknown file type.
     Unknown,

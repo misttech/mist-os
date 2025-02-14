@@ -8,16 +8,58 @@ use std::collections::BTreeSet;
 
 use crate::common::{PackageDetails, PackagedDriverDetails};
 use crate::platform_config::sysmem_config::BoardSysmemConfig;
+use anyhow::Result;
 use assembly_constants::Arm64DebugDapSoc;
-use assembly_container::{assembly_container, AssemblyContainer, WalkPaths};
+use assembly_container::{assembly_container, AssemblyContainer, FileType, WalkPaths, WalkPathsFn};
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use assembly_images_config::BoardFilesystemConfig;
+use camino::{Utf8Path, Utf8PathBuf};
 use serde::{Deserialize, Serialize};
+
+/// A path to a directory that should be copied wholesale inside an
+/// AssemblyContainer.
+///
+/// TODO(https://fxbug.dev/395689536): Move this into assembly_container crate
+/// once we remove FileRelativePathBuf from the containers, otherwise this ends
+/// up with a dependency cycle.
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, SupportsFileRelativePaths)]
+pub struct DirectoryPathBuf(#[file_relative_paths] pub FileRelativePathBuf);
+
+impl WalkPaths for DirectoryPathBuf {
+    fn walk_paths_with_dest<F: WalkPathsFn>(
+        &mut self,
+        found: &mut F,
+        dest: Utf8PathBuf,
+    ) -> Result<()> {
+        found(self.0.as_mut_utf8_pathbuf(), dest, FileType::Directory)
+    }
+}
+
+impl std::fmt::Display for DirectoryPathBuf {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl AsRef<Utf8Path> for DirectoryPathBuf {
+    fn as_ref(&self) -> &Utf8Path {
+        self.0.as_utf8_pathbuf()
+    }
+}
+
+impl AsRef<std::path::Path> for DirectoryPathBuf {
+    fn as_ref(&self) -> &std::path::Path {
+        self.0.as_utf8_pathbuf().as_std_path()
+    }
+}
 
 /// This struct provides information about the "board" that a product is being
 /// assembled to run on.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
+#[derive(
+    Clone, Debug, Default, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths, WalkPaths,
+)]
 #[serde(deny_unknown_fields)]
+#[assembly_container(board_configuration.json)]
 pub struct BoardInformation {
     /// The name of the board.
     pub name: String,
@@ -38,17 +80,20 @@ pub struct BoardInformation {
     /// Path to the devicetree binary (.dtb) this provided by this board.
     #[serde(default)]
     #[file_relative_paths]
+    #[walk_paths]
     pub devicetree: Option<FileRelativePathBuf>,
 
     /// Path to the devicetree binary overlay (.dtbo) this provided by this board.
     #[serde(default)]
     #[file_relative_paths]
+    #[walk_paths]
     pub devicetree_overlay: Option<FileRelativePathBuf>,
 
     /// Configuration for the various filesystems that the product can choose to
     /// include.
     #[serde(default)]
     #[file_relative_paths]
+    #[walk_paths]
     pub filesystems: BoardFilesystemConfig,
 
     /// These are paths to the directories that are board input bundles that
@@ -67,13 +112,15 @@ pub struct BoardInformation {
     /// may be unable to boot.
     #[serde(default)]
     #[file_relative_paths]
-    pub input_bundles: Vec<FileRelativePathBuf>,
+    #[walk_paths]
+    pub input_bundles: Vec<DirectoryPathBuf>,
 
     /// Consolidated configuration from all of the BoardInputBundles.  This is
     /// not deserialized from the BoardConfiguration, but is instead created by
     /// parsing each of the input_bundles and merging their configuration fields.
     #[serde(skip)]
     #[file_relative_paths]
+    #[walk_paths]
     pub configuration: BoardProvidedConfig,
 
     /// Configure kernel cmdline args
@@ -304,7 +351,7 @@ pub struct OOM {
 }
 
 /// This struct defines platform configurations specified by board.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(default, deny_unknown_fields)]
 pub struct PlatformConfig {
     /// Configure connectivity related features
@@ -438,8 +485,12 @@ mod test {
             },
             provided_features: vec!["feature_a".into(), "feature_b".into()],
             input_bundles: vec![
-                FileRelativePathBuf::Resolved("some/path/to/board/bundle_a".into()),
-                FileRelativePathBuf::Resolved("some/path/to/board/bundle_b".into()),
+                DirectoryPathBuf(FileRelativePathBuf::Resolved(
+                    "some/path/to/board/bundle_a".into(),
+                )),
+                DirectoryPathBuf(FileRelativePathBuf::Resolved(
+                    "some/path/to/board/bundle_b".into(),
+                )),
             ],
             devicetree: Some(FileRelativePathBuf::Resolved("some/path/to/board/test.dtb".into())),
             devicetree_overlay: Some(FileRelativePathBuf::Resolved(
