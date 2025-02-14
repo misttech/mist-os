@@ -298,7 +298,7 @@ pub const __have_pthread_attr_t: i32 = 1;
 pub const _ALLOCA_H: i32 = 1;
 pub const OPENSSL_VERSION_NUMBER: i32 = 269488255;
 pub const SSLEAY_VERSION_NUMBER: i32 = 269488255;
-pub const BORINGSSL_API_VERSION: i32 = 29;
+pub const BORINGSSL_API_VERSION: i32 = 33;
 pub const AES_ENCRYPT: i32 = 1;
 pub const AES_DECRYPT: i32 = 0;
 pub const AES_MAXNR: i32 = 14;
@@ -375,6 +375,7 @@ pub const BIO_CB_CTRL: i32 = 6;
 pub const BIO_CB_RETURN: i32 = 128;
 pub const BIO_NOCLOSE: i32 = 0;
 pub const BIO_CLOSE: i32 = 1;
+pub const BIO_FP_TEXT: i32 = 16;
 pub const BIO_CTRL_DGRAM_QUERY_MTU: i32 = 40;
 pub const BIO_CTRL_DGRAM_SET_MTU: i32 = 42;
 pub const BIO_CTRL_DGRAM_MTU_EXCEEDED: i32 = 43;
@@ -403,6 +404,9 @@ pub const BIO_FLAGS_RWS: i32 = 7;
 pub const BIO_FLAGS_SHOULD_RETRY: i32 = 8;
 pub const BIO_FLAGS_BASE64_NO_NL: i32 = 256;
 pub const BIO_FLAGS_MEM_RDONLY: i32 = 512;
+pub const BIO_TYPE_DESCRIPTOR: i32 = 256;
+pub const BIO_TYPE_FILTER: i32 = 512;
+pub const BIO_TYPE_SOURCE_SINK: i32 = 1024;
 pub const BIO_TYPE_NONE: i32 = 0;
 pub const BIO_TYPE_MEM: i32 = 1025;
 pub const BIO_TYPE_FILE: i32 = 1026;
@@ -426,9 +430,6 @@ pub const BIO_TYPE_LINEBUFFER: i32 = 532;
 pub const BIO_TYPE_DGRAM: i32 = 1301;
 pub const BIO_TYPE_ASN1: i32 = 534;
 pub const BIO_TYPE_COMP: i32 = 535;
-pub const BIO_TYPE_DESCRIPTOR: i32 = 256;
-pub const BIO_TYPE_FILTER: i32 = 512;
-pub const BIO_TYPE_SOURCE_SINK: i32 = 1024;
 pub const BIO_TYPE_START: i32 = 128;
 pub const BIO_C_SET_CONNECT: i32 = 100;
 pub const BIO_C_DO_STATE_MACHINE: i32 = 101;
@@ -1030,6 +1031,9 @@ pub const CONF_R_UNABLE_TO_CREATE_NEW_SECTION: i32 = 104;
 pub const CONF_R_VARIABLE_HAS_NO_VALUE: i32 = 105;
 pub const CONF_R_VARIABLE_EXPANSION_TOO_LONG: i32 = 106;
 pub const CONF_R_VARIABLE_EXPANSION_NOT_SUPPORTED: i32 = 107;
+pub const BCM_SHA_CBLOCK: i32 = 64;
+pub const BCM_SHA256_CBLOCK: i32 = 64;
+pub const BCM_SHA512_CBLOCK: i32 = 128;
 pub const SHA_CBLOCK: i32 = 64;
 pub const SHA_DIGEST_LENGTH: i32 = 20;
 pub const SHA224_CBLOCK: i32 = 64;
@@ -1060,6 +1064,16 @@ pub const OPENSSL_INIT_NO_ADD_ALL_CIPHERS: i32 = 0;
 pub const OPENSSL_INIT_NO_ADD_ALL_DIGESTS: i32 = 0;
 pub const OPENSSL_INIT_LOAD_CONFIG: i32 = 0;
 pub const OPENSSL_INIT_NO_LOAD_CONFIG: i32 = 0;
+pub const OPENSSL_INIT_NO_ATEXIT: i32 = 0;
+pub const OPENSSL_INIT_ATFORK: i32 = 0;
+pub const OPENSSL_INIT_ENGINE_RDRAND: i32 = 0;
+pub const OPENSSL_INIT_ENGINE_DYNAMIC: i32 = 0;
+pub const OPENSSL_INIT_ENGINE_OPENSSL: i32 = 0;
+pub const OPENSSL_INIT_ENGINE_CRYPTODEV: i32 = 0;
+pub const OPENSSL_INIT_ENGINE_CAPI: i32 = 0;
+pub const OPENSSL_INIT_ENGINE_PADLOCK: i32 = 0;
+pub const OPENSSL_INIT_ENGINE_AFALG: i32 = 0;
+pub const OPENSSL_INIT_ENGINE_ALL_BUILTIN: i32 = 0;
 pub const CTR_DRBG_ENTROPY_LEN: i32 = 48;
 pub const CTR_DRBG_MAX_GENERATE_LENGTH: i32 = 65536;
 pub const X25519_PRIVATE_KEY_LEN: i32 = 32;
@@ -1074,6 +1088,7 @@ pub const DES_ENCRYPT: i32 = 1;
 pub const DES_DECRYPT: i32 = 0;
 pub const DES_CBC_MODE: i32 = 0;
 pub const DES_PCBC_MODE: i32 = 1;
+pub const OPENSSL_DH_MAX_MODULUS_BITS: i32 = 10000;
 pub const DH_GENERATOR_2: i32 = 2;
 pub const DH_GENERATOR_5: i32 = 5;
 pub const DH_CHECK_P_NOT_PRIME: i32 = 1;
@@ -1103,6 +1118,7 @@ pub const EVP_MD_CTX_FLAG_NON_FIPS_ALLOW: i32 = 0;
 pub const DIGEST_R_INPUT_NOT_INITIALIZED: i32 = 100;
 pub const DIGEST_R_DECODE_ERROR: i32 = 101;
 pub const DIGEST_R_UNKNOWN_HASH: i32 = 102;
+pub const OPENSSL_DSA_MAX_MODULUS_BITS: i32 = 10000;
 pub const DSA_R_BAD_Q_VALUE: i32 = 100;
 pub const DSA_R_MISSING_PARAMETERS: i32 = 101;
 pub const DSA_R_MODULUS_TOO_LARGE: i32 = 102;
@@ -1201,6 +1217,7 @@ pub const EVP_R_INVALID_PEER_KEY: i32 = 134;
 pub const EVP_R_NOT_XOF_OR_INVALID_LENGTH: i32 = 135;
 pub const EVP_R_EMPTY_PSK: i32 = 136;
 pub const EVP_R_INVALID_BUFFER_SIZE: i32 = 137;
+pub const EVP_R_EXPECTING_A_DH_KEY: i32 = 138;
 pub const EVP_AEAD_MAX_KEY_LENGTH: i32 = 80;
 pub const EVP_AEAD_MAX_NONCE_LENGTH: i32 = 24;
 pub const EVP_AEAD_MAX_OVERHEAD: i32 = 64;
@@ -3492,6 +3509,8 @@ pub const LN_hkdf: &[u8; 5] = b"hkdf\0";
 pub const NID_hkdf: i32 = 963;
 pub const SN_X25519Kyber768Draft00: &[u8; 22] = b"X25519Kyber768Draft00\0";
 pub const NID_X25519Kyber768Draft00: i32 = 964;
+pub const SN_X25519MLKEM768: &[u8; 15] = b"X25519MLKEM768\0";
+pub const NID_X25519MLKEM768: i32 = 965;
 pub const EVP_PKEY_NONE: i32 = 0;
 pub const EVP_PKEY_RSA: i32 = 6;
 pub const EVP_PKEY_RSA_PSS: i32 = 912;
@@ -3505,10 +3524,11 @@ pub const EVP_PKEY_RSA2: i32 = 19;
 pub const EVP_PKEY_X448: i32 = 961;
 pub const EVP_PKEY_ED448: i32 = 960;
 pub const HKDF_R_OUTPUT_TOO_LARGE: i32 = 100;
+pub const EVP_HPKE_DHKEM_P256_HKDF_SHA256: i32 = 16;
 pub const EVP_HPKE_DHKEM_X25519_HKDF_SHA256: i32 = 32;
-pub const EVP_HPKE_MAX_PUBLIC_KEY_LENGTH: i32 = 32;
+pub const EVP_HPKE_MAX_PUBLIC_KEY_LENGTH: i32 = 65;
 pub const EVP_HPKE_MAX_PRIVATE_KEY_LENGTH: i32 = 32;
-pub const EVP_HPKE_MAX_ENC_LENGTH: i32 = 32;
+pub const EVP_HPKE_MAX_ENC_LENGTH: i32 = 65;
 pub const EVP_HPKE_HKDF_SHA256: i32 = 1;
 pub const EVP_HPKE_AES_128_GCM: i32 = 1;
 pub const EVP_HPKE_AES_256_GCM: i32 = 2;
@@ -3529,6 +3549,16 @@ pub const MD4_CBLOCK: i32 = 64;
 pub const MD4_DIGEST_LENGTH: i32 = 16;
 pub const MD5_CBLOCK: i32 = 64;
 pub const MD5_DIGEST_LENGTH: i32 = 16;
+pub const MLDSA_SEED_BYTES: i32 = 32;
+pub const MLDSA65_PRIVATE_KEY_BYTES: i32 = 4032;
+pub const MLDSA65_PUBLIC_KEY_BYTES: i32 = 1952;
+pub const MLDSA65_SIGNATURE_BYTES: i32 = 3309;
+pub const MLKEM768_PUBLIC_KEY_BYTES: i32 = 1184;
+pub const MLKEM_SEED_BYTES: i32 = 64;
+pub const MLKEM768_CIPHERTEXT_BYTES: i32 = 1088;
+pub const MLKEM_SHARED_SECRET_BYTES: i32 = 32;
+pub const MLKEM1024_PUBLIC_KEY_BYTES: i32 = 1568;
+pub const MLKEM1024_CIPHERTEXT_BYTES: i32 = 1568;
 pub const OBJ_NAME_TYPE_MD_METH: i32 = 1;
 pub const OBJ_NAME_TYPE_CIPHER_METH: i32 = 2;
 pub const OBJ_R_UNKNOWN_NID: i32 = 100;
@@ -3549,6 +3579,7 @@ pub const PKCS7_R_BAD_PKCS7_VERSION: i32 = 100;
 pub const PKCS7_R_NOT_PKCS7_SIGNED_DATA: i32 = 101;
 pub const PKCS7_R_NO_CERTIFICATES_INCLUDED: i32 = 102;
 pub const PKCS7_R_NO_CRLS_INCLUDED: i32 = 103;
+pub const OPENSSL_RSA_MAX_MODULUS_BITS: i32 = 16384;
 pub const RSA_PKCS1_PADDING: i32 = 1;
 pub const RSA_NO_PADDING: i32 = 3;
 pub const RSA_PKCS1_OAEP_PADDING: i32 = 4;
@@ -3681,7 +3712,6 @@ pub const X509_VERSION_3: i32 = 2;
 pub const EXFLAG_BCONS: i32 = 1;
 pub const EXFLAG_KUSAGE: i32 = 2;
 pub const EXFLAG_XKUSAGE: i32 = 4;
-pub const EXFLAG_NSCERT: i32 = 8;
 pub const EXFLAG_CA: i32 = 16;
 pub const EXFLAG_SI: i32 = 32;
 pub const EXFLAG_V1: i32 = 64;
@@ -3710,6 +3740,14 @@ pub const XKU_ANYEKU: i32 = 256;
 pub const X509_CRL_VERSION_1: i32 = 0;
 pub const X509_CRL_VERSION_2: i32 = 1;
 pub const X509_REQ_VERSION_1: i32 = 0;
+pub const X509V3_ADD_OP_MASK: i32 = 15;
+pub const X509V3_ADD_DEFAULT: i32 = 0;
+pub const X509V3_ADD_APPEND: i32 = 1;
+pub const X509V3_ADD_REPLACE: i32 = 2;
+pub const X509V3_ADD_REPLACE_EXISTING: i32 = 3;
+pub const X509V3_ADD_KEEP_EXISTING: i32 = 4;
+pub const X509V3_ADD_DELETE: i32 = 5;
+pub const X509V3_ADD_SILENT: i32 = 16;
 pub const GEN_OTHERNAME: i32 = 0;
 pub const GEN_EMAIL: i32 = 1;
 pub const GEN_DNS: i32 = 2;
@@ -3719,58 +3757,10 @@ pub const GEN_EDIPARTY: i32 = 5;
 pub const GEN_URI: i32 = 6;
 pub const GEN_IPADD: i32 = 7;
 pub const GEN_RID: i32 = 8;
-pub const X509_FLAG_COMPAT: i32 = 0;
-pub const X509_FLAG_NO_HEADER: i32 = 1;
-pub const X509_FLAG_NO_VERSION: i32 = 2;
-pub const X509_FLAG_NO_SERIAL: i32 = 4;
-pub const X509_FLAG_NO_SIGNAME: i32 = 8;
-pub const X509_FLAG_NO_ISSUER: i32 = 16;
-pub const X509_FLAG_NO_VALIDITY: i32 = 32;
-pub const X509_FLAG_NO_SUBJECT: i32 = 64;
-pub const X509_FLAG_NO_PUBKEY: i32 = 128;
-pub const X509_FLAG_NO_EXTENSIONS: i32 = 256;
-pub const X509_FLAG_NO_SIGDUMP: i32 = 512;
-pub const X509_FLAG_NO_AUX: i32 = 1024;
-pub const X509_FLAG_NO_ATTRIBUTES: i32 = 2048;
-pub const X509_FLAG_NO_IDS: i32 = 4096;
-pub const X509V3_EXT_UNKNOWN_MASK: i32 = 983040;
-pub const X509V3_EXT_DEFAULT: i32 = 0;
-pub const X509V3_EXT_ERROR_UNKNOWN: i32 = 65536;
-pub const X509V3_EXT_PARSE_UNKNOWN: i32 = 131072;
-pub const X509V3_EXT_DUMP_UNKNOWN: i32 = 196608;
-pub const XN_FLAG_COMPAT: i32 = 0;
-pub const XN_FLAG_SEP_MASK: i32 = 983040;
-pub const XN_FLAG_SEP_COMMA_PLUS: i32 = 65536;
-pub const XN_FLAG_SEP_CPLUS_SPC: i32 = 131072;
-pub const XN_FLAG_SEP_SPLUS_SPC: i32 = 196608;
-pub const XN_FLAG_SEP_MULTILINE: i32 = 262144;
-pub const XN_FLAG_DN_REV: i32 = 1048576;
-pub const XN_FLAG_FN_MASK: i32 = 6291456;
-pub const XN_FLAG_FN_SN: i32 = 0;
-pub const XN_FLAG_SPC_EQ: i32 = 8388608;
-pub const XN_FLAG_DUMP_UNKNOWN_FIELDS: i32 = 16777216;
-pub const XN_FLAG_RFC2253: i32 = 17892119;
-pub const XN_FLAG_ONELINE: i32 = 8520479;
-pub const X509V3_CTX_TEST: i32 = 1;
-pub const X509_TRUST_DEFAULT: i32 = -1;
-pub const X509_TRUST_COMPAT: i32 = 1;
-pub const X509_TRUST_SSL_CLIENT: i32 = 2;
-pub const X509_TRUST_SSL_SERVER: i32 = 3;
-pub const X509_TRUST_EMAIL: i32 = 4;
-pub const X509_TRUST_OBJECT_SIGN: i32 = 5;
-pub const X509_TRUST_TSA: i32 = 8;
-pub const X509_TRUST_TRUSTED: i32 = 1;
-pub const X509_TRUST_REJECTED: i32 = 2;
-pub const X509_TRUST_UNTRUSTED: i32 = 3;
 pub const X509_LU_NONE: i32 = 0;
 pub const X509_LU_X509: i32 = 1;
 pub const X509_LU_CRL: i32 = 2;
 pub const X509_LU_PKEY: i32 = 3;
-pub const X509_L_FILE_LOAD: i32 = 1;
-pub const X509_L_ADD_DIR: i32 = 2;
-pub const X509_FILETYPE_PEM: i32 = 1;
-pub const X509_FILETYPE_ASN1: i32 = 2;
-pub const X509_FILETYPE_DEFAULT: i32 = 3;
 pub const X509_V_OK: i32 = 0;
 pub const X509_V_ERR_UNSPECIFIED: i32 = 1;
 pub const X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT: i32 = 2;
@@ -3851,17 +3841,8 @@ pub const X509_V_FLAG_TRUSTED_FIRST: i32 = 32768;
 pub const X509_V_FLAG_PARTIAL_CHAIN: i32 = 524288;
 pub const X509_V_FLAG_NO_ALT_CHAINS: i32 = 1048576;
 pub const X509_V_FLAG_NO_CHECK_TIME: i32 = 2097152;
-pub const X509V3_EXT_CTX_DEP: i32 = 2;
-pub const X509V3_EXT_MULTILINE: i32 = 4;
-pub const CRLDP_ALL_REASONS: i32 = 32895;
-pub const NS_SSL_CLIENT: i32 = 128;
-pub const NS_SSL_SERVER: i32 = 64;
-pub const NS_SMIME: i32 = 32;
-pub const NS_OBJSIGN: i32 = 16;
-pub const NS_SSL_CA: i32 = 4;
-pub const NS_SMIME_CA: i32 = 2;
-pub const NS_OBJSIGN_CA: i32 = 1;
-pub const NS_ANY_CA: i32 = 7;
+pub const X509_CHECK_FLAG_NO_WILDCARDS: i32 = 2;
+pub const X509_CHECK_FLAG_NEVER_CHECK_SUBJECT: i32 = 32;
 pub const X509_PURPOSE_SSL_CLIENT: i32 = 1;
 pub const X509_PURPOSE_SSL_SERVER: i32 = 2;
 pub const X509_PURPOSE_NS_SSL_SERVER: i32 = 3;
@@ -3871,20 +3852,66 @@ pub const X509_PURPOSE_CRL_SIGN: i32 = 6;
 pub const X509_PURPOSE_ANY: i32 = 7;
 pub const X509_PURPOSE_OCSP_HELPER: i32 = 8;
 pub const X509_PURPOSE_TIMESTAMP_SIGN: i32 = 9;
-pub const X509V3_ADD_OP_MASK: i32 = 15;
-pub const X509V3_ADD_DEFAULT: i32 = 0;
-pub const X509V3_ADD_APPEND: i32 = 1;
-pub const X509V3_ADD_REPLACE: i32 = 2;
-pub const X509V3_ADD_REPLACE_EXISTING: i32 = 3;
-pub const X509V3_ADD_KEEP_EXISTING: i32 = 4;
-pub const X509V3_ADD_DELETE: i32 = 5;
-pub const X509V3_ADD_SILENT: i32 = 16;
+pub const X509_TRUST_COMPAT: i32 = 1;
+pub const X509_TRUST_SSL_CLIENT: i32 = 2;
+pub const X509_TRUST_SSL_SERVER: i32 = 3;
+pub const X509_TRUST_EMAIL: i32 = 4;
+pub const X509_TRUST_OBJECT_SIGN: i32 = 5;
+pub const X509_TRUST_TSA: i32 = 8;
+pub const X509_FILETYPE_PEM: i32 = 1;
+pub const X509_FILETYPE_ASN1: i32 = 2;
+pub const X509_FILETYPE_DEFAULT: i32 = 3;
+pub const X509_L_FILE_LOAD: i32 = 1;
+pub const X509_L_ADD_DIR: i32 = 2;
+pub const X509_FLAG_COMPAT: i32 = 0;
+pub const X509_FLAG_NO_HEADER: i32 = 1;
+pub const X509_FLAG_NO_VERSION: i32 = 2;
+pub const X509_FLAG_NO_SERIAL: i32 = 4;
+pub const X509_FLAG_NO_SIGNAME: i32 = 8;
+pub const X509_FLAG_NO_ISSUER: i32 = 16;
+pub const X509_FLAG_NO_VALIDITY: i32 = 32;
+pub const X509_FLAG_NO_SUBJECT: i32 = 64;
+pub const X509_FLAG_NO_PUBKEY: i32 = 128;
+pub const X509_FLAG_NO_EXTENSIONS: i32 = 256;
+pub const X509_FLAG_NO_SIGDUMP: i32 = 512;
+pub const X509_FLAG_NO_AUX: i32 = 1024;
+pub const X509_FLAG_NO_ATTRIBUTES: i32 = 2048;
+pub const X509_FLAG_NO_IDS: i32 = 4096;
+pub const X509V3_EXT_UNKNOWN_MASK: i32 = 983040;
+pub const X509V3_EXT_DEFAULT: i32 = 0;
+pub const X509V3_EXT_ERROR_UNKNOWN: i32 = 65536;
+pub const X509V3_EXT_PARSE_UNKNOWN: i32 = 131072;
+pub const X509V3_EXT_DUMP_UNKNOWN: i32 = 196608;
+pub const XN_FLAG_COMPAT: i32 = 0;
+pub const XN_FLAG_SEP_MASK: i32 = 983040;
+pub const XN_FLAG_SEP_COMMA_PLUS: i32 = 65536;
+pub const XN_FLAG_SEP_CPLUS_SPC: i32 = 131072;
+pub const XN_FLAG_SEP_SPLUS_SPC: i32 = 196608;
+pub const XN_FLAG_SEP_MULTILINE: i32 = 262144;
+pub const XN_FLAG_DN_REV: i32 = 1048576;
+pub const XN_FLAG_FN_MASK: i32 = 6291456;
+pub const XN_FLAG_FN_SN: i32 = 0;
+pub const XN_FLAG_SPC_EQ: i32 = 8388608;
+pub const XN_FLAG_DUMP_UNKNOWN_FIELDS: i32 = 16777216;
+pub const XN_FLAG_RFC2253: i32 = 17892119;
+pub const XN_FLAG_ONELINE: i32 = 8520479;
+pub const X509_TRUST_TRUSTED: i32 = 1;
+pub const X509_TRUST_REJECTED: i32 = 2;
+pub const X509_TRUST_UNTRUSTED: i32 = 3;
+pub const X509V3_EXT_MULTILINE: i32 = 4;
+pub const X509V3_CTX_TEST: i32 = 1;
 pub const X509_CHECK_FLAG_ALWAYS_CHECK_SUBJECT: i32 = 0;
-pub const X509_CHECK_FLAG_NO_WILDCARDS: i32 = 2;
-pub const X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS: i32 = 0;
 pub const X509_CHECK_FLAG_MULTI_LABEL_WILDCARDS: i32 = 0;
 pub const X509_CHECK_FLAG_SINGLE_LABEL_SUBDOMAINS: i32 = 0;
-pub const X509_CHECK_FLAG_NEVER_CHECK_SUBJECT: i32 = 32;
+pub const X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS: i32 = 0;
+pub const NS_SSL_CLIENT: i32 = 128;
+pub const NS_SSL_SERVER: i32 = 64;
+pub const NS_SMIME: i32 = 32;
+pub const NS_OBJSIGN: i32 = 16;
+pub const NS_SSL_CA: i32 = 4;
+pub const NS_SMIME_CA: i32 = 2;
+pub const NS_OBJSIGN_CA: i32 = 1;
+pub const NS_ANY_CA: i32 = 7;
 pub const X509_R_AKID_MISMATCH: i32 = 100;
 pub const X509_R_BAD_PKCS7_VERSION: i32 = 101;
 pub const X509_R_BAD_X509_FILETYPE: i32 = 102;
@@ -3974,6 +4001,7 @@ pub const PEM_R_READ_KEY: i32 = 111;
 pub const PEM_R_SHORT_HEADER: i32 = 112;
 pub const PEM_R_UNSUPPORTED_CIPHER: i32 = 113;
 pub const PEM_R_UNSUPPORTED_ENCRYPTION: i32 = 114;
+pub const PEM_R_UNSUPPORTED_PROC_TYPE_VERSION: i32 = 115;
 pub const PKCS12_DEFAULT_ITER: i32 = 2048;
 pub const PKCS8_R_BAD_PKCS12_DATA: i32 = 100;
 pub const PKCS8_R_BAD_PKCS12_VERSION: i32 = 101;
@@ -4012,6 +4040,9 @@ pub const PKCS8_R_AMBIGUOUS_FRIENDLY_NAME: i32 = 133;
 pub const RIPEMD160_CBLOCK: i32 = 64;
 pub const RIPEMD160_LBLOCK: i32 = 16;
 pub const RIPEMD160_DIGEST_LENGTH: i32 = 20;
+pub const SLHDSA_SHA2_128S_PUBLIC_KEY_BYTES: i32 = 32;
+pub const SLHDSA_SHA2_128S_PRIVATE_KEY_BYTES: i32 = 64;
+pub const SLHDSA_SHA2_128S_SIGNATURE_BYTES: i32 = 7856;
 pub const SSL2_MT_CLIENT_HELLO: i32 = 1;
 pub const SSL2_VERSION: i32 = 2;
 pub const SSL3_CK_SCSV: i32 = 50331903;
@@ -4093,6 +4124,7 @@ pub const SSL3_RT_CHANGE_CIPHER_SPEC: i32 = 20;
 pub const SSL3_RT_ALERT: i32 = 21;
 pub const SSL3_RT_HANDSHAKE: i32 = 22;
 pub const SSL3_RT_APPLICATION_DATA: i32 = 23;
+pub const SSL3_RT_ACK: i32 = 26;
 pub const SSL3_RT_HEADER: i32 = 256;
 pub const SSL3_RT_CLIENT_HELLO_INNER: i32 = 257;
 pub const SSL3_AL_WARNING: i32 = 1;
@@ -4511,6 +4543,7 @@ pub const TLS1_2_VERSION: i32 = 771;
 pub const TLS1_3_VERSION: i32 = 772;
 pub const DTLS1_VERSION: i32 = 65279;
 pub const DTLS1_2_VERSION: i32 = 65277;
+pub const DTLS1_3_VERSION: i32 = 65276;
 pub const SSL_OP_NO_QUERY_MTU: i32 = 4096;
 pub const SSL_OP_NO_TICKET: i32 = 16384;
 pub const SSL_OP_CIPHER_SERVER_PREFERENCE: i32 = 4194304;
@@ -4539,6 +4572,7 @@ pub const SSL_SIGN_RSA_PSS_RSAE_SHA256: i32 = 2052;
 pub const SSL_SIGN_RSA_PSS_RSAE_SHA384: i32 = 2053;
 pub const SSL_SIGN_RSA_PSS_RSAE_SHA512: i32 = 2054;
 pub const SSL_SIGN_ED25519: i32 = 2055;
+pub const SSL_SIGN_RSA_PKCS1_SHA256_LEGACY: i32 = 1056;
 pub const SSL_SIGN_RSA_PKCS1_MD5_SHA1: i32 = 65281;
 pub const SSL_FILETYPE_PEM: i32 = 1;
 pub const SSL_FILETYPE_ASN1: i32 = 2;
@@ -4565,6 +4599,7 @@ pub const SSL_GROUP_SECP256R1: i32 = 23;
 pub const SSL_GROUP_SECP384R1: i32 = 24;
 pub const SSL_GROUP_SECP521R1: i32 = 25;
 pub const SSL_GROUP_X25519: i32 = 29;
+pub const SSL_GROUP_X25519_MLKEM768: i32 = 4588;
 pub const SSL_GROUP_X25519_KYBER768_DRAFT00: i32 = 25497;
 pub const SSL_VERIFY_NONE: i32 = 0;
 pub const SSL_VERIFY_PEER: i32 = 1;
@@ -4916,7 +4951,6 @@ pub const SSL_R_ALPN_MISMATCH_ON_EARLY_DATA: i32 = 277;
 pub const SSL_R_WRONG_VERSION_ON_EARLY_DATA: i32 = 278;
 pub const SSL_R_UNEXPECTED_EXTENSION_ON_EARLY_DATA: i32 = 279;
 pub const SSL_R_NO_SUPPORTED_VERSIONS_ENABLED: i32 = 280;
-pub const SSL_R_APPLICATION_DATA_INSTEAD_OF_HANDSHAKE: i32 = 281;
 pub const SSL_R_EMPTY_HELLO_RETRY_REQUEST: i32 = 282;
 pub const SSL_R_EARLY_DATA_NOT_IN_USE: i32 = 283;
 pub const SSL_R_HANDSHAKE_NOT_COMPLETE: i32 = 284;
@@ -6158,6 +6192,12 @@ pub struct ssl_cipher_st {
 pub type SSL_CIPHER = ssl_cipher_st;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
+pub struct ssl_credential_st {
+    _unused: [u8; 0],
+}
+pub type SSL_CREDENTIAL = ssl_credential_st;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct ssl_ctx_st {
     _unused: [u8; 0],
 }
@@ -6243,6 +6283,12 @@ pub struct x509_object_st {
 pub type X509_OBJECT = x509_object_st;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
+pub struct x509_purpose_st {
+    _unused: [u8; 0],
+}
+pub type X509_PURPOSE = x509_purpose_st;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct x509_revoked_st {
     _unused: [u8; 0],
 }
@@ -6265,7 +6311,6 @@ pub struct x509_store_st {
     _unused: [u8; 0],
 }
 pub type X509_STORE = x509_store_st;
-pub type X509_TRUST = x509_trust_st;
 pub type OPENSSL_BLOCK = *mut ::core::ffi::c_void;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -7272,6 +7317,12 @@ unsafe extern "C" {
 unsafe extern "C" {
     pub fn ERR_reason_error_string(packed_error: u32) -> *const ::core::ffi::c_char;
 }
+unsafe extern "C" {
+    pub fn ERR_lib_symbol_name(packed_error: u32) -> *const ::core::ffi::c_char;
+}
+unsafe extern "C" {
+    pub fn ERR_reason_symbol_name(packed_error: u32) -> *const ::core::ffi::c_char;
+}
 pub type ERR_print_errors_callback_t = ::core::option::Option<
     unsafe extern "C" fn(
         str_: *const ::core::ffi::c_char,
@@ -7906,10 +7957,10 @@ unsafe extern "C" {
     pub fn BIO_set_close(bio: *mut BIO, close_flag: ::core::ffi::c_int) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
-    pub fn BIO_number_read(bio: *const BIO) -> usize;
+    pub fn BIO_number_read(bio: *const BIO) -> u64;
 }
 unsafe extern "C" {
-    pub fn BIO_number_written(bio: *const BIO) -> usize;
+    pub fn BIO_number_written(bio: *const BIO) -> u64;
 }
 unsafe extern "C" {
     pub fn BIO_push(bio: *mut BIO, appended_bio: *mut BIO) -> *mut BIO;
@@ -8020,7 +8071,7 @@ unsafe extern "C" {
     ) -> *mut BIO;
 }
 unsafe extern "C" {
-    pub fn BIO_new_fp(stream: *mut FILE, close_flag: ::core::ffi::c_int) -> *mut BIO;
+    pub fn BIO_new_fp(file: *mut FILE, flags: ::core::ffi::c_int) -> *mut BIO;
 }
 unsafe extern "C" {
     pub fn BIO_get_fp(bio: *mut BIO, out_file: *mut *mut FILE) -> ::core::ffi::c_int;
@@ -8029,7 +8080,7 @@ unsafe extern "C" {
     pub fn BIO_set_fp(
         bio: *mut BIO,
         file: *mut FILE,
-        close_flag: ::core::ffi::c_int,
+        flags: ::core::ffi::c_int,
     ) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
@@ -8130,19 +8181,23 @@ unsafe extern "C" {
 unsafe extern "C" {
     pub fn BIO_meth_set_create(
         method: *mut BIO_METHOD,
-        create: ::core::option::Option<unsafe extern "C" fn(arg1: *mut BIO) -> ::core::ffi::c_int>,
+        create_func: ::core::option::Option<
+            unsafe extern "C" fn(arg1: *mut BIO) -> ::core::ffi::c_int,
+        >,
     ) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
     pub fn BIO_meth_set_destroy(
         method: *mut BIO_METHOD,
-        destroy: ::core::option::Option<unsafe extern "C" fn(arg1: *mut BIO) -> ::core::ffi::c_int>,
+        destroy_func: ::core::option::Option<
+            unsafe extern "C" fn(arg1: *mut BIO) -> ::core::ffi::c_int,
+        >,
     ) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
     pub fn BIO_meth_set_write(
         method: *mut BIO_METHOD,
-        write: ::core::option::Option<
+        write_func: ::core::option::Option<
             unsafe extern "C" fn(
                 arg1: *mut BIO,
                 arg2: *const ::core::ffi::c_char,
@@ -8154,7 +8209,7 @@ unsafe extern "C" {
 unsafe extern "C" {
     pub fn BIO_meth_set_read(
         method: *mut BIO_METHOD,
-        read: ::core::option::Option<
+        read_func: ::core::option::Option<
             unsafe extern "C" fn(
                 arg1: *mut BIO,
                 arg2: *mut ::core::ffi::c_char,
@@ -8166,7 +8221,7 @@ unsafe extern "C" {
 unsafe extern "C" {
     pub fn BIO_meth_set_gets(
         method: *mut BIO_METHOD,
-        gets: ::core::option::Option<
+        gets_func: ::core::option::Option<
             unsafe extern "C" fn(
                 arg1: *mut BIO,
                 arg2: *mut ::core::ffi::c_char,
@@ -8178,7 +8233,7 @@ unsafe extern "C" {
 unsafe extern "C" {
     pub fn BIO_meth_set_ctrl(
         method: *mut BIO_METHOD,
-        ctrl: ::core::option::Option<
+        ctrl_func: ::core::option::Option<
             unsafe extern "C" fn(
                 arg1: *mut BIO,
                 arg2: ::core::ffi::c_int,
@@ -8311,8 +8366,8 @@ pub struct bio_st {
     pub references: CRYPTO_refcount_t,
     pub ptr: *mut ::core::ffi::c_void,
     pub next_bio: *mut BIO,
-    pub num_read: usize,
-    pub num_write: usize,
+    pub num_read: u64,
+    pub num_write: u64,
 }
 pub type __gwchar_t = ::core::ffi::c_int;
 #[repr(C)]
@@ -9685,9 +9740,6 @@ unsafe extern "C" {
     ) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
-    pub fn ASN1_UTCTIME_cmp_time_t(s: *const ASN1_UTCTIME, t: time_t) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
     pub fn ASN1_GENERALIZEDTIME_new() -> *mut ASN1_GENERALIZEDTIME;
 }
 unsafe extern "C" {
@@ -9799,6 +9851,10 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn ASN1_TIME_to_posix(t: *const ASN1_TIME, out: *mut i64) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn ASN1_TIME_to_posix_nonstandard(t: *const ASN1_TIME, out: *mut i64)
+        -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
     pub fn ASN1_NULL_new() -> *mut ASN1_NULL;
@@ -10345,16 +10401,7 @@ pub struct cbs_st {
     pub len: usize,
 }
 unsafe extern "C" {
-    pub fn CBS_init(cbs: *mut CBS, data: *const u8, len: usize);
-}
-unsafe extern "C" {
     pub fn CBS_skip(cbs: *mut CBS, len: usize) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn CBS_data(cbs: *const CBS) -> *const u8;
-}
-unsafe extern "C" {
-    pub fn CBS_len(cbs: *const CBS) -> usize;
 }
 unsafe extern "C" {
     pub fn CBS_stow(
@@ -11418,28 +11465,6 @@ unsafe extern "C" {
 unsafe extern "C" {
     pub fn OPENSSL_no_config();
 }
-unsafe extern "C" {
-    pub fn SHA1_Init(sha: *mut SHA_CTX) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn SHA1_Update(
-        sha: *mut SHA_CTX,
-        data: *const ::core::ffi::c_void,
-        len: usize,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn SHA1_Final(out: *mut u8, sha: *mut SHA_CTX) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn SHA1(data: *const u8, len: usize, out: *mut u8) -> *mut u8;
-}
-unsafe extern "C" {
-    pub fn SHA1_Transform(sha: *mut SHA_CTX, block: *const u8);
-}
-unsafe extern "C" {
-    pub fn CRYPTO_fips_186_2_prf(out: *mut u8, out_len: usize, xkey: *const u8);
-}
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct sha_state_st {
@@ -11463,6 +11488,48 @@ pub struct sha_state_st__bindgen_ty_1__bindgen_ty_1 {
     pub h2: u32,
     pub h3: u32,
     pub h4: u32,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sha256_state_st {
+    pub h: [u32; 8usize],
+    pub Nl: u32,
+    pub Nh: u32,
+    pub data: [u8; 64usize],
+    pub num: ::core::ffi::c_uint,
+    pub md_len: ::core::ffi::c_uint,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct sha512_state_st {
+    pub h: [u64; 8usize],
+    pub Nl: u64,
+    pub Nh: u64,
+    pub p: [u8; 128usize],
+    pub num: ::core::ffi::c_uint,
+    pub md_len: ::core::ffi::c_uint,
+}
+unsafe extern "C" {
+    pub fn SHA1_Init(sha: *mut SHA_CTX) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn SHA1_Update(
+        sha: *mut SHA_CTX,
+        data: *const ::core::ffi::c_void,
+        len: usize,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn SHA1_Final(out: *mut u8, sha: *mut SHA_CTX) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn SHA1(data: *const u8, len: usize, out: *mut u8) -> *mut u8;
+}
+unsafe extern "C" {
+    pub fn SHA1_Transform(sha: *mut SHA_CTX, block: *const u8);
+}
+unsafe extern "C" {
+    pub fn CRYPTO_fips_186_2_prf(out: *mut u8, out_len: usize, xkey: *const u8);
 }
 unsafe extern "C" {
     pub fn SHA224_Init(sha: *mut SHA256_CTX) -> ::core::ffi::c_int;
@@ -11502,16 +11569,6 @@ unsafe extern "C" {
 unsafe extern "C" {
     pub fn SHA256_TransformBlocks(state: *mut u32, data: *const u8, num_blocks: usize);
 }
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct sha256_state_st {
-    pub h: [u32; 8usize],
-    pub Nl: u32,
-    pub Nh: u32,
-    pub data: [u8; 64usize],
-    pub num: ::core::ffi::c_uint,
-    pub md_len: ::core::ffi::c_uint,
-}
 unsafe extern "C" {
     pub fn SHA384_Init(sha: *mut SHA512_CTX) -> ::core::ffi::c_int;
 }
@@ -11546,16 +11603,6 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn SHA512_Transform(sha: *mut SHA512_CTX, block: *const u8);
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct sha512_state_st {
-    pub h: [u64; 8usize],
-    pub Nl: u64,
-    pub Nh: u64,
-    pub p: [u8; 128usize],
-    pub num: ::core::ffi::c_uint,
-    pub md_len: ::core::ffi::c_uint,
 }
 unsafe extern "C" {
     pub fn SHA512_256_Init(sha: *mut SHA512_CTX) -> ::core::ffi::c_int;
@@ -11744,9 +11791,6 @@ unsafe extern "C" {
     pub fn OPENSSL_secure_clear_free(ptr: *mut ::core::ffi::c_void, len: usize);
 }
 unsafe extern "C" {
-    pub fn CRYPTO_library_init();
-}
-unsafe extern "C" {
     pub fn CRYPTO_is_confidential_build() -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
@@ -11816,11 +11860,17 @@ unsafe extern "C" {
     pub fn FIPS_module_name() -> *const ::core::ffi::c_char;
 }
 unsafe extern "C" {
+    pub fn FIPS_module_hash() -> *const u8;
+}
+unsafe extern "C" {
     pub fn FIPS_version() -> u32;
 }
 unsafe extern "C" {
     pub fn FIPS_query_algorithm_status(algorithm: *const ::core::ffi::c_char)
         -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn CRYPTO_library_init();
 }
 unsafe extern "C" {
     pub fn CTR_DRBG_new(
@@ -12022,22 +12072,6 @@ unsafe extern "C" {
         ks3: *mut DES_key_schedule,
         ivec: *mut DES_cblock,
         enc: ::core::ffi::c_int,
-    );
-}
-unsafe extern "C" {
-    pub fn DES_decrypt3(
-        data: *mut u32,
-        ks1: *const DES_key_schedule,
-        ks2: *const DES_key_schedule,
-        ks3: *const DES_key_schedule,
-    );
-}
-unsafe extern "C" {
-    pub fn DES_encrypt3(
-        data: *mut u32,
-        ks1: *const DES_key_schedule,
-        ks2: *const DES_key_schedule,
-        ks3: *const DES_key_schedule,
     );
 }
 unsafe extern "C" {
@@ -12320,6 +12354,9 @@ unsafe extern "C" {
     pub fn EVP_MD_block_size(md: *const EVP_MD) -> usize;
 }
 unsafe extern "C" {
+    pub fn EVP_MD_CTX_get0_md(ctx: *const EVP_MD_CTX) -> *const EVP_MD;
+}
+unsafe extern "C" {
     pub fn EVP_MD_CTX_md(ctx: *const EVP_MD_CTX) -> *const EVP_MD;
 }
 unsafe extern "C" {
@@ -12480,7 +12517,7 @@ unsafe extern "C" {
     pub fn DSA_do_verify(
         digest: *const u8,
         digest_len: usize,
-        sig: *mut DSA_SIG,
+        sig: *const DSA_SIG,
         dsa: *const DSA,
     ) -> ::core::ffi::c_int;
 }
@@ -12489,7 +12526,7 @@ unsafe extern "C" {
         out_valid: *mut ::core::ffi::c_int,
         digest: *const u8,
         digest_len: usize,
-        sig: *mut DSA_SIG,
+        sig: *const DSA_SIG,
         dsa: *const DSA,
     ) -> ::core::ffi::c_int;
 }
@@ -13122,7 +13159,6 @@ pub struct ecdsa_method_st {
     pub init: ::core::option::Option<unsafe extern "C" fn(key: *mut EC_KEY) -> ::core::ffi::c_int>,
     pub finish:
         ::core::option::Option<unsafe extern "C" fn(key: *mut EC_KEY) -> ::core::ffi::c_int>,
-    pub group_order_size: ::core::option::Option<unsafe extern "C" fn(key: *const EC_KEY) -> usize>,
     pub sign: ::core::option::Option<
         unsafe extern "C" fn(
             digest: *const u8,
@@ -13146,6 +13182,16 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn i2d_ECPrivateKey(key: *const EC_KEY, outp: *mut *mut u8) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn d2i_ECPKParameters(
+        out: *mut *mut EC_GROUP,
+        inp: *mut *const u8,
+        len: ::core::ffi::c_long,
+    ) -> *mut EC_GROUP;
+}
+unsafe extern "C" {
+    pub fn i2d_ECPKParameters(group: *const EC_GROUP, outp: *mut *mut u8) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
     pub fn d2i_ECParameters(
@@ -13554,9 +13600,6 @@ unsafe extern "C" {
     pub fn EVP_PKEY_id(pkey: *const EVP_PKEY) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
-    pub fn EVP_PKEY_type(nid: ::core::ffi::c_int) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
     pub fn EVP_PKEY_set1_RSA(pkey: *mut EVP_PKEY, key: *mut RSA) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
@@ -13591,6 +13634,18 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn EVP_PKEY_get1_EC_KEY(pkey: *const EVP_PKEY) -> *mut EC_KEY;
+}
+unsafe extern "C" {
+    pub fn EVP_PKEY_set1_DH(pkey: *mut EVP_PKEY, key: *mut DH) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn EVP_PKEY_assign_DH(pkey: *mut EVP_PKEY, key: *mut DH) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn EVP_PKEY_get0_DH(pkey: *const EVP_PKEY) -> *mut DH;
+}
+unsafe extern "C" {
+    pub fn EVP_PKEY_get1_DH(pkey: *const EVP_PKEY) -> *mut DH;
 }
 unsafe extern "C" {
     pub fn EVP_PKEY_set_type(pkey: *mut EVP_PKEY, type_: ::core::ffi::c_int) -> ::core::ffi::c_int;
@@ -14016,6 +14071,12 @@ unsafe extern "C" {
     ) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
+    pub fn EVP_PKEY_CTX_set_dh_pad(
+        ctx: *mut EVP_PKEY_CTX,
+        pad: ::core::ffi::c_int,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
     pub fn EVP_PKEY_get0(pkey: *const EVP_PKEY) -> *mut ::core::ffi::c_void;
 }
 unsafe extern "C" {
@@ -14100,12 +14161,6 @@ unsafe extern "C" {
         inp: *mut *const u8,
         len: ::core::ffi::c_long,
     ) -> *mut EVP_PKEY;
-}
-unsafe extern "C" {
-    pub fn EVP_PKEY_get0_DH(pkey: *const EVP_PKEY) -> *mut DH;
-}
-unsafe extern "C" {
-    pub fn EVP_PKEY_get1_DH(pkey: *const EVP_PKEY) -> *mut DH;
 }
 unsafe extern "C" {
     pub fn EVP_PKEY_CTX_set_ec_param_enc(
@@ -14202,6 +14257,9 @@ unsafe extern "C" {
         type_: ::core::ffi::c_int,
         key: *mut ::core::ffi::c_void,
     ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn EVP_PKEY_type(nid: ::core::ffi::c_int) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
     pub fn HKDF(
@@ -14316,6 +14374,9 @@ pub struct hmac_ctx_st {
 }
 unsafe extern "C" {
     pub fn EVP_hpke_x25519_hkdf_sha256() -> *const EVP_HPKE_KEM;
+}
+unsafe extern "C" {
+    pub fn EVP_hpke_p256_hkdf_sha256() -> *const EVP_HPKE_KEM;
 }
 unsafe extern "C" {
     pub fn EVP_HPKE_KEM_id(kem: *const EVP_HPKE_KEM) -> u16;
@@ -14571,7 +14632,7 @@ pub struct evp_hpke_ctx_st {
 pub struct evp_hpke_key_st {
     pub kem: *const EVP_HPKE_KEM,
     pub private_key: [u8; 32usize],
-    pub public_key: [u8; 32usize],
+    pub public_key: [u8; 65usize],
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -14700,6 +14761,219 @@ pub struct md5_state_st {
     pub Nh: u32,
     pub data: [u8; 64usize],
     pub num: ::core::ffi::c_uint,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct MLDSA65_private_key {
+    pub opaque: MLDSA65_private_key__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union MLDSA65_private_key__bindgen_ty_1 {
+    pub bytes: [u8; 17536usize],
+    pub alignment: u32,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct MLDSA65_public_key {
+    pub opaque: MLDSA65_public_key__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union MLDSA65_public_key__bindgen_ty_1 {
+    pub bytes: [u8; 6240usize],
+    pub alignment: u32,
+}
+unsafe extern "C" {
+    pub fn MLDSA65_generate_key(
+        out_encoded_public_key: *mut u8,
+        out_seed: *mut u8,
+        out_private_key: *mut MLDSA65_private_key,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn MLDSA65_private_key_from_seed(
+        out_private_key: *mut MLDSA65_private_key,
+        seed: *const u8,
+        seed_len: usize,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn MLDSA65_public_from_private(
+        out_public_key: *mut MLDSA65_public_key,
+        private_key: *const MLDSA65_private_key,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn MLDSA65_sign(
+        out_encoded_signature: *mut u8,
+        private_key: *const MLDSA65_private_key,
+        msg: *const u8,
+        msg_len: usize,
+        context: *const u8,
+        context_len: usize,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn MLDSA65_verify(
+        public_key: *const MLDSA65_public_key,
+        signature: *const u8,
+        signature_len: usize,
+        msg: *const u8,
+        msg_len: usize,
+        context: *const u8,
+        context_len: usize,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn MLDSA65_marshal_public_key(
+        out: *mut CBB,
+        public_key: *const MLDSA65_public_key,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn MLDSA65_parse_public_key(
+        public_key: *mut MLDSA65_public_key,
+        in_: *mut CBS,
+    ) -> ::core::ffi::c_int;
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct MLKEM768_public_key {
+    pub opaque: MLKEM768_public_key__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union MLKEM768_public_key__bindgen_ty_1 {
+    pub bytes: [u8; 6208usize],
+    pub alignment: u16,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct MLKEM768_private_key {
+    pub opaque: MLKEM768_private_key__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union MLKEM768_private_key__bindgen_ty_1 {
+    pub bytes: [u8; 7776usize],
+    pub alignment: u16,
+}
+unsafe extern "C" {
+    pub fn MLKEM768_generate_key(
+        out_encoded_public_key: *mut u8,
+        optional_out_seed: *mut u8,
+        out_private_key: *mut MLKEM768_private_key,
+    );
+}
+unsafe extern "C" {
+    pub fn MLKEM768_private_key_from_seed(
+        out_private_key: *mut MLKEM768_private_key,
+        seed: *const u8,
+        seed_len: usize,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn MLKEM768_public_from_private(
+        out_public_key: *mut MLKEM768_public_key,
+        private_key: *const MLKEM768_private_key,
+    );
+}
+unsafe extern "C" {
+    pub fn MLKEM768_encap(
+        out_ciphertext: *mut u8,
+        out_shared_secret: *mut u8,
+        public_key: *const MLKEM768_public_key,
+    );
+}
+unsafe extern "C" {
+    pub fn MLKEM768_decap(
+        out_shared_secret: *mut u8,
+        ciphertext: *const u8,
+        ciphertext_len: usize,
+        private_key: *const MLKEM768_private_key,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn MLKEM768_marshal_public_key(
+        out: *mut CBB,
+        public_key: *const MLKEM768_public_key,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn MLKEM768_parse_public_key(
+        out_public_key: *mut MLKEM768_public_key,
+        in_: *mut CBS,
+    ) -> ::core::ffi::c_int;
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct MLKEM1024_public_key {
+    pub opaque: MLKEM1024_public_key__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union MLKEM1024_public_key__bindgen_ty_1 {
+    pub bytes: [u8; 10304usize],
+    pub alignment: u16,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct MLKEM1024_private_key {
+    pub opaque: MLKEM1024_private_key__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union MLKEM1024_private_key__bindgen_ty_1 {
+    pub bytes: [u8; 12384usize],
+    pub alignment: u16,
+}
+unsafe extern "C" {
+    pub fn MLKEM1024_generate_key(
+        out_encoded_public_key: *mut u8,
+        optional_out_seed: *mut u8,
+        out_private_key: *mut MLKEM1024_private_key,
+    );
+}
+unsafe extern "C" {
+    pub fn MLKEM1024_private_key_from_seed(
+        out_private_key: *mut MLKEM1024_private_key,
+        seed: *const u8,
+        seed_len: usize,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn MLKEM1024_public_from_private(
+        out_public_key: *mut MLKEM1024_public_key,
+        private_key: *const MLKEM1024_private_key,
+    );
+}
+unsafe extern "C" {
+    pub fn MLKEM1024_encap(
+        out_ciphertext: *mut u8,
+        out_shared_secret: *mut u8,
+        public_key: *const MLKEM1024_public_key,
+    );
+}
+unsafe extern "C" {
+    pub fn MLKEM1024_decap(
+        out_shared_secret: *mut u8,
+        ciphertext: *const u8,
+        ciphertext_len: usize,
+        private_key: *const MLKEM1024_private_key,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn MLKEM1024_marshal_public_key(
+        out: *mut CBB,
+        public_key: *const MLKEM1024_public_key,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn MLKEM1024_parse_public_key(
+        out_public_key: *mut MLKEM1024_public_key,
+        in_: *mut CBS,
+    ) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
     pub fn OBJ_dup(obj: *const ASN1_OBJECT) -> *mut ASN1_OBJECT;
@@ -15382,6 +15656,9 @@ unsafe extern "C" {
     pub fn RSA_blinding_on(rsa: *mut RSA, ctx: *mut BN_CTX) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
+    pub fn RSA_blinding_off(rsa: *mut RSA);
+}
+unsafe extern "C" {
     pub fn RSA_generate_key(
         bits: ::core::ffi::c_int,
         e: u64,
@@ -15457,7 +15734,6 @@ pub struct rsa_meth_st {
     pub app_data: *mut ::core::ffi::c_void,
     pub init: ::core::option::Option<unsafe extern "C" fn(rsa: *mut RSA) -> ::core::ffi::c_int>,
     pub finish: ::core::option::Option<unsafe extern "C" fn(rsa: *mut RSA) -> ::core::ffi::c_int>,
-    pub size: ::core::option::Option<unsafe extern "C" fn(rsa: *const RSA) -> usize>,
     pub sign: ::core::option::Option<
         unsafe extern "C" fn(
             type_: ::core::ffi::c_int,
@@ -15698,6 +15974,9 @@ unsafe extern "C" {
     pub fn X509_email_free(sk: *mut stack_st_OPENSSL_STRING);
 }
 unsafe extern "C" {
+    pub fn X509_cmp(a: *const X509, b: *const X509) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
     pub fn X509_new() -> *mut X509;
 }
 unsafe extern "C" {
@@ -15863,6 +16142,9 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn i2d_X509_CRL(crl: *mut X509_CRL, outp: *mut *mut u8) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_CRL_match(a: *const X509_CRL, b: *const X509_CRL) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
     pub fn X509_CRL_get_version(crl: *const X509_CRL) -> ::core::ffi::c_long;
@@ -16688,6 +16970,90 @@ unsafe extern "C" {
         loc: ::core::ffi::c_int,
     ) -> *mut stack_st_X509_EXTENSION;
 }
+unsafe extern "C" {
+    pub fn X509V3_EXT_d2i(ext: *const X509_EXTENSION) -> *mut ::core::ffi::c_void;
+}
+unsafe extern "C" {
+    pub fn X509V3_get_d2i(
+        extensions: *const stack_st_X509_EXTENSION,
+        nid: ::core::ffi::c_int,
+        out_critical: *mut ::core::ffi::c_int,
+        out_idx: *mut ::core::ffi::c_int,
+    ) -> *mut ::core::ffi::c_void;
+}
+unsafe extern "C" {
+    pub fn X509V3_EXT_free(
+        nid: ::core::ffi::c_int,
+        ext_data: *mut ::core::ffi::c_void,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509V3_EXT_i2d(
+        ext_nid: ::core::ffi::c_int,
+        crit: ::core::ffi::c_int,
+        ext_struc: *mut ::core::ffi::c_void,
+    ) -> *mut X509_EXTENSION;
+}
+unsafe extern "C" {
+    pub fn X509V3_add1_i2d(
+        x: *mut *mut stack_st_X509_EXTENSION,
+        nid: ::core::ffi::c_int,
+        value: *mut ::core::ffi::c_void,
+        crit: ::core::ffi::c_int,
+        flags: ::core::ffi::c_ulong,
+    ) -> ::core::ffi::c_int;
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct BASIC_CONSTRAINTS_st {
+    pub ca: ASN1_BOOLEAN,
+    pub pathlen: *mut ASN1_INTEGER,
+}
+unsafe extern "C" {
+    pub static BASIC_CONSTRAINTS_it: ASN1_ITEM;
+}
+unsafe extern "C" {
+    pub fn BASIC_CONSTRAINTS_new() -> *mut BASIC_CONSTRAINTS;
+}
+unsafe extern "C" {
+    pub fn BASIC_CONSTRAINTS_free(bcons: *mut BASIC_CONSTRAINTS);
+}
+unsafe extern "C" {
+    pub fn d2i_BASIC_CONSTRAINTS(
+        out: *mut *mut BASIC_CONSTRAINTS,
+        inp: *mut *const u8,
+        len: ::core::ffi::c_long,
+    ) -> *mut BASIC_CONSTRAINTS;
+}
+unsafe extern "C" {
+    pub fn i2d_BASIC_CONSTRAINTS(
+        bcons: *const BASIC_CONSTRAINTS,
+        outp: *mut *mut u8,
+    ) -> ::core::ffi::c_int;
+}
+pub type EXTENDED_KEY_USAGE = stack_st_ASN1_OBJECT;
+unsafe extern "C" {
+    pub static EXTENDED_KEY_USAGE_it: ASN1_ITEM;
+}
+unsafe extern "C" {
+    pub fn EXTENDED_KEY_USAGE_new() -> *mut EXTENDED_KEY_USAGE;
+}
+unsafe extern "C" {
+    pub fn EXTENDED_KEY_USAGE_free(eku: *mut EXTENDED_KEY_USAGE);
+}
+unsafe extern "C" {
+    pub fn d2i_EXTENDED_KEY_USAGE(
+        out: *mut *mut EXTENDED_KEY_USAGE,
+        inp: *mut *const u8,
+        len: ::core::ffi::c_long,
+    ) -> *mut EXTENDED_KEY_USAGE;
+}
+unsafe extern "C" {
+    pub fn i2d_EXTENDED_KEY_USAGE(
+        eku: *const EXTENDED_KEY_USAGE,
+        outp: *mut *mut u8,
+    ) -> ::core::ffi::c_int;
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct otherName_st {
@@ -16802,6 +17168,433 @@ unsafe extern "C" {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
+pub struct AUTHORITY_KEYID_st {
+    pub keyid: *mut ASN1_OCTET_STRING,
+    pub issuer: *mut GENERAL_NAMES,
+    pub serial: *mut ASN1_INTEGER,
+}
+unsafe extern "C" {
+    pub static AUTHORITY_KEYID_it: ASN1_ITEM;
+}
+unsafe extern "C" {
+    pub fn AUTHORITY_KEYID_new() -> *mut AUTHORITY_KEYID;
+}
+unsafe extern "C" {
+    pub fn AUTHORITY_KEYID_free(akid: *mut AUTHORITY_KEYID);
+}
+unsafe extern "C" {
+    pub fn d2i_AUTHORITY_KEYID(
+        out: *mut *mut AUTHORITY_KEYID,
+        inp: *mut *const u8,
+        len: ::core::ffi::c_long,
+    ) -> *mut AUTHORITY_KEYID;
+}
+unsafe extern "C" {
+    pub fn i2d_AUTHORITY_KEYID(
+        akid: *mut AUTHORITY_KEYID,
+        outp: *mut *mut u8,
+    ) -> ::core::ffi::c_int;
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct GENERAL_SUBTREE_st {
+    pub base: *mut GENERAL_NAME,
+    pub minimum: *mut ASN1_INTEGER,
+    pub maximum: *mut ASN1_INTEGER,
+}
+pub type GENERAL_SUBTREE = GENERAL_SUBTREE_st;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct stack_st_GENERAL_SUBTREE {
+    _unused: [u8; 0],
+}
+pub type sk_GENERAL_SUBTREE_free_func =
+    ::core::option::Option<unsafe extern "C" fn(arg1: *mut GENERAL_SUBTREE)>;
+pub type sk_GENERAL_SUBTREE_copy_func = ::core::option::Option<
+    unsafe extern "C" fn(arg1: *const GENERAL_SUBTREE) -> *mut GENERAL_SUBTREE,
+>;
+pub type sk_GENERAL_SUBTREE_cmp_func = ::core::option::Option<
+    unsafe extern "C" fn(
+        arg1: *const *const GENERAL_SUBTREE,
+        arg2: *const *const GENERAL_SUBTREE,
+    ) -> ::core::ffi::c_int,
+>;
+pub type sk_GENERAL_SUBTREE_delete_if_func = ::core::option::Option<
+    unsafe extern "C" fn(
+        arg1: *mut GENERAL_SUBTREE,
+        arg2: *mut ::core::ffi::c_void,
+    ) -> ::core::ffi::c_int,
+>;
+unsafe extern "C" {
+    pub fn GENERAL_SUBTREE_new() -> *mut GENERAL_SUBTREE;
+}
+unsafe extern "C" {
+    pub fn GENERAL_SUBTREE_free(subtree: *mut GENERAL_SUBTREE);
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct NAME_CONSTRAINTS_st {
+    pub permittedSubtrees: *mut stack_st_GENERAL_SUBTREE,
+    pub excludedSubtrees: *mut stack_st_GENERAL_SUBTREE,
+}
+unsafe extern "C" {
+    pub static NAME_CONSTRAINTS_it: ASN1_ITEM;
+}
+unsafe extern "C" {
+    pub fn NAME_CONSTRAINTS_new() -> *mut NAME_CONSTRAINTS;
+}
+unsafe extern "C" {
+    pub fn NAME_CONSTRAINTS_free(ncons: *mut NAME_CONSTRAINTS);
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ACCESS_DESCRIPTION_st {
+    pub method: *mut ASN1_OBJECT,
+    pub location: *mut GENERAL_NAME,
+}
+pub type ACCESS_DESCRIPTION = ACCESS_DESCRIPTION_st;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct stack_st_ACCESS_DESCRIPTION {
+    _unused: [u8; 0],
+}
+pub type sk_ACCESS_DESCRIPTION_free_func =
+    ::core::option::Option<unsafe extern "C" fn(arg1: *mut ACCESS_DESCRIPTION)>;
+pub type sk_ACCESS_DESCRIPTION_copy_func = ::core::option::Option<
+    unsafe extern "C" fn(arg1: *const ACCESS_DESCRIPTION) -> *mut ACCESS_DESCRIPTION,
+>;
+pub type sk_ACCESS_DESCRIPTION_cmp_func = ::core::option::Option<
+    unsafe extern "C" fn(
+        arg1: *const *const ACCESS_DESCRIPTION,
+        arg2: *const *const ACCESS_DESCRIPTION,
+    ) -> ::core::ffi::c_int,
+>;
+pub type sk_ACCESS_DESCRIPTION_delete_if_func = ::core::option::Option<
+    unsafe extern "C" fn(
+        arg1: *mut ACCESS_DESCRIPTION,
+        arg2: *mut ::core::ffi::c_void,
+    ) -> ::core::ffi::c_int,
+>;
+unsafe extern "C" {
+    pub fn ACCESS_DESCRIPTION_new() -> *mut ACCESS_DESCRIPTION;
+}
+unsafe extern "C" {
+    pub fn ACCESS_DESCRIPTION_free(desc: *mut ACCESS_DESCRIPTION);
+}
+pub type AUTHORITY_INFO_ACCESS = stack_st_ACCESS_DESCRIPTION;
+unsafe extern "C" {
+    pub static AUTHORITY_INFO_ACCESS_it: ASN1_ITEM;
+}
+unsafe extern "C" {
+    pub fn AUTHORITY_INFO_ACCESS_new() -> *mut AUTHORITY_INFO_ACCESS;
+}
+unsafe extern "C" {
+    pub fn AUTHORITY_INFO_ACCESS_free(aia: *mut AUTHORITY_INFO_ACCESS);
+}
+unsafe extern "C" {
+    pub fn d2i_AUTHORITY_INFO_ACCESS(
+        out: *mut *mut AUTHORITY_INFO_ACCESS,
+        inp: *mut *const u8,
+        len: ::core::ffi::c_long,
+    ) -> *mut AUTHORITY_INFO_ACCESS;
+}
+unsafe extern "C" {
+    pub fn i2d_AUTHORITY_INFO_ACCESS(
+        aia: *mut AUTHORITY_INFO_ACCESS,
+        outp: *mut *mut u8,
+    ) -> ::core::ffi::c_int;
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct DIST_POINT_NAME_st {
+    pub type_: ::core::ffi::c_int,
+    pub name: DIST_POINT_NAME_st__bindgen_ty_1,
+    pub dpname: *mut X509_NAME,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union DIST_POINT_NAME_st__bindgen_ty_1 {
+    pub fullname: *mut GENERAL_NAMES,
+    pub relativename: *mut stack_st_X509_NAME_ENTRY,
+}
+pub type DIST_POINT_NAME = DIST_POINT_NAME_st;
+unsafe extern "C" {
+    pub fn DIST_POINT_NAME_new() -> *mut DIST_POINT_NAME;
+}
+unsafe extern "C" {
+    pub fn DIST_POINT_NAME_free(name: *mut DIST_POINT_NAME);
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct DIST_POINT_st {
+    pub distpoint: *mut DIST_POINT_NAME,
+    pub reasons: *mut ASN1_BIT_STRING,
+    pub CRLissuer: *mut GENERAL_NAMES,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct stack_st_DIST_POINT {
+    _unused: [u8; 0],
+}
+pub type sk_DIST_POINT_free_func =
+    ::core::option::Option<unsafe extern "C" fn(arg1: *mut DIST_POINT)>;
+pub type sk_DIST_POINT_copy_func =
+    ::core::option::Option<unsafe extern "C" fn(arg1: *const DIST_POINT) -> *mut DIST_POINT>;
+pub type sk_DIST_POINT_cmp_func = ::core::option::Option<
+    unsafe extern "C" fn(
+        arg1: *const *const DIST_POINT,
+        arg2: *const *const DIST_POINT,
+    ) -> ::core::ffi::c_int,
+>;
+pub type sk_DIST_POINT_delete_if_func = ::core::option::Option<
+    unsafe extern "C" fn(
+        arg1: *mut DIST_POINT,
+        arg2: *mut ::core::ffi::c_void,
+    ) -> ::core::ffi::c_int,
+>;
+unsafe extern "C" {
+    pub fn DIST_POINT_new() -> *mut DIST_POINT;
+}
+unsafe extern "C" {
+    pub fn DIST_POINT_free(dp: *mut DIST_POINT);
+}
+pub type CRL_DIST_POINTS = stack_st_DIST_POINT;
+unsafe extern "C" {
+    pub static CRL_DIST_POINTS_it: ASN1_ITEM;
+}
+unsafe extern "C" {
+    pub fn CRL_DIST_POINTS_new() -> *mut CRL_DIST_POINTS;
+}
+unsafe extern "C" {
+    pub fn CRL_DIST_POINTS_free(crldp: *mut CRL_DIST_POINTS);
+}
+unsafe extern "C" {
+    pub fn d2i_CRL_DIST_POINTS(
+        out: *mut *mut CRL_DIST_POINTS,
+        inp: *mut *const u8,
+        len: ::core::ffi::c_long,
+    ) -> *mut CRL_DIST_POINTS;
+}
+unsafe extern "C" {
+    pub fn i2d_CRL_DIST_POINTS(
+        crldp: *mut CRL_DIST_POINTS,
+        outp: *mut *mut u8,
+    ) -> ::core::ffi::c_int;
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ISSUING_DIST_POINT_st {
+    pub distpoint: *mut DIST_POINT_NAME,
+    pub onlyuser: ASN1_BOOLEAN,
+    pub onlyCA: ASN1_BOOLEAN,
+    pub onlysomereasons: *mut ASN1_BIT_STRING,
+    pub indirectCRL: ASN1_BOOLEAN,
+    pub onlyattr: ASN1_BOOLEAN,
+}
+unsafe extern "C" {
+    pub static ISSUING_DIST_POINT_it: ASN1_ITEM;
+}
+unsafe extern "C" {
+    pub fn ISSUING_DIST_POINT_new() -> *mut ISSUING_DIST_POINT;
+}
+unsafe extern "C" {
+    pub fn ISSUING_DIST_POINT_free(idp: *mut ISSUING_DIST_POINT);
+}
+unsafe extern "C" {
+    pub fn d2i_ISSUING_DIST_POINT(
+        out: *mut *mut ISSUING_DIST_POINT,
+        inp: *mut *const u8,
+        len: ::core::ffi::c_long,
+    ) -> *mut ISSUING_DIST_POINT;
+}
+unsafe extern "C" {
+    pub fn i2d_ISSUING_DIST_POINT(
+        idp: *mut ISSUING_DIST_POINT,
+        outp: *mut *mut u8,
+    ) -> ::core::ffi::c_int;
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct NOTICEREF_st {
+    pub organization: *mut ASN1_STRING,
+    pub noticenos: *mut stack_st_ASN1_INTEGER,
+}
+pub type NOTICEREF = NOTICEREF_st;
+unsafe extern "C" {
+    pub fn NOTICEREF_new() -> *mut NOTICEREF;
+}
+unsafe extern "C" {
+    pub fn NOTICEREF_free(ref_: *mut NOTICEREF);
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct USERNOTICE_st {
+    pub noticeref: *mut NOTICEREF,
+    pub exptext: *mut ASN1_STRING,
+}
+pub type USERNOTICE = USERNOTICE_st;
+unsafe extern "C" {
+    pub fn USERNOTICE_new() -> *mut USERNOTICE;
+}
+unsafe extern "C" {
+    pub fn USERNOTICE_free(notice: *mut USERNOTICE);
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct POLICYQUALINFO_st {
+    pub pqualid: *mut ASN1_OBJECT,
+    pub d: POLICYQUALINFO_st__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union POLICYQUALINFO_st__bindgen_ty_1 {
+    pub cpsuri: *mut ASN1_IA5STRING,
+    pub usernotice: *mut USERNOTICE,
+    pub other: *mut ASN1_TYPE,
+}
+pub type POLICYQUALINFO = POLICYQUALINFO_st;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct stack_st_POLICYQUALINFO {
+    _unused: [u8; 0],
+}
+pub type sk_POLICYQUALINFO_free_func =
+    ::core::option::Option<unsafe extern "C" fn(arg1: *mut POLICYQUALINFO)>;
+pub type sk_POLICYQUALINFO_copy_func = ::core::option::Option<
+    unsafe extern "C" fn(arg1: *const POLICYQUALINFO) -> *mut POLICYQUALINFO,
+>;
+pub type sk_POLICYQUALINFO_cmp_func = ::core::option::Option<
+    unsafe extern "C" fn(
+        arg1: *const *const POLICYQUALINFO,
+        arg2: *const *const POLICYQUALINFO,
+    ) -> ::core::ffi::c_int,
+>;
+pub type sk_POLICYQUALINFO_delete_if_func = ::core::option::Option<
+    unsafe extern "C" fn(
+        arg1: *mut POLICYQUALINFO,
+        arg2: *mut ::core::ffi::c_void,
+    ) -> ::core::ffi::c_int,
+>;
+unsafe extern "C" {
+    pub fn POLICYQUALINFO_new() -> *mut POLICYQUALINFO;
+}
+unsafe extern "C" {
+    pub fn POLICYQUALINFO_free(info: *mut POLICYQUALINFO);
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct POLICYINFO_st {
+    pub policyid: *mut ASN1_OBJECT,
+    pub qualifiers: *mut stack_st_POLICYQUALINFO,
+}
+pub type POLICYINFO = POLICYINFO_st;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct stack_st_POLICYINFO {
+    _unused: [u8; 0],
+}
+pub type sk_POLICYINFO_free_func =
+    ::core::option::Option<unsafe extern "C" fn(arg1: *mut POLICYINFO)>;
+pub type sk_POLICYINFO_copy_func =
+    ::core::option::Option<unsafe extern "C" fn(arg1: *const POLICYINFO) -> *mut POLICYINFO>;
+pub type sk_POLICYINFO_cmp_func = ::core::option::Option<
+    unsafe extern "C" fn(
+        arg1: *const *const POLICYINFO,
+        arg2: *const *const POLICYINFO,
+    ) -> ::core::ffi::c_int,
+>;
+pub type sk_POLICYINFO_delete_if_func = ::core::option::Option<
+    unsafe extern "C" fn(
+        arg1: *mut POLICYINFO,
+        arg2: *mut ::core::ffi::c_void,
+    ) -> ::core::ffi::c_int,
+>;
+unsafe extern "C" {
+    pub fn POLICYINFO_new() -> *mut POLICYINFO;
+}
+unsafe extern "C" {
+    pub fn POLICYINFO_free(info: *mut POLICYINFO);
+}
+pub type CERTIFICATEPOLICIES = stack_st_POLICYINFO;
+unsafe extern "C" {
+    pub static CERTIFICATEPOLICIES_it: ASN1_ITEM;
+}
+unsafe extern "C" {
+    pub fn CERTIFICATEPOLICIES_new() -> *mut CERTIFICATEPOLICIES;
+}
+unsafe extern "C" {
+    pub fn CERTIFICATEPOLICIES_free(policies: *mut CERTIFICATEPOLICIES);
+}
+unsafe extern "C" {
+    pub fn d2i_CERTIFICATEPOLICIES(
+        out: *mut *mut CERTIFICATEPOLICIES,
+        inp: *mut *const u8,
+        len: ::core::ffi::c_long,
+    ) -> *mut CERTIFICATEPOLICIES;
+}
+unsafe extern "C" {
+    pub fn i2d_CERTIFICATEPOLICIES(
+        policies: *const CERTIFICATEPOLICIES,
+        outp: *mut *mut u8,
+    ) -> ::core::ffi::c_int;
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct POLICY_MAPPING_st {
+    pub issuerDomainPolicy: *mut ASN1_OBJECT,
+    pub subjectDomainPolicy: *mut ASN1_OBJECT,
+}
+pub type POLICY_MAPPING = POLICY_MAPPING_st;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct stack_st_POLICY_MAPPING {
+    _unused: [u8; 0],
+}
+pub type sk_POLICY_MAPPING_free_func =
+    ::core::option::Option<unsafe extern "C" fn(arg1: *mut POLICY_MAPPING)>;
+pub type sk_POLICY_MAPPING_copy_func = ::core::option::Option<
+    unsafe extern "C" fn(arg1: *const POLICY_MAPPING) -> *mut POLICY_MAPPING,
+>;
+pub type sk_POLICY_MAPPING_cmp_func = ::core::option::Option<
+    unsafe extern "C" fn(
+        arg1: *const *const POLICY_MAPPING,
+        arg2: *const *const POLICY_MAPPING,
+    ) -> ::core::ffi::c_int,
+>;
+pub type sk_POLICY_MAPPING_delete_if_func = ::core::option::Option<
+    unsafe extern "C" fn(
+        arg1: *mut POLICY_MAPPING,
+        arg2: *mut ::core::ffi::c_void,
+    ) -> ::core::ffi::c_int,
+>;
+unsafe extern "C" {
+    pub fn POLICY_MAPPING_new() -> *mut POLICY_MAPPING;
+}
+unsafe extern "C" {
+    pub fn POLICY_MAPPING_free(mapping: *mut POLICY_MAPPING);
+}
+pub type POLICY_MAPPINGS = stack_st_POLICY_MAPPING;
+unsafe extern "C" {
+    pub static POLICY_MAPPINGS_it: ASN1_ITEM;
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct POLICY_CONSTRAINTS_st {
+    pub requireExplicitPolicy: *mut ASN1_INTEGER,
+    pub inhibitPolicyMapping: *mut ASN1_INTEGER,
+}
+pub type POLICY_CONSTRAINTS = POLICY_CONSTRAINTS_st;
+unsafe extern "C" {
+    pub static POLICY_CONSTRAINTS_it: ASN1_ITEM;
+}
+unsafe extern "C" {
+    pub fn POLICY_CONSTRAINTS_new() -> *mut POLICY_CONSTRAINTS;
+}
+unsafe extern "C" {
+    pub fn POLICY_CONSTRAINTS_free(pcons: *mut POLICY_CONSTRAINTS);
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct stack_st_X509_ALGOR {
     _unused: [u8; 0],
 }
@@ -16860,7 +17653,7 @@ unsafe extern "C" {
     );
 }
 unsafe extern "C" {
-    pub fn X509_ALGOR_set_md(alg: *mut X509_ALGOR, md: *const EVP_MD);
+    pub fn X509_ALGOR_set_md(alg: *mut X509_ALGOR, md: *const EVP_MD) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
     pub fn X509_ALGOR_cmp(a: *const X509_ALGOR, b: *const X509_ALGOR) -> ::core::ffi::c_int;
@@ -16974,6 +17767,389 @@ unsafe extern "C" {
         attr: *mut X509_ATTRIBUTE,
         idx: ::core::ffi::c_int,
     ) -> *mut ASN1_TYPE;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_new() -> *mut X509_STORE;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_up_ref(store: *mut X509_STORE) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_free(store: *mut X509_STORE);
+}
+unsafe extern "C" {
+    pub fn X509_STORE_add_cert(store: *mut X509_STORE, x509: *mut X509) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_add_crl(store: *mut X509_STORE, crl: *mut X509_CRL) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_get0_param(store: *mut X509_STORE) -> *mut X509_VERIFY_PARAM;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_set1_param(
+        store: *mut X509_STORE,
+        param: *const X509_VERIFY_PARAM,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_set_flags(
+        store: *mut X509_STORE,
+        flags: ::core::ffi::c_ulong,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_set_depth(
+        store: *mut X509_STORE,
+        depth: ::core::ffi::c_int,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_set_purpose(
+        store: *mut X509_STORE,
+        purpose: ::core::ffi::c_int,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_set_trust(
+        store: *mut X509_STORE,
+        trust: ::core::ffi::c_int,
+    ) -> ::core::ffi::c_int;
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct stack_st_X509_OBJECT {
+    _unused: [u8; 0],
+}
+pub type sk_X509_OBJECT_free_func =
+    ::core::option::Option<unsafe extern "C" fn(arg1: *mut X509_OBJECT)>;
+pub type sk_X509_OBJECT_copy_func =
+    ::core::option::Option<unsafe extern "C" fn(arg1: *const X509_OBJECT) -> *mut X509_OBJECT>;
+pub type sk_X509_OBJECT_cmp_func = ::core::option::Option<
+    unsafe extern "C" fn(
+        arg1: *const *const X509_OBJECT,
+        arg2: *const *const X509_OBJECT,
+    ) -> ::core::ffi::c_int,
+>;
+pub type sk_X509_OBJECT_delete_if_func = ::core::option::Option<
+    unsafe extern "C" fn(
+        arg1: *mut X509_OBJECT,
+        arg2: *mut ::core::ffi::c_void,
+    ) -> ::core::ffi::c_int,
+>;
+unsafe extern "C" {
+    pub fn X509_OBJECT_new() -> *mut X509_OBJECT;
+}
+unsafe extern "C" {
+    pub fn X509_OBJECT_free(obj: *mut X509_OBJECT);
+}
+unsafe extern "C" {
+    pub fn X509_OBJECT_get_type(obj: *const X509_OBJECT) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_OBJECT_get0_X509(obj: *const X509_OBJECT) -> *mut X509;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_get1_objects(store: *mut X509_STORE) -> *mut stack_st_X509_OBJECT;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_new() -> *mut X509_STORE_CTX;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_free(ctx: *mut X509_STORE_CTX);
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_init(
+        ctx: *mut X509_STORE_CTX,
+        store: *mut X509_STORE,
+        x509: *mut X509,
+        chain: *mut stack_st_X509,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_verify_cert(ctx: *mut X509_STORE_CTX) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_get0_chain(ctx: *const X509_STORE_CTX) -> *mut stack_st_X509;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_get1_chain(ctx: *const X509_STORE_CTX) -> *mut stack_st_X509;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_get_error(ctx: *const X509_STORE_CTX) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_set_error(ctx: *mut X509_STORE_CTX, err: ::core::ffi::c_int);
+}
+unsafe extern "C" {
+    pub fn X509_verify_cert_error_string(err: ::core::ffi::c_long) -> *const ::core::ffi::c_char;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_get_error_depth(ctx: *const X509_STORE_CTX) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_get_current_cert(ctx: *const X509_STORE_CTX) -> *mut X509;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_get0_current_crl(ctx: *const X509_STORE_CTX) -> *mut X509_CRL;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_get0_store(ctx: *const X509_STORE_CTX) -> *mut X509_STORE;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_get0_cert(ctx: *const X509_STORE_CTX) -> *mut X509;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_get0_untrusted(ctx: *const X509_STORE_CTX) -> *mut stack_st_X509;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_set0_trusted_stack(ctx: *mut X509_STORE_CTX, sk: *mut stack_st_X509);
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_set0_crls(ctx: *mut X509_STORE_CTX, sk: *mut stack_st_X509_CRL);
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_set_default(
+        ctx: *mut X509_STORE_CTX,
+        name: *const ::core::ffi::c_char,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_get0_param(ctx: *mut X509_STORE_CTX) -> *mut X509_VERIFY_PARAM;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_set0_param(ctx: *mut X509_STORE_CTX, param: *mut X509_VERIFY_PARAM);
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_set_flags(ctx: *mut X509_STORE_CTX, flags: ::core::ffi::c_ulong);
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_set_time(
+        ctx: *mut X509_STORE_CTX,
+        flags: ::core::ffi::c_ulong,
+        t: time_t,
+    );
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_set_time_posix(
+        ctx: *mut X509_STORE_CTX,
+        flags: ::core::ffi::c_ulong,
+        t: i64,
+    );
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_set_depth(ctx: *mut X509_STORE_CTX, depth: ::core::ffi::c_int);
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_set_purpose(
+        ctx: *mut X509_STORE_CTX,
+        purpose: ::core::ffi::c_int,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_set_trust(
+        ctx: *mut X509_STORE_CTX,
+        trust: ::core::ffi::c_int,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_VERIFY_PARAM_new() -> *mut X509_VERIFY_PARAM;
+}
+unsafe extern "C" {
+    pub fn X509_VERIFY_PARAM_free(param: *mut X509_VERIFY_PARAM);
+}
+unsafe extern "C" {
+    pub fn X509_VERIFY_PARAM_inherit(
+        to: *mut X509_VERIFY_PARAM,
+        from: *const X509_VERIFY_PARAM,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_VERIFY_PARAM_set1(
+        to: *mut X509_VERIFY_PARAM,
+        from: *const X509_VERIFY_PARAM,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_VERIFY_PARAM_set_flags(
+        param: *mut X509_VERIFY_PARAM,
+        flags: ::core::ffi::c_ulong,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_VERIFY_PARAM_clear_flags(
+        param: *mut X509_VERIFY_PARAM,
+        flags: ::core::ffi::c_ulong,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_VERIFY_PARAM_get_flags(param: *const X509_VERIFY_PARAM) -> ::core::ffi::c_ulong;
+}
+unsafe extern "C" {
+    pub fn X509_VERIFY_PARAM_set_depth(param: *mut X509_VERIFY_PARAM, depth: ::core::ffi::c_int);
+}
+unsafe extern "C" {
+    pub fn X509_VERIFY_PARAM_get_depth(param: *const X509_VERIFY_PARAM) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_VERIFY_PARAM_set_time(param: *mut X509_VERIFY_PARAM, t: time_t);
+}
+unsafe extern "C" {
+    pub fn X509_VERIFY_PARAM_set_time_posix(param: *mut X509_VERIFY_PARAM, t: i64);
+}
+unsafe extern "C" {
+    pub fn X509_VERIFY_PARAM_add0_policy(
+        param: *mut X509_VERIFY_PARAM,
+        policy: *mut ASN1_OBJECT,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_VERIFY_PARAM_set1_policies(
+        param: *mut X509_VERIFY_PARAM,
+        policies: *const stack_st_ASN1_OBJECT,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_VERIFY_PARAM_set1_host(
+        param: *mut X509_VERIFY_PARAM,
+        name: *const ::core::ffi::c_char,
+        name_len: usize,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_VERIFY_PARAM_add1_host(
+        param: *mut X509_VERIFY_PARAM,
+        name: *const ::core::ffi::c_char,
+        name_len: usize,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_VERIFY_PARAM_set_hostflags(
+        param: *mut X509_VERIFY_PARAM,
+        flags: ::core::ffi::c_uint,
+    );
+}
+unsafe extern "C" {
+    pub fn X509_VERIFY_PARAM_set1_email(
+        param: *mut X509_VERIFY_PARAM,
+        email: *const ::core::ffi::c_char,
+        email_len: usize,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_VERIFY_PARAM_set1_ip(
+        param: *mut X509_VERIFY_PARAM,
+        ip: *const u8,
+        ip_len: usize,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_VERIFY_PARAM_set1_ip_asc(
+        param: *mut X509_VERIFY_PARAM,
+        ipasc: *const ::core::ffi::c_char,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_VERIFY_PARAM_set_purpose(
+        param: *mut X509_VERIFY_PARAM,
+        purpose: ::core::ffi::c_int,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_VERIFY_PARAM_set_trust(
+        param: *mut X509_VERIFY_PARAM,
+        trust: ::core::ffi::c_int,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_load_locations(
+        store: *mut X509_STORE,
+        file: *const ::core::ffi::c_char,
+        dir: *const ::core::ffi::c_char,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_add_lookup(
+        store: *mut X509_STORE,
+        method: *const X509_LOOKUP_METHOD,
+    ) -> *mut X509_LOOKUP;
+}
+unsafe extern "C" {
+    pub fn X509_LOOKUP_hash_dir() -> *const X509_LOOKUP_METHOD;
+}
+unsafe extern "C" {
+    pub fn X509_LOOKUP_file() -> *const X509_LOOKUP_METHOD;
+}
+unsafe extern "C" {
+    pub fn X509_LOOKUP_load_file(
+        lookup: *mut X509_LOOKUP,
+        file: *const ::core::ffi::c_char,
+        type_: ::core::ffi::c_int,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_LOOKUP_add_dir(
+        lookup: *mut X509_LOOKUP,
+        path: *const ::core::ffi::c_char,
+        type_: ::core::ffi::c_int,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_LOOKUP_ctrl(
+        lookup: *mut X509_LOOKUP,
+        cmd: ::core::ffi::c_int,
+        argc: *const ::core::ffi::c_char,
+        argl: ::core::ffi::c_long,
+        ret: *mut *mut ::core::ffi::c_char,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_load_cert_file(
+        lookup: *mut X509_LOOKUP,
+        file: *const ::core::ffi::c_char,
+        type_: ::core::ffi::c_int,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_load_crl_file(
+        lookup: *mut X509_LOOKUP,
+        file: *const ::core::ffi::c_char,
+        type_: ::core::ffi::c_int,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_load_cert_crl_file(
+        lookup: *mut X509_LOOKUP,
+        file: *const ::core::ffi::c_char,
+        type_: ::core::ffi::c_int,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_NAME_hash(name: *mut X509_NAME) -> u32;
+}
+unsafe extern "C" {
+    pub fn X509_NAME_hash_old(name: *mut X509_NAME) -> u32;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_set_default_paths(store: *mut X509_STORE) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_get_default_cert_area() -> *const ::core::ffi::c_char;
+}
+unsafe extern "C" {
+    pub fn X509_get_default_cert_dir() -> *const ::core::ffi::c_char;
+}
+unsafe extern "C" {
+    pub fn X509_get_default_cert_file() -> *const ::core::ffi::c_char;
+}
+unsafe extern "C" {
+    pub fn X509_get_default_private_dir() -> *const ::core::ffi::c_char;
+}
+unsafe extern "C" {
+    pub fn X509_get_default_cert_dir_env() -> *const ::core::ffi::c_char;
+}
+unsafe extern "C" {
+    pub fn X509_get_default_cert_file_env() -> *const ::core::ffi::c_char;
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -17683,6 +18859,40 @@ unsafe extern "C" {
         x509: *mut X509,
     ) -> ::core::ffi::c_int;
 }
+unsafe extern "C" {
+    pub fn X509_check_purpose(
+        x509: *mut X509,
+        purpose: ::core::ffi::c_int,
+        ca: ::core::ffi::c_int,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_check_trust(
+        x509: *mut X509,
+        id: ::core::ffi::c_int,
+        flags: ::core::ffi::c_int,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_get1_certs(
+        ctx: *mut X509_STORE_CTX,
+        name: *mut X509_NAME,
+    ) -> *mut stack_st_X509;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_get1_crls(
+        ctx: *mut X509_STORE_CTX,
+        name: *mut X509_NAME,
+    ) -> *mut stack_st_X509_CRL;
+}
+unsafe extern "C" {
+    pub fn X509_STORE_CTX_get_by_subject(
+        ctx: *mut X509_STORE_CTX,
+        type_: ::core::ffi::c_int,
+        name: *mut X509_NAME,
+        ret: *mut X509_OBJECT,
+    ) -> ::core::ffi::c_int;
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct private_key_st {
@@ -17721,6 +18931,95 @@ pub type sk_X509_INFO_delete_if_func = ::core::option::Option<
 >;
 unsafe extern "C" {
     pub fn X509_INFO_free(info: *mut X509_INFO);
+}
+pub type X509V3_EXT_NEW =
+    ::core::option::Option<unsafe extern "C" fn() -> *mut ::core::ffi::c_void>;
+pub type X509V3_EXT_FREE =
+    ::core::option::Option<unsafe extern "C" fn(ext: *mut ::core::ffi::c_void)>;
+pub type X509V3_EXT_D2I = ::core::option::Option<
+    unsafe extern "C" fn(
+        ext: *mut ::core::ffi::c_void,
+        inp: *mut *const u8,
+        len: ::core::ffi::c_long,
+    ) -> *mut ::core::ffi::c_void,
+>;
+pub type X509V3_EXT_I2D = ::core::option::Option<
+    unsafe extern "C" fn(ext: *mut ::core::ffi::c_void, outp: *mut *mut u8) -> ::core::ffi::c_int,
+>;
+pub type X509V3_EXT_I2V = ::core::option::Option<
+    unsafe extern "C" fn(
+        method: *const X509V3_EXT_METHOD,
+        ext: *mut ::core::ffi::c_void,
+        extlist: *mut stack_st_CONF_VALUE,
+    ) -> *mut stack_st_CONF_VALUE,
+>;
+pub type X509V3_EXT_V2I = ::core::option::Option<
+    unsafe extern "C" fn(
+        method: *const X509V3_EXT_METHOD,
+        ctx: *const X509V3_CTX,
+        values: *const stack_st_CONF_VALUE,
+    ) -> *mut ::core::ffi::c_void,
+>;
+pub type X509V3_EXT_I2S = ::core::option::Option<
+    unsafe extern "C" fn(
+        method: *const X509V3_EXT_METHOD,
+        ext: *mut ::core::ffi::c_void,
+    ) -> *mut ::core::ffi::c_char,
+>;
+pub type X509V3_EXT_S2I = ::core::option::Option<
+    unsafe extern "C" fn(
+        method: *const X509V3_EXT_METHOD,
+        ctx: *const X509V3_CTX,
+        str_: *const ::core::ffi::c_char,
+    ) -> *mut ::core::ffi::c_void,
+>;
+pub type X509V3_EXT_I2R = ::core::option::Option<
+    unsafe extern "C" fn(
+        method: *const X509V3_EXT_METHOD,
+        ext: *mut ::core::ffi::c_void,
+        out: *mut BIO,
+        indent: ::core::ffi::c_int,
+    ) -> ::core::ffi::c_int,
+>;
+pub type X509V3_EXT_R2I = ::core::option::Option<
+    unsafe extern "C" fn(
+        method: *const X509V3_EXT_METHOD,
+        ctx: *const X509V3_CTX,
+        str_: *const ::core::ffi::c_char,
+    ) -> *mut ::core::ffi::c_void,
+>;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct v3_ext_method {
+    pub ext_nid: ::core::ffi::c_int,
+    pub ext_flags: ::core::ffi::c_int,
+    pub it: *const ASN1_ITEM_st,
+    pub ext_new: X509V3_EXT_NEW,
+    pub ext_free: X509V3_EXT_FREE,
+    pub d2i: X509V3_EXT_D2I,
+    pub i2d: X509V3_EXT_I2D,
+    pub i2s: X509V3_EXT_I2S,
+    pub s2i: X509V3_EXT_S2I,
+    pub i2v: X509V3_EXT_I2V,
+    pub v2i: X509V3_EXT_V2I,
+    pub i2r: X509V3_EXT_I2R,
+    pub r2i: X509V3_EXT_R2I,
+    pub usr_data: *mut ::core::ffi::c_void,
+}
+unsafe extern "C" {
+    pub fn X509V3_EXT_get(ext: *const X509_EXTENSION) -> *const X509V3_EXT_METHOD;
+}
+unsafe extern "C" {
+    pub fn X509V3_EXT_get_nid(nid: ::core::ffi::c_int) -> *const X509V3_EXT_METHOD;
+}
+unsafe extern "C" {
+    pub fn X509V3_EXT_add(ext: *mut X509V3_EXT_METHOD) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509V3_EXT_add_alias(
+        nid_to: ::core::ffi::c_int,
+        nid_from: ::core::ffi::c_int,
+    ) -> ::core::ffi::c_int;
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -17930,1340 +19229,26 @@ unsafe extern "C" {
 unsafe extern "C" {
     pub fn X509_STORE_set_verify_cb(store: *mut X509_STORE, verify_cb: X509_STORE_CTX_verify_cb);
 }
-pub type X509_STORE_CTX_get_crl_fn = ::core::option::Option<
-    unsafe extern "C" fn(
-        ctx: *mut X509_STORE_CTX,
-        crl: *mut *mut X509_CRL,
-        x: *mut X509,
-    ) -> ::core::ffi::c_int,
->;
-pub type X509_STORE_CTX_check_crl_fn = ::core::option::Option<
-    unsafe extern "C" fn(ctx: *mut X509_STORE_CTX, crl: *mut X509_CRL) -> ::core::ffi::c_int,
->;
-unsafe extern "C" {
-    pub fn X509_STORE_set_get_crl(store: *mut X509_STORE, get_crl: X509_STORE_CTX_get_crl_fn);
-}
-unsafe extern "C" {
-    pub fn X509_STORE_set_check_crl(store: *mut X509_STORE, check_crl: X509_STORE_CTX_check_crl_fn);
-}
 unsafe extern "C" {
     pub fn X509_STORE_CTX_set_chain(ctx: *mut X509_STORE_CTX, sk: *mut stack_st_X509);
+}
+unsafe extern "C" {
+    pub fn X509_STORE_get0_objects(store: *mut X509_STORE) -> *mut stack_st_X509_OBJECT;
+}
+unsafe extern "C" {
+    pub fn X509_PURPOSE_get_by_sname(sname: *const ::core::ffi::c_char) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn X509_PURPOSE_get0(id: ::core::ffi::c_int) -> *const X509_PURPOSE;
+}
+unsafe extern "C" {
+    pub fn X509_PURPOSE_get_id(purpose: *const X509_PURPOSE) -> ::core::ffi::c_int;
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct X509_algor_st {
     pub algorithm: *mut ASN1_OBJECT,
     pub parameter: *mut ASN1_TYPE,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct stack_st_DIST_POINT {
-    _unused: [u8; 0],
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct x509_trust_st {
-    pub trust: ::core::ffi::c_int,
-    pub flags: ::core::ffi::c_int,
-    pub check_trust: ::core::option::Option<
-        unsafe extern "C" fn(
-            arg1: *const X509_TRUST,
-            arg2: *mut X509,
-            arg3: ::core::ffi::c_int,
-        ) -> ::core::ffi::c_int,
-    >,
-    pub name: *mut ::core::ffi::c_char,
-    pub arg1: ::core::ffi::c_int,
-    pub arg2: *mut ::core::ffi::c_void,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct stack_st_X509_TRUST {
-    _unused: [u8; 0],
-}
-pub type sk_X509_TRUST_free_func =
-    ::core::option::Option<unsafe extern "C" fn(arg1: *mut X509_TRUST)>;
-pub type sk_X509_TRUST_copy_func =
-    ::core::option::Option<unsafe extern "C" fn(arg1: *const X509_TRUST) -> *mut X509_TRUST>;
-pub type sk_X509_TRUST_cmp_func = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *const *const X509_TRUST,
-        arg2: *const *const X509_TRUST,
-    ) -> ::core::ffi::c_int,
->;
-pub type sk_X509_TRUST_delete_if_func = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *mut X509_TRUST,
-        arg2: *mut ::core::ffi::c_void,
-    ) -> ::core::ffi::c_int,
->;
-unsafe extern "C" {
-    pub fn X509_verify_cert_error_string(err: ::core::ffi::c_long) -> *const ::core::ffi::c_char;
-}
-unsafe extern "C" {
-    pub fn X509_get_default_cert_area() -> *const ::core::ffi::c_char;
-}
-unsafe extern "C" {
-    pub fn X509_get_default_cert_dir() -> *const ::core::ffi::c_char;
-}
-unsafe extern "C" {
-    pub fn X509_get_default_cert_file() -> *const ::core::ffi::c_char;
-}
-unsafe extern "C" {
-    pub fn X509_get_default_cert_dir_env() -> *const ::core::ffi::c_char;
-}
-unsafe extern "C" {
-    pub fn X509_get_default_cert_file_env() -> *const ::core::ffi::c_char;
-}
-unsafe extern "C" {
-    pub fn X509_get_default_private_dir() -> *const ::core::ffi::c_char;
-}
-unsafe extern "C" {
-    pub fn X509_TRUST_set(
-        t: *mut ::core::ffi::c_int,
-        trust: ::core::ffi::c_int,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_cmp(a: *const X509, b: *const X509) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_NAME_hash(name: *mut X509_NAME) -> u32;
-}
-unsafe extern "C" {
-    pub fn X509_NAME_hash_old(name: *mut X509_NAME) -> u32;
-}
-unsafe extern "C" {
-    pub fn X509_CRL_match(a: *const X509_CRL, b: *const X509_CRL) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_verify_cert(ctx: *mut X509_STORE_CTX) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_check_trust(
-        x: *mut X509,
-        id: ::core::ffi::c_int,
-        flags: ::core::ffi::c_int,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_TRUST_get_count() -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_TRUST_get0(idx: ::core::ffi::c_int) -> *const X509_TRUST;
-}
-unsafe extern "C" {
-    pub fn X509_TRUST_get_by_id(id: ::core::ffi::c_int) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_TRUST_get_flags(xp: *const X509_TRUST) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_TRUST_get0_name(xp: *const X509_TRUST) -> *mut ::core::ffi::c_char;
-}
-unsafe extern "C" {
-    pub fn X509_TRUST_get_trust(xp: *const X509_TRUST) -> ::core::ffi::c_int;
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct stack_st_X509_OBJECT {
-    _unused: [u8; 0],
-}
-pub type sk_X509_OBJECT_free_func =
-    ::core::option::Option<unsafe extern "C" fn(arg1: *mut X509_OBJECT)>;
-pub type sk_X509_OBJECT_copy_func =
-    ::core::option::Option<unsafe extern "C" fn(arg1: *const X509_OBJECT) -> *mut X509_OBJECT>;
-pub type sk_X509_OBJECT_cmp_func = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *const *const X509_OBJECT,
-        arg2: *const *const X509_OBJECT,
-    ) -> ::core::ffi::c_int,
->;
-pub type sk_X509_OBJECT_delete_if_func = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *mut X509_OBJECT,
-        arg2: *mut ::core::ffi::c_void,
-    ) -> ::core::ffi::c_int,
->;
-unsafe extern "C" {
-    pub fn X509_STORE_set_depth(
-        store: *mut X509_STORE,
-        depth: ::core::ffi::c_int,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_set_depth(ctx: *mut X509_STORE_CTX, depth: ::core::ffi::c_int);
-}
-unsafe extern "C" {
-    pub fn X509_LOOKUP_load_file(
-        lookup: *mut X509_LOOKUP,
-        path: *const ::core::ffi::c_char,
-        type_: ::core::ffi::c_int,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_LOOKUP_add_dir(
-        lookup: *mut X509_LOOKUP,
-        path: *const ::core::ffi::c_char,
-        type_: ::core::ffi::c_int,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_OBJECT_new() -> *mut X509_OBJECT;
-}
-unsafe extern "C" {
-    pub fn X509_OBJECT_free(obj: *mut X509_OBJECT);
-}
-unsafe extern "C" {
-    pub fn X509_OBJECT_get_type(obj: *const X509_OBJECT) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_OBJECT_get0_X509(obj: *const X509_OBJECT) -> *mut X509;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_new() -> *mut X509_STORE;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_up_ref(store: *mut X509_STORE) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_free(store: *mut X509_STORE);
-}
-unsafe extern "C" {
-    pub fn X509_STORE_get0_objects(st: *mut X509_STORE) -> *mut stack_st_X509_OBJECT;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_get1_certs(
-        st: *mut X509_STORE_CTX,
-        nm: *mut X509_NAME,
-    ) -> *mut stack_st_X509;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_get1_crls(
-        st: *mut X509_STORE_CTX,
-        nm: *mut X509_NAME,
-    ) -> *mut stack_st_X509_CRL;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_set_flags(
-        store: *mut X509_STORE,
-        flags: ::core::ffi::c_ulong,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_set_purpose(
-        store: *mut X509_STORE,
-        purpose: ::core::ffi::c_int,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_set_trust(
-        store: *mut X509_STORE,
-        trust: ::core::ffi::c_int,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_set1_param(
-        store: *mut X509_STORE,
-        param: *const X509_VERIFY_PARAM,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_get0_param(store: *mut X509_STORE) -> *mut X509_VERIFY_PARAM;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_new() -> *mut X509_STORE_CTX;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_free(ctx: *mut X509_STORE_CTX);
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_init(
-        ctx: *mut X509_STORE_CTX,
-        store: *mut X509_STORE,
-        x509: *mut X509,
-        chain: *mut stack_st_X509,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_set0_trusted_stack(ctx: *mut X509_STORE_CTX, sk: *mut stack_st_X509);
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_get0_store(ctx: *const X509_STORE_CTX) -> *mut X509_STORE;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_get0_cert(ctx: *const X509_STORE_CTX) -> *mut X509;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_add_lookup(
-        v: *mut X509_STORE,
-        m: *const X509_LOOKUP_METHOD,
-    ) -> *mut X509_LOOKUP;
-}
-unsafe extern "C" {
-    pub fn X509_LOOKUP_hash_dir() -> *const X509_LOOKUP_METHOD;
-}
-unsafe extern "C" {
-    pub fn X509_LOOKUP_file() -> *const X509_LOOKUP_METHOD;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_add_cert(ctx: *mut X509_STORE, x: *mut X509) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_add_crl(ctx: *mut X509_STORE, x: *mut X509_CRL) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_get_by_subject(
-        vs: *mut X509_STORE_CTX,
-        type_: ::core::ffi::c_int,
-        name: *mut X509_NAME,
-        ret: *mut X509_OBJECT,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_LOOKUP_ctrl(
-        ctx: *mut X509_LOOKUP,
-        cmd: ::core::ffi::c_int,
-        argc: *const ::core::ffi::c_char,
-        argl: ::core::ffi::c_long,
-        ret: *mut *mut ::core::ffi::c_char,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_load_cert_file(
-        ctx: *mut X509_LOOKUP,
-        file: *const ::core::ffi::c_char,
-        type_: ::core::ffi::c_int,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_load_crl_file(
-        ctx: *mut X509_LOOKUP,
-        file: *const ::core::ffi::c_char,
-        type_: ::core::ffi::c_int,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_load_cert_crl_file(
-        ctx: *mut X509_LOOKUP,
-        file: *const ::core::ffi::c_char,
-        type_: ::core::ffi::c_int,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_load_locations(
-        ctx: *mut X509_STORE,
-        file: *const ::core::ffi::c_char,
-        dir: *const ::core::ffi::c_char,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_set_default_paths(ctx: *mut X509_STORE) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_get_error(ctx: *const X509_STORE_CTX) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_set_error(ctx: *mut X509_STORE_CTX, err: ::core::ffi::c_int);
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_get_error_depth(ctx: *const X509_STORE_CTX) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_get_current_cert(ctx: *const X509_STORE_CTX) -> *mut X509;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_get0_current_crl(ctx: *const X509_STORE_CTX) -> *mut X509_CRL;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_get0_chain(ctx: *const X509_STORE_CTX) -> *mut stack_st_X509;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_get1_chain(ctx: *const X509_STORE_CTX) -> *mut stack_st_X509;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_get0_untrusted(ctx: *const X509_STORE_CTX) -> *mut stack_st_X509;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_set0_crls(c: *mut X509_STORE_CTX, sk: *mut stack_st_X509_CRL);
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_set_purpose(
-        ctx: *mut X509_STORE_CTX,
-        purpose: ::core::ffi::c_int,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_set_trust(
-        ctx: *mut X509_STORE_CTX,
-        trust: ::core::ffi::c_int,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_purpose_inherit(
-        ctx: *mut X509_STORE_CTX,
-        def_purpose: ::core::ffi::c_int,
-        purpose: ::core::ffi::c_int,
-        trust: ::core::ffi::c_int,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_set_flags(ctx: *mut X509_STORE_CTX, flags: ::core::ffi::c_ulong);
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_set_time(
-        ctx: *mut X509_STORE_CTX,
-        flags: ::core::ffi::c_ulong,
-        t: time_t,
-    );
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_set_time_posix(
-        ctx: *mut X509_STORE_CTX,
-        flags: ::core::ffi::c_ulong,
-        t: i64,
-    );
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_get0_param(ctx: *mut X509_STORE_CTX) -> *mut X509_VERIFY_PARAM;
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_set0_param(ctx: *mut X509_STORE_CTX, param: *mut X509_VERIFY_PARAM);
-}
-unsafe extern "C" {
-    pub fn X509_STORE_CTX_set_default(
-        ctx: *mut X509_STORE_CTX,
-        name: *const ::core::ffi::c_char,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_VERIFY_PARAM_new() -> *mut X509_VERIFY_PARAM;
-}
-unsafe extern "C" {
-    pub fn X509_VERIFY_PARAM_free(param: *mut X509_VERIFY_PARAM);
-}
-unsafe extern "C" {
-    pub fn X509_VERIFY_PARAM_inherit(
-        to: *mut X509_VERIFY_PARAM,
-        from: *const X509_VERIFY_PARAM,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_VERIFY_PARAM_set1(
-        to: *mut X509_VERIFY_PARAM,
-        from: *const X509_VERIFY_PARAM,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_VERIFY_PARAM_set_flags(
-        param: *mut X509_VERIFY_PARAM,
-        flags: ::core::ffi::c_ulong,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_VERIFY_PARAM_clear_flags(
-        param: *mut X509_VERIFY_PARAM,
-        flags: ::core::ffi::c_ulong,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_VERIFY_PARAM_get_flags(param: *const X509_VERIFY_PARAM) -> ::core::ffi::c_ulong;
-}
-unsafe extern "C" {
-    pub fn X509_VERIFY_PARAM_set_purpose(
-        param: *mut X509_VERIFY_PARAM,
-        purpose: ::core::ffi::c_int,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_VERIFY_PARAM_set_trust(
-        param: *mut X509_VERIFY_PARAM,
-        trust: ::core::ffi::c_int,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_VERIFY_PARAM_set_depth(param: *mut X509_VERIFY_PARAM, depth: ::core::ffi::c_int);
-}
-unsafe extern "C" {
-    pub fn X509_VERIFY_PARAM_set_time(param: *mut X509_VERIFY_PARAM, t: time_t);
-}
-unsafe extern "C" {
-    pub fn X509_VERIFY_PARAM_set_time_posix(param: *mut X509_VERIFY_PARAM, t: i64);
-}
-unsafe extern "C" {
-    pub fn X509_VERIFY_PARAM_add0_policy(
-        param: *mut X509_VERIFY_PARAM,
-        policy: *mut ASN1_OBJECT,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_VERIFY_PARAM_set1_policies(
-        param: *mut X509_VERIFY_PARAM,
-        policies: *const stack_st_ASN1_OBJECT,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_VERIFY_PARAM_set1_host(
-        param: *mut X509_VERIFY_PARAM,
-        name: *const ::core::ffi::c_char,
-        name_len: usize,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_VERIFY_PARAM_add1_host(
-        param: *mut X509_VERIFY_PARAM,
-        name: *const ::core::ffi::c_char,
-        name_len: usize,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_VERIFY_PARAM_set_hostflags(
-        param: *mut X509_VERIFY_PARAM,
-        flags: ::core::ffi::c_uint,
-    );
-}
-unsafe extern "C" {
-    pub fn X509_VERIFY_PARAM_set1_email(
-        param: *mut X509_VERIFY_PARAM,
-        email: *const ::core::ffi::c_char,
-        email_len: usize,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_VERIFY_PARAM_set1_ip(
-        param: *mut X509_VERIFY_PARAM,
-        ip: *const u8,
-        ip_len: usize,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_VERIFY_PARAM_set1_ip_asc(
-        param: *mut X509_VERIFY_PARAM,
-        ipasc: *const ::core::ffi::c_char,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_VERIFY_PARAM_get_depth(param: *const X509_VERIFY_PARAM) -> ::core::ffi::c_int;
-}
-pub type X509V3_EXT_NEW =
-    ::core::option::Option<unsafe extern "C" fn() -> *mut ::core::ffi::c_void>;
-pub type X509V3_EXT_FREE =
-    ::core::option::Option<unsafe extern "C" fn(arg1: *mut ::core::ffi::c_void)>;
-pub type X509V3_EXT_D2I = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *mut ::core::ffi::c_void,
-        arg2: *mut *const ::core::ffi::c_uchar,
-        arg3: ::core::ffi::c_long,
-    ) -> *mut ::core::ffi::c_void,
->;
-pub type X509V3_EXT_I2D = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *mut ::core::ffi::c_void,
-        arg2: *mut *mut ::core::ffi::c_uchar,
-    ) -> ::core::ffi::c_int,
->;
-pub type X509V3_EXT_I2V = ::core::option::Option<
-    unsafe extern "C" fn(
-        method: *const X509V3_EXT_METHOD,
-        ext: *mut ::core::ffi::c_void,
-        extlist: *mut stack_st_CONF_VALUE,
-    ) -> *mut stack_st_CONF_VALUE,
->;
-pub type X509V3_EXT_V2I = ::core::option::Option<
-    unsafe extern "C" fn(
-        method: *const X509V3_EXT_METHOD,
-        ctx: *const X509V3_CTX,
-        values: *const stack_st_CONF_VALUE,
-    ) -> *mut ::core::ffi::c_void,
->;
-pub type X509V3_EXT_I2S = ::core::option::Option<
-    unsafe extern "C" fn(
-        method: *const X509V3_EXT_METHOD,
-        ext: *mut ::core::ffi::c_void,
-    ) -> *mut ::core::ffi::c_char,
->;
-pub type X509V3_EXT_S2I = ::core::option::Option<
-    unsafe extern "C" fn(
-        method: *const X509V3_EXT_METHOD,
-        ctx: *const X509V3_CTX,
-        str_: *const ::core::ffi::c_char,
-    ) -> *mut ::core::ffi::c_void,
->;
-pub type X509V3_EXT_I2R = ::core::option::Option<
-    unsafe extern "C" fn(
-        method: *const X509V3_EXT_METHOD,
-        ext: *mut ::core::ffi::c_void,
-        out: *mut BIO,
-        indent: ::core::ffi::c_int,
-    ) -> ::core::ffi::c_int,
->;
-pub type X509V3_EXT_R2I = ::core::option::Option<
-    unsafe extern "C" fn(
-        method: *const X509V3_EXT_METHOD,
-        ctx: *const X509V3_CTX,
-        str_: *const ::core::ffi::c_char,
-    ) -> *mut ::core::ffi::c_void,
->;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct v3_ext_method {
-    pub ext_nid: ::core::ffi::c_int,
-    pub ext_flags: ::core::ffi::c_int,
-    pub it: *const ASN1_ITEM_st,
-    pub ext_new: X509V3_EXT_NEW,
-    pub ext_free: X509V3_EXT_FREE,
-    pub d2i: X509V3_EXT_D2I,
-    pub i2d: X509V3_EXT_I2D,
-    pub i2s: X509V3_EXT_I2S,
-    pub s2i: X509V3_EXT_S2I,
-    pub i2v: X509V3_EXT_I2V,
-    pub v2i: X509V3_EXT_V2I,
-    pub i2r: X509V3_EXT_I2R,
-    pub r2i: X509V3_EXT_R2I,
-    pub usr_data: *mut ::core::ffi::c_void,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct stack_st_X509V3_EXT_METHOD {
-    _unused: [u8; 0],
-}
-pub type sk_X509V3_EXT_METHOD_free_func =
-    ::core::option::Option<unsafe extern "C" fn(arg1: *mut X509V3_EXT_METHOD)>;
-pub type sk_X509V3_EXT_METHOD_copy_func = ::core::option::Option<
-    unsafe extern "C" fn(arg1: *const X509V3_EXT_METHOD) -> *mut X509V3_EXT_METHOD,
->;
-pub type sk_X509V3_EXT_METHOD_cmp_func = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *const *const X509V3_EXT_METHOD,
-        arg2: *const *const X509V3_EXT_METHOD,
-    ) -> ::core::ffi::c_int,
->;
-pub type sk_X509V3_EXT_METHOD_delete_if_func = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *mut X509V3_EXT_METHOD,
-        arg2: *mut ::core::ffi::c_void,
-    ) -> ::core::ffi::c_int,
->;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct BASIC_CONSTRAINTS_st {
-    pub ca: ::core::ffi::c_int,
-    pub pathlen: *mut ASN1_INTEGER,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct ACCESS_DESCRIPTION_st {
-    pub method: *mut ASN1_OBJECT,
-    pub location: *mut GENERAL_NAME,
-}
-pub type ACCESS_DESCRIPTION = ACCESS_DESCRIPTION_st;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct stack_st_ACCESS_DESCRIPTION {
-    _unused: [u8; 0],
-}
-pub type sk_ACCESS_DESCRIPTION_free_func =
-    ::core::option::Option<unsafe extern "C" fn(arg1: *mut ACCESS_DESCRIPTION)>;
-pub type sk_ACCESS_DESCRIPTION_copy_func = ::core::option::Option<
-    unsafe extern "C" fn(arg1: *const ACCESS_DESCRIPTION) -> *mut ACCESS_DESCRIPTION,
->;
-pub type sk_ACCESS_DESCRIPTION_cmp_func = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *const *const ACCESS_DESCRIPTION,
-        arg2: *const *const ACCESS_DESCRIPTION,
-    ) -> ::core::ffi::c_int,
->;
-pub type sk_ACCESS_DESCRIPTION_delete_if_func = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *mut ACCESS_DESCRIPTION,
-        arg2: *mut ::core::ffi::c_void,
-    ) -> ::core::ffi::c_int,
->;
-pub type AUTHORITY_INFO_ACCESS = stack_st_ACCESS_DESCRIPTION;
-pub type EXTENDED_KEY_USAGE = stack_st_ASN1_OBJECT;
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct DIST_POINT_NAME_st {
-    pub type_: ::core::ffi::c_int,
-    pub name: DIST_POINT_NAME_st__bindgen_ty_1,
-    pub dpname: *mut X509_NAME,
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union DIST_POINT_NAME_st__bindgen_ty_1 {
-    pub fullname: *mut GENERAL_NAMES,
-    pub relativename: *mut stack_st_X509_NAME_ENTRY,
-}
-pub type DIST_POINT_NAME = DIST_POINT_NAME_st;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct DIST_POINT_st {
-    pub distpoint: *mut DIST_POINT_NAME,
-    pub reasons: *mut ASN1_BIT_STRING,
-    pub CRLissuer: *mut GENERAL_NAMES,
-}
-pub type CRL_DIST_POINTS = stack_st_DIST_POINT;
-pub type sk_DIST_POINT_free_func =
-    ::core::option::Option<unsafe extern "C" fn(arg1: *mut DIST_POINT)>;
-pub type sk_DIST_POINT_copy_func =
-    ::core::option::Option<unsafe extern "C" fn(arg1: *const DIST_POINT) -> *mut DIST_POINT>;
-pub type sk_DIST_POINT_cmp_func = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *const *const DIST_POINT,
-        arg2: *const *const DIST_POINT,
-    ) -> ::core::ffi::c_int,
->;
-pub type sk_DIST_POINT_delete_if_func = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *mut DIST_POINT,
-        arg2: *mut ::core::ffi::c_void,
-    ) -> ::core::ffi::c_int,
->;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct AUTHORITY_KEYID_st {
-    pub keyid: *mut ASN1_OCTET_STRING,
-    pub issuer: *mut GENERAL_NAMES,
-    pub serial: *mut ASN1_INTEGER,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct NOTICEREF_st {
-    pub organization: *mut ASN1_STRING,
-    pub noticenos: *mut stack_st_ASN1_INTEGER,
-}
-pub type NOTICEREF = NOTICEREF_st;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct USERNOTICE_st {
-    pub noticeref: *mut NOTICEREF,
-    pub exptext: *mut ASN1_STRING,
-}
-pub type USERNOTICE = USERNOTICE_st;
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub struct POLICYQUALINFO_st {
-    pub pqualid: *mut ASN1_OBJECT,
-    pub d: POLICYQUALINFO_st__bindgen_ty_1,
-}
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union POLICYQUALINFO_st__bindgen_ty_1 {
-    pub cpsuri: *mut ASN1_IA5STRING,
-    pub usernotice: *mut USERNOTICE,
-    pub other: *mut ASN1_TYPE,
-}
-pub type POLICYQUALINFO = POLICYQUALINFO_st;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct stack_st_POLICYQUALINFO {
-    _unused: [u8; 0],
-}
-pub type sk_POLICYQUALINFO_free_func =
-    ::core::option::Option<unsafe extern "C" fn(arg1: *mut POLICYQUALINFO)>;
-pub type sk_POLICYQUALINFO_copy_func = ::core::option::Option<
-    unsafe extern "C" fn(arg1: *const POLICYQUALINFO) -> *mut POLICYQUALINFO,
->;
-pub type sk_POLICYQUALINFO_cmp_func = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *const *const POLICYQUALINFO,
-        arg2: *const *const POLICYQUALINFO,
-    ) -> ::core::ffi::c_int,
->;
-pub type sk_POLICYQUALINFO_delete_if_func = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *mut POLICYQUALINFO,
-        arg2: *mut ::core::ffi::c_void,
-    ) -> ::core::ffi::c_int,
->;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct POLICYINFO_st {
-    pub policyid: *mut ASN1_OBJECT,
-    pub qualifiers: *mut stack_st_POLICYQUALINFO,
-}
-pub type POLICYINFO = POLICYINFO_st;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct stack_st_POLICYINFO {
-    _unused: [u8; 0],
-}
-pub type CERTIFICATEPOLICIES = stack_st_POLICYINFO;
-pub type sk_POLICYINFO_free_func =
-    ::core::option::Option<unsafe extern "C" fn(arg1: *mut POLICYINFO)>;
-pub type sk_POLICYINFO_copy_func =
-    ::core::option::Option<unsafe extern "C" fn(arg1: *const POLICYINFO) -> *mut POLICYINFO>;
-pub type sk_POLICYINFO_cmp_func = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *const *const POLICYINFO,
-        arg2: *const *const POLICYINFO,
-    ) -> ::core::ffi::c_int,
->;
-pub type sk_POLICYINFO_delete_if_func = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *mut POLICYINFO,
-        arg2: *mut ::core::ffi::c_void,
-    ) -> ::core::ffi::c_int,
->;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct POLICY_MAPPING_st {
-    pub issuerDomainPolicy: *mut ASN1_OBJECT,
-    pub subjectDomainPolicy: *mut ASN1_OBJECT,
-}
-pub type POLICY_MAPPING = POLICY_MAPPING_st;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct stack_st_POLICY_MAPPING {
-    _unused: [u8; 0],
-}
-pub type sk_POLICY_MAPPING_free_func =
-    ::core::option::Option<unsafe extern "C" fn(arg1: *mut POLICY_MAPPING)>;
-pub type sk_POLICY_MAPPING_copy_func = ::core::option::Option<
-    unsafe extern "C" fn(arg1: *const POLICY_MAPPING) -> *mut POLICY_MAPPING,
->;
-pub type sk_POLICY_MAPPING_cmp_func = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *const *const POLICY_MAPPING,
-        arg2: *const *const POLICY_MAPPING,
-    ) -> ::core::ffi::c_int,
->;
-pub type sk_POLICY_MAPPING_delete_if_func = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *mut POLICY_MAPPING,
-        arg2: *mut ::core::ffi::c_void,
-    ) -> ::core::ffi::c_int,
->;
-pub type POLICY_MAPPINGS = stack_st_POLICY_MAPPING;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct GENERAL_SUBTREE_st {
-    pub base: *mut GENERAL_NAME,
-    pub minimum: *mut ASN1_INTEGER,
-    pub maximum: *mut ASN1_INTEGER,
-}
-pub type GENERAL_SUBTREE = GENERAL_SUBTREE_st;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct stack_st_GENERAL_SUBTREE {
-    _unused: [u8; 0],
-}
-pub type sk_GENERAL_SUBTREE_free_func =
-    ::core::option::Option<unsafe extern "C" fn(arg1: *mut GENERAL_SUBTREE)>;
-pub type sk_GENERAL_SUBTREE_copy_func = ::core::option::Option<
-    unsafe extern "C" fn(arg1: *const GENERAL_SUBTREE) -> *mut GENERAL_SUBTREE,
->;
-pub type sk_GENERAL_SUBTREE_cmp_func = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *const *const GENERAL_SUBTREE,
-        arg2: *const *const GENERAL_SUBTREE,
-    ) -> ::core::ffi::c_int,
->;
-pub type sk_GENERAL_SUBTREE_delete_if_func = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *mut GENERAL_SUBTREE,
-        arg2: *mut ::core::ffi::c_void,
-    ) -> ::core::ffi::c_int,
->;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct NAME_CONSTRAINTS_st {
-    pub permittedSubtrees: *mut stack_st_GENERAL_SUBTREE,
-    pub excludedSubtrees: *mut stack_st_GENERAL_SUBTREE,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct POLICY_CONSTRAINTS_st {
-    pub requireExplicitPolicy: *mut ASN1_INTEGER,
-    pub inhibitPolicyMapping: *mut ASN1_INTEGER,
-}
-pub type POLICY_CONSTRAINTS = POLICY_CONSTRAINTS_st;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct ISSUING_DIST_POINT_st {
-    pub distpoint: *mut DIST_POINT_NAME,
-    pub onlyuser: ASN1_BOOLEAN,
-    pub onlyCA: ASN1_BOOLEAN,
-    pub onlysomereasons: *mut ASN1_BIT_STRING,
-    pub indirectCRL: ASN1_BOOLEAN,
-    pub onlyattr: ASN1_BOOLEAN,
-}
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct x509_purpose_st {
-    pub purpose: ::core::ffi::c_int,
-    pub trust: ::core::ffi::c_int,
-    pub flags: ::core::ffi::c_int,
-    pub check_purpose: ::core::option::Option<
-        unsafe extern "C" fn(
-            arg1: *const x509_purpose_st,
-            arg2: *const X509,
-            arg3: ::core::ffi::c_int,
-        ) -> ::core::ffi::c_int,
-    >,
-    pub name: *mut ::core::ffi::c_char,
-    pub sname: *mut ::core::ffi::c_char,
-    pub usr_data: *mut ::core::ffi::c_void,
-}
-pub type X509_PURPOSE = x509_purpose_st;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct stack_st_X509_PURPOSE {
-    _unused: [u8; 0],
-}
-pub type sk_X509_PURPOSE_free_func =
-    ::core::option::Option<unsafe extern "C" fn(arg1: *mut X509_PURPOSE)>;
-pub type sk_X509_PURPOSE_copy_func =
-    ::core::option::Option<unsafe extern "C" fn(arg1: *const X509_PURPOSE) -> *mut X509_PURPOSE>;
-pub type sk_X509_PURPOSE_cmp_func = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *const *const X509_PURPOSE,
-        arg2: *const *const X509_PURPOSE,
-    ) -> ::core::ffi::c_int,
->;
-pub type sk_X509_PURPOSE_delete_if_func = ::core::option::Option<
-    unsafe extern "C" fn(
-        arg1: *mut X509_PURPOSE,
-        arg2: *mut ::core::ffi::c_void,
-    ) -> ::core::ffi::c_int,
->;
-unsafe extern "C" {
-    pub fn BASIC_CONSTRAINTS_new() -> *mut BASIC_CONSTRAINTS;
-}
-unsafe extern "C" {
-    pub fn BASIC_CONSTRAINTS_free(a: *mut BASIC_CONSTRAINTS);
-}
-unsafe extern "C" {
-    pub fn d2i_BASIC_CONSTRAINTS(
-        a: *mut *mut BASIC_CONSTRAINTS,
-        in_: *mut *const ::core::ffi::c_uchar,
-        len: ::core::ffi::c_long,
-    ) -> *mut BASIC_CONSTRAINTS;
-}
-unsafe extern "C" {
-    pub fn i2d_BASIC_CONSTRAINTS(
-        a: *const BASIC_CONSTRAINTS,
-        out: *mut *mut ::core::ffi::c_uchar,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub static BASIC_CONSTRAINTS_it: ASN1_ITEM;
-}
-unsafe extern "C" {
-    pub fn AUTHORITY_KEYID_new() -> *mut AUTHORITY_KEYID;
-}
-unsafe extern "C" {
-    pub fn AUTHORITY_KEYID_free(a: *mut AUTHORITY_KEYID);
-}
-unsafe extern "C" {
-    pub fn d2i_AUTHORITY_KEYID(
-        a: *mut *mut AUTHORITY_KEYID,
-        in_: *mut *const ::core::ffi::c_uchar,
-        len: ::core::ffi::c_long,
-    ) -> *mut AUTHORITY_KEYID;
-}
-unsafe extern "C" {
-    pub fn i2d_AUTHORITY_KEYID(
-        a: *mut AUTHORITY_KEYID,
-        out: *mut *mut ::core::ffi::c_uchar,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub static AUTHORITY_KEYID_it: ASN1_ITEM;
-}
-unsafe extern "C" {
-    pub fn EXTENDED_KEY_USAGE_new() -> *mut EXTENDED_KEY_USAGE;
-}
-unsafe extern "C" {
-    pub fn EXTENDED_KEY_USAGE_free(a: *mut EXTENDED_KEY_USAGE);
-}
-unsafe extern "C" {
-    pub fn d2i_EXTENDED_KEY_USAGE(
-        a: *mut *mut EXTENDED_KEY_USAGE,
-        in_: *mut *const ::core::ffi::c_uchar,
-        len: ::core::ffi::c_long,
-    ) -> *mut EXTENDED_KEY_USAGE;
-}
-unsafe extern "C" {
-    pub fn i2d_EXTENDED_KEY_USAGE(
-        a: *const EXTENDED_KEY_USAGE,
-        out: *mut *mut ::core::ffi::c_uchar,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub static EXTENDED_KEY_USAGE_it: ASN1_ITEM;
-}
-unsafe extern "C" {
-    pub fn CERTIFICATEPOLICIES_new() -> *mut CERTIFICATEPOLICIES;
-}
-unsafe extern "C" {
-    pub fn CERTIFICATEPOLICIES_free(a: *mut CERTIFICATEPOLICIES);
-}
-unsafe extern "C" {
-    pub fn d2i_CERTIFICATEPOLICIES(
-        a: *mut *mut CERTIFICATEPOLICIES,
-        in_: *mut *const ::core::ffi::c_uchar,
-        len: ::core::ffi::c_long,
-    ) -> *mut CERTIFICATEPOLICIES;
-}
-unsafe extern "C" {
-    pub fn i2d_CERTIFICATEPOLICIES(
-        a: *const CERTIFICATEPOLICIES,
-        out: *mut *mut ::core::ffi::c_uchar,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub static CERTIFICATEPOLICIES_it: ASN1_ITEM;
-}
-unsafe extern "C" {
-    pub fn POLICYINFO_new() -> *mut POLICYINFO;
-}
-unsafe extern "C" {
-    pub fn POLICYINFO_free(a: *mut POLICYINFO);
-}
-unsafe extern "C" {
-    pub fn d2i_POLICYINFO(
-        a: *mut *mut POLICYINFO,
-        in_: *mut *const ::core::ffi::c_uchar,
-        len: ::core::ffi::c_long,
-    ) -> *mut POLICYINFO;
-}
-unsafe extern "C" {
-    pub fn i2d_POLICYINFO(
-        a: *const POLICYINFO,
-        out: *mut *mut ::core::ffi::c_uchar,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub static POLICYINFO_it: ASN1_ITEM;
-}
-unsafe extern "C" {
-    pub fn POLICYQUALINFO_new() -> *mut POLICYQUALINFO;
-}
-unsafe extern "C" {
-    pub fn POLICYQUALINFO_free(a: *mut POLICYQUALINFO);
-}
-unsafe extern "C" {
-    pub fn d2i_POLICYQUALINFO(
-        a: *mut *mut POLICYQUALINFO,
-        in_: *mut *const ::core::ffi::c_uchar,
-        len: ::core::ffi::c_long,
-    ) -> *mut POLICYQUALINFO;
-}
-unsafe extern "C" {
-    pub fn i2d_POLICYQUALINFO(
-        a: *const POLICYQUALINFO,
-        out: *mut *mut ::core::ffi::c_uchar,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub static POLICYQUALINFO_it: ASN1_ITEM;
-}
-unsafe extern "C" {
-    pub fn USERNOTICE_new() -> *mut USERNOTICE;
-}
-unsafe extern "C" {
-    pub fn USERNOTICE_free(a: *mut USERNOTICE);
-}
-unsafe extern "C" {
-    pub fn d2i_USERNOTICE(
-        a: *mut *mut USERNOTICE,
-        in_: *mut *const ::core::ffi::c_uchar,
-        len: ::core::ffi::c_long,
-    ) -> *mut USERNOTICE;
-}
-unsafe extern "C" {
-    pub fn i2d_USERNOTICE(
-        a: *const USERNOTICE,
-        out: *mut *mut ::core::ffi::c_uchar,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub static USERNOTICE_it: ASN1_ITEM;
-}
-unsafe extern "C" {
-    pub fn NOTICEREF_new() -> *mut NOTICEREF;
-}
-unsafe extern "C" {
-    pub fn NOTICEREF_free(a: *mut NOTICEREF);
-}
-unsafe extern "C" {
-    pub fn d2i_NOTICEREF(
-        a: *mut *mut NOTICEREF,
-        in_: *mut *const ::core::ffi::c_uchar,
-        len: ::core::ffi::c_long,
-    ) -> *mut NOTICEREF;
-}
-unsafe extern "C" {
-    pub fn i2d_NOTICEREF(
-        a: *const NOTICEREF,
-        out: *mut *mut ::core::ffi::c_uchar,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub static NOTICEREF_it: ASN1_ITEM;
-}
-unsafe extern "C" {
-    pub fn CRL_DIST_POINTS_new() -> *mut CRL_DIST_POINTS;
-}
-unsafe extern "C" {
-    pub fn CRL_DIST_POINTS_free(a: *mut CRL_DIST_POINTS);
-}
-unsafe extern "C" {
-    pub fn d2i_CRL_DIST_POINTS(
-        a: *mut *mut CRL_DIST_POINTS,
-        in_: *mut *const ::core::ffi::c_uchar,
-        len: ::core::ffi::c_long,
-    ) -> *mut CRL_DIST_POINTS;
-}
-unsafe extern "C" {
-    pub fn i2d_CRL_DIST_POINTS(
-        a: *mut CRL_DIST_POINTS,
-        out: *mut *mut ::core::ffi::c_uchar,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub static CRL_DIST_POINTS_it: ASN1_ITEM;
-}
-unsafe extern "C" {
-    pub fn DIST_POINT_new() -> *mut DIST_POINT;
-}
-unsafe extern "C" {
-    pub fn DIST_POINT_free(a: *mut DIST_POINT);
-}
-unsafe extern "C" {
-    pub fn d2i_DIST_POINT(
-        a: *mut *mut DIST_POINT,
-        in_: *mut *const ::core::ffi::c_uchar,
-        len: ::core::ffi::c_long,
-    ) -> *mut DIST_POINT;
-}
-unsafe extern "C" {
-    pub fn i2d_DIST_POINT(
-        a: *mut DIST_POINT,
-        out: *mut *mut ::core::ffi::c_uchar,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub static DIST_POINT_it: ASN1_ITEM;
-}
-unsafe extern "C" {
-    pub fn DIST_POINT_NAME_new() -> *mut DIST_POINT_NAME;
-}
-unsafe extern "C" {
-    pub fn DIST_POINT_NAME_free(a: *mut DIST_POINT_NAME);
-}
-unsafe extern "C" {
-    pub fn d2i_DIST_POINT_NAME(
-        a: *mut *mut DIST_POINT_NAME,
-        in_: *mut *const ::core::ffi::c_uchar,
-        len: ::core::ffi::c_long,
-    ) -> *mut DIST_POINT_NAME;
-}
-unsafe extern "C" {
-    pub fn i2d_DIST_POINT_NAME(
-        a: *mut DIST_POINT_NAME,
-        out: *mut *mut ::core::ffi::c_uchar,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub static DIST_POINT_NAME_it: ASN1_ITEM;
-}
-unsafe extern "C" {
-    pub fn ISSUING_DIST_POINT_new() -> *mut ISSUING_DIST_POINT;
-}
-unsafe extern "C" {
-    pub fn ISSUING_DIST_POINT_free(a: *mut ISSUING_DIST_POINT);
-}
-unsafe extern "C" {
-    pub fn d2i_ISSUING_DIST_POINT(
-        a: *mut *mut ISSUING_DIST_POINT,
-        in_: *mut *const ::core::ffi::c_uchar,
-        len: ::core::ffi::c_long,
-    ) -> *mut ISSUING_DIST_POINT;
-}
-unsafe extern "C" {
-    pub fn i2d_ISSUING_DIST_POINT(
-        a: *mut ISSUING_DIST_POINT,
-        out: *mut *mut ::core::ffi::c_uchar,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub static ISSUING_DIST_POINT_it: ASN1_ITEM;
-}
-unsafe extern "C" {
-    pub fn DIST_POINT_set_dpname(
-        dpn: *mut DIST_POINT_NAME,
-        iname: *mut X509_NAME,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn ACCESS_DESCRIPTION_new() -> *mut ACCESS_DESCRIPTION;
-}
-unsafe extern "C" {
-    pub fn ACCESS_DESCRIPTION_free(a: *mut ACCESS_DESCRIPTION);
-}
-unsafe extern "C" {
-    pub fn d2i_ACCESS_DESCRIPTION(
-        a: *mut *mut ACCESS_DESCRIPTION,
-        in_: *mut *const ::core::ffi::c_uchar,
-        len: ::core::ffi::c_long,
-    ) -> *mut ACCESS_DESCRIPTION;
-}
-unsafe extern "C" {
-    pub fn i2d_ACCESS_DESCRIPTION(
-        a: *mut ACCESS_DESCRIPTION,
-        out: *mut *mut ::core::ffi::c_uchar,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub static ACCESS_DESCRIPTION_it: ASN1_ITEM;
-}
-unsafe extern "C" {
-    pub fn AUTHORITY_INFO_ACCESS_new() -> *mut AUTHORITY_INFO_ACCESS;
-}
-unsafe extern "C" {
-    pub fn AUTHORITY_INFO_ACCESS_free(a: *mut AUTHORITY_INFO_ACCESS);
-}
-unsafe extern "C" {
-    pub fn d2i_AUTHORITY_INFO_ACCESS(
-        a: *mut *mut AUTHORITY_INFO_ACCESS,
-        in_: *mut *const ::core::ffi::c_uchar,
-        len: ::core::ffi::c_long,
-    ) -> *mut AUTHORITY_INFO_ACCESS;
-}
-unsafe extern "C" {
-    pub fn i2d_AUTHORITY_INFO_ACCESS(
-        a: *mut AUTHORITY_INFO_ACCESS,
-        out: *mut *mut ::core::ffi::c_uchar,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub static AUTHORITY_INFO_ACCESS_it: ASN1_ITEM;
-}
-unsafe extern "C" {
-    pub static POLICY_MAPPING_it: ASN1_ITEM;
-}
-unsafe extern "C" {
-    pub fn POLICY_MAPPING_new() -> *mut POLICY_MAPPING;
-}
-unsafe extern "C" {
-    pub fn POLICY_MAPPING_free(a: *mut POLICY_MAPPING);
-}
-unsafe extern "C" {
-    pub static POLICY_MAPPINGS_it: ASN1_ITEM;
-}
-unsafe extern "C" {
-    pub static GENERAL_SUBTREE_it: ASN1_ITEM;
-}
-unsafe extern "C" {
-    pub fn GENERAL_SUBTREE_new() -> *mut GENERAL_SUBTREE;
-}
-unsafe extern "C" {
-    pub fn GENERAL_SUBTREE_free(a: *mut GENERAL_SUBTREE);
-}
-unsafe extern "C" {
-    pub static NAME_CONSTRAINTS_it: ASN1_ITEM;
-}
-unsafe extern "C" {
-    pub fn NAME_CONSTRAINTS_new() -> *mut NAME_CONSTRAINTS;
-}
-unsafe extern "C" {
-    pub fn NAME_CONSTRAINTS_free(a: *mut NAME_CONSTRAINTS);
-}
-unsafe extern "C" {
-    pub fn POLICY_CONSTRAINTS_new() -> *mut POLICY_CONSTRAINTS;
-}
-unsafe extern "C" {
-    pub fn POLICY_CONSTRAINTS_free(a: *mut POLICY_CONSTRAINTS);
-}
-unsafe extern "C" {
-    pub static POLICY_CONSTRAINTS_it: ASN1_ITEM;
-}
-unsafe extern "C" {
-    pub fn X509V3_EXT_add(ext: *mut X509V3_EXT_METHOD) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509V3_EXT_add_alias(
-        nid_to: ::core::ffi::c_int,
-        nid_from: ::core::ffi::c_int,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509V3_EXT_get(ext: *const X509_EXTENSION) -> *const X509V3_EXT_METHOD;
-}
-unsafe extern "C" {
-    pub fn X509V3_EXT_get_nid(nid: ::core::ffi::c_int) -> *const X509V3_EXT_METHOD;
-}
-unsafe extern "C" {
-    pub fn X509V3_EXT_d2i(ext: *const X509_EXTENSION) -> *mut ::core::ffi::c_void;
-}
-unsafe extern "C" {
-    pub fn X509V3_get_d2i(
-        extensions: *const stack_st_X509_EXTENSION,
-        nid: ::core::ffi::c_int,
-        out_critical: *mut ::core::ffi::c_int,
-        out_idx: *mut ::core::ffi::c_int,
-    ) -> *mut ::core::ffi::c_void;
-}
-unsafe extern "C" {
-    pub fn X509V3_EXT_free(
-        nid: ::core::ffi::c_int,
-        ext_data: *mut ::core::ffi::c_void,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509V3_EXT_i2d(
-        ext_nid: ::core::ffi::c_int,
-        crit: ::core::ffi::c_int,
-        ext_struc: *mut ::core::ffi::c_void,
-    ) -> *mut X509_EXTENSION;
-}
-unsafe extern "C" {
-    pub fn X509V3_add1_i2d(
-        x: *mut *mut stack_st_X509_EXTENSION,
-        nid: ::core::ffi::c_int,
-        value: *mut ::core::ffi::c_void,
-        crit: ::core::ffi::c_int,
-        flags: ::core::ffi::c_ulong,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_check_purpose(
-        x: *mut X509,
-        id: ::core::ffi::c_int,
-        ca: ::core::ffi::c_int,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_PURPOSE_set(
-        p: *mut ::core::ffi::c_int,
-        purpose: ::core::ffi::c_int,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_PURPOSE_get_count() -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_PURPOSE_get0(idx: ::core::ffi::c_int) -> *const X509_PURPOSE;
-}
-unsafe extern "C" {
-    pub fn X509_PURPOSE_get_by_sname(sname: *const ::core::ffi::c_char) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_PURPOSE_get_by_id(id: ::core::ffi::c_int) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_PURPOSE_get0_name(xp: *const X509_PURPOSE) -> *mut ::core::ffi::c_char;
-}
-unsafe extern "C" {
-    pub fn X509_PURPOSE_get0_sname(xp: *const X509_PURPOSE) -> *mut ::core::ffi::c_char;
-}
-unsafe extern "C" {
-    pub fn X509_PURPOSE_get_trust(xp: *const X509_PURPOSE) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn X509_PURPOSE_get_id(arg1: *const X509_PURPOSE) -> ::core::ffi::c_int;
 }
 pub type pem_password_cb = ::core::option::Option<
     unsafe extern "C" fn(
@@ -19273,21 +19258,6 @@ pub type pem_password_cb = ::core::option::Option<
         userdata: *mut ::core::ffi::c_void,
     ) -> ::core::ffi::c_int,
 >;
-unsafe extern "C" {
-    pub fn PEM_get_EVP_CIPHER_INFO(
-        header: *mut ::core::ffi::c_char,
-        cipher: *mut EVP_CIPHER_INFO,
-    ) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn PEM_do_header(
-        cipher: *mut EVP_CIPHER_INFO,
-        data: *mut ::core::ffi::c_uchar,
-        len: *mut ::core::ffi::c_long,
-        callback: pem_password_cb,
-        u: *mut ::core::ffi::c_void,
-    ) -> ::core::ffi::c_int;
-}
 unsafe extern "C" {
     pub fn PEM_read_bio(
         bp: *mut BIO,
@@ -19334,8 +19304,8 @@ unsafe extern "C" {
         bp: *mut BIO,
         x: *mut ::core::ffi::c_void,
         enc: *const EVP_CIPHER,
-        kstr: *mut ::core::ffi::c_uchar,
-        klen: ::core::ffi::c_int,
+        pass: *const ::core::ffi::c_uchar,
+        pass_len: ::core::ffi::c_int,
         cb: pem_password_cb,
         u: *mut ::core::ffi::c_void,
     ) -> ::core::ffi::c_int;
@@ -19391,8 +19361,8 @@ unsafe extern "C" {
         fp: *mut FILE,
         x: *mut ::core::ffi::c_void,
         enc: *const EVP_CIPHER,
-        kstr: *mut ::core::ffi::c_uchar,
-        klen: ::core::ffi::c_int,
+        pass: *const ::core::ffi::c_uchar,
+        pass_len: ::core::ffi::c_int,
         callback: pem_password_cb,
         u: *mut ::core::ffi::c_void,
     ) -> ::core::ffi::c_int;
@@ -19592,8 +19562,8 @@ unsafe extern "C" {
         bp: *mut BIO,
         x: *mut RSA,
         enc: *const EVP_CIPHER,
-        kstr: *mut ::core::ffi::c_uchar,
-        klen: ::core::ffi::c_int,
+        pass: *const ::core::ffi::c_uchar,
+        pass_len: ::core::ffi::c_int,
         cb: pem_password_cb,
         u: *mut ::core::ffi::c_void,
     ) -> ::core::ffi::c_int;
@@ -19603,8 +19573,8 @@ unsafe extern "C" {
         fp: *mut FILE,
         x: *mut RSA,
         enc: *const EVP_CIPHER,
-        kstr: *mut ::core::ffi::c_uchar,
-        klen: ::core::ffi::c_int,
+        pass: *const ::core::ffi::c_uchar,
+        pass_len: ::core::ffi::c_int,
         cb: pem_password_cb,
         u: *mut ::core::ffi::c_void,
     ) -> ::core::ffi::c_int;
@@ -19674,8 +19644,8 @@ unsafe extern "C" {
         bp: *mut BIO,
         x: *mut DSA,
         enc: *const EVP_CIPHER,
-        kstr: *mut ::core::ffi::c_uchar,
-        klen: ::core::ffi::c_int,
+        pass: *const ::core::ffi::c_uchar,
+        pass_len: ::core::ffi::c_int,
         cb: pem_password_cb,
         u: *mut ::core::ffi::c_void,
     ) -> ::core::ffi::c_int;
@@ -19685,8 +19655,8 @@ unsafe extern "C" {
         fp: *mut FILE,
         x: *mut DSA,
         enc: *const EVP_CIPHER,
-        kstr: *mut ::core::ffi::c_uchar,
-        klen: ::core::ffi::c_int,
+        pass: *const ::core::ffi::c_uchar,
+        pass_len: ::core::ffi::c_int,
         cb: pem_password_cb,
         u: *mut ::core::ffi::c_void,
     ) -> ::core::ffi::c_int;
@@ -19756,8 +19726,8 @@ unsafe extern "C" {
         bp: *mut BIO,
         x: *mut EC_KEY,
         enc: *const EVP_CIPHER,
-        kstr: *mut ::core::ffi::c_uchar,
-        klen: ::core::ffi::c_int,
+        pass: *const ::core::ffi::c_uchar,
+        pass_len: ::core::ffi::c_int,
         cb: pem_password_cb,
         u: *mut ::core::ffi::c_void,
     ) -> ::core::ffi::c_int;
@@ -19767,8 +19737,8 @@ unsafe extern "C" {
         fp: *mut FILE,
         x: *mut EC_KEY,
         enc: *const EVP_CIPHER,
-        kstr: *mut ::core::ffi::c_uchar,
-        klen: ::core::ffi::c_int,
+        pass: *const ::core::ffi::c_uchar,
+        pass_len: ::core::ffi::c_int,
         cb: pem_password_cb,
         u: *mut ::core::ffi::c_void,
     ) -> ::core::ffi::c_int;
@@ -19838,8 +19808,8 @@ unsafe extern "C" {
         bp: *mut BIO,
         x: *mut EVP_PKEY,
         enc: *const EVP_CIPHER,
-        kstr: *mut ::core::ffi::c_uchar,
-        klen: ::core::ffi::c_int,
+        pass: *const ::core::ffi::c_uchar,
+        pass_len: ::core::ffi::c_int,
         cb: pem_password_cb,
         u: *mut ::core::ffi::c_void,
     ) -> ::core::ffi::c_int;
@@ -19849,8 +19819,8 @@ unsafe extern "C" {
         fp: *mut FILE,
         x: *mut EVP_PKEY,
         enc: *const EVP_CIPHER,
-        kstr: *mut ::core::ffi::c_uchar,
-        klen: ::core::ffi::c_int,
+        pass: *const ::core::ffi::c_uchar,
+        pass_len: ::core::ffi::c_int,
         cb: pem_password_cb,
         u: *mut ::core::ffi::c_void,
     ) -> ::core::ffi::c_int;
@@ -19882,21 +19852,21 @@ unsafe extern "C" {
         bp: *mut BIO,
         x: *const EVP_PKEY,
         nid: ::core::ffi::c_int,
-        kstr: *mut ::core::ffi::c_char,
-        klen: ::core::ffi::c_int,
+        pass: *const ::core::ffi::c_char,
+        pass_len: ::core::ffi::c_int,
         cb: pem_password_cb,
         u: *mut ::core::ffi::c_void,
     ) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
     pub fn PEM_write_bio_PKCS8PrivateKey(
-        arg1: *mut BIO,
-        arg2: *const EVP_PKEY,
-        arg3: *const EVP_CIPHER,
-        arg4: *mut ::core::ffi::c_char,
-        arg5: ::core::ffi::c_int,
-        arg6: pem_password_cb,
-        arg7: *mut ::core::ffi::c_void,
+        bp: *mut BIO,
+        x: *const EVP_PKEY,
+        enc: *const EVP_CIPHER,
+        pass: *const ::core::ffi::c_char,
+        pass_len: ::core::ffi::c_int,
+        cb: pem_password_cb,
+        u: *mut ::core::ffi::c_void,
     ) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
@@ -19904,8 +19874,8 @@ unsafe extern "C" {
         bp: *mut BIO,
         x: *const EVP_PKEY,
         enc: *const EVP_CIPHER,
-        kstr: *mut ::core::ffi::c_char,
-        klen: ::core::ffi::c_int,
+        pass: *const ::core::ffi::c_char,
+        pass_len: ::core::ffi::c_int,
         cb: pem_password_cb,
         u: *mut ::core::ffi::c_void,
     ) -> ::core::ffi::c_int;
@@ -19915,8 +19885,8 @@ unsafe extern "C" {
         bp: *mut BIO,
         x: *const EVP_PKEY,
         nid: ::core::ffi::c_int,
-        kstr: *mut ::core::ffi::c_char,
-        klen: ::core::ffi::c_int,
+        pass: *const ::core::ffi::c_char,
+        pass_len: ::core::ffi::c_int,
         cb: pem_password_cb,
         u: *mut ::core::ffi::c_void,
     ) -> ::core::ffi::c_int;
@@ -19934,8 +19904,8 @@ unsafe extern "C" {
         fp: *mut FILE,
         x: *const EVP_PKEY,
         enc: *const EVP_CIPHER,
-        kstr: *mut ::core::ffi::c_char,
-        klen: ::core::ffi::c_int,
+        pass: *const ::core::ffi::c_char,
+        pass_len: ::core::ffi::c_int,
         cb: pem_password_cb,
         u: *mut ::core::ffi::c_void,
     ) -> ::core::ffi::c_int;
@@ -19945,8 +19915,8 @@ unsafe extern "C" {
         fp: *mut FILE,
         x: *const EVP_PKEY,
         nid: ::core::ffi::c_int,
-        kstr: *mut ::core::ffi::c_char,
-        klen: ::core::ffi::c_int,
+        pass: *const ::core::ffi::c_char,
+        pass_len: ::core::ffi::c_int,
         cb: pem_password_cb,
         u: *mut ::core::ffi::c_void,
     ) -> ::core::ffi::c_int;
@@ -19956,8 +19926,8 @@ unsafe extern "C" {
         fp: *mut FILE,
         x: *const EVP_PKEY,
         nid: ::core::ffi::c_int,
-        kstr: *mut ::core::ffi::c_char,
-        klen: ::core::ffi::c_int,
+        pass: *const ::core::ffi::c_char,
+        pass_len: ::core::ffi::c_int,
         cb: pem_password_cb,
         u: *mut ::core::ffi::c_void,
     ) -> ::core::ffi::c_int;
@@ -19975,8 +19945,8 @@ unsafe extern "C" {
         fp: *mut FILE,
         x: *const EVP_PKEY,
         enc: *const EVP_CIPHER,
-        kstr: *mut ::core::ffi::c_char,
-        klen: ::core::ffi::c_int,
+        pass: *const ::core::ffi::c_char,
+        pass_len: ::core::ffi::c_int,
         cd: pem_password_cb,
         u: *mut ::core::ffi::c_void,
     ) -> ::core::ffi::c_int;
@@ -20219,6 +20189,79 @@ unsafe extern "C" {
 unsafe extern "C" {
     pub fn SIPHASH_24(key: *const u64, input: *const u8, input_len: usize) -> u64;
 }
+unsafe extern "C" {
+    pub fn SLHDSA_SHA2_128S_generate_key(out_public_key: *mut u8, out_private_key: *mut u8);
+}
+unsafe extern "C" {
+    pub fn SLHDSA_SHA2_128S_public_from_private(out_public_key: *mut u8, private_key: *const u8);
+}
+unsafe extern "C" {
+    pub fn SLHDSA_SHA2_128S_sign(
+        out_signature: *mut u8,
+        private_key: *const u8,
+        msg: *const u8,
+        msg_len: usize,
+        context: *const u8,
+        context_len: usize,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn SLHDSA_SHA2_128S_verify(
+        signature: *const u8,
+        signature_len: usize,
+        public_key: *const u8,
+        msg: *const u8,
+        msg_len: usize,
+        context: *const u8,
+        context_len: usize,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn SLHDSA_SHA2_128S_prehash_sign(
+        out_signature: *mut u8,
+        private_key: *const u8,
+        hashed_msg: *const u8,
+        hashed_msg_len: usize,
+        hash_nid: ::core::ffi::c_int,
+        context: *const u8,
+        context_len: usize,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn SLHDSA_SHA2_128S_prehash_verify(
+        signature: *const u8,
+        signature_len: usize,
+        public_key: *const u8,
+        hashed_msg: *const u8,
+        hashed_msg_len: usize,
+        hash_nid: ::core::ffi::c_int,
+        context: *const u8,
+        context_len: usize,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn SLHDSA_SHA2_128S_prehash_warning_nonstandard_sign(
+        out_signature: *mut u8,
+        private_key: *const u8,
+        hashed_msg: *const u8,
+        hashed_msg_len: usize,
+        hash_nid: ::core::ffi::c_int,
+        context: *const u8,
+        context_len: usize,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn SLHDSA_SHA2_128S_prehash_warning_nonstandard_verify(
+        signature: *const u8,
+        signature_len: usize,
+        public_key: *const u8,
+        hashed_msg: *const u8,
+        hashed_msg_len: usize,
+        hash_nid: ::core::ffi::c_int,
+        context: *const u8,
+        context_len: usize,
+    ) -> ::core::ffi::c_int;
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct timezone {
@@ -20306,6 +20349,9 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn SSL_is_dtls(ssl: *const SSL) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn SSL_is_quic(ssl: *const SSL) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
     pub fn SSL_set_bio(ssl: *mut SSL, rbio: *mut BIO, wbio: *mut BIO);
@@ -20404,7 +20450,7 @@ unsafe extern "C" {
     pub fn SSL_set_mtu(ssl: *mut SSL, mtu: ::core::ffi::c_uint) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
-    pub fn DTLSv1_set_initial_timeout_duration(ssl: *mut SSL, duration_ms: ::core::ffi::c_uint);
+    pub fn DTLSv1_set_initial_timeout_duration(ssl: *mut SSL, duration_ms: u32);
 }
 unsafe extern "C" {
     pub fn DTLSv1_get_timeout(ssl: *const SSL, out: *mut timeval) -> ::core::ffi::c_int;
@@ -20477,6 +20523,62 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn SSL_CTX_set0_buffer_pool(ctx: *mut SSL_CTX, pool: *mut CRYPTO_BUFFER_POOL);
+}
+unsafe extern "C" {
+    pub fn SSL_CREDENTIAL_new_x509() -> *mut SSL_CREDENTIAL;
+}
+unsafe extern "C" {
+    pub fn SSL_CREDENTIAL_up_ref(cred: *mut SSL_CREDENTIAL);
+}
+unsafe extern "C" {
+    pub fn SSL_CREDENTIAL_free(cred: *mut SSL_CREDENTIAL);
+}
+unsafe extern "C" {
+    pub fn SSL_CREDENTIAL_set1_private_key(
+        cred: *mut SSL_CREDENTIAL,
+        key: *mut EVP_PKEY,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn SSL_CREDENTIAL_set1_signing_algorithm_prefs(
+        cred: *mut SSL_CREDENTIAL,
+        prefs: *const u16,
+        num_prefs: usize,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn SSL_CREDENTIAL_set1_cert_chain(
+        cred: *mut SSL_CREDENTIAL,
+        certs: *const *mut CRYPTO_BUFFER,
+        num_certs: usize,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn SSL_CREDENTIAL_set1_ocsp_response(
+        cred: *mut SSL_CREDENTIAL,
+        ocsp: *mut CRYPTO_BUFFER,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn SSL_CREDENTIAL_set1_signed_cert_timestamp_list(
+        cred: *mut SSL_CREDENTIAL,
+        sct_list: *mut CRYPTO_BUFFER,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn SSL_CTX_add1_credential(
+        ctx: *mut SSL_CTX,
+        cred: *mut SSL_CREDENTIAL,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn SSL_add1_credential(ssl: *mut SSL, cred: *mut SSL_CREDENTIAL) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn SSL_certs_clear(ssl: *mut SSL);
+}
+unsafe extern "C" {
+    pub fn SSL_get0_selected_credential(ssl: *const SSL) -> *const SSL_CREDENTIAL;
 }
 unsafe extern "C" {
     pub fn SSL_CTX_use_certificate(ctx: *mut SSL_CTX, x509: *mut X509) -> ::core::ffi::c_int;
@@ -20561,15 +20663,6 @@ unsafe extern "C" {
         ssl: *const SSL,
         out_sigalgs: *mut *const u16,
     ) -> usize;
-}
-unsafe extern "C" {
-    pub fn SSL_certs_clear(ssl: *mut SSL);
-}
-unsafe extern "C" {
-    pub fn SSL_CTX_check_private_key(ctx: *const SSL_CTX) -> ::core::ffi::c_int;
-}
-unsafe extern "C" {
-    pub fn SSL_check_private_key(ssl: *const SSL) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
     pub fn SSL_CTX_get0_certificate(ctx: *const SSL_CTX) -> *mut X509;
@@ -20684,6 +20777,9 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn SSL_CTX_get0_chain(ctx: *const SSL_CTX) -> *const stack_st_CRYPTO_BUFFER;
+}
+unsafe extern "C" {
+    pub fn SSL_get0_chain(ssl: *const SSL) -> *const stack_st_CRYPTO_BUFFER;
 }
 unsafe extern "C" {
     pub fn SSL_CTX_use_RSAPrivateKey(ctx: *mut SSL_CTX, rsa: *mut RSA) -> ::core::ffi::c_int;
@@ -20843,6 +20939,21 @@ unsafe extern "C" {
         ctx: *mut SSL_CTX,
         key_method: *const SSL_PRIVATE_KEY_METHOD,
     );
+}
+unsafe extern "C" {
+    pub fn SSL_CREDENTIAL_set_private_key_method(
+        cred: *mut SSL_CREDENTIAL,
+        key_method: *const SSL_PRIVATE_KEY_METHOD,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn SSL_CREDENTIAL_set_must_match_issuer(cred: *mut SSL_CREDENTIAL);
+}
+unsafe extern "C" {
+    pub fn SSL_CREDENTIAL_clear_must_match_issuer(cred: *mut SSL_CREDENTIAL);
+}
+unsafe extern "C" {
+    pub fn SSL_CREDENTIAL_must_match_issuer(cred: *const SSL_CREDENTIAL) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
     pub fn SSL_can_release_private_key(ssl: *const SSL) -> ::core::ffi::c_int;
@@ -21657,6 +21768,9 @@ unsafe extern "C" {
     pub fn SSL_set0_client_CAs(ssl: *mut SSL, name_list: *mut stack_st_CRYPTO_BUFFER);
 }
 unsafe extern "C" {
+    pub fn SSL_set0_CA_names(ssl: *mut SSL, name_list: *mut stack_st_CRYPTO_BUFFER);
+}
+unsafe extern "C" {
     pub fn SSL_CTX_set0_client_CAs(ctx: *mut SSL_CTX, name_list: *mut stack_st_CRYPTO_BUFFER);
 }
 unsafe extern "C" {
@@ -22002,15 +22116,13 @@ unsafe extern "C" {
     pub fn SSL_get_psk_identity(ssl: *const SSL) -> *const ::core::ffi::c_char;
 }
 unsafe extern "C" {
-    pub fn SSL_set1_delegated_credential(
-        ssl: *mut SSL,
-        dc: *mut CRYPTO_BUFFER,
-        pkey: *mut EVP_PKEY,
-        key_method: *const SSL_PRIVATE_KEY_METHOD,
-    ) -> ::core::ffi::c_int;
+    pub fn SSL_CREDENTIAL_new_delegated() -> *mut SSL_CREDENTIAL;
 }
 unsafe extern "C" {
-    pub fn SSL_delegated_credential_used(ssl: *const SSL) -> ::core::ffi::c_int;
+    pub fn SSL_CREDENTIAL_set1_delegated_credential(
+        cred: *mut SSL_CREDENTIAL,
+        dc: *mut CRYPTO_BUFFER,
+    ) -> ::core::ffi::c_int;
 }
 pub const ssl_encryption_level_t_ssl_encryption_initial: ssl_encryption_level_t = 0;
 pub const ssl_encryption_level_t_ssl_encryption_early_data: ssl_encryption_level_t = 1;
@@ -22306,6 +22418,28 @@ unsafe extern "C" {
     ) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
+    pub fn SSL_CREDENTIAL_set_ex_data(
+        cred: *mut SSL_CREDENTIAL,
+        idx: ::core::ffi::c_int,
+        data: *mut ::core::ffi::c_void,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn SSL_CREDENTIAL_get_ex_data(
+        cred: *const SSL_CREDENTIAL,
+        idx: ::core::ffi::c_int,
+    ) -> *mut ::core::ffi::c_void;
+}
+unsafe extern "C" {
+    pub fn SSL_CREDENTIAL_get_ex_new_index(
+        argl: ::core::ffi::c_long,
+        argp: *mut ::core::ffi::c_void,
+        unused: *mut CRYPTO_EX_unused,
+        dup_unused: CRYPTO_EX_dup,
+        free_func: CRYPTO_EX_free,
+    ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
     pub fn SSL_get_ivs(
         ssl: *const SSL,
         out_read_iv: *mut *const u8,
@@ -22470,6 +22604,8 @@ pub struct ssl_early_callback_ctx {
     pub random_len: usize,
     pub session_id: *const u8,
     pub session_id_len: usize,
+    pub dtls_cookie: *const u8,
+    pub dtls_cookie_len: usize,
     pub cipher_suites: *const u8,
     pub cipher_suites_len: usize,
     pub compression_methods: *const u8,
@@ -22480,6 +22616,7 @@ pub struct ssl_early_callback_ctx {
 pub const ssl_select_cert_result_t_ssl_select_cert_success: ssl_select_cert_result_t = 1;
 pub const ssl_select_cert_result_t_ssl_select_cert_retry: ssl_select_cert_result_t = 0;
 pub const ssl_select_cert_result_t_ssl_select_cert_error: ssl_select_cert_result_t = -1;
+pub const ssl_select_cert_result_t_ssl_select_cert_disable_ech: ssl_select_cert_result_t = -2;
 pub type ssl_select_cert_result_t = ::core::ffi::c_int;
 unsafe extern "C" {
     pub fn SSL_early_callback_ctx_extension_get(
@@ -22602,6 +22739,12 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn SSL_set_jdk11_workaround(ssl: *mut SSL, enable: ::core::ffi::c_int);
+}
+unsafe extern "C" {
+    pub fn SSL_set_check_client_certificate_type(ssl: *mut SSL, enable: ::core::ffi::c_int);
+}
+unsafe extern "C" {
+    pub fn SSL_set_check_ecdsa_curve(ssl: *mut SSL, enable: ::core::ffi::c_int);
 }
 unsafe extern "C" {
     pub fn SSL_library_init() -> ::core::ffi::c_int;
@@ -23117,10 +23260,17 @@ unsafe extern "C" {
         curves: *const ::core::ffi::c_char,
     ) -> ::core::ffi::c_int;
 }
+unsafe extern "C" {
+    pub fn SSL_CTX_check_private_key(ctx: *const SSL_CTX) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn SSL_check_private_key(ssl: *const SSL) -> ::core::ffi::c_int;
+}
 pub const ssl_compliance_policy_t_ssl_compliance_policy_none: ssl_compliance_policy_t = 0;
 pub const ssl_compliance_policy_t_ssl_compliance_policy_fips_202205: ssl_compliance_policy_t = 1;
 pub const ssl_compliance_policy_t_ssl_compliance_policy_wpa3_192_202304: ssl_compliance_policy_t =
     2;
+pub const ssl_compliance_policy_t_ssl_compliance_policy_cnsa_202407: ssl_compliance_policy_t = 3;
 pub type ssl_compliance_policy_t = ::core::ffi::c_uint;
 unsafe extern "C" {
     pub fn SSL_CTX_set_compliance_policy(
@@ -23129,10 +23279,16 @@ unsafe extern "C" {
     ) -> ::core::ffi::c_int;
 }
 unsafe extern "C" {
+    pub fn SSL_CTX_get_compliance_policy(ctx: *const SSL_CTX) -> ssl_compliance_policy_t;
+}
+unsafe extern "C" {
     pub fn SSL_set_compliance_policy(
         ssl: *mut SSL,
         policy: ssl_compliance_policy_t,
     ) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn SSL_get_compliance_policy(ssl: *const SSL) -> ssl_compliance_policy_t;
 }
 unsafe extern "C" {
     pub fn TRUST_TOKEN_experiment_v1() -> *const TRUST_TOKEN_METHOD;
@@ -23366,6 +23522,12 @@ unsafe extern "C" {
 }
 unsafe extern "C" {
     pub fn ERR_GET_FUNC_RUST(packed_error: u32) -> ::core::ffi::c_int;
+}
+unsafe extern "C" {
+    pub fn CBS_init_RUST(cbs: *mut CBS, data: *const u8, len: usize);
+}
+unsafe extern "C" {
+    pub fn CBS_len_RUST(cbs: *const CBS) -> usize;
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]

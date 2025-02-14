@@ -33,10 +33,10 @@ group("boringssl-static") {
 crypto_sources += crypto_sources_asm
 
 # TODO(https://fxbug.dev/42122741): remove this added source.
-crypto_sources += [ "src/decrepit/xts/xts.c" ]
+crypto_sources += [ "src/decrepit/xts/xts.cc" ]
 
 # TODO(https://fxbug.dev/42122741): Required for TPM2.0 TSS Library //third_party/tpm2-tss.
-crypto_sources += [ "src/decrepit/cfb/cfb.c" ]
+crypto_sources += [ "src/decrepit/cfb/cfb.cc" ]
 
 ################
 # libcrypto.so #
@@ -192,17 +192,6 @@ if (!is_kernel) {
 
   crypto_tests = []
 
-  # TODO(https://fxbug.dev/339028859): Delete this fiddling. With the roll,
-  # the need for crypto_test_data.cc will go away (it's just a stub now), and
-  # file_test_gtest.cc will be be auto-generated into `test_support_sources`,
-  # where it should have been originally.
-  crypto_test_source_outliers = [
-    "crypto_test_data.cc",
-    "src/crypto/test/file_test_gtest.cc",
-  ]
-  crypto_test_sources -= crypto_test_source_outliers
-  test_support_sources += crypto_test_source_outliers
-
   crypto_test_main = "src/crypto/test/gtest_main.cc"
   source_set("crypto_test_main") {
     visibility = [ ":*" ]
@@ -220,10 +209,12 @@ if (!is_kernel) {
     testonly = true
 
     # get_test_data.cc provides our own definition of GetTestData(), which is
-    # declared somewhere in test_support_sources.
+    # declared somewhere in test_support_sources. This is permitted by defining
+    # BORINGSSL_CUSTOM_GET_TEST_DATA.
     sources = test_support_sources + [ "get_test_data.cc" ]
     deps = [ "//third_party/googletest:gtest" ]
     configs += [ ":test_config" ]
+    defines = [ "BORINGSSL_CUSTOM_GET_TEST_DATA" ]
   }
 
   foreach(crypto_test_source, crypto_test_sources - [ crypto_test_main ]) {
@@ -266,6 +257,18 @@ if (!is_kernel) {
     test_data_deps += [ ":${target_name}" ]
   }
 
+  group("temp_storage") {
+    visibility = [ ":*" ]
+    testonly = true
+    metadata = {
+      test_component_manifest_cml = [
+        {
+          include = [ "//src/sys/test_runners/tmp_storage.shard.cml" ]
+        },
+      ]
+    }
+  }
+
   if (is_fuchsia) {
     crypto_test_components = []
     needs_custom_component_manifest = [ "bio_test_crypto_test" ]
@@ -277,11 +280,18 @@ if (!is_kernel) {
             [ crypto_test ] != needs_custom_component_manifest) {
           manifest = "meta/${crypto_test}.cml"
         }
-        deps = [ ":${crypto_test}" ]
+        deps = [
+          ":${crypto_test}",
+          ":temp_storage",
+        ]
       }
     }
     fuchsia_unittest_component("ssl_test_component") {
-      deps = [ ":ssl_test" ]
+      deps = [
+        ":ssl_test",
+        ":temp_storage",
+        "//src/sys/test_runners/gtest:death_test",
+      ]
     }
     fuchsia_test_package("boringssl_tests") {
       test_components = crypto_test_components + [ ":ssl_test_component" ]

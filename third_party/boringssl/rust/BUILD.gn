@@ -93,7 +93,7 @@ rustc_library("bssl-sys.lib") {
   rustenv = [ "BINDGEN_RS_FILE=" + rebase_path(inputs[0], bssl_sys_src) ]
 
   non_rust_deps = [ ":rust-wrapper" ]
-  configs += [ ":bssl-sys.allows" ]
+  configs += [ ":bssl-sys.config" ]
 
   # Since bindgen.rs is being include!-ed into the crate root (which we want
   # to remain purely mirrored code), we don't have a chance to annotate
@@ -103,9 +103,18 @@ rustc_library("bssl-sys.lib") {
   quiet_clippy = true
 }
 
-config("bssl-sys.allows") {
+config("bssl-sys.config") {
   visibility = [ ":*" ]
   rustflags = [
+    # This controls whether bindgen.rs is included via the BINDGEN_RS_FILE
+    # environment variable.
+    "--cfg=bindgen_rs_file",
+
+    # Needed to expose CBS_init() and CBS_len(), which is currently a bit funny
+    # due to these being inline definitions included in wrapper.h that bindgen
+    # ignores.
+    "--cfg=unsupported_inline_wrappers",
+
     # The boringssl API uses uint128_t's and without this rustc would complain
     # that u128 in the bindings are not "FFI-safe".
     "-Aimproper_ctypes",
