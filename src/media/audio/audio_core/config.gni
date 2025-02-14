@@ -111,7 +111,7 @@ template("audio_core_config") {
 
   if (defined(invoker.policy)) {
     resource(target_name + "-policy") {
-      sources = [ invoker.config ]
+      sources = [ invoker.policy ]
       outputs = "data/audio_policy.json"
     }
   }
