@@ -27,19 +27,23 @@ zx::result<> Pciroot::CreateInterruptsAndRouting(
             pci_dt::Gicv3InterruptFlagsLabel(entry.parent.flags));
     ZX_DEBUG_ASSERT_MSG(entry.parent.flags == pci_dt::Gicv3InterruptFlags::LevelTriggered,
                         "Expected interrupt-map to contain level triggered interrupts");
-    zx::interrupt interrupt;
-    zx_status_t status = zx::interrupt::create(/*resource=*/irq_resource_,
-                                               /*vector=*/entry.parent.int_number,
-                                               /*options=*/0,
-                                               /*result=*/&interrupt);
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Couldn't create interrupt object for vector %#x (handle: %#x): %s",
-              entry.parent.int_number, irq_resource_.get(), zx_status_get_string(status));
-      return zx::error(status);
+    uint32_t vector = entry.parent.int_number;
+    if (!std::any_of(interrupts_.begin(), interrupts_.end(),
+                     [vector](const auto& irq) { return irq.vector == vector; })) {
+      zx::interrupt interrupt;
+      zx_status_t status = zx::interrupt::create(/*resource=*/irq_resource_,
+                                                 /*vector=*/vector,
+                                                 /*options=*/0,
+                                                 /*result=*/&interrupt);
+      if (status != ZX_OK) {
+        FDF_LOG(ERROR, "Couldn't create interrupt object for vector %#x (handle: %#x): %s", vector,
+                irq_resource_.get(), zx_status_get_string(status));
+        return zx::error(status);
+      }
+      interrupts_.push_back(
+          pci_legacy_irq_t{.interrupt = interrupt.release(), .vector = entry.parent.int_number});
     }
 
-    interrupts_.push_back(
-        pci_legacy_irq_t{.interrupt = interrupt.release(), .vector = entry.parent.int_number});
     pci_irq_routing_entry_t routing_entry{
         .port_device_id = PCI_IRQ_ROUTING_NO_PARENT,
         .port_function_id = PCI_IRQ_ROUTING_NO_PARENT,
@@ -95,7 +99,7 @@ zx_status_t Pciroot::PcirootGetPciPlatformInfo(pci_platform_info_t* info) {
   if (zx_status_t status = cam_.duplicate(ZX_RIGHT_SAME_RIGHTS, &cam); status != ZX_OK) {
     FDF_LOG(WARNING, "couldn't duplicate ecam handle: %s", zx_status_get_string(status));
   }
-  info->cam = {.vmo = cam.release(), .is_extended = false};
+  info->cam = {.vmo = cam.release(), .is_extended = is_extended_};
   return ZX_OK;
 }
 
