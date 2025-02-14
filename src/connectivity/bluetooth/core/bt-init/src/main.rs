@@ -59,11 +59,9 @@ async fn open_childs_service_directory<C: ComponentClientAdapter>(
     let underlying_svc =
         component_client.open_childs_exposed_directory(child_name.to_owned()).await;
     match underlying_svc {
+        // It is OK if `child_name` is not available. We fallback to bt-gap instead.
         Err(e) => {
-            info!(
-                "failed to bind child {}: {:?}, falling back to bt-gap's service directory",
-                child_name, e,
-            );
+            info!("{e:?}, falling back to bt-gap's service directory",);
             component_client.open_childs_exposed_directory(BT_GAP_CHILD_NAME.to_owned()).await
         }
         dir => {

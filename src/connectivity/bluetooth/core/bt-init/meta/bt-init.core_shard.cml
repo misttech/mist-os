@@ -27,9 +27,9 @@
             source_availability: "unknown",
         },
         {
+            config: "fuchsia.bluetooth.LegacyPairing",
             from: "parent",
             to: "#bluetooth-core",
-            config: "fuchsia.bluetooth.LegacyPairing",
         },
         {
             directory: "dev-class",
