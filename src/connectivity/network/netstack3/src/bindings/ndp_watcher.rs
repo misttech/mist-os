@@ -263,9 +263,11 @@ mod watcher {
         /// to.
         pub(crate) fn flush_batch(&mut self) {
             let Self { stream: _, inner_events, responder, interest: _ } = self;
-            if let Some(responder) = responder.take() {
+            // NB: We must take care not to take and drop the responder if
+            // there's no batch of events ready.
+            if responder.is_some() {
                 if let Some((dropped, events)) = inner_events.take_batch() {
-                    respond_with_batch(responder, dropped, events);
+                    respond_with_batch(responder.take().expect("must be present"), dropped, events);
                 }
             }
         }
@@ -732,13 +734,21 @@ mod test {
 
         // Only the broadly-interested watcher receives the nonce option.
         {
+            let mut next_fut = type_specific_interface_watcher.next();
+            let polled = fasync::TestExecutor::poll_until_stalled(&mut next_fut).await;
+            match polled {
+                Poll::Pending => (),
+                Poll::Ready(result) => {
+                    panic!("should not complete: {result:?}");
+                }
+            }
+
             let (ra, entry) = nonce_ra_and_watch_entry(INTERESTED_INTERFACE_ID);
             ra_sink.send_ra(ra);
             let (batch, dropped) = interest_all_watcher.next().await.expect("should yield");
             assert_eq!(batch, vec![entry.clone().into()]);
             assert_eq!(dropped, 0);
 
-            let mut next_fut = type_specific_interface_watcher.next();
             let polled = fasync::TestExecutor::poll_until_stalled(&mut next_fut).await;
             match polled {
                 Poll::Pending => (),
