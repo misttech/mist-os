@@ -65,6 +65,9 @@ rustc_library("binder") {
   source_root = "//third_party/android/platform/frameworks/native/libs/binder/rust/src/lib.rs"
 
   disable_clippy = true
+
+  # TODO(https://fxbug.dev/390250858): Re-enable when lld issue is fixed.
+  exclude_toolchain_tags = [ "profile" ]
 }
 
 fuchsia_unittest_package("binder_rust_tests") {

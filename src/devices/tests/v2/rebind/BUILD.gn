@@ -104,6 +104,9 @@ rustc_test("rebind_test") {
     "//src/lib/fuchsia-component-test",
     "//third_party/rust_crates:anyhow",
   ]
+
+  # TODO(https://fxbug.dev/390250858): Re-enable when lld issue is fixed.
+  exclude_toolchain_tags = [ "profile" ]
 }
 
 fuchsia_unittest_package("package") {
