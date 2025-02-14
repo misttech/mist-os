@@ -937,6 +937,7 @@ impl ConfigurationContext<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assembly_config_schema::InputBundlesConfig;
     use assembly_images_config::BoardFilesystemConfig;
     use assembly_named_file_map::SourceMerklePair;
     use lazy_static::lazy_static;
@@ -948,7 +949,7 @@ mod tests {
         pub(crate) static ref BOARD_INFORMATION_FOR_TESTS: BoardInformation = BoardInformation {
             name: "Test Board".into(),
             provided_features: vec![],
-            input_bundles: vec![],
+            input_bundles: InputBundlesConfig::default(),
             filesystems: BoardFilesystemConfig::default(),
             ..Default::default()
         };

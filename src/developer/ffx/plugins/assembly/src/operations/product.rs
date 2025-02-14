@@ -127,7 +127,7 @@ Resulting product is not supported and may misbehave!
     // Parse the board's Board Input Bundles, if it has them, and merge their
     // configuration fields into that of the board_info struct.
     let mut board_input_bundles = Vec::new();
-    for bundle_path in &board_info.input_bundles {
+    for bundle_path in board_info.input_bundles.map.values() {
         let bundle = BoardInputBundle::from_dir(&bundle_path)
             .with_context(|| format!("Reading board input bundle: {bundle_path}"))?;
         board_input_bundles.push((bundle_path.clone(), bundle));
