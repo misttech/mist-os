@@ -318,7 +318,7 @@ std::optional<usb::FidlRequest> OvernetUsb::PrepareTx() {
 
   auto request = bulk_in_ep_.GetRequest();
   if (!request) {
-    FDF_SLOG(WARNING, "No available TX requests");
+    FDF_SLOG(DEBUG, "No available TX requests");
     return std::nullopt;
   }
   request->clear_buffers();
