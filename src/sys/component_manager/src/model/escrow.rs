@@ -9,8 +9,11 @@ use cm_util::TaskGroup;
 use fasync::Task;
 use fidl::endpoints::{create_proxy, ServerEnd};
 use futures::channel::{mpsc, oneshot};
+use futures::lock::Mutex;
 use futures::{select, FutureExt, StreamExt};
-use std::sync::Mutex;
+use log::warn;
+use moniker::Moniker;
+use std::pin::pin;
 use vfs::directory::entry::OpenRequest;
 use vfs::remote::remote_dir;
 use zx::AsHandleRef;
@@ -20,6 +23,14 @@ use super::start::Start;
 use crate::bedrock::program::EscrowRequest;
 use crate::model::component::StartReason;
 use errors::ActionError;
+
+/// Controls after how many open requests to a component's outgoing directory channel will
+/// component manager perform a liveness check.
+const LIVENESS_CHECK_FREQUENCY: usize = 1000;
+
+/// Controls how long component manager will wait for a response to a liveness check before
+/// emitting a warn level log about the check failure.
+const LIVENESS_CHECK_TIMEOUT_MS: usize = 3000;
 
 pub struct EscrowedState {
     pub outgoing_dir: ServerEnd<fio::DirectoryMarker>,
@@ -68,7 +79,9 @@ impl Debug for EscrowedState {
 /// directory server endpoint, thus reducing the risks of deadlocks.
 pub struct Actor {
     sender: mpsc::UnboundedSender<Command>,
-    outgoing_dir: Arc<Mutex<fio::DirectoryProxy>>,
+    // The usize is used to track how many requests have been sent to this proxy.
+    outgoing_dir: Arc<Mutex<(usize, fio::DirectoryProxy)>>,
+    moniker: Moniker,
 }
 
 impl Actor {
@@ -77,18 +90,22 @@ impl Actor {
     ///
     /// Also returns a task owning and running the actor. The task should
     /// typically be run in a non-blocking task group of the component.
-    pub fn new(scope: &TaskGroup, starter: impl Start + Send + Sync + 'static) -> Actor {
+    pub fn new(
+        moniker: Moniker,
+        scope: &TaskGroup,
+        starter: impl Start + Send + Sync + 'static,
+    ) -> Actor {
         let (sender, receiver) = mpsc::unbounded();
         let (client, server) = create_proxy::<fio::DirectoryMarker>();
         let escrow = EscrowedState { outgoing_dir: server, escrowed_dictionary: None };
-        let outgoing_dir = Arc::new(Mutex::new(client));
+        let outgoing_dir = Arc::new(Mutex::new((0, client)));
         let actor = ActorImpl {
             starter: Arc::new(starter),
             outgoing_dir: outgoing_dir.clone(),
             nonblocking_start_task: TaskGroup::new(),
         };
         scope.spawn(actor.run(escrow, receiver));
-        let handle = Actor { sender, outgoing_dir };
+        let handle = Actor { sender, outgoing_dir, moniker };
         handle
     }
 
@@ -114,8 +131,34 @@ impl Actor {
     /// Forwards `open_request` to the outgoing directory of the component.  If the component is not
     /// started, this will cause the escrowed state to become urgent and the component to be
     /// started.
-    pub fn open_outgoing(&self, open_request: OpenRequest<'_>) -> Result<(), zx::Status> {
-        open_request.open_remote(remote_dir(Clone::clone(&*self.outgoing_dir.lock().unwrap())))
+    pub async fn open_outgoing(&self, open_request: OpenRequest<'_>) -> Result<(), zx::Status> {
+        let outgoing_dir_clone = {
+            let guard = self.outgoing_dir.lock().await;
+            let (mut open_counter, outgoing_dir) = &*guard;
+            open_counter += 1;
+            if open_counter % LIVENESS_CHECK_FREQUENCY == 0 {
+                let mut sync_fut = outgoing_dir.sync().fuse();
+                let mut timer = pin!(fasync::Timer::new(std::time::Duration::from_millis(
+                    LIVENESS_CHECK_TIMEOUT_MS.try_into().expect("failed to usize to u64")
+                ))
+                .fuse());
+                select! {
+                    _ = sync_fut => (),
+                    _ = timer => {
+                        warn!(
+                            "Checked outgoing directory liveness after {} requests, and it didn't \
+                            respond in {} milliseconds. If component is ignoring inbound requests, \
+                            its channel could fill and crash component manager. Moniker is {}",
+                            LIVENESS_CHECK_FREQUENCY,
+                            LIVENESS_CHECK_TIMEOUT_MS,
+                            self.moniker,
+                        );
+                    }
+                }
+            }
+            Clone::clone(&*outgoing_dir)
+        };
+        open_request.open_remote(remote_dir(outgoing_dir_clone))
     }
 }
 
@@ -126,7 +169,7 @@ enum Command {
 
 struct ActorImpl {
     starter: Arc<dyn Start + Send + Sync + 'static>,
-    outgoing_dir: Arc<Mutex<fio::DirectoryProxy>>,
+    outgoing_dir: Arc<Mutex<(usize, fio::DirectoryProxy)>>,
 
     // The actor monitors a `start_task`, a task to start the component, until
     // the escrow state is reaped. But the rest of the component start process
@@ -244,7 +287,7 @@ impl ActorImpl {
                             "the escrowed state of the component is readable but the component \
                              failed to start: {err}"
                         );
-                        return self.update_escrow(Default::default());
+                        return self.update_escrow(Default::default()).await;
                     }
                 }
             },
@@ -256,20 +299,20 @@ impl ActorImpl {
         let Some(command) = command else { return State::Quit };
         match command {
             Command::DidStop(request) => {
-                return self.update_escrow(request.unwrap_or_default());
+                return self.update_escrow(request.unwrap_or_default()).await;
             }
             Command::WillStart(_) => panic!("double start"),
         }
     }
 
-    fn update_escrow(&mut self, request: EscrowRequest) -> State {
+    async fn update_escrow(&mut self, request: EscrowRequest) -> State {
         let outgoing_dir = if let Some(server) = request.outgoing_dir {
             server
         } else {
             // No outgoing directory server endpoint was escrowed. Mint a new pair and
             // update our client counterpart.
             let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-            *self.outgoing_dir.lock().unwrap() = client;
+            *self.outgoing_dir.lock().await = (0, client);
             server
         };
         let escrow =
@@ -322,7 +365,7 @@ mod tests {
     #[should_panic(expected = "double start")]
     async fn double_start() {
         let task_group = TaskGroup::new();
-        let actor = Actor::new(&task_group, MustNotStart);
+        let actor = Actor::new(Moniker::root(), &task_group, MustNotStart);
 
         _ = actor.will_start().await;
         _ = actor.will_start().await;
@@ -333,7 +376,7 @@ mod tests {
     #[should_panic(expected = "double stop")]
     async fn double_stop() {
         let task_group = TaskGroup::new();
-        let actor = Actor::new(&task_group, MustNotStart);
+        let actor = Actor::new(Moniker::root(), &task_group, MustNotStart);
 
         _ = actor.will_start().await;
         _ = actor.did_stop(None);
@@ -353,7 +396,7 @@ mod tests {
     ) -> Arc<Actor> {
         let mock_start = MockStart { start_tx, actor: Mutex::new(None) };
         let mock_start = Arc::new(mock_start);
-        let actor = Actor::new(task_group, mock_start.clone());
+        let actor = Actor::new(Moniker::root(), task_group, mock_start.clone());
         let actor = Arc::new(actor);
         *mock_start.actor.try_lock().unwrap() = Some(Arc::downgrade(&actor));
         actor
@@ -385,12 +428,14 @@ mod tests {
         let execution_scope = ExecutionScope::new();
         let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
         assert_eq!(
-            actor.open_outgoing(OpenRequest::new(
-                execution_scope.clone(),
-                fio::OpenFlags::empty(),
-                "foo".try_into().unwrap(),
-                &mut object_request
-            )),
+            actor
+                .open_outgoing(OpenRequest::new(
+                    execution_scope.clone(),
+                    fio::OpenFlags::empty(),
+                    "foo".try_into().unwrap(),
+                    &mut object_request
+                ))
+                .await,
             Ok(())
         );
         let (reason, escrow) = start_rx.next().await.unwrap();
@@ -418,12 +463,14 @@ mod tests {
         let execution_scope = ExecutionScope::new();
         let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
         assert_eq!(
-            actor.open_outgoing(OpenRequest::new(
-                execution_scope.clone(),
-                fio::OpenFlags::empty(),
-                "foo".try_into().unwrap(),
-                &mut object_request
-            )),
+            actor
+                .open_outgoing(OpenRequest::new(
+                    execution_scope.clone(),
+                    fio::OpenFlags::empty(),
+                    "foo".try_into().unwrap(),
+                    &mut object_request
+                ))
+                .await,
             Ok(())
         );
 
@@ -453,12 +500,14 @@ mod tests {
         let execution_scope = ExecutionScope::new();
         let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
         assert_eq!(
-            actor.open_outgoing(OpenRequest::new(
-                execution_scope.clone(),
-                fio::OpenFlags::empty(),
-                "foo".try_into().unwrap(),
-                &mut object_request
-            )),
+            actor
+                .open_outgoing(OpenRequest::new(
+                    execution_scope.clone(),
+                    fio::OpenFlags::empty(),
+                    "foo".try_into().unwrap(),
+                    &mut object_request
+                ))
+                .await,
             Ok(())
         );
         assert_matches!(TestExecutor::poll_until_stalled(start_rx.next()).await, Poll::Pending);
@@ -493,12 +542,14 @@ mod tests {
         let execution_scope = ExecutionScope::new();
         let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
         assert_eq!(
-            actor.open_outgoing(OpenRequest::new(
-                execution_scope.clone(),
-                fio::OpenFlags::empty(),
-                "foo".try_into().unwrap(),
-                &mut object_request
-            )),
+            actor
+                .open_outgoing(OpenRequest::new(
+                    execution_scope.clone(),
+                    fio::OpenFlags::empty(),
+                    "foo".try_into().unwrap(),
+                    &mut object_request
+                ))
+                .await,
             Ok(())
         );
         assert_matches!(TestExecutor::poll_until_stalled(start_rx.next()).await, Poll::Ready(_));
@@ -510,19 +561,21 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn stop_without_escrow() {
         let task_group = TaskGroup::new();
-        let actor = Actor::new(&task_group, MustNotStart);
+        let actor = Actor::new(Moniker::root(), &task_group, MustNotStart);
 
         let escrow = actor.will_start().await;
         let (client_end, server_end) = zx::Channel::create();
         let execution_scope = ExecutionScope::new();
         let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
         assert_eq!(
-            actor.open_outgoing(OpenRequest::new(
-                execution_scope.clone(),
-                fio::OpenFlags::empty(),
-                "foo".try_into().unwrap(),
-                &mut object_request
-            )),
+            actor
+                .open_outgoing(OpenRequest::new(
+                    execution_scope.clone(),
+                    fio::OpenFlags::empty(),
+                    "foo".try_into().unwrap(),
+                    &mut object_request
+                ))
+                .await,
             Ok(())
         );
 
@@ -537,12 +590,14 @@ mod tests {
         let execution_scope = ExecutionScope::new();
         let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
         assert_eq!(
-            actor.open_outgoing(OpenRequest::new(
-                execution_scope.clone(),
-                fio::OpenFlags::empty(),
-                "bar".try_into().unwrap(),
-                &mut object_request
-            )),
+            actor
+                .open_outgoing(OpenRequest::new(
+                    execution_scope.clone(),
+                    fio::OpenFlags::empty(),
+                    "bar".try_into().unwrap(),
+                    &mut object_request
+                ))
+                .await,
             Ok(())
         );
         let mut outgoing = escrow.unwrap().outgoing_dir.into_stream();
@@ -577,19 +632,24 @@ mod tests {
         let task_group = TaskGroup::new();
         let (start_tx, mut start_rx) = mpsc::unbounded();
         let (result_tx, result_rx) = mpsc::unbounded();
-        let actor =
-            Actor::new(&task_group, BlockingStart { start_tx, result_rx: Mutex::new(result_rx) });
+        let actor = Actor::new(
+            Moniker::root(),
+            &task_group,
+            BlockingStart { start_tx, result_rx: Mutex::new(result_rx) },
+        );
 
         let (client_end, server_end) = zx::Channel::create();
         let execution_scope = ExecutionScope::new();
         let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
         assert_eq!(
-            actor.open_outgoing(OpenRequest::new(
-                execution_scope.clone(),
-                fio::OpenFlags::empty(),
-                "foo".try_into().unwrap(),
-                &mut object_request
-            )),
+            actor
+                .open_outgoing(OpenRequest::new(
+                    execution_scope.clone(),
+                    fio::OpenFlags::empty(),
+                    "foo".try_into().unwrap(),
+                    &mut object_request
+                ))
+                .await,
             Ok(())
         );
         start_rx.next().await.unwrap();
@@ -613,19 +673,24 @@ mod tests {
         let task_group = TaskGroup::new();
         let (start_tx, mut start_rx) = mpsc::unbounded();
         let (result_tx, result_rx) = mpsc::unbounded();
-        let actor =
-            Actor::new(&task_group, BlockingStart { start_tx, result_rx: Mutex::new(result_rx) });
+        let actor = Actor::new(
+            Moniker::root(),
+            &task_group,
+            BlockingStart { start_tx, result_rx: Mutex::new(result_rx) },
+        );
 
         let (_, server_end) = zx::Channel::create();
         let execution_scope = ExecutionScope::new();
         let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
         assert_eq!(
-            actor.open_outgoing(OpenRequest::new(
-                execution_scope.clone(),
-                fio::OpenFlags::empty(),
-                "foo".try_into().unwrap(),
-                &mut object_request
-            )),
+            actor
+                .open_outgoing(OpenRequest::new(
+                    execution_scope.clone(),
+                    fio::OpenFlags::empty(),
+                    "foo".try_into().unwrap(),
+                    &mut object_request
+                ))
+                .await,
             Ok(())
         );
         start_rx.next().await.unwrap();

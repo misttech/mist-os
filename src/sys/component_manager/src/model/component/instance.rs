@@ -405,8 +405,11 @@ impl ResolvedInstanceState {
         }
 
         let program_escrow = if decl.get_runner().is_some() {
-            let escrow =
-                escrow::Actor::new(&component.nonblocking_task_group(), component.as_weak());
+            let escrow = escrow::Actor::new(
+                component.moniker.clone(),
+                &component.nonblocking_task_group(),
+                component.as_weak(),
+            );
             Some(escrow)
         } else {
             None

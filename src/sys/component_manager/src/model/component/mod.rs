@@ -949,7 +949,7 @@ impl ComponentInstance {
             | InstanceState::Started(ref mut resolved, _) => {
                 let program_escrow =
                     resolved.program_escrow().ok_or(OpenOutgoingDirError::InstanceNonExecutable)?;
-                program_escrow.open_outgoing(open_request)?;
+                program_escrow.open_outgoing(open_request).await?;
                 Ok(())
             }
             _ => Err(OpenOutgoingDirError::InstanceNotResolved),
