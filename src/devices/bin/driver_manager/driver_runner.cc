@@ -221,6 +221,10 @@ void PerformBFS(const std::shared_ptr<Node>& starting_node,
     }
 
     for (const auto& child : current->children()) {
+      if (child->GetPrimaryParent() != current.get()) {
+        continue;
+      }
+
       if (auto [_, inserted] = visited.insert(child); inserted) {
         node_queue.push(child);
       }
