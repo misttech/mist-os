@@ -513,41 +513,6 @@ impl Journal {
         checksum_list: &mut ChecksumList,
     ) -> Result<(), Error> {
         match mutation {
-            // TODO(https://fxbug.dev/313678158): This can be removed the next time we bump
-            // EARLIEST_SUPPORTED_VERSION, because the latest journal code writes all the checksums
-            // out in a separate record.
-            Mutation::ObjectStore(ObjectStoreMutation {
-                item:
-                    Item {
-                        key:
-                            ObjectKey {
-                                data:
-                                    ObjectKeyData::Attribute(
-                                        _,
-                                        AttributeKey::Extent(ExtentKey { range }),
-                                    ),
-                                ..
-                            },
-                        value:
-                            ObjectValue::Extent(ExtentValue::Some {
-                                device_offset,
-                                mode: ExtentMode::Cow(checksums),
-                                ..
-                            }),
-                        ..
-                    },
-                ..
-            }) => {
-                checksum_list
-                    .push(
-                        journal_offset,
-                        *device_offset..*device_offset + range.length().unwrap(),
-                        checksums.maybe_as_ref().context("Malformed snooped checksums")?,
-                        // Cow mode extents are always writing for the first time
-                        true,
-                    )
-                    .context("Pushing snooped checksums to checksum list")?;
-            }
             Mutation::ObjectStore(_) => {}
             Mutation::Allocator(AllocatorMutation::Deallocate { device_range, .. }) => {
                 checksum_list.mark_deallocated(journal_offset, device_range.clone().into());
