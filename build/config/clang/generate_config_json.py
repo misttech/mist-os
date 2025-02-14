@@ -345,23 +345,41 @@ class CommandPool(object):
     Usage is:
        - Create instance.
        - Call add_command() as many times as necessary.
-       - Call run() to wait until all commands completed, and get the list of
-         resulting CommandInfo values.
+       - Call run() to wait until all commands completed, and get a
+         { dest -> value } dictionary.
     """
 
     def __init__(self, pool_depth: int = 16) -> None:
+        """Initialize instance.
+
+        Args:
+           pool_depth: Maximum number of commands that will be run in parallel.
+        """
         self._commands: T.List[CommandInfo] = []
         self._wait_ids: T.List[int] = []
         self._run_ids: T.List[int] = []
         self._depth = pool_depth
-        self._results: T.Dict[str, CommandInfo] = {}
-
-    def reset(self) -> None:
-        self._results = {}
+        self._results: T.Dict[str, str] = {}
 
     def add_command(
         self, dest: str, cmd_result: CommandResult, cmd_args: T.List[str]
     ) -> None:
+        """Add new command to the pool.
+
+        This queues a new command invocation and tries to start it
+        immediately if possible.
+
+        Args:
+            dest: A unique name for this command invocation. This is also
+                used as a key for the dictionary returned by run().
+
+            cmd_result: A CommandResult instance whose process() method
+                will be called on command completion. Its result will
+                be stored as the value associated with |dest| in the
+                dictionary returned by run().
+
+            cmd_args: The command arguments passed to subprocess.run().
+        """
         cmd_id = len(self._commands)
         info = CommandInfo(cmd_id, cmd_args, cmd_result, dest, None)
         self._commands.append(info)
@@ -369,6 +387,11 @@ class CommandPool(object):
         self._start_if_possible()
 
     def _poll_run_queue(self) -> bool:
+        """Poll the run queue, and process the output of completed processes.
+
+        Returns:
+            True if any process completed, False otherwise.
+        """
         completed = []
         for cmd_id in self._run_ids:
             info = self._commands[cmd_id]
@@ -385,12 +408,16 @@ class CommandPool(object):
             self._run_ids.remove(cmd_id)
             info = self._commands[cmd_id]
             assert info.proc
-            self._results[info.dest] = info
+
+            self._results[info.dest] = info.cmd_result.process(info.proc)
+
+            # Release file descriptors as early as possible.
+            info.proc = None
 
         return True
 
     def _start_if_possible(self) -> None:
-        # Pool for any existing
+        """Start new command processes if possible."""
         self._poll_run_queue()
         while len(self._run_ids) <= self._depth and len(self._wait_ids):
             cmd_id = self._wait_ids[0]
@@ -405,14 +432,26 @@ class CommandPool(object):
             )
             self._run_ids.append(cmd_id)
 
-    def run(self) -> T.Sequence[CommandInfo]:
+    def run(self) -> T.Dict[str, str]:
+        """Run all queued commands in parallel.
+
+        Only returns when all commands added through add_command()
+        have completed. This returns a dictionary mapping command
+        unique names to their output' processed result.
+
+        Returns:
+            A { dest -> value } dictionary, where keys are the |dest|
+            parameter passed to add_command(), and |value| is the
+            result of calling the corresponding CommandResult.process()
+            method.
+        """
         while len(self._run_ids) + len(self._wait_ids) > 0:
             if not self._poll_run_queue():
                 time.sleep(0.01)  # 10ms
                 continue
             self._start_if_possible()
 
-        return list(self._results.values())
+        return self._results
 
 
 def main() -> int:
@@ -531,10 +570,8 @@ def main() -> int:
                 )
         # LINT.ThenChange(//build/config/sanitizers/BUILD.gn)
 
-    for info in command_pool.run():
-        proc = info.proc
-        assert proc is not None
-        store_into_dict(result, info.dest, info.cmd_result.process(proc))
+    for dest, value in command_pool.run().items():
+        store_into_dict(result, dest, value)
 
     def get_dest_path(variant: str, soname: str) -> str:
         return f"lib/{variant}/{soname}"
