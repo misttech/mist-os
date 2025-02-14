@@ -1846,6 +1846,8 @@ mod tests {
         fixture.close().await;
     }
 
+    /// Verify that once we enable verity on a file, it can never be written to or resized.
+    /// This applies even to connections that have [`fio::OpenFlags::RIGHT_WRITABLE`].
     #[fuchsia::test]
     async fn test_write_fail_fsverity_enabled_file() {
         let fixture = TestFixture::new().await;
@@ -1878,50 +1880,48 @@ mod tests {
             .expect("FIDL transport error")
             .expect("enable verity failed");
 
-        // Writes via FIDL
-        file.write(&[2; 8192])
-            .await
-            .expect("FIDL transport error")
-            .map_err(Status::from_raw)
-            .expect_err("write succeeded on fsverity-enabled file");
-        // Writes via the pager
-        let vmo = file
-            .get_backing_memory(fio::VmoFlags::READ | fio::VmoFlags::WRITE)
-            .await
-            .expect("FIDL transport error")
-            .map_err(Status::from_raw)
-            .expect("get_backing_memory failed");
-        fasync::unblock(move || {
-            vmo.write(&[2; 8192], 0).expect_err("write via VMO succeeded on fsverity-enabled file");
-        })
-        .await;
-        // Truncation
-        file.resize(1)
-            .await
-            .expect("FIDL transport error")
-            .map_err(Status::from_raw)
-            .expect_err("resize succeeded on fsverity-enabled file");
+        async fn assert_file_is_not_writable(file: &fio::FileProxy) {
+            // Writes via FIDL should fail
+            file.write(&[2; 8192])
+                .await
+                .expect("FIDL transport error")
+                .map_err(Status::from_raw)
+                .expect_err("write succeeded on fsverity-enabled file");
+            // Writes via the pager should fail
+            let vmo = file
+                .get_backing_memory(fio::VmoFlags::READ | fio::VmoFlags::WRITE)
+                .await
+                .expect("FIDL transport error")
+                .map_err(Status::from_raw)
+                .expect("get_backing_memory failed");
+            fasync::unblock(move || {
+                vmo.write(&[2; 8192], 0)
+                    .expect_err("write via VMO succeeded on fsverity-enabled file");
+            })
+            .await;
+            // Truncation should fail
+            file.resize(1)
+                .await
+                .expect("FIDL transport error")
+                .map_err(Status::from_raw)
+                .expect_err("resize succeeded on fsverity-enabled file");
+        }
 
-        // Ensure that new writable handles can't be created
-        deprecated_open_file(
-            &root,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            "foo",
-        )
-        .await
-        .expect_err("open writable succeeded on fsverity-enabled file");
-
-        // Close the file and ensure that it cannot be reopened for writing
+        assert_file_is_not_writable(&file).await;
         close_file_checked(file).await;
-        deprecated_open_file(
+
+        // Ensure that even if new writable connections are created, those also cannot write.
+        let file = deprecated_open_file(
             &root,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
             "foo",
         )
         .await
-        .expect_err("open writable succeeded on fsverity-enabled file");
+        .expect("failed to open fsverity-enabled file");
+        assert_file_is_not_writable(&file).await;
+        close_file_checked(file).await;
 
-        // Reopen the filesystem and ensure that the file can't be opened for writing
+        // Reopen the filesystem and ensure that the file can't be written to.
         let device = fixture.close().await;
         device.ensure_unique();
         device.reopen(false);
@@ -1937,13 +1937,15 @@ mod tests {
         .await;
 
         let root = fixture.root();
-        deprecated_open_file(
+        let file = deprecated_open_file(
             &root,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
             "foo",
         )
         .await
-        .expect_err("open writable succeeded on fsverity-enabled file");
+        .expect("failed to open fsverity-enabled file");
+        assert_file_is_not_writable(&file).await;
+        close_file_checked(file).await;
 
         fixture.close().await;
     }
