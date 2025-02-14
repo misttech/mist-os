@@ -58,8 +58,8 @@ class Dpc : public fbl::DoublyLinkedListable<Dpc*, fbl::NodeOptions::AllowCopyMo
   // on its worker thread.
   void Invoke() TA_EXCL(Dpc::Lock::Get());
 
-  Func* func_;
-  void* arg_;
+  Func* const func_;
+  void* const arg_;
 };
 
 // Each cpu maintains a DpcQueue, in its percpu structure.

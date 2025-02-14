@@ -9,6 +9,7 @@
 #include <arch/arch_ops.h>
 #include <arch/mp.h>
 #include <fbl/alloc_checker.h>
+#include <fbl/array.h>
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/cpu.h>
 #include <kernel/dpc.h>
@@ -21,58 +22,51 @@
 
 #include <ktl/enforce.h>
 
-struct event_signal_from_dpc_context {
-  Dpc dpc;
-  Event event;
-  ktl::atomic<cpu_num_t> expected_cpu;
-  ktl::atomic<bool> dpc_started;
-};
-
-static void event_signal_from_dpc_check_cpu(Dpc* dpc) {
-  auto* const context = dpc->arg<event_signal_from_dpc_context>();
-  context->dpc_started = true;
-
-  // DPCs allow interrupts and blocking.
-  DEBUG_ASSERT(!arch_ints_disabled());
-  DEBUG_ASSERT(!arch_blocking_disallowed());
-  DEBUG_ASSERT(context->expected_cpu == arch_curr_cpu_num());
-
-  context->event.Signal();
-}
-
 static bool test_dpc_queue() {
   BEGIN_TEST;
+
+  struct Context {
+    Context() : dpc(&SignalEvent, &dpc) {}
+
+    static void SignalEvent(Dpc* dpc) {
+      auto* const context = dpc->arg<Context>();
+      context->dpc_started = true;
+
+      // DPCs allow interrupts and blocking.
+      DEBUG_ASSERT(!arch_ints_disabled());
+      DEBUG_ASSERT(!arch_blocking_disallowed());
+      DEBUG_ASSERT(context->expected_cpu == arch_curr_cpu_num());
+
+      context->event.Signal();
+    }
+
+    Dpc dpc;
+    Event event;
+    ktl::atomic<cpu_num_t> expected_cpu;
+    ktl::atomic<bool> dpc_started;
+  };
 
   static constexpr int kNumDPCs = 72;
 
   fbl::AllocChecker ac;
-  auto context = ktl::make_unique<ktl::array<event_signal_from_dpc_context, kNumDPCs>>(&ac);
+  auto context = fbl::MakeArray<Context>(&ac, kNumDPCs);
   ASSERT_TRUE(ac.check());
 
   // Init all the DPCs and supporting context.
   for (int i = 0; i < kNumDPCs; i++) {
-    (*context)[i].dpc_started = false;
+    context[i].dpc_started = false;
   }
 
   // Fire off DPCs.
   for (int i = 0; i < kNumDPCs; i++) {
     AutoPreemptDisabler preempt_disable;
-    (*context)[i].dpc =
-        Dpc{&event_signal_from_dpc_check_cpu, reinterpret_cast<void*>(&(*context)[i])};
     interrupt_saved_state_t int_state = arch_interrupt_save();
-    (*context)[i].expected_cpu = arch_curr_cpu_num();
-    (*context)[i].dpc.Queue();
+    context[i].expected_cpu = arch_curr_cpu_num();
+    context[i].dpc.Queue();
     arch_interrupt_restore(int_state);
   }
   for (int i = 0; i < kNumDPCs; i++) {
-    if ((*context)[i].dpc_started) {
-      // Once the DPC has started executing, we can reclaim the submitted Dpc. Zero it to
-      // try to check this.
-      (*context)[i].dpc = Dpc();
-    }
-  }
-  for (int i = 0; i < kNumDPCs; i++) {
-    (*context)[i].event.Wait();
+    context[i].event.Wait();
   }
 
   END_TEST;

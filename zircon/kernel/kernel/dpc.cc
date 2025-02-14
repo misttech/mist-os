@@ -109,7 +109,7 @@ int DpcQueue::Work() {
     [[maybe_unused]] zx_status_t err = event_.Wait();
     DEBUG_ASSERT(err == ZX_OK);
 
-    Dpc dpc_local;
+    ktl::optional<Dpc> dpc_local;
     {
       Guard<SpinLock, IrqSave> guard{Dpc::Lock::Get()};
 
@@ -127,11 +127,11 @@ int DpcQueue::Work() {
       }
 
       // Copy the Dpc to the stack.
-      dpc_local = *dpc;
+      dpc_local.emplace(*dpc);
     }
 
     // Call the Dpc.
-    dpc_local.Invoke();
+    dpc_local->Invoke();
   }
 
   return 0;
