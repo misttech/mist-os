@@ -19,6 +19,7 @@ use crate::fs::proc::swaps::swaps_node;
 use crate::fs::proc::sysctl::{net_directory, sysctl_directory};
 use crate::fs::proc::sysrq::SysRqNode;
 use crate::fs::proc::thread_self::thread_self_node;
+use crate::fs::proc::uptime::uptime_node;
 use crate::mm::PAGE_SIZE;
 use crate::task::{CurrentTask, Kernel, KernelStats, TaskStateCode};
 use crate::vfs::{
@@ -75,11 +76,7 @@ impl ProcDirectory {
             "swaps".into() => swaps_node(current_task, fs),
             "sys".into() => sysctl_directory(current_task, fs),
             "net".into() => net_directory(current_task, fs),
-            "uptime".into() => fs.create_node(
-                current_task,
-                UptimeFile::new_node(&kernel.stats),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
+            "uptime".into() => uptime_node(current_task, fs),
             "loadavg".into() => fs.create_node(
                 current_task,
                 LoadavgFile::new_node(kernel),
@@ -392,37 +389,6 @@ impl BytesFileOps for MiscFile {
             contents.push_str(&format!("{:3} {}\n", device_type.minor(), name));
         }
         Ok(contents.into_bytes().into())
-    }
-}
-
-#[derive(Clone)]
-struct UptimeFile {
-    kernel_stats: Arc<KernelStats>,
-}
-
-impl UptimeFile {
-    pub fn new_node(kernel_stats: &Arc<KernelStats>) -> impl FsNodeOps {
-        DynamicFile::new_node(Self { kernel_stats: kernel_stats.clone() })
-    }
-}
-
-impl DynamicFileSource for UptimeFile {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let uptime = (zx::MonotonicInstant::get() - zx::MonotonicInstant::ZERO).into_seconds_f64();
-
-        // Fetch CPU stats from `fuchsia.kernel.Stats` to calculate idle time.
-        let cpu_stats = self
-            .kernel_stats
-            .get()
-            .get_cpu_stats(zx::MonotonicInstant::INFINITE)
-            .map_err(|_| errno!(EIO))?;
-        let per_cpu_stats = cpu_stats.per_cpu_stats.unwrap_or(vec![]);
-        let idle_time = per_cpu_stats.iter().map(|s| s.idle_time.unwrap_or(0)).sum();
-        let idle_time = zx::MonotonicDuration::from_nanos(idle_time).into_seconds_f64();
-
-        writeln!(sink, "{:.2} {:.2}", uptime, idle_time)?;
-
-        Ok(())
     }
 }
 
