@@ -29,6 +29,7 @@
 #include <vector>
 
 #include <ddktl/fidl.h>
+#include <ddktl/service.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 #include <fbl/ref_ptr.h>
@@ -153,6 +154,19 @@ zx_status_t UsbPeripheral::Init() {
   if (status != ZX_OK) {
     zxlogf(ERROR, "DdkAdd failed - %s", zx_status_get_string(status));
     return status;
+  }
+
+  // Advertise a service:
+  fuchsia_hardware_usb_peripheral::Service::InstanceHandler handler({
+      .device = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                        fidl::kIgnoreBindingClosure),
+  });
+
+  zx::result add_result =
+      ddk::AddService<fuchsia_hardware_usb_peripheral::Service>(zxdev(), std::move(handler));
+  if (add_result.is_error()) {
+    zxlogf(ERROR, "Failed to add service");
+    return add_result.status_value();
   }
 
   PeripheralConfigParser peripheral_config = {};

@@ -16,7 +16,12 @@
         fallback: "false",
     },
     capabilities: [
-        { service: "fuchsia.hardware.usb.function.UsbFunctionService" },
+        {
+            service: [
+                "fuchsia.hardware.usb.function.UsbFunctionService",
+                "fuchsia.hardware.usb.peripheral.Service",
+            ],
+        },
     ],
     use: [
         { service: "fuchsia.hardware.usb.dci.UsbDciService" },
@@ -35,7 +40,10 @@
     ],
     expose: [
         {
-            service: "fuchsia.hardware.usb.function.UsbFunctionService",
+            service: [
+                "fuchsia.hardware.usb.function.UsbFunctionService",
+                "fuchsia.hardware.usb.peripheral.Service",
+            ],
             from: "self",
         },
     ],

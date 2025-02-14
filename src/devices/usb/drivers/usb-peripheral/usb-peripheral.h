@@ -273,6 +273,8 @@ class UsbPeripheral : public UsbPeripheralType,
   usb_peripheral_config::Config config_;
 
   UsbDciInterfaceServer intf_srv_{this};
+
+  fidl::ServerBindingGroup<fuchsia_hardware_usb_peripheral::Device> bindings_;
 };
 
 }  // namespace usb_peripheral
