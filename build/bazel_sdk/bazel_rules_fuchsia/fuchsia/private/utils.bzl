@@ -6,6 +6,35 @@
 
 load(":providers.bzl", "FuchsiaProvidersInfo")
 
+# A dictionary to be expanded inside a ctx.actions.run() or
+# ctx.actions.run_shell() call to specify that the corresponding
+# action should only run locally.
+#
+# Example usage is:
+#
+#    ctx.actions.run(
+#      executable = ...,
+#      inputs = ...,
+#      outputs = ....
+#      **LOCAL_ONLY_ACTION_KWARGS
+#    )
+#
+# A good reason to use this is to avoid sending very large
+# input or outputs through the network, especially when
+# running the command locally can still be fast.
+#
+# IMPORTANT: This does NOT disable Bazel sandboxing, like
+# the Bazel "local" tag does.
+#
+# See https://bazel.build/reference/be/common-definitions#common-attributes
+#
+LOCAL_ONLY_ACTION_KWARGS = {
+    "execution_requirements": {
+        "no-remote": "1",
+        "no-cache": "1",
+    },
+}
+
 _INVALID_LABEL_CHARACTERS = "\"!%@^_#$&'()*+,;<=>?[]{|}~/".elems()
 
 def _fuchsia_cpu_alias(cpu):

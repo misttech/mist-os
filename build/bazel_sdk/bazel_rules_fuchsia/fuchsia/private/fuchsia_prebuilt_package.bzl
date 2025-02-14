@@ -6,9 +6,16 @@
 
 load("@bazel_skylib//rules:select_file.bzl", "select_file")
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 load("//fuchsia/private/workflows:fuchsia_package_tasks.bzl", "fuchsia_package_tasks")
 load(":providers.bzl", "FuchsiaComponentInfo", "FuchsiaDebugSymbolInfo", "FuchsiaPackageInfo", "FuchsiaPackagedComponentInfo")
-load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
+
+LOCAL_ONLY_ACTION_KWARGS = {
+    "execution_requirements": {
+        "no-remote": "1",
+        "no-cache": "1",
+    },
+}
 
 def _relative_file_name(ctx, filename):
     return ctx.label.name + "_expanded/" + filename
@@ -137,6 +144,7 @@ def _unpack_prebuilt_package_impl(ctx):
         ],
         mnemonic = "FuchsiaFfxPackageArchiveExtract",
         progress_message = "extracting the package for %{label}",
+        **LOCAL_ONLY_ACTION_KWARGS
     )
 
     # rebase paths in package manifest
@@ -151,6 +159,7 @@ def _unpack_prebuilt_package_impl(ctx):
             "--updated-package-manifest",
             rebased_package_manifest_json.path,
         ],
+        **LOCAL_ONLY_ACTION_KWARGS
     )
     output_files.append(rebased_package_manifest_json)
 
@@ -228,6 +237,7 @@ def _pack_prebuilt_package_impl(ctx):
         outputs = [far_file, ffx_isolate_dir],
         mnemonic = "FuchsiaFfxPackageArchiveCreate",
         progress_message = "Archiving package for %{label}",
+        **LOCAL_ONLY_ACTION_KWARGS
     )
 
     return [
