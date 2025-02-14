@@ -14,7 +14,6 @@ import argparse
 import dataclasses
 import json
 import os
-import re
 import subprocess
 import sys
 import time
@@ -223,7 +222,7 @@ def store_into_dict(d: T.Dict[str, T.Any], path: str, value: T.Any) -> None:
         value: The value to set.
     """
     components = path.split(".")
-    assert len(components) > 0, f"Trying to use an empty path!"
+    assert len(components) > 0, "Trying to use an empty path!"
 
     cur_dict = d
     for cur_field in components[:-1]:
@@ -248,13 +247,6 @@ def dict_to_gn_scope_inplace(v: T.Dict[str, T.Any]) -> None:
             del v[key]
         if isinstance(value, dict):
             dict_to_gn_scope_inplace(value)
-
-
-def run_command_get_output(cmd_args: T.List[str | Path]) -> str:
-    ret = subprocess.run(
-        [str(a) for a in cmd_args], capture_output=True, text=True, check=True
-    )
-    return ret.stdout.strip()
 
 
 class CommandResult(object):
@@ -532,10 +524,6 @@ def main() -> int:
 
     def get_dest_path(variant: str, soname: str) -> str:
         return f"lib/{variant}/{soname}"
-
-    # A regular expression used to match .<major>.<minor> and .<major>
-    # suffixes at the end of Fuchsia shared library names.
-    major_minor_re = re.compile(r"(.*\.so)\.[0-9.]+")
 
     # Add empty variants dictionary to all targets that don't have one.
     # This simplifies the GN code paths.
