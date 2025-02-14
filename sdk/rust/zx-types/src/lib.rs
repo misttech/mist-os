@@ -56,6 +56,7 @@ pub type zx_vcpu_state_topic_t = u32;
 pub type zx_restricted_reason_t = u64;
 pub type zx_processor_power_level_options_t = u64;
 pub type zx_processor_power_control_t = u64;
+pub type zx_system_memory_stall_type_t = u32;
 
 macro_rules! const_assert {
     ($e:expr $(,)?) => {
@@ -1737,6 +1738,11 @@ multiconst!(zx_object_info_topic_t, [
     ZX_INFO_VMAR_MAPS                  = 36; // zx_info_maps_t[n]
     ZX_INFO_POWER_DOMAINS              = 37; // zx_info_power_domain_info_t[n]
     ZX_INFO_MEMORY_STALL               = 38; // zx_info_memory_stall_t[1]
+]);
+
+multiconst!(zx_system_memory_stall_type_t, [
+    ZX_SYSTEM_MEMORY_STALL_SOME        = 0;
+    ZX_SYSTEM_MEMORY_STALL_FULL        = 1;
 ]);
 
 // This macro takes struct-like syntax and creates another macro that can be used to create
