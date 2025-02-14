@@ -3,24 +3,28 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use fidl_fuchsia_io as fio;
 #[cfg(target_os = "fuchsia")]
 use fs_management::filesystem::BlockConnector;
 
 /// Block device configuration options.
 pub struct BlockDeviceConfig {
+    /// If true, the block device will always be added to an FVM volume.  If the system has an FVM
+    /// instance, it'll be added in there, and otherwise a test-only FVM instance will be spawned
+    /// and the volume will be added to that instance.
+    /// Note that even if this is false, the block device might end up in an FVM volume
+    /// (particularly when the system uses FVM).
+    pub requires_fvm: bool,
+
     /// If true, zxcrypt is initialized on top of the block device.
     pub use_zxcrypt: bool,
 
-    /// For filesystem that are not FVM-aware, this option can be used to pre-allocate space inside
-    /// of the FVM volume.
-    pub fvm_volume_size: Option<u64>,
+    /// For non-FVM volumes, this is the size of the volume and is required to be set.
+    /// For FVM volumes, this is optional, and if set will pre-size the volume.
+    pub volume_size: Option<u64>,
 }
 
 /// A trait representing a block device.
 pub trait BlockDevice: Send + Sync {
-    fn dir(&self) -> &fio::DirectoryProxy;
-
     #[cfg(target_os = "fuchsia")]
     fn connector(&self) -> Box<dyn BlockConnector>;
 }

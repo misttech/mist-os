@@ -78,10 +78,6 @@ impl Ramdisk {
 }
 
 impl BlockDevice for Ramdisk {
-    fn dir(&self) -> &fio::DirectoryProxy {
-        &self.volume_dir
-    }
-
     fn connector(&self) -> Box<dyn BlockConnector> {
         let volume_dir = fuchsia_fs::directory::clone(&self.volume_dir).unwrap();
         Box::new(DirBasedBlockConnector::new(

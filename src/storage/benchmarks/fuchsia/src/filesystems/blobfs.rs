@@ -24,7 +24,11 @@ impl FilesystemConfig for Blobfs {
         block_device_factory: &dyn BlockDeviceFactory,
     ) -> BlobfsInstance {
         let block_device = block_device_factory
-            .create_block_device(&BlockDeviceConfig { use_zxcrypt: false, fvm_volume_size: None })
+            .create_block_device(&BlockDeviceConfig {
+                requires_fvm: true,
+                use_zxcrypt: false,
+                volume_size: None,
+            })
             .await;
         let blobfs = FsManagementFilesystemInstance::new(
             fs_management::Blobfs { ..Default::default() },

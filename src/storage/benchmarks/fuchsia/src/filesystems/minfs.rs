@@ -19,7 +19,11 @@ impl FilesystemConfig for Minfs {
         block_device_factory: &dyn BlockDeviceFactory,
     ) -> FsManagementFilesystemInstance {
         let block_device = block_device_factory
-            .create_block_device(&BlockDeviceConfig { use_zxcrypt: true, fvm_volume_size: None })
+            .create_block_device(&BlockDeviceConfig {
+                requires_fvm: true,
+                use_zxcrypt: true,
+                volume_size: None,
+            })
             .await;
         FsManagementFilesystemInstance::new(
             fs_management::Minfs::default(),

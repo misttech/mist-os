@@ -74,6 +74,15 @@ impl BlockConnector for fidl_fuchsia_storage_partitions::PartitionServiceProxy {
     }
 }
 
+// NB: We have to be specific here; we cannot do a blanket impl for AsRef<T: BlockConnector> because
+// that would conflict with a downstream crate that implements AsRef for a concrete BlockConnector
+// defined here already.
+impl<T: BlockConnector> BlockConnector for Arc<T> {
+    fn connect_volume(&self) -> Result<ClientEnd<VolumeMarker>, Error> {
+        self.as_ref().connect_volume()
+    }
+}
+
 impl<F> BlockConnector for F
 where
     F: Fn() -> Result<ClientEnd<VolumeMarker>, Error> + Send + Sync,
