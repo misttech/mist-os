@@ -393,17 +393,13 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
     return;
   }
 
-  zx_status_t tear_down_status = ZX_OK;
-  fit::deferred_action tear_down_on_error =
-      fit::defer([this, &tear_down_status] { TearDown(tear_down_status); });
-
   fbl::AutoLock lock(controller_.mtx());
   zx::result<std::span<const display::DisplayTiming>> display_timings_result =
       controller_.GetDisplayTimings(display_id);
   if (display_timings_result.is_error()) {
     FDF_LOG(ERROR, "Failed to get display timings for display #%" PRIu64 ": %s", display_id.value(),
             display_timings_result.status_string());
-    tear_down_status = display_timings_result.status_value();
+    TearDown(display_timings_result.status_value());
     return;
   }
 
@@ -429,20 +425,18 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
     FDF_LOG(ERROR, "Display mode not found: (%" PRIu32 " x %" PRIu32 ") @ %" PRIu32 " millihertz",
             request->mode.active_area.width, request->mode.active_area.height,
             request->mode.refresh_rate_millihertz);
-    tear_down_status = ZX_ERR_NOT_FOUND;
+    TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
 
   if (display_timings.size() == 1) {
     FDF_LOG(INFO, "Display has only one timing available. Modeset is skipped.");
-    tear_down_on_error.cancel();
     return;
   }
 
   config->draft_.mode = ToBanjoDisplayMode(*display_timing_it);
   draft_config_valid_ = false;
   config->display_config_change_ = true;
-  tear_down_on_error.cancel();
 }
 
 void Client::SetDisplayColorConversion(SetDisplayColorConversionRequestView request,
