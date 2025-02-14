@@ -63,12 +63,9 @@ VmObjectPaged::~VmObjectPaged() {
 
   LTRACEF("%p\n", this);
 
-  if (!cow_pages_) {
-    // Initialization didn't finish. This is not in the global list and any complex destruction can
-    // all be skipped.
-    DEBUG_ASSERT(!InGlobalList());
-    return;
-  }
+  // VmObjectPaged initialize must always complete and is not allowed to fail, as such it should
+  // always end up in the global list.
+  DEBUG_ASSERT(InGlobalList());
 
   DestructorHelper();
 }
@@ -699,22 +696,24 @@ zx_status_t VmObjectPaged::CreateChildReferenceCommon(uint32_t options, VmCowRan
   }
 
   // Reference shares the same VmCowPages as the parent.
-
-  fbl::AllocChecker ac;
-  auto vmo = fbl::AdoptRef<VmObjectPaged>(
-      new (&ac) VmObjectPaged(options, hierarchy_state_ptr_, cow_pages_, range));
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-
+  fbl::RefPtr<VmObjectPaged> vmo;
   {
     Guard<VmoLockType> guard{lock()};
-    AssertHeld(vmo->lock_ref());
 
     // We know that we are not contiguous so we should not be uncached either.
     if (cache_policy_ != ARCH_MMU_FLAG_CACHED && !allow_uncached) {
       return ZX_ERR_BAD_STATE;
     }
+
+    // Once all fallible checks are performed, construct the VmObjectPaged.
+    fbl::AllocChecker ac;
+    vmo = fbl::AdoptRef<VmObjectPaged>(
+        new (&ac) VmObjectPaged(options, hierarchy_state_ptr_, cow_pages_, range));
+    if (!ac.check()) {
+      return ZX_ERR_NO_MEMORY;
+    }
+    AssertHeld(vmo->lock_ref());
+
     vmo->cache_policy_ = cache_policy_;
     {
       Guard<CriticalMutex> child_guard{ChildListLock::Get()};
