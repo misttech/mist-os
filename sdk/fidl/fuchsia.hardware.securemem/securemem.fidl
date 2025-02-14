@@ -24,3 +24,8 @@ closed protocol Device {
         paddr uint64;
     });
 };
+
+// Added to allow service connection to replace devfs
+service Service {
+    device client_end:Device;
+};
