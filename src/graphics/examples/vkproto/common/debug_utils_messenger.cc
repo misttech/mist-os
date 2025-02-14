@@ -123,8 +123,13 @@ vk::DebugUtilsMessengerCreateInfoEXT DebugUtilsMessenger::DefaultDebugUtilsMesse
   info.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
                      vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance |
                      vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation;
-  info.pfnUserCallback = DebugCallback;
 
+#if VK_HEADER_VERSION < 304
+  // TODO(https://fxbug.dev/379153784): Remove this when the migration is done.
+  info.pfnUserCallback = DebugCallback;
+#else   // VK_HEADER_VERSION >= 304
+  info.pfnUserCallback = reinterpret_cast<vk::PFN_DebugUtilsMessengerCallbackEXT>(DebugCallback);
+#endif  // VK_HEADER_VERSION < 304
   return info;
 }
 

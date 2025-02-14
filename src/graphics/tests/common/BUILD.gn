@@ -12,6 +12,11 @@ fuchsia_structured_config_cpp_elf_lib("config") {
   cm_label = ":config-manifest"
 }
 
+# TODO(https://fxbug.dev/379153784): Remove this when the migration is done.
+config("allow_deprecated_vulkan_hpp_constructors") {
+  cflags = [ "-Wno-deprecated-declarations" ]
+}
+
 source_set("common") {
   sources = [
     "//src/graphics/tests/common/utils.cc",
@@ -23,6 +28,8 @@ source_set("common") {
     "//src/lib/vulkan",
     "//third_party/googletest:gtest_no_testonly",
   ]
+
+  configs += [ ":allow_deprecated_vulkan_hpp_constructors" ]
 }
 
 if (is_fuchsia) {
@@ -59,6 +66,8 @@ executable("vkcontext_bin") {
     "//src/lib/fxl/test:test_settings",
     "//third_party/googletest:gtest",
   ]
+
+  configs += [ ":allow_deprecated_vulkan_hpp_constructors" ]
 }
 
 fuchsia_test_component("vkcontext_cmp") {

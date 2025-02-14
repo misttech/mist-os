@@ -77,9 +77,16 @@ TEST(VkContext, Allocator) {
   vk::AllocationCallbacks allocator;
   int allocations = 0;
   allocator.pUserData = &allocations;
+#if VK_HEADER_VERSION < 304
+  // TODO(https://fxbug.dev/379153784): Remove this when the migration is done.
   allocator.pfnAllocation = &vkallocate;
   allocator.pfnReallocation = &vkreallocate;
   allocator.pfnFree = &vkfree;
+#else   // VK_HEADER_VERSION >= 304
+  allocator.pfnAllocation = reinterpret_cast<vk::PFN_AllocationFunction>(&vkallocate);
+  allocator.pfnReallocation = reinterpret_cast<vk::PFN_ReallocationFunction>(&vkreallocate);
+  allocator.pfnFree = reinterpret_cast<vk::PFN_FreeFunction>(&vkfree);
+#endif  // VK_HEADER_VERSION < 304
   std::unique_ptr<VulkanContext> ctx = VulkanContext::Builder{}.set_allocator(allocator).Unique();
   ASSERT_NE(ctx, nullptr);
   EXPECT_GT(allocations, 0);
