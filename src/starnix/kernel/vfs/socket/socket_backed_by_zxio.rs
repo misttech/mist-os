@@ -286,6 +286,7 @@ impl SocketOps for ZxioBackedSocket {
 
     fn connect(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &SocketHandle,
         _current_task: &CurrentTask,
         peer: SocketPeer,
@@ -302,14 +303,24 @@ impl SocketOps for ZxioBackedSocket {
         }
     }
 
-    fn listen(&self, _socket: &Socket, backlog: i32, _credentials: ucred) -> Result<(), Errno> {
+    fn listen(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _socket: &Socket,
+        backlog: i32,
+        _credentials: ucred,
+    ) -> Result<(), Errno> {
         self.zxio
             .listen(backlog)
             .map_err(|status| from_status_like_fdio!(status))?
             .map_err(|out_code| errno_from_zxio_code!(out_code))
     }
 
-    fn accept(&self, socket: &Socket) -> Result<SocketHandle, Errno> {
+    fn accept(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        socket: &Socket,
+    ) -> Result<SocketHandle, Errno> {
         let zxio = self
             .zxio
             .accept()
@@ -326,6 +337,7 @@ impl SocketOps for ZxioBackedSocket {
 
     fn bind(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         socket_address: SocketAddress,
@@ -418,23 +430,36 @@ impl SocketOps for ZxioBackedSocket {
         zxio_query_events(&self.zxio)
     }
 
-    fn shutdown(&self, _socket: &Socket, how: SocketShutdownFlags) -> Result<(), Errno> {
+    fn shutdown(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _socket: &Socket,
+        how: SocketShutdownFlags,
+    ) -> Result<(), Errno> {
         self.zxio
             .shutdown(how)
             .map_err(|status| from_status_like_fdio!(status))?
             .map_err(|out_code| errno_from_zxio_code!(out_code))
     }
 
-    fn close(&self, _socket: &Socket) {}
+    fn close(&self, _locked: &mut Locked<'_, FileOpsCore>, _socket: &Socket) {}
 
-    fn getsockname(&self, socket: &Socket) -> Result<SocketAddress, Errno> {
+    fn getsockname(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        socket: &Socket,
+    ) -> Result<SocketAddress, Errno> {
         match self.zxio.getsockname() {
             Err(_) | Ok(Err(_)) => Ok(SocketAddress::default_for_domain(socket.domain)),
             Ok(Ok(addr)) => SocketAddress::from_bytes(addr),
         }
     }
 
-    fn getpeername(&self, _socket: &Socket) -> Result<SocketAddress, Errno> {
+    fn getpeername(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _socket: &Socket,
+    ) -> Result<SocketAddress, Errno> {
         self.zxio
             .getpeername()
             .map_err(|status| from_status_like_fdio!(status))?
@@ -444,6 +469,7 @@ impl SocketOps for ZxioBackedSocket {
 
     fn setsockopt(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         task: &Task,
         level: u32,
@@ -491,6 +517,7 @@ impl SocketOps for ZxioBackedSocket {
 
     fn getsockopt(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         level: u32,
         optname: u32,

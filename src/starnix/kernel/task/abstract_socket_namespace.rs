@@ -10,6 +10,7 @@ use std::sync::{Arc, Weak};
 use crate::task::CurrentTask;
 use crate::vfs::socket::{Socket, SocketAddress, SocketHandle};
 use crate::vfs::FsString;
+use starnix_sync::{FileOpsCore, LockBefore, Locked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
 
@@ -38,16 +39,21 @@ where
         Arc::new(AbstractSocketNamespace::<K> { table: Mutex::new(HashMap::new()), address_maker })
     }
 
-    pub fn bind(
+    pub fn bind<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         address: K,
         socket: &SocketHandle,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
+        let mut locked = locked.cast_locked::<FileOpsCore>();
         let mut table = self.table.lock();
         match table.entry(address.clone()) {
             Entry::Vacant(entry) => {
-                socket.bind(current_task, (self.address_maker)(address))?;
+                socket.bind(&mut locked, current_task, (self.address_maker)(address))?;
                 entry.insert(Arc::downgrade(socket));
             }
             Entry::Occupied(mut entry) => {
@@ -55,7 +61,7 @@ where
                 if occupant.is_some() {
                     return error!(EADDRINUSE);
                 }
-                socket.bind(current_task, (self.address_maker)(address))?;
+                socket.bind(&mut locked, current_task, (self.address_maker)(address))?;
                 entry.insert(Arc::downgrade(socket));
             }
         }

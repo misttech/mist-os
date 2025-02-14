@@ -188,7 +188,7 @@ pub fn sys_bind(
             // If there is a null byte at the start of the sun_path, then the
             // address is abstract.
             if name[0] == b'\0' {
-                current_task.abstract_socket_namespace.bind(current_task, name, socket)?;
+                current_task.abstract_socket_namespace.bind(locked, current_task, name, socket)?;
             } else {
                 let mode = file.node().info().mode;
                 let mode = current_task.fs().apply_umask(mode).with_type(FileMode::IFSOCK);
@@ -212,26 +212,26 @@ pub fn sys_bind(
             }
         }
         SocketAddress::Vsock(port) => {
-            current_task.abstract_vsock_namespace.bind(current_task, port, socket)?;
+            current_task.abstract_vsock_namespace.bind(locked, current_task, port, socket)?;
         }
         SocketAddress::Inet(_)
         | SocketAddress::Inet6(_)
         | SocketAddress::Netlink(_)
-        | SocketAddress::Packet(_) => socket.bind(current_task, address)?,
+        | SocketAddress::Packet(_) => socket.bind(locked, current_task, address)?,
     }
 
     Ok(())
 }
 
 pub fn sys_listen(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     backlog: i32,
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
     let socket = Socket::get_from_file(&file)?;
-    socket.listen(current_task, backlog)?;
+    socket.listen(locked, current_task, backlog)?;
     Ok(())
 }
 
@@ -255,13 +255,16 @@ pub fn sys_accept4(
 ) -> Result<FdNumber, Errno> {
     let file = current_task.files.get(fd)?;
     let socket = Socket::get_from_file(&file)?;
-    let accepted_socket =
-        file.blocking_op(locked, current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, |_| {
-            socket.accept()
-        })?;
+    let accepted_socket = file.blocking_op(
+        locked,
+        current_task,
+        FdEvents::POLLIN | FdEvents::POLLHUP,
+        None,
+        |locked| socket.accept(locked),
+    )?;
 
     if !user_socket_address.is_null() {
-        let address_bytes = accepted_socket.getpeername()?.to_bytes();
+        let address_bytes = accepted_socket.getpeername(locked)?.to_bytes();
         write_socket_address(
             current_task,
             user_socket_address,
@@ -309,7 +312,7 @@ pub fn sys_connect(
         }
     };
 
-    let result = client_socket.connect(current_task, peer.clone());
+    let result = client_socket.connect(locked, current_task, peer.clone());
 
     if client_file.is_non_blocking() {
         return result;
@@ -330,7 +333,7 @@ pub fn sys_connect(
             if !client_socket.query_events(locked, current_task)?.contains(FdEvents::POLLOUT) {
                 waiter.wait(locked, current_task)?;
             }
-            client_socket.connect(current_task, peer)
+            client_socket.connect(locked, current_task, peer)
         }
         // TODO(tbodt): Support blocking when the UNIX domain socket queue fills up. This one's
         // weird because as far as I can tell, removing a socket from the queue does not actually
@@ -359,7 +362,7 @@ fn write_socket_address(
 }
 
 pub fn sys_getsockname(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_socket_address: UserAddress,
@@ -367,7 +370,7 @@ pub fn sys_getsockname(
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
     let socket = Socket::get_from_file(&file)?;
-    let address_bytes = socket.getsockname()?.to_bytes();
+    let address_bytes = socket.getsockname(locked)?.to_bytes();
 
     write_socket_address(current_task, user_socket_address, user_address_length, &address_bytes)?;
 
@@ -375,7 +378,7 @@ pub fn sys_getsockname(
 }
 
 pub fn sys_getpeername(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_socket_address: UserAddress,
@@ -383,7 +386,7 @@ pub fn sys_getpeername(
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
     let socket = Socket::get_from_file(&file)?;
-    let address_bytes = socket.getpeername()?.to_bytes();
+    let address_bytes = socket.getpeername(locked)?.to_bytes();
 
     write_socket_address(current_task, user_socket_address, user_address_length, &address_bytes)?;
 
@@ -806,7 +809,7 @@ pub fn sys_getsockopt(
     let opt_value = if socket.domain.is_inet() && IpTables::can_handle_getsockopt(level, optname) {
         current_task.kernel().iptables.read(locked).getsockopt(socket, optname, optval)?
     } else {
-        socket.getsockopt(level, optname, optlen)?
+        socket.getsockopt(locked, level, optname, optlen)?
     };
 
     let actual_optlen = opt_value.len() as socklen_t;
@@ -840,12 +843,12 @@ pub fn sys_setsockopt(
             user_opt,
         )
     } else {
-        socket.setsockopt(current_task, level, optname, user_opt)
+        socket.setsockopt(locked, current_task, level, optname, user_opt)
     }
 }
 
 pub fn sys_shutdown(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     how: u32,
@@ -858,7 +861,7 @@ pub fn sys_shutdown(
         SHUT_RDWR => SocketShutdownFlags::READ | SocketShutdownFlags::WRITE,
         _ => return error!(EINVAL),
     };
-    socket.shutdown(how)?;
+    socket.shutdown(locked, how)?;
     Ok(())
 }
 

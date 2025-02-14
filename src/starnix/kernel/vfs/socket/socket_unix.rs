@@ -419,6 +419,7 @@ impl UnixSocket {
 impl SocketOps for UnixSocket {
     fn connect(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         socket: &SocketHandle,
         current_task: &CurrentTask,
         peer: SocketPeer,
@@ -436,7 +437,13 @@ impl SocketOps for UnixSocket {
         }
     }
 
-    fn listen(&self, socket: &Socket, backlog: i32, credentials: ucred) -> Result<(), Errno> {
+    fn listen(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        socket: &Socket,
+        backlog: i32,
+        credentials: ucred,
+    ) -> Result<(), Errno> {
         match socket.socket_type {
             SocketType::Stream | SocketType::SeqPacket => {}
             _ => return error!(EOPNOTSUPP),
@@ -458,7 +465,11 @@ impl SocketOps for UnixSocket {
         }
     }
 
-    fn accept(&self, socket: &Socket) -> Result<SocketHandle, Errno> {
+    fn accept(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        socket: &Socket,
+    ) -> Result<SocketHandle, Errno> {
         match socket.socket_type {
             SocketType::Stream | SocketType::SeqPacket => {}
             _ => return error!(EOPNOTSUPP),
@@ -473,6 +484,7 @@ impl SocketOps for UnixSocket {
 
     fn bind(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         socket_address: SocketAddress,
@@ -609,7 +621,12 @@ impl SocketOps for UnixSocket {
     /// Shuts down this socket according to how, preventing any future reads and/or writes.
     ///
     /// Used by the shutdown syscalls.
-    fn shutdown(&self, _socket: &Socket, how: SocketShutdownFlags) -> Result<(), Errno> {
+    fn shutdown(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _socket: &Socket,
+        how: SocketShutdownFlags,
+    ) -> Result<(), Errno> {
         let peer = {
             let mut inner = self.lock();
             let peer = inner.peer().ok_or_else(|| errno!(ENOTCONN))?.clone();
@@ -635,7 +652,7 @@ impl SocketOps for UnixSocket {
     /// which changes how read() behaves on that socket. Second, close
     /// transitions the internal state of this socket to Closed, which breaks
     /// the reference cycle that exists in the connected state.
-    fn close(&self, socket: &Socket) {
+    fn close(&self, _locked: &mut Locked<'_, FileOpsCore>, socket: &Socket) {
         let (maybe_peer, has_unread) = {
             let mut inner = self.lock();
             let maybe_peer = inner.peer().map(Arc::clone);
@@ -661,7 +678,11 @@ impl SocketOps for UnixSocket {
     ///
     /// The name is derived from the address and domain. A socket
     /// will always have a name, even if it is not bound to an address.
-    fn getsockname(&self, socket: &Socket) -> Result<SocketAddress, Errno> {
+    fn getsockname(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        socket: &Socket,
+    ) -> Result<SocketAddress, Errno> {
         let inner = self.lock();
         if let Some(address) = &inner.address {
             Ok(address.clone())
@@ -673,13 +694,18 @@ impl SocketOps for UnixSocket {
     /// Returns the name of the peer of this socket, if such a peer exists.
     ///
     /// Returns an error if the socket is not connected.
-    fn getpeername(&self, _socket: &Socket) -> Result<SocketAddress, Errno> {
+    fn getpeername(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _socket: &Socket,
+    ) -> Result<SocketAddress, Errno> {
         let peer = self.lock().peer().ok_or_else(|| errno!(ENOTCONN))?.clone();
-        peer.getsockname()
+        peer.getsockname(locked)
     }
 
     fn setsockopt(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         task: &Task,
         level: u32,
@@ -750,6 +776,7 @@ impl SocketOps for UnixSocket {
 
     fn getsockopt(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         socket: &Socket,
         level: u32,
         optname: u32,
@@ -787,8 +814,8 @@ impl SocketOps for UnixSocket {
 
     fn ioctl(
         &self,
-        socket: &Socket,
         locked: &mut Locked<'_, Unlocked>,
+        socket: &Socket,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -1058,9 +1085,9 @@ mod tests {
         )
         .expect("Failed to create socket.");
         socket
-            .bind(&current_task, SocketAddress::Unix(b"\0".into()))
+            .bind(&mut locked, &current_task, SocketAddress::Unix(b"\0".into()))
             .expect("Failed to bind socket.");
-        socket.listen(&current_task, 10).expect("Failed to listen.");
+        socket.listen(&mut locked, &current_task, 10).expect("Failed to listen.");
         let connecting_socket = Socket::new(
             &current_task,
             SocketDomain::Unix,
@@ -1069,10 +1096,10 @@ mod tests {
         )
         .expect("Failed to connect socket.");
         connecting_socket
-            .connect(&current_task, SocketPeer::Handle(socket.clone()))
+            .connect(&mut locked, &current_task, SocketPeer::Handle(socket.clone()))
             .expect("Failed to connect socket.");
         assert_eq!(Ok(FdEvents::POLLIN), socket.query_events(&mut locked, &current_task));
-        let server_socket = socket.accept().unwrap();
+        let server_socket = socket.accept(&mut locked).unwrap();
 
         let opt_size = std::mem::size_of::<socklen_t>();
         let user_address =
@@ -1080,9 +1107,11 @@ mod tests {
         let send_capacity: socklen_t = 4 * 4096;
         current_task.write_memory(user_address, &send_capacity.to_ne_bytes()).unwrap();
         let user_buffer = UserBuffer { address: user_address, length: opt_size };
-        server_socket.setsockopt(&current_task, SOL_SOCKET, SO_SNDBUF, user_buffer).unwrap();
+        server_socket
+            .setsockopt(&mut locked, &current_task, SOL_SOCKET, SO_SNDBUF, user_buffer)
+            .unwrap();
 
-        let opt_bytes = server_socket.getsockopt(SOL_SOCKET, SO_SNDBUF, 0).unwrap();
+        let opt_bytes = server_socket.getsockopt(&mut locked, SOL_SOCKET, SO_SNDBUF, 0).unwrap();
         let retrieved_capacity = socklen_t::from_ne_bytes(opt_bytes.try_into().unwrap());
         // Setting SO_SNDBUF actually sets it to double the size
         assert_eq!(2 * send_capacity, retrieved_capacity);
