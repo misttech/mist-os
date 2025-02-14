@@ -53,7 +53,7 @@ class PagerProxy : public PageProvider,
   bool DebugIsPageOk(vm_page_t* page, uint64_t offset) final;
   void OnClose() final;
   void OnDetach() final;
-  zx_status_t WaitOnEvent(Event* event) final;
+  zx_status_t WaitOnEvent(Event* event, bool suspendable) final;
   void Dump(uint depth, uint32_t max_items) final;
   bool SupportsPageRequestType(page_request_type type) const final {
     if (type == page_request_type::READ) {

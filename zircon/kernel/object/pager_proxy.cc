@@ -310,7 +310,8 @@ void PagerProxy::SetPageSourceUnchecked(fbl::RefPtr<PageSource> src) {
   func();
 }
 
-zx_status_t PagerProxy::WaitOnEvent(Event* event) {
+zx_status_t PagerProxy::WaitOnEvent(Event* event, bool suspendable) {
+  DEBUG_ASSERT(suspendable);
   ThreadDispatcher::AutoBlocked by(ThreadDispatcher::Blocked::PAGER);
   kcounter_add(dispatcher_pager_total_request_count, 1);
   uint32_t waited = 0;

@@ -48,7 +48,7 @@ class PhysicalPageProvider : public PageProvider {
   void OnDetach() final;
   // Before actually waiting on the event, uses the calling thread (which isn't holding any locks)
   // to process all the requests in pending_requests_.
-  zx_status_t WaitOnEvent(Event* event) final;
+  zx_status_t WaitOnEvent(Event* event, bool suspendable) final;
 
   void Dump(uint depth, uint32_t max_items) final;
 
