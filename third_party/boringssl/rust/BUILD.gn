@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/rust/rustc_library.gni")
+import("bssl-sys/opensslconf.gni")
 
 boringssl_root = "//third_party/boringssl/src"
 bssl_sys_dir = "${boringssl_root}/rust/bssl-sys"
@@ -61,6 +62,15 @@ group("bssl-crypto.static") {
     ":bssl-crypto.lib",
     "//third_party/boringssl:boringssl-static",
   ]
+}
+
+# These cfg values encode the openssl configuration settings made in boringssl,
+# which need to be communicated to any dependent openssl rust bindings.
+config("osslconf") {
+  rustflags = []
+  foreach(define, opensslconf_defines) {
+    rustflags += [ "--cfg=osslconf=\"${define}\"" ]
+  }
 }
 
 group("tests") {
