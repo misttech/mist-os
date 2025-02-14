@@ -8,25 +8,22 @@ directory = "../third_party/rust_crates/vendor"
 target-dir = "../out/cargo_target"
 rustflags = ["-Wrust-2018-idioms"]
 
-# Override the harfbuzz and freetype crates' build scripts, and instead link to our existing
-# versions of the native libraries.
+[env]
+# We need to override this environment variable for `include_bytes_from_working_dir`. However, this
+# won't be the right setting for users who fx set with `--dir` or `--auto-dir`. In that case, users
+# should manually set the FUCHSIA_BUILD_DIR environment variable via .bashrc. This config will only
+# set the variable if it's not already present.
+FUCHSIA_BUILD_DIR = { value = "../out/default", relative = true }
+
+# Override these crates' build scripts, and instead link to our existing versions of the native
+# libraries.
 # See https://doc.rust-lang.org/cargo/reference/build-scripts.html#overriding-build-scripts.
-# Keep in sync with //third_party/rust_crates/.cargo/config.
 
-[target.x86_64-fuchsia.harfbuzz]
-rustc-link-lib = ["harfbuzz"]
+[target.x86_64-unknown-fuchsia.ring_core_0_17_8]
+rustc-env = { RING_CORE_PREFIX = "ring_core_0_17_8_" }
 
-[target.x86_64-unknown-linux-gnu.harfbuzz]
-rustc-link-lib = ["harfbuzz"]
+[target.x86_64-unknown-linux-gnu.ring_core_0_17_8]
+rustc-env = { RING_CORE_PREFIX = "ring_core_0_17_8_" }
 
-[target.x86_64-apple-darwin.harfbuzz]
-rustc-link-lib = ["harfbuzz"]
-
-[target.x86_64-fuchsia.freetype]
-rustc-link-lib = ["freetype2"]
-
-[target.x86_64-unknown-linux-gnu.freetype]
-rustc-link-lib = ["freetype2"]
-
-[target.x86_64-apple-darwin.freetype]
-rustc-link-lib = ["freetype2"]
+[target.x86_64-apple-darwin.ring_core_0_17_8]
+rustc-env = { RING_CORE_PREFIX = "ring_core_0_17_8_" }
