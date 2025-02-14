@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::bpf::attachments::SockAddrEbpfProgramResult;
+use crate::bpf::attachments::{SockAddrEbpfProgramResult, SockAddrOp};
 use crate::fs::fuchsia::zxio::{zxio_query_events, zxio_wait_async};
 use crate::mm::{MemoryAccessorExt, UNIFIED_ASPACES_ENABLED};
 use crate::task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter};
@@ -257,6 +257,28 @@ impl ZxioBackedSocket {
             )
         })
     }
+
+    fn run_sockaddr_ebpf(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        socket: &Socket,
+        current_task: &CurrentTask,
+        op: SockAddrOp,
+        socket_address: &SocketAddress,
+    ) -> Result<(), Errno> {
+        let ebpf_result = current_task.kernel().root_cgroup_ebpf_programs.run_sock_addr_prog(
+            locked,
+            op,
+            socket.domain,
+            socket.socket_type,
+            socket.protocol,
+            socket_address,
+        )?;
+        match ebpf_result {
+            SockAddrEbpfProgramResult::Allow => Ok(()),
+            SockAddrEbpfProgramResult::Block => error!(EPERM),
+        }
+    }
 }
 
 impl SocketOps for ZxioBackedSocket {
@@ -287,15 +309,24 @@ impl SocketOps for ZxioBackedSocket {
 
     fn connect(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _socket: &SocketHandle,
-        _current_task: &CurrentTask,
+        locked: &mut Locked<'_, FileOpsCore>,
+        socket: &SocketHandle,
+        current_task: &CurrentTask,
         peer: SocketPeer,
     ) -> Result<(), Errno> {
         match peer {
-            SocketPeer::Address(SocketAddress::Inet(addr))
-            | SocketPeer::Address(SocketAddress::Inet6(addr))
-            | SocketPeer::Address(SocketAddress::Packet(addr)) => self
+            SocketPeer::Address(
+                ref address @ (SocketAddress::Inet(_) | SocketAddress::Inet6(_)),
+            ) => self.run_sockaddr_ebpf(locked, socket, current_task, SockAddrOp::Connect, address)?,
+            _ => (),
+        };
+
+        match peer {
+            SocketPeer::Address(
+                SocketAddress::Inet(addr)
+                | SocketAddress::Inet6(addr)
+                | SocketAddress::Packet(addr),
+            ) => self
                 .zxio
                 .connect(&addr)
                 .map_err(|status| from_status_like_fdio!(status))?
@@ -343,16 +374,7 @@ impl SocketOps for ZxioBackedSocket {
         current_task: &CurrentTask,
         socket_address: SocketAddress,
     ) -> Result<(), Errno> {
-        let ebpf_result = current_task.kernel().root_cgroup_ebpf_programs.on_bind(
-            locked,
-            socket.domain,
-            socket.socket_type,
-            socket.protocol,
-            &socket_address,
-        )?;
-        if ebpf_result != SockAddrEbpfProgramResult::Allow {
-            return error!(EPERM);
-        }
+        self.run_sockaddr_ebpf(locked, socket, current_task, SockAddrOp::Bind, &socket_address)?;
 
         match socket_address {
             SocketAddress::Inet(addr)

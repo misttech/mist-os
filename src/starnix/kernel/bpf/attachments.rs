@@ -568,20 +568,32 @@ pub struct CgroupEbpfProgramSet {
     udp6_sendmsg: AttachedEbpfProgramCell,
 }
 
+pub enum SockAddrOp {
+    Bind,
+    Connect,
+    UdpSendMsg,
+}
+
 impl CgroupEbpfProgramSet {
-    pub fn on_bind(
+    pub fn run_sock_addr_prog(
         &self,
         locked: &mut Locked<'_, FileOpsCore>,
+        op: SockAddrOp,
         domain: SocketDomain,
         socket_type: SocketType,
         protocol: SocketProtocol,
         socket_address: &SocketAddress,
     ) -> Result<SockAddrEbpfProgramResult, Errno> {
-        let prog_guard = match domain {
-            SocketDomain::Inet => Some(self.inet4_bind.read(locked)),
-            SocketDomain::Inet6 => Some(self.inet6_bind.read(locked)),
+        let prog_cell = match (domain, op) {
+            (SocketDomain::Inet, SockAddrOp::Bind) => Some(&self.inet4_bind),
+            (SocketDomain::Inet6, SockAddrOp::Bind) => Some(&self.inet6_bind),
+            (SocketDomain::Inet, SockAddrOp::Connect) => Some(&self.inet4_connect),
+            (SocketDomain::Inet6, SockAddrOp::Connect) => Some(&self.inet6_connect),
+            (SocketDomain::Inet, SockAddrOp::UdpSendMsg) => Some(&self.udp4_sendmsg),
+            (SocketDomain::Inet6, SockAddrOp::UdpSendMsg) => Some(&self.udp6_sendmsg),
             _ => None,
         };
+        let prog_guard = prog_cell.map(|cell| cell.read(locked));
         let Some(prog) = prog_guard.as_ref().and_then(|guard| guard.as_ref()) else {
             return Ok(SockAddrEbpfProgramResult::Allow);
         };
