@@ -106,7 +106,14 @@ _HOST_TARGETS = [
 _ALL_TARGETS = _FUCHSIA_TARGETS + _HOST_TARGETS + ["fallback"]
 
 
-def fix_clang_runtime_json(runtime_json: T.Any) -> None:
+class Runtime(T.TypedDict):
+    cflags: T.List[str]
+    ldflags: T.List[str]
+    runtime: T.List[T.Dict[str, str]]
+    target: T.List[str]
+
+
+def fix_clang_runtime_json(runtime_json: T.List[Runtime]) -> None:
     """Fix the content of runtime.json."""
 
     # As a special case, on Fuchsia and for ASan builds, libclang_rt.asan.so depends
@@ -142,10 +149,10 @@ def fix_clang_runtime_json(runtime_json: T.Any) -> None:
         entry for entry in runtime_json if "-fuchsia" in entry["target"][0]
     ]
 
-    def match_static_libstdcxx(entry: T.Dict[str, T.Any]) -> bool:
+    def match_static_libstdcxx(entry: Runtime) -> bool:
         return "-static-libstdc++" in entry["ldflags"]
 
-    def match_sanitizer(entry: T.Dict[str, T.Any]) -> bool:
+    def match_sanitizer(entry: Runtime) -> bool:
         return any(
             cflags.startswith("-fsanitize=") for cflags in entry["cflags"]
         )
@@ -212,7 +219,10 @@ def get_shared_static_exts(clang_target: str) -> T.Tuple[str, str]:
         return ".so", ".a"
 
 
-def store_into_dict(d: T.Dict[str, T.Any], path: str, value: T.Any) -> None:
+Tree = T.Dict[str, T.Union[str, "Tree"]]
+
+
+def store_into_dict(d: Tree, path: str, value: str) -> None:
     """Store a value into a tree of string-keyed dictionaries.
 
     Args:
@@ -224,15 +234,19 @@ def store_into_dict(d: T.Dict[str, T.Any], path: str, value: T.Any) -> None:
     components = path.split(".")
     assert len(components) > 0, "Trying to use an empty path!"
 
-    cur_dict = d
-    for cur_field in components[:-1]:
-        assert cur_field, f"Empty component in path: {path}"
-        cur_dict = cur_dict.setdefault(cur_field, {})
+    curr_dict = d
+    for curr_field in components[:-1]:
+        assert curr_field, f"Empty component in {path=}"
+        next_dict = curr_dict.setdefault(curr_field, {})
+        assert isinstance(
+            next_dict, dict
+        ), f"Inconsistent component in {path=}, {next_dict=}"
+        curr_dict = next_dict
 
-    cur_dict[components[-1]] = value
+    curr_dict[components[-1]] = value
 
 
-def dict_to_gn_scope_inplace(v: T.Dict[str, T.Any]) -> None:
+def dict_to_gn_scope_inplace(v: Tree) -> None:
     """Convert a GN scope's object keys to be compatible with GN.
 
     GN cannot read JSON objects whose keys are not valid GN identifiers.
@@ -457,7 +471,7 @@ def main() -> int:
     with runtime_json_path.open("rb") as f:
         runtime_json = json.load(f)
 
-    result: T.Dict[str, T.Any] = {}
+    result: Tree = {}
 
     command_pool = CommandPool(args.jobs)
 
@@ -528,6 +542,7 @@ def main() -> int:
     # Add empty variants dictionary to all targets that don't have one.
     # This simplifies the GN code paths.
     for clang_target, values in result.items():
+        assert isinstance(values, dict)
         values.setdefault("variants", {})
 
     # LINT.IfChange
