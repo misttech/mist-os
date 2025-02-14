@@ -16,7 +16,7 @@ use assembly_constants::{
 };
 use assembly_util::read_config;
 use camino::{Utf8Path, Utf8PathBuf};
-use sampler_config::user_facing::ComponentIdInfoList;
+use sampler_config::assembly::ComponentIdInfoList;
 use std::collections::BTreeSet;
 
 const ALLOWED_SERIAL_LOG_COMPONENTS: &[&str] = &[

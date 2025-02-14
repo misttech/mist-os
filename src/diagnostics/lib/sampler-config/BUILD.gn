@@ -35,10 +35,10 @@ rustc_library("sampler-config") {
   ]
 
   sources = [
+    "src/assembly/mod.rs",
     "src/common.rs",
     "src/lib.rs",
     "src/runtime/mod.rs",
-    "src/user_facing/mod.rs",
     "src/utils.rs",
   ]
 

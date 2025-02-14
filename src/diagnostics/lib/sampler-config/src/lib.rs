@@ -16,12 +16,12 @@ pub mod runtime;
 // are.
 // TODO(https://fxbug.dev/395172409): re-enable
 // #[cfg(not(target_os = "fuchsia"))]
-pub mod user_facing;
+pub mod assembly;
 mod utils;
 
+use assembly::{ComponentIdInfo, ComponentIdInfoList, ProjectTemplate};
 pub use common::*;
 use runtime::ProjectConfig;
-use user_facing::{ComponentIdInfo, ComponentIdInfoList, ProjectTemplate};
 
 const INSTANCE_IDS_PATH: &str = "config/data/component_id_index";
 
