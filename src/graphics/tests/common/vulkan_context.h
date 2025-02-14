@@ -101,7 +101,13 @@ class VulkanContext {
   int queue_family_index() const;
   const vk::QueueFlags &queue_flag_bits() const { return queue_flags_; }
   bool validation_errors_ignored() const { return validation_errors_ignored_; }
+
+#if VK_HEADER_VERSION < 301
+  // TODO(https://fxbug.dev/379153784): Delete this once the migration is done.
   const vk::DispatchLoaderDynamic &loader() const { return loader_; }
+#else   // VK_HEADER_VERSION >= 301
+  const vk::detail::DispatchLoaderDynamic &loader() const { return loader_; }
+#endif  // VK_HEADER_VERSION < 301
 
   // Package up the vulkan context and the user data for the debug callback together.
   // |user_data_| declared such that VulkanContext will own the |user_data_| so we don't
@@ -167,8 +173,14 @@ class VulkanContext {
   // By default validation errors should fail the test.
   bool validation_errors_ignored_ = false;
 
+#if VK_HEADER_VERSION < 301
+  // TODO(https://fxbug.dev/379153784): Delete this once the migration is done.
   vk::DispatchLoaderDynamic loader_;
   vk::UniqueHandle<vk::DebugUtilsMessengerEXT, vk::DispatchLoaderDynamic> messenger_;
+#else   // VK_HEADER_VERSION >= 301
+  vk::detail::DispatchLoaderDynamic loader_;
+  vk::UniqueHandle<vk::DebugUtilsMessengerEXT, vk::detail::DispatchLoaderDynamic> messenger_;
+#endif  // VK_HEADER_VERSION < 301
 };
 
 class VulkanContext::Builder {

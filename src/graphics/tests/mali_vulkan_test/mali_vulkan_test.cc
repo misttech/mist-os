@@ -20,7 +20,12 @@ class ProtectedMode : public testing::Test {
  protected:
   std::unique_ptr<VulkanContext> ctx_;
   bool device_supports_protected_memory_ = false;
+#if VK_HEADER_VERSION < 301
+  // TODO(https://fxbug.dev/379153784): Delete this once the migration is done.
   vk::DispatchLoaderDynamic loader_;
+#else   // VK_HEADER_VERSION >= 301
+  vk::detail::DispatchLoaderDynamic loader_;
+#endif  // VK_HEADER_VERSION < 301
 };
 
 bool ProtectedMode::Initialize() {

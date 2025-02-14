@@ -36,9 +36,15 @@ class DebugUtilsMessenger {
   std::shared_ptr<vk::Instance> instance_;
   const bool use_defaults_ = true;
   vk::DebugUtilsMessengerCreateInfoEXT debug_utils_messenger_info_{};
+#if VK_HEADER_VERSION < 301
+  // TODO(https://fxbug.dev/379153784): Delete this once the migration is done.
   vk::DispatchLoaderDynamic dispatch_loader_{};
-
   vk::UniqueHandle<vk::DebugUtilsMessengerEXT, vk::DispatchLoaderDynamic> debug_utils_messenger_;
+#else   // VK_HEADER_VERSION >= 301
+  vk::detail::DispatchLoaderDynamic dispatch_loader_{};
+  vk::UniqueHandle<vk::DebugUtilsMessengerEXT, vk::detail::DispatchLoaderDynamic>
+      debug_utils_messenger_;
+#endif  // VK_HEADER_VERSION < 301
 };
 
 }  // namespace vkp

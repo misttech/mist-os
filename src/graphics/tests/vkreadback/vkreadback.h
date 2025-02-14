@@ -87,7 +87,14 @@ class VkReadbackTest {
   [[nodiscard]] bool Readback();
 
   vk::Device vulkan_device() const { return ctx_->device().get(); }
+
+#if VK_HEADER_VERSION < 301
+  // TODO(https://fxbug.dev/379153784): Delete this once the migration is done.
   const vk::DispatchLoaderDynamic& vulkan_loader() const { return ctx_->loader(); }
+#else   // VK_HEADER_VERSION >= 301
+  const vk::detail::DispatchLoaderDynamic& vulkan_loader() const { return ctx_->loader(); }
+#endif  // VK_HEADER_VERSION < 301
+
   vk::PhysicalDevice physical_device() const { return ctx_->physical_device(); }
   VulkanExtensionSupportState timeline_semaphore_support() const {
     return timeline_semaphore_support_;
