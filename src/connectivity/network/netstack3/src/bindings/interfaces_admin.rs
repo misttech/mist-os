@@ -1791,7 +1791,9 @@ async fn address_state_provider_main_loop(
                                     AddressStateProviderCancellationReason::InvalidProperties,
                                 );
                             }
-                            AddressStateProviderError::Fidl(_) => todo!(),
+                            AddressStateProviderError::Fidl(_) => {
+                                break None;
+                            }
                         }
                     }
                 },
