@@ -41,7 +41,8 @@ void VirtualAudio::GetDefaultConfiguration(GetDefaultConfigurationRequestView re
       completer.ReplySuccess(fidl::ToWire(arena, VirtualAudioComposite::GetDefaultConfig()));
       return;
     default:
-      FDF_LOG(ERROR, "Failed to get default configuration: Device type not supported");
+      FDF_LOG(ERROR, "Failed to get default configuration: Device type %u not supported",
+              static_cast<uint32_t>(request->type));
       completer.ReplyError(fuchsia_virtualaudio::Error::kNotSupported);
       return;
   }
@@ -53,12 +54,26 @@ void VirtualAudio::AddDevice(AddDeviceRequestView request, AddDeviceCompleter::S
 }
 
 void VirtualAudio::GetNumDevices(GetNumDevicesCompleter::Sync& completer) {
-  // TODO(b/388880875): Implement logic.
-  completer.Reply(0, 0, 0);
+  uint32_t num_inputs = 0;
+  uint32_t num_outputs = 0;
+  uint32_t num_unspecified_direction = 0;
+  for (const auto& [_, device] : devices_) {
+    std::optional is_input = device->is_input();
+    if (is_input.has_value()) {
+      if (is_input.value()) {
+        num_inputs++;
+      } else {
+        num_outputs++;
+      }
+    } else {
+      num_unspecified_direction++;
+    }
+  }
+  completer.Reply(num_inputs, num_outputs, num_unspecified_direction);
 }
 
 void VirtualAudio::RemoveAll(RemoveAllCompleter::Sync& completer) {
-  // TODO(b/388880875): Implement logic.
+  devices_.clear();
   completer.Reply();
 }
 
