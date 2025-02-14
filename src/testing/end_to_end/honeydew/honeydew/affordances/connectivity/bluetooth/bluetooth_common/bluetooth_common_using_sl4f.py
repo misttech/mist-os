@@ -6,7 +6,6 @@
 from enum import StrEnum
 from typing import Any
 
-from honeydew import errors
 from honeydew.affordances.connectivity.bluetooth.bluetooth_common import (
     bluetooth_common,
 )
@@ -17,7 +16,8 @@ from honeydew.affordances.connectivity.bluetooth.utils import (
     types as bluetooth_types,
 )
 from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.transports import sl4f as sl4f_transport
+from honeydew.transports.sl4f import errors as sl4f_errors
+from honeydew.transports.sl4f import sl4f as sl4f_transport
 
 
 class Sl4fMethods(StrEnum):
@@ -71,7 +71,7 @@ class BluetoothCommonUsingSl4f(bluetooth_common.BluetoothCommon):
         """
         try:
             self._sl4f.run(method=Sl4fMethods.INIT_SYS)
-        except errors.Sl4fError as e:
+        except sl4f_errors.Sl4fError as e:
             raise bluetooth_errors.BluetoothError(
                 f"Failed to complete sys_init SL4F call on {self._name}."
             ) from e
@@ -95,7 +95,7 @@ class BluetoothCommonUsingSl4f(bluetooth_common.BluetoothCommon):
                 method=Sl4fMethods.ACCEPT_PAIRING,
                 params={"input": input_mode, "output": output_mode},
             )
-        except errors.Sl4fError as e:
+        except sl4f_errors.Sl4fError as e:
             raise bluetooth_errors.BluetoothError(
                 f"Failed to complete accept_pairing SL4F call on {self._name}."
             ) from e
@@ -122,7 +122,7 @@ class BluetoothCommonUsingSl4f(bluetooth_common.BluetoothCommon):
                     "transport": connection_type.value,
                 },
             )
-        except errors.Sl4fError as e:
+        except sl4f_errors.Sl4fError as e:
             raise bluetooth_errors.BluetoothError(
                 f"Failed to complete connect_device SL4F call on {self._name}."
             ) from e
@@ -141,7 +141,7 @@ class BluetoothCommonUsingSl4f(bluetooth_common.BluetoothCommon):
                 method=Sl4fMethods.FORGET_DEVICE,
                 params={"identifier": identifier},
             )
-        except errors.Sl4fError as e:
+        except sl4f_errors.Sl4fError as e:
             raise bluetooth_errors.BluetoothError(
                 f"Failed to complete forget_device SL4F call on {self._name}."
             ) from e
@@ -163,7 +163,7 @@ class BluetoothCommonUsingSl4f(bluetooth_common.BluetoothCommon):
         try:
             address = self._sl4f.run(method=Sl4fMethods.GET_ACTIVE_ADDRESS)
             mac_address = address["result"].strip("[]").split(" ")
-        except errors.Sl4fError as e:
+        except sl4f_errors.Sl4fError as e:
             raise bluetooth_errors.BluetoothError(
                 "Failed to complete get_active_adapter_address SL4F call on "
                 f"{self._name}."
@@ -186,7 +186,7 @@ class BluetoothCommonUsingSl4f(bluetooth_common.BluetoothCommon):
             for value in data.get("result", {}).values():
                 if value["bonded"]:
                     connected_devices.append(value["id"])
-        except errors.Sl4fError as e:
+        except sl4f_errors.Sl4fError as e:
             raise bluetooth_errors.BluetoothError(
                 f"Failed to complete get_connected_devices SL4F call on {self._name}."
             ) from e
@@ -206,7 +206,7 @@ class BluetoothCommonUsingSl4f(bluetooth_common.BluetoothCommon):
             known_devices = self._sl4f.run(
                 method=Sl4fMethods.GET_KNOWN_REMOTE_DEVICES
             )
-        except errors.Sl4fError as e:
+        except sl4f_errors.Sl4fError as e:
             raise bluetooth_errors.BluetoothError(
                 "Failed to complete get_known_remote_devices SL4F call on "
                 f"{self._name}."
@@ -235,7 +235,7 @@ class BluetoothCommonUsingSl4f(bluetooth_common.BluetoothCommon):
                     "transport": connection_type.value,
                 },
             )
-        except errors.Sl4fError as e:
+        except sl4f_errors.Sl4fError as e:
             raise bluetooth_errors.BluetoothError(
                 f"Failed to complete pair_device SL4F call on {self._name}."
             ) from e
@@ -254,7 +254,7 @@ class BluetoothCommonUsingSl4f(bluetooth_common.BluetoothCommon):
                 method=Sl4fMethods.REQUEST_DISCOVERY,
                 params={"discovery": discovery},
             )
-        except errors.Sl4fError as e:
+        except sl4f_errors.Sl4fError as e:
             raise bluetooth_errors.BluetoothError(
                 f"Failed to complete request_discovery SL4F call on {self._name}."
             ) from e
@@ -274,7 +274,7 @@ class BluetoothCommonUsingSl4f(bluetooth_common.BluetoothCommon):
                 method=Sl4fMethods.SET_DISCOVERABLE,
                 params={"discoverable": discoverable},
             )
-        except errors.Sl4fError as e:
+        except sl4f_errors.Sl4fError as e:
             raise bluetooth_errors.BluetoothError(
                 f"Failed to complete set_discoverable SL4F call on {self._name}."
             ) from e

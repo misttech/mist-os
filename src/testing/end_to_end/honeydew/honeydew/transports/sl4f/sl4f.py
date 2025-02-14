@@ -27,7 +27,7 @@ class SL4F(abc.ABC):
             URL of the SL4F server.
 
         Raises:
-            errors.Sl4fError: On failure.
+            Sl4fError: On failure.
         """
 
     @abc.abstractmethod
@@ -35,7 +35,7 @@ class SL4F(abc.ABC):
         """Check SL4F connection between host and SL4F server running on device.
 
         Raises:
-            errors.Sl4fConnectionError
+            Sl4fConnectionError
         """
 
     @abc.abstractmethod
@@ -66,7 +66,7 @@ class SL4F(abc.ABC):
                 exceptions_to_skip then a empty dict will be returned.
 
         Raises:
-            errors.Sl4fError: On failure.
+            Sl4fError: On failure.
         """
 
     @abc.abstractmethod
@@ -74,5 +74,5 @@ class SL4F(abc.ABC):
         """Starts the SL4F server on fuchsia device.
 
         Raises:
-            errors.Sl4fError: Failed to start the SL4F server.
+            Sl4fError: Failed to start the SL4F server.
         """

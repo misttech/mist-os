@@ -16,7 +16,7 @@ from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import (
     fuchsia_controller as fuchsia_controller_transport,
 )
-from honeydew.transports import sl4f as sl4f_transport
+from honeydew.transports.sl4f import sl4f as sl4f_transport
 from honeydew.typing import custom_types
 
 _TARGET_NAME: str = "fuchsia-emulator"

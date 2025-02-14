@@ -54,7 +54,7 @@ from honeydew.transports import (
     fuchsia_controller as fuchsia_controller_transport,
 )
 from honeydew.transports import serial_using_unix_socket
-from honeydew.transports import sl4f as sl4f_transport
+from honeydew.transports.sl4f import sl4f_impl
 from honeydew.typing import custom_types
 
 # pylint: disable=protected-access
@@ -229,12 +229,12 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
                 autospec=True,
             ) as mock_fc_check_connection,
             mock.patch.object(
-                sl4f_transport.SL4F,
+                sl4f_impl.Sl4fImpl,
                 "start_server",
                 autospec=True,
             ) as mock_sl4f_start_server,
             mock.patch.object(
-                sl4f_transport.SL4F,
+                sl4f_impl.Sl4fImpl,
                 "check_connection",
                 autospec=True,
             ) as mock_sl4f_check_connection,
@@ -283,12 +283,12 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
                 autospec=True,
             ) as mock_fc_check_connection,
             mock.patch.object(
-                sl4f_transport.SL4F,
+                sl4f_impl.Sl4fImpl,
                 "start_server",
                 autospec=True,
             ) as mock_sl4f_start_server,
             mock.patch.object(
-                sl4f_transport.SL4F,
+                sl4f_impl.Sl4fImpl,
                 "check_connection",
                 autospec=True,
             ) as mock_sl4f_check_connection,
@@ -355,20 +355,20 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             ffx_transport.FFX,
         )
 
-    def test_sl4f_transport(self) -> None:
+    def test_sl4f_impl(self) -> None:
         """Test case to make sure fuchsia_device does not support sl4f
         transport."""
         with (
             mock.patch.object(
-                sl4f_transport.SL4F,
+                sl4f_impl.Sl4fImpl,
                 "start_server",
                 autospec=True,
             ) as mock_sl4f_start_server,
         ):
-            self.assertIsInstance(self.fd_fc_obj.sl4f, sl4f_transport.SL4F)
+            self.assertIsInstance(self.fd_fc_obj.sl4f, sl4f_impl.Sl4fImpl)
             mock_sl4f_start_server.assert_called_once_with(self.fd_fc_obj.sl4f)
 
-        self.assertIsInstance(self.fd_sl4f_obj.sl4f, sl4f_transport.SL4F)
+        self.assertIsInstance(self.fd_sl4f_obj.sl4f, sl4f_impl.Sl4fImpl)
 
     def test_fuchsia_controller_transport(self) -> None:
         """Test case to make sure fuchsia_device supports fuchsia-controller
@@ -498,7 +498,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         autospec=True,
         return_value=None,
     )
-    def test_bluetooth_avrcp_sl4f_transport(
+    def test_bluetooth_avrcp_sl4f_impl(
         self, mock_bluetooth_common_init: mock.Mock
     ) -> None:
         """Test case to make sure fuchsia_device only supports
@@ -741,7 +741,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         self.fd_fc_obj._on_device_close_fns = []
 
     @mock.patch.object(
-        sl4f_transport.SL4F,
+        sl4f_impl.Sl4fImpl,
         "check_connection",
         autospec=True,
     )
@@ -767,7 +767,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         mock_sl4f_check_connection.assert_not_called()
 
     @mock.patch.object(
-        sl4f_transport.SL4F,
+        sl4f_impl.Sl4fImpl,
         "check_connection",
         autospec=True,
     )
@@ -1064,7 +1064,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch.object(
-        sl4f_transport.SL4F,
+        sl4f_impl.Sl4fImpl,
         "start_server",
         autospec=True,
     )
@@ -1106,7 +1106,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch.object(
-        sl4f_transport.SL4F,
+        sl4f_impl.Sl4fImpl,
         "start_server",
         autospec=True,
     )

@@ -15,7 +15,7 @@ from honeydew.affordances.connectivity.bluetooth.utils import (
     types as bluetooth_types,
 )
 from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.transports import sl4f as sl4f_transport
+from honeydew.transports.sl4f import sl4f as sl4f_transport
 
 _SAMPLE_RECEIVED_REQUESTS: dict[str, Any] = {
     "id": "",

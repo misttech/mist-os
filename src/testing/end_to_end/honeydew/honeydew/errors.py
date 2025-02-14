@@ -46,14 +46,6 @@ class HttpTimeoutError(HttpRequestError, TimeoutError):
     """Exception for errors raised by HTTP requests timing out on host machine."""
 
 
-class Sl4fError(TransportError):
-    """Exception for errors raised by SL4F requests."""
-
-
-class Sl4fTimeoutError(Sl4fError, TimeoutError):
-    """Exception for errors raised by SL4F request timeouts."""
-
-
 class SerialError(TransportError):
     """Exception for errors raised by host-target communication over serial."""
 
@@ -76,10 +68,6 @@ class HealthCheckError(HoneydewError):
 
 class TransportConnectionError(HoneydewError):
     """Raised when transport's check_connection fails."""
-
-
-class Sl4fConnectionError(TransportConnectionError):
-    """Raised when FFX transport's check_connection fails."""
 
 
 class FfxConnectionError(TransportConnectionError):

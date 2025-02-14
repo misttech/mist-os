@@ -11,7 +11,8 @@ from typing import Any
 
 from honeydew import errors
 from honeydew.interfaces.transports import ffx as ffx_interface
-from honeydew.interfaces.transports import sl4f as sl4f_interface
+from honeydew.transports.sl4f import errors as sl4f_errors
+from honeydew.transports.sl4f import sl4f as sl4f_interface
 from honeydew.typing import custom_types
 from honeydew.utils import http_utils, properties
 
@@ -33,7 +34,7 @@ _SL4F_METHODS: dict[str, str] = {
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class SL4F(sl4f_interface.SL4F):
+class Sl4fImpl(sl4f_interface.SL4F):
     """Provides methods for Host-(Fuchsia)Target interactions via SL4F.
 
     Args:
@@ -42,7 +43,7 @@ class SL4F(sl4f_interface.SL4F):
         device_ip: Fuchsia device IP Address.
 
     Raises:
-        errors.Sl4fError: Failed to instantiate.
+        Sl4fError: Failed to instantiate.
     """
 
     def __init__(
@@ -68,7 +69,7 @@ class SL4F(sl4f_interface.SL4F):
             URL of the SL4F server.
 
         Raises:
-            errors.Sl4fError: On failure.
+            Sl4fError: On failure.
         """
         sl4f_server_address: custom_types.Sl4fServerAddress = (
             self._get_sl4f_server_address()
@@ -86,7 +87,7 @@ class SL4F(sl4f_interface.SL4F):
         """Check SL4F connection between host and SL4F server running on device.
 
         Raises:
-            errors.Sl4fConnectionError
+            Sl4fConnectionError
         """
         try:
             get_device_name_resp: dict[str, Any] = self.run(
@@ -95,12 +96,12 @@ class SL4F(sl4f_interface.SL4F):
             device_name: str = get_device_name_resp["result"]
 
             if device_name != self._name:
-                raise errors.Sl4fError(
+                raise sl4f_errors.Sl4fError(
                     f"Device name expected: '{device_name}' but received: "
                     f"'{self._name}'."
                 )
-        except errors.Sl4fError as err:
-            raise errors.Sl4fConnectionError(
+        except sl4f_errors.Sl4fError as err:
+            raise sl4f_errors.Sl4fConnectionError(
                 f"SL4F connection check failed for {self._name} with err: {err}"
             ) from err
 
@@ -131,8 +132,8 @@ class SL4F(sl4f_interface.SL4F):
                 exceptions_to_skip then a empty dict will be returned.
 
         Raises:
-            errors.Sl4fError: On failure.
-            errors.Sl4fTimeoutError: On timeout.
+            Sl4fError: On failure.
+            Sl4fTimeoutError: On timeout.
         """
         if not params:
             params = {}
@@ -180,23 +181,23 @@ class SL4F(sl4f_interface.SL4F):
                     break
 
             except errors.HttpTimeoutError as err:
-                raise errors.Sl4fTimeoutError(exception_msg) from err
+                raise sl4f_errors.Sl4fTimeoutError(exception_msg) from err
             except errors.HttpRequestError as err:
-                raise errors.Sl4fError(exception_msg) from err
-        raise errors.Sl4fError(exception_msg)
+                raise sl4f_errors.Sl4fError(exception_msg) from err
+        raise sl4f_errors.Sl4fError(exception_msg)
 
     def start_server(self) -> None:
         """Starts the SL4F server on fuchsia device.
 
         Raises:
-            errors.Sl4fError: Failed to start the SL4F server.
+            Sl4fError: Failed to start the SL4F server.
         """
         _LOGGER.info("Starting SL4F server on %s...", self._name)
 
         try:
             self._ffx_transport.run(cmd=_FFX_CMDS["START_SL4F"])
         except errors.HoneydewError as err:
-            raise errors.Sl4fError(err) from err
+            raise sl4f_errors.Sl4fError(err) from err
 
         # verify the device is responsive to SL4F requests
         self.check_connection()
@@ -209,8 +210,8 @@ class SL4F(sl4f_interface.SL4F):
             (SL4F Server IP Address, SL4F Server Port)
 
         Raises:
-            errors.Sl4fError: In case of failure.
-            errors.FfxCommandError: If failed to get the SL4F server address.
+            Sl4fError: In case of failure.
+            FfxCommandError: If failed to get the SL4F server address.
         """
         sl4f_server_ip: ipaddress.IPv4Address | ipaddress.IPv6Address
         if self._ip_address:

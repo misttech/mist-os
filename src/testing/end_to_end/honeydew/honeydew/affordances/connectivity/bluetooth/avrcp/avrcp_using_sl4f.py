@@ -34,8 +34,9 @@ class AvrcpUsingSl4f(
 
         Args:
             target_id: id of source device to start AVRCP
+
         Raises:
-            errors.Sl4fError: On failure.
+            Sl4fError: On failure.
         """
         self._sl4f.run(
             method=Sl4fMethods.INIT_AVRCP, params={"target_id": target_id}

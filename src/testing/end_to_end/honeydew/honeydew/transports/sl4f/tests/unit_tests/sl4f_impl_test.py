@@ -1,7 +1,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Unit tests for honeydew.transports.sl4f.py."""
+"""Unit tests for sl4f_impl.py."""
 
 import ipaddress
 import unittest
@@ -12,7 +12,9 @@ from unittest import mock
 from parameterized import param, parameterized
 
 from honeydew import errors
-from honeydew.transports import ffx, sl4f
+from honeydew.transports import ffx
+from honeydew.transports.sl4f import errors as sl4f_errors
+from honeydew.transports.sl4f import sl4f_impl
 from honeydew.typing import custom_types
 from honeydew.utils import http_utils
 
@@ -31,8 +33,8 @@ _IPV6_LOCALHOST_OBJ: ipaddress.IPv6Address = ipaddress.IPv6Address(
     _IPV6_LOCALHOST
 )
 
-_SL4F_PORT_LOCAL: int = sl4f._SL4F_PORT["LOCAL"]
-_SL4F_PORT_REMOTE: int = sl4f._SL4F_PORT["REMOTE"]
+_SL4F_PORT_LOCAL: int = sl4f_impl._SL4F_PORT["LOCAL"]
+_SL4F_PORT_REMOTE: int = sl4f_impl._SL4F_PORT["REMOTE"]
 _SSH_PORT: int = 22
 
 _INPUT_ARGS: dict[str, Any] = {
@@ -62,7 +64,7 @@ _MOCK_ARGS: dict[str, Any] = {
     "target_ssh_address_ipv6_localhost": custom_types.TargetSshAddress(
         ip=_IPV6_LOCALHOST_OBJ, port=_SSH_PORT
     ),
-    "sl4f_request": sl4f._SL4F_METHODS["GetDeviceName"],
+    "sl4f_request": sl4f_impl._SL4F_METHODS["GetDeviceName"],
     "sl4f_response": {
         "id": "",
         "result": _DEVICE_NAME,
@@ -103,8 +105,8 @@ def _custom_test_name_func(
     return f"{test_func_name}_with_{test_label}"
 
 
-class Sl4fTests(unittest.TestCase):
-    """Unit tests for honeydew.transports.sl4f.py."""
+class Sl4fImplTests(unittest.TestCase):
+    """Unit tests for sl4f_impl.py."""
 
     def setUp(self) -> None:
         super().setUp()
@@ -112,20 +114,20 @@ class Sl4fTests(unittest.TestCase):
         self.ffx_obj = mock.MagicMock(spec=ffx.FFX)
 
         with mock.patch.object(
-            sl4f.SL4F, "start_server", autospec=True
+            sl4f_impl.Sl4fImpl, "start_server", autospec=True
         ) as mock_sl4f_start_server:
-            self.sl4f_obj_wo_ip = sl4f.SL4F(
+            self.sl4f_obj_wo_ip = sl4f_impl.Sl4fImpl(
                 device_name=_INPUT_ARGS["device_name"],
                 ffx_transport=self.ffx_obj,
             )
 
-            self.sl4f_obj_with_ipv4 = sl4f.SL4F(
+            self.sl4f_obj_with_ipv4 = sl4f_impl.Sl4fImpl(
                 device_name=_INPUT_ARGS["device_name"],
                 device_ip=_INPUT_ARGS["device_ip_v4"],
                 ffx_transport=self.ffx_obj,
             )
 
-            self.sl4f_obj_with_ipv6 = sl4f.SL4F(
+            self.sl4f_obj_with_ipv6 = sl4f_impl.Sl4fImpl(
                 device_name=_INPUT_ARGS["device_name"],
                 device_ip=_INPUT_ARGS["device_ip_v6"],
                 ffx_transport=self.ffx_obj,
@@ -165,7 +167,9 @@ class Sl4fTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    @mock.patch.object(sl4f.SL4F, "_get_sl4f_server_address", autospec=True)
+    @mock.patch.object(
+        sl4f_impl.Sl4fImpl, "_get_sl4f_server_address", autospec=True
+    )
     def test_sl4f_url(
         self,
         parameterized_dict: dict[str, Any],
@@ -185,7 +189,7 @@ class Sl4fTests(unittest.TestCase):
         mock_get_sl4f_server_address.assert_called()
 
     @mock.patch.object(
-        sl4f.SL4F,
+        sl4f_impl.Sl4fImpl,
         "run",
         return_value={"result": _MOCK_ARGS["device_name"]},
         autospec=True,
@@ -197,14 +201,14 @@ class Sl4fTests(unittest.TestCase):
         mock_sl4f_run.assert_called()
 
     @mock.patch.object(
-        sl4f.SL4F,
+        sl4f_impl.Sl4fImpl,
         "run",
         return_value={"result": _MOCK_ARGS["invalid-device_name"]},
         autospec=True,
     )
     def test_check_connection_exception(self, mock_sl4f_run: mock.Mock) -> None:
         """Testcase for SL4F.check_connection() raising exception"""
-        with self.assertRaises(errors.Sl4fConnectionError):
+        with self.assertRaises(sl4f_errors.Sl4fConnectionError):
             self.sl4f_obj_wo_ip.check_connection()
 
         mock_sl4f_run.assert_called()
@@ -257,7 +261,7 @@ class Sl4fTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch.object(
-        sl4f.SL4F,
+        sl4f_impl.Sl4fImpl,
         "url",
         new_callable=mock.PropertyMock,
         return_value=_MOCK_ARGS["sl4f_url_v4"],
@@ -288,7 +292,7 @@ class Sl4fTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch.object(
-        sl4f.SL4F,
+        sl4f_impl.Sl4fImpl,
         "url",
         new_callable=mock.PropertyMock,
         return_value=_MOCK_ARGS["sl4f_url_v4"],
@@ -298,7 +302,7 @@ class Sl4fTests(unittest.TestCase):
     ) -> None:
         """Testcase for SL4F.run() failure case when there is 'error' in SL4F
         response received"""
-        with self.assertRaises(errors.Sl4fError):
+        with self.assertRaises(sl4f_errors.Sl4fError):
             self.sl4f_obj_wo_ip.run(
                 method=_MOCK_ARGS["sl4f_request"], attempts=5, interval=0
             )
@@ -313,7 +317,7 @@ class Sl4fTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch.object(
-        sl4f.SL4F,
+        sl4f_impl.Sl4fImpl,
         "url",
         new_callable=mock.PropertyMock,
         return_value=_MOCK_ARGS["sl4f_url_v4"],
@@ -323,7 +327,7 @@ class Sl4fTests(unittest.TestCase):
     ) -> None:
         """Testcase for SL4F.run() failure case when there is an exception
         thrown while sending HTTP request"""
-        with self.assertRaises(errors.Sl4fError):
+        with self.assertRaises(sl4f_errors.Sl4fError):
             self.sl4f_obj_wo_ip.run(
                 method=_MOCK_ARGS["sl4f_request"], attempts=5, interval=0
             )
@@ -348,7 +352,7 @@ class Sl4fTests(unittest.TestCase):
 
         mock_send_http_request.assert_called_once()
 
-    @mock.patch.object(sl4f.SL4F, "check_connection", autospec=True)
+    @mock.patch.object(sl4f_impl.Sl4fImpl, "check_connection", autospec=True)
     def test_start_server(self, mock_check_connection: mock.Mock) -> None:
         """Testcase for SL4F.start_server()"""
         self.sl4f_obj_wo_ip.start_server()
@@ -358,7 +362,7 @@ class Sl4fTests(unittest.TestCase):
     def test_start_server_exception(self) -> None:
         """Testcase for SL4F.start_server() raising exception"""
         self.ffx_obj.run.side_effect = errors.FfxCommandError("error")
-        with self.assertRaises(errors.Sl4fError):
+        with self.assertRaises(sl4f_errors.Sl4fError):
             self.sl4f_obj_wo_ip.start_server()
 
     @parameterized.expand(
