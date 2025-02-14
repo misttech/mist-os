@@ -14,7 +14,7 @@ from honeydew.auxiliary_devices.power_switch import (
 )
 from honeydew.auxiliary_devices.power_switch import power_switch_using_dmc
 from honeydew.interfaces.device_classes import fuchsia_device
-from honeydew.interfaces.transports import serial as serial_transport
+from honeydew.transports.serial import serial as serial_transport
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

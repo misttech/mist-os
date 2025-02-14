@@ -24,13 +24,6 @@ if (is_host) {
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
   }
-
-  python_host_test("serial_using_unix_socket_test") {
-    main_source = "serial_using_unix_socket_test.py"
-    libraries = [ "//src/testing/end_to_end/honeydew" ]
-    main_callable = "unittest.main"
-    extra_args = [ "-v" ]
-  }
 }
 
 group("tests") {
@@ -38,6 +31,5 @@ group("tests") {
   public_deps = [
     ":ffx_test($host_toolchain)",
     ":fuchsia_controller_test($host_toolchain)",
-    ":serial_using_unix_socket_test($host_toolchain)",
   ]
 }

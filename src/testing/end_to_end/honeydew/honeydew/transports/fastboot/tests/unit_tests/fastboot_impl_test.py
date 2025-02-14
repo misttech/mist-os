@@ -18,10 +18,11 @@ from honeydew.auxiliary_devices.power_switch import (
     power_switch as power_switch_interface,
 )
 from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.interfaces.transports import serial as serial_interface
 from honeydew.transports import ffx
 from honeydew.transports.fastboot import errors as fastboot_errors
 from honeydew.transports.fastboot import fastboot_impl
+from honeydew.transports.serial import errors as serial_errors
+from honeydew.transports.serial import serial as serial_interface
 from honeydew.utils import common, host_shell
 
 _USB_BASED_DEVICE_NAME: str = "fuchsia-d88c-799b-0e3a"
@@ -263,7 +264,7 @@ class FastbootTests(unittest.TestCase):
     @mock.patch.object(
         fastboot_impl.FastbootImpl,
         "_boot_to_fastboot_mode_using_serial",
-        side_effect=errors.SerialError("error"),
+        side_effect=serial_errors.SerialError("error"),
         autospec=True,
     )
     def test_boot_to_fastboot_mode_exception(

@@ -47,13 +47,13 @@ from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )
-from honeydew.interfaces.transports import serial as serial_interface
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import (
     fuchsia_controller as fuchsia_controller_transport,
 )
-from honeydew.transports import serial_using_unix_socket
 from honeydew.transports.fastboot import fastboot_impl
+from honeydew.transports.serial import serial as serial_interface
+from honeydew.transports.serial import serial_using_unix_socket
 from honeydew.transports.sl4f import sl4f_impl
 from honeydew.typing import custom_types
 
@@ -382,7 +382,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         """Test case to make sure fuchsia_device supports serial transport."""
         self.assertIsInstance(
             self.fd_fc_obj.serial,
-            serial_using_unix_socket.Serial,
+            serial_using_unix_socket.SerialUsingUnixSocket,
         )
 
     def test_serial_transport_error(self) -> None:

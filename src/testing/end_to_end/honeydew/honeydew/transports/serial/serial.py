@@ -21,5 +21,5 @@ class Serial(abc.ABC):
             cmd: Command to run over serial port.
 
         Raises:
-            errors.SerialError: In case of failure.
+            SerialError: In case of failure.
         """

@@ -19,9 +19,9 @@ from honeydew.auxiliary_devices.power_switch import (
 )
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.transports import ffx as ffx_interface
-from honeydew.interfaces.transports import serial as serial_interface
 from honeydew.transports.fastboot import errors as fastboot_errors
 from honeydew.transports.fastboot import fastboot as fastboot_interface
+from honeydew.transports.serial import serial as serial_interface
 from honeydew.utils import common, host_shell, properties
 
 _FASTBOOT_PATH_ENV_VAR = "HONEYDEW_FASTBOOT_OVERRIDE"

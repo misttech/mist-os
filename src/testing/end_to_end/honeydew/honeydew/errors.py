@@ -46,10 +46,6 @@ class HttpTimeoutError(HttpRequestError, TimeoutError):
     """Exception for errors raised by HTTP requests timing out on host machine."""
 
 
-class SerialError(TransportError):
-    """Exception for errors raised by host-target communication over serial."""
-
-
 class FfxCommandError(TransportError):
     """Exception for errors raised by ffx commands running on host machine."""
 

@@ -6,8 +6,8 @@
 import logging
 import socket
 
-from honeydew import errors
-from honeydew.interfaces.transports import serial as serial_interface
+from honeydew.transports.serial import errors as serial_errors
+from honeydew.transports.serial import serial as serial_interface
 from honeydew.utils import decorators
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 _CARRIAGE_RETURN: bytes = b"\r\n\r\n"
 
 
-class Serial(serial_interface.Serial):
+class SerialUsingUnixSocket(serial_interface.Serial):
     """Serial transport interface implementation using unix socket.
 
     Serial communication with Fuchsia devices is done using Unix Socket in
@@ -47,7 +47,7 @@ class Serial(serial_interface.Serial):
             cmd: Command to run over serial port.
 
         Raises:
-            errors.SerialError: In case of failure.
+            SerialError: In case of failure.
         """
         _LOGGER.info(
             "Sending '%s' command over the serial port of '%s'",
@@ -62,6 +62,6 @@ class Serial(serial_interface.Serial):
                     _CARRIAGE_RETURN + cmd.encode("utf-8") + _CARRIAGE_RETURN
                 )
         except socket.error as e:
-            raise errors.SerialError(
+            raise serial_errors.SerialError(
                 f"Failed to send '{cmd}' command over the serial port of '{self._device_name}'"
             ) from e

@@ -7,8 +7,8 @@ import socket
 import unittest
 from unittest import mock
 
-from honeydew import errors
-from honeydew.transports import serial_using_unix_socket
+from honeydew.transports.serial import errors as serial_errors
+from honeydew.transports.serial import serial_using_unix_socket
 
 
 class FastbootTests(unittest.TestCase):
@@ -17,8 +17,8 @@ class FastbootTests(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
 
-        self.serial_obj: serial_using_unix_socket.Serial = (
-            serial_using_unix_socket.Serial(
+        self.serial_obj: serial_using_unix_socket.SerialUsingUnixSocket = (
+            serial_using_unix_socket.SerialUsingUnixSocket(
                 device_name="device_name",
                 socket_path="socket_path",
             )
@@ -39,6 +39,6 @@ class FastbootTests(unittest.TestCase):
     )
     def test_send_error(self, mock_socket: mock.Mock) -> None:
         """Test case for serial_using_unix_socket.Socket.send() raising exception"""
-        with self.assertRaises(errors.SerialError):
+        with self.assertRaises(serial_errors.SerialError):
             self.serial_obj.send(cmd="echo hello")
         mock_socket.assert_called()
