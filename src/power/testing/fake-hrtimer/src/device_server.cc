@@ -90,7 +90,22 @@ void DeviceServer::Start(StartRequest& request, StartCompleter::Sync& completer)
 }
 
 void DeviceServer::Stop(StopRequest& _request, StopCompleter::Sync& completer) {
-  completer.Reply(zx::ok());
+  // Check if there is an ongoing timer. If yes, then set cancel requested.
+  // What is the lifetime of `completer`?
+  auto reply_fn = [&completer] { completer.Reply(zx::ok()); };
+
+  std::lock_guard<std::mutex> guard(lock_);
+  if (!state_.active) {
+    reply_fn();
+  } else {
+    // If there is an active timer, let's hand it over to the handler to
+    // cancel and respond there.  This is still technically correct, if likely
+    // slower than what actual hardware would do.
+    //
+    // The idea is that Stop returns only when the timer has actually been
+    // canceled.
+    state_.completer = reply_fn;
+  }
 }
 
 void DeviceServer::GetTicksLeft(GetTicksLeftRequest& _request,
@@ -108,6 +123,13 @@ void DeviceServer::StartAndWait(StartAndWaitRequest& request,
   auto fut = std::async(
       std::launch::async,
       [&]() -> zx::result<fuchsia_hardware_hrtimer::DeviceStartAndWaitResponse> {
+        // Return an error if two schedules have been tried.
+        auto handled = HandleBadState<fuchsia_hardware_hrtimer::DeviceStartAndWaitResponse,
+                                      StartAndWaitCompleter>(completer);
+        if (handled) {
+          return std::move(handled.value());
+        }
+
         // The StartAndWait protocol requires this signal when the alarm has
         // been scheduled.  This is not strictly correct here since it should be signaled only
         // *after* the sleep has been scheduled, but should be enough for tests.
@@ -115,6 +137,14 @@ void DeviceServer::StartAndWait(StartAndWaitRequest& request,
 
         std::this_thread::sleep_for(std::chrono::nanoseconds(
             request.resolution().duration().value() * (request.ticks() + 1)));
+
+        auto to_return = HandleCanceled<fuchsia_hardware_hrtimer::DeviceStartAndWaitResponse,
+                                        StartAndWaitCompleter>(completer);
+        if (to_return) {
+          // Skip any further processing on canceled alarms.
+          return std::move(to_return.value());
+        }
+
         if (!lessor_.has_value()) {
           FX_LOGS(ERROR) << "No active lessor";
           return zx::error(ZX_ERR_BAD_STATE);
@@ -152,12 +182,27 @@ void DeviceServer::StartAndWait2(StartAndWait2Request& request,
   auto fut = std::async(
       std::launch::async,
       [&]() -> zx::result<fuchsia_hardware_hrtimer::DeviceStartAndWait2Response> {
+        // See similar code in StartAndWait.
+        auto handled = HandleBadState<fuchsia_hardware_hrtimer::DeviceStartAndWait2Response,
+                                      StartAndWait2Completer>(completer);
+        if (handled) {
+          return std::move(handled.value());
+        }
+
         if (!lessor_.has_value()) {
           FX_LOGS(ERROR) << "No active lessor";
           return zx::error(ZX_ERR_BAD_STATE);
         }
         std::this_thread::sleep_for(std::chrono::nanoseconds(
             request.resolution().duration().value() * (request.ticks() + 1)));
+
+        // See similar code in StartAndWait.
+        auto to_return = HandleCanceled<fuchsia_hardware_hrtimer::DeviceStartAndWait2Response,
+                                        StartAndWait2Completer>(completer);
+        if (to_return) {
+          return std::move(to_return.value());
+        }
+
         fidl::Result<fuchsia_power_broker::Lessor::Lease> result_lease =
             lessor_.value()->Lease(fidl::ToUnderlying(fuchsia_power_broker::BinaryPowerLevel::kOn));
 
