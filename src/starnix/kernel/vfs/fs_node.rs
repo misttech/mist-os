@@ -1613,7 +1613,7 @@ impl FsNode {
         )?;
         self.update_metadata_for_child(current_task, &mut mode, &mut owner);
         let node = self.ops().create_tmpfile(self, current_task, mode, owner)?;
-        security::fs_node_init_on_create(current_task, &node, self, "".into())?;
+        self.init_new_node_security_on_create(locked, current_task, &node, "".into())?;
         node.link_behavior.set(link_behavior).unwrap();
         Ok(node)
     }
