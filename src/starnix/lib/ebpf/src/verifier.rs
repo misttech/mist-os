@@ -151,6 +151,17 @@ pub struct StructDescriptor {
 }
 
 impl StructDescriptor {
+    /// Return true if `self` is a subtype of `super_struct`.
+    fn is_subtype(&self, super_struct: &StructDescriptor) -> bool {
+        // Check that `super_struct.fields` is a subset of `fields`.
+        for super_field in super_struct.fields.iter() {
+            if self.fields.iter().find(|field| *field == super_field).is_none() {
+                return false;
+            }
+        }
+        true
+    }
+
     /// Finds the field type for load/store at the specified location. None is returned if the
     /// access is invalid and the program must be rejected.
     fn find_field(&self, base_offset: i64, field: Field) -> Option<&FieldDescriptor> {
@@ -523,11 +534,16 @@ impl Type {
         }
     }
 
-    /// Return true if `self` is a subtype of `super`.
+    /// Return true if `self` is a subtype of `super_type`.
     pub fn is_subtype(&self, super_type: &Type) -> bool {
         match (self, super_type) {
             // Anything can be used in place of an uninitialized value.
             (_, Self::ScalarValue(data)) if data.is_uninitialized() => true,
+
+            (
+                Self::PtrToStruct { id: id1, offset: offset1, descriptor: descriptor1 },
+                Self::PtrToStruct { id: id2, offset: offset2, descriptor: descriptor2 },
+            ) => id1 == id2 && offset1 == offset2 && descriptor1.is_subtype(descriptor2),
 
             // Every type is a subtype of itself.
             (self_type, super_type) if self_type == super_type => true,

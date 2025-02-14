@@ -7,7 +7,35 @@ use ebpf::{
     MapSchema, MemoryId, MemoryParameterSize, StructDescriptor, Type,
 };
 use linux_uapi::{
-    __sk_buff, bpf_func_id_BPF_FUNC_csum_update, bpf_func_id_BPF_FUNC_get_current_uid_gid,
+    __sk_buff, bpf_attach_type_BPF_CGROUP_DEVICE, bpf_attach_type_BPF_CGROUP_GETSOCKOPT,
+    bpf_attach_type_BPF_CGROUP_INET4_BIND, bpf_attach_type_BPF_CGROUP_INET4_CONNECT,
+    bpf_attach_type_BPF_CGROUP_INET4_GETPEERNAME, bpf_attach_type_BPF_CGROUP_INET4_GETSOCKNAME,
+    bpf_attach_type_BPF_CGROUP_INET4_POST_BIND, bpf_attach_type_BPF_CGROUP_INET6_BIND,
+    bpf_attach_type_BPF_CGROUP_INET6_CONNECT, bpf_attach_type_BPF_CGROUP_INET6_GETPEERNAME,
+    bpf_attach_type_BPF_CGROUP_INET6_GETSOCKNAME, bpf_attach_type_BPF_CGROUP_INET6_POST_BIND,
+    bpf_attach_type_BPF_CGROUP_INET_EGRESS, bpf_attach_type_BPF_CGROUP_INET_INGRESS,
+    bpf_attach_type_BPF_CGROUP_INET_SOCK_CREATE, bpf_attach_type_BPF_CGROUP_INET_SOCK_RELEASE,
+    bpf_attach_type_BPF_CGROUP_SETSOCKOPT, bpf_attach_type_BPF_CGROUP_SOCK_OPS,
+    bpf_attach_type_BPF_CGROUP_SYSCTL, bpf_attach_type_BPF_CGROUP_UDP4_RECVMSG,
+    bpf_attach_type_BPF_CGROUP_UDP4_SENDMSG, bpf_attach_type_BPF_CGROUP_UDP6_RECVMSG,
+    bpf_attach_type_BPF_CGROUP_UDP6_SENDMSG, bpf_attach_type_BPF_CGROUP_UNIX_CONNECT,
+    bpf_attach_type_BPF_CGROUP_UNIX_GETPEERNAME, bpf_attach_type_BPF_CGROUP_UNIX_GETSOCKNAME,
+    bpf_attach_type_BPF_CGROUP_UNIX_RECVMSG, bpf_attach_type_BPF_CGROUP_UNIX_SENDMSG,
+    bpf_attach_type_BPF_FLOW_DISSECTOR, bpf_attach_type_BPF_LIRC_MODE2,
+    bpf_attach_type_BPF_LSM_CGROUP, bpf_attach_type_BPF_LSM_MAC, bpf_attach_type_BPF_MODIFY_RETURN,
+    bpf_attach_type_BPF_NETFILTER, bpf_attach_type_BPF_NETKIT_PEER,
+    bpf_attach_type_BPF_NETKIT_PRIMARY, bpf_attach_type_BPF_PERF_EVENT,
+    bpf_attach_type_BPF_SK_LOOKUP, bpf_attach_type_BPF_SK_MSG_VERDICT,
+    bpf_attach_type_BPF_SK_REUSEPORT_SELECT, bpf_attach_type_BPF_SK_REUSEPORT_SELECT_OR_MIGRATE,
+    bpf_attach_type_BPF_SK_SKB_STREAM_PARSER, bpf_attach_type_BPF_SK_SKB_STREAM_VERDICT,
+    bpf_attach_type_BPF_SK_SKB_VERDICT, bpf_attach_type_BPF_STRUCT_OPS,
+    bpf_attach_type_BPF_TCX_EGRESS, bpf_attach_type_BPF_TCX_INGRESS,
+    bpf_attach_type_BPF_TRACE_FENTRY, bpf_attach_type_BPF_TRACE_FEXIT,
+    bpf_attach_type_BPF_TRACE_ITER, bpf_attach_type_BPF_TRACE_KPROBE_MULTI,
+    bpf_attach_type_BPF_TRACE_KPROBE_SESSION, bpf_attach_type_BPF_TRACE_RAW_TP,
+    bpf_attach_type_BPF_TRACE_UPROBE_MULTI, bpf_attach_type_BPF_XDP,
+    bpf_attach_type_BPF_XDP_CPUMAP, bpf_attach_type_BPF_XDP_DEVMAP,
+    bpf_func_id_BPF_FUNC_csum_update, bpf_func_id_BPF_FUNC_get_current_uid_gid,
     bpf_func_id_BPF_FUNC_get_socket_cookie, bpf_func_id_BPF_FUNC_get_socket_uid,
     bpf_func_id_BPF_FUNC_ktime_get_boot_ns, bpf_func_id_BPF_FUNC_ktime_get_coarse_ns,
     bpf_func_id_BPF_FUNC_ktime_get_ns, bpf_func_id_BPF_FUNC_l3_csum_replace,
@@ -606,11 +634,62 @@ pub static BPF_SOCKOPT_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
 pub static BPF_SOCKOPT_ARGS: LazyLock<Vec<Type>> =
     LazyLock::new(|| vec![ptr_to_mem_type::<bpf_sockopt>(BPF_SOCKOPT_ID.clone())]);
 
+// Verifier allows access only to some fields of the `bfp_sock_addr` struct
+// depending on the `expected_attach_type` passed when the program is loaded.
+// The INET4 and INET6 versions defined below should be used by the verifier
+// for INET4 and INET6 attachments. `BPF_SOCK_ADDR_TYPE` contains all fields
+// from that struct. It's used by the `ProgramArgument` implementation for
+// the struct. This allows to share the `EbpfProgramContext` for all programs
+// that take `bpf_sock_addr`. Linkers considers `BPF_SOCK_ADDR_TYPE` as is
+// a subtype of both INET4 and INET6 versions.
 pub static BPF_SOCK_ADDR_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
-pub static BPF_SOCK_ADDR_TYPE: LazyLock<Type> =
-    LazyLock::new(|| ptr_to_mem_type::<bpf_sock_addr>(BPF_SOCK_ADDR_ID.clone()));
-pub static BPF_SOCK_ADDR_ARGS: LazyLock<Vec<Type>> =
-    LazyLock::new(|| vec![BPF_SOCK_ADDR_TYPE.clone()]);
+pub static BPF_SOCK_ADDR_TYPE: LazyLock<Type> = LazyLock::new(|| {
+    ptr_to_struct_type(
+        BPF_SOCK_ADDR_ID.clone(),
+        vec![
+            scalar_u32_field(offset_of!(bpf_sock_addr, user_family)),
+            scalar_u32_field(offset_of!(bpf_sock_addr, user_ip4)),
+            scalar_field(offset_of!(bpf_sock_addr, user_ip6), 16),
+            scalar_u32_field(offset_of!(bpf_sock_addr, user_port)),
+            scalar_u32_field(offset_of!(bpf_sock_addr, family)),
+            scalar_u32_field(offset_of!(bpf_sock_addr, type_)),
+            scalar_u32_field(offset_of!(bpf_sock_addr, protocol)),
+            scalar_u32_field(offset_of!(bpf_sock_addr, msg_src_ip4)),
+            scalar_field(offset_of!(bpf_sock_addr, msg_src_ip6), 16),
+        ],
+    )
+});
+
+pub static BPF_SOCK_ADDR_INET4_TYPE: LazyLock<Type> = LazyLock::new(|| {
+    ptr_to_struct_type(
+        BPF_SOCK_ADDR_ID.clone(),
+        vec![
+            scalar_u32_field(offset_of!(bpf_sock_addr, user_ip4)),
+            scalar_u32_field(offset_of!(bpf_sock_addr, user_port)),
+            scalar_u32_field(offset_of!(bpf_sock_addr, family)),
+            scalar_u32_field(offset_of!(bpf_sock_addr, type_)),
+            scalar_u32_field(offset_of!(bpf_sock_addr, protocol)),
+        ],
+    )
+});
+pub static BPF_SOCK_ADDR_INET4_ARGS: LazyLock<Vec<Type>> =
+    LazyLock::new(|| vec![BPF_SOCK_ADDR_INET4_TYPE.clone()]);
+
+pub static BPF_SOCK_ADDR_INET6_TYPE: LazyLock<Type> = LazyLock::new(|| {
+    ptr_to_struct_type(
+        BPF_SOCK_ADDR_ID.clone(),
+        vec![
+            scalar_u32_field(offset_of!(bpf_sock_addr, user_family)),
+            scalar_field(offset_of!(bpf_sock_addr, user_ip6), 16),
+            scalar_u32_field(offset_of!(bpf_sock_addr, user_port)),
+            scalar_u32_field(offset_of!(bpf_sock_addr, family)),
+            scalar_u32_field(offset_of!(bpf_sock_addr, type_)),
+            scalar_u32_field(offset_of!(bpf_sock_addr, protocol)),
+        ],
+    )
+});
+pub static BPF_SOCK_ADDR_INET6_ARGS: LazyLock<Vec<Type>> =
+    LazyLock::new(|| vec![BPF_SOCK_ADDR_INET6_TYPE.clone()]);
 
 static BPF_FUSE_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
 static BPF_FUSE_TYPE: LazyLock<Type> = LazyLock::new(|| {
@@ -711,6 +790,9 @@ pub enum EbpfApiError {
 
     #[error("Unsupported program type: {0:?}")]
     UnsupportedProgramType(ProgramType),
+
+    #[error("Invalid expected_attach_type: 0x{0:?}")]
+    InvalidExpectedAttachType(AttachType),
 }
 
 impl TryFrom<u32> for ProgramType {
@@ -811,15 +893,57 @@ impl ProgramType {
             .collect()
     }
 
-    pub fn get_args(self) -> Result<&'static [Type], EbpfApiError> {
+    pub fn get_args(
+        self,
+        expected_attach_type: AttachType,
+    ) -> Result<&'static [Type], EbpfApiError> {
         let args = match self {
-            Self::CgroupSkb | Self::SchedAct | Self::SchedCls | Self::SocketFilter => &SK_BUF_ARGS,
+            Self::SchedAct | Self::SchedCls | Self::SocketFilter => &SK_BUF_ARGS,
+
+            Self::CgroupSkb => match expected_attach_type {
+                AttachType::Unspecified
+                | AttachType::CgroupInetIngress
+                | AttachType::CgroupInetEgress => &SK_BUF_ARGS,
+                _ => return Err(EbpfApiError::InvalidExpectedAttachType(expected_attach_type)),
+            },
+
             Self::Xdp => &XDP_MD_ARGS,
             Self::Kprobe => &BPF_USER_PT_REGS_T_ARGS,
             Self::Tracepoint => &BPF_TRACEPOINT_ARGS,
-            Self::CgroupSock => &BPF_SOCK_ARGS,
-            Self::CgroupSockopt => &BPF_SOCKOPT_ARGS,
-            Self::CgroupSockAddr => &BPF_SOCK_ADDR_ARGS,
+
+            Self::CgroupSock => match expected_attach_type {
+                AttachType::Unspecified
+                | AttachType::CgroupInetIngress
+                | AttachType::CgroupInetSockCreate
+                | AttachType::CgroupInet4PostBind
+                | AttachType::CgroupInet6PostBind
+                | AttachType::CgroupInetSockRelease => &BPF_SOCK_ARGS,
+                _ => return Err(EbpfApiError::InvalidExpectedAttachType(expected_attach_type)),
+            },
+
+            Self::CgroupSockopt => match expected_attach_type {
+                AttachType::CgroupGetsockopt | AttachType::CgroupSetsockopt => &BPF_SOCKOPT_ARGS,
+                _ => return Err(EbpfApiError::InvalidExpectedAttachType(expected_attach_type)),
+            },
+
+            Self::CgroupSockAddr => match expected_attach_type {
+                AttachType::CgroupInet4Bind
+                | AttachType::CgroupInet4Connect
+                | AttachType::CgroupUdp4Sendmsg
+                | AttachType::CgroupUdp4Recvmsg
+                | AttachType::CgroupInet4Getpeername
+                | AttachType::CgroupInet4Getsockname => &BPF_SOCK_ADDR_INET4_ARGS,
+
+                AttachType::CgroupInet6Bind
+                | AttachType::CgroupInet6Connect
+                | AttachType::CgroupUdp6Sendmsg
+                | AttachType::CgroupUdp6Recvmsg
+                | AttachType::CgroupInet6Getpeername
+                | AttachType::CgroupInet6Getsockname => &BPF_SOCK_ADDR_INET6_ARGS,
+
+                _ => return Err(EbpfApiError::InvalidExpectedAttachType(expected_attach_type)),
+            },
+
             Self::Fuse => &BPF_FUSE_ARGS,
 
             Self::CgroupDevice
@@ -851,9 +975,10 @@ impl ProgramType {
 
     pub fn create_calling_context(
         self,
+        expected_attach_type: AttachType,
         maps: Vec<MapSchema>,
     ) -> Result<CallingContext, EbpfApiError> {
-        let args = self.get_args()?.to_vec();
+        let args = self.get_args(expected_attach_type)?.to_vec();
         let packet_type = match self {
             Self::CgroupSkb | Self::SchedAct | Self::SchedCls | Self::SocketFilter => {
                 Some(SK_BUF_TYPE.clone())
@@ -861,6 +986,281 @@ impl ProgramType {
             _ => None,
         };
         Ok(CallingContext { maps, helpers: self.get_helpers(), args, packet_type })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AttachType {
+    CgroupInetIngress,
+    CgroupInetEgress,
+    CgroupInetSockCreate,
+    CgroupSockOps,
+    SkSkbStreamParser,
+    SkSkbStreamVerdict,
+    CgroupDevice,
+    SkMsgVerdict,
+    CgroupInet4Bind,
+    CgroupInet6Bind,
+    CgroupInet4Connect,
+    CgroupInet6Connect,
+    CgroupInet4PostBind,
+    CgroupInet6PostBind,
+    CgroupUdp4Sendmsg,
+    CgroupUdp6Sendmsg,
+    LircMode2,
+    FlowDissector,
+    CgroupSysctl,
+    CgroupUdp4Recvmsg,
+    CgroupUdp6Recvmsg,
+    CgroupGetsockopt,
+    CgroupSetsockopt,
+    TraceRawTp,
+    TraceFentry,
+    TraceFexit,
+    ModifyReturn,
+    LsmMac,
+    TraceIter,
+    CgroupInet4Getpeername,
+    CgroupInet6Getpeername,
+    CgroupInet4Getsockname,
+    CgroupInet6Getsockname,
+    XdpDevmap,
+    CgroupInetSockRelease,
+    XdpCpumap,
+    SkLookup,
+    Xdp,
+    SkSkbVerdict,
+    SkReuseportSelect,
+    SkReuseportSelectOrMigrate,
+    PerfEvent,
+    TraceKprobeMulti,
+    LsmCgroup,
+    StructOps,
+    Netfilter,
+    TcxIngress,
+    TcxEgress,
+    TraceUprobeMulti,
+    CgroupUnixConnect,
+    CgroupUnixSendmsg,
+    CgroupUnixRecvmsg,
+    CgroupUnixGetpeername,
+    CgroupUnixGetsockname,
+    NetkitPrimary,
+    NetkitPeer,
+    TraceKprobeSession,
+
+    // Corresponds to `attach_type=-1`. Linux allows this value in
+    // `expected_attach_type` for some `program_types`
+    Unspecified,
+
+    // Corresponds to any `attach_type` value other than -1 and
+    // `bpf_attach_type` enum values.
+    Invalid(u32),
+}
+
+impl From<u32> for AttachType {
+    fn from(attach_type: u32) -> Self {
+        match attach_type {
+            #![allow(non_upper_case_globals)]
+            bpf_attach_type_BPF_CGROUP_INET_INGRESS => Self::CgroupInetIngress,
+            bpf_attach_type_BPF_CGROUP_INET_EGRESS => Self::CgroupInetEgress,
+            bpf_attach_type_BPF_CGROUP_INET_SOCK_CREATE => Self::CgroupInetSockCreate,
+            bpf_attach_type_BPF_CGROUP_SOCK_OPS => Self::CgroupSockOps,
+            bpf_attach_type_BPF_SK_SKB_STREAM_PARSER => Self::SkSkbStreamParser,
+            bpf_attach_type_BPF_SK_SKB_STREAM_VERDICT => Self::SkSkbStreamVerdict,
+            bpf_attach_type_BPF_CGROUP_DEVICE => Self::CgroupDevice,
+            bpf_attach_type_BPF_SK_MSG_VERDICT => Self::SkMsgVerdict,
+            bpf_attach_type_BPF_CGROUP_INET4_BIND => Self::CgroupInet4Bind,
+            bpf_attach_type_BPF_CGROUP_INET6_BIND => Self::CgroupInet6Bind,
+            bpf_attach_type_BPF_CGROUP_INET4_CONNECT => Self::CgroupInet4Connect,
+            bpf_attach_type_BPF_CGROUP_INET6_CONNECT => Self::CgroupInet6Connect,
+            bpf_attach_type_BPF_CGROUP_INET4_POST_BIND => Self::CgroupInet4PostBind,
+            bpf_attach_type_BPF_CGROUP_INET6_POST_BIND => Self::CgroupInet6PostBind,
+            bpf_attach_type_BPF_CGROUP_UDP4_SENDMSG => Self::CgroupUdp4Sendmsg,
+            bpf_attach_type_BPF_CGROUP_UDP6_SENDMSG => Self::CgroupUdp6Sendmsg,
+            bpf_attach_type_BPF_LIRC_MODE2 => Self::LircMode2,
+            bpf_attach_type_BPF_FLOW_DISSECTOR => Self::FlowDissector,
+            bpf_attach_type_BPF_CGROUP_SYSCTL => Self::CgroupSysctl,
+            bpf_attach_type_BPF_CGROUP_UDP4_RECVMSG => Self::CgroupUdp4Recvmsg,
+            bpf_attach_type_BPF_CGROUP_UDP6_RECVMSG => Self::CgroupUdp6Recvmsg,
+            bpf_attach_type_BPF_CGROUP_GETSOCKOPT => Self::CgroupGetsockopt,
+            bpf_attach_type_BPF_CGROUP_SETSOCKOPT => Self::CgroupSetsockopt,
+            bpf_attach_type_BPF_TRACE_RAW_TP => Self::TraceRawTp,
+            bpf_attach_type_BPF_TRACE_FENTRY => Self::TraceFentry,
+            bpf_attach_type_BPF_TRACE_FEXIT => Self::TraceFexit,
+            bpf_attach_type_BPF_MODIFY_RETURN => Self::ModifyReturn,
+            bpf_attach_type_BPF_LSM_MAC => Self::LsmMac,
+            bpf_attach_type_BPF_TRACE_ITER => Self::TraceIter,
+            bpf_attach_type_BPF_CGROUP_INET4_GETPEERNAME => Self::CgroupInet4Getpeername,
+            bpf_attach_type_BPF_CGROUP_INET6_GETPEERNAME => Self::CgroupInet6Getpeername,
+            bpf_attach_type_BPF_CGROUP_INET4_GETSOCKNAME => Self::CgroupInet4Getsockname,
+            bpf_attach_type_BPF_CGROUP_INET6_GETSOCKNAME => Self::CgroupInet6Getsockname,
+            bpf_attach_type_BPF_XDP_DEVMAP => Self::XdpDevmap,
+            bpf_attach_type_BPF_CGROUP_INET_SOCK_RELEASE => Self::CgroupInetSockRelease,
+            bpf_attach_type_BPF_XDP_CPUMAP => Self::XdpCpumap,
+            bpf_attach_type_BPF_SK_LOOKUP => Self::SkLookup,
+            bpf_attach_type_BPF_XDP => Self::Xdp,
+            bpf_attach_type_BPF_SK_SKB_VERDICT => Self::SkSkbVerdict,
+            bpf_attach_type_BPF_SK_REUSEPORT_SELECT => Self::SkReuseportSelect,
+            bpf_attach_type_BPF_SK_REUSEPORT_SELECT_OR_MIGRATE => Self::SkReuseportSelectOrMigrate,
+            bpf_attach_type_BPF_PERF_EVENT => Self::PerfEvent,
+            bpf_attach_type_BPF_TRACE_KPROBE_MULTI => Self::TraceKprobeMulti,
+            bpf_attach_type_BPF_LSM_CGROUP => Self::LsmCgroup,
+            bpf_attach_type_BPF_STRUCT_OPS => Self::StructOps,
+            bpf_attach_type_BPF_NETFILTER => Self::Netfilter,
+            bpf_attach_type_BPF_TCX_INGRESS => Self::TcxIngress,
+            bpf_attach_type_BPF_TCX_EGRESS => Self::TcxEgress,
+            bpf_attach_type_BPF_TRACE_UPROBE_MULTI => Self::TraceUprobeMulti,
+            bpf_attach_type_BPF_CGROUP_UNIX_CONNECT => Self::CgroupUnixConnect,
+            bpf_attach_type_BPF_CGROUP_UNIX_SENDMSG => Self::CgroupUnixSendmsg,
+            bpf_attach_type_BPF_CGROUP_UNIX_RECVMSG => Self::CgroupUnixRecvmsg,
+            bpf_attach_type_BPF_CGROUP_UNIX_GETPEERNAME => Self::CgroupUnixGetpeername,
+            bpf_attach_type_BPF_CGROUP_UNIX_GETSOCKNAME => Self::CgroupUnixGetsockname,
+            bpf_attach_type_BPF_NETKIT_PRIMARY => Self::NetkitPrimary,
+            bpf_attach_type_BPF_NETKIT_PEER => Self::NetkitPeer,
+            bpf_attach_type_BPF_TRACE_KPROBE_SESSION => Self::TraceKprobeSession,
+
+            u32::MAX => Self::Unspecified,
+            _ => Self::Invalid(attach_type),
+        }
+    }
+}
+
+impl AttachType {
+    pub fn is_cgroup(&self) -> bool {
+        match self {
+            Self::CgroupInetIngress
+            | Self::CgroupInetEgress
+            | Self::CgroupInetSockCreate
+            | Self::CgroupSockOps
+            | Self::CgroupDevice
+            | Self::CgroupInet4Bind
+            | Self::CgroupInet6Bind
+            | Self::CgroupInet4Connect
+            | Self::CgroupInet6Connect
+            | Self::CgroupInet4PostBind
+            | Self::CgroupInet6PostBind
+            | Self::CgroupUdp4Sendmsg
+            | Self::CgroupUdp6Sendmsg
+            | Self::CgroupSysctl
+            | Self::CgroupUdp4Recvmsg
+            | Self::CgroupUdp6Recvmsg
+            | Self::CgroupGetsockopt
+            | Self::CgroupSetsockopt
+            | Self::CgroupInet4Getpeername
+            | Self::CgroupInet6Getpeername
+            | Self::CgroupInet4Getsockname
+            | Self::CgroupInet6Getsockname
+            | Self::CgroupInetSockRelease
+            | Self::CgroupUnixConnect
+            | Self::CgroupUnixSendmsg
+            | Self::CgroupUnixRecvmsg
+            | Self::CgroupUnixGetpeername
+            | Self::CgroupUnixGetsockname => true,
+            _ => false,
+        }
+    }
+
+    pub fn get_program_type(&self) -> ProgramType {
+        match self {
+            Self::CgroupInetIngress | Self::CgroupInetEgress => ProgramType::CgroupSkb,
+            Self::CgroupInetSockCreate
+            | Self::CgroupInet4PostBind
+            | Self::CgroupInet6PostBind
+            | Self::CgroupInetSockRelease => ProgramType::CgroupSock,
+            Self::CgroupSockOps | Self::CgroupGetsockopt | Self::CgroupSetsockopt => {
+                ProgramType::CgroupSockopt
+            }
+            Self::CgroupDevice => ProgramType::CgroupDevice,
+            Self::CgroupInet4Bind
+            | Self::CgroupInet6Bind
+            | Self::CgroupInet4Connect
+            | Self::CgroupInet6Connect
+            | Self::CgroupUdp4Sendmsg
+            | Self::CgroupUdp6Sendmsg
+            | Self::CgroupUdp4Recvmsg
+            | Self::CgroupUdp6Recvmsg
+            | Self::CgroupInet4Getpeername
+            | Self::CgroupInet6Getpeername
+            | Self::CgroupInet4Getsockname
+            | Self::CgroupInet6Getsockname
+            | Self::CgroupUnixConnect
+            | Self::CgroupUnixSendmsg
+            | Self::CgroupUnixRecvmsg
+            | Self::CgroupUnixGetpeername
+            | Self::CgroupUnixGetsockname => ProgramType::CgroupSockAddr,
+            Self::CgroupSysctl => ProgramType::CgroupSysctl,
+            Self::FlowDissector => ProgramType::FlowDissector,
+            Self::LircMode2 => ProgramType::LircMode2,
+            Self::LsmMac | Self::LsmCgroup => ProgramType::Lsm,
+            Self::Netfilter => ProgramType::Netfilter,
+            Self::PerfEvent => ProgramType::PerfEvent,
+            Self::SkLookup => ProgramType::SkLookup,
+            Self::SkMsgVerdict | Self::SkSkbVerdict => ProgramType::SkMsg,
+            Self::SkReuseportSelect | Self::SkReuseportSelectOrMigrate => ProgramType::SkReuseport,
+            Self::SkSkbStreamParser | Self::SkSkbStreamVerdict => ProgramType::SkSkb,
+            Self::StructOps => ProgramType::StructOps,
+            Self::TcxIngress | Self::TcxEgress | Self::NetkitPrimary | Self::NetkitPeer => {
+                ProgramType::SchedCls
+            }
+            Self::TraceKprobeMulti | Self::TraceUprobeMulti | Self::TraceKprobeSession => {
+                ProgramType::Kprobe
+            }
+            Self::TraceRawTp
+            | Self::TraceFentry
+            | Self::TraceFexit
+            | Self::ModifyReturn
+            | Self::TraceIter => ProgramType::Tracing,
+            Self::XdpDevmap | Self::XdpCpumap | Self::Xdp => ProgramType::Xdp,
+            Self::Unspecified | Self::Invalid(_) => ProgramType::Unspec,
+        }
+    }
+
+    // Returns true if the attachment should allow programs created with the
+    // specified `expected_attach_type`.
+    pub fn is_compatible_with_expected_attach_type(self, expected: AttachType) -> bool {
+        // See https://docs.ebpf.io/linux/syscall/BPF_PROG_LOAD/#expected_attach_type.
+        match self {
+            // Egress and Ingress attachments are interchangeable. Also `expected_attach_type=-1` is
+            // allowed in both cases.
+            Self::CgroupInetIngress | Self::CgroupInetEgress => matches!(
+                expected,
+                Self::Unspecified | Self::CgroupInetIngress | Self::CgroupInetEgress
+            ),
+
+            // These attachments allow `expected_attach_type` to be set to
+            // -1 or 0 (BPF_CGROUP_INET_INGRESS).
+            Self::CgroupInetSockCreate | Self::CgroupSockOps => {
+                self == expected || matches!(expected, Self::Unspecified | Self::CgroupInetIngress)
+            }
+
+            // For these attachments `expected_attach_type` must match.
+            Self::CgroupGetsockopt
+            | Self::CgroupInet4Bind
+            | Self::CgroupInet4Connect
+            | Self::CgroupInet4Getpeername
+            | Self::CgroupInet4Getsockname
+            | Self::CgroupInet4PostBind
+            | Self::CgroupInet6Bind
+            | Self::CgroupInet6Connect
+            | Self::CgroupInet6Getpeername
+            | Self::CgroupInet6Getsockname
+            | Self::CgroupInet6PostBind
+            | Self::CgroupInetSockRelease
+            | Self::CgroupSetsockopt
+            | Self::CgroupUdp4Recvmsg
+            | Self::CgroupUdp4Sendmsg
+            | Self::CgroupUdp6Recvmsg
+            | Self::CgroupUdp6Sendmsg
+            | Self::CgroupUnixConnect
+            | Self::CgroupUnixGetpeername
+            | Self::CgroupUnixGetsockname
+            | Self::CgroupUnixRecvmsg
+            | Self::CgroupUnixSendmsg => self == expected,
+
+            // `expected_attach_type` is ignored for all other attachments.
+            _ => true,
+        }
     }
 }
 
