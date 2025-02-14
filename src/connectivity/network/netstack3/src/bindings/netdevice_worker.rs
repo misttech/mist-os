@@ -191,10 +191,11 @@ impl NetdeviceWorker {
             fasync::Task::spawn(fut)
         });
 
-        let mut buff = [0u8; DEFAULT_BUFFER_LENGTH];
+        // Keep a buffer around in case we're receiving fragmented buffers.
+        let mut linearized_buffer = Vec::new();
         loop {
             // Extract result into an enum to avoid too much code in  macro.
-            let rx: netdevice_client::Buffer<_> = futures::select! {
+            let mut rx: netdevice_client::Buffer<_> = futures::select! {
                 r = session.recv().fuse() => r.map_err(Error::Client)?,
                 r = task => match r {
                     Ok(()) => panic!("task should never end cleanly"),
@@ -211,14 +212,6 @@ impl NetdeviceWorker {
 
             trace_duration!(c"netdevice::recv");
 
-            let frame_length = rx.len();
-            // TODO(https://fxbug.dev/42051635): pass strongly owned buffers down
-            // to the stack instead of copying it out.
-            rx.read_at(0, &mut buff[..frame_length]).map_err(|e| {
-                error!("failed to read from buffer {:?}", e);
-                Error::Client(e)
-            })?;
-
             let Some(id) = id.upgrade() else {
                 // This is okay because we hold a weak reference; the device may
                 // be removed under us. Note that when the device removal has
@@ -231,8 +224,26 @@ impl NetdeviceWorker {
                 continue;
             };
 
-            let buf = packet::Buf::new(&mut buff[..frame_length], ..);
             let frame_type = rx.frame_type().map_err(Error::Client)?.try_into()?;
+            let rx_data = match rx.as_slice_mut() {
+                Some(slice) => slice,
+                None => {
+                    let frame_length = rx.len();
+                    if linearized_buffer.len() < frame_length {
+                        linearized_buffer.resize(frame_length, 0);
+                    }
+                    let linearized = &mut linearized_buffer[..frame_length];
+                    // TODO(https://fxbug.dev/42051635): pass strongly owned
+                    // buffers down to the stack instead of copying it out when
+                    // it's fragmented.
+                    rx.read_at(0, linearized).map_err(|e| {
+                        error!("failed to read from buffer {:?}", e);
+                        Error::Client(e)
+                    })?;
+                    linearized
+                }
+            };
+            let buf = packet::Buf::new(rx_data, ..);
             match id {
                 NetdeviceId::Ethernet(id) => {
                     match frame_type {
