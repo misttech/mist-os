@@ -10,6 +10,7 @@ use crate::fs::proc::device_tree::device_tree_node;
 use crate::fs::proc::devices::devices_node;
 use crate::fs::proc::kallsyms::kallsyms_node;
 use crate::fs::proc::kmsg::kmsg_node;
+use crate::fs::proc::loadavg::loadavg_node;
 use crate::fs::proc::meminfo::meminfo_node;
 use crate::fs::proc::pid_directory::pid_directory;
 use crate::fs::proc::pressure_directory::pressure_directory;
@@ -21,7 +22,7 @@ use crate::fs::proc::sysrq::SysRqNode;
 use crate::fs::proc::thread_self::thread_self_node;
 use crate::fs::proc::uptime::uptime_node;
 use crate::mm::PAGE_SIZE;
-use crate::task::{CurrentTask, Kernel, KernelStats, TaskStateCode};
+use crate::task::{CurrentTask, KernelStats};
 use crate::vfs::{
     emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
     fs_node_impl_symlink, unbounded_seek, BytesFile, BytesFileOps, DirectoryEntryType, DirentSink,
@@ -31,7 +32,7 @@ use crate::vfs::{
 };
 
 use maplit::btreemap;
-use starnix_logging::{bug_ref, log_error, track_stub};
+use starnix_logging::{bug_ref, log_error};
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::{DeviceType, MISC_MAJOR};
@@ -42,7 +43,7 @@ use starnix_uapi::version::{KERNEL_RELEASE, KERNEL_VERSION};
 use starnix_uapi::{errno, off_t, pid_t};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
 /// `ProcDirectory` represents the top-level directory in `procfs`.
 ///
@@ -77,11 +78,7 @@ impl ProcDirectory {
             "sys".into() => sysctl_directory(current_task, fs),
             "net".into() => net_directory(current_task, fs),
             "uptime".into() => uptime_node(current_task, fs),
-            "loadavg".into() => fs.create_node(
-                current_task,
-                LoadavgFile::new_node(kernel),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
+            "loadavg".into() => loadavg_node(current_task, fs),
             "config.gz".into() => fs.create_node(
                 current_task,
                 ConfigFile::new_node(),
@@ -484,40 +481,6 @@ impl DynamicFileSource for VmStatFile {
         writeln!(sink, "pgscan_direct {}", 0)?;
         writeln!(sink, "pgscan_kswapd {}", 0)?;
 
-        Ok(())
-    }
-}
-
-#[derive(Clone)]
-struct LoadavgFile(Weak<Kernel>);
-impl LoadavgFile {
-    pub fn new_node(kernel: &Arc<Kernel>) -> impl FsNodeOps {
-        DynamicFile::new_node(Self(Arc::downgrade(kernel)))
-    }
-}
-impl DynamicFileSource for LoadavgFile {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let (runnable_tasks, existing_tasks, last_pid) = {
-            let kernel = self.0.upgrade().ok_or_else(|| errno!(EIO))?;
-            let pid_table = kernel.pids.read();
-
-            let curr_tids = pid_table.task_ids();
-            let mut runnable_tasks = 0;
-            for pid in &curr_tids {
-                let weak_task = pid_table.get_task(*pid);
-                if let Some(task) = weak_task.upgrade() {
-                    if task.state_code() == TaskStateCode::Running {
-                        runnable_tasks += 1;
-                    }
-                };
-            }
-
-            let existing_tasks = pid_table.process_ids().len() + curr_tids.len();
-            (runnable_tasks, existing_tasks, pid_table.last_pid())
-        };
-
-        track_stub!(TODO("https://fxbug.dev/322874486"), "/proc/loadavg load stats");
-        writeln!(sink, "0.50 0.50 0.50 {}/{} {}", runnable_tasks, existing_tasks, last_pid)?;
         Ok(())
     }
 }

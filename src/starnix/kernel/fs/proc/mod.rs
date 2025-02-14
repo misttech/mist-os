@@ -10,6 +10,7 @@ pub mod devices;
 mod fs;
 pub mod kallsyms;
 pub mod kmsg;
+pub mod loadavg;
 pub mod meminfo;
 pub mod pid_directory;
 mod pressure_directory;
