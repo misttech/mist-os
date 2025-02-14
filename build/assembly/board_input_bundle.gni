@@ -350,6 +350,8 @@ template("board_input_bundle") {
     deps = creation_deps
     args = [
              "board-input-bundle",
+             "--name",
+             target_name,
              "--output",
              rebase_path(files.bundle_dir, root_build_dir),
              "--depfile",

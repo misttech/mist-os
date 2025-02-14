@@ -118,6 +118,12 @@ pub struct HardwareInfo {
 #[assembly_container(board_input_bundle.json)]
 #[serde(deny_unknown_fields)]
 pub struct BoardInputBundle {
+    /// The name of the board input bundle.
+    /// TODO(https://fxbug.dev/395675141): Remove the Option<> once all boards
+    /// have a name.
+    #[serde(default)]
+    pub name: Option<String>,
+
     /// These are the drivers that are included by this bundle.
     #[file_relative_paths]
     #[walk_paths]

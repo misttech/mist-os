@@ -78,6 +78,10 @@ struct HybridProductArgs {
 #[derive(FromArgs)]
 #[argh(subcommand, name = "board-input-bundle")]
 struct BoardInputBundleArgs {
+    /// the name of the board input bundle.
+    #[argh(option)]
+    name: String,
+
     /// the directory to write the board input bundle to.
     #[argh(option)]
     output: Utf8PathBuf,
