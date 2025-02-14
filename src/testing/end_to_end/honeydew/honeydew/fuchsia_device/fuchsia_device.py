@@ -66,20 +66,20 @@ from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )
-from honeydew.interfaces.transports import (
-    fastboot as fastboot_transport_interface,
-)
 from honeydew.interfaces.transports import ffx as ffx_transport_interface
 from honeydew.interfaces.transports import (
     fuchsia_controller as fuchsia_controller_transport_interface,
 )
 from honeydew.interfaces.transports import serial as serial_transport_interface
-from honeydew.transports import fastboot as fastboot_transport
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import (
     fuchsia_controller as fuchsia_controller_transport,
 )
 from honeydew.transports import serial_using_unix_socket
+from honeydew.transports.fastboot import (
+    fastboot as fastboot_transport_interface,
+)
+from honeydew.transports.fastboot import fastboot_impl
 from honeydew.transports.sl4f import sl4f as sl4f_transport_interface
 from honeydew.transports.sl4f import sl4f_impl
 from honeydew.typing import custom_types
@@ -329,7 +329,7 @@ class FuchsiaDevice(
             errors.FuchsiaDeviceError: Failed to instantiate.
         """
         fastboot_obj: fastboot_transport_interface.Fastboot = (
-            fastboot_transport.Fastboot(
+            fastboot_impl.FastbootImpl(
                 device_name=self.device_name,
                 reboot_affordance=self,
                 ffx_transport=self.ffx,

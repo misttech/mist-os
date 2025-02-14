@@ -27,12 +27,12 @@ from honeydew.affordances.ui.user_input import user_input
 from honeydew.auxiliary_devices.power_switch import (
     power_switch as power_switch_interface,
 )
-from honeydew.interfaces.transports import fastboot as fastboot_transport
 from honeydew.interfaces.transports import ffx as ffx_transport
 from honeydew.interfaces.transports import (
     fuchsia_controller as fuchsia_controller_transport,
 )
 from honeydew.interfaces.transports import serial as serial_transport
+from honeydew.transports.fastboot import fastboot as fastboot_transport
 from honeydew.transports.sl4f import sl4f as sl4f_transport
 from honeydew.typing import custom_types
 from honeydew.utils import properties

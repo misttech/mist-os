@@ -58,10 +58,6 @@ class FuchsiaControllerError(TransportError):
     """Exception for errors raised by Fuchsia Controller requests."""
 
 
-class FastbootCommandError(HoneydewError):
-    """Exception for errors raised by Fastboot commands."""
-
-
 class HealthCheckError(HoneydewError):
     """Raised when health_check fails."""
 
@@ -76,10 +72,6 @@ class FfxConnectionError(TransportConnectionError):
 
 class FuchsiaControllerConnectionError(TransportConnectionError):
     """Raised when Fuchsia-Controller transport's check_connection fails."""
-
-
-class FastbootConnectionError(TransportConnectionError):
-    """Raised when Fastboot transport's check_connection fails."""
 
 
 class FfxConfigError(HoneydewError):

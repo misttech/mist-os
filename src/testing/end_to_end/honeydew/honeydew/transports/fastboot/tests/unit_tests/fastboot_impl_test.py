@@ -1,7 +1,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Unit tests for honeydew.transports.fastboot.py."""
+"""Unit tests for fastboot_impl.py."""
 
 import os
 import sys
@@ -19,7 +19,9 @@ from honeydew.auxiliary_devices.power_switch import (
 )
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.transports import serial as serial_interface
-from honeydew.transports import fastboot, ffx
+from honeydew.transports import ffx
+from honeydew.transports.fastboot import errors as fastboot_errors
+from honeydew.transports.fastboot import fastboot_impl
 from honeydew.utils import common, host_shell
 
 _USB_BASED_DEVICE_NAME: str = "fuchsia-d88c-799b-0e3a"
@@ -117,7 +119,7 @@ def _custom_test_name_func(
 
 # pylint: disable=protected-access
 class FastbootTests(unittest.TestCase):
-    """Unit tests for honeydew.transports.fastboot.py."""
+    """Unit tests for fastboot_impl.py."""
 
     def setUp(self) -> None:
         super().setUp()
@@ -128,7 +130,7 @@ class FastbootTests(unittest.TestCase):
 
         self.ffx_obj = mock.MagicMock(spec=ffx.FFX)
 
-        self.fastboot_obj = fastboot.Fastboot(
+        self.fastboot_obj = fastboot_impl.FastbootImpl(
             device_name=_INPUT_ARGS["device_name"],
             reboot_affordance=self.reboot_affordance_obj,
             fastboot_node_id=_INPUT_ARGS["fastboot_node_id"],
@@ -147,7 +149,7 @@ class FastbootTests(unittest.TestCase):
         with mock.patch.dict(
             os.environ, {"HONEYDEW_FASTBOOT_OVERRIDE": "fastboot"}, clear=True
         ):
-            bin_name = fastboot._get_fastboot_binary()
+            bin_name = fastboot_impl._get_fastboot_binary()
             self.assertEqual(bin_name, "fastboot")
             mock_files.assert_not_called()
 
@@ -168,7 +170,7 @@ class FastbootTests(unittest.TestCase):
             mock_fd = mock.Mock()
             mock_fd.name = "tmpfastboot"
             mock_tmp_file.return_value = mock_fd
-            bin_name = fastboot._get_fastboot_binary()
+            bin_name = fastboot_impl._get_fastboot_binary()
             self.assertEqual(bin_name, "tmpfastboot")
             mock_copy.assert_called_with(mock.ANY, bin_name)
 
@@ -183,7 +185,7 @@ class FastbootTests(unittest.TestCase):
         mock_as_file.return_value.__enter__.return_value = mock_file
         with mock.patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(errors.HoneydewDataResourceError):
-                fastboot._get_fastboot_binary()
+                fastboot_impl._get_fastboot_binary()
 
     def test_node_id_when_fastboot_node_id_passed(self) -> None:
         """Testcase for Fastboot.node_id when `fastboot_node_id` arg was passed
@@ -193,7 +195,7 @@ class FastbootTests(unittest.TestCase):
         )
 
     @mock.patch.object(
-        fastboot.Fastboot,
+        fastboot_impl.FastbootImpl,
         "wait_for_fuchsia_mode",
         side_effect=errors.FuchsiaDeviceError("error"),
         autospec=True,
@@ -209,17 +211,17 @@ class FastbootTests(unittest.TestCase):
         mock_wait_for_fuchsia_mode.assert_called()
 
     @mock.patch.object(
-        fastboot.Fastboot,
+        fastboot_impl.FastbootImpl,
         "wait_for_fastboot_mode",
         autospec=True,
     )
     @mock.patch.object(
-        fastboot.Fastboot,
+        fastboot_impl.FastbootImpl,
         "_boot_to_fastboot_mode_using_ffx",
         autospec=True,
     )
     @mock.patch.object(
-        fastboot.Fastboot,
+        fastboot_impl.FastbootImpl,
         "wait_for_fuchsia_mode",
         autospec=True,
     )
@@ -238,12 +240,12 @@ class FastbootTests(unittest.TestCase):
         mock_wait_for_fastboot_mode.assert_called()
 
     @mock.patch.object(
-        fastboot.Fastboot,
+        fastboot_impl.FastbootImpl,
         "wait_for_fastboot_mode",
         autospec=True,
     )
     @mock.patch.object(
-        fastboot.Fastboot,
+        fastboot_impl.FastbootImpl,
         "_boot_to_fastboot_mode_using_serial",
         autospec=True,
     )
@@ -259,7 +261,7 @@ class FastbootTests(unittest.TestCase):
         mock_wait_for_fastboot_mode.assert_called()
 
     @mock.patch.object(
-        fastboot.Fastboot,
+        fastboot_impl.FastbootImpl,
         "_boot_to_fastboot_mode_using_serial",
         side_effect=errors.SerialError("error"),
         autospec=True,
@@ -276,7 +278,7 @@ class FastbootTests(unittest.TestCase):
         mock_boot_to_fastboot_mode_using_serial.assert_called()
 
     @mock.patch.object(
-        fastboot.Fastboot,
+        fastboot_impl.FastbootImpl,
         "is_in_fastboot_mode",
         return_value=False,
         autospec=True,
@@ -292,11 +294,11 @@ class FastbootTests(unittest.TestCase):
         mock_is_in_fastboot_mode.assert_called()
 
     @mock.patch.object(
-        fastboot.Fastboot, "wait_for_fuchsia_mode", autospec=True
+        fastboot_impl.FastbootImpl, "wait_for_fuchsia_mode", autospec=True
     )
-    @mock.patch.object(fastboot.Fastboot, "run", autospec=True)
+    @mock.patch.object(fastboot_impl.FastbootImpl, "run", autospec=True)
     @mock.patch.object(
-        fastboot.Fastboot,
+        fastboot_impl.FastbootImpl,
         "is_in_fastboot_mode",
         return_value=True,
         autospec=True,
@@ -316,13 +318,13 @@ class FastbootTests(unittest.TestCase):
         mock_wait_for_fuchsia_mode.assert_called()
 
     @mock.patch.object(
-        fastboot.Fastboot,
+        fastboot_impl.FastbootImpl,
         "run",
-        side_effect=errors.FastbootCommandError("error"),
+        side_effect=fastboot_errors.FastbootCommandError("error"),
         autospec=True,
     )
     @mock.patch.object(
-        fastboot.Fastboot,
+        fastboot_impl.FastbootImpl,
         "is_in_fastboot_mode",
         return_value=True,
         autospec=True,
@@ -394,14 +396,14 @@ class FastbootTests(unittest.TestCase):
     ) -> None:
         """Test case for Fastboot.is_in_fastboot_mode() raising exception."""
         with self.assertRaisesRegex(
-            errors.FastbootCommandError, "Failed to check"
+            fastboot_errors.FastbootCommandError, "Failed to check"
         ):
             self.fastboot_obj.is_in_fastboot_mode()
 
         mock_host_shell_run.assert_called()
 
     @mock.patch.object(
-        fastboot.Fastboot,
+        fastboot_impl.FastbootImpl,
         "is_in_fastboot_mode",
         return_value=False,
         autospec=True,
@@ -421,7 +423,7 @@ class FastbootTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch.object(
-        fastboot.Fastboot,
+        fastboot_impl.FastbootImpl,
         "is_in_fastboot_mode",
         return_value=True,
         autospec=True,
@@ -447,7 +449,7 @@ class FastbootTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch.object(
-        fastboot.Fastboot,
+        fastboot_impl.FastbootImpl,
         "is_in_fastboot_mode",
         return_value=True,
         autospec=True,
@@ -460,7 +462,7 @@ class FastbootTests(unittest.TestCase):
         """Test case for Fastboot.run() when device is in fastboot mode and
         returns in exceptions."""
 
-        with self.assertRaises(errors.FastbootCommandError):
+        with self.assertRaises(fastboot_errors.FastbootCommandError):
             self.fastboot_obj.run(cmd=_INPUT_ARGS["run_cmd"])
 
         mock_is_in_fastboot_mode.assert_called()
@@ -489,12 +491,14 @@ class FastbootTests(unittest.TestCase):
             self.fastboot_obj._fastboot_node_id, _USB_BASED_FASTBOOT_NODE_ID
         )
 
-    @mock.patch.object(fastboot.Fastboot, "boot_to_fuchsia_mode", autospec=True)
     @mock.patch.object(
-        fastboot.Fastboot, "_wait_for_valid_tcp_address", autospec=True
+        fastboot_impl.FastbootImpl, "boot_to_fuchsia_mode", autospec=True
     )
     @mock.patch.object(
-        fastboot.Fastboot, "boot_to_fastboot_mode", autospec=True
+        fastboot_impl.FastbootImpl, "_wait_for_valid_tcp_address", autospec=True
+    )
+    @mock.patch.object(
+        fastboot_impl.FastbootImpl, "boot_to_fastboot_mode", autospec=True
     )
     def test_get_fastboot_node_without_fastboot_node_id_arg_tcp_based(
         self,

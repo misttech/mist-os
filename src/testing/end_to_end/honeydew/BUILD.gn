@@ -110,12 +110,14 @@ python_library("honeydew_no_testonly") {
     "interfaces/device_classes/affordances_capable.py",
     "interfaces/device_classes/fuchsia_device.py",
     "interfaces/transports/__init__.py",
-    "interfaces/transports/fastboot.py",
     "interfaces/transports/ffx.py",
     "interfaces/transports/fuchsia_controller.py",
     "interfaces/transports/serial.py",
     "transports/__init__.py",
-    "transports/fastboot.py",
+    "transports/fastboot/__init__.py",
+    "transports/fastboot/errors.py",
+    "transports/fastboot/fastboot.py",
+    "transports/fastboot/fastboot_impl.py",
     "transports/ffx.py",
     "transports/fuchsia_controller.py",
     "transports/serial_using_unix_socket.py",
@@ -234,6 +236,7 @@ group("unit_tests") {
       "honeydew/affordances/ui/screenshot/tests/unit_tests:tests",
       "honeydew/affordances/ui/user_input/tests/unit_tests:tests",
       "honeydew/auxiliary_devices/power_switch/tests/unit_tests:tests",
+      "honeydew/transports/fastboot/tests/unit_tests:tests",
       "honeydew/transports/sl4f/tests/unit_tests:tests",
       "tests/unit_tests:tests",
     ]
@@ -261,6 +264,7 @@ group("functional_tests") {
       "honeydew/affordances/ui/screenshot/tests/functional_tests:tests",
       "honeydew/affordances/ui/user_input/tests/functional_tests:tests",
       "honeydew/auxiliary_devices/power_switch/tests/functional_tests:tests",
+      "honeydew/transports/fastboot/tests/functional_tests:tests",
       "tests/functional_tests:tests",
     ]
   }

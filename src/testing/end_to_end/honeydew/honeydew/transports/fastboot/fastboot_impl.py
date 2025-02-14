@@ -18,9 +18,10 @@ from honeydew.auxiliary_devices.power_switch import (
     power_switch as power_switch_interface,
 )
 from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.interfaces.transports import fastboot as fastboot_interface
 from honeydew.interfaces.transports import ffx as ffx_interface
 from honeydew.interfaces.transports import serial as serial_interface
+from honeydew.transports.fastboot import errors as fastboot_errors
+from honeydew.transports.fastboot import fastboot as fastboot_interface
 from honeydew.utils import common, host_shell, properties
 
 _FASTBOOT_PATH_ENV_VAR = "HONEYDEW_FASTBOOT_OVERRIDE"
@@ -75,7 +76,7 @@ def _get_fastboot_binary() -> str:
     return bin_path
 
 
-class Fastboot(fastboot_interface.Fastboot):
+class FastbootImpl(fastboot_interface.Fastboot):
     """Provides methods for Host-(Fuchsia)Target interactions via Fastboot.
 
     Args:
@@ -85,7 +86,7 @@ class Fastboot(fastboot_interface.Fastboot):
         fastboot_node_id: Fastboot Node ID.
 
     Raises:
-        errors.FuchsiaDeviceError: Failed to get the fastboot node id
+        FuchsiaDeviceError: Failed to get the fastboot node id
     """
 
     def __init__(
@@ -133,9 +134,8 @@ class Fastboot(fastboot_interface.Fastboot):
                 power switch hardware where this fuchsia device is connected.
 
         Raises:
-            errors.FuchsiaStateError: Invalid state to perform this operation.
-            errors.FuchsiaDeviceError: Failed to boot the device to fastboot
-                mode.
+            FuchsiaStateError: Invalid state to perform this operation.
+            FuchsiaDeviceError: Failed to boot the device to fastboot mode.
         """
         # Note: Rebooting the device into fastboot mode using serial is mostly used when device is
         # in bad state. So Do not check if device is in Fuchsia mode and directly perform the
@@ -169,9 +169,8 @@ class Fastboot(fastboot_interface.Fastboot):
         """Boot the device to fuchsia mode from fastboot mode.
 
         Raises:
-            errors.FuchsiaStateError: Invalid state to perform this operation.
-            errors.FuchsiaDeviceError: Failed to boot the device to fuchsia
-                mode.
+            FuchsiaStateError: Invalid state to perform this operation.
+            FuchsiaDeviceError: Failed to boot the device to fuchsia mode.
         """
         if not self.is_in_fastboot_mode():
             raise errors.FuchsiaStateError(
@@ -197,7 +196,7 @@ class Fastboot(fastboot_interface.Fastboot):
             True if in fastboot mode, False otherwise.
 
         Raises:
-            errors.FastbootCommandError: Failed to check if device is in fastboot mode or not.
+            FastbootCommandError: Failed to check if device is in fastboot mode or not.
         """
         _LOGGER.debug(
             "Checking if '%s' is in fastboot mode or not", self._device_name
@@ -213,7 +212,7 @@ class Fastboot(fastboot_interface.Fastboot):
                 or ""
             )
         except errors.HostCmdError as err:
-            raise errors.FastbootCommandError(
+            raise fastboot_errors.FastbootCommandError(
                 f"Failed to check if {self._device_name} is in fastboot mode or not"
             ) from err
 
@@ -238,8 +237,8 @@ class Fastboot(fastboot_interface.Fastboot):
             Output of `fastboot -s {node} {cmd}`.
 
         Raises:
-            errors.FuchsiaStateError: Invalid state to perform this operation.
-            errors.FastbootCommandError: In case of failure.
+            FuchsiaStateError: Invalid state to perform this operation.
+            FastbootCommandError: In case of failure.
         """
         if not self.is_in_fastboot_mode():
             raise errors.FuchsiaStateError(
@@ -267,7 +266,7 @@ class Fastboot(fastboot_interface.Fastboot):
             return output.strip().split("\n")[:-1]
 
         except errors.HostCmdError as err:
-            raise errors.FastbootCommandError(err) from err
+            raise fastboot_errors.FastbootCommandError(err) from err
 
     def wait_for_fastboot_mode(self) -> None:
         """Wait for Fuchsia device to go to fastboot mode."""
@@ -350,7 +349,7 @@ class Fastboot(fastboot_interface.Fastboot):
         to the TCP address.
 
         Raises:
-            errors.FuchsiaDeviceError: Failed to get the fastboot node id
+            FuchsiaDeviceError: Failed to get the fastboot node id
         """
         if fastboot_node_id:
             self._fastboot_node_id: str = fastboot_node_id

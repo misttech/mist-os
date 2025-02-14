@@ -44,9 +44,8 @@ class Fastboot(abc.ABC):
                 power switch hardware where this fuchsia device is connected.
 
         Raises:
-            errors.FuchsiaStateError: Invalid state to perform this operation.
-            errors.FuchsiaDeviceError: Failed to boot the device to fastboot
-                mode.
+            FuchsiaStateError: Invalid state to perform this operation.
+            FuchsiaDeviceError: Failed to boot the device to fastboot mode.
         """
 
     @abc.abstractmethod
@@ -54,9 +53,8 @@ class Fastboot(abc.ABC):
         """Boot the device to fuchsia mode from fastboot mode.
 
         Raises:
-            errors.FuchsiaStateError: Invalid state to perform this operation.
-            errors.FuchsiaDeviceError: Failed to boot the device to fuchsia
-                mode.
+            FuchsiaStateError: Invalid state to perform this operation.
+            FuchsiaDeviceError: Failed to boot the device to fuchsia mode.
         """
 
     @abc.abstractmethod
@@ -67,7 +65,7 @@ class Fastboot(abc.ABC):
             True if in fastboot mode, False otherwise.
 
         Raises:
-            errors.FastbootCommandError: Failed to check if device is in fastboot mode or not.
+            FastbootCommandError: Failed to check if device is in fastboot mode or not.
         """
 
     @abc.abstractmethod
@@ -81,8 +79,8 @@ class Fastboot(abc.ABC):
             Output of `fastboot -s {node} {cmd}`.
 
         Raises:
-            errors.FuchsiaStateError: Invalid state to perform this operation.
-            errors.FastbootCommandError: In case of failure.
+            FuchsiaStateError: Invalid state to perform this operation.
+            FastbootCommandError: In case of failure.
         """
 
     @abc.abstractmethod

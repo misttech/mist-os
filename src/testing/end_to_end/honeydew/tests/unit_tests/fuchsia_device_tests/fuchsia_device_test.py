@@ -48,12 +48,12 @@ from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )
 from honeydew.interfaces.transports import serial as serial_interface
-from honeydew.transports import fastboot as fastboot_transport
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import (
     fuchsia_controller as fuchsia_controller_transport,
 )
 from honeydew.transports import serial_using_unix_socket
+from honeydew.transports.fastboot import fastboot_impl
 from honeydew.transports.sl4f import sl4f_impl
 from honeydew.typing import custom_types
 
@@ -334,7 +334,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
 
     # List all the tests related to transports
     @mock.patch.object(
-        fastboot_transport.Fastboot,
+        fastboot_impl.FastbootImpl,
         "__init__",
         autospec=True,
         return_value=None,
@@ -344,7 +344,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         transport."""
         self.assertIsInstance(
             self.fd_fc_obj.fastboot,
-            fastboot_transport.Fastboot,
+            fastboot_impl.FastbootImpl,
         )
         mock_fastboot_init.assert_called_once()
 
