@@ -11,6 +11,9 @@ use depfile::Depfile;
 use pathdiff::diff_paths;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::fs::{copy, create_dir_all};
+use std::path::Path;
+use walkdir::WalkDir;
 
 /// A container of assembly artifacts that has a top-level config json file.
 /// Use #[assembly_container(config.json)] to implement this trait.
@@ -110,6 +113,13 @@ pub trait AssemblyContainer {
                     *path = Utf8PathBuf::try_from(new_path)?;
                 }
 
+                FileType::Directory => {
+                    let new_path = dir.as_ref().join(&dest);
+                    copy_dir(path.as_std_path(), new_path.as_std_path())
+                        .with_context(|| format!("Copying directory: {}", path))?;
+                    *path = dest;
+                }
+
                 // All other files are copied directly.
                 FileType::Unknown => {
                     depfile.add_input(&path);
@@ -184,6 +194,9 @@ pub enum FileType {
 
     /// A package manifest.
     PackageManifest,
+
+    /// An opaque directory.
+    Directory,
 }
 
 /// A function that is called whenever a path is found in the config.
@@ -295,8 +308,29 @@ where
     }
 }
 
+fn copy_dir(from: &Path, to: &Path) -> Result<()> {
+    let walker = WalkDir::new(from);
+    for entry in walker.into_iter() {
+        let entry = entry?;
+        let to_path = to.join(entry.path().strip_prefix(from)?);
+        if entry.metadata()?.is_dir() {
+            if to_path.exists() {
+                continue;
+            } else {
+                create_dir_all(&to_path).with_context(|| format!("creating {to_path:?}"))?;
+            }
+        } else {
+            copy(entry.path(), &to_path)
+                .with_context(|| format!("copying {:?} to {:?}", entry.path(), to_path))?;
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
+    use super::copy_dir;
     use crate::{assembly_container, AssemblyContainer, FileType, WalkPaths};
     use camino::Utf8PathBuf;
     use fuchsia_hash::{Hash, HASH_SIZE};
@@ -789,5 +823,31 @@ mod tests {
             format!("{}: \\\n  {} \\\n  {}\n", &config_path, &package_manifest_path, &blob_path),
             deps
         );
+    }
+
+    #[test]
+    fn test_copy_dir() {
+        // Prepare a directory for temporary files.
+        let dir = tempdir().unwrap();
+        let dir_path = Utf8PathBuf::from_path_buf(dir.path().to_path_buf()).unwrap();
+
+        // Write a directory with a file in a nested path.
+        //  src
+        //   |- nested
+        //       |- file.txt
+        let src_path = dir_path.join("src");
+        let src_nested_path = src_path.join("nested");
+        let src_file_path = src_nested_path.join("file.txt");
+        std::fs::create_dir_all(&src_nested_path).unwrap();
+        std::fs::write(src_file_path, "data").unwrap();
+
+        // Copy to a new directory.
+        let dst_path = dir_path.join("dst");
+        copy_dir(src_path.as_std_path(), dst_path.as_std_path()).unwrap();
+
+        // Ensure the new directory contains the file in the new location.
+        let dst_file_path = dst_path.join("nested").join("file.txt");
+        let data = std::fs::read_to_string(&dst_file_path).unwrap();
+        assert_eq!("data", &data);
     }
 }
