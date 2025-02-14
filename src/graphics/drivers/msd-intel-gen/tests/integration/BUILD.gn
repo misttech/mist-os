@@ -12,7 +12,10 @@ declare_args() {
 group("integration") {
   testonly = true
 
-  public_deps = [ ":msd_intel_gen_integration_tests" ]
+  public_deps = [
+    ":magma-conformance-vendor-helper-intel",
+    ":msd_intel_gen_integration_tests",
+  ]
 }
 
 cc_test_executable("msd_intel_gen_integration_tests") {
@@ -43,5 +46,17 @@ cc_test_executable("msd_intel_gen_integration_tests") {
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/trace-vthread",
+  ]
+}
+
+executable("magma-conformance-vendor-helper-intel") {
+  testonly = true
+  sources = [ "vendor_helper_intel.cc" ]
+  deps = [
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/syslog/cpp",
+    "//src/graphics/drivers/msd-intel-gen/include:include",
+    "//src/graphics/magma/tests/integration:vendor_helper_interface",
   ]
 }
