@@ -30,6 +30,15 @@ pub struct TimekeeperConfig {
     /// If set, the hardware has a counter that is always on and operates even
     /// if the rest of the hardware system is in a low power state.
     pub always_on_counter: bool,
+    /// If set, assembly should configure and route persistent storage to
+    /// Timekeeper.
+    pub use_persistent_storage: bool,
+    /// If set, Timekeeper should serve the FIDL protocol that allows external
+    /// time adjustment, `fuchsia.time.external/Adjust`.
+    ///
+    /// This is a security sensitive protocol, and very few assemblies are
+    /// expected to have it turned on.
+    pub serve_fuchsia_time_external_adjust: bool,
 }
 
 impl Default for TimekeeperConfig {
@@ -43,6 +52,8 @@ impl Default for TimekeeperConfig {
             utc_start_at_startup_when_invalid_rtc: false,
             serve_fuchsia_time_alarms: false,
             always_on_counter: false,
+            use_persistent_storage: false,
+            serve_fuchsia_time_external_adjust: false,
         }
     }
 }

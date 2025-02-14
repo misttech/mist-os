@@ -714,6 +714,7 @@ mod tests {
             has_real_time_clock: true,
             serve_fuchsia_time_alarms: false,
             has_always_on_counter: false,
+            serve_fuchsia_time_external_adjust: false,
         }))
     }
 

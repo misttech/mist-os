@@ -22,4 +22,5 @@
     utc_start_at_startup_when_invalid_rtc: false,
     serve_fuchsia_time_alarms: true,
     has_always_on_counter: false,
+    serve_fuchsia_time_external_adjust: false,
 }

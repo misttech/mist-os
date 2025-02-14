@@ -32,16 +32,21 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
         // allows Timekeeper to serve an endpoint for such runtime behavior changes.
         // Only eng builds are allowed to have this feature.
         let serve_test_protocols = config.serve_test_protocols;
+        let use_persistent_storage = config.use_persistent_storage;
 
         // See:
         // https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0115_build_types?hl=en#definitions
-        if serve_test_protocols {
-            if *context.build_type != BuildType::Eng {
-                return Err(anyhow!(
-                    "`serve_test_protocols==true` is only allowed in `eng` builds, see RFC 0115"
-                ));
-            }
-            // Gives Timekeeper some mutable persistent storage ("data").
+        if serve_test_protocols && *context.build_type != BuildType::Eng {
+            return Err(anyhow!(
+                "`serve_test_protocols==true` is only allowed in `eng` builds, see RFC 0115"
+            ));
+        }
+
+        // Gives Timekeeper some mutable persistent storage ("data").
+        //
+        // `serve_test_protocols` is gating this capability because historically it also was
+        // used to gate persistent storage. `use_persistent_storage` is a direct setting.
+        if serve_test_protocols || use_persistent_storage {
             builder.platform_bundle("timekeeper_persistence");
         }
 
@@ -93,6 +98,7 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
             // TODO: b/295537795 - provide this setting somehow.
             .field("power_topology_integration_enabled", false)?
             .field("serve_test_protocols", serve_test_protocols)?
+            .field("serve_fuchsia_time_external_adjust", config.serve_fuchsia_time_external_adjust)?
             .field("has_real_time_clock", has_real_time_clock)?
             .field("has_always_on_counter", has_always_on_counter)?
             .field("utc_start_at_startup_when_invalid_rtc", config.utc_start_at_startup_when_invalid_rtc)?
