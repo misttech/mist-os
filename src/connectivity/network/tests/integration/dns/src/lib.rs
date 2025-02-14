@@ -264,55 +264,49 @@ async fn discovered_ndp_dns<M: Manager, N: Netstack>(name: &str, check_type: Dns
     const DEFAULT_DNS_PORT: u16 = 53;
 
     let name = name.to_string();
-    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    // The device must be installed by netcfg in order to start the NDP watcher
+    // on the interface.
+    let _if_name = with_netcfg_owned_device::<M, N, _>(
+        &name.clone(),
+        ManagerConfig::Empty,
+        N::USE_OUT_OF_STACK_DHCP_CLIENT,
+        [],
+        |_, network, _, client_realm, _sandbox| {
+            async move {
+                // Send a Router Advertisement to an EP on the same network with DNS server
+                // configurations.
+                let fake_ep =
+                    network.create_fake_endpoint().expect("failed to create fake endpoint");
 
-    let network = sandbox.create_network("net").await.expect("failed to create network");
-    let client_realm = sandbox
-        .create_netstack_realm_with::<N, _, _>(
-            format!("{}_client", name),
-            &[
-                // Start the network manager on the client.
-                //
-                // The network manager should listen for NDP DNS server events
-                // and configure the DNS resolver accordingly.
-                KnownServiceProvider::Manager {
-                    agent: M::MANAGEMENT_AGENT,
-                    config: ManagerConfig::Empty,
-                    use_dhcp_server: false,
-                    use_out_of_stack_dhcp_client: false,
-                },
-                KnownServiceProvider::DnsResolver,
-                KnownServiceProvider::FakeClock,
-            ],
-        )
-        .expect("failed to create client realm");
-    // Start networking on client realm.
-    let _client_iface = client_realm
-        .join_network(&network, "client-ep")
-        .await
-        .expect("failed to configure client networking");
+                let addresses = [NDP_DNS_SERVER.addr.into()];
+                let rdnss = RecursiveDnsServer::new(9999, &addresses);
+                let options = [NdpOptionBuilder::RecursiveDnsServer(rdnss)];
+                send_ra_with_router_lifetime(&fake_ep, 0, &options, ipv6_consts::LINK_LOCAL_ADDR)
+                    .await
+                    .expect("failed to send router advertisement");
 
-    // Send a Router Advertisement with DNS server configurations.
-    let fake_ep = network.create_fake_endpoint().expect("failed to create fake endpoint");
-    let addresses = [NDP_DNS_SERVER.addr.into()];
-    let rdnss = RecursiveDnsServer::new(9999, &addresses);
-    let options = [NdpOptionBuilder::RecursiveDnsServer(rdnss)];
-    send_ra_with_router_lifetime(&fake_ep, 0, &options, ipv6_consts::LINK_LOCAL_ADDR)
-        .await
-        .expect("failed to send router advertisement");
+                // The list of servers we expect to observe via NDP.
+                let expect = [fnet::SocketAddress::Ipv6(fnet::Ipv6SocketAddress {
+                    address: NDP_DNS_SERVER,
+                    port: DEFAULT_DNS_PORT,
+                    zone_index: 0,
+                })];
 
-    // The list of servers we expect to retrieve from `fuchsia.net.name/LookupAdmin`.
-    let expect = [fnet::SocketAddress::Ipv6(fnet::Ipv6SocketAddress {
-        address: NDP_DNS_SERVER,
-        port: DEFAULT_DNS_PORT,
-        zone_index: 0,
-    })];
-
-    let wait_for_netmgr =
-        wait_for_component_stopped(&client_realm, M::MANAGEMENT_AGENT.get_component_name(), None)
-            .fuse();
-    let mut wait_for_netmgr = pin!(wait_for_netmgr);
-    check_type.evaluate_check::<M, _>(&client_realm, &mut wait_for_netmgr, &expect).await
+                let wait_for_netmgr = wait_for_component_stopped(
+                    &client_realm,
+                    M::MANAGEMENT_AGENT.get_component_name(),
+                    None,
+                )
+                .fuse();
+                let mut wait_for_netmgr = pin!(wait_for_netmgr);
+                check_type
+                    .evaluate_check::<M, _>(&client_realm, &mut wait_for_netmgr, &expect)
+                    .await
+            }
+            .boxed_local()
+        },
+    )
+    .await;
 }
 
 /// Tests that DHCPv4 exposes DNS servers discovered through DHCPv4 and NetworkManager

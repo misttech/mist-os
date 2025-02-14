@@ -37,6 +37,10 @@
             ],
         },
         {
+            protocol: "fuchsia.net.ndp.RouterAdvertisementOptionWatcherProvider",
+            availability: "optional",
+        },
+        {
             protocol: "fuchsia.net.filter.deprecated.Filter",
             availability: "optional",
         },

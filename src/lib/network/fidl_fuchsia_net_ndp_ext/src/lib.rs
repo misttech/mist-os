@@ -205,19 +205,36 @@ pub enum OptionWatchStreamError {
 /// Creates an option watcher and a stream of its hanging-get results.
 ///
 /// Awaits a probe of the watcher returning (indicating that it has been
-/// registered with the netstack) before returning the stream.
+/// registered with the netstack) before returning the stream. If the probe
+/// fails with ClientChannelClosed, this is interpreted to mean the
+/// RouterAdvertisementOptionWatcherProvider protocol is not present. In that
+/// event, this returns None. Otherwise, any error encountered is
+/// yielded as Some(Err(...)).
 pub async fn create_watcher_stream(
     provider: &fnet_ndp::RouterAdvertisementOptionWatcherProviderProxy,
     params: &fnet_ndp::RouterAdvertisementOptionWatcherParams,
-) -> Result<
-    impl futures::Stream<Item = Result<OptionWatchStreamItem, OptionWatchStreamError>> + 'static,
-    fidl::Error,
+) -> Option<
+    Result<
+        impl futures::Stream<Item = Result<OptionWatchStreamItem, OptionWatchStreamError>> + 'static,
+        fidl::Error,
+    >,
 > {
     let (proxy, server_end) = fidl::endpoints::create_proxy::<fnet_ndp::OptionWatcherMarker>();
-    provider.new_router_advertisement_option_watcher(server_end, &params)?;
-    proxy.probe().await?;
+    if let Err(e) = provider.new_router_advertisement_option_watcher(server_end, &params) {
+        return Some(Err(e));
+    }
+    proxy
+        .probe()
+        .await
+        .map_err(|e| match e {
+            // Indicates that this protocol isn't present on the
+            // system, so the caller shouldn't use this protocol.
+            fidl::Error::ClientChannelClosed { .. } => return None,
+            err => return Some(err),
+        })
+        .ok()?;
 
-    Ok(futures::stream::try_unfold(proxy, |proxy| async move {
+    Some(Ok(futures::stream::try_unfold(proxy, |proxy| async move {
         Ok(Some((proxy.watch_options().await?, proxy)))
     })
     .flat_map(|result: Result<_, fidl::Error>| match result {
@@ -234,7 +251,7 @@ pub async fn create_watcher_stream(
                 .map_err(OptionWatchStreamError::Conversion)
         })))
         .right_stream(),
-    }))
+    })))
 }
 
 #[cfg(test)]

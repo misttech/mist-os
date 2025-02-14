@@ -73,6 +73,7 @@ async fn watch_ndp_option(name: &str) {
         }
     )
     .await
+    .expect("protocol should be present")
     .expect("creating watcher should succeed"));
 
     let (option_builder, watch_entry) =
@@ -145,6 +146,7 @@ async fn filters_for_rdnss(name: &str) {
         }
     )
     .await
+    .expect("protocol should be present")
     .expect("should successfully create watcher stream"));
 
     let (nonce_option_builder, _nonce_watch_entry) =

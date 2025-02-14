@@ -470,6 +470,11 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                                     >(
                                         constants::dns_resolver::COMPONENT_NAME,
                                     )),
+                                    fnetemul::Capability::ChildDep(protocol_dep::<
+                                        fnet_ndp::RouterAdvertisementOptionWatcherProviderMarker,
+                                    >(
+                                        constants::netstack::COMPONENT_NAME,
+                                    )),
                                     fnetemul::Capability::NetemulDevfs(fnetemul::DevfsDep {
                                         name: Some(
                                             constants::netcfg::DEV_CLASS_NETWORK.to_string(),

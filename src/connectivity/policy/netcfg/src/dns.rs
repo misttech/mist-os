@@ -3,13 +3,24 @@
 // found in the LICENSE file.
 
 use std::collections::HashMap;
+use std::pin::Pin;
 
-use fidl_fuchsia_net_name as fnet_name;
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_name as fnet_name, fidl_fuchsia_net_ndp as fnet_ndp,
+    fidl_fuchsia_net_ndp_ext as fnet_ndp_ext,
+};
 
+use anyhow::Context;
 use async_utils::stream::{Tagged, WithTag as _};
 use dns_server_watcher::{DnsServers, DnsServersUpdateSource};
 use fidl::endpoints::{ControlHandle as _, Responder as _};
-use log::{error, trace, warn};
+use futures::stream::BoxStream;
+use futures::{Stream, StreamExt};
+use log::{error, info, trace, warn};
+use net_types::{Scope, ScopeableAddress};
+use packet_formats::icmp::ndp as packet_formats_ndp;
+
+const DNS_PORT: u16 = 53;
 
 /// Updates the DNS servers used by the DNS resolver.
 pub(super) async fn update_servers(
@@ -37,6 +48,155 @@ pub(super) async fn update_servers(
     }
 
     dns_server_watch_responders.send(dns_servers.consolidated_dns_servers());
+}
+
+/// Creates a stream of RDNSS DNS updates to conform to the output of
+/// `dns_server_watcher::new_dns_server_stream`. Returns None if the protocol
+/// is not available on the system, indicating the protocol should not be used.
+pub(super) async fn create_rdnss_stream(
+    watcher_provider: &fnet_ndp::RouterAdvertisementOptionWatcherProviderProxy,
+    source: DnsServersUpdateSource,
+    interface_id: u64,
+) -> Option<
+    Result<
+        impl Stream<Item = (DnsServersUpdateSource, Result<Vec<fnet_name::DnsServer_>, fidl::Error>)>,
+        fidl::Error,
+    >,
+> {
+    let watcher_result = fnet_ndp_ext::create_watcher_stream(
+        &watcher_provider,
+        &fnet_ndp::RouterAdvertisementOptionWatcherParams {
+            interest_types: Some(vec![
+                packet_formats_ndp::options::NdpOptionType::RecursiveDnsServer.into(),
+            ]),
+            interest_interface_id: Some(interface_id),
+            ..Default::default()
+        },
+    )
+    .await?;
+
+    // This cannot be directly returned using `?` operator since the
+    // function returns an Option.
+    let watcher = match watcher_result {
+        Ok(res) => res,
+        Err(e) => return Some(Err(e)),
+    };
+
+    Some(Ok(watcher
+        .filter_map(move |entry_res| async move {
+            let entry = match entry_res {
+                Ok(entry) => entry,
+                Err(fnet_ndp_ext::OptionWatchStreamError::Fidl(e)) => {
+                    return Some(Err(e));
+                }
+                Err(fnet_ndp_ext::OptionWatchStreamError::Conversion(e)) => {
+                    // Netstack didn't uphold the invariant to populate the
+                    // fields for `OptionWatchEntry`.
+                    error!("Failed to convert OptionWatchStream item: {e:?}");
+                    return None;
+                }
+            };
+            match entry {
+                fnet_ndp_ext::OptionWatchStreamItem::Entry(entry) => {
+                    match entry.try_parse_as_rdnss() {
+                        fnet_ndp_ext::TryParseAsOptionResult::Parsed(option) => Some(Ok(option
+                            .iter_addresses()
+                            .into_iter()
+                            .map(|addr| fnet_name::DnsServer_ {
+                                address: Some(fnet::SocketAddress::Ipv6(fnet::Ipv6SocketAddress {
+                                    address: fnet::Ipv6Address { addr: addr.ipv6_bytes() },
+                                    port: DNS_PORT,
+                                    // Determine whether the address has a zone or not in accordance
+                                    // with https://datatracker.ietf.org/doc/html/rfc8106
+                                    zone_index: addr
+                                        .scope()
+                                        .can_have_zone()
+                                        .then_some(interface_id)
+                                        .unwrap_or_default(),
+                                })),
+                                source: Some(fnet_name::DnsServerSource::Ndp(
+                                    fnet_name::NdpDnsServerSource {
+                                        source_interface: Some(interface_id),
+                                        ..Default::default()
+                                    },
+                                )),
+                                ..Default::default()
+                            })
+                            .collect::<Vec<_>>())),
+                        fnet_ndp_ext::TryParseAsOptionResult::OptionTypeMismatch => {
+                            // Netstack didn't respect our interest configuration.
+                            error!("Option type provided did not match RDNSS option type");
+                            None
+                        }
+                        fnet_ndp_ext::TryParseAsOptionResult::ParseErr(err) => {
+                            // A network peer could have included an invalid RDNSS option.
+                            warn!("Error while parsing as OptionResult: {err:?}");
+                            None
+                        }
+                    }
+                }
+                fnet_ndp_ext::OptionWatchStreamItem::Dropped(num) => {
+                    warn!(
+                        "The server dropped ({num}) NDP options \
+                    due to the HangingGet falling behind"
+                    );
+                    None
+                }
+            }
+        })
+        .tagged(source)))
+}
+
+pub(super) async fn add_rdnss_watcher(
+    watcher_provider: &fnet_ndp::RouterAdvertisementOptionWatcherProviderProxy,
+    interface_id: crate::InterfaceId,
+    watchers: &mut crate::DnsServerWatchers<'_>,
+) -> Result<(), anyhow::Error> {
+    let source = DnsServersUpdateSource::Ndp { interface_id: interface_id.get() };
+
+    // Returns None when RouterAdvertisementOptionWatcherProvider isn't available on the system.
+    let stream = create_rdnss_stream(watcher_provider, source, interface_id.get()).await;
+
+    match stream {
+        Some(result) => {
+            if let Some(o) =
+                watchers.insert(source, result.context("failed to create watcher stream")?.boxed())
+            {
+                let _: Pin<Box<BoxStream<'_, _>>> = o;
+                unreachable!("DNS server watchers must not contain key {:?}", source);
+            }
+            info!("started NDP watcher on host interface (id={interface_id})");
+        }
+        None => {
+            info!(
+                "NDP protocol unavailable: not starting watcher for interface (id={interface_id})"
+            );
+        }
+    }
+    Ok(())
+}
+
+pub(super) async fn remove_rdnss_watcher(
+    lookup_admin: &fnet_name::LookupAdminProxy,
+    dns_servers: &mut DnsServers,
+    dns_server_watch_responders: &mut DnsServerWatchResponders,
+    interface_id: crate::InterfaceId,
+    watchers: &mut crate::DnsServerWatchers<'_>,
+) {
+    let source = DnsServersUpdateSource::Ndp { interface_id: interface_id.get() };
+
+    if let None = watchers.remove(&source) {
+        // It's surprising that the DNS Watcher for the interface doesn't exist
+        // when the RDNSS stream is getting removed, but this can happen
+        // when multiple futures try to stop the NDP watcher at the same time.
+        warn!(
+            "DNS Watcher for key not present; multiple futures stopped NDP \
+            watcher for key {:?}; interface_id={}",
+            source, interface_id
+        );
+    }
+
+    update_servers(lookup_admin, dns_servers, dns_server_watch_responders, source, vec![]).await
 }
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]

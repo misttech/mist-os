@@ -38,6 +38,9 @@ pub struct DnsServers {
 
     /// DNS servers obtained from DHCPv6 clients.
     dhcpv6: HashMap<u64, Vec<DnsServer_>>,
+
+    /// DNS servers obtained from NDP clients.
+    ndp: HashMap<u64, Vec<DnsServer_>>,
 }
 
 impl DnsServers {
@@ -49,7 +52,7 @@ impl DnsServers {
         source: DnsServersUpdateSource,
         servers: Vec<DnsServer_>,
     ) {
-        let Self { default, netstack, dhcpv4, dhcpv6 } = self;
+        let Self { default, netstack, dhcpv4, dhcpv6, ndp } = self;
 
         match source {
             DnsServersUpdateSource::Default => *default = servers,
@@ -70,6 +73,15 @@ impl DnsServers {
                     dhcpv6.remove(&interface_id)
                 } else {
                     dhcpv6.insert(interface_id, servers)
+                };
+            }
+            DnsServersUpdateSource::Ndp { interface_id } => {
+                // We discard existing servers since they are being replaced with
+                // `servers` - the old servers are useless to us now.
+                let _: Option<Vec<DnsServer_>> = if servers.is_empty() {
+                    ndp.remove(&interface_id)
+                } else {
+                    ndp.insert(interface_id, servers)
                 };
             }
         }
@@ -103,10 +115,8 @@ impl DnsServers {
     ///
     /// The servers will be returned deduplicated by their address and sorted by the source
     /// that each server was learned from. The servers will be sorted in most to least
-    /// preferred order, with the most preferred server first. The preference of the servers
-    /// is NDP, DHCPv4, DHCPv6 then Static, where NDP is the most preferred. No ordering is
-    /// guaranteed across servers from different sources of the same source-kind, but ordering
-    /// within a source is maintained.
+    /// preferred order, with the most preferred server first. See doc comment on Self::ordering
+    /// for order of preference based on ServerSource.
     ///
     /// Example, say we had servers SA1 and SA2 set for DHCPv6 interface A, and SB1 and SB2
     /// for DHCPv6 interface B. The consolidated list will be either one of [SA1, SA2, SB1, SB2]
@@ -127,10 +137,11 @@ impl DnsServers {
     ///
     /// See `consolidated` for details on ordering.
     fn consolidate_filter_map<T, F: Fn(DnsServer_) -> Option<T>>(&self, f: F) -> Vec<T> {
-        let Self { default, netstack, dhcpv4, dhcpv6 } = self;
+        let Self { default, netstack, dhcpv4, dhcpv6, ndp } = self;
         let mut servers = netstack
             .iter()
             .chain(dhcpv4.values().flatten())
+            .chain(ndp.values().flatten())
             .chain(dhcpv6.values().flatten())
             .cloned()
             .collect::<Vec<_>>();
@@ -202,6 +213,9 @@ mod tests {
             ]
             .into_iter()
             .collect(),
+            ndp: [(NDP_SERVER_INTERFACE_ID, vec![ndp_server(), ndp_server()])]
+                .into_iter()
+                .collect(),
         };
         // Ordering across (the DHCPv6) sources is not guaranteed, but both DHCPv6 sources
         // have the same set of servers with the same order. With deduplication, we know
@@ -225,7 +239,7 @@ mod tests {
         // is observed by a higher priority source, then use the higher source for
         // ordering.
         let servers = DnsServers {
-            default: vec![static_server(), ndp_server(), dhcpv4_server1(), dhcpv6_server1()],
+            default: vec![static_server(), dhcpv4_server1(), dhcpv6_server1()],
             netstack: vec![static_server()],
             dhcpv4: [
                 (DHCPV4_SERVER1_INTERFACE_ID, vec![dhcpv4_server1()]),
@@ -239,6 +253,7 @@ mod tests {
             ]
             .into_iter()
             .collect(),
+            ndp: [(NDP_SERVER_INTERFACE_ID, vec![ndp_server()])].into_iter().collect(),
         };
         // No ordering is guaranteed across servers from different sources of the same
         // source-kind.
@@ -250,13 +265,16 @@ mod tests {
             HashSet::from(want_dhcpv4),
         );
 
+        let want_ndp = [NDP_SOURCE_SOCKADDR];
+        assert_eq!(HashSet::from_iter(got.by_ref().take(want_ndp.len())), HashSet::from(want_ndp));
+
         let want_dhcpv6 = [DHCPV6_SOURCE_SOCKADDR1, DHCPV6_SOURCE_SOCKADDR2];
         assert_eq!(
             HashSet::from_iter(got.by_ref().take(want_dhcpv6.len())),
             HashSet::from(want_dhcpv6),
         );
 
-        let want_rest = [STATIC_SOURCE_SOCKADDR, NDP_SOURCE_SOCKADDR];
+        let want_rest = [STATIC_SOURCE_SOCKADDR];
         assert_eq!(got.as_slice(), want_rest);
     }
 
@@ -284,12 +302,7 @@ mod tests {
         );
         let mut servers = DnsServers {
             default: vec![],
-            netstack: vec![
-                dhcpv6_with_ndp_address(),
-                dhcpv4_server1(),
-                ndp_server(),
-                static_server(),
-            ],
+            netstack: vec![dhcpv4_server1(), static_server()],
             dhcpv4: [(DHCPV4_SERVER1_INTERFACE_ID, vec![dhcpv4_server1()])].into_iter().collect(),
             dhcpv6: [(
                 DHCPV6_SERVER1_INTERFACE_ID,
@@ -297,6 +310,9 @@ mod tests {
             )]
             .into_iter()
             .collect(),
+            ndp: [(NDP_SERVER_INTERFACE_ID, vec![ndp_server(), dhcpv6_with_ndp_address()])]
+                .into_iter()
+                .collect(),
         };
         let expected_servers =
             vec![dhcpv4_server1(), ndp_server(), dhcpv6_server1(), static_server()];
@@ -308,8 +324,7 @@ mod tests {
             STATIC_SOURCE_SOCKADDR,
         ];
         assert_eq!(servers.consolidated(), expected_sockaddrs);
-        servers.netstack =
-            vec![dhcpv4_server1(), ndp_server(), static_server(), dhcpv6_with_ndp_address()];
+        servers.netstack = vec![dhcpv4_server1(), static_server(), dhcpv6_with_ndp_address()];
         assert_eq!(servers.consolidate_filter_map(Some), expected_servers);
         assert_eq!(servers.consolidated(), expected_sockaddrs);
 
@@ -335,9 +350,12 @@ mod tests {
         );
         let mut servers = DnsServers {
             default: vec![],
-            netstack: vec![ndp_with_dhcpv6_sockaddr1(), static_server()],
+            netstack: vec![static_server()],
             dhcpv4: Default::default(),
             dhcpv6,
+            ndp: [(NDP_SERVER_INTERFACE_ID, vec![ndp_with_dhcpv6_sockaddr1()])]
+                .into_iter()
+                .collect(),
         };
         let expected_servers = vec![ndp_with_dhcpv6_sockaddr1(), dhcpv6_server2(), static_server()];
         assert_eq!(servers.consolidate_filter_map(Some), expected_servers);
