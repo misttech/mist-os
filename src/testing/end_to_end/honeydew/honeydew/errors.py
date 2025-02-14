@@ -50,10 +50,6 @@ class FfxCommandError(TransportError):
     """Exception for errors raised by ffx commands running on host machine."""
 
 
-class FuchsiaControllerError(TransportError):
-    """Exception for errors raised by Fuchsia Controller requests."""
-
-
 class HealthCheckError(HoneydewError):
     """Raised when health_check fails."""
 
@@ -64,10 +60,6 @@ class TransportConnectionError(HoneydewError):
 
 class FfxConnectionError(TransportConnectionError):
     """Raised when FFX transport's check_connection fails."""
-
-
-class FuchsiaControllerConnectionError(TransportConnectionError):
-    """Raised when Fuchsia-Controller transport's check_connection fails."""
 
 
 class FfxConfigError(HoneydewError):

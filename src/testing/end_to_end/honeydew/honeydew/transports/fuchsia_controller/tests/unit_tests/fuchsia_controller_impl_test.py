@@ -10,10 +10,8 @@ from unittest import mock
 
 import fuchsia_controller_py as fuchsia_controller
 
-from honeydew import errors
-from honeydew.transports import (
-    fuchsia_controller as fuchsia_controller_transport,
-)
+from honeydew.transports.fuchsia_controller import errors as fc_errors
+from honeydew.transports.fuchsia_controller import fuchsia_controller_impl
 from honeydew.typing import custom_types
 
 _TARGET_NAME: str = "fuchsia-emulator"
@@ -61,7 +59,7 @@ class FuchsiaControllerTests(unittest.TestCase):
             autospec=True,
         ) as mock_target_wait:
             self.fuchsia_controller_obj_wo_device_ip = (
-                fuchsia_controller_transport.FuchsiaController(
+                fuchsia_controller_impl.FuchsiaControllerImpl(
                     target_name=_INPUT_ARGS["target_name"],
                     config=_MOCK_ARGS["ffx_config"],
                 )
@@ -78,7 +76,7 @@ class FuchsiaControllerTests(unittest.TestCase):
             ) as mock_target_wait,
         ):
             self.fuchsia_controller_obj_with_device_ip = (
-                fuchsia_controller_transport.FuchsiaController(
+                fuchsia_controller_impl.FuchsiaControllerImpl(
                     target_name=_INPUT_ARGS["target_name"],
                     target_ip_port=_INPUT_ARGS["target_ip_port"],
                     config=_MOCK_ARGS["ffx_config"],
@@ -103,7 +101,7 @@ class FuchsiaControllerTests(unittest.TestCase):
     ) -> None:
         """Verify create_context() when the fuchsia controller Context creation
         raises an error."""
-        with self.assertRaises(errors.FuchsiaControllerError):
+        with self.assertRaises(fc_errors.FuchsiaControllerError):
             self.fuchsia_controller_obj_with_device_ip.create_context()
 
         mock_fc_context.assert_called()
@@ -135,7 +133,7 @@ class FuchsiaControllerTests(unittest.TestCase):
         self, mock_fc_connect_device_proxy: mock.Mock
     ) -> None:
         """Test case for fuchsia_controller_transport.connect_device_proxy()"""
-        with self.assertRaises(errors.FuchsiaControllerError):
+        with self.assertRaises(fc_errors.FuchsiaControllerError):
             self.fuchsia_controller_obj_with_device_ip.connect_device_proxy(
                 _INPUT_ARGS["BuildInfo"]
             )
@@ -161,8 +159,8 @@ class FuchsiaControllerTests(unittest.TestCase):
     )
     def test_check_connection_raises(self, mock_target_wait: mock.Mock) -> None:
         """Testcase for FuchsiaController.check_connection() raises
-        errors.FuchsiaControllerConnectionError"""
-        with self.assertRaises(errors.FuchsiaControllerConnectionError):
+        FuchsiaControllerConnectionError"""
+        with self.assertRaises(fc_errors.FuchsiaControllerConnectionError):
             self.fuchsia_controller_obj_with_device_ip.check_connection()
 
         mock_target_wait.assert_called()

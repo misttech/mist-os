@@ -7,8 +7,8 @@ import logging
 
 import fuchsia_controller_py as fuchsia_controller
 
-from honeydew import errors
-from honeydew.interfaces.transports import (
+from honeydew.transports.fuchsia_controller import errors as fc_errors
+from honeydew.transports.fuchsia_controller import (
     fuchsia_controller as fuchsia_controller_interface,
 )
 from honeydew.typing import custom_types
@@ -17,7 +17,7 @@ from honeydew.utils import decorators
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class FuchsiaController(fuchsia_controller_interface.FuchsiaController):
+class FuchsiaControllerImpl(fuchsia_controller_interface.FuchsiaController):
     """Provides Host-(Fuchsia)Target interactions via Fuchsia-Controller.
 
     Args:
@@ -26,8 +26,8 @@ class FuchsiaController(fuchsia_controller_interface.FuchsiaController):
         device_ip: Fuchsia device IP Address.
 
     Raises:
-        errors.FuchsiaControllerConnectionError: If target is not ready.
-        errors.FuchsiaControllerError: Failed to instantiate.
+        FuchsiaControllerConnectionError: If target is not ready.
+        FuchsiaControllerError: Failed to instantiate.
     """
 
     def __init__(
@@ -56,8 +56,8 @@ class FuchsiaController(fuchsia_controller_interface.FuchsiaController):
         """Creates the fuchsia-controller context.
 
         Raises:
-            errors.FuchsiaControllerError: Failed to create FuchsiaController Context.
-            errors.FuchsiaControllerConnectionError: If target is not ready.
+            FuchsiaControllerError: Failed to create FuchsiaController Context.
+            FuchsiaControllerConnectionError: If target is not ready.
         """
         try:
             # To run Fuchsia-Controller in isolation
@@ -76,7 +76,7 @@ class FuchsiaController(fuchsia_controller_interface.FuchsiaController):
                 config=config, isolate_dir=isolate_dir, target=self._target
             )
         except Exception as err:  # pylint: disable=broad-except
-            raise errors.FuchsiaControllerError(
+            raise fc_errors.FuchsiaControllerError(
                 "Failed to create Fuchsia-Controller context"
             ) from err
 
@@ -85,7 +85,7 @@ class FuchsiaController(fuchsia_controller_interface.FuchsiaController):
         """Checks the Fuchsia-Controller connection from host to Fuchsia device.
 
         Raises:
-            errors.FuchsiaControllerConnectionError
+            FuchsiaControllerConnectionError
         """
         try:
             _LOGGER.debug(
@@ -100,7 +100,7 @@ class FuchsiaController(fuchsia_controller_interface.FuchsiaController):
                 self._target_name,
             )
         except Exception as err:  # pylint: disable=broad-except
-            raise errors.FuchsiaControllerConnectionError(
+            raise fc_errors.FuchsiaControllerConnectionError(
                 f"Fuchsia-Controller connection check failed for "
                 f"{self._target_name} with error: {err}"
             )
@@ -115,7 +115,7 @@ class FuchsiaController(fuchsia_controller_interface.FuchsiaController):
               name.
 
         Raises:
-            errors.FuchsiaControllerError: On FIDL communication failure.
+            FuchsiaControllerError: On FIDL communication failure.
 
         Returns:
             FIDL channel to proxy.
@@ -125,6 +125,6 @@ class FuchsiaController(fuchsia_controller_interface.FuchsiaController):
                 fidl_end_point.moniker, fidl_end_point.protocol
             )
         except fuchsia_controller.ZxStatus as status:
-            raise errors.FuchsiaControllerError(
+            raise fc_errors.FuchsiaControllerError(
                 "Fuchsia Controller FIDL Error"
             ) from status

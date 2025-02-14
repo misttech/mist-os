@@ -44,7 +44,9 @@ from honeydew.affordances.connectivity.wlan.wlan import wlan_using_fc
 from honeydew.errors import NotSupportedError
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import ffx as ffx_transport
-from honeydew.transports import fuchsia_controller as fc_transport
+from honeydew.transports.fuchsia_controller import (
+    fuchsia_controller as fc_transport,
+)
 
 _TEST_SSID = "ThepromisedLAN"
 _TEST_SSID_BYTES = list(str.encode(_TEST_SSID, "utf-8"))

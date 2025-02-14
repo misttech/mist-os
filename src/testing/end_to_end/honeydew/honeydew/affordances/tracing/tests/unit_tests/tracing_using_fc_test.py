@@ -17,7 +17,9 @@ from parameterized import param, parameterized
 from honeydew.affordances.tracing import tracing_using_fc
 from honeydew.affordances.tracing.errors import TracingError, TracingStateError
 from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.transports import fuchsia_controller as fc_transport
+from honeydew.transports.fuchsia_controller import (
+    fuchsia_controller as fc_transport,
+)
 
 
 def _custom_test_name_func(

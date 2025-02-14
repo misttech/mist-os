@@ -12,7 +12,7 @@ import fuchsia_controller_py
 from honeydew.affordances.rtc import rtc
 from honeydew.affordances.rtc.errors import HoneydewRtcError
 from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.interfaces.transports import (
+from honeydew.transports.fuchsia_controller import (
     fuchsia_controller as fuchsia_controller_lib,
 )
 from honeydew.typing import custom_types

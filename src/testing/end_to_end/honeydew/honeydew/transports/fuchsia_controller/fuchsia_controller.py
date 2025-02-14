@@ -20,8 +20,8 @@ class FuchsiaController(abc.ABC):
         """Creates the fuchsia-controller context.
 
         Raises:
-            errors.FuchsiaControllerError: Failed to create FuchsiaController Context.
-            errors.FuchsiaControllerConnectionError: If target is not ready.
+            FuchsiaControllerError: Failed to create FuchsiaController Context.
+            FuchsiaControllerConnectionError: If target is not ready.
         """
 
     @abc.abstractmethod
@@ -29,7 +29,7 @@ class FuchsiaController(abc.ABC):
         """Checks the Fuchsia-Controller connection from host to Fuchsia device.
 
         Raises:
-            errors.FuchsiaControllerConnectionError
+            FuchsiaControllerConnectionError
         """
 
     @abc.abstractmethod
@@ -43,7 +43,7 @@ class FuchsiaController(abc.ABC):
               name.
 
         Raises:
-            errors.FuchsiaControllerError: On FIDL communication failure.
+            FuchsiaControllerError: On FIDL communication failure.
 
         Returns:
             FIDL channel to proxy.

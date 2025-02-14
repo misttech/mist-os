@@ -16,7 +16,9 @@ from fidl import AsyncSocket
 from honeydew.affordances.tracing import tracing
 from honeydew.affordances.tracing.errors import TracingError, TracingStateError
 from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.transports import fuchsia_controller as fc_transport
+from honeydew.transports.fuchsia_controller import (
+    fuchsia_controller as fc_transport,
+)
 from honeydew.typing import custom_types
 
 _FC_PROXIES: dict[str, custom_types.FidlEndpoint] = {

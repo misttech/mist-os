@@ -24,7 +24,9 @@ from honeydew.affordances.connectivity.bluetooth.utils.fidl_servers import (
     bt_fidl_servers,
 )
 from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.transports import fuchsia_controller as fc_transport
+from honeydew.transports.fuchsia_controller import (
+    fuchsia_controller as fc_transport,
+)
 from honeydew.typing import custom_types
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)

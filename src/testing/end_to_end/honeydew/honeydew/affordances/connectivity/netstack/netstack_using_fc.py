@@ -21,7 +21,9 @@ from honeydew.affordances.connectivity.netstack.types import InterfaceProperties
 from honeydew.affordances.connectivity.wlan.utils.types import MacAddress
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.transports import ffx as ffx_transport
-from honeydew.interfaces.transports import fuchsia_controller as fc_transport
+from honeydew.transports.fuchsia_controller import (
+    fuchsia_controller as fc_transport,
+)
 from honeydew.typing.custom_types import FidlEndpoint
 
 # List of required FIDLs for this affordance.

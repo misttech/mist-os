@@ -67,17 +67,16 @@ from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )
 from honeydew.interfaces.transports import ffx as ffx_transport_interface
-from honeydew.interfaces.transports import (
-    fuchsia_controller as fuchsia_controller_transport_interface,
-)
 from honeydew.transports import ffx as ffx_transport
-from honeydew.transports import (
-    fuchsia_controller as fuchsia_controller_transport,
-)
 from honeydew.transports.fastboot import (
     fastboot as fastboot_transport_interface,
 )
 from honeydew.transports.fastboot import fastboot_impl
+from honeydew.transports.fuchsia_controller import errors as fc_errors
+from honeydew.transports.fuchsia_controller import (
+    fuchsia_controller as fuchsia_controller_transport_interface,
+)
+from honeydew.transports.fuchsia_controller import fuchsia_controller_impl
 from honeydew.transports.serial import serial as serial_transport_interface
 from honeydew.transports.serial import serial_using_unix_socket
 from honeydew.transports.sl4f import sl4f as sl4f_transport_interface
@@ -165,7 +164,7 @@ class FuchsiaDevice(
 
     Raises:
         errors.FFXCommandError: if FFX connection check fails.
-        errors.FuchsiaControllerError: if FC connection check fails.
+        FuchsiaControllerError: if FC connection check fails.
     """
 
     def __init__(
@@ -307,11 +306,11 @@ class FuchsiaDevice(
             Fuchsia-Controller transport interface implementation.
 
         Raises:
-            errors.FuchsiaControllerError: Failed to instantiate.
+            FuchsiaControllerError: Failed to instantiate.
         """
         fuchsia_controller_obj: (
             fuchsia_controller_transport_interface.FuchsiaController
-        ) = fuchsia_controller_transport.FuchsiaController(
+        ) = fuchsia_controller_impl.FuchsiaControllerImpl(
             target_name=self.device_name,
             config=self._ffx_config,
             target_ip_port=self._device_info.ip_port,
@@ -365,7 +364,7 @@ class FuchsiaDevice(
             SL4F transport interface implementation.
 
         Raises:
-            errors.Sl4fError: Failed to instantiate.
+            Sl4fError: Failed to instantiate.
         """
         device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None
         if self._device_info.ip_port:
@@ -694,8 +693,8 @@ class FuchsiaDevice(
             level: Log message level.
 
         Raises:
-            errors.FuchsiaControllerError: On communications failure.
-            errors.Sl4FError: On communications failure.
+            FuchsiaControllerError: On communications failure.
+            Sl4fError: On communications failure.
         """
         timestamp: str = datetime.now().strftime("%Y-%m-%d-%I-%M-%S-%p")
         message = f"[Host Time: {timestamp}] - {message}"
@@ -705,8 +704,8 @@ class FuchsiaDevice(
         """Take actions after the device is rebooted.
 
         Raises:
-            errors.FuchsiaControllerError: On communications failure.
-            errors.Sl4FError: On communications failure.
+            FuchsiaControllerError: On communications failure.
+            Sl4fError: On communications failure.
         """
         # Restart the SL4F server on device boot up.
         if self._is_sl4f_needed:
@@ -735,8 +734,8 @@ class FuchsiaDevice(
                 power switch hardware where this fuchsia device is connected.
 
         Raises:
-            errors.FuchsiaControllerError: On communications failure.
-            errors.Sl4FError: On communications failure.
+            FuchsiaControllerError: On communications failure.
+            Sl4fError: On communications failure.
         """
         _LOGGER.info("Power cycling %s...", self.device_name)
 
@@ -770,8 +769,8 @@ class FuchsiaDevice(
         """Soft reboot the device.
 
         Raises:
-            errors.FuchsiaControllerError: On communications failure.
-            errors.Sl4FError: On communications failure.
+            FuchsiaControllerError: On communications failure.
+            Sl4fError: On communications failure.
         """
         _LOGGER.info("Lacewing is rebooting %s...", self.device_name)
         self.log_message_to_device(
@@ -822,8 +821,8 @@ class FuchsiaDevice(
             Absolute path of the snapshot file.
 
         Raises:
-            errors.FuchsiaControllerError: On communications failure.
-            errors.Sl4FError: On communications failure.
+            FuchsiaControllerError: On communications failure.
+            Sl4fError: On communications failure.
         """
         _LOGGER.info("Collecting snapshot on %s...", self.device_name)
         # Take the snapshot before creating the directory or file, as
@@ -886,7 +885,7 @@ class FuchsiaDevice(
             Build info dict.
 
         Raises:
-            errors.FuchsiaControllerError: On FIDL communication failure.
+            FuchsiaControllerError: On FIDL communication failure.
         """
         try:
             buildinfo_provider_proxy = f_buildinfo.Provider.Client(
@@ -899,7 +898,7 @@ class FuchsiaDevice(
             )
             return build_info_resp.build_info
         except fcp.ZxStatus as status:
-            raise errors.FuchsiaControllerError(
+            raise fc_errors.FuchsiaControllerError(
                 "Fuchsia Controller FIDL Error"
             ) from status
 
@@ -911,7 +910,7 @@ class FuchsiaDevice(
             Device info dict.
 
         Raises:
-            errors.FuchsiaControllerError: On FIDL communication failure.
+            FuchsiaControllerError: On FIDL communication failure.
         """
         try:
             hwinfo_device_proxy = f_hwinfo.Device.Client(
@@ -922,7 +921,7 @@ class FuchsiaDevice(
             device_info_resp = asyncio.run(hwinfo_device_proxy.get_info())
             return device_info_resp.info
         except fcp.ZxStatus as status:
-            raise errors.FuchsiaControllerError(
+            raise fc_errors.FuchsiaControllerError(
                 "Fuchsia Controller FIDL Error"
             ) from status
 
@@ -934,7 +933,7 @@ class FuchsiaDevice(
             Product info dict.
 
         Raises:
-            errors.FuchsiaControllerError: On FIDL communication failure.
+            FuchsiaControllerError: On FIDL communication failure.
         """
         try:
             hwinfo_product_proxy = f_hwinfo.Product.Client(
@@ -945,7 +944,7 @@ class FuchsiaDevice(
             product_info_resp = asyncio.run(hwinfo_product_proxy.get_info())
             return product_info_resp.info
         except fcp.ZxStatus as status:
-            raise errors.FuchsiaControllerError(
+            raise fc_errors.FuchsiaControllerError(
                 "Fuchsia Controller FIDL Error"
             ) from status
 
@@ -961,7 +960,7 @@ class FuchsiaDevice(
             level: Log message level.
 
         Raises:
-            errors.FuchsiaControllerError: On FIDL communication failure.
+            FuchsiaControllerError: On FIDL communication failure.
         """
         try:
             rcs_proxy = fd_remotecontrol.RemoteControl.Client(
@@ -973,7 +972,7 @@ class FuchsiaDevice(
                 )
             )
         except fcp.ZxStatus as status:
-            raise errors.FuchsiaControllerError(
+            raise fc_errors.FuchsiaControllerError(
                 "Fuchsia Controller FIDL Error"
             ) from status
 
@@ -981,7 +980,7 @@ class FuchsiaDevice(
         """Send a device command to trigger a soft reboot.
 
         Raises:
-            errors.FuchsiaControllerError: On FIDL communication failure.
+            FuchsiaControllerError: On FIDL communication failure.
         """
         try:
             power_proxy = fhp_statecontrol.Admin.Client(
@@ -1001,7 +1000,7 @@ class FuchsiaDevice(
                 status.args[0] if len(status.args) > 0 else None
             )
             if zx_status != fcp.ZxStatus.ZX_ERR_PEER_CLOSED:
-                raise errors.FuchsiaControllerError(
+                raise fc_errors.FuchsiaControllerError(
                     "Fuchsia Controller FIDL Error"
                 ) from status
 
@@ -1012,7 +1011,7 @@ class FuchsiaDevice(
             channel_client: Client end of the snapshot data channel.
 
         Raises:
-            errors.FuchsiaControllerError: On FIDL communication failure or on
+            FuchsiaControllerError: On FIDL communication failure or on
               data transfer verification failure.
 
         Returns:
@@ -1027,11 +1026,13 @@ class FuchsiaDevice(
                 file_proxy.get_attr()
             )
             if attr_resp.s != fcp.ZxStatus.ZX_OK:
-                raise errors.FuchsiaControllerError(
+                raise fc_errors.FuchsiaControllerError(
                     f"get_attr() returned status: {attr_resp.s}"
                 )
         except fcp.ZxStatus as status:
-            raise errors.FuchsiaControllerError("get_attr() failed") from status
+            raise fc_errors.FuchsiaControllerError(
+                "get_attr() failed"
+            ) from status
 
         # Read until channel is empty.
         ret: bytearray = bytearray()
@@ -1041,19 +1042,19 @@ class FuchsiaDevice(
                     file_proxy.read(count=f_io.MAX_BUF)
                 )
                 if result.err:
-                    raise errors.FuchsiaControllerError(
+                    raise fc_errors.FuchsiaControllerError(
                         "read() failed. Received zx.Status {result.err}"
                     )
                 if not result.response.data:
                     break
                 ret.extend(result.response.data)
         except fcp.ZxStatus as status:
-            raise errors.FuchsiaControllerError("read() failed") from status
+            raise fc_errors.FuchsiaControllerError("read() failed") from status
 
         # Verify transfer.
         expected_size: int = attr_resp.attributes.content_size
         if len(ret) != expected_size:
-            raise errors.FuchsiaControllerError(
+            raise fc_errors.FuchsiaControllerError(
                 f"Expected {expected_size} bytes, but read {len(ret)} bytes"
             )
 
@@ -1063,7 +1064,7 @@ class FuchsiaDevice(
         """Send a device command to take a snapshot.
 
         Raises:
-            errors.FuchsiaControllerError: On FIDL communication failure or on
+            FuchsiaControllerError: On FIDL communication failure or on
               data transfer verification failure.
 
         Returns:
@@ -1091,7 +1092,7 @@ class FuchsiaDevice(
             # there's no need to drain the channel in parallel.
             asyncio.run(feedback_proxy.get_snapshot(params=params))
         except fcp.ZxStatus as status:
-            raise errors.FuchsiaControllerError(
+            raise fc_errors.FuchsiaControllerError(
                 "get_snapshot() failed"
             ) from status
         return self._read_snapshot_from_channel(channel_client)

@@ -14,7 +14,7 @@ import fuchsia_controller_py
 from honeydew.affordances.rtc import rtc_using_fc
 from honeydew.affordances.rtc.errors import HoneydewRtcError
 from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.transports import fuchsia_controller
+from honeydew.transports.fuchsia_controller import fuchsia_controller
 
 # Alias for convenience.
 ZX_OK = fuchsia_controller_py.ZxStatus.ZX_OK

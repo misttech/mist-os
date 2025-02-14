@@ -21,7 +21,9 @@ from honeydew.affordances.connectivity.bluetooth.utils import (
 )
 from honeydew.affordances.connectivity.bluetooth.utils import types as bt_types
 from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.transports import fuchsia_controller as fc_transport
+from honeydew.transports.fuchsia_controller import (
+    fuchsia_controller as fc_transport,
+)
 
 _SAMPLE_LE_KNOWN_DEVICES_OUTPUT: dict[str, Any] = {
     "16085008211800713200": {
