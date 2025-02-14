@@ -134,6 +134,7 @@ function main {
   local no_checks
   local verbose
   local skip_auth_check=0
+  local concurrency=0
 
   # When tracing, increase verbosity.
   if [[ -o xtrace ]]; then
@@ -194,11 +195,13 @@ function main {
       # options. For now pass them directly to fx-run-ninja, which will eventually
       # pass them to Bazel. See https://fxbug.dev/351623259
       -j)
+        concurrency="$2"
         ninja_switches+=("$1" "$2")
         shift
         ;;
 
       -j*)
+        concurrency="${1#-j}"
         ninja_switches+=("$1")
         ;;
 
@@ -399,9 +402,22 @@ function main {
     # It's not ideal that we resort to constructing the textproto file as a
     # string, but it's easier than writing a Go tool solely for the purpose of
     # constructing a protobuf with a couple top-level string fields set.
+    if (( concurrency == 0 )); then
+      concurrency="$(fx-choose-build-concurrency)"
+      # macOS in particular has a low default for number of open file descriptors
+      # per process, which is prohibitive for higher job counts. Here we raise
+      # the number of allowed file descriptors per process if it appears to be
+      # low in order to avoid failures due to the limit. See `getrlimit(2)` for
+      # more information.
+      local min_limit=$((concurrency * 2))
+      if [[ $(ulimit -n) -lt "${min_limit}" ]]; then
+        ulimit -n "${min_limit}"
+      fi
+    fi
     "${rbe_wrapper[@]}" "$fint" -log-level=error build -static="${fint_params_path}" -context=<(echo "
 checkout_dir: \"${FUCHSIA_DIR}\"
 build_dir: \"${FUCHSIA_BUILD_DIR}\"
+job_count: "$concurrency"
 ")
   else
     if [[ "${#fuchsia_targets[@]}" -gt 0 ]]; then
