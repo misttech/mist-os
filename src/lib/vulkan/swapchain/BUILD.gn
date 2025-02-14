@@ -40,6 +40,7 @@ source_set("layer_common") {
     "$validation_layer_dir/layers/vulkan/generated/error_location_helper.cpp",
     "$validation_layer_dir/layers/vulkan/generated/error_location_helper.h",
     "$validation_layer_dir/layers/vulkan/generated/vk_api_version.h",
+    "$validation_layer_dir/layers/vulkan/generated/vk_dispatch_table_helper.cpp",
     "$validation_layer_dir/layers/vulkan/generated/vk_dispatch_table_helper.h",
     "$validation_layer_dir/layers/vulkan/generated/vk_extension_helper.h",
     "$validation_layer_dir/layers/vulkan/generated/vk_layer_dispatch_table.h",
