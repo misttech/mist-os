@@ -7,10 +7,12 @@
 
 use crate::bpf::fs::get_bpf_object;
 use crate::task::CurrentTask;
+use crate::vfs::socket::{SocketAddress, SocketDomain, SocketProtocol, SocketType};
 use crate::vfs::FdNumber;
-use ebpf_api::ProgramType;
+use ebpf::{EbpfProgram, EbpfProgramContext, ProgramArgument, Type};
+use ebpf_api::{PinnedMap, ProgramType, BPF_SOCK_ADDR_TYPE};
 use starnix_logging::{log_warn, track_stub};
-use starnix_sync::{Locked, Unlocked};
+use starnix_sync::{BpfPrograms, FileOpsCore, Locked, OrderedRwLock, Unlocked};
 use starnix_syscalls::{SyscallResult, SUCCESS};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{
@@ -41,10 +43,12 @@ use starnix_uapi::{
     bpf_attach_type_BPF_TRACE_ITER, bpf_attach_type_BPF_TRACE_KPROBE_MULTI,
     bpf_attach_type_BPF_TRACE_KPROBE_SESSION, bpf_attach_type_BPF_TRACE_RAW_TP,
     bpf_attach_type_BPF_TRACE_UPROBE_MULTI, bpf_attach_type_BPF_XDP,
-    bpf_attach_type_BPF_XDP_CPUMAP, bpf_attach_type_BPF_XDP_DEVMAP, bpf_attr__bindgen_ty_6, error,
-    CGROUP2_SUPER_MAGIC,
+    bpf_attach_type_BPF_XDP_CPUMAP, bpf_attach_type_BPF_XDP_DEVMAP, bpf_attr__bindgen_ty_6,
+    bpf_sock_addr, errno, error, CGROUP2_SUPER_MAGIC,
 };
+use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
+use zerocopy::FromBytes;
 
 pub type BpfAttachAttr = bpf_attr__bindgen_ty_6;
 
@@ -307,20 +311,43 @@ pub fn bpf_prog_attach(
     }
 
     match attach_type {
-        EbpfAttachment::Cgroup(CgroupEbpfAttachment::Getsockopt)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::InetEgress)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::InetIngress)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::InetSockCreate)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::InetSockRelease)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::Inet4Bind)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::Inet4Connect)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::Inet6Bind)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::Inet6Connect)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::Setsockopt)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::Udp4Recvmsg)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::Udp4Sendmsg)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::Udp6Recvmsg)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::Udp6Sendmsg) => {
+        EbpfAttachment::Cgroup(
+            cgroup_attach_type @ (CgroupEbpfAttachment::Inet4Bind
+            | CgroupEbpfAttachment::Inet6Bind
+            | CgroupEbpfAttachment::Inet4Connect
+            | CgroupEbpfAttachment::Inet6Connect
+            | CgroupEbpfAttachment::Udp4Sendmsg
+            | CgroupEbpfAttachment::Udp6Sendmsg),
+        ) => {
+            let linked_program =
+                SockAddrEbpfProgram(program.link(attach_type.get_program_type(), &[], &[])?);
+
+            let cgroup = &current_task.kernel().root_cgroup_ebpf_programs;
+            let prog_lock = match cgroup_attach_type {
+                CgroupEbpfAttachment::Inet4Bind => &cgroup.inet4_bind,
+                CgroupEbpfAttachment::Inet6Bind => &cgroup.inet6_bind,
+                CgroupEbpfAttachment::Inet4Connect => &cgroup.inet4_connect,
+                CgroupEbpfAttachment::Inet6Connect => &cgroup.inet6_connect,
+                CgroupEbpfAttachment::Udp4Sendmsg => &cgroup.udp4_sendmsg,
+                CgroupEbpfAttachment::Udp6Sendmsg => &cgroup.udp6_sendmsg,
+                _ => unreachable!(),
+            };
+
+            *prog_lock.write(locked) = Some(linked_program);
+
+            Ok(SUCCESS)
+        }
+
+        EbpfAttachment::Cgroup(
+            CgroupEbpfAttachment::Getsockopt
+            | CgroupEbpfAttachment::InetEgress
+            | CgroupEbpfAttachment::InetIngress
+            | CgroupEbpfAttachment::InetSockCreate
+            | CgroupEbpfAttachment::InetSockRelease
+            | CgroupEbpfAttachment::Setsockopt
+            | CgroupEbpfAttachment::Udp4Recvmsg
+            | CgroupEbpfAttachment::Udp6Recvmsg,
+        ) => {
             track_stub!(TODO("https://fxbug.dev/322873416"), "BPF_PROG_ATTACH", attr.attach_type);
 
             // Fake success to avoid breaking apps that depends on the attachments above.
@@ -328,20 +355,22 @@ pub fn bpf_prog_attach(
             Ok(SUCCESS)
         }
 
-        EbpfAttachment::Cgroup(CgroupEbpfAttachment::Device)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::Inet4Getpeername)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::Inet4Getsockname)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::Inet4PostBind)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::Inet6Getpeername)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::Inet6Getsockname)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::Inet6PostBind)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::Sysctl)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::UnixConnect)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::UnixGetpeername)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::UnixGetsockname)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::UnixRecvmsg)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::UnixSendmsg)
-        | EbpfAttachment::Cgroup(CgroupEbpfAttachment::SockOps)
+        EbpfAttachment::Cgroup(
+            CgroupEbpfAttachment::Device
+            | CgroupEbpfAttachment::Inet4Getpeername
+            | CgroupEbpfAttachment::Inet4Getsockname
+            | CgroupEbpfAttachment::Inet4PostBind
+            | CgroupEbpfAttachment::Inet6Getpeername
+            | CgroupEbpfAttachment::Inet6Getsockname
+            | CgroupEbpfAttachment::Inet6PostBind
+            | CgroupEbpfAttachment::Sysctl
+            | CgroupEbpfAttachment::UnixConnect
+            | CgroupEbpfAttachment::UnixGetpeername
+            | CgroupEbpfAttachment::UnixGetsockname
+            | CgroupEbpfAttachment::UnixRecvmsg
+            | CgroupEbpfAttachment::UnixSendmsg
+            | CgroupEbpfAttachment::SockOps,
+        )
         | EbpfAttachment::SkSkbStreamParser
         | EbpfAttachment::SkSkbStreamVerdict
         | EbpfAttachment::SkMsgVerdict
@@ -374,5 +403,213 @@ pub fn bpf_prog_attach(
             track_stub!(TODO("https://fxbug.dev/322873416"), "BPF_PROG_ATTACH", attr.attach_type);
             error!(ENOTSUP)
         }
+    }
+}
+
+pub fn bpf_prog_detach(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    attr: BpfAttachAttr,
+) -> Result<SyscallResult, Errno> {
+    let attach_type = EbpfAttachment::from_attach_attr(locked, current_task, &attr)?;
+
+    match attach_type {
+        EbpfAttachment::Cgroup(
+            cgroup_attach_type @ (CgroupEbpfAttachment::Inet4Bind
+            | CgroupEbpfAttachment::Inet6Bind
+            | CgroupEbpfAttachment::Inet4Connect
+            | CgroupEbpfAttachment::Inet6Connect
+            | CgroupEbpfAttachment::Udp4Sendmsg
+            | CgroupEbpfAttachment::Udp6Sendmsg),
+        ) => {
+            let cgroup = &current_task.kernel().root_cgroup_ebpf_programs;
+            let prog_cell = match cgroup_attach_type {
+                CgroupEbpfAttachment::Inet4Bind => &cgroup.inet4_bind,
+                CgroupEbpfAttachment::Inet6Bind => &cgroup.inet6_bind,
+                CgroupEbpfAttachment::Inet4Connect => &cgroup.inet4_connect,
+                CgroupEbpfAttachment::Inet6Connect => &cgroup.inet6_connect,
+                CgroupEbpfAttachment::Udp4Sendmsg => &cgroup.udp4_sendmsg,
+                CgroupEbpfAttachment::Udp6Sendmsg => &cgroup.udp6_sendmsg,
+                _ => unreachable!(),
+            };
+            let mut prog_guard = prog_cell.write(locked);
+
+            if prog_guard.is_none() {
+                return error!(ENOENT);
+            }
+
+            *prog_guard = None;
+
+            Ok(SUCCESS)
+        }
+
+        EbpfAttachment::Cgroup(
+            CgroupEbpfAttachment::Getsockopt
+            | CgroupEbpfAttachment::InetEgress
+            | CgroupEbpfAttachment::InetIngress
+            | CgroupEbpfAttachment::InetSockCreate
+            | CgroupEbpfAttachment::InetSockRelease
+            | CgroupEbpfAttachment::Setsockopt
+            | CgroupEbpfAttachment::Udp4Recvmsg
+            | CgroupEbpfAttachment::Udp6Recvmsg
+            | CgroupEbpfAttachment::Device
+            | CgroupEbpfAttachment::Inet4Getpeername
+            | CgroupEbpfAttachment::Inet4Getsockname
+            | CgroupEbpfAttachment::Inet4PostBind
+            | CgroupEbpfAttachment::Inet6Getpeername
+            | CgroupEbpfAttachment::Inet6Getsockname
+            | CgroupEbpfAttachment::Inet6PostBind
+            | CgroupEbpfAttachment::Sysctl
+            | CgroupEbpfAttachment::UnixConnect
+            | CgroupEbpfAttachment::UnixGetpeername
+            | CgroupEbpfAttachment::UnixGetsockname
+            | CgroupEbpfAttachment::UnixRecvmsg
+            | CgroupEbpfAttachment::UnixSendmsg
+            | CgroupEbpfAttachment::SockOps,
+        )
+        | EbpfAttachment::SkSkbStreamParser
+        | EbpfAttachment::SkSkbStreamVerdict
+        | EbpfAttachment::SkMsgVerdict
+        | EbpfAttachment::LircMode2
+        | EbpfAttachment::FlowDissector
+        | EbpfAttachment::TraceRawTp
+        | EbpfAttachment::TraceFentry
+        | EbpfAttachment::TraceFexit
+        | EbpfAttachment::ModifyReturn
+        | EbpfAttachment::LsmMac
+        | EbpfAttachment::TraceIter
+        | EbpfAttachment::XdpDevmap
+        | EbpfAttachment::XdpCpumap
+        | EbpfAttachment::SkLookup
+        | EbpfAttachment::Xdp
+        | EbpfAttachment::SkSkbVerdict
+        | EbpfAttachment::SkReuseportSelect
+        | EbpfAttachment::SkReuseportSelectOrMigrate
+        | EbpfAttachment::PerfEvent
+        | EbpfAttachment::TraceKprobeMulti
+        | EbpfAttachment::LsmCgroup
+        | EbpfAttachment::StructOps
+        | EbpfAttachment::Netfilter
+        | EbpfAttachment::TcxIngress
+        | EbpfAttachment::TcxEgress
+        | EbpfAttachment::TraceUprobeMulti
+        | EbpfAttachment::NetkitPrimary
+        | EbpfAttachment::NetkitPeer
+        | EbpfAttachment::TraceKprobeSession => {
+            track_stub!(TODO("https://fxbug.dev/322873416"), "BPF_PROG_DETACH", attr.attach_type);
+            error!(ENOTSUP)
+        }
+    }
+}
+
+// Wrapper for `bpf_sock_addr` used to implement `ProgramArgument` trait.
+#[repr(C)]
+#[derive(Default)]
+pub struct BpfSockAddr(bpf_sock_addr);
+
+impl Deref for BpfSockAddr {
+    type Target = bpf_sock_addr;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for BpfSockAddr {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl ProgramArgument for &'_ mut BpfSockAddr {
+    fn get_type() -> &'static Type {
+        &*BPF_SOCK_ADDR_TYPE
+    }
+}
+
+struct SockAddrEbpfProgram(EbpfProgram<SockAddrEbpfProgram>);
+
+impl EbpfProgramContext for SockAddrEbpfProgram {
+    type RunContext<'a> = ();
+    type Packet<'a> = ();
+    type Arg1<'a> = &'a mut BpfSockAddr;
+    type Arg2<'a> = ();
+    type Arg3<'a> = ();
+    type Arg4<'a> = ();
+    type Arg5<'a> = ();
+
+    type Map = PinnedMap;
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum SockAddrEbpfProgramResult {
+    Allow,
+    Block,
+}
+
+impl SockAddrEbpfProgram {
+    fn run(&self, addr: &mut BpfSockAddr) -> SockAddrEbpfProgramResult {
+        if self.0.run_with_1_argument(&mut (), addr) == 0 {
+            SockAddrEbpfProgramResult::Block
+        } else {
+            SockAddrEbpfProgramResult::Allow
+        }
+    }
+}
+
+type AttachedEbpfProgramCell = OrderedRwLock<Option<SockAddrEbpfProgram>, BpfPrograms>;
+
+#[derive(Default)]
+pub struct CgroupEbpfProgramSet {
+    inet4_bind: AttachedEbpfProgramCell,
+    inet6_bind: AttachedEbpfProgramCell,
+    inet4_connect: AttachedEbpfProgramCell,
+    inet6_connect: AttachedEbpfProgramCell,
+    udp4_sendmsg: AttachedEbpfProgramCell,
+    udp6_sendmsg: AttachedEbpfProgramCell,
+}
+
+impl CgroupEbpfProgramSet {
+    pub fn on_bind(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        domain: SocketDomain,
+        socket_type: SocketType,
+        protocol: SocketProtocol,
+        socket_address: &SocketAddress,
+    ) -> Result<SockAddrEbpfProgramResult, Errno> {
+        let prog_guard = match domain {
+            SocketDomain::Inet => Some(self.inet4_bind.read(locked)),
+            SocketDomain::Inet6 => Some(self.inet6_bind.read(locked)),
+            _ => None,
+        };
+        let Some(prog) = prog_guard.as_ref().and_then(|guard| guard.as_ref()) else {
+            return Ok(SockAddrEbpfProgramResult::Allow);
+        };
+
+        let mut bpf_sockaddr = BpfSockAddr::default();
+        bpf_sockaddr.family = domain.as_raw().into();
+        bpf_sockaddr.type_ = socket_type.as_raw();
+        bpf_sockaddr.protocol = protocol.as_raw();
+
+        match socket_address {
+            SocketAddress::Inet(addr) => {
+                let sockaddr =
+                    linux_uapi::sockaddr_in::ref_from_prefix(&addr).map_err(|_| errno!(EINVAL))?.0;
+                bpf_sockaddr.user_family = linux_uapi::AF_INET;
+                bpf_sockaddr.user_port = sockaddr.sin_port.into();
+                bpf_sockaddr.user_ip4 = sockaddr.sin_addr.s_addr;
+            }
+            SocketAddress::Inet6(addr) => {
+                let sockaddr =
+                    linux_uapi::sockaddr_in6::ref_from_prefix(&addr).map_err(|_| errno!(EINVAL))?.0;
+                bpf_sockaddr.user_family = linux_uapi::AF_INET6;
+                bpf_sockaddr.user_port = sockaddr.sin6_port.into();
+                // SAFETY: reading an array of u32 from a union is safe.
+                bpf_sockaddr.user_ip6 = unsafe { sockaddr.sin6_addr.in6_u.u6_addr32 };
+            }
+            _ => (),
+        };
+
+        Ok(prog.run(&mut bpf_sockaddr))
     }
 }

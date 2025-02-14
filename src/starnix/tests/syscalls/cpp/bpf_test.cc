@@ -5,9 +5,11 @@
 #include "third_party/android/platform/bionic/libc/kernel/uapi/linux/bpf.h"
 
 #include <fcntl.h>
+#include <netinet/in.h>
 #include <sys/epoll.h>
 #include <sys/file.h>
 #include <sys/mman.h>
+#include <sys/mount.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <syscall.h>
@@ -33,6 +35,11 @@
   },                                                           \
       bpf_insn {                                               \
     .code = 0, .dst_reg = 0, .src_reg = 0, .off = 0, .imm = 0, \
+  }
+
+#define BPF_LOAD_OFFSET(dst, src, offset)                                                       \
+  bpf_insn {                                                                                    \
+    .code = BPF_LDX | BPF_MEM | BPF_W, .dst_reg = dst, .src_reg = src, .off = offset, .imm = 0, \
   }
 
 #define BPF_MOV_IMM(reg, value)                                                    \
@@ -222,7 +229,6 @@ class BpfMapTest : public testing::Test {
     attr.log_buf = reinterpret_cast<uint64_t>(buffer);
     attr.log_size = 4096;
     attr.log_level = 1;
-    bpf(BPF_PROG_LOAD, attr);
 
     fbl::unique_fd prog_fd(SAFE_SYSCALL(bpf(BPF_PROG_LOAD, attr)));
     int sk[2];
@@ -532,6 +538,120 @@ TEST_F(BpfMapTest, NotificationsRingBufTest) {
   // A normal write will now send an event.
   WriteToRingBuffer(42);
   EXPECT_EQ(1, epoll_wait(epollfd.get(), &ev, 1, 0));
+}
+
+class BpfCgroupTest : public testing::Test {
+ protected:
+  void SetUp() override {
+    ASSERT_FALSE(temp_dir_.path().empty());
+    int mount_result = mount(nullptr, temp_dir_.path().c_str(), "cgroup2", 0, nullptr);
+    if (mount_result == -1 && errno == EPERM) {
+      GTEST_SKIP() << "Can't mount cgroup2.";
+    }
+    ASSERT_EQ(mount_result, 0);
+
+    root_cgroup_.reset(open(temp_dir_.path().c_str(), O_RDONLY));
+    assert(root_cgroup_);
+  }
+
+  fbl::unique_fd LoadProgram(const bpf_insn* program, size_t len) {
+    char buffer[4096];
+    union bpf_attr attr;
+    memset(&attr, 0, sizeof(attr));
+    attr.prog_type = BPF_PROG_TYPE_CGROUP_SOCK_ADDR;
+    attr.expected_attach_type = BPF_CGROUP_INET4_BIND;
+    attr.insns = reinterpret_cast<uint64_t>(program);
+    attr.insn_cnt = static_cast<uint32_t>(len);
+    attr.license = reinterpret_cast<uint64_t>("N/A");
+    attr.log_buf = reinterpret_cast<uint64_t>(buffer);
+    attr.log_size = 4096;
+    attr.log_level = 1;
+
+    return fbl::unique_fd(bpf(BPF_PROG_LOAD, attr));
+  }
+
+  testing::AssertionResult TryBind(uint16_t port, int expected_errno) {
+    fbl::unique_fd sock(socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
+    if (!sock) {
+      return testing::AssertionFailure() << "socket failed: " << strerror(errno);
+    }
+    sockaddr_in addr = {
+        .sin_family = AF_INET,
+        .sin_port = htons(port),
+        .sin_addr =
+            {
+                .s_addr = htonl(INADDR_LOOPBACK),
+            },
+    };
+    int r = bind(sock.get(), reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
+    if (expected_errno) {
+      if (r != -1) {
+        return testing::AssertionFailure() << "bind succeeded when it expected to fail";
+      }
+      if (errno != expected_errno) {
+        return testing::AssertionFailure() << "bind failed with an invalid errno=" << errno
+                                           << ", expected errno=" << expected_errno;
+      }
+    } else if (r != 0) {
+      return testing::AssertionFailure() << "bind failed: " << strerror(errno);
+    }
+    return testing::AssertionSuccess();
+  }
+
+ protected:
+  test_helper::ScopedTempDir temp_dir_;
+  fbl::unique_fd root_cgroup_;
+};
+
+TEST_F(BpfCgroupTest, BlockBind) {
+  const uint16_t BLOCKED_PORT = 1235;
+
+  // A bpf program that blocks bind on 42.
+  bpf_insn program[] = {
+      // r0 <- [r1+24] (bpf_sock_addr.user_port)
+      BPF_LOAD_OFFSET(0, 1, offsetof(bpf_sock_addr, user_port)),
+      // r0 != BLOCKED_PORT -> JMP 2
+      BPF_JNE_IMM(0, htons(BLOCKED_PORT), 2),
+
+      // r0 <- 0
+      BPF_MOV_IMM(0, 0),
+      // exit
+      BPF_RETURN(),
+
+      // r0 <- 1
+      BPF_MOV_IMM(0, 1),
+      // exit
+      BPF_RETURN(),
+  };
+
+  fbl::unique_fd prog = LoadProgram(program, sizeof(program) / sizeof(program[0]));
+
+  ASSERT_TRUE(TryBind(BLOCKED_PORT, 0));
+
+  bpf_attr attr;
+  memset(&attr, 0, sizeof(attr));
+  attr.target_fd = root_cgroup_.get();
+  attr.attach_bpf_fd = prog.get();
+  attr.attach_type = BPF_CGROUP_INET4_BIND;
+  ASSERT_EQ(bpf(BPF_PROG_ATTACH, attr), 0);
+
+  // The port should be blocked now.
+  ASSERT_TRUE(TryBind(BLOCKED_PORT, EPERM));
+
+  // Other ports are not blocked.
+  ASSERT_TRUE(TryBind(BLOCKED_PORT + 1, 0));
+
+  memset(&attr, 0, sizeof(attr));
+  attr.target_fd = root_cgroup_.get();
+  attr.attach_type = BPF_CGROUP_INET4_BIND;
+  EXPECT_EQ(bpf(BPF_PROG_DETACH, attr), 0);
+
+  // Repeated attempt to detach the program should fail.
+  EXPECT_EQ(bpf(BPF_PROG_DETACH, attr), -1);
+  EXPECT_EQ(errno, ENOENT);
+
+  // Should be unblocked now.
+  ASSERT_TRUE(TryBind(BLOCKED_PORT, 0));
 }
 
 }  // namespace

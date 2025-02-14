@@ -41,9 +41,7 @@ lock_ordering! {
     // dependencies in DevPtsFile.{read, write, ioctl}.
     FileOpsCore => ProcessGroupState,
     // Bpf locks
-    FileOpsCore => BpfHelperOps,
-    BpfHelperOps => BpfMapEntries,
-    UninterruptibleLock => BpfMapEntries,
+    UninterruptibleLock => BpfPrograms,
     // Userfaultfd
     FileOpsCore => UserFaultInner,
     UninterruptibleLock => UserFaultInner,

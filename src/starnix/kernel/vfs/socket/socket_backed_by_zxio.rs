@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::bpf::attachments::SockAddrEbpfProgramResult;
 use crate::fs::fuchsia::zxio::{zxio_query_events, zxio_wait_async};
 use crate::mm::{MemoryAccessorExt, UNIFIED_ASPACES_ENABLED};
 use crate::task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter};
@@ -337,11 +338,22 @@ impl SocketOps for ZxioBackedSocket {
 
     fn bind(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _socket: &Socket,
-        _current_task: &CurrentTask,
+        locked: &mut Locked<'_, FileOpsCore>,
+        socket: &Socket,
+        current_task: &CurrentTask,
         socket_address: SocketAddress,
     ) -> Result<(), Errno> {
+        let ebpf_result = current_task.kernel().root_cgroup_ebpf_programs.on_bind(
+            locked,
+            socket.domain,
+            socket.socket_type,
+            socket.protocol,
+            &socket_address,
+        )?;
+        if ebpf_result != SockAddrEbpfProgramResult::Allow {
+            return error!(EPERM);
+        }
+
         match socket_address {
             SocketAddress::Inet(addr)
             | SocketAddress::Inet6(addr)

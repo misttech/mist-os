@@ -594,21 +594,23 @@ static XDP_MD_TYPE: LazyLock<Type> = LazyLock::new(|| {
 });
 static XDP_MD_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| vec![XDP_MD_TYPE.clone()]);
 
-static BPF_USER_PT_REGS_T_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
-static BPF_USER_PT_REGS_T_ARGS: LazyLock<Vec<Type>> =
+pub static BPF_USER_PT_REGS_T_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
+pub static BPF_USER_PT_REGS_T_ARGS: LazyLock<Vec<Type>> =
     LazyLock::new(|| vec![ptr_to_mem_type::<bpf_user_pt_regs_t>(BPF_USER_PT_REGS_T_ID.clone())]);
 
-static BPF_SOCK_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
-static BPF_SOCK_ARGS: LazyLock<Vec<Type>> =
+pub static BPF_SOCK_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
+pub static BPF_SOCK_ARGS: LazyLock<Vec<Type>> =
     LazyLock::new(|| vec![ptr_to_mem_type::<bpf_sock>(BPF_SOCK_ID.clone())]);
 
-static BPF_SOCKOPT_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
-static BPF_SOCKOPT_ARGS: LazyLock<Vec<Type>> =
+pub static BPF_SOCKOPT_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
+pub static BPF_SOCKOPT_ARGS: LazyLock<Vec<Type>> =
     LazyLock::new(|| vec![ptr_to_mem_type::<bpf_sockopt>(BPF_SOCKOPT_ID.clone())]);
 
-static BPF_SOCK_ADDR_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
-static BPF_SOCK_ADDR_ARGS: LazyLock<Vec<Type>> =
-    LazyLock::new(|| vec![ptr_to_mem_type::<bpf_sock_addr>(BPF_SOCK_ADDR_ID.clone())]);
+pub static BPF_SOCK_ADDR_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
+pub static BPF_SOCK_ADDR_TYPE: LazyLock<Type> =
+    LazyLock::new(|| ptr_to_mem_type::<bpf_sock_addr>(BPF_SOCK_ADDR_ID.clone()));
+pub static BPF_SOCK_ADDR_ARGS: LazyLock<Vec<Type>> =
+    LazyLock::new(|| vec![BPF_SOCK_ADDR_TYPE.clone()]);
 
 static BPF_FUSE_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
 static BPF_FUSE_TYPE: LazyLock<Type> = LazyLock::new(|| {

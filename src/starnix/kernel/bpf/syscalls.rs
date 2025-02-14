@@ -5,7 +5,7 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
-use crate::bpf::attachments::{bpf_prog_attach, BpfAttachAttr};
+use crate::bpf::attachments::{bpf_prog_attach, bpf_prog_detach, BpfAttachAttr};
 use crate::bpf::fs::{get_bpf_object, BpfFsDir, BpfFsObject, BpfHandle};
 use crate::bpf::program::{Program, ProgramInfo};
 use crate::mm::{MemoryAccessor, MemoryAccessorExt};
@@ -412,8 +412,8 @@ pub fn sys_bpf(
             install_bpf_fd(current_task, BpfTypeFormat { data })
         }
         bpf_cmd_BPF_PROG_DETACH => {
-            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_PROG_DETACH");
-            error!(EINVAL)
+            let attach_attr: BpfAttachAttr = read_attr(current_task, attr_addr, attr_size)?;
+            bpf_prog_detach(locked, current_task, attach_attr)
         }
         bpf_cmd_BPF_PROG_RUN => {
             track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_PROG_RUN");

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::bpf::attachments::CgroupEbpfProgramSet;
 use crate::container_namespace::ContainerNamespace;
 use crate::device::android::bootloader_message_store::AndroidBootloaderMessageStore;
 use crate::device::binder::BinderDevice;
@@ -304,6 +305,11 @@ pub struct Kernel {
 
     /// Control handle to the running container's ComponentController.
     pub container_control_handle: Mutex<Option<ComponentControllerControlHandle>>,
+
+    /// eBPF programs attached to the root cgroup.
+    /// TODO(https://fxbug.dev/388077431) Move this out of `Kernel` once cgroup hierarchy is
+    /// moved to starnix_core.
+    pub root_cgroup_ebpf_programs: CgroupEbpfProgramSet,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -429,6 +435,7 @@ impl Kernel {
             procfs_device_tree_setup,
             shutting_down: AtomicBool::new(false),
             container_control_handle: Mutex::new(None),
+            root_cgroup_ebpf_programs: Default::default(),
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle
