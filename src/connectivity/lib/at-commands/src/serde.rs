@@ -25,7 +25,7 @@ pub enum DeserializeErrorCause {
     #[error("Parse error: {0:?}")]
     ParseError(String),
     #[error("Bad UTF8: {0:?}")]
-    Utf8Error(std::string::FromUtf8Error),
+    Utf8Error(std::str::Utf8Error),
     #[error("Parsed unknown command: {0:?}")]
     UnknownCommand(lowlevel::Command),
     #[error("Parsed unknown response: {0:?}")]
@@ -41,15 +41,15 @@ impl From<io::Error> for DeserializeErrorCause {
     }
 }
 
-impl<RT: pest::RuleType> From<ParseError<RT>> for DeserializeErrorCause {
-    fn from(parse_error: ParseError<RT>) -> DeserializeErrorCause {
+impl<RT: pest::RuleType> From<Box<ParseError<RT>>> for DeserializeErrorCause {
+    fn from(parse_error: Box<ParseError<RT>>) -> DeserializeErrorCause {
         let string = format!("{:?}", parse_error);
         DeserializeErrorCause::ParseError(string)
     }
 }
 
-impl From<std::string::FromUtf8Error> for DeserializeErrorCause {
-    fn from(utf8_error: std::string::FromUtf8Error) -> DeserializeErrorCause {
+impl From<std::str::Utf8Error> for DeserializeErrorCause {
+    fn from(utf8_error: std::str::Utf8Error) -> DeserializeErrorCause {
         DeserializeErrorCause::Utf8Error(utf8_error)
     }
 }
@@ -91,7 +91,7 @@ pub(crate) mod internal {
         type Lowlevel: WriteTo;
         type Rule: pest::RuleType;
 
-        fn parse(string: &String) -> Result<Self::Lowlevel, ParseError<Self::Rule>>;
+        fn parse(string: &str) -> Result<Self::Lowlevel, Box<ParseError<Self::Rule>>>;
         fn raise(lowlevel: &Self::Lowlevel) -> Result<Self, DeserializeErrorCause>;
         fn lower(&self) -> Self::Lowlevel;
 
@@ -105,7 +105,7 @@ pub(crate) mod internal {
         type Lowlevel = lowlevel::Command;
         type Rule = command_grammar::Rule;
 
-        fn parse(string: &String) -> Result<lowlevel::Command, ParseError<Self::Rule>> {
+        fn parse(string: &str) -> Result<lowlevel::Command, Box<ParseError<Self::Rule>>> {
             command_parser::parse(string)
         }
 
@@ -123,7 +123,7 @@ pub(crate) mod internal {
         type Lowlevel = lowlevel::Response;
         type Rule = response_grammar::Rule;
 
-        fn parse(string: &String) -> Result<lowlevel::Response, ParseError<Self::Rule>> {
+        fn parse(string: &str) -> Result<lowlevel::Response, Box<ParseError<Self::Rule>>> {
             response_parser::parse(string)
         }
 
@@ -140,46 +140,24 @@ pub(crate) mod internal {
     /// to convert back and forth between individule objects of those types and byte
     /// streams.  This is used by SerDe to parse streams of commands and responses.
     pub trait SerDeOne: Sized {
-        fn deserialize_one<R: io::Read>(source: &mut R) -> Result<Self, DeserializeError>;
+        fn deserialize_one<R: io::Read>(source: &mut R) -> Result<Self, Box<DeserializeError>>;
         fn serialize_one<W: io::Write>(&self, sink: &mut W) -> Result<(), SerializeErrorCause>;
     }
 
     /// Blanket implementation of SerDeOne which uses SerDeMethods implemenations for commands
     /// and responses to glue the various serde functions together.
     impl<T: SerDeMethods> SerDeOne for T {
-        fn deserialize_one<R: io::Read>(source: &mut R) -> Result<Self, DeserializeError> {
+        fn deserialize_one<R: io::Read>(source: &mut R) -> Result<Self, Box<DeserializeError>> {
             //TODO(https://fxbug.dev/42144806) Remove the intermediate String and parse directly from the Read.
             let mut bytes: Vec<u8> = Vec::new();
-            let mut string = String::new();
 
-            let read_result = source.read_to_end(&mut bytes).map_err(|err| DeserializeError {
-                cause: DeserializeErrorCause::from(err),
-                bytes: bytes.clone(),
-            });
-            let string_result = read_result.and_then(|_byte_count| {
-                String::from_utf8(bytes).map_err(|err| {
-                    let bytes = Vec::from(err.as_bytes());
-                    DeserializeError { cause: DeserializeErrorCause::from(err), bytes }
-                })
-            });
-            let lowlevel_result = string_result.and_then(|s| {
-                // Hold on to string for error reporting in other steps.
-                string = s;
-                Self::parse(&string).map_err(|err| DeserializeError {
-                    cause: DeserializeErrorCause::from(err),
-                    bytes: string.clone().into_bytes(),
-                })
-            });
-            let highlevel_result = lowlevel_result.and_then(|lowlevel| {
-                Self::raise(&lowlevel).map_err(|err| DeserializeError {
-                    cause: DeserializeErrorCause::from(err),
-                    // This unwrap can't fail since we're inside the and_then, so
-                    // lowlevel_result and string_result both must be Ok(_).
-                    bytes: string.into_bytes(),
-                })
-            });
-
-            highlevel_result
+            (|| {
+                let _byte_count = source.read_to_end(&mut bytes)?;
+                let string = std::str::from_utf8(&bytes)?;
+                let lowlevel = Self::parse(string)?;
+                Ok(Self::raise(&lowlevel)?)
+            })()
+            .map_err(|cause| Box::new(DeserializeError { cause, bytes }))
         }
 
         fn serialize_one<W: io::Write>(&self, sink: &mut W) -> Result<(), SerializeErrorCause> {
@@ -210,14 +188,14 @@ pub struct DeserializeBytes {
 impl DeserializeBytes {
     /// Adds bytes to self from an io::Read source.  This should guarantee that *any* bytes read
     /// from the source are added, even in the case of an IO error.
-    fn add_bytes<R: io::Read>(&mut self, source: &mut R) -> Result<(), DeserializeError> {
+    fn add_bytes<R: io::Read>(&mut self, source: &mut R) -> Result<(), Box<DeserializeError>> {
         let mut more_bytes = Vec::new();
         let byte_count_result = source.read_to_end(&mut more_bytes);
         self.bytes.append(&mut more_bytes);
 
         match byte_count_result {
             Ok(_byte_count) => Ok(()),
-            Err(err) => Err(DeserializeError { cause: err.into(), bytes: more_bytes }),
+            Err(err) => Err(Box::new(DeserializeError { cause: err.into(), bytes: more_bytes })),
         }
     }
 
@@ -243,7 +221,7 @@ impl Default for DeserializeBytes {
 #[derive(Debug, PartialEq)]
 pub struct DeserializeResult<T> {
     pub values: Vec<T>,
-    pub error: Option<DeserializeError>,
+    pub error: Option<Box<DeserializeError>>,
     pub remaining_bytes: DeserializeBytes,
 }
 

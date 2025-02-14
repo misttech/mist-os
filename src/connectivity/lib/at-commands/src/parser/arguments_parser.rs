@@ -36,6 +36,7 @@ pub struct ArgumentsParser<Rule: RuleType> {
 }
 
 impl<Rule: RuleType> ArgumentsParser<Rule> {
+    #[allow(clippy::large_result_err)]
     pub fn parse_delimited_arguments(
         &self,
         delimited_arguments: Pair<'_, Rule>,

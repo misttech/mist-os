@@ -111,7 +111,7 @@ pub enum ProcedureError {
     #[error("Unexpected AG procedural update: {:?}", .0)]
     UnexpectedAg(AgUpdate),
     #[error("Unparsable HF procedural update: {:?}", .0)]
-    UnparsableHf(at::DeserializeError),
+    UnparsableHf(Box<at::DeserializeError>),
     #[error("Unexpected HF procedural update: {:?}", .0)]
     UnexpectedHf(at::Command),
     #[error("Invalid HF argument in procedural update: {:?}", .0)]

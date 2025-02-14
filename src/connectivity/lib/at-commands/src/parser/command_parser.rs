@@ -30,10 +30,9 @@ static ARGUMENTS_PARSER: ArgumentsParser<Rule> = ArgumentsParser {
     primitive_argument: Rule::primitive_argument,
 };
 
-pub fn parse(string: &String) -> ParseResult<Command, Rule> {
-    let mut parsed = Grammar::parse(Rule::input, string).map_err(|pest_error| {
-        ParseError::PestParseFailure { string: string.clone(), pest_error }
-    })?;
+pub fn parse(string: &str) -> ParseResult<Command, Rule> {
+    let mut parsed = Grammar::parse(Rule::input, string)
+        .map_err(|pest_error| ParseError::PestParseFailure { string: string.into(), pest_error })?;
 
     let input = next_match(&mut parsed, Rule::input)?;
     let mut input_elements = input.into_inner();
@@ -110,6 +109,6 @@ fn parse_optional_extension(optional_extension: Pair<'_, Rule>) -> ParseResult<b
     match extension_str {
         "" => Ok(false),
         "+" => Ok(true),
-        c => Err(ParseError::UnknownExtensionCharacter(c.to_string())),
+        c => Err(Box::new(ParseError::UnknownExtensionCharacter(c.to_string()))),
     }
 }
