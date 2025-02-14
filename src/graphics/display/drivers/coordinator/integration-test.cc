@@ -1646,12 +1646,13 @@ TEST_F(IntegrationTest, ImagelessConfigIsNotApplied) {
   EXPECT_EQ(1u, virtcon_client->state().vsync_count());
 }
 
-// This tests the basic behavior of ApplyConfig() and OnVsync() events.
-// We test applying configurations with images without wait fences, so they are
-// guaranteed to be ready when client calls ApplyConfig().
+// This test case covers the basic interaction between ApplyConfig() and VSync
+// events.
 //
-// In this case, the new configuration stamp is guaranteed to appear in the next
-// coming OnVsync() event.
+// The test uses configurations with images without any wait fences. These
+// images are ready for use when the Coordinator receives the ApplyConfig()
+// call. In this case, each VSync event should report the ConfigStamp used
+// in the last ApplyConfig() call.
 //
 // Here we test the following case:
 //
@@ -1661,9 +1662,7 @@ TEST_F(IntegrationTest, ImagelessConfigIsNotApplied) {
 //  - Vsync now should have kNoFence2ConfigStamp
 //  * ApplyConfig({}) ==> kNoImageConfigStamp
 //  - Vsync now should have kNoImageConfigStamp
-//
-// Both images are ready at ApplyConfig() time, i.e. no fences are provided.
-TEST_F(IntegrationTest, VsyncEvent) {
+TEST_F(IntegrationTest, VsyncReflectsAppliedConfig) {
   // Create and bind primary client.
   std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
@@ -1729,13 +1728,12 @@ TEST_F(IntegrationTest, VsyncEvent) {
   EXPECT_EQ(4u, primary_client->state().vsync_count());
 }
 
-// This tests the behavior of ApplyConfig() and OnVsync() events when images
-// come with wait fences, which is a common use case in Scenic when using GPU
-// composition.
+// This test case covers ApplyConfig() with configurations that include waiting
+// images. This matches the usage pattern of Scenic with GPU composition.
 //
-// When applying configurations with pending images, the ConfigStamp reported
-// by OnVsync() should not be updated unless the image becomes ready and
-// triggers a ReapplyConfig().
+// When applying configurations with waiting images, the ConfigStamp reported by
+// VSync events should match the latest applied configuration that doesn't have
+// any waiting image.
 //
 // Here we test the following case:
 //
@@ -1745,8 +1743,7 @@ TEST_F(IntegrationTest, VsyncEvent) {
 //  - Vsync now should have kImageWithoutFenceConfigStamp
 //  * Signal kImageWithoutFenceConfigStamp
 //  - Vsync now should have kImageWithFenceConfigStamp
-//
-TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
+TEST_F(IntegrationTest, ApplyConfigWithWaitingImage) {
   // Create and bind primary client.
   std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
@@ -1831,25 +1828,23 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   EXPECT_EQ(4u, primary_client->state().vsync_count());
 }
 
-// This tests the behavior of ApplyConfig() and OnVsync() events when images
-// that comes with wait fences are hidden in subsequent configurations.
+// This test case covers ApplyConfig() when an applied configuration removes a layer
+// with a waiting image from a previously applied configuration.
 //
-// If a pending image never becomes ready, the config_stamp returned from
-// OnVsync() should not be updated unless the image layer has been removed from
-// the display in a subsequent configuration.
+// VSync events should never include the ConfigStamp of the configuration with the
+// waiting image, because that image never becomes ready.
 //
 // Here we test the following case:
 //
 //  * ApplyConfig({layer1: image_without_fence}) ==> kImageWithoutFenceConfigStamp
 //  - Vsync now should have kImageWithoutFenceConfigStamp
-//  * ApplyConfig({layerA: img1, waiting on fence1}) ==> kImageWithFenceConfigStamp
+//  * ApplyConfig({layerA: img1, waiting on fence}) ==> kImageWithFenceConfigStamp
 //  - Vsync now should have kImageWithoutFenceConfigStamp
 //  * ApplyConfig({}) ==> kNoImageConfigStamp
 //  - Vsync now should have kNoImageConfigStamp
 //
-// Note that fence1 is never signaled.
-//
-TEST_F(IntegrationTest, VsyncHidePendingLayer) {
+// The fence is never signaled.
+TEST_F(IntegrationTest, ApplyConfigRemovesLayerWithWaitingImage) {
   // Create and bind primary client.
   std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
@@ -1922,7 +1917,7 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   ASSERT_OK(primary_client->ApplyLayers(kNoImageConfigStamp, {{.layer_id = color_layer_id}}));
 
   // On Vsync, the configuration stamp client receives on Vsync event message
-  // will be the latest one applied to the display controller, since the pending
+  // will be the latest one applied to the display controller, since the waiting
   // image has been removed from the configuration.
   ASSERT_EQ(3u, primary_client->state().vsync_count());
   SendVsyncFromDisplayEngine();
@@ -1931,15 +1926,14 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   EXPECT_EQ(4u, primary_client->state().vsync_count());
 }
 
-// This tests the behavior of ApplyConfig() and OnVsync() events when images
-// that comes with wait fences are overridden in subsequent configurations.
+// This test case covers ApplyConfig() assigning two different waiting images to
+// the same layer in two different applied configs. The second image becomes
+// ready at some point, while the first image remains waiting forever.
 //
-// If a client applies a configuration (#1) with a pending image, while display
-// controller waits for the image to be ready, the client may apply another
-// configuration (#2) with a different image. If the image in configuration #2
-// becomes available earlier than #1, the layer configuration in #1 should be
-// overridden, and signaling wait fences in #1 should not trigger a
-// ReapplyConfig().
+// VSync events should never include the ConfigStamp of the configuration with
+// the first waiting image. After the second image's waiting fence is signaled,
+// the ConfigStamp for the configuration using that second image should be
+// included in VSync events.
 //
 // Here we test the following case:
 //
@@ -1955,8 +1949,8 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
 //  * Signal fence1
 //  - Vsync should still have kImageWithFence2ConfigStamp.
 //
-// Note that fence1 is never signaled.
-TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
+// fence1, the first fence, is never signaled.
+TEST_F(IntegrationTest, ApplyConfigSkipsConfigWithWaitingImage) {
   // Create and bind primary client.
   std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
       &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
