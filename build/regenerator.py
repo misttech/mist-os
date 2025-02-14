@@ -22,14 +22,6 @@ _SCRIPT_DIR = Path(__file__).parent
 _BUILD_BAZEL_SCRIPTS = _SCRIPT_DIR / ".." / "build" / "bazel" / "scripts"
 sys.path.insert(0, str(_BUILD_BAZEL_SCRIPTS))
 
-# The list of imported files. To keep things simple, this should match
-# the import statement list below.
-_IMPORTED_PYTHON_FILES = (
-    "compute_content_hash.py",
-    "remote_services_utils.py",
-    "workspace_utils.py",
-)
-
 import compute_content_hash
 import remote_services_utils
 import workspace_utils
@@ -280,14 +272,6 @@ def main() -> int:
         extra_ninja_build_inputs: T.Set[Path] = set()
         extra_ninja_build_inputs.add(fuchsia_dir / "build" / "regenerator")
         extra_ninja_build_inputs.add(fuchsia_dir / "build" / "regenerator.py")
-        extra_ninja_build_inputs.add(
-            fuchsia_dir / "build" / "build_tests_json.py"
-        )
-
-        extra_ninja_build_inputs |= {
-            _BUILD_BAZEL_SCRIPTS / python_file
-            for python_file in _IMPORTED_PYTHON_FILES
-        }
 
         log("Generating tests.json.")
         extra_ninja_build_inputs |= build_tests_json.build_tests_json(build_dir)
@@ -359,13 +343,31 @@ def main() -> int:
             enable_bzlmod=False,
         )
 
+        # Find all imported Python modules and set them as extra inputs
+        # for safety. This avoids the need to manually track them, which
+        # is error-prone.
+        extra_ninja_build_inputs |= {
+            Path(m.__file__)
+            for m in sys.modules.values()
+            if hasattr(m, "__file__")
+        }
+
+        sorted_extra_ninja_build_inputs = sorted(
+            os.path.relpath(p, build_dir) for p in extra_ninja_build_inputs
+        )
+
+        if verbose >= 2:
+            print("- Extra Ninja inputs:")
+            for path in sorted_extra_ninja_build_inputs:
+                print(f"  {path}")
+
         # Patch build.ninja.d to ensure that Ninja will re-invoke the script if its
         # own source code, or any other extra implicit input, changes.
         log2("- Patching build.ninja.d")
         build_ninja_d_path = build_dir / "build.ninja.d"
         build_ninja_d = build_ninja_d_path.read_text().rstrip()
-        for extra_input in sorted(extra_ninja_build_inputs):
-            build_ninja_d += f" {os.path.relpath(extra_input, build_dir)}"
+        for extra_input in sorted_extra_ninja_build_inputs:
+            build_ninja_d += f" {extra_input}"
         build_ninja_d_path.write_text(build_ninja_d)
 
         log2("- Updating build.ninja.stamp timestamp")
