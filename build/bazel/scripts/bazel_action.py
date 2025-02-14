@@ -1435,11 +1435,15 @@ def main() -> int:
         force_symlink(target_path, link_path)
 
     dir_copies = []
+    missing_directories = []
     unwanted_files = []
     invalid_tracked_files = []
 
     for dir_output in args.directory_outputs:
         src_path = os.path.join(args.workspace_dir, dir_output.bazel_path)
+        if not os.path.exists(src_path):
+            missing_directories.append(src_path)
+            continue
         if not os.path.isdir(src_path):
             unwanted_files.append(src_path)
             continue
@@ -1462,16 +1466,23 @@ def main() -> int:
                     bazel_output_base_dir,
                 )
 
+    if missing_directories:
+        print(
+            "\nError: Directory provided to --directory-outputs is missing, got:\n\n%s\n"
+            % "\n".join(missing_directories)
+        )
+        return 1
+
     if unwanted_files:
         print(
-            "\nNon-directories are not allowed in --directory-outputs Bazel path, got:\n\n%s\n"
+            "\nError: Non-directories are not allowed in --directory-outputs Bazel path, got:\n\n%s\n"
             % "\n".join(unwanted_files)
         )
         return 1
 
     if invalid_tracked_files:
         print(
-            "\nMissing or non-directory tracked files from --directory-outputs Bazel path:\n\n%s\n"
+            "\nError: Missing or non-directory tracked files from --directory-outputs Bazel path:\n\n%s\n"
             % "\n".join(invalid_tracked_files)
         )
         return 1
