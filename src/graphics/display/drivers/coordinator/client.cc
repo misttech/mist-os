@@ -389,6 +389,7 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
   const display::DisplayId display_id = display::ToDisplayId(request->display_id);
   auto config = configs_.find(display_id);
   if (!config.IsValid()) {
+    FDF_LOG(WARNING, "SetDisplayMode called with unknown display ID: %" PRIu64, display_id.value());
     return;
   }
 
@@ -449,6 +450,8 @@ void Client::SetDisplayColorConversion(SetDisplayColorConversionRequestView requ
   const display::DisplayId display_id = display::ToDisplayId(request->display_id);
   auto config = configs_.find(display_id);
   if (!config.IsValid()) {
+    FDF_LOG(WARNING, "SetDisplayColorConversion called with unknown display ID: %" PRIu64,
+            display_id.value());
     return;
   }
 
@@ -930,6 +933,13 @@ void Client::SetMinimumRgb(SetMinimumRgbRequestView request,
 void Client::SetDisplayPower(SetDisplayPowerRequestView request,
                              SetDisplayPowerCompleter::Sync& completer) {
   const display::DisplayId display_id = display::ToDisplayId(request->display_id);
+  auto config = configs_.find(display_id);
+  if (!config.IsValid()) {
+    FDF_LOG(WARNING, "SetDisplayPower called with unknown display ID: %" PRIu64,
+            display_id.value());
+    completer.ReplyError(ZX_ERR_NOT_FOUND);
+  }
+
   zx::result<> result =
       controller_.engine_driver_client()->SetDisplayPower(display_id, request->power_on);
   if (result.is_error()) {

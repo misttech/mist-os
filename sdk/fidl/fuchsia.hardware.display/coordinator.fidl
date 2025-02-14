@@ -198,11 +198,19 @@ closed protocol Coordinator {
         layer_id LayerId;
     });
 
-    /// Sets the display mode for the given display.
-    ///
-    /// It is illegal to pass a display mode which was not part of the display's Info.
+    /// Sets the mode for a display.
     strict SetDisplayMode(struct {
+        /// The display whose mode is changed.
+        ///
+        /// The call is ignored if the display ID does not belong to a display
+        /// known by the Coordinator. This can happen if a client issues a call
+        /// to [`Coordinator.SetDisplayMode`] before it receives a notification
+        /// that the display was removed.
         display_id fuchsia.hardware.display.types.DisplayId;
+
+        /// The new mode for the display.
+        ///
+        /// Must be one of the [`Info.modes`] entries for the display.
         mode fuchsia.hardware.display.types.Mode;
     });
 
@@ -233,7 +241,14 @@ closed protocol Coordinator {
     /// successful. If SetDisplayColorConversion() is called and then the config is discarded, then
     /// the last successfully applied state is restored.
     strict SetDisplayColorConversion(struct {
+        /// The display whose color coefficients are set.
+        ///
+        /// The call is ignored if the display ID does not belong to a display
+        /// known by the Coordinator. This can happen if a client issues a call
+        /// to [`Coordinator.SetDisplayColorConversion`] before it receives a
+        /// notification that the display was removed.
         display_id fuchsia.hardware.display.types.DisplayId;
+
         preoffsets array<float32, 3>;
         coefficients array<float32, 9>;
         postoffsets array<float32, 3>;
@@ -535,25 +550,35 @@ closed protocol Coordinator {
 
     /// Power off/on the display panel.
     ///
-    /// This function takes effect immediately. Clients don't need to call
-    /// `ApplyConfig()` to commit this command.
+    /// This call takes effect immediately. Clients don't need to call
+    /// [`Coordinator.ApplyConfig`].
     ///
-    /// Once a display is turned off, it will not deliver vsync events, which
-    /// may include the vsync event for the most recently applied config.
+    /// Fails with ZX_ERR_NOT_FOUND if `display_id` does not belong to a display
+    /// known by the Coordinator. This can happen if a client issues a call to
+    /// [`Coordinator.SetDisplayPower`] before it receives a notification that
+    /// the display was removed.
     ///
-    /// Staged display control commands (e.g. SetDisplayLayer) will not be
-    /// affected. They are still applied to the display device when client calls
-    /// `ApplyConfig()`, but the contents will be shown on display panel only
-    /// after client powers on the display again.
-    ///
-    /// Newly added displays are turned on by default.
-    ///
-    /// Returns ZX_ERR_NOT_FOUND if `display_id` is invalid when Coordinator
-    /// handles this method.
-    /// Returns ZX_ERR_NOT_SUPPORTED if the display driver IC doesn't support
-    /// turning on/off displays.
+    /// Fails with ZX_ERR_NOT_SUPPORTED if the display drivers or the hardware
+    /// don't support displays on and off.
     strict SetDisplayPower(struct {
         display_id fuchsia.hardware.display.types.DisplayId;
+
+        /// True powers on the display, false powers it off.
+        ///
+        /// Once a display is turned off, the hardware will not generate new
+        /// VSync events. However, the client should be prepared to handle VSync
+        /// events generated before the [`Coordinator.SetDisplayPower`] call
+        /// reaches the hardware.
+        ///
+        /// Calls that impact draft configurations, such as
+        /// [`Coordinator.SetDisplayLayers`], still work while the display is
+        /// powered off.
+        ///
+        /// [`Coordinator.ApplyConfig`] also works while the display is powered
+        /// off.  When the display is powered back on on, it will show the
+        /// latest applied configuration.
+        ///
+        /// Newly added displays are powered on.
         power_on bool;
     }) -> () error zx.Status;
 };
