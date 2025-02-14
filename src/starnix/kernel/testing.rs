@@ -205,7 +205,11 @@ fn create_test_init_task(
     let system_task = kernel.kthreads.system_task();
     kernel
         .hrtimer_manager
-        .init(&system_task, /*wake_channel=*/ None)
+        .init(
+            &system_task,
+            /*wake_channel_for_test=*/ None,
+            /*wake_event_for_test=*/ None,
+        )
         .expect("init hrtimer manager worker thread");
 
     // Take the lock on thread group and task in the correct order to ensure any wrong ordering

@@ -560,7 +560,7 @@ async fn create_container(
 
     kernel
         .hrtimer_manager
-        .init(system_task, None)
+        .init(system_task, None, None)
         .source_context("initializing HrTimer manager")?;
 
     if let Err(e) = kernel.suspend_resume_manager.init(&system_task) {
