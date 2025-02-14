@@ -122,7 +122,7 @@ fi
 function count-ninja-log-lines {
   NINJA_LOG_FILE="${FUCHSIA_BUILD_DIR}/.ninja_log"
   if [[ -f "${NINJA_LOG_FILE}" ]]; then
-    echo "$(wc -l <"${NINJA_LOG_FILE}" 2>/dev/null)"
+    wc -l <"${NINJA_LOG_FILE}" 2>/dev/null
   else
     echo -1
   fi
@@ -131,7 +131,7 @@ function count-ninja-log-lines {
 function main {
   local switches=() fuchsia_targets=() ninja_switches=()
   local log_file is_logging fint_params_path
-  local has_ninja_options no_checks
+  local no_checks
   local verbose
   local skip_auth_check=0
 
@@ -190,14 +190,6 @@ function main {
         verbose=true
         ;;
 
-      # Recognize Ninja options and add them to ninja_switches directly instead of switches.
-      # Set has_ninja_options to true to indicate that Ninja-specific options were used
-      # before -- on the command-line.
-      --version|-v|--dry-run|--quiet|-n)
-        has_ninja_options=true
-        ninja_switches+=("$1")
-        ;;
-
       # As a special case, recognize `-j<count>` and `-j <count>` as valid
       # options. For now pass them directly to fx-run-ninja, which will eventually
       # pass them to Bazel. See https://fxbug.dev/351623259
@@ -207,18 +199,6 @@ function main {
         ;;
 
       -j*)
-        ninja_switches+=("$1")
-        ;;
-
-      # These Ninja options take an argument, with or without a space separator.
-      -[Cfkldw])
-        has_ninja_options=true
-        ninja_switches+=("$1" "$2")
-        shift
-        ;;
-
-      -[Cfkldw]*)
-        has_ninja_options=true
         ninja_switches+=("$1")
         ;;
 
@@ -238,23 +218,6 @@ function main {
         fuchsia_targets+=("$1")
         ;;
 
-      # Anything that follows the Ninja tool name is passed to the tool itself
-      # and not processed by Ninja itself, so stop the loop right here. If
-      # there were fuchsia targets specificied before that, they will be
-      # ignored.
-      #
-      #  ninja -t <tool> --help
-      #  ninja -t<tool> --help
-      #
-      -t*)
-        has_ninja_options=true
-        ninja_switches+=("$@")
-        if [[ "${#fuchsia_targets[@]}" -gt 0 ]]; then
-          fx-warn "Fuchsia targets before a Ninja tool name are ignored!"
-          fuchsia_targets=()
-        fi
-        break
-        ;;
       -*)
         fx-error "Unsupported option $1, see 'fx help build' for details."
         exit 1
@@ -275,16 +238,10 @@ function main {
     esac
   done
 
-  if [ -n "${has_ninja_options}" ]; then
-    fx-warn "Use -- to pass Ninja-specific options, as in:"
-    fx-warn "  fx build ${switches[*]} -- ${ninja_switches[*]}"
-    fx-warn "This warning will soon become an error."
-  fi
-
-  if [[ "$(uname)" == [Dd]arwin ]]; then
-    fx-warn "Support for building Fuchsia on macOS will be removed soon."
-    fx-warn "This warning will soon become an error."
-    fx-warn "Please see http://go/local-platform-support-prd for details."
+  if [[ "${HOST_OS}" == "mac" ]]; then
+    fx-error "Support for building Fuchsia on macOS has been removed soon."
+    fx-error "Please see http://go/local-platform-support-prd for details."
+    exit 1
   fi
 
   if [[ -n "${fint_params_path}" ]]; then
@@ -421,8 +378,9 @@ function main {
   fi
 
   local -i target_count=0
-  local -i ninja_log_line_count_before="$(count-ninja-log-lines)"
   local -i is_clean_build=0
+  local -i ninja_log_line_count_before
+  ninja_log_line_count_before="$(count-ninja-log-lines)"
   if (( ninja_log_line_count_before < 0 )); then
     is_clean_build=1
     ninja_log_line_count_before=0
@@ -521,7 +479,8 @@ build_dir: \"${FUCHSIA_BUILD_DIR}\"
   fi
 
   status=$?
-  local -i ninja_log_line_count_after="$(count-ninja-log-lines)"
+  local -i ninja_log_line_count_after
+  ninja_log_line_count_after="$(count-ninja-log-lines)"
   target_count="$(( ninja_log_line_count_after - ninja_log_line_count_before ))"
 
   if [[ "${status}" == 0 && -n "${run_ninja_build}" ]]; then
