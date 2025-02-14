@@ -73,12 +73,14 @@ fn close_inaccessible_file_descriptors(
     let null_file_handle =
         kernel_state.selinuxfs_null.get().expect("selinuxfs_init_null() has been called").clone();
 
+    let audit_context = current_task.into();
     let source_sid = new_sid;
     let permission_check = security_server.as_permission_check();
     // Remap-to-null any fds that failed a check for allowing
     // `[child-process] [fd-from-child-fd-table]:fd { use }`.
     current_task.files.remap_fds(|file| {
-        let fd_use_result = has_file_permissions(&permission_check, source_sid, file, &[]);
+        let fd_use_result =
+            has_file_permissions(&permission_check, source_sid, file, &[], audit_context);
         fd_use_result.map_or_else(|_| Some(null_file_handle.clone()), |_| None)
     });
 }
@@ -91,8 +93,17 @@ fn maybe_reset_rlimits(
     old_sid: SecurityId,
     new_sid: SecurityId,
 ) {
+    let audit_context = current_task.into();
     let permission_check = security_server.as_permission_check();
-    if check_permission(&permission_check, old_sid, new_sid, ProcessPermission::RlimitInh).is_ok() {
+    if check_permission(
+        &permission_check,
+        old_sid,
+        new_sid,
+        ProcessPermission::RlimitInh,
+        audit_context,
+    )
+    .is_ok()
+    {
         // Allow the resource limit inheritance that was applied when the current
         // task was created.
         return;
@@ -127,8 +138,9 @@ pub fn check_task_create_access(
     permission_check: &PermissionCheck<'_>,
     current_task: &CurrentTask,
 ) -> Result<(), Errno> {
+    let audit_context = current_task.into();
     let task_sid = current_task.security_state.lock().current_sid;
-    check_self_permission(permission_check, task_sid, ProcessPermission::Fork)
+    check_self_permission(permission_check, task_sid, ProcessPermission::Fork, audit_context)
 }
 
 /// Checks the SELinux permissions required for exec. Returns the SELinux state of a resolved
@@ -153,6 +165,8 @@ pub fn check_exec_access(
             .compute_new_sid(current_sid, executable_sid, ObjectClass::Process)
             .map_err(|_| errno!(EACCES))?
     };
+
+    let audit_context = current_task.into();
     let permission_check = security_server.as_permission_check();
     if current_sid == new_sid {
         // To `exec()` a binary in the caller's domain, the caller must be granted
@@ -162,18 +176,37 @@ pub fn check_exec_access(
             current_sid,
             executable_sid,
             FilePermission::ExecuteNoTrans,
+            audit_context,
         )?;
     } else {
         // Check that the domain transition is allowed.
-        check_permission(&permission_check, current_sid, new_sid, ProcessPermission::Transition)?;
+        check_permission(
+            &permission_check,
+            current_sid,
+            new_sid,
+            ProcessPermission::Transition,
+            audit_context,
+        )?;
 
         // Check that the executable file has an entry point into the new domain.
-        check_permission(&permission_check, new_sid, executable_sid, FilePermission::Entrypoint)?;
+        check_permission(
+            &permission_check,
+            new_sid,
+            executable_sid,
+            FilePermission::Entrypoint,
+            audit_context,
+        )?;
 
         // Check that ptrace permission is allowed if the process is traced.
         if let Some(ptracer) = current_task.ptracer_task().upgrade() {
             let tracer_sid = ptracer.security_state.lock().current_sid;
-            check_permission(&permission_check, tracer_sid, new_sid, ProcessPermission::Ptrace)?;
+            check_permission(
+                &permission_check,
+                tracer_sid,
+                new_sid,
+                ProcessPermission::Ptrace,
+                audit_context,
+            )?;
         }
     }
     Ok(ResolvedElfState { sid: Some(new_sid) })
@@ -187,9 +220,16 @@ pub fn check_getsched_access(
     current_task: &CurrentTask,
     target: &Task,
 ) -> Result<(), Errno> {
+    let audit_context = current_task.into();
     let source_sid = current_task.security_state.lock().current_sid;
     let target_sid = target.security_state.lock().current_sid;
-    check_permission(permission_check, source_sid, target_sid, ProcessPermission::GetSched)
+    check_permission(
+        permission_check,
+        source_sid,
+        target_sid,
+        ProcessPermission::GetSched,
+        audit_context,
+    )
 }
 
 /// Checks if the task with `source_sid` is allowed to set scheduling parameters for the task with
@@ -199,9 +239,16 @@ pub fn check_setsched_access(
     current_task: &CurrentTask,
     target: &Task,
 ) -> Result<(), Errno> {
+    let audit_context = current_task.into();
     let source_sid = current_task.security_state.lock().current_sid;
     let target_sid = target.security_state.lock().current_sid;
-    check_permission(permission_check, source_sid, target_sid, ProcessPermission::SetSched)
+    check_permission(
+        permission_check,
+        source_sid,
+        target_sid,
+        ProcessPermission::SetSched,
+        audit_context,
+    )
 }
 
 /// Checks if the task with `source_sid` is allowed to get the process group ID of the task with
@@ -211,9 +258,16 @@ pub fn check_getpgid_access(
     current_task: &CurrentTask,
     target: &Task,
 ) -> Result<(), Errno> {
+    let audit_context = current_task.into();
     let source_sid = current_task.security_state.lock().current_sid;
     let target_sid = target.security_state.lock().current_sid;
-    check_permission(permission_check, source_sid, target_sid, ProcessPermission::GetPgid)
+    check_permission(
+        permission_check,
+        source_sid,
+        target_sid,
+        ProcessPermission::GetPgid,
+        audit_context,
+    )
 }
 
 /// Checks if the task with `source_sid` is allowed to set the process group ID of the task with
@@ -223,9 +277,16 @@ pub fn check_setpgid_access(
     current_task: &CurrentTask,
     target: &Task,
 ) -> Result<(), Errno> {
+    let audit_context = current_task.into();
     let source_sid = current_task.security_state.lock().current_sid;
     let target_sid = target.security_state.lock().current_sid;
-    check_permission(permission_check, source_sid, target_sid, ProcessPermission::SetPgid)
+    check_permission(
+        permission_check,
+        source_sid,
+        target_sid,
+        ProcessPermission::SetPgid,
+        audit_context,
+    )
 }
 
 /// Checks if the task with `source_sid` has permission to read the session Id from a task with `target_sid`.
@@ -235,9 +296,16 @@ pub fn check_task_getsid(
     current_task: &CurrentTask,
     target: &Task,
 ) -> Result<(), Errno> {
+    let audit_context = current_task.into();
     let source_sid = current_task.security_state.lock().current_sid;
     let target_sid = target.security_state.lock().current_sid;
-    check_permission(permission_check, source_sid, target_sid, ProcessPermission::GetSession)
+    check_permission(
+        permission_check,
+        source_sid,
+        target_sid,
+        ProcessPermission::GetSession,
+        audit_context,
+    )
 }
 
 /// Checks if the task with `source_sid` is allowed to send `signal` to the task with `target_sid`.
@@ -247,24 +315,43 @@ pub fn check_signal_access(
     target: &Task,
     signal: Signal,
 ) -> Result<(), Errno> {
+    let audit_context = current_task.into();
     let source_sid = current_task.security_state.lock().current_sid;
     let target_sid = target.security_state.lock().current_sid;
     match signal {
         // The `sigkill` permission is required for sending SIGKILL.
-        SIGKILL => {
-            check_permission(permission_check, source_sid, target_sid, ProcessPermission::SigKill)
-        }
+        SIGKILL => check_permission(
+            permission_check,
+            source_sid,
+            target_sid,
+            ProcessPermission::SigKill,
+            audit_context,
+        ),
         // The `sigstop` permission is required for sending SIGSTOP.
-        SIGSTOP => {
-            check_permission(permission_check, source_sid, target_sid, ProcessPermission::SigStop)
-        }
+        SIGSTOP => check_permission(
+            permission_check,
+            source_sid,
+            target_sid,
+            ProcessPermission::SigStop,
+            audit_context,
+        ),
         // The `sigchld` permission is required for sending SIGCHLD.
-        SIGCHLD => {
-            check_permission(permission_check, source_sid, target_sid, ProcessPermission::SigChld)
-        }
+        SIGCHLD => check_permission(
+            permission_check,
+            source_sid,
+            target_sid,
+            ProcessPermission::SigChld,
+            audit_context,
+        ),
         // The `signal` permission is required for sending any signal other than SIGKILL, SIGSTOP
         // or SIGCHLD.
-        _ => check_permission(permission_check, source_sid, target_sid, ProcessPermission::Signal),
+        _ => check_permission(
+            permission_check,
+            source_sid,
+            target_sid,
+            ProcessPermission::Signal,
+            audit_context,
+        ),
     }
 }
 
@@ -401,7 +488,7 @@ pub fn check_task_capable(
 ) -> Result<(), Errno> {
     let sid = current_task.security_state.lock().current_sid;
     let permission = permission_from_capability(capabilities);
-    check_self_permission(&permission_check, sid, permission)
+    check_self_permission(&permission_check, sid, permission, current_task.into())
 }
 
 /// Checks if the task with `source_sid` has the permission to get and/or set limits on the task with `target_sid`.
@@ -412,13 +499,26 @@ pub fn task_prlimit(
     check_get_rlimit: bool,
     check_set_rlimit: bool,
 ) -> Result<(), Errno> {
+    let audit_context = current_task.into();
     let source_sid = current_task.security_state.lock().current_sid;
     let target_sid = target.security_state.lock().current_sid;
     if check_get_rlimit {
-        check_permission(permission_check, source_sid, target_sid, ProcessPermission::GetRlimit)?;
+        check_permission(
+            permission_check,
+            source_sid,
+            target_sid,
+            ProcessPermission::GetRlimit,
+            audit_context,
+        )?;
     }
     if check_set_rlimit {
-        check_permission(permission_check, source_sid, target_sid, ProcessPermission::SetRlimit)?;
+        check_permission(
+            permission_check,
+            source_sid,
+            target_sid,
+            ProcessPermission::SetRlimit,
+            audit_context,
+        )?;
     }
     Ok(())
 }
@@ -429,9 +529,16 @@ pub fn ptrace_access_check(
     current_task: &CurrentTask,
     tracee: &Task,
 ) -> Result<(), Errno> {
+    let audit_context = current_task.into();
     let tracer_sid = current_task.security_state.lock().current_sid;
     let tracee_sid = tracee.security_state.lock().current_sid;
-    check_permission(permission_check, tracer_sid, tracee_sid, ProcessPermission::Ptrace)
+    check_permission(
+        permission_check,
+        tracer_sid,
+        tracee_sid,
+        ProcessPermission::Ptrace,
+        audit_context,
+    )
 }
 
 /// Returns the Security Context associated with the `name`ed entry for the specified `target` task.
@@ -471,11 +578,17 @@ pub fn set_procattr(
         _ => Some(security_server.security_context_to_sid(context).map_err(|_| errno!(EINVAL))?),
     };
 
+    let audit_context = current_task.into();
     let permission_check = security_server.as_permission_check();
     let current_sid = current_task.security_state.lock().current_sid;
     match attr {
         ProcAttr::Current => {
-            check_self_permission(&permission_check, current_sid, ProcessPermission::SetCurrent)?;
+            check_self_permission(
+                &permission_check,
+                current_sid,
+                ProcessPermission::SetCurrent,
+                audit_context,
+            )?;
 
             // Permission to dynamically transition to the new Context is also required.
             let new_sid = sid.ok_or_else(|| errno!(EINVAL))?;
@@ -484,6 +597,7 @@ pub fn set_procattr(
                 current_sid,
                 new_sid,
                 ProcessPermission::DynTransition,
+                audit_context,
             )?;
 
             if current_task.thread_group.read().tasks_count() > 1 {
@@ -503,15 +617,30 @@ pub fn set_procattr(
             return error!(EINVAL);
         }
         ProcAttr::Exec => {
-            check_self_permission(&permission_check, current_sid, ProcessPermission::SetExec)?;
+            check_self_permission(
+                &permission_check,
+                current_sid,
+                ProcessPermission::SetExec,
+                audit_context,
+            )?;
             current_task.security_state.lock().exec_sid = sid
         }
         ProcAttr::FsCreate => {
-            check_self_permission(&permission_check, current_sid, ProcessPermission::SetFsCreate)?;
+            check_self_permission(
+                &permission_check,
+                current_sid,
+                ProcessPermission::SetFsCreate,
+                audit_context,
+            )?;
             current_task.security_state.lock().fscreate_sid = sid
         }
         ProcAttr::KeyCreate => {
-            check_self_permission(&permission_check, current_sid, ProcessPermission::SetKeyCreate)?;
+            check_self_permission(
+                &permission_check,
+                current_sid,
+                ProcessPermission::SetKeyCreate,
+                audit_context,
+            )?;
             current_task.security_state.lock().keycreate_sid = sid
         }
         ProcAttr::SockCreate => {
@@ -519,6 +648,7 @@ pub fn set_procattr(
                 &permission_check,
                 current_sid,
                 ProcessPermission::SetSockCreate,
+                audit_context,
             )?;
             current_task.security_state.lock().sockcreate_sid = sid
         }

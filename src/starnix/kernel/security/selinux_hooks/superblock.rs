@@ -36,9 +36,16 @@ pub fn sb_kern_mount(
     current_task: &CurrentTask,
     fs: &FileSystem,
 ) -> Result<(), Errno> {
+    let audit_context = current_task.into();
     let source_sid = current_task.security_state.lock().current_sid;
     let target_sid = fs_sid(fs)?;
-    check_permission(permission_check, source_sid, target_sid, FileSystemPermission::Mount)
+    check_permission(
+        permission_check,
+        source_sid,
+        target_sid,
+        FileSystemPermission::Mount,
+        audit_context,
+    )
 }
 
 /// Checks if `current_task` has the permission to mount at `path` with the mounting flags `flags`.
@@ -48,11 +55,18 @@ pub fn sb_mount(
     path: &NamespaceNode,
     flags: MountFlags,
 ) -> Result<(), Errno> {
+    let audit_context = current_task.into();
     let source_sid = current_task.security_state.lock().current_sid;
     if flags.contains(MountFlags::REMOUNT) {
         let mount = path.mount_if_root()?;
         let target_sid = fs_sid(&mount.root().entry.node.fs())?;
-        check_permission(permission_check, source_sid, target_sid, FileSystemPermission::Remount)
+        check_permission(
+            permission_check,
+            source_sid,
+            target_sid,
+            FileSystemPermission::Remount,
+            audit_context,
+        )
     } else {
         let FsNodeSidAndClass { sid: target_sid, class: target_class } =
             fs_node_effective_sid_and_class(&path.entry.node);
@@ -62,6 +76,7 @@ pub fn sb_mount(
             source_sid,
             target_sid,
             CommonFilePermission::MountOn.for_class(target_class),
+            audit_context,
         )
     }
 }
@@ -89,9 +104,16 @@ pub fn sb_statfs(
     current_task: &CurrentTask,
     fs: &FileSystem,
 ) -> Result<(), Errno> {
+    let audit_context = current_task.into();
     let source_sid = current_task.security_state.lock().current_sid;
     let target_sid = fs_sid(fs)?;
-    check_permission(permission_check, source_sid, target_sid, FileSystemPermission::GetAttr)
+    check_permission(
+        permission_check,
+        source_sid,
+        target_sid,
+        FileSystemPermission::GetAttr,
+        audit_context,
+    )
 }
 
 /// Checks if `current_task` has the permission to unmount the filesystem mounted on
@@ -102,8 +124,15 @@ pub fn sb_umount(
     node: &NamespaceNode,
     _flags: UnmountFlags,
 ) -> Result<(), Errno> {
+    let audit_context = current_task.into();
     let source_sid = current_task.security_state.lock().current_sid;
     let mount = node.mount_if_root()?;
     let target_sid = fs_sid(&mount.root().entry.node.fs())?;
-    check_permission(permission_check, source_sid, target_sid, FileSystemPermission::Unmount)
+    check_permission(
+        permission_check,
+        source_sid,
+        target_sid,
+        FileSystemPermission::Unmount,
+        audit_context,
+    )
 }

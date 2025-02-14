@@ -15,7 +15,7 @@ use crate::vfs::{
     FsString, PathBuilder, UnlinkKind, ValueOrSize, XattrOp,
 };
 use crate::TODO_DENY;
-use audit::{audit_log, AuditContext};
+use audit::{audit_decision, audit_todo_decision, Auditable};
 use bstr::BStr;
 use linux_uapi::XATTR_NAME_SELINUX;
 use selinux::permission_check::PermissionCheck;
@@ -25,7 +25,7 @@ use selinux::{
     FileSystemLabelingScheme, FileSystemMountOptions, FileSystemPermission, InitialSid,
     ObjectClass, Permission, ProcessPermission, SecurityId, SecurityPermission, SecurityServer,
 };
-use starnix_logging::{log_debug, log_warn, track_stub, BugRef, __track_stub_inner};
+use starnix_logging::{log_debug, log_warn, track_stub, BugRef};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex};
 use starnix_types::ownership::WeakRef;
 use starnix_uapi::arc_key::WeakKey;
@@ -74,6 +74,7 @@ fn has_file_permissions(
     subject_sid: SecurityId,
     file: &FileObject,
     permissions: &[Permission],
+    audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
     // Validate that the `subject` has the "fd { use }" permission to the `file`.
     // If the file and task security domains are identical then `fd { use }` is implicitly granted.
@@ -83,15 +84,30 @@ fn has_file_permissions(
     {
         track_stub!(
             TODO("https://fxbug.dev/385121365"),
-            "Enforce fs:use where source or target is the kernel SID"
+            "Enforce fs:use where source or target is the kernel SID?"
         );
     } else if subject_sid != file_sid {
-        check_permission(permission_check, subject_sid, file_sid, FdPermission::Use)?;
+        let node = file.node().as_ref().as_ref();
+        let audit_context = [audit_context, file.into(), node.into()];
+        check_permission(
+            permission_check,
+            subject_sid,
+            file_sid,
+            FdPermission::Use,
+            (&audit_context).into(),
+        )?;
     }
 
     // Validate that the `subject` has the desired `permissions`, if any, to the underlying node.
     if !permissions.is_empty() {
-        has_fs_node_permissions(permission_check, subject_sid, file.node(), permissions)?;
+        let audit_context = [audit_context, file.into()];
+        has_fs_node_permissions(
+            permission_check,
+            subject_sid,
+            file.node(),
+            permissions,
+            (&audit_context).into(),
+        )?;
     }
 
     Ok(())
@@ -103,12 +119,20 @@ fn has_fs_node_permissions(
     subject_sid: SecurityId,
     node: &FsNode,
     permissions: &[Permission],
+    audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
     // TODO: https://fxbug.dev/364568735 - Anon nodes and pipes are not yet labeled.
     // TODO: https://fxbug.dev/364568517 - Sockets are not yet labeled.
     if let Some(target) = get_cached_sid_and_class(node) {
+        let audit_context = [audit_context, node.into()];
         for permission in permissions {
-            check_permission(permission_check, subject_sid, target.sid, permission.clone())?;
+            check_permission(
+                permission_check,
+                subject_sid,
+                target.sid,
+                permission.clone(),
+                (&audit_context).into(),
+            )?;
         }
     }
 
@@ -117,22 +141,24 @@ fn has_fs_node_permissions(
 
 /// Checks that `current_task` has `permissions` to `node`, with "todo_deny" on denial.
 fn todo_has_fs_node_permissions(
-    todo_deny: TodoDeny,
+    bug: BugRef,
     permission_check: &PermissionCheck<'_>,
     subject_sid: SecurityId,
     node: &FsNode,
     permissions: &[Permission],
+    audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
     // TODO: https://fxbug.dev/364568735 - Anon nodes and pipes are not yet labeled.
     // TODO: https://fxbug.dev/364568517 - Sockets are not yet labeled.
     if let Some(target) = get_cached_sid_and_class(node) {
         for permission in permissions {
             todo_check_permission(
-                todo_deny.clone(),
+                bug.clone(),
                 permission_check,
                 subject_sid,
                 target.sid,
                 permission.clone(),
+                audit_context,
             )?;
         }
     }
@@ -153,7 +179,13 @@ pub fn file_permission(
         permission_flags |= PermissionFlags::APPEND;
     }
 
-    has_file_permissions(&security_server.as_permission_check(), current_sid, file, &[])?;
+    has_file_permissions(
+        &security_server.as_permission_check(),
+        current_sid,
+        file,
+        &[],
+        current_task.into(),
+    )?;
 
     track_stub!(
         TODO("https://fxbug.dev/385121365"),
@@ -397,59 +429,12 @@ fn file_class_from_file_mode(mode: FileMode) -> Result<FileClass, Errno> {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct TodoDeny {
-    bug: BugRef,
-    message: &'static str,
-    location: &'static std::panic::Location<'static>,
-}
-
 #[macro_export]
 macro_rules! TODO_DENY {
     ($bug_url:literal, $message:literal) => {{
-        use crate::security::selinux_hooks::TodoDeny;
         use starnix_logging::bug_ref;
-        TodoDeny {
-            bug: bug_ref!($bug_url),
-            message: $message,
-            location: std::panic::Location::caller(),
-        }
+        bug_ref!($bug_url)
     }};
-}
-
-/// Perform the specified check as would `check_permission()`, but report denials as "todo_deny" in
-/// the audit output, without actually denying access.
-pub(super) fn todo_check_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
-    todo_deny: TodoDeny,
-    permission_check: &PermissionCheck<'_>,
-    source_sid: SecurityId,
-    target_sid: SecurityId,
-    permission: P,
-) -> Result<(), Errno> {
-    let _ = check_permission_internal(
-        permission_check,
-        source_sid,
-        target_sid,
-        permission,
-        |mut context| {
-            if !context.result.permit {
-                // Audit-log the first few denials, but skip further denials to avoid logspamming.
-                const MAX_TODO_AUDIT_DENIALS: u64 = 5;
-
-                // Re-using the `track_stub!()` internals to track the denial, and determine whether
-                // too many denial audit logs have already been emit for this case.
-                if __track_stub_inner(todo_deny.bug, todo_deny.message, None, todo_deny.location)
-                    > MAX_TODO_AUDIT_DENIALS
-                {
-                    return;
-                }
-                context.set_decision("todo_deny");
-            }
-
-            audit_log(context);
-        },
-    );
-    Ok(())
 }
 
 /// Returns the SID with which an `FsNode` of `new_node_class` would be labeled, if created by
@@ -603,6 +588,7 @@ fn may_create(
     new_file_mode: FileMode, // Only used to determine the file class.
     name: &FsStr,
 ) -> Result<(), Errno> {
+    let audit_context = current_task.into();
     let permission_check = security_server.as_permission_check();
 
     // Verify that the caller has permissions required to add new entries to the target
@@ -616,6 +602,7 @@ fn may_create(
         current_sid,
         parent_sid,
         DirPermission::Search,
+        audit_context,
     )?;
     todo_check_permission(
         TODO_DENY!("https://fxbug.dev/374910392", "Check add_name permission."),
@@ -623,6 +610,7 @@ fn may_create(
         current_sid,
         parent_sid,
         DirPermission::AddName,
+        audit_context,
     )?;
 
     // Verify that the caller has permission to create new nodes of the desired type.
@@ -643,6 +631,7 @@ fn may_create(
         current_sid,
         new_file_sid,
         CommonFilePermission::Create.for_class(new_file_class),
+        audit_context,
     )?;
 
     // Verify that the new node's label is permitted to be created in the target filesystem.
@@ -662,6 +651,7 @@ fn may_create(
         new_file_sid,
         filesystem_sid,
         FileSystemPermission::Associate,
+        audit_context,
     )?;
 
     Ok(())
@@ -675,19 +665,34 @@ fn may_link(
     parent: &FsNode,
     existing_node: &FsNode,
 ) -> Result<(), Errno> {
+    let audit_context = current_task.into();
+
     let permission_check = security_server.as_permission_check();
     let current_sid = current_task.security_state.lock().current_sid;
     let parent_sid = fs_node_effective_sid_and_class(parent).sid;
     let FsNodeSidAndClass { sid: file_sid, class: file_class } =
         fs_node_effective_sid_and_class(existing_node);
 
-    check_permission(&permission_check, current_sid, parent_sid, DirPermission::Search)?;
-    check_permission(&permission_check, current_sid, parent_sid, DirPermission::AddName)?;
+    check_permission(
+        &permission_check,
+        current_sid,
+        parent_sid,
+        DirPermission::Search,
+        audit_context,
+    )?;
+    check_permission(
+        &permission_check,
+        current_sid,
+        parent_sid,
+        DirPermission::AddName,
+        audit_context,
+    )?;
     check_permission(
         &permission_check,
         current_sid,
         file_sid,
         CommonFilePermission::Link.for_class(file_class),
+        audit_context,
     )?;
     Ok(())
 }
@@ -704,12 +709,26 @@ fn may_unlink_or_rmdir(
     fs_node: &FsNode,
     operation: UnlinkKind,
 ) -> Result<(), Errno> {
+    let audit_context = current_task.into();
+
     let permission_check = security_server.as_permission_check();
     let current_sid = current_task.security_state.lock().current_sid;
     let parent_sid = fs_node_effective_sid_and_class(parent).sid;
 
-    check_permission(&permission_check, current_sid, parent_sid, DirPermission::Search)?;
-    check_permission(&permission_check, current_sid, parent_sid, DirPermission::RemoveName)?;
+    check_permission(
+        &permission_check,
+        current_sid,
+        parent_sid,
+        DirPermission::Search,
+        audit_context,
+    )?;
+    check_permission(
+        &permission_check,
+        current_sid,
+        parent_sid,
+        DirPermission::RemoveName,
+        audit_context,
+    )?;
 
     let FsNodeSidAndClass { sid: file_sid, class: file_class } =
         fs_node_effective_sid_and_class(fs_node);
@@ -719,10 +738,15 @@ fn may_unlink_or_rmdir(
             current_sid,
             file_sid,
             CommonFilePermission::Unlink.for_class(file_class),
+            audit_context,
         )?,
-        UnlinkKind::Directory => {
-            check_permission(&permission_check, current_sid, file_sid, DirPermission::RemoveDir)?
-        }
+        UnlinkKind::Directory => check_permission(
+            &permission_check,
+            current_sid,
+            file_sid,
+            DirPermission::RemoveDir,
+            audit_context,
+        )?,
     }
     Ok(())
 }
@@ -823,8 +847,20 @@ pub(super) fn check_fs_node_rename_access(
     let current_sid = current_task.security_state.lock().current_sid;
     let old_parent_sid = fs_node_effective_sid_and_class(old_parent).sid;
 
-    check_permission(&permission_check, current_sid, old_parent_sid, DirPermission::Search)?;
-    check_permission(&permission_check, current_sid, old_parent_sid, DirPermission::RemoveName)?;
+    check_permission(
+        &permission_check,
+        current_sid,
+        old_parent_sid,
+        DirPermission::Search,
+        current_task.into(),
+    )?;
+    check_permission(
+        &permission_check,
+        current_sid,
+        old_parent_sid,
+        DirPermission::RemoveName,
+        current_task.into(),
+    )?;
 
     let FsNodeSidAndClass { sid: file_sid, class: file_class } =
         fs_node_effective_sid_and_class(moving_node);
@@ -833,10 +869,17 @@ pub(super) fn check_fs_node_rename_access(
         current_sid,
         file_sid,
         CommonFilePermission::Rename.for_class(file_class),
+        current_task.into(),
     )?;
 
     let new_parent_sid = fs_node_effective_sid_and_class(new_parent).sid;
-    check_permission(&permission_check, current_sid, new_parent_sid, DirPermission::AddName)?;
+    check_permission(
+        &permission_check,
+        current_sid,
+        new_parent_sid,
+        DirPermission::AddName,
+        current_task.into(),
+    )?;
 
     // If a file already exists with the new name, then verify that the existing file can be
     // removed.
@@ -858,13 +901,25 @@ pub(super) fn check_fs_node_rename_access(
     if !std::ptr::eq(old_parent, new_parent) {
         // If the parent nodes are the same directory, we have already verified the search
         // permission during the `old_parent_sid` verification.
-        check_permission(&permission_check, current_sid, new_parent_sid, DirPermission::Search)?;
+        check_permission(
+            &permission_check,
+            current_sid,
+            new_parent_sid,
+            DirPermission::Search,
+            current_task.into(),
+        )?;
 
         // If the file is a directory and its parent directory is being changed by the rename,
         // we additionally check for the reparent permission. Note that the `reparent` permission is
         // only defined for directories.
         if file_class == FileClass::Dir {
-            check_permission(&permission_check, current_sid, file_sid, DirPermission::Reparent)?;
+            check_permission(
+                &permission_check,
+                current_sid,
+                file_sid,
+                DirPermission::Reparent,
+                current_task.into(),
+            )?;
         }
     }
 
@@ -885,6 +940,7 @@ pub(super) fn check_fs_node_read_link_access(
         current_sid,
         file_sid,
         CommonFilePermission::Read.for_class(file_class),
+        current_task.into(),
     )
 }
 
@@ -903,6 +959,7 @@ pub fn fs_node_permission(
         current_sid,
         fs_node,
         &permissions_from_flags(permission_flags, file_class),
+        current_task.into(),
     )
 }
 
@@ -920,6 +977,7 @@ pub(super) fn check_fs_node_getattr_access(
         current_sid,
         file_sid,
         CommonFilePermission::GetAttr.for_class(file_class),
+        current_task.into(),
     )
 }
 
@@ -939,6 +997,7 @@ pub(super) fn check_fs_node_setxattr_access(
         current_sid,
         file_sid,
         CommonFilePermission::SetAttr.for_class(file_class),
+        current_task.into(),
     )
 }
 
@@ -956,6 +1015,7 @@ pub(super) fn check_fs_node_getxattr_access(
         current_sid,
         file_sid,
         CommonFilePermission::GetAttr.for_class(file_class),
+        current_task.into(),
     )
 }
 
@@ -972,6 +1032,7 @@ pub(super) fn check_fs_node_listxattr_access(
         current_sid,
         file_sid,
         CommonFilePermission::GetAttr.for_class(file_class),
+        current_task.into(),
     )
 }
 
@@ -991,6 +1052,7 @@ pub(super) fn check_fs_node_removexattr_access(
         current_sid,
         file_sid,
         CommonFilePermission::SetAttr.for_class(file_class),
+        current_task.into(),
     )
 }
 
@@ -1003,7 +1065,7 @@ pub(super) fn check_file_ioctl_access(
 ) -> Result<(), Errno> {
     let permission_check = security_server.as_permission_check();
     let subject_sid = current_task.security_state.lock().current_sid;
-    has_file_permissions(&permission_check, subject_sid, file, &[])?;
+    has_file_permissions(&permission_check, subject_sid, file, &[], current_task.into())?;
 
     let file_class = file.node().security_state.lock().class;
     let permissions: &[Permission] = match request {
@@ -1017,12 +1079,15 @@ pub(super) fn check_file_ioctl_access(
         FIONBIO | FIOASYNC => &[],
         _ => &[CommonFilePermission::Ioctl.for_class(file_class)],
     };
+
+    let audit_context = [current_task.into(), file.into()];
     todo_has_fs_node_permissions(
         TODO_DENY!("https://fxbug.dev/385077129", "Enforce file_ioctl() fs-node checks"),
         &permission_check,
         subject_sid,
         file.node(),
         permissions,
+        (&audit_context).into(),
     )
 }
 
@@ -1048,6 +1113,7 @@ pub(super) fn check_file_lock_access(
         subject_sid,
         file,
         &[CommonFilePermission::Lock.for_class(fs_node_class)],
+        current_task.into(),
     )
 }
 
@@ -1072,11 +1138,12 @@ pub(super) fn check_file_fcntl_access(
                 subject_sid,
                 file,
                 &[CommonFilePermission::Lock.for_class(fs_node_class)],
+                current_task.into(),
             )?;
         }
         _ => {
             // Only checks the Use permission.
-            has_file_permissions(&permission_check, subject_sid, file, &[])?;
+            has_file_permissions(&permission_check, subject_sid, file, &[], current_task.into())?;
         }
     }
 
@@ -1103,6 +1170,7 @@ pub(super) fn check_file_fcntl_access(
                 subject_sid,
                 file.node(),
                 &permissions_from_flags(PermissionFlags::APPEND, fs_node_class),
+                current_task.into(),
             )?;
         }
     } else if old_flags.can_write() {
@@ -1114,6 +1182,7 @@ pub(super) fn check_file_fcntl_access(
             subject_sid,
             file.node(),
             &permissions_from_flags(PermissionFlags::WRITE, fs_node_class),
+            current_task.into(),
         )?;
     }
     Ok(())
@@ -1220,6 +1289,8 @@ where
     // Verify that the requested modification is permitted by the loaded policy.
     let new_sid = security_server.security_context_to_sid(value.into()).ok();
     if security_server.is_enforcing() {
+        let audit_context = current_task.into();
+
         let new_sid = new_sid.ok_or_else(|| errno!(EINVAL))?;
         let task_sid = current_task.security_state.lock().current_sid;
         let FsNodeSidAndClass { sid: old_sid, class: file_class } =
@@ -1231,6 +1302,7 @@ where
                 task_sid,
                 old_sid,
                 CommonFilePermission::RelabelFrom.for_class(file_class),
+                audit_context,
             )?;
         } else {
             check_permission(
@@ -1238,6 +1310,7 @@ where
                 task_sid,
                 old_sid,
                 CommonFilePermission::RelabelFrom.for_class(file_class),
+                audit_context,
             )?;
         }
         check_permission(
@@ -1245,12 +1318,14 @@ where
             task_sid,
             new_sid,
             CommonFilePermission::RelabelTo.for_class(file_class),
+            audit_context,
         )?;
         check_permission(
             &permission_check,
             new_sid,
             fs_label.sid,
             FileSystemPermission::Associate,
+            audit_context,
         )?;
     }
 
@@ -1304,14 +1379,55 @@ fn fs_node_effective_sid_and_class(fs_node: &FsNode) -> FsNodeSidAndClass {
     FsNodeSidAndClass { sid: SecurityId::initial(InitialSid::Unlabeled), class: FileClass::File }
 }
 
+/// Perform the specified check as would `check_permission()`, but report denials as "todo_deny" in
+/// the audit output, without actually denying access.
+fn todo_check_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
+    bug: BugRef,
+    permission_check: &PermissionCheck<'_>,
+    source_sid: SecurityId,
+    target_sid: SecurityId,
+    permission: P,
+    audit_context: Auditable<'_>,
+) -> Result<(), Errno> {
+    let result = permission_check.has_permission(source_sid, target_sid, permission.clone());
+
+    if result.audit {
+        audit_todo_decision(
+            bug,
+            permission_check,
+            result,
+            source_sid,
+            target_sid,
+            permission.into(),
+            audit_context,
+        );
+    }
+
+    Ok(())
+}
+
 /// Checks whether `source_sid` is allowed the specified `permission` on `target_sid`.
 fn check_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
     permission_check: &PermissionCheck<'_>,
     source_sid: SecurityId,
     target_sid: SecurityId,
     permission: P,
+    audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
-    check_permission_internal(permission_check, source_sid, target_sid, permission, audit_log)
+    let result = permission_check.has_permission(source_sid, target_sid, permission.clone());
+
+    if result.audit {
+        audit_decision(
+            permission_check,
+            result.clone(),
+            source_sid,
+            target_sid,
+            permission.into(),
+            audit_context,
+        );
+    };
+
+    result.permit.then_some(Ok(())).unwrap_or_else(|| error!(EACCES))
 }
 
 /// Checks that `subject_sid` has the specified process `permission` on `self`.
@@ -1319,35 +1435,9 @@ fn check_self_permission<P: ClassPermission + Into<Permission> + Clone + 'static
     permission_check: &PermissionCheck<'_>,
     subject_sid: SecurityId,
     permission: P,
+    audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
-    check_permission(permission_check, subject_sid, subject_sid, permission)
-}
-
-fn check_permission_internal<P: ClassPermission + Into<Permission> + Clone + 'static>(
-    permission_check: &PermissionCheck<'_>,
-    source_sid: SecurityId,
-    target_sid: SecurityId,
-    permission: P,
-    audit_hook: impl FnOnce(AuditContext<'_>),
-) -> Result<(), Errno> {
-    let result = permission_check.has_permission(source_sid, target_sid, permission.clone());
-
-    if result.audit {
-        let context = AuditContext::new(
-            permission_check,
-            result.clone(),
-            source_sid,
-            target_sid,
-            permission.into(),
-        );
-        audit_hook(context);
-    }
-
-    if result.permit {
-        Ok(())
-    } else {
-        error!(EACCES)
-    }
+    check_permission(permission_check, subject_sid, subject_sid, permission, audit_context)
 }
 
 /// Returns the security state structure for the kernel.
@@ -1514,7 +1604,7 @@ pub(super) fn selinuxfs_check_access(
     let source_sid = current_task.security_state.lock().current_sid;
     let target_sid = SecurityId::initial(InitialSid::Security);
     let permission_check = security_server.as_permission_check();
-    check_permission(&permission_check, source_sid, target_sid, permission)
+    check_permission(&permission_check, source_sid, target_sid, permission, current_task.into())
 }
 
 /// The global SELinux security structures, held by the `Kernel`.

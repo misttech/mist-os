@@ -5,29 +5,105 @@
 use bstr::BStr;
 use selinux::permission_check::{PermissionCheck, PermissionCheckResult};
 use selinux::{ClassPermission, Permission, SecurityId};
+use starnix_core::task::CurrentTask;
+use starnix_core::vfs::{FileObject, FsNode};
 use starnix_logging::{log_warn, BugRef, __track_stub_inner};
+use std::fmt::{Display, Error};
 
-/// Default audit logging handler. Specialized handlers should typically update the `AuditContext`
-/// and then pass it on to this function to perform the actual audit logging operation.
+/// Container for a reference to kernel state from which to include details when emitting audit
+/// logging.  [`Auditable`] instances are created from references to objects via `into()`, e.g:
 ///
-/// See the SELinux Project's "AVC Audit Events" description (at
-/// https://selinuxproject.org/page/NB_AL) for details of the format and fields in audit logs.
-pub(super) fn audit_log(context: AuditContext<'_>) {
-    let mut decision = context.decision;
-    let tclass = context.permission.class().name();
-    let permission_name = context.permission.name();
+///   fn my_lovely_hook(current_task: &CurrentTask, ...) {
+///     let audit_context = current_task.into();
+///     check_permission(..., audit_context)
+///   }
+///
+/// Call-sites which need to include context from multiple sources into audit logs can do so by
+/// creating an array of [`Auditable`] instances from those sources, and using `into()` to create
+/// an [`Auditable`] from a reference to that array, e.g:
+///
+///   fn my_lovelier_hook(current_task: &CurrentTask,..., audit_context: Auditable<'_>) {
+///     let audit_context = [audit_context, current_task.into()];
+///     check_permission(..., (&audit_context).into())
+///   }
+///
+/// [`Auditable`] instances are parameterized with the lifetime of the references they contain,
+/// which will be automagically derived by Rust. Since they only consist of a type discriminator and
+/// reference they are cheap to copy, avoiding the need to pass them by-reference if the same
+/// context is to be applied to multiple permission checks.
+#[derive(Clone, Copy, Debug)]
+pub(super) enum Auditable<'a> {
+    // keep-sorted start
+    AuditContext(&'a [Auditable<'a>]),
+    CurrentTask,
+    FileObject(&'a FileObject),
+    FsNode(&'a FsNode),
+    // keep-sorted end
+}
+
+impl<'a> From<&'a CurrentTask> for Auditable<'a> {
+    fn from(_value: &'a CurrentTask) -> Self {
+        // Starnix includes the PID and command in the log tags, so for now `CurrentTask` is
+        // integrated with at call-sites but the "pid" and "comm" are not duplicated in the audit
+        // log line.
+        Auditable::CurrentTask
+    }
+}
+
+impl<'a> From<&'a FileObject> for Auditable<'a> {
+    fn from(value: &'a FileObject) -> Self {
+        Auditable::FileObject(value)
+    }
+}
+
+impl<'a> From<&'a FsNode> for Auditable<'a> {
+    fn from(value: &'a FsNode) -> Self {
+        Auditable::FsNode(value)
+    }
+}
+
+impl<'a, const N: usize> From<&'a [Auditable<'a>; N]> for Auditable<'a> {
+    fn from(value: &'a [Auditable<'a>; N]) -> Self {
+        Auditable::AuditContext(value)
+    }
+}
+
+/// Emits an audit log entry with the supplied details. See the SELinux Project's "AVC Audit Events"
+/// description (at https://selinuxproject.org/page/NB_AL) for details of the format and fields in
+/// audit logs.
+///
+/// The supplied `permission_check` is used to serialize the `source_sid` and `target_sid` into
+/// their string forms.
+///
+/// If the `result` has a `todo_bug` then the audit entry's decision will be "todo_deny", instead of
+/// the standard "granted" or "denied" decisions, to indicate that the check failed, but was granted
+/// nonetheless, via [`super::todo_check_permission`] or the todo-deny exceptions configuration.
+///
+/// Callers must supply an [`Auditable`] with context for the check (e.g. the calling task, target
+/// file object or filesystem node, etc.).
+pub(super) fn audit_decision(
+    permission_check: &PermissionCheck<'_>,
+    result: PermissionCheckResult,
+    source_sid: SecurityId,
+    target_sid: SecurityId,
+    permission: Permission,
+    audit_data: Auditable<'_>,
+) {
+    let mut decision = if result.permit { "granted" } else { "denied" };
+    let tclass = permission.class().name();
+    let permission_name = permission.name();
 
     // The source and target SIDs are by definition allocated to Security Contexts, so there is no
     // need to handle `sid_to_security_context()` failure.
-    let security_server = context.permission_check.security_server();
-    let scontext = security_server.sid_to_security_context(context.source_sid).unwrap();
+    let security_server = permission_check.security_server();
+    let scontext = security_server.sid_to_security_context(source_sid).unwrap();
     let scontext = BStr::new(&scontext);
-    let tcontext = security_server.sid_to_security_context(context.target_sid).unwrap();
+    let tcontext = security_server.sid_to_security_context(target_sid).unwrap();
     let tcontext = BStr::new(&tcontext);
 
     // If `todo_bug` is set then this check is being granted to accommodate errata, rather than
     // the denial being enforced. Such checks are logged as "todo_deny", and the denial tracked.
-    if let Some(todo_bug) = context.result.todo_bug {
+    if let Some(todo_bug) = result.todo_bug {
         decision = "todo_deny";
 
         // Audit-log the first few denials, but skip further denials to avoid logspamming.
@@ -46,43 +122,40 @@ pub(super) fn audit_log(context: AuditContext<'_>) {
         }
     }
 
-    log_warn!("avc: {decision} {{ {permission_name} }} scontext={scontext} tcontext={tcontext} tclass={tclass}");
+    log_warn!("avc: {decision} {{ {permission_name} }}{audit_data} scontext={scontext} tcontext={tcontext} tclass={tclass}");
 }
 
-// Short-lived container for metadata associated with an access check, for use in audit logs.
-pub(super) struct AuditContext<'a> {
-    /// Used to serialize SIDs into audit logs.
-    permission_check: &'a PermissionCheck<'a>,
-
-    // Parameters common to every audit operation.
+/// Emits an audit log entry for a check that failed, but will still be granted because it was made
+/// with the [`super::todo_check_permission()`] API.
+pub(super) fn audit_todo_decision(
+    bug: BugRef,
+    permission_check: &PermissionCheck<'_>,
+    mut result: PermissionCheckResult,
     source_sid: SecurityId,
     target_sid: SecurityId,
     permission: Permission,
-
-    // Result of the permission check.
-    pub result: PermissionCheckResult,
-
-    // String used to describe the decision in audit logs (e.g. "granted").
-    decision: &'static str,
+    audit_context: Auditable<'_>,
+) {
+    result.todo_bug = Some(bug.into());
+    audit_decision(permission_check, result, source_sid, target_sid, permission, audit_context)
 }
 
-impl<'a> AuditContext<'a> {
-    /// Creates a new `AuditContext` instance with the provided mandatory fields.
-    pub(super) fn new(
-        permission_check: &'a PermissionCheck<'a>,
-        result: PermissionCheckResult,
-        source_sid: SecurityId,
-        target_sid: SecurityId,
-        permission: Permission,
-    ) -> AuditContext<'a> {
-        let decision = if result.permit { "granted" } else { "denied" };
-        Self { permission_check, result, source_sid, target_sid, permission, decision }
-    }
-
-    /// Replaces the text description of the audit `decision` for this operation.
-    /// This is used e.g. to replace "denied" decisions with "todo_deny" for checks that are
-    /// implemented but not yet enforced.
-    pub fn set_decision(&mut self, decision: &'static str) {
-        self.decision = decision;
+impl Display for Auditable<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), Error> {
+        match self {
+            Auditable::AuditContext(audit_context) => {
+                for item in *audit_context {
+                    item.fmt(f)?;
+                }
+                Ok(())
+            }
+            Auditable::CurrentTask => Ok(()),
+            Auditable::FileObject(file) => {
+                write!(f, " path={}", file.name.path_escaping_chroot())
+            }
+            Auditable::FsNode(node) => {
+                write!(f, " ino={}", node.node_id)
+            }
+        }
     }
 }
