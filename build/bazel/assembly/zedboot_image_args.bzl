@@ -24,10 +24,17 @@ ZEDBOOT_PLATFORM_BASE = {
     "feature_set_level": "bootstrap",
     "development_support": {
         "include_netsvc": True,
+        "enable_netsvc_netboot": True,
         "tools": {
             "storage": {
                 "enable_partitioning_tools": True,
             },
+        },
+    },
+    "graphics": {
+        "virtual_console": {
+            "color_scheme": "special",
+            "dpi": [160, 240, 360, 480],
         },
     },
 }

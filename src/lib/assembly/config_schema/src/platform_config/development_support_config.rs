@@ -56,6 +56,9 @@ pub struct DevelopmentSupportConfig {
     /// Follows the same resolution as `enabled` if absent.
     pub include_netsvc: bool,
 
+    /// Enable the netboot feature of the netsvc
+    pub enable_netsvc_netboot: bool,
+
     /// Tools to enable along with development support
     pub tools: ToolsConfig,
 

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
-use assembly_config_capabilities::{Config, ConfigValueType};
+use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType};
 use assembly_config_schema::platform_config::graphics_config::GraphicsConfig;
 
 pub(crate) struct GraphicsSubsystemConfig;
@@ -27,17 +27,28 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
             // Otherwise, enable virtcon.
             (_, _, _) => true,
         };
+
         if enable_virtual_console {
             builder.platform_bundle("virtcon");
         }
 
         builder.set_config_capability("fuchsia.virtcon.BootAnimation", Config::new_void())?;
         builder.set_config_capability("fuchsia.virtcon.BufferCount", Config::new_void())?;
-        builder.set_config_capability("fuchsia.virtcon.ColorScheme", Config::new_void())?;
+
+        if let Some(scheme) = &graphics_config.virtual_console.color_scheme {
+            builder.set_config_capability(
+                "fuchsia.virtcon.ColorScheme",
+                Config::new(ConfigValueType::String { max_size: 20 }, scheme.to_string().into()),
+            )?;
+        } else {
+            builder.set_config_capability("fuchsia.virtcon.ColorScheme", Config::new_void())?;
+        }
+
         builder.set_config_capability(
             "fuchsia.virtcon.Disable",
             Config::new(ConfigValueType::Bool, (!enable_virtual_console).into()),
         )?;
+
         if let Some(rotation) = context.board_info.platform.graphics.display.rotation {
             builder.set_config_capability(
                 "fuchsia.virtcon.DisplayRotation",
@@ -46,9 +57,25 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
         } else {
             builder.set_config_capability("fuchsia.virtcon.DisplayRotation", Config::new_void())?;
         }
-        builder.set_config_capability("fuchsia.virtcon.DotsPerInch", Config::new_void())?;
+
+        if !graphics_config.virtual_console.dpi.is_empty() {
+            builder.set_config_capability(
+                "fuchsia.virtcon.DotsPerInch",
+                Config::new(
+                    ConfigValueType::Vector {
+                        nested_type: ConfigNestedValueType::Uint32,
+                        max_count: 10,
+                    },
+                    graphics_config.virtual_console.dpi.clone().into(),
+                ),
+            )?;
+        } else {
+            builder.set_config_capability("fuchsia.virtcon.DotsPerInch", Config::new_void())?;
+        }
+
         builder.set_config_capability("fuchsia.virtcon.FontSize", Config::new_void())?;
         builder.set_config_capability("fuchsia.virtcon.KeepLogVisible", Config::new_void())?;
+
         if let Some(keymap) = &graphics_config.keymap {
             builder.set_config_capability(
                 "fuchsia.virtcon.KeyMap",
@@ -57,12 +84,15 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
         } else {
             builder.set_config_capability("fuchsia.virtcon.KeyMap", Config::new_void())?;
         }
+
         builder.set_config_capability("fuchsia.virtcon.KeyRepeat", Config::new_void())?;
+
         let rounded_corners = context.board_info.platform.graphics.display.rounded_corners;
         builder.set_config_capability(
             "fuchsia.virtcon.RoundedCorners",
             Config::new(ConfigValueType::Bool, rounded_corners.into()),
         )?;
+
         builder.set_config_capability("fuchsia.virtcon.ScrollbackRows", Config::new_void())?;
 
         Ok(())

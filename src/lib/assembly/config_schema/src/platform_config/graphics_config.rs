@@ -14,7 +14,41 @@ pub struct GraphicsConfig {
     /// UserDebug, false for User.
     pub enable_virtual_console: Option<bool>,
 
+    /// Configuration for the virtual console
+    pub virtual_console: VirtconConfig,
+
     /// Specify the keymap for the virtual console. "qwerty" and "dvorak" are
     /// supported.
     pub keymap: Option<String>,
+}
+
+/// Platform configuration options for the virtual console
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(default, deny_unknown_fields)]
+pub struct VirtconConfig {
+    /// The color scheme for the virtual console to use
+    pub color_scheme: Option<VirtconColorScheme>,
+
+    /// The cdpi of the virtual console
+    pub dpi: Vec<u32>,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum VirtconColorScheme {
+    #[default]
+    Dark,
+    Light,
+    Special,
+}
+
+impl std::fmt::Display for VirtconColorScheme {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = match self {
+            VirtconColorScheme::Dark => "dark",
+            VirtconColorScheme::Light => "light",
+            VirtconColorScheme::Special => "special",
+        };
+        f.write_str(name)
+    }
 }

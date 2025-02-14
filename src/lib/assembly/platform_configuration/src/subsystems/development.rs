@@ -38,6 +38,13 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
             builder.platform_bundle("netsvc");
         };
 
+        if config.enable_netsvc_netboot {
+            if context.build_type == &BuildType::User {
+                anyhow::bail!("netsvc can't be included in user builds");
+            }
+            builder.kernel_arg(KernelArg::NetsvcNetboot(true));
+        };
+
         if matches!(context.build_type, BuildType::Eng | BuildType::UserDebug) {
             builder.platform_bundle("ptysvc");
             builder.platform_bundle("kernel_debug_broker_userdebug");

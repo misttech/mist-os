@@ -4,18 +4,34 @@
 
 import("//build/assembly/product_assembly_configuration.gni")
 
+zedboot_platform_base = {
+  build_type = "eng"
+  feature_set_level = "bootstrap"
+  development_support = {
+    include_netsvc = true
+    enable_netsvc_netboot = true
+    tools = {
+      storage = {
+        enable_partitioning_tools = true
+      }
+    }
+  }
+  graphics = {
+    virtual_console = {
+      color_scheme = "special"
+      dpi = [
+        160,
+        240,
+        360,
+        480,
+      ]
+    }
+  }
+}
+
 product_assembly_configuration("zedboot") {
   platform = {
-    build_type = "eng"
-    feature_set_level = "bootstrap"
-    development_support = {
-      tools = {
-        storage = {
-          enable_partitioning_tools = true
-        }
-      }
-      include_netsvc = true
-    }
+    forward_variables_from(zedboot_platform_base, "*")
     storage = {
       filesystems = {
         image_name = "zedboot"
@@ -29,16 +45,7 @@ product_assembly_configuration("zedboot") {
 
 product_assembly_configuration("zedboot_with_fvm") {
   platform = {
-    build_type = "eng"
-    feature_set_level = "bootstrap"
-    development_support = {
-      include_netsvc = true
-      tools = {
-        storage = {
-          enable_partitioning_tools = true
-        }
-      }
-    }
+    forward_variables_from(zedboot_platform_base, "*")
     storage = {
       filesystems = {
         image_name = "zedboot"
@@ -60,16 +67,7 @@ product_assembly_configuration("zedboot_with_fvm") {
 
 product_assembly_configuration("zedboot_with_minfs") {
   platform = {
-    build_type = "eng"
-    feature_set_level = "bootstrap"
-    development_support = {
-      include_netsvc = true
-      tools = {
-        storage = {
-          enable_partitioning_tools = true
-        }
-      }
-    }
+    forward_variables_from(zedboot_platform_base, "*")
     storage = {
       filesystems = {
         image_name = "zedboot"

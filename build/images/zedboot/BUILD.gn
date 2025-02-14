@@ -38,27 +38,9 @@ assembled_system("zedboot_assembly") {
   # than the legacy AIB.
   include_legacy_bundle = true
   legacy_bundle_only = use_bazel_images_only
+  legacy_bundle_must_be_empty = true
 
   base_packages = []
-
-  additional_boot_args = [
-    "netsvc.all-features=true",
-    "netsvc.netboot=true",
-  ]
-
-  cmdline = [
-    "virtcon.colorscheme=special",
-    "virtcon.dpi=160,240,360,480",
-  ]
-
-  bootfs_labels = []
-
-  # For debugging.
-  bootfs_labels += [
-    "//src/devices/nand/drivers/broker:nand-broker",
-    "//src/storage/bin/umount",
-    "//src/storage/tools/logs/run-with-logs",
-  ]
 
   # zbi arguments
   if (custom_signing_script != "") {
