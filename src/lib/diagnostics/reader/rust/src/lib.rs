@@ -24,6 +24,8 @@ use std::task::{Context, Poll};
 use thiserror::Error;
 use zx::{self as zx, MonotonicDuration};
 
+pub type ArchiveReader = ArchiveReaderV1;
+
 pub use diagnostics_data::{Data, Inspect, Logs, Severity};
 pub use diagnostics_hierarchy::{hierarchy, DiagnosticsHierarchy, Property};
 
@@ -212,7 +214,7 @@ impl RetryConfig {
 /// Utility for reading inspect data of a running component using the injected Archive
 /// Reader service.
 #[derive(Clone)]
-pub struct ArchiveReader {
+pub struct ArchiveReaderV1 {
     archive: Option<ArchiveAccessorProxy>,
     selectors: Vec<SelectorArgument>,
     retry_config: RetryConfig,
@@ -221,7 +223,7 @@ pub struct ArchiveReader {
     max_aggregated_content_size_bytes: Option<u64>,
 }
 
-impl Default for ArchiveReader {
+impl Default for ArchiveReaderV1 {
     fn default() -> Self {
         Self {
             timeout: None,
@@ -234,7 +236,7 @@ impl Default for ArchiveReader {
     }
 }
 
-impl ArchiveReader {
+impl ArchiveReaderV1 {
     /// Creates a new data fetcher with default configuration:
     ///  - Maximum retries: 2^64-1
     ///  - Timeout: Never. Use with_timeout() to set a timeout.
@@ -613,7 +615,7 @@ mod tests {
 
         let moniker = format!("realm_builder:{}/test_component", instance.root.child_name());
         let component_selector = selectors::sanitize_moniker_for_selectors(&moniker);
-        let results = ArchiveReader::new()
+        let results = ArchiveReaderV1::new()
             .add_selector(format!("{component_selector}:[...]root"))
             .snapshot::<Inspect>()
             .await?;
@@ -656,7 +658,7 @@ mod tests {
         };
 
         let int_property_selector = format!("{component_selector}:[...]root:int");
-        let mut reader = ArchiveReader::new();
+        let mut reader = ArchiveReaderV1::new();
         reader.add_selector(int_property_selector).add_selector(lazy_property_selector);
         let response = reader.snapshot::<Inspect>().await?;
 
@@ -681,7 +683,7 @@ mod tests {
             .expect("component started");
 
         let moniker = format!("realm_builder:{}/test_component", instance.root.child_name());
-        let results = ArchiveReader::new()
+        let results = ArchiveReaderV1::new()
             .select_all_for_moniker(&moniker)
             .snapshot::<Inspect>()
             .await
@@ -704,7 +706,7 @@ mod tests {
     async fn timeout() -> Result<(), anyhow::Error> {
         let instance = start_component(ComponentOptions { publish_n_trees: 1 }).await?;
 
-        let mut reader = ArchiveReader::new();
+        let mut reader = ArchiveReaderV1::new();
         reader
             .add_selector(format!(
                 "realm_builder\\:{}/test_component:root",
@@ -755,7 +757,7 @@ mod tests {
                 }
             }
         }));
-        let result = ArchiveReader::new()
+        let result = ArchiveReaderV1::new()
             .with_archive(proxy)
             .snapshot::<Inspect>()
             .await
@@ -782,7 +784,7 @@ mod tests {
             }
         });
         let proxy = spawn_fake_archive(serde_json::json!([value.clone()]));
-        let mut reader = ArchiveReader::new();
+        let mut reader = ArchiveReaderV1::new();
         reader.with_archive(proxy);
         let json_result =
             reader.snapshot_raw::<Inspect, serde_json::Value>().await.expect("got result");
@@ -848,7 +850,7 @@ mod tests {
             instance.root.child_name()
         );
 
-        let results = ArchiveReader::new()
+        let results = ArchiveReaderV1::new()
             .add_selector(selector)
             // Only one schema since empty schemas are filtered out
             .with_minimum_schema_count(1)
@@ -968,7 +970,7 @@ mod tests {
         builder
     }
 
-    async fn init_isolated_logging() -> (RealmInstance, Publisher, ArchiveReader) {
+    async fn init_isolated_logging() -> (RealmInstance, Publisher, ArchiveReaderV1) {
         let instance = create_realm().await.build().await.unwrap();
         let log_sink_proxy =
             instance.root.connect_to_protocol_at_exposed_dir::<flogger::LogSinkMarker>().unwrap();
@@ -976,7 +978,7 @@ mod tests {
             .root
             .connect_to_protocol_at_exposed_dir::<fdiagnostics::ArchiveAccessorMarker>()
             .unwrap();
-        let mut reader = ArchiveReader::new();
+        let mut reader = ArchiveReaderV1::new();
         reader.with_archive(accessor_proxy);
         let options = PublisherOptions::default()
             .wait_for_initial_interest(false)
