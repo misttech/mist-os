@@ -72,7 +72,6 @@ template("audio_core_config_test") {
 # Example:
 # ```
 #   audio_core_config("foo_audio_core_config") {
-#     for_pkg = "audio_core"
 #     config = "//path/to/audio_core_config.json"
 #     policy = "//path/to/audio_policy.json"
 #     test_package_name = "foo-audio-core-config-test"
@@ -80,10 +79,6 @@ template("audio_core_config_test") {
 # ```
 #
 # Parameters
-#     for_pkg (required)
-#       The name of the audio_core package.
-#       Type: string
-#
 #     config (required)
 #       The path of an audio_core_config.json file.
 #       Type: string
@@ -100,8 +95,6 @@ template("audio_core_config_test") {
 template("audio_core_config") {
   assert(defined(invoker.config))
   assert(defined(invoker.test_package_name))
-
-  not_needed(invoker, [ "for_pkg" ])
 
   # Add the configuration data for the audio_core package.
   resource(target_name + "-config") {
