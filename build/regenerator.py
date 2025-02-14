@@ -274,7 +274,7 @@ def main() -> int:
         extra_ninja_build_inputs.add(fuchsia_dir / "build" / "regenerator.py")
 
         log("Generating tests.json.")
-        build_tests_json.build_tests_json(build_dir)
+        extra_ninja_build_inputs |= build_tests_json.build_tests_json(build_dir)
 
         # Where to store regenerator outputs. This must be in a directory specific to
         # the current Ninja build directory, to support building multiple Fuchsia build
