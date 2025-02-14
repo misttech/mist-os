@@ -167,8 +167,8 @@ bool PhysicalPageProvider::DequeueRequest(uint64_t* request_offset, uint64_t* re
   return true;
 }
 
+// TODO(https://fxbug.dev/42084841): Reason about the use of |suspendable|, ignored for now.
 zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event, bool suspendable) {
-  DEBUG_ASSERT(suspendable);
   // When WaitOnEvent is called, we know that the event being waited on is associated with a request
   // that's already been queued, so we can use this thread to process _all_ the queued requests
   // first, and then wait on the event which then won't have any reason to block this thread, since

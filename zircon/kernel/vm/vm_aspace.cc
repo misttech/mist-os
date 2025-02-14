@@ -632,7 +632,9 @@ zx_status_t VmAspace::PageFaultInternal(vaddr_t va, uint flags, size_t additiona
     }
 
     if (status == ZX_ERR_SHOULD_WAIT) {
-      zx_status_t st = page_request.Wait();
+      // If the page fault originated in kernel mode (usercopy), we cannot safely suspend the thread
+      // without potential data loss. See https://fxbug.dev/42084841 for details.
+      zx_status_t st = page_request.Wait(/*suspendable=*/flags & VMM_PF_FLAG_USER);
       if (st != ZX_OK) {
         if (st == ZX_ERR_TIMED_OUT) {
           Guard<CriticalMutex> guard{&lock_};

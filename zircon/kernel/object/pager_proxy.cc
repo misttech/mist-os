@@ -18,6 +18,7 @@
 #define LOCAL_TRACE 0
 
 KCOUNTER(dispatcher_pager_overtime_wait_count, "dispatcher.pager.overtime_waits")
+KCOUNTER(dispatcher_pager_ignored_suspend_count, "dispatcher.pager.ignored_suspends")
 KCOUNTER(dispatcher_pager_total_request_count, "dispatcher.pager.total_requests")
 KCOUNTER(dispatcher_pager_succeeded_request_count, "dispatcher.pager.succeeded_requests")
 KCOUNTER(dispatcher_pager_failed_request_count, "dispatcher.pager.failed_requests")
@@ -311,7 +312,6 @@ void PagerProxy::SetPageSourceUnchecked(fbl::RefPtr<PageSource> src) {
 }
 
 zx_status_t PagerProxy::WaitOnEvent(Event* event, bool suspendable) {
-  DEBUG_ASSERT(suspendable);
   ThreadDispatcher::AutoBlocked by(ThreadDispatcher::Blocked::PAGER);
   kcounter_add(dispatcher_pager_total_request_count, 1);
   uint32_t waited = 0;
@@ -324,53 +324,70 @@ zx_status_t PagerProxy::WaitOnEvent(Event* event, bool suspendable) {
       return Deadline::after_mono(ZX_SEC(gBootOptions->userpager_overtime_wait_seconds));
     }
   };
+  // Ignore the suspend signal if not suspendable.
+  const uint signal_mask = suspendable ? 0 : THREAD_SIGNAL_SUSPEND;
   zx_status_t result;
-  while ((result = event->Wait(make_deadline())) == ZX_ERR_TIMED_OUT) {
-    waited++;
-    // We might trigger this loop multiple times as we exceed multiples of the overtime counter, but
-    // we only want to count each unique overtime event in the kcounter.
-    if (waited == 1) {
-      dispatcher_pager_overtime_wait_count.Add(1);
-    }
+  do {
+    result = event->Wait(make_deadline(), signal_mask);
 
-    // Error out if we've been waiting for longer than the specified timeout, to allow the rest of
-    // the system to make progress (if possible).
-    if (gBootOptions->userpager_overtime_timeout_seconds > 0 &&
-        waited * gBootOptions->userpager_overtime_wait_seconds >=
-            gBootOptions->userpager_overtime_timeout_seconds) {
-      Guard<Mutex> guard{&mtx_};
-      printf("ERROR Page source %p blocked for %" PRIu64 " seconds. Page request timed out.\n",
-             page_source_.get(), gBootOptions->userpager_overtime_timeout_seconds);
-      Thread::Current::Dump(false);
-      kcounter_add(dispatcher_pager_timed_out_request_count, 1);
-      return ZX_ERR_TIMED_OUT;
-    }
+    if (result == ZX_ERR_INTERNAL_INTR_RETRY) {
+      if (suspendable) {
+        // Terminate the wait early if suspendable.
+        kcounter_add(dispatcher_pager_failed_request_count, 1);
+        return result;
+      }
+      // Count how often we ignore suspend signals as a debugging aid.
+      dispatcher_pager_ignored_suspend_count.Add(1);
+    } else if (result == ZX_ERR_TIMED_OUT) {
+      waited++;
+      // We might trigger this loop multiple times as we exceed multiples of the overtime counter,
+      // but we only want to count each unique overtime event in the kcounter.
+      if (waited == 1) {
+        dispatcher_pager_overtime_wait_count.Add(1);
+      }
 
-    // Do an informational printout of the source and ourselves if the overtime period has elapsed.
-    fbl::RefPtr<PageSource> src;
-    bool do_printout = false;
-    {
-      Guard<Mutex> guard{&mtx_};
-      src = page_source_;
-      const zx_instant_mono_t now = current_mono_time();
-      if (now >= zx_time_add_duration(last_overtime_dump_,
-                                      ZX_SEC(gBootOptions->userpager_overtime_wait_seconds))) {
-        do_printout = true;
-        last_overtime_dump_ = now;
+      // Error out if we've been waiting for longer than the specified timeout, to allow the rest of
+      // the system to make progress (if possible).
+      if (gBootOptions->userpager_overtime_timeout_seconds > 0 &&
+          waited * gBootOptions->userpager_overtime_wait_seconds >=
+              gBootOptions->userpager_overtime_timeout_seconds) {
+        Guard<Mutex> guard{&mtx_};
+        printf("ERROR Page source %p blocked for %" PRIu64 " seconds. Page request timed out.\n",
+               page_source_.get(), gBootOptions->userpager_overtime_timeout_seconds);
+        Thread::Current::Dump(false);
+        kcounter_add(dispatcher_pager_timed_out_request_count, 1);
+        return ZX_ERR_TIMED_OUT;
+      }
+
+      // Do an informational printout of the source and ourselves if the overtime period has
+      // elapsed.
+      fbl::RefPtr<PageSource> src;
+      bool do_printout = false;
+      {
+        Guard<Mutex> guard{&mtx_};
+        src = page_source_;
+        const zx_instant_mono_t now = current_mono_time();
+        if (now >= zx_time_add_duration(last_overtime_dump_,
+                                        ZX_SEC(gBootOptions->userpager_overtime_wait_seconds))) {
+          do_printout = true;
+          last_overtime_dump_ = now;
+        }
+      }
+      printf("WARNING Page source %p blocked for %" PRIu64 " seconds on event %p. %s\n", src.get(),
+             waited * gBootOptions->userpager_overtime_wait_seconds, event,
+             do_printout ? "Dump:" : "Dump skipped.");
+      // Dump out the rest of the state of the outstanding requests.
+      if (do_printout) {
+        Dump(0, gBootOptions->userpager_overtime_printout_limit);
+        if (src) {
+          // Use DumpSelf to avoid it calling our Dump method that we already performed.
+          src->DumpSelf(0, gBootOptions->userpager_overtime_printout_limit);
+        }
       }
     }
-    printf("WARNING Page source %p blocked for %" PRIu64 " seconds on event %p. %s\n", src.get(),
-           waited * gBootOptions->userpager_overtime_wait_seconds, event,
-           do_printout ? "Dump:" : "Dump skipped.");
-    // Dump out the rest of the state of the outstanding requests.
-    if (do_printout) {
-      Dump(0, gBootOptions->userpager_overtime_printout_limit);
-      if (src) {
-        // Use DumpSelf to avoid it calling our Dump method that we already performed.
-        src->DumpSelf(0, gBootOptions->userpager_overtime_printout_limit);
-      }
-    }
-  }
+
+    // Hold off on suspension until after the page request is resolved (or fails with a timeout).
+  } while (result == ZX_ERR_TIMED_OUT || result == ZX_ERR_INTERNAL_INTR_RETRY);
 
   if (result == ZX_OK) {
     kcounter_add(dispatcher_pager_succeeded_request_count, 1);

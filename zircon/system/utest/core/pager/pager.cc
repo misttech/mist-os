@@ -4094,4 +4094,169 @@ TEST(Pager, Prefetch) {
   }
 }
 
+// Tests thread suspension when blocked on a page request from a page fault in kernel mode
+// (usercopy).
+TEST(Pager, SuspendInKernelTest) {
+  UserPager pager;
+
+  ASSERT_TRUE(pager.Init());
+
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmo(1, &vmo));
+
+  // Issue a syscall with an uncommitted pager-backed VMO passed in as the user buffer.
+  TestThread t([vmo]() -> bool {
+    // Create an anonymous VMO for the syscall to operate on.
+    zx::vmo anon_vmo;
+    if (zx::vmo::create(zx_system_get_page_size(), 0, &anon_vmo) != ZX_OK) {
+      return false;
+    }
+    if (anon_vmo.op_range(ZX_VMO_OP_COMMIT, 0, zx_system_get_page_size(), nullptr, 0) != ZX_OK) {
+      return false;
+    }
+    // Map the pager-backed VMO to provide a user buffer address to the syscall.
+    zx_vaddr_t buf;
+    if (zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo->vmo(), 0,
+                                   zx_system_get_page_size(), &buf) != ZX_OK) {
+      return false;
+    }
+    auto unmap =
+        fit::defer([&]() { zx_vmar_unmap(zx_vmar_root_self(), buf, zx_system_get_page_size()); });
+
+    // This will fault on |buf| in the usercopy. zx_object_get_info() uses the variant of usercopy
+    // that resolves page faults inline. This is the path we're testing here.
+    if (anon_vmo.get_info(ZX_INFO_VMO, reinterpret_cast<void*>(buf), sizeof(zx_info_vmo_t), nullptr,
+                          nullptr) != ZX_OK) {
+      return false;
+    }
+    return true;
+  });
+
+  ASSERT_TRUE(t.Start());
+
+  // Wait for the page request and verify that the thread is blocked.
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, 1, ZX_TIME_INFINITE));
+  ASSERT_TRUE(t.WaitForBlocked());
+
+  // Issue the suspend.
+  t.Suspend();
+
+  // Wait a bit and verify that the thread is still blocked. We're testing for inability to suspend,
+  // so the best we can do is allow some time for the suspend to go through.
+  zx::nanosleep(zx::deadline_after(zx::sec(1)));
+  ASSERT_TRUE(t.WaitForBlocked());
+
+  // Resume the thread.
+  t.Resume();
+
+  // The thread is still blocked since the page request hasn't been resolved.
+  zx::nanosleep(zx::deadline_after(zx::sec(1)));
+  ASSERT_TRUE(t.WaitForBlocked());
+
+  // Suspend the thread again.
+  t.Suspend();
+
+  // Wait a bit and verify that the thread is still blocked.
+  zx::nanosleep(zx::deadline_after(zx::sec(1)));
+  ASSERT_TRUE(t.WaitForBlocked());
+
+  // Resolve the page request. We did not create the VMO with ZX_VMO_TRAP_DIRTY so the write will
+  // proceed without blocking.
+  ASSERT_TRUE(pager.SupplyPages(vmo, 0, 1));
+
+  // The thread should now suspend on its way back to userspace from the syscall.
+  ASSERT_TRUE(t.WaitForSuspend());
+
+  // Resume the thread and wait for it to terminate.
+  t.Resume();
+  ASSERT_TRUE(t.Wait());
+
+  // No more page requests seen.
+  uint64_t offset, length;
+  ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
+  ASSERT_FALSE(pager.GetPageDirtyRequest(vmo, 0, &offset, &length));
+}
+
+// Same as SuspendInKernelTest but tests the usercopy version that captures faults and lets the
+// caller (in the kernel) resolve it.
+TEST(Pager, SuspendInKernelCaptureFaultsTest) {
+  UserPager pager;
+
+  ASSERT_TRUE(pager.Init());
+
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmo(1, &vmo));
+
+  // Issue a syscall with an uncommitted pager-backed VMO passed in as the user buffer.
+  TestThread t([vmo]() -> bool {
+    // Create an anonymous VMO for the syscall to operate on.
+    zx::vmo anon_vmo;
+    if (zx::vmo::create(zx_system_get_page_size(), 0, &anon_vmo) != ZX_OK) {
+      return false;
+    }
+    if (anon_vmo.op_range(ZX_VMO_OP_COMMIT, 0, zx_system_get_page_size(), nullptr, 0) != ZX_OK) {
+      return false;
+    }
+    // Map the pager-backed VMO to provide a user buffer address to the syscall.
+    zx_vaddr_t buf;
+    if (zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo->vmo(), 0,
+                                   zx_system_get_page_size(), &buf) != ZX_OK) {
+      return false;
+    }
+    auto unmap =
+        fit::defer([&]() { zx_vmar_unmap(zx_vmar_root_self(), buf, zx_system_get_page_size()); });
+
+    // This will fault on |buf| in the usercopy. zx_vmo_write() uses the capture faults variant of
+    // usercopy, and resolves them with an explicit SoftFault(). This is the path we're testing
+    // here.
+    if (anon_vmo.write(reinterpret_cast<void*>(buf), 0, zx_system_get_page_size()) != ZX_OK) {
+      return false;
+    }
+    return true;
+  });
+
+  ASSERT_TRUE(t.Start());
+
+  // Wait for the page request and verify that the thread is blocked.
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, 1, ZX_TIME_INFINITE));
+  ASSERT_TRUE(t.WaitForBlocked());
+
+  // Issue the suspend.
+  t.Suspend();
+
+  // Wait a bit and verify that the thread is still blocked. We're testing for inability to suspend,
+  // so the best we can do is allow some time for the suspend to go through.
+  zx::nanosleep(zx::deadline_after(zx::sec(1)));
+  ASSERT_TRUE(t.WaitForBlocked());
+
+  // Resume the thread.
+  t.Resume();
+
+  // The thread is still blocked since the page request hasn't been resolved.
+  zx::nanosleep(zx::deadline_after(zx::sec(1)));
+  ASSERT_TRUE(t.WaitForBlocked());
+
+  // Suspend the thread again.
+  t.Suspend();
+
+  // Wait a bit and verify that the thread is still blocked.
+  zx::nanosleep(zx::deadline_after(zx::sec(1)));
+  ASSERT_TRUE(t.WaitForBlocked());
+
+  // Resolve the page request.
+  ASSERT_TRUE(pager.SupplyPages(vmo, 0, 1));
+
+  // The thread should now suspend on its way back to userspace from the syscall.
+  ASSERT_TRUE(t.WaitForSuspend());
+
+  // Resume the thread and wait for it to terminate.
+  t.Resume();
+  ASSERT_TRUE(t.Wait());
+
+  // No more page requests seen.
+  uint64_t offset, length;
+  ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
+  ASSERT_FALSE(pager.GetPageDirtyRequest(vmo, 0, &offset, &length));
+}
+
 }  // namespace pager_tests

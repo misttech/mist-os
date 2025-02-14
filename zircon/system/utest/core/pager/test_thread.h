@@ -35,6 +35,7 @@ class TestThread {
   bool WaitForCrash(uintptr_t crash_addr, zx_status_t error_status);
   // Block until the test thread crashes for any reason.
   bool WaitForAnyCrash();
+
   // Block until the test thread is blocked against a pager.
   // NOTE: It is only valid to call this in an environment where there is no interference from an
   // external pager. More specifically, if the test is meant to be run as a component, the caller
@@ -44,7 +45,14 @@ class TestThread {
   bool WaitForTerm() {
     return zx_thread_.wait_one(ZX_TASK_TERMINATED, zx::time::infinite(), nullptr) == ZX_OK;
   }
+  // Wait until the thread suspends.
+  bool WaitForSuspend() {
+    return zx_thread_.wait_one(ZX_THREAD_SUSPENDED, zx::time::infinite(), nullptr) == ZX_OK;
+  }
 
+  // Issue a suspend without waiting for it to complete.
+  void Suspend() { ASSERT_EQ(zx_thread_.suspend(&suspend_token_), ZX_OK); }
+  // Issue a suspend and wait until the thread successfully suspends.
   void SuspendSync() {
     ASSERT_EQ(zx_thread_.suspend(&suspend_token_), ZX_OK);
 
