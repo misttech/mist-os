@@ -99,11 +99,60 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         self.config.handle_unknown()
     }
 
+    /// Computes the access granted to `source_type` on `target_type`, for the specified
+    /// `target_class`. The result is a set of access vectors with bits set for each
+    /// `target_class` permission, describing which permissions are allowed, and
+    /// which should have access checks audit-logged when denied, or allowed.
+    ///
+    /// An [`AccessDecision`] is accumulated, starting from no permissions to be granted,
+    /// nor audit-logged if allowed, and all permissions to be audit-logged if denied.
+    /// Permissions that are explicitly `allow`ed, but that are subject to unsatisfied
+    /// constraints, are removed from the allowed set. Matching policy statements then
+    /// add permissions to the granted & audit-allow sets, or remove them from the
+    /// audit-deny set.
+    pub(super) fn compute_access_decision(
+        &self,
+        source_context: &SecurityContext,
+        target_context: &SecurityContext,
+        target_class: &Class<PS>,
+    ) -> AccessDecision {
+        let mut access_decision = self.compute_explicitly_allowed(
+            source_context.type_(),
+            target_context.type_(),
+            target_class,
+        );
+        access_decision.allow -=
+            self.compute_denied_by_constraints(source_context, target_context, target_class);
+        access_decision
+    }
+
+    /// The "custom" form of `compute_access_decision()`, used when the target class
+    /// is specified by name rather than as an object.
+    pub(super) fn compute_access_decision_custom(
+        &self,
+        source_context: &SecurityContext,
+        target_context: &SecurityContext,
+        target_class_name: &str,
+    ) -> AccessDecision {
+        let mut access_decision = self.compute_explicitly_allowed_custom(
+            source_context.type_(),
+            target_context.type_(),
+            target_class_name,
+        );
+        access_decision.allow -= self.compute_denied_by_constraints_custom(
+            source_context,
+            target_context,
+            target_class_name,
+        );
+        access_decision
+    }
+
     /// Returns whether the input types are explicitly granted the permission named
     /// `permission_name` via an `allow [...];` policy statement, or an error if looking up the
     /// input types fails. This is the "custom" form of this API because `permission_name` is
     /// associated with a [`crate::AbstractPermission::Custom::permission`] value.
-    pub fn is_explicitly_allowed_custom(
+    #[allow(dead_code)]
+    pub(super) fn is_explicitly_allowed_custom(
         &self,
         source_type: TypeId,
         target_type: TypeId,
@@ -129,6 +178,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     /// Returns whether the input is explicitly allowed by some
     /// `allow [source_type_name] [target_type_name] : [target_class] [permission];` policy
     /// statement, or an error if lookups for input values fail.
+    #[allow(dead_code)]
     pub(super) fn class_permission_is_explicitly_allowed(
         &self,
         source_type: TypeId,
@@ -200,7 +250,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     /// if no such statement exists. This is the "custom" form of this API because
     /// `target_class_name` is associated with a [`crate::AbstractObjectClass::Custom`]
     /// value.
-    pub fn compute_explicitly_allowed_custom(
+    pub(super) fn compute_explicitly_allowed_custom(
         &self,
         source_type_name: TypeId,
         target_type_name: TypeId,
@@ -219,14 +269,9 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
 
     /// Computes the access granted to `source_type` on `target_type`, for the specified
     /// `target_class`. The result is a set of access vectors with bits set for each
-    /// `target_class` permission, describing which permissions are allowed/denied, and
-    /// which should have access checks audit-logged when denied, or allowed.
-    ///
-    /// An [`AccessDecision`] is accumulated, starting from no permissions to be granted,
-    /// nor audit-logged if allowed, and all permissions to be audit-logged if denied.
-    /// Matching policy statements then add permissions to the granted & audit-allow sets,
-    /// or remove them from the audit-deny set.
-    pub(super) fn compute_explicitly_allowed(
+    /// `target_class` permission, describing which permissions are explicitly allowed,
+    /// and which should have access checks audit-logged when denied, or allowed.
+    fn compute_explicitly_allowed(
         &self,
         source_type: TypeId,
         target_type: TypeId,
@@ -306,6 +351,42 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
             auditdeny: computed_audit_deny,
             flags,
             todo_bug: None,
+        }
+    }
+
+    /// A permission is denied if it matches at least one unsatisfied constraint.
+    fn compute_denied_by_constraints(
+        &self,
+        source_context: &SecurityContext,
+        target_context: &SecurityContext,
+        target_class: &Class<PS>,
+    ) -> AccessVector {
+        let mut denied = AccessVector::NONE;
+        for constraint in target_class.constraints().iter() {
+            match constraint.constraint_expr().evaluate(source_context, target_context) {
+                Err(err) => {
+                    unreachable!("validated constraint expression failed to evaluate: {:?}", err)
+                }
+                Ok(false) => denied |= constraint.access_vector(),
+                Ok(true) => {}
+            }
+        }
+        denied
+    }
+
+    /// A permission is denied if it matches at least one unsatisfied
+    /// constraint. This is the "custom" version because `target_class_name` is
+    /// associated with a [`crate::AbstractObjectClass::Custom`] value.
+    fn compute_denied_by_constraints_custom(
+        &self,
+        source_context: &SecurityContext,
+        target_context: &SecurityContext,
+        target_class_name: &str,
+    ) -> AccessVector {
+        if let Some(target_class) = find_class_by_name(self.classes(), target_class_name) {
+            self.compute_denied_by_constraints(source_context, target_context, target_class)
+        } else {
+            AccessVector::NONE
         }
     }
 

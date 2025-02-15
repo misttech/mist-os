@@ -428,12 +428,10 @@ where
 }
 
 impl<PS: ParseStrategy> Constraint<PS> {
-    #[allow(dead_code)]
     pub(super) fn access_vector(&self) -> AccessVector {
         AccessVector((*PS::deref(&self.access_vector)).get())
     }
 
-    #[allow(dead_code)]
     pub(super) fn constraint_expr(&self) -> &ConstraintExpr<PS> {
         &self.constraint_expr
     }
@@ -487,8 +485,6 @@ impl<PS: ParseStrategy> ValidateArray<ConstraintTermCount, ConstraintTerm<PS>>
 }
 
 impl<PS: ParseStrategy> ConstraintExpr<PS> {
-    // TODO: https://fxbug.dev/372400976 - Remove `dead_code` guard.
-    #[allow(dead_code)]
     pub(super) fn evaluate(
         &self,
         source_context: &SecurityContext,
@@ -733,6 +729,7 @@ pub(super) fn find_common_symbol_by_name_bytes<'a, PS: ParseStrategy>(
 /// Each `class` may inherit from zero or one `common`, in which case the permissions specified in
 /// the denoted `common` are also permissions in `class`. Locating these "common" permissions is the
 /// reason that `common_symbols` is received as a function input.
+#[allow(dead_code)]
 pub(super) fn find_class_permission_by_name<'a, PS: ParseStrategy>(
     common_symbols: &'a CommonSymbols<PS>,
     class: &'a Class<PS>,
@@ -750,6 +747,7 @@ pub(super) fn find_class_permission_by_name<'a, PS: ParseStrategy>(
     }
 }
 
+#[allow(dead_code)]
 fn find_own_class_permission_by_name_bytes<'a, PS: ParseStrategy>(
     class: &'a Class<PS>,
     name_bytes: &'a [u8],
@@ -758,6 +756,7 @@ fn find_own_class_permission_by_name_bytes<'a, PS: ParseStrategy>(
     find_own_permission_by_name_bytes(own_permissions, name_bytes)
 }
 
+#[allow(dead_code)]
 fn find_common_permission_by_name_bytes<'a, PS: ParseStrategy>(
     common_symbol: &'a CommonSymbol<PS>,
     name_bytes: &'a [u8],
@@ -766,6 +765,7 @@ fn find_common_permission_by_name_bytes<'a, PS: ParseStrategy>(
     find_own_permission_by_name_bytes(own_permissions, name_bytes)
 }
 
+#[allow(dead_code)]
 fn find_own_permission_by_name_bytes<'a, PS: ParseStrategy>(
     own_permissions: &'a Permissions<PS>,
     name_bytes: &'a [u8],

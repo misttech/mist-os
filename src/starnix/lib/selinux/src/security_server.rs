@@ -522,16 +522,12 @@ impl Query for SecurityServer {
         let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
         let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
 
-        // Access decisions are currently based solely on explicit "allow" rules.
-        // TODO: https://fxbug.dev/372400976 - Include permissions from matched "constraints"
-        // rules in the policy.
-        // TODO: https://fxbug.dev/372400419 - Validate that "neverallow" rules are respected.
         match target_class {
             AbstractObjectClass::System(target_class) => {
-                let mut decision = active_policy.parsed.compute_explicitly_allowed(
-                    source_context.type_(),
-                    target_context.type_(),
-                    target_class,
+                let mut decision = active_policy.parsed.compute_access_decision(
+                    &source_context,
+                    &target_context,
+                    &target_class,
                 );
                 decision.todo_bug = active_policy.exceptions.lookup(
                     source_context.type_(),
@@ -540,13 +536,9 @@ impl Query for SecurityServer {
                 );
                 decision
             }
-            AbstractObjectClass::Custom(target_class) => {
-                active_policy.parsed.compute_explicitly_allowed_custom(
-                    source_context.type_(),
-                    target_context.type_(),
-                    &target_class,
-                )
-            }
+            AbstractObjectClass::Custom(target_class) => active_policy
+                .parsed
+                .compute_access_decision_custom(&source_context, &target_context, &target_class),
             // No meaningful policy can be determined without target class.
             _ => AccessDecision::allow(AccessVector::NONE),
         }

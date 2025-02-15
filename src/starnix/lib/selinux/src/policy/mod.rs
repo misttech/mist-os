@@ -77,9 +77,10 @@ impl Display for ClassPermissionId {
     }
 }
 
-/// Encapsulates the result of a permissions calculation, between source & target domains, for a
-/// specific class. Decisions describe which permissions are allowed, and whether permissions should
-/// be audit-logged when allowed, and when denied.
+/// Encapsulates the result of a permissions calculation, between
+/// source & target domains, for a specific class. Decisions describe
+/// which permissions are allowed, and whether permissions should be
+/// audit-logged when allowed, and when denied.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AccessDecision {
     pub allow: AccessVector,
@@ -154,6 +155,12 @@ impl std::ops::BitAndAssign for AccessVector {
 impl std::ops::BitOrAssign for AccessVector {
     fn bitor_assign(&mut self, rhs: Self) {
         self.0 |= rhs.0
+    }
+}
+
+impl std::ops::SubAssign for AccessVector {
+    fn sub_assign(&mut self, rhs: Self) {
+        self.0 = self.0 ^ (self.0 & rhs.0);
     }
 }
 
@@ -387,19 +394,31 @@ impl<PS: ParseStrategy> Policy<PS> {
         )
     }
 
-    /// Computes the access vector that associates type `source_type_name` and `target_type_name`
-    /// via an explicit `allow [...];` statement in the binary policy. Computes `AccessVector::NONE`
-    /// if no such statement exists.
-    pub fn compute_explicitly_allowed(
+    /// Computes the access vector that associates type `source_type_name` and
+    /// `target_type_name` via an explicit `allow [...];` statement in the
+    /// binary policy, subject to any matching constraint statements. Computes
+    /// `AccessVector::NONE` if no such statement exists.
+    ///
+    /// Access decisions are currently based on explicit "allow" rules and
+    /// "constrain" or "mlsconstrain" statements. A permission is allowed if
+    /// it is allowed by an explicit "allow", and if in addition, all matching
+    /// constraints are satisfied.
+    //
+    // TODO: https://fxbug.dev/372400976 - Check that this is actually the
+    // correct interaction between constraints and explicit "allow" rules.
+    //
+    // TODO: https://fxbug.dev/372400419 - Validate that "neverallow" rules
+    // don't need any deliberate handling here.
+    pub fn compute_access_decision(
         &self,
-        source_type: TypeId,
-        target_type: TypeId,
-        object_class: sc::ObjectClass,
+        source_context: &SecurityContext,
+        target_context: &SecurityContext,
+        object_class: &sc::ObjectClass,
     ) -> AccessDecision {
         if let Some(target_class) = self.0.class(&object_class) {
-            self.0.parsed_policy().compute_explicitly_allowed(
-                source_type,
-                target_type,
+            self.0.parsed_policy().compute_access_decision(
+                source_context,
+                target_context,
                 target_class,
             )
         } else {
@@ -407,20 +426,21 @@ impl<PS: ParseStrategy> Policy<PS> {
         }
     }
 
-    /// Computes the access vector that associates type `source_type_name` and `target_type_name`
-    /// via an explicit `allow [...];` statement in the binary policy. Computes `AccessVector::NONE`
-    /// if no such statement exists. This is the "custom" form of this API because
-    /// `target_class_name` is associated with a [`crate::AbstractObjectClass::Custom`]
-    /// value.
-    pub fn compute_explicitly_allowed_custom(
+    /// Computes the access vector that associates type `source_type_name` and
+    /// `target_type_name` via an explicit `allow [...];` statement in the
+    /// binary policy, subject to any matching constraint statements. Computes
+    /// `AccessVector::NONE` if no such statement exists. This is the "custom"
+    /// form of this API because `target_class_name` is associated with a
+    /// [`crate::AbstractObjectClass::Custom`] value.
+    pub fn compute_access_decision_custom(
         &self,
-        source_type: TypeId,
-        target_type: TypeId,
+        source_context: &SecurityContext,
+        target_context: &SecurityContext,
         target_class_name: &str,
     ) -> AccessDecision {
-        self.0.parsed_policy().compute_explicitly_allowed_custom(
-            source_type,
-            target_type,
+        self.0.parsed_policy().compute_access_decision_custom(
+            source_context,
+            target_context,
             target_class_name,
         )
     }
@@ -1126,6 +1146,117 @@ pub(super) mod tests {
         // in relation to "a_t". Therefore, we expect exactly two 1's in the access vector for
         // query `("a_t", "a_t", "class0")`.
         assert_eq!(2, raw_access_vector.count_ones());
+    }
+
+    #[test]
+    fn compute_access_decision_with_constraints() {
+        let policy_bytes =
+            include_bytes!("../../testdata/micro_policies/allow_with_constraints_policy.pp");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
+
+        let source_context: SecurityContext = policy
+            .parse_security_context(b"user0:object_r:type0:s0-s0".into())
+            .expect("create source security context");
+
+        let target_context_satisfied: SecurityContext = source_context.clone();
+        let decision_satisfied = policy.compute_access_decision(
+            &source_context,
+            &target_context_satisfied,
+            &ObjectClass::File,
+        );
+        // The class `file` has 4 permissions, 3 of which are explicitly
+        // allowed for this target context. All of those permissions satisfy all
+        // matching constraints.
+        assert_eq!(decision_satisfied.allow, AccessVector(7));
+
+        let target_context_unsatisfied: SecurityContext = policy
+            .parse_security_context(b"user1:object_r:type0:s0:c0-s0:c0".into())
+            .expect("create target security context failing some constraints");
+        let decision_unsatisfied = policy.compute_access_decision(
+            &source_context,
+            &target_context_unsatisfied,
+            &ObjectClass::File,
+        );
+        // Two of the explicitly-allowed permissions fail to satisfy a matching
+        // constraint. Only 1 is allowed in the final access decision.
+        assert_eq!(decision_unsatisfied.allow, AccessVector(4));
+    }
+
+    #[test]
+    fn compute_access_decision_custom_with_mlsconstrain() {
+        let policy_bytes =
+            include_bytes!("../../testdata/micro_policies/allow_with_constraints_policy.pp");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
+
+        let source_context: SecurityContext = policy
+            .parse_security_context(b"user0:object_r:type0:s0-s0".into())
+            .expect("create source security context");
+
+        let target_context_satisfied: SecurityContext = source_context.clone();
+        let decision_satisfied = policy.compute_access_decision_custom(
+            &source_context,
+            &target_context_satisfied,
+            "class_mlsconstrain",
+        );
+        // The class `class_mlsconstrain` has 3 permissions, 2 of which are explicitly
+        // allowed for this target context. Both of those permissions satisfy all
+        // matching constraints.
+        assert_eq!(decision_satisfied.allow, AccessVector(3));
+
+        let target_context_unsatisfied: SecurityContext = policy
+            .parse_security_context(b"user1:object_r:type0:s0:c0-s0:c0".into())
+            .expect("create target security context failing a constraint");
+        let decision_unsatisfied = policy.compute_access_decision_custom(
+            &source_context,
+            &target_context_unsatisfied,
+            "class_mlsconstrain",
+        );
+        // One of the explicitly-allowed permissions fails to satisfy a matching
+        // constraint.
+        assert_eq!(decision_unsatisfied.allow, AccessVector(2));
+    }
+
+    #[test]
+    fn compute_access_decision_custom_with_constrain() {
+        let policy_bytes =
+            include_bytes!("../../testdata/micro_policies/allow_with_constraints_policy.pp");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
+
+        let source_context: SecurityContext = policy
+            .parse_security_context(b"user0:object_r:type0:s0-s0".into())
+            .expect("create source security context");
+
+        let target_context_satisfied: SecurityContext = source_context.clone();
+        let decision_satisfied = policy.compute_access_decision_custom(
+            &source_context,
+            &target_context_satisfied,
+            "class_mlsconstrain",
+        );
+        // The class `class_constrain` has 3 permissions, 2 of which are explicitly
+        // allowed for this target context. Both of those permissions satisfy all
+        // matching constraints.
+        assert_eq!(decision_satisfied.allow, AccessVector(3));
+
+        let target_context_unsatisfied: SecurityContext = policy
+            .parse_security_context(b"user1:object_r:type0:s0:c0-s0:c0".into())
+            .expect("create target security context failing a constraint");
+        let decision_unsatisfied = policy.compute_access_decision_custom(
+            &source_context,
+            &target_context_unsatisfied,
+            "class_constrain",
+        );
+        // One of the explicitly-allowed permissions fails to satisfy a matching
+        // constraint.
+        assert_eq!(decision_unsatisfied.allow, AccessVector(2));
     }
 
     #[test]
