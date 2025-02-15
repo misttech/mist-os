@@ -8,7 +8,7 @@ use crate::parser::common::{
 };
 use nom::bytes::complete::tag;
 use nom::sequence::separated_pair;
-use nom::IResult;
+use nom::{IResult, Parser};
 use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -75,12 +75,12 @@ fn property_from_pair<'a, 'b>(
 fn property(input: NomSpan) -> IResult<NomSpan, Property, BindParserError> {
     let key = ws(compound_identifier);
     let separator = ws(map_err(tag("="), BindParserError::Assignment));
-    let (input, (key, value)) = separated_pair(key, separator, condition_value)(input)?;
+    let (input, (key, value)) = separated_pair(key, separator, condition_value).parse(input)?;
     Ok((input, Property { key, value }))
 }
 
 fn device_specification(input: NomSpan) -> IResult<NomSpan, DeviceSpecification, BindParserError> {
-    let (input, properties) = many_until_eof(ws(property))(input)?;
+    let (input, properties) = many_until_eof(ws(property)).parse(input)?;
     Ok((input, DeviceSpecification { properties }))
 }
 

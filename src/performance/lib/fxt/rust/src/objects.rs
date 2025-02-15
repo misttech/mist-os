@@ -12,6 +12,7 @@ use crate::{
 use flyweights::FlyStr;
 use nom::combinator::all_consuming;
 use nom::number::complete::le_u64;
+use nom::Parser;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct UserspaceObjRecord {
@@ -49,7 +50,8 @@ impl<'a> RawUserspaceObjRecord<'a> {
         let (payload, pointer) = le_u64(payload)?;
         let (payload, process) = ProcessRef::parse(header.process_ref(), payload)?;
         let (payload, name) = StringRef::parse(header.name_ref(), payload)?;
-        let (empty, args) = all_consuming(|p| RawArg::parse_n(header.num_args(), p))(payload)?;
+        let (empty, args) =
+            all_consuming(|p| RawArg::parse_n(header.num_args(), p)).parse(payload)?;
         assert!(empty.is_empty(), "all_consuming must not return any remaining buffer");
         Ok((rem, Self { pointer, process, name, args }))
     }
@@ -111,7 +113,8 @@ impl<'a> RawKernelObjRecord<'a> {
         let (rem, payload) = header.take_payload(buf)?;
         let (payload, koid) = le_u64(payload)?;
         let (payload, name) = StringRef::parse(header.name_ref(), payload)?;
-        let (empty, args) = all_consuming(|p| RawArg::parse_n(header.num_args(), p))(payload)?;
+        let (empty, args) =
+            all_consuming(|p| RawArg::parse_n(header.num_args(), p)).parse(payload)?;
         assert!(empty.is_empty(), "all_consuming must not return any remaining buffer");
         Ok((rem, Self { koid, name, args, ty }))
     }

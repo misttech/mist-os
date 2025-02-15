@@ -150,8 +150,9 @@ mock-omaha-server = { version = "0.3.3", default-features = false }
 mockall = "0.9"
 munge = "0.4.1"
 nix = { version = "0.29.0", features = ["feature", "fs", "hostname", "net", "process", "signal", "user"] }
-nom = { version = "7.1.3", default-features = false, features = ["std"] }
-nom_locate = "4.2.0"
+nom = { version = "8.0.0", default-features = false, features = ["std"] }
+nom-language = "0.1.0"
+nom_locate = "5.0.0"
 nu-ansi-term = "0.46.0"
 num = { version = "0.4.0", features = ["rand"] }
 num-derive = "0.4.2"
@@ -395,7 +396,8 @@ fuse3 = { path = "forks/fuse3" }
 hound = { path = "forks/hound" }
 libm = { path = "forks/libm" }
 nix_0_29_0 = { package = "nix", path = "forks/nix-0.29.0" }
-nom = { path = "forks/nom" }
+nom-7_1_3 = { package = "nom", path = "forks/nom" }
+nom-language = { package = "nom-language", path = "forks/nom-language-0.1.0" }
 notify = { path = "forks/notify" }
 # FIXME(118248): We can unfork once undefined behavior is resolved.
 prettytable-rs = { path = "forks/prettytable-rs" }

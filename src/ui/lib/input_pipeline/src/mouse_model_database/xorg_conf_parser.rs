@@ -5,12 +5,11 @@
 use nom::branch::alt;
 use nom::bytes::complete::{is_not, tag, take_until, take_while};
 use nom::character::complete::{alphanumeric1, digit1, line_ending, multispace1, not_line_ending};
-use nom::character::is_hex_digit;
 use nom::combinator::{map, map_res, value};
 use nom::error::{ErrorKind, ParseError};
 use nom::multi::many0;
-use nom::sequence::{delimited, preceded, separated_pair, tuple};
-use nom::{self, IResult};
+use nom::sequence::{delimited, preceded, separated_pair};
+use nom::{self, AsChar, IResult, Parser};
 use nom_locate::LocatedSpan;
 use std::fmt;
 use thiserror::Error;
@@ -94,7 +93,7 @@ impl ParseError<NomSpan<'_>> for XOrgConfParserError {
 }
 
 fn is_product_id_char(chr: char) -> bool {
-    chr.is_ascii() && (is_hex_digit(chr as u8) || chr == '*')
+    chr.is_ascii() && (chr.is_hex_digit() || chr == '*')
 }
 
 /// allows * to match any device, glob pattern to match using pattern and exact hex number to match.
@@ -103,7 +102,8 @@ fn parse_product_id(input: NomSpan<'_>) -> IResult<NomSpan<'_>, String, XOrgConf
     helper::map_err(
         map(parser, |s: NomSpan<'_>| s.fragment().to_string()),
         XOrgConfParserError::InvalidProductId,
-    )(input)
+    )
+    .parse(input)
 }
 
 fn parse_vendor_id(input: NomSpan<'_>) -> IResult<NomSpan<'_>, String, XOrgConfParserError> {
@@ -111,13 +111,15 @@ fn parse_vendor_id(input: NomSpan<'_>) -> IResult<NomSpan<'_>, String, XOrgConfP
     helper::map_err(
         map(parser, |s: NomSpan<'_>| s.fragment().to_string()),
         XOrgConfParserError::InvalidVendorId,
-    )(input)
+    )
+    .parse(input)
 }
 
 fn parse_usb_id(input: NomSpan<'_>) -> IResult<NomSpan<'_>, Attribute, XOrgConfParserError> {
     map(separated_pair(parse_vendor_id, tag(":"), parse_product_id), |(vendor_id, product_id)| {
         Attribute::USBID(vendor_id.to_lowercase(), product_id.to_lowercase())
-    })(input)
+    })
+    .parse(input)
 }
 
 fn parse_attribute_usb_id(
@@ -126,7 +128,8 @@ fn parse_attribute_usb_id(
     preceded(
         tag(ATTRIBUTE_KEY_MATCHUSBID),
         helper::skip_ws_or_comment(helper::quoted(parse_usb_id)),
-    )(input)
+    )
+    .parse(input)
 }
 
 fn parse_attribute_identifier(
@@ -134,7 +137,7 @@ fn parse_attribute_identifier(
 ) -> IResult<NomSpan<'_>, Attribute, XOrgConfParserError> {
     let parser =
         preceded(tag(ATTRIBUTE_KEY_IDENTIFIER), helper::skip_ws_or_comment(helper::quoted_str));
-    map(parser, |value| Attribute::Identifier(value))(input)
+    map(parser, |value| Attribute::Identifier(value)).parse(input)
 }
 
 fn parse_attribute_cpi(input: NomSpan<'_>) -> IResult<NomSpan<'_>, Attribute, XOrgConfParserError> {
@@ -145,20 +148,19 @@ fn parse_attribute_cpi(input: NomSpan<'_>) -> IResult<NomSpan<'_>, Attribute, XO
             helper::skip_ws_or_comment(helper::quoted_u32),
         )),
     );
-    map(parser, |value| Attribute::CPI(value))(input)
+    map(parser, |value| Attribute::CPI(value)).parse(input)
 }
 
 /// Consume any valid attribute.
 fn parse_attribute_any(input: NomSpan<'_>) -> IResult<NomSpan<'_>, Attribute, XOrgConfParserError> {
     let parser = separated_pair(alphanumeric1, multispace1, not_line_ending);
-    helper::map_err(map(parser, |_| Attribute::Unknown), XOrgConfParserError::InvalidAttribute)(
-        input,
-    )
+    helper::map_err(map(parser, |_| Attribute::Unknown), XOrgConfParserError::InvalidAttribute)
+        .parse(input)
 }
 
 fn parse_end_section(input: NomSpan<'_>) -> IResult<NomSpan<'_>, Attribute, XOrgConfParserError> {
     let end = value(Attribute::EndSection, tag(KEYWORD_END_SECTION));
-    helper::map_err(end, XOrgConfParserError::NotEndSection)(input)
+    helper::map_err(end, XOrgConfParserError::NotEndSection).parse(input)
 }
 
 fn parse_section_attribute(
@@ -170,7 +172,8 @@ fn parse_section_attribute(
         parse_attribute_usb_id,
         parse_attribute_cpi,
         parse_attribute_any,
-    )))(input)
+    )))
+    .parse(input)
 }
 
 fn parse_section(
@@ -179,7 +182,8 @@ fn parse_section(
     let res = helper::map_parser_err(
         preceded(tag(KEYWORD_SECTION), helper::skip_ws_or_comment(helper::quoted_str)),
         XOrgConfParserError::NotSection,
-    )(input);
+    )
+    .parse(input);
     let (mut rest, name) = match res {
         Err(e) => {
             return Err(e);
@@ -191,13 +195,13 @@ fn parse_section(
     if name != SECTION_NAME_INPUT_CLASS {
         let until_end_section = take_until(KEYWORD_END_SECTION);
         let rest =
-            match helper::map_err(until_end_section, XOrgConfParserError::FailToReachEndSection)(
-                rest,
-            ) {
+            match helper::map_err(until_end_section, XOrgConfParserError::FailToReachEndSection)
+                .parse(rest)
+            {
                 Ok((rest, _)) => rest,
                 Err(e) => return Err(e),
             };
-        return map(parse_end_section, |_| None)(rest);
+        return map(parse_end_section, |_| None).parse(rest);
     }
 
     let mut mouse_model =
@@ -238,7 +242,7 @@ fn parse_section(
 pub(super) fn parse_xorg_file(
     input: NomSpan<'_>,
 ) -> IResult<NomSpan<'_>, Vec<MouseModel>, XOrgConfParserError> {
-    let res = helper::many_until_eof(helper::skip_ws_or_comment(parse_section))(input);
+    let res = helper::many_until_eof(helper::skip_ws_or_comment(parse_section)).parse(input);
     let models = match res {
         Ok((rest, models)) => {
             // expect all content consumed.
@@ -296,13 +300,13 @@ mod helper {
     pub(super) fn map_err<'a, O, P, G>(
         mut parser: P,
         f: G,
-    ) -> impl FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, XOrgConfParserError>
+    ) -> impl Parser<NomSpan<'a>, Output = O, Error = XOrgConfParserError>
     where
-        P: FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, (NomSpan<'a>, ErrorKind)>,
+        P: Parser<NomSpan<'a>, Output = O, Error = (NomSpan<'a>, ErrorKind)>,
         G: Fn(/* bad_input: */ String) -> XOrgConfParserError,
     {
-        move |input: NomSpan<'_>| {
-            parser(input).map_err(|e| match e {
+        move |input: NomSpan<'a>| {
+            parser.parse(input).map_err(|e| match e {
                 nom::Err::Error((bad_input, _)) => nom::Err::Error(f(bad_input.to_string())),
                 nom::Err::Failure((bad_input, _)) => nom::Err::Failure(f(bad_input.to_string())),
                 nom::Err::Incomplete(_) => {
@@ -315,13 +319,13 @@ mod helper {
     pub(super) fn map_parser_err<'a, O, P, G>(
         mut parser: P,
         f: G,
-    ) -> impl FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, XOrgConfParserError>
+    ) -> impl Parser<NomSpan<'a>, Output = O, Error = XOrgConfParserError>
     where
-        P: FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, XOrgConfParserError>,
+        P: Parser<NomSpan<'a>, Output = O, Error = XOrgConfParserError>,
         G: Fn(String) -> XOrgConfParserError,
     {
-        move |input: NomSpan<'_>| {
-            parser(input).map_err(|e| match e {
+        move |input: NomSpan<'a>| {
+            parser.parse(input).map_err(|e| match e {
                 nom::Err::Error(e) => nom::Err::Error(f(e.to_string())),
                 nom::Err::Failure(e) => nom::Err::Failure(f(e.to_string())),
                 nom::Err::Incomplete(_) => {
@@ -336,9 +340,9 @@ mod helper {
     /// the AST spans contain no trailing whitespace.
     pub(super) fn skip_ws_or_comment<'a, O, F>(
         f: F,
-    ) -> impl FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, XOrgConfParserError>
+    ) -> impl Parser<NomSpan<'a>, Output = O, Error = XOrgConfParserError>
     where
-        F: FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, XOrgConfParserError>,
+        F: Parser<NomSpan<'a>, Output = O, Error = XOrgConfParserError>,
     {
         preceded(comment_or_whitespace, f)
     }
@@ -348,14 +352,14 @@ mod helper {
         input: NomSpan<'_>,
     ) -> IResult<NomSpan<'_>, (), XOrgConfParserError> {
         let multispace = value((), multispace1);
-        value((), many0(alt((multispace, singleline_comment))))(input)
+        value((), many0(alt((multispace, singleline_comment)))).parse(input)
     }
 
     /// Parser that matches a single line comment, e.g. "# comment\n".
     pub(super) fn singleline_comment(
         input: NomSpan<'_>,
     ) -> IResult<NomSpan<'_>, (), XOrgConfParserError> {
-        value((), tuple((tag("#"), not_line_ending, line_ending)))(input)
+        value((), (tag("#"), not_line_ending, line_ending)).parse(input)
     }
 
     /// Applies the parser `f` until reaching the end of the input. `f` must always make progress (i.e.
@@ -363,9 +367,9 @@ mod helper {
     /// the results of `f` in a Vec.
     pub(super) fn many_until_eof<'a, O, F>(
         mut f: F,
-    ) -> impl FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, Vec<O>, XOrgConfParserError>
+    ) -> impl Parser<NomSpan<'a>, Output = Vec<O>, Error = XOrgConfParserError>
     where
-        F: FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, XOrgConfParserError>,
+        F: Parser<NomSpan<'a>, Output = O, Error = XOrgConfParserError>,
     {
         move |mut input: NomSpan<'a>| {
             let mut result = vec![];
@@ -376,7 +380,7 @@ mod helper {
                     return Ok((rest, result));
                 }
 
-                let (next_input, res) = f(input)?;
+                let (next_input, res) = f.parse(input)?;
                 if input.fragment().len() == next_input.fragment().len() {
                     panic!("many_until_eof called on an optional parser. This will result in an infinite loop");
                 }
@@ -388,9 +392,9 @@ mod helper {
 
     pub(super) fn quoted<'a, O, F>(
         f: F,
-    ) -> impl FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, XOrgConfParserError>
+    ) -> impl Parser<NomSpan<'a>, Output = O, Error = XOrgConfParserError>
     where
-        F: FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, XOrgConfParserError>,
+        F: Parser<NomSpan<'a>, Output = O, Error = XOrgConfParserError>,
     {
         delimited(tag("\""), f, tag("\""))
     }
@@ -403,17 +407,18 @@ mod helper {
         map_err(
             map(quoted_parser, |s: NomSpan<'_>| s.fragment().to_string()),
             XOrgConfParserError::StringLiteral,
-        )(input)
+        )
+        .parse(input)
     }
 
     pub(super) fn quoted_u32(input: NomSpan<'_>) -> IResult<NomSpan<'_>, u32, XOrgConfParserError> {
         let base10 = map_res(digit1, |s: NomSpan<'_>| u32::from_str_radix(s.fragment(), 10));
         let quoted_parser = delimited(tag("\""), base10, tag("\""));
-        map_err(quoted_parser, XOrgConfParserError::NumericLiteral)(input)
+        map_err(quoted_parser, XOrgConfParserError::NumericLiteral).parse(input)
     }
 
     pub(super) fn is_ascii_hex_digit(chr: char) -> bool {
-        chr.is_ascii() && is_hex_digit(chr as u8)
+        chr.is_ascii() && chr.is_hex_digit()
     }
 }
 
@@ -453,21 +458,25 @@ mod tests {
         #[test]
         fn test_skip_ws_or_comment() {
             let test = || map(tag("test"), |s: NomSpan<'_>| s.fragment().to_string());
-            check_result(skip_ws_or_comment(test())(NomSpan::new("test")), "", "test".to_string());
+            check_result(
+                skip_ws_or_comment(test()).parse(NomSpan::new("test")),
+                "",
+                "test".to_string(),
+            );
 
             check_result(
-                skip_ws_or_comment(test())(NomSpan::new(" \n\t\r\ntest")),
+                skip_ws_or_comment(test()).parse(NomSpan::new(" \n\t\r\ntest")),
                 "",
                 "test".to_string(),
             );
             check_result(
-                skip_ws_or_comment(test())(NomSpan::new("test \n\t\r\n")),
+                skip_ws_or_comment(test()).parse(NomSpan::new("test \n\t\r\n")),
                 " \n\t\r\n",
                 "test".to_string(),
             );
 
             check_result(
-                skip_ws_or_comment(test())(NomSpan::new(" # test \n test # rest \n ")),
+                skip_ws_or_comment(test()).parse(NomSpan::new(" # test \n test # rest \n ")),
                 " # rest \n ",
                 "test".to_string(),
             );

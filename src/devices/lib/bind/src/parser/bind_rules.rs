@@ -10,8 +10,8 @@ use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{opt, value};
 use nom::multi::{many1, separated_list1};
-use nom::sequence::{delimited, preceded, terminated, tuple};
-use nom::IResult;
+use nom::sequence::{delimited, preceded, terminated};
+use nom::{IResult, Parser};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Ast<'a> {
@@ -90,14 +90,14 @@ impl<'a> TryFrom<&'a str> for Ast<'a> {
 fn condition_op(input: NomSpan) -> IResult<NomSpan, ConditionOp, BindParserError> {
     let equals = value(ConditionOp::Equals, tag("=="));
     let not_equals = value(ConditionOp::NotEquals, tag("!="));
-    map_err(alt((equals, not_equals)), BindParserError::ConditionOp)(input)
+    map_err(alt((equals, not_equals)), BindParserError::ConditionOp).parse(input)
 }
 
 fn condition(input: NomSpan) -> IResult<NomSpan, Condition, BindParserError> {
     let from = skip_ws(input)?;
-    let (input, lhs) = ws(compound_identifier)(from)?;
-    let (input, op) = ws(condition_op)(input)?;
-    let (to, rhs) = ws(condition_value)(input)?;
+    let (input, lhs) = ws(compound_identifier).parse(from)?;
+    let (input, op) = ws(condition_op).parse(input)?;
+    let (to, rhs) = ws(condition_value).parse(input)?;
 
     let span = Span::from_to(&from, &to);
     Ok((to, Condition { span, lhs, op, rhs }))
@@ -106,30 +106,30 @@ fn condition(input: NomSpan) -> IResult<NomSpan, Condition, BindParserError> {
 fn condition_statement(input: NomSpan) -> IResult<NomSpan, Statement, BindParserError> {
     let from = skip_ws(input)?;
     let terminator = ws(map_err(tag(";"), BindParserError::Semicolon));
-    let (to, condition) = terminated(condition, terminator)(from)?;
+    let (to, condition) = terminated(condition, terminator).parse(from)?;
 
     let span = Span::from_to(&from, &to);
     Ok((to, Statement::ConditionStatement { span, condition }))
 }
 
 fn keyword_if(input: NomSpan) -> IResult<NomSpan, NomSpan, BindParserError> {
-    ws(map_err(tag("if"), BindParserError::IfKeyword))(input)
+    ws(map_err(tag("if"), BindParserError::IfKeyword)).parse(input)
 }
 
 fn keyword_else(input: NomSpan) -> IResult<NomSpan, NomSpan, BindParserError> {
-    ws(map_err(tag("else"), BindParserError::ElseKeyword))(input)
+    ws(map_err(tag("else"), BindParserError::ElseKeyword)).parse(input)
 }
 
 fn if_statement(input: NomSpan) -> IResult<NomSpan, Statement, BindParserError> {
     let from = skip_ws(input)?;
 
-    let if_block = tuple((preceded(keyword_if, condition), statement_block));
+    let if_block = (preceded(keyword_if, condition), statement_block);
     let mut if_blocks = separated_list1(keyword_else, if_block);
 
     let mut else_block = preceded(keyword_else, statement_block);
 
-    let (input, blocks) = if_blocks(from)?;
-    let (to, else_block) = else_block(input)?;
+    let (input, blocks) = if_blocks.parse(from)?;
+    let (to, else_block) = else_block.parse(input)?;
 
     let span = Span::from_to(&from, &to);
     Ok((to, Statement::If { span, blocks, else_block }))
@@ -138,11 +138,11 @@ fn if_statement(input: NomSpan) -> IResult<NomSpan, Statement, BindParserError> 
 pub fn statement_block(input: NomSpan) -> IResult<NomSpan, Vec<Statement>, BindParserError> {
     let block_start = ws(map_err(tag("{"), BindParserError::IfBlockStart));
     let block_end = ws(map_err(tag("}"), BindParserError::IfBlockEnd));
-    delimited(block_start, many1(ws(statement)), block_end)(input)
+    delimited(block_start, many1(ws(statement)), block_end).parse(input)
 }
 
 fn keyword_accept(input: NomSpan) -> IResult<NomSpan, NomSpan, BindParserError> {
-    ws(map_err(tag("accept"), BindParserError::AcceptKeyword))(input)
+    ws(map_err(tag("accept"), BindParserError::AcceptKeyword)).parse(input)
 }
 
 fn accept(input: NomSpan) -> IResult<NomSpan, Statement, BindParserError> {
@@ -158,7 +158,7 @@ fn accept(input: NomSpan) -> IResult<NomSpan, Statement, BindParserError> {
     let value_list = delimited(list_start, values, list_end);
 
     let (to, (identifier, values)) =
-        preceded(keyword_accept, tuple((ws(compound_identifier), value_list)))(from)?;
+        preceded(keyword_accept, (ws(compound_identifier), value_list)).parse(from)?;
 
     let span = Span::from_to(&from, &to);
     Ok((to, Statement::Accept { span, identifier, values }))
@@ -168,7 +168,7 @@ fn keyword_false(input: NomSpan) -> IResult<NomSpan, Statement, BindParserError>
     let from = skip_ws(input)?;
     let keyword = ws(map_err(tag("false"), BindParserError::FalseKeyword));
     let terminator = ws(map_err(tag(";"), BindParserError::Semicolon));
-    let (to, _) = terminated(keyword, terminator)(from)?;
+    let (to, _) = terminated(keyword, terminator).parse(from)?;
 
     let span = Span::from_to(&from, &to);
     Ok((to, Statement::False { span }))
@@ -178,19 +178,19 @@ fn keyword_true(input: NomSpan) -> IResult<NomSpan, Statement, BindParserError> 
     let from = skip_ws(input)?;
     let keyword = ws(map_err(tag("true"), BindParserError::TrueKeyword));
     let terminator = ws(map_err(tag(";"), BindParserError::Semicolon));
-    let (to, _) = terminated(keyword, terminator)(from)?;
+    let (to, _) = terminated(keyword, terminator).parse(from)?;
 
     let span = Span::from_to(&from, &to);
     Ok((to, Statement::True { span }))
 }
 
 fn statement(input: NomSpan) -> IResult<NomSpan, Statement, BindParserError> {
-    alt((condition_statement, if_statement, accept, keyword_false, keyword_true))(input)
+    alt((condition_statement, if_statement, accept, keyword_false, keyword_true)).parse(input)
 }
 
 fn rules(input: NomSpan) -> IResult<NomSpan, Ast, BindParserError> {
-    let (input, using) = ws(using_list)(input)?;
-    let (input, statements) = many_until_eof(ws(statement))(input)?;
+    let (input, using) = ws(using_list).parse(input)?;
+    let (input, statements) = many_until_eof(ws(statement)).parse(input)?;
     if statements.is_empty() {
         return Err(nom::Err::Error(BindParserError::NoStatements(input.to_string())));
     }

@@ -4,6 +4,7 @@
 
 use crate::{take_n_padded, trace_header, ParseError, ParseResult, STRING_RECORD_TYPE};
 use nom::combinator::all_consuming;
+use nom::Parser;
 use std::num::NonZeroU16;
 
 pub(crate) const STRING_REF_INLINE_BIT: u16 = 1 << 15;
@@ -48,7 +49,8 @@ impl<'a> StringRecord<'a> {
         let (buf, header) = StringHeader::parse(buf)?;
         let (rem, payload) = header.take_payload(buf)?;
         let (empty, value) =
-            all_consuming(|p| parse_padded_string(header.string_len() as usize, p))(payload)?;
+            all_consuming(|p| parse_padded_string(header.string_len() as usize, p))
+                .parse(payload)?;
         assert!(empty.is_empty(), "all_consuming must not return any remaining buffer");
         Ok((rem, Self { index: header.string_index(), value }))
     }

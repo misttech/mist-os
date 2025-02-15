@@ -102,24 +102,24 @@ mod parse_mount_options {
     use nom::combinator::opt;
     use nom::multi::separated_list0;
     use nom::sequence::{delimited, separated_pair, terminated};
-    use nom::IResult;
+    use nom::{IResult, Parser};
     use starnix_uapi::errors::{errno, error, Errno};
     use std::collections::HashMap;
 
     fn unquoted(input: &[u8]) -> IResult<&[u8], &[u8]> {
-        is_not(",=")(input)
+        is_not(",=").parse(input)
     }
 
     fn quoted(input: &[u8]) -> IResult<&[u8], &[u8]> {
-        delimited(tag(b"\""), is_not("\""), tag(b"\""))(input)
+        delimited(tag("\""), is_not("\""), tag("\"")).parse(input)
     }
 
     fn value(input: &[u8]) -> IResult<&[u8], &[u8]> {
-        alt((quoted, unquoted))(input)
+        alt((quoted, unquoted)).parse(input)
     }
 
     fn key_value(input: &[u8]) -> IResult<&[u8], (&[u8], &[u8])> {
-        separated_pair(unquoted, tag(b"="), value)(input)
+        separated_pair(unquoted, tag("="), value).parse(input)
     }
 
     fn key_only(input: &[u8]) -> IResult<&[u8], (&[u8], &[u8])> {
@@ -128,13 +128,13 @@ mod parse_mount_options {
     }
 
     fn option(input: &[u8]) -> IResult<&[u8], (&[u8], &[u8])> {
-        alt((key_value, key_only))(input)
+        alt((key_value, key_only)).parse(input)
     }
 
     pub(super) fn parse_mount_options(input: &FsStr) -> Result<HashMap<FsString, FsString>, Errno> {
-        let (input, options) =
-            terminated(separated_list0(tag(b","), option), opt(tag(b",")))(input.into())
-                .map_err(|_| errno!(EINVAL))?;
+        let (input, options) = terminated(separated_list0(tag(","), option), opt(tag(",")))
+            .parse(input.into())
+            .map_err(|_| errno!(EINVAL))?;
 
         // `[...],last_key="mis"quoted` not allowed.
         if input.len() > 0 {

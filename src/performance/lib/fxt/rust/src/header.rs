@@ -92,7 +92,8 @@ macro_rules! trace_header {
 
             #[allow(unused)] // Some headers are converted from others and don't need to be parsed.
             fn parse(buf: &[u8]) -> crate::ParseResult<'_, Self> {
-                nom::combinator::map_res(nom::number::streaming::le_u64, |h| Self::new(h))(buf)
+                use nom::Parser;
+                nom::combinator::map_res(nom::number::streaming::le_u64, |h| Self::new(h)).parse(buf)
             }
 
             #[allow(unused)] // Not all headers come with payloads, some we use to probe for types.

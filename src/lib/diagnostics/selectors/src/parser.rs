@@ -12,8 +12,8 @@ use nom::character::complete::{alphanumeric1, multispace0, none_of, one_of};
 use nom::combinator::{all_consuming, complete, cond, map, opt, peek, recognize, verify};
 use nom::error::{ErrorKind, ParseError as NomParseError};
 use nom::multi::{many1_count, separated_list1};
-use nom::sequence::{pair, preceded, separated_pair, tuple};
-use nom::IResult;
+use nom::sequence::{pair, preceded, separated_pair};
+use nom::{IResult, Parser};
 
 const ALL_TREE_NAMES_SELECTED_SYMBOL: &str = "...";
 
@@ -30,13 +30,13 @@ fn whitespace0<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: NomParseError<&'a str>,
 {
-    take_while(move |c| c == ' ' || c == '\t')(input)
+    take_while(move |c| c == ' ' || c == '\t').parse(input)
 }
 
 /// Parses an input containing any number and type of whitespace at the front.
-fn spaced<'a, E, F, O>(parser: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
+fn spaced<'a, E, F, O>(parser: F) -> impl Parser<&'a str, Output = O, Error = E>
 where
-    F: nom::Parser<&'a str, O, E>,
+    F: Parser<&'a str, Output = O, Error = E>,
     E: NomParseError<&'a str>,
 {
     preceded(whitespace0, parser)
@@ -108,7 +108,7 @@ fn tree_selector<'a, E>(
     // this can't be determined from the input to the resulting parser, because this function is
     // used on both whole selector strings and strings that are only tree selectors
     required_escapes: RequireEscaped,
-) -> impl FnMut(&'a str) -> IResult<&'a str, TreeSelector<'a>, E>
+) -> impl Parser<&'a str, Output = TreeSelector<'a>, Error = E>
 where
     E: NomParseError<&'a str>,
 {
@@ -136,9 +136,8 @@ where
                         .into_iter()
                         .map(|name| {
                             let (_, (_, value)) =
-                                spaced(separated_pair(tag("name"), tag("="), &mut name_escapes))(
-                                    name,
-                                )?;
+                                spaced(separated_pair(tag("name"), tag("="), &mut name_escapes))
+                                    .parse(name)?;
                             Ok(extract_from_quotes(value))
                         })
                         .collect::<Result<Vec<_>, _>>()
@@ -147,10 +146,10 @@ where
                 .map(|value| value.into())
         };
 
-        let (rest, node_segments) = separated_list1(tag("/"), &mut esc)(rest)?;
-        let (rest, property_segment) = if peek::<&str, _, E, _>(tag(":"))(rest).is_ok() {
-            let (rest, _) = tag(":")(rest)?;
-            let (rest, property) = verify(esc, |value: &str| !value.is_empty())(rest)?;
+        let (rest, node_segments) = separated_list1(tag("/"), &mut esc).parse(rest)?;
+        let (rest, property_segment) = if peek(tag::<_, _, E>(":")).parse(rest).is_ok() {
+            let (rest, _) = tag(":").parse(rest)?;
+            let (rest, property) = verify(esc, |value: &str| !value.is_empty()).parse(rest)?;
             (rest, Some(property))
         } else {
             (rest, None)
@@ -170,7 +169,7 @@ where
 /// the argument `escape_colons`.
 fn component_selector<'a, E>(
     required_escapes: RequireEscaped,
-) -> impl FnMut(&'a str) -> IResult<&'a str, ComponentSelector<'a>, E>
+) -> impl Parser<&'a str, Output = ComponentSelector<'a>, Error = E>
 where
     E: NomParseError<&'a str>,
 {
@@ -179,12 +178,13 @@ where
         input: &'a str,
     ) -> IResult<&'a str, ComponentSelector<'a>, E>
     where
-        F: nom::Parser<&'a str, &'a str, E>,
+        F: Parser<&'a str, Output = &'a str, Error = E>,
         E: NomParseError<&'a str>,
     {
         // Monikers (the first part of a selector) can optionally be preceded by "/" or "./".
         let (rest, segments) =
-            preceded(opt(alt((tag("./"), tag("/")))), separated_list1(tag("/"), segment))(input)?;
+            preceded(opt(alt((tag("./"), tag("/")))), separated_list1(tag("/"), segment))
+                .parse(input)?;
         Ok((
             rest,
             ComponentSelector { segments: segments.into_iter().map(Segment::from).collect() },
@@ -232,9 +232,9 @@ fn comment<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: NomParseError<&'a str>,
 {
-    let (rest, comment) = spaced(preceded(tag("//"), is_not("\n\r")))(input)?;
+    let (rest, comment) = spaced(preceded(tag("//"), is_not("\n\r"))).parse(input)?;
     if !rest.is_empty() {
-        let (rest, _) = one_of("\n\r")(rest)?; // consume the newline character
+        let (rest, _) = one_of("\n\r").parse(rest)?; // consume the newline character
         return Ok((rest, comment));
     }
     Ok((rest, comment))
@@ -251,23 +251,21 @@ where
 {
     let required_tree_escape =
         if input.starts_with('"') { RequireEscaped::empty() } else { RequireEscaped::WHITESPACE };
-    let (rest, (component, _, tree)) = tuple((
-        component_selector(RequireEscaped::COLONS),
-        tag(":"),
-        tree_selector(required_tree_escape),
-    ))(extract_from_quotes(input))?;
+    let (rest, (component, _, tree)) =
+        (component_selector(RequireEscaped::COLONS), tag(":"), tree_selector(required_tree_escape))
+            .parse(extract_from_quotes(input))?;
     Ok((rest, (component, tree)))
 }
 
 /// Recognizes selectors, with comments allowed or disallowed.
 fn do_parse_selector<'a, E>(
     allow_inline_comment: bool,
-) -> impl FnMut(&'a str) -> IResult<&'a str, Selector<'a>, E>
+) -> impl Parser<&'a str, Output = Selector<'a>, Error = E>
 where
     E: NomParseError<&'a str>,
 {
     map(
-        tuple((spaced(core_selector), cond(allow_inline_comment, opt(comment)), multispace0)),
+        (spaced(core_selector), cond(allow_inline_comment, opt(comment)), multispace0),
         move |((component, tree), _, _)| Selector { component, tree },
     )
 }
@@ -303,10 +301,10 @@ impl<'a> ParsingError<'a> for FastError {
 }
 
 impl<'a> ParsingError<'a> for VerboseError {
-    type Internal = nom::error::VerboseError<&'a str>;
+    type Internal = nom_language::error::VerboseError<&'a str>;
 
     fn to_error(input: &str, err: Self::Internal) -> ParseError {
-        ParseError::Verbose(nom::error::convert_error(input, err))
+        ParseError::Verbose(nom_language::error::convert_error(input, err))
     }
 }
 
@@ -317,7 +315,8 @@ where
 {
     let result = complete(all_consuming(do_parse_selector::<<E as ParsingError<'_>>::Internal>(
         /*allow_inline_comment=*/ false,
-    )))(input);
+    )))
+    .parse(input);
     match result {
         Ok((_, selector)) => {
             selector.validate()?;
@@ -336,9 +335,11 @@ where
 {
     let required_tree_escape =
         if input.starts_with('"') { RequireEscaped::empty() } else { RequireEscaped::WHITESPACE };
-    let result = nom::combinator::all_consuming::<_, _, <E as ParsingError<'_>>::Internal, _>(
-        pair(spaced(tree_selector(required_tree_escape)), multispace0),
-    )(extract_from_quotes(input));
+    let result = nom::combinator::all_consuming(pair(
+        spaced(tree_selector(required_tree_escape)),
+        multispace0,
+    ))
+    .parse(extract_from_quotes(input));
     match result {
         Ok((_, (tree_selector, _))) => {
             tree_selector.validate()?;
@@ -358,9 +359,11 @@ pub fn consuming_component_selector<'a, E>(
 where
     E: ParsingError<'a>,
 {
-    let result = nom::combinator::all_consuming::<_, _, <E as ParsingError<'_>>::Internal, _>(
-        pair(spaced(component_selector(required_escapes)), multispace0),
-    )(input);
+    let result = nom::combinator::all_consuming(pair(
+        spaced(component_selector(required_escapes)),
+        multispace0,
+    ))
+    .parse(input);
     match result {
         Ok((_, (component_selector, _))) => {
             component_selector.validate()?;
@@ -384,7 +387,8 @@ where
             ),
             Some,
         ),
-    ))))(input);
+    ))))
+    .parse(input);
     match result {
         Ok((_, maybe_selector)) => match maybe_selector {
             None => Ok(None),
@@ -459,9 +463,10 @@ mod tests {
         ];
 
         for (test_string, expected_segments) in test_vector {
-            let (_, selector) = component_selector::<nom::error::VerboseError<&str>>(
+            let (_, selector) = component_selector::<nom_language::error::VerboseError<&str>>(
                 RequireEscaped::COLONS,
-            )(test_string)
+            )
+            .parse(test_string)
             .unwrap();
             assert_eq!(
                 expected_segments, selector.segments,
@@ -471,9 +476,10 @@ mod tests {
 
             // Component selectors can start with `/`
             let test_moniker_string = format!("/{test_string}");
-            let (_, selector) = component_selector::<nom::error::VerboseError<&str>>(
+            let (_, selector) = component_selector::<nom_language::error::VerboseError<&str>>(
                 RequireEscaped::COLONS,
-            )(&test_moniker_string)
+            )
+            .parse(&test_moniker_string)
             .unwrap();
             assert_eq!(
                 expected_segments, selector.segments,
@@ -483,9 +489,10 @@ mod tests {
 
             // Component selectors can start with `./`
             let test_moniker_string = format!("./{test_string}");
-            let (_, selector) = component_selector::<nom::error::VerboseError<&str>>(
+            let (_, selector) = component_selector::<nom_language::error::VerboseError<&str>>(
                 RequireEscaped::COLONS,
-            )(&test_moniker_string)
+            )
+            .parse(&test_moniker_string)
             .unwrap();
             assert_eq!(
                 expected_segments, selector.segments,
@@ -495,9 +502,10 @@ mod tests {
 
             // We can also accept component selectors without escaping
             let test_moniker_string = test_string.replace("\\:", ":");
-            let (_, selector) = component_selector::<nom::error::VerboseError<&str>>(
+            let (_, selector) = component_selector::<nom_language::error::VerboseError<&str>>(
                 RequireEscaped::empty(),
-            )(&test_moniker_string)
+            )
+            .parse(&test_moniker_string)
             .unwrap();
             assert_eq!(
                 expected_segments, selector.segments,
@@ -510,10 +518,10 @@ mod tests {
     #[fuchsia::test]
     fn missing_path_component_selector_test() {
         let component_selector_string = "c";
-        let (_, component_selector) = component_selector::<nom::error::VerboseError<&str>>(
-            RequireEscaped::COLONS,
-        )(component_selector_string)
-        .unwrap();
+        let (_, component_selector) =
+            component_selector::<nom_language::error::VerboseError<&str>>(RequireEscaped::COLONS)
+                .parse(component_selector_string)
+                .unwrap();
         let mut path_vec = component_selector.segments;
         assert_eq!(path_vec.pop(), Some(Segment::ExactMatch("c".into())));
         assert!(path_vec.is_empty());
@@ -753,11 +761,12 @@ mod tests {
         ];
         for (string, node, property) in with_spaces {
             assert_eq!(
-                all_consuming::<_, _, nom::error::VerboseError<&str>, _>(tree_selector(
-                    RequireEscaped::WHITESPACE
-                ))(string)
-                .unwrap_or_else(|e| panic!("all_consuming |{string}| failed: {e}"))
-                .1,
+                all_consuming(tree_selector(RequireEscaped::WHITESPACE))
+                    .parse(string)
+                    .unwrap_or_else(|e: nom::Err<nom_language::error::VerboseError<_>>| panic!(
+                        "all_consuming |{string}| failed: {e}"
+                    ))
+                    .1,
                 TreeSelector { node, property, tree_names: None },
                 "input: |{string}|",
             );
@@ -955,7 +964,7 @@ mod tests {
             test_cases.into_iter().enumerate()
         {
             let (actual_residue, actual_name_list) =
-                extract_conjoined_names::<nom::error::VerboseError<&str>>(input).unwrap();
+                extract_conjoined_names::<nom_language::error::VerboseError<&str>>(input).unwrap();
             assert_eq!(
                 expected_residue, actual_residue,
                 "failed test case {case_number} on residue: |{input}|",

@@ -9,7 +9,7 @@ use nom::bytes::streaming::take;
 use nom::combinator::complete;
 use nom::error::Error as NomError;
 use nom::multi::many0;
-use nom::{IResult, Needed};
+use nom::{IResult, Needed, Parser};
 use std::num::NonZero;
 use wlan_common::ie::rsn::rsne;
 use wlan_common::ie::{wpa, Id};
@@ -36,9 +36,9 @@ fn peek_u8_at(index: usize) -> impl FnMut(&[u8]) -> IResult<&[u8], u8> {
 }
 
 fn parse_ie(i0: &[u8]) -> IResult<&[u8], Element> {
-    let (i1, id) = peek_u8_at(0)(i0)?;
-    let (i2, len) = peek_u8_at(1)(i1)?;
-    let (out, bytes) = take(2 + (len as usize))(i2)?;
+    let (i1, id) = peek_u8_at(0).parse(i0)?;
+    let (i2, len) = peek_u8_at(1).parse(i1)?;
+    let (out, bytes) = take(2 + (len as usize)).parse(i2)?;
     match Id(id) {
         Id::RSNE => {
             let (_, rsne) = rsne::from_bytes(bytes)?;
@@ -49,7 +49,7 @@ fn parse_ie(i0: &[u8]) -> IResult<&[u8], Element> {
 }
 
 fn parse_element(input: &[u8]) -> IResult<&[u8], Element> {
-    let (_, type_) = peek_u8_at(0)(input)?;
+    let (_, type_) = peek_u8_at(0).parse(input)?;
     match type_ {
         kde::TYPE => kde::parse(input),
         _ => parse_ie(input),
@@ -57,7 +57,7 @@ fn parse_element(input: &[u8]) -> IResult<&[u8], Element> {
 }
 
 fn parse_elements(input: &[u8]) -> IResult<&[u8], Vec<Element>> {
-    many0(complete(parse_element))(input)
+    many0(complete(parse_element)).parse(input)
 }
 
 #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]

@@ -10,8 +10,8 @@ use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until};
 use nom::combinator::{map, opt, value};
 use nom::multi::separated_list1;
-use nom::sequence::{delimited, separated_pair, terminated, tuple};
-use nom::IResult;
+use nom::sequence::{delimited, separated_pair, terminated};
+use nom::{IResult, Parser};
 
 #[derive(Debug, PartialEq)]
 pub struct Ast {
@@ -71,34 +71,34 @@ impl Value {
 }
 
 fn keyword_extend(input: NomSpan) -> IResult<NomSpan, NomSpan, BindParserError> {
-    ws(tag("extend"))(input)
+    ws(tag("extend")).parse(input)
 }
 
 fn keyword_uint(input: NomSpan) -> IResult<NomSpan, ValueType, BindParserError> {
-    value(ValueType::Number, ws(map_err(tag("uint"), BindParserError::Type)))(input)
+    value(ValueType::Number, ws(map_err(tag("uint"), BindParserError::Type))).parse(input)
 }
 
 fn keyword_string(input: NomSpan) -> IResult<NomSpan, ValueType, BindParserError> {
-    value(ValueType::Str, ws(map_err(tag("string"), BindParserError::Type)))(input)
+    value(ValueType::Str, ws(map_err(tag("string"), BindParserError::Type))).parse(input)
 }
 
 fn keyword_bool(input: NomSpan) -> IResult<NomSpan, ValueType, BindParserError> {
-    value(ValueType::Bool, ws(map_err(tag("bool"), BindParserError::Type)))(input)
+    value(ValueType::Bool, ws(map_err(tag("bool"), BindParserError::Type))).parse(input)
 }
 
 fn keyword_enum(input: NomSpan) -> IResult<NomSpan, ValueType, BindParserError> {
-    value(ValueType::Enum, ws(map_err(tag("enum"), BindParserError::Type)))(input)
+    value(ValueType::Enum, ws(map_err(tag("enum"), BindParserError::Type))).parse(input)
 }
 
 fn value_list<'a, O, F>(
     mut f: F,
-) -> impl FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, Vec<O>, BindParserError>
+) -> impl Parser<NomSpan<'a>, Output = Vec<O>, Error = BindParserError>
 where
-    F: FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, BindParserError>,
+    F: Parser<NomSpan<'a>, Output = O, Error = BindParserError>,
 {
     move |input: NomSpan<'a>| {
         let separator = || ws(map_err(tag(","), BindParserError::ListSeparator));
-        let values = separated_list1(separator(), |s| f(s));
+        let values = separated_list1(separator(), |s| f.parse(s));
 
         // Lists may optionally be terminated by an additional trailing separator.
         let values = terminated(values, opt(separator()));
@@ -106,7 +106,8 @@ where
         // First consume all input until ';'. This simplifies the error handling since a semicolon
         // is mandatory, but a list of values is optional.
         let (input, vals_input) =
-            map_err(terminated(take_until(";"), tag(";")), BindParserError::Semicolon)(input)?;
+            map_err(terminated(take_until(";"), tag(";")), BindParserError::Semicolon)
+                .parse(input)?;
 
         if vals_input.fragment().is_empty() {
             return Ok((input, Vec::new()));
@@ -114,7 +115,7 @@ where
 
         let list_start = map_err(tag("{"), BindParserError::ListStart);
         let list_end = map_err(tag("}"), BindParserError::ListEnd);
-        let (_, result) = delimited(ws(list_start), ws(values), ws(list_end))(vals_input)?;
+        let (_, result) = delimited(ws(list_start), ws(values), ws(list_end)).parse(vals_input)?;
 
         Ok((input, result))
     }
@@ -123,32 +124,32 @@ where
 fn number_value_list(input: NomSpan) -> IResult<NomSpan, Vec<Value>, BindParserError> {
     let token = map_err(tag("="), BindParserError::Assignment);
     let value = separated_pair(ws(identifier), ws(token), ws(numeric_literal));
-    value_list(map(value, |(ident, val)| Value::Number(ident, val)))(input)
+    value_list(map(value, |(ident, val)| Value::Number(ident, val))).parse(input)
 }
 
 fn string_value_list(input: NomSpan) -> IResult<NomSpan, Vec<Value>, BindParserError> {
     let token = map_err(tag("="), BindParserError::Assignment);
     let value = separated_pair(ws(identifier), ws(token), ws(string_literal));
-    value_list(map(value, |(ident, val)| Value::Str(ident, val)))(input)
+    value_list(map(value, |(ident, val)| Value::Str(ident, val))).parse(input)
 }
 
 fn bool_value_list(input: NomSpan) -> IResult<NomSpan, Vec<Value>, BindParserError> {
     let token = map_err(tag("="), BindParserError::Assignment);
     let value = separated_pair(ws(identifier), ws(token), ws(bool_literal));
-    value_list(map(value, |(ident, val)| Value::Bool(ident, val)))(input)
+    value_list(map(value, |(ident, val)| Value::Bool(ident, val))).parse(input)
 }
 
 fn enum_value_list(input: NomSpan) -> IResult<NomSpan, Vec<Value>, BindParserError> {
-    value_list(map(ws(identifier), Value::Enum))(input)
+    value_list(map(ws(identifier), Value::Enum)).parse(input)
 }
 
 fn declaration(input: NomSpan) -> IResult<NomSpan, Declaration, BindParserError> {
-    let (input, extends) = opt(keyword_extend)(input)?;
+    let (input, extends) = opt(keyword_extend).parse(input)?;
 
     let (input, value_type) =
-        alt((keyword_uint, keyword_string, keyword_bool, keyword_enum))(input)?;
+        alt((keyword_uint, keyword_string, keyword_bool, keyword_enum)).parse(input)?;
 
-    let (input, identifier) = ws(compound_identifier)(input)?;
+    let (input, identifier) = ws(compound_identifier).parse(input)?;
 
     let value_parser = match value_type {
         ValueType::Number => number_value_list,
@@ -165,14 +166,15 @@ fn declaration(input: NomSpan) -> IResult<NomSpan, Declaration, BindParserError>
 fn library_name(input: NomSpan) -> IResult<NomSpan, CompoundIdentifier, BindParserError> {
     let keyword = ws(map_err(tag("library"), BindParserError::LibraryKeyword));
     let terminator = ws(map_err(tag(";"), BindParserError::Semicolon));
-    delimited(keyword, ws(compound_identifier), terminator)(input)
+    delimited(keyword, ws(compound_identifier), terminator).parse(input)
 }
 
 fn library(input: NomSpan) -> IResult<NomSpan, Ast, BindParserError> {
     map(
-        tuple((ws(library_name), ws(using_list), many_until_eof(ws(declaration)))),
+        (ws(library_name), ws(using_list), many_until_eof(ws(declaration))),
         |(name, using, declarations)| Ast { name, using, declarations },
-    )(input)
+    )
+    .parse(input)
 }
 
 #[cfg(test)]

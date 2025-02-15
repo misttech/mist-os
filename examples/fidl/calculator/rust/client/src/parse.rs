@@ -13,8 +13,8 @@ use nom::bytes::complete::tag;
 use nom::character::complete::space0;
 use nom::combinator::map;
 use nom::number::complete::double;
-use nom::sequence::{delimited, tuple};
-use nom::IResult;
+use nom::sequence::delimited;
+use nom::{IResult, Parser};
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum Operator {
@@ -40,24 +40,25 @@ fn operator(s: &str) -> IResult<&str, Operator> {
         map(tag("*"), |_: &str| Operator::Multiply),
         map(tag("/"), |_: &str| Operator::Divide),
         map(tag("^"), |_: &str| Operator::Pow),
-    ))(s)
+    ))
+    .parse(s)
 }
 
 /// Parses a float64. Allows one or more spaces before and after the number.
 fn number(s: &str) -> IResult<&str, f64> {
-    map(delimited(space0, double, space0), |n| n)(s)
+    map(delimited(space0, double, space0), |n| n).parse(s)
 }
 
 /// Parses an Expression::Leaf.
 fn leaf(s: &str) -> IResult<&str, Expression> {
-    map(tuple((number, operator, number)), |(left, op, right)| Expression::Leaf(left, op, right))(s)
+    map((number, operator, number), |(left, op, right)| Expression::Leaf(left, op, right)).parse(s)
 }
 
 /// Parses an Expression.
 fn expression(s: &str) -> IResult<&str, Expression> {
     // Uses leaf, leaf as the tuple to make it easier to support more complex
     // Expression enum variants in the future.
-    alt((leaf, leaf))(s)
+    alt((leaf, leaf)).parse(s)
 }
 
 /// Given a string, parses an Expression. Panics if the parse is unsuccessful.

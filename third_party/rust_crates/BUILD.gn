@@ -539,11 +539,15 @@ group("nix") {
 }
 
 group("nom") {
-  public_deps = [ ":nom-v7_1_3" ]
+  public_deps = [ ":nom-v8_0_0" ]
+}
+
+group("nom-language") {
+  public_deps = [ ":nom-language-v0_1_0" ]
 }
 
 group("nom_locate") {
-  public_deps = [ ":nom_locate-v4_2_0" ]
+  public_deps = [ ":nom_locate-v5_0_0" ]
 }
 
 if (!(current_os == "fuchsia")) {
@@ -9123,7 +9127,6 @@ rust_library("nom-v7_1_3") {
     "-Cmetadata=4e1aeb65676f807d",
     "-Cextra-filename=-4e1aeb65676f807d",
     "--cfg=feature=\"alloc\"",
-    "--cfg=feature=\"std\"",
   ]
 
   visibility = []
@@ -9133,30 +9136,27 @@ rust_library("nom-v7_1_3") {
   applicable_licenses = [ ":nom-v7_1_3.license" ]
 }
 
-license("nom_locate-v4_2_0.license") {
-  public_package_name = "nom_locate"
-  license_files =
-      [ "//third_party/rust_crates/vendor/nom_locate-4.2.0/LICENSE" ]
+license("nom-v8_0_0.license") {
+  public_package_name = "nom"
+  license_files = [ "//third_party/rust_crates/vendor/nom-8.0.0/LICENSE" ]
 }
 
-rust_library("nom_locate-v4_2_0") {
-  crate_name = "nom_locate"
-  crate_root = "//third_party/rust_crates/vendor/nom_locate-4.2.0/src/lib.rs"
-  output_name = "nom_locate-80773db85fa8fe59"
+rust_library("nom-v8_0_0") {
+  crate_name = "nom"
+  crate_root = "//third_party/rust_crates/vendor/nom-8.0.0/src/lib.rs"
+  output_name = "nom-cafacd5ae34cd66e"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":memchr-v2_7_1" ]
-  deps += [ ":nom-v7_1_3" ]
-  deps += [ ":bytecount-v0_6_0" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=80773db85fa8fe59",
-    "-Cextra-filename=-80773db85fa8fe59",
+    "--edition=2021",
+    "-Cmetadata=cafacd5ae34cd66e",
+    "-Cextra-filename=-cafacd5ae34cd66e",
     "--cfg=feature=\"alloc\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
@@ -9164,7 +9164,70 @@ rust_library("nom_locate-v4_2_0") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":nom_locate-v4_2_0.license" ]
+  applicable_licenses = [ ":nom-v8_0_0.license" ]
+}
+
+license("nom-language-v0_1_0.license") {
+  public_package_name = "nom_language"
+  license_files =
+      [ "//third_party/rust_crates/forks/nom-language-0.1.0/LICENSE" ]
+}
+
+rust_library("nom-language-v0_1_0") {
+  crate_name = "nom_language"
+  crate_root = "//third_party/rust_crates/forks/nom-language-0.1.0/src/lib.rs"
+  output_name = "nom_language-ea2d7f20581209de"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":nom-v8_0_0" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=ea2d7f20581209de",
+    "-Cextra-filename=-ea2d7f20581209de",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":nom-language-v0_1_0.license" ]
+}
+
+license("nom_locate-v5_0_0.license") {
+  public_package_name = "nom_locate"
+  license_files =
+      [ "//third_party/rust_crates/vendor/nom_locate-5.0.0/LICENSE" ]
+}
+
+rust_library("nom_locate-v5_0_0") {
+  crate_name = "nom_locate"
+  crate_root = "//third_party/rust_crates/vendor/nom_locate-5.0.0/src/lib.rs"
+  output_name = "nom_locate-9172e2f23068b02"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":memchr-v2_7_1" ]
+  deps += [ ":bytecount-v0_6_0" ]
+  deps += [ ":nom-v8_0_0" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=9172e2f23068b02",
+    "-Cextra-filename=-9172e2f23068b02",
+    "--cfg=feature=\"alloc\"",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":nom_locate-v5_0_0.license" ]
 }
 
 license("normalize-line-endings-v0_3_0.license") {

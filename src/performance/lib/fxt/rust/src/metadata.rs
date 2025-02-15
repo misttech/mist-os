@@ -6,6 +6,7 @@ use crate::string::parse_padded_string;
 use crate::{trace_header, ParseError, ParseResult, METADATA_RECORD_TYPE};
 use flyweights::FlyStr;
 use nom::combinator::all_consuming;
+use nom::Parser;
 
 const PROVIDER_INFO_METADATA_TYPE: u8 = 1;
 const PROVIDER_SECTION_METADATA_TYPE: u8 = 2;
@@ -32,16 +33,16 @@ impl MetadataRecord {
         use nom::combinator::map;
         match BaseMetadataHeader::parse(buf)?.1.metadata_type() {
             PROVIDER_INFO_METADATA_TYPE => {
-                map(ProviderInfoMetadataRecord::parse, |i| Self::ProviderInfo(i))(buf)
+                map(ProviderInfoMetadataRecord::parse, |i| Self::ProviderInfo(i)).parse(buf)
             }
             PROVIDER_SECTION_METADATA_TYPE => {
-                map(ProviderSectionMetadataRecord::parse, |s| Self::ProviderSection(s))(buf)
+                map(ProviderSectionMetadataRecord::parse, |s| Self::ProviderSection(s)).parse(buf)
             }
             PROVIDER_EVENT_METADATA_TYPE => {
-                map(ProviderEventMetadataRecord::parse, |e| Self::ProviderEvent(e))(buf)
+                map(ProviderEventMetadataRecord::parse, |e| Self::ProviderEvent(e)).parse(buf)
             }
             TRACE_INFO_METADATA_TYPE => {
-                map(TraceInfoMetadataRecord::parse, |t| Self::TraceInfo(t))(buf)
+                map(TraceInfoMetadataRecord::parse, |t| Self::TraceInfo(t)).parse(buf)
             }
             unknown => Ok((buf, Self::Unknown { raw_type: unknown })),
         }
@@ -88,7 +89,7 @@ impl ProviderInfoMetadataRecord {
         let (buf, header) = ProviderInfoMetadataHeader::parse(buf)?;
         let (rem, payload) = header.take_payload(buf)?;
         let (empty, name) =
-            all_consuming(|p| parse_padded_string(header.name_len() as usize, p))(payload)?;
+            all_consuming(|p| parse_padded_string(header.name_len() as usize, p)).parse(payload)?;
         assert!(empty.is_empty(), "all_consuming must not return any remaining buffer");
         Ok((rem, Self { provider_id: header.provider_id(), name: name.into() }))
     }

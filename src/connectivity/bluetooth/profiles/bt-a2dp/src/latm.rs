@@ -39,7 +39,7 @@ use nom::bits::complete::{tag, take};
 use nom::combinator::cond;
 use nom::error::{make_error, Error, ErrorKind};
 use nom::multi::count;
-use nom::{IResult, Offset};
+use nom::{IResult, Offset, Parser};
 
 // Common type used by all bit parsing functions. First entry is slice pointed at current byte.
 // Second entry is current offset into that byte.
@@ -112,12 +112,12 @@ enum Payload<'a> {
 // Helper function used in multiple syntax elements
 fn parse_latm_get_value(input: BitsCtx<'_>) -> IResult<BitsCtx<'_>, usize> {
     let mut value = 0;
-    let (input, bytes_for_value) = take(2usize)(input)?;
+    let (input, bytes_for_value) = take(2usize).parse(input)?;
 
     let mut input = input;
     for _ in 0..=bytes_for_value {
         value <<= 8;
-        let (input_inner, tmp): (_, usize) = take(8usize)(input)?;
+        let (input_inner, tmp): (_, usize) = take(8usize).parse(input)?;
         input = input_inner;
         value += tmp;
     }
@@ -157,7 +157,7 @@ impl Program {
         audio_mux_version: usize,
         all_streams_same_time_framing: usize,
     ) -> IResult<BitsCtx<'_>, Program> {
-        let (input, num_layer): (_, usize) = take(3usize)(input)?;
+        let (input, num_layer): (_, usize) = take(3usize).parse(input)?;
         let (input, layers) = Self::parse_layers(
             input,
             num_layer + 1,
@@ -180,7 +180,7 @@ impl Layer {
                 let (input, audio_specific_config) = AudioSpecificConfig::parse(input)?;
 
                 let (input, _): (_, usize) =
-                    take(asc_len - audio_specific_config.bits_read)(input)?;
+                    take(asc_len - audio_specific_config.bits_read).parse(input)?;
                 Ok((input, audio_specific_config))
             }
         }
@@ -194,12 +194,12 @@ impl Layer {
         all_streams_same_time_framing: usize,
     ) -> IResult<BitsCtx<'_>, Layer> {
         let (input, use_same_config) =
-            cond(layer_index > 0 && program_index > 0, take(1usize))(input)?;
+            cond(layer_index > 0 && program_index > 0, take(1usize)).parse(input)?;
 
         let use_same_config = use_same_config.unwrap_or(0);
 
         let (input, audio_specific_config) =
-            cond(use_same_config == 0, Self::parse_layer_config(audio_mux_version))(input)?;
+            cond(use_same_config == 0, Self::parse_layer_config(audio_mux_version)).parse(input)?;
 
         if let None = audio_specific_config {
             return Err(nom::Err::Failure(make_error(input, ErrorKind::Eof)));
@@ -207,21 +207,22 @@ impl Layer {
 
         let audio_specific_config = audio_specific_config.unwrap();
 
-        let (input, frame_length_type) = take(3usize)(input)?;
+        let (input, frame_length_type) = take(3usize).parse(input)?;
 
         if frame_length_type > 1 {
             //TODO(https://fxbug.dev/42120979) CELP, HVCX, etc..
             return Err(nom::Err::Failure(make_error(input, ErrorKind::Eof)));
         }
 
-        let (input, latm_buffer_fullness) = cond(frame_length_type == 0, take(8usize))(input)?;
+        let (input, latm_buffer_fullness) =
+            cond(frame_length_type == 0, take(8usize)).parse(input)?;
 
         if all_streams_same_time_framing == 0 {
             //TODO(https://fxbug.dev/42120979) core frame offset
             return Err(nom::Err::Failure(make_error(input, ErrorKind::Eof)));
         }
 
-        let (input, frame_length) = cond(frame_length_type == 1, take(9usize))(input)?;
+        let (input, frame_length) = cond(frame_length_type == 1, take(9usize)).parse(input)?;
 
         let mux_slot_length_bytes = 0usize;
 
@@ -241,18 +242,18 @@ impl Layer {
 impl AudioSpecificConfig {
     fn parse(input: BitsCtx<'_>) -> IResult<BitsCtx<'_>, Self> {
         let start_input = input;
-        let (input, mut audio_object_type) = take(5usize)(input)?;
+        let (input, mut audio_object_type) = take(5usize).parse(input)?;
         let (input, audio_object_type_ext): (_, std::option::Option<usize>) =
-            cond(audio_object_type == 32, take(6usize))(input)?;
+            cond(audio_object_type == 32, take(6usize)).parse(input)?;
 
         if let Some(audio_object_type_ext) = audio_object_type_ext {
             audio_object_type += audio_object_type_ext;
         }
 
-        let (input, sampling_frequency_index) = take(4usize)(input)?;
+        let (input, sampling_frequency_index) = take(4usize).parse(input)?;
         let (input, sampling_frequency) =
-            cond(sampling_frequency_index == 0xf, take(24usize))(input)?;
-        let (input, channel_configuration) = take(4usize)(input)?;
+            cond(sampling_frequency_index == 0xf, take(24usize)).parse(input)?;
+        let (input, channel_configuration) = take(4usize).parse(input)?;
 
         let (input, ga_specific_config) = match audio_object_type {
             1 | 2 | 3 | 4 | 6 | 7 | 17 | 19 | 20 | 21 | 22 | 23 => {
@@ -288,18 +289,19 @@ impl GASpecificConfig {
         channel_configuration: usize,
         audio_object_type: usize,
     ) -> IResult<BitsCtx<'_>, Self> {
-        let (input, frame_length_flag) = take(1usize)(input)?;
-        let (input, depends_on_core_coder) = take(1usize)(input)?;
+        let (input, frame_length_flag) = take(1usize).parse(input)?;
+        let (input, depends_on_core_coder) = take(1usize).parse(input)?;
 
-        let (input, core_coder_delay) = cond(depends_on_core_coder == 1, take(14usize))(input)?;
-        let (input, extension_flag) = take(1usize)(input)?;
+        let (input, core_coder_delay) =
+            cond(depends_on_core_coder == 1, take(14usize)).parse(input)?;
+        let (input, extension_flag) = take(1usize).parse(input)?;
 
         if channel_configuration == 0 {
             return Err(nom::Err::Failure(make_error(input, ErrorKind::Eof)));
         }
 
         let (input, layer_nr) =
-            cond(audio_object_type == 6 || audio_object_type == 20, take(3usize))(input)?;
+            cond(audio_object_type == 6 || audio_object_type == 20, take(3usize)).parse(input)?;
 
         if extension_flag == 1 {
             //TODO(https://fxbug.dev/42120979)
@@ -340,8 +342,9 @@ impl StreamMuxConfig {
     }
 
     fn parse(input: BitsCtx<'_>) -> IResult<BitsCtx<'_>, StreamMuxConfig> {
-        let (input, audio_mux_version) = take(1usize)(input)?;
-        let (input, audio_mux_version_a) = cond(audio_mux_version != 0, take(1usize))(input)?;
+        let (input, audio_mux_version) = take(1usize).parse(input)?;
+        let (input, audio_mux_version_a) =
+            cond(audio_mux_version != 0, take(1usize)).parse(input)?;
 
         if let Some(1) = audio_mux_version_a {
             // not defined
@@ -349,10 +352,10 @@ impl StreamMuxConfig {
         }
 
         let (input, _tara_buffer_fullness) =
-            cond(audio_mux_version == 1, parse_latm_get_value)(input)?;
-        let (input, all_streams_same_time_framing) = take(1usize)(input)?;
-        let (input, num_subframes): (_, usize) = take(6usize)(input)?;
-        let (input, num_program): (_, usize) = take(4usize)(input)?;
+            cond(audio_mux_version == 1, parse_latm_get_value).parse(input)?;
+        let (input, all_streams_same_time_framing) = take(1usize).parse(input)?;
+        let (input, num_subframes): (_, usize) = take(6usize).parse(input)?;
+        let (input, num_program): (_, usize) = take(4usize).parse(input)?;
 
         let (input, programs) = Self::parse_programs(
             input,
@@ -361,14 +364,14 @@ impl StreamMuxConfig {
             all_streams_same_time_framing,
         )?;
 
-        let (input, other_data_present): (_, u8) = take(1usize)(input)?;
+        let (input, other_data_present): (_, u8) = take(1usize).parse(input)?;
         if other_data_present == 1 {
             //TODO(https://fxbug.dev/42120979)
             return Err(nom::Err::Failure(make_error(input, ErrorKind::Eof)));
         }
 
-        let (input, crc_check_present): (_, u8) = take(1usize)(input)?;
-        let (input, crc_checksum) = cond(crc_check_present == 1, take(8usize))(input)?;
+        let (input, crc_check_present): (_, u8) = take(1usize).parse(input)?;
+        let (input, crc_checksum) = cond(crc_check_present == 1, take(8usize)).parse(input)?;
 
         Ok((
             input,
@@ -400,7 +403,7 @@ impl<'a> Payload<'a> {
             for layer in &mut program.layers {
                 if layer.frame_length_type == 0 {
                     loop {
-                        let (input_inner, tmp): (_, usize) = take(8usize)(input)?;
+                        let (input_inner, tmp): (_, usize) = take(8usize).parse(input)?;
                         input = input_inner;
                         layer.mux_slot_length_bytes += tmp;
                         if tmp != 0xff {
@@ -440,7 +443,8 @@ impl<'a> Payload<'a> {
 
                             payloads.push(Payload::ByteAligned(&input.0[..frame_length]));
                         } else {
-                            let (input_inner, payload) = count(take(8usize), frame_length)(input)?;
+                            let (input_inner, payload) =
+                                count(take(8usize), frame_length).parse(input)?;
                             input = input_inner;
                             payloads.push(Payload::Copied(payload));
                         }
@@ -461,7 +465,8 @@ impl<'a> Payload<'a> {
                                     ));
                                 } else {
                                     let (input_inner, payload) =
-                                        count(take(8usize), layer.mux_slot_length_bytes)(input)?;
+                                        count(take(8usize), layer.mux_slot_length_bytes)
+                                            .parse(input)?;
                                     input = input_inner;
                                     payloads.push(Payload::Copied(payload));
                                 }
@@ -509,7 +514,7 @@ impl<'a> AudioMuxElement<'a> {
     fn parse_from_bits(input: BitsCtx<'a>) -> IResult<BitsCtx<'a>, AudioMuxElement<'a>> {
         // Note: assume muxConfigPresent is 1, as recommended by RFC 3016
 
-        let (input, use_same_stream_mux) = tag(0b0, 1usize)(input)?;
+        let (input, use_same_stream_mux) = tag(0b0, 1usize).parse(input)?;
         if use_same_stream_mux == 0 {
             let (input, mut stream_mux_config) = StreamMuxConfig::parse(input)?;
             // audio_mux_version_a checked to be 0 above
@@ -524,7 +529,8 @@ impl<'a> AudioMuxElement<'a> {
     // Attempt to parse AudioMuxElement out of input slice.
     pub fn try_from_bytes(input: &'a [u8]) -> Result<AudioMuxElement<'a>, anyhow::Error> {
         // type checker was unsure about error type when mapping, specify it manually.
-        bits::<_, _, Error<(&[u8], usize)>, Error<_>, _>(Self::parse_from_bits)(input)
+        bits::<_, _, Error<(&[u8], usize)>, Error<_>, _>(Self::parse_from_bits)
+            .parse(input)
             .map(|i| i.1)
             .map_err(|_: nom::Err<_>| format_err!("Failed to parse AudioMuxElement"))
     }

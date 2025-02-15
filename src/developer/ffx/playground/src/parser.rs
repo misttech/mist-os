@@ -28,8 +28,8 @@ use nom::combinator::{
 use nom::multi::{
     fold_many0, many0, many0_count, many1, many_till, separated_list0, separated_list1,
 };
-use nom::sequence::{delimited, pair, preceded, separated_pair, terminated, tuple};
-use nom::{error as nom_error, Slice};
+use nom::sequence::{delimited, pair, preceded, separated_pair, terminated};
+use nom::{error as nom_error, Input, OutputMode, PResult, Parser};
 use nom_locate::LocatedSpan;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashSet};
@@ -364,7 +364,8 @@ impl<'a> From<&'a str> for ParseResult<'a> {
                 alt((not(anychar), map(err_skip("Trailing characters {}", rest), |_| ()))),
             ),
             err_skip("Unrecoverable parse error", rest),
-        ))(text)
+        ))
+        .parse(text)
         .expect("Incorrectly handled parse error");
 
         let extra = Rc::try_unwrap(end_pos.extra.0).unwrap().into_inner();
@@ -390,12 +391,14 @@ impl<'a> From<&'a str> for ParseResult<'a> {
 
 /// Handle an error by skipping some parsed data. If the skip parser fails the error handling
 /// fails.
-fn err_skip<'a, F: FnMut(ESpan<'a>) -> IResult<'a, X>, S: ToString + 'a, X>(
-    msg: S,
-    mut f: F,
-) -> impl FnMut(ESpan<'a>) -> IResult<'a, Node<'a>> {
+fn err_skip<'a, F, S, X>(msg: S, f: F) -> impl Parser<ESpan<'a>, Output = Node<'a>, Error = Error>
+where
+    F: Parser<ESpan<'a>, Output = X, Error = Error>,
+    S: ToString + 'a,
+{
+    let mut f = recognize(f);
     move |input| {
-        let (out_span, result) = recognize(&mut f)(input)?;
+        let (out_span, result) = f.parse(input)?;
         let parse_state = Rc::clone(&out_span.extra.0);
         let msg = msg.to_string().replace("{}", *result.fragment());
         let error = Some(Rc::new(ErrNode {
@@ -410,19 +413,20 @@ fn err_skip<'a, F: FnMut(ESpan<'a>) -> IResult<'a, X>, S: ToString + 'a, X>(
 }
 
 /// Handle an error by simply marking it with an error node and moving along.
-fn err_insert<'a, S: ToString + 'a>(msg: S) -> impl FnMut(ESpan<'a>) -> IResult<'a, Node<'a>> {
+fn err_insert<'a, S: ToString + 'a>(
+    msg: S,
+) -> impl Parser<ESpan<'a>, Output = Node<'a>, Error = Error> {
     err_skip(msg, |x| Ok((x, Node::Error)))
 }
 
 /// Handle an error by reporting it but introduce no node.
-fn err_note<'a, S: ToString + 'a>(msg: S) -> impl FnMut(ESpan<'a>) -> IResult<'a, ()> {
+fn err_note<'a, S: ToString + 'a>(msg: S) -> impl Parser<ESpan<'a>, Output = (), Error = Error> {
     map(err_insert(msg), |_| ())
 }
 
 /// Same as `tag` but inserts an error if the tag is missing.
-fn ex_tag<'a>(s: &'a str) -> impl FnMut(ESpan<'a>) -> IResult<'a, ()> + 'a {
-    let s = s.to_owned();
-    move |x| alt((map(tag(s.as_str()), |_| ()), err_note(format!("Expected '{}'", s))))(x)
+fn ex_tag<'a>(s: &'a str) -> impl Parser<ESpan<'a>, Output = (), Error = Error> + 'a {
+    alt((map(tag(s), |_| ()), err_note(format!("Expected '{}'", s))))
 }
 
 /// Inner state of [`DeferredError`].
@@ -446,11 +450,11 @@ impl<'a, O> DeferredError<'a, O> {
     /// with the handled error for later use.
     fn defer<'b>(
         &'b self,
-        mut f: impl FnMut(ESpan<'a>) -> IResult<'a, O> + 'b,
-    ) -> impl FnMut(ESpan<'a>) -> IResult<'a, O> + 'b {
-        move |input| {
+        mut f: impl Parser<ESpan<'a>, Output = O, Error = Error> + 'b,
+    ) -> impl Parser<ESpan<'a>, Output = O, Error = Error> + 'b {
+        move |input: ESpan<'a>| {
             let err = input.extra.1.clone();
-            let res = f(input.clone())?;
+            let res = f.parse(input.clone())?;
             let err_new = res.0.extra.1.clone();
 
             match (err, err_new) {
@@ -468,7 +472,7 @@ impl<'a, O> DeferredError<'a, O> {
 
     /// If a previous call to `defer` suppressed an error, this parser will
     /// immediately return that error provided the location is the same.
-    fn restore<'b>(&'b self) -> impl FnMut(ESpan<'a>) -> IResult<'a, O> + 'b {
+    fn restore<'b>(&'b self) -> impl Parser<ESpan<'a>, Output = O, Error = Error> + 'b {
         |input| {
             if let Some(inner) = self.0.borrow_mut().take() {
                 if inner.orig_location == input {
@@ -482,30 +486,50 @@ impl<'a, O> DeferredError<'a, O> {
 }
 
 /// Runs the passed parser but does not allow it to emit errors.
-fn no_errors<'a, X>(
-    mut f: impl FnMut(ESpan<'a>) -> IResult<'a, X>,
-) -> impl FnMut(ESpan<'a>) -> IResult<'a, X> {
-    move |input| DeferredError::new().defer(&mut f)(input)
+fn no_errors<'a, F>(f: F) -> NoErrors<F>
+where
+    F: Parser<ESpan<'a>>,
+{
+    NoErrors { parser: f }
+}
+
+struct NoErrors<F> {
+    parser: F,
+}
+
+impl<'a, F, O> Parser<ESpan<'a>> for NoErrors<F>
+where
+    F: Parser<ESpan<'a>, Output = O, Error = Error> + Clone,
+{
+    type Output = <F as Parser<ESpan<'a>>>::Output;
+    type Error = <F as Parser<ESpan<'a>>>::Error;
+
+    fn process<OM: OutputMode>(
+        &mut self,
+        input: ESpan<'a>,
+    ) -> PResult<OM, ESpan<'a>, Self::Output, Self::Error> {
+        DeferredError::new().defer(self.parser.clone()).process::<OM>(input)
+    }
 }
 
 /// Match optional whitespace before the given combinator.
-fn ws_before<'a, F: FnMut(ESpan<'a>) -> IResult<'a, X>, X>(
+fn ws_before<'a, F: Parser<ESpan<'a>, Output = X, Error = Error>, X>(
     f: F,
-) -> impl FnMut(ESpan<'a>) -> IResult<'a, X> {
+) -> impl Parser<ESpan<'a>, Output = X, Error = Error> {
     preceded(opt(whitespace), f)
 }
 
 /// Match optional whitespace after the given combinator.
-fn ws_after<'a, F: FnMut(ESpan<'a>) -> IResult<'a, X>, X>(
+fn ws_after<'a, F: Parser<ESpan<'a>, Output = X, Error = Error>, X>(
     f: F,
-) -> impl FnMut(ESpan<'a>) -> IResult<'a, X> {
+) -> impl Parser<ESpan<'a>, Output = X, Error = Error> {
     terminated(f, opt(whitespace))
 }
 
 /// Match optional whitespace around the given combinator.
-fn ws_around<'a, F: FnMut(ESpan<'a>) -> IResult<'a, X>, X>(
+fn ws_around<'a, F: Parser<ESpan<'a>, Output = X, Error = Error>, X>(
     f: F,
-) -> impl FnMut(ESpan<'a>) -> IResult<'a, X> {
+) -> impl Parser<ESpan<'a>, Output = X, Error = Error> {
     ws_before(ws_after(f))
 }
 
@@ -513,32 +537,32 @@ fn ws_around<'a, F: FnMut(ESpan<'a>) -> IResult<'a, X>, X>(
 /// item.
 fn ws_separated_nonempty_list<
     'a,
-    FS: FnMut(ESpan<'a>) -> IResult<'a, Y>,
-    F: FnMut(ESpan<'a>) -> IResult<'a, X>,
+    FS: Parser<ESpan<'a>, Output = Y, Error = Error>,
+    F: Parser<ESpan<'a>, Output = X, Error = Error>,
     X,
     Y,
 >(
     fs: FS,
     f: F,
-) -> impl FnMut(ESpan<'a>) -> IResult<'a, Vec<X>> {
+) -> impl Parser<ESpan<'a>, Output = Vec<X>, Error = Error> {
     separated_list1(ws_around(fs), f)
 }
 
 /// Marks the contained parser as parsing something which could be tab-completed.
 fn completion_hint<'a, X>(
-    mut f: impl FnMut(ESpan<'a>) -> IResult<'a, X>,
+    mut f: impl Parser<ESpan<'a>, Output = X, Error = Error>,
     hint: impl Fn(Span<'a>) -> TabHint<'a>,
-) -> impl FnMut(ESpan<'a>) -> IResult<'a, X> {
-    move |span| {
+) -> impl Parser<ESpan<'a>, Output = X, Error = Error> {
+    move |span: ESpan<'a>| {
         let hint_span = span.clone();
-        let ret = f(span);
+        let ret = f.parse(span);
 
         let hint_span = if let Ok((end, _)) = &ret {
             let start = hint_span.location_offset();
             let len = end.location_offset() - start;
-            hint_span.slice(..len)
+            hint_span.take(len)
         } else {
-            hint_span.slice(..0)
+            hint_span.take(0)
         };
 
         let extra = Rc::clone(&hint_span.extra.0);
@@ -554,7 +578,7 @@ fn completion_hint<'a, X>(
 fn lassoc<
     'a: 'b,
     'b,
-    F: FnMut(ESpan<'a>) -> IResult<'a, X> + 'b,
+    F: Parser<ESpan<'a>, Output = X, Error = Error> + 'b,
     FM: Fn(Y, Y) -> X + 'b,
     X: 'b,
     Y: From<X>,
@@ -562,7 +586,7 @@ fn lassoc<
     f: F,
     oper: &'b str,
     mapper: FM,
-) -> impl FnMut(ESpan<'a>) -> IResult<'a, X> + 'b {
+) -> impl Parser<ESpan<'a>, Output = X, Error = Error> + 'b {
     map(ws_separated_nonempty_list(tag(oper), f), move |items| {
         let mut items = items.into_iter();
         let first = items.next().unwrap();
@@ -574,8 +598,8 @@ fn lassoc<
 fn lassoc_choice<
     'a: 'b,
     'b,
-    F: FnMut(ESpan<'a>) -> IResult<'a, X> + 'b + Copy,
-    FO: FnMut(ESpan<'a>) -> IResult<'a, Y> + 'b,
+    F: Parser<ESpan<'a>, Output = X, Error = Error> + 'b + Copy,
+    FO: Parser<ESpan<'a>, Output = Y, Error = Error> + 'b,
     FM: Fn(X, Y, X) -> X + 'b,
     X: 'b,
     Y: 'b,
@@ -583,7 +607,7 @@ fn lassoc_choice<
     f: F,
     oper: FO,
     mapper: FM,
-) -> impl FnMut(ESpan<'a>) -> IResult<'a, X> + 'b {
+) -> impl Parser<ESpan<'a>, Output = X, Error = Error> + 'b {
     map(pair(f, many0(pair(ws_around(oper), f))), move |(first, items)| {
         items.into_iter().fold(first, |a, (op, b)| mapper(a, op, b))
     })
@@ -593,9 +617,9 @@ const KEYWORDS: [&str; 9] =
     ["let", "const", "def", "if", "else", "true", "false", "null", "import"];
 
 /// Match a keyword.
-fn kw<'s>(kw: &'s str) -> impl for<'a> FnMut(ESpan<'a>) -> IResult<'a, ESpan<'a>> + 's {
+fn kw<'s, 'a: 's>(kw: &'s str) -> impl Parser<ESpan<'a>, Output = ESpan<'a>, Error = Error> + 's {
     debug_assert!(KEYWORDS.contains(&kw));
-    move |input| terminated(tag(kw), not(alt((alphanumeric1, tag("_")))))(input)
+    terminated(tag(kw), not(alt((alphanumeric1, tag("_")))))
 }
 
 /// We define Whitespace as follows:
@@ -616,7 +640,7 @@ fn whitespace<'a>(input: ESpan<'a>) -> IResult<'a, ESpan<'a>> {
     map(
         recognize(many1(alt((
             take_while1(char::is_whitespace),
-            recognize(tuple((chr('#'), many_till(anychar, chr('\n'))))),
+            recognize((chr('#'), many_till(anychar, chr('\n')))),
         )))),
         |span: ESpan<'a>| {
             span.extra
@@ -626,7 +650,8 @@ fn whitespace<'a>(input: ESpan<'a>) -> IResult<'a, ESpan<'a>> {
                 .insert(HashSpanWrapper(span.clone().strip_parse_state()));
             span
         },
-    )(input)
+    )
+    .parse(input)
 }
 
 /// Unescaped Identifiers are defined as follows:
@@ -645,7 +670,7 @@ fn whitespace<'a>(input: ESpan<'a>) -> IResult<'a, ESpan<'a>> {
 /// a_Mixed_Bag
 /// ```
 fn unescaped_identifier<'a>(input: ESpan<'a>) -> IResult<'a, ESpan<'a>> {
-    recognize(many1(alt((alphanumeric1, tag("_")))))(input)
+    recognize(many1(alt((alphanumeric1, tag("_"))))).parse(input)
 }
 
 /// Identifiers are defined as follows:
@@ -662,7 +687,8 @@ fn unescaped_identifier<'a>(input: ESpan<'a>) -> IResult<'a, ESpan<'a>> {
 /// a_Mixed_Bag
 /// ```
 fn identifier<'a>(input: ESpan<'a>) -> IResult<'a, ESpan<'a>> {
-    verify(preceded(not(digit1), unescaped_identifier), |x| !KEYWORDS.contains(x.fragment()))(input)
+    verify(preceded(not(digit1), unescaped_identifier), |x| !KEYWORDS.contains(x.fragment()))
+        .parse(input)
 }
 
 /// Integers are defined as follows:
@@ -688,11 +714,12 @@ fn integer<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
     map(
         alt((
             preceded(not(chr('0')), recognize(separated_list1(chr('_'), digit1))),
-            recognize(tuple((tag("0x"), separated_list1(chr('_'), hex_digit1)))),
+            recognize((tag("0x"), separated_list1(chr('_'), hex_digit1))),
             terminated(tag("0"), not(digit1)),
         )),
         |x: ESpan<'a>| Node::Integer(x.strip_parse_state()),
-    )(input)
+    )
+    .parse(input)
 }
 
 /// Reals are defined as follows:
@@ -709,9 +736,10 @@ fn integer<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
 /// 1_2_3.45_6
 /// ```
 fn real<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
-    map(recognize(tuple((integer, chr('.'), digit1, many0(pair(chr('_'), digit1))))), |x| {
+    map(recognize((integer, chr('.'), digit1, many0(pair(chr('_'), digit1)))), |x| {
         Node::Real(x.strip_parse_state())
-    })(input)
+    })
+    .parse(input)
 }
 
 /// Strings are defined as follows:
@@ -752,11 +780,12 @@ fn normal_string<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
             tag(r"\$"),
             tag(r#"\\"#),
             tag(r#"\""#),
-            recognize(tuple((tag(r"\u"), map_parser(take(6usize), all_consuming(hex_digit1))))),
+            recognize((tag(r"\u"), map_parser(take(6usize), all_consuming(hex_digit1)))),
             recognize(pair(tag(r"\u"), err_note("'\\u' followed by invalid hex value"))),
             recognize(pair(chr('\\'), err_skip("Bad escape sequence: '\\{}'", anychar))),
             recognize(pair(chr('\\'), err_note("Escape sequence at end of input"))),
-        ))(input)
+        ))
+        .parse(input)
     }
 
     fn interpolation<'a>(input: ESpan<'a>) -> IResult<'a, StringElement<'a>> {
@@ -775,7 +804,8 @@ fn normal_string<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
                     StringElement::Interpolation(Node::Error)
                 }),
             )),
-        )(input)
+        )
+        .parse(input)
     }
 
     map(
@@ -790,7 +820,8 @@ fn normal_string<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
             ex_tag("\""),
         ),
         Node::String,
-    )(input)
+    )
+    .parse(input)
 }
 
 /// Variable declarations are defined as follows:
@@ -810,12 +841,12 @@ fn normal_string<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
 /// ```
 fn variable_decl<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
     map(
-        tuple((
+        (
             alt((kw("let"), kw("const"))),
             ws_around(alt((identifier, preceded(ex_tag("$"), unescaped_identifier)))),
             chr('='),
             ws_before(ex_expression),
-        )),
+        ),
         |(keyword, identifier, _, value)| Node::VariableDecl {
             identifier: identifier.strip_parse_state(),
             value: Box::new(value),
@@ -825,7 +856,8 @@ fn variable_decl<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
                 Mutability::Mutable
             },
         },
-    )(input)
+    )
+    .parse(input)
 }
 
 /// Parameter Lists are defined as follows
@@ -846,11 +878,11 @@ fn variable_decl<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
 /// ```
 fn parameter_list<'a>(input: ESpan<'a>) -> IResult<'a, ParameterList<'a>> {
     map(
-        tuple((
+        (
             separated_list0(whitespace, terminated(identifier, not(one_of(".?")))),
             many0(ws_before(terminated(identifier, chr('?')))),
             opt(ws_before(terminated(identifier, tag("..")))),
-        )),
+        ),
         |(parameters, optional_parameters, variadic)| ParameterList {
             parameters: parameters.into_iter().map(StripParseState::strip_parse_state).collect(),
             optional_parameters: optional_parameters
@@ -859,7 +891,8 @@ fn parameter_list<'a>(input: ESpan<'a>) -> IResult<'a, ParameterList<'a>> {
                 .collect(),
             variadic: variadic.map(StripParseState::strip_parse_state),
         },
-    )(input)
+    )
+    .parse(input)
 }
 
 /// Function declarations are defined as follows:
@@ -880,18 +913,19 @@ fn function_decl<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
     map(
         preceded(
             kw("def"),
-            tuple((
+            (
                 ws_before(identifier),
                 delimited(opt(tag("(")), ws_around(parameter_list), opt(tag(")"))),
                 block,
-            )),
+            ),
         ),
         |(identifier, parameters, body)| Node::FunctionDecl {
             identifier: identifier.strip_parse_state(),
             parameters,
             body: Box::new(body.into()),
         },
-    )(input)
+    )
+    .parse(input)
 }
 
 /// Short function declarations are defined as follows:
@@ -912,18 +946,19 @@ fn short_function_decl<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
     map(
         preceded(
             kw("def"),
-            tuple((
+            (
                 ws_before(identifier),
                 delimited(ws_around(tag("(")), parameter_list, ws_around(tag(")"))),
                 ex_expression,
-            )),
+            ),
         ),
         |(identifier, parameters, body)| Node::FunctionDecl {
             identifier: identifier.strip_parse_state(),
             parameters,
             body: Box::new(body),
         },
-    )(input)
+    )
+    .parse(input)
 }
 
 /// Object literals are defined as follows:
@@ -944,31 +979,31 @@ fn short_function_decl<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
 /// @Labeled { foo: 5 }
 /// ```
 fn object<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
-    fn field<'a>(is_first: bool) -> impl FnMut(ESpan<'a>) -> IResult<'a, (Node<'a>, Node<'a>)> {
-        move |input| {
-            separated_pair(
-                alt((normal_string, map(identifier, |x| Node::Identifier(x.strip_parse_state())))),
-                ws_around(alt((
-                    tag(":"),
-                    preceded(
-                        cond(is_first, not(ws_before(chr('}')))),
-                        recognize(err_skip(
-                            "Expected ':'",
-                            many0(preceded(
-                                not(alt((
-                                    recognize(identifier),
-                                    recognize(chr('$')),
-                                    recognize(chr('}')),
-                                    whitespace,
-                                ))),
-                                anychar,
-                            )),
+    fn field<'a>(
+        is_first: bool,
+    ) -> impl Parser<ESpan<'a>, Output = (Node<'a>, Node<'a>), Error = Error> {
+        separated_pair(
+            alt((normal_string, map(identifier, |x| Node::Identifier(x.strip_parse_state())))),
+            ws_around(alt((
+                tag(":"),
+                preceded(
+                    cond(is_first, not(ws_before(chr('}')))),
+                    recognize(err_skip(
+                        "Expected ':'",
+                        many0(preceded(
+                            not(alt((
+                                recognize(identifier),
+                                recognize(chr('$')),
+                                recognize(chr('}')),
+                                whitespace,
+                            ))),
+                            anychar,
                         )),
-                    ),
-                ))),
-                map(simple_expression, Node::from),
-            )(input)
-        }
+                    )),
+                ),
+            ))),
+            map(simple_expression, Node::from),
+        )
     }
 
     fn object_body<'a>(input: ESpan<'a>) -> IResult<'a, Vec<(Node<'a>, Node<'a>)>> {
@@ -988,7 +1023,8 @@ fn object<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
                 opt(ws_before(tag(","))),
             )),
             |x| x.unwrap_or_default(),
-        )(input)
+        )
+        .parse(input)
     }
 
     flat_map(opt(ws_after(preceded(chr('@'), identifier))), |name| {
@@ -997,7 +1033,8 @@ fn object<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
                 let name = name.clone();
                 map(delimited(chr('{'), ws_around(object_body), tag("}")), move |body| {
                     Node::Object(name.clone().map(|x| x.strip_parse_state()), body)
-                })(input.clone())
+                })
+                .parse(input.clone())
             };
 
             if res.is_ok() {
@@ -1008,9 +1045,10 @@ fn object<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
                 return res;
             };
 
-            err_insert(format!("Expected object body after @{}", name.fragment()))(input)
+            err_insert(format!("Expected object body after @{}", name.fragment())).parse(input)
         }
-    })(input)
+    })
+    .parse(input)
 }
 
 /// List literals are defined as follows:
@@ -1046,10 +1084,11 @@ fn list<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
                 opt(ws_before(tag(","))),
             )),
             |x| Node::List(x.unwrap_or_default()),
-        )(input)
+        )
+        .parse(input)
     }
 
-    delimited(chr('['), ws_around(list_body), ex_tag("]"))(input)
+    delimited(chr('['), ws_around(list_body), ex_tag("]")).parse(input)
 }
 
 /// Lambda expressions are defined as follows:
@@ -1081,7 +1120,8 @@ fn lambda<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
             invocation,
         ),
         |(parameters, body)| Node::Lambda { parameters, body: Box::new(body.into()) },
-    )(input)
+    )
+    .parse(input)
 }
 
 /// Lookups are defined as follows:
@@ -1113,7 +1153,8 @@ fn lookup<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
             y.into_iter()
                 .fold(x, |prev, ident| Node::Lookup(Box::new(prev.into()), Box::new(ident)).into())
         },
-    )(input)
+    )
+    .parse(input)
 }
 
 /// Parentheticals are defined as:
@@ -1128,7 +1169,7 @@ fn lookup<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
 /// 2 * ( 2 + 3 )
 /// ```
 fn parenthetical<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
-    delimited(chr('('), ws_around(ex_expression), chr(')'))(input)
+    delimited(chr('('), ws_around(ex_expression), chr(')')).parse(input)
 }
 
 /// Blocks are defined as:
@@ -1143,7 +1184,7 @@ fn parenthetical<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
 /// { let s = 2; 2 + 2; }
 /// ```
 fn block<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
-    map(delimited(chr('{'), ws_around(program), chr('}')), Node::Block)(input)
+    map(delimited(chr('{'), ws_around(program), chr('}')), Node::Block).parse(input)
 }
 
 /// Values are defined as follows:
@@ -1172,7 +1213,8 @@ fn value<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
             Node::Identifier(x.strip_parse_state())
         }),
         err_insert("Expected value"),
-    ))(input)
+    ))
+    .parse(input)
 }
 
 /// Range literals are defined as follows:
@@ -1195,12 +1237,13 @@ fn range<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
     let oper = preceded(tag(".."), map(opt(chr('=')), |x| x.is_some()));
 
     alt((
-        map(tuple((opt(logical_or), ws_around(oper), opt(logical_or))), |(a, is_inclusive, b)| {
+        map((opt(logical_or), ws_around(oper), opt(logical_or)), |(a, is_inclusive, b)| {
             Node::Range(Box::new(a.map(Node::from)), Box::new(b.map(Node::from)), is_inclusive)
                 .into()
         }),
         logical_or,
-    ))(input)
+    ))
+    .parse(input)
 }
 
 /// Logical "and" and "or" are defined as follows:
@@ -1218,12 +1261,14 @@ fn range<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
 fn logical_or<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
     lassoc(logical_and, "||", |x: Node<'a>, y| {
         Node::LogicalOr(Box::new(x.into()), Box::new(y.into()))
-    })(input)
+    })
+    .parse(input)
 }
 
 /// See `logical_or`
 fn logical_and<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
-    lassoc(logical_not, "&&", |x: Node<'a>, y| Node::LogicalAnd(Box::new(x), Box::new(y)))(input)
+    lassoc(logical_not, "&&", |x: Node<'a>, y| Node::LogicalAnd(Box::new(x), Box::new(y)))
+        .parse(input)
 }
 
 /// Logical negation is defined as follows:
@@ -1241,7 +1286,8 @@ fn logical_and<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
 fn logical_not<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
     map(pair(many0_count(ws_after(chr('!'))), comparison), |(count, node)| {
         (0..count).fold(node, |x, _| Node::LogicalNot(Box::new(x.into())))
-    })(input)
+    })
+    .parse(input)
 }
 
 /// Comparisons are defined as follows:
@@ -1264,7 +1310,8 @@ fn comparison<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
         terminated(
             alt((tag("<="), tag("<"), tag(">="), tag(">"), tag("!="), tag("=="))),
             opt(ws_before(err_skip("Logical not can't occur here", chr('!')))),
-        )(input)
+        )
+        .parse(input)
     }
 
     lassoc_choice(add_subtract, comp_op, |a, op, b| {
@@ -1278,7 +1325,8 @@ fn comparison<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
             _ => unreachable!(),
         }
         .into()
-    })(input)
+    })
+    .parse(input)
 }
 
 /// Addition is defined as follows:
@@ -1298,7 +1346,8 @@ fn add_subtract<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
         '-' => Node::Subtract(Box::new(a.into()), Box::new(b.into())),
         '+' => Node::Add(Box::new(a.into()), Box::new(b.into())),
         _ => unreachable!(),
-    })(input)
+    })
+    .parse(input)
 }
 
 /// Multiplication/division is defined as follows:
@@ -1318,7 +1367,8 @@ fn multiply_divide<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
         "*" => Node::Multiply(Box::new(a.into()), Box::new(b.into())),
         "//" => Node::Divide(Box::new(a.into()), Box::new(b.into())),
         _ => unreachable!(),
-    })(input)
+    })
+    .parse(input)
 }
 
 /// Arithmetic negation is defined as follows:
@@ -1335,7 +1385,8 @@ fn multiply_divide<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
 fn negate<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
     map(pair(many0_count(ws_after(chr('-'))), lookup), |(count, node)| {
         (0..count).fold(node, |x, _| Node::Negate(Box::new(x)))
-    })(input)
+    })
+    .parse(input)
 }
 
 /// We allow bare strings in a few places in the grammar, most notably as invocation arguments.
@@ -1361,7 +1412,8 @@ fn bare_string<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
             anychar,
         ))),
         |x| Node::BareString(x.strip_parse_state()),
-    )(input)
+    )
+    .parse(input)
 }
 
 /// Invocation is defined as:
@@ -1409,7 +1461,8 @@ fn invocation<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
             },
         ),
         map(simple_expression, Node::from),
-    ))(input)
+    ))
+    .parse(input)
 }
 
 /// Assignment is defined as:
@@ -1427,7 +1480,8 @@ fn invocation<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
 fn assignment<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
     map(pair(many0(terminated(simple_expression, ws_around(tag("=")))), invocation), |(a, b)| {
         a.into_iter().rev().fold(b, |b, a| Node::Assignment(Box::new(a.into()), Box::new(b)))
-    })(input)
+    })
+    .parse(input)
 }
 
 /// Conditionals are defined as:
@@ -1445,18 +1499,19 @@ fn assignment<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
 /// ```
 fn conditional<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
     map(
-        tuple((
+        (
             kw("if"),
             ws_before(simple_expression),
             ws_before(block),
             opt(preceded(ws_around(kw("else")), alt((conditional, block)))),
-        )),
+        ),
         |(_, condition, body, else_)| Node::If {
             condition: Box::new(condition.into()),
             body: Box::new(body),
             else_: else_.map(Box::new),
         },
-    )(input)
+    )
+    .parse(input)
 }
 
 /// Expressions are defined as follows:
@@ -1476,12 +1531,13 @@ fn expression<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
         "|>" => Node::Iterate(Box::new(a), Box::new(b)),
         "|" => Node::Pipe(Box::new(a), Box::new(b)),
         _ => unreachable!(),
-    })(input)
+    })
+    .parse(input)
 }
 
 /// Identical to [`expression`] but injects an error if an expression doesn't parse here.
 fn ex_expression<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
-    alt((expression, err_insert("Expected expression")))(input)
+    alt((expression, err_insert("Expected expression"))).parse(input)
 }
 
 /// See `expression`
@@ -1517,7 +1573,8 @@ fn import<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
             };
             Node::Import(path, name.map(|x| x.strip_parse_state()))
         },
-    )(input)
+    )
+    .parse(input)
 }
 
 /// A program is defined as:
@@ -1532,7 +1589,7 @@ fn program<'a>(input: ESpan<'a>) -> IResult<'a, Vec<Node<'a>>> {
 
     fn program_item<'a>(
         is_first: bool,
-    ) -> impl FnMut(ESpan<'a>) -> IResult<'a, (Node<'a>, Option<char>)> {
+    ) -> impl Parser<ESpan<'a>, Output = (Node<'a>, Option<char>), Error = Error> {
         move |input| {
             let defer_expr = DeferredError::new();
             let defer = defer_expr.defer(expression);
@@ -1557,11 +1614,13 @@ fn program<'a>(input: ESpan<'a>) -> IResult<'a, Vec<Node<'a>>> {
                     ),
                 )),
             );
-            parser(input)
+            parser.parse(input)
         }
     }
 
-    while let Ok((tail, (node, terminator))) = program_item(vec.is_empty())(input_next.clone()) {
+    while let Ok((tail, (node, terminator))) =
+        program_item(vec.is_empty()).parse(input_next.clone())
+    {
         let node = if let Some('&') = terminator {
             if let Node::FunctionDecl { identifier, parameters, body } = node {
                 Node::FunctionDecl { identifier, parameters, body: Box::new(Node::Async(body)) }
@@ -1648,7 +1707,7 @@ mod test {
             let never_match = defer.defer(preceded(ex_tag("never_match"), tag("")));
 
             let mut parser = alt((tag("abc"), never_match, tag("def"), defer.restore()));
-            parser(input)
+            parser.parse(input)
         }
 
         let abc = ESpan::new_extra("abc", (Rc::new(RefCell::new(ParseState::new())), None));

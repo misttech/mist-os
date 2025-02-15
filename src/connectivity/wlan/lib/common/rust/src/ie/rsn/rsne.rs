@@ -16,8 +16,8 @@ use nom::bytes::streaming::take;
 use nom::combinator::{eof, map, map_res};
 use nom::multi::length_count;
 use nom::number::streaming::{le_u16, le_u8};
-use nom::sequence::{terminated, tuple};
-use nom::IResult;
+use nom::sequence::terminated;
+use nom::{IResult, Parser};
 use wlan_bitfield::bitfield;
 
 use thiserror::Error;
@@ -554,7 +554,7 @@ fn read_suite_selector<T>(input: &[u8]) -> IResult<&[u8], T>
 where
     T: suite_selector::Factory<Suite = T>,
 {
-    let (i1, bytes) = take(4usize)(input)?;
+    let (i1, bytes) = take(4usize).parse(input)?;
     let oui = Oui::new([bytes[0], bytes[1], bytes[2]]);
     return Ok((i1, T::new(oui, bytes[3])));
 }
@@ -565,7 +565,7 @@ fn read_pmkid(input: &[u8]) -> IResult<&[u8], pmkid::Pmkid> {
         return pmkid::new(pmkid_data);
     };
 
-    map_res(nom::bytes::streaming::take(16usize), f)(input)
+    map_res(nom::bytes::streaming::take(16usize), f).parse(input)
 }
 
 fn akm(input: &[u8]) -> IResult<&[u8], akm::Akm> {
@@ -582,7 +582,7 @@ fn cipher(input: &[u8]) -> IResult<&[u8], cipher::Cipher> {
 pub fn from_bytes(input: &[u8]) -> IResult<&[u8], Rsne> {
     map(
         terminated(
-            tuple((
+            (
                 le_u8,
                 le_u8,
                 le_u16,
@@ -592,7 +592,7 @@ pub fn from_bytes(input: &[u8]) -> IResult<&[u8], Rsne> {
                 if_remaining!(map(le_u16, RsnCapabilities)),
                 if_remaining!(length_count(le_u16, read_pmkid)),
                 if_remaining!(cipher),
-            )),
+            ),
             eof,
         ),
         |(
@@ -614,7 +614,8 @@ pub fn from_bytes(input: &[u8]) -> IResult<&[u8], Rsne> {
             pmkids: pmkid_list.unwrap_or_default(),
             group_mgmt_cipher_suite: group_mgmt_cipher_suite,
         },
-    )(input)
+    )
+    .parse(input)
 }
 
 #[cfg(test)]

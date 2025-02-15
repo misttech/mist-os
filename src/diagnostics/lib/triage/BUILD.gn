@@ -16,6 +16,7 @@ lib_deps = [
   "//third_party/rust_crates:anyhow",
   "//third_party/rust_crates:itertools",
   "//third_party/rust_crates:nom",
+  "//third_party/rust_crates:nom-language",
   "//third_party/rust_crates:num-derive",
   "//third_party/rust_crates:num-traits",
   "//third_party/rust_crates:regex",

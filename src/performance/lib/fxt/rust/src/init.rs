@@ -5,6 +5,7 @@
 use crate::{trace_header, ParseResult, INIT_RECORD_TYPE};
 use nom::combinator::all_consuming;
 use nom::number::complete::le_u64;
+use nom::Parser;
 use std::time::Duration;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -12,7 +13,7 @@ pub(crate) struct Ticks(pub(crate) u64);
 
 impl Ticks {
     pub(crate) fn parse(buf: &[u8]) -> ParseResult<'_, Self> {
-        nom::combinator::map(nom::number::complete::le_u64, Ticks)(buf)
+        nom::combinator::map(nom::number::complete::le_u64, Ticks).parse(buf)
     }
 
     pub(crate) fn scale(self, ticks_per_second: u64) -> i64 {
@@ -36,7 +37,7 @@ impl InitRecord {
     pub(super) fn parse(buf: &[u8]) -> ParseResult<'_, Self> {
         let (buf, header) = InitHeader::parse(buf)?;
         let (rem, payload) = header.take_payload(buf)?;
-        let (empty, ticks_per_second) = all_consuming(le_u64)(payload)?;
+        let (empty, ticks_per_second) = all_consuming(le_u64).parse(payload)?;
         assert!(empty.is_empty(), "all_consuming must not return any remaining buffer");
         Ok((rem, Self { ticks_per_second }))
     }

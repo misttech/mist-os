@@ -9,6 +9,7 @@ use crate::string::{StringRef, STRING_REF_INLINE_BIT};
 use crate::{trace_header, ParseError, ParseResult};
 use flyweights::FlyStr;
 use nom::number::complete::{le_f64, le_i64, le_u64};
+use nom::Parser;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Arg {
@@ -40,7 +41,7 @@ pub struct RawArg<'a> {
 
 impl<'a> RawArg<'a> {
     pub(crate) fn parse_n(count: u8, buf: &'a [u8]) -> ParseResult<'a, Vec<Self>> {
-        nom::multi::count(Self::parse, count as usize)(buf)
+        nom::multi::count(Self::parse, count as usize).parse(buf)
     }
 
     pub(crate) fn parse(buf: &'a [u8]) -> ParseResult<'a, Self> {
@@ -65,17 +66,16 @@ impl<'a> RawArg<'a> {
                 let header = U32Header::new(base_header.0).map_err(nom::Err::Failure)?;
                 Ok((payload, RawArgValue::Unsigned32(header.value())))
             }
-            I64_ARG_TYPE => map(le_i64, |i| RawArgValue::Signed64(i))(payload),
-            U64_ARG_TYPE => map(le_u64, |u| RawArgValue::Unsigned64(u))(payload),
-            F64_ARG_TYPE => map(le_f64, |f| RawArgValue::Double(f))(payload),
+            I64_ARG_TYPE => map(le_i64, |i| RawArgValue::Signed64(i)).parse(payload),
+            U64_ARG_TYPE => map(le_u64, |u| RawArgValue::Unsigned64(u)).parse(payload),
+            F64_ARG_TYPE => map(le_f64, |f| RawArgValue::Double(f)).parse(payload),
             STR_ARG_TYPE => {
                 let header = StringHeader::new(base_header.0).map_err(nom::Err::Failure)?;
-                map(move |b| StringRef::parse(header.value_ref(), b), |s| RawArgValue::String(s))(
-                    payload,
-                )
+                map(move |b| StringRef::parse(header.value_ref(), b), |s| RawArgValue::String(s))
+                    .parse(payload)
             }
-            PTR_ARG_TYPE => map(le_u64, |p| RawArgValue::Pointer(p))(payload),
-            KOBJ_ARG_TYPE => map(le_u64, |k| RawArgValue::KernelObj(k))(payload),
+            PTR_ARG_TYPE => map(le_u64, |p| RawArgValue::Pointer(p)).parse(payload),
+            KOBJ_ARG_TYPE => map(le_u64, |k| RawArgValue::KernelObj(k)).parse(payload),
             unknown => Ok((&[][..], RawArgValue::Unknown { raw_type: unknown, bytes: payload })),
         }?;
 
