@@ -206,13 +206,8 @@ class WlanPolicyApFCTests(unittest.TestCase):
 
     def test_init_connect_proxy(self) -> None:
         """Verify WlanPolicyAp connects to
-        fuchsia.wlan.policy/AccessPointProvider and AccessPointListener."""
-        self.assertIsNotNone(
-            self.wlan_policy_ap_obj._access_point_provider_proxy
-        )
-        self.assertIsNotNone(
-            self.wlan_policy_ap_obj._access_point_listener_proxy
-        )
+        fuchsia.wlan.policy/AccessPointProvider."""
+        self.assertIsNotNone(self.wlan_policy_ap_obj._access_point_controller)
 
     def test_start(self) -> None:
         """Verify WlanPolicyAp.start()."""
