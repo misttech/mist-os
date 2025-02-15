@@ -985,35 +985,39 @@ async fn doctor_summary<W: Write>(
                 LedgerOutcome::Success,
                 format!("{path} locked by {lock}", path=file.display(), lock=lockfile.display()),
             ),
-            Err(LockfileCreateError {
-                kind: LockfileCreateErrorKind::TimedOut,
-                lock_path,
-                owner,
-                ..
-            }) => {
-                let mut msg = format!(
-                    "Lockfile `{lockfile}` was owned by another process that didn't release it in our timeout.",
-                    lockfile=lock_path.display(),
-                );
+            Err(err) => {
+                match *err {
+                    LockfileCreateError {
+                        kind: LockfileCreateErrorKind::TimedOut,
+                        lock_path,
+                        owner,
+                        ..
+                    } => {
+                        let mut msg = format!(
+                            "Lockfile `{lockfile}` was owned by another process that didn't release it in our timeout.",
+                            lockfile=lock_path.display(),
+                        );
 
-                if let Some(owner) = owner {
-                    msg = format!("{msg} Check that it's running? Pid {pid}", pid=owner.pid);
+                        if let Some(owner) = owner {
+                            msg = format!("{msg} Check that it's running? Pid {pid}", pid=owner.pid);
+                        }
+
+                        (LedgerOutcome::Failure, msg)
+                    }
+                    LockfileCreateError {
+                        kind: LockfileCreateErrorKind::Io(error),
+                        lock_path,
+                        ..
+                    } => {
+                        (
+                            LedgerOutcome::Failure,
+                            format!(
+                                "Could not open lockfile `{lockfile}` due to error: {error:?}. Check permissions on the directory.",
+                                lockfile=lock_path.display(),
+                            ),
+                        )
+                    }
                 }
-
-                (LedgerOutcome::Failure, msg)
-            }
-            Err(LockfileCreateError {
-                kind: LockfileCreateErrorKind::Io(error),
-                lock_path,
-                ..
-            }) => {
-                (
-                    LedgerOutcome::Failure,
-                    format!(
-                        "Could not open lockfile `{lockfile}` due to error: {error:?}. Check permissions on the directory.",
-                        lockfile=lock_path.display(),
-                    ),
-                )
             }
         };
         let node = ledger.add_node(&description, LedgerMode::Automatic)?;

@@ -67,7 +67,7 @@ impl Environment {
     /// Used to implement diagnostics for `ffx doctor`.
     pub async fn check_locks(
         context: &EnvironmentContext,
-    ) -> Result<Vec<(PathBuf, Result<PathBuf, LockfileCreateError>)>> {
+    ) -> Result<Vec<(PathBuf, Result<PathBuf, Box<LockfileCreateError>>)>> {
         let path = context.env_file_path()?.clone();
         let env = Self::load_env_file(&path, context)?;
 

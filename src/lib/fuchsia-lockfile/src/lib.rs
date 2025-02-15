@@ -108,9 +108,9 @@ impl LockfileCreateError {
         matches!(self.kind, LockfileCreateErrorKind::TimedOut)
     }
 
-    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     /// Removes the lockfile if it exists, consuming the error if it was removed
     /// or returning the error back if it failed in any other way than already not-existing.
+    #[allow(clippy::result_large_err)]
     pub fn remove_lock(self) -> Result<(), Self> {
         match remove_file(&self.lock_path) {
             Ok(_) => Ok(()),
@@ -186,11 +186,10 @@ impl LockContext {
 }
 
 impl Lockfile {
-    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     /// Creates a lockfile at `filename` if possible. Returns the underlying error
     /// from the file create call. Note that this won't retry. Use [`Lockfile::lock`]
     /// or [`Lockfile::lock_for`] to do that.
-    pub fn new(lock_path: &Path, context: LockContext) -> Result<Self, LockfileCreateError> {
+    pub fn new(lock_path: &Path, context: LockContext) -> Result<Self, Box<LockfileCreateError>> {
         // create the lock file -- if this succeeds the file exists now and is brand new
         // so we can write our details to it.
         OpenOptions::new()
@@ -207,13 +206,15 @@ impl Lockfile {
                 handle.flush()?;
                 Ok(Self { handle: Some(handle), path })
             })
-            .map_err(|e| LockfileCreateError::new(lock_path, e))
+            .map_err(|e| Box::new(LockfileCreateError::new(lock_path, e)))
     }
 
-    #[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
     /// Creates a lockfile at `filename`.lock if possible. See [`Lockfile::new`] for details on
     /// the return value.
-    pub fn new_for(filename: &Path, context: LockContext) -> Result<Self, LockfileCreateError> {
+    pub fn new_for(
+        filename: &Path,
+        context: LockContext,
+    ) -> Result<Self, Box<LockfileCreateError>> {
         let mut lock_path = filename.to_owned();
         let filename = lock_path.file_name().map_or(".lock".to_string(), |name| {
             format!("{filename}.lock", filename = name.to_string_lossy())
@@ -227,7 +228,7 @@ impl Lockfile {
     ///
     /// If unable to lock within the constraints, will return the error from the last attempt.
     /// It will try with an increasing sleep between attempts up to `timeout`.
-    async fn lock(lock_path: &Path, timeout: Duration) -> Result<Self, LockfileCreateError> {
+    async fn lock(lock_path: &Path, timeout: Duration) -> Result<Self, Box<LockfileCreateError>> {
         let end_time = Instant::now() + timeout;
         let context = LockContext::current();
         let mut sleep_time = 10;
@@ -243,12 +244,12 @@ impl Lockfile {
                     e.remove_lock()?;
                 }
                 Err(e) if Instant::now() > end_time => {
-                    return Err(LockfileCreateError {
+                    return Err(Box::new(LockfileCreateError {
                         kind: LockfileCreateErrorKind::TimedOut,
                         lock_path: e.lock_path,
                         owner: e.owner,
                         metadata: e.metadata,
-                    });
+                    }));
                 }
                 _ => {
                     fuchsia_async::Timer::new(Duration::from_millis(sleep_time)).await;
@@ -269,7 +270,10 @@ impl Lockfile {
     /// Creates a lockfile at `filename`.lock if possible, retrying until it succeeds or times out.
     ///
     /// See [`Lockfile::lock`] for more details.
-    pub async fn lock_for(filename: &Path, timeout: Duration) -> Result<Self, LockfileCreateError> {
+    pub async fn lock_for(
+        filename: &Path,
+        timeout: Duration,
+    ) -> Result<Self, Box<LockfileCreateError>> {
         let mut lock_path = filename.to_owned();
         let filename = lock_path.file_name().map_or(".lock".to_string(), |name| {
             format!("{filename}.lock", filename = name.to_string_lossy())
