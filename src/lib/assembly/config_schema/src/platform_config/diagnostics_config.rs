@@ -143,11 +143,44 @@ pub struct SamplerConfig {
     #[file_relative_paths]
     #[walk_paths]
     pub metrics_configs: Vec<FileRelativePathBuf>,
+
     /// The fire configs to pass to sampler.
     #[schemars(schema_with = "crate::vec_path_schema")]
     #[file_relative_paths]
     #[walk_paths]
     pub fire_configs: Vec<FileRelativePathBuf>,
+
+    /// The FIRE config to pass to sampler.
+    #[file_relative_paths]
+    #[walk_paths]
+    pub fire: FireConfig,
+}
+
+/// Diagnostics configuration options for Sampler FIRE projects.
+#[derive(
+    Debug,
+    Default,
+    Deserialize,
+    Serialize,
+    PartialEq,
+    JsonSchema,
+    SupportsFileRelativePaths,
+    WalkPaths,
+)]
+#[serde(default, deny_unknown_fields)]
+pub struct FireConfig {
+    /// Component configuration files containing mapping from component attribution
+    /// to Cobalt metric ID.
+    #[schemars(schema_with = "crate::vec_path_schema")]
+    #[file_relative_paths]
+    #[walk_paths]
+    pub component_configs: Vec<FileRelativePathBuf>,
+
+    /// FIRE project templates.
+    #[schemars(schema_with = "crate::vec_path_schema")]
+    #[file_relative_paths]
+    #[walk_paths]
+    pub project_templates: Vec<FileRelativePathBuf>,
 }
 
 /// Diagnostics configuration options for the memory monitor configuration area.

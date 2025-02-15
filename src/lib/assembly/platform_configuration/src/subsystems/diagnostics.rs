@@ -251,6 +251,21 @@ impl<'a> DefineSubsystemConfiguration<DiagnosticsSubsystemConfig<'a>> for Diagno
                 })
                 .context(format!("Adding metrics config to sampler: {}", &metrics_config))?;
         }
+        for fire_config in &sampler.fire.component_configs {
+            // Ensure that the fire_config is the correct format.
+            let _ = read_config::<ComponentIdInfoList>(&fire_config)
+                .with_context(|| format!("Parsing fire config: {}", &fire_config))?;
+            let filename = fire_config.as_utf8_pathbuf().file_name().ok_or_else(|| {
+                anyhow!("Failed to get filename for fire config: {}", &fire_config)
+            })?;
+            builder
+                .package("sampler")
+                .config_data(FileEntry {
+                    source: fire_config.clone().into(),
+                    destination: format!("fire/assembly/{}", filename),
+                })
+                .context(format!("Adding fire config to sampler: {}", &fire_config))?;
+        }
         for fire_config in &sampler.fire_configs {
             // Ensure that the fire_config is the correct format.
             let _ = read_config::<ComponentIdInfoList>(&fire_config)
