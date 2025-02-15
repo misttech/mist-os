@@ -15,7 +15,9 @@ use crate::mode_management::phy_manager::{PhyManager, PhyManagerApi};
 use crate::mode_management::{create_iface_manager, device_monitor, recovery, DEFECT_CHANNEL_SIZE};
 use crate::telemetry::{TelemetryEvent, TelemetrySender};
 use crate::util::listener;
-use crate::util::testing::{create_inspect_persistence_channel, run_until_completion, run_while};
+use crate::util::testing::{
+    create_inspect_persistence_channel, generate_ssid, run_until_completion, run_while,
+};
 use anyhow::{format_err, Error};
 use fidl::endpoints::{create_proxy, create_request_stream};
 use fidl_fuchsia_wlan_device_service::DeviceWatcherEvent;
@@ -2220,6 +2222,143 @@ fn listnr_updates_connecting_networks_correctly_on_removal() {
     assert_eq!(networks.len(), 1);
     let network = networks.pop().unwrap();
     assert_eq!(network.id.unwrap(), network_id.clone());
+    assert_eq!(network.state.unwrap(), types::ConnectionState::Disconnected);
+    assert_eq!(network.status, Some(types::DisconnectStatus::ConnectionStopped));
+}
+
+#[fuchsia::test]
+fn listnr_updates_connecting_networks_correctly_on_new_saved_network() {
+    let mut exec = fasync::TestExecutor::new();
+    let mut test_values =
+        test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false, RoamingPolicy::Disabled);
+
+    // No request has been sent yet. Future should be idle.
+    assert_variant!(
+        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
+        Poll::Pending
+    );
+
+    // Initial update should reflect client connections are disabled
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.listener_updates_stream,
+    );
+    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsDisabled);
+    assert_eq!(networks.unwrap().len(), 0);
+
+    // Get ready for client connections
+    let _iface_sme_stream = prepare_client_interface(&mut exec, &mut test_values);
+
+    // Check for a listener update saying client connections are enabled
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.listener_updates_stream,
+    );
+    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
+    assert_eq!(networks.unwrap().len(), 0);
+
+    // Generate network ID
+    let network_id =
+        fidl_policy::NetworkIdentifier { ssid: TEST_SSID.clone().to_vec(), type_: Saved::Wpa2 };
+    let network_config = fidl_policy::NetworkConfig {
+        id: Some(network_id.clone()),
+        credential: Some(TEST_CREDS.wpa_pass_min.policy.clone()),
+        ..Default::default()
+    };
+
+    // Save the network
+    let save_fut = test_values.external_interfaces.client_controller.save_network(&network_config);
+    let mut save_fut = pin!(save_fut);
+
+    // Continue processing the save request. Connect process starts, and save request returns once the scan has been queued.
+    let save_resp =
+        run_while(&mut exec, &mut test_values.internal_objects.internal_futures, &mut save_fut);
+    assert_variant!(save_resp, Ok(Ok(())));
+
+    // Check for a listener update saying we're connecting to the first network.
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.listener_updates_stream,
+    );
+    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
+    let mut networks = networks.unwrap();
+    assert_eq!(networks.len(), 1);
+    let network = networks.pop().unwrap();
+    assert_eq!(network.id.unwrap(), network_id.clone());
+    assert_eq!(network.state.unwrap(), types::ConnectionState::Connecting);
+
+    // Generate a second network ID
+    let second_network_id = fidl_policy::NetworkIdentifier {
+        ssid: generate_ssid("second_ssid").to_vec(),
+        type_: Saved::Wpa2,
+    };
+    let second_network_config = fidl_policy::NetworkConfig {
+        id: Some(second_network_id.clone()),
+        credential: Some(TEST_CREDS.wpa_pass_min.policy.clone()),
+        ..Default::default()
+    };
+
+    // Save the second network
+    let second_save_fut =
+        test_values.external_interfaces.client_controller.save_network(&second_network_config);
+    let second_save_fut = pin!(second_save_fut);
+
+    // Continue processing the save request. Connect process starts, and save request returns once the scan has been queued.
+    let second_save_resp =
+        run_while(&mut exec, &mut test_values.internal_objects.internal_futures, second_save_fut);
+    assert_variant!(second_save_resp, Ok(Ok(())));
+
+    // Check for a listener update saying the first network is now disconnected.
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.listener_updates_stream,
+    );
+    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
+    let mut networks = networks.unwrap();
+    assert_eq!(networks.len(), 1);
+    let network = networks.pop().unwrap();
+    assert_eq!(network.id.unwrap(), network_id.clone());
+    assert_eq!(network.state.unwrap(), types::ConnectionState::Disconnected);
+    assert_eq!(network.status, Some(types::DisconnectStatus::ConnectionStopped));
+
+    // Check for a listener update saying the new network is connecting.
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.listener_updates_stream,
+    );
+    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
+    let mut networks = networks.unwrap();
+    assert_eq!(networks.len(), 1);
+    let network = networks.pop().unwrap();
+    assert_eq!(network.id.unwrap(), second_network_id.clone());
+    assert_eq!(network.state.unwrap(), types::ConnectionState::Connecting);
+
+    // Remove the second network before connection has completed.
+    let remove_fut =
+        test_values.external_interfaces.client_controller.remove_network(&second_network_config);
+    let remove_fut = pin!(remove_fut);
+
+    // Continue processing the remove request.
+    let remove_resp =
+        run_while(&mut exec, &mut test_values.internal_objects.internal_futures, remove_fut);
+    assert_variant!(remove_resp, Ok(Ok(())));
+
+    // Check for a listener update saying the second network has disconnected.
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.listener_updates_stream,
+    );
+    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
+    let mut networks = networks.unwrap();
+    assert_eq!(networks.len(), 1);
+    let network = networks.pop().unwrap();
+    assert_eq!(network.id.unwrap(), second_network_id.clone());
     assert_eq!(network.state.unwrap(), types::ConnectionState::Disconnected);
     assert_eq!(network.status, Some(types::DisconnectStatus::ConnectionStopped));
 }
