@@ -7,7 +7,7 @@ use crate::utils::OneOrMany;
 use anyhow::bail;
 use component_id_index::InstanceId;
 use moniker::ExtendedMoniker;
-use serde::{de, Deserialize, Deserializer};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::marker::PhantomData;
 use std::str::FromStr;
 
@@ -18,7 +18,7 @@ pub use crate::runtime::{MetricConfig, ProjectConfig};
 /// Configuration for a single FIRE project template to map Inspect data to its Cobalt metrics
 /// for all components in the ComponentIdInfo. Just like ProjectConfig except it uses MetricTemplate
 /// instead of MetricConfig.
-#[derive(Deserialize, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct ProjectTemplate {
     /// Project ID that metrics are being sampled and forwarded on behalf of.
     pub project_id: ProjectId,
@@ -53,7 +53,7 @@ impl ProjectTemplate {
 
 /// Configuration for a single FIRE metric template to map from an Inspect property
 /// to a cobalt metric. Unlike MetricConfig, selectors aren't parsed.
-#[derive(Clone, Deserialize, Debug, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct MetricTemplate {
     /// Selector identifying the metric to
     /// sample via the diagnostics platform.
@@ -88,14 +88,18 @@ pub struct MetricTemplate {
     pub project_id: Option<ProjectId>,
 }
 
-#[derive(Deserialize, Debug, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
 pub struct ComponentIdInfo {
     /// The component's moniker
-    #[serde(deserialize_with = "moniker_deserialize")]
+    #[serde(deserialize_with = "moniker_deserialize", serialize_with = "moniker_serialize")]
     pub moniker: ExtendedMoniker,
 
     /// The Component Instance ID - may not be available
-    #[serde(default, deserialize_with = "instance_id_deserialize")]
+    #[serde(
+        default,
+        deserialize_with = "instance_id_deserialize",
+        serialize_with = "instance_id_serialize"
+    )]
     pub instance_id: Option<InstanceId>,
 
     /// The ID sent to Cobalt as an event code
@@ -106,7 +110,7 @@ pub struct ComponentIdInfo {
     pub label: String,
 }
 
-#[derive(Deserialize, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Default, Debug, PartialEq, Eq)]
 pub struct ComponentIdInfoList(Vec<ComponentIdInfo>);
 
 impl ComponentIdInfoList {
@@ -248,11 +252,38 @@ where
     }
 }
 
+pub fn moniker_serialize<S>(moniker: &ExtendedMoniker, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&moniker.to_string())
+}
+
+pub fn instance_id_serialize<S>(
+    instance_id: &Option<InstanceId>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    match instance_id.as_ref() {
+        Some(instance_id) => serializer.serialize_some(&instance_id.to_string()),
+        None => serializer.serialize_none(),
+    }
+}
+
 fn one_or_many_strings<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
 where
     D: Deserializer<'de>,
 {
     deserializer.deserialize_any(OneOrMany(PhantomData::<String>))
+}
+
+#[derive(Serialize, Deserialize, Default)]
+pub struct MergedSamplerConfig {
+    pub fire_project_templates: Vec<ProjectTemplate>,
+    pub fire_component_configs: Vec<ComponentIdInfoList>,
+    pub project_configs: Vec<ProjectConfig>,
 }
 
 #[cfg(test)]
