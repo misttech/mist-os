@@ -95,8 +95,6 @@ def run_clidoc(args, cmd_list):
         args.depfile,
         "--sdk-manifest",
         args.sdk_manifest,
-        "--isolate-dir",
-        args.isolate_dir,
         "--subtool-manifest",
         args.subtool_manifest,
     ] + cmds

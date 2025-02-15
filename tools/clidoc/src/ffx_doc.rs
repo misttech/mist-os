@@ -37,6 +37,7 @@ pub(crate) fn write_formatted_output_for_ffx(
     debug!("Generating docs for {:?} to {:?}", cmd_path, output_md_path);
 
     let mut cmd = Command::new(&cmd_path);
+    cmd.args(["--no-environment"]);
     // ffx can't really run standalone in a hermetic environment, so we need to impute some
     // configuration.
     if let Some(sdk_root) = sdk_root_path {

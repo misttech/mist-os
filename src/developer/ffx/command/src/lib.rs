@@ -105,6 +105,24 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
         })?;
     }
 
+    // initialize logging
+
+    // Yecch, this is unreasonably specific. But it is to preserve compatibility
+    // with the daemon, which is going away, at which point this code can also
+    // go away.
+    let log_dest = if app.subcommand.len() >= 2
+        && app.subcommand[0..2] == ["daemon", "start"]
+        && app.log_destination.is_none()
+    {
+        // The daemon should by default produce output on stdout, not ffx.log,
+        // because integrators who turn off daemon.autostart are expecting to
+        // manage the output.
+        Some(ffx_config::logging::LogDestination::Stdout)
+    } else {
+        app.log_destination.clone()
+    };
+    ffx_config::logging::init(&context, app.verbose, &log_dest)?;
+
     let tools = T::from_env(&context).await?;
 
     if return_args_info {
@@ -136,8 +154,10 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
     // commands to have positional arguments and they are present if the schema is
     // requested.
     let tool = if app.schema && app.machine.is_some() {
+        tracing::info!("Schema requested - calling try from name: {cmd:?}");
         tools.try_runner_from_name(&cmd).await?
     } else {
+        tracing::info!("No schema requested - calling try from args: {cmd:?}");
         match tools.try_from_args(&cmd).await {
             Ok(t) => t,
             Err(Error::Help { command, output, code }) => {
@@ -178,22 +198,6 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
         }
     };
 
-    // Yecch, this is unreasonably specific. But it is to preserve compatibility
-    // with the daemon, which is going away, at which point this code can also
-    // go away.
-    let log_dest = if app.subcommand.len() >= 2
-        && app.subcommand[0..2] == ["daemon", "start"]
-        && app.log_destination.is_none()
-    {
-        // The daemon should by default produce output on stdout, not ffx.log,
-        // because integrators who turn off daemon.autostart are expecting to
-        // manage the output.
-        Some(ffx_config::logging::LogDestination::Stdout)
-    } else {
-        app.log_destination.clone()
-    };
-
-    ffx_config::logging::init(&context, app.verbose, &log_dest)?;
     tracing::info!("starting command: {:?}", Vec::from_iter(cmd.all_iter()));
     tracing::info!("with context: {kind:#?}", kind = context.env_kind());
 
@@ -201,7 +205,6 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
     tracing::debug!("metrics session started");
 
     let stamp = stamp_file(&app.stamp)?;
-    tracing::debug!("stamp file created, running tool");
     let res = match tool {
         Some(tool) => tool.run(metrics).await,
         // since we didn't run a subtool, do the metrics ourselves
