@@ -33,7 +33,6 @@
                 "*key_socket*",
                 "*keys*",
                 "*mac_admin*",
-                "*mkdir*",
                 "*mmap*",
                 "*module_load*",
                 "*msg*",

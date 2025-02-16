@@ -595,17 +595,14 @@ fn may_create(
     // directory node.
     let current_sid = current_task.security_state.lock().current_sid;
     let parent_sid = fs_node_effective_sid_and_class(parent).sid;
-
-    todo_check_permission(
-        TODO_DENY!("https://fxbug.dev/374910392", "Check search permission."),
+    check_permission(
         &permission_check,
         current_sid,
         parent_sid,
         DirPermission::Search,
         audit_context,
     )?;
-    todo_check_permission(
-        TODO_DENY!("https://fxbug.dev/374910392", "Check add_name permission."),
+    check_permission(
         &permission_check,
         current_sid,
         parent_sid,
@@ -625,8 +622,7 @@ fn may_create(
     )?
     .map(|(sid, _)| sid)
     .unwrap_or_else(|| SecurityId::initial(InitialSid::File));
-    todo_check_permission(
-        TODO_DENY!("https://fxbug.dev/375381156", "Check create permission."),
+    check_permission(
         &permission_check,
         current_sid,
         new_file_sid,
@@ -645,8 +641,7 @@ fn may_create(
             error!(EPERM)
         }
     }?;
-    todo_check_permission(
-        TODO_DENY!("https://fxbug.dev/375381156", "Check associate permission."),
+    check_permission(
         &permission_check,
         new_file_sid,
         filesystem_sid,

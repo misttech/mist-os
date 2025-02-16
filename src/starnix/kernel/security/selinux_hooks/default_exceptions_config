@@ -11,12 +11,21 @@ todo_deny https://fxbug.dev/375036278 hal_gnss_default vendor_file file
 todo_deny https://fxbug.dev/390458405 update_engine vendor_file file
 
 // https://fxbug.dev/392857781 - Some HAL tests/pre-run steps are launched with bad labels.
+todo_deny https://fxbug.dev/392857781 init nativetest_data_file dir
+todo_deny https://fxbug.dev/392857781 init nativetest_data_file file
+todo_deny https://fxbug.dev/392857781 init shell_data_file dir
+todo_deny https://fxbug.dev/392857781 init shell_data_file file
 todo_deny https://fxbug.dev/392857781 init system_file file
 todo_deny https://fxbug.dev/392857781 init vendor_file file
-todo_deny https://fxbug.dev/392857781 init nativetest_data_file file
+
+// https://fxbug.dev/392857781 - Different HAL tests/pre-run steps also have bad labels, causing kernel/tmpfs check failures.
+todo_deny https://fxbug.dev/392857781 kernel tmpfs dir
 
 // https://fxbug.dev/391664952 - Some test infra attempts to run commands via "sh" without specifying a security domain to transition to, triggering "execute_no_trans" failures.
 todo_deny https://fxbug.dev/391664952 init shell_exec file
+
+// https://fxbug.dev/375381156 - "add_name" checks for "logd" to itself fail.
+todo_deny https://fxbug.dev/375381156 logd logd dir
 
 //
 // Exceptions required for the SELinux Test Suite container.
