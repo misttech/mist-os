@@ -917,9 +917,6 @@ class VmCowPages final : public VmHierarchyBase,
   static zx_status_t ForEveryOwnedHierarchyPageInRange(S* self, T func, uint64_t offset,
                                                        uint64_t size) TA_REQ(self->lock());
 
-  // Walks up the parent tree and returns the root, or |this| if there is no parent.
-  const VmCowPages* GetRootLocked() const TA_REQ(lock());
-
   // Changes a Reference in the provided VmPageOrMarker into a real vm_page_t. The allocated page
   // is assumed to be for this VmCowPages, and so uses the pmm_alloc_flags_, but it is not assumed
   // that the page_or_mark is actually yet in this page_list_, and so the allocated page is not

@@ -3822,12 +3822,6 @@ void VmCowPages::PromoteRangeForReclamationLocked(VmCowRange range) {
     return;
   }
 
-  // Walk up the tree to get to the root parent. A raw pointer is fine as we're holding the lock and
-  // won't drop it in this function.
-  // We need the root to check if the pages are owned by the root below. Hints only apply to pages
-  // in the root that are visible to this child, not to pages the child might have forked.
-  const VmCowPages* const root = GetRootLocked();
-
   uint64_t start_offset = ROUNDDOWN(range.offset, PAGE_SIZE);
   uint64_t end_offset = ROUNDUP(range.end(), PAGE_SIZE);
 
@@ -3844,11 +3838,14 @@ void VmCowPages::PromoteRangeForReclamationLocked(VmCowRange range) {
     // On success or failure this causes the cursor to go to the next offset.
     vm_page_t* page = cursor->MaybePage(false);
     if (page) {
-      // Check to see if the page is owned by the root VMO. Hints only apply to the root.
+      // Check to see if the page is owned by the root VMO. Hints only apply to the root, as that is
+      // where the page source is.
       // Don't move a pinned page or a dirty page to the DontNeed queue.
       // Note that this does not unset the always_need bit if it has been previously set. The
       // always_need hint is sticky.
-      if (page->object.get_object() == root && page->object.pin_count == 0 && is_page_clean(page)) {
+      VmCowPages* owner = reinterpret_cast<VmCowPages*>(page->object.get_object());
+      DEBUG_ASSERT(owner);
+      if (owner->page_source_ && page->object.pin_count == 0 && is_page_clean(page)) {
         pmm_page_queues()->MoveToReclaimDontNeed(page);
         vm_vmo_dont_need.Add(1);
       }
@@ -3902,9 +3899,11 @@ zx_status_t VmCowPages::ProtectRangeFromReclamationLocked(VmCowRange range, bool
           return ZX_OK;
         }
 
-        // Check to see if the page is owned by the root VMO. Hints only apply to the root.
+        // Check to see if the page is owned by the root VMO. Hints only apply to the root, as that
+        // is where the page source is. There could equivalently be no owner if this is the zero
+        // page, which should also be ignored.
         VmCowPages* owner = reinterpret_cast<VmCowPages*>(page->object.get_object());
-        if (owner != GetRootLocked()) {
+        if (!owner || !owner->page_source_) {
           // Hinting is not applicable to this page, but it might apply to following ones.
           continue;
         }
@@ -5552,18 +5551,6 @@ zx_status_t VmCowPages::WritebackEndLocked(VmCowRange range) {
 
   VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
   return ZX_OK;
-}
-
-const VmCowPages* VmCowPages::GetRootLocked() const {
-  auto cow_pages = this;
-  AssertHeld(cow_pages->lock_ref());
-  while (cow_pages->parent_) {
-    cow_pages = cow_pages->parent_.get();
-    // We just checked that this is not null in the loop conditional.
-    DEBUG_ASSERT(cow_pages);
-  }
-  DEBUG_ASSERT(cow_pages);
-  return cow_pages;
 }
 
 fbl::RefPtr<VmCowPages> VmCowPages::DebugGetParent() {
