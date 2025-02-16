@@ -489,18 +489,19 @@ void VmCowPages::TransitionToAliveLocked() {
   life_cycle_ = LifeCycle::Alive;
 }
 
-void VmCowPages::MaybeDeadTransitionLocked(Guard<VmoLockType>& guard) {
+fbl::RefPtr<VmCowPages> VmCowPages::MaybeDeadTransitionLocked(Guard<VmoLockType>& guard) {
   if (!paged_ref_ && children_list_len_ == 0 && life_cycle_ == LifeCycle::Alive) {
-    DeadTransition(guard);
+    return DeadTransitionLocked(guard);
   }
+  return nullptr;
 }
 
-void VmCowPages::MaybeDeadTransition() {
+fbl::RefPtr<VmCowPages> VmCowPages::MaybeDeadTransition() {
   Guard<VmoLockType> guard{lock()};
-  MaybeDeadTransitionLocked(guard);
+  return MaybeDeadTransitionLocked(guard);
 }
 
-void VmCowPages::DeadTransition(Guard<VmoLockType>& guard) {
+fbl::RefPtr<VmCowPages> VmCowPages::DeadTransitionLocked(Guard<VmoLockType>& guard) {
   canary_.Assert();
   DEBUG_ASSERT(life_cycle_ == LifeCycle::Alive);
 
@@ -512,6 +513,7 @@ void VmCowPages::DeadTransition(Guard<VmoLockType>& guard) {
   DEBUG_ASSERT(high_priority_count_ == 0);
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
+  fbl::RefPtr<VmCowPages> deferred;
 
   // If we're not a hidden vmo then we need to remove ourselves from our parent and free any pages
   // that we own.
@@ -532,11 +534,9 @@ void VmCowPages::DeadTransition(Guard<VmoLockType>& guard) {
       // deferred deletion method. See common in parent else branch for why we can avoid this on a
       // hidden parent.
       if (!parent_locked().is_hidden()) {
-        guard.CallUnlocked([parent = ktl::move(parent_)]() mutable {
-          VmDeferredDeleter<VmCowPages>::DoDeferredDelete(ktl::move(parent));
-        });
+        deferred = ktl::move(parent_);
       } else {
-        parent_locked().MaybeDeadTransitionLocked(guard);
+        deferred = parent_locked().MaybeDeadTransitionLocked(guard);
       }
     }
   } else {
@@ -568,7 +568,7 @@ void VmCowPages::DeadTransition(Guard<VmoLockType>& guard) {
       // otherwise its destructor will run without this transition happening, which is an error.
       // This otherwise does not cause any actual cleanup to happen, since our parent is hidden and
       // will have had all its pages removed already.
-      parent_locked().DeadTransition(guard);
+      deferred = parent_locked().DeadTransitionLocked(guard);
     }
   }
 
@@ -580,6 +580,7 @@ void VmCowPages::DeadTransition(Guard<VmoLockType>& guard) {
   }
 
   life_cycle_ = LifeCycle::Dead;
+  return deferred;
 }
 
 VmCowPages::~VmCowPages() {

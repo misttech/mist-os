@@ -94,8 +94,7 @@ class ScopedPageFreedList;
 // object is unreachable due to having a ref count of 0.
 class VmCowPages final : public VmHierarchyBase,
                          public fbl::ContainableBaseClasses<
-                             fbl::TaggedDoublyLinkedListable<VmCowPages*, internal::ChildListTag>>,
-                         public VmDeferredDeleter<VmCowPages> {
+                             fbl::TaggedDoublyLinkedListable<VmCowPages*, internal::ChildListTag>> {
  public:
   static zx_status_t Create(fbl::RefPtr<VmHierarchyState> root_lock, VmCowPagesOptions options,
                             uint32_t pmm_alloc_flags, uint64_t size,
@@ -667,10 +666,12 @@ class VmCowPages final : public VmHierarchyBase,
   // Potentially transitions from Alive->Dead if the cow pages is unreachable (i.e. has no
   // paged_ref_ and no children). Used by the VmObjectPaged when it unlinks the paged_ref_, but
   // prior to dropping the RefPtr, giving the VmCowPages a chance to transition.
-  void MaybeDeadTransitionLocked(Guard<VmoLockType>& guard) TA_REQ(lock());
+  // If a VmCowPages is returned then this is a parent that needs to have MaybeDeadTransition called
+  // on it.
+  fbl::RefPtr<VmCowPages> MaybeDeadTransitionLocked(Guard<VmoLockType>& guard) TA_REQ(lock());
 
   // Unlocked helper around MaybeDeadTransitionLocked
-  void MaybeDeadTransition();
+  fbl::RefPtr<VmCowPages> MaybeDeadTransition();
 
   // Helper to allocate a new page for the VMO, filling out the page request if necessary.
   zx_status_t AllocPage(vm_page_t** page, AnonymousPageRequest* page_request);
@@ -731,7 +732,9 @@ class VmCowPages final : public VmHierarchyBase,
   // Transitions from Alive->Dead, freeing pages and cleaning up state. Responsibility of the caller
   // to validate that it is correct to be doing this transition. May drop the lock during its
   // execution.
-  void DeadTransition(Guard<VmoLockType>& guard) TA_REQ(lock());
+  // Might return its parent_ RefPtr, which the caller must check if a dead transition is needed and
+  // then release the RefPtr.
+  fbl::RefPtr<VmCowPages> DeadTransitionLocked(Guard<VmoLockType>& guard) TA_REQ(lock());
 
   bool is_hidden() const { return !!(options_ & VmCowPagesOptions::kHidden); }
   bool can_decommit_zero_pages() const {

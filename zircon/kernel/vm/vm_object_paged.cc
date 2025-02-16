@@ -77,6 +77,7 @@ void VmObjectPaged::DestructorHelper() {
     Unpin(0, size());
   }
 
+  fbl::RefPtr<VmCowPages> deferred;
   {
     Guard<VmoLockType> guard{lock()};
 
@@ -123,7 +124,10 @@ void VmObjectPaged::DestructorHelper() {
                                              reference_list_);
     }
     DEBUG_ASSERT(reference_list_.is_empty());
-    cow_pages_locked()->MaybeDeadTransitionLocked(guard);
+    deferred = cow_pages_locked()->MaybeDeadTransitionLocked(guard);
+  }
+  while (deferred) {
+    deferred = deferred->MaybeDeadTransition();
   }
 
   fbl::RefPtr<VmObjectPaged> maybe_parent;
