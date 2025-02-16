@@ -650,6 +650,8 @@ class VmMappingCoalescer {
   // Submit any outstanding mappings to the MMU.
   zx_status_t Flush();
 
+  size_t TotalMapped() { return total_mapped_; }
+
   // Drop the current outstanding mappings without sending them to the MMU.
   void Drop() { count_ = 0; }
 
@@ -665,6 +667,7 @@ class VmMappingCoalescer {
   vaddr_t base_;
   paddr_t phys_[NumPages];
   size_t count_;
+  size_t total_mapped_ = 0;
   uint mmu_flags_;
   const ArchVmAspace::ExistingEntryAction existing_entry_action_;
 };
@@ -709,6 +712,7 @@ zx_status_t VmMappingCoalescer<NumPages>::Flush() {
   }
   DEBUG_ASSERT_MSG(ret != ZX_OK || mapped == count_, "mapped %zu, count %zu\n", mapped, count_);
   base_ += count_ * PAGE_SIZE;
+  total_mapped_ += count_;
   count_ = 0;
   return ret;
 }
@@ -942,9 +946,9 @@ zx_status_t VmMapping::DestroyLocked() {
   return ZX_OK;
 }
 
-zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
-                                       const size_t additional_pages,
-                                       MultiPageRequest* page_request) {
+ktl::pair<zx_status_t, uint32_t> VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
+                                                            const size_t additional_pages,
+                                                            MultiPageRequest* page_request) {
   VM_KTRACE_DURATION(
       2, "VmMapping::PageFault",
       ("user_id", KTRACE_ANNOTATED_VALUE(AssertHeld(lock_ref()), object_->user_id())),
@@ -1000,7 +1004,7 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
       // instruction fetch from a no execute region
       LTRACEF("permission failure: execute fault on no execute region\n");
     }
-    return ZX_ERR_ACCESS_DENIED;
+    return {ZX_ERR_ACCESS_DENIED, 0};
   }
 
   // grab the lock for the vmo
@@ -1008,7 +1012,7 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
 
   const uint64_t vmo_size = object_->size_locked();
   if (vmo_offset >= vmo_size) {
-    return ZX_ERR_OUT_OF_RANGE;
+    return {ZX_ERR_OUT_OF_RANGE, 0};
   }
 
   // Calculate the number of pages from va until the end of the VMO and protection range, so we
@@ -1054,7 +1058,7 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
     const size_t cursor_size = num_fault_pages * PAGE_SIZE;
     __UNINITIALIZED auto cursor = paged->GetLookupCursorLocked(vmo_offset, cursor_size);
     if (cursor.is_error()) {
-      return cursor.error_value();
+      return {cursor.error_value(), coalescer.TotalMapped()};
     }
     // Do not consider pages touched when mapping in, if they are actually touched they will
     // get an accessed bit set in the hardware.
@@ -1071,7 +1075,7 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
           cursor->RequirePage(write, num_curr_pages, page_request);
       if (result.is_error()) {
         coalescer.Flush();
-        return result.error_value();
+        return {result.error_value(), coalescer.TotalMapped()};
       }
 
       DEBUG_ASSERT(!write || result->writable);
@@ -1095,7 +1099,7 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
       if (status != ZX_OK) {
         // Flush any existing pages in the coalescer.
         coalescer.Flush();
-        return status;
+        return {status, coalescer.TotalMapped()};
       }
     }
 
@@ -1129,14 +1133,14 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
 
     status = coalescer.AppendOrAdjustMapping(va, phys_base, range.mmu_flags);
     if (status != ZX_OK) {
-      return status;
+      return {status, coalescer.TotalMapped()};
     }
 
     // Extrapolate the pages from the base address.
     for (size_t offset = PAGE_SIZE; offset < phys_len; offset += PAGE_SIZE) {
       status = coalescer.Append(va + offset, phys_base + offset);
       if (status != ZX_OK) {
-        return status;
+        return {status, coalescer.TotalMapped()};
       }
     }
   }
@@ -1149,7 +1153,7 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
     // to unmap the range instead.
     currently_faulting.MappingUpdated();
   }
-  return status;
+  return {status, coalescer.TotalMapped()};
 }
 
 void VmMapping::ActivateLocked() {

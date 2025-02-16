@@ -602,6 +602,7 @@ zx_status_t VmAspace::PageFaultInternal(vaddr_t va, uint flags, size_t additiona
   do {
     // For now, hold the aspace lock across the page fault operation, which stops any other
     // operations on the address space from moving the region out from underneath it.
+    uint32_t mapped;
     {
       Guard<CriticalMutex> guard{&lock_};
       DEBUG_ASSERT(!aspace_destroyed_);
@@ -628,7 +629,10 @@ zx_status_t VmAspace::PageFaultInternal(vaddr_t va, uint flags, size_t additiona
       }
       DEBUG_ASSERT(last_fault_);
       AssertHeld(last_fault_->lock_ref());
-      status = last_fault_->PageFaultLocked(va, flags, additional_pages, &page_request);
+      auto [fault_status, count] =
+          last_fault_->PageFaultLocked(va, flags, additional_pages, &page_request);
+      status = fault_status;
+      mapped = count;
     }
 
     if (status == ZX_ERR_SHOULD_WAIT) {
@@ -642,6 +646,15 @@ zx_status_t VmAspace::PageFaultInternal(vaddr_t va, uint flags, size_t additiona
           root_vmar_->DumpLocked(0, false);
         }
         return st;
+      }
+      // Before retrying the page fault, take into account how many pages got mapped on the previous
+      // attempt (if any).
+      if (mapped > 0) {
+        va += PAGE_SIZE * mapped;
+        // For mapped to be non-zero and we were able to have an error then we must have requested
+        // a non-zero amount of additional pages, and not all of them were able to be mapped.
+        DEBUG_ASSERT(mapped <= additional_pages);
+        additional_pages -= mapped;
       }
     }
   } while (status == ZX_ERR_SHOULD_WAIT);

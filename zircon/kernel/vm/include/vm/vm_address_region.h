@@ -1028,9 +1028,14 @@ class VmMapping final : public VmAddressRegionOrMapping,
   // As the |additional_pages| are resolved with the same |pf_flags| they may trigger copy-on-write
   // or other allocations in the underlying VMO.
   // If this returns ZX_ERR_SHOULD_WAIT, then the caller should wait on |page_request|
-  // and try again.
-  zx_status_t PageFaultLocked(vaddr_t va, uint pf_flags, size_t additional_pages,
-                              MultiPageRequest* page_request) TA_REQ(lock());
+  // and try again. In addition to a status this returns how many pages got mapped in.
+  // If ZX_OK is returned then the number of pages mapped in is guaranteed to be >0.
+  // If |additional_pages| was non-zero, then the maximum number of pages that will be mapped is
+  // |additional_pages + 1|. Otherwise the maximum number of pages that will be mapped is
+  // kPageFaultMaxOptimisticPages.
+  ktl::pair<zx_status_t, uint32_t> PageFaultLocked(vaddr_t va, uint pf_flags,
+                                                   size_t additional_pages,
+                                                   MultiPageRequest* page_request) TA_REQ(lock());
 
   // Apis intended for use by VmObject
 

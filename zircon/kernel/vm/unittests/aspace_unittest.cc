@@ -1741,6 +1741,18 @@ static bool vm_mapping_page_fault_range_test() {
     EXPECT_TRUE(vmo->GetAttributedMemory() == make_private_attribution_counts(kAllocSize, 0));
   }
 
+  // Faulting a partial range should not overrun
+  {
+    EXPECT_OK(vmo->DecommitRange(0, kAllocSize));
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, 0));
+    EXPECT_TRUE(vmo->GetAttributedMemory() == make_private_attribution_counts(0, 0));
+
+    // Write faulting the range should both map and allocate the requested pages, but no more.
+    EXPECT_OK(Thread::Current::SoftFaultInRange(mapping->base(), kWriteFlags, kAllocSize / 2));
+    EXPECT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, kTestPages / 2));
+    EXPECT_TRUE(vmo->GetAttributedMemory() == make_private_attribution_counts(kAllocSize / 2, 0));
+  }
+
   // Should not error if > VMO length.
   {
     EXPECT_OK(vmo->DecommitRange(0, kAllocSize));
@@ -1795,9 +1807,20 @@ static bool vm_mapping_page_fault_range_test() {
       const vaddr_t base = paged_mapping->base();
       Guard<CriticalMutex> guard{paged_mapping->mapping()->lock()};
       MultiPageRequest page_request;
-      EXPECT_EQ(paged_mapping->mapping()->PageFaultLocked(base, kWriteFlags, kTestPages - 1,
-                                                          &page_request),
-                ZX_ERR_SHOULD_WAIT);
+      ktl::pair<zx_status_t, uint32_t> result;
+      // Although the first page is supplied to paged_vmo, attempting to map it could still fail due
+      // to either it being deduped to a marker, or it being a loaned page and needing to be
+      // swapped. Both of these cases require an allocation, which could need to wait. This wait
+      // request should only be due to the pmm random delayed allocations, and so we can just ignore
+      // it and try again.
+      size_t retry_count = 0;
+      do {
+        result = paged_mapping->mapping()->PageFaultLocked(base, kWriteFlags, kTestPages - 1,
+                                                           &page_request);
+        retry_count++;
+      } while (result.first == ZX_ERR_SHOULD_WAIT && result.second == 0 && retry_count < 100);
+      EXPECT_EQ(result.first, ZX_ERR_SHOULD_WAIT);
+      EXPECT_EQ(result.second, 1u);
     }
 
     // The one previously committed page should have been mapped in and the VMO marked modified.
