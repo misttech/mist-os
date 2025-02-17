@@ -20,6 +20,22 @@
 
 namespace unwinder {
 
+// Contains the information relevant for the given Module. The CfiModules are lazily loaded when
+// this module is needed.
+struct CfiModuleInfo {
+  bool IsValidPC(uint64_t pc) const;
+
+  Module module;
+  // The loaded binary file corresponding to this module.. This is the (possibly stripped) binary
+  // file. It may contain an .eh_frame section, and optionally a .debug_frame section (in the case
+  // it is unstripped).
+  std::unique_ptr<CfiModule> binary;
+  // The loaded debug info file, if present. This is an optional addition to the binary file
+  // above. When non-null, this file will be inspected for a .debug_frame section before the
+  // binary file. This is only loaded and used if the |debug_info_memory| is non-null in |module|.
+  std::unique_ptr<CfiModule> debug_info;
+};
+
 class CfiUnwinder : public UnwinderBase {
  public:
   explicit CfiUnwinder(const std::vector<Module>& modules);
@@ -32,7 +48,7 @@ class CfiUnwinder : public UnwinderBase {
   // For other unwinders that want to check whether a value looks like a valid PC.
   bool IsValidPC(uint64_t pc);
 
-  Error GetCfiModuleFor(uint64_t pc, CfiModule** out);
+  Error GetCfiModuleInfoForPc(uint64_t pc, CfiModuleInfo** out);
 
  private:
   // |is_return_address| indicates whether the current PC is pointing to a return address,
@@ -42,8 +58,9 @@ class CfiUnwinder : public UnwinderBase {
   void AsyncStep(AsyncMemory* stack, Registers current, bool is_return_address,
                  fit::callback<void(Error, Registers)> cb);
 
-  // Mapping from module load addresses to a pair of (module description, lazily-initialized CFI).
-  std::map<uint64_t, std::pair<Module, std::unique_ptr<CfiModule>>> module_map_;
+  // Mapping from module load addresses to a pair of (module description, lazily-initialized CFI
+  // modules for the binary and optional debugging info).
+  std::map<uint64_t, CfiModuleInfo> module_map_;
 };
 
 }  // namespace unwinder
