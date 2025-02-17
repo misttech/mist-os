@@ -288,11 +288,16 @@ Error CfiModule::PrepareToStep(const Registers& current, DwarfCie& cie) {
   }
 
   DwarfFde fde;
-  // Search for .eh_frame first.
-  if (auto err = SearchEhFrame(pc, cie, fde); err.has_err()) {
-    // Cannot find the correct FDE in .eh_frame, try to find in .debug_frame.
-    if (SearchDebugFrame(pc, cie, fde).has_err()) {
-      return err;  // return the error from .eh_frame.
+
+  // Search for .debug_frame first. This is preferred over .eh_frame sections in situations where we
+  // might encounter both since debug_frame is likely to contain more complete information about all
+  // callsites that might be optimized out of eh_frame sections for binary size or performance
+  // reasons. Callers must provide an appropriate binary for the debug_frame section to be found,
+  // namely from either an unstripped binary or a separated debug info file corresponding to the
+  // program being unwound.
+  if (auto debug_frame_err = SearchDebugFrame(pc, cie, fde); debug_frame_err.has_err()) {
+    if (auto eh_frame_err = SearchEhFrame(pc, cie, fde); eh_frame_err.has_err()) {
+      return Error(debug_frame_err.msg() + ";" + eh_frame_err.msg());
     }
   }
 
