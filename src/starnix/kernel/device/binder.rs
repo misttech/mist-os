@@ -4755,6 +4755,7 @@ pub mod tests {
                 prot_flags,
                 MappingOptions::empty(),
                 NamespaceNode::new_anonymous_unrooted(
+                    current_task,
                     FsNode::new_root(PanickingFsNode).into_handle(),
                 ),
             )

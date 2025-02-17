@@ -226,7 +226,28 @@ where
     // hook implementation, and let it label, or queue, the `FsNode` based on the `FileSystem` label
     // state, thereby ensuring safe ordering.
     if let Some(state) = &current_task.kernel().security_state.state {
-        selinux_hooks::fs_node_init_with_dentry(locked, &state.server, current_task, dir_entry)
+        selinux_hooks::fs_node_init_with_dentry(
+            Some(&mut locked.cast_locked()),
+            &state.server,
+            current_task,
+            dir_entry,
+        )
+    } else {
+        Ok(())
+    }
+}
+
+pub fn fs_node_init_with_dentry_no_xattr(
+    current_task: &CurrentTask,
+    dir_entry: &DirEntryHandle,
+) -> Result<(), Errno> {
+    profile_duration!("security.hooks.fs_node_init_with_dentry_no_xattr");
+    // TODO: https://fxbug.dev/367585803 - Don't use `if_selinux_else()` here, because the `has_policy()`
+    // check is racey, so doing non-trivial work in the "else" path is unsafe. Instead, call the SELinux
+    // hook implementation, and let it label, or queue, the `FsNode` based on the `FileSystem` label
+    // state, thereby ensuring safe ordering.
+    if let Some(state) = &current_task.kernel().security_state.state {
+        selinux_hooks::fs_node_init_with_dentry(None, &state.server, current_task, dir_entry)
     } else {
         Ok(())
     }

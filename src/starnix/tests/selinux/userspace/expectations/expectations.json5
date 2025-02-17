@@ -9,11 +9,5 @@
                 "*",
             ],
         },
-        {
-            type: "expect_failure",
-            matchers: [
-                "*/pipe.cm",
-            ],
-        },
     ],
 }

@@ -1024,8 +1024,10 @@ impl NamespaceNode {
 
     /// Create a namespace node that is not mounted in a namespace and that refers to a node that
     /// is not rooted in a hierarchy and has no name.
-    pub fn new_anonymous_unrooted(node: FsNodeHandle) -> Self {
-        Self::new_anonymous(DirEntry::new_unrooted(node))
+    pub fn new_anonymous_unrooted(current_task: &CurrentTask, node: FsNodeHandle) -> Self {
+        let dir_entry = DirEntry::new_unrooted(node);
+        let _ = security::fs_node_init_with_dentry_no_xattr(current_task, &dir_entry);
+        Self::new_anonymous(dir_entry)
     }
 
     /// Create a FileObject corresponding to this namespace node.

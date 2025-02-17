@@ -1455,8 +1455,13 @@ impl FileObject {
         flags: OpenFlags,
     ) -> FileHandle {
         assert!(!node.fs().has_permanent_entries());
-        Self::new(current_task, ops, NamespaceNode::new_anonymous_unrooted(node), flags)
-            .expect("Failed to create anonymous FileObject")
+        Self::new(
+            current_task,
+            ops,
+            NamespaceNode::new_anonymous_unrooted(current_task, node),
+            flags,
+        )
+        .expect("Failed to create anonymous FileObject")
     }
 
     /// Create a FileObject with an associated NamespaceNode.

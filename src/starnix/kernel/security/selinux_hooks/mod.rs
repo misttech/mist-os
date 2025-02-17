@@ -230,16 +230,14 @@ pub(super) fn fs_node_notify_security_context(
 }
 
 /// Called by the VFS to initialize the security state for an `FsNode` that is being linked at
-/// `dir_entry`.
-pub(super) fn fs_node_init_with_dentry<L>(
-    locked: &mut Locked<'_, L>,
+/// `dir_entry`. If `locked_or_no_xattr` is `None`, xattrs will not be read - this makes sense
+/// for entries containing anonymous nodes, that will not have an associated filesystem entry.
+pub(super) fn fs_node_init_with_dentry(
+    locked_or_no_xattr: Option<&mut Locked<'_, FileOpsCore>>,
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     dir_entry: &DirEntryHandle,
-) -> Result<(), Errno>
-where
-    L: LockEqualOrBefore<FileOpsCore>,
-{
+) -> Result<(), Errno> {
     // Attempt to derive a specific security class for the `FsNode`, based on its file mode.
     // TODO: This ensures a correct class for nodes with a wrong `FileMode` at
     // creation, but should not really be required.
@@ -283,8 +281,8 @@ where
         // fs_use_xattr-labelling defers to the security attribute on the file node, with fall-back
         // behaviours for missing and invalid labels.
         FileSystemLabelingScheme::FsUse { fs_use_type, computed_def_sid: def_sid, .. } => {
-            match fs_use_type {
-                FsUseType::Xattr => {
+            match (fs_use_type, locked_or_no_xattr) {
+                (FsUseType::Xattr, Some(locked)) => {
                     // Determine the SID from the "security.selinux" attribute.
                     let attr = fs_node.ops().get_xattr(
                         &mut locked.cast_locked::<FileOpsCore>(),
@@ -342,6 +340,16 @@ where
                         };
                         def_sid
                     })
+                }
+                (FsUseType::Xattr, None) => {
+                    log_warn!(
+                        "Node {:?} in filesystem {} ({:?}-labeled) created in a context where the \
+                        FileOpsCore lock cannot be taken.",
+                        dir_entry,
+                        fs.name(),
+                        fs_use_type
+                    );
+                    SecurityId::initial(InitialSid::Unlabeled)
                 }
                 _ => {
                     // Ephemeral nodes are then labeled by applying SID computation between their
@@ -1357,8 +1365,6 @@ fn fs_node_effective_sid_and_class(fs_node: &FsNode) -> FsNodeSidAndClass {
         track_stub!(TODO("https://fxbug.dev/376237171"), "Label anon nodes properly");
     } else if fs_name == "sockfs" {
         track_stub!(TODO("https://fxbug.dev/364568517"), "Label socket nodes properly");
-    } else if fs_name == "pipefs" {
-        track_stub!(TODO("https://fxbug.dev/380448690"), "Label fifo nodes properly");
     } else {
         #[cfg(is_debug)]
         panic!(
@@ -1531,15 +1537,25 @@ where
     };
 
     if let Some(root_dir_entry) = file_system.maybe_root() {
-        fs_node_init_with_dentry(locked, security_server, current_task, root_dir_entry)?;
+        fs_node_init_with_dentry(
+            Some(&mut locked.cast_locked()),
+            security_server,
+            current_task,
+            root_dir_entry,
+        )?;
     }
 
     // Label the `FsNode`s for any `pending_entries`.
     let labeled_entries = pending_entries.len();
     for dir_entry in pending_entries {
         if let Some(dir_entry) = dir_entry.0.upgrade() {
-            fs_node_init_with_dentry(locked, security_server, current_task, &dir_entry)
-                .unwrap_or_else(|_| panic!("Failed to resolve FsNode label"));
+            fs_node_init_with_dentry(
+                Some(&mut locked.cast_locked()),
+                security_server,
+                current_task,
+                &dir_entry,
+            )
+            .unwrap_or_else(|_| panic!("Failed to resolve FsNode label"));
         }
     }
     log_debug!("Labeled {} entries in {} FileSystem", labeled_entries, file_system.name());
@@ -1884,8 +1900,13 @@ mod tests {
                 // Clear the cached SID and use `fs_node_init_with_dentry()` to re-resolve the label.
                 clear_cached_sid(node);
                 assert_eq!(None, get_cached_sid(node));
-                fs_node_init_with_dentry(locked, &security_server, &current_task, dir_entry)
-                    .expect("fs_node_init_with_dentry");
+                fs_node_init_with_dentry(
+                    Some(&mut locked.cast_locked()),
+                    &security_server,
+                    &current_task,
+                    dir_entry,
+                )
+                .expect("fs_node_init_with_dentry");
 
                 // `fs_node_getsecurity()` should now fall-back to the policy's "file" Context.
                 let default_file_context = security_server
@@ -1931,8 +1952,13 @@ mod tests {
                 // Clear the cached SID and use `fs_node_init_with_dentry()` to re-resolve the label.
                 clear_cached_sid(node);
                 assert_eq!(None, get_cached_sid(node));
-                fs_node_init_with_dentry(locked, &security_server, &current_task, dir_entry)
-                    .expect("fs_node_init_with_dentry");
+                fs_node_init_with_dentry(
+                    Some(&mut locked.cast_locked()),
+                    &security_server,
+                    &current_task,
+                    dir_entry,
+                )
+                .expect("fs_node_init_with_dentry");
 
                 // `fs_node_getsecurity()` should report the same invalid string as is in the xattr.
                 let result = fs_node_getsecurity(
@@ -1981,8 +2007,13 @@ mod tests {
                     .expect("setxattr");
                 clear_cached_sid(node);
                 assert_eq!(None, get_cached_sid(node));
-                fs_node_init_with_dentry(locked, &security_server, &current_task, dir_entry)
-                    .expect("fs_node_init_with_dentry");
+                fs_node_init_with_dentry(
+                    Some(&mut locked.cast_locked()),
+                    &security_server,
+                    &current_task,
+                    dir_entry,
+                )
+                .expect("fs_node_init_with_dentry");
 
                 // `fs_node_getsecurity()` should report the same valid Security Context string as the xattr holds.
                 let result = fs_node_getsecurity(
