@@ -26,6 +26,7 @@ syscall_tests = [
   "loop_test",
   "prctl_test",
   "restart_read_test",
+  "setpriority_test",
   "sw_breakpoint_test",
   "sysfs_kernel_test",
   "test_helper_test",

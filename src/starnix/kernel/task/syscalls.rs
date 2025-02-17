@@ -1604,19 +1604,32 @@ pub fn sys_setpriority(
         PRIO_PROCESS => {}
         _ => return error!(EINVAL),
     }
-    track_stub!(TODO("https://fxbug.dev/322894197"), "setpriority permissions");
+
     let weak = get_task_or_current(current_task, who);
     let target_task = Task::from_weak(&weak)?;
+    const MIN_RAW_PRIORITY: i32 = 1;
+    const MID_RAW_PRIORITY: i32 = 20;
+    const MAX_RAW_PRIORITY: i32 = 40;
+    let new_raw_priority =
+        (MID_RAW_PRIORITY).saturating_sub(priority).clamp(MIN_RAW_PRIORITY, MAX_RAW_PRIORITY) as u8;
+    let permitted = current_task.creds().has_capability(CAP_SYS_NICE) || {
+        let friendly = current_task.creds().euid == target_task.creds().euid
+            || current_task.creds().euid == target_task.creds().uid;
+        let strengthening = target_task.read().scheduler_policy.raw_priority() < new_raw_priority;
+        let allowed_so_far_as_rlimit_is_concerned = !strengthening
+            || new_raw_priority as u64 <= target_task.thread_group.get_rlimit(Resource::NICE);
+        friendly && allowed_so_far_as_rlimit_is_concerned
+    };
+    if !permitted {
+        return error!(EPERM);
+    }
+
+    // TODO: https://fxbug.dev/392615438 - this check_setsched_access is probably partially-correct
+    // at best; the SELinux story probably also involves a sys_nice capability check. See
+    // https://fxbug.dev/322894197#comment2.
     security::check_setsched_access(current_task, &target_task)?;
-    const MIN_RAW_PRIORITY: u8 = 1;
-    const MID_RAW_PRIORITY: u8 = 20;
-    const MAX_RAW_PRIORITY: u8 = 40;
-    let unclamped_raw_priority = (MID_RAW_PRIORITY as i32).saturating_sub(priority);
-    let raw_priority_ceiling =
-        std::cmp::min(MAX_RAW_PRIORITY as u64, target_task.thread_group.get_rlimit(Resource::NICE));
-    target_task.update_scheduler_nice(
-        unclamped_raw_priority.clamp(MIN_RAW_PRIORITY as i32, raw_priority_ceiling as i32) as u8,
-    )?;
+
+    target_task.update_scheduler_nice(new_raw_priority)?;
     Ok(())
 }
 
