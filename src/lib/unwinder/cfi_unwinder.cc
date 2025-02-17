@@ -99,7 +99,43 @@ void CfiUnwinder::AsyncStep(AsyncMemory* stack, Registers current, bool is_retur
     return cb(err, Registers(current.arch()));
   }
 
-  cfi_info->binary->AsyncStep(stack, current, std::move(cb));
+  if (cfi_info->debug_info) {
+    // Try stepping with the debug_info if it is available. This could contain both .debug_frame and
+    // .eh_frame sections in the case of a fully unstripped binary, or just a .debug_frame section
+    // in the case of a separated debug_info binary. Both have to fail for us to try again with the
+    // "binary" file, which will only contain an .eh_frame section.
+    cfi_info->debug_info->AsyncStep(
+        stack, current,
+        [cfi_info, stack, current, cb = std::move(cb)](Error err, Registers regs) mutable {
+          if (err.has_err()) {
+            // debug_info didn't work, try again with the binary module instead. If this fails it's
+            // a fatal error for this unwinder.
+            if (cfi_info->binary) {
+              return cfi_info->binary->AsyncStep(
+                  stack, current, [e = err, cb = std::move(cb)](Error err, Registers regs) mutable {
+                    if (err.has_err()) {
+                      // Propagate both errors up.
+                      return cb(Error("debug_info:" + e.msg() + ";binary:" + err.msg()),
+                                std::move(regs));
+                    }
+
+                    // Using the binary worked.
+                    cb(err, std::move(regs));
+                  });
+            } else {
+              return cb(Error("debug_info:" + err.msg() + ";binary not present."), regs);
+            }
+          }
+
+          // Unwinding with the debug_info module worked, issue the callback.
+          cb(err, std::move(regs));
+        });
+  } else if (cfi_info->binary) {
+    // No debug_info available, unwind with the binary module.
+    cfi_info->binary->AsyncStep(stack, current, std::move(cb));
+  } else {
+    return cb(Error("Module has no associated memory."), Registers(current.arch()));
+  }
 }
 
 bool CfiUnwinder::IsValidPC(uint64_t pc) {
