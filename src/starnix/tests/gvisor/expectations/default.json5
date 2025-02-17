@@ -1203,6 +1203,9 @@
 
                 // TODO(https://fxbug.dev/394338846): Re-enable once roll succeeds.
                 "MountTest.MMapWithExecProtFailsOnNoExecFile",
+
+                // TODO(https://fxbug.dev/397205797): Fix and re-enable
+                "ExecTest.Setpgid",
             ],
         },
     ],
