@@ -373,17 +373,27 @@ pub fn sys_bpf(
                 }
                 .as_bytes()
                 .to_owned(),
-                BpfHandle::Program(prog) =>
-                {
+                BpfHandle::Program(prog) => {
                     #[allow(unknown_lints, clippy::unnecessary_struct_initialization)]
-                    bpf_prog_info { type_: prog.info.program_type.into(), ..Default::default() }
-                        .as_bytes()
-                        .to_owned()
+                    bpf_prog_info {
+                        type_: prog.info.program_type.into(),
+                        // TODO: https://fxbug.dev/397389704 - return actual length.
+                        jited_prog_len: 1,
+                        ..Default::default()
+                    }
+                    .as_bytes()
+                    .to_owned()
                 }
-                BpfHandle::ProgramStub(type_) =>
-                {
+                BpfHandle::ProgramStub(type_) => {
                     #[allow(unknown_lints, clippy::unnecessary_struct_initialization)]
-                    bpf_prog_info { type_, ..Default::default() }.as_bytes().to_owned()
+                    bpf_prog_info {
+                        type_,
+                        // TODO: https://fxbug.dev/397389704 - return actual length.
+                        jited_prog_len: 1,
+                        ..Default::default()
+                    }
+                    .as_bytes()
+                    .to_owned()
                 }
                 _ => {
                     return error!(EINVAL);
