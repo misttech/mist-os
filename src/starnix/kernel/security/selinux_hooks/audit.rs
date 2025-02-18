@@ -6,7 +6,7 @@ use bstr::BStr;
 use selinux::permission_check::{PermissionCheck, PermissionCheckResult};
 use selinux::{ClassPermission, Permission, SecurityId};
 use starnix_core::task::CurrentTask;
-use starnix_core::vfs::{FileObject, FsNode};
+use starnix_core::vfs::{FileObject, FileSystem, FsNode};
 use starnix_logging::{log_warn, BugRef, __track_stub_inner};
 use std::fmt::{Display, Error};
 
@@ -31,12 +31,13 @@ use std::fmt::{Display, Error};
 /// which will be automagically derived by Rust. Since they only consist of a type discriminator and
 /// reference they are cheap to copy, avoiding the need to pass them by-reference if the same
 /// context is to be applied to multiple permission checks.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub(super) enum Auditable<'a> {
     // keep-sorted start
     AuditContext(&'a [Auditable<'a>]),
     CurrentTask,
     FileObject(&'a FileObject),
+    FileSystem(&'a FileSystem),
     FsNode(&'a FsNode),
     // keep-sorted end
 }
@@ -59,6 +60,12 @@ impl<'a> From<&'a FileObject> for Auditable<'a> {
 impl<'a> From<&'a FsNode> for Auditable<'a> {
     fn from(value: &'a FsNode) -> Self {
         Auditable::FsNode(value)
+    }
+}
+
+impl<'a> From<&'a FileSystem> for Auditable<'a> {
+    fn from(value: &'a FileSystem) -> Self {
+        Auditable::FileSystem(value)
     }
 }
 
@@ -151,10 +158,13 @@ impl Display for Auditable<'_> {
             }
             Auditable::CurrentTask => Ok(()),
             Auditable::FileObject(file) => {
-                write!(f, " path={}", file.name.path_escaping_chroot())
+                write!(f, " path=\"{}\"", file.name.path_escaping_chroot())
             }
             Auditable::FsNode(node) => {
                 write!(f, " ino={}", node.node_id)
+            }
+            Auditable::FileSystem(fs) => {
+                write!(f, " dev=\"{}\"", fs.options.source)
             }
         }
     }

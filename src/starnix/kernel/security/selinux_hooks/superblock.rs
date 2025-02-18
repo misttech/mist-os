@@ -36,7 +36,7 @@ pub fn sb_kern_mount(
     current_task: &CurrentTask,
     fs: &FileSystem,
 ) -> Result<(), Errno> {
-    let audit_context = current_task.into();
+    let audit_context = [current_task.into(), fs.into()];
     let source_sid = current_task.security_state.lock().current_sid;
     let target_sid = fs_sid(fs)?;
     check_permission(
@@ -44,7 +44,7 @@ pub fn sb_kern_mount(
         source_sid,
         target_sid,
         FileSystemPermission::Mount,
-        audit_context,
+        (&audit_context).into(),
     )
 }
 
@@ -55,28 +55,31 @@ pub fn sb_mount(
     path: &NamespaceNode,
     flags: MountFlags,
 ) -> Result<(), Errno> {
-    let audit_context = current_task.into();
     let source_sid = current_task.security_state.lock().current_sid;
     if flags.contains(MountFlags::REMOUNT) {
         let mount = path.mount_if_root()?;
-        let target_sid = fs_sid(&mount.root().entry.node.fs())?;
+        let fs = mount.root().entry.node.fs();
+        let target_sid = fs_sid(&fs)?;
+        let audit_context = [current_task.into(), fs.as_ref().into()];
         check_permission(
             permission_check,
             source_sid,
             target_sid,
             FileSystemPermission::Remount,
-            audit_context,
+            (&audit_context).into(),
         )
     } else {
+        let node = path.entry.node.as_ref().as_ref();
         let FsNodeSidAndClass { sid: target_sid, class: target_class } =
-            fs_node_effective_sid_and_class(&path.entry.node);
+            fs_node_effective_sid_and_class(node);
+        let audit_context = [current_task.into(), node.into()];
         todo_check_permission(
             TODO_DENY!("https://fxbug.dev/380230897", "Check mounton permission."),
             permission_check,
             source_sid,
             target_sid,
             CommonFilePermission::MountOn.for_class(target_class),
-            audit_context,
+            (&audit_context).into(),
         )
     }
 }
@@ -104,7 +107,7 @@ pub fn sb_statfs(
     current_task: &CurrentTask,
     fs: &FileSystem,
 ) -> Result<(), Errno> {
-    let audit_context = current_task.into();
+    let audit_context = [current_task.into(), fs.into()];
     let source_sid = current_task.security_state.lock().current_sid;
     let target_sid = fs_sid(fs)?;
     check_permission(
@@ -112,7 +115,7 @@ pub fn sb_statfs(
         source_sid,
         target_sid,
         FileSystemPermission::GetAttr,
-        audit_context,
+        (&audit_context).into(),
     )
 }
 
@@ -124,15 +127,16 @@ pub fn sb_umount(
     node: &NamespaceNode,
     _flags: UnmountFlags,
 ) -> Result<(), Errno> {
-    let audit_context = current_task.into();
     let source_sid = current_task.security_state.lock().current_sid;
     let mount = node.mount_if_root()?;
-    let target_sid = fs_sid(&mount.root().entry.node.fs())?;
+    let fs = mount.root().entry.node.fs();
+    let target_sid = fs_sid(&fs)?;
+    let audit_context = [current_task.into(), fs.as_ref().into()];
     check_permission(
         permission_check,
         source_sid,
         target_sid,
         FileSystemPermission::Unmount,
-        audit_context,
+        (&audit_context).into(),
     )
 }

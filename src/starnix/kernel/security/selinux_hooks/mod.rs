@@ -596,26 +596,28 @@ fn may_create(
     new_file_mode: FileMode, // Only used to determine the file class.
     name: &FsStr,
 ) -> Result<(), Errno> {
-    let audit_context = current_task.into();
     let permission_check = security_server.as_permission_check();
 
     // Verify that the caller has permissions required to add new entries to the target
     // directory node.
     let current_sid = current_task.security_state.lock().current_sid;
     let parent_sid = fs_node_effective_sid_and_class(parent).sid;
+    let fs = parent.fs();
+
+    let audit_context = [current_task.into(), parent.into(), fs.as_ref().into()];
     check_permission(
         &permission_check,
         current_sid,
         parent_sid,
         DirPermission::Search,
-        audit_context,
+        (&audit_context).into(),
     )?;
     check_permission(
         &permission_check,
         current_sid,
         parent_sid,
         DirPermission::AddName,
-        audit_context,
+        (&audit_context).into(),
     )?;
 
     // Verify that the caller has permission to create new nodes of the desired type.
@@ -623,23 +625,25 @@ fn may_create(
     let new_file_sid = compute_new_fs_node_sid(
         security_server,
         current_task,
-        &parent.fs(),
+        &fs,
         Some(parent),
         new_file_class,
         name.into(),
     )?
     .map(|(sid, _)| sid)
     .unwrap_or_else(|| SecurityId::initial(InitialSid::File));
+
+    let audit_context = [current_task.into(), fs.as_ref().into()];
     check_permission(
         &permission_check,
         current_sid,
         new_file_sid,
         CommonFilePermission::Create.for_class(new_file_class),
-        audit_context,
+        (&audit_context).into(),
     )?;
 
     // Verify that the new node's label is permitted to be created in the target filesystem.
-    let filesystem_sid = match &*parent.fs().security_state.state.0.lock() {
+    let filesystem_sid = match &*fs.security_state.state.0.lock() {
         FileSystemLabelState::Labeled { label } => Ok(label.sid),
         FileSystemLabelState::Unlabeled { .. } => {
             track_stub!(
@@ -654,7 +658,7 @@ fn may_create(
         new_file_sid,
         filesystem_sid,
         FileSystemPermission::Associate,
-        audit_context,
+        (&audit_context).into(),
     )?;
 
     Ok(())
