@@ -1686,9 +1686,7 @@ impl Journal {
         let mut buf = handle.allocate_buffer(amount).await;
         let offset = self.inner.lock().unwrap().writer.take_flushable(buf.as_mut());
         let len = buf.len() as u64;
-        if !self.inner.lock().unwrap().image_builder_mode {
-            self.handle.get().unwrap().overwrite(offset, buf.as_mut(), false).await?;
-        }
+        self.handle.get().unwrap().overwrite(offset, buf.as_mut(), false).await?;
         let mut inner = self.inner.lock().unwrap();
         if let Some(waker) = inner.sync_waker.take() {
             waker.wake();
