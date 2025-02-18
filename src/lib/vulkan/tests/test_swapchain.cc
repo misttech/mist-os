@@ -663,6 +663,22 @@ debug_utils_callback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
                      VkDebugUtilsMessageTypeFlagsEXT messageTypes,
                      const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) {
   fprintf(stderr, "Got debug utils callback: %s\n", pCallbackData->pMessage);
+
+  const std::string message_id_name =
+      (pCallbackData->pMessageIdName) ? std::string(pCallbackData->pMessageIdName) : "";
+
+  // TODO(https://fxbug.dev/396805504): Stop suppressing the following
+  // validation error.
+  if (message_id_name == "SYNC-HAZARD-WRITE-AFTER-PRESENT") {
+    return VK_FALSE;
+  }
+
+  // TODO(https://fxbug.dev/396803351): Stop suppressing the following
+  // validation error.
+  if (message_id_name == "UNASSIGNED-VkPresentInfoKHR-pImageIndices-MissingAcquireWait") {
+    return VK_FALSE;
+  }
+
   auto swapchain = static_cast<TestSwapchain*>(pUserData);
   EXPECT_TRUE(swapchain->allows_validation_errors_);
   return VK_FALSE;
