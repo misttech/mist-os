@@ -1817,6 +1817,7 @@ static bool vm_mapping_page_fault_range_test() {
       do {
         result = paged_mapping->mapping()->PageFaultLocked(base, kWriteFlags, kTestPages - 1,
                                                            &page_request);
+        page_request.CancelRequests();
         retry_count++;
       } while (result.first == ZX_ERR_SHOULD_WAIT && result.second == 0 && retry_count < 100);
       EXPECT_EQ(result.first, ZX_ERR_SHOULD_WAIT);
