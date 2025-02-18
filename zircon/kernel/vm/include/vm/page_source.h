@@ -69,8 +69,8 @@ class PageSource;
 class AnonymousPageRequester;
 
 struct VmoDebugInfo {
-  uintptr_t vmo_ptr;
   uint64_t vmo_id;
+  char vmo_name[8];
 };
 
 // The different types of page requests that can exist.

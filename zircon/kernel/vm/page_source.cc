@@ -489,8 +489,8 @@ void PageSource::DumpSelf(uint depth, uint max_items) const {
   for (uint8_t type = 0; type < page_request_type::COUNT; type++) {
     printer.BeginList(max_items);
     for (auto& req : outstanding_requests_[type]) {
-      printer.Emit("  vmo 0x%lx/k%lu %s req [0x%lx, 0x%lx) pending 0x%lx overlap %lu %s",
-                   req.vmo_debug_info_.vmo_ptr, req.vmo_debug_info_.vmo_id,
+      printer.Emit("  vmo <%s>/k%lu %s req [0x%lx, 0x%lx) pending 0x%lx overlap %lu %s",
+                   req.vmo_debug_info_.vmo_name, req.vmo_debug_info_.vmo_id,
                    PageRequestTypeToString(page_request_type(type)), req.offset_, req.GetEnd(),
                    req.pending_size_, req.overlap_.size_slow(),
                    req.provider_owned_ ? "[sent]" : "");

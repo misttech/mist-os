@@ -2298,8 +2298,8 @@ zx_status_t VmCowPages::PrepareForWriteLocked(VmCowRange range, LazyPageRequest*
   // failures requesting the dirty transition.
   if (paged_ref_) {
     AssertHeld(paged_ref_->lock_ref());
-    vmo_debug_info = {.vmo_ptr = reinterpret_cast<uintptr_t>(paged_ref_),
-                      .vmo_id = paged_ref_->user_id()};
+    vmo_debug_info.vmo_id = paged_ref_->user_id();
+    paged_ref_->get_name(vmo_debug_info.vmo_name, sizeof(vmo_debug_info.vmo_name));
   }
   status = page_source_->RequestDirtyTransition(page_request->get(), start_offset,
                                                 pages_to_dirty_len, vmo_debug_info);
@@ -2507,8 +2507,8 @@ zx_status_t VmCowPages::LookupCursor::ReadRequest(uint max_request_pages,
   // handle any failures requesting the pages.
   if (owner()->paged_ref_) {
     AssertHeld(owner()->paged_ref_->lock_ref());
-    vmo_debug_info = {.vmo_ptr = reinterpret_cast<uintptr_t>(owner()->paged_ref_),
-                      .vmo_id = owner()->paged_ref_->user_id()};
+    vmo_debug_info.vmo_id = owner()->paged_ref_->user_id();
+    owner()->paged_ref_->get_name(vmo_debug_info.vmo_name, sizeof(vmo_debug_info.vmo_name));
   }
 
   // Try and batch more pages up to |max_request_pages|.
