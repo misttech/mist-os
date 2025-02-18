@@ -2077,6 +2077,8 @@ impl FsNode {
         has.rdev = info.rdev != new_info.rdev;
         has.casefold = info.casefold != new_info.casefold;
 
+        security::check_fs_node_setattr_access(current_task, &self, &has)?;
+
         // Call `update_attributes(..)` to persist the changes for the following fields.
         if has.modification_time
             || has.access_time
