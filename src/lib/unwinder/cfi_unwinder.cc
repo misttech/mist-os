@@ -15,14 +15,9 @@
 
 namespace unwinder {
 
-bool CfiModuleInfo::IsValidPC(uint64_t pc) const {
-  return ((binary && binary->IsValidPC(pc)) || (debug_info && debug_info->IsValidPC(pc)));
-}
-
 CfiUnwinder::CfiUnwinder(const std::vector<Module>& modules) : UnwinderBase(this) {
   for (const auto& module : modules) {
-    module_map_.emplace(module.load_address,
-                        CfiModuleInfo{.module = module, .binary = nullptr, .debug_info = nullptr});
+    module_map_.emplace(module.load_address, std::make_pair(module, nullptr));
   }
 }
 
@@ -52,12 +47,12 @@ Error CfiUnwinder::Step(Memory* stack, const Registers& current, Registers& next
     regs.SetPC(pc);
   }
 
-  CfiModuleInfo* cfi;
-  if (auto err = GetCfiModuleInfoForPc(pc, &cfi); err.has_err()) {
+  CfiModule* cfi;
+  if (auto err = GetCfiModuleFor(pc, &cfi); err.has_err()) {
     return err;
   }
 
-  if (auto err = cfi->binary->Step(stack, regs, next); err.has_err()) {
+  if (auto err = cfi->Step(stack, regs, next); err.has_err()) {
     return err;
   }
   return Success();
@@ -94,54 +89,39 @@ void CfiUnwinder::AsyncStep(AsyncMemory* stack, Registers current, bool is_retur
     current.SetPC(pc);
   }
 
-  CfiModuleInfo* cfi_info;
-  if (auto err = GetCfiModuleInfoForPc(pc, &cfi_info); err.has_err()) {
+  CfiModule* cfi;
+  if (auto err = GetCfiModuleFor(pc, &cfi); err.has_err()) {
     return cb(err, Registers(current.arch()));
   }
 
-  cfi_info->binary->AsyncStep(stack, current, std::move(cb));
+  cfi->AsyncStep(stack, current, std::move(cb));
 }
 
 bool CfiUnwinder::IsValidPC(uint64_t pc) {
-  CfiModuleInfo* cfi;
-  return GetCfiModuleInfoForPc(pc, &cfi).ok();
+  CfiModule* cfi;
+  return GetCfiModuleFor(pc, &cfi).ok();
 }
 
-Error CfiUnwinder::GetCfiModuleInfoForPc(uint64_t pc, CfiModuleInfo** out) {
+Error CfiUnwinder::GetCfiModuleFor(uint64_t pc, CfiModule** out) {
   auto module_it = module_map_.upper_bound(pc);
   if (module_it == module_map_.begin()) {
     return Error("%#" PRIx64 " is not covered by any module", pc);
   }
   module_it--;
   uint64_t module_address = module_it->first;
-  auto& module_info = module_it->second;
+  auto& [module, cfi] = module_it->second;
 
-  if (module_info.module.binary_memory) {
-    module_info.binary = std::make_unique<CfiModule>(module_info.module.binary_memory,
-                                                     module_address, module_info.module.mode);
-    // Loading the main binary file should always contain either an eh_frame section or a
-    // debug_frame section.
-    if (auto err = module_info.binary->Load(); err.has_err()) {
+  if (!cfi) {
+    cfi = std::make_unique<CfiModule>(module.memory, module_address, module.mode);
+    if (auto err = cfi->Load(); err.has_err()) {
       return err;
     }
   }
 
-  if (module_info.module.debug_info_memory) {
-    module_info.debug_info = std::make_unique<CfiModule>(module_info.module.debug_info_memory,
-                                                         module_address, module_info.module.mode);
-    // A split debug info file may contain neither eh_frame nor debug_frame sections, it is not an
-    // error if this fails to load.
-    if (auto err = module_info.debug_info->Load(); err.has_err()) {
-      // Reset the pointer to null to indicate that it should not be used for look ups later.
-      module_info.debug_info.reset();
-    }
+  if (!cfi->IsValidPC(pc)) {
+    return Error("%#" PRIx64 " is not covered by any module", pc);
   }
-
-  if (!module_info.IsValidPC(pc)) {
-    return Error("%#" PRIx64 " is not a valid PC in module %#" PRIx64, pc, module_address);
-  }
-
-  *out = &module_info;
+  *out = cfi.get();
   return Success();
 }
 

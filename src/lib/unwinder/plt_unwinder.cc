@@ -78,13 +78,12 @@ Error PltUnwinder::StepArm64(Memory* stack, const Registers& current, Registers&
 
   // Check whether the machine instruction is a PLT entry to avoid false positives.
   // We use "br x17" as a signature, which is d61f0220 represented in little endian.
-  CfiModuleInfo* cfi_module;
-  if (auto err = cfi_unwinder_->GetCfiModuleInfoForPc(lr, &cfi_module); err.has_err()) {
+  CfiModule* cfi_module;
+  if (auto err = cfi_unwinder_->GetCfiModuleFor(lr, &cfi_module); err.has_err()) {
     return err;
   }
   uint32_t br_instruction;
-  if (auto err = cfi_module->binary->memory()->Read((pc & ~0xf) | 0xc, br_instruction);
-      err.has_err()) {
+  if (auto err = cfi_module->memory()->Read((pc & ~0xf) | 0xc, br_instruction); err.has_err()) {
     return err;
   }
   if (br_instruction != 0xd61f0220) {

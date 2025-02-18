@@ -5,8 +5,6 @@
 #ifndef SRC_LIB_UNWINDER_CFI_MODULE_H_
 #define SRC_LIB_UNWINDER_CFI_MODULE_H_
 
-#include <elf.h>
-
 #include <cstdint>
 #include <map>
 
@@ -73,9 +71,6 @@ class CfiModule {
   // Search for CIE and FDE in .debug_frame section.
   [[nodiscard]] Error SearchDebugFrame(uint64_t pc, DwarfCie& cie, DwarfFde& fde);
   [[nodiscard]] Error BuildDebugFrameMap();
-
-  [[nodiscard]] Error LoadEhFrame(const Elf64_Ehdr& ehdr);
-  [[nodiscard]] Error LoadDebugFrame(const Elf64_Ehdr& ehdr);
 
   // Helpers to decode CIE and FDE. Version could be 1 or 4.
   [[nodiscard]] Error DecodeFde(uint8_t version, uint64_t fde_ptr, DwarfCie& cie, DwarfFde& fde);
