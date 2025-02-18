@@ -187,7 +187,7 @@ pub struct FsNode {
 pub type FsNodeHandle = Arc<FsNodeReleaser>;
 pub type WeakFsNodeHandle = Weak<FsNodeReleaser>;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct FsNodeInfo {
     pub ino: ino_t,
     pub mode: FileMode,
@@ -234,7 +234,6 @@ impl FsNodeInfo {
 
     pub fn chmod(&mut self, mode: FileMode) {
         self.mode = (self.mode & !FileMode::PERMISSIONS) | (mode & FileMode::PERMISSIONS);
-        self.time_status_change = utc::utc_now();
     }
 
     pub fn chown(&mut self, owner: Option<uid_t>, group: Option<gid_t>) {
@@ -249,7 +248,6 @@ impl FsNodeInfo {
             self.mode &= !FileMode::ISUID;
             self.clear_sgid_bit();
         }
-        self.time_status_change = utc::utc_now();
     }
 
     fn clear_sgid_bit(&mut self) {
@@ -2062,6 +2060,14 @@ impl FsNode {
         let mut info = self.info.write();
         let mut new_info = info.clone();
         mutator(&mut new_info)?;
+
+        // `mutator`s should not update the attribute change time, which is managed by this API.
+        assert_eq!(info.time_status_change, new_info.time_status_change);
+        if *info == new_info {
+            return Ok(());
+        }
+        new_info.time_status_change = utc::utc_now();
+
         let mut has = zxio_node_attr_has_t { ..Default::default() };
         has.modification_time = info.time_modify != new_info.time_modify;
         has.access_time = info.time_access != new_info.time_access;
@@ -2070,6 +2076,7 @@ impl FsNode {
         has.gid = info.gid != new_info.gid;
         has.rdev = info.rdev != new_info.rdev;
         has.casefold = info.casefold != new_info.casefold;
+
         // Call `update_attributes(..)` to persist the changes for the following fields.
         if has.modification_time
             || has.access_time
@@ -2569,7 +2576,6 @@ impl FsNode {
             // filesystems that manages file timestamps.
             self.update_attributes(locked, current_task, |info| {
                 let now = utc::utc_now();
-                info.time_status_change = now;
                 let get_time = |time: TimeUpdateType| match time {
                     TimeUpdateType::Now => Some(now),
                     TimeUpdateType::Time(t) => Some(t),
