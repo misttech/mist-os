@@ -39,7 +39,9 @@ if (is_fuchsia) {
       build_type = "eng"
       feature_set_level = "utility"
       graphics = {
-        enable_virtual_console = false
+        virtual_console = {
+          enable = false
+        }
       }
       recovery = {
         system_recovery = "fdr"

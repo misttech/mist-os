@@ -53,7 +53,9 @@ template("assemble_network_conformance_system") {
         config_type = "none"
       }
       graphics = {
-        enable_virtual_console = false
+        virtual_console = {
+          enable = false
+        }
       }
     }
     base_packages = [

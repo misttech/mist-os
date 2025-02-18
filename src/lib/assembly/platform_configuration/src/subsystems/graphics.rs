@@ -13,20 +13,24 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
         graphics_config: &GraphicsConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        let enable_virtual_console = match (
-            context.build_type,
-            context.feature_set_level,
-            graphics_config.enable_virtual_console,
-        ) {
-            // Use the value if one was specified.
-            (_, _, Some(enable_virtual_console)) => enable_virtual_console,
-            // If unspecified, virtcon is disabled if it's a user build-type
-            (assembly_config_schema::BuildType::User, _, _) => false,
-            // If neither of those, disable if we're targeting embeddable as well.
-            (_, FeatureSupportLevel::Embeddable, _) => false,
-            // Otherwise, enable virtcon.
-            (_, _, _) => true,
-        };
+        let virtcon_config = &graphics_config.virtual_console;
+
+        // During the transition, use the value provided in virtual_console.enable
+        // if provided, otherwise use the value from enable_virtual_console
+        let enable_virtual_console =
+            virtcon_config.enable.or(graphics_config.enable_virtual_console);
+
+        let enable_virtual_console =
+            match (context.build_type, context.feature_set_level, enable_virtual_console) {
+                // Use the value if one was specified.
+                (_, _, Some(enable_virtual_console)) => enable_virtual_console,
+                // If unspecified, virtcon is disabled if it's a user build-type
+                (assembly_config_schema::BuildType::User, _, _) => false,
+                // If neither of those, disable if we're targeting embeddable as well.
+                (_, FeatureSupportLevel::Embeddable, _) => false,
+                // Otherwise, enable virtcon.
+                (_, _, _) => true,
+            };
 
         if enable_virtual_console {
             builder.platform_bundle("virtcon");
@@ -35,7 +39,7 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
         builder.set_config_capability("fuchsia.virtcon.BootAnimation", Config::new_void())?;
         builder.set_config_capability("fuchsia.virtcon.BufferCount", Config::new_void())?;
 
-        if let Some(scheme) = &graphics_config.virtual_console.color_scheme {
+        if let Some(scheme) = &virtcon_config.color_scheme {
             builder.set_config_capability(
                 "fuchsia.virtcon.ColorScheme",
                 Config::new(ConfigValueType::String { max_size: 20 }, scheme.to_string().into()),
@@ -58,7 +62,7 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
             builder.set_config_capability("fuchsia.virtcon.DisplayRotation", Config::new_void())?;
         }
 
-        if !graphics_config.virtual_console.dpi.is_empty() {
+        if !virtcon_config.dpi.is_empty() {
             builder.set_config_capability(
                 "fuchsia.virtcon.DotsPerInch",
                 Config::new(
@@ -66,7 +70,7 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
                         nested_type: ConfigNestedValueType::Uint32,
                         max_count: 10,
                     },
-                    graphics_config.virtual_console.dpi.clone().into(),
+                    virtcon_config.dpi.clone().into(),
                 ),
             )?;
         } else {
@@ -76,7 +80,7 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
         builder.set_config_capability("fuchsia.virtcon.FontSize", Config::new_void())?;
         builder.set_config_capability("fuchsia.virtcon.KeepLogVisible", Config::new_void())?;
 
-        if let Some(keymap) = &graphics_config.keymap {
+        if let Some(keymap) = virtcon_config.keymap.as_ref().or(graphics_config.keymap.as_ref()) {
             builder.set_config_capability(
                 "fuchsia.virtcon.KeyMap",
                 Config::new(ConfigValueType::String { max_size: 10 }, keymap.as_str().into()),

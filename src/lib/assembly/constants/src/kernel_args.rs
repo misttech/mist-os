@@ -111,7 +111,7 @@ pub enum KernelArg {
     /// can be enabled at boot unless `disable_at_boot` is set to True.
     PageScannerZeroPageScanCount(ZeroPageScanCount),
 
-    /// Enable the netboot functionality of the netsvc
+    /// Enable the netboot functionality of the netsvc.
     NetsvcNetboot(bool),
 }
 
