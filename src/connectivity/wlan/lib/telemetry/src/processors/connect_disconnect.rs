@@ -139,6 +139,7 @@ impl From<&fidl_sme::DisconnectSource> for InspectDisconnectSource {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct DisconnectInfo {
+    pub iface_id: u16,
     pub connected_duration: zx::MonotonicDuration,
     pub is_sme_reconnecting: bool,
     pub disconnect_source: fidl_sme::DisconnectSource,
@@ -576,6 +577,7 @@ mod tests {
         let bss_description = fake_bss_description!(Open);
         let channel = bss_description.channel;
         let disconnect_info = DisconnectInfo {
+            iface_id: 32,
             connected_duration: zx::MonotonicDuration::from_seconds(30),
             is_sme_reconnecting: false,
             disconnect_source: fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
