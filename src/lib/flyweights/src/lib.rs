@@ -7,6 +7,8 @@
 
 #![warn(missing_docs)]
 
+mod raw;
+
 use ahash::AHashSet;
 use bstr::{BStr, BString};
 use serde::de::{Deserializer, Visitor};
@@ -17,30 +19,63 @@ use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::ptr::NonNull;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 /// The global string cache for `FlyStr`.
 ///
-/// If a live `FlyStr` contains an `Arc<Box<[u8]>>`, the `Arc<Box<[u8]>>` must also be in this cache
-/// and it must have a refcount of >= 2.
+/// If a live `FlyStr` contains an `Storage`, the `Storage` must also be in this cache and it must
+/// have a refcount of >= 2.
 static CACHE: std::sync::LazyLock<Mutex<AHashSet<Storage>>> =
     std::sync::LazyLock::new(|| Mutex::new(AHashSet::new()));
 
-/// Wrapper type for stored `Arc`s that lets us query the cache without an owned value. Implementing
-/// `Borrow<[u8]> for Arc<Box<[u8]>>` upstream *might* be possible with specialization but this is
-/// easy enough.
-#[derive(Eq, Hash, PartialEq)]
-struct Storage(Arc<Box<[u8]>>);
+/// Wrapper type for stored strings that lets us query the cache without an owned value.
+#[repr(transparent)]
+struct Storage(NonNull<raw::Payload>);
+
+// SAFETY: FlyStr storage is always safe to send across threads.
+unsafe impl Send for Storage {}
+// SAFETY: FlyStr storage is always safe to share across threads.
+unsafe impl Sync for Storage {}
+
+impl PartialEq for Storage {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.as_bytes() == other.as_bytes()
+    }
+}
+
+impl Eq for Storage {}
+
+impl Hash for Storage {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.as_bytes().hash(state)
+    }
+}
+
+impl Storage {
+    #[inline]
+    fn inc_ref(&self) {
+        // SAFETY: `Storage` always points to a valid `Payload`.
+        unsafe { raw::Payload::inc_ref(self.0.as_ptr()) }
+    }
+
+    #[inline]
+    fn as_bytes(&self) -> &[u8] {
+        // SAFETY: `Storage` always points to a valid `Payload`.
+        unsafe { &*raw::Payload::bytes(self.0.as_ptr()) }
+    }
+}
 
 impl Borrow<[u8]> for Storage {
     #[inline]
     fn borrow(&self) -> &[u8] {
-        self.0.as_ref()
+        self.as_bytes()
     }
 }
 
 /// An immutable string type which only stores a single copy of each string allocated. Internally
-/// represented as an `Arc` to the backing allocation. Occupies a single pointer width.
+/// represented as a shared pointer to the backing allocation. Occupies a single pointer width.
 ///
 /// # Small strings
 ///
@@ -79,6 +114,7 @@ impl FlyStr {
     /// contention.
     ///
     /// Each string allocated is hashed for lookup in the cache.
+    #[inline]
     pub fn new(s: impl AsRef<str> + Into<String>) -> Self {
         Self(RawRepr::new_str(s))
     }
@@ -306,7 +342,7 @@ impl Visitor<'_> for FlyStrVisitor {
 }
 
 macro_rules! new_raw_repr {
-    ($borrowed_bytes:expr, $owned_bytes:expr) => {
+    ($borrowed_bytes:expr) => {
         if $borrowed_bytes.len() <= MAX_INLINE_SIZE {
             RawRepr::new_inline($borrowed_bytes)
         } else {
@@ -314,14 +350,14 @@ macro_rules! new_raw_repr {
             if let Some(existing) = cache.get($borrowed_bytes) {
                 RawRepr::from_storage(existing)
             } else {
-                RawRepr::new_for_storage(&mut cache, $owned_bytes)
+                RawRepr::new_for_storage(&mut cache, $borrowed_bytes)
             }
         }
     };
 }
 
 /// An immutable bytestring type which only stores a single copy of each string allocated.
-/// Internally represented as an `Arc` to the backing allocation. Occupies a single pointer width.
+/// Internally represented as a shared pointer to the backing allocation. Occupies a single pointer width.
 ///
 /// # Small strings
 ///
@@ -395,7 +431,7 @@ impl From<&'_ BStr> for FlyByteStr {
     #[inline]
     fn from(s: &BStr) -> Self {
         let bytes: &[u8] = s.as_ref();
-        Self(new_raw_repr!(bytes, bytes.to_vec().into_boxed_slice()))
+        Self(new_raw_repr!(bytes))
     }
 }
 
@@ -409,7 +445,7 @@ impl From<&'_ str> for FlyByteStr {
 impl From<&'_ Vec<u8>> for FlyByteStr {
     #[inline]
     fn from(s: &Vec<u8>) -> Self {
-        Self(new_raw_repr!(&s[..], s.clone().into_boxed_slice()))
+        Self(new_raw_repr!(&s[..]))
     }
 }
 
@@ -444,14 +480,14 @@ impl From<Box<[u8]>> for FlyByteStr {
 impl From<Box<str>> for FlyByteStr {
     #[inline]
     fn from(s: Box<str>) -> Self {
-        Self(new_raw_repr!(s.as_bytes(), s.into_boxed_bytes()))
+        Self(new_raw_repr!(s.as_bytes()))
     }
 }
 
 impl From<&'_ Box<[u8]>> for FlyByteStr {
     #[inline]
     fn from(s: &'_ Box<[u8]>) -> Self {
-        Self(new_raw_repr!(&**s, s.clone()))
+        Self(new_raw_repr!(&**s))
     }
 }
 
@@ -672,12 +708,12 @@ impl<'de> Visitor<'de> for FlyByteStrVisitor {
 
 #[repr(C)] // Guarantee predictable field ordering.
 union RawRepr {
-    /// Strings longer than MAX_INLINE_SIZE are allocated as Arc<Box<[u8]>> which have a thin
+    /// Strings longer than MAX_INLINE_SIZE are allocated using `raw::Payload`, which have a thin
     /// pointer representation. This means that `heap` variants of `Storage` will always have the
     /// pointer contents aligned and this variant will never have its least significant bit set.
     ///
     /// We store a `NonNull` so we can have guaranteed pointer layout.
-    heap: NonNull<Box<[u8]>>,
+    heap: NonNull<raw::Payload>,
 
     /// Strings shorter than or equal in length to MAX_INLINE_SIZE are stored in this union variant.
     /// The first byte is reserved for the size of the inline string, and the remaining bytes are
@@ -688,10 +724,11 @@ union RawRepr {
 }
 
 // The inline variant should not cause us to occupy more space than the heap variant alone.
-static_assertions::assert_eq_size!(Arc<Box<[u8]>>, RawRepr);
+static_assertions::assert_eq_size!(NonNull<raw::Payload>, RawRepr);
 
-// Alignment of the Arc pointers must be >1 in order to have space for the mask bit at the bottom.
-static_assertions::const_assert!(std::mem::align_of::<Box<[u8]>>() > 1);
+// Alignment of the payload pointers must be >1 in order to have space for the mask bit at the
+// bottom.
+static_assertions::const_assert!(std::mem::align_of::<raw::Payload>() > 1);
 
 // The short string optimization makes little-endian layout assumptions with the first byte being
 // the least significant.
@@ -700,7 +737,7 @@ static_assertions::assert_type_eq_all!(byteorder::NativeEndian, byteorder::Littl
 /// An enum with an actual discriminant that allows us to limit the reach of unsafe code in the
 /// implementation without affecting the stored size of `RawRepr`.
 enum SafeRepr<'a> {
-    Heap(NonNull<Box<[u8]>>),
+    Heap(NonNull<raw::Payload>),
     Inline(&'a InlineRepr),
 }
 
@@ -710,20 +747,14 @@ unsafe impl Send for RawRepr {}
 unsafe impl Sync for RawRepr {}
 
 impl RawRepr {
-    fn new_str(s: impl AsRef<str> + Into<String>) -> Self {
+    fn new_str(s: impl AsRef<str>) -> Self {
         let borrowed = s.as_ref();
-        new_raw_repr!(borrowed.as_bytes(), {
-            let s: String = s.into();
-            s.into_bytes().into_boxed_slice()
-        })
+        new_raw_repr!(borrowed.as_bytes())
     }
 
-    fn new(s: impl AsRef<[u8]> + Into<Vec<u8>>) -> Self {
+    fn new(s: impl AsRef<[u8]>) -> Self {
         let borrowed = s.as_ref();
-        new_raw_repr!(borrowed, {
-            let v: Vec<u8> = s.into();
-            v.into_boxed_slice()
-        })
+        new_raw_repr!(borrowed)
     }
 
     #[inline]
@@ -736,15 +767,21 @@ impl RawRepr {
 
     #[inline]
     fn from_storage(storage: &Storage) -> Self {
-        Self { heap: nonnull_from_arc(Arc::clone(&storage.0)) }
+        storage.inc_ref();
+        Self { heap: storage.0 }
     }
 
     #[inline]
-    fn new_for_storage(cache: &mut AHashSet<Storage>, bytes: Box<[u8]>) -> Self {
+    fn new_for_storage(cache: &mut AHashSet<Storage>, bytes: &[u8]) -> Self {
         assert!(bytes.len() > MAX_INLINE_SIZE);
-        let new_storage = Arc::new(bytes);
-        let for_cache = Storage(Arc::clone(&new_storage));
-        let new = Self { heap: nonnull_from_arc(new_storage) };
+        let new_storage = raw::Payload::alloc(bytes);
+        // SAFETY: We just allocated `new_storage`, so it's guaranteed to be valid.
+        unsafe {
+            raw::Payload::inc_ref(new_storage.as_ptr());
+        }
+
+        let for_cache = Storage(new_storage);
+        let new = Self { heap: new_storage };
         assert!(!new.is_inline(), "least significant bit must be 0 for heap strings");
         cache.insert(for_cache);
         new
@@ -771,8 +808,8 @@ impl RawRepr {
     #[inline]
     fn as_bytes(&self) -> &[u8] {
         match self.project() {
-            // SAFETY: FlyStr owns the `Arc` stored as a NonNull, it is live as long as `FlyStr`.
-            SafeRepr::Heap(ptr) => unsafe { &**ptr.as_ref() },
+            // SAFETY: FlyStr owns the payload stored as a NonNull, it is live as long as `FlyStr`.
+            SafeRepr::Heap(ptr) => unsafe { &*raw::Payload::bytes(ptr.as_ptr()) },
             SafeRepr::Inline(i) => i.as_bytes(),
         }
     }
@@ -805,15 +842,11 @@ impl Clone for RawRepr {
     fn clone(&self) -> Self {
         match self.project() {
             SafeRepr::Heap(ptr) => {
-                // SAFETY: We own this Arc, we know it's live because we are. The pointer came from
-                // Arc::into_raw.
-                let clone = unsafe { Arc::from_raw(ptr.as_ptr() as *const Box<[u8]>) };
-
-                // Increment the count since we're not taking ownership of `self`.
-                // SAFETY: This pointer came from `Arc::into_raw` and is still live.
-                unsafe { Arc::increment_strong_count(ptr.as_ptr()) };
-
-                Self { heap: nonnull_from_arc(clone) }
+                // SAFETY: We own this payload, we know it's live because we are.
+                unsafe {
+                    raw::Payload::inc_ref(ptr.as_ptr());
+                }
+                Self { heap: ptr }
             }
             SafeRepr::Inline(&inline) => Self { inline },
         }
@@ -826,23 +859,22 @@ impl Drop for RawRepr {
             // Lock the cache before checking the count to ensure consistency.
             let mut cache = CACHE.lock().unwrap();
 
-            // SAFETY: We checked above that this is the heap repr and this pointer was created from
-            // an Arc in RawRepr::new.
-            let heap = unsafe { Arc::from_raw(self.heap.as_ptr()) };
+            // SAFETY: We checked above that this is the heap repr.
+            let heap = unsafe { self.heap };
+
+            // SAFETY: The payload is live.
+            let prev_refcount = unsafe { raw::Payload::dec_ref(heap.as_ptr()) };
 
             // Check whether we're the last reference outside the cache, if so remove from cache.
-            if Arc::strong_count(&heap) == 2 {
-                assert!(cache.remove(&**heap), "cache must have a reference if refcount is 2");
+            if prev_refcount == 2 {
+                let bytes = unsafe { &*raw::Payload::bytes(heap.as_ptr()) };
+                assert!(cache.remove(bytes), "cache must have a reference if refcount is 2");
+
+                // SAFETY: The payload is live.
+                unsafe { raw::Payload::dec_ref(heap.as_ptr()) };
             }
         }
     }
-}
-
-#[inline]
-fn nonnull_from_arc(a: Arc<Box<[u8]>>) -> NonNull<Box<[u8]>> {
-    let raw: *const Box<[u8]> = Arc::into_raw(a);
-    // SAFETY: Arcs can't be null.
-    unsafe { NonNull::new_unchecked(raw as *mut Box<[u8]>) }
 }
 
 #[derive(Clone, Copy, Hash, PartialEq)]
@@ -858,7 +890,7 @@ struct InlineRepr {
 
 /// We can store small strings up to 1 byte less than the size of the pointer to the heap-allocated
 /// string.
-const MAX_INLINE_SIZE: usize = std::mem::size_of::<NonNull<Box<[u8]>>>() - 1;
+const MAX_INLINE_SIZE: usize = std::mem::size_of::<NonNull<raw::Payload>>() - 1;
 
 // Guard rail to make sure we never end up with an incorrect inline size encoding. Ensure that
 // MAX_INLINE_SIZE is always smaller than the maximum size we can represent in a byte with the LSB
@@ -915,11 +947,8 @@ mod tests {
         fn refcount(&self) -> Option<usize> {
             match self.project() {
                 SafeRepr::Heap(ptr) => {
-                    let tmp = unsafe { Arc::from_raw(ptr.as_ptr() as *const Box<[u8]>) };
-                    // tmp isn't taking ownership
-                    unsafe { Arc::increment_strong_count(ptr.as_ptr()) };
-                    // don't count tmp itself
-                    let count = Arc::strong_count(&tmp) - 1;
+                    // SAFETY: The payload is live as long as the repr is live.
+                    let count = unsafe { raw::Payload::refcount(ptr.as_ptr()) };
                     Some(count)
                 }
                 SafeRepr::Inline(_) => None,
