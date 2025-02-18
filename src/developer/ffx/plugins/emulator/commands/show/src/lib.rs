@@ -175,6 +175,7 @@ mod tests {
                     ports: None,
                     window_height: 0,
                     window_width: 0,
+                    cid: 0,
                 }),
             },
             ShowDetail::Net {
@@ -281,6 +282,7 @@ mod tests {
                 ports: None,
                 window_height: 0,
                 window_width: 0,
+                cid: 0,
             }),
         }];
         assert_eq!(got_data, want_data);
