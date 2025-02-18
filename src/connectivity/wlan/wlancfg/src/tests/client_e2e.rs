@@ -2138,7 +2138,7 @@ fn test_connect_failure_recovery() {
 }
 
 #[fuchsia::test]
-fn listnr_updates_connecting_networks_correctly_on_removal() {
+fn listener_updates_connecting_networks_correctly_on_removal() {
     let mut exec = fasync::TestExecutor::new();
     let mut test_values =
         test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false, RoamingPolicy::Disabled);
@@ -2227,7 +2227,7 @@ fn listnr_updates_connecting_networks_correctly_on_removal() {
 }
 
 #[fuchsia::test]
-fn listnr_updates_connecting_networks_correctly_on_new_saved_network() {
+fn listener_updates_connecting_networks_correctly_on_new_saved_network() {
     let mut exec = fasync::TestExecutor::new();
     let mut test_values =
         test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false, RoamingPolicy::Disabled);
@@ -2311,7 +2311,8 @@ fn listnr_updates_connecting_networks_correctly_on_new_saved_network() {
         run_while(&mut exec, &mut test_values.internal_objects.internal_futures, second_save_fut);
     assert_variant!(second_save_resp, Ok(Ok(())));
 
-    // Check for a listener update saying the first network is now disconnected.
+    // Check for a listener update saying the first network is now disconnected, and the new network
+    // is connecting.
     let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
         &mut exec,
         &mut test_values.internal_objects.internal_futures,
@@ -2319,24 +2320,16 @@ fn listnr_updates_connecting_networks_correctly_on_new_saved_network() {
     );
     assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
     let mut networks = networks.unwrap();
-    assert_eq!(networks.len(), 1);
+    assert_eq!(networks.len(), 2);
+    // Second network is connecting.
+    let network = networks.pop().unwrap();
+    assert_eq!(network.id.unwrap(), second_network_id.clone());
+    assert_eq!(network.state.unwrap(), types::ConnectionState::Connecting);
+    // First network is disconnected.
     let network = networks.pop().unwrap();
     assert_eq!(network.id.unwrap(), network_id.clone());
     assert_eq!(network.state.unwrap(), types::ConnectionState::Disconnected);
     assert_eq!(network.status, Some(types::DisconnectStatus::ConnectionStopped));
-
-    // Check for a listener update saying the new network is connecting.
-    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
-        &mut exec,
-        &mut test_values.internal_objects.internal_futures,
-        &mut test_values.external_interfaces.listener_updates_stream,
-    );
-    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
-    let mut networks = networks.unwrap();
-    assert_eq!(networks.len(), 1);
-    let network = networks.pop().unwrap();
-    assert_eq!(network.id.unwrap(), second_network_id.clone());
-    assert_eq!(network.state.unwrap(), types::ConnectionState::Connecting);
 
     // Remove the second network before connection has completed.
     let remove_fut =

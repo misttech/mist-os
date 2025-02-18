@@ -487,33 +487,22 @@ impl IfaceManagerService {
             }
         }
 
+        let mut networks = vec![];
         // Cancel any ongoing connection attempts.
         if !self.connection_selection_futures.is_empty() {
             info!("Connect request received, ignoring results from ongoing connection selections.");
             self.connection_selection_futures.clear();
-
             // Any clients that had been configured but don't have state machines are pending connect
-            // requests that we just cancelled. We have to fire a "Disconnected" listener update for
+            // requests that we just cancelled. We have to add a "Disconnected" listener update for
             // them and mark as Unconfigured.
             for client in self.clients.iter_mut() {
                 if let ClientIfaceContainerConfig::Configured(id) = &client.config {
                     if client.client_state_machine.as_mut().is_none() {
-                        let _ = self
-                            .client_update_sender
-                            .clone()
-                            .unbounded_send(listener::Message::NotifyListeners(
-                                listener::ClientStateUpdate {
-                                    state: client_types::ClientState::ConnectionsEnabled,
-                                    networks: vec![listener::ClientNetworkState {
-                                        id: id.clone(),
-                                        state: client_types::ConnectionState::Disconnected,
-                                        status: Some(
-                                            client_types::DisconnectStatus::ConnectionStopped,
-                                        ),
-                                    }],
-                                },
-                            ))
-                            .map_err(|e| error!("failed to send state update: {:?}", e));
+                        networks.push(listener::ClientNetworkState {
+                            id: id.clone(),
+                            state: client_types::ConnectionState::Disconnected,
+                            status: Some(client_types::DisconnectStatus::ConnectionStopped),
+                        });
                         client.config = ClientIfaceContainerConfig::Unconfigured;
                     }
                 }
@@ -530,15 +519,16 @@ impl IfaceManagerService {
         self.telemetry_sender
             .send(TelemetryEvent::StartEstablishConnection { reset_start_time: true });
 
-        // Send listener update that connection attempt is starting.
+        // Add listener update that connection attempt is starting.
+        networks.push(listener::ClientNetworkState {
+            id: connect_request.network.clone(),
+            state: client_types::ConnectionState::Connecting,
+            status: None,
+        });
         if let Err(e) = self.client_update_sender.clone().unbounded_send(
             listener::Message::NotifyListeners(listener::ClientStateUpdate {
                 state: client_types::ClientState::ConnectionsEnabled,
-                networks: vec![listener::ClientNetworkState {
-                    id: connect_request.network.clone(),
-                    state: client_types::ConnectionState::Connecting,
-                    status: None,
-                }],
+                networks,
             }),
         ) {
             error!("failed to send state update: {:?}", e);
