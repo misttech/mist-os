@@ -8,8 +8,8 @@
 
 #include "src/__support/common.h"
 
-namespace LIBC_NAMESPACE {
+namespace LIBC_NAMESPACE_DECL {
 
 LLVM_LIBC_FUNCTION(void, abort, ()) { CRASH_WITH_UNIQUE_BACKTRACE(); }
 
-}  // namespace LIBC_NAMESPACE
+}  // namespace LIBC_NAMESPACE_DECL
