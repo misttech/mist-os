@@ -2,13 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# These are included from //bundles/buildbot/bringup:e2e_tests
-group("e2e_tests") {
-  testonly = true
-  deps = []
-}
-
+# These are the non-hermetic tests that don't need to be ran under the bringup_with_tests product.
 group("tests") {
   testonly = true
-  deps = [ "example:pkg" ]
+  deps = [
+    "example:pkg",
+    "msd-arm-mali:pkg",
+  ]
 }

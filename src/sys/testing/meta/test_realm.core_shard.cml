@@ -535,5 +535,10 @@
             availability: "optional",
             source_availability: "unknown",
         },
+        {
+            service: [ "fuchsia.gpu.magma.Service" ],
+            from: "parent",
+            to: "#testing",
+        },
     ],
 }

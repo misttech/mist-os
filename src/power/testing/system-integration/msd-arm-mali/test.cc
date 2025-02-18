@@ -63,10 +63,10 @@ class TestConnection : public magma::TestDeviceBase {
 class PowerSystemIntegration : public system_integration_utils::TestLoopBase, public testing::Test {
  public:
   struct InspectSelectors {
-    const std::string sag_moniker = "bootstrap/system-activity-governor/system-activity-governor";
+    const std::string sag_moniker = "system-activity-governor/system-activity-governor";
     const std::vector<std::string> sag_exec_state_level = {"root", "power_elements",
                                                            "execution_state", "power_level"};
-    const std::string pb_moniker = "bootstrap/power-broker";
+    const std::string pb_moniker = "power-broker";
     std::vector<std::string> mali_gpu_required_level;
     std::vector<std::string> mali_gpu_current_level;
 
@@ -81,6 +81,11 @@ class PowerSystemIntegration : public system_integration_utils::TestLoopBase, pu
         "root", "msd-arm-mali", "device", "current_power_level"};
   };
   void SetUp() override { Initialize(); }
+
+  void TearDown() override {
+    // Add a delay for the fence reset to finish restarting the target driver back to normal.
+    RunLoopWithTimeout(zx::sec(1));
+  }
 
   InspectSelectors GetInspectSelectors(diagnostics::reader::ArchiveReader& reader) {
     InspectSelectors selectors;
@@ -101,6 +106,10 @@ class PowerSystemIntegration : public system_integration_utils::TestLoopBase, pu
 };
 
 TEST_F(PowerSystemIntegration, SuspendResume) {
+  // Hold on to fence for the test duration.
+  auto fence =
+      PrepareDriver("gpu-ffe40000_group", "fuchsia-boot:///aml-gpu-package#meta/aml-gpu.cm", true);
+
   // Duration to sleep much be << 1 second, or else the command submission may timeout.
   const auto kPollDuration = zx::msec(50);
   // To enable changing SAG's power levels, first trigger the "boot complete" logic. This is done by
@@ -109,26 +118,40 @@ TEST_F(PowerSystemIntegration, SuspendResume) {
   ASSERT_EQ(ChangeSagState(state, kPollDuration), ZX_OK);
   ASSERT_TRUE(SetBootComplete());
 
-  diagnostics::reader::ArchiveReader reader(dispatcher());
+  // There are two archive accessors. One is the test one that is hermetic to the test realm.
+  // This is where the broker/SAG specific entries can be found.
+  //
+  // The other is the real one for the system. This is where the driver entries can be found.
+  //
+  auto test_archives_result = component::Connect<fuchsia_diagnostics::ArchiveAccessor>();
+  ASSERT_EQ(ZX_OK, test_archives_result.status_value());
+  diagnostics::reader::ArchiveReader test_reader(dispatcher(), {},
+                                                 std::move(test_archives_result.value()));
 
-  const InspectSelectors s = GetInspectSelectors(reader);
+  auto real_archives_result = component::Connect<fuchsia_diagnostics::ArchiveAccessor>(
+      "/svc/fuchsia.diagnostics.RealArchiveAccessor");
+  ASSERT_EQ(ZX_OK, real_archives_result.status_value());
+  diagnostics::reader::ArchiveReader real_reader(dispatcher(), {},
+                                                 std::move(real_archives_result.value()));
+
+  const InspectSelectors s = GetInspectSelectors(test_reader);
 
   // Verify boot complete state using inspect data:
   // - SAG: exec state level active
   // - Power Broker: mali gpu powered off.
   // - msd_arm_mali - no lease, powered off.
-  MatchInspectData(reader, s.sag_moniker, std::nullopt, s.sag_exec_state_level,
+  MatchInspectData(test_reader, s.sag_moniker, std::nullopt, s.sag_exec_state_level,
                    uint64_t{2});  // kActive
-  MatchInspectData(reader, s.pb_moniker, std::nullopt, s.mali_gpu_required_level,
+  MatchInspectData(test_reader, s.pb_moniker, std::nullopt, s.mali_gpu_required_level,
                    uint64_t{0});  // Off
-  MatchInspectData(reader, s.pb_moniker, std::nullopt, s.mali_gpu_current_level,
+  MatchInspectData(test_reader, s.pb_moniker, std::nullopt, s.mali_gpu_current_level,
                    uint64_t{0});  // Off
 
-  MatchInspectData(reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
+  MatchInspectData(real_reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
                    s.msd_arm_mali_power_lease_active, false);
-  MatchInspectData(reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
+  MatchInspectData(real_reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
                    s.msd_arm_mali_required_power_level, uint64_t{0});
-  MatchInspectData(reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
+  MatchInspectData(real_reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
                    s.msd_arm_mali_current_power_level, uint64_t{0});
 
   std::unique_ptr<TestConnection> test;
@@ -146,13 +169,13 @@ TEST_F(PowerSystemIntegration, SuspendResume) {
 
   // - Power Broker: mali gpu powered on.
   // - msd_arm_mali - lease enabled, powered on.
-  MatchInspectData(reader, s.pb_moniker, std::nullopt, s.mali_gpu_required_level, uint64_t{1});
-  MatchInspectData(reader, s.pb_moniker, std::nullopt, s.mali_gpu_current_level, uint64_t{1});
-  MatchInspectData(reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
+  MatchInspectData(test_reader, s.pb_moniker, std::nullopt, s.mali_gpu_required_level, uint64_t{1});
+  MatchInspectData(test_reader, s.pb_moniker, std::nullopt, s.mali_gpu_current_level, uint64_t{1});
+  MatchInspectData(real_reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
                    s.msd_arm_mali_power_lease_active, true);
-  MatchInspectData(reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
+  MatchInspectData(real_reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
                    s.msd_arm_mali_required_power_level, uint64_t{1});
-  MatchInspectData(reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
+  MatchInspectData(real_reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
                    s.msd_arm_mali_current_power_level, uint64_t{1});
 
   // Emulate system suspend.
@@ -163,13 +186,13 @@ TEST_F(PowerSystemIntegration, SuspendResume) {
 
   // - Power Broker: mali gpu powered off.
   // - msd_arm_mali - lease enabled, powered off.
-  MatchInspectData(reader, s.pb_moniker, std::nullopt, s.mali_gpu_required_level, uint64_t{0});
-  MatchInspectData(reader, s.pb_moniker, std::nullopt, s.mali_gpu_current_level, uint64_t{0});
-  MatchInspectData(reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
+  MatchInspectData(test_reader, s.pb_moniker, std::nullopt, s.mali_gpu_required_level, uint64_t{0});
+  MatchInspectData(test_reader, s.pb_moniker, std::nullopt, s.mali_gpu_current_level, uint64_t{0});
+  MatchInspectData(real_reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
                    s.msd_arm_mali_power_lease_active, true);
-  MatchInspectData(reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
+  MatchInspectData(real_reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
                    s.msd_arm_mali_required_power_level, uint64_t{0});
-  MatchInspectData(reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
+  MatchInspectData(real_reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
                    s.msd_arm_mali_current_power_level, uint64_t{0});
 
   // Emulate system resume.
@@ -180,30 +203,34 @@ TEST_F(PowerSystemIntegration, SuspendResume) {
 
   // - Power Broker: mali gpu powered on.
   // - msd_arm_mali - lease enabled, powered on.
-  MatchInspectData(reader, s.pb_moniker, std::nullopt, s.mali_gpu_required_level, uint64_t{1});
-  MatchInspectData(reader, s.pb_moniker, std::nullopt, s.mali_gpu_current_level, uint64_t{1});
-  MatchInspectData(reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
+  MatchInspectData(test_reader, s.pb_moniker, std::nullopt, s.mali_gpu_required_level, uint64_t{1});
+  MatchInspectData(test_reader, s.pb_moniker, std::nullopt, s.mali_gpu_current_level, uint64_t{1});
+  MatchInspectData(real_reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
                    s.msd_arm_mali_power_lease_active, true);
-  MatchInspectData(reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
+  MatchInspectData(real_reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
                    s.msd_arm_mali_required_power_level, uint64_t{1});
-  MatchInspectData(reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
+  MatchInspectData(real_reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
                    s.msd_arm_mali_current_power_level, uint64_t{1});
   finished_test = true;
   command_loop.join();
 
   // - Power Broker: mali gpu powered off.
   // - msd_arm_mali - lease off, powered off.
-  MatchInspectData(reader, s.pb_moniker, std::nullopt, s.mali_gpu_required_level, uint64_t{0});
-  MatchInspectData(reader, s.pb_moniker, std::nullopt, s.mali_gpu_current_level, uint64_t{0});
-  MatchInspectData(reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
+  MatchInspectData(test_reader, s.pb_moniker, std::nullopt, s.mali_gpu_required_level, uint64_t{0});
+  MatchInspectData(test_reader, s.pb_moniker, std::nullopt, s.mali_gpu_current_level, uint64_t{0});
+  MatchInspectData(real_reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
                    s.msd_arm_mali_power_lease_active, false);
-  MatchInspectData(reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
+  MatchInspectData(real_reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
                    s.msd_arm_mali_required_power_level, uint64_t{0});
-  MatchInspectData(reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
+  MatchInspectData(real_reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
                    s.msd_arm_mali_current_power_level, uint64_t{0});
 }
 
 TEST_F(PowerSystemIntegration, PowerIdle) {
+  // Hold on to fence for the test duration.
+  auto fence =
+      PrepareDriver("gpu-ffe40000_group", "fuchsia-boot:///aml-gpu-package#meta/aml-gpu.cm", true);
+
   auto topology_result = component::Connect<fuchsia_power_broker::Topology>();
   ASSERT_EQ(ZX_OK, topology_result.status_value());
   fidl::ClientEnd topology = std::move(*topology_result);
@@ -216,25 +243,39 @@ TEST_F(PowerSystemIntegration, PowerIdle) {
   ASSERT_EQ(ChangeSagState(state, kPollDuration), ZX_OK);
   ASSERT_TRUE(SetBootComplete());
 
-  diagnostics::reader::ArchiveReader reader(dispatcher());
-  const InspectSelectors s = GetInspectSelectors(reader);
+  // There are two archive accessors. One is the test one that is hermetic to the test realm.
+  // This is where the broker/SAG specific entries can be found.
+  //
+  // The other is the real one for the system. This is where the driver entries can be found.
+  //
+  auto test_archives_result = component::Connect<fuchsia_diagnostics::ArchiveAccessor>();
+  ASSERT_EQ(ZX_OK, test_archives_result.status_value());
+  diagnostics::reader::ArchiveReader test_reader(dispatcher(), {},
+                                                 std::move(test_archives_result.value()));
+
+  auto real_archives_result = component::Connect<fuchsia_diagnostics::ArchiveAccessor>(
+      "/svc/fuchsia.diagnostics.RealArchiveAccessor");
+  ASSERT_EQ(ZX_OK, real_archives_result.status_value());
+  diagnostics::reader::ArchiveReader real_reader(dispatcher(), {},
+                                                 std::move(real_archives_result.value()));
+  const InspectSelectors s = GetInspectSelectors(test_reader);
 
   // Verify boot complete state using inspect data:
   // - SAG: exec state level active
   // - Power Broker: mali gpu powered off.
   // - msd_arm_mali - no lease, powered off.
-  MatchInspectData(reader, s.sag_moniker, std::nullopt, s.sag_exec_state_level,
+  MatchInspectData(test_reader, s.sag_moniker, std::nullopt, s.sag_exec_state_level,
                    uint64_t{2});  // kActive
-  MatchInspectData(reader, s.pb_moniker, std::nullopt, s.mali_gpu_required_level,
+  MatchInspectData(test_reader, s.pb_moniker, std::nullopt, s.mali_gpu_required_level,
                    uint64_t{0});  // Off
-  MatchInspectData(reader, s.pb_moniker, std::nullopt, s.mali_gpu_current_level,
+  MatchInspectData(test_reader, s.pb_moniker, std::nullopt, s.mali_gpu_current_level,
                    uint64_t{0});  // Off
 
-  MatchInspectData(reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
+  MatchInspectData(real_reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
                    s.msd_arm_mali_power_lease_active, false);
-  MatchInspectData(reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
+  MatchInspectData(real_reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
                    s.msd_arm_mali_required_power_level, uint64_t{0});
-  MatchInspectData(reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
+  MatchInspectData(real_reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
                    s.msd_arm_mali_current_power_level, uint64_t{0});
 
   // Connect after boot complete checks to ensure that the driver has loaded already.
@@ -295,29 +336,29 @@ TEST_F(PowerSystemIntegration, PowerIdle) {
 
   // - Power Broker: mali gpu powered on.
   // - msd_arm_mali - lease disabled, powered on.
-  MatchInspectData(reader, s.pb_moniker, std::nullopt, s.mali_gpu_required_level, uint64_t{1});
-  MatchInspectData(reader, s.pb_moniker, std::nullopt, s.mali_gpu_current_level, uint64_t{1});
-  MatchInspectData(reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
+  MatchInspectData(test_reader, s.pb_moniker, std::nullopt, s.mali_gpu_required_level, uint64_t{1});
+  MatchInspectData(test_reader, s.pb_moniker, std::nullopt, s.mali_gpu_current_level, uint64_t{1});
+  MatchInspectData(real_reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
                    s.msd_arm_mali_power_lease_active, false);
-  MatchInspectData(reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
+  MatchInspectData(real_reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
                    s.msd_arm_mali_required_power_level, uint64_t{1});
-  MatchInspectData(reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
+  MatchInspectData(real_reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
                    s.msd_arm_mali_current_power_level, uint64_t{1});
 
   lease_control.reset();
 
   // - Power Broker: mali gpu powered off.
   // - msd_arm_mali - lease disabled, powered off.
-  MatchInspectData(reader, s.pb_moniker, std::nullopt, s.mali_gpu_required_level,
+  MatchInspectData(test_reader, s.pb_moniker, std::nullopt, s.mali_gpu_required_level,
                    uint64_t{0});  // Off
-  MatchInspectData(reader, s.pb_moniker, std::nullopt, s.mali_gpu_current_level,
+  MatchInspectData(test_reader, s.pb_moniker, std::nullopt, s.mali_gpu_current_level,
                    uint64_t{0});  // Off
 
-  MatchInspectData(reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
+  MatchInspectData(real_reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
                    s.msd_arm_mali_power_lease_active, false);
-  MatchInspectData(reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
+  MatchInspectData(real_reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
                    s.msd_arm_mali_required_power_level, uint64_t{0});
-  MatchInspectData(reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
+  MatchInspectData(real_reader, s.msd_arm_mali_moniker, s.msd_arm_mali_inspect_tree_name,
                    s.msd_arm_mali_current_power_level, uint64_t{0});
 }
 

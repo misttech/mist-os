@@ -19,10 +19,15 @@
         {
             protocol: [
                 "fuchsia.kernel.InfoResource",
-                "fuchsia.power.broker.Topology",
-                "fuchsia.power.system.ActivityGovernor",
                 "fuchsia.scheduler.RoleManager",
             ],
+        },
+        {
+            protocol: [
+                "fuchsia.power.broker.Topology",
+                "fuchsia.power.system.ActivityGovernor",
+            ],
+            availability: "optional",
         },
         {
             service: [

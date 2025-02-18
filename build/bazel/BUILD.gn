@@ -212,10 +212,7 @@ group("bazel_action_allowlist") {
   ]
 
   # Bazel assembly used in tests
-  visibility += [
-    "//build/images/updates/tests:bazel_pb_bazel_build_group",
-    "//src/power/testing/system-integration/msd-arm-mali/custom-product:product_bundle_bazel_build_group",
-  ]
+  visibility += [ "//build/images/updates/tests:bazel_pb_bazel_build_group" ]
 
   # Bazel build related targets
   visibility += [

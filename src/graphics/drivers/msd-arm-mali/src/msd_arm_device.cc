@@ -293,12 +293,21 @@ bool MsdArmDevice::Init(ParentDevice* platform_device,
 
   // Start interrupt thread so ResetDevice can wait for the reset interrupt.
   StartGpuInterruptThread();
-  if (parent_device_->suspend_enabled()) {
-    fuchsia_power_manager_ = std::make_unique<FuchsiaPowerManager>(this);
-    if (!fuchsia_power_manager_->Initialize(parent_device_, inspect_)) {
-      MAGMA_LOG(ERROR, "Failed to initialize fuchsia power manager");
+
+  // Always try to configure power manager since it will be available during the non-hermetic
+  // testing. But only error on failure if the system-wide config was enabled.
+  fuchsia_power_manager_ = std::make_unique<FuchsiaPowerManager>(this);
+  bool power_init_success = fuchsia_power_manager_->Initialize(parent_device_, inspect_);
+  if (!power_init_success) {
+    if (parent_device_->suspend_enabled()) {
+      MAGMA_LOG(ERROR, "Failed to initialize fuchsia power manager.");
       return false;
     }
+
+    // Reset it if it did not initialize but we want to continue without it.
+    MAGMA_LOG(INFO, "Continuing without power framework.");
+    fuchsia_power_manager_.reset();
+  } else {
     timeout_sources_.push_back(fuchsia_power_manager_.get());
   }
 

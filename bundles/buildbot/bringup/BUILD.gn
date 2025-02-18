@@ -21,5 +21,5 @@ group("bringup") {
 # WARNING: Known to infrastructure
 group("e2e_tests") {
   testonly = true
-  deps = [ "//src/power/testing/system-integration:e2e_tests" ]
+  deps = []
 }
