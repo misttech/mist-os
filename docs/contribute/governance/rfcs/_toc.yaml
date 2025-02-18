@@ -544,3 +544,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0263_migrate_driver_communication_to_services.md
   - title: "RFC-0264: Running unmodified AArch32 Linux programs on Fuchsia"
     path: /docs/contribute/governance/rfcs/0264_running_unmodified_aarch32_linux_programs_on_fuchsia.md
+  - title: "RFC-0266: Memory Mappable Kernel Clocks"
+    path: /docs/contribute/governance/rfcs/0266_memory_mappable_kernel_clocks.md

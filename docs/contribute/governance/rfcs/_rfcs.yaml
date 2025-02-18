@@ -3452,3 +3452,16 @@
   reviewers: ['jamesr@google.com', 'lindkvist@google.com', 'maniscalco@google.com', 'mcgrathr@google.com', 'mvanotti@google.com', 'phosek@google.com', 'travisg@google.com']
   submitted: '2024-11-05'
   reviewed: '2025-01-21'
+
+- name: 'RFC-0266'
+  title: 'Memory Mappable Kernel Clocks'
+  short_description: 'Provides a way for user-mode processes to read kernel clock state without a entering the Zircon kernel.'
+  authors: ['johngro@google.com']
+  file: '0266_memory_mappable_kernel_clocks.md'
+  area: ['Kernel']
+  issue: ['374816449, 374816524']
+  gerrit_change_id: ['']
+  status: 'Accepted'
+  reviewers: ['rashaeqbal@google.com', 'rudymathu@google.com', 'jamesr@google.com', 'adanis@google.com', 'mpuryear@google.com']
+  submitted: '2024-11-21'
+  reviewed: '2025-02-14'
