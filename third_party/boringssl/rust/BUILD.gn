@@ -100,7 +100,7 @@ rustc_library("bssl-sys.lib") {
   # `#![allow(clippy::missing_safety_doc)]`, etc. Accordingly we have no choice
   # but to skip the check altogether. There is barely anything in lib.rs apart
   # from the bindgen output anyway.
-  quiet_clippy = true
+  disable_clippy = true
 }
 
 config("bssl-sys.config") {
