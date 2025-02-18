@@ -635,7 +635,7 @@ pub fn check_task_capable(
     current_task: &CurrentTask,
     capabilities: starnix_uapi::auth::Capabilities,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.task_capable");
+    profile_duration!("security.hooks.check_task_capable");
     if !current_task.creds().has_capability(capabilities) {
         return error!(EPERM);
     }

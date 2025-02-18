@@ -995,9 +995,9 @@ fn do_attach(
 }
 
 fn check_caps_for_attach(ptrace_scope: u8, current_task: &CurrentTask) -> Result<(), Errno> {
-    if ptrace_scope == ADMIN_ONLY_SCOPE && !current_task.creds().has_capability(CAP_SYS_PTRACE) {
+    if ptrace_scope == ADMIN_ONLY_SCOPE {
         // Admin only use of ptrace
-        return error!(EPERM);
+        security::check_task_capable(current_task, CAP_SYS_PTRACE)?;
     }
     if ptrace_scope == NO_ATTACH_SCOPE {
         // No use of ptrace

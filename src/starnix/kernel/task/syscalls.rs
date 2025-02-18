@@ -454,7 +454,7 @@ pub fn sys_setuid(
     let prev = creds.copy_user_credentials();
     creds.euid = uid;
     creds.fsuid = uid;
-    if creds.has_capability(CAP_SETUID) {
+    if security::check_task_capable(current_task, CAP_SETUID).is_ok() {
         creds.uid = uid;
         creds.saved_uid = uid;
     }
@@ -478,7 +478,7 @@ pub fn sys_setgid(
     }
     creds.egid = gid;
     creds.fsgid = gid;
-    if creds.has_capability(CAP_SETGID) {
+    if security::check_task_capable(current_task, CAP_SETGID).is_ok() {
         creds.gid = gid;
         creds.saved_gid = gid;
     }
@@ -1263,7 +1263,7 @@ where
     // * the same `uid`, `euid`, `saved_uid`, `gid`, `egid`, `saved_gid` as the target.
     if current_task.get_pid() != target_task.get_pid() {
         let current_creds = current_task.creds();
-        if !current_creds.has_capability(CAP_SYS_RESOURCE) {
+        if security::check_task_capable(current_task, CAP_SYS_RESOURCE).is_err() {
             let target_creds = target_task.creds();
             let creds_match = current_creds.uid == target_creds.uid
                 && current_creds.euid == target_creds.euid
@@ -1497,10 +1497,9 @@ pub fn sys_seccomp(
             let code: Vec<sock_filter> =
                 current_task.read_objects_to_vec(fprog.filter.into(), fprog.len as usize)?;
 
-            if !current_task.read().no_new_privs()
-                && !current_task.creds().has_capability(CAP_SYS_ADMIN)
-            {
-                return error!(EACCES);
+            if !current_task.read().no_new_privs() {
+                security::check_task_capable(current_task, CAP_SYS_ADMIN)
+                    .map_err(|_| errno!(EACCES))?;
             }
             current_task.add_seccomp_filter(code, flags)
         }

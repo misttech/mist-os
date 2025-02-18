@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::security;
 use bstr::ByteSlice;
 use fuchsia_component::client::connect_to_protocol_sync;
 use linux_uapi::LINUX_REBOOT_CMD_POWER_OFF;
@@ -155,9 +156,7 @@ pub fn sys_sethostname(
     hostname: UserCString,
     len: u64,
 ) -> Result<SyscallResult, Errno> {
-    if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
-        return error!(EPERM);
-    }
+    security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
 
     let hostname = read_name(current_task, hostname, len)?;
 
@@ -174,9 +173,7 @@ pub fn sys_setdomainname(
     domainname: UserCString,
     len: u64,
 ) -> Result<SyscallResult, Errno> {
-    if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
-        return error!(EPERM);
-    }
+    security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
 
     let domainname = read_name(current_task, domainname, len)?;
 
@@ -256,9 +253,7 @@ pub fn sys_reboot(
     {
         return error!(EINVAL);
     }
-    if !current_task.creds().has_capability(CAP_SYS_BOOT) {
-        return error!(EPERM);
-    }
+    security::check_task_capable(current_task, CAP_SYS_BOOT)?;
 
     let arg_bytes = if matches!(cmd, LINUX_REBOOT_CMD_RESTART2) {
         // This is an arbitrary limit that should be large enough.
@@ -447,9 +442,7 @@ pub fn sys_delete_module(
     user_name: UserCString,
     _flags: u32,
 ) -> Result<SyscallResult, Errno> {
-    if !current_task.creds().has_capability(CAP_SYS_MODULE) {
-        return error!(EPERM);
-    }
+    security::check_task_capable(current_task, CAP_SYS_MODULE)?;
     // According to LTP test delete_module02.c
     const MODULE_NAME_LEN: usize = 64 - std::mem::size_of::<u64>();
     let _name = current_task.read_c_string_to_vec(user_name, MODULE_NAME_LEN)?;

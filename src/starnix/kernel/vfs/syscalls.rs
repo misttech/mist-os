@@ -317,8 +317,8 @@ pub fn sys_fcntl(
         }
         F_SETLEASE => {
             let creds = current_task.creds();
-            if !creds.has_capability(CAP_LEASE) && creds.fsuid != file.node().info().uid {
-                return error!(EPERM);
+            if creds.fsuid != file.node().info().uid {
+                security::check_task_capable(current_task, CAP_LEASE)?;
             }
             let lease = FileLeaseType::from_bits(arg as u32)?;
             security::check_file_fcntl_access(current_task, &file, cmd, arg)?;
@@ -1045,8 +1045,9 @@ pub fn sys_linkat(
         return error!(EINVAL);
     }
 
-    if flags & AT_EMPTY_PATH != 0 && !current_task.creds().has_capability(CAP_DAC_READ_SEARCH) {
-        return error!(ENOENT);
+    if flags & AT_EMPTY_PATH != 0 {
+        security::check_task_capable(current_task, CAP_DAC_READ_SEARCH)
+            .map_err(|_| errno!(ENOENT))?;
     }
 
     let flags = LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_FOLLOW)?;
@@ -1709,9 +1710,7 @@ pub fn sys_mount(
     flags: u32,
     data_addr: UserCString,
 ) -> Result<(), Errno> {
-    if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
-        return error!(EPERM);
-    }
+    security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
 
     let flags = MountFlags::from_bits(flags).ok_or_else(|| {
         track_stub!(
@@ -1873,9 +1872,7 @@ pub fn sys_umount2(
     target_addr: UserCString,
     flags: u32,
 ) -> Result<(), Errno> {
-    if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
-        return error!(EPERM);
-    }
+    security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
 
     let unmount_flags = UnmountFlags::from_bits(flags).ok_or_else(|| {
         track_stub!(
@@ -1985,9 +1982,7 @@ pub fn sys_timerfd_create(
     let timer_type = match clock_id {
         CLOCK_MONOTONIC | CLOCK_BOOTTIME | CLOCK_REALTIME => TimerWakeup::Regular,
         CLOCK_BOOTTIME_ALARM | CLOCK_REALTIME_ALARM => {
-            if !current_task.creds().has_capability(CAP_WAKE_ALARM) {
-                return error!(EPERM);
-            }
+            security::check_task_capable(current_task, CAP_WAKE_ALARM)?;
             TimerWakeup::Alarm
         }
         _ => return error!(EINVAL),
@@ -2315,7 +2310,7 @@ pub fn sys_epoll_ctl(
             // capability, then the EPOLLWAKEUP flag is silently ignored.
             // See https://man7.org/linux/man-pages/man2/epoll_ctl.2.html
             if epoll_event.events().contains(FdEvents::EPOLLWAKEUP) {
-                if !current_task.creds().has_capability(CAP_BLOCK_SUSPEND) {
+                if security::check_task_capable(current_task, CAP_BLOCK_SUSPEND).is_err() {
                     epoll_event.ignore(FdEvents::EPOLLWAKEUP);
                 }
             }
@@ -3061,6 +3056,11 @@ pub fn sys_io_uring_setup(
     user_entries: UserValue<u32>,
     user_params: UserRef<io_uring_params>,
 ) -> Result<FdNumber, Errno> {
+    // TODO: https://fxbug.dev/397186254 - we will want to do a no-audit CAP_IPC_LOCK capability
+    // check; see "If not granted CAP_IPC_LOCK io_uring operations are accounted against the user's
+    // RLIMIT_MEMLOCK limit" at
+    // https://github.com/SELinuxProject/selinux-notebook/blob/main/src/auditing.md#capability-audit-exemptions
+
     if !current_task.kernel().features.io_uring {
         return error!(ENOSYS);
     }
@@ -3070,7 +3070,7 @@ pub fn sys_io_uring_setup(
     match limits.io_uring_disabled.load(atomic::Ordering::Relaxed) {
         0 => (),
         1 => {
-            if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
+            if security::check_task_capable(current_task, CAP_SYS_ADMIN).is_err() {
                 let io_uring_group = limits
                     .io_uring_group
                     .load(atomic::Ordering::Relaxed)

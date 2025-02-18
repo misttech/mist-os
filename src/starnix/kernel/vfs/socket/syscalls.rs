@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::mm::{MemoryAccessor, MemoryAccessorExt};
+use crate::security;
 use crate::task::{CurrentTask, IpTables, Task, WaitCallback, Waiter};
 use crate::vfs::buffers::{
     AncillaryData, ControlMsg, UserBuffersInputBuffer, UserBuffersOutputBuffer,
@@ -173,8 +174,9 @@ pub fn sys_bind(
         //   a process that has the CAP_NET_BIND_SERVICE capability in the
         //   user namespace governing its network namespace) may bind(2) to
         //   these sockets.
-        if port != 0 && port < 1024 && !current_task.creds().has_capability(CAP_NET_BIND_SERVICE) {
-            return error!(EACCES);
+        if port != 0 && port < 1024 {
+            security::check_task_capable(current_task, CAP_NET_BIND_SERVICE)
+                .map_err(|_| errno!(EACCES))?;
         }
     }
     match address {

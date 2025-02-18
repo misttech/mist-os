@@ -1058,9 +1058,9 @@ pub fn default_ioctl(
                 user_id,
             );
 
-            if user_id != file.node().info().uid && !current_task.creds().has_capability(CAP_FOWNER)
-            {
-                return error!(EACCES);
+            if user_id != file.node().info().uid {
+                security::check_task_capable(current_task, CAP_FOWNER)
+                    .map_err(|_| errno!(EACCES))?;
             }
 
             if let Some(users) = current_task

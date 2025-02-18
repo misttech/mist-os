@@ -1767,9 +1767,7 @@ impl CurrentTask {
             timerslack_ns = state.timerslack_ns;
 
             uts_ns = if clone_newuts {
-                if !self.creds().has_capability(CAP_SYS_ADMIN) {
-                    return error!(EPERM);
-                }
+                security::check_task_capable(self, CAP_SYS_ADMIN)?;
                 state.uts_ns.read().fork()
             } else {
                 state.uts_ns.clone()

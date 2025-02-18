@@ -7,6 +7,7 @@ use crate::mm::{
     DesiredAddress, FutexKey, MappingName, MappingOptions, MemoryAccessorExt, MremapFlags,
     PrivateFutexKey, ProtectionFlags, SharedFutexKey, PAGE_SIZE,
 };
+use crate::security;
 use crate::syscalls::time::TimeSpecPtr;
 use crate::task::{CurrentTask, TargetTime, Task};
 use crate::time::utc::estimate_boot_deadline_from_utc;
@@ -619,8 +620,8 @@ pub fn sys_get_robust_list(
     if user_head_ptr.is_null() || user_len_ptr.is_null() {
         return error!(EFAULT);
     }
-    if pid != 0 && !current_task.creds().has_capability(CAP_SYS_PTRACE) {
-        return error!(EPERM);
+    if pid != 0 {
+        security::check_task_capable(current_task, CAP_SYS_PTRACE)?;
     }
     let task = if pid == 0 { current_task.weak_task() } else { current_task.get_task(pid) };
     let task = Task::from_weak(&task)?;

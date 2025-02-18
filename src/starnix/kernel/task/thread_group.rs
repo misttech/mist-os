@@ -1061,7 +1061,7 @@ impl ThreadGroup {
             return error!(EINVAL);
         }
 
-        let has_admin = current_task.creds().has_capability(CAP_SYS_ADMIN);
+        let mut has_admin_capability_determined = false;
 
         // "If this terminal is already the controlling terminal of a different
         // session group, then the ioctl fails with EPERM, unless the caller
@@ -1072,17 +1072,19 @@ impl ThreadGroup {
             terminal_state.controller.as_ref().and_then(|cs| cs.session.upgrade())
         {
             if other_session != process_group.session {
-                if !has_admin || !steal {
+                if !steal {
                     return error!(EPERM);
                 }
+                security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
+                has_admin_capability_determined = true;
 
                 // Steal the TTY away. Unlike TIOCNOTTY, don't send signals.
                 other_session.write().controlling_terminal = None;
             }
         }
 
-        if !is_readable && !has_admin {
-            return error!(EPERM);
+        if !is_readable && !has_admin_capability_determined {
+            security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
         }
 
         session_writer.controlling_terminal =
@@ -1162,7 +1164,8 @@ impl ThreadGroup {
         resource: Resource,
         maybe_new_limit: Option<rlimit>,
     ) -> Result<rlimit, Errno> {
-        let can_increase_rlimit = current_task.creds().has_capability(CAP_SYS_RESOURCE);
+        let can_increase_rlimit =
+            security::check_task_capable(current_task, CAP_SYS_RESOURCE).is_ok();
         let mut limit_state = self.limits.lock();
         limit_state.get_and_set(resource, maybe_new_limit, can_increase_rlimit)
     }

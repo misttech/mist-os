@@ -1507,11 +1507,8 @@ impl FsNode {
             //   CAP_MKNOD capability); also returned if the filesystem
             //   containing pathname does not support the type of node
             //   requested.
-            let creds = current_task.creds();
-            if !creds.has_capability(CAP_MKNOD) {
-                if !matches!(mode.fmt(), FileMode::IFREG | FileMode::IFIFO | FileMode::IFSOCK) {
-                    return error!(EPERM);
-                }
+            if !matches!(mode.fmt(), FileMode::IFREG | FileMode::IFIFO | FileMode::IFSOCK) {
+                security::check_task_capable(current_task, CAP_MKNOD)?;
             }
             let mut locked = locked.cast_locked::<FileOpsCore>();
             self.ops().mknod(&mut locked, self, current_task, name, mode, dev, owner)?
@@ -1674,7 +1671,9 @@ impl FsNode {
         // Check that the the filesystem UID of the calling process (`current_task`) is the same as
         // the UID of the existing file. The check can be bypassed if the calling process has
         // `CAP_FOWNER` capability.
-        if !creds.has_capability(CAP_FOWNER) && child_uid != creds.fsuid {
+        if child_uid != creds.fsuid
+            && security::check_task_capable(current_task, CAP_FOWNER).is_err()
+        {
             // If current_task is not the user of the existing file, it needs to have read and write
             // access to the existing file.
             child
@@ -1933,9 +1932,9 @@ impl FsNode {
             // We need to check whether the current task has permission to create such a file.
             // See a similar check in `FsNode::chmod`.
             let creds = current_task.creds();
-            if !creds.has_capability(CAP_FOWNER)
-                && owner.gid != creds.fsgid
+            if owner.gid != creds.fsgid
                 && !creds.is_in_group(owner.gid)
+                && security::check_task_capable(current_task, CAP_FOWNER).is_err()
             {
                 *mode &= !FileMode::ISGID;
             }
@@ -1960,11 +1959,10 @@ impl FsNode {
         //      *  The calling process has the CAP_FOWNER capability in
         //         its user namespace and the owner UID of the file has a
         //         mapping in the namespace.
-        if creds.has_capability(CAP_FOWNER) || creds.fsuid == self.info().uid {
-            Ok(())
-        } else {
-            error!(EPERM)
+        if creds.fsuid != self.info().uid {
+            security::check_task_capable(current_task, CAP_FOWNER)?;
         }
+        Ok(())
     }
 
     pub fn default_check_access_impl(
@@ -1982,7 +1980,8 @@ impl FsNode {
             // To set the timestamps to other values the caller must either be the file owner or hold
             // the CAP_FOWNER capability.
             let creds = current_task.creds();
-            let has_owner_priviledge = creds.fsuid == node_uid || creds.has_capability(CAP_FOWNER);
+            let has_owner_priviledge = creds.fsuid == node_uid
+                || security::check_task_capable(current_task, CAP_FOWNER).is_ok();
             if has_owner_priviledge {
                 return Ok(());
             }
@@ -2032,11 +2031,8 @@ impl FsNode {
         child: &FsNodeHandle,
     ) -> Result<(), Errno> {
         let creds = current_task.creds();
-        if !creds.has_capability(CAP_FOWNER)
-            && self.info().mode.contains(FileMode::ISVTX)
-            && child.info().uid != creds.fsuid
-        {
-            return error!(EPERM);
+        if self.info().mode.contains(FileMode::ISVTX) && child.info().uid != creds.fsuid {
+            security::check_task_capable(current_task, CAP_FOWNER)?;
         }
         Ok(())
     }
@@ -2107,13 +2103,14 @@ impl FsNode {
         mount.check_readonly_filesystem()?;
         self.update_attributes(locked, current_task, |info| {
             let creds = current_task.creds();
-            if !creds.has_capability(CAP_FOWNER) {
-                if info.uid != creds.euid {
-                    return error!(EPERM);
-                }
-                if info.gid != creds.egid && !creds.is_in_group(info.gid) {
-                    mode &= !FileMode::ISGID;
-                }
+            if info.uid != creds.euid {
+                security::check_task_capable(current_task, CAP_FOWNER)?;
+            } else if info.gid != creds.egid
+                && !creds.is_in_group(info.gid)
+                && mode.intersects(FileMode::ISGID)
+                && security::check_task_capable(current_task, CAP_FOWNER).is_err()
+            {
+                mode &= !FileMode::ISGID;
             }
             info.chmod(mode);
             Ok(())
@@ -2134,7 +2131,7 @@ impl FsNode {
     {
         mount.check_readonly_filesystem()?;
         self.update_attributes(locked, current_task, |info| {
-            if current_task.creds().has_capability(CAP_CHOWN) {
+            if security::check_task_capable(current_task, CAP_CHOWN).is_ok() {
                 info.chown(owner, group);
                 return Ok(());
             }
@@ -2344,7 +2341,7 @@ impl FsNode {
             if !info.mode.is_reg() && !info.mode.is_dir() {
                 return Err(error());
             }
-        } else if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
+        } else if security::check_task_capable(current_task, CAP_SYS_ADMIN).is_err() {
             // Non-privileged callers only have access to the user namespace.
             return Err(error());
         }
@@ -2508,6 +2505,7 @@ impl FsNode {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
+        // TODO: https://fxbug.dev/397357288 - upgrade to security::check_task_capable.
         if !current_task.creds().has_capability(CAP_FSETID) {
             self.update_attributes(locked, current_task, |info| {
                 info.clear_suid_and_sgid_bits();

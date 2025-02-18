@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::mm::MemoryAccessorExt;
+use crate::security;
 use crate::signals::SignalEvent;
 use crate::task::{
     ClockId, CurrentTask, EventHandler, GenericDuration, SignalHandler, SignalHandlerInner,
@@ -450,9 +451,7 @@ pub fn sys_timer_create(
     };
     let timer_wakeup = match clock_id as u32 {
         CLOCK_BOOTTIME_ALARM | CLOCK_REALTIME_ALARM => {
-            if !current_task.creds().has_capability(CAP_WAKE_ALARM) {
-                return error!(EPERM);
-            }
+            security::check_task_capable(current_task, CAP_WAKE_ALARM)?;
             TimerWakeup::Alarm
         }
         _ => TimerWakeup::Regular,

@@ -8,6 +8,7 @@ use super::{
     ZxioBackedSocket,
 };
 use crate::mm::MemoryAccessorExt;
+use crate::security;
 use crate::task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter};
 use crate::vfs::buffers::{
     AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer, VecInputBuffer, VecOutputBuffer,
@@ -324,7 +325,9 @@ fn create_socket_ops(
         SocketDomain::Inet | SocketDomain::Inet6 => {
             // Follow Linux, and require CAP_NET_RAW to create raw sockets.
             // See https://man7.org/linux/man-pages/man7/raw.7.html.
-            if socket_type == SocketType::Raw && !current_task.creds().has_capability(CAP_NET_RAW) {
+            if socket_type == SocketType::Raw
+                && security::check_task_capable(current_task, CAP_NET_RAW).is_err()
+            {
                 error!(EPERM)
             } else {
                 Ok(Box::new(ZxioBackedSocket::new(domain, socket_type, protocol)?))
@@ -337,11 +340,8 @@ fn create_socket_ops(
         SocketDomain::Packet => {
             // Follow Linux, and require CAP_NET_RAW to create packet sockets.
             // See https://man7.org/linux/man-pages/man7/packet.7.html.
-            if current_task.creds().has_capability(CAP_NET_RAW) {
-                Ok(Box::new(ZxioBackedSocket::new(domain, socket_type, protocol)?))
-            } else {
-                error!(EPERM)
-            }
+            security::check_task_capable(current_task, CAP_NET_RAW)?;
+            Ok(Box::new(ZxioBackedSocket::new(domain, socket_type, protocol)?))
         }
         SocketDomain::Key => {
             track_stub!(
@@ -640,7 +640,7 @@ impl Socket {
                 Ok(SUCCESS)
             }
             SIOCSIFADDR => {
-                if !current_task.creds().has_capability(CAP_NET_ADMIN) {
+                if security::check_task_capable(current_task, CAP_NET_ADMIN).is_err() {
                     return error!(EPERM, "tried to SIOCSIFADDR without CAP_NET_ADMIN");
                 }
 
@@ -738,7 +738,7 @@ impl Socket {
                 Ok(SUCCESS)
             }
             SIOCSIFNETMASK => {
-                if !current_task.creds().has_capability(CAP_NET_ADMIN) {
+                if security::check_task_capable(current_task, CAP_NET_ADMIN).is_err() {
                     return error!(EPERM, "tried to SIOCSIFNETMASK without CAP_NET_ADMIN");
                 }
 
