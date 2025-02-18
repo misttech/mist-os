@@ -737,7 +737,7 @@ impl MutableDirectory for FxDirectory {
                         let scope = self.volume().scope();
                         scope.spawn(
                             symlink::Connection::new(scope.clone(), node)
-                                .run(fio::OpenFlags::RIGHT_READABLE.to_object_request(connection)),
+                                .run(fio::PERM_READABLE.to_object_request(connection)),
                         );
                     })
                     .await
@@ -1061,12 +1061,11 @@ mod tests {
     use crate::directory::FxDirectory;
     use crate::file::FxFile;
     use crate::fuchsia::testing::{
-        close_dir_checked, close_file_checked, deprecated_open_dir, deprecated_open_dir_checked,
-        deprecated_open_file, deprecated_open_file_checked, open_dir, open_dir_checked,
-        TestFixture, TestFixtureOptions,
+        close_dir_checked, close_file_checked, open_dir, open_dir_checked, open_file,
+        open_file_checked, TestFixture, TestFixtureOptions,
     };
     use assert_matches::assert_matches;
-    use fidl::endpoints::{create_proxy, ClientEnd, Proxy, ServerEnd};
+    use fidl::endpoints::{create_proxy, ClientEnd, Proxy};
     use fuchsia_fs::directory::{DirEntry, DirentKind};
     use fuchsia_fs::file;
     use futures::{join, StreamExt};
@@ -1112,12 +1111,17 @@ mod tests {
             let root = fixture.root();
 
             let flags = if i == 0 {
-                fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE
+                fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE
             } else {
-                fio::OpenFlags::RIGHT_READABLE
+                fio::PERM_READABLE
             };
-            let dir =
-                deprecated_open_dir_checked(&root, flags | fio::OpenFlags::DIRECTORY, "foo").await;
+            let dir = open_dir_checked(
+                &root,
+                "foo",
+                flags | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
+            )
+            .await;
             close_dir_checked(dir).await;
 
             device = fixture.close().await;
@@ -1130,10 +1134,11 @@ mod tests {
         let root = fixture.root();
 
         assert_eq!(
-            deprecated_open_file(
+            open_file(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
-                "foo"
+                "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+                &Default::default()
             )
             .await
             .expect_err("Open succeeded")
@@ -1151,18 +1156,20 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let f = deprecated_open_file_checked(
+        let f = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         close_file_checked(f).await;
 
-        let f = deprecated_open_file_checked(
+        let f = open_file_checked(
             &root,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         close_file_checked(f).await;
@@ -1175,29 +1182,32 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let d = deprecated_open_dir_checked(
+        let d = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
         close_dir_checked(d).await;
 
-        let d = deprecated_open_dir_checked(
+        let d = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             "foo/bar",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
         close_dir_checked(d).await;
 
-        let d = deprecated_open_dir_checked(
+        let d = open_dir_checked(
             &root,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             "foo/bar",
+            fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
         close_dir_checked(d).await;
@@ -1210,25 +1220,27 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let f = deprecated_open_file_checked(
+        let f = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::CREATE_IF_ABSENT
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::Flags::FLAG_MUST_CREATE
+                | fio::PERM_READABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         close_file_checked(f).await;
 
         assert_eq!(
-            deprecated_open_file(
+            open_file(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::CREATE_IF_ABSENT
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::NOT_DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::Flags::FLAG_MUST_CREATE
+                    | fio::PERM_READABLE
+                    | fio::Flags::PROTOCOL_FILE,
+                &Default::default()
             )
             .await
             .expect_err("Open succeeded")
@@ -1246,13 +1258,14 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -1280,10 +1293,11 @@ mod tests {
             .expect("unlink failed");
 
         assert_eq!(
-            deprecated_open_file(
+            open_file(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
-                "foo"
+                "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+                &Default::default()
             )
             .await
             .expect_err("Open succeeded")
@@ -1294,13 +1308,14 @@ mod tests {
         );
 
         // Create another file so we can verify that the extents were actually freed.
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "bar",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         let buf = vec![0xaa as u8; 8192];
@@ -1315,13 +1330,14 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         close_file_checked(file).await;
@@ -1332,10 +1348,11 @@ mod tests {
             .expect("unlink failed");
 
         assert_eq!(
-            deprecated_open_file(
+            open_file(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
-                "foo"
+                "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+                &Default::default()
             )
             .await
             .expect_err("Open succeeded")
@@ -1353,13 +1370,14 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -1373,10 +1391,11 @@ mod tests {
 
         // The child should immediately appear unlinked...
         assert_eq!(
-            deprecated_open_file(
+            open_file(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
-                "foo"
+                "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+                &Default::default()
             )
             .await
             .expect_err("Open succeeded")
@@ -1404,19 +1423,21 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let dir = deprecated_open_dir_checked(
+        let dir = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
-        let f = deprecated_open_file_checked(
+        let f = open_file_checked(
             &dir,
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             "bar",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE,
+            &Default::default(),
         )
         .await;
         close_file_checked(f).await;
@@ -1450,13 +1471,14 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let dir = deprecated_open_dir_checked(
+        let dir = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
@@ -1466,12 +1488,11 @@ mod tests {
             .expect("unlink failed");
 
         assert_eq!(
-            deprecated_open_file(
+            open_file(
                 &dir,
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::CREATE
-                    | fio::OpenFlags::NOT_DIRECTORY,
-                "bar"
+                "bar",
+                fio::PERM_READABLE | fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE,
+                &Default::default()
             )
             .await
             .expect_err("Create file succeeded")
@@ -1494,23 +1515,23 @@ mod tests {
         const PARENT: &str = "foo";
         const CHILD: &str = "bar";
         const GRANDCHILD: &str = "baz";
-        deprecated_open_dir_checked(
+        open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
             PARENT,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
         let open_parent = || async {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 PARENT,
+                fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
             .await
         };
@@ -1522,13 +1543,14 @@ mod tests {
         //  - In one task, try to unlink foo/bar/.
         //  - In another task, try to add a file foo/bar/baz.
         for _ in 0..100 {
-            let d = deprecated_open_dir_checked(
+            let d = open_dir_checked(
                 &parent,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 CHILD,
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
             .await;
             close_dir_checked(d).await;
@@ -1552,12 +1574,11 @@ mod tests {
 
             let parent = open_parent().await;
             let writer = fasync::Task::spawn(async move {
-                let child_or = deprecated_open_dir(
+                let child_or = open_dir(
                     &parent,
-                    fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE
-                        | fio::OpenFlags::DIRECTORY,
                     CHILD,
+                    fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                    &Default::default(),
                 )
                 .await;
                 if let Err(e) = &child_or {
@@ -1571,12 +1592,11 @@ mod tests {
                 }
                 let child = child_or.unwrap();
                 let _: Vec<_> = child.query().await.expect("query failed");
-                match deprecated_open_file(
+                match open_file(
                     &child,
-                    fio::OpenFlags::CREATE
-                        | fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::NOT_DIRECTORY,
                     GRANDCHILD,
+                    fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+                    &Default::default(),
                 )
                 .await
                 {
@@ -1617,33 +1637,36 @@ mod tests {
         let root = fixture.root();
 
         let open_dir = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent = Arc::new(open_dir().await);
 
         let files = ["eenie", "meenie", "minie", "moe"];
         for file in &files {
-            let file = deprecated_open_file_checked(
+            let file = open_file_checked(
                 parent.as_ref(),
-                fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY,
                 file,
+                fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
             )
             .await;
             close_file_checked(file).await;
         }
         let dirs = ["fee", "fi", "fo", "fum"];
         for dir in &dirs {
-            let dir = deprecated_open_dir_checked(
+            let dir = open_dir_checked(
                 parent.as_ref(),
-                fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY,
                 dir,
+                fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
             .await;
             close_dir_checked(dir).await;
@@ -1699,22 +1722,24 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let parent = deprecated_open_dir_checked(
+        let parent = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
         let files = ["a", "b"];
         for file in &files {
-            let file = deprecated_open_file_checked(
+            let file = open_file_checked(
                 &parent,
-                fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY,
                 file,
+                fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
             )
             .await;
             close_file_checked(file).await;
@@ -1761,13 +1786,14 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
@@ -1783,10 +1809,11 @@ mod tests {
             .expect("FIDL call failed")
             .map_err(zx::ok)
             .expect("update_attributes failed");
-        let dir = deprecated_open_dir_checked(
+        let dir = open_dir_checked(
             parent.as_ref(),
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
             "fee",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
@@ -1802,10 +1829,11 @@ mod tests {
         .expect("Failed to make FIDL call")
         .expect("Failed to set xattr with create");
 
-        let subdir = deprecated_open_dir_checked(
+        let subdir = open_dir_checked(
             &dir,
-            fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY,
             "fo",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
         close_dir_checked(dir).await;
@@ -1815,10 +1843,11 @@ mod tests {
         let new_fixture = TestFixture::new_with_device(device).await;
         let root = new_fixture.root();
         let open_dir = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
@@ -1848,10 +1877,11 @@ mod tests {
         }
 
         let encrypted_dir = Arc::new(
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 parent.as_ref(),
-                fio::OpenFlags::DIRECTORY,
                 &encrypted_name,
+                fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
             .await,
         );
@@ -1885,13 +1915,14 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
@@ -1907,10 +1938,14 @@ mod tests {
             .expect("FIDL call failed")
             .map_err(zx::ok)
             .expect("update_attributes failed");
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             parent.as_ref(),
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::NOT_DIRECTORY,
             "fee",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -1936,10 +1971,11 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = new_fixture.crypt().unwrap();
         let root = new_fixture.root();
         let open_dir = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
@@ -1969,10 +2005,11 @@ mod tests {
         }
 
         let encrypted_file = Arc::new(
-            deprecated_open_file_checked(
+            open_file_checked(
                 parent.as_ref(),
-                fio::OpenFlags::NOT_DIRECTORY,
                 &encrypted_name,
+                fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
             )
             .await,
         );
@@ -1991,10 +2028,11 @@ mod tests {
         crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
 
         let file = Arc::new(
-            deprecated_open_file_checked(
+            open_file_checked(
                 parent.as_ref(),
-                fio::OpenFlags::NOT_DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
                 "fee",
+                fio::Flags::PROTOCOL_FILE | fio::PERM_READABLE,
+                &Default::default(),
             )
             .await,
         );
@@ -2011,13 +2049,14 @@ mod tests {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
         let open_dir = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
@@ -2042,13 +2081,14 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
@@ -2077,17 +2117,19 @@ mod tests {
             .expect("FIDL call failed")
             .map_err(zx::ok)
             .expect("update_attributes failed");
-        let dir = deprecated_open_dir_checked(
+        let dir = open_dir_checked(
             parent.as_ref(),
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
             "fee",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
-        let subdir = deprecated_open_dir_checked(
+        let subdir = open_dir_checked(
             &dir,
-            fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY,
             "fo",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
         close_dir_checked(dir).await;
@@ -2097,10 +2139,11 @@ mod tests {
         let new_fixture = TestFixture::new_with_device(device).await;
         let root = new_fixture.root();
         let open_dir = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
@@ -2139,10 +2182,11 @@ mod tests {
         }
 
         let encrypted_dir = Arc::new(
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 parent.as_ref(),
-                fio::OpenFlags::DIRECTORY,
                 &encrypted_name,
+                fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
             .await,
         );
@@ -2167,13 +2211,14 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
@@ -2193,10 +2238,11 @@ mod tests {
         // Need enough entries such that multiple read_dirents calls are required to drain all the
         // entries.
         for i in 0..300 {
-            let dir = deprecated_open_dir_checked(
+            let dir = open_dir_checked(
                 parent.as_ref(),
-                fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
                 &format!("plaintext_{}", i),
+                fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
             .await;
             close_dir_checked(dir).await;
@@ -2208,10 +2254,11 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = new_fixture.crypt().unwrap();
         let root = new_fixture.root();
         let open_dir = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
@@ -2257,13 +2304,14 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
@@ -2279,17 +2327,19 @@ mod tests {
             .expect("FIDL call failed")
             .map_err(zx::ok)
             .expect("update_attributes failed");
-        let dir = deprecated_open_dir_checked(
+        let dir = open_dir_checked(
             parent.as_ref(),
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
             "fee",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
-        let subdir = deprecated_open_dir_checked(
+        let subdir = open_dir_checked(
             &dir,
-            fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY,
             "fo",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
         close_dir_checked(dir).await;
@@ -2319,10 +2369,11 @@ mod tests {
         let new_fixture = TestFixture::new_with_device(device).await;
         let root = new_fixture.root();
         let open_dir = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
@@ -2340,10 +2391,11 @@ mod tests {
         }
 
         let encrypted_dir = Arc::new(
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 parent.as_ref(),
-                fio::OpenFlags::DIRECTORY,
                 &encrypted_name,
+                fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
             .await,
         );
@@ -2368,26 +2420,28 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir_1 = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
         let parent_1: Arc<fio::DirectoryProxy> = Arc::new(open_dir_1().await);
 
         let open_dir_2 = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo_2",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
@@ -2412,8 +2466,13 @@ mod tests {
             .expect("FIDL call failed")
             .map_err(zx::ok)
             .expect("update_attributes failed");
-        let file =
-            deprecated_open_file_checked(parent_1.as_ref(), fio::OpenFlags::CREATE, "fee").await;
+        let file = open_file_checked(
+            parent_1.as_ref(),
+            "fee",
+            fio::Flags::FLAG_MAYBE_CREATE,
+            &Default::default(),
+        )
+        .await;
 
         close_file_checked(file).await;
         close_dir_checked(Arc::try_unwrap(parent_1).unwrap()).await;
@@ -2423,23 +2482,21 @@ mod tests {
         let new_fixture = TestFixture::new_with_device(device).await;
         let root = new_fixture.root();
         let open_dir_1 = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent_1: Arc<fio::DirectoryProxy> = Arc::new(open_dir_1().await);
 
         let open_dir_2 = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo_2",
+                fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
@@ -2490,26 +2547,28 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir_1 = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
         let parent_1: Arc<fio::DirectoryProxy> = Arc::new(open_dir_1().await);
 
         let open_dir_2 = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo_2",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
@@ -2538,8 +2597,13 @@ mod tests {
             .expect("FIDL call failed")
             .map_err(zx::ok)
             .expect("update_attributes failed");
-        let file =
-            deprecated_open_file_checked(parent_1.as_ref(), fio::OpenFlags::CREATE, "fee").await;
+        let file = open_file_checked(
+            parent_1.as_ref(),
+            "fee",
+            fio::Flags::FLAG_MAYBE_CREATE,
+            &Default::default(),
+        )
+        .await;
 
         close_file_checked(file).await;
 
@@ -2564,26 +2628,28 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir_1 = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
         let parent_1: Arc<fio::DirectoryProxy> = Arc::new(open_dir_1().await);
 
         let open_dir_2 = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo_2",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
@@ -2601,8 +2667,13 @@ mod tests {
             .map_err(zx::ok)
             .expect("update_attributes failed");
 
-        let file =
-            deprecated_open_file_checked(parent_2.as_ref(), fio::OpenFlags::CREATE, "fee").await;
+        let file = open_file_checked(
+            parent_2.as_ref(),
+            "fee",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
+        )
+        .await;
 
         close_file_checked(file).await;
 
@@ -2627,26 +2698,28 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir_1 = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
         let parent_1: Arc<fio::DirectoryProxy> = Arc::new(open_dir_1().await);
 
         let open_dir_2 = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo_2",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
@@ -2662,10 +2735,14 @@ mod tests {
             .expect("FIDL call failed")
             .map_err(zx::ok)
             .expect("update_attributes failed");
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             parent_1.as_ref(),
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE,
             "fee",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         let _ = file
@@ -2683,23 +2760,21 @@ mod tests {
         let new_fixture = TestFixture::new_with_device(device).await;
         let root = new_fixture.root();
         let open_dir_1 = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent_1: Arc<fio::DirectoryProxy> = Arc::new(open_dir_1().await);
 
         let open_dir_2 = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo_2",
+                fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
@@ -2739,12 +2814,9 @@ mod tests {
             zx::Status::OK.into_raw()
         );
 
-        let file = deprecated_open_file_checked(
-            parent_2.as_ref(),
-            fio::OpenFlags::RIGHT_READABLE,
-            "file_2",
-        )
-        .await;
+        let file =
+            open_file_checked(parent_2.as_ref(), "file_2", fio::PERM_READABLE, &Default::default())
+                .await;
         let (mutable_attributes, _immutable_attributes) = file
             .get_attributes(
                 fio::NodeAttributesQuery::CONTENT_SIZE
@@ -2778,13 +2850,14 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
@@ -2804,10 +2877,11 @@ mod tests {
         for _ in 0..100 {
             let one_char = || CHARSET[rand::thread_rng().gen_range(0..CHARSET.len())] as char;
             let filename: String = std::iter::repeat_with(one_char).take(100).collect();
-            let dir = deprecated_open_dir_checked(
+            let dir = open_dir_checked(
                 parent.as_ref(),
-                fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
                 &filename,
+                fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
             .await;
             close_dir_checked(dir).await;
@@ -2830,10 +2904,11 @@ mod tests {
         let new_fixture = TestFixture::new_with_device(device).await;
         let root = new_fixture.root();
         let open_dir = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
@@ -2859,13 +2934,14 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent = Arc::new(open_dir().await);
@@ -2881,10 +2957,11 @@ mod tests {
             .map_err(zx::ok)
             .expect("update_attributes failed");
 
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             parent.as_ref(),
-            fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY,
             "file",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -2895,10 +2972,11 @@ mod tests {
         let new_fixture = TestFixture::new_with_device(device).await;
         let root = new_fixture.root();
         let open_dir = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
@@ -2919,10 +2997,11 @@ mod tests {
             }
         }
 
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             parent.as_ref(),
-            fio::OpenFlags::NOT_DIRECTORY,
             &encrypted_name,
+            fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         let (_mutable_attributes, _immutable_attributes) = file
@@ -2947,13 +3026,14 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
@@ -2969,10 +3049,11 @@ mod tests {
             .expect("FIDL call failed")
             .map_err(zx::ok)
             .expect("update_attributes failed");
-        let dir = deprecated_open_dir_checked(
+        let dir = open_dir_checked(
             parent.as_ref(),
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
             "fee",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
@@ -2982,12 +3063,11 @@ mod tests {
         let new_fixture = TestFixture::new_with_device(device).await;
         let root = new_fixture.root();
         let open_dir = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
@@ -3044,13 +3124,14 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
         let root = fixture.root();
         let open_dir = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
 
@@ -3066,10 +3147,11 @@ mod tests {
             .expect("FIDL call failed")
             .map_err(zx::ok)
             .expect("update_attributes failed");
-        let dir = deprecated_open_dir_checked(
+        let dir = open_dir_checked(
             parent.as_ref(),
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
             "fee",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
@@ -3080,12 +3162,11 @@ mod tests {
         let crypt: Arc<InsecureCrypt> = new_fixture.crypt().unwrap();
         let root = new_fixture.root();
         let open_dir = || {
-            deprecated_open_dir_checked(
+            open_dir_checked(
                 &root,
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
         };
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
@@ -3131,9 +3212,13 @@ mod tests {
             .expect("FIDL call failed")
             .expect("rename should fail on a locked directory");
 
-        let _dir =
-            deprecated_open_dir_checked(parent.as_ref(), fio::OpenFlags::DIRECTORY, "new_fee")
-                .await;
+        let _dir = open_dir_checked(
+            parent.as_ref(),
+            "new_fee",
+            fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
+        )
+        .await;
         close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
         new_fixture.close().await;
     }
@@ -3143,13 +3228,14 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let dir = deprecated_open_dir_checked(
+        let dir = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
@@ -3207,31 +3293,28 @@ mod tests {
                 .expect("create_symlink failed");
 
             let (proxy, server_end) = create_proxy::<fio::SymlinkMarker>();
-            root.deprecated_open(
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-                fio::ModeType::empty(),
+            root.open(
                 "symlink",
-                ServerEnd::new(server_end.into_channel()),
+                fio::PERM_READABLE | fio::Flags::FLAG_SEND_REPRESENTATION,
+                &Default::default(),
+                server_end.into_channel(),
             )
             .expect("open failed");
 
-            let on_open = proxy
+            let representation = proxy
                 .take_event_stream()
                 .next()
                 .await
-                .expect("missing OnOpen event")
-                .expect("failed to read event")
-                .into_on_open_();
+                .expect("missing Symlink event")
+                .expect("failed to read Symlink event")
+                .into_on_representation()
+                .expect("failed to decode OnRepresentation");
 
-            if let Some((0, Some(node_info))) = on_open {
-                assert_matches!(
-                    *node_info,
-                    fio::NodeInfoDeprecated::Symlink(fio::SymlinkObject { target, .. })
-                        if target == b"target"
-                );
-            } else {
-                panic!("Unexpected on_open {on_open:?}");
-            }
+            assert_matches!(representation,
+                fio::Representation::Symlink(fio::SymlinkInfo{
+                    target: Some(target), ..
+                }) if target == b"target"
+            );
 
             let (proxy, server_end) = create_proxy::<fio::SymlinkMarker>();
             root.create_symlink("symlink2", b"target2", Some(server_end))
@@ -3252,12 +3335,14 @@ mod tests {
                 .expect("unlink failed");
 
             // Rename over the first symlink.
-            deprecated_open_file_checked(
+            open_file_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE,
                 "target",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
             )
             .await;
             let (status, dst_token) = root.get_token().await.expect("FIDL call failed");
@@ -3288,31 +3373,32 @@ mod tests {
         {
             let root = fixture.root();
 
-            let inner = deprecated_open_dir_checked(
+            let inner = open_dir_checked(
                 root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "bar",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
             .await;
-            let inner2 = deprecated_open_dir_checked(
+            let inner2 = open_dir_checked(
                 &inner,
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 ".",
+                fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
             .await;
 
-            let file = deprecated_open_file_checked(
+            let file = open_file_checked(
                 &inner,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::NOT_DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
             )
             .await;
             assert_eq!(
@@ -3321,13 +3407,14 @@ mod tests {
             );
             close_file_checked(file).await;
 
-            let file = deprecated_open_file_checked(
+            let file = open_file_checked(
                 &inner,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::NOT_DIRECTORY,
                 "foo2",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
             )
             .await;
             assert_eq!(
@@ -3393,12 +3480,11 @@ mod tests {
 
         // Ensure that the file contents can be read back. If a race in object management happens
         // it may resurrect the object in the tree, but the extents will all still be missing.
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             fixture.root(),
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "baz",
+            fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         let buff = file.read(5).await.expect("FIDL failed").expect("Read failed");
@@ -3421,31 +3507,28 @@ mod tests {
 
             async fn open_symlink(root: &fio::DirectoryProxy, path: &str) -> fio::SymlinkProxy {
                 let (proxy, server_end) = create_proxy::<fio::SymlinkMarker>();
-                root.deprecated_open(
-                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-                    fio::ModeType::empty(),
+                root.open(
                     path,
-                    ServerEnd::new(server_end.into_channel()),
+                    fio::PERM_READABLE | fio::Flags::FLAG_SEND_REPRESENTATION,
+                    &Default::default(),
+                    server_end.into_channel(),
                 )
                 .expect("open failed");
 
-                let on_open = proxy
+                let representation = proxy
                     .take_event_stream()
                     .next()
                     .await
-                    .expect("missing OnOpen event")
-                    .expect("failed to read event")
-                    .into_on_open_();
+                    .expect("missing Symlink event")
+                    .expect("failed to read Symlink event")
+                    .into_on_representation()
+                    .expect("failed to decode OnRepresentation");
 
-                if let Some((0, Some(node_info))) = on_open {
-                    assert_matches!(
-                        *node_info,
-                        fio::NodeInfoDeprecated::Symlink(fio::SymlinkObject { target, .. })
-                            if target == b"target"
-                    );
-                } else {
-                    panic!("Unexpected on_open {on_open:?}");
-                }
+                assert_matches!(representation,
+                    fio::Representation::Symlink(fio::SymlinkInfo{
+                        target: Some(target), ..
+                    }) if target == b"target"
+                );
 
                 proxy
             }
@@ -3509,13 +3592,14 @@ mod tests {
         {
             let root = fixture.root();
 
-            let dir = deprecated_open_dir_checked(
+            let dir = open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "dir",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
             .await;
 
@@ -3550,13 +3634,14 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let file = deprecated_open_dir_checked(
+        let file = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
@@ -3646,13 +3731,14 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let dir = deprecated_open_dir_checked(
+        let dir = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
@@ -3715,13 +3801,14 @@ mod tests {
         let fixture = TestFixture::new().await;
         {
             let root = fixture.root();
-            let dir = deprecated_open_dir_checked(
+            let dir = open_dir_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY,
                 "foo",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_DIRECTORY,
+                Default::default(),
             )
             .await;
 
@@ -4045,13 +4132,14 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let dir = deprecated_open_dir_checked(
+        let dir = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
@@ -4263,10 +4351,11 @@ mod tests {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
 
-        let dir = deprecated_open_dir_checked(
+        let dir = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY,
             "foo",
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
@@ -4276,7 +4365,7 @@ mod tests {
             .expect("unlink failed");
 
         assert_eq!(
-            deprecated_open_dir(&root, fio::OpenFlags::DIRECTORY, "foo")
+            open_dir(&root, "foo", fio::Flags::PROTOCOL_DIRECTORY, &Default::default())
                 .await
                 .expect_err("Open succeeded")
                 .root_cause()
@@ -4285,7 +4374,7 @@ mod tests {
             &zx::Status::NOT_FOUND,
         );
 
-        deprecated_open_dir_checked(&dir, fio::OpenFlags::DIRECTORY, ".").await;
+        open_dir_checked(&dir, ".", fio::Flags::PROTOCOL_DIRECTORY, Default::default()).await;
 
         fixture.close().await;
     }
@@ -4297,10 +4386,11 @@ mod tests {
 
         const PATH: &str = "foo";
 
-        let dir = deprecated_open_dir_checked(
+        let dir = open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY,
             PATH,
+            fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_DIRECTORY,
+            Default::default(),
         )
         .await;
 
@@ -4312,9 +4402,9 @@ mod tests {
         assert_eq!(
             open_dir(
                 &root,
+                PATH,
                 fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_SEND_REPRESENTATION,
-                &fio::Options::default(),
-                PATH
+                &fio::Options::default()
             )
             .await
             .expect_err("Open succeeded unexpectedly")
@@ -4326,9 +4416,9 @@ mod tests {
 
         open_dir_checked(
             &dir,
-            fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_SEND_REPRESENTATION,
-            &fio::Options::default(),
             ".",
+            fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_SEND_REPRESENTATION,
+            fio::Options::default(),
         )
         .await;
 

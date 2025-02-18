@@ -463,7 +463,7 @@ impl BlockServer {
 
 #[cfg(test)]
 mod tests {
-    use crate::fuchsia::testing::{deprecated_open_file_checked, TestFixture};
+    use crate::fuchsia::testing::{open_file_checked, TestFixture};
     use block_client::{BlockClient, RemoteBlockClient, VmoId};
     use fidl::endpoints::{ClientEnd, ServerEnd};
     use fidl_fuchsia_hardware_block::BlockMarker;
@@ -476,6 +476,8 @@ mod tests {
 
     struct BlockConnector(fio::DirectoryProxy, &'static str);
 
+    // TODO(https://fxbug.dev/378924259): Migrate this to the new Open method, and convert this to
+    // fs_management::filesystem::DirBasedBlockConnector
     impl fs_management::filesystem::BlockConnector for BlockConnector {
         fn connect_volume(&self) -> Result<ClientEnd<VolumeMarker>, anyhow::Error> {
             let (client, server) = fidl::endpoints::create_endpoints::<VolumeMarker>();
@@ -498,13 +500,14 @@ mod tests {
         let fixture = TestFixture::new().await;
         let connector = {
             let root = fixture.root();
-            let file = deprecated_open_file_checked(
+            let file = open_file_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::NOT_DIRECTORY,
                 "block_device",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
             )
             .await;
             file.resize(2 * 1024 * 1024).await.expect("FIDL error").expect("resize error");
@@ -550,6 +553,7 @@ mod tests {
             },
             async {
                 let root = fixture.root();
+                // TODO(https://fxbug.dev/378924259): Migrate to new Open method.
                 root.deprecated_open(
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
@@ -584,6 +588,7 @@ mod tests {
             },
             async {
                 let root = fixture.root();
+                // TODO(https://fxbug.dev/378924259): Migrate to new Open method.
                 root.deprecated_open(
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
@@ -644,6 +649,7 @@ mod tests {
             },
             async {
                 let root = fixture.root();
+                // TODO(https://fxbug.dev/378924259): Migrate to new Open method.
                 root.deprecated_open(
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
@@ -674,6 +680,7 @@ mod tests {
             },
             async {
                 let root = fixture.root();
+                // TODO(https://fxbug.dev/378924259): Migrate to new Open method.
                 root.deprecated_open(
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
@@ -708,13 +715,14 @@ mod tests {
             },
             async {
                 let root = fixture.root();
-                let file = deprecated_open_file_checked(
+                let file = open_file_checked(
                     &root,
-                    fio::OpenFlags::CREATE
-                        | fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE
-                        | fio::OpenFlags::NOT_DIRECTORY,
                     "block_device",
+                    fio::Flags::FLAG_MAYBE_CREATE
+                        | fio::PERM_READABLE
+                        | fio::PERM_WRITABLE
+                        | fio::Flags::PROTOCOL_FILE,
+                    &Default::default(),
                 )
                 .await;
                 let () = file
@@ -730,6 +738,7 @@ mod tests {
                     .map_err(zx::Status::from_raw)
                     .expect("close error");
 
+                // TODO(https://fxbug.dev/378924259): Migrate to new Open method.
                 root.deprecated_open(
                     fio::OpenFlags::RIGHT_READABLE
                         | fio::OpenFlags::RIGHT_WRITABLE
@@ -749,13 +758,14 @@ mod tests {
         let fixture = TestFixture::new().await;
         let connector = {
             let root = fixture.root();
-            let file = deprecated_open_file_checked(
+            let file = open_file_checked(
                 &root,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::NOT_DIRECTORY,
                 "block_device",
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
             )
             .await;
             file.resize(5 * 1024 * 1024).await.expect("FIDL error").expect("resize error");

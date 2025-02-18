@@ -639,14 +639,12 @@ mod tests {
     use crate::fuchsia::fxblob::BlobDirectory;
     use crate::fuchsia::node::FxNode;
     use crate::fuchsia::pager::PagerBacked;
-    use crate::fuchsia::testing::{deprecated_open_file_checked, TestFixture, TestFixtureOptions};
+    use crate::fuchsia::testing::{open_file_checked, TestFixture, TestFixtureOptions};
     use crate::fuchsia::volume::FxVolume;
     use anyhow::Error;
     use async_trait::async_trait;
     use delivery_blob::CompressionMode;
     use event_listener::{Event, EventListener};
-    use fidl_fuchsia_io::OpenFlags;
-    use fuchsia_async as fasync;
     use fuchsia_hash::Hash;
     use fxfs::object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle};
     use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
@@ -657,6 +655,7 @@ mod tests {
     use std::time::Duration;
     use storage_device::buffer::{BufferRef, MutableBufferRef};
     use storage_device::buffer_allocator::{BufferAllocator, BufferFuture, BufferSource};
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     struct FakeReaderWriterInner {
         data: Vec<u8>,
@@ -749,10 +748,11 @@ mod tests {
             .expect("Creating new_file")
             .object_id();
         transaction.commit().await.unwrap();
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             fixture.root(),
-            OpenFlags::RIGHT_WRITABLE | OpenFlags::RIGHT_READABLE | OpenFlags::NOT_DIRECTORY,
             name,
+            fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         file.write(data).await.unwrap().expect("Writing file");

@@ -1182,13 +1182,12 @@ mod tests {
     use crate::fuchsia::node::FxNode;
     use crate::fuchsia::pager::{default_page_in, PageInRange, PagerPacketReceiverRegistration};
     use crate::fuchsia::testing::{
-        close_dir_checked, close_file_checked, deprecated_open_file_checked, TestFixture,
-        TestFixtureOptions,
+        close_dir_checked, close_file_checked, open_file_checked, TestFixture, TestFixtureOptions,
     };
     use crate::fuchsia::volume::FxVolumeAndRoot;
     use anyhow::bail;
     use assert_matches::assert_matches;
-    use fidl::endpoints::{create_proxy, ServerEnd};
+    use fidl::endpoints::create_proxy;
     use fuchsia_fs::file;
     use futures::channel::mpsc::{unbounded, UnboundedSender};
     use futures::{join, StreamExt};
@@ -1296,14 +1295,18 @@ mod tests {
 
     fn open_volume(volume: &FxVolumeAndRoot) -> fio::DirectoryProxy {
         let (root, server_end) = create_proxy::<fio::DirectoryMarker>();
-        volume.root().clone().as_directory().open(
-            volume.volume().scope().clone(),
-            fio::OpenFlags::DIRECTORY
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE,
-            Path::dot(),
-            ServerEnd::new(server_end.into_channel()),
-        );
+        let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE;
+        volume
+            .root()
+            .clone()
+            .as_directory()
+            .open3(
+                volume.volume().scope().clone(),
+                Path::dot(),
+                flags,
+                &mut vfs::ObjectRequest::new(flags, &Default::default(), server_end.into_channel()),
+            )
+            .expect("failed to open volume directory");
         root
     }
 
@@ -1320,13 +1323,14 @@ mod tests {
         .await;
         let root = open_volume(&volume);
 
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         let info = file.describe().await.unwrap();
@@ -1370,10 +1374,14 @@ mod tests {
         .await;
         let root = open_volume(&volume);
 
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -1415,13 +1423,14 @@ mod tests {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         let info = file.describe().await.expect("describe failed");
@@ -1487,13 +1496,14 @@ mod tests {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -1531,13 +1541,14 @@ mod tests {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -1575,10 +1586,14 @@ mod tests {
         .await;
         let root = open_volume(&volume);
 
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         file::write(&file, [1, 2, 3, 4]).await.unwrap();
@@ -1614,13 +1629,14 @@ mod tests {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         let info = file.describe().await.unwrap();
@@ -1790,10 +1806,14 @@ mod tests {
         .await;
         let root = open_volume(&volume);
 
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         let initial_file_size = zx::system_get_page_size() as usize * 10;
@@ -1838,10 +1858,14 @@ mod tests {
         .await;
         let root = open_volume(&volume);
 
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         let page_size = zx::system_get_page_size() as u64;
@@ -1888,20 +1912,25 @@ mod tests {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         let page_size = zx::system_get_page_size() as u64;
         file.resize(page_size).await.unwrap().map_err(zx::ok).unwrap();
         close_file_checked(file).await;
 
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::PERM_READABLE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         let attrs = get_attrs_checked(&file).await;
@@ -1916,13 +1945,14 @@ mod tests {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -2007,21 +2037,21 @@ mod tests {
         let fixture = TestFixture::new_unencrypted().await;
         for i in 1..100 {
             let file_name = format!("file {}", i);
-            let file1 = deprecated_open_file_checked(
+            let file1 = open_file_checked(
                 fixture.root(),
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::NOT_DIRECTORY,
                 &file_name,
+                fio::Flags::FLAG_MAYBE_CREATE
+                    | fio::PERM_READABLE
+                    | fio::PERM_WRITABLE
+                    | fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
             )
             .await;
-            let file2 = deprecated_open_file_checked(
+            let file2 = open_file_checked(
                 fixture.root(),
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::NOT_DIRECTORY,
                 &file_name,
+                fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_FILE,
+                &Default::default(),
             )
             .await;
             join!(
@@ -2083,13 +2113,14 @@ mod tests {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -2138,13 +2169,14 @@ mod tests {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -2395,13 +2427,14 @@ mod tests {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -2445,13 +2478,14 @@ mod tests {
     async fn test_file_allocate() {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -2473,13 +2507,14 @@ mod tests {
     async fn test_file_allocate_empty() {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -2521,13 +2556,14 @@ mod tests {
     async fn test_file_allocate_write() {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -2549,13 +2585,14 @@ mod tests {
     async fn test_file_allocate_write_mixed() {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -2582,13 +2619,14 @@ mod tests {
     async fn test_file_allocate_write_disk_full() {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -2644,13 +2682,14 @@ mod tests {
             let root = fixture.root();
 
             {
-                let file = deprecated_open_file_checked(
+                let file = open_file_checked(
                     &root,
-                    fio::OpenFlags::CREATE
-                        | fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE
-                        | fio::OpenFlags::NOT_DIRECTORY,
                     FILE_NAME,
+                    fio::Flags::FLAG_MAYBE_CREATE
+                        | fio::PERM_READABLE
+                        | fio::PERM_WRITABLE
+                        | fio::Flags::PROTOCOL_FILE,
+                    &Default::default(),
                 )
                 .await;
                 file.allocate(0, page_size * 4, fio::AllocateMode::empty())
@@ -2676,13 +2715,14 @@ mod tests {
         .await;
         let root = fixture.root();
 
-        let filler_file = deprecated_open_file_checked(
+        let filler_file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             "filler",
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
         loop {
@@ -2695,12 +2735,11 @@ mod tests {
             }
         }
 
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -2750,13 +2789,14 @@ mod tests {
     async fn test_file_allocate_write_restart() {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -2838,12 +2878,11 @@ mod tests {
 
         let fixture = TestFixture::new_with_device(device).await;
         let root = fixture.root();
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -2883,13 +2922,14 @@ mod tests {
     async fn test_truncate_allocated_file() {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -2938,13 +2978,14 @@ mod tests {
     async fn test_allocate_unaligned() {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -2987,13 +3028,14 @@ mod tests {
         // is updated, any data between the old and new size is properly zeroed.
         let fixture = TestFixture::new().await;
         let root = fixture.root();
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -3046,13 +3088,14 @@ mod tests {
     async fn test_truncate_allocated_file_unaligned() {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -3101,13 +3144,14 @@ mod tests {
     async fn test_complete_truncate_allocated_file() {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -3156,13 +3200,14 @@ mod tests {
     async fn test_allocate_truncate_allocate() {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -3189,13 +3234,14 @@ mod tests {
     async fn test_allocate_existing_data_no_sync() {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -3240,13 +3286,14 @@ mod tests {
     async fn test_write_to_previously_allocated_range_between_flushes() {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 
@@ -3272,13 +3319,14 @@ mod tests {
     async fn test_truncate_then_allocate_between_syncs() {
         let fixture = TestFixture::new().await;
         let root = fixture.root();
-        let file = deprecated_open_file_checked(
+        let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
             FILE_NAME,
+            fio::Flags::FLAG_MAYBE_CREATE
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::Flags::PROTOCOL_FILE,
+            &Default::default(),
         )
         .await;
 

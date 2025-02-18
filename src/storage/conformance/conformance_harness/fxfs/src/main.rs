@@ -11,15 +11,14 @@ use fidl_fuchsia_io_test::{
 };
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
-use fxfs_testing::{deprecated_open_dir, deprecated_open_file, TestFixture};
+use fxfs_testing::{open_dir, open_file, TestFixture};
 use log::error;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 struct Harness(TestHarnessRequestStream);
 
-const FLAGS: fio::OpenFlags = fio::OpenFlags::CREATE
-    .union(fio::OpenFlags::RIGHT_READABLE)
-    .union(fio::OpenFlags::RIGHT_WRITABLE);
+const FLAGS: fio::Flags =
+    fio::Flags::FLAG_MAYBE_CREATE.union(fio::PERM_READABLE).union(fio::PERM_WRITABLE);
 
 async fn add_entries(
     dest: fio::DirectoryProxy,
@@ -32,14 +31,18 @@ async fn add_entries(
                 io_test::DirectoryEntry::Directory(io_test::Directory {
                     name, entries, ..
                 }) => {
-                    let new_dir =
-                        deprecated_open_dir(&dest, FLAGS | fio::OpenFlags::DIRECTORY, &name)
-                            .await
-                            .context(format!("failed to create directory {name}"))?;
+                    let new_dir = open_dir(
+                        &dest,
+                        &name,
+                        FLAGS | fio::Flags::PROTOCOL_DIRECTORY,
+                        &Default::default(),
+                    )
+                    .await
+                    .context(format!("failed to create directory {name}"))?;
                     queue.push((new_dir, entries));
                 }
                 io_test::DirectoryEntry::File(io_test::File { name, contents, .. }) => {
-                    let file = deprecated_open_file(&dest, FLAGS, &name)
+                    let file = open_file(&dest, &name, FLAGS, &Default::default())
                         .await
                         .context(format!("failed to create file {name}"))?;
                     if !contents.is_empty() {
@@ -97,10 +100,11 @@ async fn run(mut stream: TestHarnessRequestStream, fixture: &TestFixture) -> Res
                 control_handle: _,
             } => {
                 let counter = COUNTER.fetch_add(1, Ordering::SeqCst);
-                let dir = deprecated_open_dir(
+                let dir = open_dir(
                     fixture.root(),
-                    FLAGS | fio::OpenFlags::DIRECTORY,
                     &format!("test.{}", counter),
+                    FLAGS | fio::Flags::PROTOCOL_DIRECTORY,
+                    &Default::default(),
                 )
                 .await
                 .unwrap();

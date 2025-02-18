@@ -192,12 +192,13 @@ async fn main() -> Result<(), Error> {
         .context("create and mount volume failed on vol")?;
     let (root, server_end) = create_proxy::<fio::DirectoryMarker>();
 
-    vol.root_dir().as_directory().open(
+    let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE;
+    vol.root_dir().as_directory().open3(
         vol.volume().scope().clone(),
-        fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
         Path::dot(),
-        ServerEnd::new(server_end.into_channel()),
-    );
+        flags,
+        &mut vfs::ObjectRequest::new(flags, &Default::default(), server_end.into_channel()),
+    )?;
 
     let mut fs = ServiceFs::new();
     fs.add_remote("data", root);
