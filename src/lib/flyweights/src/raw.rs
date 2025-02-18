@@ -75,11 +75,15 @@ impl Payload {
         unsafe { NonNull::new_unchecked(payload.cast::<Payload>()) }
     }
 
+    /// Deallocates the payload.
+    ///
     /// # Safety
     ///
-    /// `header` must be to the header of an allocated `Payload`.
+    /// `ptr` must be to a `Payload` returned from `Payload::alloc`.
     #[inline]
-    unsafe fn dealloc(header: *mut Header) {
+    pub unsafe fn dealloc(ptr: *mut Self) {
+        // SAFETY: The caller guaranteed that `ptr` is to a `Payload` returned from `Payload::alloc`.
+        let header = unsafe { Self::header(ptr) };
         // SAFETY: `header` points to a `Header` which is valid for reads.
         let len = unsafe { (*header).len };
         let layout = Self::layout(len);
@@ -110,7 +114,7 @@ impl Payload {
     ///
     /// `ptr` must be to a `Payload` returned from `Payload::alloc`.
     #[inline]
-    pub unsafe fn inc_ref(ptr: *mut Self) {
+    pub unsafe fn inc_ref(ptr: *mut Self) -> usize {
         // SAFETY: The caller guaranteed that `ptr` is to a `Payload` returned from `Payload::alloc`.
         let header = unsafe { Self::header(ptr) };
         // SAFETY: `header` points to a `Header` which is valid for reads and writes. Relaxed
@@ -120,11 +124,13 @@ impl Payload {
         if prev_count > MAX_REFCOUNT {
             std::process::abort();
         }
+        prev_count
     }
 
     /// Decrements the refcount of a `Payload` by one, returning the refcount prior to decrementing.
     ///
-    /// If this decrements the refcount to zero, the payload will be deallocated.
+    /// Decrementing the refcount to zero does not deallocate the payload. Deallocating the payload
+    /// must be done manually.
     ///
     /// # Safety
     ///
@@ -137,17 +143,7 @@ impl Payload {
         // ordering is sufficient here because the contained value is immutable and can't be
         // modified after creation. We also don't have to drop any data, which isn't a necessary
         // requirement but does provide an additional security.
-        let prev_count = unsafe { (*header).ref_count.fetch_sub(1, Ordering::Relaxed) };
-
-        if prev_count == 1 {
-            // SAFETY: `header` points to the header of `ptr`, which the caller guaranteed to be
-            // allocated.
-            unsafe {
-                Self::dealloc(header);
-            }
-        }
-
-        prev_count
+        unsafe { (*header).ref_count.fetch_sub(1, Ordering::Relaxed) }
     }
 
     /// # Safety

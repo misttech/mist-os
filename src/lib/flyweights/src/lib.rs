@@ -55,7 +55,7 @@ impl Hash for Storage {
 
 impl Storage {
     #[inline]
-    fn inc_ref(&self) {
+    fn inc_ref(&self) -> usize {
         // SAFETY: `Storage` always points to a valid `Payload`.
         unsafe { raw::Payload::inc_ref(self.0.as_ptr()) }
     }
@@ -767,18 +767,21 @@ impl RawRepr {
 
     #[inline]
     fn from_storage(storage: &Storage) -> Self {
-        storage.inc_ref();
+        if storage.inc_ref() == 0 {
+            // Another thread is trying to lock the cache and free this string. They already
+            // released their refcount, so give it back to them. This will prevent this thread
+            // and other threads from attempting to free the string if they drop the refcount back
+            // down.
+            storage.inc_ref();
+        }
         Self { heap: storage.0 }
     }
 
     #[inline]
     fn new_for_storage(cache: &mut AHashSet<Storage>, bytes: &[u8]) -> Self {
         assert!(bytes.len() > MAX_INLINE_SIZE);
+        // `Payload::alloc` starts the refcount at 1.
         let new_storage = raw::Payload::alloc(bytes);
-        // SAFETY: We just allocated `new_storage`, so it's guaranteed to be valid.
-        unsafe {
-            raw::Payload::inc_ref(new_storage.as_ptr());
-        }
 
         let for_cache = Storage(new_storage);
         let new = Self { heap: new_storage };
@@ -856,22 +859,68 @@ impl Clone for RawRepr {
 impl Drop for RawRepr {
     fn drop(&mut self) {
         if !self.is_inline() {
-            // Lock the cache before checking the count to ensure consistency.
-            let mut cache = CACHE.lock().unwrap();
-
             // SAFETY: We checked above that this is the heap repr.
             let heap = unsafe { self.heap };
+
+            // Decrementing the refcount before locking the cache causes the following failure mode:
+            //
+            // 1. We drop the refcount to 0.
+            // 2. Another thread finds the string we're about to drop and increments the refcount
+            //    back up to 1.
+            // 3. That thread drops its refcount, and also sees the refcount drop to 0.
+            // 4. That thread locks the cache, removes the value, and drops the payload. This leaves
+            //    us with a dangling pointer to the dropped payload.
+            // 5. We lock the cache and go to look up our value in the cache. Our payload pointer is
+            //    dangling now, but we don't know that. If we try to read through our dangling
+            //    pointer, we cause UB.
+            //
+            // To account for this failure mode and still optimistically drop our refcount, we
+            // modify the procedure slightly:
+            //
+            // 1. We drop the refcount to 0.
+            // 2. Another thread finds the string we're about to drop and increments the refcount
+            //    back up to 1. It notices that the refcount incremented from 0 to 1, and so knows
+            //    that our thread will try to drop it. While still holding the cache lock, that
+            //    thread increments the refcount again from 1 to 2. This "gives back" the refcount
+            //    to our thread.
+            // 3. That thread drops its refcount, and sees the refcount drop to 1. It won't try to
+            //    drop the payload this time.
+            // 4. We lock the cache, and decrement the refcount a second time. If it decremented
+            //    from 0 or 1, then we know that no other threads are currently holding references
+            //    to it and we can safely drop it ourselves.
 
             // SAFETY: The payload is live.
             let prev_refcount = unsafe { raw::Payload::dec_ref(heap.as_ptr()) };
 
-            // Check whether we're the last reference outside the cache, if so remove from cache.
-            if prev_refcount == 2 {
-                let bytes = unsafe { &*raw::Payload::bytes(heap.as_ptr()) };
-                assert!(cache.remove(bytes), "cache must have a reference if refcount is 2");
+            // If we held the final refcount outside of the cache, try to remove the string.
+            if prev_refcount == 1 {
+                let mut cache = CACHE.lock().unwrap();
 
-                // SAFETY: The payload is live.
-                unsafe { raw::Payload::dec_ref(heap.as_ptr()) };
+                let current_refcount = unsafe { raw::Payload::dec_ref(heap.as_ptr()) };
+                if current_refcount <= 1 {
+                    // If the refcount was still 0 after acquiring the cache lock, no other thread
+                    // looked up this payload between optimistically decrementing the refcount and
+                    // now. If the refcount was 1, then another thread did, but dropped its refcount
+                    // before we got the cache lock. Either way, we can safely remove the string
+                    // from the cache and free it.
+
+                    let bytes = unsafe { &*raw::Payload::bytes(heap.as_ptr()) };
+                    assert!(
+                        cache.remove(bytes),
+                        "cache did not contain bytes, but this thread didn't remove them yet",
+                    );
+
+                    // Get out of the critical section as soon as possible
+                    drop(cache);
+
+                    // SAFETY: The payload is live.
+                    unsafe { raw::Payload::dealloc(heap.as_ptr()) };
+                } else {
+                    // Another thread looked up this payload, made a reference to it, and gave our
+                    // refcount back to us for a minmium refcount of 2. We re-removed our refcount,
+                    // giving a minimum of one. This means it's no longer our responsibility to
+                    // deallocate the string, so we ended up needlessly locking the cache.
+                }
             }
         }
     }
@@ -1098,15 +1147,15 @@ mod tests {
 
         let original = FlyStr::new(contents);
         assert_eq!(num_strings_in_global_cache(), 1, "only one string allocated");
-        assert_eq!(original.0.refcount(), Some(2), "one copy on stack, one in cache");
+        assert_eq!(original.0.refcount(), Some(1), "one copy on stack");
 
         let cloned = original.clone();
         assert_eq!(num_strings_in_global_cache(), 1, "cloning just incremented refcount");
-        assert_eq!(cloned.0.refcount(), Some(3), "two copies on stack, one in cache");
+        assert_eq!(cloned.0.refcount(), Some(2), "two copies on stack");
 
         let deduped = FlyStr::new(contents);
         assert_eq!(num_strings_in_global_cache(), 1, "new string was deduped");
-        assert_eq!(deduped.0.refcount(), Some(4), "three copies on stack, one in cache");
+        assert_eq!(deduped.0.refcount(), Some(3), "three copies on stack");
     }
 
     #[test_case(MIN_LEN_LONG_STRING ; "barely long strings")]
@@ -1119,15 +1168,15 @@ mod tests {
 
         let original = FlyByteStr::new(contents);
         assert_eq!(num_strings_in_global_cache(), 1, "only one string allocated");
-        assert_eq!(original.0.refcount(), Some(2), "one copy on stack, one in cache");
+        assert_eq!(original.0.refcount(), Some(1), "one copy on stack");
 
         let cloned = original.clone();
         assert_eq!(num_strings_in_global_cache(), 1, "cloning just incremented refcount");
-        assert_eq!(cloned.0.refcount(), Some(3), "two copies on stack, one in cache");
+        assert_eq!(cloned.0.refcount(), Some(2), "two copies on stack");
 
         let deduped = FlyByteStr::new(contents);
         assert_eq!(num_strings_in_global_cache(), 1, "new string was deduped");
-        assert_eq!(deduped.0.refcount(), Some(4), "three copies on stack, one in cache");
+        assert_eq!(deduped.0.refcount(), Some(3), "three copies on stack");
     }
 
     #[test]
