@@ -164,10 +164,10 @@ impl Procedure for DtmfProcedure {
                         let response = Box::new(Into::into);
                         SlcRequest::SendDtmf { code, response }.into()
                     }
-                    Err(()) => ProcedureRequest::Error(ProcedureError::InvalidHfArgument(update)),
+                    Err(()) => ProcedureError::InvalidHfArgument(update).into(),
                 }
             }
-            _ => ProcedureRequest::Error(ProcedureError::UnexpectedHf(update)),
+            _ => ProcedureError::UnexpectedHf(update).into(),
         }
     }
 
@@ -177,7 +177,7 @@ impl Procedure for DtmfProcedure {
                 self.state.transition();
                 update.into()
             }
-            (_, update) => ProcedureRequest::Error(ProcedureError::UnexpectedAg(update)),
+            (_, update) => ProcedureError::UnexpectedAg(update).into(),
         }
     }
 
@@ -201,17 +201,17 @@ mod tests {
     fn procedure_handles_invalid_messages() {
         let mut proc = DtmfProcedure::new();
         let req = proc.hf_update(at::Command::CindRead {}, &mut SlcState::default());
-        assert_matches!(req, ProcedureRequest::Error(ProcedureError::UnexpectedHf(_)));
+        assert_matches!(req, ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedHf(_)));
 
         let req = proc.ag_update(AgUpdate::ThreeWaySupport, &mut SlcState::default());
-        assert_matches!(req, ProcedureRequest::Error(ProcedureError::UnexpectedAg(_)));
+        assert_matches!(req, ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedAg(_)));
     }
 
     #[test]
     fn procedure_with_invalid_dtmf_code() {
         let mut proc = DtmfProcedure::new();
         let req = proc.hf_update(at::Command::Vts { code: "foo".into() }, &mut SlcState::default());
-        assert_matches!(req, ProcedureRequest::Error(ProcedureError::InvalidHfArgument(_)));
+        assert_matches!(req, ProcedureRequest::Error(err) if matches!(*err, ProcedureError::InvalidHfArgument(_)));
     }
 
     #[test]

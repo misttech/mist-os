@@ -42,7 +42,7 @@ impl Procedure for CallWaitingNotificationsProcedure {
                 state.call_waiting_notifications = enable;
                 AgUpdate::Ok.into()
             }
-            (_, update) => ProcedureRequest::Error(ProcedureError::UnexpectedHf(update)),
+            (_, update) => ProcedureError::UnexpectedHf(update).into(),
         }
     }
 
@@ -57,7 +57,7 @@ impl Procedure for CallWaitingNotificationsProcedure {
                     ProcedureRequest::None
                 }
             }
-            (_, update) => ProcedureRequest::Error(ProcedureError::UnexpectedAg(update)),
+            (_, update) => ProcedureError::UnexpectedAg(update).into(),
         }
     }
 
@@ -81,10 +81,10 @@ mod tests {
     fn procedure_handles_invalid_messages() {
         let mut proc = CallWaitingNotificationsProcedure::new();
         let req = proc.hf_update(at::Command::CopsRead {}, &mut SlcState::default());
-        assert_matches!(req, ProcedureRequest::Error(ProcedureError::UnexpectedHf(_)));
+        assert_matches!(req, ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedHf(_)));
 
         let req = proc.ag_update(AgUpdate::ThreeWaySupport, &mut SlcState::default());
-        assert_matches!(req, ProcedureRequest::Error(ProcedureError::UnexpectedAg(_)));
+        assert_matches!(req, ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedAg(_)));
     }
 
     #[test]

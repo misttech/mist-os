@@ -75,7 +75,7 @@ impl Procedure for VolumeSynchronizationProcedure {
                         response: Box::new(|| AgUpdate::Ok),
                     }
                     .into(),
-                    Err(_) => ProcedureRequest::Error(ProcedureError::InvalidHfArgument(update)),
+                    Err(_) => ProcedureError::InvalidHfArgument(update).into(),
                 }
             }
             (State::Start, at::Command::Vgm { level }) => {
@@ -86,10 +86,10 @@ impl Procedure for VolumeSynchronizationProcedure {
                         response: Box::new(|| AgUpdate::Ok),
                     }
                     .into(),
-                    Err(_) => ProcedureRequest::Error(ProcedureError::InvalidHfArgument(update)),
+                    Err(_) => ProcedureError::InvalidHfArgument(update).into(),
                 }
             }
-            _ => ProcedureRequest::Error(ProcedureError::UnexpectedHf(update)),
+            _ => ProcedureError::UnexpectedHf(update).into(),
         }
     }
 
@@ -99,7 +99,7 @@ impl Procedure for VolumeSynchronizationProcedure {
                 self.state.transition();
                 update.into()
             }
-            (_, update) => ProcedureRequest::Error(ProcedureError::UnexpectedAg(update)),
+            (_, update) => ProcedureError::UnexpectedAg(update).into(),
         }
     }
 
@@ -123,21 +123,21 @@ mod tests {
     fn procedure_handles_invalid_messages() {
         let mut proc = VolumeSynchronizationProcedure::new();
         let req = proc.hf_update(at::Command::CindRead {}, &mut SlcState::default());
-        assert_matches!(req, ProcedureRequest::Error(ProcedureError::UnexpectedHf(_)));
+        assert_matches!(req, ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedHf(_)));
 
         let req = proc.ag_update(AgUpdate::ThreeWaySupport, &mut SlcState::default());
-        assert_matches!(req, ProcedureRequest::Error(ProcedureError::UnexpectedAg(_)));
+        assert_matches!(req, ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedAg(_)));
     }
 
     #[test]
     fn procedure_handles_invalid_level_values() {
         let mut proc = VolumeSynchronizationProcedure::new();
         let req = proc.hf_update(at::Command::Vgs { level: 16 }, &mut SlcState::default());
-        assert_matches!(req, ProcedureRequest::Error(ProcedureError::InvalidHfArgument(_)));
+        assert_matches!(req, ProcedureRequest::Error(err) if matches!(*err, ProcedureError::InvalidHfArgument(_)));
 
         let mut proc = VolumeSynchronizationProcedure::new();
         let req = proc.hf_update(at::Command::Vgm { level: 16 }, &mut SlcState::default());
-        assert_matches!(req, ProcedureRequest::Error(ProcedureError::InvalidHfArgument(_)));
+        assert_matches!(req, ProcedureRequest::Error(err) if matches!(*err, ProcedureError::InvalidHfArgument(_)));
     }
 
     #[test]

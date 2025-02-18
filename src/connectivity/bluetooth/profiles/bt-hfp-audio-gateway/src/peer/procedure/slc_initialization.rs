@@ -82,7 +82,7 @@ impl Procedure for SlcInitProcedure {
 
     fn hf_update(&mut self, update: at::Command, state: &mut SlcState) -> ProcedureRequest {
         if self.is_terminated() {
-            return ProcedureRequest::Error(Error::AlreadyTerminated);
+            return Error::AlreadyTerminated.into();
         }
         self.state = self.state.hf_update(update, state);
         self.state.request()
@@ -90,7 +90,7 @@ impl Procedure for SlcInitProcedure {
 
     fn ag_update(&mut self, update: AgUpdate, state: &mut SlcState) -> ProcedureRequest {
         if self.is_terminated() {
-            return ProcedureRequest::Error(Error::AlreadyTerminated);
+            return Error::AlreadyTerminated.into();
         }
 
         self.state = self.state.ag_update(update, state);
@@ -456,7 +456,7 @@ impl SlcErrorState {
 
 impl SlcProcedureState for SlcErrorState {
     fn request(&self) -> ProcedureRequest {
-        ProcedureRequest::Error(self.error.clone())
+        self.error.clone().into()
     }
 
     fn is_terminal(&self) -> bool {
@@ -555,7 +555,7 @@ mod tests {
         let invalid_enable = at::Command::Cmer { mode: 4, keyp: 0, disp: 0, ind: 1 };
         assert_matches!(
             procedure.hf_update(invalid_enable, &mut state),
-            ProcedureRequest::Error(Error::InvalidHfArgument(_))
+            ProcedureRequest::Error(err) if matches!(*err, Error::InvalidHfArgument(_))
         );
     }
 
@@ -578,7 +578,7 @@ mod tests {
         };
         assert_matches!(
             procedure.hf_update(invalid_enable, &mut state),
-            ProcedureRequest::Error(Error::InvalidHfArgument(_))
+            ProcedureRequest::Error(err) if matches!(*err, Error::InvalidHfArgument(_))
         );
     }
 

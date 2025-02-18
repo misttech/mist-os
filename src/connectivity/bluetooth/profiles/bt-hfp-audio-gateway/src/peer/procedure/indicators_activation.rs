@@ -49,7 +49,7 @@ impl Procedure for IndicatorsActivationProcedure {
                     AgUpdate::Error.into()
                 }
             }
-            (_, update) => ProcedureRequest::Error(ProcedureError::UnexpectedHf(update)),
+            (_, update) => ProcedureError::UnexpectedHf(update).into(),
         }
     }
 
@@ -77,7 +77,7 @@ mod tests {
         let random_hf = at::Command::CindRead {};
         assert_matches!(
             procedure.hf_update(random_hf, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedHf(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedHf(_))
         );
     }
 
@@ -89,7 +89,7 @@ mod tests {
         let random_ag = AgUpdate::ThreeWaySupport;
         assert_matches!(
             procedure.ag_update(random_ag, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedAg(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedAg(_))
         );
     }
 
@@ -116,7 +116,7 @@ mod tests {
         // Trying to send a request after procedure is terminated will fail.
         assert_matches!(
             procedure.hf_update(update, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedHf(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedHf(_))
         );
     }
 }

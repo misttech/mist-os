@@ -66,10 +66,10 @@ impl Procedure for InitiateCallProcedure {
                 });
                 match update_to_information_request(update, response) {
                     Ok(information_request) => ProcedureRequest::Request(information_request),
-                    Err(update) => ProcedureRequest::Error(ProcedureError::UnexpectedHf(update)),
+                    Err(update) => ProcedureError::UnexpectedHf(update).into(),
                 }
             }
-            (_, update) => ProcedureRequest::Error(ProcedureError::UnexpectedHf(update)),
+            (_, update) => ProcedureError::UnexpectedHf(update).into(),
         }
     }
 
@@ -80,7 +80,7 @@ impl Procedure for InitiateCallProcedure {
                 self.state.transition();
                 update.into()
             }
-            (_, update) => ProcedureRequest::Error(ProcedureError::UnexpectedAg(update)),
+            (_, update) => ProcedureError::UnexpectedAg(update).into(),
         }
     }
 
@@ -144,7 +144,7 @@ mod tests {
         let random_hf = at::Command::CindRead {};
         assert_matches!(
             proc.hf_update(random_hf, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedHf(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedHf(_))
         );
     }
 
@@ -156,7 +156,7 @@ mod tests {
         let random_ag = AgUpdate::ThreeWaySupport;
         assert_matches!(
             proc.ag_update(random_ag, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedAg(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedAg(_))
         );
     }
 
@@ -185,11 +185,11 @@ mod tests {
         assert!(proc.is_terminated());
         assert_matches!(
             proc.hf_update(at::Command::AtdNumber { number }, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedHf(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedHf(_))
         );
         assert_matches!(
             proc.ag_update(AgUpdate::Ok, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedAg(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedAg(_))
         );
     }
 
@@ -218,11 +218,11 @@ mod tests {
         assert!(proc.is_terminated());
         assert_matches!(
             proc.hf_update(at::Command::AtdMemory { location }, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedHf(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedHf(_))
         );
         assert_matches!(
             proc.ag_update(AgUpdate::Ok, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedAg(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedAg(_))
         );
     }
 
@@ -249,11 +249,11 @@ mod tests {
         assert!(proc.is_terminated());
         assert_matches!(
             proc.hf_update(at::Command::Bldn {}, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedHf(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedHf(_))
         );
         assert_matches!(
             proc.ag_update(AgUpdate::Ok, &mut state),
-            ProcedureRequest::Error(ProcedureError::UnexpectedAg(_))
+            ProcedureRequest::Error(err) if matches!(*err, ProcedureError::UnexpectedAg(_))
         );
     }
 }
