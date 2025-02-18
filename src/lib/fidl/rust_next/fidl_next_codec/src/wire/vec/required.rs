@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use core::fmt;
+use core::mem::needs_drop;
 use core::ops::Deref;
 use core::ptr::NonNull;
 
@@ -22,8 +23,10 @@ pub struct WireVector<T> {
 
 impl<T> Drop for WireVector<T> {
     fn drop(&mut self) {
-        unsafe {
-            self.raw.as_slice_ptr().drop_in_place();
+        if needs_drop::<T>() {
+            unsafe {
+                self.raw.as_slice_ptr().drop_in_place();
+            }
         }
     }
 }

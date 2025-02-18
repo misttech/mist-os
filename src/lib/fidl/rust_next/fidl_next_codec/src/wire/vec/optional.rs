@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use core::fmt;
+use core::mem::needs_drop;
 
 use munge::munge;
 
@@ -20,7 +21,7 @@ pub struct WireOptionalVector<T> {
 
 impl<T> Drop for WireOptionalVector<T> {
     fn drop(&mut self) {
-        if self.is_some() {
+        if needs_drop::<T>() && self.is_some() {
             unsafe {
                 self.raw.as_slice_ptr().drop_in_place();
             }

@@ -6,7 +6,7 @@ use core::ptr::slice_from_raw_parts_mut;
 
 use munge::munge;
 
-use crate::{u64_le, Decode, DecodeError, Decoder, DecoderExt, Owned, Slot, WirePointer};
+use crate::{u64_le, Decode, DecodeError, Decoder, DecoderExt, Slot, WirePointer};
 
 #[repr(C)]
 pub struct RawWireVector<T> {
@@ -20,16 +20,6 @@ unsafe impl<T: Send> Send for RawWireVector<T> {}
 
 // SAFETY: `RawWireVector` doesn't add any interior mutability, so it is `Sync` if `T` is `Sync`.
 unsafe impl<T: Sync> Sync for RawWireVector<T> {}
-
-impl<T> Drop for RawWireVector<T> {
-    fn drop(&mut self) {
-        if !self.ptr.as_ptr().is_null() {
-            unsafe {
-                self.as_slice_ptr().drop_in_place();
-            }
-        }
-    }
-}
 
 impl<T> RawWireVector<T> {
     pub fn encode_present(slot: Slot<'_, Self>, len: u64) {
@@ -87,8 +77,7 @@ unsafe impl<D: Decoder + ?Sized, T: Decode<D>> Decode<D> for RawWireVector<T> {
         let len = len.to_native();
         if WirePointer::is_encoded_present(ptr.as_mut())? {
             let slice = decoder.decode_next_slice::<T>(len as usize)?;
-            let slice = unsafe { Owned::new_unchecked(slice.into_raw().cast::<T>()) };
-            WirePointer::set_decoded(ptr, slice.into_raw());
+            WirePointer::set_decoded(ptr, slice.into_raw().cast());
         }
 
         Ok(())
