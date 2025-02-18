@@ -1473,6 +1473,7 @@ class VmCowPages final : public VmHierarchyBase,
   enum class LifeCycle : uint8_t {
     Init,
     Alive,
+    Dying,
     Dead,
   };
   LifeCycle life_cycle_ TA_GUARDED(lock()) = LifeCycle::Init;

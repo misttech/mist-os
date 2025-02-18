@@ -504,6 +504,9 @@ fbl::RefPtr<VmCowPages> VmCowPages::MaybeDeadTransition() {
 fbl::RefPtr<VmCowPages> VmCowPages::DeadTransitionLocked(Guard<VmoLockType>& guard) {
   canary_.Assert();
   DEBUG_ASSERT(life_cycle_ == LifeCycle::Alive);
+  // Change our life cycle to the dying state so that if we need to drop the lock no other attempts
+  // are made at performing a DeadTransition.
+  life_cycle_ = LifeCycle::Dying;
 
   // To prevent races with a hidden parent creation or merging, it is necessary to hold the lock
   // over the is_hidden and parent_ check and into the subsequent removal call.
@@ -579,6 +582,8 @@ fbl::RefPtr<VmCowPages> VmCowPages::DeadTransitionLocked(Guard<VmoLockType>& gua
     page_source_->Close();
   }
 
+  // Due to the potential lock dropping earlier double check our life_cycle_ is what we expect.
+  DEBUG_ASSERT(life_cycle_ == LifeCycle::Dying);
   life_cycle_ = LifeCycle::Dead;
   return deferred;
 }
@@ -588,7 +593,10 @@ VmCowPages::~VmCowPages() {
   // cleanup happening here in the destructor.
   canary_.Assert();
   DEBUG_ASSERT(page_list_.HasNoPageOrRef());
-  DEBUG_ASSERT(life_cycle_ != LifeCycle::Alive);
+  // A cow pages can only be destructed if it is either still in the Init state, suggesting
+  // something when wrong with completing construction, or if it is fully in the Dead state, nothing
+  // in between.
+  DEBUG_ASSERT(life_cycle_ == LifeCycle::Init || life_cycle_ == LifeCycle::Dead);
   // The discardable tracker is unlinked explicitly in the destructor to ensure that no RefPtrs can
   // be constructed to the VmCowPages from here. See comment in
   // DiscardableVmoTracker::DebugDiscardablePageCounts that depends upon this being here instead of
