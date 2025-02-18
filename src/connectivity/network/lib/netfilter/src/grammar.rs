@@ -94,7 +94,8 @@ pub struct FilterRuleParser;
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
-    Pest(pest::error::Error<Rule>),
+    // Boxing `pest::error::Error<...>` because it's >184 bytes as of writing.
+    Pest(Box<pest::error::Error<Rule>>),
     Addr(std::net::AddrParseError),
     Num(std::num::ParseIntError),
     Invalid(InvalidReason),

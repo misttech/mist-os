@@ -75,7 +75,6 @@ fn parse_devclass(pair: Pair<'_, Rule>) -> Option<fnet_interfaces_ext::PortClass
     })
 }
 
-#[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
 fn parse_src(
     pair: Pair<'_, Rule>,
 ) -> Result<(Option<filter_ext::AddressMatcher>, Option<filter_ext::PortMatcher>), Error> {
@@ -83,7 +82,6 @@ fn parse_src(
     parse_src_or_dst(pair)
 }
 
-#[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
 fn parse_dst(
     pair: Pair<'_, Rule>,
 ) -> Result<(Option<filter_ext::AddressMatcher>, Option<filter_ext::PortMatcher>), Error> {
@@ -91,7 +89,6 @@ fn parse_dst(
     parse_src_or_dst(pair)
 }
 
-#[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
 fn parse_src_or_dst(
     pair: Pair<'_, Rule>,
 ) -> Result<(Option<filter_ext::AddressMatcher>, Option<filter_ext::PortMatcher>), Error> {
@@ -121,7 +118,6 @@ fn parse_src_or_dst(
     }
 }
 
-#[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
 fn parse_port_range(pair: Pair<'_, Rule>) -> Result<filter_ext::PortMatcher, Error> {
     assert_eq!(pair.as_rule(), Rule::port_range);
     let mut inner = pair.into_inner();
@@ -148,7 +144,6 @@ fn parse_port_range(pair: Pair<'_, Rule>) -> Result<filter_ext::PortMatcher, Err
     }
 }
 
-#[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
 fn parse_rule(
     pair: Pair<'_, Rule>,
     routines: &FilterRoutines,
@@ -218,7 +213,6 @@ pub struct FilterRoutines {
 #[derive(Debug, Default)]
 pub struct NatRoutines {}
 
-#[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
 fn validate_rule(rule: &filter_ext::Rule) -> Result<(), Error> {
     if let (Some(src_subnet), Some(dst_subnet)) = (&rule.matchers.src_addr, &rule.matchers.dst_addr)
     {
@@ -236,12 +230,12 @@ fn validate_rule(rule: &filter_ext::Rule) -> Result<(), Error> {
     Ok(())
 }
 
-#[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
 pub fn parse_str_to_rules(
     line: &str,
     routines: &FilterRoutines,
 ) -> Result<Vec<filter_ext::Rule>, Error> {
-    let mut pairs = FilterRuleParser::parse(Rule::rules, &line).map_err(Error::Pest)?;
+    let mut pairs =
+        FilterRuleParser::parse(Rule::rules, &line).map_err(|err| Error::Pest(Box::new(err)))?;
     let mut rules = Vec::new();
     for (index, filter_rule) in pairs.next().unwrap().into_inner().into_iter().enumerate() {
         match filter_rule.as_rule() {
@@ -257,7 +251,6 @@ pub fn parse_str_to_rules(
     Ok(rules)
 }
 
-#[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
 pub fn parse_str_to_nat_rules(
     _line: &str,
     _routines: &NatRoutines,
@@ -267,7 +260,6 @@ pub fn parse_str_to_nat_rules(
     todo!("not yet supported in the filter2 API")
 }
 
-#[allow(clippy::result_large_err, reason = "mass allow for https://fxbug.dev/381896734")]
 pub fn parse_str_to_rdr_rules(
     _line: &str,
     _routines: &NatRoutines,
