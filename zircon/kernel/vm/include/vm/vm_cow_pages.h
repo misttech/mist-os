@@ -813,21 +813,6 @@ class VmCowPages final : public VmHierarchyBase,
     return !page_source_ || !page_source_->properties().is_preserving_page_content;
   }
 
-  bool is_cow_clonable_locked() const TA_REQ(lock()) {
-    // Copy-on-write clones of pager vmos or their descendants aren't supported as we can't
-    // efficiently make an immutable snapshot.
-    if (can_root_source_evict()) {
-      return false;
-    }
-
-    // We also don't support COW clones for contiguous VMOs.
-    if (is_source_supplying_specific_physical_pages()) {
-      return false;
-    }
-
-    return true;
-  }
-
   // Returns whether or not performing a bidirectional clone would result in a valid tree structure.
   // This does not perform checks on whether there are pinned pages, or if a bidirectional clone
   // would semantically make sense.
