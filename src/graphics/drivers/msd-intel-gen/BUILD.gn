@@ -45,7 +45,10 @@ fuchsia_cc_driver("msd_intel_test-driver") {
 fuchsia_driver_component("msd_intel_test") {
   testonly = true
   component_name = "libmsd_intel_test"
-  deps = [ ":msd_intel_test-driver" ]
+  deps = [
+    ":msd_intel_test-driver",
+    "//src/graphics/magma/tests/unit_tests:test_firmware",
+  ]
   info = "meta/msd_intel_test-info.json"
   manifest = "meta/msd_intel_test.cml"
 }
@@ -139,15 +142,4 @@ group("tests") {
 
 fuchsia_driver_package("msd-intel-gen") {
   driver_components = [ ":msd_intel" ]
-}
-
-fuchsia_driver_package("msd-intel-gen-test") {
-  testonly = true
-  driver_components = [ ":msd_intel_test" ]
-  deps = [ "//src/graphics/magma/tests/unit_tests:test_firmware" ]
-}
-
-group("test-driver") {
-  testonly = true
-  deps = [ ":msd-intel-gen-test" ]
 }

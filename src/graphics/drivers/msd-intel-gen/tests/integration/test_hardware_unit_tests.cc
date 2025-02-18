@@ -25,7 +25,7 @@ namespace {
 const std::string kProductionDriver =
     "fuchsia-pkg://fuchsia.com/msd-intel-gen#meta/libmsd_intel.cm";
 const std::string kTestDriver =
-    "fuchsia-pkg://fuchsia.com/msd-intel-gen-test#meta/libmsd_intel_test.cm";
+    "fuchsia-pkg://fuchsia.com/msd_intel_gen_hardware_unit_tests#meta/libmsd_intel_test.cm";
 }  // namespace
 
 inline void RestartAndWait(std::string driver_url) {
@@ -50,7 +50,7 @@ inline void RestartAndWait(std::string driver_url) {
   }
 
   // Loop until a new device with the correct specs is found.
-  auto deadline_time = zx::clock::get_monotonic() + zx::sec(10);
+  auto deadline_time = zx::clock::get_monotonic() + zx::sec(40);
   while (zx::clock::get_monotonic() < deadline_time) {
     for (auto& p : std::filesystem::directory_iterator("/dev/class/gpu")) {
       auto magma_client =
@@ -74,12 +74,7 @@ inline void RestartAndWait(std::string driver_url) {
   GTEST_FATAL_FAILURE_("We failed to find the GPU before the deadline");
 }
 
-// TODO(https://fxbug.dev/42082221) - enable
-#if ENABLE_HARDWARE_UNIT_TESTS
 TEST(HardwareUnitTests, All) {
-#else
-TEST(HardwareUnitTests, DISABLED_All) {
-#endif
   auto manager = component::Connect<fuchsia_driver_development::Manager>();
 
   // The test build of the MSD runs a bunch of unit tests automatically when it loads. We need to
@@ -103,8 +98,6 @@ TEST(HardwareUnitTests, DISABLED_All) {
     ASSERT_FALSE(result->is_error()) << result->error_value();
   }
 
-  RestartAndWait(kProductionDriver);
-
   auto cleanup = fit::defer([&]() {
     // Ignore errors when trying to get the existing driver back to a working state.
     (void)manager_client->EnableDriver(fidl::StringView::FromExternal(kProductionDriver),
@@ -113,6 +106,8 @@ TEST(HardwareUnitTests, DISABLED_All) {
                                         fidl::StringView());
     RestartAndWait(kTestDriver);
   });
+
+  ASSERT_NO_FATAL_FAILURE(RestartAndWait(kProductionDriver));
 
   {
     magma::TestDeviceBase test_base(MAGMA_VENDOR_ID_INTEL);

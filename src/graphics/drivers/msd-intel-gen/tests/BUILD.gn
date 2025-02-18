@@ -22,6 +22,7 @@ group("integration") {
   testonly = true
   deps = [
     ":magma-conformance-tests-intel",
+    ":msd_intel_gen_hardware_unit_tests",
     ":msd_intel_gen_integration_tests",
   ]
 }
@@ -34,6 +35,24 @@ fuchsia_test_component("msd_intel_gen_nonhardware_tests_component") {
 fuchsia_test_package("msd_intel_gen_nonhardware_tests") {
   test_components = [ ":msd_intel_gen_nonhardware_tests_component" ]
   test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
+fuchsia_test_component("msd_intel_gen_hardware_unit_tests_component") {
+  deps = [ "integration:msd_intel_gen_hardware_unit_tests" ]
+  manifest = "meta/msd_intel_gen_hardware_unit_tests.cml"
+  test_type = "device"
+}
+
+fuchsia_test_package("msd_intel_gen_hardware_unit_tests") {
+  test_components = [ ":msd_intel_gen_hardware_unit_tests_component" ]
+  deps = [ "..:msd_intel_test" ]
+  test_specs = {
+    # TODO(b/42082221): Re-enable these tests in infra.
+    environments = []
     log_settings = {
       max_severity = "ERROR"
     }
