@@ -300,9 +300,12 @@ zx_status_t VmObjectPaged::CreateCommon(uint32_t pmm_alloc_flags, uint32_t optio
   }
 
   fbl::AllocChecker ac;
-  auto state = fbl::MakeRefCountedChecked<VmHierarchyState>(&ac);
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+  fbl::RefPtr<VmHierarchyState> state;
+  if constexpr (VMO_USE_SHARED_LOCK) {
+    state = fbl::MakeRefCountedChecked<VmHierarchyState>(&ac);
+    if (!ac.check()) {
+      return ZX_ERR_NO_MEMORY;
+    }
   }
 
   ktl::unique_ptr<DiscardableVmoTracker> discardable = nullptr;
@@ -548,9 +551,12 @@ zx_status_t VmObjectPaged::CreateWithSourceCommon(fbl::RefPtr<PageSource> src,
   DEBUG_ASSERT(!(options & kAlwaysPinned));
 
   fbl::AllocChecker ac;
-  auto state = fbl::AdoptRef<VmHierarchyState>(new (&ac) VmHierarchyState);
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+  fbl::RefPtr<VmHierarchyState> state;
+  if constexpr (VMO_USE_SHARED_LOCK) {
+    state = fbl::MakeRefCountedChecked<VmHierarchyState>(&ac);
+    if (!ac.check()) {
+      return ZX_ERR_NO_MEMORY;
+    }
   }
 
   // The cow pages will have a page source, so blocking is always possible.
@@ -711,8 +717,12 @@ zx_status_t VmObjectPaged::CreateChildReferenceCommon(uint32_t options, VmCowRan
 
     // Once all fallible checks are performed, construct the VmObjectPaged.
     fbl::AllocChecker ac;
+    fbl::RefPtr<VmHierarchyState> state;
+#if VMO_USE_SHARED_LOCK
+    state = hierarchy_state_ptr_;
+#endif
     vmo = fbl::AdoptRef<VmObjectPaged>(
-        new (&ac) VmObjectPaged(options, hierarchy_state_ptr_, cow_pages_, range));
+        new (&ac) VmObjectPaged(options, ktl::move(state), cow_pages_, range));
     if (!ac.check()) {
       return ZX_ERR_NO_MEMORY;
     }
@@ -815,8 +825,12 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, SnapshotType type
       options |= kCanBlockOnPageRequests;
     }
     fbl::AllocChecker ac;
+    fbl::RefPtr<VmHierarchyState> state;
+#if VMO_USE_SHARED_LOCK
+    state = hierarchy_state_ptr_;
+#endif
     vmo = fbl::AdoptRef<VmObjectPaged>(
-        new (&ac) VmObjectPaged(options, hierarchy_state_ptr_, ktl::move(clone_cow_pages)));
+        new (&ac) VmObjectPaged(options, ktl::move(state), ktl::move(clone_cow_pages)));
     if (!ac.check()) {
       return ZX_ERR_NO_MEMORY;
     }

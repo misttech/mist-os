@@ -478,6 +478,12 @@ VmCowPages::VmCowPages(const fbl::RefPtr<VmHierarchyState> hierarchy_state_ptr,
     : VmHierarchyBase(ktl::move(hierarchy_state_ptr)),
       pmm_alloc_flags_(pmm_alloc_flags),
       options_(options),
+// If both local and shared locks are defined then there is still only one true lock, the shared
+// one, with the local lock existing to increase the tracking ability of lockdep. The local lock
+// therefore needs to be pointed at the shared lock to forward the actual locking actions.
+#if VMO_USE_LOCAL_LOCK && VMO_USE_SHARED_LOCK
+      lock_(hierarchy_state_ptr_->lock()->lock()),
+#endif
       size_(size),
       page_source_(ktl::move(page_source)),
       discardable_tracker_(ktl::move(discardable_tracker)) {
@@ -1029,6 +1035,10 @@ void VmCowPages::MovePagesIntoLocked(VmCowPages& other) {
 zx_status_t VmCowPages::ReplaceWithHiddenNodeLocked(fbl::RefPtr<VmCowPages>* replacement_node) {
   canary_.Assert();
 
+  fbl::RefPtr<VmHierarchyState> state;
+#if VMO_USE_SHARED_LOCK
+  state = hierarchy_state_ptr_;
+#endif
   DEBUG_ASSERT(life_cycle_ == LifeCycle::Alive);
   DEBUG_ASSERT(children_list_len_ == 0);
 
@@ -1041,8 +1051,8 @@ zx_status_t VmCowPages::ReplaceWithHiddenNodeLocked(fbl::RefPtr<VmCowPages>* rep
   VmCowPagesOptions options = inheritable_options();
   fbl::AllocChecker ac;
   auto hidden_parent = fbl::AdoptRef<VmCowPages>(
-      new (&ac) VmCowPages(hierarchy_state_ptr_, options | VmCowPagesOptions::kHidden,
-                           pmm_alloc_flags_, size_, nullptr, nullptr));
+      new (&ac) VmCowPages(ktl::move(state), options | VmCowPagesOptions::kHidden, pmm_alloc_flags_,
+                           size_, nullptr, nullptr));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -1091,8 +1101,12 @@ zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t limit
   VmCowPagesOptions options = inheritable_options();
 
   fbl::AllocChecker ac;
-  auto cow_clone = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
-      hierarchy_state_ptr_, options, pmm_alloc_flags_, size, nullptr, nullptr));
+  fbl::RefPtr<VmHierarchyState> state;
+#if VMO_USE_SHARED_LOCK
+  state = hierarchy_state_ptr_;
+#endif
+  auto cow_clone = fbl::AdoptRef<VmCowPages>(
+      new (&ac) VmCowPages(ktl::move(state), options, pmm_alloc_flags_, size, nullptr, nullptr));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -1130,8 +1144,12 @@ zx_status_t VmCowPages::CloneUnidirectionalLocked(uint64_t offset, uint64_t limi
   VmCowPagesOptions options = inheritable_options();
 
   fbl::AllocChecker ac;
-  auto cow_clone = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
-      hierarchy_state_ptr_, options, pmm_alloc_flags_, size, nullptr, nullptr));
+  fbl::RefPtr<VmHierarchyState> state;
+#if VMO_USE_SHARED_LOCK
+  state = hierarchy_state_ptr_;
+#endif
+  auto cow_clone = fbl::AdoptRef<VmCowPages>(
+      new (&ac) VmCowPages(ktl::move(state), options, pmm_alloc_flags_, size, nullptr, nullptr));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }

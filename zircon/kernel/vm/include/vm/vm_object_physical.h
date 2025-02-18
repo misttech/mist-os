@@ -28,14 +28,25 @@ class VmObjectPhysical final : public VmObject, public VmDeferredDeleter<VmObjec
  public:
   static zx_status_t Create(paddr_t base, uint64_t size, fbl::RefPtr<VmObjectPhysical>* vmo);
 
-  Lock<VmoLockType>* lock() const override TA_RET_CAP(hierarchy_state_ptr_->lock_ref())
-      TA_RET_CAP(lock()) {
+  // Define the lock retrieval functions differently depending on whether we should be returning a
+  // local lock instance, or the common one in the hierarchy_state_ptr. Due to the TA_RET_CAP
+  // statements we cannot perform |if constexpr| or equivalent indirection in the function body, and
+  // must have two completely different function definitions.
+  // In the absence of a local lock it is assumed, and enforced in vm_object_lock.h, that there is a
+  // shared lock in the hierarchy state. If there is both a local and a shared lock then the local
+  // lock is to be used for the improved lock tracking.
+#if VMO_USE_LOCAL_LOCK
+  Lock<VmoLockType>* lock() const override TA_RET_CAP(lock_) { return &lock_; }
+  Lock<VmoLockType>& lock_ref() const override TA_RET_CAP(lock_) { return lock_; }
+#else
+  Lock<VmoLockType>* lock() const override TA_RET_CAP(hierarchy_state_ptr_->lock_ref()) {
     return hierarchy_state_ptr_->lock();
   }
-  Lock<VmoLockType>& lock_ref() const override TA_RET_CAP(hierarchy_state_ptr_->lock_ref())
-      TA_RET_CAP(lock()) {
+  Lock<VmoLockType>& lock_ref() const override TA_RET_CAP(hierarchy_state_ptr_->lock_ref()) {
     return hierarchy_state_ptr_->lock_ref();
   }
+#endif
+
   VmObject* self_locked() TA_REQ(lock()) TA_ASSERT(self_locked()->lock()) { return this; }
 
   zx_status_t CreateChildSlice(uint64_t offset, uint64_t size, bool copy_name,
@@ -96,6 +107,10 @@ class VmObjectPhysical final : public VmObject, public VmDeferredDeleter<VmObjec
   DISALLOW_COPY_ASSIGN_AND_MOVE(VmObjectPhysical);
 
   // members
+#if VMO_USE_LOCAL_LOCK
+  mutable LOCK_DEP_INSTRUMENT(VmObjectPhysical, VmoLockTraits::LocalLockType,
+                              VmoLockTraits::LocalLockFlags) lock_;
+#endif
   const uint64_t size_ = 0;
   const paddr_t base_ = 0;
   const bool is_slice_ = false;

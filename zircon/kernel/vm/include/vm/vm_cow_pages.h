@@ -105,12 +105,24 @@ class VmCowPages final : public VmHierarchyBase,
                                     fbl::RefPtr<VmHierarchyState> root_lock, uint64_t size,
                                     fbl::RefPtr<VmCowPages>* cow_pages);
 
+  // Define the lock retrieval functions differently depending on whether we should be returning a
+  // local lock instance, or the common one in the hierarchy_state_ptr. Due to the TA_RET_CAP
+  // statements we cannot perform |if constexpr| or equivalent indirection in the function body, and
+  // must have two completely different function definitions.
+  // In the absence of a local lock it is assumed, and enforced in vm_object_lock.h, that there is a
+  // shared lock in the hierarchy state. If there is both a local and a shared lock then the local
+  // lock is to be used for the improved lock tracking.
+#if VMO_USE_LOCAL_LOCK
+  Lock<VmoLockType>* lock() const TA_RET_CAP(lock_) { return &lock_; }
+  Lock<VmoLockType>& lock_ref() const TA_RET_CAP(lock_) { return lock_; }
+#else
   Lock<VmoLockType>* lock() const TA_RET_CAP(hierarchy_state_ptr_->lock_ref()) {
     return hierarchy_state_ptr_->lock();
   }
   Lock<VmoLockType>& lock_ref() const TA_RET_CAP(hierarchy_state_ptr_->lock_ref()) {
     return hierarchy_state_ptr_->lock_ref();
   }
+#endif
 
   // Creates a copy-on-write clone with the desired parameters. This can fail due to various
   // internal states not being correct.
@@ -1393,6 +1405,11 @@ class VmCowPages final : public VmHierarchyBase,
 
   // length of children_list_
   uint32_t children_list_len_ TA_GUARDED(lock()) = 0;
+
+#if VMO_USE_LOCAL_LOCK
+  mutable LOCK_DEP_INSTRUMENT(VmCowPages, VmoLockTraits::LocalLockType,
+                              VmoLockTraits::LocalLockFlags) lock_;
+#endif
 
   uint64_t size_ TA_GUARDED(lock());
   // Offset in the *parent* where this object starts.

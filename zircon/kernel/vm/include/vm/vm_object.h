@@ -145,16 +145,22 @@ template <typename T>
 fbl::SinglyLinkedListCustomTraits<fbl::RefPtr<T>, typename VmDeferredDeleter<T>::ListTraits>
     VmDeferredDeleter<T>::delete_list_;
 
+// When not using a shared lock this object becomes empty, and never actually gets constructed. We
+// do not fully hide the class definition to avoid the amount of code elsewhere that needs to hidden
+// by pre-precessor guards.
 class VmHierarchyState : public fbl::RefCounted<VmHierarchyState> {
  public:
-  VmHierarchyState() = default;
+  VmHierarchyState() { ASSERT(VMO_USE_SHARED_LOCK); }
   ~VmHierarchyState() = default;
 
-  Lock<VmoLockType>* lock() const TA_RET_CAP(lock_) { return &lock_; }
-  Lock<VmoLockType>& lock_ref() const TA_RET_CAP(lock_) { return lock_; }
+#if VMO_USE_SHARED_LOCK
+  Lock<typename VmoLockTraits::SharedLockType>* lock() const TA_RET_CAP(lock_) { return &lock_; }
+  Lock<typename VmoLockTraits::SharedLockType>& lock_ref() const TA_RET_CAP(lock_) { return lock_; }
 
  private:
-  mutable LOCK_DEP_INSTRUMENT(VmHierarchyState, VmoLockType) lock_;
+  mutable LOCK_DEP_INSTRUMENT(VmHierarchyState, VmoLockTraits::SharedLockType,
+                              VmoLockTraits::SharedLockFlags) lock_;
+#endif
 };
 
 // Base class for any objects that want to be part of the VMO hierarchy and share some state,
@@ -170,8 +176,10 @@ class VmHierarchyBase : public fbl::RefCountedUpgradeable<VmHierarchyBase> {
   friend fbl::RefPtr<VmHierarchyBase>;
   friend class fbl::Recyclable<VmHierarchyBase>;
 
+#if VMO_USE_SHARED_LOCK
   // Pointer to state shared across all objects in a hierarchy.
   fbl::RefPtr<VmHierarchyState> const hierarchy_state_ptr_;
+#endif
 
  private:
   friend VmHierarchyState;

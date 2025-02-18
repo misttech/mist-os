@@ -349,8 +349,12 @@ void VmObject::RangeChangeUpdateMappingsLocked(uint64_t offset, uint64_t len, Ra
   }
 }
 
+#if VMO_USE_SHARED_LOCK
 VmHierarchyBase::VmHierarchyBase(fbl::RefPtr<VmHierarchyState> state)
     : hierarchy_state_ptr_(ktl::move(state)) {}
+#else
+VmHierarchyBase::VmHierarchyBase(fbl::RefPtr<VmHierarchyState> state) { DEBUG_ASSERT(!state); }
+#endif
 
 static int cmd_vm_object(int argc, const cmd_args* argv, uint32_t flags) {
   if (argc < 2) {
