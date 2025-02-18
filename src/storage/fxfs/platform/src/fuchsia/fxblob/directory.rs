@@ -90,16 +90,6 @@ impl RootDir for BlobDirectory {
         self as Arc<dyn FxNode>
     }
 
-    fn on_open(self: Arc<Self>) {
-        // It's safe for this task to be dropped when the volume is shut down.
-        let scope = self.volume().scope().clone();
-        scope.spawn(async move {
-            if let Err(e) = self.prefetch_blobs().await {
-                log::warn!("Failed to prefetch blobs: {:?}", e);
-            }
-        });
-    }
-
     /// Handle fuchsia.fxfs/BlobCreator requests for this [`BlobDirectory`].
     async fn handle_blob_creator_requests(self: Arc<Self>, mut requests: BlobCreatorRequestStream) {
         while let Ok(Some(request)) = requests.try_next().await {
@@ -147,47 +137,6 @@ impl BlobDirectory {
 
     fn store(&self) -> &ObjectStore {
         self.directory.store()
-    }
-
-    async fn prefetch_blobs(self: &Arc<Self>) -> Result<(), Error> {
-        let store = self.store();
-        let fs = store.filesystem();
-
-        let dirents = {
-            let _guard = fs
-                .lock_manager()
-                .read_lock(lock_keys![LockKey::object(
-                    store.store_object_id(),
-                    self.directory.object_id()
-                )])
-                .await;
-            let mut dirents = vec![];
-            let layer_set = store.tree().layer_set();
-            let mut merger = layer_set.merger();
-            let mut iter = self.directory.directory().iter(&mut merger).await?;
-            let mut num = 0;
-            let limit = self.directory.directory().owner().dirent_cache().limit();
-            while let Some((name, object_id, _)) = iter.get() {
-                dirents.push((name.try_into()?, object_id));
-                iter.advance().await?;
-                num += 1;
-                if num >= limit {
-                    break;
-                }
-            }
-            dirents
-        };
-
-        for (identifier, object_id) in dirents {
-            if let Ok(node) = self.get_or_load_node(object_id, &identifier).await {
-                self.directory.directory().owner().dirent_cache().insert(
-                    self.directory.object_id(),
-                    identifier.string,
-                    node,
-                );
-            }
-        }
-        Ok(())
     }
 
     /// Attempt to lookup and cache the blob with `id` in this directory.

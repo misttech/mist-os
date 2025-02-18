@@ -601,9 +601,6 @@ pub trait RootDir: FxNode + DirectoryEntry {
 
     fn as_node(self: Arc<Self>) -> Arc<dyn FxNode>;
 
-    /// An optional callback invoked when the volume is opened.
-    fn on_open(self: Arc<Self>) {}
-
     async fn handle_blob_creator_requests(self: Arc<Self>, _requests: BlobCreatorRequestStream) {}
     async fn handle_blob_reader_requests(self: Arc<Self>, _requests: BlobReaderRequestStream) {}
 }
@@ -624,7 +621,6 @@ impl FxVolumeAndRoot {
         let root_object_id = volume.store().root_directory_object_id();
         let root_dir = Directory::open(&volume, root_object_id).await?;
         let root = Arc::<T>::new(root_dir.into()) as Arc<dyn RootDir>;
-        root.clone().on_open();
         volume
             .cache
             .get_or_reserve(root_object_id)
