@@ -10,6 +10,7 @@ use fidl::endpoints::create_proxy;
 use fuchsia_async::TimeoutExt;
 use fuchsia_sync::Mutex;
 use futures::channel::oneshot;
+use futures::lock::Mutex as MutexAsync;
 use futures::{select, FutureExt, TryStreamExt};
 use ieee80211::Bssid;
 use log::{error, info, warn};
@@ -282,7 +283,7 @@ pub(crate) struct SmeClientIface {
     // TODO(b/298030838): Remove unmanaged iface support when wlanix is the sole config path.
     wlanix_provisioned: bool,
     bss_scorer: BssScorer,
-    power_state: Arc<Mutex<PowerState>>,
+    power_state: Arc<MutexAsync<PowerState>>,
     telemetry_sender: TelemetrySender,
 }
 
@@ -335,7 +336,7 @@ impl SmeClientIface {
             connected_network_rssi: Arc::new(Mutex::new(None)),
             wlanix_provisioned: true,
             bss_scorer: BssScorer::new(),
-            power_state: Arc::new(Mutex::new(PowerState {
+            power_state: Arc::new(MutexAsync::new(PowerState {
                 power_element_context,
                 suspend_mode_enabled: false,
                 power_save_enabled: false,
@@ -349,10 +350,9 @@ impl SmeClientIface {
     /// is no way to alter power levels via the wlanix FIDLs. However, this is insignificant, as
     /// empirical measurements show that the chips have virtually no power consumption when no
     /// interfaces exist.
-    #[allow(clippy::await_holding_lock, reason = "mass allow for https://fxbug.dev/381896734")]
     async fn update_power_level(&self, new_level: StaIfacePowerLevel) -> Result<(), Error> {
         // If the Power Broker is initialized, report the new state
-        if let Some(pe) = &mut self.power_state.lock().power_element_context {
+        if let Some(pe) = &mut self.power_state.lock().await.power_element_context {
             match pe.current_level.update(new_level as u8).await {
                 Err(e) => Err(format_err!("Error setting level: {:?}", e)),
                 Ok(Err(e)) => Err(format_err!("Error setting level: {:?}", e)),
@@ -527,10 +527,9 @@ impl ClientIface for SmeClientIface {
         let _prev = self.connected_network_rssi.lock().replace(ind.rssi_dbm);
     }
 
-    #[allow(clippy::await_holding_lock, reason = "mass allow for https://fxbug.dev/381896734")]
     async fn set_power_save_mode(&self, enabled: bool) -> Result<(), Error> {
         // Update our cache
-        let mut power_state = self.power_state.lock();
+        let mut power_state = self.power_state.lock().await;
         power_state.power_save_enabled = enabled;
         // Figure out the new state
         let new_level = if power_state.suspend_mode_enabled {
@@ -549,9 +548,8 @@ impl ClientIface for SmeClientIface {
         self.update_power_level(new_level).await
     }
 
-    #[allow(clippy::await_holding_lock, reason = "mass allow for https://fxbug.dev/381896734")]
     async fn set_suspend_mode(&self, enabled: bool) -> Result<(), Error> {
-        let mut power_state = self.power_state.lock();
+        let mut power_state = self.power_state.lock().await;
         power_state.suspend_mode_enabled = enabled;
         // Figure out the new state
         let new_level = if enabled {
@@ -1131,7 +1129,7 @@ mod tests {
         );
 
         // The iface has the power broker topology passed in from the manager
-        assert!(iface.power_state.lock().power_element_context.is_some());
+        assert!(iface.power_state.try_lock().unwrap().power_element_context.is_some());
     }
 
     #[test]
@@ -1243,7 +1241,7 @@ mod tests {
             connected_network_rssi: Arc::new(Mutex::new(None)),
             wlanix_provisioned: false, // set to false for this test
             bss_scorer: BssScorer::new(),
-            power_state: Arc::new(Mutex::new(PowerState {
+            power_state: Arc::new(MutexAsync::new(PowerState {
                 power_element_context: None,
                 suspend_mode_enabled: false,
                 power_save_enabled: false,
@@ -1563,7 +1561,7 @@ mod tests {
             connected_network_rssi: Arc::new(Mutex::new(None)),
             wlanix_provisioned: true,
             bss_scorer: BssScorer::new(),
-            power_state: Arc::new(Mutex::new(PowerState {
+            power_state: Arc::new(MutexAsync::new(PowerState {
                 power_element_context: None,
                 suspend_mode_enabled: false,
                 power_save_enabled: false,
