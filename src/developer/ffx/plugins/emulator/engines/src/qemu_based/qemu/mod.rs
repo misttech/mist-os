@@ -17,7 +17,6 @@ use emulator_instance::{
 };
 use ffx_config::EnvironmentContext;
 use ffx_emulator_common::config::QEMU_TOOL;
-use ffx_emulator_common::find_unused_vsock_cid;
 use ffx_emulator_config::{EmulatorEngine, EngineConsoleType, ShowDetail};
 use fho::{bug, return_bug, Result};
 use std::env;
@@ -70,12 +69,6 @@ impl EmulatorEngine for QemuEngine {
         // continuing to stage the instance.
         if self.emu_config().host.networking == NetworkingMode::User {
             crate::finalize_port_mapping(self.emu_config_mut())?;
-        }
-
-        if let Some(vsock) = &mut self.emu_config_mut().device.vsock {
-            if vsock.enabled {
-                vsock.cid = find_unused_vsock_cid()?;
-            }
         }
 
         let result = <Self as QemuBasedEngine>::stage(&mut self)

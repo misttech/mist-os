@@ -14,7 +14,7 @@ use emulator_instance::{
 };
 use ffx_config::EnvironmentContext;
 use ffx_emulator_common::config::CROSVM_TOOL;
-use ffx_emulator_common::{find_unused_vsock_cid, process};
+use ffx_emulator_common::process;
 use ffx_emulator_config::{EmulatorEngine, EngineConsoleType, ShowDetail};
 use fho::{bug, return_bug, Result};
 use std::collections::HashMap;
@@ -63,64 +63,65 @@ impl EmulatorEngine for CrosvmEngine {
     }
 
     async fn stage(&mut self) -> Result<()> {
-        if let Err(e) =
-            <Self as QemuBasedEngine>::stage(&mut self).await.and_then(|()| self.validate_staging())
-        {
-            self.data.set_engine_state(EngineState::Error);
-            return self.save_to_disk().await.and(Err(e));
-        }
-
-        if let Some(vsock) = &mut self.emu_config_mut().device.vsock {
-            if vsock.enabled {
-                vsock.cid = find_unused_vsock_cid()?;
+        let result = <Self as QemuBasedEngine>::stage(&mut self)
+            .await
+            .and_then(|()| self.validate_staging());
+        match result {
+            Ok(()) => {
+                let emu_config = self.emu_config();
+                // Fall back to 4 core is cpu_count isn't specified.
+                let cpu_count = emu_config.device.cpu.count;
+                let cpu_count = if cpu_count > 0 { cpu_count } else { 4 };
+                // TODO(https://fxbug.dev/371614411): Move these into a template.
+                let mut args = vec![
+                    "--extended-status".to_string(),
+                    "--log-level=debug".to_string(),
+                    "run".to_string(),
+                    "--disable-sandbox".to_string(),
+                    "-s".to_string(),
+                    format!(
+                        "{}/control.sock",
+                        emu_config.runtime.instance_directory.to_str().unwrap()
+                    ),
+                    "--mem".to_string(),
+                    emu_config.device.memory.quantity.to_string(),
+                    "--cpus".to_string(),
+                    cpu_count.to_string(),
+                    "--serial".to_string(),
+                    "type=stdout,stdin,hardware=serial,earlycon".to_string(),
+                    emu_config.guest.kernel_image.clone().unwrap().to_str().unwrap().into(),
+                ];
+                if let Some(zbi_image) = &emu_config.guest.zbi_image {
+                    args.extend(vec!["--initrd".to_string(), zbi_image.to_str().unwrap().into()]);
+                }
+                if let Some(vsock) = &emu_config.device.vsock {
+                    if vsock.enabled {
+                        args.extend(vec!["--vsock".to_string(), format!("cid={}", vsock.cid)]);
+                    }
+                }
+                if let Some(image) = &emu_config.guest.disk_image {
+                    args.extend(vec!["--block".to_string(), image.to_str().unwrap().into()]);
+                }
+                if emu_config.host.networking == NetworkingMode::Tap {
+                    args.extend(vec![
+                        "--net".to_string(),
+                        format!("tap-name=qemu,mac={}", emu_config.runtime.mac_address),
+                    ]);
+                }
+                self.emu_config_mut().flags.args = args;
+                // We don't care about several of these fields filled out via the qemu specific
+                // template.
+                self.emu_config_mut().flags.envs = HashMap::new();
+                self.emu_config_mut().flags.features = vec![];
+                self.emu_config_mut().flags.options = vec![];
+                self.data.set_engine_state(EngineState::Staged);
+                self.save_to_disk().await
+            }
+            Err(e) => {
+                self.data.set_engine_state(EngineState::Error);
+                self.save_to_disk().await.and(Err(e))
             }
         }
-
-        let emu_config = self.emu_config();
-        // Fall back to 4 core is cpu_count isn't specified.
-        let cpu_count = emu_config.device.cpu.count;
-        let cpu_count = if cpu_count > 0 { cpu_count } else { 4 };
-        // TODO(https://fxbug.dev/371614411): Move these into a template.
-        let mut args = vec![
-            "--extended-status".to_string(),
-            "--log-level=debug".to_string(),
-            "run".to_string(),
-            "--disable-sandbox".to_string(),
-            "-s".to_string(),
-            format!("{}/control.sock", emu_config.runtime.instance_directory.to_str().unwrap()),
-            "--mem".to_string(),
-            emu_config.device.memory.quantity.to_string(),
-            "--cpus".to_string(),
-            cpu_count.to_string(),
-            "--serial".to_string(),
-            "type=stdout,stdin,hardware=serial,earlycon".to_string(),
-            emu_config.guest.kernel_image.clone().unwrap().to_str().unwrap().into(),
-        ];
-        if let Some(zbi_image) = &emu_config.guest.zbi_image {
-            args.extend(vec!["--initrd".to_string(), zbi_image.to_str().unwrap().into()]);
-        }
-        if let Some(vsock) = &emu_config.device.vsock {
-            if vsock.enabled {
-                args.extend(vec!["--vsock".to_string(), format!("cid={}", vsock.cid)]);
-            }
-        }
-        if let Some(image) = &emu_config.guest.disk_image {
-            args.extend(vec!["--block".to_string(), image.to_str().unwrap().into()]);
-        }
-        if emu_config.host.networking == NetworkingMode::Tap {
-            args.extend(vec![
-                "--net".to_string(),
-                format!("tap-name=qemu,mac={}", emu_config.runtime.mac_address),
-            ]);
-        }
-        self.emu_config_mut().flags.args = args;
-        // We don't care about several of these fields filled out via the qemu specific
-        // template.
-        self.emu_config_mut().flags.envs = HashMap::new();
-        self.emu_config_mut().flags.features = vec![];
-        self.emu_config_mut().flags.options = vec![];
-        self.data.set_engine_state(EngineState::Staged);
-        self.save_to_disk().await
     }
 
     async fn start(&mut self, context: &EnvironmentContext, emulator_cmd: Command) -> Result<i32> {

@@ -7,10 +7,8 @@
 //! libraries.
 
 use anyhow::{anyhow, Result};
-use nix::sys::socket::{connect, socket, AddressFamily, SockFlag, SockType, VsockAddr};
 use std::fs::File;
-use std::io::{BufRead, ErrorKind, Write};
-use std::os::fd::AsRawFd;
+use std::io::{BufRead, Write};
 use std::path::PathBuf;
 
 // Provides access to ffx_config properties.
@@ -49,39 +47,6 @@ pub fn dump_log_to_out<W: Write>(log: &PathBuf, out: &mut W) -> Result<()> {
         out_handle.flush()?;
     }
     Ok(())
-}
-
-fn connect_with_cid_port(cid: u32, port: u32) -> std::io::Result<()> {
-    let addr = VsockAddr::new(cid, port);
-    let flags = SockFlag::SOCK_CLOEXEC;
-    let sock = socket(AddressFamily::Vsock, SockType::Stream, flags, None)?;
-    connect(sock.as_raw_fd(), &addr)?;
-    Ok(())
-}
-
-pub fn find_unused_vsock_cid() -> Result<u32> {
-    for cid_to_try in 3..1024 {
-        match connect_with_cid_port(cid_to_try, 22) {
-            // A successful connection indicates the CID is valid and there was even something
-            // listening to it inside the VM.
-            Ok(_) => continue,
-            Err(e) => {
-                if e.kind() == ErrorKind::ConnectionReset {
-                    // ConnectionReset means the CID was valid, but nothing was listening to the
-                    // port in the VM.
-                    continue;
-                }
-                if let Some(os_err) = e.raw_os_error() {
-                    if os_err == nix::libc::ENODEV {
-                        // ENODEV indicates that the CID is unused.
-                        return Ok(cid_to_try);
-                    }
-                }
-                eprintln!("Unexpected err {e:?}")
-            }
-        };
-    }
-    Err(anyhow!("No free cids found"))
 }
 
 #[cfg(test)]
