@@ -1,28 +1,34 @@
-# Copyright 2016 The Fuchsia Authors. All rights reserved.
+# Copyright 2021 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/components.gni")
 import("//build/testing/cc_test_executable.gni")
+import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
-group("integration") {
-  testonly = true
-
-  public_deps = [
-    ":magma-conformance-vendor-helper-intel",
-    ":msd_intel_gen_integration_tests",
-  ]
+fuchsia_test_component("msd_intel_gen_hardware_unit_tests_component") {
+  deps = [ ":test_binary" ]
+  manifest = "meta/msd_intel_gen_hardware_unit_tests.cml"
+  test_type = "device"
 }
 
-cc_test_executable("msd_intel_gen_integration_tests") {
-  testonly = true
+fuchsia_test_package("hardware_unit_tests") {
+  package_name = "msd_intel_gen_hardware_unit_tests"
+  test_components = [ ":msd_intel_gen_hardware_unit_tests_component" ]
+  deps = [ "../..:msd_intel_test" ]
+  test_specs = {
+    # TODO(b/42082221): Re-enable these tests in infra.
+    environments = []
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
 
-  sources = [
-    "test_execute.cc",
-    "test_hang_recovery.cc",
-    "test_icd_list.cc",
-    "test_shutdown.cc",
-    "test_workarounds.cc",
-  ]
+cc_test_executable("test_binary") {
+  testonly = true
+  output_name = "msd_intel_gen_hardware_unit_tests"
+  sources = [ "test.cc" ]
 
   deps = [
     "../../include",
@@ -37,17 +43,5 @@ cc_test_executable("msd_intel_gen_integration_tests") {
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/trace-vthread",
-  ]
-}
-
-executable("magma-conformance-vendor-helper-intel") {
-  testonly = true
-  sources = [ "vendor_helper_intel.cc" ]
-  deps = [
-    "//sdk/lib/async-loop:async-loop-cpp",
-    "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/syslog/cpp",
-    "//src/graphics/drivers/msd-intel-gen/include:include",
-    "//src/graphics/magma/tests/integration:vendor_helper_interface",
   ]
 }
