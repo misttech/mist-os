@@ -35,15 +35,20 @@ libc_headers = {
   llvm_libc_impl_headers = [
     "__llvm-libc-common.h",
     "llvm-libc-macros/fenv-macros.h",
+    "llvm-libc-macros/malloc-macros.h",
     "llvm-libc-types/fenv_t.h",
     "llvm-libc-types/fexcept_t.h",
+    "llvm-libc-types/size_t.h",
   ]
 
   # Files generated from corresponding `.h.def` and `.yaml` files.  These files
-  # are used in all the same ways as the $llvm_libc_headers list once they've
-  # been generated, with gen/... files in the build serving as the "source of
-  # truth" `.h` file rather than sources in the llvm-libc checkout.
-  llvm_libc_generated_headers = [ "fenv.h" ]
+  # are used in all the same ways as the $llvm_libc_public_headers list once
+  # they've been generated, with gen/... files in the build serving as the
+  # "source of truth" `.h` file rather than sources in the llvm-libc checkout.
+  llvm_libc_generated_headers = [
+    "fenv.h",
+    "malloc.h",
+  ]
 
   # Files inherited from the legacy musl fork.  These are maintained within the
   # source tree and have no other active source of truth, but they are not
@@ -83,7 +88,6 @@ libc_headers = {
     "limits.h",
     "link.h",
     "locale.h",
-    "malloc.h",
     "math.h",
     "memory.h",
     "monetary.h",

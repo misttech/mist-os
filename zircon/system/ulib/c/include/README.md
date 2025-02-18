@@ -365,7 +365,7 @@ adding a new file.  Follow these steps to add a new file to the list:
  1. Edit [`libc_headers.gni`](libc_headers.gni), and go to the end of the file.
     Inside the final `}`, add a line or two like this:
     ```gn
-      llvm_libc_headers += [ "new-header-file.h" ]
+      llvm_libc_public_headers += [ "new-header-file.h" ]
       llvm_libc_generated_headers += [ "new-generated-header-file.h" ]
     ```
     This gets new files into the lists that drive the `llvm-libc-golden`
@@ -377,7 +377,7 @@ adding a new file.  Follow these steps to add a new file to the list:
     This should create the new files in `llvm-libc-golden` (assuming you
     have `update_goldens = true` set already).
  3. Go back to `libc_headers.gni` and remove what was added above.  Instead,
-    merge the new files into the main `llvm_libc_headers` and/or
+    merge the new files into the main `llvm_libc_public_headers` and/or
     `llvm_libc_generated_headers` lists near the top.
  4. Run another build.  What's essential is:
     ```shell

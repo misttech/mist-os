@@ -162,7 +162,8 @@ typedef unsigned long wctype_t;
 #endif
 
 #if defined(__NEED_size_t) && !defined(__DEFINED_size_t)
-typedef __SIZE_TYPE__ size_t;
+#define __need_size_t
+#include <stddef.h>
 #define __DEFINED_size_t
 #endif
 
