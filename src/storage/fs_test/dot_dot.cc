@@ -100,17 +100,17 @@ TEST_P(DotDotTest, RawOpenDotDirectoryCreate) {
 
   fdio_cpp::FdioCaller caller(std::move(fd));
 
-  // Opening with kOpenFlagCreate should succeed.
-  auto endpoints = fidl::Endpoints<fio::Node>::Create();
-  // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
+  // Opening with kFlagMaybeCreate should succeed.
+  auto [client, server] = fidl::Endpoints<fio::Directory>::Create();
   auto result =
       fidl::WireCall(caller.borrow_as<fio::Directory>())
-          ->DeprecatedOpen(fio::wire::OpenFlags::kRightReadable |
-                               fio::wire::OpenFlags::kRightWritable | fio::wire::OpenFlags::kCreate,
-                           {}, fidl::StringView("."), std::move(endpoints.server));
+          ->Open(fidl::StringView("."),
+                 fio::wire::kPermReadable | fio::wire::kPermWritable |
+                     fio::wire::Flags::kProtocolDirectory | fio::wire::Flags::kFlagMaybeCreate,
+                 {}, server.TakeChannel());
   ASSERT_EQ(result.status(), ZX_OK);
 
-  const fidl::WireResult close_result = fidl::WireCall(endpoints.client)->Close();
+  const fidl::WireResult close_result = fidl::WireCall(client)->Close();
   ASSERT_EQ(close_result.status(), ZX_OK);
   const fit::result close_response = close_result.value();
   ASSERT_TRUE(close_response.is_ok()) << close_response.error_value();
@@ -122,18 +122,17 @@ TEST_P(DotDotTest, RawOpenDotDirectoryCreateIfAbsent) {
   ASSERT_TRUE(fd);
   fdio_cpp::FdioCaller caller(std::move(fd));
 
-  // Opening with kOpenFlagCreateIfAbsent should fail.
-  auto endpoints = fidl::Endpoints<fio::Node>::Create();
-  // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
-  auto result = fidl::WireCall(caller.borrow_as<fio::Directory>())
-                    ->DeprecatedOpen(fio::wire::OpenFlags::kRightReadable |
-                                         fio::wire::OpenFlags::kRightWritable |
-                                         fio::wire::OpenFlags::kCreate |
-                                         fio::wire::OpenFlags::kCreateIfAbsent,
-                                     {}, fidl::StringView("."), std::move(endpoints.server));
+  // Opening with kFlagMustCreate should fail.
+  auto [client, server] = fidl::Endpoints<fio::Directory>::Create();
+  auto result =
+      fidl::WireCall(caller.borrow_as<fio::Directory>())
+          ->Open(fidl::StringView("."),
+                 fio::wire::kPermReadable | fio::wire::kPermWritable |
+                     fio::wire::Flags::kProtocolDirectory | fio::wire::Flags::kFlagMustCreate,
+                 {}, server.TakeChannel());
   ASSERT_EQ(result.status(), ZX_OK);
 
-  const fidl::WireResult close_result = fidl::WireCall(endpoints.client)->Close();
+  const fidl::WireResult close_result = fidl::WireCall(client)->Close();
   // Can't get an epitaph with LLCPP bindings, so this will do for now.
   ASSERT_EQ(close_result.status(), ZX_ERR_PEER_CLOSED);
 }

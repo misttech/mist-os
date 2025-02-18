@@ -102,7 +102,7 @@ TEST(Service, ServeDirectory) {
 
 TEST(Service, ServiceNodeIsNotDirectory) {
   // Set up the server
-  auto root = fidl::Endpoints<fio::Directory>::Create();
+  auto [root_client, root_server] = fidl::Endpoints<fio::Directory>::Create();
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   fs::SynchronousVfs vfs(loop.dispatcher());
@@ -115,7 +115,7 @@ TEST(Service, ServiceNodeIsNotDirectory) {
     return ZX_OK;
   });
   directory->AddEntry("abc", vnode);
-  ASSERT_EQ(vfs.ServeDirectory(directory, std::move(root.server)), ZX_OK);
+  ASSERT_EQ(vfs.ServeDirectory(directory, std::move(root_server)), ZX_OK);
 
   // Call |ValidateOptions| with the directory flag should fail.
   auto result = vnode->ValidateOptions(fs::VnodeConnectionOptions{
@@ -126,26 +126,20 @@ TEST(Service, ServiceNodeIsNotDirectory) {
   ASSERT_EQ(ZX_ERR_NOT_DIR, result.status_value());
 
   // Open the service through FIDL with the directory flag, which should fail.
-  zx::result abc = fidl::CreateEndpoints<fio::Node>();
-  ASSERT_EQ(abc.status_value(), ZX_OK);
-
+  auto [client, server] = fidl::Endpoints<fio::Node>::Create();
   loop.StartThread();
 
   auto open_result =
-      fidl::WireCall(root.client)
-          ->DeprecatedOpen(fio::wire::OpenFlags::kDescribe | fio::wire::OpenFlags::kDirectory |
-                               fio::wire::OpenFlags::kRightReadable |
-                               fio::wire::OpenFlags::kRightWritable,
-                           {}, fidl::StringView("abc"), std::move(abc->server));
-  EXPECT_EQ(open_result.status(), ZX_OK);
+      fidl::WireCall(root_client)
+          ->Open(fidl::StringView("abc"),
+                 fio::wire::Flags::kFlagSendRepresentation | fio::wire::Flags::kProtocolDirectory |
+                     fio::wire::kPermReadable | fio::wire::kPermWritable,
+                 {}, server.TakeChannel());
+  // Request should succeed but `client` should be closed with epitaph.
+  ASSERT_EQ(open_result.status(), ZX_OK);
   class EventHandler : public fidl::testing::WireSyncEventHandlerTestBase<fio::Node> {
    public:
     EventHandler() = default;
-
-    void OnOpen(fidl::WireEvent<fio::Node::OnOpen>* event) override {
-      EXPECT_EQ(ZX_ERR_NOT_DIR, event->s);
-      EXPECT_FALSE(event->info.has_value());
-    }
 
     void NotImplemented_(const std::string& name) override {
       ADD_FAILURE() << "Unexpected " << name;
@@ -153,16 +147,16 @@ TEST(Service, ServiceNodeIsNotDirectory) {
   };
 
   EventHandler event_handler;
-  fidl::Status handler_result = event_handler.HandleOneEvent(abc->client);
-  // Expect that |on_open| was received
-  EXPECT_TRUE(handler_result.ok());
+  fidl::Status handler_result = event_handler.HandleOneEvent(client);
+  ASSERT_TRUE(handler_result.is_peer_closed());
+  ASSERT_EQ(handler_result.status(), ZX_ERR_NOT_DIR);
 
   loop.Shutdown();
 }
 
-TEST(Service, OpeningServiceWithNodeReferenceFlag) {
+TEST(Service, OpeningServiceWithNodeProtocol) {
   // Set up the server
-  auto root = fidl::Endpoints<fio::Directory>::Create();
+  auto [root_client, root_server] = fidl::Endpoints<fio::Directory>::Create();
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   fs::SynchronousVfs vfs(loop.dispatcher());
@@ -173,21 +167,20 @@ TEST(Service, OpeningServiceWithNodeReferenceFlag) {
     return ZX_OK;
   });
   directory->AddEntry("abc", vnode);
-  ASSERT_EQ(vfs.ServeDirectory(directory, std::move(root.server)), ZX_OK);
+  ASSERT_EQ(vfs.ServeDirectory(directory, std::move(root_server)), ZX_OK);
 
-  zx::result abc = fidl::CreateEndpoints<fio::Node>();
-  ASSERT_EQ(abc.status_value(), ZX_OK);
+  auto [client, server] = fidl::Endpoints<fio::Node>::Create();
 
   loop.StartThread();
 
-  ASSERT_EQ(fidl::WireCall(root.client)
-                ->DeprecatedOpen(fio::wire::OpenFlags::kNodeReference, {}, fidl::StringView("abc"),
-                                 std::move(abc->server))
-                .status(),
-            ZX_OK);
+  ASSERT_EQ(
+      fidl::WireCall(root_client)
+          ->Open(fidl::StringView("abc"), fio::wire::Flags::kProtocolNode, {}, server.TakeChannel())
+          .status(),
+      ZX_OK);
 
   // The channel should speak |fuchsia.io/Node| instead of the custom service FIDL protocol.
-  const fidl::WireResult result = fidl::WireCall(abc->client)->Query();
+  const fidl::WireResult result = fidl::WireCall(client)->Query();
   ASSERT_EQ(result.status(), ZX_OK);
   const fidl::WireResponse response = result.value();
   const std::span data = response.protocol.get();
