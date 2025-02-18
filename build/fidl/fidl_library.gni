@@ -213,7 +213,6 @@ template("fidl_library") {
     "fuchsia.audio.device",
     "fuchsia.drm",
     "fuchsia.media2",
-    "fuchsia.memory.attribution.plugin",
 
     # TODO(https://fxbug.dev/377756547): Remove this when FDomain passes API review.
     "fuchsia.fdomain",

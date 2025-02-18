@@ -284,7 +284,6 @@ _partner_internal_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.fs:fuchsia.fs",
   "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty",
   "//sdk/fidl/fuchsia.media2:fuchsia.media2",
-  "//sdk/fidl/fuchsia.memory.attribution.plugin:fuchsia.memory.attribution.plugin",
   "//sdk/fidl/fuchsia.memory.debug:fuchsia.memory.debug",
   "//sdk/fidl/fuchsia.memory.heapdump.client:fuchsia.memory.heapdump.client",
   "//sdk/fidl/fuchsia.memory.inspection:fuchsia.memory.inspection",
