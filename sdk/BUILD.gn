@@ -146,20 +146,6 @@ group("final_fuchsia_idk") {
   testonly = true
 }
 
-idk_subbuilds("core_idk_subbuilds") {
-  visibility = []
-  visibility = [
-    ":bazel_in_tree_idk",
-    ":final_fuchsia_idk.exported",
-  ]
-
-  sdk_collection_label = ":core_for_subbuilds"
-  subbuild_prefix = "idk_subbuild.core_for_subbuilds"
-
-  # Use the same name as the collection so paths match up.
-  sdk_collection_name = "core"
-}
-
 # This targets generates a "final" IDK archive, including prebuilt binaries for
 # several target_cpu architectures.
 idk("final_fuchsia_idk.exported") {
@@ -319,65 +305,6 @@ if (!is_host) {
     }
   }
 
-  # The collection for the partner IDK.
-  # Only built in the main build at "PLATFORM" for the target CPU. Sub-builds
-  # build ":core_for_subbuilds" for this same collection.
-  sdk_collection("core") {
-    visibility = []
-    visibility = [
-      ":bazel_in_tree_idk",
-      ":exported_idk_for_ffx_tests",
-      ":final_fuchsia_idk.exported",
-      ":plasa_manifest",
-      ":sdk",
-      ":sdk_source_set_list",
-      "//:bazel_workspace",
-      "//build/bazel/licenses:all_bazel_inputs",
-    ]
-
-    category = "partner"
-    id = sdk_id
-
-    deps = [
-      # Don't add other sdk_molecules here. Add them to the molecule below.
-      ":fuchsia_idk_atoms_produced_by_main_platform_build",
-    ]
-  }
-
-  # Builds the appropriate atoms depending on the build type - main build,
-  # CPU arch sub-build, and API level sub-build.
-  # It selects the deps of "core" or "core_for_subbuilds" as appropriate.
-  # This is only used by vendor repos, which do not have a separate collection
-  # for sub-builds and depend on this (indirectly) from their collection.
-  #
-  # Due to limitations of the build system at the GN/Bazel boundary, this cannot
-  # contain testonly atoms. See https://fxbug.dev/42070088.
-  # Libraries and packages for use in tests absolutely belong in the IDK, but
-  # the `testonly` attribute must be removed before they can be added.
-  sdk_molecule("fuchsia_idk_atoms") {
-    visibility = []
-    visibility += [
-      "//vendor/*",
-
-      # Dependencies related to template sub-targets.
-      ":fuchsia_idk_atoms",
-      ":fuchsia_idk_atoms.validate",
-    ]
-
-    category = "partner"
-
-    if (!sdk_inside_sub_build) {
-      assert(
-          current_build_target_api_level == "PLATFORM" ||
-          # Handle core.x64-sdk_source_sets_and_shlibs-apiXX-build_only builders.
-          # TODO(https://fxbug.dev/42082833): Remove this.
-          override_target_api_level != false)
-      deps = [ ":fuchsia_idk_atoms_produced_by_main_platform_build" ]
-    } else {
-      deps = [ ":fuchsia_idk_atoms_produced_by_subbuilds" ]
-    }
-  }
-
   # Prebuilt libraries and packages that are built exclusively for the API
   # levels that SDK users can target (not "PLATFORM").
   # Note: This target can be built at "PLATFORM" as required by the sub-build
@@ -431,7 +358,7 @@ if (!is_host) {
       ]
     }
 
-    # The rules below only need to be processed once when building the IDK.
+    # The rules below only need to be processed once, during the main build.
     # Since sub-builds change the `target_cpu`, this cannot be used as
     # a condition. While, `host_cpu` does not change in sub-builds, using that
     # would require extra processing and building when it does not match the
@@ -440,6 +367,45 @@ if (!is_host) {
     # https://fxbug.dev/327223536 are addressed sub-builds will never target
     # "PLATFORM" and this logic and GN variable can be removed.
     if (!sdk_inside_sub_build) {
+      # The collection for the partner IDK.
+      # Only built in the main build at "PLATFORM" for the target CPU.
+      # Sub-builds build ":core_for_subbuilds" for this same collection.
+      sdk_collection("core") {
+        visibility = []
+        visibility = [
+          ":bazel_in_tree_idk",
+          ":exported_idk_for_ffx_tests",
+          ":final_fuchsia_idk.exported",
+          ":plasa_manifest",
+          ":sdk",
+          ":sdk_source_set_list",
+          "//:bazel_workspace",
+          "//build/bazel/licenses:all_bazel_inputs",
+        ]
+
+        category = "partner"
+        id = sdk_id
+
+        deps = [
+          # Don't add other sdk_molecules here. Add them to the molecule below.
+          ":fuchsia_idk_atoms_produced_by_main_platform_build",
+        ]
+      }
+
+      idk_subbuilds("core_idk_subbuilds") {
+        visibility = []
+        visibility = [
+          ":bazel_in_tree_idk",
+          ":final_fuchsia_idk.exported",
+        ]
+
+        sdk_collection_label = ":core_for_subbuilds"
+        subbuild_prefix = "idk_subbuild.core_for_subbuilds"
+
+        # Use the same name as the collection so paths match up.
+        sdk_collection_name = "core"
+      }
+
       # All atoms to be produced by the main build for inclusion in the IDK.
       #
       # Due to limitations of the build system at the GN/Bazel boundary, this
@@ -542,6 +508,40 @@ if (!is_host) {
       }
     }  # end if (!sdk_inside_sub_build)
   }  # end if (current_build_target_api_level == "PLATFORM")
+
+  # Builds the appropriate atoms depending on the build type - main build,
+  # CPU arch sub-build, and API level sub-build.
+  # It selects the deps of "core" or "core_for_subbuilds" as appropriate.
+  # This is only used by vendor repos, which do not have a separate collection
+  # for sub-builds and depend on this (indirectly) from their collection.
+  #
+  # Due to limitations of the build system at the GN/Bazel boundary, this cannot
+  # contain testonly atoms. See https://fxbug.dev/42070088.
+  # Libraries and packages for use in tests absolutely belong in the IDK, but
+  # the `testonly` attribute must be removed before they can be added.
+  sdk_molecule("fuchsia_idk_atoms") {
+    visibility = []
+    visibility += [
+      "//vendor/*",
+
+      # Dependencies related to template sub-targets.
+      ":fuchsia_idk_atoms",
+      ":fuchsia_idk_atoms.validate",
+    ]
+
+    category = "partner"
+
+    if (!sdk_inside_sub_build) {
+      assert(
+          current_build_target_api_level == "PLATFORM" ||
+          # Handle core.x64-sdk_source_sets_and_shlibs-apiXX-build_only builders.
+          # TODO(https://fxbug.dev/42082833): Remove this.
+          override_target_api_level != false)
+      deps = [ ":fuchsia_idk_atoms_produced_by_main_platform_build" ]
+    } else {
+      deps = [ ":fuchsia_idk_atoms_produced_by_subbuilds" ]
+    }
+  }
 }  # end if (!is_host)
 
 sdk_molecule("fuchsia_idk_atoms_host_tests") {
@@ -984,8 +984,8 @@ if (current_toolchain == default_toolchain) {
   # to the in-tree Bazel workspace's `@fuchsia_sdk` repository.
   #
   # This exposes the same set of atoms as the `core` collection,
-  # but by default only provides binaries for the current target_cpu
-  # architecture, and the HEAD API level.
+  # but by default it only provides binaries for the current target_cpu
+  # architecture and the "PLATFORM" API level.
   #
   idk("bazel_in_tree_idk") {
     visibility = []
@@ -1123,8 +1123,10 @@ if (current_toolchain == default_toolchain) {
     # would require that this target exist.
     idk_subbuilds_label = "//sdk:non_existent_internal_only_idk_subbuilds"
 
-    # Only build this for the current target_cpu, and the HEAD
-    # API level. This ensures no sub-builds will be launched.
+    # Only build this for the current target_cpu and the "PLATFORM" API level.
+    # This ensures no sub-builds will be launched.
+    # Any prebuilts built will only be available in the in the legacy "binaries"
+    # metadata and the arch/ directory.
     target_cpus = [ target_cpu ]
     api_levels = []
   }
