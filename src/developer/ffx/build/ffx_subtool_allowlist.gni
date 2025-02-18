@@ -17,6 +17,13 @@ ffx_subtool_fidl_allowlist = [
   # most APIs in it are unstable.
   "//sdk/fidl/fuchsia.driver.playground:fuchsia.driver.playground",
 
+  # used by ffx audio
+  "//sdk/fidl/fuchsia.audio:fuchsia.audio",
+  "//sdk/fidl/fuchsia.audio.controller:fuchsia.audio.controller",
+  "//sdk/fidl/fuchsia.audio.device:fuchsia.audio.device",
+  "//sdk/fidl/fuchsia.drm:fuchsia.drm",
+  "//sdk/fidl/fuchsia.media2:fuchsia.media2",
+
   # used by ffx debug
   "//sdk/fidl/fuchsia.exception:fuchsia.exception",
 
