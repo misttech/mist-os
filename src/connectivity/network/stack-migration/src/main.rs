@@ -390,15 +390,13 @@ impl<P: PersistenceProvider, CR: CollaborativeRebootScheduler> Migration<P, CR> 
 struct InspectNodes {
     automated_setting: fuchsia_inspect::UintProperty,
     user_setting: fuchsia_inspect::UintProperty,
+    rollback_state: fuchsia_inspect::StringProperty,
 }
 
 impl InspectNodes {
     fn new<P, CR>(inspector: &fuchsia_inspect::Inspector, m: &Migration<P, CR>) -> Self {
         let root = inspector.root();
-        // TODO(https://fxbug.dev/388051523): Add inspect for rollback.
-        let Migration {
-            current_boot, persisted: Persisted { automated, user, rollback: _ }, ..
-        } = m;
+        let Migration { current_boot, persisted: Persisted { automated, user, rollback }, .. } = m;
         let automated_setting = root.create_uint(
             "automated_setting",
             NetstackVersion::optional_inspect_uint_value(automated),
@@ -406,17 +404,25 @@ impl InspectNodes {
         let user_setting =
             root.create_uint("user_setting", NetstackVersion::optional_inspect_uint_value(user));
 
+        let rollback_state = root.create_string("rollback_state", format!("{rollback:?}"));
+
         // The current boot version is immutable, record it once instead of
         // keeping track of a property node.
         root.record_uint("current_boot", current_boot.version().inspect_uint_value());
-        Self { automated_setting, user_setting }
+        root.record_bool(
+            "forced_netstack2",
+            *current_boot == RollbackNetstackVersion::ForceNetstack2,
+        );
+
+        Self { automated_setting, user_setting, rollback_state }
     }
 
     fn update<P, CR>(&self, m: &Migration<P, CR>) {
-        let Migration { persisted: Persisted { automated, user, rollback: _ }, .. } = m;
-        let Self { automated_setting, user_setting } = self;
+        let Migration { persisted: Persisted { automated, user, rollback }, .. } = m;
+        let Self { automated_setting, user_setting, rollback_state } = self;
         automated_setting.set(NetstackVersion::optional_inspect_uint_value(automated));
         user_setting.set(NetstackVersion::optional_inspect_uint_value(user));
+        rollback_state.set(&format!("{rollback:?}"));
     }
 }
 
@@ -693,6 +699,9 @@ async fn main_inner<
             }
             Action::UpdateRollbackState(new_state) => {
                 migration.update_rollback_state(new_state).await;
+                // Always update inspector state when the rollback state
+                // changes.
+                inspect_nodes.update(&migration);
             }
         }
     }
@@ -1207,6 +1216,8 @@ mod tests {
                 current_boot: 2u64,
                 user_setting: 2u64,
                 automated_setting: 3u64,
+                rollback_state: "None",
+                forced_netstack2: false,
             }
         );
 
@@ -1218,6 +1229,57 @@ mod tests {
                 current_boot: 2u64,
                 user_setting: 0u64,
                 automated_setting: 2u64,
+                rollback_state: "None",
+                forced_netstack2: false,
+            }
+        );
+    }
+
+    #[fuchsia::test]
+    fn inspect_rollback() {
+        let mut m = Migration::new(
+            InMemory::with_persisted(Persisted {
+                user: None,
+                automated: Some(NetstackVersion::Netstack3),
+                rollback: Some(rollback::Persisted::HealthcheckFailures(
+                    rollback::MAX_FAILED_HEALTHCHECKS,
+                )),
+            }),
+            NoCollaborativeReboot,
+        );
+        let inspector = fuchsia_inspect::component::inspector();
+        let nodes = InspectNodes::new(inspector, &m);
+        assert_data_tree!(inspector,
+            root: {
+                current_boot: 2u64,
+                user_setting: 0u64,
+                automated_setting: 3u64,
+                rollback_state: "Some(HealthcheckFailures(5))",
+                forced_netstack2: true,
+            }
+        );
+
+        m.persisted.rollback =
+            Some(rollback::Persisted::HealthcheckFailures(rollback::MAX_FAILED_HEALTHCHECKS + 1));
+        nodes.update(&m);
+        assert_data_tree!(inspector,
+            root: {
+                current_boot: 2u64,
+                user_setting: 0u64,
+                automated_setting: 3u64,
+                rollback_state: "Some(HealthcheckFailures(6))",
+                forced_netstack2: true,
+            }
+        );
+        m.persisted.rollback = Some(rollback::Persisted::Success);
+        nodes.update(&m);
+        assert_data_tree!(inspector,
+            root: {
+                current_boot: 2u64,
+                user_setting: 0u64,
+                automated_setting: 3u64,
+                rollback_state: "Some(Success)",
+                forced_netstack2: true,
             }
         );
     }
