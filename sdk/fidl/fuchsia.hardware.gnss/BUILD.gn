@@ -7,6 +7,10 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.hardware.gnss") {
   sources = [ "gnss_device.fidl" ]
   sdk_area = "Unknown"
+  sdk_category = "partner"
+
+  # TODO(https://fxbug.dev/396653562): Stabilize the FIDL
+  stable = false
   public_deps = [
     "//sdk/fidl/fuchsia.gnss.types",
     "//zircon/vdso/zx",

@@ -252,6 +252,7 @@ fidl_library://fidl/fuchsia.factory
 fidl_library://fidl/fuchsia.factory.wlan
 fidl_library://fidl/fuchsia.feedback
 fidl_library://fidl/fuchsia.fonts
+fidl_library://fidl/fuchsia.gnss.types (unstable)
 fidl_library://fidl/fuchsia.gpu.agis
 fidl_library://fidl/fuchsia.gpu.magma
 fidl_library://fidl/fuchsia.hardware.adc
@@ -262,6 +263,7 @@ fidl_library://fidl/fuchsia.hardware.bluetooth
 fidl_library://fidl/fuchsia.hardware.clock
 fidl_library://fidl/fuchsia.hardware.clockimpl
 fidl_library://fidl/fuchsia.hardware.cpu.ctrl (unstable)
+fidl_library://fidl/fuchsia.hardware.gnss (unstable)
 fidl_library://fidl/fuchsia.hardware.gpio
 fidl_library://fidl/fuchsia.hardware.hrtimer (unstable)
 fidl_library://fidl/fuchsia.hardware.i2c
