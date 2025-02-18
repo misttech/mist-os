@@ -1022,7 +1022,7 @@ reviewed_features = [
 
 [gn.package.tokio."1.38.1".platform."cfg(not(target_os = \"fuchsia\"))"]
 deps = [
-  ":bytes-v1_6_0",
+  ":bytes-v1_10_0",
   ":libc-v0_2_169",
   ":memchr-v2_7_1",
   ":mio-v0_8_9",
