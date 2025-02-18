@@ -4,7 +4,7 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-// TODO(https://fxbug.dev/42164859): Remove secondary CPU code paths and update
+// TODO(https://fxbug.dev/42164859): Remove boot CPU code paths and update
 // comments!
 
 #include <arch/arm64/asm.h>
@@ -68,16 +68,9 @@ handoff_paddr           .req x25
 
 // This code is purely position-independent and generates no relocations
 // that need boot-time fixup.
-.function _start, global
-.label PhysbootHandoff, global
+.function arm64_secondary_start, global
   // As early as possible collect the time stamp.
   sample_ticks
-
-  // This serves as a verification that code-patching was performed before
-  // the kernel was booted; if unpatched, we would trap here and halt.
-  .code_patching.start CASE_ID_SELF_TEST
-  brk #0  // Same as __builtin_trap()
-  .code_patching.end
 
   // Save boot info on the boot CPU alone. Secondaries can jump right to
   // .Lboot_info_ready.
@@ -300,14 +293,12 @@ handoff_paddr           .req x25
 .end_object
 
 .object boot_cpu_kstack, bss, local
-  .skip ARCH_DEFAULT_STACK_SIZE
   .balign 16
 .Lboot_cpu_kstack_end:
 .end_object
 
 #if __has_feature(safe_stack)
 .object boot_cpu_unsafe_kstack, bss, local
-  .skip ARCH_DEFAULT_STACK_SIZE
   .balign 16
 .Lboot_cpu_unsafe_kstack_end:
 .end_object
@@ -315,9 +306,5 @@ handoff_paddr           .req x25
 
 #if __has_feature(shadow_call_stack)
 .object boot_cpu_shadow_call_kstack, bss, local, align=8
-  .skip PAGE_SIZE
 .end_object
 #endif
-
-// This symbol is used by gdb python to know the base of the kernel module
-.label KERNEL_BASE_ADDRESS, global, value=KERNEL_BASE

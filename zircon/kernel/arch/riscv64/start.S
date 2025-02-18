@@ -132,7 +132,7 @@
 .end_function
 
 // Entry point for secondary cpus when started from SBI
-.function riscv64_secondary_entry_asm, global
+.function riscv64_secondary_start, global
   // Enable the MMU with the ASID 0, prefilled by _start
   ld      t0, riscv64_kernel_bootstrap_translation_table_phys
   srli    t1, t0, PAGE_SIZE_SHIFT

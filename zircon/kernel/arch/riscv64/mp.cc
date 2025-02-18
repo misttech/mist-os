@@ -285,11 +285,10 @@ zx_status_t riscv64_start_cpu(cpu_num_t cpu_num, uint32_t hart_id) {
 
   // Compute the entry point in physical address.
   uintptr_t kernel_secondary_entry_paddr =
-      reinterpret_cast<uintptr_t>(&riscv64_secondary_entry_asm);
-  kernel_secondary_entry_paddr +=
-      get_kernel_base_phys() - reinterpret_cast<uintptr_t>(__executable_start);
+      get_kernel_base_phys() + (reinterpret_cast<uintptr_t>(&riscv64_secondary_start) -
+                                reinterpret_cast<uintptr_t>(__executable_start));
 
-  LTRACEF("physical address of entry point at %p is %#lx\n", &riscv64_secondary_entry_asm,
+  LTRACEF("physical address of entry point at %p is %#lx\n", &riscv64_secondary_start,
           kernel_secondary_entry_paddr);
 
   // Tell SBI to start the secondary cpu.

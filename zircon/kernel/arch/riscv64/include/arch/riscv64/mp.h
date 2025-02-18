@@ -135,7 +135,10 @@ inline void arch_set_restricted_flag(bool restricted) {
 
 uint32_t riscv64_boot_hart_id();
 zx_status_t riscv64_start_cpu(cpu_num_t cpu_num, uint32_t hart_id);
-extern "C" void riscv64_secondary_entry_asm();
+
+// The start-up routine for secondary CPUs, which in turn calls the kernel
+// entrypoint of riscv64_secondary_entry().
+extern "C" void riscv64_secondary_start();
 
 // Translate a CPU number to the hart ID of the CPU.
 uint32_t arch_cpu_num_to_hart_id(cpu_num_t cpu_num);

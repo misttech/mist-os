@@ -79,6 +79,10 @@ void arch_init_cpu_map(uint cluster_count, const uint* cluster_cpus);
 void arch_register_mpid(uint cpu_id, uint64_t mpid);
 void arm64_init_percpu_early();
 
+// The start-up routine for secondary CPUs, which in turn calls the kernel
+// entrypoint of arm64_secondary_entry().
+extern "C" void arm64_secondary_start();
+
 extern uint arm_num_cpus;
 
 // Use the x20 register to always point at the local cpu structure for fast access.

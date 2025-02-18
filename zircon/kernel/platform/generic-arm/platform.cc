@@ -157,7 +157,11 @@ zx_status_t platform_start_cpu(cpu_num_t cpu_id, uint64_t mpid) {
   clean_data_object(root_kernel_page_table_phys);
   arch::ThreadMemoryBarrier();
 
-  uint32_t ret = power_cpu_on(mpid, kernel_entry_paddr, 0);
+  uintptr_t kernel_secondary_entry_paddr =
+      get_kernel_base_phys() + (reinterpret_cast<uintptr_t>(&arm64_secondary_start) -
+                                reinterpret_cast<uintptr_t>(__executable_start));
+
+  uint32_t ret = power_cpu_on(mpid, kernel_secondary_entry_paddr, 0);
   dprintf(INFO, "Trying to start cpu %u, mpid %#" PRIx64 " returned: %d\n", cpu_id, mpid, (int)ret);
   if (ret != 0) {
     return ZX_ERR_INTERNAL;
