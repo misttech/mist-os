@@ -4,11 +4,11 @@ If your device isn't able to use `adb` over USB, you can use the
 `ffx starnix adb connect` command to make a device running Android inside
 Starnix visible to the `adb` server on your development machine.
 
-This command asks `adb` to connect to your device using TCP, and makes use of
+This command gets `adb` to connect to your device using TCP, and makes use of
 a network address provided by `ffx` for the connection.
 
 There are a few ways this command can fail to work, this page includes guidance
-for addressing the common cases.
+for addressing common issues.
 
 ## Multiple `adb` devices
 
@@ -18,7 +18,7 @@ that multiple devices are present and it doesn't know which one to use.
 
 To verify if your development machine's `adb` server sees multiple devices, run:
 
-```posix-shell
+```posix-terminal
 adb devices -l
 ```
 
@@ -27,13 +27,13 @@ commands.
 
 To find the identifier of your device, run:
 
-```posix-shell
+```posix-terminal
 ffx starnix adb connect
 ```
 
 You should see output like:
 
-```
+```none
 ...
 adb is connected!
 See https://fuchsia.dev/go/troubleshoot-adb-connect if it doesn't work.
@@ -43,14 +43,15 @@ This connection's "serial number" for adb is {{ '<var>' }}ADB_CONNECTION_ADDRESS
 Take the serial number printed by the command above and either pass it as an
 argument to your `adb` commands:
 
-```posix-shell
+```posix-terminal
 adb -s {{ '<var>' }}ADB_CONNECTION_ADDRESS{{ '</var>' }} shell ...
 ```
 
 Or set an environment variable in your shell that will be used by subsequent
 `adb` commands:
 
-```posix-shell
+```posix-terminal
 export ANDROID_SERIAL={{ '<var>' }}ADB_CONNECTION_ADDRESS{{ '</var>' }}
-adb shell ...
 ```
+
+Then, use `adb` commands normally.
