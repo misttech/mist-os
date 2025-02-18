@@ -5,6 +5,7 @@
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
 
+#include <random>
 #include <vector>
 
 #include <fbl/string_printf.h>
@@ -383,6 +384,61 @@ bool VmoTransferDataTest(perftest::RepeatState* state, uint64_t transfer_size) {
   return true;
 }
 
+// Measure the time taken to manipulate a small portion of a VMO that has many mappings associated
+// with it.
+bool VmoManyMappingsTest(perftest::RepeatState* state, uint64_t num_mappings) {
+  // Create a VMO large enough that it can have |num_mappings| of non overlapping mappings, i.e. has
+  // at least that many pages.
+  const uint64_t vmo_size = num_mappings * zx_system_get_page_size();
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(vmo_size, 0, &vmo));
+  zx_vaddr_t base;
+  // Populate a vmar with subvmars that then contain our mappings to ensure that the VMO is
+  // completely mapped in an easy to access (i.e. contiguous) fashion, but is in unique mappings
+  // that cannot be internally merged by the kernel.
+  zx::vmar vmar;
+  ASSERT_OK(zx::vmar::root_self()->allocate(
+      ZX_VM_CAN_MAP_SPECIFIC | ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE, 0, vmo_size, &vmar,
+      &base));
+  for (uint64_t i = 0; i < num_mappings; i++) {
+    const uint64_t offset = i * zx_system_get_page_size();
+    zx::vmar sub_vmar;
+    zx_vaddr_t addr;
+    ASSERT_OK(vmar.allocate(ZX_VM_SPECIFIC | ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE, offset,
+                            zx_system_get_page_size(), &sub_vmar, &addr));
+    ZX_ASSERT(addr == base + offset);
+    ASSERT_OK(sub_vmar.map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, offset,
+                           zx_system_get_page_size(), &addr));
+    ZX_ASSERT(addr == base + offset);
+  }
+
+  // Prepare a random source for picking a random location in the VMO to read/write from.
+  std::random_device rand_dev;
+  std::uniform_int_distribution rand_page_gen(uint64_t{0}, num_mappings - 1);
+
+  state->DeclareStep("read");
+  state->DeclareStep("write");
+  state->DeclareStep("decommit");
+
+  while (state->KeepRunning()) {
+    // Roll a random page to use.
+    const uint64_t offset = rand_page_gen(rand_dev) * zx_system_get_page_size();
+    uint64_t* target_addr = reinterpret_cast<uint64_t*>(base + offset);
+    // Perform a read from the location, requiring a page table entry to be populated.
+    uint64_t data;
+    memcpy(&data, target_addr, sizeof(data));
+    state->NextStep();
+    // Perform a write to the location, invalidating any zero page mappings.
+    memcpy(target_addr, &data, sizeof(data));
+    state->NextStep();
+    // Decommit the page allocated in the write step, requiring page table entries to be updated.
+    ASSERT_OK(vmo.op_range(ZX_VMO_OP_DECOMMIT, offset, zx_system_get_page_size(), nullptr, 0));
+  }
+  // Cleanup all the mappings, vmars and subvmars.
+  ASSERT_OK(zx::vmar::root_self()->unmap(base, vmo_size));
+  return true;
+}
+
 template <typename Func, typename... Args>
 void RegisterVmoTest(const char* name, Func fn, Args... args) {
   for (unsigned size_in_kbytes : {4, 32, 128, 512, 2048}) {
@@ -461,6 +517,8 @@ void RegisterTests() {
 
   name = fbl::StringPrintf("Vmo/TransferData");
   RegisterVmoTest(name.c_str(), VmoTransferDataTest);
+
+  perftest::RegisterTest("Vmo/ManyMappingsReadWriteDecommit/8192", VmoManyMappingsTest, 8192);
 }
 PERFTEST_CTOR(RegisterTests)
 
