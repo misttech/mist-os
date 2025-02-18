@@ -25,7 +25,7 @@ group("tests") {
     "//src/graphics/drivers/msd-arm-mali/tests",
     "//src/graphics/drivers/msd-intel-gen/tests",
     "//src/graphics/drivers/msd-virtio-gpu/tests",
-    "//src/graphics/drivers/msd-vsi-vip/tests/integration",
+    "//src/graphics/drivers/msd-vsi-vip/tests",
     "//src/graphics/drivers/msd-vsi-vip/tests/unit_tests:msd-vsi-vip-nonhardware-tests",
   ]
   if (target_cpu == "x64") {
