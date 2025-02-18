@@ -25,6 +25,7 @@
 #include <cstdlib>
 #include <list>
 #include <memory>
+#include <span>
 
 #include <fbl/array.h>
 #include <fbl/mutex.h>
@@ -113,7 +114,7 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   void OnClientDead(ClientProxy* client);
   void SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode virtcon_mode);
 
-  void ApplyConfig(DisplayConfig* configs[], int32_t count,
+  void ApplyConfig(std::span<DisplayConfig*> display_configs,
                    display::ConfigStamp client_config_stamp, uint32_t layer_stamp,
                    ClientId client_id) __TA_EXCLUDES(mtx());
 

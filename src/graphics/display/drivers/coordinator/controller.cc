@@ -453,7 +453,7 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
   }
 }
 
-void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
+void Controller::ApplyConfig(std::span<DisplayConfig*> display_configs,
                              display::ConfigStamp client_config_stamp, uint32_t layer_stamp,
                              ClientId client_id) {
   zx_time_t timestamp = zx_clock_get_monotonic();
@@ -465,8 +465,9 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
 
   // TODO(https://fxbug.dev/42080631): Replace VLA with fixed-size array once we have a
   // limit on the number of connected displays.
-  const int32_t display_configs_size = std::max(1, count);
-  display_config_t display_configs[display_configs_size];
+  const int32_t banjo_display_configs_size =
+      std::max<int32_t>(1, static_cast<int32_t>(display_configs.size()));
+  display_config_t banjo_display_configs[banjo_display_configs_size];
   uint32_t display_count = 0;
 
   // The applied configuration's stamp.
@@ -496,15 +497,15 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
     // the configuration, although Client::HandleApplyConfig won't migrate a layer's current
     // image if there is also a pending image.
     if (switching_client || applied_layer_stamp_ != layer_stamp) {
-      for (int i = 0; i < count; i++) {
-        DisplayConfig* config = configs[i];
-        auto display = displays_.find(config->id);
-        if (!display.IsValid()) {
+      for (DisplayConfig* display_config : display_configs) {
+        auto displays_it = displays_.find(display_config->id);
+        if (!displays_it.IsValid()) {
           continue;
         }
+        DisplayInfo& display_info = *displays_it;
 
-        if (display->pending_layer_change) {
-          display->delayed_apply = true;
+        if (display_info.pending_layer_change) {
+          display_info.delayed_apply = true;
           return;
         }
       }
@@ -515,29 +516,28 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
     ++last_issued_driver_config_stamp_;
     driver_config_stamp = last_issued_driver_config_stamp_;
 
-    for (int i = 0; i < count; i++) {
-      DisplayConfig* display_config = configs[i];
-      auto display = displays_.find(display_config->id);
-      if (!display.IsValid()) {
+    for (DisplayConfig* display_config : display_configs) {
+      auto displays_it = displays_.find(display_config->id);
+      if (!displays_it.IsValid()) {
+        continue;
+      }
+      DisplayInfo& display_info = *displays_it;
+
+      display_info.config_image_queue.push({.config_stamp = driver_config_stamp, .images = {}});
+
+      display_info.switching_client = switching_client;
+      display_info.pending_layer_change = display_config->apply_layer_change();
+      if (display_info.pending_layer_change) {
+        display_info.pending_layer_change_driver_config_stamp = driver_config_stamp;
+      }
+      display_info.layer_count = display_config->applied_layer_count();
+      display_info.delayed_apply = false;
+
+      if (display_info.layer_count == 0) {
         continue;
       }
 
-      auto& config_image_queue = display->config_image_queue;
-      config_image_queue.push({.config_stamp = driver_config_stamp, .images = {}});
-
-      display->switching_client = switching_client;
-      display->pending_layer_change = display_config->apply_layer_change();
-      if (display->pending_layer_change) {
-        display->pending_layer_change_driver_config_stamp = driver_config_stamp;
-      }
-      display->layer_count = display_config->applied_layer_count();
-      display->delayed_apply = false;
-
-      if (display->layer_count == 0) {
-        continue;
-      }
-
-      display_configs[display_count++] = *display_config->applied_config();
+      banjo_display_configs[display_count++] = *display_config->applied_config();
 
       for (const LayerNode& applied_layer_node : display_config->get_applied_layers()) {
         const Layer* applied_layer = applied_layer_node.layer;
@@ -569,9 +569,9 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
         if (applied_image->InDoublyLinkedList()) {
           applied_image->RemoveFromDoublyLinkedList();
         }
-        display->images.push_back(applied_image);
-
-        config_image_queue.back().images.push_back({applied_image->id, applied_image->client_id()});
+        display_info.images.push_back(applied_image);
+        display_info.config_image_queue.back().images.push_back(
+            {.image_id = applied_image->id, .client_id = applied_image->client_id()});
       }
     }
 
@@ -591,7 +591,8 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count,
   }
 
   const config_stamp_t banjo_config_stamp = display::ToBanjoDriverConfigStamp(driver_config_stamp);
-  engine_driver_client_->ApplyConfiguration(display_configs, display_count, &banjo_config_stamp);
+  engine_driver_client_->ApplyConfiguration(banjo_display_configs, display_count,
+                                            &banjo_config_stamp);
 
   {
     fbl::AutoLock<fbl::Mutex> lock(mtx());

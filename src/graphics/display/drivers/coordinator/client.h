@@ -39,6 +39,7 @@
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/layer.h"
+#include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/api-types/cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/buffer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
@@ -92,7 +93,7 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, display:
 
   fbl::Array<CoordinatorPixelFormat> pixel_formats_;
 
-  bool display_config_change_ = false;
+  bool has_draft_nonlayer_config_change_ = false;
 
   friend Client;
   friend ClientProxy;
@@ -267,8 +268,20 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   Image::Map images_;
   CaptureImage::Map capture_images_;
 
-  DisplayConfig::Map configs_;
-  bool draft_config_valid_ = false;
+  // Maps each known display ID to this client's display config.
+  //
+  // The client's knowledge of the connected displays can fall out of sync with
+  // this map. This is because the map is modified when the Coordinator
+  // processes display change events from display engine drivers, which happens
+  // before the client receives the display driver.
+  DisplayConfig::Map display_configs_;
+
+  // True iff CheckConfig() succeeded on the draft configuration.
+  //
+  // Set to false any time when the client modifies the draft configuration. Set
+  // to true when the client calls CheckConfig() and the check passes.
+  bool draft_display_config_was_validated_ = false;
+
   bool is_owner_ = false;
 
   // A counter for the number of times the client has successfully applied
