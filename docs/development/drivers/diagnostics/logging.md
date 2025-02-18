@@ -23,7 +23,7 @@ via assembly overrides.
 
 For example, you can make a `//local/BUILD.gn` file:
 
- ```
+```gn
 # //local/BUILD.gn:
 assembly_developer_overrides("sdhci-debug-logs") {
     platform = {
@@ -41,7 +41,7 @@ assembly_developer_overrides("sdhci-debug-logs") {
 
 Then use `fx set` to set the `assembly-override`:
 
-```
+```posix-terminal
 fx set <product.board> --assembly-override=//local:sdhci-debug-logs
 ```
 
