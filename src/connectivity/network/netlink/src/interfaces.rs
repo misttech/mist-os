@@ -571,7 +571,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 // If we've newly acquired a default IPv6 route, send a fake NDUSEROPT message with
                 // a fake RDNSS record to prompt clients that we've achieved upstream IPv6
                 // connectivity.
-                // TODO(https://fxbug.dev/341759423): Rather than constructing a stub NDUSEROPT
+                // TODO(https://fxbug.dev/397475289): Rather than constructing a stub NDUSEROPT
                 // message from a fake RDNSS record, consume real data on this from the netstack
                 // once it is exposed.
                 if *has_default_ipv6_route && previously_did_not_have_default_ipv6_route {
