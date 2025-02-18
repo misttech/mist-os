@@ -163,7 +163,14 @@ impl Writer for FxBlob {
         let () = after_write(bytes.len() as u64);
         let res = fut.await;
         let () = after_write_ack();
-        res.context("calling write on BlobWriter").map_err(WriteBlobError::Other)
+        res.map_err(|e| match e {
+            e @ blob_writer::WriteError::BytesReady(s) => match s {
+                Status::IO_DATA_INTEGRITY => WriteBlobError::Corrupt,
+                Status::NO_SPACE => WriteBlobError::NoSpace,
+                _ => WriteBlobError::FxBlob(e),
+            },
+            e => WriteBlobError::FxBlob(e),
+        })
     }
 }
 
