@@ -955,8 +955,7 @@ class MappingProtectionRanges {
 };
 
 // A representation of the mapping of a VMO into the address space
-class VmMapping final : public VmAddressRegionOrMapping,
-                        public fbl::DoublyLinkedListable<VmMapping*> {
+class VmMapping final : public VmAddressRegionOrMapping {
  public:
   // Accessors for VMO-mapping state
   // These can be read under either lock (both locks being held for writing), so we provide two
@@ -1101,6 +1100,15 @@ class VmMapping final : public VmAddressRegionOrMapping,
   // This is defined and exposed here for the purposes of unittests.
   static constexpr uint64_t kPageFaultMaxOptimisticPages = 16;
 
+  // WAVL tree key function
+  // For use in WAVL tree code only.
+  VmObject::MappingTreeTraits::Key GetKey() const TA_NO_THREAD_SAFETY_ANALYSIS {
+    return VmObject::MappingTreeTraits::Key{
+        .offset = object_offset_locked_object(),
+        .object = reinterpret_cast<uint64_t>(this),
+    };
+  }
+
  protected:
   ~VmMapping() override;
   friend fbl::RefPtr<VmMapping>;
@@ -1184,6 +1192,10 @@ class VmMapping final : public VmAddressRegionOrMapping,
       auto iter = RegionList<>::ChildList::materialize_iterator(*this);
       RegionList<>::Observer::RestoreInvariants(iter);
     }
+    if (size_changed && vmo_mapping_node_.InContainer()) {
+      auto iter = VmObject::MappingTree::materialize_iterator(*this);
+      VmMappingSubtreeState::Observer<VmMapping>::RestoreInvariants(iter);
+    }
   }
 
   // For a VmMapping |state_| is only modified either with the object_ lock held, or if there is no
@@ -1206,6 +1218,12 @@ class VmMapping final : public VmAddressRegionOrMapping,
   // Whether this mapping may be merged with other adjacent mappings. A mergeable mapping is just a
   // region that can be represented by any VmMapping object, not specifically this one.
   Mergeable mergeable_ TA_GUARDED(lock()) = Mergeable::NO;
+
+  fbl::WAVLTreeNodeState<VmMapping*> vmo_mapping_node_ TA_GUARDED(object_->lock());
+  VmMappingSubtreeState mapping_subtree_state_ TA_GUARDED(object_->lock());
+
+  friend VmObject::MappingTreeTraits;
+  friend VmMappingSubtreeState;
 
   // pointer and region of the object we are mapping
   fbl::RefPtr<VmObject> object_ TA_GUARDED(lock());

@@ -35,6 +35,7 @@
 #include <vm/content_size_manager.h>
 #include <vm/page.h>
 #include <vm/vm.h>
+#include <vm/vm_mapping_subtree_state.h>
 #include <vm/vm_object_lock.h>
 #include <vm/vm_page_list.h>
 
@@ -732,6 +733,39 @@ class VmObject : public VmHierarchyBase,
   void RangeChangeUpdateMappingsLocked(uint64_t offset, uint64_t len, RangeChangeOp op)
       TA_REQ(lock());
 
+  // Define custom traits for the mapping WAVLTree as we need both a custom key and node state
+  // accessors. Due to inclusion order this needs to be defined here, and not in the VmMapping
+  // object as the inclusion order is VmObject then VmMapping, but to declare the WAVLTree the
+  // traits object, unlike the VmMapping* pointer, must be fully defined.
+  struct MappingTreeTraits {
+    // Mappings are keyed in the WAVLTree primarily by their offset, however as there can be
+    // multiple mappings starting at the same base offset the address of the mapping object is used
+    // as a tiebreaker.
+    struct Key {
+      uint64_t offset;
+      uint64_t object;
+      static constexpr Key Min() {
+        return Key{
+            .offset = 0,
+            .object = 0,
+        };
+      }
+      bool operator<(const Key& a) const {
+        if (offset != a.offset) {
+          return offset < a.offset;
+        }
+        return object < a.object;
+      }
+      bool operator==(const Key& a) const { return offset == a.offset && object == a.object; }
+    };
+    static fbl::WAVLTreeNodeState<VmMapping*>& node_state(VmMapping& mapping);
+  };
+  using KeyTraits = fbl::DefaultKeyedObjectTraits<
+      MappingTreeTraits::Key, typename fbl::internal::ContainerPtrTraits<VmMapping*>::ValueType>;
+  using MappingTree =
+      fbl::WAVLTree<MappingTreeTraits::Key, VmMapping*, KeyTraits, fbl::DefaultObjectTag,
+                    MappingTreeTraits, VmMappingSubtreeState::Observer<VmMapping>>;
+
  protected:
   enum class VMOType : bool {
     Paged = true,
@@ -761,7 +795,7 @@ class VmObject : public VmHierarchyBase,
   const VMOType type_;
 
   // list of every mapping
-  fbl::DoublyLinkedList<VmMapping*> mapping_list_ TA_GUARDED(lock());
+  MappingTree mapping_list_;
 
   // list of every child. Usage of this lock happens on VmObject creation/deletion in situations
   // where we are also either manipulating the heap and/or the AllVmosList lock. As such this lock

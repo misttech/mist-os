@@ -352,12 +352,14 @@ zx_status_t VmMapping::UnmapLocked(vaddr_t base, size_t size) {
       // We need to remove ourselves from tree before updating base_, since base_ is the tree key.
       // In this case, size_ must also be updated outside of the tree to prevent overlapping ranges
       // when subtree_state_ is updated on insertion.
+      object_->RemoveMappingLocked(this);
       AssertHeld(parent_->lock_ref());
       fbl::RefPtr<VmAddressRegionOrMapping> ref(parent_->subregions_.RemoveRegion(this));
       base_ += size;
       object_offset_ += size;
       set_size_locked(size_ - size);
       parent_->subregions_.InsertRegion(ktl::move(ref));
+      object_->AddMappingLocked(this);
     } else {
       // Resize the protection range, will also cause it to discard any protection ranges that are
       // outside the new size.
