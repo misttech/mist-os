@@ -46,14 +46,13 @@ zx_status_t ServiceProxyDir::Lookup(std::string_view name, fbl::RefPtr<fs::Vnode
     *out = entry->second;
     return ZX_OK;
   }
-  // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
-  entries_.emplace(
-      entry_name, *out = fbl::MakeRefCounted<fs::Service>([this, entry_name](
-                                                              fidl::ServerEnd<fio::Node> request) {
-        return fidl::WireCall(proxy_dir_)
-            ->DeprecatedOpen({}, {}, fidl::StringView::FromExternal(entry_name), std::move(request))
-            .status();
-      }));
+  entries_.emplace(entry_name,
+                   *out = fbl::MakeRefCounted<fs::Service>([this, entry_name](zx::channel request) {
+                     return fidl::WireCall(proxy_dir_)
+                         ->Open(fidl::StringView::FromExternal(entry_name),
+                                fio::Flags::kProtocolService, {}, std::move(request))
+                         .status();
+                   }));
 
   return ZX_OK;
 }
