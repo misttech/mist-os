@@ -12,6 +12,7 @@
         job_policy_create_raw_processes: "true",
         is_shared_process: "true",
         use_next_vdso: "true",
+        lifecycle: { stop_event: "notify" },
 
         // Needed because starnix depends on the usercopy crate which takes
         // the job's exception channel to handle page faults. Normally the
