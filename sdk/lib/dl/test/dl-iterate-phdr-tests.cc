@@ -10,11 +10,14 @@
 
 namespace {
 
-using dl::testing::CollectPhdrInfo;
-using dl::testing::DlPhdrInfo;
-using dl::testing::PhdrInfoList;
 using dl::testing::TestModule;
 using dl::testing::TestSym;
+
+using dl::testing::CollectModulePhdrInfo;
+using dl::testing::GetGlobalCounters;
+using dl::testing::GetPhdrInfoForModule;
+using dl::testing::ModuleInfoList;
+using dl::testing::ModulePhdrInfo;
 
 using dl::testing::DlTests;
 TYPED_TEST_SUITE(DlTests, dl::testing::TestTypes);
@@ -22,29 +25,24 @@ TYPED_TEST_SUITE(DlTests, dl::testing::TestTypes);
 // Call the system dl_iterate_phdr to collect the phdr info for startup modules
 // loaded with this unittest: this serves as the source of truth of what is
 // loaded when the test is run.
-PhdrInfoList GetStartupPhdrInfo() {
-  PhdrInfoList phdr_info;
-  dl_iterate_phdr(CollectPhdrInfo, &phdr_info);
+ModuleInfoList GetStartupPhdrInfo() {
+  ModuleInfoList phdr_info;
+  dl_iterate_phdr(CollectModulePhdrInfo, &phdr_info);
   return phdr_info;
 }
 
-const PhdrInfoList gStartupPhdrInfo = GetStartupPhdrInfo();
+const ModuleInfoList gStartupPhdrInfo = GetStartupPhdrInfo();
 
 // Test that `dl_iterate_phdr` includes startup modules.
 TYPED_TEST(DlTests, DlIteratePhdrStartupModules) {
-  PhdrInfoList startup_info_list;
-  EXPECT_EQ(this->DlIteratePhdr(CollectPhdrInfo, &startup_info_list), 0);
+  ModuleInfoList startup_info_list;
+  EXPECT_EQ(this->DlIteratePhdr(CollectModulePhdrInfo, &startup_info_list), 0);
 
   // If the dlopen implementation can't unload modules, there will be additional
   // modules that are collected by dl_iterate_phdr that were loaded by tests
-  // that ran before this one. If that is the case, we only check that the
-  // actual startup modules in `gStartupPhdrInfo` is a subset of the entries
-  // collected by this test.
-  if (TestFixture::kDlCloseUnloadsModules) {
-    EXPECT_EQ(gStartupPhdrInfo, startup_info_list);
-  } else {
-    EXPECT_THAT(gStartupPhdrInfo, ::testing::IsSubsetOf(startup_info_list));
-  }
+  // that ran before this one. This checks that `startup_info_list` at least
+  // starts with the elements in `gStartupPhdrInfo`.
+  EXPECT_THAT(startup_info_list, ::testing::ElementsAreArray(gStartupPhdrInfo));
 }
 
 // Test the following as it affects `dl_iterate_phdr` output:
@@ -56,12 +54,11 @@ TYPED_TEST(DlTests, DlIteratePhdrBasic) {
   const std::string kRet17File = TestModule("ret17");
 
   // Record initial values to compare against during the test.
-  PhdrInfoList initial_info_list;
-  EXPECT_EQ(this->DlIteratePhdr(CollectPhdrInfo, &initial_info_list), 0);
+  ModuleInfoList initial_info_list;
+  EXPECT_EQ(this->DlIteratePhdr(CollectModulePhdrInfo, &initial_info_list), 0);
+  const ModulePhdrInfo last_phdr_info = initial_info_list.back();
 
-  DlPhdrInfo last_phdr_info = initial_info_list.back();
-  const size_t loaded = last_phdr_info.loaded();
-  const size_t unloaded = last_phdr_info.unloaded();
+  const auto [initial_loaded, initial_unloaded] = GetGlobalCounters(this);
 
   this->ExpectRootModule(kRet17File);
 
@@ -70,15 +67,11 @@ TYPED_TEST(DlTests, DlIteratePhdrBasic) {
   EXPECT_TRUE(open_ret17.value());
 
   // Check that a struct `dl_pdhr_info` is produced for the dlopen-ed module.
-  PhdrInfoList open_info_list;
-  EXPECT_EQ(this->DlIteratePhdr(CollectPhdrInfo, &open_info_list), 0);
-  EXPECT_EQ(open_info_list.size(), initial_info_list.size() + 1);
-
-  DlPhdrInfo ret17_phdr_info = open_info_list.back();
-  EXPECT_EQ(ret17_phdr_info.name(), kRet17File);
+  ModulePhdrInfo ret17_phdr_info = GetPhdrInfoForModule(this, kRet17File);
 
   // Check that the `.dlpi_adds` counter is adjusted.
-  EXPECT_EQ(ret17_phdr_info.loaded(), loaded + 1);
+  const size_t loaded_after_open = GetGlobalCounters(this).loaded;
+  EXPECT_EQ(loaded_after_open, initial_loaded + 1);
 
   // Look up a symbol from the module and expect that its pointer value should
   // be within the address range of the module's phdrs from its
@@ -93,22 +86,23 @@ TYPED_TEST(DlTests, DlIteratePhdrBasic) {
 
   // A final check that dl-closing the module will remove its entry and update
   // the `.dlpi_subs` counter.
-  PhdrInfoList close_info_list;
-  EXPECT_EQ(this->DlIteratePhdr(CollectPhdrInfo, &close_info_list), 0);
-
+  ModuleInfoList close_info_list;
+  EXPECT_EQ(this->DlIteratePhdr(CollectModulePhdrInfo, &close_info_list), 0);
   // The last entry should be the same as at the beginning of the test.
-  DlPhdrInfo test_last_phdr_info = close_info_list.back();
+  const ModulePhdrInfo test_last_phdr_info = close_info_list.back();
+
+  const size_t unloaded_after_close = GetGlobalCounters(this).unloaded;
 
   if (TestFixture::kDlCloseUnloadsModules) {
-    EXPECT_EQ(test_last_phdr_info.unloaded(), unloaded + 1);
+    EXPECT_EQ(unloaded_after_close, initial_unloaded + 1);
     EXPECT_EQ(test_last_phdr_info, last_phdr_info);
     EXPECT_EQ(close_info_list.size(), initial_info_list.size());
   } else {
     // Musl-Fuchsia's dlclose is a no-op and does not change dl_iterate_phdr
     // output: the module entry is preserved.
-    EXPECT_EQ(test_last_phdr_info.unloaded(), unloaded);
+    EXPECT_EQ(unloaded_after_close, initial_unloaded);
     EXPECT_EQ(test_last_phdr_info, ret17_phdr_info);
-    EXPECT_EQ(close_info_list.size(), open_info_list.size());
+    EXPECT_EQ(close_info_list.size(), initial_info_list.size() + 1);
   }
 }
 
