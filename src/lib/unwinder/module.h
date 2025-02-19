@@ -7,7 +7,6 @@
 
 #include <cstdint>
 #include <cstring>
-#include <map>
 
 #include "src/lib/unwinder/memory.h"
 
@@ -24,14 +23,19 @@ struct Module {
   // The load address.
   uint64_t load_address;
 
-  // Data accessor. Cannot be null.
-  Memory* memory;
+  // Binary data accessor from either a live process or a local ELF file. Cannot be null.
+  Memory* binary_memory;
+  // Debug info data accessor for an ELF file containing DWARF debugging info. Optionally null.
+  Memory* debug_info_memory;
 
   // Address mode.
   AddressMode mode;
 
-  Module(uint64_t addr, Memory* mem, AddressMode mod)
-      : load_address(addr), memory(mem), mode(mod) {}
+  Module(uint64_t addr, Memory* binary, AddressMode mod)
+      : load_address(addr), binary_memory(binary), debug_info_memory(nullptr), mode(mod) {}
+
+  Module(uint64_t addr, Memory* binary, Memory* debug_info, AddressMode mod)
+      : load_address(addr), binary_memory(binary), debug_info_memory(debug_info), mode(mod) {}
 };
 
 }  // namespace unwinder

@@ -100,7 +100,13 @@ const constexpr uint64_t kDwarf64CieId = std::numeric_limits<uint64_t>::max();
 
 }  // namespace
 
-// Load the .eh_frame from the ELF image in memory.
+// Load the .eh_frame and/or .debug_frame.
+//
+// If |address_mode_| is kProcess, then .eh_frame will be loaded from the loaded segment in process
+// memory, and .debug_frame will never be loaded. Otherwise, the module will read from the given ELF
+// file on disk. Depending on the method of compilation for the particular TU of a given PC, the
+// .eh_frame or .debug_frame section may be used. .debug_frame is preferred and therefore inspected
+// first for a PC.
 //
 // See the Linux Standard Base Core Specification
 // https://refspecs.linuxfoundation.org/LSB_5.0.0/LSB-Core-generic/LSB-Core-generic/ehframechpt.html
@@ -112,6 +118,18 @@ Error CfiModule::Load() {
     return Error("no elf memory");
   }
 
+  auto eh_frame_err = LoadEhFrame();
+  auto debug_frame_err = LoadDebugFrame();
+
+  if (eh_frame_err.has_err() && debug_frame_err.has_err()) {
+    return Error("Failed to load both eh_frame (err=\"%s\") and debug_frame (\"%s\") sections\n.",
+                 eh_frame_err.msg().c_str(), debug_frame_err.msg().c_str());
+  }
+
+  return Success();
+}
+
+Error CfiModule::LoadEhFrame() {
   Elf64_Ehdr ehdr;
   if (auto err = elf_->Read(elf_ptr_, ehdr); err.has_err()) {
     return err;
@@ -145,6 +163,7 @@ Error CfiModule::Load() {
       pc_end_ = std::max(pc_end_, elf_ptr_ + phdr.p_vaddr + phdr.p_memsz);
     }
   }
+
   if (!eh_frame_hdr_ptr_) {
     return Error("no PT_GNU_EH_FRAME segment");
   }
@@ -187,45 +206,62 @@ Error CfiModule::Load() {
     return Error("empty binary search table");
   }
 
+  return Success();
+}
+
+Error CfiModule::LoadDebugFrame() {
+  Elf64_Ehdr ehdr;
+  if (auto err = elf_->Read(elf_ptr_, ehdr); err.has_err()) {
+    return err;
+  }
+
+  // Header magic should be correct.
+  if (strncmp(reinterpret_cast<const char*>(ehdr.e_ident), ELFMAG, SELFMAG) != 0) {
+    return Error("not an ELF image");
+  }
+
   // ==============================================================================================
-  // Optionally load from the .debug_frame section. Any failure is not an error here.
+  // Load from the .debug_frame section, if present.
   // ==============================================================================================
   debug_frame_ptr_ = 0;
   debug_frame_end_ = 0;
 
   // Section headers and .debug_frame section are not loaded.
   if (address_mode_ == Module::AddressMode::kProcess) {
-    return Success();
+    return Error("debug_frame section not present when AddressMode == kProcess");
   }
 
   // if ehdr.e_shstrndx is 0, it means there's no section info, i.e., the binary is stripped.
   if (!ehdr.e_shstrndx) {
-    return Success();
+    return Error("no section info, is this a stripped binary?");
   }
 
   uint64_t shstr_hdr_ptr =
       elf_ptr_ + ehdr.e_shoff + static_cast<uint64_t>(ehdr.e_shentsize) * ehdr.e_shstrndx;
   Elf64_Shdr shstr_hdr;
-  if (elf_->Read(shstr_hdr_ptr, shstr_hdr).has_err()) {
-    return Success();
+  if (auto err = elf_->Read(shstr_hdr_ptr, shstr_hdr); err.has_err()) {
+    return err;
   }
 
   for (uint64_t i = 0; i < ehdr.e_shnum; i++) {
     Elf64_Shdr shdr;
-    if (elf_->Read(elf_ptr_ + ehdr.e_shoff + ehdr.e_shentsize * i, shdr).has_err()) {
-      continue;
+    if (auto err = elf_->Read(elf_ptr_ + ehdr.e_shoff + ehdr.e_shentsize * i, shdr);
+        err.has_err()) {
+      return err;
     }
     static constexpr char target_section_name[] = ".debug_frame";
     char section_name[sizeof(target_section_name)];
-    if (elf_->Read(elf_ptr_ + shstr_hdr.sh_offset + shdr.sh_name, section_name).has_err()) {
-      continue;
+    if (auto err = elf_->Read(elf_ptr_ + shstr_hdr.sh_offset + shdr.sh_name, section_name);
+        err.has_err()) {
+      return err;
     }
     if (strncmp(section_name, target_section_name, sizeof(section_name)) == 0) {
       debug_frame_ptr_ = elf_ptr_ + shdr.sh_offset;
       debug_frame_end_ = debug_frame_ptr_ + shdr.sh_size;
     }
   }
-  return Success();
+
+  return Error("no debug_frame section found");
 }
 
 Error CfiModule::Step(Memory* stack, const Registers& current, Registers& next) {

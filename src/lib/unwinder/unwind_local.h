@@ -5,7 +5,8 @@
 #ifndef SRC_LIB_UNWINDER_UNWIND_LOCAL_H_
 #define SRC_LIB_UNWINDER_UNWIND_LOCAL_H_
 
-#include "src/lib/unwinder/unwind.h"
+#include "src/lib/unwinder/frame.h"
+#include "src/lib/unwinder/memory.h"
 
 namespace unwinder {
 

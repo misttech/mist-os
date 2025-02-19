@@ -72,6 +72,11 @@ class CfiModule {
   [[nodiscard]] Error SearchDebugFrame(uint64_t pc, DwarfCie& cie, DwarfFde& fde);
   [[nodiscard]] Error BuildDebugFrameMap();
 
+  // Both of these functions read the ELF file header locally to avoid needing to include elf.h here
+  // which causes compilation issues on macos.
+  [[nodiscard]] Error LoadEhFrame();
+  [[nodiscard]] Error LoadDebugFrame();
+
   // Helpers to decode CIE and FDE. Version could be 1 or 4.
   [[nodiscard]] Error DecodeFde(uint8_t version, uint64_t fde_ptr, DwarfCie& cie, DwarfFde& fde);
   [[nodiscard]] Error DecodeCie(uint8_t version, uint64_t cie_ptr, DwarfCie& cie);
