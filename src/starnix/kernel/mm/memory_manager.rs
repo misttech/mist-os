@@ -1300,8 +1300,7 @@ impl MemoryManagerState {
 
                 // Create and map a child COW memory object mapping that represents the truncated tail.
                 let memory_info = backing.memory().basic_info();
-                let child_memory_offset =
-                    (range.start - backing.base()) as u64 + backing.memory_offset();
+                let child_memory_offset = backing.address_to_offset(range.start);
                 let child_length = range.end - range.start;
                 let mut child_memory = backing
                     .memory()
@@ -3161,8 +3160,7 @@ impl MemoryManager {
             }
             match mapping.backing() {
                 MappingBacking::Memory(backing) => {
-                    let memory_offset =
-                        backing.memory_offset() + (range.start - backing.base()) as u64;
+                    let memory_offset = backing.address_to_offset(range.start);
                     let length = range.end - range.start;
 
                     let target_memory = if mapping.flags().contains(MappingFlags::SHARED)
