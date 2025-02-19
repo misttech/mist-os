@@ -19,10 +19,11 @@ fn filter(key: &ObjectKey) -> bool {
     }
 }
 
-// Limiting to ~100KiB of space usage. 56 bytes of linear overhead per item plus the overhead of
-// the structure. This is just used directly for now, we can parameterize it in the type if this is
-// ever desired to vary.
-const ITEM_LIMIT: usize = 1535;
+/// Number of items allowed in the TreeCache.
+///
+/// The TreeCache is used to speed up duplicate LSMTree::find calls. These duplicate calls tend
+/// to happen close together so the size of the cache doesn't need to be very big.
+const ITEM_LIMIT: usize = 64;
 
 struct Placeholder<'a> {
     cache: &'a TreeCache,
