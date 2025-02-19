@@ -6,7 +6,11 @@ library test.conformance;
 
 type EmptyStruct = struct {};
 
-type OneEmptyStructInStruct = struct {
+// This struct intentionally starts with the letter 'A'
+// so that it will appear in the IR before EmptyStruct.
+// This tests that each backend generates bindings compatible
+// with declarations in arbitrary order.
+type AnEmptyStructInStruct = struct {
     v EmptyStruct;
 };
 
