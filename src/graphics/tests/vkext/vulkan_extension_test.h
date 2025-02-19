@@ -51,12 +51,7 @@ class VulkanExtensionTest : public testing::Test {
 
  protected:
   using UniqueBufferCollection =
-#if VK_HEADER_VERSION < 301
-      // TODO(https://fxbug.dev/379153784): Delete this once the migration is done.
-      vk::UniqueHandle<vk::BufferCollectionFUCHSIA, vk::DispatchLoaderDynamic>;
-#else   // VK_HEADER_VERSION >= 301
       vk::UniqueHandle<vk::BufferCollectionFUCHSIA, vk::detail::DispatchLoaderDynamic>;
-#endif  // VK_HEADER_VERSION < 301
 
   bool InitVulkan();
   bool InitSysmemAllocator();
@@ -98,12 +93,7 @@ class VulkanExtensionTest : public testing::Test {
   vk::UniqueImage vk_image_;
   vk::UniqueBuffer vk_buffer_;
   vk::UniqueDeviceMemory vk_device_memory_;
-#if VK_HEADER_VERSION < 301
-  // TODO(https://fxbug.dev/379153784): Delete this once the migration is done.
-  vk::DispatchLoaderDynamic loader_;
-#else   // VK_HEADER_VERSION >= 301
   vk::detail::DispatchLoaderDynamic loader_;
-#endif  // VK_HEADER_VERSION < 301
 };
 
 #endif  // SRC_GRAPHICS_TESTS_VKEXT_VULKAN_EXTENSION_TEST_H_

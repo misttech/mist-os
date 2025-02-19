@@ -103,12 +103,7 @@ class VulkanDeviceQueues : public fxl::RefCountedThreadSafe<VulkanDeviceQueues> 
   vk::Queue vk_transfer_queue() const { return transfer_queue_; }
   uint32_t vk_transfer_queue_family() const { return transfer_queue_family_; }
   vk::SurfaceKHR vk_surface() const { return params_.surface; }
-#if VK_HEADER_VERSION < 301
-  // TODO(https://fxbug.dev/379153784): Delete this once the migration is done.
-  const vk::DispatchLoaderDynamic& dispatch_loader() const { return dispatch_loader_; }
-#else   // VK_HEADER_VERSION >= 301
   const vk::detail::DispatchLoaderDynamic& dispatch_loader() const { return dispatch_loader_; }
-#endif  // VK_HEADER_VERSION < 301
 
   // Return the parameters that were used to create this device and queues.
   const Params& params() const { return params_; }
@@ -132,12 +127,7 @@ class VulkanDeviceQueues : public fxl::RefCountedThreadSafe<VulkanDeviceQueues> 
 
   vk::Device device_;
   vk::PhysicalDevice physical_device_;
-#if VK_HEADER_VERSION < 301
-  // TODO(https://fxbug.dev/379153784): Delete this once the migration is done.
-  vk::DispatchLoaderDynamic dispatch_loader_;
-#else   // VK_HEADER_VERSION >= 301
   vk::detail::DispatchLoaderDynamic dispatch_loader_;
-#endif  // VK_HEADER_VERSION < 301
   vk::Queue main_queue_;
   uint32_t main_queue_family_;
   vk::Queue transfer_queue_;

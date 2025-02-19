@@ -16,12 +16,7 @@ struct VulkanContext {
   const vk::Instance instance;
   const vk::PhysicalDevice physical_device;
   const vk::Device device;
-#if VK_HEADER_VERSION < 301
-  // TODO(https://fxbug.dev/379153784): Delete this once the migration is done.
-  const vk::DispatchLoaderDynamic loader;
-#else   // VK_HEADER_VERSION >= 301
   const vk::detail::DispatchLoaderDynamic loader;
-#endif  // VK_HEADER_VERSION < 301
   // Queue that supports both graphics and compute.
   const vk::Queue queue;
   const uint32_t queue_family_index;
@@ -30,13 +25,8 @@ struct VulkanContext {
   const uint32_t transfer_queue_family_index;
 
   VulkanContext(vk::Instance instance, vk::PhysicalDevice physical_device, vk::Device device,
-#if VK_HEADER_VERSION < 301
-                // TODO(https://fxbug.dev/379153784): Delete this once the migration is done.
-                vk::DispatchLoaderDynamic loader,
-#else   // VK_HEADER_VERSION >= 301
-                vk::detail::DispatchLoaderDynamic loader,
-#endif  // VK_HEADER_VERSION < 301
-                vk::Queue queue, uint32_t queue_family_index, vk::Queue transfer_queue,
+                vk::detail::DispatchLoaderDynamic loader, vk::Queue queue,
+                uint32_t queue_family_index, vk::Queue transfer_queue,
                 uint32_t transfer_queue_family_index)
       : instance(instance),
         physical_device(physical_device),
@@ -45,8 +35,7 @@ struct VulkanContext {
         queue(queue),
         queue_family_index(queue_family_index),
         transfer_queue(transfer_queue),
-        transfer_queue_family_index(transfer_queue_family_index) {
-  }
+        transfer_queue_family_index(transfer_queue_family_index) {}
 
   VulkanContext() : queue_family_index(UINT32_MAX), transfer_queue_family_index(UINT32_MAX) {}
 };

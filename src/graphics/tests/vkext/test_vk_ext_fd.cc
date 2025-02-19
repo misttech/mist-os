@@ -55,12 +55,7 @@ class TestBase : public testing::Test {
 
   std::vector<const char*> desired_device_extensions_;
   std::unique_ptr<VulkanContext> context_;
-#if VK_HEADER_VERSION < 301
-  // TODO(https://fxbug.dev/379153784): Delete this once the migration is done.
-  vk::DispatchLoaderDynamic loader_;
-#else   // VK_HEADER_VERSION >= 301
   vk::detail::DispatchLoaderDynamic loader_;
-#endif  // VK_HEADER_VERSION < 301
 };
 
 // Test the vulkan semaphore external fd extension.
