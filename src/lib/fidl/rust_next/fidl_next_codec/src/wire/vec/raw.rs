@@ -6,12 +6,12 @@ use core::ptr::slice_from_raw_parts_mut;
 
 use munge::munge;
 
-use crate::{u64_le, Decode, DecodeError, Decoder, DecoderExt, Slot, WirePointer};
+use crate::{u64_le, Slot, WirePointer};
 
 #[repr(C)]
 pub struct RawWireVector<T> {
-    len: u64_le,
-    ptr: WirePointer<T>,
+    pub len: u64_le,
+    pub ptr: WirePointer<T>,
 }
 
 // SAFETY: `RawWireVector` doesn't add any restrictions on sending across thread boundaries, and so
@@ -43,43 +43,6 @@ impl<T> RawWireVector<T> {
     }
 
     pub fn as_slice_ptr(&self) -> *mut [T] {
-        slice_from_raw_parts_mut(self.as_ptr(), self.len().try_into().unwrap())
-    }
-
-    /// # Safety
-    ///
-    /// The elements of the wire vector must not need to be individually decoded, and must always be
-    /// valid.
-    pub unsafe fn decode_raw<D>(
-        slot: Slot<'_, Self>,
-        mut decoder: &mut D,
-    ) -> Result<(), DecodeError>
-    where
-        D: Decoder + ?Sized,
-        T: Decode<D>,
-    {
-        munge!(let Self { len, mut ptr } = slot);
-
-        let len = len.to_native();
-        if WirePointer::is_encoded_present(ptr.as_mut())? {
-            let mut slice = decoder.take_slice_slot::<u8>(len as usize)?;
-            WirePointer::set_decoded(ptr, slice.as_mut_ptr().cast());
-        }
-
-        Ok(())
-    }
-}
-
-unsafe impl<D: Decoder + ?Sized, T: Decode<D>> Decode<D> for RawWireVector<T> {
-    fn decode(slot: Slot<'_, Self>, mut decoder: &mut D) -> Result<(), DecodeError> {
-        munge!(let Self { len, mut ptr } = slot);
-
-        let len = len.to_native();
-        if WirePointer::is_encoded_present(ptr.as_mut())? {
-            let slice = decoder.decode_next_slice::<T>(len as usize)?;
-            WirePointer::set_decoded(ptr, slice.into_raw().cast());
-        }
-
-        Ok(())
+        slice_from_raw_parts_mut(self.as_ptr(), self.len() as usize)
     }
 }

@@ -9,8 +9,8 @@ use munge::munge;
 
 use super::raw::RawWireVector;
 use crate::{
-    Decode, DecodeError, Decoder, Encodable, EncodableOption, Encode, EncodeError, EncodeOption,
-    Encoder, EncoderExt as _, Slot, TakeFrom, WireVector,
+    Decode, DecodeError, Decoder, DecoderExt as _, Encodable, EncodableOption, Encode, EncodeError,
+    EncodeOption, Encoder, EncoderExt as _, Slot, TakeFrom, WirePointer, WireVector,
 };
 
 /// An optional FIDL vector
@@ -69,20 +69,20 @@ impl<T> WireOptionalVector<T> {
     /// valid.
     pub unsafe fn decode_raw<D>(
         mut slot: Slot<'_, Self>,
-        decoder: &mut D,
+        mut decoder: &mut D,
     ) -> Result<(), DecodeError>
     where
         D: Decoder + ?Sized,
         T: Decode<D>,
     {
-        munge!(let Self { raw } = slot.as_mut());
-        unsafe {
-            RawWireVector::decode_raw(raw, decoder)?;
-        }
+        munge!(let Self { raw: RawWireVector { len, mut ptr } } = slot.as_mut());
 
-        let this = unsafe { slot.deref_unchecked() };
-        if this.raw.as_ptr().is_null() && this.raw.len() != 0 {
-            return Err(DecodeError::InvalidOptionalSize(this.raw.len()));
+        let len = len.to_native();
+        if WirePointer::is_encoded_present(ptr.as_mut())? {
+            let mut slice = decoder.take_slice_slot::<T>(len as usize)?;
+            WirePointer::set_decoded(ptr, slice.as_mut_ptr().cast());
+        } else if len != 0 {
+            return Err(DecodeError::InvalidOptionalSize(len));
         }
 
         Ok(())
@@ -96,13 +96,15 @@ impl<T: fmt::Debug> fmt::Debug for WireOptionalVector<T> {
 }
 
 unsafe impl<D: Decoder + ?Sized, T: Decode<D>> Decode<D> for WireOptionalVector<T> {
-    fn decode(mut slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
-        munge!(let Self { raw } = slot.as_mut());
-        RawWireVector::decode(raw, decoder)?;
+    fn decode(mut slot: Slot<'_, Self>, mut decoder: &mut D) -> Result<(), DecodeError> {
+        munge!(let Self { raw: RawWireVector { len, mut ptr } } = slot.as_mut());
 
-        let this = unsafe { slot.deref_unchecked() };
-        if this.raw.as_ptr().is_null() && this.raw.len() != 0 {
-            return Err(DecodeError::InvalidOptionalSize(this.raw.len()));
+        let len = len.to_native();
+        if WirePointer::is_encoded_present(ptr.as_mut())? {
+            let slice = decoder.decode_next_slice::<T>(len as usize)?;
+            WirePointer::set_decoded(ptr, slice.into_raw().cast());
+        } else if len != 0 {
+            return Err(DecodeError::InvalidOptionalSize(len));
         }
 
         Ok(())
