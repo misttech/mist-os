@@ -82,7 +82,13 @@ zx_status_t vmm_page_fault_handler(vaddr_t addr, uint flags) {
   // If we get this, then all checks passed but we were interrupted or killed while waiting for the
   // request to be fulfilled. Pretend the fault was successful and let the thread re-fault after it
   // is resumed (in case of suspension), or proceed with termination.
-  if (status == ZX_ERR_INTERNAL_INTR_RETRY || status == ZX_ERR_INTERNAL_INTR_KILLED) {
+  if (status == ZX_ERR_INTERNAL_INTR_RETRY ||
+      // If we are in kernel mode (which can only happen from a usercopy), surface the error code so
+      // that the page fault can fail immediately. Note that we don't need to do the same for a
+      // suspend because the PageFault() call will handle it internally; suspension cannot
+      // prematurely terminate page fault resolution in kernel mode. See https://fxbug.dev/42084841
+      // for details.
+      (status == ZX_ERR_INTERNAL_INTR_KILLED && flags & VMM_PF_FLAG_USER)) {
     status = ZX_OK;
   }
 
