@@ -2873,7 +2873,7 @@ impl MemoryManager {
             state: RwLock::new(MemoryManagerState {
                 user_vmar,
                 user_vmar_info,
-                mappings: RangeMap::new(),
+                mappings: Default::default(),
                 #[cfg(feature = "alternate_anon_allocs")]
                 private_anonymous: PrivateAnonymousMemoryManager::new(backing_size),
                 forkable_state: Default::default(),
@@ -3251,7 +3251,7 @@ impl MemoryManager {
             state.brk = None;
             state.executable_node = Some(exe_node);
 
-            std::mem::replace(&mut state.mappings, RangeMap::new())
+            std::mem::replace(&mut state.mappings, Default::default())
         };
         self.initialize_mmap_layout(arch_width)?;
         Ok(())

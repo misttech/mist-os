@@ -94,7 +94,7 @@ where
 {
     /// By default, a RangeMap is empty.
     fn default() -> Self {
-        Self::new()
+        Self { map: Default::default() }
     }
 }
 
@@ -103,11 +103,6 @@ where
     K: Ord + Copy,
     V: Clone + Eq,
 {
-    /// Returns an empty RangeMap.
-    pub fn new() -> Self {
-        RangeMap { map: Default::default() }
-    }
-
     /// Returns the range (and associated value) that contains the given point,
     /// if any.
     ///
@@ -328,7 +323,7 @@ mod test {
 
     #[::fuchsia::test]
     fn test_empty() {
-        let mut map = RangeMap::<u32, i32>::new();
+        let mut map = RangeMap::<u32, i32>::default();
 
         assert!(map.get(12).is_none());
         map.remove(10..34);
@@ -339,7 +334,7 @@ mod test {
 
     #[::fuchsia::test]
     fn test_insert_into_empty() {
-        let mut map = RangeMap::<u32, i32>::new();
+        let mut map = RangeMap::<u32, i32>::default();
 
         map.insert(10..34, -14);
 
@@ -352,7 +347,7 @@ mod test {
 
     #[::fuchsia::test]
     fn test_iter() {
-        let mut map = RangeMap::<u32, i32>::new();
+        let mut map = RangeMap::<u32, i32>::default();
 
         map.insert(10..34, -14);
         map.insert(74..92, -12);
@@ -392,7 +387,7 @@ mod test {
 
     #[::fuchsia::test]
     fn test_remove_overlapping_edge() {
-        let mut map = RangeMap::<u32, i32>::new();
+        let mut map = RangeMap::<u32, i32>::default();
 
         map.insert(10..34, -14);
 
@@ -405,7 +400,7 @@ mod test {
 
     #[::fuchsia::test]
     fn test_remove_middle_splits_range() {
-        let mut map = RangeMap::<u32, i32>::new();
+        let mut map = RangeMap::<u32, i32>::default();
 
         map.insert(10..34, -14);
         map.remove(15..18);
@@ -416,7 +411,7 @@ mod test {
 
     #[::fuchsia::test]
     fn test_remove_upper_half_of_split_range_leaves_lower_range() {
-        let mut map = RangeMap::<u32, i32>::new();
+        let mut map = RangeMap::<u32, i32>::default();
 
         map.insert(10..34, -14);
         map.remove(15..18);
@@ -429,7 +424,7 @@ mod test {
 
     #[::fuchsia::test]
     fn test_range_map_overlapping_insert() {
-        let mut map = RangeMap::<u32, i32>::new();
+        let mut map = RangeMap::<u32, i32>::default();
 
         map.insert(2..7, -21);
         map.insert(5..9, -42);
@@ -444,7 +439,7 @@ mod test {
 
     #[::fuchsia::test]
     fn test_intersect_single() {
-        let mut map = RangeMap::<u32, i32>::new();
+        let mut map = RangeMap::<u32, i32>::default();
 
         map.insert(2..7, -10);
 
@@ -470,7 +465,7 @@ mod test {
 
     #[::fuchsia::test]
     fn test_intersect_multiple() {
-        let mut map = RangeMap::<u32, i32>::new();
+        let mut map = RangeMap::<u32, i32>::default();
 
         map.insert(2..7, -10);
         map.insert(7..9, -20);
@@ -490,7 +485,7 @@ mod test {
 
     #[::fuchsia::test]
     fn test_intersect_no_gaps() {
-        let mut map = RangeMap::<u32, i32>::new();
+        let mut map = RangeMap::<u32, i32>::default();
 
         map.insert(0..1, -10);
         map.insert(1..2, -20);
@@ -505,7 +500,7 @@ mod test {
 
     #[test]
     fn test_merging() {
-        let mut map = RangeMap::<u32, i32>::new();
+        let mut map = RangeMap::<u32, i32>::default();
 
         map.insert(1..2, -10);
         assert_eq!(map.iter().collect::<Vec<_>>(), vec![(&(1..2), &-10)]);
@@ -529,7 +524,7 @@ mod test {
         let first = 15..21;
         let second = first.end..29;
 
-        let mut map = RangeMap::new();
+        let mut map = RangeMap::default();
         map.insert(first.clone(), 1);
         map.insert(second.clone(), 2);
 

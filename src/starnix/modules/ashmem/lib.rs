@@ -86,7 +86,7 @@ impl Ashmem {
             size: 0,
             name: b"dev/ashmem\0".into(),
             prot_flags: ProtectionFlags::ACCESS_FLAGS,
-            unpinned: RangeMap::<u32, bool>::new(),
+            unpinned: RangeMap::<u32, bool>::default(),
             id: id,
         };
 
