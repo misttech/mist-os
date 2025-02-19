@@ -8,7 +8,6 @@
 #define ZIRCON_KERNEL_LIB_DEVICETREE_INCLUDE_LIB_DEVICETREE_INTERNAL_MATCHER_H_
 
 #include <cstddef>
-#include <cstdint>
 #include <string_view>
 #include <tuple>
 #include <type_traits>
@@ -19,68 +18,10 @@
 
 namespace devicetree {
 
-// Defined in <lib/devicetree/matcher.h>
-enum class ScanState;
+// Forward-declaration.
+enum class ScanState : uint8_t;
 
 namespace internal {
-
-DECLARE_HAS_MEMBER_FN(HasOnNode, OnNode);
-DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(OnNodeSignature, OnNode,
-                                     ScanState (C::*)(const NodePath&, const PropertyDecoder&));
-
-DECLARE_HAS_MEMBER_FN(HasOnSubtree, OnSubtree);
-DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(OnSubtreeSignature, OnSubtree,
-                                     ScanState (C::*)(const NodePath&));
-
-DECLARE_HAS_MEMBER_FN(HasOnScan, OnScan);
-DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(OnScanSignature, OnScan, ScanState (C::*)());
-
-DECLARE_HAS_MEMBER_FN(HasOnDone, OnDone);
-DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(OnDoneSignature, OnDone, void (C::*)());
-
-DECLARE_HAS_MEMBER_FN(HasOnError, OnError);
-DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(OnErrorSignature, OnError, void (C::*)(std::string_view));
-
-template <typename T>
-struct HasMaxScansMember {
- private:
-  template <typename C>
-  static std::true_type test(std::add_pointer_t<decltype(C::kMaxScans)>);
-
-  template <typename C>
-  static std::false_type test(...);
-
- public:
-  static constexpr bool value = decltype(test<T>(nullptr))::value;
-};
-
-template <typename Matcher>
-constexpr bool CheckInterface() {
-  static_assert(HasOnNode<Matcher>::value, "|Matcher| must implement |OnNode| member function.");
-  static_assert(OnNodeSignature<Matcher>::value, "|Matcher::OnNode| has incorrect signature.");
-
-  static_assert(HasOnSubtree<Matcher>::value,
-                "|Matcher| must implement |OnSubtree| member function.");
-  static_assert(OnSubtreeSignature<Matcher>::value,
-                "|Matcher::OnSubtree| has incorrect signature.");
-
-  static_assert(HasOnScan<Matcher>::value, "|Matcher| must implement |OnScan| member function.");
-  static_assert(OnScanSignature<Matcher>::value, "|Matcher::OnScan| has incorrect signature.");
-
-  static_assert(HasOnError<Matcher>::value, "|Matcher| must implement |OnError| member function.");
-  static_assert(OnErrorSignature<Matcher>::value, "|Matcher::OnError| has incorrect signature.");
-
-  static_assert(HasMaxScansMember<Matcher>::value,
-                "|Matcher| must declare |size_t kMaxScans| static member");
-  static_assert(std::is_same_v<decltype(Matcher::kMaxScans), const size_t>,
-                "|Matcher::kMaxScans| must be of type |size_t|.");
-  static_assert(Matcher::kMaxScans > 0, "|Matcher::kMaxScans| must be greater than zero.");
-  return true;
-}
-
-template <typename Matcher>
-constexpr bool kIsMatcher = OnNodeSignature_v<Matcher> && OnScanSignature_v<Matcher> &&
-                            OnErrorSignature_v<Matcher> && HasMaxScansMember<Matcher>::value;
 
 // All visitors have the same return type.
 template <typename Visitor, typename... Matchers>
@@ -119,20 +60,20 @@ constexpr void ForEachMatcher(Visitor&& visitor, Matchers&&... matchers) {
 // Per matcher state kept by the |Match| infrastructre. This state determines whether a matcher
 // is active(visiting all nodes), suspended(not visiting current subtree) or done(not visiting
 // anything anymore).
-template <typename State = ScanState>
-class MatcherVisit {
+template <typename ScanState>
+class MatcherVisitImpl {
  public:
-  constexpr MatcherVisit() = default;
-  constexpr MatcherVisit(const MatcherVisit&) = default;
-  constexpr MatcherVisit& operator=(const MatcherVisit&) = default;
+  constexpr MatcherVisitImpl() = default;
+  constexpr MatcherVisitImpl(const MatcherVisitImpl&) = default;
+  constexpr MatcherVisitImpl& operator=(const MatcherVisitImpl&) = default;
 
   // Initialize and assign from
-  explicit constexpr MatcherVisit(State state) : state_(state) {}
+  explicit constexpr MatcherVisitImpl(ScanState state) : state_(state) {}
 
-  constexpr State state() const { return state_; }
-  constexpr void set_state(State state) {
+  constexpr ScanState state() const { return state_; }
+  constexpr void set_state(ScanState state) {
     state_ = state;
-    if (state_ == State::kNeedsPathResolution) {
+    if (state_ == ScanState::kNeedsPathResolution) {
       extra_alias_scan_ = 1;
     }
   }
@@ -145,18 +86,20 @@ class MatcherVisit {
   // matcher's callbacks to be called again.
   void Unprune(const NodePath& path) {
     if (mark_ == &path.back()) {
-      *this = MatcherVisit();
+      *this = MatcherVisitImpl();
     }
   }
 
-  // Extra
+  // Whether an extra scan is required due to this matcher attempting to resolve aliases.
   constexpr size_t extra_alias_scan() const { return extra_alias_scan_; }
 
  private:
-  State state_ = State::kActive;
+  ScanState state_ = ScanState::kActive;
   const Node* mark_ = nullptr;
   size_t extra_alias_scan_ = 0;
 };
+
+using MatcherVisit = MatcherVisitImpl<ScanState>;
 
 template <typename Matcher>
 constexpr size_t GetMaxScans() {
@@ -182,8 +125,6 @@ class AliasMatcher {
 
   void OnError(std::string_view error);
 };
-
-static_assert(CheckInterface<AliasMatcher>());
 
 }  // namespace internal
 

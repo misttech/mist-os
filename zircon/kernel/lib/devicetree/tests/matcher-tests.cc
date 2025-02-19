@@ -21,47 +21,20 @@ using devicetree::testing::LoadedDtb;
 
 // Invalid matcher detection by traits.
 
-// Doesnt implement any of the Matcher contract, all traits should be false.
+// Doesn't implement any of the Matcher contract, all traits should be false.
 struct InvalidMatcher {};
-
-using devicetree::internal::HasMaxScansMember;
-using devicetree::internal::HasOnDone_v;
-using devicetree::internal::HasOnError_v;
-using devicetree::internal::HasOnNode_v;
-using devicetree::internal::HasOnScan_v;
-using devicetree::internal::OnDoneSignature_v;
-using devicetree::internal::OnErrorSignature_v;
-using devicetree::internal::OnNodeSignature_v;
-using devicetree::internal::OnScanSignature_v;
-
-static_assert(!HasOnError_v<InvalidMatcher>);
-static_assert(!OnErrorSignature_v<InvalidMatcher>);
-static_assert(!HasOnScan_v<InvalidMatcher>);
-static_assert(!OnScanSignature_v<InvalidMatcher>);
-static_assert(!HasOnNode_v<InvalidMatcher>);
-static_assert(!OnNodeSignature_v<InvalidMatcher>);
-static_assert(!HasOnDone_v<InvalidMatcher>);
-static_assert(!OnDoneSignature_v<InvalidMatcher>);
-static_assert(!HasMaxScansMember<InvalidMatcher>::value);
+static_assert(!devicetree::Matcher<InvalidMatcher>);
 
 struct ValidMatcher {
   static constexpr size_t kMaxScans = 1;
   devicetree::ScanState OnNode(const devicetree::NodePath&,
                                const devicetree::PropertyDecoder& decoder);
   void OnError(std::string_view v);
+  devicetree::ScanState OnSubtree(const devicetree::NodePath&);
   devicetree::ScanState OnScan();
   void OnDone();
 };
-
-static_assert(HasOnError_v<ValidMatcher>);
-static_assert(OnErrorSignature_v<ValidMatcher>);
-static_assert(HasOnScan_v<ValidMatcher>);
-static_assert(OnScanSignature_v<ValidMatcher>);
-static_assert(HasOnNode_v<ValidMatcher>);
-static_assert(OnNodeSignature_v<ValidMatcher>);
-static_assert(HasOnDone_v<ValidMatcher>);
-static_assert(OnDoneSignature_v<ValidMatcher>);
-static_assert(HasMaxScansMember<ValidMatcher>::value);
+static_assert(devicetree::Matcher<ValidMatcher>);
 
 // Helper matcher for tests.
 template <size_t ScanBeforeCompletion>

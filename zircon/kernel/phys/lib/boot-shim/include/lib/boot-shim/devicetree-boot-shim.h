@@ -102,8 +102,9 @@ class DevicetreeBootShim : public BootShim<Items...> {
  private:
   DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(HasInit, Init, void (C::*)(const DevicetreeBootShim& shim));
 
+  // TODO(https://fxbug.dev/397467963): Replace with a proper concept.
   template <typename T>
-  using IsDevicetreeItem = std::conditional_t<HasInit<T>::value && devicetree::kIsMatcher<T>,
+  using IsDevicetreeItem = std::conditional_t<HasInit<T>::value && devicetree::Matcher<T>,
                                               std::true_type, std::false_type>;
   devicetree::Devicetree dt_;
   DevicetreeBootShimAllocator allocator_ = nullptr;

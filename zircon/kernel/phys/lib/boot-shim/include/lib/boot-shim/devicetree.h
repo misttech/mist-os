@@ -37,7 +37,6 @@
 #include <optional>
 #include <string_view>
 #include <type_traits>
-#include <variant>
 
 #include <fbl/intrusive_hash_table.h>
 #include <fbl/intrusive_single_list.h>
@@ -54,11 +53,12 @@ class DevicetreeItemBase {
 
   constexpr DevicetreeItemBase() = default;
   constexpr DevicetreeItemBase(const char* shim_name, FILE* log)
-      : log_(log), shim_name_(shim_name) {}
-
-  devicetree::ScanState OnNode(const devicetree::NodePath&, const devicetree::PropertyDecoder&) {
-    static_assert(kMaxScans != MaxScans, "Must implement OnNode.");
-    return devicetree::ScanState::kActive;
+      : log_(log), shim_name_(shim_name) {
+    // Note: `T` is incomplete when this template instantiates, so at the time of template
+    // instantiation `T` will not meet the API requirements of `Matcher<T>`. Deferring this to a
+    // static_assert on a function body, delay's the evaluation of `Matcher<T>` until `T` is fully
+    // defined.
+    static_assert(devicetree::Matcher<T>);
   }
 
   void OnError(std::string_view error) {
@@ -76,7 +76,7 @@ class DevicetreeItemBase {
 
   template <typename Shim>
   void Init(const Shim& shim) {
-    static_assert(devicetree::kIsMatcher<T>);
+    static_assert(devicetree::Matcher<T>);
     shim_name_ = shim.shim_name();
     log_ = shim.log();
   }
