@@ -230,16 +230,20 @@ function fx-build-config-load {
     HOST_OUT_DIR="${FUCHSIA_BUILD_DIR}/${HOST_OUT_DIR}"
   fi
 
+  fx-export-default-target
+
+  return 0
+}
+
+function fx-export-default-target {
   # Set the device specified at the build directory level, if any.
-  if [[ -z "${FUCHSIA_NODENAME}" ]]; then
+  if [[ -z "${FUCHSIA_NODENAME}" || "${FUCHSIA_NODENAME_IS_FROM_FILE}" == "true" ]]; then
     if [[ -f "${FUCHSIA_BUILD_DIR}.device" ]]; then
       FUCHSIA_NODENAME="$(<"${FUCHSIA_BUILD_DIR}.device")"
       export FUCHSIA_NODENAME_IS_FROM_FILE="true"
     fi
     export FUCHSIA_NODENAME
   fi
-
-  return 0
 }
 
 # Sets FUCHSIA_BUILD_DIR once, to an absolute path.
@@ -280,6 +284,20 @@ function fx-config-read {
   fx-build-config-load || exit $?
 
   _FX_LOCK_FILE="${FUCHSIA_BUILD_DIR}.build_lock"
+}
+
+# If the fx default target is set, check whether a ffx default target is
+# overshadowing it. If so, emit a helpful warning.
+function fx-check-default-target {
+  # Refresh $FUCHSIA_NODENAME.
+  fx-export-default-target
+  local effective_default_target=$(ffx target default get)
+  if [[ -n "$FUCHSIA_NODENAME" && "$FUCHSIA_NODENAME" != "$effective_default_target" ]]; then
+    fx-warn "The build level device \"$FUCHSIA_NODENAME\" is being overridden by the user level device \"$effective_default_target\"."
+    fx-warn "Here are all of the ffx default values set: $(ffx config get --select all target.default)"
+    fx-warn 'Please run `ffx target default unset; ffx target default unset --level global` to fix this.'
+    exit 1
+  fi
 }
 
 function fx-change-build-dir {
