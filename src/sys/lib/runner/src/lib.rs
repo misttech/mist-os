@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 pub mod component;
+pub mod serde;
 
 use fidl::endpoints::ServerEnd;
 #[cfg(fuchsia_api_level_at_least = "HEAD")]
