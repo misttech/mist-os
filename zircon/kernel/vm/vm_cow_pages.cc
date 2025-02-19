@@ -24,7 +24,6 @@
 #include <vm/page.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
-#include <vm/stack_owned_loaned_pages_interval.h>
 #include <vm/vm_object.h>
 #include <vm/vm_object_paged.h>
 #include <vm/vm_page_list.h>
@@ -803,9 +802,6 @@ bool VmCowPages::DedupZeroPage(vm_page_t* page, uint64_t offset) {
   RangeChangeUpdateLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::RemoveWrite);
 
   if (IsZeroPage(page_or_marker->Page())) {
-    // We stack-own loaned pages from when they're removed until they're freed.
-    __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
-
     // Replace the slot with a marker.
     __UNINITIALIZED auto result =
         BeginAddPageWithSlotLocked(offset, page_or_marker, CanOverwriteContent::NonZero);
@@ -1904,10 +1900,6 @@ zx_status_t VmCowPages::CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* f
 void VmCowPages::ReleaseOwnedPagesLocked(uint64_t start, ScopedPageFreedList* freed_list) {
   DEBUG_ASSERT(!is_hidden());
   DEBUG_ASSERT(start <= size_);
-
-  // We stack-own loaned pages between removing the page from PageQueues and freeing the page
-  // via call to |FreePagesLocked|.
-  __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
 
   __UNINITIALIZED BatchPQRemove page_remover(&freed_list->list_);
 
@@ -3379,9 +3371,6 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
                             RangeChangeOp::Unmap);
   }
 
-  // We stack-own loaned pages from when they're removed until they're freed.
-  __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
-
   // Pages removed from this object are put into freed_list, while pages removed from any ancestor
   // are put into ancestor_freed_list. This is so that freeing of both the lists can be handled
   // correctly, by passing the correct value for freeing_owned_pages in the call to
@@ -4297,9 +4286,6 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
   DEBUG_ASSERT(IS_PAGE_ALIGNED(size_));
   DEBUG_ASSERT(IS_PAGE_ALIGNED(s));
 
-  // We stack-own loaned pages from removal until freed.
-  __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
-
   // see if we're shrinking or expanding the vmo
   if (s < size_) {
     // shrinking
@@ -4772,9 +4758,6 @@ zx_status_t VmCowPages::SupplyPagesLocked(VmCowRange range, VmPageSpliceList* pa
 
   const uint64_t start = range.offset;
   const uint64_t end = range.end();
-
-  // We stack-own loaned pages below from allocation for page replacement to AddPageLocked().
-  __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
 
   list_node freed_list;
   list_initialize(&freed_list);
@@ -5593,9 +5576,6 @@ void VmCowPages::DetachSourceLocked() {
   DEBUG_ASSERT(page_source_);
   page_source_->Detach();
 
-  // We stack-own loaned pages from RemovePages() to FreePagesLocked().
-  __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
-
   list_node_t freed_list;
   list_initialize(&freed_list);
 
@@ -5860,7 +5840,6 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEvictionLocked(vm_page_t* pa
   // Remove any mappings to this page before we remove it.
   RangeChangeUpdateLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap);
 
-  __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
   // Use RemovePage over just writing to page_or_marker so that the page list has the opportunity
   // to release any now empty intermediate nodes.
   vm_page_t* p = page_list_.RemoveContent(offset).ReleasePage();
@@ -6188,10 +6167,6 @@ zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offse
     DEBUG_ASSERT(!old_page->is_loaned());
     return ZX_ERR_BAD_STATE;
   }
-
-  // We stack-own a loaned page from pmm_alloc_page() to SwapPageLocked() OR from SwapPageLocked()
-  // until FreePageLocked().
-  __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
 
   vm_page_t* new_page = nullptr;
   zx_status_t status = ZX_OK;

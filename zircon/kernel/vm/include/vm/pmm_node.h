@@ -63,6 +63,11 @@ class PmmNode {
   void FreePage(vm_page* page);
   void FreeList(list_node* list);
 
+  // Calls the provided function, passing |page| back into it, serialized with any other calls to
+  // |AllocLoanedPage| and |FreeLoanedPage|. This allows caller to know that while the |with_page|
+  // callback is running there are no in progress calls to these methods.
+  void WithLoanedPage(vm_page_t* page, fit::inline_function<void(vm_page_t*)> with_page);
+
   // Allocates a single page from the loaned pages list. The allocated page will always have
   // is_loaned() being true, and must be returned by either FreeLoanedPage or FreeLoanedList. If
   // there are not loaned pages available ZX_ERR_UNAVAILABLE is returned, as an absence of loaned

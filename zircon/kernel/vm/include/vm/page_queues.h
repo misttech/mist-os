@@ -214,6 +214,8 @@ class PageQueues {
 
   // Can be called while the |page| is known to be in the loaned state. This method checks if it is
   // in the page queues, and if so returns a reference to the cow pages that owns it.
+  // The page must be 'owned' by the caller, in so far as the page->state() is guaranteed to not be
+  // changing.
   ktl::optional<VmoBacklink> GetCowForLoanedPage(vm_page_t* page);
 
   // Helper struct to group reclaimable queue length counts returned by GetReclaimCounts.

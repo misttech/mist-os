@@ -77,8 +77,6 @@ zx_status_t make_partially_committed_pager_vmo(size_t num_pages, size_t committe
       return status;
     }
 
-    __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
-
     VmPageSpliceList splice_list;
     status = aux_vmo->TakePages(0, committed_pages * PAGE_SIZE, &splice_list);
     if (status != ZX_OK) {

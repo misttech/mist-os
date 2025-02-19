@@ -179,10 +179,6 @@ static bool pmm_node_singlton_list_test() {
 static bool pmm_node_loan_borrow_cancel_reclaim_end() {
   BEGIN_TEST;
 
-  // Required to stack-own loaned pages.  We don't care about minimizing the duration of this
-  // interval for this test.
-  __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
-
   ManagedPmmNode node;
 
   bool was_loaning_enabled = pmm_physical_page_borrowing_config()->is_loaning_enabled();
@@ -335,10 +331,6 @@ static bool pmm_node_loan_borrow_cancel_reclaim_end() {
 
 static bool pmm_node_loan_delete_lender() {
   BEGIN_TEST;
-
-  // Required to stack-own loaned pages.  We don't care about minimizing the duration of this
-  // interval for this test.
-  __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
 
   ManagedPmmNode node;
 

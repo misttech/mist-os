@@ -30,7 +30,6 @@
 #include <vm/physmap.h>
 #include <vm/pmm.h>
 #include <vm/pmm_checker.h>
-#include <vm/stack_owned_loaned_pages_interval.h>
 
 #include "vm_priv.h"
 
@@ -296,7 +295,6 @@ void PmmNode::AllocPageHelperLocked(vm_page_t* page) {
   AsanUnpoisonPage(page);
 
   DEBUG_ASSERT(page->is_free() && !page->is_loaned());
-  DEBUG_ASSERT(!page->object.is_stack_owned());
 
   // Here we transition the page from FREE->ALLOC, completing the transfer of ownership from the
   // PmmNode to the stack. This must be done under lock_, and more specifically the same lock_
@@ -312,12 +310,6 @@ void PmmNode::AllocLoanedPageHelperLocked(vm_page_t* page) {
   AsanUnpoisonPage(page);
 
   DEBUG_ASSERT(page->is_free_loaned() && page->is_loaned());
-  DEBUG_ASSERT(!page->object.is_stack_owned());
-
-  page->object.set_stack_owner(&StackOwnedLoanedPagesInterval::current());
-  // We want the set_stack_owner() to be visible before set_state(), but we don't need to make
-  // set_state() a release just for the benefit of loaned pages, so we use this fence.
-  ktl::atomic_thread_fence(ktl::memory_order_release);
 
   // Here we transition the page from FREE_LOANED->ALLOC, completing the transfer of ownership from
   // the PmmNode to the stack. This must be done under loaned_pages_lock_, and more specifically
@@ -692,17 +684,8 @@ void PmmNode::FreePageHelperLocked(vm_page* page, bool already_filled) {
   // 2. Place the page in the free list and cease referring to the page before ever dropping lock_
   page->set_state(vm_page_state::FREE);
 
-  // This page cannot be loaned, but could be stack owned due to interactions with DeleteLender.
-  // See comment in FreeLoanedPageHelperLocked about why it is okay to reference an 'object' field
-  // here even if not in the object state.
+  // This page cannot be loaned.
   DEBUG_ASSERT(!page->is_loaned());
-  if (unlikely(page->object.is_stack_owned())) {
-    // Due to how DeleteLender works it could have transitioned a page that was stack owned, however
-    // it did not own the page and could not clear the stack owner, therefore we must check for and
-    // handle that case here. No fences are needed as the page is no longer loaned and so is not
-    // being searched for.
-    page->object.clear_stack_owner();
-  }
 
   // The caller may have called RacyFreeFillEnabled and potentially already filled a pattern,
   // however if it raced with enabling of free filling we may still need to fill the pattern. This
@@ -730,28 +713,6 @@ void PmmNode::FreeLoanedPageHelperLocked(vm_page* page, bool already_filled) {
   // 4. Place the page in the loaned_free_list_ and cease referring to the page before ever dropping
   // the loaned_list_lock_.
   page->set_state(vm_page_state::FREE_LOANED);
-
-  // Coming from OBJECT or ALLOC, this will only be true if the page was loaned (and may still be
-  // loaned, but doesn't have to be currently loaned if the contiguous VMO the page was loaned from
-  // was deleted during stack ownership).
-  //
-  // Coming from a state other than OBJECT or ALLOC, this currently won't be true, but if it were
-  // true in future, it would only be because a state other than OBJECT or ALLOC has a (future)
-  // field overlapping, in which case we do want to clear the invalid stack owner pointer value.
-  // We'll be ok to clear this invalid stack owner after setting FREE_LOANED previously (instead of
-  // clearing before) because the stack owner is only read elsewhere for pages with an underlying
-  // contiguous VMO owner (whether actually loaned at the time or not), and pages with an underlying
-  // contiguous VMO owner can only be in FREE_LOANED, ALLOC, OBJECT states, which all have this
-  // field, so reading an invalid stack owner pointer elsewhere won't happen (there's a magic number
-  // canary just in case though).  We could instead clear out any invalid stack owner pointer before
-  // setting FREE_LOANED above and have a shorter comment here, but there's no actual need for the
-  // extra "if", so we just let this "if" handle it (especially since this whole paragraph is a
-  // hypothetical future since there aren't any overlapping fields yet as of this comment).
-  if (page->object.is_stack_owned()) {
-    // Make FREE_LOANED visible before lack of stack owner.
-    ktl::atomic_thread_fence(ktl::memory_order_release);
-    page->object.clear_stack_owner();
-  }
 
   // The caller may have called IsFreeFillEnabledRacy and potentially already filled a pattern,
   // however if it raced with enabling of free filling we may still need to fill the pattern. This
@@ -795,6 +756,13 @@ void PmmNode::FreeLoanedPage(vm_page_t* page, fit::inline_function<void(vm_page_
     // If address sanitizer is enabled, put the page at the tail to maximize reuse distance.
     list_add_tail(&free_loaned_list_, &page->queue_node);
   }
+}
+
+void PmmNode::WithLoanedPage(vm_page_t* page, fit::inline_function<void(vm_page_t*)> with_page) {
+  AutoPreemptDisabler preempt_disable;
+  Guard<Mutex> guard{&loaned_list_lock_};
+  DEBUG_ASSERT(page->is_loaned());
+  with_page(page);
 }
 
 void PmmNode::FreePage(vm_page* page) {
@@ -1204,12 +1172,6 @@ void PmmNode::DeleteLender(paddr_t address, size_t count) {
                                   list_add_tail(&free_list_, &page->queue_node);
                                 }
                                 added_free_count++;
-                              } else {
-                                // The page could presently be being stack owned as we are removing
-                                // its loaned status. Since we have no ownership of the page we
-                                // cannot safely clear the stack owner without racing with someone
-                                // else. Therefore we must leave any stack ownership for the regular
-                                // free path to cleanup.
                               }
                               page->clear_is_loan_cancelled();
                               page->clear_is_loaned();

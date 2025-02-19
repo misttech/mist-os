@@ -20,7 +20,6 @@
 #include <vm/pmm.h>
 #include <vm/pmm_node.h>
 #include <vm/scanner.h>
-#include <vm/stack_owned_loaned_pages_interval.h>
 #include <vm/vm_cow_pages.h>
 
 #include <ktl/enforce.h>

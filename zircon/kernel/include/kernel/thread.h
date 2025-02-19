@@ -55,7 +55,6 @@
 class Dpc;
 struct BrwLockOps;
 class OwnedWaitQueue;
-class StackOwnedLoanedPagesInterval;
 class ThreadDispatcher;
 class VmAspace;
 class WaitQueue;
@@ -1686,10 +1685,6 @@ struct Thread : public ChainLockable {
   // obtained, it will be left empty.
   void GetBacktrace(Backtrace& out_bt) TA_EXCL(get_lock());
 
-  StackOwnedLoanedPagesInterval* stack_owned_loaned_pages_interval() {
-    return stack_owned_loaned_pages_interval_;
-  }
-
   // Returns the last flow id allocated by TakeNextLockFlowId() for this thread.
   uint64_t lock_flow_id() const {
 #if LOCK_TRACING_ENABLED
@@ -1748,10 +1743,6 @@ struct Thread : public ChainLockable {
   // ScopedThreadExceptionContext is the only public way to call
   // SaveUserStateLocked and RestoreUserStateLocked.
   friend class ScopedThreadExceptionContext;
-
-  // StackOwnedLoanedPagesInterval is the only public way to set/clear the
-  // stack_owned_loaned_pages_interval().
-  friend class StackOwnedLoanedPagesInterval;
 
   // Dumping routines are allowed to see inside us.
   friend class ThreadDumper;
@@ -1835,10 +1826,6 @@ struct Thread : public ChainLockable {
 
   // Must only be accessed by "this" thread. May be null.
   ktl::unique_ptr<RestrictedState> restricted_state_;
-
-  // This is part of ensuring that all stack ownership of loaned pages can be boosted in priority
-  // via priority inheritance if a higher priority thread is trying to reclaim the loaned pages.
-  StackOwnedLoanedPagesInterval* stack_owned_loaned_pages_interval_ = nullptr;
 
 #if WITH_LOCK_DEP
   // state for runtime lock validation when in thread context

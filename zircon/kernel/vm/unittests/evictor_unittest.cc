@@ -5,7 +5,6 @@
 // https://opensource.org/licenses/MIT
 
 #include <vm/evictor.h>
-#include <vm/stack_owned_loaned_pages_interval.h>
 
 #include "test_helper.h"
 
