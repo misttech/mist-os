@@ -408,6 +408,8 @@ class StatusProperty {
  public:
   static std::optional<StatusProperty> Create(std::optional<std::string_view> prop_value);
 
+  constexpr StatusProperty() = default;
+
   constexpr bool is_okay() const { return status_ == Status::kOkay; }
   constexpr bool is_disabled() const { return status_ == Status::kDisabled; }
 
@@ -480,6 +482,8 @@ class PropertyValue {
     return true;
   }
 
+  // Returns a valid `StatusProperty` or `std::nullopt` in case the provided string does not match
+  // any known value.
   std::optional<StatusProperty> AsStatus() const { return StatusProperty::Create(AsString()); }
 
   // Given a device node's property decoder |decoder|, the property value is assumed
@@ -782,7 +786,10 @@ class PropertyDecoder {
 
       // Not a special property.
       if (name == "status") {
-        status = value.AsStatus();
+        // Reserve `nullopt` only for no `status` property at all, since that is equivalent to
+        // "okay". The default ctor of `StatusProperty` is `kUnknown`, which fits this state, and
+        // disambiguates no property at all from property with bad value.
+        status = value.AsStatus().value_or(StatusProperty{});
         return;
       }
 

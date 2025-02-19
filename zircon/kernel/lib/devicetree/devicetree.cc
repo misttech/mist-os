@@ -446,12 +446,11 @@ MemoryReservations::value_type MemoryReservations::iterator::operator*() const {
 }
 
 std::optional<StatusProperty> StatusProperty::Create(std::optional<std::string_view> prop_value) {
-  // Lacking this property is assumed to be "okay".
-  // Some older firmware may use "ok" instead of "okay".
   if (!prop_value) {
     return std::nullopt;
   }
 
+  // Some older firmware may use "ok" instead of "okay".
   if (*prop_value == "okay" || *prop_value == "ok") {
     return StatusProperty{Status::kOkay};
   }
@@ -468,6 +467,7 @@ std::optional<StatusProperty> StatusProperty::Create(std::optional<std::string_v
     return StatusProperty{Status::kFailWithCode, prop_value->substr(5)};
   }
 
+  // Any other value is considered a bad state.
   return std::nullopt;
 }
 
