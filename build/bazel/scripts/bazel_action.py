@@ -578,7 +578,8 @@ class BazelLabelMapper(object):
                     file_prefix = file_prefix[1:]
 
             # First look into $BUILD_DIR/regenerator_outputs/bazel_content_hashes/
-            # then into $WORKSPACE/fuchsia_build_generated/
+            # then into $WORKSPACE/fuchsia_build_generated/ which should contain
+            # symlinks to Ninja-generated content hashes.
             hash_file = os.path.join(
                 self._output_dir,
                 "regenerator_outputs",

@@ -204,16 +204,9 @@ local_repository(
 )
 
 # buildifier: disable=load-on-top
-load(
-    "//:build/bazel/repository_rules/fuchsia_build_info_repository.bzl",
-    "fuchsia_build_info_repository",
-)
-
-fuchsia_build_info_repository(
+local_repository(
     name = "fuchsia_build_info",
-    # LINT.IfChange
-    args = "//:fuchsia_build_generated/args.json",
-    # LINT.ThenChange(scripts/workspace_utils.py)
+    path = "%s/regenerator_outputs/fuchsia_build_info" % ninja_output_dir,
 )
 
 # googletest is a dependency from @fuchsia_sdk amd requires a local

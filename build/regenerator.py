@@ -344,6 +344,16 @@ def main() -> int:
             )
         )
 
+        # Generate the content of the @fuchsia_build_info directory.
+        log("Generating @fuchsia_build_info content")
+        extra_ninja_build_inputs |= (
+            workspace_utils.GnBuildArgs.generate_fuchsia_build_info(
+                fuchsia_dir=fuchsia_dir,
+                build_dir=build_dir,
+                repository_dir=regenerator_outputs_dir / "fuchsia_build_info",
+            )
+        )
+
         # Generate the bazel launcher and Bazel workspace files.
         log("Generating Fuchsia Bazel workspace and launcher")
         extra_ninja_build_inputs |= workspace_utils.generate_fuchsia_workspace(
