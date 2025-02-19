@@ -423,7 +423,7 @@ impl Credentials {
         } else {
             mode_bits & 0o007
         };
-        if (mode_rwx_bits & access.rwx_bits()) != access.rwx_bits() {
+        if (mode_rwx_bits & access.rwx_bits() as u32) != access.rwx_bits() as u32 {
             return error!(EACCES);
         }
         Ok(())

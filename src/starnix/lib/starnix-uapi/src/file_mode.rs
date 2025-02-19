@@ -155,10 +155,11 @@ mod inner_access {
     // a whole, the produced code is still correct.
     #![allow(clippy::bad_bit_mask)] // TODO(b/303500202) Remove once addressed in bitflags.
     use super::OpenFlags;
+    use crate::errors::{errno, Errno};
 
     bitflags::bitflags! {
         #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-        pub struct Access: u32 {
+        pub struct Access: u8 {
             const EXIST = 0;
             const EXEC = 1;
             const WRITE = 2;
@@ -188,8 +189,17 @@ mod inner_access {
             *self != Self::EXIST
         }
 
-        pub fn rwx_bits(&self) -> u32 {
+        pub fn rwx_bits(&self) -> u8 {
             self.bits() & Self::ACCESS_MASK.bits()
+        }
+    }
+
+    impl std::convert::TryFrom<u32> for Access {
+        type Error = Errno;
+
+        fn try_from(value: u32) -> Result<Self, Self::Error> {
+            Self::from_bits(value.try_into().map_err(|_| errno!(EINVAL))?)
+                .ok_or_else(|| errno!(EINVAL))
         }
     }
 }

@@ -1161,7 +1161,7 @@ impl FsNodeOps for FuseNode {
                     locked,
                     current_task,
                     self,
-                    FuseOperation::Access { mask: (access & Access::ACCESS_MASK).bits() },
+                    FuseOperation::Access { mask: (access & Access::ACCESS_MASK).bits() as u32 },
                 )?;
 
                 if let FuseResponse::Access(result) = response {

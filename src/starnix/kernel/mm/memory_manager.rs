@@ -138,7 +138,7 @@ pub static PAGE_SIZE: LazyLock<u64> = LazyLock::new(|| zx::system_get_page_size(
 
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-    pub struct MappingOptions: u32 {
+    pub struct MappingOptions: u16 {
       const SHARED      = 1 << 0;
       const ANONYMOUS   = 1 << 1;
       const LOWER_32BIT = 1 << 2;

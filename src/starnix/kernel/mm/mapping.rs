@@ -390,7 +390,7 @@ impl MappingBackingMemory {
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     #[rustfmt::skip]  // Preserve column alignment.
-    pub struct MappingFlags: u32 {
+    pub struct MappingFlags: u16 {
         const READ        = 1 <<  0;  // PROT_READ
         const WRITE       = 1 <<  1;  // PROT_WRITE
         const EXEC        = 1 <<  2;  // PROT_EXEC
@@ -407,9 +407,9 @@ bitflags! {
 }
 
 // The low three bits of MappingFlags match ProtectionFlags.
-const_assert_eq!(MappingFlags::READ.bits(), PROT_READ);
-const_assert_eq!(MappingFlags::WRITE.bits(), PROT_WRITE);
-const_assert_eq!(MappingFlags::EXEC.bits(), PROT_EXEC);
+const_assert_eq!(MappingFlags::READ.bits(), PROT_READ as u16);
+const_assert_eq!(MappingFlags::WRITE.bits(), PROT_WRITE as u16);
+const_assert_eq!(MappingFlags::EXEC.bits(), PROT_EXEC as u16);
 
 // The next bits of MappingFlags match MappingOptions, shifted up.
 const_assert_eq!(MappingFlags::SHARED.bits(), MappingOptions::SHARED.bits() << 3);
@@ -424,13 +424,15 @@ const_assert_eq!(MappingFlags::DONT_EXPAND.bits(), MappingOptions::DONT_EXPAND.b
 
 impl MappingFlags {
     pub fn access_flags(&self) -> ProtectionFlags {
-        ProtectionFlags::from_bits_truncate(self.bits() & ProtectionFlags::ACCESS_FLAGS.bits())
+        ProtectionFlags::from_bits_truncate(
+            self.bits() as u32 & ProtectionFlags::ACCESS_FLAGS.bits(),
+        )
     }
 
     pub fn with_access_flags(&self, prot_flags: ProtectionFlags) -> Self {
         let mapping_flags =
             *self & (MappingFlags::READ | MappingFlags::WRITE | MappingFlags::EXEC).complement();
-        mapping_flags | Self::from_bits_truncate(prot_flags.access_flags().bits())
+        mapping_flags | Self::from_bits_truncate(prot_flags.access_flags().bits() as u16)
     }
 
     #[cfg(any(feature = "alternate_anon_allocs", test))]
@@ -442,7 +444,7 @@ impl MappingFlags {
         prot_flags: ProtectionFlags,
         options: MappingOptions,
     ) -> Self {
-        Self::from_bits_truncate(prot_flags.access_flags().bits())
+        Self::from_bits_truncate(prot_flags.access_flags().bits() as u16)
             | Self::from_bits_truncate(options.bits() << 3)
     }
 }

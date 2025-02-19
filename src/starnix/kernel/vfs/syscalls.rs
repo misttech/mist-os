@@ -793,7 +793,7 @@ pub fn sys_faccessat2(
     mode: u32,
     flags: u32,
 ) -> Result<(), Errno> {
-    let mode = Access::from_bits(mode).ok_or_else(|| errno!(EINVAL))?;
+    let mode = Access::try_from(mode)?;
     let lookup_flags = LookupFlags::from_bits(flags, AT_SYMLINK_NOFOLLOW | AT_EACCESS)?;
     let name = lookup_at(locked, current_task, dir_fd, user_path, lookup_flags)?;
     name.check_access(locked, current_task, mode, CheckAccessReason::Access)
