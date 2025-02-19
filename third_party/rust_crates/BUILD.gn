@@ -153,6 +153,10 @@ if (!(current_os == "fuchsia")) {
   }
 }
 
+group("cbc") {
+  public_deps = [ ":cbc-v0_1_2" ]
+}
+
 group("cfg-if") {
   public_deps = [ ":cfg-if-v1_0_0" ]
 }
@@ -2745,6 +2749,37 @@ rust_library("block-buffer-v0_10_4") {
   applicable_licenses = [ ":block-buffer-v0_10_4.license" ]
 }
 
+license("block-padding-v0_3_3.license") {
+  public_package_name = "block_padding"
+  license_files = [
+    "//third_party/rust_crates/vendor/block-padding-0.3.3/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/block-padding-0.3.3/LICENSE-MIT",
+  ]
+}
+
+rust_library("block-padding-v0_3_3") {
+  crate_name = "block_padding"
+  crate_root = "//third_party/rust_crates/vendor/block-padding-0.3.3/src/lib.rs"
+  output_name = "block_padding-81adb5775e65e96a"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":generic-array-v0_14_5" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=81adb5775e65e96a",
+    "-Cextra-filename=-81adb5775e65e96a",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":block-padding-v0_3_3.license" ]
+}
+
 license("blocking-v1_3_0.license") {
   public_package_name = "blocking"
   license_files = [
@@ -3077,6 +3112,39 @@ rust_library("cast-v0_2_2") {
   applicable_licenses = [ ":cast-v0_2_2.license" ]
 }
 
+license("cbc-v0_1_2.license") {
+  public_package_name = "cbc"
+  license_files = [
+    "//third_party/rust_crates/vendor/cbc-0.1.2/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/cbc-0.1.2/LICENSE-MIT",
+  ]
+}
+
+rust_library("cbc-v0_1_2") {
+  crate_name = "cbc"
+  crate_root = "//third_party/rust_crates/vendor/cbc-0.1.2/src/lib.rs"
+  output_name = "cbc-1fa9605950a63804"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":cipher-v0_4_4" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=1fa9605950a63804",
+    "-Cextra-filename=-1fa9605950a63804",
+    "--cfg=feature=\"block-padding\"",
+    "--cfg=feature=\"default\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":cbc-v0_1_2.license" ]
+}
+
 license("cfg-if-v0_1_10.license") {
   public_package_name = "cfg_if"
   license_files = [
@@ -3285,6 +3353,7 @@ rust_library("cipher-v0_4_4") {
     "--edition=2021",
     "-Cmetadata=df1e7a940dfb4a0",
     "-Cextra-filename=-df1e7a940dfb4a0",
+    "--cfg=feature=\"block-padding\"",
   ]
 
   visibility = [ ":*" ]
@@ -7511,6 +7580,7 @@ rust_library("inout-v0_1_3") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
+  deps += [ ":block-padding-v0_3_3" ]
   deps += [ ":generic-array-v0_14_5" ]
 
   rustenv = []
@@ -7520,6 +7590,7 @@ rust_library("inout-v0_1_3") {
     "--edition=2021",
     "-Cmetadata=b2a05e3eedfe4536",
     "-Cextra-filename=-b2a05e3eedfe4536",
+    "--cfg=feature=\"block-padding\"",
   ]
 
   visibility = [ ":*" ]
