@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Error;
+use anyhow::{Context as _, Error};
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_component::server::ServiceFs;
-use futures::{StreamExt, TryStreamExt};
+use futures::StreamExt;
 use kernel_manager::kernels::Kernels;
 use kernel_manager::{serve_starnix_manager, SuspendContext};
-use log::{info, warn};
+use log::{error, info, warn};
 use std::sync::Arc;
 use {
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_settings as fsettings,
@@ -53,13 +53,17 @@ async fn main() -> Result<(), Error> {
     let suspend_context = Arc::new(SuspendContext::default());
     fs.for_each_concurrent(None, |request: Services| async {
         match request {
-            Services::ComponentRunner(stream) => serve_component_runner(stream, &kernels)
-                .await
-                .expect("failed to start component runner"),
+            Services::ComponentRunner(stream) => {
+                if let Err(e) = serve_component_runner(stream, &kernels).await {
+                    error!(e:%; "failed to serve component runner");
+                }
+            }
             Services::StarnixManager(stream) => {
-                serve_starnix_manager(stream, suspend_context.clone(), &kernels, &sender)
-                    .await
-                    .expect("failed to serve starnix manager")
+                if let Err(e) =
+                    serve_starnix_manager(stream, suspend_context.clone(), &kernels, &sender).await
+                {
+                    error!(e:%; "failed to serve starnix manager");
+                }
             }
         }
     })
@@ -71,8 +75,8 @@ async fn serve_component_runner(
     mut stream: frunner::ComponentRunnerRequestStream,
     kernels: &Kernels,
 ) -> Result<(), Error> {
-    while let Some(event) = stream.try_next().await? {
-        match event {
+    while let Some(event) = stream.next().await {
+        match event.context("serving component runner")? {
             frunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
                 kernels.start(start_info, controller).await?;
             }
