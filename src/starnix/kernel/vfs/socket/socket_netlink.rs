@@ -34,7 +34,7 @@ use crate::vfs::socket::{
     GenericMessage, GenericNetlinkClientHandle, Socket, SocketAddress, SocketHandle,
     SocketMessageFlags, SocketOps, SocketPeer, SocketShutdownFlags, SocketType,
 };
-use starnix_logging::{log_debug, log_error, log_info, log_warn, track_stub};
+use starnix_logging::{log_debug, log_error, log_warn, track_stub};
 use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::auth::CAP_NET_ADMIN;
 use starnix_uapi::errors::Errno;
@@ -62,7 +62,7 @@ pub fn new_netlink_socket(
     socket_type: SocketType,
     family: NetlinkFamily,
 ) -> Result<Box<dyn SocketOps>, Errno> {
-    log_info!(tag = NETLINK_LOG_TAG; "Creating {:?} Netlink Socket", family);
+    log_debug!(tag = NETLINK_LOG_TAG; "Creating {:?} Netlink Socket", family);
     if socket_type != SocketType::Datagram && socket_type != SocketType::Raw {
         return error!(ESOCKTNOSUPPORT);
     }
