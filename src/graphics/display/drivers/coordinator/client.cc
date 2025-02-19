@@ -1014,7 +1014,6 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
               max_layer_count * sizeof(layer_composition_operations_t));
   int layer_composition_operations_count = 0;
 
-  bool display_config_is_invalid = false;
   size_t banjo_display_configs_index = 0;
   size_t banjo_layers_index = 0;
   for (const DisplayConfig& display_config : display_configs_) {
@@ -1046,9 +1045,10 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
         .height = banjo_display_config.mode.v_addressable,
     };
 
-    // Do any work that needs to be done to make sure that the draft layer
-    // configurations are up to date, and validate that the configuration
-    // doesn't violate any API constraints.
+    // Normalize the display configuration, and perform Coordinator-level
+    // checks. The engine drivers API contract does not allow passing
+    // configurations that fail these checks.
+    bool display_config_is_invalid = false;
     for (const LayerNode& draft_layer_node : display_config.draft_layers_) {
       layer_t& banjo_layer = banjo_layers[banjo_layers_index];
       ++banjo_layers_index;
@@ -1087,14 +1087,15 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
         break;
       }
     }
-  }
 
-  if (display_config_is_invalid) {
-    if (res) {
-      *res = fhdt::wire::ConfigResult::kInvalidConfig;
+    if (display_config_is_invalid) {
+      // The configuration failed checks that can be performed by the
+      // Coordinator.
+      if (res) {
+        *res = fhdt::wire::ConfigResult::kInvalidConfig;
+      }
+      return false;
     }
-    // If the config is invalid, there's no point in sending it to the impl driver.
-    return false;
   }
 
   size_t layer_composition_operations_count_actual;
