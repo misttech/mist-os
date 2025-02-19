@@ -447,4 +447,94 @@ TEST_F(MatchTest, OnSubtreeDoneWithSubtreeIsNoOp) {
   EXPECT_TRUE(matcher_1.on_done);
 }
 
+struct OkNodeMatcher {
+  static constexpr size_t kMaxScans = 1;
+  static constexpr bool kMatchOkNodesOnly = true;
+
+  devicetree::ScanState OnNode(const devicetree::NodePath&,
+                               const devicetree::PropertyDecoder& decoder) {
+    ok_node_count++;
+    return devicetree::ScanState::kActive;
+  }
+  void OnError(std::string_view v) {}
+  devicetree::ScanState OnSubtree(const devicetree::NodePath&) {
+    return devicetree::ScanState::kActive;
+  }
+  devicetree::ScanState OnScan() { return devicetree::ScanState::kDone; }
+  void OnDone() {}
+
+  size_t ok_node_count = 0;
+};
+static_assert(devicetree::OkNodeMatcher<OkNodeMatcher>);
+
+struct NodeMatcher {
+  static constexpr size_t kMaxScans = 1;
+  static constexpr bool kMatchOkNodesOnly = false;
+
+  devicetree::ScanState OnNode(const devicetree::NodePath&,
+                               const devicetree::PropertyDecoder& decoder) {
+    node_count++;
+    return devicetree::ScanState::kActive;
+  }
+  void OnError(std::string_view v) {}
+  devicetree::ScanState OnSubtree(const devicetree::NodePath&) {
+    return devicetree::ScanState::kActive;
+  }
+  devicetree::ScanState OnScan() { return devicetree::ScanState::kDone; }
+  void OnDone() {}
+
+  size_t node_count = 0;
+};
+static_assert(!devicetree::OkNodeMatcher<NodeMatcher>);
+
+struct NodeMatcher2 {
+  static constexpr size_t kMaxScans = 1;
+
+  devicetree::ScanState OnNode(const devicetree::NodePath&,
+                               const devicetree::PropertyDecoder& decoder) {
+    node_count++;
+    return devicetree::ScanState::kActive;
+  }
+  void OnError(std::string_view v) {}
+  devicetree::ScanState OnSubtree(const devicetree::NodePath&) {
+    return devicetree::ScanState::kActive;
+  }
+  devicetree::ScanState OnScan() { return devicetree::ScanState::kDone; }
+  void OnDone() {}
+
+  size_t node_count = 0;
+};
+static_assert(!devicetree::OkNodeMatcher<NodeMatcher>);
+
+TEST(MatchTest, OkNodeMatcherOnlyVisitOkayStatusNodes) {
+  //
+  //              root
+  //     /     /      \    \   \   \
+  //    A     C        E    F   G   H
+  //   /       \        \
+  //  B         D        J
+  //
+  // From the structure above:
+  //  * A,B have no status property and should be treated as "okay"
+  //  * C has status "okay".
+  //  * D has status "ok" which should be equivalent to "okay".
+  //  * E is "disabled", which means J is disabled as well.
+  //  * F is "fail", which is not okay.
+  //  * G is "fail-123", which is not okay.
+  //  * H is "random-value", which is an unknown string and should be not okay.
+  //
+  auto dtb_with_status = devicetree::testing::LoadDtb("simple_with_status.dtb");
+  ASSERT_TRUE(dtb_with_status.is_ok(), "%s", dtb_with_status.error_value().c_str());
+
+  OkNodeMatcher m1;
+  NodeMatcher m2;
+  NodeMatcher2 m3;
+
+  ASSERT_TRUE(devicetree::Match(dtb_with_status->fdt(), m1, m2, m3));
+
+  EXPECT_EQ(m1.ok_node_count, 5u);
+  EXPECT_EQ(m2.node_count, 10u);
+  EXPECT_EQ(m2.node_count, m3.node_count);
+}
+
 }  // namespace

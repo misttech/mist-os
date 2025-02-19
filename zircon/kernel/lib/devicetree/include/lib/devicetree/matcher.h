@@ -90,6 +90,16 @@ concept MatcherImpl = requires(MatcherType matcher, const NodePath& path,
 template <typename T>
 concept Matcher = MatcherImpl<std::decay_t<T>>;
 
+// `OkNodeMatcher` fulfills the `Matcher` concept, but declares that is only interested
+// in visiting nodes whose status is `okay` or equivalent.
+//
+// To achieve this a `OkNodeMatcher` implementation must define a constexpr bool member
+// `kMatchOkNodesOnly` as true.
+template <typename T>
+concept OkNodeMatcher = Matcher<T> && requires {
+  { std::bool_constant<std::decay_t<T>::kMatchOkNodesOnly>{} };
+} && T::kMatchOkNodesOnly;
+
 // Returns true if all `matchers` completed successfully.
 //
 // Usage example:
@@ -153,9 +163,18 @@ constexpr bool Match(const devicetree::Devicetree& devicetree, Matchers&&... mat
   // Call |OnNode| on all matchers that are not done or avoiding the subtree.
   auto visit_and_prune = [&visit_state, &alias_matcher, &matchers...](
                              const NodePath& path, const PropertyDecoder& decoder) {
-    auto on_each_matcher = [&visit_state, &path, &decoder](auto& matcher, size_t index) {
+    auto on_each_matcher = [&visit_state, &path, &decoder]<typename MatcherT>(MatcherT& matcher,
+                                                                              size_t index) {
       auto& matcher_state = visit_state[index];
       if (matcher_state.state() == ScanState::kActive) {
+        // If the matcher only wants to visit `okay` status node.
+        if constexpr (OkNodeMatcher<MatcherT>) {
+          if (!decoder.is_status_ok()) {
+            matcher_state.set_state(ScanState::kDoneWithSubtree);
+            matcher_state.Prune(path);
+            return;
+          }
+        }
         matcher_state.set_state(matcher.OnNode(path, decoder));
         if (matcher_state.state() == ScanState::kDoneWithSubtree) {
           matcher_state.Prune(path);

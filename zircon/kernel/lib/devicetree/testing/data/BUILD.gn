@@ -58,6 +58,7 @@ dts_synthetic = [
   "synthetic/ramoops.dts",
   "synthetic/reserved_memory.dts",
   "synthetic/simple_with_properties.dts",
+  "synthetic/simple_with_status.dts",
   "synthetic/qcom_msm_watchdog.dts",
   "synthetic/qcom_msm_watchdog_multiple_regs.dts",
 ]
