@@ -84,6 +84,9 @@ const METADATA_KEY: Aes256Key = Aes256Key::create([
 ]);
 
 const FVM_PART_INSTANCE_GUID: [u8; 16] = [3u8; 16];
+const DEFAULT_TEST_TYPE_GUID: [u8; 16] = [
+    0x66, 0x73, 0x68, 0x6F, 0x73, 0x74, 0x20, 0x69, 0x6E, 0x74, 0x65, 0x67, 0x72, 0x61, 0x74, 0x73,
+];
 
 async fn create_hermetic_crypt_service(
     data_key: Aes256Key,
@@ -160,21 +163,21 @@ pub async fn write_test_blob(blob_creator: BlobCreatorProxy, data: &[u8]) -> Has
 }
 
 pub enum Disk {
-    Prebuilt(zx::Vmo),
+    Prebuilt(zx::Vmo, Option<[u8; 16]>),
     Builder(DiskBuilder),
 }
 
 impl Disk {
-    pub async fn get_vmo(self) -> zx::Vmo {
+    pub async fn into_vmo_and_type_guid(self) -> (zx::Vmo, Option<[u8; 16]>) {
         match self {
-            Disk::Prebuilt(vmo) => vmo,
+            Disk::Prebuilt(vmo, guid) => (vmo, guid),
             Disk::Builder(builder) => builder.build().await,
         }
     }
 
     pub fn builder(&mut self) -> &mut DiskBuilder {
         match self {
-            Disk::Prebuilt(_) => panic!("attempted to get builder for prebuilt disk"),
+            Disk::Prebuilt(..) => panic!("attempted to get builder for prebuilt disk"),
             Disk::Builder(builder) => builder,
         }
     }
@@ -197,6 +200,7 @@ enum FxfsType {
     FxBlob(ServingMultiVolumeFilesystem, RealmInstance),
 }
 
+#[derive(Debug)]
 pub struct DiskBuilder {
     size: u64,
     // Overrides all other options.  The disk will be unformatted.
@@ -214,11 +218,13 @@ pub struct DiskBuilder {
     legacy_data_label: bool,
     // Only used if 'fs_switch' set.
     fs_switch: Option<String>,
+    // The type guid of the ramdisk when it's created for the test fshost.
+    type_guid: Option<[u8; 16]>,
 }
 
 impl DiskBuilder {
     pub fn uninitialized() -> DiskBuilder {
-        Self { uninitialized: true, ..Self::new() }
+        Self { uninitialized: true, type_guid: None, ..Self::new() }
     }
 
     pub fn new() -> DiskBuilder {
@@ -235,6 +241,7 @@ impl DiskBuilder {
             format_volume_manager: true,
             legacy_data_label: false,
             fs_switch: None,
+            type_guid: Some(DEFAULT_TEST_TYPE_GUID),
         }
     }
 
@@ -289,6 +296,9 @@ impl DiskBuilder {
 
     pub fn with_gpt(&mut self) -> &mut Self {
         self.gpt = true;
+        // The system partition matcher expects the type guid to be either None or completely zero,
+        // so if we are formatting with gpt we clear any type guid.
+        self.type_guid = None;
         self
     }
 
@@ -308,11 +318,12 @@ impl DiskBuilder {
         self
     }
 
-    pub async fn build(mut self) -> zx::Vmo {
+    pub async fn build(mut self) -> (zx::Vmo, Option<[u8; 16]>) {
+        log::info!("building disk: {:?}", self);
         let vmo = zx::Vmo::create(self.size).unwrap();
 
         if self.uninitialized {
-            return vmo;
+            return (vmo, self.type_guid);
         }
 
         let server = Arc::new(FakeServer::from_vmo(
@@ -339,7 +350,7 @@ impl DiskBuilder {
         }
 
         if !self.format_volume_manager {
-            return vmo;
+            return (vmo, self.type_guid);
         }
 
         let mut gpt = None;
@@ -368,7 +379,7 @@ impl DiskBuilder {
         if let Some(gpt) = gpt {
             gpt.shutdown().await;
         }
-        vmo
+        (vmo, self.type_guid)
     }
 
     async fn build_fxfs_as_volume_manager(&mut self, connector: Box<dyn BlockConnector>) {
@@ -679,7 +690,7 @@ impl DiskBuilder {
             _crc32: u32,
         }
 
-        let ramdisk_vmo = self.build().await;
+        let (ramdisk_vmo, _) = self.build().await;
         let extra = ramdisk_vmo.get_size().unwrap() as u32;
         let mut decompressed_buf = vec![0u8; extra as usize];
         ramdisk_vmo.read(&mut decompressed_buf, 0).unwrap();

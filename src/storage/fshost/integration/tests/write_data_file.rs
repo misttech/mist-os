@@ -7,7 +7,6 @@
 
 use fshost::{AdminProxy, AdminWriteDataFileResult};
 use fshost_test_fixture::disk_builder::VolumesSpec;
-use zx::{self as zx, HandleBased as _};
 use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio};
 
 pub mod config;
@@ -43,10 +42,9 @@ async fn unformatted() {
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
     call_write_data_file(&admin).await.expect("write_data_file failed");
-    let vmo = fixture.ramdisk_vmo().unwrap().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
-    fixture.tear_down().await;
+    let disk = fixture.tear_down().await.unwrap();
 
-    let fixture = new_builder().with_disk_from_vmo(vmo).build().await;
+    let fixture = new_builder().with_disk_from(disk).build().await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
     let secret = fuchsia_fs::directory::open_file(
@@ -79,10 +77,9 @@ async fn no_existing_data_partition() {
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
     call_write_data_file(&admin).await.expect("write_data_file failed");
-    let vmo = fixture.ramdisk_vmo().unwrap().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
-    fixture.tear_down().await;
+    let disk = fixture.tear_down().await.unwrap();
 
-    let fixture = new_builder().with_disk_from_vmo(vmo).build().await;
+    let fixture = new_builder().with_disk_from(disk).build().await;
 
     // Ensure the blob volume is present and unmodified.
     fixture.check_fs_type("blob", blob_fs_type()).await;
@@ -112,10 +109,9 @@ async fn unformatted_netboot() {
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
     call_write_data_file(&admin).await.expect("write_data_file failed");
-    let vmo = fixture.ramdisk_vmo().unwrap().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
-    fixture.tear_down().await;
+    let disk = fixture.tear_down().await.unwrap();
 
-    let fixture = new_builder().with_disk_from_vmo(vmo).build().await;
+    let fixture = new_builder().with_disk_from(disk).build().await;
 
     // Ensure the blob volume is present and unmodified.
     fixture.check_fs_type("blob", blob_fs_type()).await;
@@ -156,10 +152,9 @@ async fn unformatted_small_disk() {
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
     call_write_data_file(&admin).await.expect("write_data_file failed");
-    let vmo = fixture.ramdisk_vmo().unwrap().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
-    fixture.tear_down().await;
+    let disk = fixture.tear_down().await.unwrap();
 
-    let fixture = new_builder().with_disk_from_vmo(vmo).build().await;
+    let fixture = new_builder().with_disk_from(disk).build().await;
 
     // Ensure the blob volume is present and unmodified.
     fixture.check_fs_type("blob", blob_fs_type()).await;
@@ -193,10 +188,9 @@ async fn formatted() {
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
     call_write_data_file(&admin).await.expect("write_data_file failed");
-    let vmo = fixture.ramdisk_vmo().unwrap().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
-    fixture.tear_down().await;
+    let disk = fixture.tear_down().await.unwrap();
 
-    let fixture = new_builder().with_disk_from_vmo(vmo).build().await;
+    let fixture = new_builder().with_disk_from(disk).build().await;
 
     // Ensure the blob volume is present and unmodified.
     fixture.check_fs_type("blob", blob_fs_type()).await;
@@ -242,10 +236,9 @@ async fn formatted_file_in_root() {
         .expect("write_data_file failed: transport error")
         .unwrap();
 
-    let vmo = fixture.ramdisk_vmo().unwrap().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
-    fixture.tear_down().await;
+    let disk = fixture.tear_down().await.unwrap();
 
-    let fixture = new_builder().with_disk_from_vmo(vmo).build().await;
+    let fixture = new_builder().with_disk_from(disk).build().await;
 
     // Ensure the blob volume is present and unmodified.
     fixture.check_fs_type("blob", blob_fs_type()).await;
@@ -278,10 +271,9 @@ async fn formatted_netboot() {
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
     call_write_data_file(&admin).await.expect("write_data_file failed");
-    let vmo = fixture.ramdisk_vmo().unwrap().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
-    fixture.tear_down().await;
+    let disk = fixture.tear_down().await.unwrap();
 
-    let fixture = new_builder().with_disk_from_vmo(vmo).build().await;
+    let fixture = new_builder().with_disk_from(disk).build().await;
 
     // Ensure the blob volume is present and unmodified.
     fixture.check_fs_type("blob", blob_fs_type()).await;

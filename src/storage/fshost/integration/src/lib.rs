@@ -5,6 +5,7 @@
 use assert_matches::assert_matches;
 use diagnostics_assertions::assert_data_tree;
 use diagnostics_reader::{ArchiveReader, Inspect};
+use disk_builder::Disk;
 use fidl::endpoints::{create_proxy, ServiceMarker as _};
 use fidl_fuchsia_fxfs::{
     BlobReaderMarker, CryptManagementMarker, CryptManagementProxy, CryptMarker, CryptProxy,
@@ -13,7 +14,7 @@ use fidl_fuchsia_fxfs::{
 use fuchsia_component::client::connect_to_protocol_at_dir_root;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
-use futures::channel::mpsc::{self};
+use futures::channel::mpsc;
 use futures::{FutureExt as _, StreamExt as _};
 use ramdevice_client::{RamdiskClient, RamdiskClientBuilder};
 use std::pin::pin;
@@ -56,8 +57,8 @@ pub fn round_down<
 pub struct TestFixtureBuilder {
     netboot: bool,
     no_fuchsia_boot: bool,
-    disk: Option<disk_builder::Disk>,
-    extra_disks: Vec<disk_builder::Disk>,
+    disk: Option<Disk>,
+    extra_disks: Vec<Disk>,
     fshost: fshost_builder::FshostBuilder,
     zbi_ramdisk: Option<disk_builder::DiskBuilder>,
     storage_host: bool,
@@ -81,22 +82,22 @@ impl TestFixtureBuilder {
     }
 
     pub fn with_disk(&mut self) -> &mut disk_builder::DiskBuilder {
-        self.disk = Some(disk_builder::Disk::Builder(disk_builder::DiskBuilder::new()));
+        self.disk = Some(Disk::Builder(disk_builder::DiskBuilder::new()));
         self.disk.as_mut().unwrap().builder()
     }
 
     pub fn with_extra_disk(&mut self) -> &mut disk_builder::DiskBuilder {
-        self.extra_disks.push(disk_builder::Disk::Builder(disk_builder::DiskBuilder::new()));
+        self.extra_disks.push(Disk::Builder(disk_builder::DiskBuilder::new()));
         self.extra_disks.last_mut().unwrap().builder()
     }
 
     pub fn with_uninitialized_disk(mut self) -> Self {
-        self.disk = Some(disk_builder::Disk::Builder(disk_builder::DiskBuilder::uninitialized()));
+        self.disk = Some(Disk::Builder(disk_builder::DiskBuilder::uninitialized()));
         self
     }
 
-    pub fn with_disk_from_vmo(mut self, vmo: zx::Vmo) -> Self {
-        self.disk = Some(disk_builder::Disk::Prebuilt(vmo));
+    pub fn with_disk_from(mut self, disk: Disk) -> Self {
+        self.disk = Some(disk);
         self
     }
 
@@ -207,7 +208,7 @@ impl TestFixtureBuilder {
         let mut fixture = TestFixture {
             realm: builder.build().await.unwrap(),
             ramdisks: Vec::new(),
-            ramdisk_vmo: None,
+            main_disk: None,
             crash_reports,
             torn_down: TornDown(false),
             storage_host: self.storage_host,
@@ -239,16 +240,16 @@ impl TestFixtureBuilder {
             .unwrap();
 
         if let Some(disk) = self.disk {
-            let vmo = disk.get_vmo().await;
+            let (vmo, type_guid) = disk.into_vmo_and_type_guid().await;
             let vmo_clone =
                 vmo.create_child(zx::VmoChildOptions::SLICE, 0, vmo.get_size().unwrap()).unwrap();
 
-            fixture.add_ramdisk(vmo).await;
-            fixture.ramdisk_vmo = Some(vmo_clone);
+            fixture.add_ramdisk(vmo, type_guid).await;
+            fixture.main_disk = Some(Disk::Prebuilt(vmo_clone, type_guid));
         }
         for disk in self.extra_disks.into_iter() {
-            let vmo = disk.get_vmo().await;
-            fixture.add_ramdisk(vmo).await;
+            let (vmo, type_guid) = disk.into_vmo_and_type_guid().await;
+            fixture.add_ramdisk(vmo, type_guid).await;
         }
 
         fixture
@@ -270,33 +271,22 @@ impl Drop for TornDown {
 pub struct TestFixture {
     pub realm: RealmInstance,
     pub ramdisks: Vec<RamdiskClient>,
-    pub ramdisk_vmo: Option<zx::Vmo>,
+    pub main_disk: Option<Disk>,
     pub crash_reports: mpsc::Receiver<ffeedback::CrashReport>,
     torn_down: TornDown,
     storage_host: bool,
 }
 
 impl TestFixture {
-    pub async fn tear_down(mut self) {
+    pub async fn tear_down(mut self) -> Option<Disk> {
         log::info!(realm_name:? = self.realm.root.child_name(); "tearing down");
+        let disk = self.main_disk.take();
         // Check the crash reports before destroying the realm because tearing down the realm can
         // cause mounting errors that trigger a crash report.
         assert_matches!(self.crash_reports.try_next(), Ok(None) | Err(_));
         self.realm.destroy().await.unwrap();
         self.torn_down.0 = true;
-    }
-
-    pub async fn into_vmo(mut self) -> Option<zx::Vmo> {
-        let vmo = self.ramdisk_vmo.take();
-        self.tear_down().await;
-        vmo
-    }
-
-    pub async fn set_ramdisk_vmo(&mut self, vmo: zx::Vmo) {
-        let vmo_clone =
-            vmo.create_child(zx::VmoChildOptions::SLICE, 0, vmo.get_size().unwrap()).unwrap();
-        self.add_ramdisk(vmo).await;
-        self.ramdisk_vmo = Some(vmo_clone);
+        disk
     }
 
     pub fn exposed_dir(&self) -> &fio::DirectoryProxy {
@@ -379,21 +369,19 @@ impl TestFixture {
         file.get_attr().await.expect_err(".testdata should be absent");
     }
 
-    pub fn ramdisk_vmo(&self) -> Option<&zx::Vmo> {
-        self.ramdisk_vmo.as_ref()
-    }
-
-    pub async fn add_ramdisk(&mut self, vmo: zx::Vmo) {
-        let mut ramdisk = pin!(if self.storage_host {
+    async fn add_ramdisk(&mut self, vmo: zx::Vmo, type_guid: Option<[u8; 16]>) {
+        let mut ramdisk_builder = if self.storage_host {
             RamdiskClientBuilder::new_with_vmo(vmo, Some(512)).use_v2().publish().ramdisk_service(
                 self.dir(framdisk::ServiceMarker::SERVICE_NAME, fio::Flags::empty()),
             )
         } else {
             RamdiskClientBuilder::new_with_vmo(vmo, Some(512))
                 .dev_root(self.dir("dev-topological", fio::Flags::empty()))
+        };
+        if let Some(guid) = type_guid {
+            ramdisk_builder = ramdisk_builder.guid(guid);
         }
-        .build()
-        .fuse());
+        let mut ramdisk = pin!(ramdisk_builder.build().fuse());
 
         let ramdisk = futures::select_biased!(
             res = ramdisk => res,

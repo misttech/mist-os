@@ -139,9 +139,9 @@ async fn wipe_storage_deletes_starnix_volume() {
         .expect("fidl transport error")
         .expect("mount failed");
 
-    let vmo = fixture.into_vmo().await.unwrap();
+    let disk = fixture.tear_down().await.unwrap();
 
-    let mut builder = new_builder().with_disk_from_vmo(vmo);
+    let mut builder = new_builder().with_disk_from(disk);
     builder.fshost().create_starnix_volume_crypt().set_config_value("ramdisk_image", true);
     builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 
@@ -188,8 +188,8 @@ async fn wipe_storage_deletes_starnix_volume() {
         .map_err(zx::Status::from_raw)
         .expect("WipeStorage unexpectedly failed");
 
-    let vmo = fixture.into_vmo().await.unwrap();
-    let mut builder = new_builder().with_disk_from_vmo(vmo);
+    let disk = fixture.tear_down().await.unwrap();
+    let mut builder = new_builder().with_disk_from(disk);
     builder
         .fshost()
         .create_starnix_volume_crypt()
@@ -279,9 +279,9 @@ async fn blobfs_formatted() {
     // The test fixture writes tests blobs to blobfs or fxblob when it is formatted.
     fixture.check_test_blob(cfg!(feature = "fxblob")).await;
 
-    let vmo = fixture.into_vmo().await.unwrap();
+    let disk = fixture.tear_down().await.unwrap();
 
-    let mut builder = new_builder().with_disk_from_vmo(vmo);
+    let mut builder = new_builder().with_disk_from(disk);
     builder.fshost().set_config_value("ramdisk_image", true);
     builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 

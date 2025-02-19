@@ -20,7 +20,6 @@ use fshost_test_fixture::{
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use futures::FutureExt;
 use regex::Regex;
-use zx::{self as zx, HandleBased};
 use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 #[cfg(feature = "fxblob")]
@@ -382,8 +381,8 @@ async fn mount_and_unmount_starnix_volume() {
     fuchsia_fs::file::write(&starnix_volume_file, "file contents!").await.unwrap();
     volume_provider.unmount().await.expect("fidl transport error").expect("unmount failed");
 
-    let vmo = fixture.into_vmo().await.unwrap();
-    let mut builder = new_builder().with_disk_from_vmo(vmo);
+    let disk = fixture.tear_down().await.unwrap();
+    let mut builder = new_builder().with_disk_from(disk);
     builder
         .fshost()
         .create_starnix_volume_crypt()
@@ -657,8 +656,6 @@ async fn shred_data_volume_when_mounted() {
     builder.with_disk().format_volumes(volumes_spec());
     let fixture = builder.build().await;
 
-    let vmo = fixture.ramdisk_vmo().unwrap().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
-
     fuchsia_fs::directory::open_file(
         &fixture.dir("data", fio::PERM_READABLE | fio::PERM_WRITABLE),
         "test-file",
@@ -679,9 +676,9 @@ async fn shred_data_volume_when_mounted() {
         .expect("shred_data_volume FIDL failed")
         .expect("shred_data_volume failed");
 
-    fixture.tear_down().await;
+    let disk = fixture.tear_down().await.unwrap();
 
-    let fixture = new_builder().with_disk_from_vmo(vmo).build().await;
+    let fixture = new_builder().with_disk_from(disk).build().await;
 
     // If we try and open the same test file, it shouldn't exist because the data volume should have
     // been shredded.
@@ -729,7 +726,6 @@ async fn shred_data_deletes_starnix_volume() {
         .expect("fidl transport error")
         .expect("mount failed");
 
-    let vmo = fixture.ramdisk_vmo().unwrap().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
     let admin = fixture
         .realm
         .root
@@ -741,9 +737,9 @@ async fn shred_data_deletes_starnix_volume() {
         .await
         .expect("shred_data_volume FIDL failed")
         .expect("shred_data_volume failed");
-    fixture.tear_down().await;
+    let disk = fixture.tear_down().await.unwrap();
 
-    let mut builder = new_builder().with_disk_from_vmo(vmo);
+    let mut builder = new_builder().with_disk_from(disk);
     builder
         .fshost()
         .create_starnix_volume_crypt()
@@ -806,8 +802,8 @@ async fn vend_a_fresh_starnix_test_volume_on_each_mount() {
     fuchsia_fs::file::write(&starnix_volume_file, "file contents!").await.unwrap();
     volume_provider.unmount().await.expect("fidl transport error").expect("unmount failed");
 
-    let vmo = fixture.into_vmo().await.unwrap();
-    let mut builder = new_builder().with_disk_from_vmo(vmo);
+    let disk = fixture.tear_down().await.unwrap();
+    let mut builder = new_builder().with_disk_from(disk);
     builder.fshost().create_starnix_volume_crypt();
     let fixture = builder.build().await;
 
@@ -851,8 +847,6 @@ async fn shred_data_volume_from_recovery() {
     builder.with_disk().with_gpt().format_volumes(volumes_spec());
     let fixture = builder.build().await;
 
-    let vmo = fixture.ramdisk_vmo().unwrap().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
-
     fuchsia_fs::directory::open_file(
         &fixture.dir("data", fio::PERM_READABLE | fio::PERM_WRITABLE),
         "test-file",
@@ -861,12 +855,11 @@ async fn shred_data_volume_from_recovery() {
     .await
     .expect("open_file failed");
 
-    fixture.tear_down().await;
+    let disk = fixture.tear_down().await.unwrap();
 
     // Launch a version of fshost that will behave like recovery: it will mount data and blob from
     // a ramdisk it launches, binding the fvm on the "regular" disk but otherwise leaving it alone.
-    let mut builder =
-        new_builder().with_disk_from_vmo(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap());
+    let mut builder = new_builder().with_disk_from(disk);
     builder.fshost().set_config_value("ramdisk_image", true);
     builder.with_zbi_ramdisk().format_volumes(volumes_spec());
     let fixture = builder.build().await;
@@ -883,9 +876,9 @@ async fn shred_data_volume_from_recovery() {
         .expect("shred_data_volume FIDL failed")
         .expect("shred_data_volume failed");
 
-    fixture.tear_down().await;
+    let disk = fixture.tear_down().await.unwrap();
 
-    let fixture = new_builder().with_disk_from_vmo(vmo).build().await;
+    let fixture = new_builder().with_disk_from(disk).build().await;
 
     // If we try and open the same test file, it shouldn't exist because the data volume should have
     // been shredded.
@@ -1109,12 +1102,11 @@ async fn migration_toggle() {
     fixture.check_fs_type("data", VFS_TYPE_FXFS).await;
     fixture.check_test_data_file().await;
 
-    let vmo = fixture.into_vmo().await.unwrap();
+    let disk = fixture.tear_down().await.unwrap();
 
-    let mut builder = new_builder();
+    let mut builder = new_builder().with_disk_from(disk);
     builder.fshost().set_config_value("data_max_bytes", DATA_MAX_BYTES / 2);
-    let mut fixture = builder.build().await;
-    fixture.set_ramdisk_vmo(vmo).await;
+    let fixture = builder.build().await;
 
     fixture.check_fs_type("data", VFS_TYPE_MINFS).await;
     fixture.check_test_data_file().await;
@@ -1297,8 +1289,8 @@ async fn data_persists() {
     fuchsia_fs::file::write(&file, "file contents!").await.unwrap();
 
     // Shut down fshost, which should propagate to the data filesystem too.
-    let vmo = fixture.into_vmo().await.unwrap();
-    let builder = new_builder().with_disk_from_vmo(vmo);
+    let disk = fixture.tear_down().await.unwrap();
+    let builder = new_builder().with_disk_from(disk);
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
