@@ -260,6 +260,13 @@
             subdir: "hrtimer",
         },
         {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-battery",
+            to: [ "#session-manager" ],
+            subdir: "battery",
+        },
+        {
             protocol: [
                 "fuchsia.device.NameProvider",
                 "fuchsia.hardware.power.statecontrol.Admin",

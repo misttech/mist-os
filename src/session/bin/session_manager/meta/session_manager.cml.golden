@@ -514,6 +514,7 @@
         {
             directory: [
                 "dev-backlight",
+                "dev-battery",
                 "dev-gpu",
                 "dev-light",
                 "dev-power-sensor",

@@ -120,6 +120,7 @@ type BatteryInfo = table {
 };
 
 /// Provider interface used to obtain battery status details
+@discoverable
 closed protocol BatteryInfoProvider {
     /// Gets battery info
     strict GetBatteryInfo() -> (struct {
