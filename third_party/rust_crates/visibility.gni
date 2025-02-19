@@ -35,6 +35,7 @@ sha1_visibility = [
   # use this if it's implementing legacy protocols that require SHA-1; it should
   # never be used for new cryptographic development.
 
+  "//src/tee/runtime/api_impl:*",
   "//src/connectivity/wlan/lib/rsn:*",
 ]
 

@@ -303,6 +303,18 @@ fn slice_from_raw_parts<'a, Input, Output>(data: *const Input, size: usize) -> &
     }
 }
 
+fn buffers_overlap<Input>(a: *const Input, a_len: usize, b: *const Input, b_len: usize) -> bool {
+    let a = a.addr();
+    let a_end = a + a_len * size_of::<Input>();
+    let b = b.addr();
+    let b_end = b + b_len * size_of::<Input>();
+    if a < b {
+        a_end > b
+    } else {
+        b_end > a
+    }
+}
+
 // Returns None if a Utf8Error is encountered.
 fn c_str_to_str<'a>(name: *const ::std::os::raw::c_char) -> Option<&'a str> {
     assert!(!name.is_null());
@@ -1298,21 +1310,45 @@ extern "C" fn TEE_IsAlgorithmSupported(algId: u32, element: u32) -> TEE_Result {
 #[no_mangle]
 extern "C" fn TEE_DigestUpdate(
     operation: TEE_OperationHandle,
-    chunk: *mut ::std::os::raw::c_void,
+    chunk: *const ::std::os::raw::c_void,
     chunkSize: usize,
 ) {
-    unimplemented!()
+    let operation = *OperationHandle::from_binding(&operation);
+    let chunk = slice_from_raw_parts(chunk, chunkSize);
+    context::with_current_mut(|context| context.operations.update_digest(operation, chunk))
 }
 
 #[no_mangle]
 extern "C" fn TEE_DigestDoFinal(
     operation: TEE_OperationHandle,
-    chunk: *mut ::std::os::raw::c_void,
+    chunk: *const ::std::os::raw::c_void,
     chunkLen: usize,
     hash: *mut ::std::os::raw::c_void,
     hashLen: *mut usize,
 ) -> TEE_Result {
-    unimplemented!()
+    to_tee_result(|| -> TeeResult {
+        assert!(!hashLen.is_null());
+
+        // SAFETY: hashLen checked as non-null above.
+        let initialHashLen = unsafe { *hashLen };
+
+        // This is a precondition to being to reinterpret `hash` as a mutable
+        // slice.
+        assert!(!buffers_overlap(chunk, chunkLen, hash, initialHashLen));
+
+        let operation = *OperationHandle::from_binding(&operation);
+        let chunk = slice_from_raw_parts(chunk, chunkLen);
+        let hash = slice_from_raw_parts_mut(hash, initialHashLen);
+        context::with_current_mut(|context| {
+            context.operations.update_and_finalize_digest_into(operation, chunk, hash).map_err(
+                |len| {
+                    // SAFETY: hashLen checked as non-null above.
+                    unsafe { *hashLen = len };
+                    Error::ShortBuffer
+                },
+            )
+        })
+    }())
 }
 
 #[no_mangle]
@@ -1321,7 +1357,20 @@ extern "C" fn TEE_DigestExtract(
     hash: *mut ::std::os::raw::c_void,
     hashLen: *mut usize,
 ) -> TEE_Result {
-    unimplemented!()
+    to_tee_result(|| -> TeeResult {
+        let operation = *OperationHandle::from_binding(&operation);
+        assert!(!hashLen.is_null());
+        // SAFETY: hashLen checked as non-null above.
+        let hash = slice_from_raw_parts_mut(hash, unsafe { *hashLen });
+        context::with_current_mut(|context| {
+            let written = context.operations.extract_digest(operation, hash);
+            // SAFETY: hashLen checked as non-null above.
+            unsafe {
+                *hashLen -= written;
+            }
+        });
+        Ok(())
+    }())
 }
 
 #[no_mangle]
