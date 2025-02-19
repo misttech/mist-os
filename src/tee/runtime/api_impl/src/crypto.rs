@@ -42,6 +42,12 @@ impl Helper {
             }
         }
     }
+
+    fn reset(&mut self) {
+        match self {
+            Helper::Digest(digest) => digest.reset(),
+        }
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -87,6 +93,11 @@ impl Operation {
         } else {
             (false, 0)
         }
+    }
+
+    fn reset(&mut self) {
+        self.helper.reset();
+        self.state = OpState::Initial;
     }
 
     fn set_key(&mut self, obj: Rc<RefCell<dyn Object>>) -> TeeResult {
@@ -323,6 +334,10 @@ impl Operations {
             return;
         }
         let _ = self.operations.remove(&operation).unwrap();
+    }
+
+    pub fn reset(&mut self, operation: OperationHandle) {
+        self.get_mut(operation).reset()
     }
 
     pub fn set_key(

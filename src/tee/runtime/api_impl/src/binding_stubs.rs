@@ -1263,7 +1263,10 @@ extern "C" fn TEE_GetOperationInfoMultiple(
 
 #[no_mangle]
 extern "C" fn TEE_ResetOperation(operation: TEE_OperationHandle) {
-    unimplemented!()
+    context::with_current_mut(|context| {
+        let operation = *OperationHandle::from_binding(&operation);
+        context.operations.reset(operation)
+    })
 }
 
 #[no_mangle]

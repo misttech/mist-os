@@ -8,6 +8,7 @@
             matchers: [
                 "regression1007",
                 "regression1012",
+                "regression1013",
                 "regression1014",
                 "regression1038",
                 "regression4004",
@@ -36,7 +37,6 @@
                 "regression1008",
                 "regression1010",
                 "regression1011",
-                "regression1013",
                 "regression1021",
                 "regression1040",
                 "regression4001",
