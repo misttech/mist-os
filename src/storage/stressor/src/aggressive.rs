@@ -91,10 +91,10 @@ const NUM_OPS: usize = 3;
 
 /// The number of files to cycle through.
 /// This must be larger than DIRENT_CACHE_LIMIT to induce cache thrashing.
-const NUM_FILES: usize = 10000;
+const NUM_FILES: usize = 4000;
 
 /// See src/storage/fxfs/platform/src/fuchsia/volume.rs.
-const DIRENT_CACHE_LIMIT: usize = 8000;
+const DIRENT_CACHE_LIMIT: usize = 2000;
 
 impl Stressor {
     /// Creates a new aggressive stressor that will try to fill the disk until

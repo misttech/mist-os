@@ -55,7 +55,7 @@ impl DirentCache {
     pub fn new(limit: usize) -> Self {
         Self {
             inner: Mutex::new(DirentCacheInner {
-                lru: linked_hash_map_with_capacity(limit + 1),
+                lru: create_linked_hash_map(),
                 limit,
                 timer_in_queue: false,
             }),
@@ -100,8 +100,7 @@ impl DirentCache {
         let _dropped = {
             let mut this = self.inner.lock().unwrap();
             this.timer_in_queue = false;
-            let limit = this.limit;
-            std::mem::replace(&mut this.lru, linked_hash_map_with_capacity(limit + 1))
+            std::mem::replace(&mut this.lru, create_linked_hash_map())
         };
     }
 
@@ -111,8 +110,12 @@ impl DirentCache {
         let mut dropped_items;
         {
             let mut this = self.inner.lock().unwrap();
+
             this.limit = limit;
             if this.lru.len() <= limit {
+                if this.lru.capacity() > limit {
+                    this.lru.shrink_to_fit();
+                }
                 return;
             }
             dropped_items = Vec::with_capacity(this.lru.len() - limit);
@@ -122,6 +125,7 @@ impl DirentCache {
                     CacheHolder::Timer => this.timer_in_queue = false,
                 }
             }
+            this.lru.shrink_to_fit();
         }
     }
 
@@ -152,10 +156,9 @@ impl DirentCache {
     }
 }
 
-fn linked_hash_map_with_capacity(
-    capacity: usize,
+fn create_linked_hash_map(
 ) -> LinkedHashMap<DirentCacheKey, CacheHolder, BuildHasherDefault<FxHasher>> {
-    LinkedHashMap::with_capacity_and_hasher(capacity, BuildHasherDefault::<FxHasher>::default())
+    LinkedHashMap::with_hasher(BuildHasherDefault::<FxHasher>::default())
 }
 
 /// Hash function for both `DirentCacheKey` and `DirentCacheKeyRef` to ensure that both types hash
@@ -249,7 +252,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_simple_lru() {
+    fn test_simple_lru() {
         let cache = DirentCache::new(5);
         for i in 1..6 {
             cache.insert(1, i.to_string(), Arc::new(FakeNode(i)));
@@ -285,7 +288,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_change_limit() {
+    fn test_change_limit() {
         let cache = DirentCache::new(10);
 
         for i in 1..16 {
@@ -311,7 +314,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_cache_clear() {
+    fn test_cache_clear() {
         let cache = DirentCache::new(10);
 
         for i in 1..6 {
@@ -331,7 +334,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_timeout() {
+    fn test_timeout() {
         let cache = DirentCache::new(20);
 
         cache.recycle_stale_files();
@@ -357,5 +360,32 @@ mod tests {
                 None => assert_eq!(i % 2, 0, "Odd number {} missing.", i),
             }
         }
+    }
+
+    #[fuchsia::test]
+    fn test_set_limit_changes_capacity_when_above_limit() {
+        const CACHE_SIZE: usize = 1024;
+        let cache = DirentCache::new(CACHE_SIZE);
+        for i in 0..CACHE_SIZE {
+            cache.insert(1, i.to_string(), Arc::new(FakeNode(i as u64)));
+        }
+        assert!(cache.inner.lock().unwrap().lru.capacity() >= CACHE_SIZE);
+        cache.set_limit(8);
+        assert!(cache.inner.lock().unwrap().lru.capacity() < CACHE_SIZE);
+    }
+
+    #[fuchsia::test]
+    fn test_set_limit_changes_capacity_when_below_limit() {
+        const CACHE_SIZE: usize = 1024;
+        let cache = DirentCache::new(CACHE_SIZE);
+        for i in 0..CACHE_SIZE {
+            cache.insert(1, i.to_string(), Arc::new(FakeNode(i as u64)));
+        }
+        assert!(cache.inner.lock().unwrap().lru.capacity() >= CACHE_SIZE);
+        cache.recycle_stale_files();
+        cache.recycle_stale_files(); // Remove everything from the cache.
+        assert_eq!(cache.inner.lock().unwrap().lru.len(), 0);
+        cache.set_limit(8);
+        assert!(cache.inner.lock().unwrap().lru.capacity() < CACHE_SIZE);
     }
 }

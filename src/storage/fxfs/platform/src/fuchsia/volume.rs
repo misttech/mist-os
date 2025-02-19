@@ -44,8 +44,8 @@ use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 // LINT.IfChange
 // TODO:(b/299919008) Fix this number to something reasonable, or maybe just for fxblob.
-const DIRENT_CACHE_LIMIT: usize = 8000;
-// LINT.ThenChange(src/storage/stressor/src/aggressive.rs)
+const DIRENT_CACHE_LIMIT: usize = 2000;
+// LINT.ThenChange(//src/storage/stressor/src/aggressive.rs)
 
 const PROFILE_DIRECTORY: &str = "profiles";
 
