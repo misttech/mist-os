@@ -1506,7 +1506,7 @@ dependencies = [
  "socket2",
  "splines",
  "static_assertions",
- "strsim 0.10.0",
+ "strsim 0.11.1",
  "structopt",
  "strum",
  "strum_macros",

@@ -943,7 +943,7 @@ group("static_assertions") {
 }
 
 group("strsim") {
-  public_deps = [ ":strsim-v0_10_0" ]
+  public_deps = [ ":strsim-v0_11_1" ]
 }
 
 group("structopt") {

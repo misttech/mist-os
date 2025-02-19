@@ -214,7 +214,7 @@ smallvec = {version= "1.13.1", features = ["const_generics", "const_new", "union
 socket2 = { version = "0.5.5", features = ["all"] }
 splines = "2.2.0"
 static_assertions = "1.1.0"
-strsim = "0.10.0"
+strsim = "0.11.1"
 structopt = "0.2.14"
 strum = "0.25.0"
 strum_macros = "0.25.3"
