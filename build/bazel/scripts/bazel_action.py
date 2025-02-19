@@ -586,6 +586,7 @@ class BazelLabelMapper(object):
                 file_prefix + ".hash",
             )
             if not os.path.exists(hash_file):
+                # LINT.IfChange
                 hash_file = os.path.join(
                     self._root_workspace,
                     "fuchsia_build_generated",
@@ -593,6 +594,7 @@ class BazelLabelMapper(object):
                 )
                 if not os.path.exists(hash_file):
                     hash_file = ""
+                # LINT.ThenChange(//build/bazel/scripts/workspace_utils.py)
 
             self._repository_hash_map[repository_name] = hash_file
 

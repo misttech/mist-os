@@ -631,6 +631,34 @@ common --enable_bzlmod=false
     )
     # LINT.ThenChange(//build/info/info.gni)
 
+    # LINT.IfChange
+    generated.record_symlink(
+        "workspace/fuchsia_build_generated/fuchsia_in_tree_idk.hash",
+        gn_output_dir / "obj/build/bazel/fuchsia_in_tree_idk.hash",
+    )
+
+    generated.record_symlink(
+        "workspace/fuchsia_build_generated/fuchsia_internal_only_idk.hash",
+        gn_output_dir / "obj/build/bazel/fuchsia_internal_only_idk.hash",
+    )
+
+    # LINT.ThenChange(//build//bazel/BUILD.gn)
+
+    # LINT.IfChange
+    # The following symlinks are used only by bazel_action.py when processing
+    # the list of Bazel source inputs, the actual repository setup in
+    # WORKSPACE.bazel reuse the two symlinks above instead.
+    generated.record_symlink(
+        "workspace/fuchsia_build_generated/fuchsia_sdk.hash",
+        gn_output_dir / "obj/build/bazel/fuchsia_in_tree_idk.hash",
+    )
+
+    generated.record_symlink(
+        "workspace/fuchsia_build_generated/internal_sdk.hash",
+        gn_output_dir / "obj/build/bazel/fuchsia_internal_only_idk.hash",
+    )
+    # LINT.ThenChange(//build/bazel/scripts/bazel_action.py)
+
 
 def generate_fuchsia_workspace(
     fuchsia_dir: Path,

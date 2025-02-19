@@ -256,6 +256,13 @@ load(
     "fuchsia_idk_repository",
 )
 
+# The location of symlinks to the content hash files used to cover the in-tree IDK
+# and its internal-only variant.
+# LINT.IfChange
+fuchsia_in_tree_idk_hash_label = "//:fuchsia_build_generated/fuchsia_in_tree_idk.hash"
+fuchsia_internal_only_idk_hash_label = "//:fuchsia_build_generated/fuchsia_internal_only_idk.hash"
+# LINT.ThenChange(BUILD.gn)
+
 # A repository that wraps //sdk:bazel_in_tree_idk in the Bazel graph.
 # This is used to populate the @fuchsia_sdk repository as well as
 # generate the @fuchsia_in_tree_idk:final_idk target.
@@ -264,9 +271,7 @@ fuchsia_idk_repository(
     idk_export_dir = "%s/sdk/exported/bazel_in_tree_idk" % ninja_output_dir,
     ninja_build_dir = ninja_output_dir,
     python_executable = "prebuilt/third_party/python3/%s/bin/python3" % fuchsia_host_tag,
-    # LINT.IfChange
-    content_hash_file = "//:fuchsia_build_generated/fuchsia_in_tree_idk.hash",
-    # LINT.ThenChange(BUILD.gn)
+    content_hash_file = fuchsia_in_tree_idk_hash_label,
 )
 
 # A repository that wraps //sdk:bazel_internal_only_idk in the Bazel graph.
@@ -276,9 +281,7 @@ fuchsia_idk_repository(
     idk_export_dir = "%s/sdk/exported/bazel_internal_only_idk" % ninja_output_dir,
     ninja_build_dir = ninja_output_dir,
     python_executable = "prebuilt/third_party/python3/%s/bin/python3" % fuchsia_host_tag,
-    # LINT.IfChange
-    content_hash_file = "//:fuchsia_build_generated/fuchsia_internal_only_idk.hash",
-    # LINT.ThenChange(BUILD.gn)
+    content_hash_file = fuchsia_internal_only_idk_hash_label,
 )
 
 # buildifier: disable=load-on-top
@@ -293,9 +296,8 @@ rules_fuchsia_deps()
 fuchsia_sdk_repository(
     name = "fuchsia_sdk",
     local_paths = ["@fuchsia_in_tree_idk"],
-    # LINT.IfChange
-    local_sdk_version_file = "//:fuchsia_build_generated/fuchsia_sdk.hash",
-    # LINT.ThenChange(BUILD.gn)
+    # The @fuchsia_sdk repository is populated from the same content as @fuchsia_in_tree_idk.
+    local_sdk_version_file = fuchsia_in_tree_idk_hash_label,
     use_rules_fuchsia = True,
     buildifier = "//:prebuilt/third_party/buildifier/%s/buildifier" % fuchsia_host_tag,
 )
@@ -306,9 +308,8 @@ fuchsia_sdk_repository(
 fuchsia_sdk_repository(
     name = "internal_sdk",
     local_paths = ["@fuchsia_internal_only_idk"],
-    # LINT.IfChange
-    local_sdk_version_file = "//:fuchsia_build_generated/internal_sdk.hash",
-    # LINT.ThenChange(BUILD.gn)
+    # The @internal_sdk repository is populated from the same content as @fuchsia_internal_only_idk.
+    local_sdk_version_file = fuchsia_internal_only_idk_hash_label,
     parent_sdk = "@fuchsia_sdk",
     parent_sdk_local_paths = ["@fuchsia_in_tree_idk"],
     use_rules_fuchsia = True,

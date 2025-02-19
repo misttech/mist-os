@@ -909,9 +909,7 @@ template("bazel_action") {
       deps += [
         "//build/bazel:fuchsia_in_tree_idk.hash",
         "//build/bazel:fuchsia_internal_only_idk.hash",
-        "//build/bazel:fuchsia_sdk.hash",
         "//build/bazel:generate_main_workspace($default_toolchain)",
-        "//build/bazel:internal_sdk.hash",
       ]
     }
 
