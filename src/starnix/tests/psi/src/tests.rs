@@ -3,15 +3,11 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_starnix_psi::{
-    PsiProviderGetMemoryPressureStatsResponse, PsiProviderRequest,
-    PsiProviderWatchMemoryStallResponse, PsiStats,
+    PsiProviderGetMemoryPressureStatsResponse, PsiProviderRequest, PsiStats,
 };
 use std::sync::Arc;
 use test_case::test_case;
-use zx::{AsHandleRef, HandleBased};
 
-mod event_waiter;
-use event_waiter::{make_epoll_waiter, make_poll_waiter, make_select_waiter, EventWaiter};
 mod fake_psi_provider;
 use fake_psi_provider::*;
 mod puppet;
@@ -125,78 +121,5 @@ async fn test_psi_unavailable() {
 
     assert!(puppet.check_exists("/proc/pressure").await == false);
 
-    puppet.check_exit_clean().await;
-}
-
-/// Given a function that builds an EventWaiter from a PuppetInstance and an
-/// open PSI file descriptor in it, tests that said EventWaiter delivers the
-/// expected PSI events.
-#[test_case(make_select_waiter => ignore; "select")]
-#[test_case(make_poll_waiter => ignore; "poll")]
-#[test_case(make_epoll_waiter; "epoll")]
-#[fuchsia::test]
-async fn test_wait<T>(make_waiter: T)
-where
-    for<'p> T:
-        AsyncFn(&'p mut PuppetInstance, PuppetFileDescriptor) -> Box<dyn EventWaiter<'p> + 'p>,
-{
-    let (mut puppet, fake_psi_provider) = start_puppet_with_fake_psi_provider().await;
-
-    let event = zx::Event::create();
-    let event_dup = event
-        .duplicate_handle(zx::Rights::WAIT | zx::Rights::DUPLICATE | zx::Rights::TRANSFER)
-        .unwrap();
-
-    let fd = fake_psi_provider
-        .with_expected_request(
-            |request| {
-                let PsiProviderRequest::WatchMemoryStall { payload, responder } = request else {
-                    panic!("Unexpected request received")
-                };
-                assert_eq!(payload.kind.unwrap(), zx::sys::ZX_SYSTEM_MEMORY_STALL_SOME);
-                assert_eq!(payload.threshold.unwrap(), 1234 * 1000);
-                assert_eq!(payload.window.unwrap(), 1000000 * 1000);
-                responder
-                    .send(Ok(PsiProviderWatchMemoryStallResponse {
-                        event: Some(event_dup),
-                        ..Default::default()
-                    }))
-                    .unwrap();
-            },
-            async {
-                let fd = puppet.open("/proc/pressure/memory").await;
-                puppet.write_all(fd, "some 1234 1000000").await;
-                fd
-            },
-        )
-        .await;
-
-    let mut waiter = make_waiter(&mut puppet, fd).await;
-
-    // The event is not asserted: a non-blocking wait should report no events.
-    assert_eq!(waiter.wait(0).await, false);
-
-    // Pulse the event and sleep for longer than the window. A PSI event should be latched and
-    // delivered, even if the wait starts after the sleep.
-    event.signal_handle(zx::Signals::empty(), zx::Signals::EVENT_SIGNALED).unwrap();
-    event.signal_handle(zx::Signals::EVENT_SIGNALED, zx::Signals::empty()).unwrap();
-    std::thread::sleep(std::time::Duration::from_secs(3));
-    assert_eq!(waiter.wait(0).await, true);
-
-    // Expect no events to be further delivered if waited again, as the event is no longer signaled.
-    assert_eq!(waiter.wait(100).await, false);
-
-    // Signal it again and expect the wait result to reflect it.
-    event.signal_handle(zx::Signals::empty(), zx::Signals::EVENT_SIGNALED).unwrap();
-    assert_eq!(waiter.wait(0).await, true);
-
-    // The next wait, however, should not report any event until the window has elapsed.
-    assert_eq!(waiter.wait(100).await, false);
-    std::thread::sleep(std::time::Duration::from_secs(2));
-    assert_eq!(waiter.wait(0).await, true);
-
-    waiter.destroy().await;
-
-    puppet.close(fd).await;
     puppet.check_exit_clean().await;
 }

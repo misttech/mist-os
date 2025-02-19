@@ -128,55 +128,6 @@ impl PuppetInstance {
         reply[0].clone()
     }
 
-    pub async fn write_all(&mut self, fd: PuppetFileDescriptor, data: &str) {
-        self.write_message(&["WRITE_ALL", &fd.0.to_string(), data]).await;
-        let _ = self.read_message().await;
-    }
-
-    /// Calls select() with the file descriptor in the exceptfds set, returning
-    /// true if it delivered an exceptional condition event or false if it timed
-    /// out.
-    pub async fn select_except(&mut self, fd: PuppetFileDescriptor, timeout_ms: usize) -> bool {
-        self.write_message(&["SELECT_EXCEPT", &fd.0.to_string(), &timeout_ms.to_string()]).await;
-        let reply = self.read_message().await;
-        reply[0] == "EVENT"
-    }
-
-    /// Calls poll() with events=POLLPRI on the file descriptor, returning true
-    /// if it delivered a POLLPRI event or false if it timed out.
-    pub async fn poll_pollpri(&mut self, fd: PuppetFileDescriptor, timeout_ms: usize) -> bool {
-        self.write_message(&["POLL_POLLPRI", &fd.0.to_string(), &timeout_ms.to_string()]).await;
-        let reply = self.read_message().await;
-        reply[0] == "EVENT"
-    }
-
-    /// Creates an epollfd and registers the PSI file descriptor with events=EPOLLPRI.
-    pub async fn epoll_create_and_add_epollpri(
-        &mut self,
-        fd: PuppetFileDescriptor,
-    ) -> PuppetFileDescriptor {
-        self.write_message(&["EPOLL_CREATE_AND_ADD_EPOLLPRI", &fd.0.to_string()]).await;
-        let reply = self.read_message().await;
-        PuppetFileDescriptor(reply[0].parse().unwrap())
-    }
-
-    /// Calls epoll_wait() on an epollfd that was created by epoll_create_and_add_epollpri.
-    /// Returns true if the PSI file descriptor delivered a POLLPRI event or false if it timed out.
-    pub async fn epoll_wait_epollpri(
-        &mut self,
-        epollfd: PuppetFileDescriptor,
-        timeout_ms: usize,
-    ) -> bool {
-        self.write_message(&[
-            "EPOLL_WAIT_EPOLLPRI",
-            &epollfd.0.to_string(),
-            &timeout_ms.to_string(),
-        ])
-        .await;
-        let reply = self.read_message().await;
-        reply[0] == "EVENT"
-    }
-
     async fn write_message(&mut self, msg: &[&str]) {
         let data = format!("{};", msg.iter().map(|s| hex::encode(s.as_bytes())).join(","));
         self.ctl_channel.write_all(data.as_bytes()).await.unwrap();

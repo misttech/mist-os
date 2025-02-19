@@ -45,8 +45,4 @@ lock_ordering! {
     // Userfaultfd
     FileOpsCore => UserFaultInner,
     UninterruptibleLock => UserFaultInner,
-    // MemoryPressureMonitor
-    UninterruptibleLock => MemoryPressureMonitor,
-    FileOpsCore => MemoryPressureMonitor,
-    MemoryPressureMonitor => MemoryPressureMonitorClientState
 }

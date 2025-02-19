@@ -7,8 +7,8 @@
 #![allow(clippy::bad_bit_mask)] // TODO(https://fxbug.dev/42080521): stop using bitflags for ResourceKind
 
 use crate::{
-    object_get_info_single, object_get_info_vec, ok, AsHandleRef, Event, Handle, HandleBased,
-    HandleRef, MonotonicDuration, ObjectQuery, Status, Topic,
+    object_get_info_single, object_get_info_vec, ok, AsHandleRef, Handle, HandleBased, HandleRef,
+    ObjectQuery, Status, Topic,
 };
 use bitflags::bitflags;
 use zx_sys::{self as sys, zx_duration_mono_t, zx_duration_t, ZX_MAX_NAME_LEN};
@@ -257,15 +257,6 @@ bitflags! {
     }
 }
 
-bitflags! {
-    #[repr(transparent)]
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-    pub struct MemoryStallKind: sys::zx_system_memory_stall_type_t {
-       const SOME       = sys::ZX_SYSTEM_MEMORY_STALL_SOME;
-       const FULL       = sys::ZX_SYSTEM_MEMORY_STALL_FULL;
-    }
-}
-
 impl Resource {
     /// Create a child resource object.
     ///
@@ -344,32 +335,6 @@ impl Resource {
     /// syscall for the ZX_INFO_MEMORY_STALL topic.
     pub fn memory_stall(&self) -> Result<MemoryStall, Status> {
         object_get_info_single::<MemoryStall>(self.as_handle_ref())
-    }
-
-    /// Retrieve an event that becomes signaled if the memory stall level exceeds a given threshold
-    /// over a time window.
-    ///
-    /// Wraps the
-    /// [zx_system_watch_memory_stall](https://fuchsia.dev/fuchsia-src/reference/syscalls/system_watch_memory_stall.md)
-    /// syscall
-    pub fn watch_memory_stall(
-        &self,
-        kind: MemoryStallKind,
-        threshold: MonotonicDuration,
-        window: MonotonicDuration,
-    ) -> Result<Event, Status> {
-        let mut event_out = 0;
-        let status = unsafe {
-            sys::zx_system_watch_memory_stall(
-                self.raw_handle(),
-                kind.bits(),
-                threshold.into_nanos(),
-                window.into_nanos(),
-                &mut event_out,
-            )
-        };
-        ok(status)?;
-        unsafe { Ok(Event::from(Handle::from_raw(event_out))) }
     }
 }
 

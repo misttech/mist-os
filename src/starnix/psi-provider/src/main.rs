@@ -5,7 +5,7 @@
 use anyhow::Error;
 use fidl_fuchsia_starnix_psi::{
     PsiProviderGetMemoryPressureStatsResponse, PsiProviderRequest, PsiProviderRequestStream,
-    PsiProviderWatchMemoryStallRequest, PsiProviderWatchMemoryStallResponse, PsiStats,
+    PsiStats,
 };
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_component::server::ServiceFs;
@@ -20,13 +20,6 @@ use history::{History, SAMPLING_RATE};
 trait DataSource: Send + Sync {
     /// Captures the current timestamp and the memory stall stats.
     fn capture(&self) -> (zx::MonotonicInstant, zx::MemoryStall);
-
-    fn watch(
-        &self,
-        kind: zx::MemoryStallKind,
-        threshold: zx::MonotonicDuration,
-        window: zx::MonotonicDuration,
-    ) -> Result<zx::Event, zx::Status>;
 }
 
 struct RealDataSource {
@@ -38,15 +31,6 @@ impl DataSource for RealDataSource {
         let now = zx::MonotonicInstant::get();
         let stat = self.stall_resource.memory_stall().unwrap();
         (now, stat)
-    }
-
-    fn watch(
-        &self,
-        kind: zx::MemoryStallKind,
-        threshold: zx::MonotonicDuration,
-        window: zx::MonotonicDuration,
-    ) -> Result<zx::Event, zx::Status> {
-        self.stall_resource.watch_memory_stall(kind, threshold, window)
     }
 }
 
@@ -106,33 +90,6 @@ impl PsiProvider {
                     if let Err(e) = responder.send(Ok(&response)) {
                         warn!("error responding to stats request: {e}");
                     }
-                }
-                PsiProviderRequest::WatchMemoryStall { payload, responder } => {
-                    let response = match payload {
-                        PsiProviderWatchMemoryStallRequest {
-                            kind: Some(kind),
-                            threshold: Some(threshold),
-                            window: Some(window),
-                            ..
-                        } => {
-                            if let Some(kind) = zx::MemoryStallKind::from_bits(kind) {
-                                self.data_source
-                                    .watch(
-                                        kind,
-                                        zx::MonotonicDuration::from_nanos(threshold),
-                                        zx::MonotonicDuration::from_nanos(window),
-                                    )
-                                    .map(|event| PsiProviderWatchMemoryStallResponse {
-                                        event: Some(event),
-                                        ..Default::default()
-                                    })
-                            } else {
-                                Err(zx::Status::INVALID_ARGS)
-                            }
-                        }
-                        _ => Err(zx::Status::INVALID_ARGS),
-                    };
-                    let _ = responder.send(response.map_err(|e| e.into_raw()));
                 }
                 _ => {}
             }
@@ -285,15 +242,6 @@ mod tests {
     impl DataSource for Arc<FakeDataSource> {
         fn capture(&self) -> (zx::MonotonicInstant, zx::MemoryStall) {
             *self.result.lock().unwrap()
-        }
-
-        fn watch(
-            &self,
-            _kind: zx::MemoryStallKind,
-            _threshold: zx::MonotonicDuration,
-            _window: zx::MonotonicDuration,
-        ) -> Result<zx::Event, zx::Status> {
-            unimplemented!()
         }
     }
 
