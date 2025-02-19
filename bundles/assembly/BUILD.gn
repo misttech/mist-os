@@ -3780,8 +3780,8 @@ assembly_input_bundle("location_emergency") {
 assembly_input_bundle("audio_development_support") {
   base_driver_packages = [
     {
-      package_target = "//src/media/audio/drivers/virtual_audio"
-      driver_components = [ "meta/virtual_audio_driver.cm" ]
+      package_target = "//src/media/audio/drivers/virtual-audio-legacy"
+      driver_components = [ "meta/virtual-audio-legacy-driver.cm" ]
     },
   ]
 

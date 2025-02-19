@@ -321,7 +321,7 @@ static_library("ddk") {
     "//src/media/audio/drivers/lib/intel-hda:*",
     "//src/media/audio/drivers/testing/realm:*",
     "//src/media/audio/drivers/usb-audio:*",
-    "//src/media/audio/drivers/virtual_audio:*",
+    "//src/media/audio/drivers/virtual-audio-legacy:*",
     "//src/media/audio/lib/simple-audio-stream:*",
     "//src/media/audio/lib/simple-audio-stream/tests:*",
     "//src/media/drivers/amlogic_decoder:*",

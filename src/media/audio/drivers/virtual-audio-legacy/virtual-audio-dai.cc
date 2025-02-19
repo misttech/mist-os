@@ -1,7 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-#include "src/media/audio/drivers/virtual_audio/virtual_audio_dai.h"
+#include "src/media/audio/drivers/virtual-audio-legacy/virtual-audio-dai.h"
 
 #include <lib/ddk/debug.h>
 #include <zircon/assert.h>

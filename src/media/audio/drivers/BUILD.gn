@@ -21,7 +21,7 @@ group("drivers") {
     "testing:drivers",
     "usb-audio",
     "virtual-audio-dfv2:virtual-audio-dfv2-driver-component",
-    "virtual_audio:virtual_audio_driver",
+    "virtual-audio-legacy:virtual-audio-legacy-driver-component",
   ]
   if (target_cpu == "arm64") {
     deps += [
