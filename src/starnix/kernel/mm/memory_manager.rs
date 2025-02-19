@@ -2600,6 +2600,13 @@ pub trait MemoryAccessorExt: MemoryAccessor {
 }
 
 impl MemoryManager {
+    pub fn summarize(&self, summary: &mut crate::mm::MappingSummary) {
+        let state = self.state.read();
+        for (_, mapping) in state.mappings.iter() {
+            summary.add(mapping);
+        }
+    }
+
     pub fn get_mappings_for_vmsplice(
         self: &Arc<MemoryManager>,
         buffers: &UserBuffers,

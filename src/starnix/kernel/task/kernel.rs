@@ -13,7 +13,7 @@ use crate::execution::CrashReporter;
 use crate::fs::nmfs::NetworkManagerHandle;
 use crate::fs::proc::SystemLimits;
 use crate::memory_attribution::MemoryAttributionManager;
-use crate::mm::{FutexTable, SharedFutexKey};
+use crate::mm::{FutexTable, MappingSummary, SharedFutexKey};
 use crate::power::SuspendResumeManagerHandle;
 use crate::security;
 use crate::task::{
@@ -55,7 +55,7 @@ use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::from_status_like_fdio;
 use starnix_uapi::open_flags::OpenFlags;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU8, Ordering};
 use std::sync::{Arc, OnceLock, Weak};
@@ -688,6 +688,8 @@ impl Kernel {
         let inspector = fuchsia_inspect::Inspector::default();
 
         let thread_groups = inspector.root();
+        let mut mm_summary = MappingSummary::default();
+        let mut mms_summarized = HashSet::new();
         for thread_group in self.pids.read().get_thread_groups() {
             let tg = thread_group.read();
 
@@ -701,6 +703,11 @@ impl Kernel {
 
             let tasks_node = tg_node.create_child("tasks");
             for task in tg.tasks() {
+                if let Some(mm) = task.mm() {
+                    if mms_summarized.insert(Arc::as_ptr(mm) as usize) {
+                        mm.summarize(&mut mm_summary);
+                    }
+                }
                 let set_properties = |node: &fuchsia_inspect::Node| {
                     node.record_string("command", task.command().to_str().unwrap_or("{err}"));
 
@@ -720,6 +727,8 @@ impl Kernel {
             tg_node.record(tasks_node);
             thread_groups.record(tg_node);
         }
+
+        thread_groups.record_child("memory_managers", |node| mm_summary.record(node));
 
         inspector
     }

@@ -10,6 +10,7 @@ use crate::mm::{
 use crate::vfs::aio::AioContext;
 use crate::vfs::{ActiveNamespaceNode, FileWriteGuardRef, FsString};
 use bitflags::bitflags;
+use fuchsia_inspect::HistogramProperty;
 use fuchsia_inspect_contrib::profile_duration;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::Access;
@@ -465,3 +466,106 @@ impl PartialEq for UserFaultRegistration {
 }
 
 impl Eq for UserFaultRegistration {}
+
+#[derive(Debug, Default)]
+pub struct MappingSummary {
+    no_kind: MappingKindSummary,
+    stack: MappingKindSummary,
+    heap: MappingKindSummary,
+    vdso: MappingKindSummary,
+    vvar: MappingKindSummary,
+    file: MappingKindSummary,
+    vma: MappingKindSummary,
+    ashmem: MappingKindSummary,
+    aiocontext: MappingKindSummary,
+
+    name_lengths: Vec<usize>,
+}
+
+impl MappingSummary {
+    pub fn add(&mut self, mapping: &Mapping) {
+        let kind_summary = match &mapping.name {
+            MappingName::None => &mut self.no_kind,
+            MappingName::Stack => &mut self.stack,
+            MappingName::Heap => &mut self.heap,
+            MappingName::Vdso => &mut self.vdso,
+            MappingName::Vvar => &mut self.vvar,
+            MappingName::File(_) => &mut self.file,
+            MappingName::Vma(name) => {
+                self.name_lengths.push(name.len());
+                &mut self.vma
+            }
+            MappingName::Ashmem(name) => {
+                self.name_lengths.push(name.len());
+                &mut self.ashmem
+            }
+            MappingName::AioContext(_) => &mut self.aiocontext,
+        };
+
+        kind_summary.count += 1;
+        if mapping.flags.contains(MappingFlags::SHARED) {
+            kind_summary.num_shared += 1;
+        } else {
+            kind_summary.num_private += 1;
+        }
+        if mapping.file_write_guard().0.is_some() {
+            kind_summary.num_file_write_guards += 1;
+        }
+        match &mapping.backing {
+            MappingBacking::Memory(m) => {
+                kind_summary.num_memory_objects += 1;
+                if m.memory_offset != 0 {
+                    kind_summary.num_non_zero_memory_offset += 1;
+                }
+            }
+            #[cfg(feature = "alternate_anon_allocs")]
+            MappingBacking::PrivateAnonymous => kind_summary.num_private_anon += 1,
+        }
+    }
+
+    pub fn record(self, node: &fuchsia_inspect::Node) {
+        node.record_child("no_kind", |node| self.no_kind.record(node));
+        node.record_child("stack", |node| self.stack.record(node));
+        node.record_child("heap", |node| self.heap.record(node));
+        node.record_child("vdso", |node| self.vdso.record(node));
+        node.record_child("vvar", |node| self.vvar.record(node));
+        node.record_child("file", |node| self.file.record(node));
+        node.record_child("vma", |node| self.vma.record(node));
+        node.record_child("ashmem", |node| self.ashmem.record(node));
+        node.record_child("aiocontext", |node| self.aiocontext.record(node));
+
+        let name_lengths = node.create_uint_linear_histogram(
+            "name_lengths",
+            fuchsia_inspect::LinearHistogramParams { floor: 0, step_size: 8, buckets: 4 },
+        );
+        for l in self.name_lengths {
+            name_lengths.insert(l as u64);
+        }
+        node.record(name_lengths);
+    }
+}
+
+#[derive(Debug, Default)]
+struct MappingKindSummary {
+    count: u64,
+    num_private: u64,
+    num_shared: u64,
+    num_non_zero_memory_offset: u64,
+    num_file_write_guards: u64,
+    num_memory_objects: u64,
+    #[cfg(feature = "alternate_anon_allocs")]
+    num_private_anon: u64,
+}
+
+impl MappingKindSummary {
+    fn record(&self, node: &fuchsia_inspect::Node) {
+        node.record_uint("count", self.count);
+        node.record_uint("num_private", self.num_private);
+        node.record_uint("num_shared", self.num_shared);
+        node.record_uint("num_non_zero_memory_offset", self.num_non_zero_memory_offset);
+        node.record_uint("num_file_write_guards", self.num_file_write_guards);
+        node.record_uint("num_memory_objects", self.num_memory_objects);
+        #[cfg(feature = "alternate_anon_allocs")]
+        node.record_uint("num_private_anon", self.num_private_anon);
+    }
+}
