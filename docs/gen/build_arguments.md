@@ -731,7 +731,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8722596152063217825"`
+**Current value for `target_cpu = "arm64"`:** `"8722550849173935089"`
 
 From //out/not-default/args.gn:10
 
@@ -739,7 +739,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8722596152063217825"`
+**Current value for `target_cpu = "riscv64"`:** `"8722550849173935089"`
 
 From //out/not-default/args.gn:10
 
@@ -747,7 +747,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8722596152063217825"`
+**Current value for `target_cpu = "x64"`:** `"8722550849173935089"`
 
 From //out/not-default/args.gn:10
 
@@ -8290,12 +8290,6 @@ precommitted (which is not done by default).
 **Current value (from the default):** `false`
 
 From //src/graphics/drivers/msd-arm-mali/src/BUILD.gn:23
-
-### msd_intel_gen_enable_hardware_unit_tests
-
-**Current value (from the default):** `false`
-
-From //src/graphics/drivers/msd-intel-gen/tests/integration/BUILD.gn:9
 
 ### msd_vsi_vip_enable_suspend
 
