@@ -26,10 +26,10 @@ use std::sync::Arc;
 // Across all three link types, ACL has the largest frame at 1028. Add a byte of UART header.
 const UART_MAX_FRAME_BUFFER_SIZE: usize = 1029;
 
-// Default control device.
-fn default_control_device() -> String {
-    // TODO(https://fxbug.dev/303503457): Access virtual device via "/dev/class/bt-hci-virtual"
-    "sys/platform/bt-hci-emulator/bt_hci_virtual".to_string()
+/// The name of the test node to which bt_hci_virtual can expect to bind, i.e. the first positional
+/// argument in `ffx driver test-node add ______ fuchsia.devicetree.FIRST_COMPATIBLE=bt`.
+fn emulator_test_node_name() -> String {
+    "bt-hci-emulator".to_string()
 }
 
 /// Reads the TCP stream from the host from the `read_stream` and writes all data to the loopback
@@ -142,7 +142,8 @@ impl RootcanalClient {
         };
         log::debug!("Connected");
 
-        let channel_res = open_virtual_device(&default_control_device()).await;
+        let channel_res =
+            open_virtual_device(&(emulator_test_node_name() + "/bt_hci_virtual")).await;
         let Ok(channel) = channel_res else {
             return Err((ServiceError::Failed, channel_res.unwrap_err().into()));
         };
