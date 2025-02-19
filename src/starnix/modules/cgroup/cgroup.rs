@@ -7,13 +7,14 @@
 //! There is no support for actual resource constraints, or any operations outside of adding tasks
 //! to a control group (for the duration of their lifetime).
 
-use starnix_core::signals::send_freeze_signal;
+use starnix_core::signals::{send_freeze_signal, SignalInfo};
 use starnix_core::task::{Kernel, ThreadGroup, WaitQueue, Waiter};
 use starnix_core::vfs::{FsStr, FsString, PathBuilder};
 use starnix_logging::{log_warn, track_stub};
 use starnix_sync::Mutex;
 use starnix_types::ownership::{TempRef, WeakRef};
 use starnix_uapi::errors::Errno;
+use starnix_uapi::signals::SIGKILL;
 use starnix_uapi::{errno, error, pid_t};
 use std::collections::{btree_map, hash_map, BTreeMap, HashMap};
 use std::ops::Deref;
@@ -62,6 +63,9 @@ pub trait CgroupOps: Send + Sync + 'static {
 
     /// Return all pids that belong to this cgroup.
     fn get_pids(&self) -> Vec<pid_t>;
+
+    /// Kills all processes in the cgroup and its descendants.
+    fn kill(&self);
 
     /// Whether the cgroup or any of its descendants have any processes.
     fn is_populated(&self) -> bool;
@@ -175,6 +179,10 @@ impl CgroupOps for CgroupRoot {
         let kernel_pids = self.kernel().pids.read().process_ids();
         let controlled_pids = self.pid_table.lock();
         kernel_pids.into_iter().filter(|pid| !controlled_pids.contains_key(pid)).collect()
+    }
+
+    fn kill(&self) {
+        unreachable!("Root cgroup cannot kill its processes.");
     }
 
     fn is_populated(&self) -> bool {
@@ -376,6 +384,20 @@ impl CgroupState {
             }
         }
     }
+
+    fn propagate_kill(&self) {
+        for (_, thread_group) in self.processes.iter() {
+            let Some(thread_group) = thread_group.upgrade() else {
+                continue;
+            };
+            thread_group.write().send_signal(SignalInfo::default(SIGKILL));
+        }
+
+        // Recursively lock and kill children cgroups' processes.
+        for child in self.children.get_children() {
+            child.state.lock().propagate_kill();
+        }
+    }
 }
 
 /// `Cgroup` is a non-root cgroup in a cgroup hierarchy, and can have other `Cgroup`s as children.
@@ -518,6 +540,11 @@ impl CgroupOps for Cgroup {
         let mut state = self.state.lock();
         state.update_processes();
         state.processes.keys().copied().collect()
+    }
+
+    fn kill(&self) {
+        let state = self.state.lock();
+        state.propagate_kill();
     }
 
     fn is_populated(&self) -> bool {

@@ -29,6 +29,7 @@ use starnix_uapi::{errno, error, mode};
 use crate::cgroup::{CgroupOps, CgroupRoot};
 use crate::events::EventsFile;
 use crate::freeze::FreezeFile;
+use crate::kill::KillFile;
 use crate::procs::ControlGroupNode;
 use crate::Hierarchy;
 
@@ -36,6 +37,7 @@ const CONTROLLERS_FILE: &str = "cgroup.controllers";
 const PROCS_FILE: &str = "cgroup.procs";
 const FREEZE_FILE: &str = "cgroup.freeze";
 const EVENTS_FILE: &str = "cgroup.events";
+const KILL_FILE: &str = "cgroup.kill";
 
 #[derive(Debug)]
 pub struct CgroupDirectory {
@@ -123,7 +125,15 @@ impl CgroupDirectory {
                 fs.create_node(
                     current_task,
                     EventsFile::new_node(cgroup.clone()),
-                    FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+                    FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                ),
+            ),
+            (
+                KILL_FILE.into(),
+                fs.create_node(
+                    current_task,
+                    KillFile::new_node(cgroup.clone()),
+                    FsNodeInfo::new_factory(mode!(IFREG, 0o200), FsCred::root()),
                 ),
             ),
         ]);

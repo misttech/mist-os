@@ -9,6 +9,7 @@ mod directory;
 mod events;
 mod freeze;
 mod fs;
+mod kill;
 mod procs;
 
 pub use fs::*;

@@ -23,6 +23,7 @@ rustc_library("cgroup") {
     "events.rs",
     "freeze.rs",
     "fs.rs",
+    "kill.rs",
     "lib.rs",
     "procs.rs",
   ]

@@ -21,6 +21,7 @@ constexpr char CONTROLLERS_FILE[] = "cgroup.controllers";
 constexpr char PROCS_FILE[] = "cgroup.procs";
 constexpr char FREEZE_FILE[] = "cgroup.freeze";
 constexpr char EVENTS_FILE[] = "cgroup.events";
+constexpr char KILL_FILE[] = "cgroup.kill";
 constexpr char EVENTS_POPULATED[] = "populated 1";
 constexpr char EVENTS_NOT_POPULATED[] = "populated 0";
 
@@ -374,4 +375,99 @@ TEST_F(CgroupTest, EventsFileSeekable) {
   char buffer;
   EXPECT_THAT(read(events_fd.get(), &buffer, 1), SyscallSucceeds());
   EXPECT_EQ(buffer, '0');
+}
+
+TEST_F(CgroupTest, KillEmptyCgroup) {
+  std::string child_path = root_path() + "/child";
+  std::string child_kill_path = child_path + "/" + KILL_FILE;
+
+  CreateCgroup(child_path);
+
+  {
+    fbl::unique_fd child_kill_fd(open(child_kill_path.c_str(), O_WRONLY));
+    ASSERT_TRUE(child_kill_fd.is_valid());
+    EXPECT_THAT(write(child_kill_fd.get(), "1", 1), SyscallSucceeds());
+  }
+}
+
+TEST_F(CgroupTest, KillCgroupWithProcess) {
+  std::string child_path = root_path() + "/child";
+  std::string child_procs_path = child_path + "/" + PROCS_FILE;
+  std::string child_events_path = child_path + "/" + EVENTS_FILE;
+  std::string child_kill_path = child_path + "/" + KILL_FILE;
+
+  CreateCgroup(child_path);
+
+  test_helper::ForkHelper fork_helper;
+  fork_helper.OnlyWaitForForkedChildren();
+  fork_helper.ExpectSignal(SIGKILL);
+
+  pid_t child_pid = fork_helper.RunInForkedProcess([]() {
+    // Child process blocks forever.
+    while (true) {
+      pause();
+    }
+  });
+
+  // Move forked child to /child/cgroup.procs
+  {
+    std::string pid_string = std::to_string(child_pid);
+    fbl::unique_fd child_procs_fd(open(child_procs_path.c_str(), O_WRONLY));
+    ASSERT_TRUE(child_procs_fd.is_valid());
+    EXPECT_THAT(write(child_procs_fd.get(), pid_string.c_str(), pid_string.length()),
+                SyscallSucceeds());
+  }
+
+  CheckFileHasLine(child_events_path, EVENTS_POPULATED);
+
+  {
+    fbl::unique_fd child_kill_fd(open(child_kill_path.c_str(), O_WRONLY));
+    ASSERT_TRUE(child_kill_fd.is_valid());
+    EXPECT_THAT(write(child_kill_fd.get(), "1", 1), SyscallSucceeds());
+  }
+
+  EXPECT_TRUE(fork_helper.WaitForChildren());
+  CheckFileHasLine(child_events_path, EVENTS_NOT_POPULATED);
+}
+
+TEST_F(CgroupTest, KillCgroupWithDescendant) {
+  std::string child_path = root_path() + "/child";
+  std::string grandchild_path = child_path + "/grandchild";
+  std::string grandchild_procs_path = grandchild_path + "/" + PROCS_FILE;
+  std::string grandchild_events_path = grandchild_path + "/" + EVENTS_FILE;
+  std::string grandchild_kill_path = grandchild_path + "/" + KILL_FILE;
+
+  CreateCgroup(child_path);
+  CreateCgroup(grandchild_path);
+
+  test_helper::ForkHelper fork_helper;
+  fork_helper.OnlyWaitForForkedChildren();
+  fork_helper.ExpectSignal(SIGKILL);
+
+  pid_t child_pid = fork_helper.RunInForkedProcess([]() {
+    // Child process blocks forever.
+    while (true) {
+      pause();
+    }
+  });
+
+  // Move forked child to /child/grandchild/cgroup.procs
+  {
+    std::string pid_string = std::to_string(child_pid);
+    fbl::unique_fd child_procs_fd(open(grandchild_procs_path.c_str(), O_WRONLY));
+    ASSERT_TRUE(child_procs_fd.is_valid());
+    EXPECT_THAT(write(child_procs_fd.get(), pid_string.c_str(), pid_string.length()),
+                SyscallSucceeds());
+  }
+
+  CheckFileHasLine(grandchild_events_path, EVENTS_POPULATED);
+
+  {
+    fbl::unique_fd child_kill_fd(open(grandchild_kill_path.c_str(), O_WRONLY));
+    ASSERT_TRUE(child_kill_fd.is_valid());
+    EXPECT_THAT(write(child_kill_fd.get(), "1", 1), SyscallSucceeds());
+  }
+
+  EXPECT_TRUE(fork_helper.WaitForChildren());
+  CheckFileHasLine(grandchild_events_path, EVENTS_NOT_POPULATED);
 }
