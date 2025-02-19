@@ -529,6 +529,12 @@
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Cpu, flow_id,   \
                    ##__VA_ARGS__)
 
+// Similar to KTRACE_FLOW_STEP, but accepts an expression to use for the event timestamp.
+#define KTRACE_FLOW_STEP_TIMESTAMP(category, label, timestamp, flow_id, ...)           \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitFlowStep, category,      \
+                   FXT_INTERN_STRING(label), timestamp, TraceContext::Thread, flow_id, \
+                   ##__VA_ARGS__)
+
 //
 // ## FLOW_END
 //

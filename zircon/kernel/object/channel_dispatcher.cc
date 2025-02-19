@@ -37,6 +37,20 @@ KCOUNTER(dispatcher_channel_destroy_count, "dispatcher.channel.destroy")
 
 namespace {
 
+// Temporary hack to chase down bugs like https://fxbug.dev/42123699 where upwards of 250MB of ipc
+// memory is consumed. The bet is that even if each message is at max size there
+// should be one or two channels with thousands of messages. If so, this check adds
+// no overhead to the existing code. See https://fxbug.dev/42124465.
+// TODO(cpu): This limit can be lower but mojo's ChannelTest.PeerStressTest sends
+// about 3K small messages. Switching to size limit is more reasonable.
+constexpr size_t kMaxPendingMessageCount = 3500;
+constexpr size_t kWarnPendingMessageCount = kMaxPendingMessageCount / 2;
+
+// This value is part of the zx_channel_call contract.
+constexpr uint32_t kMinKernelGeneratedTxid = 0x80000000u;
+
+bool IsKernelGeneratedTxid(zx_txid_t txid) { return txid >= kMinKernelGeneratedTxid; }
+
 // Randomly generated multilinear hash coefficients. These should be sufficient for non-user builds
 // where tracing syscalls are enabled. In the future, if we elect to enable tracing facilities in
 // user builds, this can be strengthened by generating the coefficients during boot.
@@ -59,18 +73,38 @@ inline uint32_t HashA(uint64_t value) {
 inline uint32_t HashB(uint64_t value) {
   return HashValue(kHashCoefficients[3], kHashCoefficients[4], kHashCoefficients[5], value);
 }
+inline uint32_t HashB(uint32_t high, uint32_t low) {
+  return HashB(static_cast<uint64_t>(high) << 32 | low);
+}
 
-// Generates a flow id using a universal hash function of the minimum endpoint koid and the message
-// packet address. In general, koids are guaranteed to be unique over the lifetime of a particular
-// system boot. Using the min endpoint koid ensures both endpoints use the same hash input. The
-// message packet address is shared between the sender and receiver and is guaranteed to be unique
-// until after the flow end event releases the flow id, allowing it to be reused. Given that the
-// (koid, msg) pair is guaranteed to be unique over the span of the flow, the likelihood of id
-// confusion is equivalent to the likelihood of hash collisions by temporally overlapping flows.
+// Generates a flow id using a universal hash function of the minimum endpoint koid and the txid or
+// message packet address, depending on whether the txid is non-zero.
+//
+// In general, koids are guaranteed to be unique over the lifetime of a particular system boot.
+// Using the min endpoint koid ensures both endpoints use the same hash input. A txid is shared
+// between sender and receiver is expected to be unique (guaranteed for kerenel-generated txids)
+// among the set of txids for messages pending in a particular channel. Likewise, the message packet
+// address is shared between the sender and receiver and is guaranteed to be unique among the set of
+// pointers to pending messages.
+//
+// Given that the (koid, txid) or (koid, &msg) pair is likely to be unique over the span of the
+// flow, the likelihood of id confusion is equivalent to the likelihood of hash collisions by
+// temporally overlapping flows.
 uint64_t ChannelMessageFlowId(const MessagePacket& msg, const ChannelDispatcher* channel) {
   const zx_koid_t min_koid = ktl::min(channel->get_koid(), channel->get_related_koid());
+
+  // Use the top bit of the message id to indicate whether the input was a txid, which can be used
+  // to correlate a later response message, or a message pointer, which cannot. The 32 bit txid is
+  // combined with the bottom 32 bits of the channel koid as inputs to HashB to improve the
+  // uniqueness of the message id.
+  const uint32_t is_txid_mask = 1u << 31;
+  const uint32_t message_id =
+      msg.fidl_header().txid == 0
+          ? HashB(reinterpret_cast<uint64_t>(&msg)) & ~is_txid_mask
+          : HashB(msg.fidl_header().txid, static_cast<uint32_t>(min_koid)) | is_txid_mask;
+
   const uint64_t high = HashA(min_koid);
-  const uint64_t low = HashB(reinterpret_cast<uint64_t>(&msg));
+  const uint64_t low = message_id;
   return high << 32 | low;
 }
 
@@ -108,16 +142,29 @@ inline void TraceMessage(const MessagePacket& msg, const ChannelDispatcher* chan
   const auto get_timestamp = [&ts] { return ts = ktrace_timestamp(); };
 
   KTRACE_DURATION_BEGIN_TIMESTAMP("kernel:ipc", "ChannelMessage", get_timestamp(),
-                                  ("ordinal", msg.fidl_header().ordinal),
-                                  ("txid", msg.fidl_header().txid));
+                                  ("ordinal", msg.fidl_header().ordinal));
 
+  // When the txid is kernel-generated, Read and Write message ops are just steps in the overall
+  // flow that is bounded by ChannelCallWriteRequest and ChannelCallReadResponse message ops.
   switch (message_op) {
     case MessageOp::Write:
+      if (IsKernelGeneratedTxid(msg.fidl_header().txid)) {
+        KTRACE_FLOW_STEP_TIMESTAMP("kernel:ipc", "ChannelFlow", ts,
+                                   ChannelMessageFlowId(msg, channel));
+        break;
+      }
+      [[fallthrough]];
     case MessageOp::ChannelCallWriteRequest:
       KTRACE_FLOW_BEGIN_TIMESTAMP("kernel:ipc", "ChannelFlow", ts,
                                   ChannelMessageFlowId(msg, channel));
       break;
     case MessageOp::Read:
+      if (IsKernelGeneratedTxid(msg.fidl_header().txid)) {
+        KTRACE_FLOW_STEP_TIMESTAMP("kernel:ipc", "ChannelFlow", ts,
+                                   ChannelMessageFlowId(msg, channel));
+        break;
+      }
+      [[fallthrough]];
     case MessageOp::ChannelCallReadResponse:
       KTRACE_FLOW_END_TIMESTAMP("kernel:ipc", "ChannelFlow", ts,
                                 ChannelMessageFlowId(msg, channel));
@@ -126,20 +173,6 @@ inline void TraceMessage(const MessagePacket& msg, const ChannelDispatcher* chan
 
   KTRACE_DURATION_END_TIMESTAMP("kernel:ipc", "ChannelMessage", ts);
 }
-
-// Temporary hack to chase down bugs like https://fxbug.dev/42123699 where upwards of 250MB of ipc
-// memory is consumed. The bet is that even if each message is at max size there
-// should be one or two channels with thousands of messages. If so, this check adds
-// no overhead to the existing code. See https://fxbug.dev/42124465.
-// TODO(cpu): This limit can be lower but mojo's ChannelTest.PeerStressTest sends
-// about 3K small messages. Switching to size limit is more reasonable.
-constexpr size_t kMaxPendingMessageCount = 3500;
-constexpr size_t kWarnPendingMessageCount = kMaxPendingMessageCount / 2;
-
-// This value is part of the zx_channel_call contract.
-constexpr uint32_t kMinKernelGeneratedTxid = 0x80000000u;
-
-bool IsKernelGeneratedTxid(zx_txid_t txid) { return txid >= kMinKernelGeneratedTxid; }
 
 }  // namespace
 
