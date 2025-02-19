@@ -66,7 +66,9 @@
         break;
 
       minip_cmd_t cmd = {};
-      status = ctx.channel_read(channel, 0u, &cmd, NULL, sizeof(cmd), 0u, &actual, &actual_handles);
+      zx_handle_t received_handle = ZX_HANDLE_INVALID;
+      status = ctx.channel_read(channel, 0u, &cmd, &received_handle, sizeof(cmd), 1u, &actual,
+                                &actual_handles);
 
       if (status != ZX_OK)
         break;
@@ -263,6 +265,44 @@
             }
           }
           cmd.status = ZX_OK;
+          goto reply;
+        }
+        if (what & MINIP_CMD_READ_FROM_USER_ADDR) {
+          what &= ~MINIP_CMD_READ_FROM_USER_ADDR;
+
+          zx_vaddr_t user_addr = reinterpret_cast<zx_vaddr_t>(cmd.data);
+          cmd.status = *reinterpret_cast<zx_status_t*>(user_addr);
+          goto reply;
+        }
+        if (what & MINIP_CMD_VMO_READ) {
+          what &= ~MINIP_CMD_VMO_READ;
+
+          zx_vaddr_t user_addr = reinterpret_cast<zx_vaddr_t>(cmd.data);
+          uint64_t data;
+          uint64_t* buf = (user_addr != 0) ? reinterpret_cast<uint64_t*>(user_addr) : &data;
+          cmd.status = ctx.vmo_read(received_handle, reinterpret_cast<void*>(buf), 0, sizeof(*buf));
+          goto reply;
+        }
+        if (what & MINIP_CMD_VMO_WRITE) {
+          what &= ~MINIP_CMD_VMO_WRITE;
+
+          zx_vaddr_t user_addr = reinterpret_cast<zx_vaddr_t>(cmd.data);
+          uint64_t data;
+          uint64_t* buf = (user_addr != 0) ? reinterpret_cast<uint64_t*>(user_addr) : &data;
+          cmd.status =
+              ctx.vmo_write(received_handle, reinterpret_cast<void*>(buf), 0, sizeof(*buf));
+          goto reply;
+        }
+        if (what & MINIP_CMD_VMO_GET_INFO) {
+          what &= ~MINIP_CMD_VMO_GET_INFO;
+
+          zx_vaddr_t user_addr = reinterpret_cast<zx_vaddr_t>(cmd.data);
+          zx_info_vmo_t info;
+          zx_info_vmo_t* buf =
+              (user_addr != 0) ? reinterpret_cast<zx_info_vmo_t*>(user_addr) : &info;
+          cmd.status =
+              ctx.object_get_info(received_handle, ZX_INFO_VMO, reinterpret_cast<void*>(buf),
+                                  sizeof(*buf), nullptr, nullptr);
           goto reply;
         }
 

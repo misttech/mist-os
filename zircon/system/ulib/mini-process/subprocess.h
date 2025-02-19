@@ -32,6 +32,8 @@ typedef struct {
   __typeof(zx_vmo_replace_as_executable)* vmo_replace_as_executable;
   __typeof(zx_thread_exit)* thread_exit;
   __typeof(zx_system_get_page_size)* system_get_page_size;
+  __typeof(zx_vmo_read)* vmo_read;
+  __typeof(zx_vmo_write)* vmo_write;
 } minip_ctx_t;
 
 // Subsequent messages and replies are of this format. The |what| parameter is
@@ -39,6 +41,7 @@ typedef struct {
 typedef struct {
   zx_txid_t what;
   zx_status_t status;
+  uint64_t data;
 } minip_cmd_t;
 
 void minipr_thread_loop(zx_handle_t channel, uintptr_t fnptr);

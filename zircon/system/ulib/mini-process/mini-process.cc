@@ -54,6 +54,8 @@ static zx_status_t write_ctx_message(zx_handle_t channel, uintptr_t vdso_base,
       .vmo_replace_as_executable = get_syscall_addr(&zx_vmo_replace_as_executable, vdso_base),
       .thread_exit = get_syscall_addr(&zx_thread_exit, vdso_base),
       .system_get_page_size = get_syscall_addr(&zx_system_get_page_size, vdso_base),
+      .vmo_read = get_syscall_addr(&zx_vmo_read, vdso_base),
+      .vmo_write = get_syscall_addr(&zx_vmo_write, vdso_base),
   };
   uint32_t actual_handles = (transferred_handle == ZX_HANDLE_INVALID) ? 0u : 1u;
   return zx_channel_write(channel, 0u, &ctx, sizeof(ctx), &transferred_handle, actual_handles);
@@ -267,10 +269,13 @@ exit:
 }
 
 __EXPORT
-zx_status_t mini_process_cmd_send(zx_handle_t cntrl_channel, uint32_t what) {
-  minip_cmd_t cmd = {.what = what, .status = ZX_OK};
+zx_status_t mini_process_cmd_send(zx_handle_t cntrl_channel, uint32_t what, zx_handle_t handle,
+                                  uint64_t data) {
+  minip_cmd_t cmd = {.what = what, .status = ZX_OK, .data = data};
 
-  return zx_channel_write(cntrl_channel, 0, &cmd, sizeof(cmd), NULL, 0);
+  return zx_channel_write(cntrl_channel, 0, &cmd, sizeof(cmd),
+                          (handle != ZX_HANDLE_INVALID) ? &handle : NULL,
+                          (handle != ZX_HANDLE_INVALID) ? 1 : 0);
 }
 
 __EXPORT
@@ -291,8 +296,10 @@ zx_status_t mini_process_cmd_read_reply(zx_handle_t cntrl_channel, zx_handle_t* 
 }
 
 __EXPORT
-zx_status_t mini_process_cmd(zx_handle_t cntrl_channel, uint32_t what, zx_handle_t* handle) {
-  zx_status_t status = mini_process_cmd_send(cntrl_channel, what);
+zx_status_t mini_process_cmd(zx_handle_t cntrl_channel, uint32_t what, zx_handle_t* handle,
+                             uint64_t data) {
+  zx_status_t status =
+      mini_process_cmd_send(cntrl_channel, what, handle ? *handle : ZX_HANDLE_INVALID, data);
   if (status != ZX_OK)
     return status;
   return mini_process_cmd_read_reply(cntrl_channel, handle);
