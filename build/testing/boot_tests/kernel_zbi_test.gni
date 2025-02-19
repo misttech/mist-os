@@ -70,14 +70,13 @@ template("_cuckoo_product_bundle") {
     include_legacy_bundle = true
     kernel_zbi = assembly_kernel_zbi
     kernel_image_name = assembly_kernel_image_name
-    base_packages =
-        board_package_labels + [
-          # This package is needed to provide a fake intl_services
-          # so that snapshot won't time out trying to collect
-          # locale and timezone annotations.
-          "//src/testing/fidl/intl_property_manager:fake_intl_services_package",
-          ":$stub_test_target",
-        ]
+    base_packages = [
+      # This package is needed to provide a fake intl_services
+      # so that snapshot won't time out trying to collect
+      # locale and timezone annotations.
+      "//src/testing/fidl/intl_property_manager:fake_intl_services_package",
+      ":$stub_test_target",
+    ]
     cmdline_deps = [ "//build/testing:userboot.next-component-manager" ]
     board_config_label = board_configuration_label
 
