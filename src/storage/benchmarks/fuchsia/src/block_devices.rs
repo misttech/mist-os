@@ -202,9 +202,20 @@ impl BenchmarkVolumeFactory {
                 );
                 instance.unwrap()
             } else {
-                // TODO(https://fxbug.dev/372555079): Support this by routing the FVM protocols from
-                // fshost.
-                unimplemented!("Running benchmarks on FVM + storage-host is not supported yet!");
+                let volumes_connector = Box::new(move || {
+                    connect_to_protocol::<fidl_fuchsia_fs_startup::VolumesMarker>().unwrap()
+                });
+                let volumes_dir_connector = {
+                    Box::new(move || {
+                        fuchsia_fs::directory::open_in_namespace("volumes", fio::PERM_READABLE)
+                            .unwrap()
+                    })
+                };
+                BenchmarkVolumeFactory::connect_to_system_fvm(
+                    volumes_connector,
+                    volumes_dir_connector,
+                )
+                .unwrap()
             }
         } else {
             if fxfs_blob {

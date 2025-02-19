@@ -514,6 +514,11 @@
 
         // Needed for storage-tests
         {
+            directory: [ "volumes" ],
+            from: "parent",
+            to: "#testing",
+        },
+        {
             config: [
                 "fuchsia.fshost.FxfsBlob",
                 "fuchsia.fshost.StorageHost",
@@ -529,7 +534,10 @@
             source_availability: "unknown",
         },
         {
-            protocol: [ "fuchsia.storage.partitions.PartitionsManager" ],
+            protocol: [
+                "fuchsia.fs.startup.Volumes",
+                "fuchsia.storage.partitions.PartitionsManager",
+            ],
             from: "parent",
             to: "#testing",
             availability: "optional",

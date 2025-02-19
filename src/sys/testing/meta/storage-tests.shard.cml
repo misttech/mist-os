@@ -25,6 +25,7 @@
                 "dev-class",
                 "dev-topological",
                 "sys",
+                "volumes",
             ],
             from: "parent",
             to: [ "#storage-tests" ],
@@ -72,7 +73,10 @@
             availability: "optional",
         },
         {
-            protocol: [ "fuchsia.storage.partitions.PartitionsManager" ],
+            protocol: [
+                "fuchsia.fs.startup.Volumes",
+                "fuchsia.storage.partitions.PartitionsManager",
+            ],
             from: "parent",
             to: "#storage-tests",
             availability: "optional",

@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/339491886): Remove when all products use storage-host.
+// Stubs capabilities which are usually offered from the GPT component, for configurations without a
+// GPT.
 {
     expose: [
         {

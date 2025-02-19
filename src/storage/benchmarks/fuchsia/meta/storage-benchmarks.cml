@@ -47,6 +47,18 @@
             availability: "optional",
         },
         {
+            // Only used on FVM-enabled systems.
+            protocol: [ "fuchsia.fs.startup.Volumes" ],
+            availability: "optional",
+        },
+        {
+            // Only used on FVM-enabled systems.
+            directory: "volumes",
+            rights: [ "r*" ],
+            path: "/volumes",
+            availability: "optional",
+        },
+        {
             storage: "custom_artifacts",
             path: "/custom_artifacts",
         },
