@@ -9,7 +9,9 @@
 // build system to avoid this (since we can't have "optional" intermediate routing hops very
 // easily, see https://fxbug.dev/42058594).
 //
-// Besides, all of this should go away if and when we standardize the platform on Fxfs.
+// This is only necessary if we are not using storage-host, because we treat FVM as a container
+// equivalent to Fxblob in that case and the necessary protocols are exposed.
+// TODO(https://fxbug.dev/339491886): Remove when all products are switched over.
 {
     capabilities: [
         {

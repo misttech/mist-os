@@ -225,6 +225,11 @@ template("fshost_integration_test_package") {
   if (!defined(invoker.allow_error_severity_logs)) {
     invoker.allow_error_severity_logs = false
   }
+  if (!defined(fshost_options.data_filesystem_format)) {
+    # data_filesystem_format is implied from fxblob.
+    assert(!(defined(fshost_options.fxfs_blob) && !fshost_options.fxfs_blob))
+    fshost_options.data_filesystem_format = "fxfs"
+  }
 
   _fshost_target = "test-fshost-${target_name}"
   fshost_component_and_config(_fshost_target) {
@@ -420,8 +425,6 @@ fshost_integration_test_package("fshost_integration_tests_fxfs") {
   enable_migration_tests = false
   data_filesystem_variant = "fxblob"
   options = {
-    data_filesystem_format = "fxfs"
-    use_disk_migration = false
   }
   extra_deps = [
     "//src/storage/lib/blob_writer:blob-writer",
@@ -436,7 +439,6 @@ fshost_integration_test_package("fshost_integration_tests_storage_host_fxfs") {
   allow_error_severity_logs = true
   data_filesystem_variant = "fxblob"
   options = {
-    data_filesystem_format = "fxfs"
     use_disk_migration = false
     storage_host = true
   }

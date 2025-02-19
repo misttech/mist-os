@@ -32,19 +32,4 @@
             to: "#fxfs",
         },
     ],
-    expose: [
-        {
-            directory: "volumes",
-            from: "#fxfs",
-        },
-        {
-            protocol: "fuchsia.fs.startup.Volumes",
-            from: "#fxfs",
-        },
-        {
-            protocol: "fuchsia.fshost.StarnixVolumeProvider",
-            from: "void",
-            availability: "optional",
-        },
-    ],
 }

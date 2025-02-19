@@ -2832,9 +2832,8 @@ assembly_input_bundle("fshost_common") {
           destination = "src/storage/lib/fs_management/client.shard.cml"
         },
         {
-          source = "//src/storage/fshost/meta/fxfs_blob_fshost_base.shard.cml"
-          destination =
-              "src/storage/fshost/meta/fxfs_blob_fshost_base.shard.cml"
+          source = "//src/storage/fshost/meta/fxblob_fshost_base.shard.cml"
+          destination = "src/storage/fshost/meta/fxblob_fshost_base.shard.cml"
         },
         {
           source = "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml"
@@ -2911,8 +2910,8 @@ assembly_input_bundle("fshost_storage_host_fxfs") {
         {
           component_name = "fshost"
           shards = [
-            "//src/storage/fshost/meta/fxfs_blob_fshost.cml",
-            "//src/storage/fshost/meta/fxfs_blob_fshost_base.shard.cml",
+            "//src/storage/fshost/meta/fxblob_fshost.cml",
+            "//src/storage/fshost/meta/fxblob_fshost_base.shard.cml",
             "//src/storage/fshost/meta/storage_host_base.shard.cml",
             "//src/storage/fshost/meta/storage_host_gpt.shard.cml",
           ]
@@ -2942,8 +2941,8 @@ assembly_input_bundle("fshost_storage_host_gpt_fvm_minfs") {
         {
           component_name = "fshost"
           shards = [
-            "//src/storage/fshost/meta/minfs_fshost.cml",
-            "//src/storage/fshost/meta/minfs_fshost_base.shard.cml",
+            "//src/storage/fshost/meta/fvm_minfs_fshost.cml",
+            "//src/storage/fshost/meta/fvm_minfs_fshost_base.shard.cml",
             "//src/storage/fshost/meta/storage_host_base.shard.cml",
             "//src/storage/fshost/meta/storage_host_fvm.cml",
             "//src/storage/fshost/meta/storage_host_fvm_base.shard.cml",
@@ -2976,8 +2975,8 @@ assembly_input_bundle("fshost_storage_host_fvm_minfs") {
         {
           component_name = "fshost"
           shards = [
-            "//src/storage/fshost/meta/minfs_fshost.cml",
-            "//src/storage/fshost/meta/minfs_fshost_base.shard.cml",
+            "//src/storage/fshost/meta/fvm_minfs_fshost.cml",
+            "//src/storage/fshost/meta/fvm_minfs_fshost_base.shard.cml",
             "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml",
             "//src/storage/fshost/meta/storage_host_base.shard.cml",
             "//src/storage/fshost/meta/storage_host_fvm.cml",
@@ -3009,8 +3008,8 @@ assembly_input_bundle("fshost_fxfs") {
         {
           component_name = "fshost"
           shards = [
-            "//src/storage/fshost/meta/fxfs_blob_fshost.cml",
-            "//src/storage/fshost/meta/fxfs_blob_fshost_base.shard.cml",
+            "//src/storage/fshost/meta/fxblob_fshost.cml",
+            "//src/storage/fshost/meta/fxblob_fshost_base.shard.cml",
             "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml",
           ]
         },
@@ -3039,8 +3038,9 @@ assembly_input_bundle("fshost_fvm") {
         {
           component_name = "fshost"
           shards = [
-            "//src/storage/fshost/meta/blobfs_fshost.cml",
-            "//src/storage/fshost/meta/blobfs_fshost_base.shard.cml",
+            "//src/storage/fshost/meta/fvm_blobfs_fshost.cml",
+            "//src/storage/fshost/meta/fvm_blobfs_fshost_base.shard.cml",
+            "//src/storage/fshost/meta/fvm_fshost.shard.cml",
           ]
         },
       ]
@@ -3065,8 +3065,8 @@ assembly_input_bundle("fshost_fvm_fxfs") {
         {
           component_name = "fshost"
           shards = [
-            "//src/storage/fshost/meta/fxfs_fshost.cml",
-            "//src/storage/fshost/meta/fxfs_fshost_base.shard.cml",
+            "//src/storage/fshost/meta/fvm_fxfs_fshost.cml",
+            "//src/storage/fshost/meta/fvm_fxfs_fshost_base.shard.cml",
             "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml",
           ]
         },
@@ -3095,9 +3095,8 @@ assembly_input_bundle("fshost_fvm_minfs") {
         {
           component_name = "fshost"
           shards = [
-            "//src/storage/fshost/meta/minfs_fshost.cml",
-            "//src/storage/fshost/meta/minfs_fshost_base.shard.cml",
-            "//src/storage/fshost/meta/non_fxfs_fshost.cml",
+            "//src/storage/fshost/meta/fvm_minfs_fshost.cml",
+            "//src/storage/fshost/meta/fvm_minfs_fshost_base.shard.cml",
             "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml",
           ]
         },
@@ -3126,10 +3125,10 @@ assembly_input_bundle("fshost_fvm_minfs_migration") {
         {
           component_name = "fshost"
           shards = [
-            "//src/storage/fshost/meta/minfs_fshost.cml",
-            "//src/storage/fshost/meta/minfs_fshost_base.shard.cml",
-            "//src/storage/fshost/meta/fxfs_fshost.cml",
-            "//src/storage/fshost/meta/fxfs_fshost_base.shard.cml",
+            "//src/storage/fshost/meta/fvm_minfs_fshost.cml",
+            "//src/storage/fshost/meta/fvm_minfs_fshost_base.shard.cml",
+            "//src/storage/fshost/meta/fvm_fxfs_fshost.cml",
+            "//src/storage/fshost/meta/fvm_fxfs_fshost_base.shard.cml",
             "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml",
           ]
         },
@@ -3162,9 +3161,8 @@ assembly_input_bundle("fshost_fvm_f2fs") {
         {
           component_name = "fshost"
           shards = [
-            "//src/storage/fshost/meta/f2fs_fshost.cml",
-            "//src/storage/fshost/meta/f2fs_fshost_base.shard.cml",
-            "//src/storage/fshost/meta/non_fxfs_fshost.cml",
+            "//src/storage/fshost/meta/fvm_f2fs_fshost.cml",
+            "//src/storage/fshost/meta/fvm_f2fs_fshost_base.shard.cml",
             "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml",
           ]
         },

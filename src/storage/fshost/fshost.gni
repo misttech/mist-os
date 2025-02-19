@@ -30,69 +30,90 @@ template("fshost_cml") {
       "//src/storage/lib/fs_management/client.shard.cml",
     ]
     options = invoker.options
+    not_needed([ "options" ])
+
+    # The logic of which shards to include should match the AIBs included in
+    # //src/lib/assembly/platform_configuration/src/subsystems/storage.rs.  Because this template
+    # includes shards directly and the assembly configuration includes AIBs which themselves include
+    # shards, the definitions here are slightly redundant, for consistency with storage.rs.
     if (!defined(options.bootfs_only) || !options.bootfs_only) {
+      # `fxfs_blob` defaults to true unless set
+      _fxblob = !defined(options.fxfs_blob) || options.fxfs_blob
+      _storage_host = defined(options.storage_host) && options.storage_host
       sources += [ "//src/storage/fshost/meta/core_fshost.cml" ]
-      if (defined(options.storage_host) && options.storage_host) {
-        sources += [ "//src/storage/fshost/meta/storage_host_gpt.shard.cml" ]
-        if (defined(options.use_disk_migration) && options.use_disk_migration) {
-          # TODO(https://fxbug.dev/372555455): Implement.
-          assert(false)
-        } else if (options.data_filesystem_format == "minfs") {
-          if (invoker.testonly) {
-            sources += [ "//src/storage/fshost/meta/storage_host_fvm_test.cml" ]
-          } else {
-            sources += [ "//src/storage/fshost/meta/storage_host_fvm.cml" ]
+      if (_storage_host) {
+        sources += [
+          "//src/storage/fshost/meta/storage_host_base.shard.cml",
+          "//src/storage/fshost/meta/storage_host_gpt.shard.cml",
+        ]
+        if (_fxblob) {
+          sources += [
+            "//src/storage/fshost/meta/fxblob_fshost_base.shard.cml",
+            "//src/storage/fshost/meta/fxblob_fshost_test.cml",
+          ]
+        } else {
+          sources += [
+            "//src/storage/fshost/meta/storage_host_fvm_base.shard.cml",
+            "//src/storage/fshost/meta/storage_host_fvm_test.cml",
+          ]
+          _include_all =
+              defined(options.use_disk_migration) && options.use_disk_migration
+          if (_include_all || options.data_filesystem_format == "minfs") {
+            sources += [
+              "//src/storage/fshost/meta/fvm_minfs_fshost_base.shard.cml",
+              "//src/storage/fshost/meta/fvm_minfs_fshost_test.cml",
+            ]
           }
-        } else if (options.data_filesystem_format == "fxfs") {
-          assert(!defined(options.fxfs_blob) || options.fxfs_blob,
-                 "Fxfs in FVM not supported in storage-host")
-          if (invoker.testonly) {
-            sources += [ "//src/storage/fshost/meta/fxfs_blob_fshost_test.cml" ]
-          } else {
-            sources += [ "//src/storage/fshost/meta/fxfs_blob_fshost.cml" ]
+          if (_include_all || options.data_filesystem_format == "fxfs") {
+            # TODO(https://fxbug.dev/372555455): Implement if needed.
+            assert(false)
           }
-        } else if (options.data_filesystem_format == "f2fs") {
-          # TODO(https://fxbug.dev/372555455): Implement.
-          assert(false)
+          if (_include_all || options.data_filesystem_format == "f2fs") {
+            # TODO(https://fxbug.dev/372555455): Implement.
+            assert(false)
+          }
         }
       } else {
         sources +=
             [ "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml" ]
-        if (defined(options.use_disk_migration) && options.use_disk_migration) {
+        if (_fxblob) {
           sources += [
-            "//src/storage/fshost/meta/blobfs_fshost_test.cml",
-            "//src/storage/fshost/meta/f2fs_fshost_test.cml",
-            "//src/storage/fshost/meta/fxfs_fshost_test.cml",
-            "//src/storage/fshost/meta/minfs_fshost_test.cml",
+            "//src/storage/fshost/meta/fxblob_fshost_base.shard.cml",
+            "//src/storage/fshost/meta/fxblob_fshost_test.cml",
           ]
-        } else if (options.data_filesystem_format == "minfs") {
+        } else {
           sources += [
-            "//src/storage/fshost/meta/blobfs_fshost_test.cml",
-            "//src/storage/fshost/meta/minfs_fshost_test.cml",
-            "//src/storage/fshost/meta/non_fxfs_fshost.cml",
+            "//src/storage/fshost/meta/fvm_blobfs_fshost_base.shard.cml",
+            "//src/storage/fshost/meta/fvm_blobfs_fshost_test.cml",
+            "//src/storage/fshost/meta/fvm_fshost.shard.cml",
           ]
-        } else if (options.data_filesystem_format == "fxfs") {
-          if (defined(options.fxfs_blob) && !options.fxfs_blob) {
+          _include_all =
+              defined(options.use_disk_migration) && options.use_disk_migration
+          if (_include_all || options.data_filesystem_format == "minfs") {
             sources += [
-              "//src/storage/fshost/meta/blobfs_fshost_test.cml",
-              "//src/storage/fshost/meta/fxfs_fshost_test.cml",
+              "//src/storage/fshost/meta/fvm_minfs_fshost_base.shard.cml",
+              "//src/storage/fshost/meta/fvm_minfs_fshost_test.cml",
             ]
-          } else {
-            sources += [ "//src/storage/fshost/meta/fxfs_blob_fshost_test.cml" ]
           }
-        } else if (options.data_filesystem_format == "f2fs") {
-          sources += [
-            "//src/storage/fshost/meta/blobfs_fshost_test.cml",
-            "//src/storage/fshost/meta/f2fs_fshost_test.cml",
-            "//src/storage/fshost/meta/non_fxfs_fshost.cml",
-          ]
+          if (_include_all || options.data_filesystem_format == "fxfs") {
+            sources += [
+              "//src/storage/fshost/meta/fvm_fxfs_fshost_base.shard.cml",
+              "//src/storage/fshost/meta/fvm_fxfs_fshost_test.cml",
+            ]
+          }
+          if (_include_all || options.data_filesystem_format == "f2fs") {
+            sources += [
+              "//src/storage/fshost/meta/fvm_f2fs_fshost_base.shard.cml",
+              "//src/storage/fshost/meta/fvm_f2fs_fshost_test.cml",
+            ]
+          }
         }
       }
 
       # These are components that must be included in the package depending on the data filesystem
       # format and other configuration knobs.
-      # TODO(https://fxbug.dev/42064086):  Remove these dep when adding fshost to the common platform AIB,
-      # and add these component to the AIB at the same time.
+      # TODO(https://fxbug.dev/42064086):  Remove these dep when adding fshost to the common
+      # platform AIB, and add these component to the AIB at the same time.
       deps = [
         "//src/storage/blobfs/bin:component",
         "//src/storage/memfs:memfs_component",
@@ -101,7 +122,7 @@ template("fshost_cml") {
         "//src/storage/minfs/bin:minfs-component",
       ]
 
-      if (options.data_filesystem_format == "fxfs") {
+      if (_fxblob || options.data_filesystem_format == "fxfs") {
         deps += [
           "//src/storage/crypt/fxfs",
           "//src/storage/fxfs:fxfs_component",
