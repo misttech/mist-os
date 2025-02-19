@@ -213,18 +213,12 @@ sign_zbi = custom_signing_script != "" || use_vboot
 # change. See: src/sys/pkg/bin/system-updater/epoch/playbook.md
 update_platform_epoch = 1
 
-# bazel_product_bundle_target is not empty when both
-# bazel_product_bundle_{prefix,board} are defined and will point
-# to the label of a fuchsia_product_bundle() in the Bazel graph.
-if (use_bazel_images_only) {
-  assert(
-      bazel_product_bundle_full != false ||
-          (bazel_product_bundle_prefix != false &&
-               bazel_product_bundle_board != false),
-      "Either bazel_product_bundle_full must be set, or both bazel_product_bundle_prefix and bazel_product_bundle_board must be set when use_bazel_images_only=true. Seeing bazel_product_bundle_full=${bazel_product_bundle_full}, bazel_product_bundle_prefix=${bazel_product_bundle_prefix}, bazel_product_bundle_board=${bazel_product_bundle_board}")
-}
-
-if (bazel_product_bundle_full != false && bazel_product_bundle_board != "") {
+if (main_pb_label != "") {
+  assert(use_bazel_images_only,
+         "main_pb_label can only be set when use_bazel_images_only=true")
+  bazel_product_bundle_target = main_pb_label
+} else if (bazel_product_bundle_full != false &&
+           bazel_product_bundle_board != "") {
   bazel_product_bundle_target =
       bazel_product_bundle_full + "." + bazel_product_bundle_board
 } else if (bazel_product_bundle_prefix != false &&

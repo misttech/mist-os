@@ -125,7 +125,9 @@ group("record_filesystem_sizes") {
   testonly = true
   if (!use_bringup_assembly) {
     if (use_bazel_images_only) {
-      deps = [ "${bazel_product_bundle_target}_elf_sizes" ]
+      if (bazel_product_bundle_target != "") {
+        deps = [ "${bazel_product_bundle_target}_elf_sizes" ]
+      }
     } else {
       deps = [ "//build/images/sizes:elf_sizes.json" ]
     }
@@ -291,7 +293,9 @@ group("default-images") {
   ]
 
   if (use_bazel_images_only) {
-    deps += [ "${bazel_product_bundle_target}_size_targets" ]
+    if (bazel_product_bundle_target != "") {
+      deps += [ "${bazel_product_bundle_target}_size_targets" ]
+    }
   } else {
     if (size_checker_input != {
         }) {

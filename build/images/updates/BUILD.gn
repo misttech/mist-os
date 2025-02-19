@@ -155,18 +155,20 @@ import("//src/sys/pkg/repositories/devhost/devhost.gni")
 assert(current_toolchain == default_toolchain,
        "//build/images/* are only valid in the Fuchsia toolchain")
 
-if (use_bringup_assembly) {
-  # These don't have any meaning in a bringup assembly, so leave them as empty
+if (use_bringup_assembly ||
+    (use_bazel_images_only && bazel_product_bundle_target == "")) {
+  # These don't have any meaning in these assemblies, so leave them as empty
   # placeholder targets.
   group("updates") {
   }
   group("packages") {
   }
+  group("prepare_publish") {
+  }
   group("publish") {
   }
 
-  # This file doesn't exist for bringup, as bringup does not have packages to
-  # upload blobs for.
+  # This file doesn't exist for these assemblies.
   group("all_package_manifests.list") {
   }
 } else {
