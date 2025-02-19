@@ -43,6 +43,57 @@ impl<P: DiscoverableProtocolMarker> Into<CapabilityOptions> for DiscoverableCapa
     }
 }
 
+// Gets monikers for components that expose a capability matching the given |query|.
+// This moniker is eventually converted into a selector and is used to connecting to
+// the capability.
+async fn find_components_with_capability(
+    query_proxy: &fsys::RealmQueryProxy,
+    query: &str,
+) -> Result<Vec<String>> {
+    Ok(capability::get_all_route_segments(query.to_string(), &query_proxy)
+        .await?
+        .iter()
+        .filter_map(|segment| {
+            if let capability::RouteSegment::ExposeBy { moniker, .. } = segment {
+                Some(moniker.to_string())
+            } else {
+                None
+            }
+        })
+        .collect())
+}
+
+/// Find the components that expose a given capability, and let the user
+/// request which component they would like to connect to.
+async fn user_choose_selector(
+    query_proxy: &fsys::RealmQueryProxy,
+    capability: &str,
+) -> Result<String> {
+    let capabilities = find_components_with_capability(query_proxy, capability).await?;
+    println!("Please choose which component to connect to:");
+    for (i, component) in capabilities.iter().enumerate() {
+        println!("    {}: {}", i, component)
+    }
+
+    let mut line_editor = rustyline::Editor::<()>::new();
+    loop {
+        let line = line_editor.readline("$ ")?;
+        let choice = line.trim().parse::<usize>();
+        if choice.is_err() {
+            println!("Error: please choose a value.");
+            continue;
+        }
+        let choice = choice.unwrap();
+        if choice >= capabilities.len() {
+            println!("Error: please choose a correct value.");
+            continue;
+        }
+        // We have to escape colons in the capability name to distinguish them from the
+        // syntactically meaningful colons in the ':expose:" string.
+        return Ok(capabilities[choice].clone());
+    }
+}
+
 impl DriverConnector {
     fn new(remote_control: Option<RemoteControlProxyHolder>) -> Self {
         Self { remote_control }
@@ -60,6 +111,8 @@ impl DriverConnector {
             capability: &str,
         ) -> Result<S::Proxy> {
             let (proxy, server_end) = fidl::endpoints::create_proxy::<S>();
+            // TODO(https://fxbug.dev/384054758): Transition to RemoteControl.ConnectCapability when
+            // available at all API levels.
             remote_control
                 .deprecated_open_capability(
                     moniker,
@@ -81,71 +134,64 @@ impl DriverConnector {
             Ok(proxy)
         }
 
-        // Gets monikers for components that expose a capability matching the given |query|.
-        // This moniker is eventually converted into a selector and is used to connecting to
-        // the capability.
-        async fn find_components_with_capability(
-            rcs_proxy: &rc::RemoteControlProxy,
-            query: &str,
-        ) -> Result<Vec<String>> {
-            let query_proxy = rcs::root_realm_query(rcs_proxy, std::time::Duration::from_secs(15))
-                .await
-                .context("opening query")?;
-            Ok(capability::get_all_route_segments(query.to_string(), &query_proxy)
-                .await?
-                .iter()
-                .filter_map(|segment| {
-                    if let capability::RouteSegment::ExposeBy { moniker, .. } = segment {
-                        Some(moniker.to_string())
-                    } else {
-                        None
-                    }
-                })
-                .collect())
-        }
-
-        /// Find the components that expose a given capability, and let the user
-        /// request which component they would like to connect to.
-        async fn user_choose_selector(
-            remote_control: &rc::RemoteControlProxy,
-            capability: &str,
-        ) -> Result<String> {
-            let capabilities = find_components_with_capability(&remote_control, capability).await?;
-            println!("Please choose which component to connect to:");
-            for (i, component) in capabilities.iter().enumerate() {
-                println!("    {}: {}", i, component)
-            }
-
-            let mut line_editor = rustyline::Editor::<()>::new();
-            loop {
-                let line = line_editor.readline("$ ")?;
-                let choice = line.trim().parse::<usize>();
-                if choice.is_err() {
-                    println!("Error: please choose a value.");
-                    continue;
-                }
-                let choice = choice.unwrap();
-                if choice >= capabilities.len() {
-                    println!("Error: please choose a correct value.");
-                    continue;
-                }
-                // We have to escape colons in the capability name to distinguish them from the
-                // syntactically meaningful colons in the ':expose:" string.
-                return Ok(capabilities[choice].clone());
-            }
-        }
-
         let CapabilityOptions { capability_name, default_capability_name_for_query } =
             capability_options.into();
 
         if let Some(ref remote_control) = self.remote_control {
             let (moniker, capability): (String, &str) = match select {
                 true => {
-                    (user_choose_selector(remote_control, capability_name).await?, capability_name)
+                    let query_proxy =
+                        rcs::root_realm_query(remote_control, std::time::Duration::from_secs(15))
+                            .await
+                            .context("opening query")?;
+                    (user_choose_selector(&query_proxy, capability_name).await?, capability_name)
                 }
                 false => (moniker.to_string(), default_capability_name_for_query),
             };
             remotecontrol_connect::<S>(&remote_control, &moniker, &capability).await
+        } else {
+            anyhow::bail!("Failed to get remote control proxy");
+        }
+    }
+
+    async fn get_component_with_directory(
+        &self,
+        moniker: &str,
+        capability_options: impl Into<CapabilityOptions>,
+        select: bool,
+    ) -> Result<fio::DirectoryProxy> {
+        let CapabilityOptions { capability_name, default_capability_name_for_query } =
+            capability_options.into();
+
+        if let Some(ref remote_control) = self.remote_control {
+            let query_proxy =
+                rcs::root_realm_query(remote_control, std::time::Duration::from_secs(15))
+                    .await
+                    .context("opening query")?;
+            let (moniker, capability): (String, &str) = match select {
+                true => {
+                    (user_choose_selector(&query_proxy, capability_name).await?, capability_name)
+                }
+                false => (moniker.to_string(), default_capability_name_for_query),
+            };
+            // TODO(https://fxbug.dev/384050847): Use RealmQuery.OpenDirectory when available at all
+            // API levels. This requires that we first open the exposed directory and issue an open
+            // request to the capability path explicitly, rather than proxying the request through
+            // component manager.
+            let (capability_dir, server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+            query_proxy
+                .deprecated_open(
+                    &moniker,
+                    fsys::OpenDirType::ExposedDir,
+                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
+                    fio::ModeType::empty(),
+                    capability,
+                    server_end.into_channel().into(),
+                )
+                .await?
+                .expect("open directory capability error");
+            Ok(capability_dir)
         } else {
             anyhow::bail!("Failed to get remote control proxy");
         }
@@ -165,7 +211,7 @@ impl driver_connector::DriverConnector for DriverConnector {
     }
 
     async fn get_dev_proxy(&self, select: bool) -> Result<fio::DirectoryProxy> {
-        self.get_component_with_capability::<fio::DirectoryMarker>(
+        self.get_component_with_directory(
             "/bootstrap/devfs",
             CapabilityOptions {
                 capability_name: "dev",

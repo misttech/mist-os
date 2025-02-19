@@ -27,7 +27,7 @@ TestPkg::TestPkg(fidl::ServerEnd<fuchsia_io::Directory> server,
                              std::forward_as_tuple(path.c_str()));
   }
 
-  lib_dir_.SetOpen3Handler(
+  lib_dir_.SetOpenHandler(
       [this](fuchsia::io::Flags flags, const std::string& path, zx::channel object) {
         EXPECT_EQ(fuchsia::io::PERM_READABLE | fuchsia::io::PERM_EXECUTABLE, flags);
         auto it = libname_to_file_.find(path);
@@ -37,8 +37,8 @@ TestPkg::TestPkg(fidl::ServerEnd<fuchsia_io::Directory> server,
       });
 
   pkg_binding_.Bind(server.TakeChannel(), loop_.dispatcher());
-  pkg_dir_.SetOpen3Handler([this, module_open_path = std::string(module_open_path)](
-                               fuchsia::io::Flags flags, std::string path, zx::channel object) {
+  pkg_dir_.SetOpenHandler([this, module_open_path = std::string(module_open_path)](
+                              fuchsia::io::Flags flags, std::string path, zx::channel object) {
     if (strcmp(path.c_str(), "lib") == 0) {
       EXPECT_EQ(fuchsia::io::Flags::PROTOCOL_DIRECTORY | fuchsia::io::PERM_READABLE |
                     fuchsia::io::PERM_EXECUTABLE,

@@ -331,11 +331,6 @@ class TestDirectory : public fidl::testing::WireTestBase<fio::Directory> {
   void SetOpenHandler(OpenHandler open_handler) { open_handler_ = std::move(open_handler); }
 
  private:
-  void DeprecatedOpen(DeprecatedOpenRequestView request,
-                      DeprecatedOpenCompleter::Sync& completer) override {
-    open_handler_(request->path.get(), std::move(request->object));
-  }
-
   void Open(OpenRequestView request, OpenCompleter::Sync& completer) override {
     open_handler_(request->path.get(), fidl::ServerEnd<fio::Node>(std::move(request->object)));
   }

@@ -760,19 +760,14 @@ fidl::WireClient<fuchsia_device::Controller> DriverRunnerTestBase::ConnectToDevi
   zx::result dev_res = devfs().Connect(vfs);
   EXPECT_EQ(dev_res.status_value(), ZX_OK);
   fidl::WireClient<fuchsia_io::Directory> dev{std::move(*dev_res), dispatcher()};
-  auto controller_endpoints = fidl::Endpoints<fuchsia_device::Controller>::Create();
-
+  auto [client, server] = fidl::Endpoints<fuchsia_device::Controller>::Create();
   auto device_controller_path = std::string(child_name) + "/device_controller";
-  EXPECT_EQ(dev->DeprecatedOpen(
-                   fuchsia_io::OpenFlags::kNotDirectory, {},
-                   fidl::StringView::FromExternal(device_controller_path),
-                   fidl::ServerEnd<fuchsia_io::Node>(controller_endpoints.server.TakeChannel()))
+  EXPECT_EQ(dev->Open(fidl::StringView::FromExternal(device_controller_path),
+                      fio::wire::Flags::kProtocolService, {}, server.TakeChannel())
                 .status(),
             ZX_OK);
   EXPECT_TRUE(RunLoopUntilIdle());
-
-  return fidl::WireClient<fuchsia_device::Controller>{std::move(controller_endpoints.client),
-                                                      dispatcher()};
+  return fidl::WireClient<fuchsia_device::Controller>{std::move(client), dispatcher()};
 }
 
 }  // namespace driver_runner

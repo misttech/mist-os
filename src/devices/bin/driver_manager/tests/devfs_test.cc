@@ -230,9 +230,8 @@ TEST(Devfs, PassthroughTarget) {
     auto [_, server_end] = fidl::Endpoints<fuchsia_io::Node>::Create();
 
     ASSERT_OK(fidl::WireCall(devfs_client.value())
-                  ->DeprecatedOpen(fuchsia_io::wire::OpenFlags(), fuchsia_io::wire::ModeType(),
-                                   fidl::StringView::FromExternal(test.file_name),
-                                   std::move(server_end))
+                  ->Open(fidl::StringView::FromExternal(test.file_name),
+                         fuchsia_io::wire::Flags::kProtocolService, {}, server_end.TakeChannel())
                   .status());
     loop.Run();
     loop.ResetQuit();

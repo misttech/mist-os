@@ -26,13 +26,12 @@ class TestFile : public fuchsia::io::testing::File_TestBase {
     EXPECT_EQ(fuchsia::io::VmoFlags::READ | fuchsia::io::VmoFlags::EXECUTE |
                   fuchsia::io::VmoFlags::PRIVATE_CLONE,
               flags);
-    auto endpoints = fidl::Endpoints<fuchsia_io::File>::Create();
+    auto [client, server] = fidl::Endpoints<fuchsia_io::File>::Create();
     EXPECT_EQ(ZX_OK, fdio_open3(path_.data(),
-                                static_cast<uint64_t>(fuchsia::io::PERM_READABLE |
-                                                      fuchsia::io::PERM_EXECUTABLE),
-                                endpoints.server.channel().release()));
+                                uint64_t{fuchsia::io::PERM_READABLE | fuchsia::io::PERM_EXECUTABLE},
+                                server.TakeChannel().release()));
 
-    fidl::WireSyncClient<fuchsia_io::File> file(std::move(endpoints.client));
+    fidl::WireSyncClient<fuchsia_io::File> file(std::move(client));
     fidl::WireResult result = file->GetBackingMemory(fuchsia_io::wire::VmoFlags(uint32_t(flags)));
     EXPECT_TRUE(result.ok()) << result.FormatDescription();
     auto* res = result.Unwrap();
@@ -53,23 +52,14 @@ class TestFile : public fuchsia::io::testing::File_TestBase {
 
 class TestDirectory : public fuchsia::io::testing::Directory_TestBase {
  public:
-  using OpenHandler = fit::function<void(fuchsia::io::OpenFlags flags, std::string path,
-                                         fidl::InterfaceRequest<fuchsia::io::Node> object)>;
-  using Open3Handler =
+  using OpenHandler =
       fit::function<void(fuchsia::io::Flags flags, const std::string& path, zx::channel object)>;
 
   void SetOpenHandler(OpenHandler open_handler) { open_handler_ = std::move(open_handler); }
-  void SetOpen3Handler(Open3Handler open3_handler) { open3_handler_ = std::move(open3_handler); }
-
- private:
-  void DeprecatedOpen(fuchsia::io::OpenFlags flags, fuchsia::io::ModeType mode, std::string path,
-                      fidl::InterfaceRequest<fuchsia::io::Node> object) override {
-    open_handler_(flags, std::move(path), std::move(object));
-  }
 
   void Open(std::string path, fuchsia::io::Flags flags, fuchsia::io::Options mode,
             zx::channel object) override {
-    open3_handler_(flags, path, std::move(object));
+    open_handler_(flags, path, std::move(object));
   }
 
   void NotImplemented_(const std::string& name) override {
@@ -77,7 +67,6 @@ class TestDirectory : public fuchsia::io::testing::Directory_TestBase {
   }
 
   OpenHandler open_handler_;
-  Open3Handler open3_handler_;
 };
 
 // Implementation of a /pkg directory that can be passed as a component namespace entry

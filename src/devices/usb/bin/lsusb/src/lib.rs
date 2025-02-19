@@ -43,12 +43,11 @@ async fn list_devices(usb_device_dir: &fio::DirectoryProxy, args: &Args) -> Resu
 
         let (device, server_end) =
             fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_usb_device::DeviceMarker>();
-        // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
-        usb_device_dir.deprecated_open(
-            fio::OpenFlags::NOT_DIRECTORY,
-            fio::ModeType::empty(),
+        usb_device_dir.open(
             &filename,
-            server_end.into_channel().into(),
+            fio::Flags::PROTOCOL_SERVICE,
+            &Default::default(),
+            server_end.into_channel(),
         )?;
 
         match list_device(&device, filename, 0, 0, &args).await {
@@ -330,11 +329,11 @@ async fn list_tree(usb_device_dir: &fio::DirectoryProxy, args: &Args) -> Result<
 
         let (device, server_end) =
             fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_usb_device::DeviceMarker>();
-        usb_device_dir.deprecated_open(
-            fio::OpenFlags::NOT_DIRECTORY,
-            fio::ModeType::empty(),
+        usb_device_dir.open(
             &filename,
-            server_end.into_channel().into(),
+            fio::Flags::PROTOCOL_SERVICE,
+            &Default::default(),
+            server_end.into_channel(),
         )?;
 
         devices.push(get_device_info(device, filename).await?);

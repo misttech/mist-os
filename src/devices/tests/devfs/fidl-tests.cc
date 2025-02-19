@@ -22,23 +22,20 @@ namespace {
 namespace fio = fuchsia_io;
 
 void FidlOpenValidator(const fidl::ClientEnd<fio::Directory>& directory, const char* path,
-                       zx::result<fio::wire::NodeInfoDeprecated::Tag> expected) {
-  auto endpoints = fidl::Endpoints<fio::Node>::Create();
-  const fidl::Status result = fidl::WireCall(directory)->DeprecatedOpen(
-      fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kDescribe, {},
-      fidl::StringView::FromExternal(path), std::move(endpoints.server));
+                       zx::result<fio::wire::Representation::Tag> expected) {
+  auto [client, server] = fidl::Endpoints<fio::Node>::Create();
+  const fidl::Status result = fidl::WireCall(directory)->Open(
+      fidl::StringView::FromExternal(path),
+      fio::wire::kPermReadable | fio::wire::Flags::kFlagSendRepresentation, {},
+      server.TakeChannel());
   ASSERT_OK(result.status());
 
   class EventHandler : public fidl::testing::WireSyncEventHandlerTestBase<fio::Node> {
    public:
-    std::optional<zx_status_t> status() const { return status_; }
-    std::optional<fio::wire::NodeInfoDeprecated::Tag> tag() const { return tag_; }
+    fio::wire::Representation::Tag tag() const { return tag_; }
 
-    void OnOpen(fidl::WireEvent<fio::Node::OnOpen>* event) override {
-      status_ = event->s;
-      if (event->info.has_value()) {
-        tag_ = event->info->Which();
-      }
+    void OnRepresentation(fidl::WireEvent<fio::Node::OnRepresentation>* event) override {
+      tag_ = event->Which();
     }
 
     void NotImplemented_(const std::string& name) override {
@@ -46,21 +43,14 @@ void FidlOpenValidator(const fidl::ClientEnd<fio::Directory>& directory, const c
     }
 
    private:
-    std::optional<zx_status_t> status_;
-    std::optional<fio::wire::NodeInfoDeprecated::Tag> tag_;
+    fio::wire::Representation::Tag tag_;
   };
 
   EventHandler event_handler;
-  ASSERT_OK(event_handler.HandleOneEvent(endpoints.client).status());
-  ASSERT_TRUE(event_handler.status().has_value());
+  zx_status_t status = event_handler.HandleOneEvent(client).status();
+  ASSERT_EQ(status, expected.status_value()) << zx_status_get_string(status);
   if (expected.is_ok()) {
-    ASSERT_OK(event_handler.status().value());
-    ASSERT_TRUE(event_handler.tag().has_value());
-    ASSERT_EQ(event_handler.tag().value(), expected.value());
-  }
-  if (expected.is_error()) {
-    ASSERT_STATUS(event_handler.status().value(), expected.status_value());
-    ASSERT_EQ(event_handler.tag(), std::nullopt);
+    ASSERT_EQ(event_handler.tag(), *expected);
   }
 }
 
@@ -71,7 +61,7 @@ TEST(FidlTestCase, OpenDev) {
   ASSERT_OK(fdio_open3("/dev", static_cast<uint64_t>(fio::wire::kPermReadable),
                        endpoints.server.channel().release()));
 
-  FidlOpenValidator(endpoints.client, "zero", zx::ok(fio::wire::NodeInfoDeprecated::Tag::kFile));
+  FidlOpenValidator(endpoints.client, "zero", zx::ok(fio::wire::Representation::Tag::kFile));
   FidlOpenValidator(endpoints.client, "this-path-better-not-actually-exist",
                     zx::error(ZX_ERR_NOT_FOUND));
   FidlOpenValidator(endpoints.client, "zero/this-path-better-not-actually-exist",
@@ -83,8 +73,7 @@ TEST(FidlTestCase, OpenPkg) {
   ASSERT_OK(fdio_open3("/pkg", static_cast<uint64_t>(fio::wire::kPermReadable),
                        endpoints.server.channel().release()));
 
-  FidlOpenValidator(endpoints.client, "bin",
-                    zx::ok(fio::wire::NodeInfoDeprecated::Tag::kDirectory));
+  FidlOpenValidator(endpoints.client, "bin", zx::ok(fio::wire::Representation::Tag::kDirectory));
   FidlOpenValidator(endpoints.client, "this-path-better-not-actually-exist",
                     zx::error(ZX_ERR_NOT_FOUND));
 }

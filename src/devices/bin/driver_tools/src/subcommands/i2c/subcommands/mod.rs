@@ -21,12 +21,7 @@ fn connect_to_i2c_device(
         .ok_or_else(|| anyhow::anyhow!("Failed to get device path string"))?;
     let (proxy, server) = fidl::endpoints::create_proxy::<fi2c::DeviceMarker>();
     let () = root
-        .deprecated_open(
-            fio::OpenFlags::empty(),
-            fio::ModeType::empty(),
-            device_path,
-            fidl::endpoints::ServerEnd::new(server.into_channel()),
-        )
+        .open(device_path, fio::Flags::PROTOCOL_SERVICE, &Default::default(), server.into_channel())
         .context("Failed to open I2C device file")?;
     Ok(proxy)
 }
