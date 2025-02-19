@@ -65,14 +65,14 @@ impl RealmProxy for RealmInstanceProxy {
         self.0
             .root
             .get_exposed_dir()
-            .deprecated_open(
-                fio::OpenFlags::DIRECTORY,
-                fio::ModeType::empty(),
+            .open(
                 service,
-                fidl::endpoints::ServerEnd::new(server_end),
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                &Default::default(),
+                server_end,
             )
             .map_err(|e| {
-                warn!("Failed to open service directory for {service}. {e:?}");
+                warn!("Failed to open service directory for {service}: {e:?}");
                 OperationError::Failed
             })
     }
@@ -86,14 +86,14 @@ impl RealmProxy for RealmInstanceProxy {
         self.0
             .root
             .get_exposed_dir()
-            .deprecated_open(
-                fio::OpenFlags::DIRECTORY,
-                fio::ModeType::empty(),
+            .open(
                 format!("{service}/{instance}").as_str(),
-                fidl::endpoints::ServerEnd::new(server_end),
+                fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY,
+                &Default::default(),
+                server_end,
             )
             .map_err(|e| {
-                warn!("Failed to open service instance directory for {service}/{instance}. {e:?}");
+                warn!("Failed to open service instance directory for {service}/{instance}: {e:?}");
                 OperationError::Failed
             })
     }
