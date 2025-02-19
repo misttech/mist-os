@@ -249,6 +249,10 @@ if (!(current_os == "fuchsia")) {
   }
 }
 
+group("ecb") {
+  public_deps = [ ":ecb-v0_1_2" ]
+}
+
 group("ecdsa") {
   public_deps = [ ":ecdsa-v0_14_8" ]
 }
@@ -4970,6 +4974,36 @@ rust_library("easy-parallel-v3_1_0") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":easy-parallel-v3_1_0.license" ]
+}
+
+license("ecb-v0_1_2.license") {
+  public_package_name = "ecb"
+  license_files = [ "//third_party/rust_crates/vendor/ecb-0.1.2/LICENSE" ]
+}
+
+rust_library("ecb-v0_1_2") {
+  crate_name = "ecb"
+  crate_root = "//third_party/rust_crates/vendor/ecb-0.1.2/src/lib.rs"
+  output_name = "ecb-f56ef70301e83d9e"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":cipher-v0_4_4" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=f56ef70301e83d9e",
+    "-Cextra-filename=-f56ef70301e83d9e",
+    "--cfg=feature=\"block-padding\"",
+    "--cfg=feature=\"default\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":ecb-v0_1_2.license" ]
 }
 
 license("ecdsa-v0_14_8.license") {
