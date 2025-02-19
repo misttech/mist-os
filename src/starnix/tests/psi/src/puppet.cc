@@ -4,7 +4,9 @@
 
 #include <err.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <stdlib.h>
+#include <sys/epoll.h>
 #include <sys/resource.h>
 #include <unistd.h>
 
@@ -13,6 +15,7 @@
 #include <vector>
 
 #include "src/lib/files/file.h"
+#include "src/lib/files/file_descriptor.h"
 #include "src/lib/fxl/strings/join_strings.h"
 #include "src/lib/fxl/strings/string_number_conversions.h"
 #include "src/lib/fxl/strings/string_printf.h"
@@ -108,6 +111,88 @@ int main(int argc, const char** argv) {
       std::string buf;
       files::ReadFileDescriptorToString(fd, &buf);
       ctl_socket.WriteMessage({std::move(buf)});
+    } else if (command[0] == "WRITE_ALL" && command.size() == 3) {
+      int fd = fxl::StringToNumber<int>(command[1]);
+      fxl::WriteFileDescriptor(fd, command[2].data(), static_cast<ssize_t>(command[2].length()));
+      ctl_socket.WriteMessage({});
+    } else if (command[0] == "SELECT_EXCEPT" && command.size() == 3) {
+      int fd = fxl::StringToNumber<int>(command[1]);
+      int timeout_ms = fxl::StringToNumber<int>(command[2]);
+
+      fd_set xfds;
+      FD_ZERO(&xfds);
+      FD_CLR(fd, &xfds);
+
+      timeval timeout{
+          .tv_sec = timeout_ms / 1000,
+          .tv_usec = (timeout_ms % 1000) * 1000,
+      };
+
+      switch (select(fd + 1, nullptr, nullptr, &xfds, &timeout)) {
+        case 0:
+          ctl_socket.WriteMessage({"TIMEOUT"});
+          break;
+        case 1:
+          if (!FD_ISSET(fd, &xfds)) {
+            errx(EXIT_FAILURE, "select returned no exceptional condition event");
+          }
+          ctl_socket.WriteMessage({"EVENT"});
+          break;
+        default:
+          err(EXIT_FAILURE, "select failed");
+          break;
+      }
+    } else if (command[0] == "POLL_POLLPRI" && command.size() == 3) {
+      int fd = fxl::StringToNumber<int>(command[1]);
+      int timeout_ms = fxl::StringToNumber<int>(command[2]);
+      pollfd pfd{.fd = fd, .events = POLLPRI, .revents = 0};
+      switch (poll(&pfd, 1, timeout_ms)) {
+        case 0:
+          ctl_socket.WriteMessage({"TIMEOUT"});
+          break;
+        case 1:
+          if (!(pfd.revents & POLLPRI)) {
+            errx(EXIT_FAILURE, "poll returned no POLLPRI event");
+          }
+          ctl_socket.WriteMessage({"EVENT"});
+          break;
+        default:
+          err(EXIT_FAILURE, "poll failed");
+          break;
+      }
+    } else if (command[0] == "EPOLL_CREATE_AND_ADD_EPOLLPRI" && command.size() == 2) {
+      int fd = fxl::StringToNumber<int>(command[1]);
+
+      int epollfd = epoll_create1(0);
+      if (epollfd < 0) {
+        err(EXIT_FAILURE, "epoll_create1 failed");
+      }
+
+      epoll_event event;
+      event.events = EPOLLPRI;
+      event.data.u32 = 1234;
+      if (epoll_ctl(epollfd, EPOLL_CTL_ADD, fd, &event) != 0) {
+        err(EXIT_FAILURE, "epoll_ctl(EPOLL_CTL_ADD) failed");
+      }
+      ctl_socket.WriteMessage({fxl::StringPrintf("%d", epollfd)});
+    } else if (command[0] == "EPOLL_WAIT_EPOLLPRI" && command.size() == 3) {
+      int epollfd = fxl::StringToNumber<int>(command[1]);
+      int timeout_ms = fxl::StringToNumber<int>(command[2]);
+      epoll_event event;
+      switch (epoll_wait(epollfd, &event, 1, timeout_ms)) {
+        case 0:
+          ctl_socket.WriteMessage({"TIMEOUT"});
+          break;
+        case 1:
+          if (!(event.events & EPOLLPRI)) {
+            errx(EXIT_FAILURE, "epoll returned no EPOLLPRI event");
+          }
+          ctl_socket.WriteMessage({"EVENT"});
+          break;
+        default:
+          err(EXIT_FAILURE, "epoll_wait failed");
+          break;
+      }
     } else if (command[0] == "EXIT" && command.size() == 1) {
       break;
     } else {
