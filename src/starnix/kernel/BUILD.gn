@@ -180,6 +180,7 @@ rustc_library("starnix_core") {
     "memory_attribution/mod.rs",
     "memory_attribution/sync.rs",
     "mm/futex_table.rs",
+    "mm/mapping.rs",
     "mm/memory.rs",
     "mm/memory_manager.rs",
     "mm/mod.rs",
