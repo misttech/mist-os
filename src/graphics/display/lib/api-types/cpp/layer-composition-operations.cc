@@ -11,10 +11,7 @@ namespace display {
 // Ensure that the Banjo constants match the FIDL constants.
 static_assert(LayerCompositionOperations::kUseImage.ToBanjo() ==
               LAYER_COMPOSITION_OPERATIONS_USE_IMAGE);
-static_assert(LayerCompositionOperations::kMergeBase.ToBanjo() ==
-              LAYER_COMPOSITION_OPERATIONS_MERGE_BASE);
-static_assert(LayerCompositionOperations::kMergeSrc.ToBanjo() ==
-              LAYER_COMPOSITION_OPERATIONS_MERGE_SRC);
+static_assert(LayerCompositionOperations::kMerge.ToBanjo() == LAYER_COMPOSITION_OPERATIONS_MERGE);
 static_assert(LayerCompositionOperations::kFrameScale.ToBanjo() ==
               LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE);
 static_assert(LayerCompositionOperations::kSrcFrame.ToBanjo() ==

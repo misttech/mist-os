@@ -170,13 +170,12 @@ type DisplayConfig = struct {
 /// documentation there for the semantics of each operation.
 type LayerCompositionOperations = strict bits : uint32 {
     USE_IMAGE = 0x1;
-    MERGE_BASE = 0x2;
-    MERGE_SRC = 0x4;
-    FRAME_SCALE = 0x8;
-    SRC_FRAME = 0x10;
-    TRANSFORM = 0x20;
-    COLOR_CONVERSION = 0x40;
-    ALPHA = 0x80;
+    MERGE = 0x2;
+    FRAME_SCALE = 0x4;
+    SRC_FRAME = 0x8;
+    TRANSFORM = 0x10;
+    COLOR_CONVERSION = 0x20;
+    ALPHA = 0x40;
 };
 
 // An E-EDID can contain up to 256 data blocks, each of which contains 128

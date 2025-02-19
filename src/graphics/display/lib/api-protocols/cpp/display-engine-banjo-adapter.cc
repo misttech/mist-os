@@ -142,9 +142,8 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
   // This adapter does not currently support multi-layer configurations. This
   // restriction will be lifted in the near future.
   if (banjo_layers.size() > 1) {
-    out_layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
-    for (size_t i = 1; i < banjo_layers.size(); ++i) {
-      out_layer_composition_operations[i] = LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
+    for (size_t i = 0; i < banjo_layers.size(); ++i) {
+      out_layer_composition_operations[i] = LAYER_COMPOSITION_OPERATIONS_MERGE;
     }
     return display::ConfigCheckResult::kUnsupportedConfig.ToBanjo();
   }

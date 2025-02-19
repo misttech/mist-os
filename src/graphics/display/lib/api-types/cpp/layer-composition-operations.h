@@ -52,8 +52,7 @@ class LayerCompositionOperations {
   constexpr uint32_t ValueForLogging() const;
 
   static const LayerCompositionOperations kUseImage;
-  static const LayerCompositionOperations kMergeBase;
-  static const LayerCompositionOperations kMergeSrc;
+  static const LayerCompositionOperations kMerge;
   static const LayerCompositionOperations kFrameScale;
   static const LayerCompositionOperations kSrcFrame;
   static const LayerCompositionOperations kTransform;
@@ -65,10 +64,12 @@ class LayerCompositionOperations {
 
   constexpr bool HasUseImage() const;
   constexpr LayerCompositionOperations WithUseImage() const;
-  constexpr bool HasMergeBase() const;
+  constexpr bool HasMerge() const;
+  constexpr LayerCompositionOperations WithMerge() const;
+
+  // TODO(https://fxbug.dev/397708825): Remove this after drivers are migrated.
   constexpr LayerCompositionOperations WithMergeBase() const;
-  constexpr bool HasMergeSrc() const;
-  constexpr LayerCompositionOperations WithMergeSrc() const;
+
   constexpr bool HasFrameScale() const;
   constexpr LayerCompositionOperations WithFrameScale() const;
   constexpr bool HasSrcFrame() const;
@@ -94,8 +95,7 @@ constexpr bool LayerCompositionOperations::IsValid(
     fuchsia_hardware_display_engine::wire::LayerCompositionOperations fidl_operations) {
   constexpr fuchsia_hardware_display_engine::wire::LayerCompositionOperations kAllOperations =
       fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kUseImage |
-      fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kMergeBase |
-      fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kMergeSrc |
+      fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kMerge |
       fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kFrameScale |
       fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kSrcFrame |
       fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kTransform |
@@ -109,10 +109,10 @@ constexpr bool LayerCompositionOperations::IsValid(
 constexpr bool LayerCompositionOperations::IsValid(
     layer_composition_operations_t banjo_operations) {
   constexpr layer_composition_operations_t kAllOperations =
-      LAYER_COMPOSITION_OPERATIONS_USE_IMAGE | LAYER_COMPOSITION_OPERATIONS_MERGE_BASE |
-      LAYER_COMPOSITION_OPERATIONS_MERGE_SRC | LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE |
-      LAYER_COMPOSITION_OPERATIONS_SRC_FRAME | LAYER_COMPOSITION_OPERATIONS_TRANSFORM |
-      LAYER_COMPOSITION_OPERATIONS_COLOR_CONVERSION | LAYER_COMPOSITION_OPERATIONS_ALPHA;
+      LAYER_COMPOSITION_OPERATIONS_USE_IMAGE | LAYER_COMPOSITION_OPERATIONS_MERGE |
+      LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE | LAYER_COMPOSITION_OPERATIONS_SRC_FRAME |
+      LAYER_COMPOSITION_OPERATIONS_TRANSFORM | LAYER_COMPOSITION_OPERATIONS_COLOR_CONVERSION |
+      LAYER_COMPOSITION_OPERATIONS_ALPHA;
 
   return (static_cast<uint32_t>(banjo_operations) & ~static_cast<uint32_t>(kAllOperations)) == 0;
 }
@@ -155,10 +155,8 @@ constexpr uint32_t LayerCompositionOperations::ValueForLogging() const {
 
 inline constexpr const LayerCompositionOperations LayerCompositionOperations::kUseImage(
     fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kUseImage);
-inline constexpr const LayerCompositionOperations LayerCompositionOperations::kMergeBase(
-    fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kMergeBase);
-inline constexpr const LayerCompositionOperations LayerCompositionOperations::kMergeSrc(
-    fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kMergeSrc);
+inline constexpr const LayerCompositionOperations LayerCompositionOperations::kMerge(
+    fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kMerge);
 inline constexpr const LayerCompositionOperations LayerCompositionOperations::kFrameScale(
     fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kFrameScale);
 inline constexpr const LayerCompositionOperations LayerCompositionOperations::kSrcFrame(
@@ -174,8 +172,7 @@ inline constexpr const LayerCompositionOperations LayerCompositionOperations::kN
 
 inline constexpr const LayerCompositionOperations LayerCompositionOperations::kAllOperations(
     fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kUseImage |
-    fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kMergeBase |
-    fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kMergeSrc |
+    fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kMerge |
     fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kFrameScale |
     fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kSrcFrame |
     fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kTransform |
@@ -190,20 +187,17 @@ constexpr LayerCompositionOperations LayerCompositionOperations::WithUseImage() 
   return LayerCompositionOperations(operations_ | kUseImage.operations_);
 }
 
-constexpr bool LayerCompositionOperations::HasMergeBase() const {
-  return (static_cast<uint32_t>(operations_) & static_cast<uint32_t>(kMergeBase.operations_)) != 0;
+constexpr bool LayerCompositionOperations::HasMerge() const {
+  return (static_cast<uint32_t>(operations_) & static_cast<uint32_t>(kMerge.operations_)) != 0;
 }
 
+constexpr LayerCompositionOperations LayerCompositionOperations::WithMerge() const {
+  return LayerCompositionOperations(operations_ | kMerge.operations_);
+}
+
+// TODO(https://fxbug.dev/397708825): Remove this after drivers are migrated.
 constexpr LayerCompositionOperations LayerCompositionOperations::WithMergeBase() const {
-  return LayerCompositionOperations(operations_ | kMergeBase.operations_);
-}
-
-constexpr bool LayerCompositionOperations::HasMergeSrc() const {
-  return (static_cast<uint32_t>(operations_) & static_cast<uint32_t>(kMergeSrc.operations_)) != 0;
-}
-
-constexpr LayerCompositionOperations LayerCompositionOperations::WithMergeSrc() const {
-  return LayerCompositionOperations(operations_ | kMergeSrc.operations_);
+  return LayerCompositionOperations(operations_ | kMerge.operations_);
 }
 
 constexpr bool LayerCompositionOperations::HasFrameScale() const {

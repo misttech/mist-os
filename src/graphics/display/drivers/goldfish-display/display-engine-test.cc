@@ -109,10 +109,9 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigMultiLayer) {
       &config_, results_.data(), results_.size(), &actual_result_size);
   EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
   EXPECT_EQ(actual_result_size, kMaxLayerCount);
-  EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_MERGE_BASE,
-            results_[0] & LAYER_COMPOSITION_OPERATIONS_MERGE_BASE);
+  EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_MERGE, results_[0] & LAYER_COMPOSITION_OPERATIONS_MERGE);
   for (unsigned i = 1; i < kMaxLayerCount; ++i) {
-    EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_MERGE_SRC, results_[i]);
+    EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_MERGE, results_[i]);
   }
 }
 

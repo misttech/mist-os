@@ -1713,9 +1713,8 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
   }
 
   if (merge_all) {
-    layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
-    for (size_t j = 1; j < banjo_display_config->layer_count; ++j) {
-      layer_composition_operations[j] = LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
+    for (size_t j = 0; j < banjo_display_config->layer_count; ++j) {
+      layer_composition_operations[j] = LAYER_COMPOSITION_OPERATIONS_MERGE;
     }
     check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
   }
@@ -1739,9 +1738,8 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
         continue;
       }
 
-      layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
-      for (size_t j = 1; j < banjo_display_config->layer_count; ++j) {
-        layer_composition_operations[j] = LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
+      for (size_t j = 0; j < banjo_display_config->layer_count; ++j) {
+        layer_composition_operations[j] = LAYER_COMPOSITION_OPERATIONS_MERGE;
       }
       check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
       break;

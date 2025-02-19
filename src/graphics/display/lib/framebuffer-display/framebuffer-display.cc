@@ -292,9 +292,9 @@ display::ConfigCheckResult FramebufferDisplay::CheckConfiguration(
 
   display::ConfigCheckResult result = display::ConfigCheckResult::kOk;
   if (layer.display_destination() != display_area) {
-    // TODO(https://fxbug.dev/388602122): Revise the definition of MERGE_BASE to
+    // TODO(https://fxbug.dev/388602122): Revise the definition of MERGE to
     // include this case, or replace with a different opcode.
-    layer_composition_operations[0] = layer_composition_operations[0].WithMergeBase();
+    layer_composition_operations[0] = layer_composition_operations[0].WithMerge();
     result = display::ConfigCheckResult::kUnsupportedConfig;
   }
   if (layer.image_source() != layer.display_destination()) {

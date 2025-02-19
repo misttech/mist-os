@@ -438,9 +438,8 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
   }
   // If there is more than one layer, the rest need to be merged into the base layer.
   if (display_config.layer_count > 1) {
-    layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
-    for (size_t j = 1; j < display_config.layer_count; ++j) {
-      layer_composition_operations[j] |= LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
+    for (size_t j = 0; j < display_config.layer_count; ++j) {
+      layer_composition_operations[j] |= LAYER_COMPOSITION_OPERATIONS_MERGE;
     }
     check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
   }

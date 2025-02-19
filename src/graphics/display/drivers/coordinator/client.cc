@@ -1143,10 +1143,10 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
     // //sdk/banjo/fuchsia.hardware.display.controller/display-controller.fidl
     // will cause the definition of `kAllErrors` to change as well.
     static constexpr layer_composition_operations_t kAllOperations =
-        LAYER_COMPOSITION_OPERATIONS_USE_IMAGE | LAYER_COMPOSITION_OPERATIONS_MERGE_BASE |
-        LAYER_COMPOSITION_OPERATIONS_MERGE_SRC | LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE |
-        LAYER_COMPOSITION_OPERATIONS_SRC_FRAME | LAYER_COMPOSITION_OPERATIONS_TRANSFORM |
-        LAYER_COMPOSITION_OPERATIONS_COLOR_CONVERSION | LAYER_COMPOSITION_OPERATIONS_ALPHA;
+        LAYER_COMPOSITION_OPERATIONS_USE_IMAGE | LAYER_COMPOSITION_OPERATIONS_MERGE |
+        LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE | LAYER_COMPOSITION_OPERATIONS_SRC_FRAME |
+        LAYER_COMPOSITION_OPERATIONS_TRANSFORM | LAYER_COMPOSITION_OPERATIONS_COLOR_CONVERSION |
+        LAYER_COMPOSITION_OPERATIONS_ALPHA;
 
     banjo_layers_index = 0;
     for (const DisplayConfig& display_config : display_configs_) {
@@ -1154,20 +1154,9 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
         continue;
       }
 
-      bool seen_base = false;
       for (const LayerNode& draft_layer_node : display_config.draft_layers_) {
         uint32_t composition_operations =
             kAllOperations & layer_composition_operations[banjo_layers_index];
-        // Fixup the error flags if the driver impl incorrectly set multiple MERGE_BASEs.
-        if (composition_operations & LAYER_COMPOSITION_OPERATIONS_MERGE_BASE) {
-          if (seen_base) {
-            composition_operations &= ~LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
-            composition_operations |= LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
-          } else {
-            seen_base = true;
-            composition_operations &= ~LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
-          }
-        }
 
         // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs,
         // the client-side ID will have to be looked up in a map.
@@ -2015,11 +2004,8 @@ namespace {
 static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientUseImage)) ==
                   LAYER_COMPOSITION_OPERATIONS_USE_IMAGE,
               "Const mismatch");
-static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientMergeBase)) ==
-                  LAYER_COMPOSITION_OPERATIONS_MERGE_BASE,
-              "Const mismatch");
-static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientMergeSrc)) ==
-                  LAYER_COMPOSITION_OPERATIONS_MERGE_SRC,
+static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientMerge)) ==
+                  LAYER_COMPOSITION_OPERATIONS_MERGE,
               "Const mismatch");
 static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientFrameScale)) ==
                   LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE,

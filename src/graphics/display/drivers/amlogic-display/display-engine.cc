@@ -528,9 +528,8 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
   }();
 
   if (check_result == CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG) {
-    layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
-    for (size_t i = 1; i < display_config.layer_count; ++i) {
-      layer_composition_operations[i] = LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
+    for (size_t i = 0; i < display_config.layer_count; ++i) {
+      layer_composition_operations[i] = LAYER_COMPOSITION_OPERATIONS_MERGE;
     }
   }
   return check_result;
