@@ -41,6 +41,29 @@ class TouchDevice(abc.ABC):
             UserInputError: if failed tap operation.
         """
 
+    @abc.abstractmethod
+    def swipe(
+        self,
+        start_location: types.Coordinate,
+        end_location: types.Coordinate,
+        move_event_count: int,
+    ) -> None:
+        """Instantiates a swipe event sequence that starts at `start_location` and ends at
+           `end_location`, with a total number of move events equal to `move_event_count`.
+
+           Events are injected with no explicit delay in between.
+
+        Args:
+            start_location: swipe start location in X, Y axis coordinate.
+
+            end_location: swipe end location in X, Y axis coordinate.
+
+            move_event_count: Number of move events.
+
+        Raises:
+            UserInputError: if failed swipe operation.
+        """
+
 
 class UserInput(abc.ABC):
     """Abstract base class for UserInput affordance."""

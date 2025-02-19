@@ -101,6 +101,41 @@ class TouchDevice(user_input.TouchDevice):
                 f"tap operation failed on {self._device_name}"
             ) from status
 
+    def swipe(
+        self,
+        start_location: ui_custom_types.Coordinate,
+        end_location: ui_custom_types.Coordinate,
+        move_event_count: int,
+    ) -> None:
+        """Instantiates a swipe event sequence that starts at `start_location` and ends at
+           `end_location`, with a total number of move events equal to `move_event_count`.
+
+           Events are injected with no explicit delay in between.
+
+        Args:
+            start_location: swipe start location in X, Y axis coordinate.
+
+            end_location: swipe end location in X, Y axis coordinate.
+
+            move_event_count: Number of move events.
+
+        Raises:
+            UserInputError: if failed swipe operation.
+        """
+
+        try:
+            self._touch_screen_proxy.simulate_swipe(
+                start_location=f_math.Vec(
+                    x=start_location.x, y=start_location.y
+                ),
+                end_location=f_math.Vec(x=end_location.x, y=end_location.y),
+                move_event_count=move_event_count,
+            )
+        except fcp.ZxStatus as status:
+            raise user_input_errors.UserInputError(
+                f"swipe operation failed on {self._device_name}"
+            ) from status
+
 
 class UserInputUsingFc(user_input.UserInput):
     """UserInput affordance implementation using FuchsiaController.
