@@ -4,7 +4,7 @@
 
 use crate::fs::fuchsia::{new_remote_file, OpenFlags};
 use crate::task::{
-    CurrentTask, EventHandler, SignalHandler, SignalHandlerInner, Task, WaitCanceler, Waiter,
+    CurrentTask, EventHandler, SignalHandler, SignalHandlerInner, WaitCanceler, Waiter,
 };
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::socket::{
@@ -277,7 +277,7 @@ impl SocketOps for RemoteUnixDomainSocket {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
-        _task: &Task,
+        _current_task: &CurrentTask,
         _level: u32,
         _optname: u32,
         _user_opt: UserBuffer,

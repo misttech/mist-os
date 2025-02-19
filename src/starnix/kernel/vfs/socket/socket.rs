@@ -9,7 +9,7 @@ use super::{
 };
 use crate::mm::MemoryAccessorExt;
 use crate::security;
-use crate::task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter};
+use crate::task::{CurrentTask, EventHandler, WaitCanceler, Waiter};
 use crate::vfs::buffers::{
     AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer, VecInputBuffer, VecOutputBuffer,
 };
@@ -213,7 +213,7 @@ pub trait SocketOps: Send + Sync + AsAny {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
-        _task: &Task,
+        _current_task: &CurrentTask,
         _level: u32,
         _optname: u32,
         _user_opt: UserBuffer,
@@ -436,7 +436,7 @@ impl Socket {
     pub fn setsockopt<L>(
         &self,
         locked: &mut Locked<'_, L>,
-        task: &Task,
+        current_task: &CurrentTask,
         level: u32,
         optname: u32,
         user_opt: UserBuffer,
@@ -447,7 +447,7 @@ impl Socket {
         let mut locked = locked.cast_locked::<FileOpsCore>();
         let read_timeval = || {
             let timeval_ref = user_opt.try_into()?;
-            let duration = duration_from_timeval(task.read_object(timeval_ref)?)?;
+            let duration = duration_from_timeval(current_task.read_object(timeval_ref)?)?;
             Ok(if duration == zx::MonotonicDuration::default() { None } else { Some(duration) })
         };
 
@@ -456,11 +456,18 @@ impl Socket {
                 SO_RCVTIMEO => self.state.lock().receive_timeout = read_timeval()?,
                 SO_SNDTIMEO => self.state.lock().send_timeout = read_timeval()?,
                 SO_MARK => {
-                    self.state.lock().mark = task.read_object(user_opt.try_into()?)?;
+                    self.state.lock().mark = current_task.read_object(user_opt.try_into()?)?;
                 }
-                _ => self.ops.setsockopt(&mut locked, self, task, level, optname, user_opt)?,
+                _ => self.ops.setsockopt(
+                    &mut locked,
+                    self,
+                    current_task,
+                    level,
+                    optname,
+                    user_opt,
+                )?,
             },
-            _ => self.ops.setsockopt(&mut locked, self, task, level, optname, user_opt)?,
+            _ => self.ops.setsockopt(&mut locked, self, current_task, level, optname, user_opt)?,
         }
         Ok(())
     }

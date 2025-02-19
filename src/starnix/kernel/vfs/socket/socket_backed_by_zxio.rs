@@ -317,7 +317,9 @@ impl SocketOps for ZxioBackedSocket {
         match peer {
             SocketPeer::Address(
                 ref address @ (SocketAddress::Inet(_) | SocketAddress::Inet6(_)),
-            ) => self.run_sockaddr_ebpf(locked, socket, current_task, SockAddrOp::Connect, address)?,
+            ) => {
+                self.run_sockaddr_ebpf(locked, socket, current_task, SockAddrOp::Connect, address)?
+            }
             _ => (),
         };
 
@@ -505,27 +507,27 @@ impl SocketOps for ZxioBackedSocket {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
-        task: &Task,
+        current_task: &CurrentTask,
         level: u32,
         optname: u32,
         user_opt: UserBuffer,
     ) -> Result<(), Errno> {
         match (level, optname) {
             (SOL_SOCKET, SO_ATTACH_FILTER) => {
-                let fprog = task.read_object::<sock_fprog>(user_opt.try_into()?)?;
+                let fprog = current_task.read_object::<sock_fprog>(user_opt.try_into()?)?;
                 if u32::from(fprog.len) > BPF_MAXINSNS || fprog.len == 0 {
                     return error!(EINVAL);
                 }
                 let code: Vec<sock_filter> =
-                    task.read_objects_to_vec(fprog.filter.into(), fprog.len as usize)?;
-                self.attach_cbpf_filter(task, code)
+                    current_task.read_objects_to_vec(fprog.filter.into(), fprog.len as usize)?;
+                self.attach_cbpf_filter(current_task, code)
             }
             (SOL_IP, IP_RECVERR) => {
                 track_stub!(TODO("https://fxbug.dev/333060595"), "SOL_IP.IP_RECVERR");
                 Ok(())
             }
             (SOL_SOCKET, SO_MARK) => {
-                let mark = task.read_object::<u32>(user_opt.try_into()?)?;
+                let mark = current_task.read_object::<u32>(user_opt.try_into()?)?;
                 let socket_mark = zxio_socket_mark {
                     is_present: true,
                     domain: ZXIO_SOCKET_MARK_SO_MARK,
@@ -540,7 +542,7 @@ impl SocketOps for ZxioBackedSocket {
                     .map_err(|out_code| errno_from_zxio_code!(out_code))
             }
             _ => {
-                let optval = task.read_buffer(&user_opt)?;
+                let optval = current_task.read_buffer(&user_opt)?;
                 self.zxio
                     .setsockopt(level as i32, optname as i32, &optval)
                     .map_err(|status| from_status_like_fdio!(status))?

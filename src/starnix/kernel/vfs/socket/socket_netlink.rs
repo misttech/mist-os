@@ -25,7 +25,7 @@ use zerocopy::{FromBytes, IntoBytes};
 use crate::device::kobject::{Device, KObjectBased, UEventAction, UEventContext};
 use crate::device::{DeviceListener, DeviceListenerKey};
 use crate::mm::MemoryAccessorExt;
-use crate::task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, WaitQueue, Waiter};
+use crate::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter};
 use crate::vfs::buffers::{
     AncillaryData, InputBuffer, Message, MessageQueue, MessageReadInfo, OutputBuffer,
     UnixControlData, VecInputBuffer,
@@ -319,7 +319,7 @@ impl NetlinkSocketInner {
 
     fn setsockopt(
         &mut self,
-        task: &Task,
+        current_task: &CurrentTask,
         level: u32,
         optname: u32,
         user_opt: UserBuffer,
@@ -327,33 +327,37 @@ impl NetlinkSocketInner {
         match level {
             SOL_SOCKET => match optname {
                 SO_SNDBUF => {
-                    let requested_capacity: socklen_t = task.read_object(user_opt.try_into()?)?;
+                    let requested_capacity: socklen_t =
+                        current_task.read_object(user_opt.try_into()?)?;
                     self.set_capacity(requested_capacity as usize * 2);
                 }
                 SO_RCVBUF => {
-                    let requested_capacity: socklen_t = task.read_object(user_opt.try_into()?)?;
+                    let requested_capacity: socklen_t =
+                        current_task.read_object(user_opt.try_into()?)?;
                     self.set_capacity(requested_capacity as usize);
                 }
                 SO_PASSCRED => {
-                    let passcred: u32 = task.read_object(user_opt.try_into()?)?;
+                    let passcred: u32 = current_task.read_object(user_opt.try_into()?)?;
                     self.passcred = passcred != 0;
                 }
                 SO_TIMESTAMP => {
-                    let timestamp: u32 = task.read_object(user_opt.try_into()?)?;
+                    let timestamp: u32 = current_task.read_object(user_opt.try_into()?)?;
                     self.timestamp = timestamp != 0;
                 }
                 SO_SNDBUFFORCE => {
-                    if !task.creds().has_capability(CAP_NET_ADMIN) {
+                    if !current_task.creds().has_capability(CAP_NET_ADMIN) {
                         return error!(EPERM);
                     }
-                    let requested_capacity: socklen_t = task.read_object(user_opt.try_into()?)?;
+                    let requested_capacity: socklen_t =
+                        current_task.read_object(user_opt.try_into()?)?;
                     self.set_capacity(requested_capacity as usize * 2);
                 }
                 SO_RCVBUFFORCE => {
-                    if !task.creds().has_capability(CAP_NET_ADMIN) {
+                    if !current_task.creds().has_capability(CAP_NET_ADMIN) {
                         return error!(EPERM);
                     }
-                    let requested_capacity: socklen_t = task.read_object(user_opt.try_into()?)?;
+                    let requested_capacity: socklen_t =
+                        current_task.read_object(user_opt.try_into()?)?;
                     self.set_capacity(requested_capacity as usize);
                 }
                 _ => return error!(ENOSYS),
@@ -550,12 +554,12 @@ impl SocketOps for BaseNetlinkSocket {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
-        task: &Task,
+        current_task: &CurrentTask,
         level: u32,
         optname: u32,
         user_opt: UserBuffer,
     ) -> Result<(), Errno> {
-        self.lock().setsockopt(task, level, optname, user_opt)
+        self.lock().setsockopt(current_task, level, optname, user_opt)
     }
 }
 
@@ -743,12 +747,12 @@ impl SocketOps for UEventNetlinkSocket {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
-        task: &Task,
+        current_task: &CurrentTask,
         level: u32,
         optname: u32,
         user_opt: UserBuffer,
     ) -> Result<(), Errno> {
-        self.lock().setsockopt(task, level, optname, user_opt)
+        self.lock().setsockopt(current_task, level, optname, user_opt)
     }
 }
 
@@ -1068,14 +1072,14 @@ impl SocketOps for RouteNetlinkSocket {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
-        task: &Task,
+        current_task: &CurrentTask,
         level: u32,
         optname: u32,
         user_opt: UserBuffer,
     ) -> Result<(), Errno> {
         // TODO(https://issuetracker.google.com/283827094): Support add/del
         // multicast group membership.
-        self.inner.lock().setsockopt(task, level, optname, user_opt)
+        self.inner.lock().setsockopt(current_task, level, optname, user_opt)
     }
 }
 
@@ -1228,12 +1232,12 @@ impl SocketOps for DiagnosticNetlinkSocket {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
-        task: &Task,
+        current_task: &CurrentTask,
         level: u32,
         optname: u32,
         user_opt: UserBuffer,
     ) -> Result<(), Errno> {
-        self.inner.lock().setsockopt(task, level, optname, user_opt)
+        self.inner.lock().setsockopt(current_task, level, optname, user_opt)
     }
 }
 
@@ -1418,7 +1422,7 @@ impl SocketOps for GenericNetlinkSocket {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
-        task: &Task,
+        current_task: &CurrentTask,
         level: u32,
         optname: u32,
         user_opt: UserBuffer,
@@ -1426,12 +1430,12 @@ impl SocketOps for GenericNetlinkSocket {
         match level {
             SOL_NETLINK => match optname {
                 NETLINK_ADD_MEMBERSHIP => {
-                    let group_id: u32 = task.read_object(user_opt.try_into()?)?;
+                    let group_id: u32 = current_task.read_object(user_opt.try_into()?)?;
                     self.client.add_membership(ModernGroup(group_id))
                 }
-                _ => self.lock().setsockopt(task, level, optname, user_opt),
+                _ => self.lock().setsockopt(current_task, level, optname, user_opt),
             },
-            _ => self.lock().setsockopt(task, level, optname, user_opt),
+            _ => self.lock().setsockopt(current_task, level, optname, user_opt),
         }
     }
 }
