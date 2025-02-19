@@ -96,22 +96,9 @@ pub(super) fn audit_decision(
     permission: Permission,
     audit_data: Auditable<'_>,
 ) {
-    let mut decision = if result.permit { "granted" } else { "denied" };
-    let tclass = permission.class().name();
-    let permission_name = permission.name();
-
-    // The source and target SIDs are by definition allocated to Security Contexts, so there is no
-    // need to handle `sid_to_security_context()` failure.
-    let security_server = permission_check.security_server();
-    let scontext = security_server.sid_to_security_context(source_sid).unwrap();
-    let scontext = BStr::new(&scontext);
-    let tcontext = security_server.sid_to_security_context(target_sid).unwrap();
-    let tcontext = BStr::new(&tcontext);
-
-    // If `todo_bug` is set then this check is being granted to accommodate errata, rather than
-    // the denial being enforced. Such checks are logged as "todo_deny", and the denial tracked.
-    if let Some(todo_bug) = result.todo_bug {
-        decision = "todo_deny";
+    let decision = if let Some(todo_bug) = result.todo_bug {
+        // If `todo_bug` is set then this check is being granted to accommodate errata, rather than
+        // the denial being enforced.
 
         // Audit-log the first few denials, but skip further denials to avoid logspamming.
         const MAX_TODO_AUDIT_DENIALS: u64 = 5;
@@ -127,7 +114,27 @@ pub(super) fn audit_decision(
         {
             return;
         }
-    }
+
+        // The first few of each `todo_bug` are logged as "todo_deny", and the denial tracked.
+        "todo_deny"
+    } else {
+        if result.permit {
+            "granted"
+        } else {
+            "denied"
+        }
+    };
+
+    let tclass = permission.class().name();
+    let permission_name = permission.name();
+
+    // The source and target SIDs are by definition allocated to Security Contexts, so there is no
+    // need to handle `sid_to_security_context()` failure.
+    let security_server = permission_check.security_server();
+    let scontext = security_server.sid_to_security_context(source_sid).unwrap();
+    let scontext = BStr::new(&scontext);
+    let tcontext = security_server.sid_to_security_context(target_sid).unwrap();
+    let tcontext = BStr::new(&tcontext);
 
     log_warn!("avc: {decision} {{ {permission_name} }}{audit_data} scontext={scontext} tcontext={tcontext} tclass={tclass}");
 }
