@@ -40,6 +40,8 @@
 # IDK metadata for each tool. This would allow the computations performed
 # here to be done automatically.
 
+load("@bazel_skylib//lib:paths.bzl", "paths")
+
 def _to_quoted_comma_separated_list(args):
     """Return a list of strings as a shell-quoted, comma-separated string."""
     return "\"%s\"" % ",".join(args)
@@ -113,7 +115,9 @@ def get_ffx_product_args(fuchsia_toolchain):
         fuchsia_toolchain.ffx_product.path,
         "--config",
         _to_quoted_comma_separated_list([
-            "product.experimental=true",
+            # The SDK version is needed by `ffx product create`, so add the sdk info.
+            "sdk.manifest=" + fuchsia_toolchain.sdk_manifest.path,
+            "sdk.root=" + paths.dirname(fuchsia_toolchain.sdk_manifest.dirname),
             "sdk.overrides.blobfs=" + fuchsia_toolchain.blobfs.path,
         ]),
     ]
