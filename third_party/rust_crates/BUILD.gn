@@ -200,7 +200,7 @@ if (!(current_os == "fuchsia")) {
 }
 
 group("csv") {
-  public_deps = [ ":csv-v1_2_1" ]
+  public_deps = [ ":csv-v1_3_1" ]
 }
 
 group("darling") {
@@ -3646,7 +3646,7 @@ rust_library("criterion-v0_2_11") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":csv-v1_2_1" ]
+  deps += [ ":csv-v1_3_1" ]
   deps += [ ":walkdir-v2_3_1" ]
   deps += [ ":atty-v0_2_11" ]
   deps += [ ":cast-v0_2_2" ]
@@ -4070,15 +4070,15 @@ rust_proc_macro("cstr-v0_2_11") {
   applicable_licenses = [ ":cstr-v0_2_11.license" ]
 }
 
-license("csv-v1_2_1.license") {
+license("csv-v1_3_1.license") {
   public_package_name = "csv"
   license_files = [ "//third_party/rust_crates/ask2patch/csv/LICENSE-MIT" ]
 }
 
-rust_library("csv-v1_2_1") {
+rust_library("csv-v1_3_1") {
   crate_name = "csv"
   crate_root = "//third_party/rust_crates/ask2patch/csv/src/lib.rs"
-  output_name = "csv-37fa29d57667d41d"
+  output_name = "csv-ff1010399cb16e52"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -4092,13 +4092,13 @@ rust_library("csv-v1_2_1") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=37fa29d57667d41d",
-    "-Cextra-filename=-37fa29d57667d41d",
+    "-Cmetadata=ff1010399cb16e52",
+    "-Cextra-filename=-ff1010399cb16e52",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":csv-v1_2_1.license" ]
+  applicable_licenses = [ ":csv-v1_3_1.license" ]
 }
 
 license("csv-core-v0_1_12.license") {
@@ -11169,7 +11169,7 @@ rust_library("prettytable-rs-v0_8_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":csv-v1_2_1" ]
+  deps += [ ":csv-v1_3_1" ]
   deps += [ ":atty-v0_2_11" ]
   deps += [ ":encode_unicode-v0_3_5" ]
   deps += [ ":lazy_static-v1_4_0" ]
