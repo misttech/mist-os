@@ -13,7 +13,7 @@ use crate::vfs::{
     FileOps, FsNode, FsNodeInfo, FsNodeOps, FsString, MemoryXattrStorage, MountInfo, NamespaceNode,
     XattrStorage as _, MAX_LFS_FILESIZE,
 };
-use linux_uapi::ASHMEM_SET_SIZE;
+use linux_uapi::{ASHMEM_GET_SIZE, ASHMEM_SET_SIZE};
 use starnix_logging::{impossible_error, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -409,8 +409,13 @@ impl FileOps for MemoryFileObject {
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
         match request {
+            ASHMEM_GET_SIZE => {
+                track_stub!(TODO("https://fxbug.dev/389102161"), "ashmem get_size on memfd");
+                Ok(self.memory.get_size().into())
+            }
             ASHMEM_SET_SIZE => {
-                track_stub!(TODO("https://fxbug.dev/389102161"), "ashmem ioctl on memfd");
+                track_stub!(TODO("https://fxbug.dev/389102161"), "ashmem set_size on memfd");
+                self.memory.set_size(arg.into()).map_err(|_| errno!(EINVAL))?;
                 Ok(SUCCESS)
             }
             _ => default_ioctl(file, locked, current_task, request, arg),
