@@ -17,9 +17,8 @@ template("tests_json") {
   # See root_patterns in the //.gn file.
   _valid_dirs = [ "//:*" ]
   if (!label_matches(":$target_name", _valid_dirs)) {
-    assert(
-        false,
-        "test_collection can only be used in these directories: $_valid_dirs")
+    assert(false,
+           "tests_json can only be used in these directories: $_valid_dirs")
   }
 
   _product_bundle_test_groups = []

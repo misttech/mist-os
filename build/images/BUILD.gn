@@ -180,6 +180,7 @@ if (build_uefi_disk && !product_skip_uefi_disk) {
     no_output_dir_leaks = false
 
     deps = [
+      "//:product_bundles",
       "//src/firmware/gigaboot/cpp:fuchsia",
       labels.images,
       labels.recovery_images,
@@ -187,7 +188,10 @@ if (build_uefi_disk && !product_skip_uefi_disk) {
     ]
     testonly = true
     tool = "//tools/make-fuchsia-vol"
-    inputs = [ mkfs_bin ]
+    inputs = [
+      mkfs_bin,
+      "$root_build_dir/product_bundles.json",
+    ]
 
     bootloader_path = rebase_path(
             "${root_build_dir}/kernel.efi_${target_cpu}/fuchsia-efi.efi")
