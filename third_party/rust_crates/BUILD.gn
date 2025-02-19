@@ -4082,7 +4082,7 @@ rust_library("csv-v1_2_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":csv-core-v0_1_10" ]
+  deps += [ ":csv-core-v0_1_12" ]
   deps += [ ":itoa-v1_0_5" ]
   deps += [ ":ryu-v1_0_3" ]
   deps += [ ":serde-v1_0_204" ]
@@ -4101,15 +4101,15 @@ rust_library("csv-v1_2_1") {
   applicable_licenses = [ ":csv-v1_2_1.license" ]
 }
 
-license("csv-core-v0_1_10.license") {
+license("csv-core-v0_1_12.license") {
   public_package_name = "csv_core"
   license_files = [ "//third_party/rust_crates/ask2patch/csv-core/LICENSE-MIT" ]
 }
 
-rust_library("csv-core-v0_1_10") {
+rust_library("csv-core-v0_1_12") {
   crate_name = "csv_core"
   crate_root = "//third_party/rust_crates/ask2patch/csv-core/src/lib.rs"
-  output_name = "csv_core-736f88686751ea8f"
+  output_name = "csv_core-8eb7c7bcd8f6666"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -4120,14 +4120,14 @@ rust_library("csv-core-v0_1_10") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=736f88686751ea8f",
-    "-Cextra-filename=-736f88686751ea8f",
+    "-Cmetadata=8eb7c7bcd8f6666",
+    "-Cextra-filename=-8eb7c7bcd8f6666",
     "--cfg=feature=\"default\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":csv-core-v0_1_10.license" ]
+  applicable_licenses = [ ":csv-core-v0_1_12.license" ]
 }
 
 rust_library("ctor-v0_1_22") {
