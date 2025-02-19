@@ -58,6 +58,7 @@
                 "ClockRebootTest.CheckClockAfterReboot",
                 "CryptoTest.AESCBCDecryptFailsForBadInput",
                 "CryptoTest.AESCBCDecryptHelloWorld",
+                "CryptoTest.AESCBCDecryptFailsForBadInput",
                 "CryptoTest.AESCBCEncryptDecryptLoop",
                 "CryptoTest.AESCBCEncryptFailsForBadInput",
                 "CryptoTest.AESCBCEncryptHelloWorld",

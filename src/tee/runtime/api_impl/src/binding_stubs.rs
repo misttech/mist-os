@@ -11,7 +11,7 @@
 #![allow(unused_variables)]
 
 use crate::props::is_propset_pseudo_handle;
-use crate::{context, mem, storage, time};
+use crate::{context, crypto, mem, storage, time};
 use num_traits::FromPrimitive;
 use tee_internal::binding::{
     TEE_Attribute, TEE_BigInt, TEE_BigIntFMM, TEE_BigIntFMMContext, TEE_Identity,
@@ -20,9 +20,9 @@ use tee_internal::binding::{
     TEE_Time, TEE_Whence, TEE_SUCCESS, TEE_UUID,
 };
 use tee_internal::{
-    to_tee_result, Algorithm, Attribute, AttributeId, Error, HandleFlags, Mode, ObjectEnumHandle,
-    ObjectHandle, OperationHandle, PropSetHandle, Result as TeeResult, Storage as TeeStorage, Type,
-    Usage, ValueFields, Whence, OBJECT_ID_MAX_LEN,
+    to_tee_result, Algorithm, Attribute, AttributeId, EccCurve, Error, HandleFlags, Mode,
+    ObjectEnumHandle, ObjectHandle, OperationHandle, PropSetHandle, Result as TeeResult,
+    Storage as TeeStorage, Type, Usage, ValueFields, Whence, OBJECT_ID_MAX_LEN,
 };
 
 // This function returns a list of the C entry point that we want to expose from
@@ -1307,7 +1307,15 @@ extern "C" fn TEE_CopyOperation(
 
 #[no_mangle]
 extern "C" fn TEE_IsAlgorithmSupported(algId: u32, element: u32) -> TEE_Result {
-    unimplemented!()
+    to_tee_result(|| -> TeeResult {
+        let alg = Algorithm::from_u32(algId).ok_or(Error::NotSupported)?;
+        let element = EccCurve::from_u32(algId).ok_or(Error::NotSupported)?;
+        if crypto::is_algorithm_supported(alg, element) {
+            Ok(())
+        } else {
+            Err(Error::NotSupported)
+        }
+    }())
 }
 
 #[no_mangle]

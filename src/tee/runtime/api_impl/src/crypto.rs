@@ -10,9 +10,23 @@ use std::rc::Rc;
 use digest::DynDigest as Digest;
 use sha1::Sha1;
 use sha2::{Sha224, Sha256, Sha384, Sha512};
-use tee_internal::{Algorithm, Error, Mode, OperationHandle, Result as TeeResult, Usage};
+use tee_internal::{Algorithm, EccCurve, Error, Mode, OperationHandle, Result as TeeResult, Usage};
 
 use crate::storage::{AesKey, Key, KeyType as _, NoKey, Object};
+
+pub fn is_algorithm_supported(alg: Algorithm, element: EccCurve) -> bool {
+    if element != EccCurve::None {
+        return false;
+    }
+    match alg {
+        Algorithm::Sha1
+        | Algorithm::Sha224
+        | Algorithm::Sha256
+        | Algorithm::Sha384
+        | Algorithm::Sha512 => true,
+        _ => false,
+    }
+}
 
 // Encapsulated an abstracted helper classes particular to supported
 // algorithms.

@@ -692,8 +692,9 @@ pub enum Algorithm {
 }
 
 #[repr(u32)]
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, FromPrimitive, PartialEq)]
 pub enum EccCurve {
+    None = binding::TEE_CRYPTO_ELEMENT_NONE,
     NistP192 = binding::TEE_ECC_CURVE_NIST_P192,
     NistP224 = binding::TEE_ECC_CURVE_NIST_P224,
     NistP256 = binding::TEE_ECC_CURVE_NIST_P256,
