@@ -94,6 +94,12 @@ func (n AnvlCaseNumber) String() string {
 	return fmt.Sprintf("%d.%d", n.MajorNumber, n.MinorNumber)
 }
 
+// Returns whether a is smaller than b
+func (a AnvlCaseNumber) Cmp(b AnvlCaseNumber) bool {
+	return a.MajorNumber < b.MajorNumber ||
+		(a.MajorNumber == b.MajorNumber && a.MinorNumber < b.MinorNumber)
+}
+
 var Pass = outcome.Pass
 var Fail = outcome.Fail
 var Inconclusive = outcome.Inconclusive
