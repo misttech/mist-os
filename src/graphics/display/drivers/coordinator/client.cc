@@ -985,36 +985,24 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
     ops->clear();
   }
 
-  if (display_configs_.size() == 0) {
-    // This can happen if the client put together a configuration for a
-    // display, the display was removed, and the client called CheckConfig()
-    // before it received the display change event.
-    //
-    // Passing the check is acceptable, because ApplyConfig() will skip the
-    // configuration for the missing display. On the other hand, the client
-    // may be using CheckConfig() to probe the display engine's capabilities,
-    // and may get confused by this result.
-    return true;
-  }
-
-  // VLA is guaranteed to be non-empty (causing UB) thanks to the check above.
-  display_config_t banjo_display_configs[display_configs_.size()];
-
   // The total number of registered layers is an upper bound on the number of
   // layers assigned to display configurations.
   const size_t max_layer_count = std::max(size_t{1}, layers_.size());
 
   // VLA is guaranteed  be non-empty (causing UB) thanks to the clamping above.
-  layer_t banjo_layers[max_layer_count];
-
+  //
   // TODO(https://fxbug.dev/42080896): Do not use VLA. We should introduce a limit on
   // totally supported layers instead.
+  layer_t banjo_layers[max_layer_count];
   layer_composition_operations_t layer_composition_operations[max_layer_count];
   std::memset(layer_composition_operations, 0,
               max_layer_count * sizeof(layer_composition_operations_t));
-  int layer_composition_operations_count = 0;
 
-  size_t banjo_display_configs_index = 0;
+  // The layer count will be replaced if the client has a valid configuration
+  // for a display.
+  display_config_t banjo_display_config;
+  banjo_display_config.layer_count = 0;
+
   size_t banjo_layers_index = 0;
   for (const DisplayConfig& display_config : display_configs_) {
     if (display_config.draft_layers_.is_empty()) {
@@ -1027,14 +1015,6 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
       // display is added and the moment it receives its first configuration.
       continue;
     }
-
-    // Put this display's `display_config_t` into the array.
-    display_config_t& banjo_display_config = banjo_display_configs[banjo_display_configs_index];
-    ++banjo_display_configs_index;
-
-    // Create this display's compact `layer_t` array
-    banjo_display_config = display_config.draft_;
-    banjo_display_config.layer_list = banjo_layers + banjo_layers_index;
 
     // Frame used for checking that each layer's `display_destination` lies
     // entirely within the display output.
@@ -1054,7 +1034,6 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
       ++banjo_layers_index;
 
       banjo_layer = draft_layer_node.layer->draft_layer_config_;
-      ++layer_composition_operations_count;
 
       bool layer_config_is_invalid = false;
       if (banjo_layer.image_source.width != 0 && banjo_layer.image_source.height != 0) {
@@ -1098,10 +1077,26 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
     }
   }
 
+  if (banjo_display_config.layer_count == 0) {
+    // The client does not have a non-empty configuration for an existing
+    // display.
+    //
+    // This can happen if the client put together a configuration for a
+    // display, the display was removed, and the client called CheckConfig()
+    // before it received the display change event.
+    //
+    // Passing the check is acceptable, because ApplyConfig() will skip the
+    // configuration for the missing display. On the other hand, the client
+    // may be using CheckConfig() to probe the display engine's capabilities,
+    // and may get confused by this result.
+    return true;
+  }
+
   size_t layer_composition_operations_count_actual;
   config_check_result_t display_cfg_result = controller_.engine_driver_client()->CheckConfiguration(
-      banjo_display_configs, banjo_display_configs_index, layer_composition_operations,
-      layer_composition_operations_count, &layer_composition_operations_count_actual);
+      &banjo_display_config, layer_composition_operations,
+      /* layer_composition_operations_count=*/banjo_display_config.layer_count,
+      &layer_composition_operations_count_actual);
 
   switch (display_cfg_result) {
     case CONFIG_CHECK_RESULT_OK:

@@ -87,12 +87,10 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
           .image_source_transformation = COORDINATE_TRANSFORMATION_IDENTITY,
       },
   };
-  display_config_t test_configs[] = {
-      {
-          .display_id = ToBanjoDisplayId(info->id),
-          .layer_list = test_layers,
-          .layer_count = 1,
-      },
+  display_config_t test_config = {
+      .display_id = ToBanjoDisplayId(info->id),
+      .layer_list = test_layers,
+      .layer_count = 1,
   };
 
   for (auto edid_timing = edid::timing_iterator(&info->edid->base); edid_timing.is_valid();
@@ -116,7 +114,7 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
 
     layer_t& test_layer = test_layers[0];
     ZX_DEBUG_ASSERT_MSG(
-        static_cast<const layer_t*>(&test_layer) == &test_configs[0].layer_list[0],
+        static_cast<const layer_t*>(&test_layer) == &test_config.layer_list[0],
         "test_layer should be a non-const alias for the first layer in test_configs");
     test_layer.image_metadata.dimensions.width = width;
     test_layer.image_metadata.dimensions.height = height;
@@ -125,14 +123,13 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
     test_layer.display_destination.width = width;
     test_layer.display_destination.height = height;
 
-    display_config_t& test_config = test_configs[0];
     test_config.mode = display::ToBanjoDisplayMode(timing);
 
     config_check_result_t display_cfg_result;
     layer_composition_operations_t layer_result = 0;
     size_t display_layer_results_count;
     display_cfg_result = engine_driver_client_->CheckConfiguration(
-        test_configs, 1, &layer_result,
+        &test_config, &layer_result,
         /*layer_composition_operations_count=*/1, &display_layer_results_count);
     if (display_cfg_result == CONFIG_CHECK_RESULT_OK) {
       fbl::AllocChecker ac;
@@ -590,9 +587,13 @@ void Controller::ApplyConfig(std::span<DisplayConfig*> display_configs,
     }
   }
 
+  // TODO(https://fxbug.com/42080631): Remove multiple displays from the coordinator.
+  if (display_count != 1) {
+    FDF_LOG(WARNING, "Attempted to ApplyConfiguration() with %" PRIu32 " displays", display_count);
+  }
+
   const config_stamp_t banjo_config_stamp = display::ToBanjoDriverConfigStamp(driver_config_stamp);
-  engine_driver_client_->ApplyConfiguration(banjo_display_configs, display_count,
-                                            &banjo_config_stamp);
+  engine_driver_client_->ApplyConfiguration(banjo_display_configs, &banjo_config_stamp);
 
   {
     fbl::AutoLock<fbl::Mutex> lock(mtx());

@@ -229,7 +229,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationSuccess) {
   std::array<layer_composition_operations_t, 1> banjo_layer_composition_operations;
   size_t banjo_layer_composition_operations_output_size = 0;
   EXPECT_EQ(display::ConfigCheckResult::kOk.ToBanjo(),
-            engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig, 1,
+            engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig,
                                              banjo_layer_composition_operations.data(),
                                              banjo_layer_composition_operations.size(),
                                              &banjo_layer_composition_operations_output_size));
@@ -266,7 +266,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationError) {
   std::array<layer_composition_operations_t, 1> banjo_layer_composition_operations;
   size_t banjo_layer_composition_operations_output_size = 0;
   EXPECT_EQ(display::ConfigCheckResult::kUnsupportedDisplayModes.ToBanjo(),
-            engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig, 1,
+            engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig,
                                              banjo_layer_composition_operations.data(),
                                              banjo_layer_composition_operations.size(),
                                              &banjo_layer_composition_operations_output_size));
@@ -307,7 +307,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationUnsupportedConfig) {
   std::array<layer_composition_operations_t, 1> banjo_layer_composition_operations;
   size_t banjo_layer_composition_operations_output_size = 0;
   ASSERT_EQ(display::ConfigCheckResult::kUnsupportedConfig.ToBanjo(),
-            engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig, 1,
+            engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig,
                                              banjo_layer_composition_operations.data(),
                                              banjo_layer_composition_operations.size(),
                                              &banjo_layer_composition_operations_output_size));
@@ -347,7 +347,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, ApplyConfiguration) {
     EXPECT_THAT(layers, ::testing::ElementsAre(kLayer0));
     EXPECT_EQ(kConfigStamp, config_stamp);
   });
-  engine_banjo_.ApplyConfiguration(&kBanjoDisplayConfig, 1, &kBanjoConfigStamp);
+  engine_banjo_.ApplyConfiguration(&kBanjoDisplayConfig, &kBanjoConfigStamp);
 }
 
 TEST_F(DisplayEngineBanjoAdapterTest, SetBufferCollectionConstraintsSuccess) {

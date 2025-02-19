@@ -159,6 +159,7 @@ type DisplayConfig = struct {
     cc_coefficients array<array<float32, 3>, 3>;
     cc_postoffsets array<float32, 3>;
 
+    /// Valid display configurations have at least one layer.
     layer vector<Layer>:MAX;
 };
 
@@ -362,62 +363,38 @@ open protocol Engine {
         image_id ImageId;
     }) -> ();
 
-    /// Validates the given configuration.
-    ///
-    /// The configuration may not include all displays. Omitted displays should
-    /// be treated as whichever of off or displaying a blank screen results in
-    /// a more permissive validation.
-    ///
-    /// All displays in a configuration will have at least one layer. The
-    /// layers will be arranged in increasing z-order, and their z_index fields
-    /// will be set consecutively.
-    ///
-    /// Whether or not the driver can accept the configuration cannot depend on
-    /// the particular image handles, as it must always be possible to present
-    /// a new image in place of another image with a matching configuration.
+    /// Verifies that a configuration can be presented on a display.
     flexible CheckConfiguration(struct {
-        display_config vector<DisplayConfig>:MAX;
+        /// The display configuration to be validated.
+        ///
+        /// The verification result must not depend on the image handles in the
+        /// configuration. In other words, drivers must accept replacing an
+        /// existing configuration with a new configuration that matches it in
+        /// every respect except for the use of different image handles.
+        display_config DisplayConfig;
     }) -> (struct {
-        /// Indicates if the combination of display modes is supported.
+        /// Indicates if the display mode and composited layers are supported.
         config_check_result fuchsia.hardware.display.types.ConfigResult;
 
         /// Compositing operations that yield a supported configuration.
         ///
-        /// This member is only meaningful if `config_check_result` is
-        /// [fuchsia.hardware.display.types/ConfigResult.UNSUPPORTED_CONFIG`].
-        /// Otherwise, the value is undefined and should be ignored.
-        ///
-        /// The compositing operations are specified as an array with one
-        /// element for each layer in each `display_config` element. The
-        /// elements map to layers following a DFS traversal of a tree where the
-        /// first-level children are the `display_config` elements, and the
-        /// second-level children are each `DisplayConfig`'s layers.
-        ///
-        /// The element ordering matches flattening the array obtained by mapping
-        /// each `display_config` element to its `DisplayConfig.layers` value:
-        ///   [ display 0 layer 0, display 0 layer 1, ...,
-        ///     display 1 layer 0, display 1 layer 1, ...,
-        ///     display (N-1) layer 0, ..., display (N-1) layer (M-1) ].
+        /// If `config_check_result` is
+        /// `CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG`, the compositing operations
+        /// are specified as a vector with one element for each layer in the
+        /// display configuration. Otherwise, the vector must be empty.
         layer_composition_operations vector<LayerCompositionOperations>:MAX;
     });
 
-    /// Applies the configuration.
+    /// Submits a configuration for future presentation on a display.
     ///
-    /// All configurations passed to this function must be derived from
-    /// configurations which have been successfully validated, with the only
-    /// differences either being omitted layers or different image handles. To
-    /// account for any layers which are not present, the driver must use the
-    /// z_index values of the present layers to configure them as if the whole
-    /// configuration was present.
-    ///
-    /// Unlike with `CheckConfiguration`, displays included in the configuration
-    /// are not guaranteed to include any layers. Both omitted displays and
-    /// displays with no layers can either be turned off or set to display a
-    /// blank screen, but for displays with no layers there is a strong
-    /// preference to display a blank screen instead of turning them off. In
-    /// either case, the driver must drop all references to old images and
-    /// invoke the vsync callback after doing so.
+    /// `display_config` must be derived from a configuration that was validated
+    /// via [`Engine.CheckConfiguration`].
     flexible ApplyConfiguration(struct {
+        /// The display configuration to be submitted for presentation.
+        ///
+        /// While the configuration is transmitted to the display, the driver
+        /// will hold references to the image whose handles are included in the
+        /// configuration.
         display_config vector<DisplayConfig>:MAX;
 
         /// Identifies the configuration to be applied. Must be a valid value.

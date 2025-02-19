@@ -167,7 +167,7 @@ zx::result<> EngineDriverClient::ReleaseCapture(
 }
 
 config_check_result_t EngineDriverClient::CheckConfiguration(
-    const display_config_t* display_config_list, size_t display_config_count,
+    const display_config_t* display_config,
     layer_composition_operations_t* out_layer_composition_operations_list,
     size_t layer_composition_operations_count, size_t* out_layer_composition_operations_actual) {
   if (use_engine_) {
@@ -175,20 +175,19 @@ config_check_result_t EngineDriverClient::CheckConfiguration(
   }
 
   ZX_DEBUG_ASSERT(banjo_engine_.is_valid());
-  return banjo_engine_.CheckConfiguration(
-      display_config_list, display_config_count, out_layer_composition_operations_list,
-      layer_composition_operations_count, out_layer_composition_operations_actual);
+  return banjo_engine_.CheckConfiguration(display_config, out_layer_composition_operations_list,
+                                          layer_composition_operations_count,
+                                          out_layer_composition_operations_actual);
 }
 
-void EngineDriverClient::ApplyConfiguration(const display_config_t* display_config_list,
-                                            size_t display_config_count,
+void EngineDriverClient::ApplyConfiguration(const display_config_t* display_config,
                                             const config_stamp_t* config_stamp) {
   if (use_engine_) {
     return;
   }
 
   ZX_DEBUG_ASSERT(banjo_engine_.is_valid());
-  banjo_engine_.ApplyConfiguration(display_config_list, display_config_count, config_stamp);
+  banjo_engine_.ApplyConfiguration(display_config, config_stamp);
 }
 
 void EngineDriverClient::SetListener(const display_engine_listener_protocol_t& protocol) {

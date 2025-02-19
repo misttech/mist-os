@@ -185,13 +185,13 @@ class Device : public DeviceType {
   void DisplayEngineReleaseImage(image_t* image) {}
 
   config_check_result_t DisplayEngineCheckConfiguration(
-      const display_config_t** display_configs, size_t display_count,
+      const display_config_t* display_config,
       layer_composition_operations_t* out_layer_composition_operations_list,
       size_t layer_composition_operations_count,
       size_t* out_layer_composition_operations_actual);
 
   void DisplayEngineApplyConfiguration(
-      const display_config_t** display_config, size_t display_count) {}
+      const display_config_t* display_config) {}
 
   zx_status_t DisplayEngineSetBufferCollectionConstraints(
       const image_buffer_usage_t* usage, uint64_t collection_id) {
