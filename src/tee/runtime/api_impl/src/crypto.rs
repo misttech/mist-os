@@ -140,6 +140,9 @@ impl Operations {
     }
 
     pub fn free(&mut self, operation: OperationHandle) {
+        if operation.is_null() {
+            return;
+        }
         let _ = self.operations.remove(&operation).unwrap();
     }
 

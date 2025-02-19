@@ -586,6 +586,9 @@ impl TransientObjects {
     }
 
     fn free(&mut self, handle: ObjectHandle) {
+        if handle.is_null() {
+            return;
+        }
         match self.by_handle.entry(handle) {
             HashMapEntry::Occupied(entry) => {
                 let _ = entry.remove();
