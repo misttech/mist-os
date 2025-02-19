@@ -32,7 +32,7 @@ use crate::vfs::{
 };
 
 use maplit::btreemap;
-use starnix_logging::{bug_ref, log_error};
+use starnix_logging::{bug_ref, log_error, BugRef};
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::{DeviceType, MISC_MAJOR};
@@ -91,41 +91,21 @@ impl ProcDirectory {
                 // (https://man7.org/linux/man-pages/man5/proc.5.html)
                 FsNodeInfo::new_factory(mode!(IFREG, 0o200), FsCred::root()),
             ),
-            "asound".into() => fs.create_node(
-                current_task,
-                // Note: this is actually a directory but for now just track when it's opened.
-                StubEmptyFile::new_node("/proc/asound", bug_ref!("https://fxbug.dev/322893329")),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
-            "diskstats".into() => fs.create_node(
-                current_task,
-                StubEmptyFile::new_node("/proc/diskstats", bug_ref!("https://fxbug.dev/322893370")),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
+            "asound".into() => stub_node(current_task, fs, "/proc/asound", bug_ref!("https://fxbug.dev/322893329")),
+            "diskstats".into() => stub_node(current_task, fs, "/proc/diskstats", bug_ref!("https://fxbug.dev/322893370")),
             "filesystems".into() => bytes_node(current_task, fs, b"fxfs".to_vec()),
             "misc".into() => fs.create_node(
                 current_task,
                 MiscFile::new_node(),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
-                // Starnix does not support dynamically loading modules.
-                // Instead, we pretend to have loaded a single module, ferris (named after
-                // Rust's 🦀), to avoid breaking code that assumes the modules list is
-                // non-empty.
+            // Starnix does not support dynamically loading modules.
+            // Instead, we pretend to have loaded a single module, ferris (named after
+            // Rust's 🦀), to avoid breaking code that assumes the modules list is
+            // non-empty.
             "modules".into() => bytes_node(current_task, fs, b"ferris 8192 0 - Live 0x0000000000000000\n".to_vec()),
-            "pagetypeinfo".into() => fs.create_node(
-                current_task,
-                StubEmptyFile::new_node(
-                    "/proc/pagetypeinfo",
-                    bug_ref!("https://fxbug.dev/322894315"),
-                ),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
-            "slabinfo".into() => fs.create_node(
-                current_task,
-                StubEmptyFile::new_node("/proc/slabinfo", bug_ref!("https://fxbug.dev/322894195")),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
+            "pagetypeinfo".into() => stub_node(current_task, fs, "/proc/pagetypeinfo", bug_ref!("https://fxbug.dev/322894315")),
+            "slabinfo".into() => stub_node(current_task, fs, "/proc/slabinfo", bug_ref!("https://fxbug.dev/322894195")),
             "uid_cputime".into() => {
                 let mut dir = StaticDirectoryBuilder::new(fs);
                 dir.entry(
@@ -182,14 +162,7 @@ impl ProcDirectory {
                 let version_string = format!("Linux version {} ({}) ({}) {}\n", release, user, toolchain, version);
                 bytes_node(current_task, fs, version_string.into())
             },
-            "vmallocinfo".into() => fs.create_node(
-                current_task,
-                StubEmptyFile::new_node(
-                    "/proc/vmallocinfo",
-                    bug_ref!("https://fxbug.dev/322894183"),
-                ),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
+            "vmallocinfo".into() => stub_node(current_task, fs, "/proc/vmallocinfo", bug_ref!("https://fxbug.dev/322894183")),
             "vmstat".into() => fs.create_node(
                 current_task,
                 VmStatFile::new_node(&kernel.stats),
@@ -208,6 +181,19 @@ impl ProcDirectory {
 
         Arc::new(ProcDirectory { nodes })
     }
+}
+
+fn stub_node(
+    current_task: &CurrentTask,
+    fs: &FileSystemHandle,
+    name: &'static str,
+    bug: BugRef,
+) -> FsNodeHandle {
+    fs.create_node(
+        current_task,
+        StubEmptyFile::new_node(name, bug),
+        FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+    )
 }
 
 impl FsNodeOps for Arc<ProcDirectory> {
