@@ -127,16 +127,6 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   zx_status_t DisplayEngineReleaseCapture(uint64_t capture_handle) { return ZX_ERR_NOT_SUPPORTED; }
   zx_status_t DisplayEngineSetMinimumRgb(uint8_t minimum_rgb) { return ZX_ERR_NOT_SUPPORTED; }
 
-  // TODO(https://fxbug.dev/42080631): Remove these transitional overloads.
-  config_check_result_t DisplayEngineCheckConfiguration(
-      const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
-      layer_composition_operations_t* out_layer_composition_operations_list,
-      size_t out_layer_composition_operations_size,
-      size_t* out_layer_composition_operations_actual);
-  void DisplayEngineApplyConfiguration(const display_config_t* banjo_display_configs_array,
-                                       size_t banjo_display_configs_count,
-                                       const config_stamp_t* banjo_config_stamp);
-
   // gpu core ops
   zx_status_t IntelGpuCoreReadPciConfig16(uint16_t addr, uint16_t* value_out);
   zx_status_t IntelGpuCoreMapPciMmio(uint32_t pci_bar, uint8_t** addr_out, uint64_t* size_out);

@@ -253,44 +253,6 @@ zx_status_t DisplayEngineBanjoAdapter::DisplayEngineSetMinimumRgb(uint8_t minimu
   return result.status_value();
 }
 
-config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration(
-    const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
-    layer_composition_operations_t* out_layer_composition_operations_list,
-    size_t out_layer_composition_operations_size, size_t* out_layer_composition_operations_actual) {
-  // The display coordinator currently uses zero-display configs to blank all
-  // displays. We'll remove this eventually.
-  if (banjo_display_configs_count == 0) {
-    return display::ConfigCheckResult::kOk.ToBanjo();
-  }
-
-  // This adapter does not support multiple-display operation. None of our
-  // drivers supports this mode.
-  if (banjo_display_configs_count > 1) {
-    ZX_DEBUG_ASSERT_MSG(false, "Multiple displays registered with the display coordinator");
-    return display::ConfigCheckResult::kTooManyDisplays.ToBanjo();
-  }
-
-  return DisplayEngineCheckConfiguration(
-      banjo_display_configs_array, out_layer_composition_operations_list,
-      out_layer_composition_operations_size, out_layer_composition_operations_actual);
-}
-
-void DisplayEngineBanjoAdapter::DisplayEngineApplyConfiguration(
-    const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
-    const config_stamp_t* banjo_config_stamp) {
-  // The display coordinator currently uses zero-display configs to blank all
-  // displays. We'll remove this eventually.
-  if (banjo_display_configs_count == 0) {
-    return;
-  }
-
-  // This adapter does not support multiple-display operation. None of our
-  // drivers supports this mode.
-  ZX_DEBUG_ASSERT_MSG(banjo_display_configs_count == 1,
-                      "Display coordinator applied rejected multi-display config");
-  DisplayEngineApplyConfiguration(banjo_display_configs_array, banjo_config_stamp);
-}
-
 display_engine_protocol_t DisplayEngineBanjoAdapter::GetProtocol() {
   return {
       .ops = &display_engine_protocol_ops_,

@@ -879,8 +879,7 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureSolidColorFill) {
   // Must match kDisplayId in fake-display.cc.
   // TODO(https://fxbug.dev/42078942): Do not hardcode the display ID.
   constexpr display::DisplayId kDisplayId(1);
-  constexpr size_t kDisplayCount = 1;
-  std::array<const display_config_t, kDisplayCount> kDisplayConfigs = {
+  const display_config_t kDisplayConfig = {
       display_config_t{
           .display_id = display::ToBanjoDisplayId(kDisplayId),
           .mode = {},
@@ -901,14 +900,14 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureSolidColorFill) {
   // Check and apply the display configuration.
   config_check_result_t config_check_result =
       fake_display_stack_->display_engine().DisplayEngineCheckConfiguration(
-          kDisplayConfigs.data(), kDisplayConfigs.size(), layer_composition_operations.data(),
-          layer_composition_operations.size(), &layer_composition_operations_count);
+          &kDisplayConfig, layer_composition_operations.data(), layer_composition_operations.size(),
+          &layer_composition_operations_count);
   EXPECT_EQ(config_check_result, CONFIG_CHECK_RESULT_OK);
 
   const display::DriverConfigStamp config_stamp(1);
   const config_stamp_t banjo_config_stamp = display::ToBanjoDriverConfigStamp(config_stamp);
-  fake_display_stack_->display_engine().DisplayEngineApplyConfiguration(
-      kDisplayConfigs.data(), kDisplayConfigs.size(), &banjo_config_stamp);
+  fake_display_stack_->display_engine().DisplayEngineApplyConfiguration(&kDisplayConfig,
+                                                                        &banjo_config_stamp);
 
   // Start capture; wait until the capture ends.
   EXPECT_FALSE(display_capture_completion.completed().signaled());

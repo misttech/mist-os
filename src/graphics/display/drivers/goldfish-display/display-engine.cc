@@ -704,44 +704,6 @@ zx_status_t DisplayEngine::DisplayEngineSetBufferCollectionConstraints(
   return ZX_OK;
 }
 
-config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
-    const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
-    layer_composition_operations_t* out_layer_composition_operations_list,
-    size_t out_layer_composition_operations_size, size_t* out_layer_composition_operations_actual) {
-  // The display coordinator currently uses zero-display configs to blank all
-  // displays. We'll remove this eventually.
-  if (banjo_display_configs_count == 0) {
-    return CONFIG_CHECK_RESULT_OK;
-  }
-
-  // This adapter does not support multiple-display operation. None of our
-  // drivers supports this mode.
-  if (banjo_display_configs_count > 1) {
-    ZX_DEBUG_ASSERT_MSG(false, "Multiple displays registered with the display coordinator");
-    return CONFIG_CHECK_RESULT_TOO_MANY;
-  }
-
-  return DisplayEngineCheckConfiguration(
-      banjo_display_configs_array, out_layer_composition_operations_list,
-      out_layer_composition_operations_size, out_layer_composition_operations_actual);
-}
-
-void DisplayEngine::DisplayEngineApplyConfiguration(
-    const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
-    const config_stamp_t* banjo_config_stamp) {
-  // The display coordinator currently uses zero-display configs to blank all
-  // displays. We'll remove this eventually.
-  if (banjo_display_configs_count == 0) {
-    return;
-  }
-
-  // This adapter does not support multiple-display operation. None of our
-  // drivers supports this mode.
-  ZX_DEBUG_ASSERT_MSG(banjo_display_configs_count == 1,
-                      "Display coordinator applied rejected multi-display config");
-  DisplayEngineApplyConfiguration(banjo_display_configs_array, banjo_config_stamp);
-}
-
 zx_status_t DisplayEngine::SetupPrimaryDisplay() {
   // On the host render control protocol, the "invalid" host display ID is used
   // to configure the primary display device.

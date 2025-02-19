@@ -80,16 +80,6 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
   zx_status_t DisplayEngineReleaseCapture(uint64_t capture_handle) { return ZX_ERR_NOT_SUPPORTED; }
   zx_status_t DisplayEngineSetMinimumRgb(uint8_t minimum_rgb) { return ZX_ERR_NOT_SUPPORTED; }
 
-  // TODO(https://fxbug.dev/42080631): Remove these transitional overloads.
-  config_check_result_t DisplayEngineCheckConfiguration(
-      const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
-      layer_composition_operations_t* out_layer_composition_operations_list,
-      size_t out_layer_composition_operations_size,
-      size_t* out_layer_composition_operations_actual);
-  void DisplayEngineApplyConfiguration(const display_config_t* banjo_display_configs_array,
-                                       size_t banjo_display_configs_count,
-                                       const config_stamp_t* banjo_config_stamp);
-
   void SetupPrimaryDisplayForTesting(int32_t width_px, int32_t height_px, int32_t refresh_rate_hz);
 
   const display_engine_protocol_ops_t* display_engine_protocol_ops() const {

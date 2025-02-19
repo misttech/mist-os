@@ -107,16 +107,6 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
   zx_status_t DisplayEngineStartCapture(uint64_t capture_handle);
   zx_status_t DisplayEngineReleaseCapture(uint64_t capture_handle);
 
-  // TODO(https://fxbug.dev/42080631): Remove these transitional overloads.
-  config_check_result_t DisplayEngineCheckConfiguration(
-      const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
-      layer_composition_operations_t* out_layer_composition_operations_list,
-      size_t out_layer_composition_operations_size,
-      size_t* out_layer_composition_operations_actual);
-  void DisplayEngineApplyConfiguration(const display_config_t* banjo_display_configs_array,
-                                       size_t banjo_display_configs_count,
-                                       const config_stamp_t* banjo_config_stamp);
-
   const display_engine_protocol_ops_t* display_engine_protocol_ops() const {
     return &display_engine_protocol_ops_;
   }
