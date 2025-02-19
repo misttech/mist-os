@@ -133,7 +133,7 @@ fn rust_bench_log(c: &mut Criterion, input_size: usize) {
     )
     .unwrap();
 
-    c.bench_function(&format!("rust/encode/{input_size}"), move |b| {
+    c.bench_function(&format!("rust/encode/{input_size}x"), move |b| {
         let mut buf = Vec::new();
         let mut handle_buf = Vec::new();
         b.iter(|| {
@@ -149,7 +149,7 @@ fn rust_bench_log(c: &mut Criterion, input_size: usize) {
     });
 
     c.bench_function(
-        &format!("rust/decode_natural/{input_size}"),
+        &format!("rust/decode_natural/{input_size}x"),
         move |b| {
             b.iter(|| {
                 let mut out = ftl::Logs { logs: Vec::new() };
@@ -174,7 +174,7 @@ fn rust_next_bench_log(c: &mut Criterion, input_size: usize) {
     let mut decode_chunks = Vec::new();
     decode_chunks.encode_next(&mut input).unwrap();
 
-    c.bench_function(&format!("rust_next/encode/{input_size}"), move |b| {
+    c.bench_function(&format!("rust_next/encode/{input_size}x"), move |b| {
         let mut chunks = Vec::new();
         b.iter(|| {
             chunks.clear();
@@ -183,23 +183,23 @@ fn rust_next_bench_log(c: &mut Criterion, input_size: usize) {
     });
 
     let decode_wire_chunks = decode_chunks.clone();
-    c.bench_function(&format!("rust_next/decode_wire/{input_size}"), move |b| {
-        b.iter_batched(
+    c.bench_function(&format!("rust_next/decode_wire/{input_size}x"), move |b| {
+        b.iter_batched_ref(
             || decode_wire_chunks.clone(),
-            |mut decode_chunks| {
-                let mut chunks = decode_chunks.as_mut_slice();
-                black_box(black_box(&mut chunks).decode_next::<ftl_next::WireLogs>()).unwrap();
+            |decode_chunks| {
+                let mut chunks = black_box(decode_chunks).as_mut_slice();
+                black_box((&mut chunks).decode_next::<ftl_next::WireLogs>()).unwrap();
             },
             criterion::BatchSize::SmallInput,
         );
     });
 
-    c.bench_function(&format!("rust_next/decode_natural/{input_size}"), move |b| {
-        b.iter_batched(
+    c.bench_function(&format!("rust_next/decode_natural/{input_size}x"), move |b| {
+        b.iter_batched_ref(
             || decode_chunks.clone(),
-            |mut decode_chunks| {
-                let mut chunks = decode_chunks.as_mut_slice();
-                let value = black_box(&mut chunks).decode_next::<ftl_next::WireLogs>().unwrap();
+            |decode_chunks| {
+                let mut chunks = black_box(decode_chunks).as_mut_slice();
+                let value = (&mut chunks).decode_next::<ftl_next::WireLogs>().unwrap();
                 black_box(ftl_next::Logs::take_from(&value));
             },
             criterion::BatchSize::SmallInput,
