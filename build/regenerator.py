@@ -6,11 +6,9 @@
 """Regenerate the Ninja build plan and the Bazel workspace for the Fuchsia build system."""
 
 import argparse
-import filecmp
 import json
 import os
 import shlex
-import shutil
 import subprocess
 import sys
 import typing as T
@@ -274,14 +272,6 @@ def main() -> int:
         extra_ninja_build_inputs: T.Set[Path] = set()
         extra_ninja_build_inputs.add(fuchsia_dir / "build" / "regenerator")
         extra_ninja_build_inputs.add(fuchsia_dir / "build" / "regenerator.py")
-
-        log("Generating product_bundles.json.")
-        product_bundles_metadata = build_dir / "product_bundles_metadata.json"
-        product_bundles = build_dir / "product_bundles.json"
-        if not product_bundles.exists() or not filecmp.cmp(
-            product_bundles_metadata, product_bundles
-        ):
-            shutil.copy(product_bundles_metadata, product_bundles)
 
         log("Generating tests.json.")
         extra_ninja_build_inputs |= build_tests_json.build_tests_json(build_dir)

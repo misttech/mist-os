@@ -11,7 +11,6 @@ import("//build/drivers/create_all_drivers_doc.gni")
 import("//build/images/args.gni")
 import("//build/info/info.gni")
 import("//build/product.gni")
-import("//build/product_bundles_json.gni")
 import("//build/rust/config.gni")
 import("//build/security.gni")
 import("//build/testing/platforms.gni")
@@ -1751,15 +1750,41 @@ build_api_module("detailed_size_checker_data") {
   deps = [ "//build/images:default-images" ]
 }
 
-# Builds a list of all the product bundles in the build.
+# Contains information about the product bundles produced by the build.
 #
-# This target will NOT build the product bundles, but will pretend to
-# in order to list product_bundles.json as an output.
-product_bundles_json("product_bundles") {
-  deps = [
-           ":tests",
-           "//build/images:default-images",
-         ] + product_bundle_labels
+# Type: list(scope)
+#   name
+#     Required: The name of the product bundle. The main product bundle is
+#               expected to have the name $product.$board.
+#   path
+#     Required: Path to the product bundle directory
+#   cpu
+#     Required: The target CPU architecture of the associated images.
+#   product_version
+#     Required: A string indicating the version of the product bundle.
+#   transfer_manifest_path
+#     Required: Path to the transfer manifest listing the product bundle
+#               artifacts.
+#   transfer_manifest_url
+#     Required: 'transfer_manifest_path' with a "file://" prefix if the file is
+#               local, otherwise it's the remote location of the transfer.json.
+#   label
+#     Required: Label (with toolchain) that generated this product bundle.
+#   json
+#     Required: Path the JSON representation of the product bundle.
+#
+build_api_module("product_bundles") {
+  testonly = true
+  data_keys = [ "product_bundles" ]
+  walk_keys = [ "product_bundles_barrier" ]
+
+  # Product bundles are not built in SDK-only builds.
+  if (has_board) {
+    deps = [
+             ":tests",
+             "//build/images:default-images",
+           ] + product_bundle_labels
+  }
 }
 
 # Checks that product bundle names are unique.
