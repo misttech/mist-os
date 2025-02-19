@@ -74,6 +74,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireAllInstants> for AllInstants {
+    #[inline]
     fn take_from(from: &WireAllInstants) -> Self {
         Self {
             monotonic: ::fidl_next::TakeFrom::take_from(&from.monotonic),
@@ -247,6 +248,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireComplexInstants> for ComplexInstants {
+    #[inline]
     fn take_from(from: &WireComplexInstants) -> Self {
         Self {
             monotonic: from.monotonic().map(::fidl_next::TakeFrom::take_from),

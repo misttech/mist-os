@@ -59,6 +59,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireInt32Wrapper> for Int32Wrapper {
+    #[inline]
     fn take_from(from: &WireInt32Wrapper) -> Self {
         Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
     }
@@ -154,6 +155,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireSimpleProtocolAddRequest> for SimpleProtocolAddRequest {
+    #[inline]
     fn take_from(from: &WireSimpleProtocolAddRequest) -> Self {
         Self {
             a: ::fidl_next::TakeFrom::take_from(&from.a),
@@ -253,6 +255,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireSimpleProtocolAddResponse> for SimpleProtocolAddResponse {
+    #[inline]
     fn take_from(from: &WireSimpleProtocolAddResponse) -> Self {
         Self { sum: ::fidl_next::TakeFrom::take_from(&from.sum) }
     }
@@ -497,6 +500,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireSimpleUnion> for SimpleUnion {
+    #[inline]
     fn take_from(from: &WireSimpleUnion) -> Self {
         match from.raw.ordinal() {
             1 => Self::A(::fidl_next::TakeFrom::take_from(unsafe {
@@ -513,6 +517,7 @@ impl ::fidl_next::TakeFrom<WireSimpleUnion> for SimpleUnion {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalSimpleUnion> for Option<Box<SimpleUnion>> {
+    #[inline]
     fn take_from(from: &WireOptionalSimpleUnion) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -725,6 +730,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStructWithNullableHandle> for StructWithNullableHandle {
+    #[inline]
     fn take_from(from: &WireStructWithNullableHandle) -> Self {
         Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
     }
@@ -822,6 +828,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStructWithNullableProtocol> for StructWithNullableProtocol {
+    #[inline]
     fn take_from(from: &WireStructWithNullableProtocol) -> Self {
         Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
     }
@@ -922,6 +929,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStructWithNullableRequest> for StructWithNullableRequest {
+    #[inline]
     fn take_from(from: &WireStructWithNullableRequest) -> Self {
         Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
     }
@@ -1019,6 +1027,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStructWithNullableString> for StructWithNullableString {
+    #[inline]
     fn take_from(from: &WireStructWithNullableString) -> Self {
         Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
     }
@@ -1113,6 +1122,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStructWithNullableStruct> for StructWithNullableStruct {
+    #[inline]
     fn take_from(from: &WireStructWithNullableStruct) -> Self {
         Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
     }
@@ -1205,6 +1215,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStructWithNullableUnion> for StructWithNullableUnion {
+    #[inline]
     fn take_from(from: &WireStructWithNullableUnion) -> Self {
         Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
     }
@@ -1297,6 +1308,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStructWithNullableVector> for StructWithNullableVector {
+    #[inline]
     fn take_from(from: &WireStructWithNullableVector) -> Self {
         Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
     }

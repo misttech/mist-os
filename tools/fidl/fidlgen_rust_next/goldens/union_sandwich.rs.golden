@@ -62,6 +62,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireUnionSize12Alignment4> for UnionSize12Alignment4 {
+    #[inline]
     fn take_from(from: &WireUnionSize12Alignment4) -> Self {
         match from.raw.ordinal() {
             1 => Self::Variant(::fidl_next::TakeFrom::take_from(unsafe {
@@ -76,6 +77,7 @@ impl ::fidl_next::TakeFrom<WireUnionSize12Alignment4> for UnionSize12Alignment4 
 impl ::fidl_next::TakeFrom<WireOptionalUnionSize12Alignment4>
     for Option<Box<UnionSize12Alignment4>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalUnionSize12Alignment4) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -259,6 +261,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireSandwichUnionSize12Alignment4> for SandwichUnionSize12Alignment4 {
+    #[inline]
     fn take_from(from: &WireSandwichUnionSize12Alignment4) -> Self {
         Self {
             before: ::fidl_next::TakeFrom::take_from(&from.before),
@@ -372,6 +375,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStructSize16Alignment8> for StructSize16Alignment8 {
+    #[inline]
     fn take_from(from: &WireStructSize16Alignment8) -> Self {
         Self {
             f1: ::fidl_next::TakeFrom::take_from(&from.f1),
@@ -475,6 +479,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireUnionSize24Alignment8> for UnionSize24Alignment8 {
+    #[inline]
     fn take_from(from: &WireUnionSize24Alignment8) -> Self {
         match from.raw.ordinal() {
             1 => Self::Variant(::fidl_next::TakeFrom::take_from(unsafe {
@@ -489,6 +494,7 @@ impl ::fidl_next::TakeFrom<WireUnionSize24Alignment8> for UnionSize24Alignment8 
 impl ::fidl_next::TakeFrom<WireOptionalUnionSize24Alignment8>
     for Option<Box<UnionSize24Alignment8>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalUnionSize24Alignment8) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -678,6 +684,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireSandwichUnionSize24Alignment8> for SandwichUnionSize24Alignment8 {
+    #[inline]
     fn take_from(from: &WireSandwichUnionSize24Alignment8) -> Self {
         Self {
             before: ::fidl_next::TakeFrom::take_from(&from.before),
@@ -789,6 +796,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireUnionSize36Alignment4> for UnionSize36Alignment4 {
+    #[inline]
     fn take_from(from: &WireUnionSize36Alignment4) -> Self {
         match from.raw.ordinal() {
             1 => Self::Variant(::fidl_next::TakeFrom::take_from(unsafe {
@@ -803,6 +811,7 @@ impl ::fidl_next::TakeFrom<WireUnionSize36Alignment4> for UnionSize36Alignment4 
 impl ::fidl_next::TakeFrom<WireOptionalUnionSize36Alignment4>
     for Option<Box<UnionSize36Alignment4>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalUnionSize36Alignment4) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -986,6 +995,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireSandwichUnionSize36Alignment4> for SandwichUnionSize36Alignment4 {
+    #[inline]
     fn take_from(from: &WireSandwichUnionSize36Alignment4) -> Self {
         Self {
             before: ::fidl_next::TakeFrom::take_from(&from.before),
@@ -1095,6 +1105,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireUnionSize8Alignment4> for UnionSize8Alignment4 {
+    #[inline]
     fn take_from(from: &WireUnionSize8Alignment4) -> Self {
         match from.raw.ordinal() {
             1 => Self::Variant(::fidl_next::TakeFrom::take_from(unsafe {
@@ -1107,6 +1118,7 @@ impl ::fidl_next::TakeFrom<WireUnionSize8Alignment4> for UnionSize8Alignment4 {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalUnionSize8Alignment4> for Option<Box<UnionSize8Alignment4>> {
+    #[inline]
     fn take_from(from: &WireOptionalUnionSize8Alignment4) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -1312,6 +1324,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireSandwichUnionSize8Alignment4> for SandwichUnionSize8Alignment4 {
+    #[inline]
     fn take_from(from: &WireSandwichUnionSize8Alignment4) -> Self {
         Self {
             before: ::fidl_next::TakeFrom::take_from(&from.before),

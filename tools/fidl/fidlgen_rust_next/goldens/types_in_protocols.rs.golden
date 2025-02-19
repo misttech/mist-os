@@ -116,6 +116,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireArrayBasic> for ArrayBasic {
+    #[inline]
     fn take_from(from: &WireArrayBasic) -> Self {
         Self {
             array_uint8: ::fidl_next::TakeFrom::take_from(&from.array_uint8),
@@ -271,6 +272,7 @@ impl ::core::convert::From<WireBits> for Bits {
 }
 
 impl ::fidl_next::TakeFrom<WireBits> for Bits {
+    #[inline]
     fn take_from(from: &WireBits) -> Self {
         Self::from(*from)
     }
@@ -343,6 +345,7 @@ impl ::core::convert::From<WireEnum> for Enum {
 }
 
 impl ::fidl_next::TakeFrom<WireEnum> for Enum {
+    #[inline]
     fn take_from(from: &WireEnum) -> Self {
         Self::from(*from)
     }
@@ -433,6 +436,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStruct> for Struct {
+    #[inline]
     fn take_from(from: &WireStruct) -> Self {
         Self {}
     }
@@ -506,6 +510,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireTable> for Table {
+    #[inline]
     fn take_from(from: &WireTable) -> Self {
         Self {}
     }
@@ -609,6 +614,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireUnion> for Union {
+    #[inline]
     fn take_from(from: &WireUnion) -> Self {
         match from.raw.ordinal() {
             1 => Self::B(::fidl_next::TakeFrom::take_from(unsafe {
@@ -621,6 +627,7 @@ impl ::fidl_next::TakeFrom<WireUnion> for Union {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalUnion> for Option<Box<Union>> {
+    #[inline]
     fn take_from(from: &WireOptionalUnion) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -844,6 +851,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireArrayCompound> for ArrayCompound {
+    #[inline]
     fn take_from(from: &WireArrayCompound) -> Self {
         Self {
             array_bits: ::fidl_next::TakeFrom::take_from(&from.array_bits),
@@ -997,6 +1005,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireArrayVectorNested> for ArrayVectorNested {
+    #[inline]
     fn take_from(from: &WireArrayVectorNested) -> Self {
         Self {
             array_array_uint8: ::fidl_next::TakeFrom::take_from(&from.array_array_uint8),
@@ -1169,6 +1178,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireBasic> for Basic {
+    #[inline]
     fn take_from(from: &WireBasic) -> Self {
         Self {
             uint8: ::fidl_next::TakeFrom::take_from(&from.uint8),
@@ -1372,6 +1382,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireCompound> for Compound {
+    #[inline]
     fn take_from(from: &WireCompound) -> Self {
         Self {
             bits: ::fidl_next::TakeFrom::take_from(&from.bits),
@@ -1517,6 +1528,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireProtocolErrorBasicResult> for ProtocolErrorBasicResult {
+    #[inline]
     fn take_from(from: &WireProtocolErrorBasicResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -1535,6 +1547,7 @@ impl ::fidl_next::TakeFrom<WireProtocolErrorBasicResult> for ProtocolErrorBasicR
 impl ::fidl_next::TakeFrom<WireOptionalProtocolErrorBasicResult>
     for Option<Box<ProtocolErrorBasicResult>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalProtocolErrorBasicResult) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -1726,6 +1739,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireProtocolErrorCompoundResult> for ProtocolErrorCompoundResult {
+    #[inline]
     fn take_from(from: &WireProtocolErrorCompoundResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -1744,6 +1758,7 @@ impl ::fidl_next::TakeFrom<WireProtocolErrorCompoundResult> for ProtocolErrorCom
 impl ::fidl_next::TakeFrom<WireOptionalProtocolErrorCompoundResult>
     for Option<Box<ProtocolErrorCompoundResult>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalProtocolErrorCompoundResult) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -1937,6 +1952,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireProtocolErrorArrayBasicResult> for ProtocolErrorArrayBasicResult {
+    #[inline]
     fn take_from(from: &WireProtocolErrorArrayBasicResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -1955,6 +1971,7 @@ impl ::fidl_next::TakeFrom<WireProtocolErrorArrayBasicResult> for ProtocolErrorA
 impl ::fidl_next::TakeFrom<WireOptionalProtocolErrorArrayBasicResult>
     for Option<Box<ProtocolErrorArrayBasicResult>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalProtocolErrorArrayBasicResult) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -2149,6 +2166,7 @@ where
 impl ::fidl_next::TakeFrom<WireProtocolErrorArrayCompoundResult>
     for ProtocolErrorArrayCompoundResult
 {
+    #[inline]
     fn take_from(from: &WireProtocolErrorArrayCompoundResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -2167,6 +2185,7 @@ impl ::fidl_next::TakeFrom<WireProtocolErrorArrayCompoundResult>
 impl ::fidl_next::TakeFrom<WireOptionalProtocolErrorArrayCompoundResult>
     for Option<Box<ProtocolErrorArrayCompoundResult>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalProtocolErrorArrayCompoundResult) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -2410,6 +2429,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireVectorBasic> for VectorBasic {
+    #[inline]
     fn take_from(from: &WireVectorBasic) -> Self {
         Self {
             vector_uint8: ::fidl_next::TakeFrom::take_from(&from.vector_uint8),
@@ -2591,6 +2611,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireProtocolErrorVectorBasicResult> for ProtocolErrorVectorBasicResult {
+    #[inline]
     fn take_from(from: &WireProtocolErrorVectorBasicResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -2609,6 +2630,7 @@ impl ::fidl_next::TakeFrom<WireProtocolErrorVectorBasicResult> for ProtocolError
 impl ::fidl_next::TakeFrom<WireOptionalProtocolErrorVectorBasicResult>
     for Option<Box<ProtocolErrorVectorBasicResult>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalProtocolErrorVectorBasicResult) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -2827,6 +2849,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireVectorCompound> for VectorCompound {
+    #[inline]
     fn take_from(from: &WireVectorCompound) -> Self {
         Self {
             vector_bits: ::fidl_next::TakeFrom::take_from(&from.vector_bits),
@@ -2975,6 +2998,7 @@ where
 impl ::fidl_next::TakeFrom<WireProtocolErrorVectorCompoundResult>
     for ProtocolErrorVectorCompoundResult
 {
+    #[inline]
     fn take_from(from: &WireProtocolErrorVectorCompoundResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -2993,6 +3017,7 @@ impl ::fidl_next::TakeFrom<WireProtocolErrorVectorCompoundResult>
 impl ::fidl_next::TakeFrom<WireOptionalProtocolErrorVectorCompoundResult>
     for Option<Box<ProtocolErrorVectorCompoundResult>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalProtocolErrorVectorCompoundResult) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -3200,6 +3225,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireVectorOptional> for VectorOptional {
+    #[inline]
     fn take_from(from: &WireVectorOptional) -> Self {
         Self {
             opt_vector_uint8: ::fidl_next::TakeFrom::take_from(&from.opt_vector_uint8),
@@ -3328,6 +3354,7 @@ where
 impl ::fidl_next::TakeFrom<WireProtocolErrorVectorOptionalResult>
     for ProtocolErrorVectorOptionalResult
 {
+    #[inline]
     fn take_from(from: &WireProtocolErrorVectorOptionalResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -3346,6 +3373,7 @@ impl ::fidl_next::TakeFrom<WireProtocolErrorVectorOptionalResult>
 impl ::fidl_next::TakeFrom<WireOptionalProtocolErrorVectorOptionalResult>
     for Option<Box<ProtocolErrorVectorOptionalResult>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalProtocolErrorVectorOptionalResult) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -3544,6 +3572,7 @@ where
 impl ::fidl_next::TakeFrom<WireProtocolErrorArrayVectorNestedResult>
     for ProtocolErrorArrayVectorNestedResult
 {
+    #[inline]
     fn take_from(from: &WireProtocolErrorArrayVectorNestedResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -3562,6 +3591,7 @@ impl ::fidl_next::TakeFrom<WireProtocolErrorArrayVectorNestedResult>
 impl ::fidl_next::TakeFrom<WireOptionalProtocolErrorArrayVectorNestedResult>
     for Option<Box<ProtocolErrorArrayVectorNestedResult>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalProtocolErrorArrayVectorNestedResult) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -3745,6 +3775,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireResourceStruct> for ResourceStruct {
+    #[inline]
     fn take_from(from: &WireResourceStruct) -> Self {
         Self {}
     }
@@ -3822,6 +3853,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireResourceTable> for ResourceTable {
+    #[inline]
     fn take_from(from: &WireResourceTable) -> Self {
         Self {}
     }
@@ -3929,6 +3961,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireResourceUnion> for ResourceUnion {
+    #[inline]
     fn take_from(from: &WireResourceUnion) -> Self {
         match from.raw.ordinal() {
             1 => Self::B(::fidl_next::TakeFrom::take_from(unsafe {
@@ -3941,6 +3974,7 @@ impl ::fidl_next::TakeFrom<WireResourceUnion> for ResourceUnion {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalResourceUnion> for Option<Box<ResourceUnion>> {
+    #[inline]
     fn take_from(from: &WireOptionalResourceUnion) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -4252,6 +4286,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireResource> for Resource {
+    #[inline]
     fn take_from(from: &WireResource) -> Self {
         Self {
             handle: ::fidl_next::TakeFrom::take_from(&from.handle),
@@ -4549,6 +4584,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireProtocolErrorResourceResult> for ProtocolErrorResourceResult {
+    #[inline]
     fn take_from(from: &WireProtocolErrorResourceResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -4567,6 +4603,7 @@ impl ::fidl_next::TakeFrom<WireProtocolErrorResourceResult> for ProtocolErrorRes
 impl ::fidl_next::TakeFrom<WireOptionalProtocolErrorResourceResult>
     for Option<Box<ProtocolErrorResourceResult>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalProtocolErrorResourceResult) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))

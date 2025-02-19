@@ -61,6 +61,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireSuperFooRequest> for SuperFooRequest {
+    #[inline]
     fn take_from(from: &WireSuperFooRequest) -> Self {
         Self { s: ::fidl_next::TakeFrom::take_from(&from.s) }
     }
@@ -153,6 +154,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireSuperFooResponse> for SuperFooResponse {
+    #[inline]
     fn take_from(from: &WireSuperFooResponse) -> Self {
         Self { y: ::fidl_next::TakeFrom::take_from(&from.y) }
     }

@@ -76,6 +76,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<{{ wire_name }}> for {{ name }} {
+    #[inline]
     fn take_from(from: &{{ wire_name }}) -> Self {
         Self {
             {% for member in table.members %}

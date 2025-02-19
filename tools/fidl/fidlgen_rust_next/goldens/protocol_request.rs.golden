@@ -145,6 +145,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireParentGetChildResponse> for ParentGetChildResponse {
+    #[inline]
     fn take_from(from: &WireParentGetChildResponse) -> Self {
         Self { c: ::fidl_next::TakeFrom::take_from(&from.c) }
     }
@@ -239,6 +240,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireParentGetChildRequestResponse> for ParentGetChildRequestResponse {
+    #[inline]
     fn take_from(from: &WireParentGetChildRequestResponse) -> Self {
         Self { r: ::fidl_next::TakeFrom::take_from(&from.r) }
     }
@@ -333,6 +335,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireParentTakeChildRequest> for ParentTakeChildRequest {
+    #[inline]
     fn take_from(from: &WireParentTakeChildRequest) -> Self {
         Self { c: ::fidl_next::TakeFrom::take_from(&from.c) }
     }
@@ -427,6 +430,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireParentTakeChildRequestRequest> for ParentTakeChildRequestRequest {
+    #[inline]
     fn take_from(from: &WireParentTakeChildRequestRequest) -> Self {
         Self { r: ::fidl_next::TakeFrom::take_from(&from.r) }
     }

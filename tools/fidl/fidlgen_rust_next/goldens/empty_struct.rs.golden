@@ -54,6 +54,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireEmpty> for Empty {
+    #[inline]
     fn take_from(from: &WireEmpty) -> Self {
         Self {}
     }
@@ -139,6 +140,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireEmptyProtocolSendRequest> for EmptyProtocolSendRequest {
+    #[inline]
     fn take_from(from: &WireEmptyProtocolSendRequest) -> Self {
         Self { e: ::fidl_next::TakeFrom::take_from(&from.e) }
     }
@@ -229,6 +231,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireEmptyProtocolReceiveRequest> for EmptyProtocolReceiveRequest {
+    #[inline]
     fn take_from(from: &WireEmptyProtocolReceiveRequest) -> Self {
         Self { e: ::fidl_next::TakeFrom::take_from(&from.e) }
     }
@@ -321,6 +324,7 @@ where
 impl ::fidl_next::TakeFrom<WireEmptyProtocolSendAndReceiveRequest>
     for EmptyProtocolSendAndReceiveRequest
 {
+    #[inline]
     fn take_from(from: &WireEmptyProtocolSendAndReceiveRequest) -> Self {
         Self { e: ::fidl_next::TakeFrom::take_from(&from.e) }
     }
@@ -413,6 +417,7 @@ where
 impl ::fidl_next::TakeFrom<WireEmptyProtocolSendAndReceiveResponse>
     for EmptyProtocolSendAndReceiveResponse
 {
+    #[inline]
     fn take_from(from: &WireEmptyProtocolSendAndReceiveResponse) -> Self {
         Self { e: ::fidl_next::TakeFrom::take_from(&from.e) }
     }

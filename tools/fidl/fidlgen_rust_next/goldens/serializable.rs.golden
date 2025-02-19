@@ -54,6 +54,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireSerializableStruct> for SerializableStruct {
+    #[inline]
     fn take_from(from: &WireSerializableStruct) -> Self {
         Self {}
     }
@@ -127,6 +128,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireSerializableTable> for SerializableTable {
+    #[inline]
     fn take_from(from: &WireSerializableTable) -> Self {
         Self {}
     }
@@ -224,6 +226,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireSerializableUnion> for SerializableUnion {
+    #[inline]
     fn take_from(from: &WireSerializableUnion) -> Self {
         match from.raw.ordinal() {
             1 => Self::Unused(::fidl_next::TakeFrom::take_from(unsafe {
@@ -236,6 +239,7 @@ impl ::fidl_next::TakeFrom<WireSerializableUnion> for SerializableUnion {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalSerializableUnion> for Option<Box<SerializableUnion>> {
+    #[inline]
     fn take_from(from: &WireOptionalSerializableUnion) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))

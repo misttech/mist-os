@@ -74,6 +74,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireFlexibleFoo> for FlexibleFoo {
+    #[inline]
     fn take_from(from: &WireFlexibleFoo) -> Self {
         match from.raw.ordinal() {
             1 => Self::S(::fidl_next::TakeFrom::take_from(unsafe {
@@ -90,6 +91,7 @@ impl ::fidl_next::TakeFrom<WireFlexibleFoo> for FlexibleFoo {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalFlexibleFoo> for Option<Box<FlexibleFoo>> {
+    #[inline]
     fn take_from(from: &WireOptionalFlexibleFoo) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -283,6 +285,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStrictFoo> for StrictFoo {
+    #[inline]
     fn take_from(from: &WireStrictFoo) -> Self {
         match from.raw.ordinal() {
             1 => Self::S(::fidl_next::TakeFrom::take_from(unsafe {
@@ -299,6 +302,7 @@ impl ::fidl_next::TakeFrom<WireStrictFoo> for StrictFoo {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalStrictFoo> for Option<Box<StrictFoo>> {
+    #[inline]
     fn take_from(from: &WireOptionalStrictFoo) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -485,6 +489,7 @@ where
 impl ::fidl_next::TakeFrom<WireProtocolRequestStrictResponseFlexibleRequest>
     for ProtocolRequestStrictResponseFlexibleRequest
 {
+    #[inline]
     fn take_from(from: &WireProtocolRequestStrictResponseFlexibleRequest) -> Self {
         Self { s: ::fidl_next::TakeFrom::take_from(&from.s) }
     }
@@ -581,6 +586,7 @@ where
 impl ::fidl_next::TakeFrom<WireProtocolRequestStrictResponseFlexibleResponse>
     for ProtocolRequestStrictResponseFlexibleResponse
 {
+    #[inline]
     fn take_from(from: &WireProtocolRequestStrictResponseFlexibleResponse) -> Self {
         Self { f: ::fidl_next::TakeFrom::take_from(&from.f) }
     }
@@ -677,6 +683,7 @@ where
 impl ::fidl_next::TakeFrom<WireProtocolRequestFlexibleResponseStrictRequest>
     for ProtocolRequestFlexibleResponseStrictRequest
 {
+    #[inline]
     fn take_from(from: &WireProtocolRequestFlexibleResponseStrictRequest) -> Self {
         Self { s: ::fidl_next::TakeFrom::take_from(&from.s) }
     }
@@ -773,6 +780,7 @@ where
 impl ::fidl_next::TakeFrom<WireProtocolRequestFlexibleResponseStrictResponse>
     for ProtocolRequestFlexibleResponseStrictResponse
 {
+    #[inline]
     fn take_from(from: &WireProtocolRequestFlexibleResponseStrictResponse) -> Self {
         Self { f: ::fidl_next::TakeFrom::take_from(&from.f) }
     }

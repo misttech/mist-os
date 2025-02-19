@@ -54,6 +54,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireEmpty> for Empty {
+    #[inline]
     fn take_from(from: &WireEmpty) -> Self {
         Self {}
     }
@@ -140,6 +141,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireEmptyFlexibleUnion> for EmptyFlexibleUnion {
+    #[inline]
     fn take_from(from: &WireEmptyFlexibleUnion) -> Self {
         match from.raw.ordinal() {
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -148,6 +150,7 @@ impl ::fidl_next::TakeFrom<WireEmptyFlexibleUnion> for EmptyFlexibleUnion {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalEmptyFlexibleUnion> for Option<Box<EmptyFlexibleUnion>> {
+    #[inline]
     fn take_from(from: &WireOptionalEmptyFlexibleUnion) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -341,6 +344,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireExplicitFlexibleUnion> for ExplicitFlexibleUnion {
+    #[inline]
     fn take_from(from: &WireExplicitFlexibleUnion) -> Self {
         match from.raw.ordinal() {
             1 => Self::I(::fidl_next::TakeFrom::take_from(unsafe {
@@ -359,6 +363,7 @@ impl ::fidl_next::TakeFrom<WireExplicitFlexibleUnion> for ExplicitFlexibleUnion 
 impl ::fidl_next::TakeFrom<WireOptionalExplicitFlexibleUnion>
     for Option<Box<ExplicitFlexibleUnion>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalExplicitFlexibleUnion) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -558,6 +563,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireExplicitFoo> for ExplicitFoo {
+    #[inline]
     fn take_from(from: &WireExplicitFoo) -> Self {
         match from.raw.ordinal() {
             1 => Self::I(::fidl_next::TakeFrom::take_from(unsafe {
@@ -574,6 +580,7 @@ impl ::fidl_next::TakeFrom<WireExplicitFoo> for ExplicitFoo {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalExplicitFoo> for Option<Box<ExplicitFoo>> {
+    #[inline]
     fn take_from(from: &WireOptionalExplicitFoo) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -760,6 +767,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WirePizza> for Pizza {
+    #[inline]
     fn take_from(from: &WirePizza) -> Self {
         Self { toppings: ::fidl_next::TakeFrom::take_from(&from.toppings) }
     }
@@ -854,6 +862,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WirePasta> for Pasta {
+    #[inline]
     fn take_from(from: &WirePasta) -> Self {
         Self { sauce: ::fidl_next::TakeFrom::take_from(&from.sauce) }
     }
@@ -964,6 +973,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireExplicitPizzaOrPasta> for ExplicitPizzaOrPasta {
+    #[inline]
     fn take_from(from: &WireExplicitPizzaOrPasta) -> Self {
         match from.raw.ordinal() {
             1 => Self::Pizza(::fidl_next::TakeFrom::take_from(unsafe {
@@ -980,6 +990,7 @@ impl ::fidl_next::TakeFrom<WireExplicitPizzaOrPasta> for ExplicitPizzaOrPasta {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalExplicitPizzaOrPasta> for Option<Box<ExplicitPizzaOrPasta>> {
+    #[inline]
     fn take_from(from: &WireOptionalExplicitPizzaOrPasta) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -1171,6 +1182,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireExplicitStrictFoo> for ExplicitStrictFoo {
+    #[inline]
     fn take_from(from: &WireExplicitStrictFoo) -> Self {
         match from.raw.ordinal() {
             2 => Self::I(::fidl_next::TakeFrom::take_from(unsafe {
@@ -1187,6 +1199,7 @@ impl ::fidl_next::TakeFrom<WireExplicitStrictFoo> for ExplicitStrictFoo {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalExplicitStrictFoo> for Option<Box<ExplicitStrictFoo>> {
+    #[inline]
     fn take_from(from: &WireOptionalExplicitStrictFoo) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -1378,6 +1391,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireExplicitUnion> for ExplicitUnion {
+    #[inline]
     fn take_from(from: &WireExplicitUnion) -> Self {
         match from.raw.ordinal() {
             1 => Self::Primitive(::fidl_next::TakeFrom::take_from(unsafe {
@@ -1394,6 +1408,7 @@ impl ::fidl_next::TakeFrom<WireExplicitUnion> for ExplicitUnion {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalExplicitUnion> for Option<Box<ExplicitUnion>> {
+    #[inline]
     fn take_from(from: &WireOptionalExplicitUnion) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -1579,6 +1594,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireFieldCollision> for FieldCollision {
+    #[inline]
     fn take_from(from: &WireFieldCollision) -> Self {
         match from.raw.ordinal() {
             1 => Self::FieldCollisionTag(::fidl_next::TakeFrom::take_from(unsafe {
@@ -1591,6 +1607,7 @@ impl ::fidl_next::TakeFrom<WireFieldCollision> for FieldCollision {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalFieldCollision> for Option<Box<FieldCollision>> {
+    #[inline]
     fn take_from(from: &WireOptionalFieldCollision) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -1801,6 +1818,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireFlexibleFoo> for FlexibleFoo {
+    #[inline]
     fn take_from(from: &WireFlexibleFoo) -> Self {
         match from.raw.ordinal() {
             1 => Self::S(::fidl_next::TakeFrom::take_from(unsafe {
@@ -1817,6 +1835,7 @@ impl ::fidl_next::TakeFrom<WireFlexibleFoo> for FlexibleFoo {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalFlexibleFoo> for Option<Box<FlexibleFoo>> {
+    #[inline]
     fn take_from(from: &WireOptionalFlexibleFoo) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -2016,6 +2035,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireFlexiblePizzaOrPasta> for FlexiblePizzaOrPasta {
+    #[inline]
     fn take_from(from: &WireFlexiblePizzaOrPasta) -> Self {
         match from.raw.ordinal() {
             1 => Self::Pizza(::fidl_next::TakeFrom::take_from(unsafe {
@@ -2032,6 +2052,7 @@ impl ::fidl_next::TakeFrom<WireFlexiblePizzaOrPasta> for FlexiblePizzaOrPasta {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalFlexiblePizzaOrPasta> for Option<Box<FlexiblePizzaOrPasta>> {
+    #[inline]
     fn take_from(from: &WireOptionalFlexiblePizzaOrPasta) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -2237,6 +2258,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireFlexibleUnion> for FlexibleUnion {
+    #[inline]
     fn take_from(from: &WireFlexibleUnion) -> Self {
         match from.raw.ordinal() {
             1 => Self::Primitive(::fidl_next::TakeFrom::take_from(unsafe {
@@ -2257,6 +2279,7 @@ impl ::fidl_next::TakeFrom<WireFlexibleUnion> for FlexibleUnion {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalFlexibleUnion> for Option<Box<FlexibleUnion>> {
+    #[inline]
     fn take_from(from: &WireOptionalFlexibleUnion) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -2486,6 +2509,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireNewerSimpleUnion> for NewerSimpleUnion {
+    #[inline]
     fn take_from(from: &WireNewerSimpleUnion) -> Self {
         match from.raw.ordinal() {
             1 => Self::I(::fidl_next::TakeFrom::take_from(unsafe {
@@ -2506,6 +2530,7 @@ impl ::fidl_next::TakeFrom<WireNewerSimpleUnion> for NewerSimpleUnion {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalNewerSimpleUnion> for Option<Box<NewerSimpleUnion>> {
+    #[inline]
     fn take_from(from: &WireOptionalNewerSimpleUnion) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -2712,6 +2737,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireNullableUnionStruct> for NullableUnionStruct {
+    #[inline]
     fn take_from(from: &WireNullableUnionStruct) -> Self {
         Self { the_union: ::fidl_next::TakeFrom::take_from(&from.the_union) }
     }
@@ -2819,6 +2845,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireOlderSimpleUnion> for OlderSimpleUnion {
+    #[inline]
     fn take_from(from: &WireOlderSimpleUnion) -> Self {
         match from.raw.ordinal() {
             1 => Self::I(::fidl_next::TakeFrom::take_from(unsafe {
@@ -2835,6 +2862,7 @@ impl ::fidl_next::TakeFrom<WireOlderSimpleUnion> for OlderSimpleUnion {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalOlderSimpleUnion> for Option<Box<OlderSimpleUnion>> {
+    #[inline]
     fn take_from(from: &WireOptionalOlderSimpleUnion) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -3024,6 +3052,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WirePizzaOrPasta> for PizzaOrPasta {
+    #[inline]
     fn take_from(from: &WirePizzaOrPasta) -> Self {
         match from.raw.ordinal() {
             1 => Self::Pizza(::fidl_next::TakeFrom::take_from(unsafe {
@@ -3040,6 +3069,7 @@ impl ::fidl_next::TakeFrom<WirePizzaOrPasta> for PizzaOrPasta {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalPizzaOrPasta> for Option<Box<PizzaOrPasta>> {
+    #[inline]
     fn take_from(from: &WireOptionalPizzaOrPasta) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -3225,6 +3255,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireReverseOrdinalUnion> for ReverseOrdinalUnion {
+    #[inline]
     fn take_from(from: &WireReverseOrdinalUnion) -> Self {
         match from.raw.ordinal() {
             1 => Self::First(::fidl_next::TakeFrom::take_from(unsafe {
@@ -3241,6 +3272,7 @@ impl ::fidl_next::TakeFrom<WireReverseOrdinalUnion> for ReverseOrdinalUnion {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalReverseOrdinalUnion> for Option<Box<ReverseOrdinalUnion>> {
+    #[inline]
     fn take_from(from: &WireOptionalReverseOrdinalUnion) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -3458,6 +3490,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStrictBoundedUnion> for StrictBoundedUnion {
+    #[inline]
     fn take_from(from: &WireStrictBoundedUnion) -> Self {
         match from.raw.ordinal() {
             1 => Self::V(::fidl_next::TakeFrom::take_from(unsafe {
@@ -3470,6 +3503,7 @@ impl ::fidl_next::TakeFrom<WireStrictBoundedUnion> for StrictBoundedUnion {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalStrictBoundedUnion> for Option<Box<StrictBoundedUnion>> {
+    #[inline]
     fn take_from(from: &WireOptionalStrictBoundedUnion) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -3652,6 +3686,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStrictFoo> for StrictFoo {
+    #[inline]
     fn take_from(from: &WireStrictFoo) -> Self {
         match from.raw.ordinal() {
             1 => Self::S(::fidl_next::TakeFrom::take_from(unsafe {
@@ -3668,6 +3703,7 @@ impl ::fidl_next::TakeFrom<WireStrictFoo> for StrictFoo {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalStrictFoo> for Option<Box<StrictFoo>> {
+    #[inline]
     fn take_from(from: &WireOptionalStrictFoo) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -3859,6 +3895,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStrictPizzaOrPasta> for StrictPizzaOrPasta {
+    #[inline]
     fn take_from(from: &WireStrictPizzaOrPasta) -> Self {
         match from.raw.ordinal() {
             1 => Self::Pizza(::fidl_next::TakeFrom::take_from(unsafe {
@@ -3875,6 +3912,7 @@ impl ::fidl_next::TakeFrom<WireStrictPizzaOrPasta> for StrictPizzaOrPasta {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalStrictPizzaOrPasta> for Option<Box<StrictPizzaOrPasta>> {
+    #[inline]
     fn take_from(from: &WireOptionalStrictPizzaOrPasta) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -4072,6 +4110,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStrictSimpleUnion> for StrictSimpleUnion {
+    #[inline]
     fn take_from(from: &WireStrictSimpleUnion) -> Self {
         match from.raw.ordinal() {
             1 => Self::I(::fidl_next::TakeFrom::take_from(unsafe {
@@ -4092,6 +4131,7 @@ impl ::fidl_next::TakeFrom<WireStrictSimpleUnion> for StrictSimpleUnion {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalStrictSimpleUnion> for Option<Box<StrictSimpleUnion>> {
+    #[inline]
     fn take_from(from: &WireOptionalStrictSimpleUnion) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -4298,6 +4338,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStrictUnion> for StrictUnion {
+    #[inline]
     fn take_from(from: &WireStrictUnion) -> Self {
         match from.raw.ordinal() {
             1 => Self::Primitive(::fidl_next::TakeFrom::take_from(unsafe {
@@ -4318,6 +4359,7 @@ impl ::fidl_next::TakeFrom<WireStrictUnion> for StrictUnion {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalStrictUnion> for Option<Box<StrictUnion>> {
+    #[inline]
     fn take_from(from: &WireOptionalStrictUnion) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -4526,6 +4568,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStructWithNullableUnion> for StructWithNullableUnion {
+    #[inline]
     fn take_from(from: &WireStructWithNullableUnion) -> Self {
         Self { x1: ::fidl_next::TakeFrom::take_from(&from.x1) }
     }
@@ -4627,6 +4670,7 @@ where
 impl ::fidl_next::TakeFrom<WireTestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>
     for TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse
 {
+    #[inline]
     fn take_from(
         from: &WireTestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse,
     ) -> Self {
@@ -4731,6 +4775,7 @@ where
 impl ::fidl_next::TakeFrom<WireTestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse>
     for TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse
 {
+    #[inline]
     fn take_from(
         from: &WireTestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse,
     ) -> Self {
@@ -5039,6 +5084,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireUnion> for Union {
+    #[inline]
     fn take_from(from: &WireUnion) -> Self {
         match from.raw.ordinal() {
             1 => Self::Primitive(::fidl_next::TakeFrom::take_from(unsafe {
@@ -5059,6 +5105,7 @@ impl ::fidl_next::TakeFrom<WireUnion> for Union {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalUnion> for Option<Box<Union>> {
+    #[inline]
     fn take_from(from: &WireOptionalUnion) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -5274,6 +5321,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireUnionContainingEmptyStruct> for UnionContainingEmptyStruct {
+    #[inline]
     fn take_from(from: &WireUnionContainingEmptyStruct) -> Self {
         match from.raw.ordinal() {
             1 => Self::Empty(::fidl_next::TakeFrom::take_from(unsafe {
@@ -5288,6 +5336,7 @@ impl ::fidl_next::TakeFrom<WireUnionContainingEmptyStruct> for UnionContainingEm
 impl ::fidl_next::TakeFrom<WireOptionalUnionContainingEmptyStruct>
     for Option<Box<UnionContainingEmptyStruct>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalUnionContainingEmptyStruct) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -5499,6 +5548,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireUnionSandwich> for UnionSandwich {
+    #[inline]
     fn take_from(from: &WireUnionSandwich) -> Self {
         Self {
             a: ::fidl_next::TakeFrom::take_from(&from.a),
@@ -5616,6 +5666,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireUnionWithAttributes> for UnionWithAttributes {
+    #[inline]
     fn take_from(from: &WireUnionWithAttributes) -> Self {
         match from.raw.ordinal() {
             1 => Self::X(::fidl_next::TakeFrom::take_from(unsafe {
@@ -5628,6 +5679,7 @@ impl ::fidl_next::TakeFrom<WireUnionWithAttributes> for UnionWithAttributes {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalUnionWithAttributes> for Option<Box<UnionWithAttributes>> {
+    #[inline]
     fn take_from(from: &WireOptionalUnionWithAttributes) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))

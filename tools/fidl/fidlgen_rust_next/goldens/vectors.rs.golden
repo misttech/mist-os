@@ -70,6 +70,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireExampleUseOfVectors> for ExampleUseOfVectors {
+    #[inline]
     fn take_from(from: &WireExampleUseOfVectors) -> Self {
         Self {
             vector_of_uint8: ::fidl_next::TakeFrom::take_from(&from.vector_of_uint8),

@@ -67,6 +67,7 @@ where
 impl ::fidl_next::TakeFrom<WireComposedProtocolOneWayAnonComposedRequest>
     for ComposedProtocolOneWayAnonComposedRequest
 {
+    #[inline]
     fn take_from(from: &WireComposedProtocolOneWayAnonComposedRequest) -> Self {
         Self { a: from.a().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -179,6 +180,7 @@ where
 impl ::fidl_next::TakeFrom<WireComposedProtocolTwoWayAnonComposedRequest>
     for ComposedProtocolTwoWayAnonComposedRequest
 {
+    #[inline]
     fn take_from(from: &WireComposedProtocolTwoWayAnonComposedRequest) -> Self {
         match from.raw.ordinal() {
             1 => Self::B(::fidl_next::TakeFrom::take_from(unsafe {
@@ -193,6 +195,7 @@ impl ::fidl_next::TakeFrom<WireComposedProtocolTwoWayAnonComposedRequest>
 impl ::fidl_next::TakeFrom<WireOptionalComposedProtocolTwoWayAnonComposedRequest>
     for Option<Box<ComposedProtocolTwoWayAnonComposedRequest>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalComposedProtocolTwoWayAnonComposedRequest) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -395,6 +398,7 @@ where
 impl ::fidl_next::TakeFrom<WireComposedProtocolTwoWayAnonComposedResponse>
     for ComposedProtocolTwoWayAnonComposedResponse
 {
+    #[inline]
     fn take_from(from: &WireComposedProtocolTwoWayAnonComposedResponse) -> Self {
         Self { a: from.a().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -512,6 +516,7 @@ where
 impl ::fidl_next::TakeFrom<WireComposedProtocolTwoWayAnonComposedWithErrorRequest>
     for ComposedProtocolTwoWayAnonComposedWithErrorRequest
 {
+    #[inline]
     fn take_from(from: &WireComposedProtocolTwoWayAnonComposedWithErrorRequest) -> Self {
         Self { a: from.a().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -628,6 +633,7 @@ where
 impl ::fidl_next::TakeFrom<WireComposedProtocolTwoWayAnonComposedWithErrorResponse>
     for ComposedProtocolTwoWayAnonComposedWithErrorResponse
 {
+    #[inline]
     fn take_from(from: &WireComposedProtocolTwoWayAnonComposedWithErrorResponse) -> Self {
         match from.raw.ordinal() {
             1 => Self::B(::fidl_next::TakeFrom::take_from(unsafe {
@@ -642,6 +648,7 @@ impl ::fidl_next::TakeFrom<WireComposedProtocolTwoWayAnonComposedWithErrorRespon
 impl ::fidl_next::TakeFrom<WireOptionalComposedProtocolTwoWayAnonComposedWithErrorResponse>
     for Option<Box<ComposedProtocolTwoWayAnonComposedWithErrorResponse>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalComposedProtocolTwoWayAnonComposedWithErrorResponse) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -854,6 +861,7 @@ where
 impl ::fidl_next::TakeFrom<WireComposedProtocolTwoWayAnonComposedWithErrorResult>
     for ComposedProtocolTwoWayAnonComposedWithErrorResult
 {
+    #[inline]
     fn take_from(from: &WireComposedProtocolTwoWayAnonComposedWithErrorResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -872,6 +880,7 @@ impl ::fidl_next::TakeFrom<WireComposedProtocolTwoWayAnonComposedWithErrorResult
 impl ::fidl_next::TakeFrom<WireOptionalComposedProtocolTwoWayAnonComposedWithErrorResult>
     for Option<Box<ComposedProtocolTwoWayAnonComposedWithErrorResult>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalComposedProtocolTwoWayAnonComposedWithErrorResult) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -1073,6 +1082,7 @@ where
 impl ::fidl_next::TakeFrom<WireComposedProtocolOnAnonComposedRequest>
     for ComposedProtocolOnAnonComposedRequest
 {
+    #[inline]
     fn take_from(from: &WireComposedProtocolOnAnonComposedRequest) -> Self {
         match from.raw.ordinal() {
             1 => Self::B(::fidl_next::TakeFrom::take_from(unsafe {
@@ -1087,6 +1097,7 @@ impl ::fidl_next::TakeFrom<WireComposedProtocolOnAnonComposedRequest>
 impl ::fidl_next::TakeFrom<WireOptionalComposedProtocolOnAnonComposedRequest>
     for Option<Box<ComposedProtocolOnAnonComposedRequest>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalComposedProtocolOnAnonComposedRequest) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -1286,6 +1297,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireTablePayload> for TablePayload {
+    #[inline]
     fn take_from(from: &WireTablePayload) -> Self {
         Self { a: from.a().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -1396,6 +1408,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireUnionPayload> for UnionPayload {
+    #[inline]
     fn take_from(from: &WireUnionPayload) -> Self {
         match from.raw.ordinal() {
             1 => Self::B(::fidl_next::TakeFrom::take_from(unsafe {
@@ -1408,6 +1421,7 @@ impl ::fidl_next::TakeFrom<WireUnionPayload> for UnionPayload {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalUnionPayload> for Option<Box<UnionPayload>> {
+    #[inline]
     fn take_from(from: &WireOptionalUnionPayload) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -1610,6 +1624,7 @@ where
 impl ::fidl_next::TakeFrom<WireComposedProtocolTwoWayNamedComposedWithErrorResult>
     for ComposedProtocolTwoWayNamedComposedWithErrorResult
 {
+    #[inline]
     fn take_from(from: &WireComposedProtocolTwoWayNamedComposedWithErrorResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -1628,6 +1643,7 @@ impl ::fidl_next::TakeFrom<WireComposedProtocolTwoWayNamedComposedWithErrorResul
 impl ::fidl_next::TakeFrom<WireOptionalComposedProtocolTwoWayNamedComposedWithErrorResult>
     for Option<Box<ComposedProtocolTwoWayNamedComposedWithErrorResult>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalComposedProtocolTwoWayNamedComposedWithErrorResult) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -2367,6 +2383,7 @@ where
 impl ::fidl_next::TakeFrom<WireMainProtocolTwoWayLocalWithErrorResult>
     for MainProtocolTwoWayLocalWithErrorResult
 {
+    #[inline]
     fn take_from(from: &WireMainProtocolTwoWayLocalWithErrorResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -2385,6 +2402,7 @@ impl ::fidl_next::TakeFrom<WireMainProtocolTwoWayLocalWithErrorResult>
 impl ::fidl_next::TakeFrom<WireOptionalMainProtocolTwoWayLocalWithErrorResult>
     for Option<Box<MainProtocolTwoWayLocalWithErrorResult>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalMainProtocolTwoWayLocalWithErrorResult) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -2577,6 +2595,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireMainProtocolOneWayAnonRequest> for MainProtocolOneWayAnonRequest {
+    #[inline]
     fn take_from(from: &WireMainProtocolOneWayAnonRequest) -> Self {
         Self { a: from.a().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -2693,6 +2712,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireMainProtocolTwoWayAnonRequest> for MainProtocolTwoWayAnonRequest {
+    #[inline]
     fn take_from(from: &WireMainProtocolTwoWayAnonRequest) -> Self {
         match from.raw.ordinal() {
             1 => Self::B(::fidl_next::TakeFrom::take_from(unsafe {
@@ -2707,6 +2727,7 @@ impl ::fidl_next::TakeFrom<WireMainProtocolTwoWayAnonRequest> for MainProtocolTw
 impl ::fidl_next::TakeFrom<WireOptionalMainProtocolTwoWayAnonRequest>
     for Option<Box<MainProtocolTwoWayAnonRequest>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalMainProtocolTwoWayAnonRequest) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -2908,6 +2929,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireMainProtocolTwoWayAnonResponse> for MainProtocolTwoWayAnonResponse {
+    #[inline]
     fn take_from(from: &WireMainProtocolTwoWayAnonResponse) -> Self {
         Self { a: from.a().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -3025,6 +3047,7 @@ where
 impl ::fidl_next::TakeFrom<WireMainProtocolTwoWayAnonWithErrorRequest>
     for MainProtocolTwoWayAnonWithErrorRequest
 {
+    #[inline]
     fn take_from(from: &WireMainProtocolTwoWayAnonWithErrorRequest) -> Self {
         Self { a: from.a().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -3143,6 +3166,7 @@ where
 impl ::fidl_next::TakeFrom<WireMainProtocolTwoWayAnonWithErrorResponse>
     for MainProtocolTwoWayAnonWithErrorResponse
 {
+    #[inline]
     fn take_from(from: &WireMainProtocolTwoWayAnonWithErrorResponse) -> Self {
         match from.raw.ordinal() {
             1 => Self::B(::fidl_next::TakeFrom::take_from(unsafe {
@@ -3157,6 +3181,7 @@ impl ::fidl_next::TakeFrom<WireMainProtocolTwoWayAnonWithErrorResponse>
 impl ::fidl_next::TakeFrom<WireOptionalMainProtocolTwoWayAnonWithErrorResponse>
     for Option<Box<MainProtocolTwoWayAnonWithErrorResponse>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalMainProtocolTwoWayAnonWithErrorResponse) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -3366,6 +3391,7 @@ where
 impl ::fidl_next::TakeFrom<WireMainProtocolTwoWayAnonWithErrorResult>
     for MainProtocolTwoWayAnonWithErrorResult
 {
+    #[inline]
     fn take_from(from: &WireMainProtocolTwoWayAnonWithErrorResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -3384,6 +3410,7 @@ impl ::fidl_next::TakeFrom<WireMainProtocolTwoWayAnonWithErrorResult>
 impl ::fidl_next::TakeFrom<WireOptionalMainProtocolTwoWayAnonWithErrorResult>
     for Option<Box<MainProtocolTwoWayAnonWithErrorResult>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalMainProtocolTwoWayAnonWithErrorResult) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -3584,6 +3611,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireMainProtocolOnAnonRequest> for MainProtocolOnAnonRequest {
+    #[inline]
     fn take_from(from: &WireMainProtocolOnAnonRequest) -> Self {
         match from.raw.ordinal() {
             1 => Self::B(::fidl_next::TakeFrom::take_from(unsafe {
@@ -3598,6 +3626,7 @@ impl ::fidl_next::TakeFrom<WireMainProtocolOnAnonRequest> for MainProtocolOnAnon
 impl ::fidl_next::TakeFrom<WireOptionalMainProtocolOnAnonRequest>
     for Option<Box<MainProtocolOnAnonRequest>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalMainProtocolOnAnonRequest) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))

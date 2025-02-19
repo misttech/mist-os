@@ -64,6 +64,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireInt16Int8> for Int16Int8 {
+    #[inline]
     fn take_from(from: &WireInt16Int8) -> Self {
         Self {
             a: ::fidl_next::TakeFrom::take_from(&from.a),
@@ -163,6 +164,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireArrayInt16Int8> for ArrayInt16Int8 {
+    #[inline]
     fn take_from(from: &WireArrayInt16Int8) -> Self {
         Self { arr: ::fidl_next::TakeFrom::take_from(&from.arr) }
     }
@@ -258,6 +260,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireInt8Int32> for Int8Int32 {
+    #[inline]
     fn take_from(from: &WireInt8Int32) -> Self {
         Self {
             a: ::fidl_next::TakeFrom::take_from(&from.a),
@@ -366,6 +369,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireNonInlineStructTestStruct> for NonInlineStructTestStruct {
+    #[inline]
     fn take_from(from: &WireNonInlineStructTestStruct) -> Self {
         Self {
             element: ::fidl_next::TakeFrom::take_from(&from.element),
@@ -479,6 +483,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStructPaddingTestStruct> for StructPaddingTestStruct {
+    #[inline]
     fn take_from(from: &WireStructPaddingTestStruct) -> Self {
         Self {
             trailing: ::fidl_next::TakeFrom::take_from(&from.trailing),
@@ -594,6 +599,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireTopLevelStruct> for TopLevelStruct {
+    #[inline]
     fn take_from(from: &WireTopLevelStruct) -> Self {
         Self {
             a: ::fidl_next::TakeFrom::take_from(&from.a),

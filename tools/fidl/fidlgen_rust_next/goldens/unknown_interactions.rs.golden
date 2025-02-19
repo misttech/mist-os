@@ -66,6 +66,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse>
     for UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse
 {
+    #[inline]
     fn take_from(
         from: &WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse,
     ) -> Self {
@@ -172,6 +173,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse>
     for UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse
 {
+    #[inline]
     fn take_from(
         from: &WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse,
     ) -> Self {
@@ -190,6 +192,7 @@ impl
         WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse,
     > for Option<Box<UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse,
     ) -> Self {
@@ -412,6 +415,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse>
     for UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse
 {
+    #[inline]
     fn take_from(
         from: &WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse,
     ) -> Self {
@@ -528,6 +532,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse>
     for UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse) -> Self {
         Self {}
     }
@@ -627,6 +632,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult>
     for UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -645,6 +651,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarDriverProtocolStrictTwoWay
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult>
     for Option<Box<UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult,
     ) -> Self {
@@ -894,6 +901,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse>
     for UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse
 {
+    #[inline]
     fn take_from(
         from: &WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse,
     ) -> Self {
@@ -1002,6 +1010,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult>
     for UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult
 {
+    #[inline]
     fn take_from(
         from: &WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult,
     ) -> Self {
@@ -1024,6 +1033,7 @@ impl
         WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult,
     > for Option<Box<UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult,
     ) -> Self {
@@ -1284,6 +1294,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse>
     for UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse
 {
+    #[inline]
     fn take_from(
         from: &WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse,
     ) -> Self {
@@ -1302,6 +1313,7 @@ impl
         WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse,
     > for Option<Box<UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse,
     ) -> Self {
@@ -1532,6 +1544,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult>
     for UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult
 {
+    #[inline]
     fn take_from(
         from: &WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult,
     ) -> Self {
@@ -1554,6 +1567,7 @@ impl
         WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult,
     > for Option<Box<UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult,
     ) -> Self {
@@ -1771,6 +1785,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse>
     for UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse
 {
+    #[inline]
     fn take_from(
         from: &WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse,
     ) -> Self {
@@ -1902,6 +1917,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult>
     for UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult
 {
+    #[inline]
     fn take_from(
         from: &WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult,
     ) -> Self {
@@ -1924,6 +1940,7 @@ impl
         WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult,
     > for Option<Box<UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult,
     ) -> Self {
@@ -2742,6 +2759,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse>
     for UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
     }
@@ -2845,6 +2863,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse>
     for UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
@@ -2859,6 +2878,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayUnionR
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse>
     for Option<Box<UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse,
     ) -> Self {
@@ -3075,6 +3095,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayTableResponse>
     for UnknownInteractionsAjarProtocolStrictTwoWayTableResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsAjarProtocolStrictTwoWayTableResponse) -> Self {
         Self { some_field: from.some_field().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -3186,6 +3207,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse>
     for UnknownInteractionsAjarProtocolStrictTwoWayErrResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse) -> Self {
         Self {}
     }
@@ -3283,6 +3305,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayErrResult>
     for UnknownInteractionsAjarProtocolStrictTwoWayErrResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsAjarProtocolStrictTwoWayErrResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -3301,6 +3324,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayErrRes
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayErrResult>
     for Option<Box<UnknownInteractionsAjarProtocolStrictTwoWayErrResult>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayErrResult) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -3544,6 +3568,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse>
     for UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
     }
@@ -3648,6 +3673,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult>
     for UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -3666,6 +3692,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayFields
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult>
     for Option<Box<UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult,
     ) -> Self {
@@ -3919,6 +3946,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse>
     for UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
@@ -3933,6 +3961,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayUnionE
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse>
     for Option<Box<UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse,
     ) -> Self {
@@ -4160,6 +4189,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult>
     for UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -4178,6 +4208,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayUnionE
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult>
     for Option<Box<UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult,
     ) -> Self {
@@ -4387,6 +4418,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse>
     for UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse) -> Self {
         Self { some_field: from.some_field().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -4514,6 +4546,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResult>
     for UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -4532,6 +4565,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayTableE
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayTableErrResult>
     for Option<Box<UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayTableErrResult,
     ) -> Self {
@@ -4737,6 +4771,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest>
     for UnknownInteractionsAjarProtocolStrictEventFieldsRequest
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
     }
@@ -4838,6 +4873,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictEventUnionRequest>
     for UnknownInteractionsAjarProtocolStrictEventUnionRequest
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsAjarProtocolStrictEventUnionRequest) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
@@ -4852,6 +4888,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictEventUnionRe
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsAjarProtocolStrictEventUnionRequest>
     for Option<Box<UnknownInteractionsAjarProtocolStrictEventUnionRequest>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsAjarProtocolStrictEventUnionRequest,
     ) -> Self {
@@ -5068,6 +5105,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictEventTableRequest>
     for UnknownInteractionsAjarProtocolStrictEventTableRequest
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsAjarProtocolStrictEventTableRequest) -> Self {
         Self { some_field: from.some_field().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -5186,6 +5224,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest>
     for UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
     }
@@ -5289,6 +5328,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest>
     for UnknownInteractionsAjarProtocolFlexibleEventUnionRequest
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
@@ -5303,6 +5343,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolFlexibleEventUnion
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsAjarProtocolFlexibleEventUnionRequest>
     for Option<Box<UnknownInteractionsAjarProtocolFlexibleEventUnionRequest>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsAjarProtocolFlexibleEventUnionRequest,
     ) -> Self {
@@ -5519,6 +5560,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest>
     for UnknownInteractionsAjarProtocolFlexibleEventTableRequest
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest) -> Self {
         Self { some_field: from.some_field().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -6604,6 +6646,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse>
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse
 {
+    #[inline]
     fn take_from(
         from: &WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse,
     ) -> Self {
@@ -6711,6 +6754,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse>
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse
 {
+    #[inline]
     fn take_from(
         from: &WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse,
     ) -> Self {
@@ -6729,6 +6773,7 @@ impl
         WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse,
     > for Option<Box<UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse,
     ) -> Self {
@@ -6951,6 +6996,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse>
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse
 {
+    #[inline]
     fn take_from(
         from: &WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse,
     ) -> Self {
@@ -7067,6 +7113,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse>
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse
 {
+    #[inline]
     fn take_from(
         from: &WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse,
     ) -> Self {
@@ -7169,6 +7216,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult>
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -7187,6 +7235,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedDriverProtocolStrictTwoW
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult>
     for Option<Box<UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult,
     ) -> Self {
@@ -7440,6 +7489,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse>
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse
 {
+    #[inline]
     fn take_from(
         from: &WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse,
     ) -> Self {
@@ -7548,6 +7598,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult>
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult
 {
+    #[inline]
     fn take_from(
         from: &WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult,
     ) -> Self {
@@ -7570,6 +7621,7 @@ impl
         WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult,
     > for Option<Box<UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult,
     ) -> Self {
@@ -7832,6 +7884,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse>
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse
 {
+    #[inline]
     fn take_from(
         from: &WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse,
     ) -> Self {
@@ -7850,6 +7903,7 @@ impl
         WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse,
     > for Option<Box<UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse,
     ) -> Self {
@@ -8082,6 +8136,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult>
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult
 {
+    #[inline]
     fn take_from(
         from: &WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult,
     ) -> Self {
@@ -8104,6 +8159,7 @@ impl
         WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult,
     > for Option<Box<UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult,
     ) -> Self {
@@ -8323,6 +8379,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse>
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse
 {
+    #[inline]
     fn take_from(
         from: &WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse,
     ) -> Self {
@@ -8456,6 +8513,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult>
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult
 {
+    #[inline]
     fn take_from(
         from: &WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult,
     ) -> Self {
@@ -8478,6 +8536,7 @@ impl
         WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult,
     > for Option<Box<UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult,
     ) -> Self {
@@ -9272,6 +9331,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse>
     for UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
     }
@@ -9375,6 +9435,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse>
     for UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
@@ -9389,6 +9450,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayUnio
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse>
     for Option<Box<UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse,
     ) -> Self {
@@ -9607,6 +9669,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayTableResponse>
     for UnknownInteractionsClosedProtocolStrictTwoWayTableResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsClosedProtocolStrictTwoWayTableResponse) -> Self {
         Self { some_field: from.some_field().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -9720,6 +9783,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse>
     for UnknownInteractionsClosedProtocolStrictTwoWayErrResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse) -> Self {
         Self {}
     }
@@ -9817,6 +9881,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayErrResult>
     for UnknownInteractionsClosedProtocolStrictTwoWayErrResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsClosedProtocolStrictTwoWayErrResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -9835,6 +9900,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayErrR
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayErrResult>
     for Option<Box<UnknownInteractionsClosedProtocolStrictTwoWayErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayErrResult,
     ) -> Self {
@@ -10080,6 +10146,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse>
     for UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse
 {
+    #[inline]
     fn take_from(
         from: &WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse,
     ) -> Self {
@@ -10187,6 +10254,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult>
     for UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -10205,6 +10273,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayFiel
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult>
     for Option<Box<UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult,
     ) -> Self {
@@ -10461,6 +10530,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse>
     for UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
@@ -10476,6 +10546,7 @@ impl
     ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse>
     for Option<Box<UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse,
     ) -> Self {
@@ -10704,6 +10775,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult>
     for UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -10722,6 +10794,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayUnio
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult>
     for Option<Box<UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult,
     ) -> Self {
@@ -10936,6 +11009,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse>
     for UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse) -> Self {
         Self { some_field: from.some_field().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -11063,6 +11137,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResult>
     for UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -11081,6 +11156,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayTabl
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayTableErrResult>
     for Option<Box<UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayTableErrResult,
     ) -> Self {
@@ -11292,6 +11368,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest>
     for UnknownInteractionsClosedProtocolStrictEventFieldsRequest
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
     }
@@ -11395,6 +11472,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictEventUnionRequest>
     for UnknownInteractionsClosedProtocolStrictEventUnionRequest
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsClosedProtocolStrictEventUnionRequest) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
@@ -11409,6 +11487,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictEventUnion
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsClosedProtocolStrictEventUnionRequest>
     for Option<Box<UnknownInteractionsClosedProtocolStrictEventUnionRequest>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsClosedProtocolStrictEventUnionRequest,
     ) -> Self {
@@ -11625,6 +11704,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictEventTableRequest>
     for UnknownInteractionsClosedProtocolStrictEventTableRequest
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsClosedProtocolStrictEventTableRequest) -> Self {
         Self { some_field: from.some_field().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -12486,6 +12566,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse>
     for UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
     }
@@ -12589,6 +12670,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse>
     for UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
@@ -12603,6 +12685,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayUnio
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse>
     for Option<Box<UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse,
     ) -> Self {
@@ -12821,6 +12904,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayTableResponse>
     for UnknownInteractionsDriverProtocolStrictTwoWayTableResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolStrictTwoWayTableResponse) -> Self {
         Self { some_field: from.some_field().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -12934,6 +13018,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse>
     for UnknownInteractionsDriverProtocolStrictTwoWayErrResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse) -> Self {
         Self {}
     }
@@ -13031,6 +13116,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayErrResult>
     for UnknownInteractionsDriverProtocolStrictTwoWayErrResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolStrictTwoWayErrResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -13049,6 +13135,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayErrR
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayErrResult>
     for Option<Box<UnknownInteractionsDriverProtocolStrictTwoWayErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayErrResult,
     ) -> Self {
@@ -13294,6 +13381,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse>
     for UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse
 {
+    #[inline]
     fn take_from(
         from: &WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse,
     ) -> Self {
@@ -13401,6 +13489,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult>
     for UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -13419,6 +13508,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayFiel
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult>
     for Option<Box<UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult,
     ) -> Self {
@@ -13675,6 +13765,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse>
     for UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
@@ -13690,6 +13781,7 @@ impl
     ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse>
     for Option<Box<UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse,
     ) -> Self {
@@ -13918,6 +14010,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult>
     for UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -13936,6 +14029,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayUnio
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult>
     for Option<Box<UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult,
     ) -> Self {
@@ -14150,6 +14244,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse>
     for UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse) -> Self {
         Self { some_field: from.some_field().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -14277,6 +14372,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResult>
     for UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -14295,6 +14391,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayTabl
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayTableErrResult>
     for Option<Box<UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayTableErrResult,
     ) -> Self {
@@ -14499,6 +14596,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse) -> Self {
         Self {}
     }
@@ -14597,6 +14695,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayResult>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -14615,6 +14714,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayRe
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayResult>
     for Option<Box<UnknownInteractionsDriverProtocolFlexibleTwoWayResult>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayResult) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -14871,6 +14971,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
     }
@@ -14976,6 +15077,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -14994,6 +15096,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayFi
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult>
     for Option<Box<UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult,
     ) -> Self {
@@ -15262,6 +15365,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
@@ -15276,6 +15380,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayUn
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse>
     for Option<Box<UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse,
     ) -> Self {
@@ -15504,6 +15609,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -15522,6 +15628,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayUn
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult>
     for Option<Box<UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult,
     ) -> Self {
@@ -15742,6 +15849,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse) -> Self {
         Self { some_field: from.some_field().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -15870,6 +15978,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResult>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -15888,6 +15997,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayTa
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayTableResult>
     for Option<Box<UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayTableResult,
     ) -> Self {
@@ -16100,6 +16210,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse) -> Self {
         Self {}
     }
@@ -16206,6 +16317,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResult>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -16228,6 +16340,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayEr
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayErrResult>
     for Option<Box<UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayErrResult,
     ) -> Self {
@@ -16505,6 +16618,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse
 {
+    #[inline]
     fn take_from(
         from: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse,
     ) -> Self {
@@ -16619,6 +16733,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult
 {
+    #[inline]
     fn take_from(
         from: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult,
     ) -> Self {
@@ -16645,6 +16760,7 @@ impl
         WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult,
     > for Option<Box<UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult,
     ) -> Self {
@@ -16936,6 +17052,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse
 {
+    #[inline]
     fn take_from(
         from: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse,
     ) -> Self {
@@ -16954,6 +17071,7 @@ impl
         WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse,
     > for Option<Box<UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse,
     ) -> Self {
@@ -17190,6 +17308,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -17213,6 +17332,7 @@ impl
     ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult>
     for Option<Box<UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult,
     ) -> Self {
@@ -17449,6 +17569,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse
 {
+    #[inline]
     fn take_from(
         from: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse,
     ) -> Self {
@@ -17586,6 +17707,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -17609,6 +17731,7 @@ impl
     ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult>
     for Option<Box<UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult,
     ) -> Self {
@@ -18883,6 +19006,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayFieldsResponse>
     for UnknownInteractionsProtocolStrictTwoWayFieldsResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolStrictTwoWayFieldsResponse) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
     }
@@ -18984,6 +19108,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayUnionResponse>
     for UnknownInteractionsProtocolStrictTwoWayUnionResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolStrictTwoWayUnionResponse) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
@@ -18998,6 +19123,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayUnionRespo
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionResponse>
     for Option<Box<UnknownInteractionsProtocolStrictTwoWayUnionResponse>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionResponse) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -19212,6 +19338,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayTableResponse>
     for UnknownInteractionsProtocolStrictTwoWayTableResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolStrictTwoWayTableResponse) -> Self {
         Self { some_field: from.some_field().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -19323,6 +19450,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayErrResponse>
     for UnknownInteractionsProtocolStrictTwoWayErrResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolStrictTwoWayErrResponse) -> Self {
         Self {}
     }
@@ -19419,6 +19547,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayErrResult>
     for UnknownInteractionsProtocolStrictTwoWayErrResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolStrictTwoWayErrResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -19437,6 +19566,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayErrResult>
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsProtocolStrictTwoWayErrResult>
     for Option<Box<UnknownInteractionsProtocolStrictTwoWayErrResult>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalUnknownInteractionsProtocolStrictTwoWayErrResult) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -19676,6 +19806,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResponse>
     for UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResponse) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
     }
@@ -19778,6 +19909,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResult>
     for UnknownInteractionsProtocolStrictTwoWayFieldsErrResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -19796,6 +19928,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayFieldsErrR
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsProtocolStrictTwoWayFieldsErrResult>
     for Option<Box<UnknownInteractionsProtocolStrictTwoWayFieldsErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsProtocolStrictTwoWayFieldsErrResult,
     ) -> Self {
@@ -20044,6 +20177,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse>
     for UnknownInteractionsProtocolStrictTwoWayUnionErrResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
@@ -20058,6 +20192,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayUnionErrRe
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionErrResponse>
     for Option<Box<UnknownInteractionsProtocolStrictTwoWayUnionErrResponse>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionErrResponse,
     ) -> Self {
@@ -20279,6 +20414,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayUnionErrResult>
     for UnknownInteractionsProtocolStrictTwoWayUnionErrResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolStrictTwoWayUnionErrResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -20297,6 +20433,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayUnionErrRe
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionErrResult>
     for Option<Box<UnknownInteractionsProtocolStrictTwoWayUnionErrResult>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionErrResult) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -20503,6 +20640,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayTableErrResponse>
     for UnknownInteractionsProtocolStrictTwoWayTableErrResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolStrictTwoWayTableErrResponse) -> Self {
         Self { some_field: from.some_field().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -20628,6 +20766,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayTableErrResult>
     for UnknownInteractionsProtocolStrictTwoWayTableErrResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolStrictTwoWayTableErrResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -20646,6 +20785,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayTableErrRe
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsProtocolStrictTwoWayTableErrResult>
     for Option<Box<UnknownInteractionsProtocolStrictTwoWayTableErrResult>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalUnknownInteractionsProtocolStrictTwoWayTableErrResult) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -20843,6 +20983,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayResponse>
     for UnknownInteractionsProtocolFlexibleTwoWayResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleTwoWayResponse) -> Self {
         Self {}
     }
@@ -20940,6 +21081,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayResult>
     for UnknownInteractionsProtocolFlexibleTwoWayResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleTwoWayResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -20958,6 +21100,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayResult>
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsProtocolFlexibleTwoWayResult>
     for Option<Box<UnknownInteractionsProtocolFlexibleTwoWayResult>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalUnknownInteractionsProtocolFlexibleTwoWayResult) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -21205,6 +21348,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResponse>
     for UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResponse) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
     }
@@ -21308,6 +21452,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResult>
     for UnknownInteractionsProtocolFlexibleTwoWayFieldsResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -21326,6 +21471,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayFieldsRe
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsProtocolFlexibleTwoWayFieldsResult>
     for Option<Box<UnknownInteractionsProtocolFlexibleTwoWayFieldsResult>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalUnknownInteractionsProtocolFlexibleTwoWayFieldsResult) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -21585,6 +21731,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse>
     for UnknownInteractionsProtocolFlexibleTwoWayUnionResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
@@ -21599,6 +21746,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayUnionRes
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionResponse>
     for Option<Box<UnknownInteractionsProtocolFlexibleTwoWayUnionResponse>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
     ) -> Self {
@@ -21821,6 +21969,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayUnionResult>
     for UnknownInteractionsProtocolFlexibleTwoWayUnionResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleTwoWayUnionResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -21839,6 +21988,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayUnionRes
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionResult>
     for Option<Box<UnknownInteractionsProtocolFlexibleTwoWayUnionResult>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionResult) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -22054,6 +22204,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse>
     for UnknownInteractionsProtocolFlexibleTwoWayTableResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleTwoWayTableResponse) -> Self {
         Self { some_field: from.some_field().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -22180,6 +22331,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayTableResult>
     for UnknownInteractionsProtocolFlexibleTwoWayTableResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleTwoWayTableResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -22198,6 +22350,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayTableRes
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsProtocolFlexibleTwoWayTableResult>
     for Option<Box<UnknownInteractionsProtocolFlexibleTwoWayTableResult>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalUnknownInteractionsProtocolFlexibleTwoWayTableResult) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -22404,6 +22557,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse>
     for UnknownInteractionsProtocolFlexibleTwoWayErrResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse) -> Self {
         Self {}
     }
@@ -22508,6 +22662,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayErrResult>
     for UnknownInteractionsProtocolFlexibleTwoWayErrResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleTwoWayErrResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -22530,6 +22685,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayErrResul
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsProtocolFlexibleTwoWayErrResult>
     for Option<Box<UnknownInteractionsProtocolFlexibleTwoWayErrResult>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalUnknownInteractionsProtocolFlexibleTwoWayErrResult) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -22805,6 +22961,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse>
     for UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
     }
@@ -22916,6 +23073,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult>
     for UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -22938,6 +23096,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayFieldsEr
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult>
     for Option<Box<UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult,
     ) -> Self {
@@ -23220,6 +23379,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse>
     for UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
@@ -23234,6 +23394,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayUnionErr
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse>
     for Option<Box<UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse,
     ) -> Self {
@@ -23462,6 +23623,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResult>
     for UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -23484,6 +23646,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayUnionErr
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionErrResult>
     for Option<Box<UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionErrResult,
     ) -> Self {
@@ -23712,6 +23875,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResponse>
     for UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResponse) -> Self {
         Self { some_field: from.some_field().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -23844,6 +24008,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResult>
     for UnknownInteractionsProtocolFlexibleTwoWayTableErrResult
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -23866,6 +24031,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayTableErr
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsProtocolFlexibleTwoWayTableErrResult>
     for Option<Box<UnknownInteractionsProtocolFlexibleTwoWayTableErrResult>>
 {
+    #[inline]
     fn take_from(
         from: &WireOptionalUnknownInteractionsProtocolFlexibleTwoWayTableErrResult,
     ) -> Self {
@@ -24090,6 +24256,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictEventFieldsRequest>
     for UnknownInteractionsProtocolStrictEventFieldsRequest
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolStrictEventFieldsRequest) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
     }
@@ -24191,6 +24358,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictEventUnionRequest>
     for UnknownInteractionsProtocolStrictEventUnionRequest
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolStrictEventUnionRequest) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
@@ -24205,6 +24373,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictEventUnionReques
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsProtocolStrictEventUnionRequest>
     for Option<Box<UnknownInteractionsProtocolStrictEventUnionRequest>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalUnknownInteractionsProtocolStrictEventUnionRequest) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -24419,6 +24588,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictEventTableRequest>
     for UnknownInteractionsProtocolStrictEventTableRequest
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolStrictEventTableRequest) -> Self {
         Self { some_field: from.some_field().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -24535,6 +24705,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleEventFieldsRequest>
     for UnknownInteractionsProtocolFlexibleEventFieldsRequest
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleEventFieldsRequest) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
     }
@@ -24636,6 +24807,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleEventUnionRequest>
     for UnknownInteractionsProtocolFlexibleEventUnionRequest
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleEventUnionRequest) -> Self {
         match from.raw.ordinal() {
             1 => Self::SomeField(::fidl_next::TakeFrom::take_from(unsafe {
@@ -24650,6 +24822,7 @@ impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleEventUnionRequ
 impl ::fidl_next::TakeFrom<WireOptionalUnknownInteractionsProtocolFlexibleEventUnionRequest>
     for Option<Box<UnknownInteractionsProtocolFlexibleEventUnionRequest>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalUnknownInteractionsProtocolFlexibleEventUnionRequest) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -24864,6 +25037,7 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleEventTableRequest>
     for UnknownInteractionsProtocolFlexibleEventTableRequest
 {
+    #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleEventTableRequest) -> Self {
         Self { some_field: from.some_field().map(::fidl_next::TakeFrom::take_from) }
     }

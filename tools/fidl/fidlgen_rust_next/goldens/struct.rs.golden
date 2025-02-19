@@ -66,6 +66,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireBasicStruct> for BasicStruct {
+    #[inline]
     fn take_from(from: &WireBasicStruct) -> Self {
         Self {
             x: ::fidl_next::TakeFrom::take_from(&from.x),
@@ -172,6 +173,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireSimple> for Simple {
+    #[inline]
     fn take_from(from: &WireSimple) -> Self {
         Self {
             f1: ::fidl_next::TakeFrom::take_from(&from.f1),

@@ -59,6 +59,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireByteAndBytes> for ByteAndBytes {
+    #[inline]
     fn take_from(from: &WireByteAndBytes) -> Self {
         Self { single_byte: ::fidl_next::TakeFrom::take_from(&from.single_byte) }
     }

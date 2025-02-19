@@ -66,6 +66,7 @@ impl ::core::convert::From<WireObjType> for ObjType {
 }
 
 impl ::fidl_next::TakeFrom<WireObjType> for ObjType {
+    #[inline]
     fn take_from(from: &WireObjType) -> Self {
         Self::from(*from)
     }
@@ -239,6 +240,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireExampleOfUseOfAliases> for ExampleOfUseOfAliases {
+    #[inline]
     fn take_from(from: &WireExampleOfUseOfAliases) -> Self {
         Self {
             field_of_u32: ::fidl_next::TakeFrom::take_from(&from.field_of_u32),

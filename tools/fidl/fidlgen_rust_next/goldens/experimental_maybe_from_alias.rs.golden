@@ -329,6 +329,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireTesting> for Testing {
+    #[inline]
     fn take_from(from: &WireTesting) -> Self {
         Self {
             u1: ::fidl_next::TakeFrom::take_from(&from.u1),

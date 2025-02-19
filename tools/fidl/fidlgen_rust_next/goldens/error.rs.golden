@@ -61,6 +61,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireExampleFooRequest> for ExampleFooRequest {
+    #[inline]
     fn take_from(from: &WireExampleFooRequest) -> Self {
         Self { s: ::fidl_next::TakeFrom::take_from(&from.s) }
     }
@@ -153,6 +154,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireExampleFooResponse> for ExampleFooResponse {
+    #[inline]
     fn take_from(from: &WireExampleFooResponse) -> Self {
         Self { y: ::fidl_next::TakeFrom::take_from(&from.y) }
     }
@@ -253,6 +255,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireExampleFooResult> for ExampleFooResult {
+    #[inline]
     fn take_from(from: &WireExampleFooResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -269,6 +272,7 @@ impl ::fidl_next::TakeFrom<WireExampleFooResult> for ExampleFooResult {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalExampleFooResult> for Option<Box<ExampleFooResult>> {
+    #[inline]
     fn take_from(from: &WireOptionalExampleFooResult) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))

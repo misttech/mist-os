@@ -63,6 +63,7 @@ where
 impl ::fidl_next::TakeFrom<WireExampleUseOfErrorSyntaxCallWhichMayFailRequest>
     for ExampleUseOfErrorSyntaxCallWhichMayFailRequest
 {
+    #[inline]
     fn take_from(from: &WireExampleUseOfErrorSyntaxCallWhichMayFailRequest) -> Self {
         Self { s: ::fidl_next::TakeFrom::take_from(&from.s) }
     }
@@ -157,6 +158,7 @@ where
 impl ::fidl_next::TakeFrom<WireExampleUseOfErrorSyntaxCallWhichMayFailResponse>
     for ExampleUseOfErrorSyntaxCallWhichMayFailResponse
 {
+    #[inline]
     fn take_from(from: &WireExampleUseOfErrorSyntaxCallWhichMayFailResponse) -> Self {
         Self { value: ::fidl_next::TakeFrom::take_from(&from.value) }
     }
@@ -259,6 +261,7 @@ where
 impl ::fidl_next::TakeFrom<WireExampleUseOfErrorSyntaxCallWhichMayFailResult>
     for ExampleUseOfErrorSyntaxCallWhichMayFailResult
 {
+    #[inline]
     fn take_from(from: &WireExampleUseOfErrorSyntaxCallWhichMayFailResult) -> Self {
         match from.raw.ordinal() {
             1 => Self::Response(::fidl_next::TakeFrom::take_from(unsafe {
@@ -277,6 +280,7 @@ impl ::fidl_next::TakeFrom<WireExampleUseOfErrorSyntaxCallWhichMayFailResult>
 impl ::fidl_next::TakeFrom<WireOptionalExampleUseOfErrorSyntaxCallWhichMayFailResult>
     for Option<Box<ExampleUseOfErrorSyntaxCallWhichMayFailResult>>
 {
+    #[inline]
     fn take_from(from: &WireOptionalExampleUseOfErrorSyntaxCallWhichMayFailResult) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))

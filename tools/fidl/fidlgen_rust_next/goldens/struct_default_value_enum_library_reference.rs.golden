@@ -59,6 +59,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireFoo> for Foo {
+    #[inline]
     fn take_from(from: &WireFoo) -> Self {
         Self { field: ::fidl_next::TakeFrom::take_from(&from.field) }
     }

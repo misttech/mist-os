@@ -47,6 +47,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireEmptyTable> for EmptyTable {
+    #[inline]
     fn take_from(from: &WireEmptyTable) -> Self {
         Self {}
     }
@@ -131,6 +132,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireExtensionTable> for ExtensionTable {
+    #[inline]
     fn take_from(from: &WireExtensionTable) -> Self {
         Self {}
     }
@@ -269,6 +271,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireNewerSimpleTable> for NewerSimpleTable {
+    #[inline]
     fn take_from(from: &WireNewerSimpleTable) -> Self {
         Self {
             x: from.x().map(::fidl_next::TakeFrom::take_from),
@@ -420,6 +423,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireOlderSimpleTable> for OlderSimpleTable {
+    #[inline]
     fn take_from(from: &WireOlderSimpleTable) -> Self {
         Self { x: from.x().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -571,6 +575,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireReverseOrdinalTable> for ReverseOrdinalTable {
+    #[inline]
     fn take_from(from: &WireReverseOrdinalTable) -> Self {
         Self {
             z: from.z().map(::fidl_next::TakeFrom::take_from),
@@ -740,6 +745,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireSimpleTable> for SimpleTable {
+    #[inline]
     fn take_from(from: &WireSimpleTable) -> Self {
         Self {
             x: from.x().map(::fidl_next::TakeFrom::take_from),
@@ -2006,6 +2012,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireSixtyFourOrdinalTable> for SixtyFourOrdinalTable {
+    #[inline]
     fn take_from(from: &WireSixtyFourOrdinalTable) -> Self {
         Self {
             v1: from.v1().map(::fidl_next::TakeFrom::take_from),
@@ -3133,6 +3140,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireTableWithAttributes> for TableWithAttributes {
+    #[inline]
     fn take_from(from: &WireTableWithAttributes) -> Self {
         Self { x: from.x().map(::fidl_next::TakeFrom::take_from) }
     }

@@ -61,6 +61,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireParentFirstRequest> for ParentFirstRequest {
+    #[inline]
     fn take_from(from: &WireParentFirstRequest) -> Self {
         Self { request: ::fidl_next::TakeFrom::take_from(&from.request) }
     }
@@ -284,6 +285,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireChildSecondRequest> for ChildSecondRequest {
+    #[inline]
     fn take_from(from: &WireChildSecondRequest) -> Self {
         Self { request: ::fidl_next::TakeFrom::take_from(&from.request) }
     }

@@ -64,6 +64,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireTwoWayAddRequest> for TwoWayAddRequest {
+    #[inline]
     fn take_from(from: &WireTwoWayAddRequest) -> Self {
         Self {
             addend1: ::fidl_next::TakeFrom::take_from(&from.addend1),
@@ -163,6 +164,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireTwoWayAddResponse> for TwoWayAddResponse {
+    #[inline]
     fn take_from(from: &WireTwoWayAddResponse) -> Self {
         Self { sum: ::fidl_next::TakeFrom::take_from(&from.sum) }
     }

@@ -45,6 +45,7 @@ impl ::core::convert::From<WireBits> for Bits {
 }
 
 impl ::fidl_next::TakeFrom<WireBits> for Bits {
+    #[inline]
     fn take_from(from: &WireBits) -> Self {
         Self::from(*from)
     }
@@ -129,6 +130,7 @@ impl ::core::convert::From<WireBitsType> for BitsType {
 }
 
 impl ::fidl_next::TakeFrom<WireBitsType> for BitsType {
+    #[inline]
     fn take_from(from: &WireBitsType) -> Self {
         Self::from(*from)
     }
@@ -207,6 +209,7 @@ impl ::core::convert::From<WireEnum> for Enum {
 }
 
 impl ::fidl_next::TakeFrom<WireEnum> for Enum {
+    #[inline]
     fn take_from(from: &WireEnum) -> Self {
         Self::from(*from)
     }
@@ -294,6 +297,7 @@ impl ::core::convert::From<WireEnumType> for EnumType {
 }
 
 impl ::fidl_next::TakeFrom<WireEnumType> for EnumType {
+    #[inline]
     fn take_from(from: &WireEnumType) -> Self {
         Self::from(*from)
     }
@@ -435,6 +439,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStruct> for Struct {
+    #[inline]
     fn take_from(from: &WireStruct) -> Self {
         Self {
             int64_with_default: ::fidl_next::TakeFrom::take_from(&from.int64_with_default),

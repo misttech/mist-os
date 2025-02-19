@@ -50,6 +50,7 @@ impl ::core::convert::From<WireExampleBits> for ExampleBits {
 }
 
 impl ::fidl_next::TakeFrom<WireExampleBits> for ExampleBits {
+    #[inline]
     fn take_from(from: &WireExampleBits) -> Self {
         Self::from(*from)
     }
@@ -128,6 +129,7 @@ impl ::core::convert::From<WireExampleEnum> for ExampleEnum {
 }
 
 impl ::fidl_next::TakeFrom<WireExampleEnum> for ExampleEnum {
+    #[inline]
     fn take_from(from: &WireExampleEnum) -> Self {
         Self::from(*from)
     }
@@ -229,6 +231,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireExampleProtocolMethodRequest> for ExampleProtocolMethodRequest {
+    #[inline]
     fn take_from(from: &WireExampleProtocolMethodRequest) -> Self {
         Self { arg: ::fidl_next::TakeFrom::take_from(&from.arg) }
     }
@@ -457,6 +460,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireExampleStruct> for ExampleStruct {
+    #[inline]
     fn take_from(from: &WireExampleStruct) -> Self {
         Self { member: ::fidl_next::TakeFrom::take_from(&from.member) }
     }
@@ -553,6 +557,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireExampleTable> for ExampleTable {
+    #[inline]
     fn take_from(from: &WireExampleTable) -> Self {
         Self { member: from.member().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -663,6 +668,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireExampleUnion> for ExampleUnion {
+    #[inline]
     fn take_from(from: &WireExampleUnion) -> Self {
         match from.raw.ordinal() {
             1 => Self::Variant(::fidl_next::TakeFrom::take_from(unsafe {
@@ -675,6 +681,7 @@ impl ::fidl_next::TakeFrom<WireExampleUnion> for ExampleUnion {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalExampleUnion> for Option<Box<ExampleUnion>> {
+    #[inline]
     fn take_from(from: &WireOptionalExampleUnion) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))

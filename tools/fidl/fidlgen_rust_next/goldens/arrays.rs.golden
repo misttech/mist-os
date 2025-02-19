@@ -59,6 +59,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStructLargeArray> for StructLargeArray {
+    #[inline]
     fn take_from(from: &WireStructLargeArray) -> Self {
         Self { a: ::fidl_next::TakeFrom::take_from(&from.a) }
     }
@@ -149,6 +150,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStructSmallArray> for StructSmallArray {
+    #[inline]
     fn take_from(from: &WireStructSmallArray) -> Self {
         Self { a: ::fidl_next::TakeFrom::take_from(&from.a) }
     }
@@ -245,6 +247,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireTableLargeArray> for TableLargeArray {
+    #[inline]
     fn take_from(from: &WireTableLargeArray) -> Self {
         Self { a: from.a().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -360,6 +363,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireTableSmallArray> for TableSmallArray {
+    #[inline]
     fn take_from(from: &WireTableSmallArray) -> Self {
         Self { a: from.a().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -472,6 +476,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireUnionLargeArray> for UnionLargeArray {
+    #[inline]
     fn take_from(from: &WireUnionLargeArray) -> Self {
         match from.raw.ordinal() {
             1 => Self::A(::fidl_next::TakeFrom::take_from(unsafe {
@@ -484,6 +489,7 @@ impl ::fidl_next::TakeFrom<WireUnionLargeArray> for UnionLargeArray {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalUnionLargeArray> for Option<Box<UnionLargeArray>> {
+    #[inline]
     fn take_from(from: &WireOptionalUnionLargeArray) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -660,6 +666,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireUnionSmallArray> for UnionSmallArray {
+    #[inline]
     fn take_from(from: &WireUnionSmallArray) -> Self {
         match from.raw.ordinal() {
             1 => Self::A(::fidl_next::TakeFrom::take_from(unsafe {
@@ -672,6 +679,7 @@ impl ::fidl_next::TakeFrom<WireUnionSmallArray> for UnionSmallArray {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalUnionSmallArray> for Option<Box<UnionSmallArray>> {
+    #[inline]
     fn take_from(from: &WireOptionalUnionSmallArray) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))

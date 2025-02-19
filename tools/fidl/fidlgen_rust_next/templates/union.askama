@@ -105,6 +105,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<{{ wire_name }}> for {{ name }} {
+    #[inline]
     fn take_from(from: &{{ wire_name }}) -> Self {
         match from.raw.ordinal() {
             {% for member in union.members %}
@@ -118,6 +119,7 @@ impl ::fidl_next::TakeFrom<{{ wire_name }}> for {{ name }} {
 }
 
 impl ::fidl_next::TakeFrom<WireOptional{{ name }}> for Option<Box<{{ name }}>> {
+    #[inline]
     fn take_from(from: &WireOptional{{ name }}) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))

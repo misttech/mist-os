@@ -64,6 +64,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireMyStruct> for MyStruct {
+    #[inline]
     fn take_from(from: &WireMyStruct) -> Self {
         Self {}
     }

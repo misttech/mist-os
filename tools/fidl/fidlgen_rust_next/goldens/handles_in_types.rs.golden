@@ -56,6 +56,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireEmptyResourceStruct> for EmptyResourceStruct {
+    #[inline]
     fn take_from(from: &WireEmptyResourceStruct) -> Self {
         Self {}
     }
@@ -133,6 +134,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireEmptyResourceTable> for EmptyResourceTable {
+    #[inline]
     fn take_from(from: &WireEmptyResourceTable) -> Self {
         Self {}
     }
@@ -234,6 +236,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireEmptyResourceUnion> for EmptyResourceUnion {
+    #[inline]
     fn take_from(from: &WireEmptyResourceUnion) -> Self {
         match from.raw.ordinal() {
             _ => unsafe { ::core::hint::unreachable_unchecked() },
@@ -242,6 +245,7 @@ impl ::fidl_next::TakeFrom<WireEmptyResourceUnion> for EmptyResourceUnion {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalEmptyResourceUnion> for Option<Box<EmptyResourceUnion>> {
+    #[inline]
     fn take_from(from: &WireOptionalEmptyResourceUnion) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -391,6 +395,7 @@ impl ::core::convert::From<WireObjType> for ObjType {
 }
 
 impl ::fidl_next::TakeFrom<WireObjType> for ObjType {
+    #[inline]
     fn take_from(from: &WireObjType) -> Self {
         Self::from(*from)
     }
@@ -503,6 +508,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireTableWithHandle> for TableWithHandle {
+    #[inline]
     fn take_from(from: &WireTableWithHandle) -> Self {
         Self { h: from.h().map(::fidl_next::TakeFrom::take_from) }
     }
@@ -624,6 +630,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireUnionWithHandle> for UnionWithHandle {
+    #[inline]
     fn take_from(from: &WireUnionWithHandle) -> Self {
         match from.raw.ordinal() {
             1 => Self::H(::fidl_next::TakeFrom::take_from(unsafe {
@@ -636,6 +643,7 @@ impl ::fidl_next::TakeFrom<WireUnionWithHandle> for UnionWithHandle {
 }
 
 impl ::fidl_next::TakeFrom<WireOptionalUnionWithHandle> for Option<Box<UnionWithHandle>> {
+    #[inline]
     fn take_from(from: &WireOptionalUnionWithHandle) -> Self {
         if let Some(inner) = from.as_ref() {
             Some(::fidl_next::TakeFrom::take_from(inner))
@@ -848,6 +856,7 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireHandlesInTypes> for HandlesInTypes {
+    #[inline]
     fn take_from(from: &WireHandlesInTypes) -> Self {
         Self {
             normal_handle: ::fidl_next::TakeFrom::take_from(&from.normal_handle),
