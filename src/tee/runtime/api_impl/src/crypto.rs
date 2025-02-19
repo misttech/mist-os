@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use tee_internal::{Algorithm, Error, Mode, OperationHandle, Result as TeeResult, Usage};
 
-use crate::storage::{Key, NoKey, Object};
+use crate::storage::{AesKey, Key, KeyType as _, NoKey, Object};
 
 // TODO(https://fxbug.dev/360942581): Figure out operation state transitions.
 #[allow(dead_code)]
@@ -70,7 +70,6 @@ impl Operation {
         self.key = key.clone();
         Ok(())
     }
-
     fn clear_key(&mut self) -> TeeResult {
         self.key = Key::Data(NoKey {});
         self.state = OpState::Initial;
@@ -97,7 +96,12 @@ impl Operations {
         mode: Mode,
         max_key_size: u32,
     ) -> TeeResult<OperationHandle> {
-        match algorithm {
+        // We could directly check `FooKey::is_valid_size(max_key_size)` in
+        // each match arm, but by forwarding the appropriate key size check
+        // function pointer and doing it indirectly after the match statement,
+        // we ensure that is check is always made and reduce a bit of
+        // boilerplate while we're at it.
+        let is_valid_key_size = match algorithm {
             Algorithm::AesCbcNopad | Algorithm::AesEcbNopad => {
                 match mode {
                     Mode::Encrypt | Mode::Decrypt => {}
@@ -105,21 +109,24 @@ impl Operations {
                         return Err(Error::NotSupported);
                     }
                 };
-                // TODO: check that max_key_size matches table 5-9
-                let operation = Operation::new(algorithm, mode, max_key_size);
-                let handle = self.allocate_operation_handle();
-                let prev = self.operations.insert(handle, RefCell::new(operation));
-                debug_assert!(prev.is_none());
-                Ok(handle)
+                AesKey::is_valid_size
             }
             _ => {
                 inspect_stubs::track_stub!(
                     TODO("https://fxbug.dev/360942581"),
                     "unsupported algorithm",
                 );
-                Err(Error::NotImplemented)
+                return Err(Error::NotImplemented);
             }
+        };
+        if !is_valid_key_size(max_key_size) {
+            return Err(Error::NotSupported);
         }
+        let operation = Operation::new(algorithm, mode, max_key_size);
+        let handle = self.allocate_operation_handle();
+        let prev = self.operations.insert(handle, RefCell::new(operation));
+        debug_assert!(prev.is_none());
+        Ok(handle)
     }
 
     fn allocate_operation_handle(&mut self) -> OperationHandle {

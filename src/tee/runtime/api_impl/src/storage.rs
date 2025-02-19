@@ -50,9 +50,16 @@ fn is_transient_handle(object: ObjectHandle) -> bool {
 pub trait KeyType {
     fn new(_max_size: u32) -> TeeResult<Self>
     where
-        Self: Sized,
+        Self: Sized, // Not a subtrait to keep KeyType dyn-compatible
     {
         unimplemented!()
+    }
+
+    fn is_valid_size(_size: u32) -> bool
+    where
+        Self: Sized, // Not a subtrait to keep KeyType dyn-compatible
+    {
+        false
     }
 
     fn size(&self) -> u32 {
@@ -89,14 +96,6 @@ pub struct SimpleSymmetricKey<const SIZE_MIN: u32, const SIZE_MAX: u32, const SI
     secret: Vec<u8>, // TEE_ATTR_SECRET_VALUE
 }
 
-impl<const SIZE_MIN: u32, const SIZE_MAX: u32, const SIZE_MULTIPLE: u32>
-    SimpleSymmetricKey<SIZE_MIN, SIZE_MAX, SIZE_MULTIPLE>
-{
-    const fn is_valid_size(size: u32) -> bool {
-        size >= SIZE_MIN && size <= SIZE_MAX && (size % SIZE_MULTIPLE) == 0
-    }
-}
-
 impl<const SIZE_MIN: u32, const SIZE_MAX: u32, const SIZE_MULTIPLE: u32> KeyType
     for SimpleSymmetricKey<SIZE_MIN, SIZE_MAX, SIZE_MULTIPLE>
 {
@@ -111,6 +110,10 @@ impl<const SIZE_MIN: u32, const SIZE_MAX: u32, const SIZE_MULTIPLE: u32> KeyType
         } else {
             Err(Error::NotSupported)
         }
+    }
+
+    fn is_valid_size(size: u32) -> bool {
+        size >= SIZE_MIN && size <= SIZE_MAX && (size % SIZE_MULTIPLE) == 0
     }
 
     fn size(&self) -> u32 {
@@ -283,6 +286,10 @@ impl KeyType for NoKey {
         } else {
             Err(Error::NotSupported)
         }
+    }
+
+    fn is_valid_size(size: u32) -> bool {
+        size == 0
     }
 
     fn reset(&mut self) {}
