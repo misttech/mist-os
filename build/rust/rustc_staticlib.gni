@@ -27,8 +27,8 @@ import("//build/rust/rustc_test.gni")
 #   test_configs (optional)
 #     A list of config labels applying to the test target, in addition to those in `configs`.
 #
-#   test_vars (optional)
-#     A scope of variables to forward to the test target.
+#   test_visibility (optional)
+#     An override for the visibility setting for the generated test target when there is one.
 #
 #   enforce_source_listing (optional)
 #     When true, enforces that any source files used by the Rust compiler are
@@ -137,6 +137,13 @@ template("rustc_staticlib") {
                                "test_configs",
                                "test_deps",
                              ])
+
+      # Use a different visibility for this test target if specified.
+      if (defined(test_visibility)) {
+        visibility = []
+        visibility = test_visibility
+      }
+
       output_name = invoker.target_name + "_staticlib_test"
       if (defined(invoker.output_name)) {
         output_name = invoker.output_name + "_staticlib_test"
