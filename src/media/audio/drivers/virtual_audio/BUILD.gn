@@ -6,41 +6,42 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/zbi/kernel_cmdline.gni")
 
-fuchsia_driver_package("virtual-audio-legacy") {
-  driver_components = [ ":virtual-audio-legacy-driver-component" ]
+fuchsia_driver_package("virtual_audio") {
+  driver_components = [ ":virtual_audio_driver" ]
 }
 
-driver_bind_rules("virtual-audio-legacy-bind") {
-  rules = "meta/virtual-audio-legacy.bind"
-  tests = "meta/bind-tests.json"
+driver_bind_rules("virtual_audio_bind") {
+  rules = "meta/virtual_audio.bind"
+  tests = "meta/bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.platform" ]
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":virtual-audio-legacy-bind_test" ]
+  deps = [ ":virtual_audio_bind_test" ]
 }
 
-fuchsia_cc_driver("virtual-audio-legacy-driver") {
+fuchsia_cc_driver("virtual_audio_driver-driver") {
   legacy = true
+  output_name = "virtual_audio_driver"
 
   sources = [
-    "virtual-audio-codec.cc",
-    "virtual-audio-codec.h",
-    "virtual-audio-composite.cc",
-    "virtual-audio-composite.h",
-    "virtual-audio-dai.cc",
-    "virtual-audio-dai.h",
-    "virtual-audio-device.cc",
-    "virtual-audio-device.h",
-    "virtual-audio-legacy.cc",
-    "virtual-audio-legacy.h",
-    "virtual-audio-stream.cc",
-    "virtual-audio-stream.h",
+    "virtual_audio.cc",
+    "virtual_audio.h",
+    "virtual_audio_codec.cc",
+    "virtual_audio_codec.h",
+    "virtual_audio_composite.cc",
+    "virtual_audio_composite.h",
+    "virtual_audio_dai.cc",
+    "virtual_audio_dai.h",
+    "virtual_audio_device.cc",
+    "virtual_audio_device.h",
+    "virtual_audio_stream.cc",
+    "virtual_audio_stream.h",
   ]
 
   deps = [
-    ":virtual-audio-legacy-bind",
+    ":virtual_audio_bind",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
     "//sdk/fidl/fuchsia.virtualaudio:fuchsia.virtualaudio_cpp",
     "//sdk/lib/async:async-cpp",
@@ -58,13 +59,13 @@ fuchsia_cc_driver("virtual-audio-legacy-driver") {
   ]
 }
 
-fuchsia_driver_component("virtual-audio-legacy-driver-component") {
-  component_name = "virtual-audio-legacy-driver"
-  deps = [ ":virtual-audio-legacy-driver" ]
-  info = "meta/virtual-audio-legacy-info.json"
-  manifest = "meta/virtual-audio-legacy-driver.cml"
+fuchsia_driver_component("virtual_audio_driver") {
+  component_name = "virtual_audio_driver"
+  deps = [ ":virtual_audio_driver-driver" ]
+  info = "meta/virtual_audio-info.json"
+  manifest = "meta/virtual_audio_driver.cml"
 }
 
 kernel_cmdline("kernel-logging") {
-  args = [ "driver.virtual-audio-legacy.log=trace" ]
+  args = [ "driver.virtual_audio.log=trace" ]
 }

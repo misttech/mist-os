@@ -180,7 +180,7 @@ const std::set<std::string> kCreateThreadSymbolsDriversAllowlist = {
     "#meta/virtio_scsi.cm",
     "#meta/virtio_socket.cm",
     "#meta/virtio-gpu-display.cm",
-    "#meta/virtual-audio-legacy-driver.cm",
+    "#meta/virtual_audio_driver.cm",
     "#meta/virtual-bus-tester.cm",
     "#meta/wlanif.cm",
     "#meta/wlansoftmac.cm",

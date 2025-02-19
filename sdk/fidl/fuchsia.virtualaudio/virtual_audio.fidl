@@ -17,7 +17,7 @@ const MAX_COUNT_RING_BUFFERS uint32
 const MAX_COUNT_DAI_INTERCONNECTS uint32
         = fuchsia.hardware.audio.signalprocessing.MAX_COUNT_PROCESSING_ELEMENTS;
 
-const CONTROL_NODE_NAME string = "sys/platform/virtual-audio/virtual-audio-legacy";
+const CONTROL_NODE_NAME string = "sys/platform/virtual-audio/virtual_audio";
 
 type Direction = table {
     /// Device type is input (true) or output (false)

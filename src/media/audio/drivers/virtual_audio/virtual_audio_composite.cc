@@ -1,7 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-#include "src/media/audio/drivers/virtual-audio-legacy/virtual-audio-composite.h"
+#include "src/media/audio/drivers/virtual_audio/virtual_audio_composite.h"
 
 #include <fidl/fuchsia.hardware.audio/cpp/common_types.h>
 #include <lib/ddk/debug.h>

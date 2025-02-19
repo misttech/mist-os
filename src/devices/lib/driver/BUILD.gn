@@ -245,7 +245,7 @@ shared_library("driver") {
     "//src/media/audio/drivers/intel-hda/controller:*",
     "//src/media/audio/drivers/testing/realm:*",
     "//src/media/audio/drivers/usb-audio:*",
-    "//src/media/audio/drivers/virtual-audio-legacy:*",
+    "//src/media/audio/drivers/virtual_audio:*",
     "//src/media/drivers/amlogic_decoder:*",
     "//src/storage/fvm/driver:*",
     "//src/testing/fuzzing/syzkaller:*",

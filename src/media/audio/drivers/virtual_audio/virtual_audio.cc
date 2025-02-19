@@ -1,7 +1,7 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-#include "src/media/audio/drivers/virtual-audio-legacy/virtual-audio-legacy.h"
+#include "src/media/audio/drivers/virtual_audio/virtual_audio.h"
 
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/binding_driver.h>
@@ -13,16 +13,16 @@
 
 #include <ddktl/fidl.h>
 
-#include "src/media/audio/drivers/virtual-audio-legacy/virtual-audio-codec.h"
-#include "src/media/audio/drivers/virtual-audio-legacy/virtual-audio-composite.h"
-#include "src/media/audio/drivers/virtual-audio-legacy/virtual-audio-dai.h"
-#include "src/media/audio/drivers/virtual-audio-legacy/virtual-audio-device.h"
-#include "src/media/audio/drivers/virtual-audio-legacy/virtual-audio-stream.h"
+#include "src/media/audio/drivers/virtual_audio/virtual_audio_codec.h"
+#include "src/media/audio/drivers/virtual_audio/virtual_audio_composite.h"
+#include "src/media/audio/drivers/virtual_audio/virtual_audio_dai.h"
+#include "src/media/audio/drivers/virtual_audio/virtual_audio_device.h"
+#include "src/media/audio/drivers/virtual_audio/virtual_audio_stream.h"
 
 namespace virtual_audio {
 
-zx_status_t VirtualAudioLegacy::Bind(void* ctx, zx_device_t* parent) {
-  auto device = std::make_unique<VirtualAudioLegacy>(parent);
+zx_status_t VirtualAudio::Bind(void* ctx, zx_device_t* parent) {
+  auto device = std::make_unique<VirtualAudio>(parent);
   if (zx::result result = device->Init(); result.is_error()) {
     zxlogf(ERROR, "Failed to initialize device: %s", result.status_string());
     return result.status_value();
@@ -35,9 +35,9 @@ zx_status_t VirtualAudioLegacy::Bind(void* ctx, zx_device_t* parent) {
   return ZX_OK;
 }
 
-zx::result<> VirtualAudioLegacy::Init() {
+zx::result<> VirtualAudio::Init() {
   zx_status_t status =
-      DdkAdd(ddk::DeviceAddArgs("virtual-audio-legacy").set_flags(DEVICE_ADD_NON_BINDABLE));
+      DdkAdd(ddk::DeviceAddArgs("virtual_audio").set_flags(DEVICE_ADD_NON_BINDABLE));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to add device: %s", zx_status_get_string(status));
     return zx::error(status);
@@ -46,7 +46,7 @@ zx::result<> VirtualAudioLegacy::Init() {
   return zx::ok();
 }
 
-void VirtualAudioLegacy::DdkUnbind(ddk::UnbindTxn txn) {
+void VirtualAudio::DdkUnbind(ddk::UnbindTxn txn) {
   if (devices_.empty()) {
     zxlogf(INFO, "Unbinding immediately: No devices to shutdown");
     txn.Reply();
@@ -57,14 +57,14 @@ void VirtualAudioLegacy::DdkUnbind(ddk::UnbindTxn txn) {
   ShutdownAllDevices();
 }
 
-void VirtualAudioLegacy::DdkRelease() {
+void VirtualAudio::DdkRelease() {
   // By now, all our lists should be empty and we release.
   ZX_ASSERT(devices_.empty());
   delete this;
 }
 
-void VirtualAudioLegacy::GetDefaultConfiguration(
-    GetDefaultConfigurationRequestView request, GetDefaultConfigurationCompleter::Sync& completer) {
+void VirtualAudio::GetDefaultConfiguration(GetDefaultConfigurationRequestView request,
+                                           GetDefaultConfigurationCompleter::Sync& completer) {
   fidl::Arena arena;
   switch (request->type) {
     case fuchsia_virtualaudio::wire::DeviceType::kComposite:
@@ -90,8 +90,7 @@ void VirtualAudioLegacy::GetDefaultConfiguration(
   }
 }
 
-void VirtualAudioLegacy::AddDevice(AddDeviceRequestView request,
-                                   AddDeviceCompleter::Sync& completer) {
+void VirtualAudio::AddDevice(AddDeviceRequestView request, AddDeviceCompleter::Sync& completer) {
   auto config = fidl::ToNatural(request->config);
   ZX_ASSERT(config.device_specific().has_value());
   auto device_id = next_device_id_++;
@@ -107,7 +106,7 @@ void VirtualAudioLegacy::AddDevice(AddDeviceRequestView request,
   completer.ReplySuccess();
 }
 
-void VirtualAudioLegacy::GetNumDevices(GetNumDevicesCompleter::Sync& completer) {
+void VirtualAudio::GetNumDevices(GetNumDevicesCompleter::Sync& completer) {
   uint32_t num_inputs = 0;
   uint32_t num_outputs = 0;
   uint32_t num_unspecified_direction = 0;
@@ -125,7 +124,7 @@ void VirtualAudioLegacy::GetNumDevices(GetNumDevicesCompleter::Sync& completer) 
   completer.Reply(num_inputs, num_outputs, num_unspecified_direction);
 }
 
-void VirtualAudioLegacy::RemoveAll(RemoveAllCompleter::Sync& completer) {
+void VirtualAudio::RemoveAll(RemoveAllCompleter::Sync& completer) {
   if (devices_.empty()) {
     completer.Reply();
     return;
@@ -135,7 +134,7 @@ void VirtualAudioLegacy::RemoveAll(RemoveAllCompleter::Sync& completer) {
   ShutdownAllDevices();
 }
 
-void VirtualAudioLegacy::OnDeviceShutdown(DeviceId device_id) {
+void VirtualAudio::OnDeviceShutdown(DeviceId device_id) {
   zxlogf(INFO, "Device %lu has shutdown", device_id);
   devices_.erase(device_id);
   if (devices_.empty()) {
@@ -152,7 +151,7 @@ void VirtualAudioLegacy::OnDeviceShutdown(DeviceId device_id) {
   }
 }
 
-void VirtualAudioLegacy::ShutdownAllDevices() {
+void VirtualAudio::ShutdownAllDevices() {
   for (auto& [id, device] : devices_) {
     zxlogf(INFO, "Shutting down device %lu", id);
     device->ShutdownAsync();
@@ -161,11 +160,11 @@ void VirtualAudioLegacy::ShutdownAllDevices() {
 
 }  // namespace virtual_audio
 
-static constexpr zx_driver_ops_t virtual_audio_legacy_driver_ops = []() {
+static constexpr zx_driver_ops_t virtual_audio_driver_ops = []() {
   zx_driver_ops_t ops = {};
   ops.version = DRIVER_OPS_VERSION;
-  ops.bind = &virtual_audio::VirtualAudioLegacy::Bind;
+  ops.bind = &virtual_audio::VirtualAudio::Bind;
   return ops;
 }();
 
-ZIRCON_DRIVER(virtual_audio_legacy, virtual_audio_legacy_driver_ops, "fuchsia", "0.1");
+ZIRCON_DRIVER(virtual_audio, virtual_audio_driver_ops, "fuchsia", "0.1");

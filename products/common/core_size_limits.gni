@@ -249,7 +249,7 @@ size_checker_input = {
       pkgs = [
         "audio-capture-timestamp-validator",
         "audio_ffx_daemon",
-        "virtual-audio-legacy",
+        "virtual_audio",
         "virtual-audio-dfv2",
         "audio-codec-ctl",
         "audio-effects-ctl",

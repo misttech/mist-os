@@ -1,8 +1,8 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-#ifndef SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_LEGACY_VIRTUAL_AUDIO_STREAM_H_
-#define SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_LEGACY_VIRTUAL_AUDIO_STREAM_H_
+#ifndef SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_STREAM_H_
+#define SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_STREAM_H_
 
 #include <fidl/fuchsia.virtualaudio/cpp/wire.h>
 #include <lib/affine/transform.h>
@@ -16,8 +16,8 @@
 #include <audio-proto/audio-proto.h>
 #include <fbl/ref_ptr.h>
 
-#include "src/media/audio/drivers/virtual-audio-legacy/virtual-audio-device.h"
-#include "src/media/audio/drivers/virtual-audio-legacy/virtual-audio-driver.h"
+#include "src/media/audio/drivers/virtual_audio/virtual_audio_device.h"
+#include "src/media/audio/drivers/virtual_audio/virtual_audio_driver.h"
 
 namespace virtual_audio {
 
@@ -243,4 +243,4 @@ class VirtualAudioStreamWrapper : public VirtualAudioDriver {
 
 }  // namespace virtual_audio
 
-#endif  // SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_LEGACY_VIRTUAL_AUDIO_STREAM_H_
+#endif  // SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_STREAM_H_

@@ -9,8 +9,8 @@
     ],
     program: {
         runner: "driver",
-        bind: "meta/bind/virtual-audio-legacy-bind.bindbc",
-        compat: "driver/virtual-audio-legacy-driver.so",
+        bind: "meta/bind/virtual_audio_bind.bindbc",
+        compat: "driver/virtual_audio_driver.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },

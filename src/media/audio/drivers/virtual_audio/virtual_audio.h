@@ -1,8 +1,8 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-#ifndef SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_LEGACY_VIRTUAL_AUDIO_LEGACY_H_
-#define SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_LEGACY_VIRTUAL_AUDIO_LEGACY_H_
+#ifndef SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_H_
+#define SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_H_
 
 #include <fidl/fuchsia.virtualaudio/cpp/fidl.h>
 #include <lib/ddk/device.h>
@@ -16,16 +16,15 @@ namespace virtual_audio {
 
 class VirtualAudioDevice;
 
-class VirtualAudioLegacy;
-using VirtualAudioLegacyDeviceType =
-    ddk::Device<VirtualAudioLegacy, ddk::Unbindable,
-                ddk::Messageable<fuchsia_virtualaudio::Control>::Mixin>;
+class VirtualAudio;
+using VirtualAudioDeviceType = ddk::Device<VirtualAudio, ddk::Unbindable,
+                                           ddk::Messageable<fuchsia_virtualaudio::Control>::Mixin>;
 
-class VirtualAudioLegacy : public VirtualAudioLegacyDeviceType {
+class VirtualAudio : public VirtualAudioDeviceType {
  public:
   static zx_status_t Bind(void* ctx, zx_device_t* parent);
 
-  explicit VirtualAudioLegacy(zx_device_t* parent) : VirtualAudioLegacyDeviceType(parent) {}
+  explicit VirtualAudio(zx_device_t* parent) : VirtualAudioDeviceType(parent) {}
 
   void DdkRelease();
   void DdkUnbind(ddk::UnbindTxn txn);
@@ -60,4 +59,4 @@ class VirtualAudioLegacy : public VirtualAudioLegacyDeviceType {
 
 }  // namespace virtual_audio
 
-#endif  // SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_LEGACY_VIRTUAL_AUDIO_LEGACY_H_
+#endif  // SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_H_
