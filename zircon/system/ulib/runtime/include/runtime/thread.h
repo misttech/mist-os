@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#pragma once
+#ifndef RUNTIME_THREAD_H_
+#define RUNTIME_THREAD_H_
 
 #include <stddef.h>
 #include <stdint.h>
@@ -100,4 +101,13 @@ zx_status_t zxr_thread_destroy(zxr_thread_t* thread);
 // different thread after zxr_thread_join() or zxr_thread_detach() is called.
 zx_handle_t zxr_thread_get_handle(zxr_thread_t* thread);
 
+// Get the zx_handle_t corresponding to |thread| which must correspond to
+// the calling thread. This is not safe to call on other threads.
+// The returned handle is not a duplicate, and should be duplicated to avoid
+// the potential for invalid handle use if the caller intends to use it on a
+// different thread after zxr_thread_join() or zxr_thread_detach() is called.
+zx_handle_t zxr_thread_self_handle(zxr_thread_t* thread);
+
 __END_CDECLS
+
+#endif  // RUNTIME_THREAD_H_

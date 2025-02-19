@@ -288,6 +288,8 @@ zx_handle_t zxr_thread_get_handle(zxr_thread_t* thread) {
   return to_internal(thread)->handle;
 }
 
+zx_handle_t zxr_thread_self_handle(zxr_thread_t* thread) { return to_internal(thread)->handle; }
+
 zx_status_t zxr_thread_adopt(zx_handle_t handle, zxr_thread_t* thread) {
   initialize_thread(to_internal(thread), handle, false);
   return handle == ZX_HANDLE_INVALID ? ZX_ERR_BAD_HANDLE : ZX_OK;
