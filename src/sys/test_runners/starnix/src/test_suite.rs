@@ -21,8 +21,11 @@ use zx::sys::ZX_CHANNEL_MAX_MSG_BYTES;
 use {fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata};
 
 /// Determines what type of tests the program is.
-fn get_test_type(program: &fdata::Dictionary) -> Result<TestType, Error> {
-    match get_opt_str_value_from_dict(program, "test_type")?.as_deref() {
+///
+/// Removes this from the original start info because the start info is later passed on to the
+/// Starnix kernel.
+fn remove_test_type(program: &mut fdata::Dictionary) -> Result<TestType, Error> {
+    match take_opt_str_value_from_dict(program, "test_type")?.as_deref() {
         Some("binder_latency") => Ok(TestType::BinderLatency),
         Some("gbenchmark") => Ok(TestType::Gbenchmark),
         Some("gtest") => Ok(TestType::Gtest),
@@ -35,6 +38,27 @@ fn get_test_type(program: &fdata::Dictionary) -> Result<TestType, Error> {
         // If test_type is not specified, then just run the component as a single test case.
         None => Ok(TestType::SingleTest),
     }
+}
+
+fn take_opt_str_value_from_dict(
+    dict: &mut fdata::Dictionary,
+    name: &str,
+) -> Result<Option<String>, Error> {
+    match take_value(dict, name) {
+        Some(fdata::DictionaryValue::Str(value)) => Ok(Some(value.clone())),
+        Some(_) => Err(anyhow!("{} must a string", name)),
+        _ => Ok(None),
+    }
+}
+
+fn take_value<'a>(dict: &mut fdata::Dictionary, key: &str) -> Option<fdata::DictionaryValue> {
+    let entries = dict.entries.as_mut()?;
+    for i in 0..entries.len() {
+        if entries[i].key == key {
+            return entries.remove(i).value.map(|b| *b);
+        }
+    }
+    None
 }
 
 async fn component_runner_from_start_info(
@@ -61,7 +85,7 @@ pub async fn handle_suite_requests(
     mut stream: ftest::SuiteRequestStream,
 ) -> Result<(), Error> {
     debug!(start_info:?; "got suite request stream");
-    let test_type = get_test_type(start_info.program.as_ref().unwrap())?;
+    let test_type = remove_test_type(start_info.program.as_mut().unwrap())?;
 
     // The kernel start info is largely the same as that of the test component. The main difference
     // is that the `container_start_info` does not contain the outgoing directory of the test component.
