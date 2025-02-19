@@ -25,11 +25,16 @@ source_set("common") {
     "virtual-audio-dfv2.cc",
     "virtual-audio-dfv2.h",
   ]
-  deps = [ "//src/devices/lib/driver:driver_runtime" ]
+  deps = [
+    "//src/devices/lib/driver:driver_runtime",
+    "//src/media/audio/drivers/lib/audio-proto-utils",
+    "//zircon/system/ulib/fbl",
+  ]
   public_deps = [
     "//sdk/fidl/fuchsia.virtualaudio:fuchsia.virtualaudio_cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/devfs/cpp",
+    "//zircon/system/ulib/fzl",
   ]
 }
 

@@ -9,6 +9,8 @@
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
 
+#include "src/media/audio/drivers/virtual-audio-dfv2/virtual-audio-composite.h"
+
 namespace virtual_audio {
 
 class VirtualAudio : public fdf::DriverBase,
@@ -38,6 +40,9 @@ class VirtualAudio : public fdf::DriverBase,
   fidl::ServerBindingGroup<fuchsia_virtualaudio::Control> bindings_;
   driver_devfs::Connector<fuchsia_virtualaudio::Control> devfs_connector_{
       fit::bind_member<&VirtualAudio::Serve>(this)};
+  std::unordered_map<VirtualAudioComposite::InstanceId, std::unique_ptr<VirtualAudioComposite>>
+      devices_;
+  VirtualAudioComposite::InstanceId next_device_instance_id_ = 0;
 };
 
 }  // namespace virtual_audio

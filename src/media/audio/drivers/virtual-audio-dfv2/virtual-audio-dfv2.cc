@@ -6,8 +6,6 @@
 
 #include <lib/driver/component/cpp/driver_export.h>
 
-#include "src/media/audio/drivers/virtual-audio-dfv2/virtual-audio-composite.h"
-
 namespace virtual_audio {
 
 zx::result<> VirtualAudio::Start() {
@@ -48,17 +46,48 @@ void VirtualAudio::GetDefaultConfiguration(GetDefaultConfigurationRequestView re
 }
 
 void VirtualAudio::AddDevice(AddDeviceRequestView request, AddDeviceCompleter::Sync& completer) {
-  // TODO(b/388880875): Implement logic.
-  completer.ReplyError(fuchsia_virtualaudio::Error::kNotSupported);
+  const auto& config = fidl::ToNatural(request->config);
+  const std::optional device_specific = config.device_specific();
+  if (!device_specific.has_value()) {
+    FDF_LOG(ERROR, "Missing device_specific field");
+    completer.ReplyError(fuchsia_virtualaudio::Error::kInvalidArgs);
+    return;
+  }
+  const auto& device_type = device_specific.value().Which();
+  if (device_type != fuchsia_virtualaudio::DeviceSpecific::Tag::kComposite) {
+    FDF_LOG(ERROR, "Unsupported device type %u",
+            static_cast<uint32_t>(device_specific.value().Which()));
+    completer.ReplyError(fuchsia_virtualaudio::Error::kInvalidArgs);
+    return;
+  }
+
+  auto device_instance_id = next_device_instance_id_++;
+  zx::result device = VirtualAudioComposite::Create(
+      device_instance_id, dispatcher(), std::move(request->server),
+      [this, device_instance_id](auto _) {
+        FDF_LOG(INFO, "Removing device %lu: Device's binding closed", device_instance_id);
+        devices_.erase(device_instance_id);
+      },
+      [this](std::string_view child_node_name, fuchsia_driver_framework::DevfsAddArgs& devfs_args) {
+        return AddOwnedChild(child_node_name, devfs_args);
+      });
+  if (device.is_error()) {
+    FDF_LOG(ERROR, "Failed to create virtual audio composite device: %s", device.status_string());
+    completer.ReplyError(fuchsia_virtualaudio::Error::kInternal);
+    return;
+  }
+  devices_[device_instance_id] = std::move(device.value());
+  FDF_LOG(INFO, "Create virtual audio composite device %lu", device_instance_id);
+
+  completer.ReplySuccess();
 }
 
 void VirtualAudio::GetNumDevices(GetNumDevicesCompleter::Sync& completer) {
-  // TODO(b/388880875): Implement logic.
-  completer.Reply(0, 0, 0);
+  completer.Reply(0, 0, static_cast<uint32_t>(devices_.size()));
 }
 
 void VirtualAudio::RemoveAll(RemoveAllCompleter::Sync& completer) {
-  // TODO(b/388880875): Implement logic.
+  devices_.clear();
   completer.Reply();
 }
 
