@@ -918,19 +918,19 @@ impl MemoryManagerState {
             MappingBacking::Memory(backing) => {
                 if private_anonymous {
                     let new_memory_size = backing
-                        .memory_offset
+                        .memory_offset()
                         .checked_add(final_length as u64)
                         .ok_or_else(|| errno!(EINVAL))?;
                     backing
-                        .memory
+                        .memory()
                         .set_size(new_memory_size)
                         .map_err(MemoryManager::get_errno_for_map_err)?;
                     // Zero-out the pages that were added when growing. This is not necessary, but ensures
                     // correctness of our COW implementation. Ignore any errors.
                     let original_length = original_range.end - original_range.start;
-                    let _ = backing.memory.op_range(
+                    let _ = backing.memory().op_range(
                         zx::VmoOp::ZERO,
-                        backing.memory_offset + original_length as u64,
+                        backing.memory_offset() + original_length as u64,
                         (final_length - original_length) as u64,
                     );
                 }
@@ -939,8 +939,8 @@ impl MemoryManagerState {
                 Ok(Some(self.map_memory(
                     mm,
                     DesiredAddress::FixedOverwrite(original_range.start),
-                    backing.memory.clone(),
-                    backing.memory_offset,
+                    backing.memory().clone(),
+                    backing.memory_offset(),
                     final_length,
                     original_mapping.flags(),
                     original_mapping.max_access(),
@@ -1041,10 +1041,10 @@ impl MemoryManagerState {
                     // This mapping is a private, anonymous mapping. Create a COW child memory object that covers
                     // the pages being moved and map that into the destination.
                     let child_memory = backing
-                        .memory
+                        .memory()
                         .create_child(
                             zx::VmoChildOptions::SNAPSHOT | zx::VmoChildOptions::RESIZABLE,
-                            backing.memory_offset + offset_into_original_range,
+                            backing.memory_offset() + offset_into_original_range,
                             dst_length as u64,
                         )
                         .map_err(MemoryManager::get_errno_for_map_err)?;
@@ -1065,7 +1065,7 @@ impl MemoryManagerState {
                 } else {
                     // This mapping is backed by an FD, just map the range of the memory object covering the moved
                     // pages. If the memory object already had COW semantics, this preserves them.
-                    (backing.memory_offset + offset_into_original_range, backing.memory.clone())
+                    (backing.memory_offset() + offset_into_original_range, backing.memory().clone())
                 }
             }
             #[cfg(feature = "alternate_anon_allocs")]
@@ -1296,15 +1296,15 @@ impl MemoryManagerState {
             if let Some((range, mut mapping)) = truncated_tail {
                 let MappingBacking::Memory(mut backing) = mapping.backing().clone();
                 mm.inflight_vmspliced_payloads
-                    .handle_unmapping(&backing.memory, &unmap_range.intersect(&range))?;
+                    .handle_unmapping(&backing.memory(), &unmap_range.intersect(&range))?;
 
                 // Create and map a child COW memory object mapping that represents the truncated tail.
-                let memory_info = backing.memory.basic_info();
+                let memory_info = backing.memory().basic_info();
                 let child_memory_offset =
-                    (range.start - backing.base) as u64 + backing.memory_offset;
+                    (range.start - backing.base()) as u64 + backing.memory_offset();
                 let child_length = range.end - range.start;
                 let mut child_memory = backing
-                    .memory
+                    .memory()
                     .create_child(
                         zx::VmoChildOptions::SNAPSHOT | zx::VmoChildOptions::RESIZABLE,
                         child_memory_offset,
@@ -1318,13 +1318,13 @@ impl MemoryManagerState {
                 }
 
                 // Update the mapping.
-                backing.memory = Arc::new(child_memory);
-                backing.base = range.start;
-                backing.memory_offset = 0;
+                backing.set_memory(Arc::new(child_memory));
+                backing.set_base(range.start);
+                backing.set_memory_offset(0);
 
                 self.map_in_user_vmar(
                     SelectedAddress::FixedOverwrite(range.start),
-                    &backing.memory,
+                    backing.memory(),
                     0,
                     child_length,
                     mapping.flags(),
@@ -1339,13 +1339,13 @@ impl MemoryManagerState {
             if let Some((range, mapping)) = truncated_head {
                 let MappingBacking::Memory(backing) = mapping.backing();
                 mm.inflight_vmspliced_payloads
-                    .handle_unmapping(&backing.memory, &unmap_range.intersect(&range))?;
+                    .handle_unmapping(backing.memory(), &unmap_range.intersect(&range))?;
 
                 // Resize the memory object of the head mapping, whose tail was cut off.
                 let new_mapping_size = (range.end - range.start) as u64;
-                let new_memory_size = backing.memory_offset + new_mapping_size;
+                let new_memory_size = backing.memory_offset() + new_mapping_size;
                 backing
-                    .memory
+                    .memory()
                     .set_size(new_memory_size)
                     .map_err(MemoryManager::get_errno_for_map_err)?;
             }
@@ -1492,8 +1492,8 @@ impl MemoryManagerState {
                 let new_mapping = match mapping.backing() {
                     MappingBacking::Memory(backing) => Mapping::with_name(
                         range_to_zero.start,
-                        backing.memory.clone(),
-                        backing.memory_offset + start,
+                        backing.memory().clone(),
+                        backing.memory_offset() + start,
                         new_flags,
                         mapping.max_access(),
                         mapping.name().clone(),
@@ -1536,7 +1536,7 @@ impl MemoryManagerState {
                 };
 
                 let memory = match mapping.backing() {
-                    MappingBacking::Memory(backing) => &backing.memory,
+                    MappingBacking::Memory(backing) => backing.memory(),
                     #[cfg(feature = "alternate_anon_allocs")]
                     MappingBacking::PrivateAnonymous => &self.private_anonymous.backing,
                 };
@@ -1583,7 +1583,7 @@ impl MemoryManagerState {
                     MappingBacking::Memory(m) => VmsplicePayloadSegment {
                         addr_offset: address,
                         length,
-                        memory: m.memory.clone(),
+                        memory: m.memory().clone(),
                         memory_offset: m.address_to_offset(address),
                     },
                     #[cfg(feature = "alternate_anon_allocs")]
@@ -3161,7 +3161,8 @@ impl MemoryManager {
             }
             match mapping.backing() {
                 MappingBacking::Memory(backing) => {
-                    let memory_offset = backing.memory_offset + (range.start - backing.base) as u64;
+                    let memory_offset =
+                        backing.memory_offset() + (range.start - backing.base()) as u64;
                     let length = range.end - range.start;
 
                     let target_memory = if mapping.flags().contains(MappingFlags::SHARED)
@@ -3169,15 +3170,15 @@ impl MemoryManager {
                     {
                         // Note that the Vvar is a special mapping that behaves like a shared mapping but
                         // is private to each process.
-                        backing.memory.clone()
+                        backing.memory().clone()
                     } else if mapping.flags().contains(MappingFlags::WIPEONFORK) {
                         create_anonymous_mapping_memory(length as u64)?
                     } else {
-                        let basic_info = backing.memory.basic_info();
+                        let basic_info = backing.memory().basic_info();
                         let memory = match clone_cache.entry(basic_info.koid) {
                             Entry::Occupied(o) => o.into_mut(),
                             Entry::Vacant(v) => {
-                                v.insert(clone_memory(&backing.memory, basic_info.rights)?)
+                                v.insert(clone_memory(backing.memory(), basic_info.rights)?)
                             }
                         };
                         memory.clone()
@@ -3608,10 +3609,10 @@ impl MemoryManager {
                 let MappingBacking::Memory(backing) = mapping.backing();
                 match &name {
                     Some(memory_name) => {
-                        backing.memory.set_zx_name(memory_name);
+                        backing.memory().set_zx_name(memory_name);
                     }
                     None => {
-                        backing.memory.set_zx_name(b"");
+                        backing.memory().set_zx_name(b"");
                     }
                 }
             }
@@ -3623,8 +3624,8 @@ impl MemoryManager {
                 let tail_mapping = match mapping.backing() {
                     MappingBacking::Memory(backing) => Mapping::new(
                         end,
-                        backing.memory.clone(),
-                        backing.memory_offset + tail_offset as u64,
+                        backing.memory().clone(),
+                        backing.memory_offset() + tail_offset as u64,
                         mapping.flags(),
                         mapping.max_access(),
                         mapping.file_write_guard().clone(),
@@ -3699,7 +3700,7 @@ impl MemoryManager {
         }
         match mapping.backing() {
             MappingBacking::Memory(backing) => {
-                Ok((Arc::clone(&backing.memory), mapping.address_to_offset(addr)))
+                Ok((Arc::clone(backing.memory()), mapping.address_to_offset(addr)))
             }
             #[cfg(feature = "alternate_anon_allocs")]
             MappingBacking::PrivateAnonymous => {
@@ -3824,7 +3825,7 @@ impl MemoryManager {
                 .expect("mapping bookkeeping must be consistent with zircon's");
             debug_assert_eq!(
                 match mm_mapping.backing() {
-                    MappingBacking::Memory(m) => m.memory.get_koid(),
+                    MappingBacking::Memory(m) => m.memory().get_koid(),
                     #[cfg(feature = "alternate_anon_allocs")]
                     MappingBacking::PrivateAnonymous => state.private_anonymous.backing.get_koid(),
                 },
@@ -3949,7 +3950,7 @@ fn write_map(
         if map.can_exec() { 'x' } else { '-' },
         if map.flags().contains(MappingFlags::SHARED) { 's' } else { 'p' },
         match map.backing() {
-            MappingBacking::Memory(backing) => backing.memory_offset,
+            MappingBacking::Memory(backing) => backing.memory_offset(),
             #[cfg(feature = "alternate_anon_allocs")]
             MappingBacking::PrivateAnonymous => 0,
         },
@@ -4094,7 +4095,7 @@ impl SequenceFileSource for ProcSmapsFile {
 
             let (committed_bytes, share_count) = match map.backing() {
                 MappingBacking::Memory(backing) => {
-                    let memory_info = backing.memory.info()?;
+                    let memory_info = backing.memory().info()?;
                     (memory_info.committed_bytes, memory_info.share_count as u64)
                 }
                 #[cfg(feature = "alternate_anon_allocs")]
@@ -4932,10 +4933,10 @@ mod tests {
         let original_memory = {
             match mapping.backing() {
                 MappingBacking::Memory(backing) => {
-                    assert_eq!(backing.base, addr);
-                    assert_eq!(backing.memory_offset, 0);
-                    assert_eq!(backing.memory.get_size(), *PAGE_SIZE * 2);
-                    backing.memory.clone()
+                    assert_eq!(backing.base(), addr);
+                    assert_eq!(backing.memory_offset(), 0);
+                    assert_eq!(backing.memory().get_size(), *PAGE_SIZE * 2);
+                    backing.memory().clone()
                 }
             }
         };
@@ -4958,10 +4959,10 @@ mod tests {
             #[cfg(not(feature = "alternate_anon_allocs"))]
             match mapping.backing() {
                 MappingBacking::Memory(backing) => {
-                    assert_eq!(backing.base, addr + *PAGE_SIZE);
-                    assert_eq!(backing.memory_offset, 0);
-                    assert_eq!(backing.memory.get_size(), *PAGE_SIZE);
-                    assert_ne!(original_memory.get_koid(), backing.memory.get_koid());
+                    assert_eq!(backing.base(), addr + *PAGE_SIZE);
+                    assert_eq!(backing.memory_offset(), 0);
+                    assert_eq!(backing.memory().get_size(), *PAGE_SIZE);
+                    assert_ne!(original_memory.get_koid(), backing.memory().get_koid());
                 }
             }
         }
@@ -4986,10 +4987,10 @@ mod tests {
         let original_memory = {
             match mapping.backing() {
                 MappingBacking::Memory(backing) => {
-                    assert_eq!(backing.base, addr);
-                    assert_eq!(backing.memory_offset, 0);
-                    assert_eq!(backing.memory.get_size(), *PAGE_SIZE * 2);
-                    backing.memory.clone()
+                    assert_eq!(backing.base(), addr);
+                    assert_eq!(backing.memory_offset(), 0);
+                    assert_eq!(backing.memory().get_size(), *PAGE_SIZE * 2);
+                    backing.memory().clone()
                 }
             }
         };
@@ -5012,10 +5013,10 @@ mod tests {
             #[cfg(not(feature = "alternate_anon_allocs"))]
             match mapping.backing() {
                 MappingBacking::Memory(backing) => {
-                    assert_eq!(backing.base, addr);
-                    assert_eq!(backing.memory_offset, 0);
-                    assert_eq!(backing.memory.get_size(), *PAGE_SIZE);
-                    assert_eq!(original_memory.get_koid(), backing.memory.get_koid());
+                    assert_eq!(backing.base(), addr);
+                    assert_eq!(backing.memory_offset(), 0);
+                    assert_eq!(backing.memory().get_size(), *PAGE_SIZE);
+                    assert_eq!(original_memory.get_koid(), backing.memory().get_koid());
                 }
             }
         }
@@ -5058,10 +5059,10 @@ mod tests {
         let original_memory2 = {
             match mapping2.backing() {
                 MappingBacking::Memory(backing) => {
-                    assert_eq!(backing.base, addr2);
-                    assert_eq!(backing.memory_offset, 0);
-                    assert_eq!(backing.memory.get_size(), *PAGE_SIZE);
-                    backing.memory.clone()
+                    assert_eq!(backing.base(), addr2);
+                    assert_eq!(backing.memory_offset(), 0);
+                    assert_eq!(backing.memory().get_size(), *PAGE_SIZE);
+                    backing.memory().clone()
                 }
             }
         };
@@ -5083,10 +5084,10 @@ mod tests {
         #[cfg(not(feature = "alternate_anon_allocs"))]
         match mapping2.backing() {
             MappingBacking::Memory(backing) => {
-                assert_eq!(backing.base, addr2);
-                assert_eq!(backing.memory_offset, 0);
-                assert_eq!(backing.memory.get_size(), *PAGE_SIZE);
-                assert_eq!(original_memory2.get_koid(), backing.memory.get_koid());
+                assert_eq!(backing.base(), addr2);
+                assert_eq!(backing.memory_offset(), 0);
+                assert_eq!(backing.memory().get_size(), *PAGE_SIZE);
+                assert_eq!(original_memory2.get_koid(), backing.memory().get_koid());
             }
         }
     }
@@ -5111,10 +5112,10 @@ mod tests {
         let original_memory = {
             match mapping.backing() {
                 MappingBacking::Memory(backing) => {
-                    assert_eq!(backing.base, addr);
-                    assert_eq!(backing.memory_offset, 0);
-                    assert_eq!(backing.memory.get_size(), *PAGE_SIZE * 3);
-                    backing.memory.clone()
+                    assert_eq!(backing.base(), addr);
+                    assert_eq!(backing.memory_offset(), 0);
+                    assert_eq!(backing.memory().get_size(), *PAGE_SIZE * 3);
+                    backing.memory().clone()
                 }
             }
         };
@@ -5137,10 +5138,10 @@ mod tests {
             // The first page's memory object should be the same as the original, only shrunk.
             match mapping.backing() {
                 MappingBacking::Memory(backing) => {
-                    assert_eq!(backing.base, addr);
-                    assert_eq!(backing.memory_offset, 0);
-                    assert_eq!(backing.memory.get_size(), *PAGE_SIZE);
-                    assert_eq!(original_memory.get_koid(), backing.memory.get_koid());
+                    assert_eq!(backing.base(), addr);
+                    assert_eq!(backing.memory_offset(), 0);
+                    assert_eq!(backing.memory().get_size(), *PAGE_SIZE);
+                    assert_eq!(original_memory.get_koid(), backing.memory().get_koid());
                 }
             }
 
@@ -5153,10 +5154,10 @@ mod tests {
             // The last page should be a new child COW memory object.
             match &mapping.backing() {
                 MappingBacking::Memory(backing) => {
-                    assert_eq!(backing.base, addr + *PAGE_SIZE * 2);
-                    assert_eq!(backing.memory_offset, 0);
-                    assert_eq!(backing.memory.get_size(), *PAGE_SIZE);
-                    assert_ne!(original_memory.get_koid(), backing.memory.get_koid());
+                    assert_eq!(backing.base(), addr + *PAGE_SIZE * 2);
+                    assert_eq!(backing.memory_offset(), 0);
+                    assert_eq!(backing.memory().get_size(), *PAGE_SIZE);
+                    assert_ne!(original_memory.get_koid(), backing.memory().get_koid());
                 }
             }
         }
