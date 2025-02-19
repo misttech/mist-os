@@ -17,7 +17,7 @@ use assembly_file_relative_path::SupportsFileRelativePaths;
 use assembly_images_config::{FilesystemImageMode, ImagesConfig};
 use assembly_tool::SdkToolProvider;
 use assembly_util::read_config;
-use camino::{Utf8Path, Utf8PathBuf};
+use camino::Utf8PathBuf;
 use ffx_assembly_args::{PackageValidationHandling, ProductArgs};
 use tracing::info;
 
@@ -53,14 +53,16 @@ Resulting product is not supported and may misbehave!
     }
 
     let product_config_dir = product;
-    let board_info_path = board_info;
+    let board_config_dir = board_info;
 
     let product_config =
         AssemblyConfig::from_dir(&product_config_dir).context("Reading product configuration")?;
+    let board_config =
+        BoardInformation::from_dir(&board_config_dir).context("Reading board configuration")?;
 
     // If there are developer overrides, then those need to be parsed  and applied before other
     // actions can be taken, since they impact how the rest of the assembly process works.
-    let (product_config, board_info, developer_overrides) = if let Some(overrides_path) =
+    let (product_config, board_config, developer_overrides) = if let Some(overrides_path) =
         developer_overrides
     {
         let developer_overrides = read_config::<DeveloperOverrides>(&overrides_path)
@@ -87,15 +89,9 @@ Resulting product is not supported and may misbehave!
             .context("Merging developer overrides into product configuration")?;
 
         // Apply the board overrides.
-        let board_config_overrides = developer_overrides.board;
-        let board_info = read_config::<serde_json::Value>(&board_info_path)
-            .context("Reading board information")?;
-        let board_info = merge_override_values_with_resolved_paths(
-            board_info,
-            Some(&board_info_path),
-            board_config_overrides,
-        )
-        .context("Merging developer overrides into board configuration")?;
+        let board_config = board_config
+            .apply_overrides(developer_overrides.board)
+            .context("Merging developer overrides into board configuration")?;
 
         // Reconstitute the developer overrides struct, but with a null platform and product
         // configs, since they've been used to modify the main platform and product configurations.
@@ -112,13 +108,9 @@ Resulting product is not supported and may misbehave!
             product_config.platform.storage.filesystems.image_mode = FilesystemImageMode::Ramdisk;
         }
 
-        (product_config, board_info, Some(developer_overrides))
+        (product_config, board_config, Some(developer_overrides))
     } else {
-        let board_info = read_config::<BoardInformation>(&board_info_path)
-            .context("Reading board configuration")?
-            .resolve_paths_from_file(&board_info_path)
-            .context("Resolving paths in board config")?;
-        (product_config, board_info, None)
+        (product_config, board_config, None)
     };
 
     let platform = product_config.platform;
@@ -127,7 +119,7 @@ Resulting product is not supported and may misbehave!
     // Parse the board's Board Input Bundles, if it has them, and merge their
     // configuration fields into that of the board_info struct.
     let mut board_input_bundles = Vec::new();
-    for bundle_path in board_info.input_bundles.map.values() {
+    for bundle_path in board_config.input_bundles.map.values() {
         let bundle = BoardInputBundle::from_dir(&bundle_path)
             .with_context(|| format!("Reading board input bundle: {bundle_path}"))?;
         board_input_bundles.push((bundle_path.clone(), bundle));
@@ -154,16 +146,16 @@ Resulting product is not supported and may misbehave!
         board_configuration_files.first().map(|(_, cfg)| (*cfg).clone()).unwrap_or_default()
     };
 
-    // Replace board_info with a new one that swaps its empty 'configuraton' field
+    // Replace board_config with a new one that swaps its empty 'configuraton' field
     // for the consolidated one created from the board's input bundles.
-    let board_info = BoardInformation { configuration: board_provided_config, ..board_info };
+    let board_config = BoardInformation { configuration: board_provided_config, ..board_config };
 
     // Get platform configuration based on the AssemblyConfig and the BoardInformation.
     let resource_dir = input_bundles_dir.join("resources");
     let configuration = assembly_platform_configuration::define_configuration(
         &platform,
         &product,
-        &board_info,
+        &board_config,
         &outdir,
         &resource_dir,
         developer_overrides.as_ref().and_then(|o| Some(&o.developer_only_options)),
@@ -173,7 +165,7 @@ Resulting product is not supported and may misbehave!
     // and start doing the work of creating the image assembly config.
     let image_mode = platform.storage.filesystems.image_mode;
     let mut builder =
-        ImageAssemblyConfigBuilder::new(platform.build_type, board_info.name.clone(), image_mode);
+        ImageAssemblyConfigBuilder::new(platform.build_type, board_config.name.clone(), image_mode);
 
     // Set the developer overrides, if any.
     if let Some(developer_overrides) = developer_overrides {
@@ -194,7 +186,7 @@ Resulting product is not supported and may misbehave!
 
     // Set the info used for BoardDriver arguments.
     builder
-        .set_board_driver_arguments(&board_info)
+        .set_board_driver_arguments(&board_config)
         .context("Setting arguments for the Board Driver")?;
 
     // Set the configuration for the rest of the packages.
@@ -291,12 +283,12 @@ Resulting product is not supported and may misbehave!
         .context("Adding product-provided base-drivers")?;
 
     // Add devicetree binary
-    if let Some(devicetree_path) = &board_info.devicetree {
+    if let Some(devicetree_path) = &board_config.devicetree {
         builder
             .add_devicetree(devicetree_path.as_utf8_pathbuf())
             .context("Adding devicetree binary")?;
     }
-    if let Some(devicetree_overlay_path) = &board_info.devicetree_overlay {
+    if let Some(devicetree_overlay_path) = &board_config.devicetree_overlay {
         builder
             .add_devicetree_overlay(devicetree_overlay_path.as_utf8_pathbuf())
             .context("Adding devicetree binary overlay")?;
@@ -307,7 +299,7 @@ Resulting product is not supported and may misbehave!
         .set_images_config(
             ImagesConfig::from_product_and_board(
                 &platform.storage.filesystems,
-                &board_info.filesystems,
+                &board_config.filesystems,
             )
             .context("Constructing images config")?,
         )
@@ -340,7 +332,7 @@ Resulting product is not supported and may misbehave!
         std::fs::File::create(&board_forensics_file_path).with_context(|| {
             format!("Failed to create builder forensics files: {builder_forensics_file_path}")
         })?;
-    serde_json::to_writer_pretty(board_forensics_file, &board_info)
+    serde_json::to_writer_pretty(board_forensics_file, &board_config)
         .with_context(|| format!("Writing board forensics file to: {board_forensics_file_path}"))?;
 
     // Get the tool set.
@@ -373,53 +365,6 @@ Resulting product is not supported and may misbehave!
 
 fn make_bundle_path(bundles_dir: &Utf8PathBuf, name: &str) -> Utf8PathBuf {
     bundles_dir.join(name).join("assembly_config.json")
-}
-
-/// Merge overrides into the main configuration, after having resolved paths in the main
-/// configuration, if that's necessary.
-///
-/// This requires:
-///   1. deserialize the configuration struct
-///   2. resolve paths if necessary
-///   3. re-serialize to a serde_json::Value
-///   4. perform the merge operation
-///   5. deserialize the configuration struct
-///
-fn merge_override_values_with_resolved_paths<
-    T: SupportsFileRelativePaths + serde::de::DeserializeOwned + serde::Serialize,
-    P: AsRef<Utf8Path>,
->(
-    config: serde_json::Value,
-    config_path: Option<&P>,
-    overrides: serde_json::Value,
-) -> Result<T> {
-    // Only perform the relativization if there's a config_path.
-    let config = if let Some(config_path) = config_path {
-        let parsed_config =
-            serde_json::from_value::<T>(config).context("Parsing configuration value")?;
-        let resolved_config = parsed_config
-            .resolve_paths_from_file(config_path)
-            .context("Resolving paths in parsed configuration value")?;
-        serde_json::to_value(resolved_config)
-            .context("Reserializing configuration value with resolved paths")?
-    } else {
-        config
-    };
-
-    let merged = assembly_config_schema::try_merge_into::<T>(config, overrides)
-        .context("Merging platform config developer overrides")?;
-
-    // Because serde_json and serde_json5 deserialize enums differently, we need to bounce the
-    // serde_json::Value of the platform config through a string so that we can re-parse it
-    // using serde_json5.
-    // TODO: Remove this after the following issue is fixed:
-    // https://github.com/google/serde_json5/issues/10
-    let merged_json5 = serde_json::to_string_pretty(&merged)
-        .context("Creating intermediate json5 from merged value")?;
-
-    // Now deserialize the merged and serialized json5.  This works around the issue with enums.
-    serde_json5::from_str(&merged_json5)
-        .context("Deserializing merged value from intermediate json5")
 }
 
 fn print_developer_overrides_banner(

@@ -32,7 +32,7 @@
       "optionality": "required",
       "long": "--board-info",
       "short": null,
-      "description": "the file containing information about the board that the product is being assembled to run on.",
+      "description": "the board configuration directory.",
       "hidden": false
     },
     {

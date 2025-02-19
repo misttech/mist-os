@@ -246,8 +246,7 @@ pub struct ProductArgs {
     #[argh(option)]
     pub product: Utf8PathBuf,
 
-    /// the file containing information about the board that the product is
-    /// being assembled to run on.
+    /// the board configuration directory.
     #[argh(option)]
     pub board_info: Utf8PathBuf,
 

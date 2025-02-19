@@ -531,10 +531,10 @@ template("assembled_system") {
       # Assembly will fail without it, but this template is still being invoked in
       # configurations that don't define a board.
       if (defined(labels.board_config_label)) {
-        board_config =
+        board_config_dir =
             get_label_info(labels.board_config_label, "target_out_dir") + "/" +
-            get_label_info(labels.board_config_label, "name") +
-            "/board_configuration.json"
+            get_label_info(labels.board_config_label, "name")
+        board_config = "${board_config_dir}/board_configuration.json"
       }
 
       gendir = "$outdir/gen"
@@ -703,7 +703,7 @@ template("assembled_system") {
       if (defined(files.board_config)) {
         args += [
           "--board-info",
-          rebase_path(files.board_config, root_build_dir),
+          rebase_path(files.board_config_dir, root_build_dir),
         ]
         inputs += [ files.board_config ]
       }

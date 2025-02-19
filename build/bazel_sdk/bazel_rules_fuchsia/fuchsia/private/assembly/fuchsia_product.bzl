@@ -66,13 +66,9 @@ def _fuchsia_product_assembly_impl(ctx):
         **LOCAL_ONLY_ACTION_KWARGS
     )
 
-    # Calculate the path to the board configuration file, if it's not directly
-    # provided.
-    board_config = ctx.attr.board_config[FuchsiaBoardConfigInfo]
-    board_config_file_path = board_config.directory + "/board_configuration.json"
-
     # Invoke Product Assembly
     product_config = ctx.attr.product_config[FuchsiaProductConfigInfo]
+    board_config = ctx.attr.board_config[FuchsiaBoardConfigInfo]
 
     build_type = product_config.build_type
     build_id_dirs = []
@@ -93,7 +89,7 @@ def _fuchsia_product_assembly_impl(ctx):
         "--product",
         product_config.directory,
         "--board-info",
-        board_config_file_path,
+        board_config.directory,
         "--input-bundles-dir",
         platform_artifacts.root,
         "--outdir",
