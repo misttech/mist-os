@@ -202,7 +202,7 @@ serde_derive = "1.0.147"
 serde_json = "1.0.128"
 serde_json5 = "0.1.0"
 serde_repr = "0.1.7"
-sha1 = "0.10.5"
+sha1 = "0.10.6"
 sha2 = "0.10.2"
 signature =  "1.4.0"
 # TODO(https://fxbug.dev/385403698): add a visibility allowlist to prevent unintended usage when
@@ -925,7 +925,7 @@ rustflags = []
 [gn.package.serde_json."1.0.128"]
 rustflags = ["--cfg=fast_arithmetic=\\\"64\\\""]
 
-[gn.package.sha1."0.10.5"]
+[gn.package.sha1."0.10.6"]
 group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "sha1_visibility" }
 
 [gn.package.signal-hook."0.3.17"]
