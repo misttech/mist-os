@@ -49,7 +49,7 @@
     Developer tool interfaces, such as the <a
     href='/docs/development/api/cli.md'>Command-line Tools Rubric</a>. APIs that
     affect the developer experience in the host environment such as debugging,
-    forensics, or the development kit.
+    or the development kit.
 
 - name: 'Diagnostics'
   api_primary: 'crjohns@google.com'
@@ -255,11 +255,12 @@
   api_secondary: ''
   description: |
     The set of APIs that allow clients to log events that are associated with
-    metrics. These events are collected off-device, and can later be analyzed
-    across many devices.
+    metrics or file crash reports. These events and reports are collected off-device,
+    and can later be analyzed across many devices.
   examples:
     - fidl: 'fuchsia.metrics'
     - fidl: 'fuchsia.cobalt'
+    - fidl: 'fuchsia.feedback'
 
 - name: 'Netstack'
   api_primary: 'brunodalbo@google.com'
