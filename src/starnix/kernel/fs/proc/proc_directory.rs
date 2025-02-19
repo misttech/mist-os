@@ -102,25 +102,17 @@ impl ProcDirectory {
                 StubEmptyFile::new_node("/proc/diskstats", bug_ref!("https://fxbug.dev/322893370")),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
-            "filesystems".into() => fs.create_node(
-                current_task,
-                BytesFile::new_node(b"fxfs".to_vec()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
+            "filesystems".into() => bytes_node(current_task, fs, b"fxfs".to_vec()),
             "misc".into() => fs.create_node(
                 current_task,
                 MiscFile::new_node(),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
-            "modules".into() => fs.create_node(
-                current_task,
                 // Starnix does not support dynamically loading modules.
                 // Instead, we pretend to have loaded a single module, ferris (named after
                 // Rust's 🦀), to avoid breaking code that assumes the modules list is
                 // non-empty.
-                BytesFile::new_node(b"ferris 8192 0 - Live 0x0000000000000000\n".to_vec()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
+            "modules".into() => bytes_node(current_task, fs, b"ferris 8192 0 - Live 0x0000000000000000\n".to_vec()),
             "pagetypeinfo".into() => fs.create_node(
                 current_task,
                 StubEmptyFile::new_node(
@@ -182,17 +174,14 @@ impl ProcDirectory {
                 );
                 dir.build(current_task)
             },
-            "version".into() => fs.create_node(
-                current_task,
-                BytesFile::new_node(|| {
-                    let release = KERNEL_RELEASE;
-                    let user = "build-user@build-host";
-                    let toolchain = "clang version HEAD, LLD HEAD";
-                    let version = KERNEL_VERSION;
-                    Ok(format!("Linux version {} ({}) ({}) {}\n", release, user, toolchain, version))
-                }),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
+            "version".into() => {
+                let release = KERNEL_RELEASE;
+                let user = "build-user@build-host";
+                let toolchain = "clang version HEAD, LLD HEAD";
+                let version = KERNEL_VERSION;
+                let version_string = format!("Linux version {} ({}) ({}) {}\n", release, user, toolchain, version);
+                bytes_node(current_task, fs, version_string.into())
+            },
             "vmallocinfo".into() => fs.create_node(
                 current_task,
                 StubEmptyFile::new_node(
@@ -321,6 +310,15 @@ impl FileOps for ProcDirectory {
 
         Ok(())
     }
+}
+
+/// Returns a new `BytesFile` containing the provided `bytes`.
+fn bytes_node(current_task: &CurrentTask, fs: &FileSystemHandle, bytes: Vec<u8>) -> FsNodeHandle {
+    fs.create_node(
+        current_task,
+        BytesFile::new_node(bytes),
+        FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+    )
 }
 
 /// A node that represents a link to `self/mounts`.
