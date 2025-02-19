@@ -177,6 +177,10 @@ group("clap") {
   public_deps = [ ":clap-v2_34_0" ]
 }
 
+group("cmac") {
+  public_deps = [ ":cmac-v0_7_2" ]
+}
+
 group("crc") {
   public_deps = [ ":crc-v1_8_1" ]
 }
@@ -3438,6 +3442,39 @@ rust_library("cloudabi-v0_0_3") {
   applicable_licenses = [ ":cloudabi-v0_0_3.license" ]
 }
 
+license("cmac-v0_7_2.license") {
+  public_package_name = "cmac"
+  license_files = [
+    "//third_party/rust_crates/vendor/cmac-0.7.2/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/cmac-0.7.2/LICENSE-MIT",
+  ]
+}
+
+rust_library("cmac-v0_7_2") {
+  crate_name = "cmac"
+  crate_root = "//third_party/rust_crates/vendor/cmac-0.7.2/src/lib.rs"
+  output_name = "cmac-d5b29128dff49930"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":cipher-v0_4_4" ]
+  deps += [ ":dbl-v0_3_2" ]
+  deps += [ ":digest-v0_10_7" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=d5b29128dff49930",
+    "-Cextra-filename=-d5b29128dff49930",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":cmac-v0_7_2.license" ]
+}
+
 license("combine-v4_6_2.license") {
   public_package_name = "combine"
   license_files = [ "//third_party/rust_crates/vendor/combine-4.6.2/LICENSE" ]
@@ -4484,6 +4521,37 @@ rust_library("data-encoding-v2_3_2") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":data-encoding-v2_3_2.license" ]
+}
+
+license("dbl-v0_3_2.license") {
+  public_package_name = "dbl"
+  license_files = [
+    "//third_party/rust_crates/vendor/dbl-0.3.2/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/dbl-0.3.2/LICENSE-MIT",
+  ]
+}
+
+rust_library("dbl-v0_3_2") {
+  crate_name = "dbl"
+  crate_root = "//third_party/rust_crates/vendor/dbl-0.3.2/src/lib.rs"
+  output_name = "dbl-b2dad617a1bdc7f"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":generic-array-v0_14_5" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=b2dad617a1bdc7f",
+    "-Cextra-filename=-b2dad617a1bdc7f",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":dbl-v0_3_2.license" ]
 }
 
 license("deflate-v0_7_19.license") {
