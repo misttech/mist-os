@@ -1,0 +1,41 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(
+    "@rules_fuchsia//fuchsia:defs.bzl",
+    "fuchsia_bind_cc_library",
+    "fuchsia_fidl_bind_library",
+    "fuchsia_fidl_library",
+)
+
+package(default_visibility = ["//visibility:public"])
+
+fuchsia_fidl_library(
+    name = "fuchsia.power.battery",
+    srcs = [
+        "battery.fidl",
+    ],
+    cc_bindings = [
+        "cpp",
+        "cpp_wire",
+        "cpp_driver_wire",
+        "cpp_driver",
+    ],
+    target_compatible_with = ["@platforms//os:fuchsia"],
+    deps = [
+        "@fuchsia_sdk//fidl/zx",
+    ],
+)
+
+fuchsia_fidl_bind_library(
+    name = "fuchsia.power.battery_bindlib",
+    library = ":fuchsia.power.battery",
+    target_compatible_with = ["@platforms//os:fuchsia"],
+)
+
+fuchsia_bind_cc_library(
+    name = "fuchsia.power.battery_bindlib_cc",
+    library = ":fuchsia.power.battery_bindlib",
+    target_compatible_with = ["@platforms//os:fuchsia"],
+)
