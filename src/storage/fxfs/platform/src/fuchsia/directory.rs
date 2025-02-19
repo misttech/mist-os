@@ -868,8 +868,17 @@ impl VfsDirectory for FxDirectory {
                             log::error!("Tried to expose a verified file as a block device.");
                             return Err(zx::Status::NOT_SUPPORTED);
                         }
-                        let mut server =
-                            BlockServer::new(node, object_request.take().into_channel());
+                        if !flags.contains(fio::OpenFlags::RIGHT_READABLE) {
+                            log::error!(
+                                "Opening a file as block device requires at least RIGHT_READABLE."
+                            );
+                            return Err(zx::Status::ACCESS_DENIED);
+                        }
+                        let mut server = BlockServer::new(
+                            node,
+                            /*read_only=*/ !flags.contains(fio::OpenFlags::RIGHT_WRITABLE),
+                            object_request.take().into_channel(),
+                        );
                         Ok(async move {
                             let _ = server.run().await;
                         }
