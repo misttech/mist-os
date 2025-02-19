@@ -10,6 +10,7 @@ import("//build/sdk/sdk_host_tool.gni")
 rustc_binary("generate_config") {
   edition = "2021"
   sources = [
+    "src/board_config.rs",
     "src/board_input_bundle.rs",
     "src/main.rs",
     "src/product_config.rs",

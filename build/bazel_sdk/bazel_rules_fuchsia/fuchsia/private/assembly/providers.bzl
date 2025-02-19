@@ -44,8 +44,7 @@ FuchsiaBoardInputBundleInfo = provider(
 FuchsiaBoardConfigInfo = provider(
     doc = "A board info used to containing the board_configuration.json and its associated files",
     fields = {
-        "files": "A list of files consisting the board config.",
-        "config": "The path to JSON board configuration file.",
+        "directory": "Directory of the board config container",
         "build_id_dirs": "Directories containing the debug symbols",
     },
 )

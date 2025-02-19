@@ -126,8 +126,8 @@ fuchsia_board_configuration(
     },
     post_processing_script = ":post_processing_script",
     tee_trusted_app_guids = [
-        "ta_1",
-        "ta_2",
+        "67e55044-10b1-426f-9247-bb680e5fe0c8",
+        "67e55044-10b1-426f-9247-bb680e5fe0c8",
     ],
 )
 
@@ -146,6 +146,7 @@ fuchsia_post_processing_script(
     post_processing_script_inputs = {
         "test_data/fake_dep": "fake_dep",
         "test_data/test.dtb": "test.dtb",
+        "test_data/zbi_signing_script": "zbi_signing_script",
     },
     post_processing_script_path = "zbi_signing_script",
 )

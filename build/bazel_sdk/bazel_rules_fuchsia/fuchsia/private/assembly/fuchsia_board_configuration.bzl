@@ -4,7 +4,6 @@
 
 """Rules for defining assembly board configuration."""
 
-load("@bazel_skylib//lib:paths.bzl", "paths")
 load(
     "//fuchsia/private/licenses:common.bzl",
     "check_type",
@@ -20,58 +19,20 @@ load(
     "LOCAL_ONLY_ACTION_KWARGS",
     "extract_labels",
     "replace_labels_with_files",
-    "select_single_file",
+    "select_root_dir",
 )
-
-def _copy_directory(ctx, src, dst, inputs, outputs, subdirectories_to_skip = None):
-    cmd = """\
-if [ ! -d \"$1\" ]; then
-    echo \"Error: $1 is not a directory\"
-    exit 1
-fi
-
-rm -rf \"$2\" && cp -fR \"$1/\" \"$2\";
-"""
-    if subdirectories_to_skip:
-        for d in subdirectories_to_skip:
-            cmd += 'rm -rf \"' + src + "/" + d + '\";\n'
-    mnemonic = "CopyDirectory"
-    progress_message = "Copying directory %s" % src
-
-    ctx.actions.run_shell(
-        inputs = inputs,
-        outputs = outputs,
-        command = cmd,
-        arguments = [src, dst],
-        mnemonic = mnemonic,
-        progress_message = progress_message,
-        use_default_shell_env = True,
-        **LOCAL_ONLY_ACTION_KWARGS
-    )
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _fuchsia_board_configuration_impl(ctx):
+    sdk = get_fuchsia_sdk_toolchain(ctx)
+
     build_id_dirs = []
 
-    # TODO(https://fxbug.dev/349939865): Change the file name to
-    # `board_configuration.json` and nest under `ctx.label.name`.
-    board_config_file = ctx.actions.declare_file(ctx.label.name + "_board_config.json")
-    board_files = [board_config_file]
-
-    filesystems = json.decode(ctx.attr.filesystems)
-    check_type(filesystems, "dict")
-    replace_labels_with_files(filesystems, ctx.attr.filesystems_labels)
-    for label, _ in ctx.attr.filesystems_labels.items():
-        src = label.files.to_list()[0]
-        dest = ctx.actions.declare_file(src.path)
-        ctx.actions.symlink(output = dest, target_file = src)
-        board_files.append(src)
-        board_files.append(dest)
-
     board_config = {}
+    board_config_file = ctx.actions.declare_file(ctx.label.name + "_board_config.json")
+
     board_config["name"] = ctx.attr.board_name
     board_config["provided_features"] = ctx.attr.provided_features
-    if filesystems != {}:
-        board_config["filesystems"] = filesystems
 
     kernel = json.decode(ctx.attr.kernel)
     check_type(kernel, "dict")
@@ -91,29 +52,32 @@ def _fuchsia_board_configuration_impl(ctx):
     if ctx.attr.tee_trusted_app_guids:
         board_config["tee_trusted_app_guids"] = ctx.attr.tee_trusted_app_guids
 
-    # Files from board_input_bundles have paths that are relative to root,
-    # prefix "../"s to make them relative to the output board config.
-    board_config_relative_to_root = "../" * board_config_file.path.count("/")
+    input_files = []
+    input_bundles = []
+    input_files.extend(ctx.files.board_input_bundles)
     for bib in ctx.attr.board_input_bundles:
-        path = bib[FuchsiaBoardInputBundleInfo].directory
-        board_config["input_bundles"] = board_config.get("input_bundles", []) + [
-            board_config_relative_to_root + path,
-        ]
+        input_bundles.append(bib[FuchsiaBoardInputBundleInfo].directory)
         build_id_dirs.extend(bib[FuchsiaBoardInputBundleInfo].build_id_dirs)
-    board_files.extend(ctx.files.board_input_bundles)
+    board_config["input_bundles"] = input_bundles
 
     if ctx.attr.devicetree:
-        board_files.append(ctx.file.devicetree)
-        board_config["devicetree"] = board_config_relative_to_root + ctx.file.devicetree.path
+        input_files.append(ctx.file.devicetree)
+        board_config["devicetree"] = ctx.file.devicetree.path
 
     if ctx.attr.devicetree_overlay:
-        board_files.append(ctx.file.devicetree_overlay)
-        board_config["devicetree_overlay"] = board_config_relative_to_root + ctx.file.devicetree_overlay.path
+        input_files.append(ctx.file.devicetree_overlay)
+        board_config["devicetree_overlay"] = ctx.file.devicetree_overlay.path
 
-    args = []
+    filesystems = json.decode(ctx.attr.filesystems)
+    check_type(filesystems, "dict")
+    replace_labels_with_files(filesystems, ctx.attr.filesystems_labels)
+    board_config["filesystems"] = filesystems
+
+    creation_args = []
     if ctx.attr.post_processing_script:
         script = ctx.attr.post_processing_script[FuchsiaPostProcessingScriptInfo]
 
+        board_script_path = None
         paths_map = {}
         for source, dest in script.post_processing_script_inputs.items():
             # The sources come from two resource: passed in Label or python related files. If
@@ -124,57 +88,55 @@ def _fuchsia_board_configuration_impl(ctx):
             else:
                 source_file = source.files.to_list()[0]
 
-            board_files.append(source_file)
-            paths_map[dest] = source_file.path
+            script_input = ctx.actions.declare_file(dest)
+            ctx.actions.symlink(output = script_input, target_file = source_file)
+            input_files.extend([source_file, script_input])
+            paths_map[dest] = script_input.path
+
+            if dest == script.post_processing_script_path:
+                board_script_path = script_input.path
+
+        if not board_script_path:
+            fail("board_script_path must be present in the inputs.")
 
         filesystems = board_config.get("filesystems", {})
         board_config["filesystems"] = filesystems
 
         zbi = filesystems.get("zbi", {})
         zbi["postprocessing_script"] = {
-            "board_script_path": "scripts/" + script.post_processing_script_path,
+            "board_script_path": board_script_path,
             "args": script.post_processing_script_args,
             "inputs": paths_map,
         }
         board_config["filesystems"]["zbi"] = zbi
 
-        board_scripts_input_file = ctx.actions.declare_file(ctx.label.name + "_script_inputs.json")
-        ctx.actions.write(board_scripts_input_file, json.encode(paths_map))
-        board_files.append(board_scripts_input_file)
-
-        args += [
-            "--script-inputs-path",
-            board_scripts_input_file.path,
-        ]
-
     content = json.encode_indent(board_config, indent = "  ")
     ctx.actions.write(board_config_file, content)
+    input_files.append(board_config_file)
 
-    board_config_dir = ctx.actions.declare_directory(ctx.label.name + "_board_configuration")
-    args += [
-        "--config-file",
+    board_config_dir = ctx.actions.declare_directory(ctx.label.name)
+    args = [
+        "board",
+        "--config",
         board_config_file.path,
-        "--output-dir",
+        "--output",
         board_config_dir.path,
-    ]
-
+    ] + creation_args
     ctx.actions.run(
-        outputs = [board_config_dir],
-        inputs = board_files,
-        executable = ctx.executable._establish_board_config_dir,
+        executable = sdk.assembly_generate_config,
         arguments = args,
-        progress_message = "Build board configuration for %s" % ctx.label,
+        inputs = input_files + ctx.files.filesystems_labels,
+        outputs = [board_config_dir],
+        progress_message = "Creating board config for %s" % ctx.label,
         **LOCAL_ONLY_ACTION_KWARGS
     )
-    board_files.append(board_config_dir)
 
     return [
         DefaultInfo(
-            files = depset(board_files),
+            files = depset([board_config_dir]),
         ),
         FuchsiaBoardConfigInfo(
-            config = board_config_dir.path + "/board_configuration.json",
-            files = board_files,
+            directory = board_config_dir.path,
             build_id_dirs = build_id_dirs,
         ),
         OutputGroupInfo(
@@ -185,6 +147,7 @@ def _fuchsia_board_configuration_impl(ctx):
 _fuchsia_board_configuration = rule(
     doc = """Generates a board configuration file.""",
     implementation = _fuchsia_board_configuration_impl,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "board_name": attr.string(
             doc = "Name of this board.",
@@ -235,11 +198,6 @@ _fuchsia_board_configuration = rule(
             doc = "GUIDs for the TAs provided by this board's TEE driver.",
             default = [],
         ),
-        "_establish_board_config_dir": attr.label(
-            default = "//fuchsia/tools:establish_board_config_dir",
-            executable = True,
-            cfg = "exec",
-        ),
     },
 )
 
@@ -264,11 +222,11 @@ def fuchsia_board_configuration(
     )
 
 def _fuchsia_prebuilt_board_configuration_impl(ctx):
-    board_configuration = select_single_file(ctx.files.files, "board_configuration.json")
+    directory = select_root_dir(ctx.files.files)
     return [
+        DefaultInfo(files = depset(ctx.files.files)),
         FuchsiaBoardConfigInfo(
-            files = ctx.files.files,
-            config = board_configuration.path,
+            directory = directory,
             build_id_dirs = [],
         ),
     ]
@@ -279,7 +237,7 @@ _fuchsia_prebuilt_board_configuration = rule(
     provides = [FuchsiaBoardConfigInfo],
     attrs = {
         "files": attr.label(
-            doc = "A filegroup containing all of the files consisting of the prebuilt board configuration.",
+            doc = "All files referenced by the board config.",
             mandatory = True,
         ),
     },
@@ -297,77 +255,39 @@ def fuchsia_prebuilt_board_configuration(
     _fuchsia_prebuilt_board_configuration(**kwargs)
 
 def _fuchsia_hybrid_board_configuration_impl(ctx):
-    src_board_config = ctx.attr.board_configuration[FuchsiaBoardConfigInfo].config
-    src_board_dir = paths.dirname(src_board_config)
+    board_config_dir = ctx.actions.declare_directory(ctx.label.name)
+    board_config = ctx.attr.board_configuration[FuchsiaBoardConfigInfo]
+    args = [
+        "hybrid-board",
+        "--config",
+        board_config.directory,
+        "--output",
+        board_config_dir.path,
+        "--replace-bibs-from-board",
+        ctx.attr.replacement_board_input_bundles[FuchsiaBoardConfigInfo].directory,
+    ]
 
-    output_board_dir = ctx.label.name
-    output_board_config = ctx.actions.declare_file(paths.join(output_board_dir, paths.basename(src_board_config)))
-
-    board_outputs_without_bibs = []
-    board_input_bundles_dir = "input_bundles"
-    for f in ctx.attr.board_configuration[FuchsiaBoardConfigInfo].files:
-        relative_path = paths.relativize(f.path, src_board_dir)
-        if relative_path.startswith(board_input_bundles_dir):
-            continue
-        if not f.is_directory:
-            output_path = paths.join(output_board_dir, relative_path)
-            board_outputs_without_bibs.append(ctx.actions.declare_file(output_path))
-
-    _copy_directory(
-        ctx,
-        src_board_dir,
-        output_board_config.dirname,
-        ctx.attr.board_configuration[FuchsiaBoardConfigInfo].files,
-        board_outputs_without_bibs,
-        subdirectories_to_skip = [board_input_bundles_dir],
+    sdk = get_fuchsia_sdk_toolchain(ctx)
+    ctx.actions.run(
+        executable = sdk.assembly_generate_config,
+        arguments = args,
+        inputs = ctx.files.replacement_board_input_bundles + ctx.files.board_configuration,
+        outputs = [board_config_dir],
     )
-
-    all_outputs = board_outputs_without_bibs
-
-    bib_outputs = []
-    files_to_copy = []
-    replacement_board_info = ctx.attr.replacement_board_input_bundles[FuchsiaBoardConfigInfo]
-    for f in replacement_board_info.files:
-        if f.is_directory:
-            continue
-
-        bib_board_dir = paths.dirname(replacement_board_info.config)
-        relative_file_path = paths.relativize(f.path, bib_board_dir)
-
-        # Copy in only the files which are under the boards directory of this
-        # bundle.
-        if not relative_file_path.startswith(board_input_bundles_dir):
-            continue
-
-        bib_outputs.append(ctx.actions.declare_file(paths.join(output_board_dir, relative_file_path)))
-        files_to_copy.append(f)
-
-    _copy_directory(
-        ctx,
-        paths.join(bib_board_dir, board_input_bundles_dir),
-        paths.join(output_board_config.dirname, board_input_bundles_dir),
-        files_to_copy,
-        bib_outputs,
-    )
-
-    all_outputs += bib_outputs
 
     build_id_dirs = ctx.attr.board_configuration[FuchsiaBoardConfigInfo].build_id_dirs + ctx.attr.replacement_board_input_bundles[FuchsiaBoardConfigInfo].build_id_dirs
-
     return [
-        DefaultInfo(
-            files = depset(all_outputs),
-        ),
+        DefaultInfo(files = depset([board_config_dir])),
         FuchsiaBoardConfigInfo(
-            files = all_outputs,
+            directory = board_config_dir.path,
             build_id_dirs = build_id_dirs,
-            config = output_board_config.path,
         ),
     ]
 
 _fuchsia_hybrid_board_configuration = rule(
     doc = "Combine in-tree board input bundles with a board from out-of-tree for hybrid assembly",
     implementation = _fuchsia_hybrid_board_configuration_impl,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     provides = [FuchsiaBoardConfigInfo],
     attrs = {
         "board_configuration": attr.label(

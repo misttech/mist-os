@@ -3,8 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/bazel/bazel_inputs.gni")
-import("//build/group_with_inputs.gni")
-import("//build/python/python_action.gni")
+import("//build/compiled_action.gni")
 
 # Creates the assembly Board configuration file, and it's main Hardware Support
 # Bundle, which respectively provide information about the board and components
@@ -104,19 +103,6 @@ template("board_configuration") {
 
     # Outputs
     bazel_inputs = "${target_name}.bazel_input"
-    assembly_inputs = "${target_name}.assembly_inputs"
-
-    # Inputs
-    if (defined(invoker.input_bundles)) {
-      input_bundles = invoker.input_bundles
-
-      # The validation task that the bundles are all created by the
-      # board_input_bundle() template.
-      validate_input_bundles = "${main_target}.validate_input_bundle_targets"
-    }
-
-    # The input bundle copying targets.
-    input_bundle_copy_targets = []
 
     # Intermediate Files
     base_info = "${target_name}.base_info"
@@ -131,181 +117,58 @@ template("board_configuration") {
     #
     # This allows other templates to compute the path to the main configuration
     # file based on just the label.
-    board_configuration_dir = "${bundles_dir}/${target_name}"
+    board_config_dir = "${bundles_dir}/${target_name}"
+    board_config_file = "${board_config_dir}/board_configuration.json"
 
-    # The "official" output board configuration file
-    board_configuration = "${board_configuration_dir}/board_configuration.json"
+    board_config_file_intermediate =
+        "${bundles_dir}/${target_name}_board_configuration.json"
 
-    # The board input bundles that are needed for OOT use.
-    assembly_inputs = "${bundles_dir}/${target_name}.assembly_inputs.json"
-
-    # The files that we create as book-keeping between our tasks.
-    depfile = "${bundles_dir}/${target_name}.d"
-
-    # Intermediate Files
-    _gen_files = "${target_gen_dir}/${target_name}"
-    base_info = "${_gen_files}.base_info.json"
-
-    if (defined(labels.input_bundles)) {
-      # The directory of input bundles
-      input_bundles_dir = "${board_configuration_dir}/input_bundles"
-      input_bundle_dirs = []
-    }
+    # The directory of input bundles
+    input_bundle_dirs = []
   }
 
-  creation_deps = []
-
-  # Check the 'filesystems' parameter for any vbmeta keys.  If found, add them
-  # as 'inputs' to a group_with_inputs() for vbmeta, and rebase them from GN
-  # file-paths to the appropriate form that will be needed by assembly.
-  if (defined(invoker.filesystems)) {
-    _filesystems = invoker.filesystems
-    if (defined(_filesystems.vbmeta)) {
-      _vbmeta = _filesystems.vbmeta
-      _vbmeta_rebased = {
-        forward_variables_from(_filesystems.vbmeta,
-                               "*",
-                               [
-                                 "key",
-                                 "key_metadata",
-                               ])
-      }
-      if (defined(_vbmeta.key)) {
-        _vbmeta_key_filename = get_path_info(_vbmeta.key, "file")
-        _vbmeta_rebased.key = "vbmeta/${_vbmeta_key_filename}"
-
-        copy("${target_name}.vbmeta.key") {
-          visibility = [ ":${labels.main_target}" ]
-          sources = [ _vbmeta.key ]
-          outputs =
-              [ "${files.board_configuration_dir}/${_vbmeta_rebased.key}" ]
-
-          # keys currently need to be source files.
-          deps = []
-        }
-        creation_deps += [ ":${target_name}.vbmeta.key" ]
-      }
-
-      if (defined(_vbmeta.key_metadata)) {
-        _vbmeta_key_metadata_filename =
-            get_path_info(_vbmeta.key_metadata, "file")
-        _vbmeta_rebased.key_metadata = "vbmeta/${_vbmeta_key_metadata_filename}"
-
-        copy("${target_name}.vbmeta.key_metadata") {
-          visibility = [ ":${labels.main_target}" ]
-          sources = [ _vbmeta.key_metadata ]
-          outputs = [
-            "${files.board_configuration_dir}/${_vbmeta_rebased.key_metadata}",
-          ]
-
-          # keys currently need to be source files.
-          deps = []
-        }
-        creation_deps += [ ":${target_name}.vbmeta.key_metadata" ]
-      }
-
-      if (_vbmeta_rebased != {
-          }) {
-        # replace the vbmeta field of _filesystems with one that contains the
-        # rebased file.
-        _filesystems.vbmeta = {
-        }
-        _filesystems.vbmeta = _vbmeta_rebased
-      }
-    }
-  }
-
-  if (defined(labels.input_bundles)) {
-    _input_bundle_manifest_files = []
-
-    foreach(input_bundle, labels.input_bundles) {
+  if (defined(invoker.input_bundles)) {
+    _input_bundle_names = []
+    foreach(input_bundle, invoker.input_bundles) {
       _input_bundle_name = get_label_info(input_bundle, "name")
+      assert(
+          _input_bundle_names == _input_bundle_names + [ _input_bundle_name ] -
+                                     [ _input_bundle_name ],
+          "All input bundle targets must have unique 'name' portions of their label.")
+      _input_bundle_names += [ _input_bundle_name ]
+
       _input_bundle_input_dir = get_label_info(input_bundle, "target_out_dir") +
                                 "/" + _input_bundle_name
-
-      _input_bundle_input_file =
-          "${_input_bundle_input_dir}/board_input_bundle.json"
-
-      _input_bundle_manifest_files += [ _input_bundle_input_file ]
-
-      _input_bundle_output_dir =
-          "${files.input_bundles_dir}/${_input_bundle_name}"
-
-      _input_bundle_output_file =
-          "${_input_bundle_output_dir}/board_input_bundle.json"
-
-      assert(
-          files.input_bundle_dirs ==
-              files.input_bundle_dirs + [ _input_bundle_output_dir ] -
-                  [ _input_bundle_output_dir ],
-          "All input bundle targets must have unique 'name' portions of their label.")
-
-      files.input_bundle_dirs += [ _input_bundle_output_dir ]
-
-      # Copy the Board Input Bundle into the board's own directory, to make the
-      # whole board portable.
-      _input_bundle_copy_target = "${target_name}.${_input_bundle_name}.copy"
-      action(_input_bundle_copy_target) {
-        forward_variables_from(invoker, [ "testonly" ])
-        visibility = [
-          ":${labels.assembly_inputs}",
-          ":${labels.main_target}",
-        ]
-        script = "//build/copy_tree.py"
-        deps = [ ":${labels.validate_input_bundles}" ]
-        depfile = "${target_out_dir}/${target_name}.d"
-
-        outputs = [ _input_bundle_output_file ]
-
-        # The contents of these folders are dynamic, and managed entirely by this
-        # action.  Further, this action will need to delete items from these
-        # directories that are not added back (on an incremental build, if an item
-        # is removed from one of these sets)
-        hermetic_action_ignored_prefixes = [ _input_bundle_output_dir ]
-
-        args = [
-          rebase_path(_input_bundle_input_dir, root_build_dir),
-          rebase_path(_input_bundle_output_dir, root_build_dir),
-          rebase_path(outputs[0], root_build_dir),
-          "--depfile",
-          rebase_path(depfile, root_build_dir),
-        ]
-      }
-      labels.input_bundle_copy_targets += [ ":${_input_bundle_copy_target}" ]
+      files.input_bundle_dirs += [ _input_bundle_input_dir ]
     }
-
-    # Validate that the input bundle targets are actually board_input_bundle()
-    # targets.
-    group_with_inputs(labels.validate_input_bundles) {
-      forward_variables_from(invoker, [ "testonly" ])
-      visibility = labels.input_bundle_copy_targets
-      deps = labels.input_bundles
-      inputs = _input_bundle_manifest_files
-    }
-
-    creation_deps += labels.input_bundle_copy_targets
   }
 
-  if (defined(invoker.devicetree)) {
-    devicetree = invoker.devicetree
-    _dtb_filename = get_label_info(devicetree, "name") + ".dtb"
-    _dtb_path =
-        get_label_info(devicetree, "target_out_dir") + "/${_dtb_filename}"
-
-    _dtb_rebased_path = "devicetree/${_dtb_filename}"
-
-    copy("${target_name}.devicetree") {
-      visibility = [ ":${labels.main_target}" ]
-      sources = [ _dtb_path ]
-      outputs = [ "${files.board_configuration_dir}/${_dtb_rebased_path}" ]
-
-      deps = [ devicetree ]
+  _filesystems = {
+  }
+  if (defined(invoker.filesystems)) {
+    _filesystems = invoker.filesystems
+  }
+  if (defined(_filesystems.vbmeta)) {
+    _vbmeta = _filesystems.vbmeta
+    if (defined(_vbmeta.key)) {
+      _vbmeta.key = rebase_path(_vbmeta.key, root_build_dir)
     }
-
-    creation_deps += [ ":${target_name}.devicetree" ]
+    if (defined(_vbmeta.key_metadata)) {
+      _vbmeta.key_metadata = rebase_path(_vbmeta.key_metadata, root_build_dir)
+    }
+    _filesystems.vbmeta = {
+    }
+    _filesystems.vbmeta = _vbmeta
   }
 
   base_info_contents = {
+    forward_variables_from(invoker,
+                           [
+                             "provided_features",
+                             "kernel",
+                             "platform",
+                             "tee_trusted_app_guids",
+                           ])
     name = board_name
 
     if (defined(invoker.hardware_info)) {
@@ -326,43 +189,65 @@ template("board_configuration") {
       filesystems = _filesystems
     }
 
-    if (defined(files.input_bundle_dirs)) {
-      input_bundles =
-          rebase_path(files.input_bundle_dirs, files.board_configuration_dir)
-    }
-
     if (defined(invoker.devicetree)) {
-      devicetree =
-          "devicetree/" + get_label_info(invoker.devicetree, "name") + ".dtb"
+      devicetree = rebase_path(
+              get_label_info(invoker.devicetree, "target_out_dir") + "/" +
+                  get_label_info(invoker.devicetree, "name") + ".dtb",
+              root_build_dir)
     }
-
-    forward_variables_from(invoker,
-                           [
-                             "provided_features",
-                             "kernel",
-                             "platform",
-                             "tee_trusted_app_guids",
-                           ])
   }
 
   generated_file(labels.base_info) {
     forward_variables_from(invoker, [ "testonly" ])
     visibility = [ ":${labels.main_target}" ]
-
-    outputs = [ files.board_configuration ]
+    outputs = [ files.board_config_file_intermediate ]
     output_conversion = "json"
-
     contents = base_info_contents
   }
 
-  group(labels.main_target) {
+  compiled_action(labels.main_target) {
     forward_variables_from(invoker,
                            [
                              "testonly",
                              "visibility",
                            ])
+
+    # The contents of these folders are dynamic, and managed entirely by this
+    # action.  Further, this action will need to delete items from these
+    # directories that are not added back (on an incremental build, if an item
+    # is removed from one of these sets)
+    hermetic_action_ignored_prefixes =
+        [ "${files.board_config_dir}" ] + files.input_bundle_dirs
+
+    tool = "//build/assembly/tools/generate_config"
+    tool_output_name = "assembly_generate_config"
+    outputs = [ files.board_config_file ]
+    depfile = "${target_out_dir}/${target_name}.d"
+
+    args = [
+      "board",
+      "--config",
+      rebase_path(files.board_config_file_intermediate, root_build_dir),
+      "--output",
+      rebase_path(files.board_config_dir, root_build_dir),
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
+    ]
+    foreach(board_input_bundle, files.input_bundle_dirs) {
+      args += [
+        "--board-input-bundles",
+        rebase_path(board_input_bundle, root_build_dir),
+      ]
+    }
+
     public_deps = [ ":${labels.base_info}" ]
-    deps = creation_deps
+    deps = []
+    if (defined(invoker.input_bundles)) {
+      deps += invoker.input_bundles
+    }
+    if (defined(invoker.devicetree)) {
+      deps += [ invoker.devicetree ]
+    }
 
     metadata = {
       board_configs = [
@@ -370,7 +255,7 @@ template("board_configuration") {
           label =
               get_label_info(":${labels.main_target}", "label_with_toolchain")
           name = board_name
-          outdir = rebase_path(files.board_configuration_dir, root_build_dir)
+          outdir = rebase_path(files.board_config_dir, root_build_dir)
         },
       ]
     }
@@ -380,6 +265,6 @@ template("board_configuration") {
   bazel_input_directory(labels.bazel_inputs) {
     forward_variables_from(invoker, [ "testonly" ])
     generator = ":${labels.main_target}"
-    output_directory = files.board_configuration_dir
+    output_directory = files.board_config_dir
   }
 }

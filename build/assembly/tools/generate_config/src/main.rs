@@ -6,6 +6,7 @@
 
 #![deny(missing_docs)]
 
+mod board_config;
 mod board_input_bundle;
 mod product_config;
 
@@ -34,6 +35,12 @@ enum Subcommand {
 
     /// generate a board input bundle.
     BoardInputBundle(BoardInputBundleArgs),
+
+    /// generate a board config.
+    Board(BoardArgs),
+
+    /// generate a board config using an input board config as a template.
+    HybridBoard(HybridBoardArgs),
 }
 
 /// Arguments to generate a product config.
@@ -93,49 +100,49 @@ struct BoardInputBundleArgs {
     /// 2) 'set': The package set that it belongs to ("bootfs" or "base")
     /// 3) 'components': A list of the driver components in this package.
     #[argh(option)]
-    pub drivers: Option<Utf8PathBuf>,
+    drivers: Option<Utf8PathBuf>,
 
     /// the paths to package manifests for all packages to add to the base
     /// package set.
     #[argh(option)]
-    pub base_packages: Vec<Utf8PathBuf>,
+    base_packages: Vec<Utf8PathBuf>,
 
     /// the paths to package manifests for all packages to add to the bootfs
     /// package set.
     #[argh(option)]
-    pub bootfs_packages: Vec<Utf8PathBuf>,
+    bootfs_packages: Vec<Utf8PathBuf>,
 
     /// cpu-manager configuration
     #[argh(option)]
-    pub cpu_manager_config: Option<Utf8PathBuf>,
+    cpu_manager_config: Option<Utf8PathBuf>,
 
     /// energy model configuration for processor power management
     #[argh(option)]
-    pub energy_model_config: Option<Utf8PathBuf>,
+    energy_model_config: Option<Utf8PathBuf>,
 
     /// arguments to pass to the kernel on boot
     #[argh(option)]
-    pub kernel_boot_args: Vec<String>,
+    kernel_boot_args: Vec<String>,
 
     /// power-manager configuration
     #[argh(option)]
-    pub power_manager_config: Option<Utf8PathBuf>,
+    power_manager_config: Option<Utf8PathBuf>,
 
     /// power metrics recorder configuration
     #[argh(option)]
-    pub power_metrics_recorder_config: Option<Utf8PathBuf>,
+    power_metrics_recorder_config: Option<Utf8PathBuf>,
 
     /// system power modes configuration
     #[argh(option)]
-    pub system_power_mode_config: Option<Utf8PathBuf>,
+    system_power_mode_config: Option<Utf8PathBuf>,
 
     /// thermal management configuration
     #[argh(option)]
-    pub thermal_config: Option<Utf8PathBuf>,
+    thermal_config: Option<Utf8PathBuf>,
 
     /// thread role configuration files
     #[argh(option)]
-    pub thread_roles: Vec<Utf8PathBuf>,
+    thread_roles: Vec<Utf8PathBuf>,
 
     /// sysmem format costs configuration files
     ///
@@ -145,7 +152,49 @@ struct BoardInputBundleArgs {
     /// repetition and to take advantage of FIDL rust codegen), and there's no
     /// json schema for FIDL types.
     #[argh(option)]
-    pub sysmem_format_costs_config: Vec<Utf8PathBuf>,
+    sysmem_format_costs_config: Vec<Utf8PathBuf>,
+
+    /// a depfile to write.
+    #[argh(option)]
+    depfile: Option<Utf8PathBuf>,
+}
+
+/// Arguments to generate a board config.
+#[derive(FromArgs)]
+#[argh(subcommand, name = "board")]
+struct BoardArgs {
+    /// the input board config with absolute paths.
+    #[argh(option)]
+    config: Utf8PathBuf,
+
+    /// paths to board input bundles to include.
+    #[argh(option)]
+    board_input_bundles: Vec<Utf8PathBuf>,
+
+    /// the directory to write the board config to.
+    #[argh(option)]
+    output: Utf8PathBuf,
+
+    /// a depfile to write.
+    #[argh(option)]
+    depfile: Option<Utf8PathBuf>,
+}
+
+/// Arguments to generate a hybrid board config.
+#[derive(FromArgs)]
+#[argh(subcommand, name = "hybrid-board")]
+struct HybridBoardArgs {
+    /// the input board config with absolute paths.
+    #[argh(option)]
+    config: Utf8PathBuf,
+
+    /// the directory to write the board config to.
+    #[argh(option)]
+    output: Utf8PathBuf,
+
+    /// a board that contains BIBs that should be added to `config`.
+    #[argh(option)]
+    replace_bibs_from_board: Utf8PathBuf,
 
     /// a depfile to write.
     #[argh(option)]
@@ -158,5 +207,7 @@ fn main() -> Result<()> {
         Subcommand::Product(args) => product_config::new(&args),
         Subcommand::HybridProduct(args) => product_config::hybrid(&args),
         Subcommand::BoardInputBundle(args) => board_input_bundle::new(&args),
+        Subcommand::Board(args) => board_config::new(&args),
+        Subcommand::HybridBoard(args) => board_config::hybrid(&args),
     }
 }
