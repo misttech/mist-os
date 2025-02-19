@@ -40,7 +40,7 @@ class TestThread {
   // NOTE: It is only valid to call this in an environment where there is no interference from an
   // external pager. More specifically, if the test is meant to be run as a component, the caller
   // cannot rely on a true return value since the thread might be blocked against a system pager.
-  bool WaitForBlocked();
+  bool WaitForBlocked() { return WaitForBlockedOnPager(zx_thread_); }
   // Block until the thread terminates.
   bool WaitForTerm() {
     return zx_thread_.wait_one(ZX_TASK_TERMINATED, zx::time::infinite(), nullptr) == ZX_OK;
@@ -63,6 +63,8 @@ class TestThread {
   void Resume() { suspend_token_.reset(); }
 
   void Run();
+
+  static bool WaitForBlockedOnPager(zx::thread& thread);
 
  private:
   enum class ExpectStatus {

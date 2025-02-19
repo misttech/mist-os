@@ -142,11 +142,11 @@ void TestThread::PrintDebugInfo(const zx_exception_report_t& report) {
   inspector_print_backtrace_markup(stdout, zx_process_self(), zx_thread_.get());
 }
 
-bool TestThread::WaitForBlocked() {
+bool TestThread::WaitForBlockedOnPager(zx::thread& thread) {
   while (1) {
     zx_info_thread_t info;
     uint64_t actual, actual_count;
-    if (zx_thread_.get_info(ZX_INFO_THREAD, &info, sizeof(info), &actual, &actual_count) != ZX_OK) {
+    if (thread.get_info(ZX_INFO_THREAD, &info, sizeof(info), &actual, &actual_count) != ZX_OK) {
       return false;
     } else if (info.state == ZX_THREAD_STATE_DEAD) {
       return false;

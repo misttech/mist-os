@@ -85,6 +85,7 @@ bootfs_only = [
   "address-tagging",
   "job",
   "object-info",
+  "pager-process",
   "process",
   "vmar",
 
