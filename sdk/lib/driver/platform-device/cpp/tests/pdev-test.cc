@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire_test_base.h>
+#include <fidl/test.metadata/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
@@ -71,6 +72,13 @@ class FakePDevWithThread {
       return zx::error(status);
     }
     return zx::ok(std::move(endpoints->client));
+  }
+
+  template <typename FidlType>
+  void AddFidlMetadata(FidlType metadata) {
+    server.SyncCall([metadata = std::move(metadata)](auto* pdev) {
+      pdev->AddFidlMetadata(FidlType::kSerializableName, metadata);
+    });
   }
 
  private:
@@ -314,6 +322,19 @@ TEST(PDevTest, GetPowerConfiguration) {
   ASSERT_EQ(config.element.name, "test power element");
   ASSERT_TRUE(config.element.levels.empty());
   ASSERT_TRUE(config.dependencies.empty());
+}
+
+TEST(PDevTest, GetFidlMetadata) {
+  static const test_metadata::Metadata kMetadata{{.test_field = "test value"}};
+  FakePDevWithThread infra;
+  zx::result client_channel = infra.Start({});
+  infra.AddFidlMetadata(kMetadata);
+  ASSERT_OK(client_channel);
+
+  fdf::PDev pdev{std::move(client_channel.value())};
+  zx::result metadata = pdev.GetFidlMetadata<test_metadata::Metadata>();
+  ASSERT_OK(metadata);
+  ASSERT_EQ(metadata.value(), kMetadata);
 }
 
 #endif  // FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
