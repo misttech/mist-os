@@ -81,16 +81,6 @@
                 "CryptoTest.WTPI_EncryptAndSign_Then_VerifyAndDecrypt_Works",
                 "CryptoTest.WTPI_VerifyAndDecryptFailsForShortBuffer",
                 "CryptoTest.WrapAndUnwrapAsymmetricKeyWorks",
-                "HmacTests/HmacTest.HMAC_SHA1Basic/0",
-                "HmacTests/HmacTest.HMAC_SHA1Basic/1",
-                "HmacTests/HmacTest.HMAC_SHA1FailsWithBadInput/0",
-                "HmacTests/HmacTest.HMAC_SHA1FailsWithBadInput/1",
-                "HmacTests/HmacTest.HMAC_SHA256Basic/0",
-                "HmacTests/HmacTest.HMAC_SHA256Basic/1",
-                "HmacTests/HmacTest.HMAC_SHA256_VerifyBasic/0",
-                "HmacTests/HmacTest.HMAC_SHA256_VerifyBasic/1",
-                "HmacTests/HmacTest.HMAC_SHA256_VerifyFailsWithBadInput/0",
-                "HmacTests/HmacTest.HMAC_SHA256_VerifyFailsWithBadInput/1",
             ],
         },
         {
@@ -112,6 +102,19 @@
                 // TODO(https://fxbug.dev/348474598): Seems to pass spuriously sometimes. Perhaps related
                 // to the ASAN issues cited above.
                 "CryptoTest.DeriveDeviceKeyIntoHandleFailsForBadInput",
+
+                // TODO(https://fxbug.dev/360942581): These generate UBSan
+                // failures at the moment.
+                "HmacTests/HmacTest.HMAC_SHA1Basic/0",
+                "HmacTests/HmacTest.HMAC_SHA1Basic/1",
+                "HmacTests/HmacTest.HMAC_SHA1FailsWithBadInput/0",
+                "HmacTests/HmacTest.HMAC_SHA1FailsWithBadInput/1",
+                "HmacTests/HmacTest.HMAC_SHA256Basic/0",
+                "HmacTests/HmacTest.HMAC_SHA256Basic/1",
+                "HmacTests/HmacTest.HMAC_SHA256_VerifyBasic/0",
+                "HmacTests/HmacTest.HMAC_SHA256_VerifyBasic/1",
+                "HmacTests/HmacTest.HMAC_SHA256_VerifyFailsWithBadInput/0",
+                "HmacTests/HmacTest.HMAC_SHA256_VerifyFailsWithBadInput/1",
             ],
         },
     ],

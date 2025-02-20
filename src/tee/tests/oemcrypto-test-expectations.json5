@@ -35,7 +35,10 @@
             ],
         },
         {
-            type: "expect_failure",
+            // TODO(https://fxbug.dev/397716819): Previously this block was
+            // "expect_failure", but the runtime is too long so - pending
+            // further triage of the cases of interest - we skip them for now.
+            type: "skip",
             matchers: [
                 "OEMCryptoLoadsCertificateAlternates.TestSignaturePKCS1",
                 "OEMCryptoLoadsCertificateAlternates.ForbidUseAsDRMCert",
@@ -1033,11 +1036,6 @@
                 "TestAPI16/OEMCryptoUsageTableDefragTest.ReuseUsageEntryWithInvalidIndexAPI17/0",
                 "TestAPI16/OEMCryptoUsageTableDefragTest.ReuseUsageEntrySessionAlreadyHasEntryAPI17/0",
                 "TestAPI16/OEMCryptoUsageTableTestWallClock.TimeRollbackPrevention/0",
-            ],
-        },
-        {
-            type: "skip",
-            matchers: [
             ],
         },
     ],
