@@ -46,14 +46,6 @@
             },
             {
                 "notes": [
-                    "Temporary skip, to allow removal of icu stable library."
-                ],
-                "paths": [
-                    "third_party/icu/stable"
-                ]
-            },
-            {
-                "notes": [
                     "Exempt the SDK workflow validation test workspace directory"
                 ],
                 "paths": [

@@ -17,8 +17,7 @@
                         "projects": [
                             "prebuilt/third_party/tzres",
                             "third_party/icu/default",
-                            "third_party/icu/latest",
-                            "third_party/icu/stable"
+                            "third_party/icu/latest"
                         ],
                         "bug": "",
                         "notes": [
