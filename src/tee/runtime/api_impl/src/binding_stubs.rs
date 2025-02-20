@@ -1421,7 +1421,9 @@ extern "C" fn TEE_MACInit(
     IV: *mut ::std::os::raw::c_void,
     IVLen: usize,
 ) {
-    unimplemented!()
+    let operation = *OperationHandle::from_binding(&operation);
+    let iv = slice_from_raw_parts(IV, IVLen);
+    context::with_current_mut(|context| context.operations.init_mac(operation, iv));
 }
 
 #[no_mangle]
@@ -1430,7 +1432,9 @@ extern "C" fn TEE_MACUpdate(
     chunk: *mut ::std::os::raw::c_void,
     chunkSize: usize,
 ) {
-    unimplemented!()
+    let operation = *OperationHandle::from_binding(&operation);
+    let chunk = slice_from_raw_parts(chunk, chunkSize);
+    context::with_current_mut(|context| context.operations.update_mac(operation, chunk));
 }
 
 #[no_mangle]
@@ -1441,7 +1445,28 @@ extern "C" fn TEE_MACComputeFinal(
     mac: *mut ::std::os::raw::c_void,
     macLen: *mut usize,
 ) -> TEE_Result {
-    unimplemented!()
+    to_tee_result(|| -> TeeResult {
+        assert!(!macLen.is_null());
+
+        // SAFETY: macLen checked as non-null above.
+        let initialMacLen = unsafe { *macLen };
+
+        // This is a precondition to being anble to reinterpret `mac` as a
+        // mutable slice.
+        assert!(!buffers_overlap(message, messageLen, mac, initialMacLen));
+
+        let operation = *OperationHandle::from_binding(&operation);
+        let message = slice_from_raw_parts(message, messageLen);
+        let mac = slice_from_raw_parts_mut(mac, initialMacLen);
+
+        context::with_current_mut(|context| {
+            context.operations.compute_final_mac(operation, message, mac).map_err(|len| {
+                // SAFETY: macLen checked as non-null above.
+                unsafe { *macLen = len };
+                Error::ShortBuffer
+            })
+        })
+    }())
 }
 
 #[no_mangle]

@@ -7,12 +7,22 @@ use std::cmp::min;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use digest::DynDigest as Digest;
+use digest::{DynDigest as Digest, KeyInit as _};
+use hmac::Hmac;
 use sha1::Sha1;
 use sha2::{Sha224, Sha256, Sha384, Sha512};
 use tee_internal::{Algorithm, EccCurve, Error, Mode, OperationHandle, Result as TeeResult, Usage};
 
-use crate::storage::{AesKey, Key, KeyType as _, NoKey, Object};
+use crate::storage::{
+    AesKey, HmacSha1Key, HmacSha224Key, HmacSha256Key, HmacSha384Key, HmacSha512Key, Key,
+    KeyType as _, NoKey, Object,
+};
+
+type HmacSha1 = Hmac<Sha1>;
+type HmacSha224 = Hmac<Sha224>;
+type HmacSha256 = Hmac<Sha256>;
+type HmacSha384 = Hmac<Sha384>;
+type HmacSha512 = Hmac<Sha512>;
 
 pub fn is_algorithm_supported(alg: Algorithm, element: EccCurve) -> bool {
     if element != EccCurve::None {
@@ -23,15 +33,77 @@ pub fn is_algorithm_supported(alg: Algorithm, element: EccCurve) -> bool {
         | Algorithm::Sha224
         | Algorithm::Sha256
         | Algorithm::Sha384
-        | Algorithm::Sha512 => true,
+        | Algorithm::Sha512
+        | Algorithm::HmacSha1
+        | Algorithm::HmacSha224
+        | Algorithm::HmacSha256
+        | Algorithm::HmacSha384
+        | Algorithm::HmacSha512 => true,
         _ => false,
     }
+}
+
+// A MAC abstraction conveniently shaped for our API glue needs.
+trait Mac {
+    fn output_size(&self) -> usize;
+
+    fn update(&mut self, data: &[u8]);
+
+    fn reset(&mut self);
+
+    fn finalize_into_reset(&mut self, out: &mut [u8]);
+
+    // Returns Error::MacInvalid in the case of failure.
+    fn verify_reset(&mut self, expected: &[u8]) -> TeeResult;
+}
+
+// Implementations for the hmac digest types.
+impl<M> Mac for M
+where
+    M: digest::FixedOutputReset + digest::MacMarker + digest::Update,
+{
+    fn output_size(&self) -> usize {
+        // OutputSizeUser is a subtrait of FixedOutputReset.
+        <Self as digest::OutputSizeUser>::output_size()
+    }
+
+    fn update(&mut self, data: &[u8]) {
+        <Self as digest::Update>::update(self, data)
+    }
+
+    fn reset(&mut self) {
+        // Reset is a subtrait of FixedOutputReset.
+        <Self as digest::Reset>::reset(self)
+    }
+
+    fn finalize_into_reset(&mut self, out: &mut [u8]) {
+        <Self as digest::FixedOutputReset>::finalize_into_reset(self, out.into())
+    }
+
+    fn verify_reset(&mut self, expected: &[u8]) -> TeeResult {
+        let finalized = <Self as digest::FixedOutputReset>::finalize_fixed_reset(self);
+        if finalized.as_slice() == expected {
+            Ok(())
+        } else {
+            Err(Error::MacInvalid)
+        }
+    }
+}
+
+// Supported MAC algorithm types.
+enum MacType {
+    HmacSha1,
+    HmacSha224,
+    HmacSha256,
+    HmacSha384,
+    HmacSha512,
 }
 
 // Encapsulated an abstracted helper classes particular to supported
 // algorithms.
 enum Helper {
     Digest(Box<dyn Digest>),
+    Mac(Option<Box<dyn Mac>>, MacType),
     // TODO(https://fxbug.dev/360942581): Add more...
 }
 
@@ -43,6 +115,11 @@ impl Helper {
             Algorithm::Sha256 => Ok(Helper::Digest(Box::new(Sha256::default()))),
             Algorithm::Sha384 => Ok(Helper::Digest(Box::new(Sha384::default()))),
             Algorithm::Sha512 => Ok(Helper::Digest(Box::new(Sha512::default()))),
+            Algorithm::HmacSha1 => Ok(Helper::Mac(None, MacType::HmacSha1)),
+            Algorithm::HmacSha224 => Ok(Helper::Mac(None, MacType::HmacSha224)),
+            Algorithm::HmacSha256 => Ok(Helper::Mac(None, MacType::HmacSha256)),
+            Algorithm::HmacSha384 => Ok(Helper::Mac(None, MacType::HmacSha384)),
+            Algorithm::HmacSha512 => Ok(Helper::Mac(None, MacType::HmacSha512)),
             _ => Err(Error::NotSupported),
         }
     }
@@ -54,12 +131,49 @@ impl Helper {
                 assert!(matches!(key, Key::Data(NoKey {})));
                 digest.reset()
             }
+            Helper::Mac(mac, mac_type) => match mac_type {
+                MacType::HmacSha1 => {
+                    let Key::HmacSha1(HmacSha1Key { secret }) = key else {
+                        panic!("Wrong key type ({:?}) - expected HMAC SHA1", key.get_type());
+                    };
+                    *mac = Some(Box::new(HmacSha1::new_from_slice(&secret).unwrap()))
+                }
+                MacType::HmacSha224 => {
+                    let Key::HmacSha224(HmacSha224Key { secret }) = key else {
+                        panic!("Wrong key type ({:?}) - expected HMAC SHA224", key.get_type());
+                    };
+                    *mac = Some(Box::new(HmacSha224::new_from_slice(&secret).unwrap()))
+                }
+                MacType::HmacSha256 => {
+                    let Key::HmacSha256(HmacSha256Key { secret }) = key else {
+                        panic!("Wrong key type ({:?}) - expected HMAC SHA256", key.get_type());
+                    };
+                    *mac = Some(Box::new(HmacSha256::new_from_slice(&secret).unwrap()))
+                }
+                MacType::HmacSha384 => {
+                    let Key::HmacSha384(HmacSha384Key { secret }) = key else {
+                        panic!("Wrong key type ({:?}) - expected HMAC SHA384", key.get_type());
+                    };
+                    *mac = Some(Box::new(HmacSha384::new_from_slice(&secret).unwrap()))
+                }
+                MacType::HmacSha512 => {
+                    let Key::HmacSha512(HmacSha512Key { secret }) = key else {
+                        panic!("Wrong key type ({:?}) - expected HMAC SHA512", key.get_type());
+                    };
+                    *mac = Some(Box::new(HmacSha512::new_from_slice(&secret).unwrap()))
+                }
+            },
         }
     }
 
     fn reset(&mut self) {
         match self {
             Helper::Digest(digest) => digest.reset(),
+            Helper::Mac(mac, _) => {
+                if let Some(mac) = mac {
+                    mac.reset()
+                }
+            }
         }
     }
 }
@@ -95,8 +209,19 @@ impl Operation {
     }
 
     fn as_digest(&mut self) -> &mut Box<dyn Digest> {
-        let Helper::Digest(ref mut digest) = &mut self.helper;
-        digest
+        if let Helper::Digest(ref mut digest) = &mut self.helper {
+            digest
+        } else {
+            panic!("{:?} is not a digest algorithm", self.algorithm)
+        }
+    }
+
+    fn as_mac(&mut self) -> &mut Box<dyn Mac> {
+        if let Helper::Mac(ref mut mac, _) = &mut self.helper {
+            mac.as_mut().expect("TEE_SetKey() has not yet been called")
+        } else {
+            panic!("{:?} is not a MAC algorithm", self.algorithm)
+        }
     }
 
     // Returns whether the operation is in the extracting state and, if so, the
@@ -161,6 +286,11 @@ impl Operation {
             | Algorithm::Shake256 => {
                 panic!("Algorithm {:?} has no associated object type", self.algorithm);
             }
+            Algorithm::HmacSha1
+            | Algorithm::HmacSha224
+            | Algorithm::HmacSha256
+            | Algorithm::HmacSha384
+            | Algorithm::HmacSha512 => {}
             _ => return Err(Error::NotImplemented),
         };
         self.key = key.clone();
@@ -262,6 +392,61 @@ impl Operation {
         self.finalize_digest();
         self.extract_finalized(buf)
     }
+
+    // See TEE_MACInit().
+    fn init_mac(&mut self, _iv: &[u8]) {
+        assert_eq!(self.mode, Mode::Mac);
+        assert!(self.state == OpState::Initial || self.state == OpState::Active);
+
+        if self.state == OpState::Active {
+            self.as_mac().reset();
+        }
+
+        // Currently supported MAC algorithms don't deal in initialization
+        // vectors; the spec say to ignore the provided one in that case.
+
+        self.state = OpState::Active;
+    }
+
+    // See TEE_MACUpdate().
+    fn update_mac(&mut self, chunk: &[u8]) {
+        assert_eq!(self.mode, Mode::Mac);
+        assert_eq!(self.state, OpState::Active);
+
+        let mac = self.as_mac();
+        if !chunk.is_empty() {
+            mac.update(chunk);
+        }
+    }
+
+    // See TEE_MACComputeFinal().
+    fn compute_final_mac(&mut self, message: &[u8], output: &mut [u8]) -> Result<(), usize> {
+        assert_eq!(self.mode, Mode::Mac);
+        assert_eq!(self.state, OpState::Active);
+
+        let output_size = self.as_mac().output_size();
+        if output.len() < output_size {
+            return Err(output_size);
+        }
+
+        // Make sure we validate the output buffer size before updating the
+        // digest.
+        let mac = self.as_mac();
+        if !message.is_empty() {
+            mac.update(message);
+        }
+        mac.finalize_into_reset(&mut output[..output_size]);
+        self.state = OpState::Initial;
+        Ok(())
+    }
+
+    // See TEE_MACCompareFinal().
+    fn compare_final_mac(&mut self, message: &[u8], expected: &[u8]) -> TeeResult {
+        self.update_mac(message);
+        let result = self.as_mac().verify_reset(expected);
+        self.state = OpState::Initial;
+        result
+    }
 }
 
 pub struct Operations {
@@ -314,6 +499,36 @@ impl Operations {
                     return Err(Error::NotSupported);
                 }
                 NoKey::is_valid_size
+            }
+            Algorithm::HmacSha1 => {
+                if mode != Mode::Mac {
+                    return Err(Error::NotSupported);
+                }
+                HmacSha1Key::is_valid_size
+            }
+            Algorithm::HmacSha224 => {
+                if mode != Mode::Mac {
+                    return Err(Error::NotSupported);
+                }
+                HmacSha224Key::is_valid_size
+            }
+            Algorithm::HmacSha256 => {
+                if mode != Mode::Mac {
+                    return Err(Error::NotSupported);
+                }
+                HmacSha256Key::is_valid_size
+            }
+            Algorithm::HmacSha384 => {
+                if mode != Mode::Mac {
+                    return Err(Error::NotSupported);
+                }
+                HmacSha384Key::is_valid_size
+            }
+            Algorithm::HmacSha512 => {
+                if mode != Mode::Mac {
+                    return Err(Error::NotSupported);
+                }
+                HmacSha512Key::is_valid_size
             }
             _ => {
                 inspect_stubs::track_stub!(
@@ -381,6 +596,32 @@ impl Operations {
 
     pub fn extract_digest<'a>(&mut self, operation: OperationHandle, buf: &'a mut [u8]) -> usize {
         self.get_mut(operation).extract_digest(buf)
+    }
+
+    pub fn init_mac(&mut self, operation: OperationHandle, iv: &[u8]) {
+        self.get_mut(operation).init_mac(iv)
+    }
+
+    pub fn update_mac(&mut self, operation: OperationHandle, chunk: &[u8]) {
+        self.get_mut(operation).update_mac(chunk)
+    }
+
+    pub fn compute_final_mac(
+        &mut self,
+        operation: OperationHandle,
+        message: &[u8],
+        mac: &mut [u8],
+    ) -> Result<(), usize> {
+        self.get_mut(operation).compute_final_mac(message, mac)
+    }
+
+    pub fn compare_final_mac(
+        &mut self,
+        operation: OperationHandle,
+        message: &[u8],
+        mac: &[u8],
+    ) -> TeeResult {
+        self.get_mut(operation).compare_final_mac(message, mac)
     }
 }
 

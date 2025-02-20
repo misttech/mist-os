@@ -55,6 +55,7 @@ rustc_library("api_impl") {
     "//src/tee/lib/tee_properties",
     "//src/tee/tee_internal_api:tee_internal",
     "//third_party/rust_crates:digest",
+    "//third_party/rust_crates:hmac",
     "//third_party/rust_crates:libc",
     "//third_party/rust_crates:num-traits",
     "//third_party/rust_crates:sha1",

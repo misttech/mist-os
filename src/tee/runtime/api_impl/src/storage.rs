@@ -93,7 +93,7 @@ pub trait KeyType {
 
 #[derive(Clone)]
 pub struct SimpleSymmetricKey<const SIZE_MIN: u32, const SIZE_MAX: u32, const SIZE_MULTIPLE: u32> {
-    secret: Vec<u8>, // TEE_ATTR_SECRET_VALUE
+    pub secret: Vec<u8>, // TEE_ATTR_SECRET_VALUE
 }
 
 impl<const SIZE_MIN: u32, const SIZE_MAX: u32, const SIZE_MULTIPLE: u32> KeyType
