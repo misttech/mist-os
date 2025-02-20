@@ -63,18 +63,11 @@ namespace fdf_metadata {
 template <typename FidlType>
 class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Metadata> {
  public:
-  // Make sure that the component manifest specifies |service_name| as a service capability and
-  // exposes it.
-  explicit MetadataServer(
-      std::string service_name,
-      std::string instance_name = component::OutgoingDirectory::kDefaultServiceInstance)
-      : instance_name_(std::move(instance_name)), service_name_(std::move(service_name)) {}
-
-  // Uses `FidlType::kSerializableName` as the service name. Make sure that `FidlType` is annotated
-  // with `@serializable`.
+  // The caller's component manifest must specify `|FidlType|::kSerializableName` as a service
+  // capability and expose it. Otherwise, other components will not be able to retrieve metadata.
   explicit MetadataServer(
       std::string instance_name = component::OutgoingDirectory::kDefaultServiceInstance)
-      : MetadataServer(FidlType::kSerializableName, std::move(instance_name)) {}
+      : instance_name_(std::move(instance_name)) {}
 
   // Set the metadata to be served to |metadata|. |metadata| must be persistable.
   zx::result<> SetMetadata(const FidlType& metadata) {
@@ -149,7 +142,8 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
       std::string_view instance_name = component::OutgoingDirectory::kDefaultServiceInstance) {
     fidl::WireSyncClient<fuchsia_driver_metadata::Metadata> client{};
     {
-      zx::result result = ConnectToMetadataProtocol(incoming, service_name_, instance_name);
+      zx::result result =
+          ConnectToMetadataProtocol(incoming, FidlType::kSerializableName, instance_name);
       if (result.is_error()) {
         FDF_SLOG(ERROR, "Failed to connect to metadata server.",
                  KV("status", result.status_string()));
@@ -181,11 +175,12 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
   }
 
   // Serves the fuchsia.driver.metadata/Service service to |outgoing| under the service name
-  // `service_name_` and instance name `MetadataServer::instance_name_`.
+  // `|FidlType|::kSerializableName` and instance name `MetadataServer::instance_name_`.
   zx::result<> Serve(component::OutgoingDirectory& outgoing, async_dispatcher_t* dispatcher) {
     fuchsia_driver_metadata::Service::InstanceHandler handler{
         {.metadata = bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure)}};
-    zx::result result = outgoing.AddService(std::move(handler), service_name_, instance_name_);
+    zx::result result =
+        outgoing.AddService(std::move(handler), FidlType::kSerializableName, instance_name_);
     if (result.is_error()) {
       FDF_SLOG(ERROR, "Failed to add service.", KV("status", result.status_string()));
       return result.take_error();
@@ -197,12 +192,12 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
   // service.
   fuchsia_driver_framework::Offer MakeOffer() {
     return fuchsia_driver_framework::Offer::WithZirconTransport(
-        fdf::MakeOffer(service_name_, instance_name_));
+        fdf::MakeOffer(FidlType::kSerializableName, instance_name_));
   }
 
   fuchsia_driver_framework::wire::Offer MakeOffer(fidl::AnyArena& arena) {
     return fuchsia_driver_framework::wire::Offer::WithZirconTransport(
-        arena, fdf::MakeOffer(arena, service_name_, instance_name_));
+        arena, fdf::MakeOffer(arena, FidlType::kSerializableName, instance_name_));
   }
 
  private:
@@ -225,9 +220,6 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
   // Name of the instance directory that will serve this instance's fuchsia.driver.metadata/Service
   // service.
   std::string instance_name_;
-
-  // Name of the service directory that will serve the fuchsia.driver.metadata/Service service.
-  std::string service_name_;
 };
 
 }  // namespace fdf_metadata
