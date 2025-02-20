@@ -156,6 +156,14 @@ void FreeReference(VmPageOrMarker::ReferenceValue content) {
   compression->Free(content);
 }
 
+// Helper to allow for accessing the VmCowPages::paged_ref_ without needing to manually assert the
+// lock. Declared as a local helper here instead of a method in VmCowPages due to VmCowPages being
+// defined prior to VmObjectPaged.
+VmObjectPaged* paged_backlink_locked(VmCowPages* cow) TA_REQ(cow->lock())
+    TA_ASSERT(paged_backlink_locked(cow)->lock()) {
+  return cow->get_paged_backlink_locked();
+}
+
 }  // namespace
 
 // Helper class for collecting pages to performed batched Removes from the page queue to not incur
@@ -773,8 +781,7 @@ bool VmCowPages::DedupZeroPage(vm_page_t* page, uint64_t offset) {
   // The VmObjectPaged could have been destroyed, or this could be a hidden node. Check if the
   // paged_ref_ is valid first.
   if (paged_ref_) {
-    AssertHeld(paged_ref_->lock_ref());
-    if (!paged_ref_->CanDedupZeroPagesLocked()) {
+    if (!paged_backlink_locked(this)->CanDedupZeroPagesLocked()) {
       return false;
     }
   }
@@ -2315,7 +2322,6 @@ zx_status_t VmCowPages::PrepareForWriteLocked(VmCowRange range, LazyPageRequest*
   // VmObjectPaged has gone away, so paged_ref_ could be null. Let the page source handle any
   // failures requesting the dirty transition.
   if (paged_ref_) {
-    AssertHeld(paged_ref_->lock_ref());
     vmo_debug_info.vmo_id = paged_ref_->user_id();
     paged_ref_->get_name(vmo_debug_info.vmo_name, sizeof(vmo_debug_info.vmo_name));
   }
@@ -5716,8 +5722,7 @@ void VmCowPages::RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op) {
 
   // Perform any range change for this separately before processing any children.
   if (paged_ref_) {
-    AssertHeld(paged_ref_->lock_ref());
-    paged_ref_->RangeChangeUpdateLocked(range, op);
+    paged_backlink_locked(this)->RangeChangeUpdateLocked(range, op);
   }
 
   // Set the initial parent to this so we can start processing the subtree.
@@ -5867,8 +5872,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompressionLocked(vm_page_t*
   DEBUG_ASSERT(!discardable_tracker_);
   DEBUG_ASSERT(can_decommit_zero_pages());
   if (paged_ref_) {
-    AssertHeld(paged_ref_->lock_ref());
-    if ((paged_ref_->GetMappingCachePolicyLocked() & ZX_CACHE_POLICY_MASK) !=
+    if ((paged_backlink_locked(this)->GetMappingCachePolicyLocked() & ZX_CACHE_POLICY_MASK) !=
         ZX_CACHE_POLICY_CACHED) {
       // Cannot compress uncached mappings. To avoid this page remaining in the reclamation list we
       // simulate an access.
@@ -6766,8 +6770,7 @@ void VmCowPages::CopyPageContentsForReplacementLocked(vm_page_t* dst_page, vm_pa
   DEBUG_ASSERT(dst);
   memcpy(dst, src, PAGE_SIZE);
   if (paged_ref_) {
-    AssertHeld(paged_ref_->lock_ref());
-    if (paged_ref_->GetMappingCachePolicyLocked() != ARCH_MMU_FLAG_CACHED) {
+    if (paged_backlink_locked(this)->GetMappingCachePolicyLocked() != ARCH_MMU_FLAG_CACHED) {
       arch_clean_invalidate_cache_range((vaddr_t)dst, PAGE_SIZE);
     }
   }
