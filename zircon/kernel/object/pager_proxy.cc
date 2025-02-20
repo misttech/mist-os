@@ -404,7 +404,9 @@ zx_status_t PagerProxy::WaitOnEvent(Event* event, bool suspendable) {
 void PagerProxy::Dump(uint depth, uint32_t max_items) {
   Guard<Mutex> guard{&mtx_};
   dump::DepthPrinter printer(depth);
-  printer.Emit("pager_proxy %p pager_dispatcher %p page_source %p key %lu", this, pager_,
+  char name[ZX_MAX_NAME_LEN];
+  pager_->get_debug_name(name, ZX_MAX_NAME_LEN);
+  printer.Emit("pager_proxy %p pager_dispatcher <%s> page_source %p key %lu", this, name,
                page_source_.get(), key_);
 
   printer.Emit("  source closed %d pager closed %d packet_busy %d complete_pending %d",
