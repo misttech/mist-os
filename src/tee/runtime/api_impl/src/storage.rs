@@ -571,8 +571,8 @@ impl TransientObjects {
     fn new() -> Self {
         Self {
             by_handle: HashMap::new(),
-            // Always even, per the described convention above
-            next_handle_value: 0,
+            // Always even, per the described convention above - also non-null.
+            next_handle_value: 2,
         }
     }
 
@@ -582,6 +582,7 @@ impl TransientObjects {
         let prev =
             self.by_handle.insert(handle.clone(), Rc::new(RefCell::new(TransientObject::new(key))));
         debug_assert!(prev.is_none());
+
         Ok(handle)
     }
 
