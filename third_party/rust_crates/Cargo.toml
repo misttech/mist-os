@@ -268,11 +268,13 @@ features = ["ansi", "env-filter", "fmt", "registry", "std", "tracing-log"]
 # keep-sorted start
 # do not add back without verifying certificate transparency is ready to use - see https://fxbug.dev/25100
 # ct-logs = "0.6"
+der = { version = "0.7.9", features = ["alloc", "derive", "flagset", "oid", "zeroize"] }
 euclid = { version = "0.22.1", features = [ "serde" ] }
 getopts = "0.2"
 hyper-rustls = { version = "0.24.2", default-features = false }
 lipsum = "0.6.0"
 openat = "0.1.17"
+pkcs1 = "0.7.5"
 rust_icu_common = { version = "5.0.0", default-features = false, features = ["renaming"] }
 rust_icu_sys = { version = "5.0.0", default-features = false, features = ["renaming", "icu_version_in_env", "icu_version_67_plus"] }
 rust_icu_ucal = { version = "5.0.0", default-features = false, features = ["renaming", "icu_version_in_env"] }
@@ -283,12 +285,15 @@ rust_icu_uenum = { version = "5.0.0", default-features = false, features = ["ren
 rust_icu_uloc = { version = "5.0.0", default-features = false, features = ["renaming", "icu_version_in_env", "icu_version_67_plus"] }
 rust_icu_unorm2 = { version = "5.0.0", default-features = false, features = ["renaming", "icu_version_in_env", "icu_version_67_plus"] }
 rust_icu_ustring = { version = "5.0.0", default-features = false, features = ["renaming", "icu_version_in_env"] }
+sec1 = { version = "0.7.3", features = ["alloc", "der", "pkcs8", "zeroize"] }
+spki = { version = "0.7.3", features = ["alloc"] }
 tokio = { version = "=1.38.1", default-features = false }
 trust-dns-proto = { version = "0.22.0", default-features = false, features = ["testing"] }
 trust-dns-resolver = { version = "0.22.0", default-features = false, features = ["testing"] }
 ttf-parser = "0.10.1"
 unicode-normalization = "0.1"
 vk-sys = "0.7.0"
+x509-cert = "0.2.5"
 # keep-sorted end
 
 # Host-side only dependencies
@@ -595,7 +600,7 @@ deps = [
   "//third_party/rust_crates/compat/generator:asm",
 ]
 
-[gn.package.generic-array."0.14.5"]
+[gn.package.generic-array."0.14.7"]
 rustflags = [ "--cfg=relaxed_coherence" ]
 
 [gn.package.getrandom."0.2.10"]
