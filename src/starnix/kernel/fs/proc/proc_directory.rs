@@ -441,6 +441,11 @@ impl VmStatFile {
     }
 }
 
+// Fake an increment, since the current clients only care about the number increasing and not
+// what the number is.
+static VM_STAT_HACK_COUNTER: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+
 impl DynamicFileSource for VmStatFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let mem_stats = self
@@ -462,8 +467,12 @@ impl DynamicFileSource for VmStatFile {
         writeln!(sink, "workingset_refault_file {}", 0)?;
         writeln!(sink, "nr_inactive_file {}", nr_inactive_file)?;
         writeln!(sink, "nr_active_file {}", nr_active_file)?;
+        writeln!(
+            sink,
+            "pgscan_kswapd {}",
+            VM_STAT_HACK_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        )?;
         writeln!(sink, "pgscan_direct {}", 0)?;
-        writeln!(sink, "pgscan_kswapd {}", 0)?;
 
         Ok(())
     }
