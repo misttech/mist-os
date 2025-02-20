@@ -418,6 +418,7 @@ mod test {
             Default::default(),
             Some(input_device.inspect_status.clone()),
             None,
+            None,
         );
 
         (input_device, input_file, touch_source_stream)
@@ -460,6 +461,7 @@ mod test {
             Default::default(),
             None,
             Some(input_device.inspect_status.clone()),
+            None,
         );
 
         (input_device, input_file, keyboard_stream)
@@ -508,6 +510,7 @@ mod test {
             Default::default(),
             None,
             Some(input_device.inspect_status.clone()),
+            None,
         );
         (input_device, input_file, device_listener_stream)
     }
@@ -517,6 +520,14 @@ mod test {
         current_task: &CurrentTask,
     ) -> (Arc<InputDevice>, FileHandle, fuipointer::MouseSourceRequestStream) {
         let inspector = fuchsia_inspect::Inspector::default();
+        start_mouse_input_inspect(locked, current_task, &inspector)
+    }
+
+    fn start_mouse_input_inspect(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        inspector: &fuchsia_inspect::Inspector,
+    ) -> (Arc<InputDevice>, FileHandle, fuipointer::MouseSourceRequestStream) {
         let input_device = InputDevice::new_mouse(inspector.root());
         let input_file =
             input_device.open_test(locked, current_task).expect("Failed to create input file");
@@ -550,6 +561,7 @@ mod test {
             input_device.open_files.clone(),
             None,
             None,
+            Some(input_device.inspect_status.clone()),
         );
 
         (input_device, input_file, mouse_source_stream)
@@ -622,6 +634,10 @@ mod test {
             }),
             ..Default::default()
         }
+    }
+
+    fn make_mouse_wheel_event(ticks: i64) -> fuipointer::MouseEvent {
+        make_mouse_wheel_event_with_timestamp(ticks, 0)
     }
 
     fn make_mouse_wheel_event_with_timestamp(ticks: i64, timestamp: i64) -> fuipointer::MouseEvent {
@@ -2016,6 +2032,7 @@ mod test {
             Default::default(),
             Some(input_device.inspect_status.clone()),
             None,
+            None,
         );
 
         // Send 2 TouchEvents to proxy that should be counted as `received` by InputFile
@@ -2240,6 +2257,114 @@ mod test {
                     // Button events perform a realtime clockread, so any value will do.
                     last_generated_uapi_event_timestamp_ns: AnyProperty,
                     last_read_uapi_event_timestamp_ns: AnyProperty,
+                },
+            }
+        });
+    }
+
+    #[::fuchsia::test]
+    async fn mouse_input_initialized_with_inspect_node() {
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let mouse_device = InputDevice::new_mouse(&inspector.root());
+        let _file_obj = mouse_device.open_test(&mut locked, &current_task);
+
+        assert_data_tree!(inspector, root: {
+            mouse_device: {
+                total_fidl_events_received_count: 0u64,
+                total_fidl_events_ignored_count: 0u64,
+                total_fidl_events_unexpected_count: 0u64,
+                total_fidl_events_converted_count: 0u64,
+                total_uapi_events_generated_count: 0u64,
+                last_generated_uapi_event_timestamp_ns: 0i64,
+                mouse_file_0: {
+                    fidl_events_received_count: 0u64,
+                    fidl_events_ignored_count: 0u64,
+                    fidl_events_unexpected_count: 0u64,
+                    fidl_events_converted_count: 0u64,
+                    uapi_events_generated_count: 0u64,
+                    uapi_events_read_count: 0u64,
+                    last_generated_uapi_event_timestamp_ns: 0i64,
+                    last_read_uapi_event_timestamp_ns: 0i64,
+                }
+            }
+        });
+    }
+
+    #[::fuchsia::test]
+    async fn mouse_relay_updates_mouse_inspect_status() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_input_device, input_file, mut mouse_source_stream) =
+            start_mouse_input_inspect(&mut locked, &current_task, &inspector);
+
+        let mouse_move_event = fuipointer::MouseEvent {
+            timestamp: Some(0),
+            pointer_sample: Some(fuipointer::MousePointerSample {
+                device_id: Some(0),
+                position_in_viewport: Some([50.0, 50.0]),
+                scroll_v: Some(0),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let mouse_click_event = fuipointer::MouseEvent {
+            timestamp: Some(0),
+            pointer_sample: Some(fuipointer::MousePointerSample {
+                device_id: Some(0),
+                scroll_v: Some(0),
+                pressed_buttons: Some(vec![1]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        // Send 2 non-wheel MouseEvents to proxy that should be counted as `received` by InputFile
+        // These events have no scroll_v delta in the pointer sample so they should be ignored.
+        answer_next_mouse_watch_request(
+            &mut mouse_source_stream,
+            vec![mouse_move_event, mouse_click_event],
+        )
+        .await;
+
+        // Send 5 MouseEvents with non-zero scroll_v delta to proxy, these should be received and
+        // converted to 1 uapi event each, with an extra sync event to signify end of the batch.
+        answer_next_mouse_watch_request(
+            &mut mouse_source_stream,
+            vec![make_mouse_wheel_event(1); 5],
+        )
+        .await;
+
+        // Send a final mouse wheel event and ensure the inspect tree reflects it's timestamp under
+        // last_generated_uapi_event_timestamp_ns and last_read_uapi_event_timestamp_ns.
+        answer_next_mouse_watch_request(
+            &mut mouse_source_stream,
+            vec![make_mouse_wheel_event_with_timestamp(-1, 5000)],
+        )
+        .await;
+
+        // Wait for another `Watch` to ensure mouse_file is done processing the other replies.
+        // Use an empty vec, to ensure no unexpected `uapi::input_event`s are created.
+        answer_next_mouse_watch_request(&mut mouse_source_stream, vec![]).await;
+
+        let _events = read_uapi_events(&mut locked, &input_file, &current_task);
+        assert_data_tree!(inspector, root: {
+            mouse_device: {
+                total_fidl_events_received_count: 8u64,
+                total_fidl_events_ignored_count: 2u64,
+                total_fidl_events_unexpected_count: 0u64,
+                total_fidl_events_converted_count: 6u64,
+                total_uapi_events_generated_count: 8u64,
+                last_generated_uapi_event_timestamp_ns: 5000i64,
+                mouse_file_0: {
+                    fidl_events_received_count: 8u64,
+                    fidl_events_ignored_count: 2u64,
+                    fidl_events_unexpected_count: 0u64,
+                    fidl_events_converted_count: 6u64,
+                    uapi_events_generated_count: 8u64,
+                    uapi_events_read_count: 8u64,
+                    last_generated_uapi_event_timestamp_ns: 5000i64,
+                    last_read_uapi_event_timestamp_ns: 5000i64,
                 },
             }
         });

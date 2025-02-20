@@ -348,6 +348,7 @@ pub fn run_container_features(
             mouse_device.open_files.clone(),
             Some(touch_device.inspect_status.clone()),
             Some(keyboard_device.inspect_status.clone()),
+            Some(mouse_device.inspect_status.clone()),
         );
 
         register_uinput_device(locked, &kernel.kthreads.system_task(), input_events_relay);

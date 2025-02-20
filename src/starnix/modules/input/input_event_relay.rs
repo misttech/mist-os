@@ -131,6 +131,7 @@ impl InputEventsRelay {
         default_mouse_device_opened_files: OpenedFiles,
         default_touch_device_inspect: Option<Arc<InputDeviceStatus>>,
         default_keyboard_device_inspect: Option<Arc<InputDeviceStatus>>,
+        default_mouse_device_inspect: Option<Arc<InputDeviceStatus>>,
     ) {
         self.start_touch_relay(
             kernel,
@@ -158,6 +159,7 @@ impl InputEventsRelay {
             event_proxy_mode,
             mouse_source_client_end,
             default_mouse_device_opened_files,
+            default_mouse_device_inspect,
         );
     }
 
@@ -525,6 +527,7 @@ impl InputEventsRelay {
         event_proxy_mode: EventProxyMode,
         mouse_source_client_end: ClientEnd<fuipointer::MouseSourceMarker>,
         default_mouse_device_opened_files: OpenedFiles,
+        device_inspect_status: Option<Arc<InputDeviceStatus>>,
     ) {
         let slf = self.clone();
         kernel.kthreads.spawn(move |_lock_context, _current_task| {
@@ -533,6 +536,7 @@ impl InputEventsRelay {
                     event_proxy_mode,
                     mouse_source_client_end,
                     default_mouse_device_opened_files,
+                    device_inspect_status,
                 )
                 .await;
             })
@@ -544,11 +548,12 @@ impl InputEventsRelay {
         event_proxy_mode: EventProxyMode,
         mouse_source_client_end: ClientEnd<fuipointer::MouseSourceMarker>,
         default_mouse_device_opened_files: Arc<Mutex<Vec<Weak<InputFile>>>>,
+        device_inspect_status: Option<Arc<InputDeviceStatus>>,
     ) {
         let default_mouse_device = DeviceState {
             device_type: InputDeviceType::Mouse,
             open_files: default_mouse_device_opened_files,
-            inspect_status: None,
+            inspect_status: device_inspect_status,
         };
         let (mouse_source_proxy, resume_event) = match event_proxy_mode {
             EventProxyMode::WakeContainer => {
@@ -578,6 +583,10 @@ impl InputEventsRelay {
 
             match event_future.await {
                 Ok(mouse_events) => {
+                    let num_received_events: u64 = mouse_events.len().try_into().unwrap();
+                    let mut num_ignored_events: u64 = 0;
+                    let mut num_converted_events: u64 = 0;
+                    let mut num_unexpected_events: u64 = 0;
                     let mut new_events: VecDeque<uapi::input_event> = VecDeque::new();
                     let mut last_event_time_ns = zx::MonotonicInstant::get();
                     for event in mouse_events {
@@ -588,18 +597,23 @@ impl InputEventsRelay {
                                     Some(MousePointerSample { scroll_v: Some(ticks), .. }),
                                 ..
                             } => {
-                                // Ensure this is a mouse wheel event, otherwise ignore.
+                                last_event_time_ns = zx::MonotonicInstant::from_nanos(time);
+                                // Ensure this is a mouse wheel event with delta, otherwise ignore.
                                 if ticks != 0 {
-                                    last_event_time_ns = zx::MonotonicInstant::from_nanos(time);
                                     new_events.push_back(uapi::input_event {
                                         time: timeval_from_time(last_event_time_ns),
                                         type_: uapi::EV_REL as u16,
                                         code: uapi::REL_WHEEL as u16,
                                         value: ticks as i32,
                                     });
+                                    num_converted_events += 1;
+                                } else {
+                                    num_ignored_events += 1;
                                 }
                             }
-                            _ => {}
+                            _ => {
+                                num_unexpected_events += 1;
+                            }
                         }
                     }
                     if new_events.len() > 0 {
@@ -611,12 +625,45 @@ impl InputEventsRelay {
                             value: 0,
                         });
                     }
+
+                    if let Some(dev_inspect_status) = &default_mouse_device.inspect_status {
+                        dev_inspect_status.count_total_received_events(num_received_events);
+                        dev_inspect_status.count_total_ignored_events(num_ignored_events);
+                        dev_inspect_status.count_total_unexpected_events(num_unexpected_events);
+                        dev_inspect_status.count_total_converted_events(num_converted_events);
+                        if !new_events.is_empty() {
+                            dev_inspect_status.count_total_generated_events(
+                                new_events.len().try_into().unwrap(),
+                                last_event_time_ns.into_nanos().try_into().unwrap(),
+                            );
+                        }
+                    } else {
+                        log_warn!("unable to record inspect for mouse device");
+                    }
+
                     default_mouse_device.open_files.lock().retain(|f| {
                         let Some(file) = f.upgrade() else {
                             log_warn!("Dropping input file for mouse that failed to upgrade");
                             return false;
                         };
+                        match &file.inspect_status {
+                            Some(file_inspect_status) => {
+                                file_inspect_status.count_received_events(num_received_events);
+                                file_inspect_status.count_ignored_events(num_ignored_events);
+                                file_inspect_status.count_unexpected_events(num_unexpected_events);
+                                file_inspect_status.count_converted_events(num_converted_events);
+                            }
+                            None => {
+                                log_warn!("unable to record inspect within the input file")
+                            }
+                        }
                         if !new_events.is_empty() {
+                            if let Some(file_inspect_status) = &file.inspect_status {
+                                file_inspect_status.count_generated_events(
+                                    new_events.len().try_into().unwrap(),
+                                    last_event_time_ns.into_nanos().try_into().unwrap(),
+                                );
+                            }
                             let mut inner = file.inner.lock();
                             inner.events.extend(new_events.clone());
                             inner.waiters.notify_fd_events(FdEvents::POLLIN);
@@ -746,6 +793,7 @@ mod test {
             mouse_device.open_files.clone(),
             Some(touch_device.inspect_status.clone()),
             Some(keyboard_device.inspect_status.clone()),
+            Some(mouse_device.inspect_status.clone()),
         );
 
         (
