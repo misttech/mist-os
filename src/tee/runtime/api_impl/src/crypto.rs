@@ -7,6 +7,8 @@ use std::cmp::min;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use aes::{Aes128, Aes192, Aes256};
+use cmac::Cmac;
 use digest::{DynDigest as Digest, KeyInit as _};
 use hmac::Hmac;
 use sha1::Sha1;
@@ -18,6 +20,9 @@ use crate::storage::{
     KeyType as _, NoKey, Object,
 };
 
+type AesCmac128 = Cmac<Aes128>;
+type AesCmac192 = Cmac<Aes192>;
+type AesCmac256 = Cmac<Aes256>;
 type HmacSha1 = Hmac<Sha1>;
 type HmacSha224 = Hmac<Sha224>;
 type HmacSha256 = Hmac<Sha256>;
@@ -34,6 +39,7 @@ pub fn is_algorithm_supported(alg: Algorithm, element: EccCurve) -> bool {
         | Algorithm::Sha256
         | Algorithm::Sha384
         | Algorithm::Sha512
+        | Algorithm::AesCmac
         | Algorithm::HmacSha1
         | Algorithm::HmacSha224
         | Algorithm::HmacSha256
@@ -92,6 +98,7 @@ where
 
 // Supported MAC algorithm types.
 enum MacType {
+    AesCmac,
     HmacSha1,
     HmacSha224,
     HmacSha256,
@@ -115,6 +122,7 @@ impl Helper {
             Algorithm::Sha256 => Ok(Helper::Digest(Box::new(Sha256::default()))),
             Algorithm::Sha384 => Ok(Helper::Digest(Box::new(Sha384::default()))),
             Algorithm::Sha512 => Ok(Helper::Digest(Box::new(Sha512::default()))),
+            Algorithm::AesCmac => Ok(Helper::Mac(None, MacType::AesCmac)),
             Algorithm::HmacSha1 => Ok(Helper::Mac(None, MacType::HmacSha1)),
             Algorithm::HmacSha224 => Ok(Helper::Mac(None, MacType::HmacSha224)),
             Algorithm::HmacSha256 => Ok(Helper::Mac(None, MacType::HmacSha256)),
@@ -132,6 +140,20 @@ impl Helper {
                 digest.reset()
             }
             Helper::Mac(mac, mac_type) => match mac_type {
+                MacType::AesCmac => {
+                    let Key::Aes(AesKey { secret }) = key else {
+                        panic!("Wrong key type ({:?}) - expected AES", key.get_type());
+                    };
+                    let cmac: Box<dyn Mac> = if secret.len() == 16 {
+                        Box::new(AesCmac128::new_from_slice(&secret).unwrap())
+                    } else if secret.len() == 24 {
+                        Box::new(AesCmac192::new_from_slice(&secret).unwrap())
+                    } else {
+                        assert_eq!(secret.len(), 32, "Invalid AES key length: {}", secret.len());
+                        Box::new(AesCmac256::new_from_slice(&secret).unwrap())
+                    };
+                    *mac = Some(cmac);
+                }
                 MacType::HmacSha1 => {
                     let Key::HmacSha1(HmacSha1Key { secret }) = key else {
                         panic!("Wrong key type ({:?}) - expected HMAC SHA1", key.get_type());
@@ -286,7 +308,8 @@ impl Operation {
             | Algorithm::Shake256 => {
                 panic!("Algorithm {:?} has no associated object type", self.algorithm);
             }
-            Algorithm::HmacSha1
+            Algorithm::AesCmac
+            | Algorithm::HmacSha1
             | Algorithm::HmacSha224
             | Algorithm::HmacSha256
             | Algorithm::HmacSha384
@@ -499,6 +522,12 @@ impl Operations {
                     return Err(Error::NotSupported);
                 }
                 NoKey::is_valid_size
+            }
+            Algorithm::AesCmac => {
+                if mode != Mode::Mac {
+                    return Err(Error::NotSupported);
+                }
+                AesKey::is_valid_size
             }
             Algorithm::HmacSha1 => {
                 if mode != Mode::Mac {

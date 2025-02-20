@@ -54,6 +54,8 @@ rustc_library("api_impl") {
     "//src/lib/fuchsia-runtime",
     "//src/tee/lib/tee_properties",
     "//src/tee/tee_internal_api:tee_internal",
+    "//third_party/rust_crates:aes",
+    "//third_party/rust_crates:cmac",
     "//third_party/rust_crates:digest",
     "//third_party/rust_crates:hmac",
     "//third_party/rust_crates:libc",
