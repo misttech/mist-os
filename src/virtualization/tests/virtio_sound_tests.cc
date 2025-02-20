@@ -14,7 +14,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "src/media/audio/audio_core/shared/device_id.h"
+#include "src/media/audio/audio_core/device_id.h"
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_realm.h"
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_test.h"
 #include "src/media/audio/audio_core/testing/integration/virtual_device.h"
@@ -40,12 +40,12 @@ constexpr AudioSampleFormat kSampleFormat = AudioSampleFormat::FLOAT;
 
 constexpr audio_stream_unique_id_t kOutputId = AUDIO_STREAM_UNIQUE_ID_BUILTIN_SPEAKERS;
 
-// TODO(https://fxbug.dev/42168790): Consider creating a `virtio_audio_test_util` that directly communicates
-// with ALSA instead to have better control over the output buffer.
+// TODO(https://fxbug.dev/42168790): Consider creating a `virtio_audio_test_util` that directly
+// communicates with ALSA instead, to have better control over the output buffer.
 constexpr char kAplayBinPath[] = "/tmp/vm_extras/aplay";
 
-// TODO(https://fxbug.dev/42168790): Consider creating a `virtio_audio_test_util` that directly generates this
-// audio files on-the-fly.
+// TODO(https://fxbug.dev/42168790): Consider creating a `virtio_audio_test_util` that directly
+// generates audio files on-the-fly.
 constexpr char kTestFilePath[] = "/tmp/extras/stereo_ramp_48khz_16bit.wav";
 
 constexpr int32_t kRampFrameCount = 65536;
@@ -146,9 +146,8 @@ TYPED_TEST(VirtioSoundGuestTest, OutputFidelity) {
   // values with opposing direction in each channel. It is calculated for each frame as follows:
   //    `buffer[frame][0] = 0x7FFF - frame`
   //    `buffer[frame][1] = -0x8000 + frame`
-  // Note that the file consists of `kZeroPaddingFrameCount` frames of zeros at the beginning in
-  // order to compensate for the initial gain ramp, which is then followed by the
-  // `kRampFrameCount` ramp frames as described above.
+  // Note that the file begins with `kZeroPaddingFrameCount` frames of zeros, in order to compensate
+  // for the initial gain ramp. This is followed by `kRampFrameCount` ramp frames (described above).
   ASSERT_EQ(this->Execute({kAplayBinPath, kTestFilePath}), ZX_OK);
 
   const auto ring_buffer = this->GetOutputRingBuffer();
@@ -168,8 +167,9 @@ TYPED_TEST(VirtioSoundGuestTest, OutputFidelity) {
   ASSERT_LE(end_frame, ring_buffer.NumFrames()) << "Not enough frames in ring buffer";
 
   const auto buffer_slice = AudioBufferSlice(&ring_buffer, *start_frame, end_frame);
-  // TODO(https://fxbug.dev/42177076): Temporarily limit the end frame to `24000 - kZeroPaddingFrameCount`
-  // until the buffer repetition issue is resolved (to be replaced by `kRampFrameCount`).
+  // TODO(https://fxbug.dev/42177076): Temporarily limit the end frame to
+  // `24000 - kZeroPaddingFrameCount`, until the buffer repetition issue is resolved.
+  // When the issue is fixed, this would be replaced by `kRampFrameCount`.
   for (int32_t frame = 0; frame < 24000 - kZeroPaddingFrameCount; ++frame) {
     EXPECT_FLOAT_EQ(buffer_slice.SampleAt(frame, 0),
                     static_cast<float>(0x7FFF - frame) / static_cast<float>(kRampFrameCount / 2))

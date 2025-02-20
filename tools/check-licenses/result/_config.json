@@ -201,7 +201,7 @@
           "src/connectivity/wlan/lib/common/cpp/include/wlan/common/mcs_rate_lookup.h": true,
           "src/connectivity/wlan/lib/common/cpp/mcs_rate_lookup.cc": true,
           "src/connectivity/wlan/lib/common/cpp/mcs_rate_lookup_test.cc": true,
-          "src/media/audio/audio_core/shared/schema/make_schema_header.py": true,
+          "src/media/audio/audio_core/schema/make_schema_header.py": true,
           "src/connectivity/network/netstack/dhcp/server.go": true
         }
       },

@@ -23,7 +23,7 @@
 
 #include "src/lib/fxl/strings/concatenate.h"
 #include "src/lib/fxl/strings/string_printf.h"
-#include "src/media/audio/audio_core/shared/device_id.h"
+#include "src/media/audio/audio_core/device_id.h"
 #include "src/media/audio/audio_core/testing/integration/renderer_shim.h"
 #include "src/media/audio/lib/analysis/analysis.h"
 #include "src/media/audio/lib/analysis/generators.h"

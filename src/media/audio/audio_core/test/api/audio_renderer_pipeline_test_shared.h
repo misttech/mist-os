@@ -13,7 +13,7 @@
 
 #include <gtest/gtest.h>
 
-#include "src/media/audio/audio_core/shared/device_id.h"
+#include "src/media/audio/audio_core/device_id.h"
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_test.h"
 #include "src/media/audio/lib/analysis/generators.h"
 #include "src/media/audio/lib/test/comparators.h"

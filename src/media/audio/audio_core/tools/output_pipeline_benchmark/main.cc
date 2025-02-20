@@ -11,9 +11,9 @@
 #include "src/lib/files/path.h"
 #include "src/lib/fxl/command_line.h"
 #include "src/lib/fxl/strings/split_string.h"
-#include "src/media/audio/audio_core/shared/mix_profile_config.h"
-#include "src/media/audio/audio_core/shared/pin_executable_memory.h"
-#include "src/media/audio/audio_core/shared/stream_usage.h"
+#include "src/media/audio/audio_core/mix_profile_config.h"
+#include "src/media/audio/audio_core/pin_executable_memory.h"
+#include "src/media/audio/audio_core/stream_usage.h"
 #include "src/media/audio/audio_core/tools/output_pipeline_benchmark/output_pipeline_benchmark.h"
 
 using media::audio::MixProfileConfig;

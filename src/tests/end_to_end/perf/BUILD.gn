@@ -59,7 +59,7 @@ group("test") {
     "//src/graphics/benchmarks",
     "//src/lib/diagnostics:benchmarks",
     "//src/lib/flyweights/benchmarks",
-    "//src/media/audio/audio_core/shared/mixer/tools:benchmarks",
+    "//src/media/audio/audio_core/mixer/tools:benchmarks",
     "//src/performance/trace_bench:benchmarks",
     "//src/power:benchmarks",
     "//src/starnix:benchmarks",
@@ -79,7 +79,7 @@ group("tests_to_run_on_internal_builders") {
   testonly = true
 
   deps = [
-    "//src/media/audio/audio_core/shared/mixer/tools:benchmarks",
+    "//src/media/audio/audio_core/mixer/tools:benchmarks",
     "//src/storage/benchmarks/fuchsia:benchmarks",
     "//src/sys/component_manager/tests/bootfs_launching_benchmark:benchmark",
     "//src/tests/benchmarks:kernel_boot_benchmarks",
