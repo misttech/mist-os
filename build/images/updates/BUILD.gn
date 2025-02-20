@@ -165,11 +165,36 @@ if (use_bringup_assembly ||
   }
   group("prepare_publish") {
   }
-  group("publish") {
+  group("all_package_manifests.list") {
   }
 
-  # This file doesn't exist for these assemblies.
-  group("all_package_manifests.list") {
+  if (use_bringup_assembly) {
+    group("publish") {
+    }
+  } else {
+    # Publish an empty TUF repo for multi-product builds.
+    _output_repository_dir = "${root_build_dir}/amber-files"
+    devhost_repository_publish("publish") {
+      testonly = true
+      output_repository_dir = _output_repository_dir
+      deps = []
+      package_list_manifests = []
+      output_blob_manifest_path = root_build_dir + "/all_blobs.json"
+
+      metadata = {
+        package_repository = [
+          {
+            path = rebase_path("${_output_repository_dir}/repository",
+                               root_build_dir)
+            targets =
+                rebase_path("${_output_repository_dir}/repository/targets.json",
+                            root_build_dir)
+            blobs = rebase_path("${_output_repository_dir}/repository/blobs",
+                                root_build_dir)
+          },
+        ]
+      }
+    }
   }
 } else {
   group("updates") {
