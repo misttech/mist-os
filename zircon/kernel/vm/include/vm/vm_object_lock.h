@@ -185,7 +185,10 @@ struct Fine {
 // these #define.
 // To minimize errors the lock type is indirectly selected by manipulating these defines, and we
 // static assert that they match the traits of the chosen lock.
-#define VMO_USE_LOCAL_LOCK false
+// To avoid using additional memory for no benefit, the TrackedHierarchy lock (i.e. combination of
+// both local and shared locks) is only used if lockdep is in use, otherwise the regular global
+// hierarchy lock is used.
+#define VMO_USE_LOCAL_LOCK (LOCK_DEP_ENABLED_FEATURE_LEVEL > 0)
 #define VMO_USE_SHARED_LOCK true
 
 #if VMO_USE_LOCAL_LOCK && VMO_USE_SHARED_LOCK
@@ -193,9 +196,7 @@ using VmoLockTraits = vmo_lock_traits::TrackedHierarchy;
 #elif VMO_USE_LOCAL_LOCK && !VMO_USE_SHARED_LOCK
 using VmoLockTraits = vmo_lock_traits::Fine;
 #elif !VMO_USE_LOCAL_LOCK && VMO_USE_SHARED_LOCK
-// TODO(https://fxbug.dev/338300943) Switch from Global to Hierarchy to begin the lock transition
-// process.
-using VmoLockTraits = vmo_lock_traits::Global;
+using VmoLockTraits = vmo_lock_traits::Hierarchy;
 #else
 #error "Invalid locking discipline"
 #endif
