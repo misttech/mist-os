@@ -196,6 +196,7 @@ struct __PACKED BaseEdid {
 static_assert(offsetof(BaseEdid, edid_version) == 0x12, "Layout check");
 static_assert(offsetof(BaseEdid, standard_timings) == 0x26, "Layout check");
 static_assert(offsetof(BaseEdid, detailed_descriptors) == 0x36, "Layout check");
+static_assert(offsetof(BaseEdid, num_extensions) == 0x7e, "Layout check");
 
 // Version 3 of the CEA EDID Timing Extension
 struct __PACKED CeaEdidTimingExtension {

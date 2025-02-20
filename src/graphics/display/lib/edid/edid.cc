@@ -151,23 +151,42 @@ fit::result<const char*, Edid> Edid::Create(cpp20::span<const uint8_t> bytes) {
   if (bytes.empty()) {
     return fit::error("EDID is empty");
   }
-  if (bytes.size() % kBlockSize != 0) {
-    return fit::error("EDID size is not a multiple of block size");
-  }
-  static constexpr int kMaxAllowedEdidBytesSize = kBlockSize * kMaxEdidBlockCount;
-  if (bytes.size() > kMaxAllowedEdidBytesSize) {
-    return fit::error("EDID size exceeds the maximum allowed size");
+  if (bytes.size() < kBlockSize) {
+    return fit::error("EDID size is too small (no room for the base block)");
   }
 
-  fbl::Vector<uint8_t> bytes_vec;
+  // Engine drivers may report zero-padded EDID data. Work around this issue by
+  // computing the EDID size based on the extension block count in the EDID base
+  // block.
+  const BaseEdid* base_edid = reinterpret_cast<const BaseEdid*>(bytes.data());
+
+  // The addition will not overflow (causing UB) because `num_extension` is a
+  // 1-byte field. The maximum addition result is 256.
+  const int total_edid_block_count = 1 + base_edid->num_extensions;
+
+  // The multiplication will not overflow because of the quantities involved.
+  // `kBlockSize` is 128 and `total_edid_block_count` is at most 256, so the
+  // multiplication result is at most 32,768.
+  const size_t declared_edid_size = size_t{kBlockSize} * total_edid_block_count;
+  if (declared_edid_size > bytes.size()) {
+    return fit::error("EDID size based on declared block count exceeds byte buffer size");
+  }
+  cpp20::span<const uint8_t> valid_edid_bytes = bytes.subspan(0, declared_edid_size);
+
+  // The maximum EDID block count is based on the fact that the size field is stored in a
+  // byte.
+  ZX_DEBUG_ASSERT_MSG(valid_edid_bytes.size() <= size_t{kBlockSize} * kMaxEdidBlockCount,
+                      "Maximum EDID size reasoning was incorrect");
+
+  fbl::Vector<uint8_t> edid_bytes_buffer;
   fbl::AllocChecker alloc_checker;
-  bytes_vec.resize(bytes.size(), 0, &alloc_checker);
+  edid_bytes_buffer.resize(valid_edid_bytes.size(), 0, &alloc_checker);
   if (!alloc_checker.check()) {
     return fit::error("Failed to allocate memory for EDID");
   }
-  std::copy(bytes.begin(), bytes.end(), bytes_vec.begin());
+  std::copy(valid_edid_bytes.begin(), valid_edid_bytes.end(), edid_bytes_buffer.begin());
 
-  Edid edid(std::move(bytes_vec));
+  Edid edid(std::move(edid_bytes_buffer));
   fit::result<const char*> validate_result = edid.Validate();
   if (validate_result.is_error()) {
     return validate_result.take_error();

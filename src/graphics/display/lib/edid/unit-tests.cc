@@ -197,4 +197,22 @@ TEST_F(EdidTest, QemuVirtioGpuEdidParsesCorrectly) {
   EXPECT_EQ(false, edid.supports_basic_audio());
 }
 
+TEST_F(EdidTest, QemuVirtioGpuEdidWithPaddingParsesCorrectly) {
+  std::array<uint8_t, 1024> padded_edid_bytes;
+  std::copy(edid::kQemuVirtioGpuEdid.begin(), edid::kQemuVirtioGpuEdid.end(),
+            padded_edid_bytes.begin());
+
+  fit::result<const char*, edid::Edid> edid_result = edid::Edid::Create(padded_edid_bytes);
+  EXPECT_TRUE(edid_result.is_ok()) << "EDID parsing failed: " << edid_result.error_value();
+  edid::Edid edid = std::move(edid_result).value();
+
+  for (auto timing_it = edid::timing_iterator(&edid); timing_it.is_valid(); ++timing_it) {
+    const display::DisplayTiming& display_timing = *timing_it;
+    EXPECT_TRUE(display_timing.IsValid());
+  }
+
+  EXPECT_EQ(false, edid.is_hdmi());
+  EXPECT_EQ(false, edid.supports_basic_audio());
+}
+
 }  // namespace
