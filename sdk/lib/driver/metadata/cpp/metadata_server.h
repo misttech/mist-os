@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.driver.metadata/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <lib/async/default.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/driver/component/cpp/node_add_args.h>
@@ -14,6 +15,7 @@
 #include <lib/driver/logging/cpp/structured_logger.h>
 #include <lib/driver/metadata/cpp/metadata.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 
@@ -80,15 +82,59 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
     static_assert(!fidl::IsResource<FidlType>::value,
                   "|FidlType| cannot be a resource type. Resources cannot be persisted.");
 
-    fit::result data = fidl::Persist(metadata);
-    if (data.is_error()) {
+    fit::result persisted_metadata = fidl::Persist(metadata);
+    if (persisted_metadata.is_error()) {
       FDF_SLOG(ERROR, "Failed to persist metadata.",
-               KV("status", data.error_value().status_string()));
-      return zx::error(data.error_value().status());
+               KV("status", persisted_metadata.error_value().status_string()));
+      return zx::error(persisted_metadata.error_value().status());
     }
-    encoded_metadata_.emplace(data.value());
+    persisted_metadata_.emplace(std::move(persisted_metadata.value()));
 
     return zx::ok();
+  }
+
+  // Retrieves persisted metadata from |pdev| associated with the metadata ID
+  // `|FidlType|::kSerializableName`. Assumes that the metadata from the platform device is a
+  // persisted |FidlType|. Returns false if the metadata was not found. Returns true if otherwise.
+  zx::result<bool> SetMetadataFromPDevIfExists(
+      fidl::ClientEnd<fuchsia_hardware_platform_device::Device>& pdev) {
+    fidl::WireResult result = fidl::WireCall(pdev)->GetMetadata(
+        fidl::StringView::FromExternal(FidlType::kSerializableName));
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "Failed to send GetMetadata request: %s", result.status_string());
+      return zx::error(result.status());
+    }
+    if (result->is_error()) {
+      if (result->error_value() == ZX_ERR_NOT_FOUND) {
+        return zx::ok(false);
+      }
+      FDF_LOG(ERROR, "Failed to get metadata: %s", zx_status_get_string(result->error_value()));
+      return zx::error(result->error_value());
+    }
+    const auto persisted_metadata = result.value()->metadata.get();
+    persisted_metadata_.emplace();
+    persisted_metadata_->assign(persisted_metadata.begin(), persisted_metadata.end());
+
+    return zx::ok(true);
+  }
+
+  // Retrieves persisted metadata from |pdev| associated with the metadata ID
+  // `|FidlType|::kSerializableName`. Assumes that the metadata from the platform device is a
+  // persisted |FidlType|. Returns false if the metadata was not found. Returns true if otherwise.
+  zx::result<bool> SetMetadataFromPDevIfExists(fdf::PDev& pdev) {
+    zx::result metadata = pdev.GetFidlMetadata<FidlType>();
+    if (metadata.is_error()) {
+      if (metadata.status_value() == ZX_ERR_NOT_FOUND) {
+        return zx::ok(false);
+      }
+      FDF_LOG(ERROR, "Failed to get metadata: %s", metadata.status_string());
+      return metadata.take_error();
+    }
+    if (zx::result result = SetMetadata(metadata.value()); result.is_error()) {
+      FDF_LOG(ERROR, "Failed to set metadata: %s", result.status_string());
+      return result.take_error();
+    }
+    return zx::ok(true);
   }
 
   // Sets the metadata to be served to the metadata found in |incoming|.
@@ -122,10 +168,10 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
                KV("status", zx_status_get_string(result->error_value())));
       return result->take_error();
     }
-    cpp20::span<uint8_t> metadata = result.value()->metadata.get();
+    cpp20::span<uint8_t> persisted_metadata = result.value()->metadata.get();
     std::vector<uint8_t> copy;
-    copy.insert(copy.begin(), metadata.begin(), metadata.end());
-    encoded_metadata_.emplace(std::move(copy));
+    copy.insert(copy.begin(), persisted_metadata.begin(), persisted_metadata.end());
+    persisted_metadata_.emplace(std::move(copy));
 
     return zx::ok();
   }
@@ -162,19 +208,19 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
  private:
   // fuchsia.driver.metadata/Metadata protocol implementation.
   void GetMetadata(GetMetadataCompleter::Sync& completer) override {
-    if (!encoded_metadata_.has_value()) {
+    if (!persisted_metadata_.has_value()) {
       FDF_LOG(ERROR, "Metadata not set. Set metadata with SetMetadata() or ForwardMetadata()");
       completer.ReplyError(ZX_ERR_BAD_STATE);
       return;
     }
-    completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(encoded_metadata_.value()));
+    completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(persisted_metadata_.value()));
   }
 
   fidl::ServerBindingGroup<fuchsia_driver_metadata::Metadata> bindings_;
 
-  // Encoded metadata that will be served in this instance's fuchsia.driver.metadata/Metadata
+  // Persisted metadata that will be served in this instance's fuchsia.driver.metadata/Metadata
   // protocol.
-  std::optional<std::vector<uint8_t>> encoded_metadata_;
+  std::optional<std::vector<uint8_t>> persisted_metadata_;
 
   // Name of the instance directory that will serve this instance's fuchsia.driver.metadata/Service
   // service.
