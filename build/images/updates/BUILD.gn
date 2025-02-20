@@ -160,6 +160,8 @@ if (use_bringup_assembly ||
   # These don't have any meaning in these assemblies, so leave them as empty
   # placeholder targets.
   group("updates") {
+    testonly = true
+    deps = [ ":publish" ]
   }
   group("packages") {
   }
