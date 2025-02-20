@@ -9,23 +9,15 @@ vulkan_executable("escher-flatland-bin") {
   sources = [ "main.cc" ]
   output_name = "escher_flatland"
   deps = [
-    "//sdk/fidl/fuchsia.element:fuchsia.element_cpp",
-    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_cpp",
-    "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
-    "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/syslog/cpp",
     "//src/ui/lib/escher",
+    "//src/ui/lib/escher/escher_flatland",
     "//zircon/system/ulib/trace-provider",
   ]
 }
 
 fuchsia_package_with_single_component("escher-flatland") {
   manifest = "meta/escher-flatland.cml"
-  deps = [
-    ":escher-flatland-bin",
-    "//src/lib/vulkan:vulkan_validation_layers",
-    "//src/lib/vulkan/swapchain:image_pipe_swapchain_layer",
-  ]
+  deps = [ ":escher-flatland-bin" ]
 }
