@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::security;
 use crate::vfs::socket::SocketDomain;
 use futures::channel::mpsc::{
     UnboundedReceiver, UnboundedSender, {self},
@@ -345,17 +346,13 @@ impl NetlinkSocketInner {
                     self.timestamp = timestamp != 0;
                 }
                 SO_SNDBUFFORCE => {
-                    if !current_task.creds().has_capability(CAP_NET_ADMIN) {
-                        return error!(EPERM);
-                    }
+                    security::check_task_capable(current_task, CAP_NET_ADMIN)?;
                     let requested_capacity: socklen_t =
                         current_task.read_object(user_opt.try_into()?)?;
                     self.set_capacity(requested_capacity as usize * 2);
                 }
                 SO_RCVBUFFORCE => {
-                    if !current_task.creds().has_capability(CAP_NET_ADMIN) {
-                        return error!(EPERM);
-                    }
+                    security::check_task_capable(current_task, CAP_NET_ADMIN)?;
                     let requested_capacity: socklen_t =
                         current_task.read_object(user_opt.try_into()?)?;
                     self.set_capacity(requested_capacity as usize);

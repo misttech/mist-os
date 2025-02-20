@@ -643,20 +643,41 @@ pub fn task_get_context(current_task: &CurrentTask, target: &Task) -> Result<Vec
     )
 }
 
-/// Verifies that a task has all of the given capabilities.
+/// Checks if a task has all of the given capabilities.
+/// Corresponds to the `capable()` LSM hook.
+pub fn check_task_capable_noaudit(
+    task: &Task,
+    capabilities: starnix_uapi::auth::Capabilities,
+) -> bool {
+    profile_duration!("security.hooks.check_task_capable_noaudit");
+    return task.creds().has_capability(capabilities)
+        && if_selinux_else(
+            task,
+            |security_server| {
+                selinux_hooks::task::is_task_capable(
+                    &security_server.as_permission_check(),
+                    &task,
+                    capabilities,
+                )
+            },
+            || true,
+        );
+}
+
+/// Checks if a task has all of the given capabilities.
 /// Corresponds to the `capable()` LSM hook.
 pub fn check_task_capable(
-    current_task: &CurrentTask,
+    task: &Task,
     capabilities: starnix_uapi::auth::Capabilities,
 ) -> Result<(), Errno> {
     profile_duration!("security.hooks.check_task_capable");
-    if !current_task.creds().has_capability(capabilities) {
+    if !task.creds().has_capability(capabilities) {
         return error!(EPERM);
     }
-    if_selinux_else_default_ok(current_task, |security_server| {
+    if_selinux_else_default_ok(task, |security_server| {
         selinux_hooks::task::check_task_capable(
             &security_server.as_permission_check(),
-            &current_task,
+            &task,
             capabilities,
         )
     })

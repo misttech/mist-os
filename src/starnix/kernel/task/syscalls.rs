@@ -20,8 +20,8 @@ use starnix_syscalls::SyscallResult;
 use starnix_types::ownership::WeakRef;
 use starnix_types::time::timeval_from_duration;
 use starnix_uapi::auth::{
-    Capabilities, Credentials, SecureBits, CAP_SETGID, CAP_SETPCAP, CAP_SETUID, CAP_SYS_ADMIN,
-    CAP_SYS_NICE, CAP_SYS_PTRACE, CAP_SYS_RESOURCE, CAP_SYS_TTY_CONFIG,
+    Capabilities, SecureBits, CAP_SETGID, CAP_SETPCAP, CAP_SETUID, CAP_SYS_ADMIN, CAP_SYS_NICE,
+    CAP_SYS_PTRACE, CAP_SYS_RESOURCE, CAP_SYS_TTY_CONFIG,
 };
 use starnix_uapi::errors::{Errno, ENAMETOOLONG};
 use starnix_uapi::file_mode::{Access, AccessCheck, FileMode};
@@ -411,18 +411,18 @@ pub fn sys_setpgid(
 // A non-root process is allowed to set any of its three uids to the value of any other. The
 // CAP_SETUID capability bypasses these checks and allows setting any uid to any integer. Likewise
 // for gids.
-fn new_uid_allowed(creds: &Credentials, uid: uid_t) -> bool {
-    creds.has_capability(CAP_SETUID)
-        || uid == creds.uid
-        || uid == creds.euid
-        || uid == creds.saved_uid
+fn new_uid_allowed(current_task: &CurrentTask, uid: uid_t) -> bool {
+    uid == current_task.creds().uid
+        || uid == current_task.creds().euid
+        || uid == current_task.creds().saved_uid
+        || security::check_task_capable_noaudit(current_task, CAP_SETUID)
 }
 
-fn new_gid_allowed(creds: &Credentials, gid: gid_t) -> bool {
-    creds.has_capability(CAP_SETGID)
-        || gid == creds.gid
-        || gid == creds.egid
-        || gid == creds.saved_gid
+fn new_gid_allowed(current_task: &CurrentTask, gid: gid_t) -> bool {
+    gid == current_task.creds().gid
+        || gid == current_task.creds().egid
+        || gid == current_task.creds().saved_gid
+        || security::check_task_capable_noaudit(current_task, CAP_SETGID)
 }
 
 pub fn sys_getuid(
@@ -448,7 +448,7 @@ pub fn sys_setuid(
     if uid == gid_t::MAX {
         return error!(EINVAL);
     }
-    if !new_uid_allowed(&creds, uid) {
+    if !new_uid_allowed(&current_task, uid) {
         return error!(EPERM);
     }
     let prev = creds.copy_user_credentials();
@@ -473,7 +473,7 @@ pub fn sys_setgid(
     if gid == gid_t::MAX {
         return error!(EINVAL);
     }
-    if !new_gid_allowed(&creds, gid) {
+    if !new_gid_allowed(&current_task, gid) {
         return error!(EPERM);
     }
     creds.egid = gid;
@@ -507,7 +507,7 @@ pub fn sys_setfsuid(
 ) -> Result<uid_t, Errno> {
     let mut creds = current_task.creds();
     let prev = creds.copy_user_credentials();
-    if fsuid != u32::MAX && new_uid_allowed(&creds, fsuid) {
+    if fsuid != u32::MAX && new_uid_allowed(&current_task, fsuid) {
         creds.fsuid = fsuid;
         creds.update_capabilities(prev);
         current_task.set_creds(creds);
@@ -525,7 +525,7 @@ pub fn sys_setfsgid(
     let prev = creds.copy_user_credentials();
     let prev_fsgid = creds.fsgid;
 
-    if fsgid != u32::MAX && new_gid_allowed(&creds, fsgid) {
+    if fsgid != u32::MAX && new_gid_allowed(&current_task, fsgid) {
         creds.fsgid = fsgid;
         creds.update_capabilities(prev);
         current_task.set_creds(creds);
@@ -569,7 +569,7 @@ pub fn sys_setreuid(
     euid: uid_t,
 ) -> Result<(), Errno> {
     let mut creds = current_task.creds();
-    let allowed = |uid| uid == u32::MAX || new_uid_allowed(&creds, uid);
+    let allowed = |uid| uid == u32::MAX || new_uid_allowed(&current_task, uid);
     if !allowed(ruid) || !allowed(euid) {
         return error!(EPERM);
     }
@@ -601,7 +601,7 @@ pub fn sys_setregid(
     egid: gid_t,
 ) -> Result<(), Errno> {
     let mut creds = current_task.creds();
-    let allowed = |gid| gid == u32::MAX || new_gid_allowed(&creds, gid);
+    let allowed = |gid| gid == u32::MAX || new_gid_allowed(&current_task, gid);
     if !allowed(rgid) || !allowed(egid) {
         return error!(EPERM);
     }
@@ -632,7 +632,7 @@ pub fn sys_setresuid(
     suid: uid_t,
 ) -> Result<(), Errno> {
     let mut creds = current_task.creds();
-    let allowed = |uid| uid == u32::MAX || new_uid_allowed(&creds, uid);
+    let allowed = |uid| uid == u32::MAX || new_uid_allowed(&current_task, uid);
     if !allowed(ruid) || !allowed(euid) || !allowed(suid) {
         return error!(EPERM);
     }
@@ -661,7 +661,7 @@ pub fn sys_setresgid(
     sgid: gid_t,
 ) -> Result<(), Errno> {
     let mut creds = current_task.creds();
-    let allowed = |gid| gid == u32::MAX || new_gid_allowed(&creds, gid);
+    let allowed = |gid| gid == u32::MAX || new_gid_allowed(&current_task, gid);
     if !allowed(rgid) || !allowed(egid) || !allowed(sgid) {
         return error!(EPERM);
     }
@@ -1611,20 +1611,18 @@ pub fn sys_setpriority(
     const MAX_RAW_PRIORITY: i32 = 40;
     let new_raw_priority =
         (MID_RAW_PRIORITY).saturating_sub(priority).clamp(MIN_RAW_PRIORITY, MAX_RAW_PRIORITY) as u8;
-    let permitted = current_task.creds().has_capability(CAP_SYS_NICE) || {
-        let friendly = current_task.creds().euid == target_task.creds().euid
-            || current_task.creds().euid == target_task.creds().uid;
-        let strengthening = target_task.read().scheduler_policy.raw_priority() < new_raw_priority;
-        let allowed_so_far_as_rlimit_is_concerned = !strengthening
-            || new_raw_priority as u64 <= target_task.thread_group.get_rlimit(Resource::NICE);
-        friendly && allowed_so_far_as_rlimit_is_concerned
-    };
-    if !permitted {
-        return error!(EPERM);
+    let friendly = current_task.creds().euid == target_task.creds().euid
+        || current_task.creds().euid == target_task.creds().uid;
+    let strengthening = target_task.read().scheduler_policy.raw_priority() < new_raw_priority;
+    let allowed_so_far_as_rlimit_is_concerned = !strengthening
+        || new_raw_priority as u64 <= target_task.thread_group.get_rlimit(Resource::NICE);
+    if !(friendly && allowed_so_far_as_rlimit_is_concerned) {
+        security::check_task_capable(current_task, CAP_SYS_NICE)?;
     }
 
     // TODO: https://fxbug.dev/392615438 - this check_setsched_access is probably partially-correct
-    // at best; the SELinux story probably also involves a sys_nice capability check. See
+    // for now; for the SELinux story we probably want to be more sure about the sys_nice capability
+    // check and also condition this setsched check on only happening for cross-process calls. See
     // https://fxbug.dev/322894197#comment2.
     security::check_setsched_access(current_task, &target_task)?;
 
@@ -1940,6 +1938,7 @@ mod tests {
     use crate::mm::syscalls::sys_munmap;
     use crate::testing::*;
     use starnix_syscalls::SUCCESS;
+    use starnix_uapi::auth::Credentials;
     use starnix_uapi::{SCHED_FIFO, SCHED_NORMAL};
     use std::{mem, u64};
 

@@ -5,7 +5,7 @@
 use bstr::BStr;
 use selinux::permission_check::{PermissionCheck, PermissionCheckResult};
 use selinux::{ClassPermission, Permission, SecurityId};
-use starnix_core::task::CurrentTask;
+use starnix_core::task::{CurrentTask, Task};
 use starnix_core::vfs::{FileObject, FileSystem, FsNode};
 use starnix_logging::{log_warn, BugRef, __track_stub_inner};
 use std::fmt::{Display, Error};
@@ -39,6 +39,7 @@ pub(super) enum Auditable<'a> {
     FileObject(&'a FileObject),
     FileSystem(&'a FileSystem),
     FsNode(&'a FsNode),
+    Task(&'a Task),
     // keep-sorted end
 }
 
@@ -48,6 +49,12 @@ impl<'a> From<&'a CurrentTask> for Auditable<'a> {
         // integrated with at call-sites but the "pid" and "comm" are not duplicated in the audit
         // log line.
         Auditable::CurrentTask
+    }
+}
+
+impl<'a> From<&'a Task> for Auditable<'a> {
+    fn from(value: &'a Task) -> Self {
+        Auditable::Task(value)
     }
 }
 
@@ -172,6 +179,9 @@ impl Display for Auditable<'_> {
             }
             Auditable::FileSystem(fs) => {
                 write!(f, " dev=\"{}\"", fs.options.source)
+            }
+            Auditable::Task(task) => {
+                write!(f, " pid={}, comm={}", task.get_pid(), BStr::new(task.command().as_bytes()))
             }
         }
     }

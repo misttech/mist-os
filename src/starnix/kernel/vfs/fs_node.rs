@@ -1173,7 +1173,7 @@ impl FsNode {
     {
         let mut info = FsNodeInfo::new(0, mode!(IFDIR, 0o777), FsCred::root());
         info_updater(&mut info);
-        Self::new_internal(Box::new(ops), Weak::new(), Weak::new(), 0, info, &Credentials::root())
+        Self::new_internal(Box::new(ops), Weak::new(), Weak::new(), 0, info, None)
     }
 
     /// Create a node without inserting it into the FileSystem node cache. This is usually not what
@@ -1186,9 +1186,15 @@ impl FsNode {
         info: FsNodeInfo,
     ) -> FsNodeHandle {
         let ops = ops.into();
-        let creds = current_task.creds();
-        Self::new_internal(ops, fs.kernel.clone(), Arc::downgrade(fs), node_id, info, &creds)
-            .into_handle()
+        Self::new_internal(
+            ops,
+            fs.kernel.clone(),
+            Arc::downgrade(fs),
+            node_id,
+            info,
+            Some(current_task),
+        )
+        .into_handle()
     }
 
     pub fn into_handle(mut self) -> FsNodeHandle {
@@ -1204,7 +1210,7 @@ impl FsNode {
         fs: Weak<FileSystem>,
         node_id: ino_t,
         info: FsNodeInfo,
-        credentials: &Credentials,
+        current_task: Option<&CurrentTask>,
     ) -> Self {
         // Allow the FsNodeOps to populate initial info.
         let info = {
@@ -1214,8 +1220,10 @@ impl FsNode {
         };
 
         let fifo = if info.mode.is_fifo() {
+            let current_task = current_task
+                .expect("expected that a CurrentTask would be available when creating a fifo");
             let mut default_pipe_capacity = (*PAGE_SIZE * 16) as usize;
-            if !credentials.has_capability(CAP_SYS_RESOURCE) {
+            if !security::check_task_capable_noaudit(current_task, CAP_SYS_RESOURCE) {
                 let kernel = kernel.upgrade().expect("Invalid kernel when creating fs node");
                 let max_size = kernel.system_limits.pipe_max_size.load(Ordering::Relaxed);
                 default_pipe_capacity = std::cmp::min(default_pipe_capacity, max_size);

@@ -493,14 +493,24 @@ fn permission_from_capability(capabilities: starnix_uapi::auth::Capabilities) ->
     }
 }
 
+pub fn is_task_capable(
+    permission_check: &PermissionCheck<'_>,
+    task: &Task,
+    capabilities: starnix_uapi::auth::Capabilities,
+) -> bool {
+    let sid = task.security_state.lock().current_sid;
+    let permission = permission_from_capability(capabilities);
+    permission_check.has_permission(sid, sid, permission).permit
+}
+
 pub fn check_task_capable(
     permission_check: &PermissionCheck<'_>,
-    current_task: &CurrentTask,
+    task: &Task,
     capabilities: starnix_uapi::auth::Capabilities,
 ) -> Result<(), Errno> {
-    let sid = current_task.security_state.lock().current_sid;
+    let sid = task.security_state.lock().current_sid;
     let permission = permission_from_capability(capabilities);
-    check_self_permission(&permission_check, sid, permission, current_task.into())
+    check_self_permission(&permission_check, sid, permission, task.into())
 }
 
 /// Checks if the task with `source_sid` has the permission to get and/or set limits on the task with `target_sid`.

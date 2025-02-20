@@ -1321,15 +1321,14 @@ impl Task {
         //      -  The caller has the CAP_SYS_PTRACE capability in the user
         //         namespace of the target.
         let target_creds = target.creds();
-        if !creds.has_capability(CAP_SYS_PTRACE)
-            && !(target_creds.uid == uid
-                && target_creds.euid == uid
-                && target_creds.saved_uid == uid
-                && target_creds.gid == gid
-                && target_creds.egid == gid
-                && target_creds.saved_gid == gid)
+        if !(target_creds.uid == uid
+            && target_creds.euid == uid
+            && target_creds.saved_uid == uid
+            && target_creds.gid == gid
+            && target_creds.egid == gid
+            && target_creds.saved_gid == gid)
         {
-            return error!(EPERM);
+            security::check_task_capable(self, CAP_SYS_PTRACE)?;
         }
 
         // (4)  Deny access if the target process "dumpable" attribute has a
@@ -1338,8 +1337,8 @@ impl Task {
         //      the CAP_SYS_PTRACE capability in the user namespace of the
         //      target process.
         let dumpable = *target.mm().ok_or_else(|| errno!(EINVAL))?.dumpable.lock(locked);
-        if dumpable != DumpPolicy::User && !creds.has_capability(CAP_SYS_PTRACE) {
-            return error!(EPERM);
+        if dumpable != DumpPolicy::User {
+            security::check_task_capable(self, CAP_SYS_PTRACE)?;
         }
 
         // TODO: Implement the LSM security_ptrace_access_check() interface.
@@ -1470,10 +1469,6 @@ impl Task {
 
         let self_creds = self.creds();
 
-        if self_creds.has_capability(CAP_KILL) {
-            return Ok(());
-        }
-
         if self_creds.has_same_uid(&target.creds()) {
             return Ok(());
         }
@@ -1485,6 +1480,8 @@ impl Task {
                 return Ok(());
             }
         }
+
+        security::check_task_capable(self, CAP_KILL)?;
 
         error!(EPERM)
     }
