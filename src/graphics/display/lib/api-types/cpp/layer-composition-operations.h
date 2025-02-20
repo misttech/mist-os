@@ -66,10 +66,6 @@ class LayerCompositionOperations {
   constexpr LayerCompositionOperations WithUseImage() const;
   constexpr bool HasMerge() const;
   constexpr LayerCompositionOperations WithMerge() const;
-
-  // TODO(https://fxbug.dev/397708825): Remove this after drivers are migrated.
-  constexpr LayerCompositionOperations WithMergeBase() const;
-
   constexpr bool HasFrameScale() const;
   constexpr LayerCompositionOperations WithFrameScale() const;
   constexpr bool HasSrcFrame() const;
@@ -192,11 +188,6 @@ constexpr bool LayerCompositionOperations::HasMerge() const {
 }
 
 constexpr LayerCompositionOperations LayerCompositionOperations::WithMerge() const {
-  return LayerCompositionOperations(operations_ | kMerge.operations_);
-}
-
-// TODO(https://fxbug.dev/397708825): Remove this after drivers are migrated.
-constexpr LayerCompositionOperations LayerCompositionOperations::WithMergeBase() const {
   return LayerCompositionOperations(operations_ | kMerge.operations_);
 }
 
