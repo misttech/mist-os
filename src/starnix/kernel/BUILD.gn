@@ -174,6 +174,7 @@ rustc_library("starnix_core") {
     "fs/sysfs/kobject_symlink_directory.rs",
     "fs/sysfs/mod.rs",
     "fs/sysfs/power_directory.rs",
+    "fs/sysfs/vulnerabilities_class_directory.rs",
     "fs/tmpfs.rs",
     "lib.rs",
     "loader.rs",

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::kobject::KObject;
+use crate::device::kobject::{KObject, KObjectHandle};
 use crate::fs::tmpfs::TmpfsDirectory;
 use crate::task::CurrentTask;
 use crate::vfs::{
@@ -18,11 +18,17 @@ use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
 use std::sync::Weak;
 
-pub struct CpuClassDirectory {}
+pub struct CpuClassDirectory {
+    _kobject: Weak<KObject>,
+}
 
 impl CpuClassDirectory {
     pub fn new(_kobject: Weak<KObject>) -> Self {
-        Self {}
+        Self { _kobject }
+    }
+
+    fn kobject(&self) -> KObjectHandle {
+        self._kobject.upgrade().expect("Weak references to kobject must always be valid")
     }
 }
 
@@ -52,6 +58,11 @@ impl FsNodeOps for CpuClassDirectory {
             VecDirectoryEntry {
                 entry_type: DirectoryEntryType::REG,
                 name: "possible".into(),
+                inode: None,
+            },
+            VecDirectoryEntry {
+                entry_type: DirectoryEntryType::DIR,
+                name: "vulnerabilities".into(),
                 inode: None,
             },
         ];
@@ -91,6 +102,19 @@ impl FsNodeOps for CpuClassDirectory {
                 BytesFile::new_node(format!("0-{}\n", zx::system_get_num_cpus() - 1).into_bytes()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             )),
+            b"vulnerabilities" => {
+                let mut child_kobject: Option<std::sync::Arc<KObject>> =
+                    self.kobject().get_child(name);
+                if let Some(kobject) = child_kobject.take() {
+                    Ok(node.fs().create_node(
+                        current_task,
+                        kobject.ops(),
+                        FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
+                    ))
+                } else {
+                    error!(ENOENT)
+                }
+            },
             _ => error!(ENOENT),
         }
     }

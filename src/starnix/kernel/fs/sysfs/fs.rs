@@ -5,6 +5,7 @@
 use crate::device::kobject::KObjectHandle;
 use crate::fs::sysfs::{
     sysfs_kernel_directory, sysfs_power_directory, CpuClassDirectory, KObjectDirectory,
+    VulnerabilitiesClassDirectory,
 };
 use crate::task::{CurrentTask, Kernel, NetstackDevicesDirectory};
 use crate::vfs::{
@@ -117,7 +118,8 @@ impl SysFs {
             .objects
             .devices
             .get_or_create_child("system".into(), KObjectDirectory::new)
-            .get_or_create_child("cpu".into(), CpuClassDirectory::new);
+            .get_or_create_child("cpu".into(), CpuClassDirectory::new)
+            .get_or_create_child("vulnerabilities".into(), VulnerabilitiesClassDirectory::new);
 
         dir.build_root();
         fs
