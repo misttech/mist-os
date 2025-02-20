@@ -69,7 +69,6 @@ To add an external crate, do the following:
       See [cargo-gnaw's README][cargo-gnaw-readme]
       for more details.
 
-      <!-- TODO(https://fxbug.dev/42137677) remove this step -->
       After committing your change locally, run `fx update-rustc-third-party`
       a second time and ensure it completes successfully without producing any
       changes. You can run `git status` to be certain.
@@ -133,7 +132,12 @@ To update an external crate, do the following:
 
    1. Increase the patch number of the crate in
       [`third_party/rust_crates/Cargo.toml`][external-cargo-toml]
-      1. For transitive deps (which don't appear in the root `Cargo.toml`), you can use a command like `cargo +fuchsia update --manifest-path third_party/rust_crates/Cargo.toml --package $crate_name`, instead.
+      * For transitive deps (which don't appear in `third_party_rust_crates/Cargo.toml`),
+        run `fx host-tool cargo update --manifest-path third_party/rust_crates/Cargo.toml --package $crate_name`
+        instead. The output of the command will print the version `$crate_name`
+        has been updated to. Next, check for references of `$crate_name` in
+        `third_party/rust_crates/BUILD.gn` and update the version strings
+        accordingly.
 
    1. Run the following command:
 
@@ -149,7 +153,10 @@ To update an external crate, do the following:
       the `Cargo.toml` file.
       See [cargo-gnaw's README][cargo-gnaw-readme] for more details.
 
-      <!-- TODO(https://fxbug.dev/42137677) remove this step -->
+   1. Check that the version strings for the updated crate have been updated
+      correctly in `third_party/rust_crates/BUILD.gn`, and manually adjust if
+      necessary.
+
       After committing your change locally, run `fx update-rustc-third-party`
       a second time and ensure it completes successfully without producing any
       changes. You can run `git status` to be certain.
