@@ -54,7 +54,7 @@ rustc_library("lib") {
     "src/main.rs",
     "src/metadata.rs",
     "src/metadata/commit.rs",
-    "src/metadata/configuration.rs",
+    "src/metadata/configuration_without_recovery.rs",
     "src/metadata/errors.rs",
     "src/metadata/inspect.rs",
     "src/metadata/policy.rs",

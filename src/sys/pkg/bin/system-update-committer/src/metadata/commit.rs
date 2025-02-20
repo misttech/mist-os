@@ -2,25 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::configuration::Configuration;
+use super::configuration_without_recovery::ConfigurationWithoutRecovery;
 use super::errors::{BootManagerError, BootManagerResultExt};
 use fidl_fuchsia_paver as paver;
 
 /// Commit the slot by updating the boot metadata.
 pub async fn do_commit(
     boot_manager: &paver::BootManagerProxy,
-    current_config: &Configuration,
+    current_config: &ConfigurationWithoutRecovery,
 ) -> Result<(), BootManagerError> {
     // Do all writes inside this function to ensure that we call flush no matter what.
     async fn internal_write(
         boot_manager: &paver::BootManagerProxy,
-        current_config: &Configuration,
+        current_config: &ConfigurationWithoutRecovery,
     ) -> Result<(), BootManagerError> {
         let alternate_config = current_config.to_alternate().into();
-        let current_config = current_config.into();
 
         let () = boot_manager
-            .set_configuration_healthy(current_config)
+            .set_configuration_healthy(current_config.into())
             .await
             .into_boot_manager_result("set_configuration_healthy")?;
         let () = boot_manager
@@ -48,9 +47,8 @@ mod tests {
     use zx::Status;
 
     /// Helper fn to verify that do_commit succeeds.
-    async fn run_success_test(current_config: &Configuration) {
+    async fn run_success_test(current_config: &ConfigurationWithoutRecovery) {
         let paver = Arc::new(MockPaverServiceBuilder::new().build());
-
         let () = do_commit(&paver.spawn_boot_manager_service(), current_config).await.unwrap();
 
         assert_eq!(
@@ -67,12 +65,12 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_success_current_a() {
-        run_success_test(&Configuration::A).await;
+        run_success_test(&ConfigurationWithoutRecovery::A).await;
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_success_current_b() {
-        run_success_test(&Configuration::B).await;
+        run_success_test(&ConfigurationWithoutRecovery::B).await;
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -87,11 +85,7 @@ mod tests {
         );
 
         assert_matches!(
-            do_commit(
-                &paver.spawn_boot_manager_service(),
-                &Configuration::from(&paver::Configuration::A)
-            )
-            .await,
+            do_commit(&paver.spawn_boot_manager_service(), &ConfigurationWithoutRecovery::A).await,
             Err(BootManagerError::Status {
                 method_name: "set_configuration_healthy",
                 status: Status::OUT_OF_RANGE

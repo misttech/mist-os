@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::configuration::Configuration;
+use super::configuration_without_recovery::ConfigurationWithoutRecovery;
 use super::errors::{BootManagerError, BootManagerResultExt, PolicyError};
 use fidl_fuchsia_paver as paver;
 use log::{info, warn};
@@ -21,7 +21,7 @@ enum State {
     //   * the current config status is Healthy
     NoOp,
     Active {
-        current_config: Configuration,
+        current_config: ConfigurationWithoutRecovery,
         // None if the value is erroneously missing from QueryConfigurationStatusAndBootAttempts.
         boot_attempts: Option<u8>,
     },
@@ -47,8 +47,8 @@ impl PolicyEngine {
                 info!("System in recovery: skipping health verification and boot metadata updates");
                 return Ok(Self(State::NoOp));
             }
-            Ok(paver::Configuration::A) => Configuration::A,
-            Ok(paver::Configuration::B) => Configuration::B,
+            Ok(paver::Configuration::A) => ConfigurationWithoutRecovery::A,
+            Ok(paver::Configuration::B) => ConfigurationWithoutRecovery::B,
         };
 
         let status_and_boot_attempts = boot_manager
@@ -81,7 +81,7 @@ impl PolicyEngine {
     /// * If we should (e.g. if the system is pending commit), return
     ///   `Some((slot_to_act_on, boot_attempts))`.
     /// * If we shouldn't (e.g. if the system is already committed), return `None`.
-    pub fn should_verify_and_commit(&self) -> Option<(&Configuration, Option<u8>)> {
+    pub fn should_verify_and_commit(&self) -> Option<(&ConfigurationWithoutRecovery, Option<u8>)> {
         match &self.0 {
             State::Active { current_config, boot_attempts } => {
                 Some((current_config, *boot_attempts))
@@ -133,10 +133,10 @@ mod tests {
     }
 
     /// Helper fn to verify we should NOT verify and commit when current is healthy.
-    async fn test_skip_when_current_is_healthy(current_config: &Configuration) {
+    async fn test_skip_when_current_is_healthy(current_config: paver::Configuration) {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
-                .current_config(current_config.into())
+                .current_config(current_config)
                 .insert_hook(mphooks::config_status_and_boot_attempts(|_| {
                     Ok((paver::ConfigurationStatus::Healthy, None))
                 }))
@@ -151,7 +151,7 @@ mod tests {
             vec![
                 PaverEvent::QueryCurrentConfiguration,
                 PaverEvent::QueryConfigurationStatusAndBootAttempts {
-                    configuration: current_config.into()
+                    configuration: current_config
                 },
             ]
         );
@@ -159,16 +159,18 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_skip_when_current_is_healthy_a() {
-        test_skip_when_current_is_healthy(&Configuration::A).await
+        test_skip_when_current_is_healthy(paver::Configuration::A).await
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_skip_when_current_is_healthy_b() {
-        test_skip_when_current_is_healthy(&Configuration::B).await
+        test_skip_when_current_is_healthy(paver::Configuration::B).await
     }
 
     /// Helper fn to verify we should verify and commit when current is pending.
-    async fn test_verify_and_commit_when_current_is_pending(current_config: &Configuration) {
+    async fn test_verify_and_commit_when_current_is_pending(
+        current_config: &ConfigurationWithoutRecovery,
+    ) {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .current_config(current_config.into())
@@ -194,16 +196,18 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_verify_and_commit_when_current_is_pending_a() {
-        test_verify_and_commit_when_current_is_pending(&Configuration::A).await
+        test_verify_and_commit_when_current_is_pending(&ConfigurationWithoutRecovery::A).await
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_verify_and_commit_when_current_is_pending_b() {
-        test_verify_and_commit_when_current_is_pending(&Configuration::B).await
+        test_verify_and_commit_when_current_is_pending(&ConfigurationWithoutRecovery::B).await
     }
 
     /// Helper fn to verify an error is returned if current is unbootable.
-    async fn test_returns_error_when_current_unbootable(current_config: &Configuration) {
+    async fn test_returns_error_when_current_unbootable(
+        current_config: &ConfigurationWithoutRecovery,
+    ) {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .current_config(current_config.into())
@@ -231,12 +235,12 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_returns_error_when_current_unbootable_a() {
-        test_returns_error_when_current_unbootable(&Configuration::A).await
+        test_returns_error_when_current_unbootable(&ConfigurationWithoutRecovery::A).await
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_returns_error_when_current_unbootable_b() {
-        test_returns_error_when_current_unbootable(&Configuration::B).await
+        test_returns_error_when_current_unbootable(&ConfigurationWithoutRecovery::B).await
     }
 
     /// Test the build fn fails on a standard paver error.

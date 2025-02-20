@@ -14,7 +14,7 @@ use zx::{self as zx, EventPair, Peered};
 use {fidl_fuchsia_paver as paver, fuchsia_inspect as finspect};
 
 mod commit;
-mod configuration;
+mod configuration_without_recovery;
 mod errors;
 mod inspect;
 mod policy;
@@ -117,7 +117,7 @@ mod tests {
     use super::errors::{VerifyError, VerifyErrors, VerifyFailureReason, VerifySource};
     use super::*;
     use assert_matches::assert_matches;
-    use configuration::Configuration;
+    use configuration_without_recovery::ConfigurationWithoutRecovery;
     use fasync::OnSignals;
     use fidl_fuchsia_update_verify::BlobfsVerifierProxy;
     use mock_paver::{hooks as mphooks, MockPaverServiceBuilder, PaverEvent};
@@ -222,7 +222,9 @@ mod tests {
 
     /// When the current slot is healthy, we should not update metadata.
     /// However, the FIDL server should still be unblocked.
-    async fn test_does_not_change_metadata_when_current_is_healthy(current_config: &Configuration) {
+    async fn test_does_not_change_metadata_when_current_is_healthy(
+        current_config: &ConfigurationWithoutRecovery,
+    ) {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .current_config(current_config.into())
@@ -266,16 +268,20 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_does_not_change_metadata_when_current_is_healthy_a() {
-        test_does_not_change_metadata_when_current_is_healthy(&Configuration::A).await
+        test_does_not_change_metadata_when_current_is_healthy(&ConfigurationWithoutRecovery::A)
+            .await
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_does_not_change_metadata_when_current_is_healthy_b() {
-        test_does_not_change_metadata_when_current_is_healthy(&Configuration::B).await
+        test_does_not_change_metadata_when_current_is_healthy(&ConfigurationWithoutRecovery::B)
+            .await
     }
 
     /// When the current slot is pending, we should verify, commit, & unblock the fidl server.
-    async fn test_verifies_and_commits_when_current_is_pending(current_config: &Configuration) {
+    async fn test_verifies_and_commits_when_current_is_pending(
+        current_config: &ConfigurationWithoutRecovery,
+    ) {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .current_config(current_config.into())
@@ -321,12 +327,12 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_verifies_and_commits_when_current_is_pending_a() {
-        test_verifies_and_commits_when_current_is_pending(&Configuration::A).await
+        test_verifies_and_commits_when_current_is_pending(&ConfigurationWithoutRecovery::A).await
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_verifies_and_commits_when_current_is_pending_b() {
-        test_verifies_and_commits_when_current_is_pending(&Configuration::B).await
+        test_verifies_and_commits_when_current_is_pending(&ConfigurationWithoutRecovery::B).await
     }
 
     /// When we fail to verify and the config says to ignore, we should still do the commit.
@@ -363,7 +369,9 @@ mod tests {
     }
 
     /// When we fail to verify and the config says to not ignore, we should report an error.
-    async fn test_errors_when_failed_verification_not_ignored(current_config: &Configuration) {
+    async fn test_errors_when_failed_verification_not_ignored(
+        current_config: &ConfigurationWithoutRecovery,
+    ) {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .current_config(current_config.into())
@@ -413,12 +421,12 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_errors_when_failed_verification_not_ignored_a() {
-        test_errors_when_failed_verification_not_ignored(&Configuration::A).await
+        test_errors_when_failed_verification_not_ignored(&ConfigurationWithoutRecovery::A).await
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_errors_when_failed_verification_not_ignored_b() {
-        test_errors_when_failed_verification_not_ignored(&Configuration::B).await
+        test_errors_when_failed_verification_not_ignored(&ConfigurationWithoutRecovery::B).await
     }
 
     #[fasync::run_singlethreaded(test)]
