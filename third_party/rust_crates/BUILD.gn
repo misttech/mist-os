@@ -4103,7 +4103,7 @@ rust_library("crypto-bigint-v0_4_9") {
   deps = []
   deps += [ ":zeroize-v1_8_1" ]
   deps += [ ":generic-array-v0_14_5" ]
-  deps += [ ":rand_core-v0_6_3" ]
+  deps += [ ":rand_core-v0_6_4" ]
   deps += [ ":subtle-v2_6_1" ]
 
   rustenv = []
@@ -4139,7 +4139,7 @@ rust_library("crypto-common-v0_1_6") {
 
   deps = []
   deps += [ ":generic-array-v0_14_5" ]
-  deps += [ ":rand_core-v0_6_3" ]
+  deps += [ ":rand_core-v0_6_4" ]
   deps += [ ":typenum-v1_15_0" ]
 
   rustenv = []
@@ -5190,7 +5190,7 @@ rust_library("elliptic-curve-v0_12_3") {
   deps += [ ":hkdf-v0_12_3" ]
   deps += [ ":pem-rfc7468-v0_6_0" ]
   deps += [ ":pkcs8-v0_9_0" ]
-  deps += [ ":rand_core-v0_6_3" ]
+  deps += [ ":rand_core-v0_6_4" ]
   deps += [ ":sec1-v0_3_0" ]
   deps += [ ":serdect-v0_1_0" ]
   deps += [ ":subtle-v2_6_1" ]
@@ -5579,7 +5579,7 @@ rust_library("ff-v0_12_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":rand_core-v0_6_3" ]
+  deps += [ ":rand_core-v0_6_4" ]
   deps += [ ":subtle-v2_6_1" ]
 
   rustenv = []
@@ -6694,7 +6694,7 @@ rust_library("group-v0_12_1") {
 
   deps = []
   deps += [ ":ff-v0_12_1" ]
-  deps += [ ":rand_core-v0_6_3" ]
+  deps += [ ":rand_core-v0_6_4" ]
   deps += [ ":subtle-v2_6_1" ]
 
   rustenv = []
@@ -10400,7 +10400,7 @@ rust_library("password-hash-v0_4_2") {
 
   deps = []
   deps += [ ":base64ct-v1_6_0" ]
-  deps += [ ":rand_core-v0_6_3" ]
+  deps += [ ":rand_core-v0_6_4" ]
   deps += [ ":subtle-v2_6_1" ]
 
   rustenv = []
@@ -11975,7 +11975,7 @@ rust_library("rand-v0_8_4") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":rand_core-v0_6_3" ]
+  deps += [ ":rand_core-v0_6_4" ]
   if (!false) {
     deps += [ ":rand_chacha-v0_3_1" ]
   }
@@ -12053,7 +12053,7 @@ rust_library("rand_chacha-v0_3_1") {
 
   deps = []
   deps += [ ":ppv-lite86-v0_2_10" ]
-  deps += [ ":rand_core-v0_6_3" ]
+  deps += [ ":rand_core-v0_6_4" ]
 
   rustenv = []
 
@@ -12129,16 +12129,16 @@ rust_library("rand_core-v0_4_2") {
   applicable_licenses = [ ":rand_core-v0_4_2.license" ]
 }
 
-license("rand_core-v0_6_3.license") {
+license("rand_core-v0_6_4.license") {
   public_package_name = "rand_core"
   license_files =
-      [ "//third_party/rust_crates/vendor/rand_core-0.6.3/LICENSE-APACHE" ]
+      [ "//third_party/rust_crates/vendor/rand_core-0.6.4/LICENSE-APACHE" ]
 }
 
-rust_library("rand_core-v0_6_3") {
+rust_library("rand_core-v0_6_4") {
   crate_name = "rand_core"
-  crate_root = "//third_party/rust_crates/vendor/rand_core-0.6.3/src/lib.rs"
-  output_name = "rand_core-c72139d238b8db6b"
+  crate_root = "//third_party/rust_crates/vendor/rand_core-0.6.4/src/lib.rs"
+  output_name = "rand_core-2ee54e7f12912262"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -12149,8 +12149,8 @@ rust_library("rand_core-v0_6_3") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=c72139d238b8db6b",
-    "-Cextra-filename=-c72139d238b8db6b",
+    "-Cmetadata=2ee54e7f12912262",
+    "-Cextra-filename=-2ee54e7f12912262",
     "--cfg=feature=\"alloc\"",
     "--cfg=feature=\"getrandom\"",
     "--cfg=feature=\"std\"",
@@ -12158,7 +12158,7 @@ rust_library("rand_core-v0_6_3") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":rand_core-v0_6_3.license" ]
+  applicable_licenses = [ ":rand_core-v0_6_4.license" ]
 }
 
 license("rand_hc-v0_1_0.license") {
@@ -12203,7 +12203,7 @@ rust_library("rand_hc-v0_3_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":rand_core-v0_6_3" ]
+  deps += [ ":rand_core-v0_6_4" ]
 
   rustenv = []
 
@@ -12400,7 +12400,7 @@ rust_library("rand_xorshift-v0_3_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":rand_core-v0_6_3" ]
+  deps += [ ":rand_core-v0_6_4" ]
 
   rustenv = []
 
@@ -14897,7 +14897,7 @@ rust_library("signature-v1_6_4") {
 
   deps = []
   deps += [ ":digest-v0_10_7" ]
-  deps += [ ":rand_core-v0_6_3" ]
+  deps += [ ":rand_core-v0_6_4" ]
 
   rustenv = []
 

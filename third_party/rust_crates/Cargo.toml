@@ -799,7 +799,7 @@ license_files = ["LICENSE-APACHE"]
 [gn.package.rand_core."0.4.2"]
 license_files = ["LICENSE-APACHE"]
 
-[gn.package.rand_core."0.6.3"]
+[gn.package.rand_core."0.6.4"]
 license_files = ["LICENSE-APACHE"]
 
 [gn.package.rand_hc."0.1.0"]
