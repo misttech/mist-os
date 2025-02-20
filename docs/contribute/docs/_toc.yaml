@@ -37,6 +37,8 @@ toc:
   path: /docs/contribute/docs/doc-checker.md
 - title: "Markdown linter - mdlint"
   path: /docs/contribute/docs/mdlint.md
+- title: "Generate reference documentation locally"
+  path: /docs/contribute/docs/docsgen.md
 - title: Shortlinks
   section:
   - include: /docs/contribute/docs/shortlinks/_toc.yaml
