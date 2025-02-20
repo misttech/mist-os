@@ -10,6 +10,6 @@
         "//src/sys/test_runners/tmp_storage.shard.cml",
     ],
     program: {
-        binary: "bin/audio_core_v1_unittests",
+        binary: "bin/audio_core_unittests",
     },
 }

@@ -13,8 +13,7 @@ group("tests") {
   testonly = true
 
   deps = [
-    ":audio_core_shared_unittests",
-    ":audio_core_v1_unittests",
+    ":audio_core_unittests",
     "mixer:tests",
     "test",
     "testing",
@@ -27,24 +26,10 @@ group("tools") {
 }
 
 # packages
-fuchsia_unittest_package("audio_core_v1_unittests") {
+fuchsia_unittest_package("audio_core_unittests") {
   manifest = "meta/audio_core_unittests.cml"
   deps = [
     ":unittest_bin",
-    "//src/media/audio/effects/test_effects:test_effects_v1",
-  ]
-
-  test_specs = {
-    log_settings = {
-      max_severity = "FATAL"
-    }
-  }
-}
-
-fuchsia_unittest_package("audio_core_shared_unittests") {
-  manifest = "meta/audio_core_shared_unittests.cml"
-  deps = [
-    ":shared_unittest_bin",
     "//src/media/audio/effects/test_effects:test_effects_v1",
   ]
 
@@ -85,9 +70,11 @@ executable("audio_core_bin_with_prebuilt_coefficient_tables") {
 cc_test_executable("unittest_bin") {
   visibility = [ ":*" ]
   testonly = true
-  output_name = "audio_core_v1_unittests"
+  output_name = "audio_core_unittests"
 
   sources = [
+    "activity_dispatcher_unittest.cc",
+    "audio_admin_unittest.cc",
     "audio_capturer_unittest.cc",
     "audio_device_settings_unittest.cc",
     "audio_device_unittest.cc",
@@ -99,83 +86,46 @@ cc_test_executable("unittest_bin") {
     "audio_tuner_impl_unittest.cc",
     "capture_packet_queue_unittest.cc",
     "channel_attributes_unittest.cc",
+    "device_config_unittest.cc",
+    "device_id_unittest.cc",
     "driver_output_unittest.cc",
     "effects_stage_v1_unittest.cc",
     "effects_stage_v2_unittest.cc",
     "link_matrix_unittest.cc",
+    "loudness_transform_unittest.cc",
     "mix_stage_clock_unittest.cc",
     "mix_stage_unittest.cc",
     "output_pipeline_unittest.cc",
     "packet_queue_unittest.cc",
     "packet_unittest.cc",
-    "plug_detector_unittest.cc",
-    "reusable_buffer_unittest.cc",
-    "ring_buffer_unittest.cc",
-    "route_graph_unittest.cc",
-    "silence_padding_stream_unittest.cc",
-    "stream_unittest.cc",
-    "tap_stage_unittest.cc",
-    "thermal_watcher_unittest.cc",
-    "threading_model_unittest.cc",
-    "throttle_output_unittest.cc",
-    "versioned_timeline_function_unittest.cc",
-    "wakeup_event_unittest.cc",
-  ]
-
-  deps = [
-    ":audio_core_lib",
-    "mixer",
-    "testing:unittest_support",
-    "//sdk/fidl/fuchsia.audio.effects:fuchsia.audio.effects_hlcpp",
-    "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_hlcpp",
-    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
-    "//sdk/lib/async-loop:async-loop-cpp",
-    "//sdk/lib/async-loop:async-loop-default",
-    "//sdk/lib/fit-promise",
-    "//sdk/lib/inspect/testing/cpp",
-    "//sdk/lib/sys/cpp/testing:unit",
-    "//src/lib/fxl/test:gtest_main",
-    "//src/lib/testing/loop_fixture",
-    "//src/media/audio/effects/test_effects:test_effects_v2",
-    "//src/media/audio/lib/clock/testing",
-    "//src/media/audio/lib/effects_loader",
-    "//src/media/audio/lib/effects_loader/testing",
-    "//src/media/audio/lib/format",
-    "//src/media/audio/lib/processing",
-    "//src/media/audio/lib/processing:prebuilt_coefficient_tables",
-    "//src/storage/lib/vfs/cpp",
-    "//third_party/googletest:gmock",
-    "//zircon/system/ulib/fzl",
-  ]
-}
-
-cc_test_executable("shared_unittest_bin") {
-  visibility = [ ":*" ]
-  testonly = true
-  output_name = "audio_core_shared_unittests"
-
-  sources = [
-    "activity_dispatcher_unittest.cc",
-    "audio_admin_unittest.cc",
-    "device_config_unittest.cc",
-    "device_id_unittest.cc",
-    "loudness_transform_unittest.cc",
     "pin_executable_memory_unittest.cc",
     "pipeline_config_unittest.cc",
+    "plug_detector_unittest.cc",
     "policy_loader_unittest.cc",
     "policy_loader_unittest_data.h",
     "process_config_loader_unittest.cc",
     "process_config_unittest.cc",
     "profile_provider_unittest.cc",
     "reporter_unittest.cc",
+    "reusable_buffer_unittest.cc",
+    "ring_buffer_unittest.cc",
+    "route_graph_unittest.cc",
     "select_best_format_unittest.cc",
+    "silence_padding_stream_unittest.cc",
+    "stream_unittest.cc",
     "stream_usage_unittest.cc",
     "stream_volume_manager_unittest.cc",
+    "tap_stage_unittest.cc",
+    "thermal_watcher_unittest.cc",
+    "threading_model_unittest.cc",
+    "throttle_output_unittest.cc",
     "usage_gain_reporter_impl_unittest.cc",
     "usage_reporter_impl_unittest.cc",
     "usage_settings_unittest.cc",
+    "versioned_timeline_function_unittest.cc",
     "volume_control_unittest.cc",
     "volume_curve_unittest.cc",
+    "wakeup_event_unittest.cc",
   ]
 
   deps = [
