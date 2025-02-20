@@ -36,6 +36,28 @@ int main(int argc, char** argv) {
   std::string content(buffer, bytes_read);
   printf("Bytes read: %zd  \nContents: %s\n", bytes_read, content.c_str());
 
+  // Read again, to check for EOF
+  printf("Reading again to await EOF\n");
+
+  // Flushing here as a failure case will cause a hang
+  fflush(stdout);
+  bytes_read = read(fd, buffer, 4096);
+
+  if (bytes_read < 0) {
+    printf("Error: Read failed when expecting EOF\n");
+    return 1;
+  }
+  if (bytes_read > 0) {
+    // Unexpected buffer contents
+    std::string unexpected_content(buffer, bytes_read);
+    printf("Error: Bytes read: %zd  \nUnexpected content: %s", bytes_read,
+           unexpected_content.c_str());
+    return 1;
+  }
+
+  // To reach here, bytes_read was 0, correctly marking EOF
+  printf("Successfully read EOF from firmware_name path\n");
+
   // Make sure we received the correct string...
   if (content != expected_firmware_name) {
     printf("Error: Received incorrect firmware_name string\n");

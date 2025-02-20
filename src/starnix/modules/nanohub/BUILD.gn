@@ -19,6 +19,7 @@ rustc_library("nanohub") {
     "lib.rs",
     "nanohub.rs",
     "nanohub_comms_directory.rs",
+    "nanohub_socket_file.rs",
     "socket_tunnel_file.rs",
   ]
 
@@ -28,6 +29,7 @@ rustc_library("nanohub") {
     "//src/lib/fuchsia-component",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/lib/starnix-sync",
+    "//src/starnix/lib/starnix-syscalls",
     "//src/starnix/lib/starnix-uapi",
   ]
 }
