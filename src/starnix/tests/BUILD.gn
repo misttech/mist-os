@@ -19,6 +19,7 @@ group("tests") {
     "fp_stack_glue:tests",
     "gvisor:tests",
     "memory_attribution:tests",
+    "nanohub:tests",
     "psi:tests",
     "reboot:tests",
     "remotevol_shutdown:tests",
