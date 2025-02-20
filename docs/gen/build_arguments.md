@@ -487,7 +487,7 @@ From //boards/arm64.gni:24
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:39
+From //build/board.gni:35
 
 **Current value for `target_cpu = "riscv64"`:** `"//boards/riscv64"`
 
@@ -495,7 +495,7 @@ From //boards/riscv64.gni:24
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:39
+From //build/board.gni:35
 
 **Current value for `target_cpu = "x64"`:** `"//boards/x64"`
 
@@ -503,7 +503,7 @@ From //boards/x64.gni:27
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:39
+From //build/board.gni:35
 
 ### board_description
 
@@ -540,7 +540,7 @@ board's fastboot protocol.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:25
+From //build/board.gni:21
 
 ### board_is_emu
 
@@ -554,7 +554,7 @@ From //boards/arm64.gni:31
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:44
+From //build/board.gni:40
 
 **Current value for `target_cpu = "riscv64"`:** `true`
 
@@ -562,7 +562,7 @@ From //boards/riscv64.gni:30
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:44
+From //build/board.gni:40
 
 **Current value for `target_cpu = "x64"`:** `true`
 
@@ -570,7 +570,7 @@ From //boards/x64.gni:31
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:44
+From //build/board.gni:40
 
 ### board_name
 
@@ -600,15 +600,6 @@ From //boards/x64.gni:23
 
 From //build/board.gni:11
 
-### board_package_labels
-
-A list of package labels to include in the 'base' package set. Used by the
-board definition rather than the product definition.
-
-**Current value (from the default):** `[]`
-
-From //build/board.gni:21
-
 ### board_tools
 
 List of paths to board-specific tools to include in the build output.
@@ -623,7 +614,7 @@ any kind of stable contract for users of the archive.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:36
+From //build/board.gni:32
 
 ### bootfs_only
 
@@ -731,7 +722,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8722505544147585393"`
+**Current value for `target_cpu = "arm64"`:** `"8722460241677389937"`
 
 From //out/not-default/args.gn:10
 
@@ -739,7 +730,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8722505544147585393"`
+**Current value for `target_cpu = "riscv64"`:** `"8722460241677389937"`
 
 From //out/not-default/args.gn:10
 
@@ -747,7 +738,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8722505544147585393"`
+**Current value for `target_cpu = "x64"`:** `"8722460241677389937"`
 
 From //out/not-default/args.gn:10
 
@@ -1051,20 +1042,20 @@ This should never be set as a build argument.
 }
   lsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
 }
   static = {
   clang_rt = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.lsan.a"
-  clang_rt_cxx = ""
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
 }
 }
   tsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
 }
   static = {
-  clang_rt = ""
-  clang_rt_cxx = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.tsan_cxx.a"
 }
 }
   ubsan = {
@@ -1080,7 +1071,7 @@ This should never be set as a build argument.
 }
   aarch64_unknown_linux_gnu = {
   libclang_rt_profile_a = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.profile.a"
-  libunwind_so = ""
+  libunwind_so = "../../../../out/not-default/libunwind.so"
   resource_dir = "lib/clang/20"
   variants = {
   asan = {
@@ -1103,11 +1094,11 @@ This should never be set as a build argument.
 }
   lsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
 }
   static = {
   clang_rt = "lib/clang/20/lib/aarch64-unknown-linux-gnu/libclang_rt.lsan.a"
-  clang_rt_cxx = ""
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
 }
 }
   tsan = {
@@ -1132,7 +1123,7 @@ This should never be set as a build argument.
 }
   armv7_unknown_linux_gnueabihf = {
   libclang_rt_profile_a = "lib/clang/20/lib/armv7-unknown-linux-gnueabihf/libclang_rt.profile.a"
-  libunwind_so = ""
+  libunwind_so = "../../../../out/not-default/libunwind.so"
   resource_dir = "lib/clang/20"
   variants = {
   asan = {
@@ -1146,29 +1137,29 @@ This should never be set as a build argument.
 }
   hwasan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.hwasan.so"
 }
   static = {
-  clang_rt = ""
-  clang_rt_cxx = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.hwasan.a"
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.hwasan_cxx.a"
 }
 }
   lsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
 }
   static = {
   clang_rt = "lib/clang/20/lib/armv7-unknown-linux-gnueabihf/libclang_rt.lsan.a"
-  clang_rt_cxx = ""
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
 }
 }
   tsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
 }
   static = {
-  clang_rt = ""
-  clang_rt_cxx = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.tsan_cxx.a"
 }
 }
   ubsan = {
@@ -1184,7 +1175,7 @@ This should never be set as a build argument.
 }
   fallback = {
   libclang_rt_profile_a = ""
-  libunwind_so = ""
+  libunwind_so = "../../../../out/not-default/libunwind.so"
   resource_dir = "lib/clang/20"
   variants = { }
 }
@@ -1213,20 +1204,20 @@ This should never be set as a build argument.
 }
   lsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
 }
   static = {
   clang_rt = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.lsan.a"
-  clang_rt_cxx = ""
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
 }
 }
   tsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
 }
   static = {
-  clang_rt = ""
-  clang_rt_cxx = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.tsan_cxx.a"
 }
 }
   ubsan = {
@@ -1242,7 +1233,7 @@ This should never be set as a build argument.
 }
   riscv64_unknown_linux_gnu = {
   libclang_rt_profile_a = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.profile.a"
-  libunwind_so = ""
+  libunwind_so = "../../../../out/not-default/libunwind.so"
   resource_dir = "lib/clang/20"
   variants = {
   asan = {
@@ -1265,11 +1256,11 @@ This should never be set as a build argument.
 }
   lsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
 }
   static = {
   clang_rt = "lib/clang/20/lib/riscv64-unknown-linux-gnu/libclang_rt.lsan.a"
-  clang_rt_cxx = ""
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
 }
 }
   tsan = {
@@ -1799,8 +1790,8 @@ This should never be set as a build argument.
   target = ["x86_64-unknown-fuchsia", "x86_64-fuchsia"]
 }]
   x86_64_pc_windows_msvc = {
-  libclang_rt_profile_a = ""
-  libunwind_so = ""
+  libclang_rt_profile_a = "../../../../out/not-default/libclang_rt.profile.lib"
+  libunwind_so = "../../../../out/not-default/libunwind.dll"
   resource_dir = "lib/clang/20"
   variants = { }
 }
@@ -1829,20 +1820,20 @@ This should never be set as a build argument.
 }
   lsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
 }
   static = {
   clang_rt = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.lsan.a"
-  clang_rt_cxx = ""
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
 }
 }
   tsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
 }
   static = {
-  clang_rt = ""
-  clang_rt_cxx = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.tsan_cxx.a"
 }
 }
   ubsan = {
@@ -1858,7 +1849,7 @@ This should never be set as a build argument.
 }
   x86_64_unknown_linux_gnu = {
   libclang_rt_profile_a = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.profile.a"
-  libunwind_so = ""
+  libunwind_so = "../../../../out/not-default/libunwind.so"
   resource_dir = "lib/clang/20"
   variants = {
   asan = {
@@ -1881,11 +1872,11 @@ This should never be set as a build argument.
 }
   lsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
 }
   static = {
   clang_rt = "lib/clang/20/lib/x86_64-unknown-linux-gnu/libclang_rt.lsan.a"
-  clang_rt_cxx = ""
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
 }
 }
   tsan = {
@@ -4801,7 +4792,7 @@ From //boards/arm64.gni:42
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:48
+From //build/board.gni:44
 
 **Current value for `target_cpu = "riscv64"`:** `"//boards/partitions:riscv64"`
 
@@ -4809,7 +4800,7 @@ From //boards/riscv64.gni:32
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:48
+From //build/board.gni:44
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
@@ -4817,7 +4808,7 @@ From //boards/x64.gni:34
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:48
+From //build/board.gni:44
 
 ### perfetto_build_with_android
 
@@ -5142,7 +5133,7 @@ provided value for 'board_configuration_label'
 
 **Current value (from the default):** `"//boards/arm64"`
 
-From //build/board.gni:57
+From //build/board.gni:53
 
 ### recovery_label
 
