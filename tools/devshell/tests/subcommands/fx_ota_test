@@ -31,7 +31,7 @@ BT_MOCKED_TOOLS=(
   "tools/devshell/lib/updates.sh"
 )
 
-declare fx build build_main_pb check_package_server trigger_update commit_update
+declare fx build check_package_server trigger_update commit_update
 
 BT_SET_UP() {
   source "${BT_TEMP_DIR}/tools/devshell/tests/lib/fuchsia-mock.sh"
@@ -39,7 +39,6 @@ BT_SET_UP() {
   source "${BT_TEMP_DIR}/tools/devshell/lib/vars.sh"
   fx-config-read
   build="${BT_TEMP_DIR}/tools/devshell/build"
-  build_main_pb="${BT_TEMP_DIR}/tools/devshell/contrib/build-main-pb"
   check_package_server="${BT_TEMP_DIR}/check_package_server"
   trigger_update="${BT_TEMP_DIR}/trigger_update"
   commit_update="${BT_TEMP_DIR}/commit_update"
@@ -199,8 +198,8 @@ EOF
 
   local out="${BT_TEMP_DIR}/_fx_ota_output"
   BT_EXPECT ${fx} ota > "$out" 2>&1
-  # build-main-pb was called
-  BT_ASSERT_FILE_EXISTS "${build_main_pb}.mock_state"
+  # build was called
+  BT_ASSERT_FILE_EXISTS "${build}.mock_state"
   # update was triggered
   BT_ASSERT_FILE_EXISTS "${trigger_update}.mock_state"
 }

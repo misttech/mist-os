@@ -99,11 +99,7 @@ function main {
 
   if $build; then
     fx-info "Building/refreshing ${build_targets[@]}"
-    if $use_main_pb; then
-      fx-command-run build-main-pb
-    else
-      fx-command-run build "${build_targets[@]}" || return 1
-    fi
+    fx-command-run build "${build_targets[@]}" || return 1
   fi
 
   # Note: the following command continues to run as the system goes into

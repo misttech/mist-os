@@ -8,13 +8,7 @@
 
 ## usage: fx build-product
 
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-source "$SCRIPT_DIR/../lib/vars.sh" || exit $?
+echo "This command is deprecated in favor of 'fx set-main-pb' and 'fx build'"
+echo "This will be removed in https://fxbug.dev/397689721"
 
-fx-config-read
-
-set -e
-
-product=$(fx-command-run get-main-pb)
-echo "Building $product..."
-fx-command-run build "$product" "$@"
+# TODO(https://fxbug.dev/397689721): Remove after a month of soaking.
