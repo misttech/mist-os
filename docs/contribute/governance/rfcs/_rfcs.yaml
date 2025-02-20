@@ -3453,6 +3453,19 @@
   submitted: '2024-11-05'
   reviewed: '2025-01-21'
 
+- name: 'RFC-0265'
+  title: 'Counter: A simple Zircon object for synchronizing across processes'
+  short_description: 'Proposes a new Zircon object, zx::counter.'
+  authors: ['maniscalco@google.com']
+  file: '0265_zircon_counter_object.md'
+  area: ['Kernel']
+  issue: ['382751863']
+  gerrit_change_id: ['1170953']
+  status: 'Accepted'
+  reviewers: ['emircan@google.com', 'lindkvist@google.com', 'mcgrathr@google.com']
+  submitted: '2024-12-09'
+  reviewed: '2025-02-12'
+
 - name: 'RFC-0266'
   title: 'Memory Mappable Kernel Clocks'
   short_description: 'Provides a way for user-mode processes to read kernel clock state without a entering the Zircon kernel.'
