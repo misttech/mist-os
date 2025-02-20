@@ -21,11 +21,8 @@ use futures::prelude::*;
 use mock_paver::{hooks as mphooks, MockPaverService, MockPaverServiceBuilder, PaverEvent};
 use mock_reboot::MockRebootService;
 use mock_verifier::MockVerifierService;
-use serde_json::json;
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tempfile::TempDir;
 use test_case::test_case;
 use zx::{self as zx, AsHandleRef};
 use {fidl_fuchsia_io as fio, fidl_fuchsia_update_verify as fupdate_verify};
@@ -34,7 +31,6 @@ const SYSTEM_UPDATE_COMMITTER_CM: &str = "#meta/system-update-committer.cm";
 const HANG_DURATION: Duration = Duration::from_millis(500);
 
 struct TestEnvBuilder {
-    config_data: Option<(PathBuf, String)>,
     paver_service_builder: Option<MockPaverServiceBuilder>,
     reboot_service: Option<MockRebootService>,
     blobfs_verifier_service: Option<MockVerifierService>,
@@ -42,10 +38,6 @@ struct TestEnvBuilder {
     idle_timeout_millis: Option<i64>,
 }
 impl TestEnvBuilder {
-    fn config_data(self, path: impl Into<PathBuf>, data: impl Into<String>) -> Self {
-        Self { config_data: Some((path.into(), data.into())), ..self }
-    }
-
     fn paver_service_builder(self, paver_service_builder: MockPaverServiceBuilder) -> Self {
         Self { paver_service_builder: Some(paver_service_builder), ..self }
     }
@@ -68,23 +60,7 @@ impl TestEnvBuilder {
     }
 
     async fn build(self) -> TestEnv {
-        // Optionally write config data.
-        let config_data = tempfile::tempdir().expect("/tmp to exist");
-        if let Some((path, data)) = self.config_data {
-            let path = config_data.path().join(path);
-            assert!(!path.exists());
-            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-            std::fs::write(path, data).unwrap();
-        }
-
         let mut fs = ServiceFs::new();
-        let config_data_proxy = fuchsia_fs::directory::open_in_namespace(
-            config_data.path().to_str().unwrap(),
-            fuchsia_fs::PERM_READABLE | fuchsia_fs::PERM_WRITABLE,
-        )
-        .unwrap();
-        fs.dir("config").add_remote("data", config_data_proxy);
-
         let mut svc = fs.dir("svc");
 
         // Set up paver service.
@@ -242,7 +218,6 @@ impl TestEnvBuilder {
             .expect("connect to commit status provider");
 
         TestEnv {
-            _config_data: config_data,
             realm_instance,
             commit_status_provider,
             paver_service,
@@ -253,7 +228,6 @@ impl TestEnvBuilder {
     }
 }
 struct TestEnv {
-    _config_data: TempDir,
     realm_instance: RealmInstance,
     commit_status_provider: CommitStatusProviderProxy,
     paver_service: Arc<MockPaverService>,
@@ -265,7 +239,6 @@ struct TestEnv {
 impl TestEnv {
     fn builder() -> TestEnvBuilder {
         TestEnvBuilder {
-            config_data: None,
             paver_service_builder: None,
             reboot_service: None,
             blobfs_verifier_service: None,
@@ -533,6 +506,9 @@ async fn inspect_health_status_ok(idle_timeout_millis: i64) {
 #[test_case(0i64; "rapid idle")]
 #[fasync::run_singlethreaded(test)]
 async fn inspect_multiple_failures(idle_timeout_millis: i64) {
+    let (reboot_sender, reboot_recv) = oneshot::channel();
+    let reboot_sender = Arc::new(Mutex::new(Some(reboot_sender)));
+
     let env = TestEnv::builder()
         .idle_timeout_millis(idle_timeout_millis)
         // Make sure we run health verifications.
@@ -547,12 +523,20 @@ async fn inspect_multiple_failures(idle_timeout_millis: i64) {
         .netstack_verifier_service(MockVerifierService::new(|_| {
             Err(fidl_fuchsia_update_verify::VerifyError::Internal)
         }))
+        .reboot_service(MockRebootService::new(Box::new(move |options: RebootOptions| {
+            reboot_sender.lock().take().unwrap().send(options).unwrap();
+            Ok(())
+        })))
         .build()
         .await;
 
-    // Wait for verifications to complete.
-    let p = env.commit_status_provider_proxy().is_current_system_committed().await.unwrap();
-    assert_eq!(OnSignals::new(&p, zx::Signals::USER_0).await, Ok(zx::Signals::USER_0));
+    assert_eq!(
+        reboot_recv.await,
+        Ok(RebootOptions {
+            reasons: Some(vec![RebootReason2::RetrySystemUpdate]),
+            ..Default::default()
+        })
+    );
 
     // Observe verification shows up in inspect.
     let hierarchy = env.system_update_committer_inspect_hierarchy().await;
@@ -571,12 +555,11 @@ async fn inspect_multiple_failures(idle_timeout_millis: i64) {
                 }
             },
             "fuchsia.inspect.Health": {
+                "message": AnyProperty,
                 "start_timestamp_nanos": AnyProperty,
-                "status": "OK",
+                "status": "UNHEALTHY",
             },
-            "commit": {
-                "boot_attempts": 1u64
-            }
+            "commit": {}
         }
     );
 }
@@ -604,9 +587,6 @@ async fn paver_failure_causes_reboot(idle_timeout_millis: i64) {
                 }
             },
         )))
-        // Make the config say that verification errors should be ignored. This shouldn't have any
-        // effect on whether the paver failures cause a reboot.
-        .config_data("config.json", json!({"blobfs": "ignore"}).to_string())
         // Handle the reboot requests.
         .reboot_service(MockRebootService::new(Box::new(move |options: RebootOptions| {
             reboot_sender.lock().take().unwrap().send(options).unwrap();
@@ -658,8 +638,6 @@ async fn blobfs_verification_failure_causes_reboot(idle_timeout_millis: i64) {
         .blobfs_verifier_service(MockVerifierService::new(|_| {
             Err(fidl_fuchsia_update_verify::VerifyError::Internal)
         }))
-        // Make us reboot on failure.
-        .config_data("config.json", json!({"blobfs": "reboot_on_failure"}).to_string())
         // Handle the reboot requests.
         .reboot_service(MockRebootService::new(Box::new(move |options: RebootOptions| {
             reboot_sender.lock().take().unwrap().send(options).unwrap();
@@ -720,8 +698,6 @@ async fn netstack_verification_failure_causes_reboot(idle_timeout_millis: i64) {
         .netstack_verifier_service(MockVerifierService::new(|_| {
             Err(fidl_fuchsia_update_verify::VerifyError::Internal)
         }))
-        // Make us reboot on failure.
-        .config_data("config.json", json!({"netstack": "reboot_on_failure"}).to_string())
         // Handle the reboot requests.
         .reboot_service(MockRebootService::new(Box::new(move |options: RebootOptions| {
             reboot_sender.lock().take().unwrap().send(options).unwrap();
@@ -763,27 +739,27 @@ async fn netstack_verification_failure_causes_reboot(idle_timeout_millis: i64) {
     );
 }
 
-/// When the verifications fail and the config says NOT to reboot, we should NOT reboot.
+/// When in recovery mode, we should never call health verification.
 #[test_case(-1i64; "never idle")]
 #[test_case(0i64; "rapid idle")]
 #[fasync::run_singlethreaded(test)]
-async fn verification_failure_does_not_cause_reboot(idle_timeout_millis: i64) {
+async fn recovery_mode_does_not_verify_health(idle_timeout_millis: i64) {
     let (reboot_sender, mut reboot_recv) = oneshot::channel();
     let reboot_sender = Arc::new(Mutex::new(Some(reboot_sender)));
     let env = TestEnv::builder()
         .idle_timeout_millis(idle_timeout_millis)
         // Make sure we run health verifications.
-        .paver_service_builder(MockPaverServiceBuilder::new().insert_hook(
-            mphooks::config_status_and_boot_attempts(|_| {
-                Ok((ConfigurationStatus::Pending, Some(1)))
-            }),
-        ))
-        // Make the health verifications fail.
+        .paver_service_builder(
+            MockPaverServiceBuilder::new()
+                .insert_hook(mphooks::config_status_and_boot_attempts(|_| {
+                    panic!("recovery shouldn't query status")
+                }))
+                .current_config(Configuration::Recovery),
+        )
+        // Make the health verifications fail which in other modes triggers a reboot.
         .blobfs_verifier_service(MockVerifierService::new(|_| {
             Err(fidl_fuchsia_update_verify::VerifyError::Internal)
         }))
-        // Make us IGNORE the verification failure.
-        .config_data("config.json", json!({"blobfs": "ignore"}).to_string())
         // Handle the reboot requests.
         .reboot_service(MockRebootService::new(Box::new(move |options: RebootOptions| {
             reboot_sender.lock().take().unwrap().send(options).unwrap();
@@ -799,27 +775,18 @@ async fn verification_failure_does_not_cause_reboot(idle_timeout_millis: i64) {
     // We should NOT observe a reboot.
     assert_eq!(reboot_recv.try_recv(), Ok(None));
 
-    // Observe failed verification shows up in inspect.
+    // Observe failed verification does not show up in inspect.
     let hierarchy = env.system_update_committer_inspect_hierarchy().await;
     assert_data_tree!(
         hierarchy,
         root: {
             "structured_config": contains {},
-            "verification": {
-                "ota_verification_duration": {
-                    "failure_blobfs": AnyProperty,
-                },
-                "ota_verification_failure": {
-                    "blobfs_verify": 1u64,
-                }
-            },
+            "verification": {},
             "fuchsia.inspect.Health": {
                 "start_timestamp_nanos": AnyProperty,
                 "status": "OK"
             },
-            "commit": {
-                "boot_attempts": 1u64
-            }
+            "commit": {}
         }
     );
 }

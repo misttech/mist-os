@@ -23,7 +23,6 @@ rustc_test("test_driver") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
-    "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-sync",
     "//src/sys/lib/cm_rust",
     "//src/sys/lib/component-events",
@@ -34,8 +33,6 @@ rustc_test("test_driver") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:serde_json",
-    "//third_party/rust_crates:tempfile",
     "//third_party/rust_crates:test-case",
   ]
 

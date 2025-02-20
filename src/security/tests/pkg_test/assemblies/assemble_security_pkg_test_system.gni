@@ -270,15 +270,8 @@ template("assemble_security_pkg_test_system") {
     deps = [ "//build/info:build_info_files" ]
   }
 
-  packages_for_assembly = [
-                            ":${labels.root_ssl_certificates}",
-
-                            # TODO(https://fxbug.dev/42169686): There should be a contract for
-                            # determining the correct configuration for every product.
-                            # For now, this appears to be the only configuration in
-                            # use.
-                            "//src/sys/pkg/bin/system-update-committer:enable_reboot_on_verification_failure",
-                          ] + invoker.base_packages
+  packages_for_assembly =
+      [ ":${labels.root_ssl_certificates}" ] + invoker.base_packages
 
   board_configuration(labels.board_config) {
     name = invoker.board_name

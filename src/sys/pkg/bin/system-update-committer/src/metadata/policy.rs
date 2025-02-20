@@ -3,10 +3,7 @@
 // found in the LICENSE file.
 
 use super::configuration::Configuration;
-use super::errors::{
-    BootManagerError, BootManagerResultExt, PolicyError, VerifyError, VerifyErrors, VerifySource,
-};
-use crate::config::{Config as ComponentConfig, Mode};
+use super::errors::{BootManagerError, BootManagerResultExt, PolicyError};
 use fidl_fuchsia_paver as paver;
 use log::{info, warn};
 use zx::Status;
@@ -92,46 +89,15 @@ impl PolicyEngine {
             State::NoOp => None,
         }
     }
-
-    /// Filters out any failed verifications if the config says to ignore them.
-    pub fn apply_config(
-        res: Result<(), VerifyErrors>,
-        config: &ComponentConfig,
-    ) -> Result<(), VerifyErrors> {
-        match res {
-            Ok(()) => Ok(()),
-            Err(VerifyErrors::VerifyErrors(v)) => {
-                // For any existing verification errors,
-                let errors: Vec<_> = v
-                    .into_iter()
-                    .filter(|VerifyError::VerifyError(source, _, _)| {
-                        // filter out the ones which config says to ignore.
-                        match source {
-                            VerifySource::Blobfs => config.blobfs() != &Mode::Ignore,
-                            VerifySource::Netstack => config.netstack() != &Mode::Ignore,
-                        }
-                    })
-                    .collect();
-
-                // If there are any remaining verification errors, pass them on.
-                if errors.is_empty() {
-                    Ok(())
-                } else {
-                    Err(VerifyErrors::VerifyErrors(errors))
-                }
-            }
-        }
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::metadata::errors::VerifyFailureReason;
     use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
     use mock_paver::{hooks as mphooks, MockPaverServiceBuilder, PaverEvent};
     use std::sync::Arc;
-    use {fidl_fuchsia_update_verify as verify, fuchsia_async as fasync};
 
     /// Test we should NOT verify and commit when when the device is in recovery.
     #[fasync::run_singlethreaded(test)]
@@ -294,94 +260,5 @@ mod tests {
         );
 
         assert_eq!(paver.take_events(), vec![PaverEvent::QueryCurrentConfiguration]);
-    }
-
-    fn test_blobfs_verify_errors(config: ComponentConfig, expect_err: bool) {
-        let duration = std::time::Duration::from_secs(1);
-        let timeout_err = Err(VerifyErrors::VerifyErrors(vec![VerifyError::VerifyError(
-            VerifySource::Blobfs,
-            VerifyFailureReason::Timeout,
-            duration,
-        )]));
-        let verify_err = Err(VerifyErrors::VerifyErrors(vec![VerifyError::VerifyError(
-            VerifySource::Blobfs,
-            VerifyFailureReason::Verify(verify::VerifyError::Internal),
-            duration,
-        )]));
-        let fidl_err = Err(VerifyErrors::VerifyErrors(vec![VerifyError::VerifyError(
-            VerifySource::Blobfs,
-            VerifyFailureReason::Fidl(fidl::Error::OutOfRange),
-            duration,
-        )]));
-
-        assert_eq!(PolicyEngine::apply_config(timeout_err, &config).is_err(), expect_err);
-        assert_eq!(PolicyEngine::apply_config(verify_err, &config).is_err(), expect_err);
-        assert_eq!(PolicyEngine::apply_config(fidl_err, &config).is_err(), expect_err);
-    }
-
-    /// Blobfs errors should be ignored if the config says so.
-    #[test]
-    fn test_blobfs_errors_ignored() {
-        test_blobfs_verify_errors(ComponentConfig::builder().blobfs(Mode::Ignore).build(), false);
-    }
-
-    #[test]
-    fn test_errors_all_ignored() {
-        let duration = std::time::Duration::from_secs(1);
-        let ve1 =
-            VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Timeout, duration);
-        let ve2 = VerifyError::VerifyError(
-            VerifySource::Blobfs,
-            VerifyFailureReason::Verify(verify::VerifyError::Internal),
-            duration,
-        );
-
-        let config = ComponentConfig::builder().blobfs(Mode::Ignore).build();
-
-        // TODO(https://fxbug.dev/42156562): When there are multiple VerifySource
-        // types, test heterogeneous VerifyErrors lists.
-        assert_matches!(
-            PolicyEngine::apply_config(Err(VerifyErrors::VerifyErrors(vec![ve1, ve2])), &config),
-            Ok(())
-        );
-    }
-
-    #[test]
-    fn test_errors_none_ignored() {
-        let duration = std::time::Duration::from_secs(1);
-        let ve1 =
-            VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Timeout, duration);
-        let ve2 = VerifyError::VerifyError(
-            VerifySource::Blobfs,
-            VerifyFailureReason::Verify(verify::VerifyError::Internal),
-            duration,
-        );
-
-        let config = ComponentConfig::builder().blobfs(Mode::RebootOnFailure).build();
-
-        let filtered_errors = assert_matches!(
-            PolicyEngine::apply_config(Err(VerifyErrors::VerifyErrors(vec![ve1, ve2])), &config),
-            Err(VerifyErrors::VerifyErrors(s)) => s);
-
-        assert_matches!(
-            &filtered_errors[..],
-            [
-                VerifyError::VerifyError(VerifySource::Blobfs, VerifyFailureReason::Timeout, _),
-                VerifyError::VerifyError(
-                    VerifySource::Blobfs,
-                    VerifyFailureReason::Verify(verify::VerifyError::Internal),
-                    _
-                )
-            ]
-        );
-    }
-
-    /// Blobfs errors should NOT be ignored if the config says to reboot on failure.
-    #[test]
-    fn test_blobfs_errors_reboot_on_failure() {
-        test_blobfs_verify_errors(
-            ComponentConfig::builder().blobfs(Mode::RebootOnFailure).build(),
-            true,
-        );
     }
 }

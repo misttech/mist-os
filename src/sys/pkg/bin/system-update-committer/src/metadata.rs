@@ -4,7 +4,6 @@
 
 //! Handles interfacing with the boot metadata (e.g. verifying a slot, committing a slot, etc).
 
-use crate::config::Config;
 use crate::metadata::verify::VerifierProxy;
 use commit::do_commit;
 use errors::MetadataError;
@@ -40,17 +39,17 @@ pub async fn put_metadata_in_happy_state(
     verifiers: &[&dyn VerifierProxy],
     node: &finspect::Node,
     commit_inspect: &CommitInspect,
-    config: &Config,
 ) -> Result<CommitResult, MetadataError> {
     let mut unblocker = Some(unblocker);
-    let commit_result = if config.enable() {
+    let commit_result = {
         let engine = PolicyEngine::build(boot_manager).await.map_err(MetadataError::Policy)?;
         if let Some((current_config, boot_attempts)) = engine.should_verify_and_commit() {
             // At this point, the FIDL server should start responding to requests so that clients
             // can find out that the health verification is underway.
             unblocker = unblock_fidl_server(unblocker)?;
-            let res = do_health_verification(verifiers, node).await;
-            let () = PolicyEngine::apply_config(res, config).map_err(MetadataError::Verify)?;
+            let () =
+                do_health_verification(verifiers, node).await.map_err(MetadataError::Verify)?;
+
             let () =
                 do_commit(boot_manager, current_config).await.map_err(MetadataError::Commit)?;
             let () = commit_inspect.record_boot_attempts(boot_attempts);
@@ -58,8 +57,6 @@ pub async fn put_metadata_in_happy_state(
         } else {
             CommitResult::CommitNotNecessary
         }
-    } else {
-        CommitResult::CommitNotNecessary
     };
 
     // Tell the rest of the system we are now committed.
@@ -119,8 +116,6 @@ fn unblock_fidl_server(
 mod tests {
     use super::errors::{VerifyError, VerifyErrors, VerifyFailureReason, VerifySource};
     use super::*;
-    use crate::config::Mode;
-    use ::fidl::endpoints::create_proxy;
     use assert_matches::assert_matches;
     use configuration::Configuration;
     use fasync::OnSignals;
@@ -177,7 +172,6 @@ mod tests {
             &[&blobfs_verifier],
             &finspect::Node::default(),
             &CommitInspect::new(finspect::Node::default()),
-            &Config::builder().build(),
         )
         .await
         .unwrap();
@@ -213,44 +207,11 @@ mod tests {
             &[&blobfs_verifier],
             &finspect::Node::default(),
             &CommitInspect::new(finspect::Node::default()),
-            &Config::builder().build(),
         )
         .await
         .unwrap();
 
         assert_eq!(paver.take_events(), vec![PaverEvent::QueryCurrentConfiguration]);
-        assert_eq!(
-            p_external.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST),
-            Ok(zx::Signals::USER_0)
-        );
-        assert_eq!(unblocker_recv.await, Ok(()));
-        assert_eq!(blobfs_verifier_call_count.load(Ordering::SeqCst), 0);
-    }
-
-    /// When we're disabled, we should not update metadata.
-    /// However, the FIDL server should still be unblocked.
-    #[fasync::run_singlethreaded(test)]
-    async fn test_does_not_change_metadata_when_disabled() {
-        // We shouldn't even attempt to talk to the paver when disabled, so a proxy with the remote
-        // end closed should work fine.
-        let boot_manager_proxy = create_proxy::<paver::BootManagerMarker>().0;
-        let (p_internal, p_external) = EventPair::create();
-        let (unblocker, unblocker_recv) = oneshot::channel();
-        let (blobfs_verifier, blobfs_verifier_call_count) =
-            success_blobfs_verifier_and_call_count();
-
-        put_metadata_in_happy_state(
-            &boot_manager_proxy,
-            &p_internal,
-            unblocker,
-            &[&blobfs_verifier],
-            &finspect::Node::default(),
-            &CommitInspect::new(finspect::Node::default()),
-            &Config::builder().enable(false).build(),
-        )
-        .await
-        .unwrap();
-
         assert_eq!(
             p_external.wait_handle(zx::Signals::USER_0, zx::MonotonicInstant::INFINITE_PAST),
             Ok(zx::Signals::USER_0)
@@ -282,7 +243,6 @@ mod tests {
             &[&blobfs_verifier],
             &finspect::Node::default(),
             &CommitInspect::new(finspect::Node::default()),
-            &Config::builder().build(),
         )
         .await
         .unwrap();
@@ -336,7 +296,6 @@ mod tests {
             &[&blobfs_verifier],
             &finspect::Node::default(),
             &CommitInspect::new(finspect::Node::default()),
-            &Config::builder().build(),
         )
         .await
         .unwrap();
@@ -371,10 +330,11 @@ mod tests {
     }
 
     /// When we fail to verify and the config says to ignore, we should still do the commit.
-    async fn test_commits_when_failed_verification_ignored(current_config: &Configuration) {
+    #[fasync::run_singlethreaded(test)]
+    async fn test_commits_when_failed_verification_ignored() {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
-                .current_config(current_config.into())
+                .current_config(paver::Configuration::Recovery)
                 .insert_hook(mphooks::config_status_and_boot_attempts(|_| {
                     Ok((paver::ConfigurationStatus::Pending, Some(1)))
                 }))
@@ -392,38 +352,14 @@ mod tests {
             &[&blobfs_verifier],
             &finspect::Node::default(),
             &CommitInspect::new(finspect::Node::default()),
-            &Config::builder().blobfs(Mode::Ignore).build(),
         )
         .await
         .unwrap();
 
-        assert_eq!(
-            paver.take_events(),
-            vec![
-                PaverEvent::QueryCurrentConfiguration,
-                PaverEvent::QueryConfigurationStatusAndBootAttempts {
-                    configuration: current_config.into()
-                },
-                PaverEvent::SetConfigurationHealthy { configuration: current_config.into() },
-                PaverEvent::SetConfigurationUnbootable {
-                    configuration: current_config.to_alternate().into()
-                },
-                PaverEvent::BootManagerFlush,
-            ]
-        );
+        assert_eq!(paver.take_events(), vec![PaverEvent::QueryCurrentConfiguration,]);
         assert_eq!(OnSignals::new(&p_external, zx::Signals::USER_0).await, Ok(zx::Signals::USER_0));
         assert_eq!(unblocker_recv.await, Ok(()));
-        assert_eq!(blobfs_verifier_call_count.load(Ordering::SeqCst), 1);
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn test_commits_when_failed_verification_ignored_a() {
-        test_commits_when_failed_verification_ignored(&Configuration::A).await
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn test_commits_when_failed_verification_ignored_b() {
-        test_commits_when_failed_verification_ignored(&Configuration::B).await
+        assert_eq!(blobfs_verifier_call_count.load(Ordering::SeqCst), 0);
     }
 
     /// When we fail to verify and the config says to not ignore, we should report an error.
@@ -448,7 +384,6 @@ mod tests {
             &[&blobfs_verifier],
             &finspect::Node::default(),
             &CommitInspect::new(finspect::Node::default()),
-            &Config::builder().blobfs(Mode::RebootOnFailure).build(),
         )
         .await;
 

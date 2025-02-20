@@ -23,7 +23,6 @@ use {
     fidl_fuchsia_update as fupdate, fuchsia_async as fasync,
 };
 
-mod config;
 mod fidl;
 mod metadata;
 mod reboot;
@@ -133,7 +132,6 @@ async fn fresh_run() -> Result<(), Error> {
         p_internal.duplicate_handle(zx::Rights::BASIC).context("while duplicating p_internal")?;
 
     let (unblocker, blocker) = oneshot::channel();
-    let config = config::Config::load_from_config_data_or_default();
 
     // Handle putting boot metadata in happy state, rebooting on failure (if necessary), and
     // reporting health to the inspect health node.
@@ -145,7 +143,6 @@ async fn fresh_run() -> Result<(), Error> {
             &[&blobfs_verifier, &netstack_verifier],
             verification_node_ref,
             commit_node_ref,
-            &config,
         )
         .await
         {
