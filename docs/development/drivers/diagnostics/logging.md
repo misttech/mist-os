@@ -17,11 +17,12 @@ following logs:
   * `INFO`
 
 To control which log levels are sent to the `syslog`, you can use the
-[assembly platform configuration](/reference/assembly/DiagnosticsConfig)
-. An assembly platform configuration can be specified in either the product or
-via assembly overrides.
+[platform configuration in product assembly][diagnosticsConfig-ref]. An assembly
+platform configuration can be specified in either the product or through
+[developer overrides for product assembly][dev-overrides-docs].
 
-For example, you can make a `//local/BUILD.gn` file:
+To set this through developer overrides for product assembly, use the
+following in `//local/BUILD.gn`:
 
 ```gn
 # //local/BUILD.gn:
@@ -56,3 +57,6 @@ Note: There is both producer and consumer filtering applied to logs. The above
 covers the producer-side, for more information on the consumer-side, and on how
 to view driver logs, see
 [viewing logs](/docs/development/diagnostics/logs/viewing.md).
+
+[diagnosticsConfig-ref]: /reference/assembly/DiagnosticsConfig
+[dev-overrides-docs]: /docs/development/build/assembly_developer_overrides.md
