@@ -7,6 +7,7 @@ use fuchsia_hyper::{new_https_client, HttpsClient};
 use hyper::body::HttpBody;
 use hyper::{Body, Method, Request};
 use std::collections::{BTreeMap, HashMap};
+use std::mem;
 use std::ops::{Deref, DerefMut};
 
 use crate::env_info::{get_arch, get_os, is_googler};
@@ -21,6 +22,12 @@ const ENDPOINT: &str = "/mp/collect";
 enum GA4MetricsServiceState {
     OptedIn(MetricsState, HttpsClient),
     OptedOut(MetricsState),
+}
+
+impl Default for GA4MetricsServiceState {
+    fn default() -> Self {
+        GA4MetricsServiceState::OptedOut(MetricsState::default())
+    }
 }
 
 impl Deref for GA4MetricsServiceState {
@@ -114,6 +121,17 @@ impl GA4MetricsService {
     /// Record analytics participation status in new migrated status file to support
     /// enhanced analytics for Googlers.
     pub fn set_new_opt_in_status(&mut self, status: MetricsStatus) -> Result<()> {
+        let mut state = mem::take(&mut self.state);
+        if status.is_opted_in() {
+            if let GA4MetricsServiceState::OptedOut(state_inside) = state {
+                state = GA4MetricsServiceState::OptedIn(state_inside, new_https_client());
+            }
+        } else {
+            if let GA4MetricsServiceState::OptedIn(state_inside, _) = state {
+                state = GA4MetricsServiceState::OptedOut(state_inside);
+            }
+        }
+        self.state = state;
         self.state.set_new_opt_in_status(status)
     }
 
@@ -208,28 +226,36 @@ impl GA4MetricsService {
         }
         self.rewrite_ua_ffx_known_batch_to_ga4();
 
-        let GA4MetricsServiceState::OptedIn(_, ref client) = self.state else { unreachable!() };
+        if let GA4MetricsServiceState::OptedIn(_, ref client) = self.state {
+            let _ = self.post.validate()?;
+            let post_body = self.post.to_json();
+            let url = self.get_url();
+            log::trace!(url:%, post_body:%; "POSTING GA4 ANALYTICS");
 
-        let _ = self.post.validate()?;
-        let post_body = self.post.to_json();
-        let url = self.get_url();
-        log::trace!(url:%, post_body:%; "POSTING GA4 ANALYTICS");
-
-        let req = Request::builder()
-            .method(Method::POST)
-            .uri(url)
-            .header("Content-Type", "application/json")
-            .body(Body::from(post_body))?;
-        let res = client.request(req).await;
-        Ok(match res {
-            Ok(mut res) => {
-                log::trace!("GA 4 Analytics response: {}", res.status());
-                while let Some(chunk) = res.body_mut().data().await {
-                    log::trace!(chunk:?; "");
+            let req = Request::builder()
+                .method(Method::POST)
+                .uri(url)
+                .header("Content-Type", "application/json")
+                .body(Body::from(post_body))?;
+            let res = client.request(req).await;
+            Ok(match res {
+                Ok(mut res) => {
+                    log::trace!("GA 4 Analytics response: {}", res.status());
+                    while let Some(chunk) = res.body_mut().data().await {
+                        log::trace!(chunk:?; "");
+                    }
                 }
-            }
-            Err(e) => log::trace!("Error posting GA 4 analytics: {}", e),
-        })
+                Err(e) => log::trace!("Error posting GA 4 analytics: {}", e),
+            })
+        } else {
+            // Normally analytics errors are logged as traces only, esp. those caused by network
+            // errors. However this branch being reachable would be a real bug in the code.
+            // We log the error and disable analytics for the session.
+            log::error!("Analytics Error: branch should not be reachable");
+            // Unwrap is safe here as the function only returns Ok(()).
+            self.opt_out_for_this_invocation().unwrap();
+            Ok(())
+        }
     }
 
     /// Rewrites the batch call from ffx invoke under UA analytics
@@ -493,6 +519,105 @@ mod tests {
         }
         let _res = ms.opt_out_for_this_invocation().unwrap();
         assert_eq!(ms.state.status, MetricsStatus::OptedOut);
+
+        drop(dir);
+        Ok(())
+    }
+
+    #[test]
+    fn opt_in_from_opted_out() -> Result<()> {
+        let dir = create_tmp_metrics_dir()?;
+        write_opt_in_status(&dir, false)?;
+        let mut ms = test_metrics_svc(
+            &dir,
+            String::from(APP_NAME),
+            String::from(BUILD_VERSION),
+            String::from(SDK_VERSION),
+            UNKNOWN_PROPERTY_ID.to_string(),
+            UNKNOWN_GA4_PRODUCT_CODE.to_string(),
+            UNKNOWN_GA4_KEY.to_string(),
+            false,
+        );
+        assert!(!ms.state.status.is_opted_in());
+        assert!(matches!(ms.state, GA4MetricsServiceState::OptedOut(_)));
+        ms.set_new_opt_in_status(MetricsStatus::OptedIn).unwrap();
+        assert!(ms.state.status.is_opted_in(), "{:?}", ms.state.status);
+        assert!(matches!(ms.state, GA4MetricsServiceState::OptedIn(_, _)));
+
+        drop(dir);
+        Ok(())
+    }
+
+    #[test]
+    fn opt_out_from_opted_in() -> Result<()> {
+        let dir = create_tmp_metrics_dir()?;
+        write_opt_in_status(&dir, true)?;
+        let mut ms = test_metrics_svc(
+            &dir,
+            String::from(APP_NAME),
+            String::from(BUILD_VERSION),
+            String::from(SDK_VERSION),
+            UNKNOWN_PROPERTY_ID.to_string(),
+            UNKNOWN_GA4_PRODUCT_CODE.to_string(),
+            UNKNOWN_GA4_KEY.to_string(),
+            false,
+        );
+
+        assert!(ms.state.status.is_opted_in(), "{:?}", ms.state.status);
+        assert!(matches!(ms.state, GA4MetricsServiceState::OptedIn(_, _)));
+        ms.set_new_opt_in_status(MetricsStatus::OptedOut).unwrap();
+        assert!(!ms.state.status.is_opted_in());
+        assert!(matches!(ms.state, GA4MetricsServiceState::OptedOut(_)));
+
+        drop(dir);
+        Ok(())
+    }
+
+    #[test]
+    fn opt_in_from_opted_in() -> Result<()> {
+        let dir = create_tmp_metrics_dir()?;
+        write_opt_in_status(&dir, true)?;
+        let mut ms = test_metrics_svc(
+            &dir,
+            String::from(APP_NAME),
+            String::from(BUILD_VERSION),
+            String::from(SDK_VERSION),
+            UNKNOWN_PROPERTY_ID.to_string(),
+            UNKNOWN_GA4_PRODUCT_CODE.to_string(),
+            UNKNOWN_GA4_KEY.to_string(),
+            false,
+        );
+
+        assert!(ms.state.status.is_opted_in(), "{:?}", ms.state.status);
+        assert!(matches!(ms.state, GA4MetricsServiceState::OptedIn(_, _)));
+        ms.set_new_opt_in_status(MetricsStatus::OptedIn).unwrap();
+        assert!(ms.state.status.is_opted_in());
+        assert!(matches!(ms.state, GA4MetricsServiceState::OptedIn(_, _)));
+
+        drop(dir);
+        Ok(())
+    }
+
+    #[test]
+    fn opt_out_from_opted_out() -> Result<()> {
+        let dir = create_tmp_metrics_dir()?;
+        write_opt_in_status(&dir, false)?;
+        let mut ms = test_metrics_svc(
+            &dir,
+            String::from(APP_NAME),
+            String::from(BUILD_VERSION),
+            String::from(SDK_VERSION),
+            UNKNOWN_PROPERTY_ID.to_string(),
+            UNKNOWN_GA4_PRODUCT_CODE.to_string(),
+            UNKNOWN_GA4_KEY.to_string(),
+            false,
+        );
+
+        assert!(!ms.state.status.is_opted_in(), "{:?}", ms.state.status);
+        assert!(matches!(ms.state, GA4MetricsServiceState::OptedOut(_)));
+        ms.set_new_opt_in_status(MetricsStatus::OptedOut).unwrap();
+        assert!(!ms.state.status.is_opted_in());
+        assert!(matches!(ms.state, GA4MetricsServiceState::OptedOut(_)));
 
         drop(dir);
         Ok(())
