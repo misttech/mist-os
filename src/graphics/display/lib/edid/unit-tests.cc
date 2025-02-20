@@ -18,7 +18,12 @@
 
 namespace {
 
-TEST(EdidTest, CaeValidationDtdOverflow) {
+class EdidTest : public ::testing::Test {
+ private:
+  fdf_testing::ScopedGlobalLogger logger_;
+};
+
+TEST_F(EdidTest, CaeValidationDtdOverflow) {
   edid::CeaEdidTimingExtension cea = {};
   cea.tag = edid::CeaEdidTimingExtension::kTag;
   cea.dtd_start_idx = 2;
@@ -26,17 +31,12 @@ TEST(EdidTest, CaeValidationDtdOverflow) {
   ASSERT_FALSE(cea.validate());
 }
 
-TEST(EdidTest, EisaVidLookup) {
+TEST_F(EdidTest, EisaVidLookup) {
   EXPECT_TRUE(!strcmp(edid::GetEisaVendorName(0x1e6d), "GOLDSTAR COMPANY LTD"));
   EXPECT_TRUE(!strcmp(edid::GetEisaVendorName(0x5a63), "VIEWSONIC CORPORATION"));
 }
 
-class EdidTest : public ::testing::Test {
- private:
-  fdf_testing::ScopedGlobalLogger logger_;
-};
-
-TEST(EdidTest, GetManufacturerIdAndName) {
+TEST_F(EdidTest, GetManufacturerIdAndName) {
   static constexpr uint8_t kHpZr30wEdidArray[] = {
       0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x22, 0xf0, 0x6c, 0x28, 0x01, 0x01, 0x01,
       0x01, 0x1e, 0x15, 0x01, 0x04, 0xb5, 0x40, 0x28, 0x78, 0xe2, 0x8d, 0x85, 0xad, 0x4f, 0x35,
@@ -69,7 +69,7 @@ TEST(EdidTest, GetManufacturerIdAndName) {
   EXPECT_STREQ(manufacturer_name, "HEWLETT PACKARD");
 }
 
-TEST(EdidTest, GetDisplayProductNameWithNameDescriptor) {
+TEST_F(EdidTest, GetDisplayProductNameWithNameDescriptor) {
   static constexpr uint8_t kHpZr30wEdidArray[] = {
       0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x22, 0xf0, 0x6c, 0x28, 0x01, 0x01, 0x01,
       0x01, 0x1e, 0x15, 0x01, 0x04, 0xb5, 0x40, 0x28, 0x78, 0xe2, 0x8d, 0x85, 0xad, 0x4f, 0x35,
@@ -98,7 +98,7 @@ TEST(EdidTest, GetDisplayProductNameWithNameDescriptor) {
   EXPECT_EQ(edid.GetDisplayProductName(), std::string("HP ZR30w"));
 }
 
-TEST(EdidTest, GetDisplayProductNameWithoutNameDescriptor) {
+TEST_F(EdidTest, GetDisplayProductNameWithoutNameDescriptor) {
   // This removes the name descriptor HP ZR30w EDID array and replaces it with
   // a placeholder display descriptor instead.
   static constexpr uint8_t kHpZr30wWithoutNameDescriptorEdidArray[] = {
@@ -124,7 +124,7 @@ TEST(EdidTest, GetDisplayProductNameWithoutNameDescriptor) {
   EXPECT_TRUE(edid.GetDisplayProductName().empty());
 }
 
-TEST(EdidTest, GetDisplayProductSerialWithSerialDescriptor) {
+TEST_F(EdidTest, GetDisplayProductSerialWithSerialDescriptor) {
   static constexpr uint8_t kHpZr30wEdidArray[] = {
       0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x22, 0xf0, 0x6c, 0x28, 0x01, 0x01, 0x01,
       0x01, 0x1e, 0x15, 0x01, 0x04, 0xb5, 0x40, 0x28, 0x78, 0xe2, 0x8d, 0x85, 0xad, 0x4f, 0x35,
@@ -152,7 +152,7 @@ TEST(EdidTest, GetDisplayProductSerialWithSerialDescriptor) {
   EXPECT_EQ(edid.GetDisplayProductSerialNumber(), std::string("CN413010YH"));
 }
 
-TEST(EdidTest, GetDisplayProductSerialWithoutSerialDescriptor) {
+TEST_F(EdidTest, GetDisplayProductSerialWithoutSerialDescriptor) {
   // This removes the serial descriptor HP ZR30w EDID array and replaces it with
   // a placeholder display descriptor instead.
   static constexpr uint8_t kHpZr30wWithoutSerialDescriptorEdidArray[] = {
