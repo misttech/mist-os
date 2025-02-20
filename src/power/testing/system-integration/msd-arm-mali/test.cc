@@ -283,19 +283,21 @@ TEST_F(PowerSystemIntegration, PowerIdle) {
   fidl::SyncClient<fuchsia_gpu_magma::PowerElementProvider> power_client;
   const char* kGpuServicePath = "/svc/fuchsia.gpu.magma.Service";
   for (const auto& entry : std::filesystem::directory_iterator(kGpuServicePath)) {
-    fprintf(stderr, "Got instance at path %s\n", entry.path().c_str());
     std::string instance_id = entry.path().filename().native();
+    magma::TestDeviceBase test_device(std::string(kGpuServicePath) + "/" + instance_id + "/device");
+    fprintf(stderr, "Got instance with id %d at path %s\n", test_device.GetVendorId(),
+            entry.path().c_str());
+    if (test_device.GetVendorId() != static_cast<uint64_t>(MAGMA_VENDOR_ID_MALI)) {
+      continue;
+    }
     auto service_result = component::OpenService<fuchsia_gpu_magma::Service>(instance_id);
     ASSERT_TRUE(service_result.is_ok());
     auto connect_result = service_result->connect_power_element_provider();
     ASSERT_TRUE(connect_result.is_ok());
     power_client = fidl::SyncClient(std::move(*connect_result));
-    // Only one GPU driver should be installed in this custom board, and it should be for the ARM
-    // mali.
-    magma::TestDeviceBase test_device(std::string(kGpuServicePath) + "/" + instance_id + "/device");
-    ASSERT_EQ(static_cast<uint64_t>(MAGMA_VENDOR_ID_MALI), test_device.GetVendorId());
+    break;
   }
-  ASSERT_TRUE(power_client.is_valid());
+  ASSERT_TRUE(power_client.is_valid()) << "Could not find MALI gpu instance";
 
   auto power_goals = power_client->GetPowerGoals();
   ASSERT_TRUE(power_goals.is_ok()) << power_goals.error_value();
