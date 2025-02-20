@@ -93,6 +93,11 @@ const ASLR_32_RANDOM_BITS: usize = 8;
 // TODO(https://fxbug.dev/322874791): Once setting RLIMIT_STACK is implemented, we should use it.
 const MAX_STACK_SIZE: usize = 512 * 1024 * 1024;
 
+// Value to report temporarily as the VM RSS HWM.
+// TODO(https://fxbug.dev/396221597): Need support from the kernel to track the committed bytes high
+// water mark.
+const STUB_VM_RSS_HWM: usize = 2 * 1024 * 1024;
+
 fn usercopy() -> Option<&'static usercopy::Usercopy> {
     static USERCOPY: LazyLock<Option<usercopy::Usercopy>> = LazyLock::new(|| {
         // We do not create shared processes in unit tests.
@@ -3856,6 +3861,10 @@ impl MemoryManager {
                 stats.vm_exe += zx_mapping.size;
             }
         }
+
+        // TODO(https://fxbug.dev/396221597): Placeholder for now. We need kernel support to track
+        // the committed bytes high water mark.
+        stats.vm_rss_hwm = STUB_VM_RSS_HWM;
         stats
     }
 
@@ -4022,6 +4031,7 @@ fn write_map(
 pub struct MemoryStats {
     pub vm_size: usize,
     pub vm_rss: usize,
+    pub vm_rss_hwm: usize,
     pub rss_anonymous: usize,
     pub rss_file: usize,
     pub rss_shared: usize,

@@ -319,6 +319,13 @@ fn static_directory_builder_with_common_task_entries<'a>(
     // attempt to dump process information to read this value, but later work should
     // return a proper 'wchan'.
     dir.entry(current_task, "wchan", BytesFile::new_node(b"0".to_vec()), mode!(IFREG, 0o444));
+    dir.entry(
+        current_task,
+        "clear_refs",
+        ClearRefsFile::new_node(task.into()),
+        // Not a typo, this is a write-only file.
+        mode!(IFREG, 0o200),
+    );
     // proc(5): "The files inside each /proc/pid directory are normally owned by
     // the effective user and effective group ID of the process."
     dir.dir_creds(task.creds().euid_as_fscred());
@@ -1205,6 +1212,7 @@ impl DynamicFileSource for StatusFile {
                 writeln!(sink, "VmStk:\t{} kB", mem_stats.vm_stack / 1024)?;
                 writeln!(sink, "VmExe:\t{} kB", mem_stats.vm_exe / 1024)?;
                 writeln!(sink, "VmSwap:\t{} kB", mem_stats.vm_swap / 1024)?;
+                writeln!(sink, "VmHWM:\t{} kB", mem_stats.vm_rss_hwm / 1024)?;
             }
             // Report seccomp filter status.
             let seccomp = task.seccomp_filter_state.get() as u8;
@@ -1301,5 +1309,21 @@ impl BytesFileOps for OomScoreAdjFile {
         let task = Task::from_weak(&self.0)?;
         let oom_score_adj = task.read().oom_score_adj;
         Ok(serialize_for_file(oom_score_adj).into())
+    }
+}
+
+struct ClearRefsFile(WeakRef<Task>);
+
+impl ClearRefsFile {
+    fn new_node(task: WeakRef<Task>) -> impl FsNodeOps {
+        BytesFile::new_node(Self(task))
+    }
+}
+
+impl BytesFileOps for ClearRefsFile {
+    fn write(&self, _current_task: &CurrentTask, _data: Vec<u8>) -> Result<(), Errno> {
+        let _task = Task::from_weak(&self.0)?;
+        track_stub!(TODO("https://fxbug.dev/396221597"), "/proc/pid/clear_refs");
+        Ok(())
     }
 }
