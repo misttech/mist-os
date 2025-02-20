@@ -119,9 +119,14 @@ zx_status_t CreateGpioHPlatformDevice(
           .id = fuchsia_hardware_pinimpl::Metadata::kSerializableName,
           .data = std::move(encoded_pin_metadata.value()),
       }},
+      // TODO(b/395140408): Remove once no longer retrieved.
       {{
           .id = std::to_string(DEVICE_METADATA_SCHEDULER_ROLE_NAME),
           .data = role_metadata.value(),
+      }},
+      {{
+          .id = fuchsia_scheduler::RoleName::kSerializableName,
+          .data = std::move(role_metadata.value()),
       }},
   };
 
