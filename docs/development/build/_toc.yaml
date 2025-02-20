@@ -19,6 +19,8 @@ toc:
   - include: /docs/development/build/build_system/_toc.yaml
 - title: "Advanced"
   section:
+  - title: "Use developer overrides for assembly of a Fuchsia product"
+    path: /docs/development/build/assembly_developer_overrides.md
   - title: "Build Clang toolchain"
     path: /docs/development/build/toolchain.md
   - title: "Build Rust for Fuchsia"
