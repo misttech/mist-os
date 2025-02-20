@@ -812,7 +812,7 @@ license_files = ["LICENSE-APACHE"]
 [gn.package.rand_jitter."0.1.3"]
 license_files = ["LICENSE-APACHE"]
 
-[gn.package.rand_os."0.1.2"]
+[gn.package.rand_os."0.1.3"]
 license_files = ["LICENSE-APACHE"]
 
 [gn.package.rand_pcg."0.1.1"]
