@@ -882,7 +882,6 @@ pub(super) mod testing {
 pub(super) mod tests {
     use super::*;
 
-    use crate::policy::error::QueryError;
     use crate::policy::metadata::HandleUnknown;
     use crate::policy::{parse_policy_by_reference, parse_policy_by_value, SecurityContext};
     use crate::{
@@ -902,24 +901,45 @@ pub(super) mod tests {
         source_type: TypeId,
         target_type: TypeId,
         permission: sc::Permission,
-    ) -> Result<bool, QueryError> {
+    ) -> Result<bool, &'static str> {
         let object_class = permission.class();
-        if let (Some(target_class), Some(permission)) =
-            (policy.0.class(&object_class), policy.0.permission(&permission))
-        {
-            policy.0.parsed_policy().class_permission_is_explicitly_allowed(
-                source_type,
-                target_type,
-                target_class,
-                permission,
-            )
-        } else {
-            Ok(false)
-        }
+        let target_class = policy.0.class(&object_class).ok_or("class lookup failed")?;
+        let permission = policy.0.permission(&permission).ok_or("permission lookup failed")?;
+        let access_decision = policy.0.parsed_policy().compute_explicitly_allowed(
+            source_type,
+            target_type,
+            target_class,
+        );
+        let permission_bit = AccessVector::from_class_permission_id(permission.id());
+        Ok(permission_bit == access_decision.allow & permission_bit)
     }
 
-    fn type_id_by_name<PS: ParseStrategy>(parsed_policy: &ParsedPolicy<PS>, name: &str) -> TypeId {
-        parsed_policy.type_by_name(name).unwrap().id()
+    /// Returns whether the input types are explicitly granted `permission` via an `allow [...];`
+    /// policy statement, when the target class and permission name are specified as strings.
+    ///
+    /// # Panics
+    /// If supplied with type Ids not previously obtained from the `Policy` itself; validation
+    /// ensures that all such Ids have corresponding definitions.
+    fn is_explicitly_allowed_custom<PS: ParseStrategy>(
+        policy: &Policy<PS>,
+        source_type: TypeId,
+        target_type: TypeId,
+        target_class_name: &str,
+        permission_name: &str,
+    ) -> Result<bool, &'static str> {
+        let (permission_id, _) = policy
+            .find_class_permissions_by_name(target_class_name)
+            .or(Err("class name lookup failed"))?
+            .into_iter()
+            .find(|(_, name)| name == permission_name.as_bytes())
+            .ok_or("permission name lookup failed")?;
+        let access_decision = policy.0.parsed_policy().compute_explicitly_allowed_custom(
+            source_type,
+            target_type,
+            target_class_name,
+        );
+        let permission_bit = AccessVector::from_class_permission_id(permission_id);
+        Ok(permission_bit == access_decision.allow & permission_bit)
     }
 
     #[derive(Debug, Deserialize)]
@@ -989,7 +1009,6 @@ pub(super) mod tests {
             assert_eq!(policy_bytes, returned_policy_bytes);
 
             // Test parse-by-reference.
-
             let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
             let policy = policy.validate().expect("validate policy");
 
@@ -1004,15 +1023,15 @@ pub(super) mod tests {
         let (policy, _) = parse_policy_by_value(policy_bytes.to_vec()).expect("parse policy");
         let policy = policy.validate().expect("validate selinux testsuite policy");
 
-        let unconfined_t = type_id_by_name(policy.0.parsed_policy(), "unconfined_t");
+        let unconfined_t = policy.type_id_by_name("unconfined_t").expect("look up type id");
 
-        is_explicitly_allowed(
+        assert!(is_explicitly_allowed(
             &policy,
             unconfined_t,
             unconfined_t,
             Permission::Process(ProcessPermission::Fork),
         )
-        .expect("check for `allow unconfined_t unconfined_t:process fork;` in policy");
+        .expect("check for `allow unconfined_t unconfined_t:process fork;"));
     }
 
     #[test]
@@ -1034,15 +1053,15 @@ pub(super) mod tests {
     fn explicit_allow_type_type() {
         let policy_bytes =
             include_bytes!("../../testdata/micro_policies/allow_a_t_b_t_class0_perm0_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
-        let parsed_policy = &policy.0;
-        Validate::validate(parsed_policy).expect("validate policy");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
 
-        let a_t = type_id_by_name(parsed_policy, "a_t");
-        let b_t = type_id_by_name(parsed_policy, "b_t");
+        let a_t = policy.type_id_by_name("a_t").expect("look up type id");
+        let b_t = policy.type_id_by_name("b_t").expect("look up type id");
 
-        assert!(parsed_policy
-            .is_explicitly_allowed_custom(a_t, b_t, "class0", "perm0")
+        assert!(is_explicitly_allowed_custom(&policy, a_t, b_t, "class0", "perm0")
             .expect("query well-formed"));
     }
 
@@ -1050,15 +1069,15 @@ pub(super) mod tests {
     fn no_explicit_allow_type_type() {
         let policy_bytes =
             include_bytes!("../../testdata/micro_policies/no_allow_a_t_b_t_class0_perm0_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
-        let parsed_policy = &policy.0;
-        Validate::validate(parsed_policy).expect("validate policy");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
 
-        let a_t = type_id_by_name(parsed_policy, "a_t");
-        let b_t = type_id_by_name(parsed_policy, "b_t");
+        let a_t = policy.type_id_by_name("a_t").expect("look up type id");
+        let b_t = policy.type_id_by_name("b_t").expect("look up type id");
 
-        assert!(!parsed_policy
-            .is_explicitly_allowed_custom(a_t, b_t, "class0", "perm0")
+        assert!(!is_explicitly_allowed_custom(&policy, a_t, b_t, "class0", "perm0")
             .expect("query well-formed"));
     }
 
@@ -1066,15 +1085,15 @@ pub(super) mod tests {
     fn explicit_allow_type_attr() {
         let policy_bytes =
             include_bytes!("../../testdata/micro_policies/allow_a_t_b_attr_class0_perm0_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
-        let parsed_policy = &policy.0;
-        Validate::validate(parsed_policy).expect("validate policy");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
 
-        let a_t = type_id_by_name(parsed_policy, "a_t");
-        let b_t = type_id_by_name(parsed_policy, "b_t");
+        let a_t = policy.type_id_by_name("a_t").expect("look up type id");
+        let b_t = policy.type_id_by_name("b_t").expect("look up type id");
 
-        assert!(parsed_policy
-            .is_explicitly_allowed_custom(a_t, b_t, "class0", "perm0")
+        assert!(is_explicitly_allowed_custom(&policy, a_t, b_t, "class0", "perm0")
             .expect("query well-formed"));
     }
 
@@ -1083,15 +1102,15 @@ pub(super) mod tests {
         let policy_bytes = include_bytes!(
             "../../testdata/micro_policies/no_allow_a_t_b_attr_class0_perm0_policy.pp"
         );
-        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
-        let parsed_policy = &policy.0;
-        Validate::validate(parsed_policy).expect("validate policy");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
 
-        let a_t = type_id_by_name(parsed_policy, "a_t");
-        let b_t = type_id_by_name(parsed_policy, "b_t");
+        let a_t = policy.type_id_by_name("a_t").expect("look up type id");
+        let b_t = policy.type_id_by_name("b_t").expect("look up type id");
 
-        assert!(!parsed_policy
-            .is_explicitly_allowed_custom(a_t, b_t, "class0", "perm0")
+        assert!(!is_explicitly_allowed_custom(&policy, a_t, b_t, "class0", "perm0")
             .expect("query well-formed"));
     }
 
@@ -1100,15 +1119,15 @@ pub(super) mod tests {
         let policy_bytes = include_bytes!(
             "../../testdata/micro_policies/allow_a_attr_b_attr_class0_perm0_policy.pp"
         );
-        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
-        let parsed_policy = &policy.0;
-        Validate::validate(parsed_policy).expect("validate policy");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
 
-        let a_t = type_id_by_name(parsed_policy, "a_t");
-        let b_t = type_id_by_name(parsed_policy, "b_t");
+        let a_t = policy.type_id_by_name("a_t").expect("look up type id");
+        let b_t = policy.type_id_by_name("b_t").expect("look up type id");
 
-        assert!(parsed_policy
-            .is_explicitly_allowed_custom(a_t, b_t, "class0", "perm0")
+        assert!(is_explicitly_allowed_custom(&policy, a_t, b_t, "class0", "perm0")
             .expect("query well-formed"));
     }
 
@@ -1117,29 +1136,30 @@ pub(super) mod tests {
         let policy_bytes = include_bytes!(
             "../../testdata/micro_policies/no_allow_a_attr_b_attr_class0_perm0_policy.pp"
         );
-        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
-        let parsed_policy = &policy.0;
-        Validate::validate(parsed_policy).expect("validate policy");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
 
-        let a_t = type_id_by_name(parsed_policy, "a_t");
-        let b_t = type_id_by_name(parsed_policy, "b_t");
+        let a_t = policy.type_id_by_name("a_t").expect("look up type id");
+        let b_t = policy.type_id_by_name("b_t").expect("look up type id");
 
-        assert!(!parsed_policy
-            .is_explicitly_allowed_custom(a_t, b_t, "class0", "perm0")
+        assert!(!is_explicitly_allowed_custom(&policy, a_t, b_t, "class0", "perm0")
             .expect("query well-formed"));
     }
 
     #[test]
     fn compute_explicitly_allowed_multiple_attributes() {
         let policy_bytes = include_bytes!("../../testdata/micro_policies/allow_a_t_a1_attr_class0_perm0_a2_attr_class0_perm1_policy.pp");
-        let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
-        let parsed_policy = &policy.0;
-        Validate::validate(parsed_policy).expect("validate policy");
+        let policy = parse_policy_by_reference(policy_bytes.as_slice())
+            .expect("parse policy")
+            .validate()
+            .expect("validate policy");
 
-        let a_t = type_id_by_name(parsed_policy, "a_t");
+        let a_t = policy.type_id_by_name("a_t").expect("look up type id");
 
         let raw_access_vector =
-            parsed_policy.compute_explicitly_allowed_custom(a_t, a_t, "class0").allow.0;
+            policy.0.parsed_policy().compute_explicitly_allowed_custom(a_t, a_t, "class0").allow.0;
 
         // Two separate attributes are each allowed one permission on `[attr] self:class0`. Both
         // attributes are associated with "a_t". No other `allow` statements appear in the policy

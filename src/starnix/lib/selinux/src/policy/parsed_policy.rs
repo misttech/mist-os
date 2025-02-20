@@ -9,15 +9,14 @@ use super::arrays::{
     Nodes, Ports, RangeTransitions, RoleAllow, RoleAllows, RoleTransition, RoleTransitions,
     SimpleArray, MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY,
 };
-use super::error::{ParseError, QueryError, ValidateError};
+use super::error::{ParseError, ValidateError};
 use super::extensible_bitmap::ExtensibleBitmap;
 use super::metadata::{Config, Counts, HandleUnknown, Magic, PolicyVersion, Signature};
 use super::parser::ParseStrategy;
 use super::security_context::{Level, SecurityContext};
 use super::symbols::{
-    find_class_by_name, find_class_permission_by_name, Category, Class, Classes, CommonSymbol,
-    CommonSymbols, ConditionalBoolean, MlsLevel, Permission, Role, Sensitivity, SymbolList, Type,
-    User,
+    find_class_by_name, Category, Class, Classes, CommonSymbol, CommonSymbols, ConditionalBoolean,
+    MlsLevel, Role, Sensitivity, SymbolList, Type, User,
 };
 use super::{
     AccessDecision, AccessVector, CategoryId, Parse, RoleId, SensitivityId, TypeId, UserId,
@@ -147,104 +146,6 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         access_decision
     }
 
-    /// Returns whether the input types are explicitly granted the permission named
-    /// `permission_name` via an `allow [...];` policy statement, or an error if looking up the
-    /// input types fails. This is the "custom" form of this API because `permission_name` is
-    /// associated with a [`crate::AbstractPermission::Custom::permission`] value.
-    #[allow(dead_code)]
-    pub(super) fn is_explicitly_allowed_custom(
-        &self,
-        source_type: TypeId,
-        target_type: TypeId,
-        target_class_name: &str,
-        permission_name: &str,
-    ) -> Result<bool, QueryError> {
-        let target_class = find_class_by_name(self.classes(), target_class_name)
-            .ok_or_else(|| QueryError::UnknownClass { class_name: target_class_name.to_owned() })?;
-        let permission =
-            find_class_permission_by_name(&self.common_symbols.data, target_class, permission_name)
-                .ok_or_else(|| QueryError::UnknownPermission {
-                    class_name: target_class_name.to_owned(),
-                    permission_name: permission_name.to_owned(),
-                })?;
-        self.class_permission_is_explicitly_allowed(
-            source_type,
-            target_type,
-            target_class,
-            permission,
-        )
-    }
-
-    /// Returns whether the input is explicitly allowed by some
-    /// `allow [source_type_name] [target_type_name] : [target_class] [permission];` policy
-    /// statement, or an error if lookups for input values fail.
-    #[allow(dead_code)]
-    pub(super) fn class_permission_is_explicitly_allowed(
-        &self,
-        source_type: TypeId,
-        target_type: TypeId,
-        target_class: &Class<PS>,
-        permission: &Permission<PS>,
-    ) -> Result<bool, QueryError> {
-        let permission_bit = AccessVector::from_class_permission_id(permission.id());
-
-        let target_class_id = target_class.id();
-
-        for access_vector_rule in self.access_vector_rules.data.iter() {
-            // Concern ourselves only with explicit `allow [...];` policy statements.
-            if !access_vector_rule.is_allow() {
-                continue;
-            }
-
-            // Concern ourselves only with `allow [source-type] [target-type]:[class] [...];`
-            // policy statements where `[class]` matches `target_class_id`.
-            if access_vector_rule.target_class() != target_class_id {
-                continue;
-            }
-
-            // Concern ourselves only with
-            // `allow [source-type] [target-type]:[class] { [permissions] };` policy statements
-            // where `permission_bit` refers to one of `[permissions]`.
-            match access_vector_rule.access_vector() {
-                Some(access_vector) => {
-                    if (access_vector & permission_bit) == AccessVector::NONE {
-                        continue;
-                    }
-                }
-                None => continue,
-            }
-
-            // Note: Perform bitmap lookups last: they are the most expensive comparison operation.
-
-            // Note: Type ids start at 1, but are 0-indexed in bitmaps: hence the `type - 1` bitmap
-            // lookups below.
-
-            // Concern ourselves only with `allow [source-type] [...];` policy statements where
-            // `[source-type]` is associated with `source_type_id`.
-            let source_attribute_bitmap: &ExtensibleBitmap<PS> =
-                &self.attribute_maps[(source_type.0.get() - 1) as usize];
-            if !source_attribute_bitmap.is_set(access_vector_rule.source_type().0.get() - 1) {
-                continue;
-            }
-
-            // Concern ourselves only with `allow [source-type] [target-type][...];` policy
-            // statements where `[target-type]` is associated with `target_type_id`.
-            let target_attribute_bitmap: &ExtensibleBitmap<PS> =
-                &self.attribute_maps[(target_type.0.get() - 1) as usize];
-            if !target_attribute_bitmap.is_set(access_vector_rule.target_type().0.get() - 1) {
-                continue;
-            }
-
-            // `access_vector_rule` explicitly allows the source, target,
-            // permission in this query.
-            return Ok(true);
-        }
-
-        // Failed to find any explicit-allow access vector rule for this source,
-        // target, permission query.
-        Ok(false)
-    }
-
     /// Computes the access vector that associates type `source_type_name` and `target_type_name`
     /// via an explicit `allow [...];` statement in the binary policy. Computes `AccessVector::NONE`
     /// if no such statement exists. This is the "custom" form of this API because
@@ -271,7 +172,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     /// `target_class`. The result is a set of access vectors with bits set for each
     /// `target_class` permission, describing which permissions are explicitly allowed,
     /// and which should have access checks audit-logged when denied, or allowed.
-    fn compute_explicitly_allowed(
+    pub(super) fn compute_explicitly_allowed(
         &self,
         source_type: TypeId,
         target_type: TypeId,

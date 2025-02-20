@@ -693,18 +693,9 @@ fn find_class_by_name_bytes<'a, PS: ParseStrategy>(
     None
 }
 
-/// Locates a class named `name` among `classes`. Returns the first such class found, though policy
-/// validation should ensure that only one such class exists.
-///
-/// TODO: Eliminate `dead_code` guard.
-#[allow(dead_code)]
-pub(super) fn find_common_symbol_by_name<'a, PS: ParseStrategy>(
-    common_symbols: &'a CommonSymbols<PS>,
-    name: &str,
-) -> Option<&'a CommonSymbol<PS>> {
-    find_common_symbol_by_name_bytes(common_symbols, name.as_bytes())
-}
-
+/// Locates a symbol named `name_bytes` among `common_symbols`. Returns
+/// the first such symbol found, though policy validation should ensure
+/// that only one exists.
 pub(super) fn find_common_symbol_by_name_bytes<'a, PS: ParseStrategy>(
     common_symbols: &'a CommonSymbols<PS>,
     name_bytes: &[u8],
@@ -712,67 +703,6 @@ pub(super) fn find_common_symbol_by_name_bytes<'a, PS: ParseStrategy>(
     for common_symbol in common_symbols.into_iter() {
         if common_symbol.name_bytes() == name_bytes {
             return Some(common_symbol);
-        }
-    }
-
-    None
-}
-
-/// Locates a permission named `name` associated with `class`. The policy language supports a
-/// limited form of inheritance. For example:
-///
-/// ```config
-/// common file { ioctl read write create [...] }
-/// class file inherits file { execute_no_trans entrypoint }
-/// ```
-///
-/// Each `class` may inherit from zero or one `common`, in which case the permissions specified in
-/// the denoted `common` are also permissions in `class`. Locating these "common" permissions is the
-/// reason that `common_symbols` is received as a function input.
-#[allow(dead_code)]
-pub(super) fn find_class_permission_by_name<'a, PS: ParseStrategy>(
-    common_symbols: &'a CommonSymbols<PS>,
-    class: &'a Class<PS>,
-    name: &'a str,
-) -> Option<&'a Permission<PS>> {
-    let name_bytes = name.as_bytes();
-    if let Some(permission) = find_own_class_permission_by_name_bytes(class, name_bytes) {
-        Some(permission)
-    } else if let Some(common_symbol) =
-        find_common_symbol_by_name_bytes(common_symbols, class.common_name_bytes())
-    {
-        find_common_permission_by_name_bytes(common_symbol, name_bytes)
-    } else {
-        None
-    }
-}
-
-#[allow(dead_code)]
-fn find_own_class_permission_by_name_bytes<'a, PS: ParseStrategy>(
-    class: &'a Class<PS>,
-    name_bytes: &'a [u8],
-) -> Option<&'a Permission<PS>> {
-    let own_permissions: &Permissions<PS> = &class.constraints.metadata.data;
-    find_own_permission_by_name_bytes(own_permissions, name_bytes)
-}
-
-#[allow(dead_code)]
-fn find_common_permission_by_name_bytes<'a, PS: ParseStrategy>(
-    common_symbol: &'a CommonSymbol<PS>,
-    name_bytes: &'a [u8],
-) -> Option<&'a Permission<PS>> {
-    let own_permissions: &Permissions<PS> = &common_symbol.data;
-    find_own_permission_by_name_bytes(own_permissions, name_bytes)
-}
-
-#[allow(dead_code)]
-fn find_own_permission_by_name_bytes<'a, PS: ParseStrategy>(
-    own_permissions: &'a Permissions<PS>,
-    name_bytes: &'a [u8],
-) -> Option<&'a Permission<PS>> {
-    for permission in own_permissions {
-        if permission.name_bytes() == name_bytes {
-            return Some(permission);
         }
     }
 
@@ -835,18 +765,6 @@ impl<PS: ParseStrategy> Class<PS> {
         ClassId(NonZeroU32::new(class_metadata.id.get()).unwrap())
     }
 
-    /// Returns whether this class inherits from a named `common` policy statement. For example,
-    /// `common file { common_file_perm }`, `class file inherits file { file_perm }` yields two
-    /// [`Class`] objects, one that refers to a permission named `"common_file_perm"` permission and
-    /// has `self.has_common() == false`, and another that refers to a permission named
-    /// `"file_perm"` and has `self.has_common() == true`.
-    ///
-    /// TODO: Eliminate `dead_code` guard.
-    #[allow(dead_code)]
-    pub fn has_common(&self) -> bool {
-        self.common_name_bytes().len() != 0
-    }
-
     /// Returns the full listing of permissions used in this policy.
     pub fn permissions(&self) -> &Permissions<PS> {
         &self.constraints.metadata.data
@@ -859,7 +777,6 @@ impl<PS: ParseStrategy> Class<PS> {
     /// The same permission may appear in multiple entries in the returned list.
     // TODO: https://fxbug.dev/372400976 - Is it accurate to change "may be
     // granted to "are granted" above?
-    #[allow(dead_code)]
     pub fn constraints(&self) -> &Vec<Constraint<PS>> {
         &self.constraints.data
     }
