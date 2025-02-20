@@ -173,6 +173,10 @@ group("chrono-english") {
   public_deps = [ ":chrono-english-v0_1_7" ]
 }
 
+group("cipher") {
+  public_deps = [ ":cipher-v0_4_4" ]
+}
+
 group("clap") {
   public_deps = [ ":clap-v2_34_0" ]
 }
@@ -205,6 +209,10 @@ if (!(current_os == "fuchsia")) {
   group("crossterm") {
     public_deps = [ ":crossterm-v0_19_0" ]
   }
+}
+
+group("crypto-common") {
+  public_deps = [ ":crypto-common-v0_1_6" ]
 }
 
 group("csv") {
