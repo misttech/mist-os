@@ -47,7 +47,7 @@ use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::ResolveFlags;
 use starnix_uapi::{
     clone_args, errno, error, from_status_like_fdio, pid_t, rlimit, sock_filter,
-    CLONE_CHILD_CLEARTID, CLONE_CHILD_SETTID, CLONE_FILES, CLONE_FS, CLONE_INTO_CGROUP,
+    CLONE_CHILD_CLEARTID, CLONE_CHILD_SETTID, CLONE_FILES, CLONE_FS, CLONE_INTO_CGROUP, CLONE_IO,
     CLONE_NEWUTS, CLONE_PARENT, CLONE_PARENT_SETTID, CLONE_PTRACE, CLONE_SETTLS, CLONE_SIGHAND,
     CLONE_SYSVSEM, CLONE_THREAD, CLONE_VFORK, CLONE_VM, FUTEX_OWNER_DIED, FUTEX_TID_MASK,
     ROBUST_LIST_LIMIT, SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER,
@@ -1643,6 +1643,7 @@ impl CurrentTask {
             | CLONE_VFORK
             | CLONE_NEWUTS
             | CLONE_PTRACE) as u64;
+
         // A mask with all valid flags set, because we want to return a different error code for an
         // invalid flag vs an unimplemented flag. Subtracting 1 from the largest valid flag gives a
         // mask with all flags below it set. Shift up by one to make sure the largest flag is also
@@ -1739,7 +1740,7 @@ impl CurrentTask {
             let original_parent;
 
             // Make sure to drop these locks ASAP to avoid inversion
-            let thread_group_state = {
+            let mut thread_group_state = {
                 let thread_group_state = self.thread_group.write();
                 if clone_parent {
                     // With the CLONE_PARENT flag, the parent of the new task is our parent
@@ -1790,7 +1791,17 @@ impl CurrentTask {
                     self.thread_group.signal_actions.fork()
                 };
                 let process_group = thread_group_state.process_group.clone();
-                ReleaseGuard::take(create_zircon_process(
+
+                // If the new `Task` is not a thread, but is sharing resources with the parent,
+                // then mark both the parent and the new task as sharing.  Otherwise, the new `Task`
+                // is marked as not-sharing, and the parent left unmodified (since it may be
+                // sharing with other `ThreadGroups`).
+                let clone_io = (flags & CLONE_IO as u64) != 0;
+                let is_sharing =
+                    clone_vm | clone_fs | clone_files | clone_sighand | clone_io | clone_sysvsem;
+                thread_group_state.is_sharing |= is_sharing;
+
+                let task_info = ReleaseGuard::take(create_zircon_process(
                     locked,
                     kernel,
                     Some(thread_group_state),
@@ -1798,7 +1809,11 @@ impl CurrentTask {
                     process_group,
                     signal_actions,
                     command.as_bytes(),
-                )?)
+                )?);
+
+                task_info.thread_group.write().is_sharing = is_sharing;
+
+                task_info
             }
         };
 

@@ -208,6 +208,18 @@ pub fn check_exec_access(
                 audit_context,
             )?;
         }
+
+        // Check that the share permission is allowed, if the process shares any resources (i.e. if
+        // it was created with e.g. `CLONE_FILES`, etc).
+        if current_task.thread_group.read().is_sharing {
+            check_permission(
+                &permission_check,
+                current_sid,
+                new_sid,
+                ProcessPermission::Share,
+                audit_context,
+            )?;
+        }
     }
     Ok(ResolvedElfState { sid: Some(new_sid) })
 }

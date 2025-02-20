@@ -129,6 +129,9 @@ pub struct ThreadGroupMutableState {
 
     /// Channel to message when this thread group exits.
     exit_notifier: Option<futures::channel::oneshot::Sender<()>>,
+
+    /// True if the `ThreadGroup` shares any state with a parent or child process (via `clone()`).
+    pub is_sharing: bool,
 }
 
 /// A collection of `Task` objects that roughly correspond to a "process".
@@ -488,6 +491,7 @@ impl ThreadGroup {
                         .unwrap_or(Default::default()),
                     allowed_ptracers: PtraceAllowedPtracers::None,
                     exit_notifier: None,
+                    is_sharing: false,
                 }),
             };
 
