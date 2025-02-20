@@ -9,13 +9,13 @@
 
 use std::string::ToString as _;
 
+use diagnostics_traits::{FuchsiaInspector, InspectorDeviceIdProvider};
 use fuchsia_inspect::Node;
 use net_types::ethernet::Mac;
 use net_types::ip::{Ipv4, Ipv6};
 use net_types::{UnicastAddr, Witness as _};
 use netstack3_core::device::{DeviceId, EthernetLinkDevice, WeakDeviceId};
 use netstack3_core::inspect::Inspector as _;
-use netstack3_fuchsia::{FuchsiaInspector, InspectorDeviceIdProvider};
 
 use crate::bindings::devices::{
     DeviceIdAndName, DeviceSpecificInfo, DynamicCommonInfo, DynamicNetdeviceInfo, EthernetInfo,

@@ -60,6 +60,7 @@ rustc_library_with_features("netstack3-base") {
   deps = [
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
+    "//src/connectivity/network/lib/diagnostics-traits",
     "//src/connectivity/network/lib/explicit",
     "//src/lib/fakealloc",
     "//src/lib/network/packet",

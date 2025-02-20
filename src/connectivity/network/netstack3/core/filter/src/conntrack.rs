@@ -1990,8 +1990,9 @@ mod tests {
     fn inspect<I: IpExt + TestIpExt>() {
         use alloc::boxed::Box;
         use alloc::string::ToString;
-        use netstack3_fuchsia::testutils::{assert_data_tree, Inspector};
-        use netstack3_fuchsia::FuchsiaInspector;
+        use diagnostics_assertions::assert_data_tree;
+        use diagnostics_traits::FuchsiaInspector;
+        use fuchsia_inspect::Inspector;
 
         let mut bindings_ctx = FakeBindingsCtx::<I>::new();
         bindings_ctx.sleep(Duration::from_secs(1));

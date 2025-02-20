@@ -15,10 +15,10 @@ use net_types::{SpecifiedAddr, ZonedAddr};
 use netstack3_base::socket::{DualStackIpExt, DualStackRemoteIp, SocketZonedAddrExt as _};
 use netstack3_base::sync::{PrimaryRc, StrongRc, WeakRc};
 use netstack3_base::{
-    AnyDevice, ContextPair, DeviceIdContext, Inspector, InspectorDeviceExt, IpDeviceAddr, IpExt,
-    ReferenceNotifiers, ReferenceNotifiersExt as _, RemoveResourceResultWithContext,
-    ResourceCounterContext, StrongDeviceIdentifier, TxMetadataBindingsTypes, WeakDeviceIdentifier,
-    ZonedAddressError,
+    AnyDevice, ContextPair, DeviceIdContext, Inspector, InspectorDeviceExt, InspectorExt,
+    IpDeviceAddr, IpExt, ReferenceNotifiers, ReferenceNotifiersExt as _,
+    RemoveResourceResultWithContext, ResourceCounterContext, StrongDeviceIdentifier,
+    TxMetadataBindingsTypes, WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_filter::RawIpBody;
 use packet::{BufferMut, SliceBufViewMut};

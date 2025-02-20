@@ -56,7 +56,7 @@ pub use frame::{
     RecvIpFrameMeta, SendFrameContext, SendFrameError, SendFrameErrorReason, SendableFrameMeta,
     TxMetadataBindingsTypes,
 };
-pub use inspect::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt};
+pub use inspect::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt, InspectorExt};
 pub use ip::{
     BroadcastIpExt, IcmpErrorCode, IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode, IpExt,
     IpTypesIpExt, Mms, WrapBroadcastMarker,

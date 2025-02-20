@@ -44,6 +44,7 @@ common_deps = [
   "//src/connectivity/lib/net-types",
   "//src/connectivity/lib/network-device/rust",
   "//src/connectivity/lib/packet-formats",
+  "//src/connectivity/network/lib/diagnostics-traits",
   "//src/connectivity/network/lib/explicit",
   "//src/lib/async-utils",
   "//src/lib/debug/rust",
@@ -86,7 +87,6 @@ common_deps = [
 
 common_test_deps = [
   "core:netstack3-core-testutils",
-  "fuchsia:netstack3-fuchsia-testutils",
   "//src/connectivity/lib/ip-test-macro",
   "//src/connectivity/lib/net-declare",
   "//src/connectivity/network/testing/netemul/network-context/fidl:network_rust",
@@ -164,10 +164,7 @@ network_unified_binary("bin") {
   ]
 
   deps = common_deps
-  non_test_deps = [
-    "core:netstack3-core",
-    "fuchsia:netstack3-fuchsia",
-  ]
+  non_test_deps = [ "core:netstack3-core" ]
 
   test_deps = common_test_deps
 
@@ -243,10 +240,7 @@ rustc_binary("bin-instrumented") {
   with_unit_tests = true
 
   deps = common_deps
-  non_test_deps = [
-    "core:netstack3-core-instrumented",
-    "fuchsia:netstack3-fuchsia-instrumented",
-  ]
+  non_test_deps = [ "core:netstack3-core-instrumented" ]
   test_deps = common_test_deps
   features = [ "instrumented" ]
 

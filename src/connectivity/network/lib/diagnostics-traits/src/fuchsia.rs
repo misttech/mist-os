@@ -1,17 +1,22 @@
-// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! Utilities for interacting with the Fuchsia Inspect system.
-
+use alloc::format;
+use alloc::string::String;
 use core::fmt::Display;
 use core::marker::PhantomData;
 
 use fuchsia_inspect::Node;
-
 use log::warn;
 
-use netstack3_base::{Inspector, InspectorDeviceExt};
+use crate::{Inspector, InspectorDeviceExt};
+
+/// Provides an abstract interface for extracting inspect device identifier.
+pub trait InspectorDeviceIdProvider<DeviceId> {
+    /// Extracts the device identifier from the provided opaque type.
+    fn device_id(id: &DeviceId) -> u64;
+}
 
 /// Provides a Fuchsia implementation of `Inspector`.
 pub struct FuchsiaInspector<'a, D> {
@@ -73,12 +78,6 @@ impl<'a, D> Inspector for FuchsiaInspector<'a, D> {
     }
 }
 
-/// Provides an abstract interface for extracting inspect device identifier.
-pub trait InspectorDeviceIdProvider<DeviceId> {
-    /// Extracts the device identifier from the provided opaque type.
-    fn device_id(id: &DeviceId) -> u64;
-}
-
 impl<'a, D, P: InspectorDeviceIdProvider<D>> InspectorDeviceExt<D> for FuchsiaInspector<'a, P> {
     fn record_device<I: Inspector>(inspector: &mut I, name: &str, device: &D) {
         inspector.record_uint(name, P::device_id(device))
@@ -87,10 +86,4 @@ impl<'a, D, P: InspectorDeviceIdProvider<D>> InspectorDeviceExt<D> for FuchsiaIn
     fn device_identifier_as_address_zone(id: D) -> impl Display {
         P::device_id(&id)
     }
-}
-
-#[cfg(any(test, feature = "testutils"))]
-pub mod testutils {
-    pub use diagnostics_assertions::assert_data_tree;
-    pub use fuchsia_inspect::Inspector;
 }

@@ -5,7 +5,7 @@
 //! Declares counters for observability/debugging of raw IP sockets.
 
 use net_types::ip::{Ip, IpVersionMarker};
-use netstack3_base::{Counter, Inspectable, Inspector};
+use netstack3_base::{Counter, Inspectable, Inspector, InspectorExt};
 
 /// Raw IP socket counters.
 ///

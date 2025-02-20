@@ -32,10 +32,11 @@ use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc};
 use netstack3_base::{
     AnyDevice, BroadcastIpExt, CoreTimerContext, Counter, CounterContext, DeviceIdContext,
     DeviceIdentifier as _, DeviceWithName, ErrorAndSerializer, EventContext, FrameDestination,
-    HandleableTimer, Inspectable, Inspector, InstantContext, IpAddressId, IpDeviceAddr,
-    IpDeviceAddressIdContext, IpExt, Matcher as _, NestedIntoCoreTimerCtx, NotFoundError,
-    RngContext, SendFrameErrorReason, StrongDeviceIdentifier, TimerBindingsTypes, TimerContext,
-    TimerHandler, TracingContext, TxMetadataBindingsTypes, WeakIpAddressId, WrapBroadcastMarker,
+    HandleableTimer, Inspectable, Inspector, InspectorExt as _, InstantContext, IpAddressId,
+    IpDeviceAddr, IpDeviceAddressIdContext, IpExt, Matcher as _, NestedIntoCoreTimerCtx,
+    NotFoundError, RngContext, SendFrameErrorReason, StrongDeviceIdentifier, TimerBindingsTypes,
+    TimerContext, TimerHandler, TracingContext, TxMetadataBindingsTypes, WeakIpAddressId,
+    WrapBroadcastMarker,
 };
 use netstack3_filter::{
     self as filter, ConnectionDirection, ConntrackConnection, FilterBindingsContext,

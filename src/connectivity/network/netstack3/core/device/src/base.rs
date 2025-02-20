@@ -13,8 +13,8 @@ use net_types::ethernet::Mac;
 use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6};
 use netstack3_base::sync::RwLock;
 use netstack3_base::{
-    Counter, Device, DeviceIdContext, HandleableTimer, Inspectable, Inspector, InstantContext,
-    ReferenceNotifiers, TimerBindingsTypes, TimerHandler, TxMetadataBindingsTypes,
+    Counter, Device, DeviceIdContext, HandleableTimer, Inspectable, Inspector, InspectorExt as _,
+    InstantContext, ReferenceNotifiers, TimerBindingsTypes, TimerHandler, TxMetadataBindingsTypes,
 };
 use netstack3_filter::FilterBindingsTypes;
 use netstack3_ip::device::Ipv6LinkLayerAddr;

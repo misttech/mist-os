@@ -16,7 +16,7 @@ use net_types::ip::IpVersion;
 use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc};
 use netstack3_base::{
     AnyDevice, ContextPair, Counter, Device, DeviceIdContext, FrameDestination, Inspectable,
-    Inspector, InspectorDeviceExt, ReferenceNotifiers, ReferenceNotifiersExt as _,
+    Inspector, InspectorDeviceExt, InspectorExt, ReferenceNotifiers, ReferenceNotifiersExt as _,
     RemoveResourceResultWithContext, ResourceCounterContext, SendFrameContext,
     SendFrameErrorReason, StrongDeviceIdentifier, WeakDeviceIdentifier as _,
 };

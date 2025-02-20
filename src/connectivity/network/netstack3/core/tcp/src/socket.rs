@@ -52,7 +52,7 @@ use netstack3_base::sync::RwLock;
 use netstack3_base::{
     trace_duration, AnyDevice, BidirectionalConverter as _, ContextPair, Control, CoreTimerContext,
     CounterContext, CtxPair, DeferredResourceRemovalContext, DeviceIdContext, EitherDeviceId,
-    ExistsError, HandleableTimer, IcmpErrorCode, Inspector, InspectorDeviceExt,
+    ExistsError, HandleableTimer, IcmpErrorCode, Inspector, InspectorDeviceExt, InspectorExt,
     InstantBindingsTypes, IpDeviceAddr, IpExt, LocalAddressError, Mss,
     OwnedOrRefsBidirectionalConverter, PortAllocImpl, ReferenceNotifiersExt as _,
     RemoveResourceResult, RngContext, Segment, SeqNum, StrongDeviceIdentifier as _,

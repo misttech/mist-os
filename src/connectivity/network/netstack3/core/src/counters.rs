@@ -5,7 +5,7 @@
 //! Types for working with and exposing packet statistic counters.
 
 use net_types::ip::{Ip, Ipv4, Ipv6};
-use netstack3_base::{ContextPair, CounterContext, Inspector};
+use netstack3_base::{ContextPair, CounterContext, Inspector, InspectorExt as _};
 use netstack3_device::ethernet::EthernetDeviceCounters;
 use netstack3_device::socket::DeviceSocketCounters;
 use netstack3_device::{ArpCounters, DeviceCounters};
