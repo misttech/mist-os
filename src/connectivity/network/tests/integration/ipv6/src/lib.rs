@@ -960,6 +960,11 @@ async fn slaac_regeneration_after_dad_failure<N: Netstack>(name: &str) {
         setup_network_with::<N, _>(&sandbox, name, None, &[KnownServiceProvider::SecureStash])
             .await
             .expect("error setting up network");
+    // Increase the number of transmits required for DAD to succeed to reduce the
+    // likelihood of flakes where DAD erroneously succeeds when it should fail. This
+    // number is chosen to be high enough to reduce flakiness while not extending
+    // the runtime of the test by too much.
+    let _: Option<u16> = iface.set_dad_transmits(4).await.expect("set dad transmits");
 
     // Send a Router Advertisement with information for a SLAAC prefix.
     //
