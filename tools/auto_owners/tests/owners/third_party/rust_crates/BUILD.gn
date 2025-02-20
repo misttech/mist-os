@@ -13,3 +13,11 @@ group("foo-v1_0_0") {
 group("foo") {
   deps = [ "//third_party/rust_crates/vendor/foo" ]
 }
+
+group("with-dashes") {
+  deps = [ "//third_party/rust_crates/vendor/with-dashes" ]
+}
+
+group("with-dashes-v0_1_0") {
+  deps = [ ":with-dashes" ]
+}

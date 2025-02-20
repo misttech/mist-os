@@ -12,5 +12,12 @@
         "canonical_target": "//third_party/rust_crates:bar-v0_0_1",
         "shortcut_target": "//third_party/rust_crates:bar",
         "path": "third_party/rust_crates/vendor/bar"
+    },
+    {
+        "name": "with_dashes",
+        "version": "0.1.0",
+        "canonical_target": "//third_party/rust_crates:with-dashes-v0_1_0",
+        "shortcut_target": "//third_party/rust_crates:with-dashes",
+        "path": "third_party/rust_crates/vendor/with-dashes"
     }
 ]
