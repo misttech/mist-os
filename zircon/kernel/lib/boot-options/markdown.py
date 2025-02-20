@@ -17,7 +17,7 @@ SPECIAL_TYPES = {
     "SmallString": r"\<string>",
     "RedactedHex": r"\<hexadecimal>",
     "TestOption": "test",
-    "uart::all::Config<>": r"\[none | legacy | qemu | \<type>,\<base>,\<irq>\]",
+    "uart::all::Driver": r"\[none | legacy | qemu | \<type>,\<base>,\<irq>\]",
 }
 
 

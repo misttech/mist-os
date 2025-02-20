@@ -160,11 +160,13 @@ void HandoffPrep::SetMemory() {
   // providing a PERIPHERAL range that already covers UART MMIO, but there is
   // currently a gap in that coverage.
   if constexpr (kArchHandoffGenerateUartPeripheralRanges) {
-    GetUartDriver().Visit([&]<typename KernelDriver>(const KernelDriver& driver) {
-      if (auto uart_mmio = GetUartMmioRange(driver, ZX_PAGE_SIZE)) {
-        ZX_ASSERT(Allocation::GetPool().MarkAsPeripheral(*uart_mmio).is_ok());
-      }
-    });
+    uart::internal::Visit(
+        [&](auto& driver) {
+          if (auto uart_mmio = GetUartMmioRange(driver, ZX_PAGE_SIZE)) {
+            ZX_ASSERT(Allocation::GetPool().MarkAsPeripheral(*uart_mmio).is_ok());
+          }
+        },
+        gBootOptions->serial);
   }
 
   // Normalizes types so that only those that are of interest to the kernel

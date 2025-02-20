@@ -128,12 +128,6 @@ class Config {
     return *this;
   }
 
-  template <typename T>
-  Config& operator=(const uart::Config<T>& uart_config) {
-    configs_ = uart_config;
-    return *this;
-  }
-
   // Visitor to access the active configuration object.
   template <typename T>
   void Visit(T&& visitor) {
@@ -165,13 +159,6 @@ UartDriver MakeDriver(const uart::all::Config<UartDriver>& config) {
     driver.template emplace<typename T::uart_type>(*uart_config);
   });
   return driver;
-}
-
-template <typename UartDriver = uart::all::Driver>
-uart::all::Config<UartDriver> GetConfig(const uart::all::Driver& driver) {
-  uart::all::Config<UartDriver> cfg;
-  uart::internal::Visit([&cfg](const auto& driver) { cfg = driver; }, driver);
-  return cfg;
 }
 
 // uart::all::KernelDriver is a variant across all the KernelDriver types.

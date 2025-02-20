@@ -31,9 +31,9 @@ void PhysMain(void* zbi, arch::EarlyTicks ticks) {
   // Move default uart into the boot options, so its properly overriden (if any) by the different
   // boot options below.
   //
-  // TODO(https://fxbug.dev/42084617): To be removed when driver state handed over switches do
-  // `uart::all::Config` as we work to remove `uart()` accessor.
-  boot_options.serial = uart::all::GetConfig(ktl::move(GetUartDriver()).TakeUart());
+  // TODO(fxb/42084617): To be removed when driver state handed over switches do `uart::all::Config`
+  // as we work to remove `uart()` accessor.
+  boot_options.serial = ktl::move(GetUartDriver()).TakeUart();
 
   // Obtain proper UART configuration from ZBI, both cmdline items and uart driver items.
   SetBootOptions(boot_options, zbitl::StorageFromRawHeader(static_cast<const zbi_header_t*>(zbi)));
@@ -43,7 +43,7 @@ void PhysMain(void* zbi, arch::EarlyTicks ticks) {
   // Note we don't do this after parsing ZBI items and before parsing command
   // line options, because if kernel.serial overrode what the ZBI items said,
   // we shouldn't be sending output to the wrong UART in between.
-  SetUartConsole(uart::all::MakeDriver(boot_options.serial));
+  SetUartConsole(boot_options.serial);
 
   // Perform any architecture-specific set up.
   ArchSetUp(zbi);

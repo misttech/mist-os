@@ -118,58 +118,6 @@ TEST(UartTests, Config) {
       .flags = 3,
   };
 
-  {
-    zbi_dcfg_simple_t dcfg2 = {
-        .mmio_phys = 2,
-        .irq = 2,
-        .flags = 3,
-    };
-    uart::Config<uart::ns8250::Mmio32Driver> cfg1{dcfg};
-    uart::Config<uart::ns8250::Mmio32Driver> cfg2{dcfg};
-    uart::Config<uart::ns8250::Mmio32Driver> cfg3{dcfg2};
-
-    zbi_dcfg_simple_pio_t dcfg_pio = {
-        .base = 123,
-        .irq = 4,
-    };
-    zbi_dcfg_simple_pio_t dcfg_pio2 = {
-        .base = 124,
-        .irq = 4,
-    };
-
-    uart::Config<uart::ns8250::PioDriver> cfg4{dcfg_pio};
-    uart::Config<uart::ns8250::PioDriver> cfg5{dcfg_pio};
-    uart::Config<uart::ns8250::PioDriver> cfg6{dcfg_pio2};
-    uart::Config<uart::null::Driver> cfg7{};
-    uart::Config<uart::null::Driver> cfg8{};
-    uart::Config<uart::ns8250::Mmio8Driver> cfg9{dcfg};
-
-    // Check operator== and !=.
-
-    // MMIO
-    EXPECT_EQ(cfg1, cfg1);
-    EXPECT_EQ(cfg1, cfg2);
-    EXPECT_EQ(cfg2, cfg1);
-    EXPECT_NE(cfg1, cfg3);
-    EXPECT_NE(cfg1, cfg4);
-
-    // MMIO vs other types
-    EXPECT_NE(cfg1, cfg7);
-    EXPECT_NE(cfg1, cfg9);
-    EXPECT_NE(cfg7, cfg1);
-    EXPECT_NE(cfg9, cfg1);
-
-    // PIO
-    EXPECT_EQ(cfg4, cfg4);
-    EXPECT_EQ(cfg4, cfg5);
-    EXPECT_EQ(cfg5, cfg4);
-    EXPECT_NE(cfg4, cfg6);
-
-    // Stub driver
-    EXPECT_EQ(cfg7, cfg7);
-    EXPECT_EQ(cfg7, cfg8);
-  }
-
   // uart::foo::Driver
   uart::ns8250::Mmio32Driver uart(dcfg);
 

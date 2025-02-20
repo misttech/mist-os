@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_SYSTEM_ULIB_UART_INCLUDE_LIB_UART_NULL_H_
-#define ZIRCON_SYSTEM_ULIB_UART_INCLUDE_LIB_UART_NULL_H_
+#ifndef LIB_UART_NULL_H_
+#define LIB_UART_NULL_H_
 
 // uart::null::Driver is a bit bucket.
 // It also serves to demonstrate the API required by uart::KernelDriver.
@@ -12,7 +12,6 @@
 #include <zircon/assert.h>
 
 #include <array>
-#include <optional>
 #include <string_view>
 
 #include "uart.h"
@@ -25,7 +24,7 @@ namespace uart {
 namespace null {
 
 struct Driver {
-  using config_type = StubConfig;
+  struct config_type {};
 
   static constexpr std::array<std::string_view, 0> kDevicetreeBindings = {};
   static constexpr std::string_view kConfigName = "none";
@@ -122,4 +121,4 @@ struct Driver {
 
 }  // namespace uart
 
-#endif  // ZIRCON_SYSTEM_ULIB_UART_INCLUDE_LIB_UART_NULL_H_
+#endif  // LIB_UART_NULL_H_
