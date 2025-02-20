@@ -364,7 +364,7 @@ When set to true, as much of the recent kernel debuglog as will fit will be
 appended to the generated crashlog during a kernel panic to assist in debugging.
 )""")
 
-DEFINE_OPTION("kernel.serial", uart::all::Driver, serial, {}, R"""(
+DEFINE_OPTION("kernel.serial", uart::all::Config<>, serial, {}, R"""(
 This controls what serial port is used.  If provided, it overrides the serial
 port described by the system's bootdata.  The kernel debug serial port is
 a reserved resource and may not be used outside of the kernel.

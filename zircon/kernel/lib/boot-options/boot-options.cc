@@ -278,18 +278,18 @@ bool ParseIntValue(std::string_view value, T& result) {
 
 template <typename... Driver>
 struct UartParser {
-  uart::all::Driver& result_;
+  uart::all::Config<>& result_;
 
   template <typename OneDriver>
   bool MaybeCreate(std::string_view value) {
     if (auto driver = OneDriver::MaybeCreate(value)) {
-      result_ = std::move(*driver);
+      result_ = *driver;
       return true;
     }
     return false;
   }
 
-  bool Parse(std::string_view value) { return (MaybeCreate<Driver>(value) || ... || false); }
+  bool Parse(std::string_view value) { return (MaybeCreate<Driver>(value) || ...); }
 };
 
 }  // namespace
@@ -353,7 +353,7 @@ void BootOptions::PrintValue(const RedactedHex& value, FILE* out) {
   }
 }
 
-bool BootOptions::Parse(std::string_view value, uart::all::Driver BootOptions::* member) {
+bool BootOptions::Parse(std::string_view value, uart::all::Config<> BootOptions::* member) {
   if (!uart::all::WithAllDrivers<UartParser>{this->*member}.Parse(value)) {
     // Probably has nowhere to go, but anyway.
     printf("WARN: Unrecognized serial console setting '%.*s' ignored\n",
@@ -363,8 +363,8 @@ bool BootOptions::Parse(std::string_view value, uart::all::Driver BootOptions::*
   return true;
 }
 
-void BootOptions::PrintValue(const uart::all::Driver& value, FILE* out) {
-  std::visit([out](const auto& uart) { uart.Unparse(out); }, value);
+void BootOptions::PrintValue(const uart::all::Config<>& value, FILE* out) {
+  value.Visit([out]<typename T>(const T& config) { typename T::uart_type(*config).Unparse(out); });
 }
 
 bool BootOptions::Parse(std::string_view value, OomBehavior BootOptions::* member) {
