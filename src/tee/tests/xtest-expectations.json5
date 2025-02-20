@@ -77,9 +77,17 @@
                 "regression4116",
                 "regression4117",
                 "regression6010",
-                "regression6012",
                 "regression6013",
                 "regression6020",
+            ],
+        },
+        {
+            type: "skip",
+            matchers: [
+                // TODO(https://fxbug.dev/360942417): This test doesn't
+                // properly clean up its state in the case of failure,
+                // affecting other tests.
+                "regression6012",
             ],
         },
     ],

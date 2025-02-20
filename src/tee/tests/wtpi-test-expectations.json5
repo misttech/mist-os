@@ -8,7 +8,6 @@
             matchers: [
                 "ClockInterfaceTest.ClockBasic",
                 "ClockInterfaceTest.TrustedTimeNULL",
-                "ClockRebootTest.SaveClockBeforeReboot",
                 "CryptoTest.CRC32Basic",
                 "CryptoTest.CRC32ContFailsForBadInputs",
                 "CryptoTest.CRC32FailsWhenInitialIsNull",
@@ -42,7 +41,6 @@
                 "CryptoTest.WrapKeyFailsForBadInputs",
                 "GenerationNumberInterfaceTest.LoadGenerationNumberFailsForNullInput",
                 "GenerationNumberInterfaceTest.SaveLoadGenerationNumber",
-                "GenerationNumberRebootTest.SaveBeforeReboot",
                 "Prov4Test.ECCDeriveSessionKeyFailsForBadInput",
                 "Prov4Test.ECCDeriveSessionKeySuccess",
                 "Prov4Test.GenerateRandomCertificateKeyPairFailsForBadInput",
@@ -56,7 +54,6 @@
         {
             type: "expect_failure",
             matchers: [
-                "ClockRebootTest.CheckClockAfterReboot",
                 "CryptoTest.AESCBCDecryptFailsForBadInput",
                 "CryptoTest.AESCBCDecryptHelloWorld",
                 "CryptoTest.AESCBCDecryptFailsForBadInput",
@@ -84,7 +81,6 @@
                 "CryptoTest.WTPI_EncryptAndSign_Then_VerifyAndDecrypt_Works",
                 "CryptoTest.WTPI_VerifyAndDecryptFailsForShortBuffer",
                 "CryptoTest.WrapAndUnwrapAsymmetricKeyWorks",
-                "GenerationNumberRebootTest.LoadAfterReboot",
                 "HmacTests/HmacTest.HMAC_SHA1Basic/0",
                 "HmacTests/HmacTest.HMAC_SHA1Basic/1",
                 "HmacTests/HmacTest.HMAC_SHA1FailsWithBadInput/0",
@@ -100,6 +96,13 @@
         {
             type: "skip",
             matchers: [
+                // TODO(https://fxbug.dev/397778461): Ordering matters for these pairs of tests.
+                // Skip until we can get that right.
+                "ClockRebootTest.SaveClockBeforeReboot",
+                "ClockRebootTest.CheckClockAfterReboot",
+                "GenerationNumberRebootTest.LoadAfterReboot",
+                "GenerationNumberRebootTest.SaveBeforeReboot",
+
                 // TODO(https://fxbug.dev/348474598): These succeed in ARM builds but fail in x86 ones.
                 // Maybe not unrelatedly, they also generate ASan failures. More investigation is
                 // needed.
