@@ -6,46 +6,9 @@ import("//build/components.gni")
 import("//build/testing/cc_test_executable.gni")
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
-group("unit_tests") {
-  testonly = true
-  deps = [
-    ":msd_arm_mali_lifecycle_tests",
-    ":msd_arm_mali_nonhardware_tests",
-  ]
-}
-
-fuchsia_unittest_package("msd_arm_mali_nonhardware_tests") {
-  deps = [ ":msd_arm_mali_nonhardware_tests_bin" ]
-  manifest = "meta/msd_arm_mali_nonhardware_tests.cml"
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-  test_type = "system"
-}
-
-# Target which deps on mandatory shards to include in CML files.
-# Any shards added as data deps will be automatically added
-# to the target's generated .cml file.
-# If you would rather verify that a shard's routes are included
-# in a .cml file but not actually add them, you should instead
-# add a data_dep directly on the shard from your _package build rule,
-# which changes the include() to an assert() rule.
-group("arm_mali_include_shard") {
-  # Automatically include the syslog shard in generated CML files.
-  data_deps = [ "//sdk/lib/syslog:client_includes" ]
-}
-
-fuchsia_unittest_package("msd_arm_mali_lifecycle_tests") {
-  deps = [
-    ":arm_mali_include_shard",
-    ":msd_arm_mali_lifecycle_tests_bin",
-  ]
-
-  # Assert that the syslog include shard is included so that we fail at build time
-  # rather than at runtime.
-  data_deps = [ "//sdk/lib/syslog:client_includes" ]
+fuchsia_unittest_package("unit_tests") {
+  package_name = "msd_arm_mali_unit_tests"
+  deps = [ ":msd_arm_mali_lifecycle_tests_bin" ]
 
   test_specs = {
     log_settings = {
@@ -54,29 +17,12 @@ fuchsia_unittest_package("msd_arm_mali_lifecycle_tests") {
   }
 }
 
-cc_test_executable("msd_arm_mali_nonhardware_tests_bin") {
-  testonly = true
-
-  sources = []
-
-  deps = []
-
-  public_deps = [
-    ":tests_not_requiring_hardware",
-    "//src/devices/testing/no_ddk",
-    "//src/graphics/magma/lib/magma/test_util:logger_init_helper",
-    "//src/lib/fxl/test:gtest_main",
-    "//third_party/googletest:gtest",
-    "//zircon/system/ulib/trace",
-    "//zircon/system/ulib/trace-vthread",
-  ]
-}
-
-# Tests that run in both DFv1 and DFv2
-source_set("common_non_hardware_tests") {
+cc_test_executable("msd_arm_mali_lifecycle_tests_bin") {
   testonly = true
   sources = [
     "driver_logger_harness.h",
+    "driver_logger_harness_dfv2.cc",
+    "lifecycle_tests.cc",
     "non_hardware_test_device.cc",
     "test_address_manager.cc",
     "test_address_space.cc",
@@ -92,6 +38,7 @@ source_set("common_non_hardware_tests") {
   deps = [
     "../../include",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_testing",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/power/cpp",
@@ -100,54 +47,19 @@ source_set("common_non_hardware_tests") {
     "//sdk/lib/driver/testing/cpp",
     "//src/devices/bus/testing/fake-pdev",
     "//src/devices/testing/fake-resource",
+    "//src/graphics/drivers/msd-arm-mali:config",
+    "//src/graphics/drivers/msd-arm-mali:msd_arm_entry",
     "//src/graphics/drivers/msd-arm-mali/src",
     "//src/graphics/drivers/msd-arm-mali/src:parent_device_dfv2",
     "//src/graphics/magma/lib/magma/platform:buffer",
     "//src/graphics/magma/lib/magma/platform:port",
+    "//src/graphics/magma/lib/magma/platform/zircon:logger_for_dfv2",
     "//src/graphics/magma/lib/magma_service/mock:bus_mapper",
     "//src/graphics/magma/lib/magma_service/mock:mmio",
     "//src/graphics/magma/lib/magma_service/test_util:msd_stubs",
     "//src/graphics/magma/lib/magma_service/util:registers",
-    "//third_party/googletest:gtest",
-  ]
-}
-
-source_set("tests_not_requiring_hardware") {
-  testonly = true
-
-  sources = [ "driver_logger_harness_stub.cc" ]
-
-  deps = [
-    ":common_non_hardware_tests",
-    ":test_deps",
-    "//sdk/lib/driver/testing/cpp",
-    "//sdk/lib/fdio",
-    "//src/graphics/magma/lib/magma_service/mock:bus_mapper",
-    "//src/graphics/magma/lib/magma_service/test_util:msd_stubs",
-    "//zircon/system/ulib/sync:sync-cpp",
-  ]
-}
-
-cc_test_executable("msd_arm_mali_lifecycle_tests_bin") {
-  testonly = true
-  sources = [
-    "driver_logger_harness_dfv2.cc",
-    "lifecycle_tests.cc",
-  ]
-  deps = [
-    ":common_non_hardware_tests",
-    "../../include",
-    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_testing",
-    "//sdk/lib/async_patterns/testing/cpp",
-    "//sdk/lib/driver/runtime/testing/cpp",
-    "//sdk/lib/driver/testing/cpp",
-    "//src/devices/bus/testing/fake-pdev",
-    "//src/devices/testing/fake-resource",
-    "//src/graphics/drivers/msd-arm-mali:config",
-    "//src/graphics/drivers/msd-arm-mali:msd_arm_entry",
-    "//src/graphics/drivers/msd-arm-mali/src",
-    "//src/graphics/magma/lib/magma/platform/zircon:logger_for_dfv2",
     "//src/lib/fxl/test:gtest_main",
+    "//third_party/googletest:gtest",
   ]
 }
 
@@ -162,15 +74,6 @@ source_set("tests_requiring_hardware") {
   ]
 
   deps = [
-    ":test_deps",
-    "//src/graphics/magma/tests/unit_tests:magma_platform_device_tests",
-  ]
-}
-
-group("test_deps") {
-  testonly = true
-
-  public_deps = [
     "../../include",
     "//src/graphics/drivers/msd-arm-mali/src",
     "//src/graphics/magma:msd",
@@ -181,6 +84,7 @@ group("test_deps") {
     "//src/graphics/magma/lib/magma_service/sys_driver",
     "//src/graphics/magma/lib/magma_service/test_util:platform_msd_device_helper",
     "//src/graphics/magma/lib/magma_service/util:registers",
+    "//src/graphics/magma/tests/unit_tests:magma_platform_device_tests",
     "//third_party/googletest:gtest",
   ]
 }
