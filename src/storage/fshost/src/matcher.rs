@@ -55,8 +55,8 @@ impl Matchers {
         // Match the system container.
         // On a regular system, we'll mount the container and its inner volumes.
         // On recovery systems, there might be a ramdisk container as well as an on-disk container.
-        // We will mount the ramdisk container and its volumes, but we will only bind the on-disk
-        // container (which allows enumerating volumes) but will mount to its volumes.
+        // We will mount the ramdisk container and its volumes, but we will only mount the on-disk
+        // container (which allows enumerating volumes) and will not mount its volumes.
         if config.fxfs_blob {
             if !config.netboot {
                 matchers.push(Box::new(FxblobMatcher::new(config.ramdisk_image)));
@@ -65,12 +65,12 @@ impl Matchers {
                 matchers.push(Box::new(FxblobOnRecoveryMatcher::new()));
             }
         } else {
-            matchers.push(Box::new(FvmMatcher::new(
-                config.ramdisk_image,
-                config.netboot,
-                config.storage_host,
-            )));
-            if config.ramdisk_image {
+            if !config.netboot {
+                matchers.push(Box::new(FvmMatcher::new(config.ramdisk_image, config.storage_host)));
+            }
+            // TODO(https://fxbug.dev/397770032): Support recovery mode for storage-host. See the
+            // FvmOnRecoveryMatcher for details.
+            if config.ramdisk_image || (config.netboot && !config.storage_host) {
                 matchers.push(Box::new(FvmOnRecoveryMatcher::new(config.storage_host)));
             }
         }
@@ -256,9 +256,6 @@ struct FvmMatcher {
     // True if this partition is required to exist on a ramdisk.
     ramdisk_required: bool,
 
-    // If set, only the driver will bind, not the inner volumes.
-    netboot: bool,
-
     // If set, the FVM component will be launched instead of the legacy FVM driver.
     storage_host: bool,
 
@@ -268,8 +265,8 @@ struct FvmMatcher {
 }
 
 impl FvmMatcher {
-    fn new(ramdisk_required: bool, netboot: bool, storage_host: bool) -> Self {
-        Self { ramdisk_required, netboot, storage_host, already_matched: false }
+    fn new(ramdisk_required: bool, storage_host: bool) -> Self {
+        Self { ramdisk_required, storage_host, already_matched: false }
     }
 
     async fn bind_fvm_component(
@@ -290,9 +287,6 @@ impl FvmMatcher {
     ) -> Result<(), Error> {
         // volume names have the format {label}-p-{index}, e.g. blobfs-p-1
         let volume_names = env.bind_and_enumerate_fvm(device).await?;
-        if self.netboot {
-            return Ok(());
-        }
         if let Some(blob_name) =
             volume_names.iter().find(|name| name.starts_with(BLOBFS_PARTITION_LABEL))
         {
@@ -542,7 +536,7 @@ impl Matcher for FvmOnRecoveryMatcher {
         env: &mut dyn Environment,
     ) -> Result<Option<DeviceTag>, Error> {
         if self.storage_host {
-            // TODO(https://fxbug.dev/388533231): Support recovery mode.  To do this, we'll need to
+            // TODO(https://fxbug.dev/397770032): Support recovery mode.  To do this, we'll need to
             // make FVM components dynamic children so we can have two (one for the ramdisk, one for
             // this).  Alternatively, we can make it so that recovery doesn't bind the FVM
             // component, but we'll need to make sure that works with all recovery flows, and the
@@ -1187,7 +1181,7 @@ mod tests {
         assert!(matchers
             .match_device(
                 Box::new(MockDevice::new().set_content_format(DiskFormat::Fvm)),
-                &mut MockEnv::new().expect_bind_and_enumerate_fvm()
+                &mut MockEnv::new().expect_attach_driver(FVM_DRIVER_PATH)
             )
             .await
             .expect("match_device failed"));
