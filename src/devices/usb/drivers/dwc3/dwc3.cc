@@ -115,22 +115,11 @@ zx_status_t Dwc3::AcquirePDevResources() {
   }
 
   // Initialize mac address metadata server.
-  {
-    zx::result metadata = pdev_.GetFidlMetadata<fuchsia_boot_metadata::MacAddressMetadata>(
-        fuchsia_boot_metadata::MacAddressMetadata::kSerializableName);
-    if (metadata.is_ok()) {
-      if (zx::result result = mac_address_metadata_server_.SetMetadata(metadata.value());
-          result.is_error()) {
-        FDF_LOG(ERROR, "Failed to set metadata for mac address metdadata server: %s",
-                result.status_string());
-        return result.status_value();
-      }
-    } else if (metadata.status_value() == ZX_ERR_NOT_FOUND) {
-      FDF_LOG(DEBUG, "Not forwarding mac address: Metadata not found");
-    } else {
-      FDF_LOG(ERROR, "Failed to get mac address metadata: %s", metadata.status_string());
-      return metadata.status_value();
-    }
+  if (zx::result result = mac_address_metadata_server_.SetMetadataFromPDevIfExists(pdev_);
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to set metadata for mac address metdadata server: %s",
+            result.status_string());
+    return result.status_value();
   }
   if (zx::result result = mac_address_metadata_server_.Serve(*outgoing(), dispatcher());
       result.is_error()) {
@@ -139,22 +128,11 @@ zx_status_t Dwc3::AcquirePDevResources() {
   }
 
   // Initialize serial number metadata server.
-  {
-    zx::result metadata = pdev_.GetFidlMetadata<fuchsia_boot_metadata::SerialNumberMetadata>(
-        fuchsia_boot_metadata::SerialNumberMetadata::kSerializableName);
-    if (metadata.is_ok()) {
-      if (zx::result result = serial_number_metadata_server_.SetMetadata(metadata.value());
-          result.is_error()) {
-        FDF_LOG(ERROR, "Failed to set metadata for serial number metdadata server: %s",
-                result.status_string());
-        return result.status_value();
-      }
-    } else if (metadata.status_value() == ZX_ERR_NOT_FOUND) {
-      FDF_LOG(DEBUG, "Not forwarding serial number: Metadata not found");
-    } else {
-      FDF_LOG(ERROR, "Failed to get serial number metadata: %s", metadata.status_string());
-      return metadata.status_value();
-    }
+  if (zx::result result = serial_number_metadata_server_.SetMetadataFromPDevIfExists(pdev_);
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to set metadata for serial number metdadata server: %s",
+            result.status_string());
+    return result.status_value();
   }
   if (zx::result result = serial_number_metadata_server_.Serve(*outgoing(), dispatcher());
       result.is_error()) {

@@ -403,21 +403,13 @@ zx::result<> AmlI2c::Start() {
     irq_ = std::move(interrupt.value());
   }
 
-  {
-    zx::result metadata = pdev.GetFidlMetadata<fuchsia_hardware_i2c_businfo::I2CBusMetadata>(
-        fuchsia_hardware_i2c_businfo::I2CBusMetadata::kSerializableName);
-    if (metadata.is_error()) {
-      FDF_LOG(ERROR, "Failed to get metadata: %s", metadata.status_string());
-      return metadata.take_error();
-    }
-    if (zx::result result = metadata_server_.SetMetadata(metadata.value()); result.is_error()) {
-      FDF_LOG(ERROR, "Failed to set metadata for metadata server: %s", result.status_string());
-      return result.take_error();
-    }
-    if (zx::result result = metadata_server_.Serve(*outgoing(), dispatcher()); result.is_error()) {
-      FDF_LOG(ERROR, "Failed to serve metadata: %s", result.status_string());
-      return result.take_error();
-    }
+  if (zx::result result = metadata_server_.SetMetadataFromPDevIfExists(pdev); result.is_error()) {
+    FDF_LOG(ERROR, "Failed to set metadata for metadata server: %s", result.status_string());
+    return result.take_error();
+  }
+  if (zx::result result = metadata_server_.Serve(*outgoing(), dispatcher()); result.is_error()) {
+    FDF_LOG(ERROR, "Failed to serve metadata: %s", result.status_string());
+    return result.take_error();
   }
 
   status = zx::event::create(0, &event_);

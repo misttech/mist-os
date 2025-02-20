@@ -203,15 +203,7 @@ zx::result<> AmlSaradc::Start() {
     return irq.take_error();
   }
 
-  zx::result metadata = pdev.GetFidlMetadata<fuchsia_hardware_adcimpl::Metadata>(
-      fuchsia_hardware_adcimpl::Metadata::kSerializableName);
-  if (metadata.is_error()) {
-    FDF_SLOG(ERROR, "Failed to get metadata from platform device.",
-             KV("status", metadata.status_string()));
-    return metadata.take_error();
-  }
-
-  if (zx::result result = metadata_server_.SetMetadata(metadata.value()); result.is_error()) {
+  if (zx::result result = metadata_server_.SetMetadataFromPDevIfExists(pdev); result.is_error()) {
     FDF_SLOG(ERROR, "Failed to set metadata.", KV("status", result.status_string()));
     return result.take_error();
   }

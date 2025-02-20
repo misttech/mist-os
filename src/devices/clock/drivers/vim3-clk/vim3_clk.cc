@@ -43,49 +43,30 @@ zx::result<> Vim3Clock::Start() {
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   // Serve clock IDs metadata.
-  {
-    zx::result clock_ids = pdev.GetFidlMetadata<fuchsia_hardware_clockimpl::ClockIdsMetadata>(
-        fuchsia_hardware_clockimpl::ClockIdsMetadata::kSerializableName);
-    if (clock_ids.is_error()) {
-      FDF_LOG(ERROR, "Failed to retrieve clock ID's: %s", clock_ids.status_string());
-      return clock_ids.take_error();
-    }
-    if (zx::result result = clock_ids_metadata_server_.SetMetadata(clock_ids.value());
-        result.is_error()) {
-      FDF_LOG(ERROR, "Failed to set metadata for clock ID's metadata server: %s",
-              result.status_string());
-      return result.take_error();
-    }
-    if (zx::result result = clock_ids_metadata_server_.Serve(*outgoing(), dispatcher());
-        result.is_error()) {
-      FDF_LOG(ERROR, "Failed to serve clock ID's: %s", result.status_string());
-      return result.take_error();
-    }
+  if (zx::result result = clock_ids_metadata_server_.SetMetadataFromPDevIfExists(pdev);
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to set metadata for clock ID's metadata server: %s",
+            result.status_string());
+    return result.take_error();
+  }
+  if (zx::result result = clock_ids_metadata_server_.Serve(*outgoing(), dispatcher());
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to serve clock ID's: %s", result.status_string());
+    return result.take_error();
   }
 #endif
 
   // Serve clock init metadata.
-  {
-    zx::result init_metadata = pdev.GetFidlMetadata<fuchsia_hardware_clockimpl::InitMetadata>(
-        fuchsia_hardware_clockimpl::InitMetadata::kSerializableName);
-    if (init_metadata.is_ok()) {
-      if (zx::result result = clock_init_metadata_server_.SetMetadata(init_metadata.value());
-          result.is_error()) {
-        FDF_LOG(ERROR, "Failed to set metadata for clock init metadata server: %s",
-                result.status_string());
-        return result.take_error();
-      }
-      if (zx::result result = clock_init_metadata_server_.Serve(*outgoing(), dispatcher());
-          result.is_error()) {
-        FDF_LOG(ERROR, "Failed to serve clock init metadata: %s", result.status_string());
-        return result.take_error();
-      }
-    } else if (init_metadata.status_value() == ZX_ERR_NOT_FOUND) {
-      FDF_LOG(DEBUG, "Not serving clock init metadata: Does not exist");
-    } else {
-      FDF_LOG(ERROR, "Failed to retrieve clock init metadata: %s", init_metadata.status_string());
-      return init_metadata.take_error();
-    }
+  if (zx::result result = clock_init_metadata_server_.SetMetadataFromPDevIfExists(pdev);
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to set metadata for clock init metadata server: %s",
+            result.status_string());
+    return result.take_error();
+  }
+  if (zx::result result = clock_init_metadata_server_.Serve(*outgoing(), dispatcher());
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to serve clock init metadata: %s", result.status_string());
+    return result.take_error();
   }
 
   zx::result hiu_mmio = pdev.MapMmio(kHiuMmioIndex);
