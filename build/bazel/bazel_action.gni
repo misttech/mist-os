@@ -548,22 +548,6 @@ template("bazel_action") {
     visibility = [ ":*" ]
   }
 
-  # Generate a manifest file that references all transitive bazel_input_xxx()
-  # dependencies from _bazel_inputs, which will be passed to bazel_action.py
-  # for verification (and print a human-friendly message on error).
-  #
-  # NOTE: Place the manifest file under $target_out_dir because $target_gen_dir
-  # is cleared explicitly by the //build/bazel/tests/build_action/run_tests.py
-  # script. It also prevents these file to appear as extraneous differences.
-  _ninja_inputs_manifest = "$target_out_dir/${target_name}.ninja_inputs.json"
-  _ninja_inputs_target = "${target_name}.ninja_inputs"
-
-  generate_bazel_inputs_manifest(_ninja_inputs_target) {
-    forward_variables_from(invoker, [ "testonly" ])
-    output = _ninja_inputs_manifest
-    inputs_deps = [ ":${_bazel_inputs_group_target}" ]
-  }
-
   # Generate a manifest file that references all transitive bazel_input_file()
   # and bazel_input_directory() dependencies from 'deps' or 'bazel_inputs'.
   #
@@ -571,9 +555,10 @@ template("bazel_action") {
   # repository with symlinks and filegroups().
   #
   _gn_targets_repository_manifest =
-      "$target_gen_dir/${target_name}.gn_targets_manifest.json"
-  _gn_targets_repository_target = "${target_name}.gn_targets"
-  generate_gn_targets_repository_manifest(_gn_targets_repository_target) {
+      "$target_out_dir/${target_name}.gn_targets_manifest.json"
+  _gn_targets_repository_manifest_target = "${target_name}.gn_targets"
+  generate_gn_targets_repository_manifest(
+      _gn_targets_repository_manifest_target) {
     forward_variables_from(invoker, [ "testonly" ])
     output = _gn_targets_repository_manifest
     deps = [ ":${_bazel_inputs_group_target}" ]
@@ -606,6 +591,39 @@ template("bazel_action") {
     visibility = [ ":*" ]
   }
 
+  # Generate the @gn_targets repository for this Bazel invocation.
+  _gn_targets_repository_target = "${target_name}.gn_targets.repository"
+  _gn_targets_repository_path = "${target_out_dir}/${target_name}.gn_targets"
+  action(_gn_targets_repository_target) {
+    forward_variables_from(invoker, [ "testonly" ])
+    inputs = [
+      _all_licenses_spdx_file,
+      _gn_targets_repository_manifest,
+    ]
+
+    deps = [
+      ":${_all_licenses_spdx_target}",
+      ":${_gn_targets_repository_manifest_target}",
+    ]
+
+    outputs = [ "${_gn_targets_repository_path}/WORKSPACE.bazel" ]
+
+    script = "//build/bazel/scripts/create_gn_targets_dir.py"
+    args = [
+      "--build-dir",
+      rebase_path(root_build_dir, root_build_dir),
+      "--all_licenses_spdx_json",
+      rebase_path(inputs[0], root_build_dir),
+      "--inputs-manifest",
+      rebase_path(inputs[1], root_build_dir),
+      "--output-dir",
+      rebase_path(_gn_targets_repository_path, root_build_dir),
+    ]
+
+    # This generates a full directory with unpredictable outputs.
+    hermetic_deps = false
+  }
+
   action(target_name) {
     forward_variables_from(invoker,
                            [
@@ -619,8 +637,6 @@ template("bazel_action") {
     script = "//build/bazel/scripts/bazel_action.py"
 
     inputs = _bazel_build_files
-
-    inputs += [ _ninja_inputs_manifest ]
 
     if (defined(invoker.inputs)) {
       inputs += invoker.inputs
@@ -656,12 +672,8 @@ template("bazel_action") {
              invoker.command,
              "--gn-target-label",
              get_label_info(":$target_name", "label_no_toolchain"),
-             "--ninja-inputs-manifest",
-             rebase_path(_ninja_inputs_manifest, root_build_dir),
-             "--gn-targets-repository-manifest",
-             rebase_path(_gn_targets_repository_manifest, root_build_dir),
-             "--gn-targets-all-licenses-spdx",
-             rebase_path(_all_licenses_spdx_file, root_build_dir),
+             "--gn-targets-repository-dir",
+             rebase_path(_gn_targets_repository_path, root_build_dir),
              "--bazel-targets",
            ] + _bazel_targets +
            [
@@ -899,9 +911,7 @@ template("bazel_action") {
       deps = []
     }
     deps += [
-      ":${_all_licenses_spdx_target}",
       ":${_gn_targets_repository_target}",
-      ":${_ninja_inputs_target}",
       "//build/bazel:bazel_action_allowlist",
     ]
 

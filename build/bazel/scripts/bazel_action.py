@@ -403,19 +403,17 @@ def copy_file_if_changed(
 
 
 def force_symlink(target_path: str, link_path: str) -> None:
-    if os.path.islink(link_path) or os.path.exists(link_path):
-        os.remove(link_path)
-
-    link_parent = os.path.dirname(link_path)
-    os.makedirs(link_parent, exist_ok=True)
-    rel_target_path = os.path.relpath(target_path, link_parent)
-    os.symlink(rel_target_path, link_path)
-
-    real_dst_path = os.path.realpath(link_path)
-    real_src_path = os.path.realpath(target_path)
-    assert (
-        real_dst_path == real_src_path
-    ), f"Symlink creation failed {link_path} points to {real_dst_path}, not {real_src_path}"
+    link_dir = os.path.dirname(link_path)
+    os.makedirs(link_dir, exist_ok=True)
+    target_path = os.path.relpath(target_path, link_dir)
+    try:
+        os.symlink(target_path, link_path)
+    except OSError as e:
+        if e.errno == errno.EEXIST:
+            os.remove(link_path)
+            os.symlink(target_path, link_path)
+        else:
+            raise
 
 
 def depfile_quote(path: str) -> str:
@@ -1033,16 +1031,8 @@ def main() -> int:
         help="Label of GN target invoking this script.",
     )
     parser.add_argument(
-        "--ninja-inputs-manifest",
-        help="Path to the manifest file describing bazel_input_xxx() dependencies.",
-    )
-    parser.add_argument(
-        "--gn-targets-repository-manifest",
-        help="Path to the manifest file describing the content of the @gn_targets repository.",
-    )
-    parser.add_argument(
-        "--gn-targets-all-licenses-spdx",
-        help="Path to the SPDX file describing licenses for all files in @gn_targets repository.",
+        "--gn-targets-repository-dir",
+        help="Path of @gn_targets repository directory for this invocation.",
     )
     parser.add_argument(
         "--bazel-targets",
@@ -1121,26 +1111,6 @@ def main() -> int:
     current_dir = os.getcwd()
     bazel_output_base_dir = find_bazel_output_base(args.workspace_dir)
 
-    # LINT.IfChange
-    if args.gn_targets_repository_manifest:
-        force_symlink(
-            target_path=args.gn_targets_repository_manifest,
-            link_path=os.path.join(
-                args.workspace_dir,
-                "fuchsia_build_generated/gn_targets_repository_manifest.json",
-            ),
-        )
-
-    if args.gn_targets_all_licenses_spdx:
-        force_symlink(
-            target_path=args.gn_targets_all_licenses_spdx,
-            link_path=os.path.join(
-                args.workspace_dir,
-                "fuchsia_build_generated/gn_targets_all_licenses_spdx.json",
-            ),
-        )
-    # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
-
     jobs = None
     if "--config=remote" in args.extra_bazel_args:
         cpus = os.cpu_count()
@@ -1153,6 +1123,19 @@ def main() -> int:
         job_count = os.environ.get("FUCHSIA_BAZEL_JOB_COUNT")
         if job_count:
             jobs = int(job_count)
+
+    if args.gn_targets_repository_dir:
+        # Update fuchsia_build_generated/gn_targets_dir to point
+        # to a new location that matches the content of @gn_target
+        # for the current bazel_action() target.
+        # LINT.IfChange
+        force_symlink(
+            os.path.realpath(args.gn_targets_repository_dir),
+            os.path.join(
+                args.workspace_dir, "fuchsia_build_generated/gn_targets_dir"
+            ),
+        )
+        # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
 
     def run_bazel_query(
         query_type: str, query_args: List[str], ignore_errors: bool
@@ -1172,11 +1155,7 @@ def main() -> int:
             On failure, if ignore_errors is False, then return (None, None),
             otherwise, return (stdout_lines, stderr_lines).
         """
-        query_cmd = [
-            args.bazel_launcher,
-            query_type,
-        ] + query_args
-
+        query_cmd = [args.bazel_launcher, query_type] + query_args
         if ignore_errors:
             query_cmd += ["--keep_going"]
 

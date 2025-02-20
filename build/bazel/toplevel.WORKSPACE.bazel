@@ -232,14 +232,15 @@ boringssl_repository(
     # LINT.ThenChange(scripts/workspace_utils.py)
 )
 
-# buildifier: disable=load-on-top
-load("//:build/bazel/repository_rules/gn_targets_repository.bzl", "gn_targets_repository")
-
-gn_targets_repository(
+# fuchsia_build_generated/gn_target_dir is a symlink to the content
+# of the @gn_targets repository. At `fx gen` time, it will point to
+# an empty repository, but bazel_action.py will update it just before
+# invoking Bazel to point to a directory whose content matches the
+# current `bazel_action()` target.
+local_repository(
     name = "gn_targets",
     # LINT.IfChange
-    inputs_manifest = "fuchsia_build_generated/gn_targets_repository_manifest.json",
-    all_licenses_spdx_json = "fuchsia_build_generated/gn_targets_all_licenses_spdx.json",
+    path = "fuchsia_build_generated/gn_targets_dir",
     # LINT.ThenChange(//build/bazel/scripts/bazel_action.py)
 )
 

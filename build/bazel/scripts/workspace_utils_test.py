@@ -616,5 +616,178 @@ zoo2 = "non-false string"
         )
 
 
+class GnTargetsDirTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self._td = tempfile.TemporaryDirectory()
+        self._root = Path(self._td.name)
+
+    def tearDown(self) -> None:
+        self._td.cleanup()
+
+    def test_simple(self) -> None:
+        build_dir = self._root / "build"
+        build_dir.mkdir()
+
+        manifest_path = self._root / "manifest"
+        manifest_path.write_text(
+            json.dumps(
+                [
+                    {
+                        "bazel_name": "package",
+                        "bazel_package": "src/drivers/virtio",
+                        "generator_label": "//src/drivers/virtio:package-archive(//build/toolchain/fuchsia:x64)",
+                        "output_files": ["obj/src/drivers/virtio/package.far"],
+                    },
+                    {
+                        "bazel_name": "eng.bazel_inputs",
+                        "bazel_package": "bundles/assembly",
+                        "generator_label": "//bundles/assembly:eng.platform_artifacts(//build/toolchain/fuchsia:x64)",
+                        "output_directory": "obj/bundles/assembly/eng/platform_artifacts",
+                    },
+                ],
+                indent=2,
+            )
+        )
+
+        all_licenses_path = self._root / "all_licenses.spdx.json"
+        all_licenses_path.write_text("")
+
+        generated = workspace_utils.GeneratedWorkspaceFiles()
+        workspace_utils.record_gn_targets_dir(
+            generated, build_dir, manifest_path, all_licenses_path
+        )
+
+        generated_json = json.loads(generated.to_json())
+        self.maxDiff = None
+        self.assertListEqual(
+            sorted(generated_json.keys()),
+            [
+                "BUILD.bazel",
+                "MODULE.bazel",
+                "WORKSPACE.bazel",
+                "_files/obj/bundles/assembly/eng/platform_artifacts",
+                "_files/obj/src/drivers/virtio/package.far",
+                "all_licenses.spdx.json",
+                "bundles/assembly/BUILD.bazel",
+                "bundles/assembly/_files",
+                "src/drivers/virtio/BUILD.bazel",
+                "src/drivers/virtio/_files",
+            ],
+        )
+
+        self.assertEqual(
+            generated_json["BUILD.bazel"]["content"],
+            r"""# AUTO-GENERATED - DO NOT EDIT
+load("@rules_license//rules:license.bzl", "license")
+
+# This contains information about all the licenses of all
+# Ninja outputs exposed in this repository.
+# IMPORTANT: package_name *must* be "Legacy Ninja Build Outputs"
+# as several license pipeline exception files hard-code this under //vendor/...
+license(
+    name = "all_licenses_spdx_json",
+    package_name = "Legacy Ninja Build Outputs",
+    license_text = "all_licenses.spdx.json",
+    visibility = ["//visibility:public"]
+)
+
+""",
+        )
+
+        self.assertEqual(
+            generated_json["MODULE.bazel"]["content"],
+            'module(name = "gn_targets", version = "1")\n',
+        )
+
+        self.assertEqual(
+            generated_json["WORKSPACE.bazel"]["content"],
+            'workspace(name = "gn_targets")\n',
+        )
+
+        self.assertDictEqual(
+            generated_json["all_licenses.spdx.json"],
+            {
+                "target": str(all_licenses_path.resolve()),
+                "type": "symlink",
+            },
+        )
+
+        self.assertDictEqual(
+            generated_json["_files/obj/src/drivers/virtio/package.far"],
+            {
+                "target": str(build_dir / "obj/src/drivers/virtio/package.far"),
+                "type": "raw_symlink",
+            },
+        )
+
+        self.assertDictEqual(
+            generated_json[
+                "_files/obj/bundles/assembly/eng/platform_artifacts"
+            ],
+            {
+                "target": str(
+                    build_dir / "obj/bundles/assembly/eng/platform_artifacts"
+                ),
+                "type": "raw_symlink",
+            },
+        )
+
+        self.assertDictEqual(
+            generated_json["src/drivers/virtio/_files"],
+            {
+                "target": "../../../_files",
+                "type": "raw_symlink",
+            },
+        )
+
+        self.assertDictEqual(
+            generated_json["bundles/assembly/_files"],
+            {
+                "target": "../../_files",
+                "type": "raw_symlink",
+            },
+        )
+
+        self.assertEqual(
+            generated_json["bundles/assembly/BUILD.bazel"]["content"],
+            r"""# AUTO-GENERATED - DO NOT EDIT
+
+package(
+    default_applicable_licenses = ["//:all_licenses_spdx_json"],
+    default_visibility = ["//visibility:public"],
+)
+
+
+# From GN target: //bundles/assembly:eng.platform_artifacts(//build/toolchain/fuchsia:x64)
+filegroup(
+    name = "eng.bazel_inputs",
+    srcs = glob(["_files/obj/bundles/assembly/eng/platform_artifacts/**"], exclude_directories=1),
+)
+alias(
+    name = "eng.bazel_inputs.directory",
+    actual = "_files/obj/bundles/assembly/eng/platform_artifacts",
+)
+""",
+        )
+
+        self.assertEqual(
+            generated_json["src/drivers/virtio/BUILD.bazel"]["content"],
+            """# AUTO-GENERATED - DO NOT EDIT
+
+package(
+    default_applicable_licenses = ["//:all_licenses_spdx_json"],
+    default_visibility = ["//visibility:public"],
+)
+
+
+# From GN target: //src/drivers/virtio:package-archive(//build/toolchain/fuchsia:x64)
+filegroup(
+    name = "package",
+    srcs = ["_files/obj/src/drivers/virtio/package.far"],
+)
+""",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

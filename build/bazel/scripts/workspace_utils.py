@@ -172,8 +172,13 @@ def force_symlink(dst_path: str | Path, target_path: str | Path) -> None:
         target_path: path to actual symlink target.
     """
     dst_dir = os.path.dirname(dst_path)
-    os.makedirs(dst_dir, exist_ok=True)
     target_path = os.path.relpath(target_path, dst_dir)
+    return force_raw_symlink(dst_path, target_path)
+
+
+def force_raw_symlink(dst_path: str | Path, target_path: str | Path) -> None:
+    dst_dir = os.path.dirname(dst_path)
+    os.makedirs(dst_dir, exist_ok=True)
     try:
         os.symlink(target_path, dst_path)
     except OSError as e:
@@ -331,6 +336,25 @@ class GeneratedWorkspaceFiles(object):
             "target": str(target_path),
         }
 
+    def record_raw_symlink(
+        self, dst_path: str, target_path: str | Path
+    ) -> None:
+        """Record a new symlink entry.
+
+        Note that the entry always generates a relative symlink target
+        when writing the entry to the workspace in write(), even if
+        target_path is absolute.
+
+        Args:
+           dst_path: symlink path, relative to workspace root.
+           target_path: symlink target path.
+        """
+        self._check_new_path(dst_path)
+        self._files[dst_path] = {
+            "type": "raw_symlink",
+            "target": str(target_path),
+        }
+
     def record_file_content(
         self, dst_path: str, content: str, executable: bool = False
     ) -> None:
@@ -380,6 +404,10 @@ class GeneratedWorkspaceFiles(object):
                 target_path = entry["target"]
                 link_path = os.path.join(out_dir, path)
                 force_symlink(link_path, target_path)
+            elif type == "raw_symlink":
+                target_path = entry["target"]
+                link_path = os.path.join(out_dir, path)
+                force_raw_symlink(link_path, target_path)
             elif type == "file":
                 file_path = os.path.join(out_dir, path)
                 os.makedirs(os.path.dirname(file_path), exist_ok=True)
@@ -683,6 +711,14 @@ common --enable_bzlmod=false
         gn_output_dir / "obj/build/bazel/fuchsia_internal_only_idk.hash",
     )
     # LINT.ThenChange(//build/bazel/scripts/bazel_action.py)
+
+    # Create a link to an empty repository. This is updated by bazel_action.py
+    # before each Bazel invocation to point to the @gn_targets content specific
+    # to its parent bazel_action() target.
+    generated.record_symlink(
+        "workspace/fuchsia_build_generated/gn_targets_dir",
+        fuchsia_dir / "build" / "bazel" / "local_repositories" / "empty",
+    )
 
 
 def generate_fuchsia_workspace(
@@ -994,3 +1030,190 @@ class GnBuildArgs(object):
             repository_dir, Path(f"{repository_dir}.generated-info.json")
         )
         return extra_ninja_inputs
+
+
+def record_gn_targets_dir(
+    generated: GeneratedWorkspaceFiles,
+    build_dir: Path,
+    inputs_manifest_path: Path,
+    all_licenses_spdx_path: Path,
+) -> None:
+    """Record the content of a @gn_targets directory in a GeneratedWorkspaceFiles instance.
+
+    Args:
+        generated: A GeneratedWorkspaceFiles instance.
+        build_dir: Path to the Ninja build directory.
+        inputs_manifest_path: Path to an inputs manifest file generated
+            by the generate_gn_targets_repository_manifest() GN template.
+            See //build/bazel/bazel_inputs.gni comments for file format.
+        all_licenses_spdx_path: Path to an SPDX file listing all licensing
+            requirements for the inputs covered by the manifest.
+    Raises:
+        ValueError in case of missing or malformed input.
+    """
+    # Ensure build_dir is absolute. Most symlink targets must be absolute for Bazel
+    # to work properly.
+    build_dir = build_dir.resolve()
+
+    if not inputs_manifest_path.exists():
+        raise ValueError(
+            f"Missing inputs manifest file: {inputs_manifest_path}"
+        )
+    if not all_licenses_spdx_path.exists():
+        raise ValueError(
+            f"Missing licensing information file: {all_licenses_spdx_path}"
+        )
+
+    # This creates two sets of symlinks.
+    #
+    # The first one maps `_files/{ninja_path}` to the absolute path of the corresponding
+    # Ninja artifact in the build directory, e.g.:
+    #
+    #  _files/obj/src/foo/foo.cc.o ----> $NINJA_BUILD_DIR/obj/src/foo/foo.cc
+    #
+    # There is one such symlink per Ninja output paths.
+    #
+    # Second, for each bazel_package value, `{bazel_package}/_files` will be a relative
+    # symlink that points to the top-level `_files` directory, as in:
+    #
+    #  src/foo/_files ---> ../../_files
+    #
+    # This is used by the BUILD.bazel file generated in the same sub-directory, that can
+    # reference the artifacts using labels like "_files/{ninja_path}" without having
+    # to care for Bazel package boundaries, as in:
+    #
+    #  ```
+    #  # Generated as src/foo/BUILD.bazel
+    #  filegroup(
+    #     name = "foo",
+    #     srcs = [ "_files/src/foo/foo.cc.o" ]
+    #  )
+    #  ```
+    #
+    # The reason why this double indirection exists is purely for debuggability!
+    # It is easier to see all the Ninja artifacts exposed at once from the top-level
+    # _files/ directory when verifying correctness.
+    #
+    # It is perfectly possible to only place absollute symlinks under
+    # {bazel_package}/_files/... but doing this leads to repositories that are
+    # harder to inspect in practice due to the extra long paths it creates.
+
+    # The top-level directory that will contain symlinks to all Ninja output
+    # files, using . For example _files/obj/src/foo/foo.cc.o
+    build_dir_name = "_files"
+
+    all_files = []
+
+    # Build a { bazel_package -> { gn_target_name -> entry } } map.
+    package_map: T.Dict[str, T.Dict[str, str]] = {}
+    for entry in json.loads(inputs_manifest_path.read_text()):
+        bazel_package = entry["bazel_package"]
+        bazel_name = entry["bazel_name"]
+        name_map = package_map.setdefault(bazel_package, {})
+        name_map[bazel_name] = entry
+
+    # Create the ///{gn_dir}/BUILD.bazel file for each GN directory.
+    # Every target defined in {gn_dir}/BUILD.gn that is part of the manifest
+    # will have its own filegroup() entry with the corresponding target name.
+    for bazel_package, name_map in package_map.items():
+        content = """# AUTO-GENERATED - DO NOT EDIT
+
+package(
+    default_applicable_licenses = ["//:all_licenses_spdx_json"],
+    default_visibility = ["//visibility:public"],
+)
+
+"""
+        for bazel_name, entry in name_map.items():
+            file_links = entry.get("output_files", [])
+            if file_links:
+                for file in file_links:
+                    # Create //_files/{ninja_path} as a symlink to the Ninja output location.
+                    generated.record_raw_symlink(
+                        f"{build_dir_name}/{file}",
+                        build_dir / file,
+                    )
+                    all_files.append(file)
+
+                content += """
+# From GN target: {label}
+filegroup(
+    name = "{name}",
+    srcs = """.format(
+                    label=entry["generator_label"], name=bazel_name
+                )
+                if len(file_links) == 1:
+                    content += '["_files/%s"],\n' % file_links[0]
+                else:
+                    content += "[\n"
+                    for file in file_links:
+                        content += '        "_files/%s",\n' % file
+                    content += "    ],\n"
+                content += ")\n"
+
+            dir_link = entry.get("output_directory", "")
+            if dir_link:
+                # Create //_files/{ninja_path} as a symlink to the real path.
+                generated.record_raw_symlink(
+                    f"{build_dir_name}/{dir_link}", build_dir / dir_link
+                )
+
+                content += """
+# From GN target: {label}
+filegroup(
+    name = "{name}",
+    srcs = glob(["{ninja_path}/**"], exclude_directories=1),
+)
+alias(
+    name = "{name}.directory",
+    actual = "{ninja_path}",
+)
+""".format(
+                    label=entry["generator_label"],
+                    name=bazel_name,
+                    ninja_path=f"{build_dir_name}/{dir_link}",
+                )
+
+        generated.record_file_content(f"{bazel_package}/BUILD.bazel", content)
+
+        # Because {bazel_package}/BUILD.bazel contains label references
+        #
+        # such as "_files/obj/src/tee/ta/noop/ta-noop.far", create
+        # {bazel_package}/_files as a symlink to the top-level _files directory.
+        #
+        # A relative path target is required, as the final output directory path is
+        # not known yet. This much walk back the bazel_package path fragments.
+        generated.record_raw_symlink(
+            f"{bazel_package}/{build_dir_name}",
+            ("../" * len(bazel_package.split("/"))) + build_dir_name,
+        )
+
+    # The symlink for the special all_licenses_spdx.json file.
+    # IMPORTANT: This must end in `.spdx.json` for license classification to work correctly!
+    generated.record_symlink(
+        "all_licenses.spdx.json", all_licenses_spdx_path.resolve()
+    )
+
+    # The content of BUILD.bazel
+    build_content = """# AUTO-GENERATED - DO NOT EDIT
+load("@rules_license//rules:license.bzl", "license")
+
+# This contains information about all the licenses of all
+# Ninja outputs exposed in this repository.
+# IMPORTANT: package_name *must* be "Legacy Ninja Build Outputs"
+# as several license pipeline exception files hard-code this under //vendor/...
+license(
+    name = "all_licenses_spdx_json",
+    package_name = "Legacy Ninja Build Outputs",
+    license_text = "all_licenses.spdx.json",
+    visibility = ["//visibility:public"]
+)
+
+"""
+    generated.record_file_content("BUILD.bazel", build_content)
+    generated.record_file_content(
+        "WORKSPACE.bazel", 'workspace(name = "gn_targets")\n'
+    )
+    generated.record_file_content(
+        "MODULE.bazel", 'module(name = "gn_targets", version = "1")\n'
+    )
