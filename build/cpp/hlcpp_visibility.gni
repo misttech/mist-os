@@ -208,7 +208,6 @@ hlcpp_visibility = [
   "//src/media/audio/audio_core/testing/integration:*",
   "//src/media/audio/audio_core/tools/output_pipeline_benchmark:*",
   "//src/media/audio/audio_core/v1/*",
-  "//src/media/audio/audio_core/v2:*",
   "//src/media/audio/drivers/aml-g12-tdm/*",
   "//src/media/audio/drivers/tests:*",
   "//src/media/audio/examples/simple_capture:*",

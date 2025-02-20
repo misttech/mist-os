@@ -11,10 +11,7 @@ group("tests") {
 }
 
 source_set("common") {
-  visibility = [
-    "../*",
-    "//src/media/audio/audio_core/v2/*",
-  ]
+  visibility = [ "../*" ]
 
   sources = [
     "base_fidl_server.h",

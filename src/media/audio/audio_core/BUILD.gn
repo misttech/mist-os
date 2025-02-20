@@ -36,7 +36,6 @@ group("tests") {
     "shared:tests",
     "test",
     "v1:tests",
-    "v2:tests",
   ]
 }
 
