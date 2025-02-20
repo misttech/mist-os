@@ -183,4 +183,18 @@ TEST_F(EdidTest, GetDisplayProductSerialWithoutSerialDescriptor) {
   EXPECT_EQ(edid.GetDisplayProductSerialNumber(), std::string("67305985"));
 }
 
+TEST_F(EdidTest, QemuVirtioGpuEdidParsesCorrectly) {
+  fit::result<const char*, edid::Edid> edid_result = edid::Edid::Create(edid::kQemuVirtioGpuEdid);
+  EXPECT_TRUE(edid_result.is_ok()) << "EDID parsing failed: " << edid_result.error_value();
+  edid::Edid edid = std::move(edid_result).value();
+
+  for (auto timing_it = edid::timing_iterator(&edid); timing_it.is_valid(); ++timing_it) {
+    const display::DisplayTiming& display_timing = *timing_it;
+    EXPECT_TRUE(display_timing.IsValid());
+  }
+
+  EXPECT_EQ(false, edid.is_hdmi());
+  EXPECT_EQ(false, edid.supports_basic_audio());
+}
+
 }  // namespace
