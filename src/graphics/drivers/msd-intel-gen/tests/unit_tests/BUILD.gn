@@ -2,8 +2,24 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/components.gni")
 import("//build/testing/cc_test_executable.gni")
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
+
+fuchsia_test_component("msd_intel_gen_nonhardware_tests_component") {
+  deps = [ ":msd_intel_gen_nonhardware_tests" ]
+  manifest = "meta/msd_intel_gen_nonhardware_tests.cml"
+}
+
+fuchsia_test_package("unit_tests") {
+  package_name = "msd_intel_gen_nonhardware_tests"
+  test_components = [ ":msd_intel_gen_nonhardware_tests_component" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
 
 cc_test_executable("msd_intel_gen_nonhardware_tests") {
   testonly = true

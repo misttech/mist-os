@@ -5,7 +5,7 @@
     include: [ "syslog/client.shard.cml" ],
     program: {
         runner: "elf",
-        binary: "bin/magma-conformance-vendor-helper-intel",
+        binary: "bin/vendor-helper-intel",
     },
     capabilities: [
         { protocol: "fuchsia.gpu.magma.test.VendorHelper" },
