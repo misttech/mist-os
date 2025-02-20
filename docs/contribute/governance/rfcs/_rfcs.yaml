@@ -3460,8 +3460,21 @@
   file: '0266_memory_mappable_kernel_clocks.md'
   area: ['Kernel']
   issue: ['374816449, 374816524']
-  gerrit_change_id: ['']
+  gerrit_change_id: ['1161916']
   status: 'Accepted'
   reviewers: ['rashaeqbal@google.com', 'rudymathu@google.com', 'jamesr@google.com', 'adanis@google.com', 'mpuryear@google.com']
   submitted: '2024-11-21'
   reviewed: '2025-02-14'
+
+- name: 'RFC-0267'
+  title: 'IOBuffer Ring Buffer Discipline'
+  short_description: 'A ring buffer discipline for IOBuffers.'
+  authors: ['csuter@google.com']
+  file: '0267_io_buffer_ring_buffer_discipline.md'
+  area: ['Diagnostics']
+  issue: ['319500512']
+  gerrit_change_id: ['1183493']
+  status: 'Accepted'
+  reviewers: ['adanis@google.comm', 'eieio@google.com', 'gmtr@google.com', 'miguelfrde@google.com']
+  submitted: '2025-01-07'
+  reviewed: '2025-02-20'
