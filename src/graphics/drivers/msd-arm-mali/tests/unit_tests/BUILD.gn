@@ -2,10 +2,59 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/components.gni")
 import("//build/testing/cc_test_executable.gni")
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
-cc_test_executable("msd_arm_mali_nonhardware_tests") {
+group("unit_tests") {
+  testonly = true
+  deps = [
+    ":msd_arm_mali_lifecycle_tests",
+    ":msd_arm_mali_nonhardware_tests",
+  ]
+}
+
+fuchsia_unittest_package("msd_arm_mali_nonhardware_tests") {
+  deps = [ ":msd_arm_mali_nonhardware_tests_bin" ]
+  manifest = "meta/msd_arm_mali_nonhardware_tests.cml"
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+  test_type = "system"
+}
+
+# Target which deps on mandatory shards to include in CML files.
+# Any shards added as data deps will be automatically added
+# to the target's generated .cml file.
+# If you would rather verify that a shard's routes are included
+# in a .cml file but not actually add them, you should instead
+# add a data_dep directly on the shard from your _package build rule,
+# which changes the include() to an assert() rule.
+group("arm_mali_include_shard") {
+  # Automatically include the syslog shard in generated CML files.
+  data_deps = [ "//sdk/lib/syslog:client_includes" ]
+}
+
+fuchsia_unittest_package("msd_arm_mali_lifecycle_tests") {
+  deps = [
+    ":arm_mali_include_shard",
+    ":msd_arm_mali_lifecycle_tests_bin",
+  ]
+
+  # Assert that the syslog include shard is included so that we fail at build time
+  # rather than at runtime.
+  data_deps = [ "//sdk/lib/syslog:client_includes" ]
+
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
+cc_test_executable("msd_arm_mali_nonhardware_tests_bin") {
   testonly = true
 
   sources = []
@@ -79,7 +128,7 @@ source_set("tests_not_requiring_hardware") {
   ]
 }
 
-cc_test_executable("msd_arm_mali_lifecycle_tests") {
+cc_test_executable("msd_arm_mali_lifecycle_tests_bin") {
   testonly = true
   sources = [
     "driver_logger_harness_dfv2.cc",
