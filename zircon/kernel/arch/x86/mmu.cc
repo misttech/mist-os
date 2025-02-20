@@ -18,8 +18,6 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
-#include <new>
-
 #include <arch/arch_ops.h>
 #include <arch/x86.h>
 #include <arch/x86/descriptor.h>
@@ -91,7 +89,13 @@ volatile uint8_t kasan_zero_page[PAGE_SIZE] __ALIGNED(PAGE_SIZE);
 /* a big pile of page tables needed to map 64GB of memory into kernel space using 2MB pages */
 volatile pt_entry_t linear_map_pdp[(64ULL * GB) / (2 * MB)] __ALIGNED(PAGE_SIZE);
 
-static constexpr uint64_t kNumKernelPageTables = (sizeof(linear_map_pdp) / PAGE_SIZE) + 4;
+// The number of pages occupied by page tables handed off from physboot. This
+// is incremented in X86ArchVmAspace::HandoffPageTablesFromPhysboot() below.
+//
+// TODO(https://fxbug.dev/42164859): Physmap pages are not yet handed off, but
+// they soon will be so easiest to just include those pages as the initial
+// value for now.
+static uint64_t num_handoff_mmu_pages = sizeof(linear_map_pdp) / PAGE_SIZE;
 
 // When this bit is set in the source operand of a MOV CR3, TLB entries and paging structure
 // caches for the active PCID may be preserved. If the bit is clear, entries will be cleared.
@@ -714,8 +718,7 @@ zx_status_t X86PageTableMmu::InitKernel(void* ctx,
   virt_ = (pt_entry_t*)X86_PHYS_TO_VIRT(root_page_table_phys);
   page_ = Pmm::Node().PaddrToPage(root_page_table_phys);
   ctx_ = ctx;
-  // These are all the page tables mapped in by start.S into the kernel aspace.
-  pages_ = kNumKernelPageTables;
+  pages_ = num_handoff_mmu_pages;
   use_global_mappings_ = true;
   return ZX_OK;
 }
@@ -1115,6 +1118,7 @@ void X86ArchVmAspace::HandoffPageTablesFromPhysboot(list_node_t* mmu_pages) {
       }
     }
     page->set_state(vm_page_state::MMU);
+    ++num_handoff_mmu_pages;
   }
 }
 
