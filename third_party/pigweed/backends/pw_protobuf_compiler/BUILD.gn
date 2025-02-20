@@ -83,6 +83,7 @@ _protobuf_python_sources = [
   "$_protobuf_python_path/google/protobuf/pyext/__init__.py",
   "$_protobuf_python_path/google/protobuf/pyext/cpp_message.py",
   "$_protobuf_python_path/google/protobuf/reflection.py",
+  "$_protobuf_python_path/google/protobuf/runtime_version.py",
   "$_protobuf_python_path/google/protobuf/service.py",
   "$_protobuf_python_path/google/protobuf/service_reflection.py",
   "$_protobuf_python_path/google/protobuf/symbol_database.py",
@@ -135,6 +136,46 @@ pw_python_action("compile_common_python_protos") {
   deps = [ pw_protobuf_compiler_PROTOC_TARGET ]
 }
 
+# It is no longer possible to use the protobuf/python directory as-is
+# as some Python files need to be generated (usually with
+# `bazel build //python/dist:source`, which will unfortunately build
+# a ton of different things).
+#
+# The action below is used to generate the python_edition_defaults.py source
+# file, which requires compiling descriptor.proto first, then expanding
+# a python_edition_defaults.py.template file with the string representation
+# of its content.
+#
+# The result must be available in the protoc python package as
+# google/protobuf/internal/python_edition_defaults.py
+#
+# See $PROTOBUF/editions/defaults.bzl for details.
+
+_python_edition_defaults_path = "$target_out_dir/python_edition_defaults.py"
+_python_edition_defaults_target = "python_editions_defaults_py"
+
+pw_python_action(_python_edition_defaults_target) {
+  script = "expand_python_edition_defaults.py"
+  inputs = [
+    "$_protobuf_path/google/protobuf/descriptor.proto",
+    "$_protobuf_python_path/google/protobuf/internal/python_edition_defaults.py.template",
+  ]
+  outputs = [ _python_edition_defaults_path ]
+  args = [
+    "--protoc",
+    pw_protobuf_compiler_PROTOC_BINARY,
+    "--descriptor-proto",
+    rebase_path(inputs[0], root_build_dir),
+    "--template-file",
+    rebase_path(inputs[1], root_build_dir),
+    "--output",
+    rebase_path(outputs[0], root_build_dir),
+    "--edition-defaults-minimum=PROTO2",
+    "--edition-defaults-maximum=2023",
+  ]
+  deps = [ pw_protobuf_compiler_PROTOC_TARGET ]
+}
+
 pw_python_distribution("protoc_python_package") {
   # No in-tree pw_python_package targets should be included.
   packages = []
@@ -169,5 +210,15 @@ pw_python_distribution("protoc_python_package") {
     extra_files += [ "${pyfile} > ${new_path}" ]
   }
 
-  public_deps = [ ":compile_common_python_protos" ]
+  # Special case for for python_edition_defaults.py
+  foreach(pyfile, [ _python_edition_defaults_path ]) {
+    new_path =
+        string_replace(pyfile, target_out_dir, "google/protobuf/internal")
+    extra_files += [ "${pyfile} > ${new_path}" ]
+  }
+
+  public_deps = [
+    ":${_python_edition_defaults_target}",
+    ":compile_common_python_protos",
+  ]
 }
