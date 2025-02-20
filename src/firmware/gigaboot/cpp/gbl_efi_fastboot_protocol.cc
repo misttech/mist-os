@@ -92,6 +92,19 @@ EFIAPI efi_status ClearLock(struct gbl_efi_fastboot_protocol* self, uint64_t loc
   return EFI_UNSUPPORTED;
 }
 
+EFIAPI efi_status StartLocal(struct gbl_efi_fastboot_protocol* self, void** ctx) {
+  return EFI_UNSUPPORTED;
+}
+
+EFIAPI efi_status UpdateLocal(struct gbl_efi_fastboot_protocol* self, void* ctx, uint8_t* buf,
+                              size_t* size) {
+  return EFI_UNSUPPORTED;
+}
+
+EFIAPI efi_status CloseLocal(struct gbl_efi_fastboot_protocol* self, void* ctx) {
+  return EFI_UNSUPPORTED;
+}
+
 EFIAPI efi_status GetPartitionPermissions(struct gbl_efi_fastboot_protocol* self,
                                           const uint8_t* part_name, size_t part_name_len,
                                           uint64_t* permissions) {
@@ -108,6 +121,9 @@ GblEfiFastbootProtocol protocol = {
                  .get_policy = GetPolicy,
                  .set_lock = SetLock,
                  .clear_lock = ClearLock,
+                 .start_local_session = StartLocal,
+                 .update_local_session = UpdateLocal,
+                 .close_local_session = CloseLocal,
                  .get_partition_permissions = GetPartitionPermissions,
                  .wipe_user_data = WipeUserData}};
 
