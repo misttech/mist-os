@@ -7,22 +7,16 @@
 #include <lib/devicetree/matcher.h>
 #include <lib/fit/defer.h>
 
-#include <algorithm>
-
 #include "lib/boot-shim/devicetree.h"
 
 namespace boot_shim {
 
 devicetree::ScanState DevicetreeChosenNodeMatcherBase::HandleTtyNode(
     const devicetree::NodePath& path, const devicetree::PropertyDecoder& decoder) {
-  auto [compatible, status, interrupts, reg_property, reg_offset] =
-      decoder.FindProperties("compatible", "status", "interrupts", "reg", "reg-offset");
+  auto [compatible, interrupts, reg_property, reg_offset] =
+      decoder.FindProperties("compatible", "interrupts", "reg", "reg-offset");
   // Without this we cant figure out what driver to use.
   if (!compatible) {
-    return devicetree::ScanState::kActive;
-  }
-
-  if (status && status->AsString() != "okay") {
     return devicetree::ScanState::kActive;
   }
 

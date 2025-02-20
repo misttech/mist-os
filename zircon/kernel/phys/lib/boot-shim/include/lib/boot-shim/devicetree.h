@@ -50,6 +50,7 @@ template <typename T, size_t MaxScans>
 class DevicetreeItemBase {
  public:
   static constexpr size_t kMaxScans = MaxScans;
+  static constexpr bool kMatchOkNodesOnly = true;
 
   constexpr DevicetreeItemBase() = default;
   constexpr DevicetreeItemBase(const char* shim_name, FILE* log)
@@ -704,6 +705,9 @@ class DevicetreeCpuTopologyItem : public DevicetreeItemBase<DevicetreeCpuTopolog
     // Index of |zbi_topology_node_t| in the |ZBI_ITEM_TYPE_CPU_TOPOLOGY| that was generated from
     // this |CpuMapEntry|.
     std::optional<size_t> topology_node_index;
+
+    // Whether this entry should be skipped when generating the zbi output.
+    bool skip = false;
   };
 
   // May only be called after |Init| and a full match sequence has been performed.
@@ -726,6 +730,10 @@ class DevicetreeCpuTopologyItem : public DevicetreeItemBase<DevicetreeCpuTopolog
     return node_name.substr(prefix.length()).find_first_not_of("01234567890") ==
            std::string_view::npos;
   }
+
+  // Remove any entries from the map that point to cpu entries whose status is not okay.
+  // This MUST be called AFTER |UpdateEntryCpuLinks|.
+  fit::result<ItemBase::DataZbi::Error, size_t> MarkSkippedMapEntries() const;
 
   // After both |entries_| and |cpus_| have been filled this routine will fill up
   // the reference from an entry to a 'cpu' node.
@@ -995,13 +1003,6 @@ class GenericWatchdogItemBase
     auto compatibles =
         decoder.FindAndDecodeProperty<&devicetree::PropertyValue::AsStringList>("compatible");
     if (!compatibles) {
-      return devicetree::ScanState::kActive;
-    }
-
-    auto device_status =
-        decoder.FindAndDecodeProperty<&devicetree::PropertyValue::AsString>("status");
-    // Ignore disabled device nodes and keep looking.
-    if (device_status && device_status.value() == "disabled") {
       return devicetree::ScanState::kActive;
     }
 

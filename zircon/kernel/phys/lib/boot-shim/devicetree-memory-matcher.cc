@@ -7,7 +7,6 @@
 #include <lib/zircon-internal/align.h>
 
 #include "lib/boot-shim/devicetree.h"
-#include "lib/devicetree/matcher.h"
 #include "lib/memalloc/range.h"
 
 namespace boot_shim {
