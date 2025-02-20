@@ -1457,30 +1457,36 @@ impl Task {
         self.creds().as_fscred()
     }
 
-    pub fn can_signal(&self, target: &Task, unchecked_signal: UncheckedSignal) -> bool {
+    pub fn can_signal(
+        &self,
+        target: &Task,
+        unchecked_signal: UncheckedSignal,
+    ) -> Result<(), Errno> {
         // If both the tasks share a thread group the signal can be sent. This is not documented
         // in kill(2) because kill does not support task-level granularity in signal sending.
         if self.thread_group == target.thread_group {
-            return true;
+            return Ok(());
         }
 
         let self_creds = self.creds();
 
         if self_creds.has_capability(CAP_KILL) {
-            return true;
+            return Ok(());
         }
 
         if self_creds.has_same_uid(&target.creds()) {
-            return true;
+            return Ok(());
         }
 
         if Signal::try_from(unchecked_signal) == Ok(SIGCONT) {
             let target_session = target.thread_group.read().process_group.session.leader;
             let self_session = self.thread_group.read().process_group.session.leader;
-            return target_session == self_session;
+            if target_session == self_session {
+                return Ok(());
+            }
         }
 
-        false
+        error!(EPERM)
     }
 
     /// Interrupts the current task.

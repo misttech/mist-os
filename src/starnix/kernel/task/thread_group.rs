@@ -1474,9 +1474,7 @@ impl ThreadGroup {
         // Tasks can technically have different credentials, but in practice they are kept in sync.
         let state = self.read();
         let target_task = state.get_live_task()?;
-        if !current_task.can_signal(&target_task, unchecked_signal) {
-            return error!(EPERM);
-        }
+        current_task.can_signal(&target_task, unchecked_signal)?;
 
         // 0 is a sentinel value used to do permission checks.
         if unchecked_signal.is_zero() {

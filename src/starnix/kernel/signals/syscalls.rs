@@ -322,9 +322,7 @@ fn send_unchecked_signal(
     unchecked_signal: UncheckedSignal,
     si_code: i32,
 ) -> Result<(), Errno> {
-    if !current_task.can_signal(&target, unchecked_signal) {
-        return error!(EPERM);
-    }
+    current_task.can_signal(&target, unchecked_signal)?;
 
     // 0 is a sentinel value used to do permission checks.
     if unchecked_signal.is_zero() {
@@ -353,9 +351,7 @@ fn send_unchecked_signal_info(
     unchecked_signal: UncheckedSignal,
     siginfo_ref: UserAddress,
 ) -> Result<(), Errno> {
-    if !current_task.can_signal(&target, unchecked_signal) {
-        return error!(EPERM);
-    }
+    current_task.can_signal(&target, unchecked_signal)?;
 
     // 0 is a sentinel value used to do permission checks.
     if unchecked_signal.is_zero() {
@@ -1557,7 +1553,7 @@ mod tests {
         let task2 = task1.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         task2.set_creds(Credentials::with_ids(2, 2));
 
-        assert!(!task1.can_signal(&task2, SIGINT.into()));
+        assert!(task1.can_signal(&task2, SIGINT.into()).is_err());
         assert_eq!(sys_kill(&mut locked, &task2, task1.id, SIGINT.into()), error!(EPERM));
         assert_eq!(task1.read().queued_signal_count(SIGINT), 0);
     }
@@ -1572,7 +1568,7 @@ mod tests {
         task2.thread_group.setsid(&mut locked).expect("setsid");
         task2.set_creds(Credentials::with_ids(2, 2));
 
-        assert!(!task2.can_signal(&task1, SIGINT.into()));
+        assert!(task2.can_signal(&task1, SIGINT.into()).is_err());
         assert_eq!(sys_kill(&mut locked, &task2, -task1.id, SIGINT.into()), error!(EPERM));
         assert_eq!(task1.read().queued_signal_count(SIGINT), 0);
     }
