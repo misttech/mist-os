@@ -162,12 +162,15 @@ class SchedulerState {
   using KeyType = ktl::pair<SchedTime, uint64_t>;
 
   struct BaseProfile {
-    BaseProfile() : fair{} {}
+    constexpr BaseProfile() : fair{} {}
 
-    explicit BaseProfile(int priority, bool inheritable = true);
-    explicit BaseProfile(SchedWeight weight, bool inheritable = true)
+    explicit constexpr BaseProfile(int priority, bool inheritable = true)
+        : discipline{SchedDiscipline::Fair},
+          inheritable{inheritable},
+          fair{.weight{SchedulerState::ConvertPriorityToWeight(priority)}} {}
+    explicit constexpr BaseProfile(SchedWeight weight, bool inheritable = true)
         : inheritable{inheritable}, fair{.weight{weight}} {}
-    explicit BaseProfile(SchedDeadlineParams deadline_params)
+    explicit constexpr BaseProfile(SchedDeadlineParams deadline_params)
         : discipline{SchedDiscipline::Deadline},
           inheritable{true},  // Deadline profiles are always inheritable.
           deadline{deadline_params} {}
