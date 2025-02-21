@@ -40,13 +40,13 @@ use crate::walk_state::WalkState;
 use cm_rust::{
     Availability, CapabilityTypeName, ExposeConfigurationDecl, ExposeDecl, ExposeDeclCommon,
     ExposeDirectoryDecl, ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl,
-    ExposeServiceDecl, ExposeSource, OfferConfigurationDecl, OfferDeclCommon, OfferDictionaryDecl,
-    OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl, OfferResolverDecl,
-    OfferRunnerDecl, OfferServiceDecl, OfferSource, OfferStorageDecl, OfferTarget,
-    RegistrationDeclCommon, RegistrationSource, ResolverRegistration, RunnerRegistration,
-    SourceName, StorageDecl, StorageDirectorySource, UseConfigurationDecl, UseDecl, UseDeclCommon,
-    UseDirectoryDecl, UseEventStreamDecl, UseProtocolDecl, UseRunnerDecl, UseServiceDecl,
-    UseSource, UseStorageDecl,
+    ExposeServiceDecl, ExposeSource, ExposeTarget, OfferConfigurationDecl, OfferDeclCommon,
+    OfferDictionaryDecl, OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl,
+    OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl, OfferSource, OfferStorageDecl,
+    OfferTarget, RegistrationDeclCommon, RegistrationSource, ResolverRegistration,
+    RunnerRegistration, SourceName, StorageDecl, StorageDirectorySource, UseConfigurationDecl,
+    UseDecl, UseDeclCommon, UseDirectoryDecl, UseEventStreamDecl, UseProtocolDecl, UseRunnerDecl,
+    UseServiceDecl, UseSource, UseStorageDecl,
 };
 use cm_types::{IterablePath, Name, RelativePath};
 use from_enum::FromEnum;
@@ -334,8 +334,13 @@ where
             route_directory_from_expose(expose_directory_decl, target, mapper).await
         }
         RouteRequest::ExposeProtocol(expose_protocol_decl) => {
+            let sandbox = target.component_sandbox().await?;
+            let dictionary = match &expose_protocol_decl.target {
+                ExposeTarget::Parent => sandbox.component_output.capabilities(),
+                ExposeTarget::Framework => sandbox.component_output.framework(),
+            };
             route_capability_inner::<Connector, _>(
-                &target.component_sandbox().await?.component_output.capabilities(),
+                &dictionary,
                 &expose_protocol_decl.target_name,
                 protocol_metadata(expose_protocol_decl.availability),
                 target,
@@ -346,8 +351,13 @@ where
             route_service_from_expose(expose_bundle, target, mapper).await
         }
         RouteRequest::ExposeRunner(expose_runner_decl) => {
+            let sandbox = target.component_sandbox().await?;
+            let dictionary = match &expose_runner_decl.target {
+                ExposeTarget::Parent => sandbox.component_output.capabilities(),
+                ExposeTarget::Framework => sandbox.component_output.framework(),
+            };
             route_capability_inner::<Connector, _>(
-                &target.component_sandbox().await?.component_output.capabilities(),
+                &dictionary,
                 &expose_runner_decl.target_name,
                 runner_metadata(Availability::Required),
                 target,
@@ -355,8 +365,13 @@ where
             .await
         }
         RouteRequest::ExposeResolver(expose_resolver_decl) => {
+            let sandbox = target.component_sandbox().await?;
+            let dictionary = match &expose_resolver_decl.target {
+                ExposeTarget::Parent => sandbox.component_output.capabilities(),
+                ExposeTarget::Framework => sandbox.component_output.framework(),
+            };
             route_capability_inner::<Connector, _>(
-                &target.component_sandbox().await?.component_output.capabilities(),
+                &dictionary,
                 &expose_resolver_decl.target_name,
                 resolver_metadata(Availability::Required),
                 target,
