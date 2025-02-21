@@ -475,16 +475,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         class: &Class<PS>,
         name: NullessByteStr<'_>,
     ) -> Option<TypeId> {
-        let entry = self.parsed_policy.filename_transitions().iter().find(|transition| {
-            transition.target_type() == target_type
-                && transition.target_class() == class.id()
-                && transition.name_bytes() == name.as_bytes()
-        })?;
-        entry
-            .outputs()
-            .iter()
-            .find(|entry| entry.has_source_type(source_type))
-            .map(|x| x.out_type())
+        self.parsed_policy.compute_filename_transition(source_type, target_type, class.id(), name)
     }
 
     fn range_transition_new_range(

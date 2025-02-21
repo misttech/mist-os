@@ -631,6 +631,28 @@ pub(super) struct DeprecatedFilenameTransition<PS: ParseStrategy> {
     metadata: PS::Output<DeprecatedFilenameTransitionMetadata>,
 }
 
+impl<PS: ParseStrategy> DeprecatedFilenameTransition<PS> {
+    pub(super) fn name_bytes(&self) -> &[u8] {
+        PS::deref_slice(&self.filename.data)
+    }
+
+    pub(super) fn source_type(&self) -> TypeId {
+        TypeId(NonZeroU32::new(PS::deref(&self.metadata).source_type.get()).unwrap())
+    }
+
+    pub(super) fn target_type(&self) -> TypeId {
+        TypeId(NonZeroU32::new(PS::deref(&self.metadata).transition_type.get()).unwrap())
+    }
+
+    pub(super) fn target_class(&self) -> ClassId {
+        ClassId(NonZeroU32::new(PS::deref(&self.metadata).transition_class.get()).unwrap())
+    }
+
+    pub(super) fn out_type(&self) -> TypeId {
+        TypeId(NonZeroU32::new(PS::deref(&self.metadata).out_type.get()).unwrap())
+    }
+}
+
 impl<PS: ParseStrategy> Parse<PS> for DeprecatedFilenameTransition<PS>
 where
     SimpleArray<PS, PS::Slice<u8>>: Parse<PS>,
@@ -660,10 +682,10 @@ where
 #[derive(Clone, Debug, KnownLayout, FromBytes, Immutable, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(super) struct DeprecatedFilenameTransitionMetadata {
-    bit: le::U32,
+    source_type: le::U32,
     transition_type: le::U32,
     transition_class: le::U32,
-    old_type: le::U32,
+    out_type: le::U32,
 }
 
 pub(super) type InitialSids<PS> = Vec<InitialSid<PS>>;

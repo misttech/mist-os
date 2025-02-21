@@ -2,12 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::NullessByteStr;
+
 use super::arrays::{
     AccessVectorRules, ConditionalNodes, Context, DeprecatedFilenameTransitions,
-    FilenameTransition, FilenameTransitionList, FilenameTransitions, FsUses, GenericFsContexts,
-    IPv6Nodes, InfinitiBandEndPorts, InfinitiBandPartitionKeys, InitialSids, NamedContextPairs,
-    Nodes, Ports, RangeTransitions, RoleAllow, RoleAllows, RoleTransition, RoleTransitions,
-    SimpleArray, MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY,
+    FilenameTransitionList, FilenameTransitions, FsUses, GenericFsContexts, IPv6Nodes,
+    InfinitiBandEndPorts, InfinitiBandPartitionKeys, InitialSids, NamedContextPairs, Nodes, Ports,
+    RangeTransitions, RoleAllow, RoleAllows, RoleTransition, RoleTransitions, SimpleArray,
+    MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY,
 };
 use super::error::{ParseError, ValidateError};
 use super::extensible_bitmap::ExtensibleBitmap;
@@ -19,8 +21,8 @@ use super::symbols::{
     MlsLevel, Role, Sensitivity, SymbolList, Type, User,
 };
 use super::{
-    AccessDecision, AccessVector, CategoryId, Parse, RoleId, SensitivityId, TypeId, UserId,
-    Validate, SELINUX_AVD_FLAGS_PERMISSIVE,
+    AccessDecision, AccessVector, CategoryId, ClassId, Parse, RoleId, SensitivityId, TypeId,
+    UserId, Validate, SELINUX_AVD_FLAGS_PERMISSIVE,
 };
 
 use anyhow::Context as _;
@@ -398,10 +400,36 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         &self.access_vector_rules.data
     }
 
-    pub(super) fn filename_transitions(&self) -> &[FilenameTransition<PS>] {
+    pub(super) fn compute_filename_transition(
+        &self,
+        source_type: TypeId,
+        target_type: TypeId,
+        class: ClassId,
+        name: NullessByteStr<'_>,
+    ) -> Option<TypeId> {
         match &self.filename_transition_list {
-            FilenameTransitionList::PolicyVersionGeq33(list) => &list.data,
-            _ => &[],
+            FilenameTransitionList::PolicyVersionGeq33(list) => {
+                let entry = list.data.iter().find(|transition| {
+                    transition.target_type() == target_type
+                        && transition.target_class() == class
+                        && transition.name_bytes() == name.as_bytes()
+                })?;
+                entry
+                    .outputs()
+                    .iter()
+                    .find(|entry| entry.has_source_type(source_type))
+                    .map(|x| x.out_type())
+            }
+            FilenameTransitionList::PolicyVersionLeq32(list) => list
+                .data
+                .iter()
+                .find(|transition| {
+                    transition.target_class() == class
+                        && transition.target_type() == target_type
+                        && transition.source_type() == source_type
+                        && transition.name_bytes() == name.as_bytes()
+                })
+                .map(|x| x.out_type()),
         }
     }
 
