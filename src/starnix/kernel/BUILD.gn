@@ -157,6 +157,7 @@ rustc_library("starnix_core") {
     "fs/proc/meminfo.rs",
     "fs/proc/misc.rs",
     "fs/proc/mod.rs",
+    "fs/proc/mounts_symlink.rs",
     "fs/proc/pid_directory.rs",
     "fs/proc/pressure_directory.rs",
     "fs/proc/proc_directory.rs",

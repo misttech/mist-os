@@ -14,6 +14,7 @@ pub mod kmsg;
 pub mod loadavg;
 pub mod meminfo;
 pub mod misc;
+pub mod mounts_symlink;
 pub mod pid_directory;
 mod pressure_directory;
 mod proc_directory;

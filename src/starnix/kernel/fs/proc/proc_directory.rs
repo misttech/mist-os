@@ -13,6 +13,7 @@ use crate::fs::proc::kmsg::kmsg_node;
 use crate::fs::proc::loadavg::loadavg_node;
 use crate::fs::proc::meminfo::meminfo_node;
 use crate::fs::proc::misc::misc_node;
+use crate::fs::proc::mounts_symlink::mounts_node;
 use crate::fs::proc::pid_directory::pid_directory;
 use crate::fs::proc::pressure_directory::pressure_directory;
 use crate::fs::proc::self_symlink::self_node;
@@ -30,9 +31,9 @@ use crate::fs::proc::zoneinfo::zoneinfo_node;
 use crate::task::CurrentTask;
 use crate::vfs::{
     emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
-    fs_node_impl_symlink, unbounded_seek, BytesFile, DirectoryEntryType, DirentSink, FileObject,
-    FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-    SeekTarget, StubEmptyFile, SymlinkTarget,
+    unbounded_seek, BytesFile, DirectoryEntryType, DirentSink, FileObject, FileOps,
+    FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget,
+    StubEmptyFile,
 };
 
 use maplit::btreemap;
@@ -72,7 +73,7 @@ impl ProcDirectory {
             "meminfo".into() => meminfo_node(current_task, fs),
             "kmsg".into() => kmsg_node(current_task, fs),
             "kallsyms".into() => kallsyms_node(current_task, fs),
-            "mounts".into() => MountsSymlink::new_node(current_task, fs),
+            "mounts".into() => mounts_node(current_task, fs),
             "cgroups".into() => cgroups_node(current_task, fs),
             "stat".into() => stat_node(current_task, fs),
             "swaps".into() => swaps_node(current_task, fs),
@@ -127,6 +128,15 @@ fn stub_node(
     fs.create_node(
         current_task,
         StubEmptyFile::new_node(name, bug),
+        FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+    )
+}
+
+/// Returns a new `BytesFile` containing the provided `bytes`.
+fn bytes_node(current_task: &CurrentTask, fs: &FileSystemHandle, bytes: Vec<u8>) -> FsNodeHandle {
+    fs.create_node(
+        current_task,
+        BytesFile::new_node(bytes),
         FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
     )
 }
@@ -230,40 +240,5 @@ impl FileOps for ProcDirectory {
         }
 
         Ok(())
-    }
-}
-
-/// Returns a new `BytesFile` containing the provided `bytes`.
-fn bytes_node(current_task: &CurrentTask, fs: &FileSystemHandle, bytes: Vec<u8>) -> FsNodeHandle {
-    fs.create_node(
-        current_task,
-        BytesFile::new_node(bytes),
-        FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-    )
-}
-
-/// A node that represents a link to `self/mounts`.
-struct MountsSymlink;
-
-impl MountsSymlink {
-    fn new_node(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
-        fs.create_node(
-            current_task,
-            Self,
-            FsNodeInfo::new_factory(mode!(IFLNK, 0o777), FsCred::root()),
-        )
-    }
-}
-
-impl FsNodeOps for MountsSymlink {
-    fs_node_impl_symlink!();
-
-    fn readlink(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-    ) -> Result<SymlinkTarget, Errno> {
-        Ok(SymlinkTarget::Path("self/mounts".into()))
     }
 }
