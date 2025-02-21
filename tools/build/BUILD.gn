@@ -5,8 +5,6 @@
 import("//build/go/go_library.gni")
 import("//build/go/go_test.gni")
 
-assert(is_host, "build tools are all host binaries")
-
 group("tools") {
   testonly = true
 
