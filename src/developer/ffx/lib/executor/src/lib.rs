@@ -7,6 +7,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::process::{Command, ExitStatus};
 
+pub mod strict;
 pub mod test;
 
 #[derive(Debug, Clone)]

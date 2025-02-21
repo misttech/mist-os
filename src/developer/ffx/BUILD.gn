@@ -338,7 +338,6 @@ group("e2e_tests") {
   testonly = true
   deps = [
     "frontends/ffx:e2e_tests($host_toolchain)",
-    "plugins/emulator:e2e_tests",
     "tests:e2e_tests($host_toolchain)",
   ]
 }

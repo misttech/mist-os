@@ -28,6 +28,7 @@ rustc_library("lib") {
 
   sources = [
     "src/lib.rs",
+    "src/strict.rs",
     "src/test.rs",
   ]
 }
