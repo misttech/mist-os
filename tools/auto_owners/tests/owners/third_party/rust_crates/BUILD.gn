@@ -14,10 +14,10 @@ group("foo") {
   deps = [ "//third_party/rust_crates/vendor/foo" ]
 }
 
-group("with-dashes") {
-  deps = [ "//third_party/rust_crates/vendor/with-dashes" ]
+group("with-dashes-and-version") {
+  deps = [ ":with-dashes-and-version-v0_1_0" ]
 }
 
-group("with-dashes-v0_1_0") {
-  deps = [ ":with-dashes" ]
+group("with-dashes-and-version-v0_1_0") {
+  deps = [ "//third_party/rust_crates/vendor/with-dashes-and-version-0.1.0" ]
 }

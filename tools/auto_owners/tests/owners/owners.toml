@@ -1,6 +1,2 @@
 'third_party/rust_crates/vendor/foo'= ["third_party/foo/OWNERS"]
-
-# The following two entries are to showcase https://fxbug.dev/398010494
-# and how the entry with the underscore is the one being applied.
-'third_party/rust_crates/vendor/with-dashes'= ["third_party/foo/OWNERS"]
-'third_party/rust_crates/vendor/with_dashes'= ["third_party/bar/OWNERS"]
+'third_party/rust_crates/vendor/with-dashes-and-version'= ["third_party/foo/OWNERS"]
