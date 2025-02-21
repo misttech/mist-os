@@ -11,6 +11,7 @@ import("//zircon/kernel/phys/boot-shim/devicetree.gni")
 import("//zircon/kernel/phys/efi/efi_executable.gni")
 import("//zircon/kernel/phys/phys_executable.gni")
 import("//zircon/kernel/phys/qemu.gni")
+import("//zircon/kernel/phys/shim_executable.gni")
 import("//zircon/kernel/phys/test/turducken_zbi_test.gni")
 import("//zircon/kernel/phys/zbi_executable.gni")
 
@@ -58,6 +59,23 @@ if (have_devicetree) {
     # when booted via firmware on certain types of hardware.  Leave a little buffer
     # for growth.
     timeout = 840
+  }
+
+  # Shim whose purpose is to dump a devicetree.
+  phys_executable("devicetree-dump") {
+    sources = [ "devicetree-dump-boot-shim.cc" ]
+    include_dirs = [ "//" ]
+    deps = [
+      ":devicetree",
+      "//third_party/modp_b64:modp_b64_c",
+      "//zircon/kernel/lib/devicetree",
+      "//zircon/kernel/lib/libc",
+      "//zircon/kernel/phys:address-space",
+      "//zircon/kernel/phys:allocation-init",
+      "//zircon/kernel/phys:main",
+      "//zircon/kernel/phys:symbolize",
+      "//zircon/system/ulib/fbl",
+    ]
   }
 }
 
