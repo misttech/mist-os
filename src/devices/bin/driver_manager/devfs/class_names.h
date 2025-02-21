@@ -62,8 +62,7 @@ const std::unordered_map<std::string_view, ServiceEntry> kClassNameToService = {
     {"audio", {ServiceEntry::kDevfs, "", ""}},  // Protocol: "fuchsia.hardware.audio.Device"
     {"backlight",
      {ServiceEntry::kDevfsAndService, "fuchsia.hardware.backlight.Service", "backlight"}},
-    {"battery",
-     {ServiceEntry::kDevfs, "", ""}},  // Protocol: "fuchsia.power.battery.BatteryInfoProvider"
+    {"battery", {ServiceEntry::kDevfsAndService, "fuchsia.power.battery.InfoService", "device"}},
     {"block-partition", {ServiceEntry::kDevfs, "", ""}},
     {"block", {ServiceEntry::kDevfs, "", ""}},
     {"block-volume", {ServiceEntry::kDevfs, "", ""}},

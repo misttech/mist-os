@@ -64,6 +64,7 @@
                 "fuchsia.hardware.vsock.Service",
                 "fuchsia.input.report.Service",
                 "fuchsia.lowpan.spinel.Service",
+                "fuchsia.power.battery.InfoService",
                 "fuchsia.services.test.Device",
                 "fuchsia.tpm.Service",
                 "fuchsia.wlan.device.Service",

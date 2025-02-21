@@ -147,3 +147,7 @@ closed protocol BatteryManager {
     // Provides battery status information
     compose BatteryInfoProvider;
 };
+
+service InfoService {
+    device client_end:BatteryInfoProvider;
+};
