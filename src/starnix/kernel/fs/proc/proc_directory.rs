@@ -21,6 +21,7 @@ use crate::fs::proc::swaps::swaps_node;
 use crate::fs::proc::sysctl::{net_directory, sysctl_directory};
 use crate::fs::proc::sysrq::sysrq_node;
 use crate::fs::proc::thread_self::thread_self_node;
+use crate::fs::proc::uid_cputime::uid_cputime_node;
 use crate::fs::proc::uptime::uptime_node;
 use crate::mm::PAGE_SIZE;
 use crate::task::{CurrentTask, KernelStats};
@@ -91,28 +92,7 @@ impl ProcDirectory {
             "modules".into() => bytes_node(current_task, fs, b"ferris 8192 0 - Live 0x0000000000000000\n".to_vec()),
             "pagetypeinfo".into() => stub_node(current_task, fs, "/proc/pagetypeinfo", bug_ref!("https://fxbug.dev/322894315")),
             "slabinfo".into() => stub_node(current_task, fs, "/proc/slabinfo", bug_ref!("https://fxbug.dev/322894195")),
-            "uid_cputime".into() => {
-                let mut dir = StaticDirectoryBuilder::new(fs);
-                dir.entry(
-                    current_task,
-                    "remove_uid_range",
-                    StubEmptyFile::new_node(
-                        "/proc/uid_cputime/remove_uid_range",
-                        bug_ref!("https://fxbug.dev/322894025"),
-                    ),
-                    mode!(IFREG, 0o222),
-                );
-                dir.entry(
-                    current_task,
-                    "show_uid_stat",
-                    StubEmptyFile::new_node(
-                        "/proc/uid_cputime/show_uid_stat",
-                        bug_ref!("https://fxbug.dev/322893886"),
-                    ),
-                    mode!(IFREG, 0444),
-                );
-                dir.build(current_task)
-            },
+            "uid_cputime".into() => uid_cputime_node(current_task, fs),
             "uid_io".into() => {
                 let mut dir = StaticDirectoryBuilder::new(fs);
                 dir.entry(

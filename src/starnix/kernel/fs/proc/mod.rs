@@ -23,6 +23,7 @@ pub mod swaps;
 mod sysctl;
 mod sysrq;
 pub mod thread_self;
+pub mod uid_cputime;
 pub mod uptime;
 
 pub use fs::{get_proc_fs, proc_fs};
