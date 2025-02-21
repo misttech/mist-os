@@ -14,6 +14,7 @@
 #include <cstdint>
 
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/hardware/serialimpl/cpp/bind.h>
 #include <bind/fuchsia/serial/cpp/bind.h>
 #include <gtest/gtest.h>
 
@@ -82,14 +83,19 @@ TEST(SerialPortVisitorTest, TestMetadataAndBindProperty) {
       // 1st parent is pdev. Skipping that.
       // 2nd parent is bt-uart.
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_serial::BIND_PROTOCOL_DEVICE),
-            fdf::MakeProperty(bind_fuchsia_serial::NAME, TEST_NAME)}},
+          {{
+              fdf::MakeProperty(bind_fuchsia_serial::NAME, TEST_NAME),
+              fdf::MakeProperty(bind_fuchsia_hardware_serialimpl::SERVICE,
+                                bind_fuchsia_hardware_serialimpl::SERVICE_DRIVERTRANSPORT),
+          }},
           (*mgr_request.parents())[1].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                                    bind_fuchsia_serial::BIND_PROTOCOL_DEVICE),
-            fdf::MakeAcceptBindRule(bind_fuchsia::SERIAL_CLASS,
-                                    static_cast<uint32_t>(TEST_CLASS))}},
+          {{
+              fdf::MakeAcceptBindRule(bind_fuchsia::SERIAL_CLASS,
+                                      static_cast<uint32_t>(TEST_CLASS)),
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_serialimpl::SERVICE,
+                                      bind_fuchsia_hardware_serialimpl::SERVICE_DRIVERTRANSPORT),
+          }},
           (*mgr_request.parents())[1].bind_rules(), false));
     }
   }

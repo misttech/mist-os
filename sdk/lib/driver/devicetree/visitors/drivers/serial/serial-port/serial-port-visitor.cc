@@ -12,6 +12,7 @@
 #include <lib/driver/logging/cpp/logger.h>
 
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/hardware/serialimpl/cpp/bind.h>
 #include <bind/fuchsia/serial/cpp/bind.h>
 
 namespace serial_port_visitor_dt {
@@ -128,13 +129,14 @@ zx::result<> SerialPortVisitor::AddChildNodeSpec(fdf_devicetree::Node& child, ui
   auto uart_node = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                                      bind_fuchsia_serial::BIND_PROTOCOL_DEVICE),
               fdf::MakeAcceptBindRule(bind_fuchsia::SERIAL_CLASS, serial_class),
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_serialimpl::SERVICE,
+                                      bind_fuchsia_hardware_serialimpl::SERVICE_DRIVERTRANSPORT),
           },
       .properties =
           {
-              fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_serial::BIND_PROTOCOL_DEVICE),
+              fdf::MakeProperty(bind_fuchsia_hardware_serialimpl::SERVICE,
+                                bind_fuchsia_hardware_serialimpl::SERVICE_DRIVERTRANSPORT),
           },
   }};
 
