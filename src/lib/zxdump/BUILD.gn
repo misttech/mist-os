@@ -383,6 +383,12 @@ executable("gcore") {
   ]
 }
 
-fuchsia_shell_package("zxdump-tools") {
+# To use this tool with a product, use developer overrides for assembly
+# to register it as a shell command and add the package to product image.
+#
+# https://fuchsia.dev/fuchsia-src/development/build/assembly_developer_overrides#add-shell-command
+# https://fuchsia.dev/fuchsia-src/development/build/assembly_developer_overrides#add-package
+#
+fuchsia_package("zxdump-tools") {
   deps = [ ":tools" ]
 }
