@@ -7,11 +7,7 @@ This is the integration tests for a number of system tests.
 In order to build the system tests, add this to your `fx set`:
 
 ```sh
-% fx set ... \
-  --with //src/sys/pkg:e2e_tests \
-  --with //src/testing/sl4f \
-  --with //src/sys/bin/start_sl4f \
-  --args='core_realm_shards = [ "//src/testing/sl4f:sl4f_core_shard" ]'
+% fx set ... --with //src/sys/pkg:e2e_tests
 
 % fx build
 ```
@@ -50,14 +46,21 @@ This tests Over the Air (OTA) updates. At a high level, it:
   N').
 * OTAs back into upgrade build artifacts (version N).
 
-You should be able to run the tests with:
+Note that for all tests below, the `--device name` and `--device-hostname
+host/ip_addr` can be looked up from the output of `ffx target list`.
+Without specifying them, the tests **might not work, especially if multiple
+targets are connected**.
+
+The tests can be run with:
 
 ```sh
-% $(fx get-build-dir)/host_x64/system_tests_upgrade \
+% cd $(fx get-build-dir) && host_x64/system_tests_upgrade \
   --ssh-private-key $(ffx config get ssh.priv | tr -d '"') \
   --ffx-path $(fx get-build-dir)/host-tools/ffx \
-  --builder-name fuchsia/global.ci/core.x64-release-nuc_in_basic_envs \
-  --fuchsia-build-dir $(fx get-build-dir)
+  --builder-name fuchsia/global.ci/core.x64-release \
+  --fuchsia-build-dir $(fx get-build-dir) \
+  --device fuchsia-5254-475e-82ef \
+  --device-hostname fe80::e493:5839:b86a:f7f1%qem
 ```
 
 This will run through the whole test paving the build to the latest version
@@ -68,25 +71,26 @@ The Upgrade Tests also support reproducing a specific build. To do this,
 determine the build ids from the downgrade and upgrade builds, then run:
 
 ```sh
-% $(fx get-build-dir)/host_x64/system_tests_upgrade \
+% cd $(fx get-build-dir) && host_x64/system_tests_upgrade \
   --ssh-private-key $(ffx config get ssh.priv | tr -d '"') \
   --ffx-path $(fx get-build-dir)/host-tools/ffx \
   --build-id 123456789... \
-  --build-id 987654321...
+  --build-id 987654321... \
+  --device fuchsia-5254-475e-82ef \
+  --device-hostname fe80::e493:5839:b86a:f7f1%qem
 ```
 
 Or you can combine these options:
 
 ```sh
-% $(fx get-build-dir)/host_x64/system_tests_upgrade \
+% cd $(fx get-build-dir) && host_x64/system_tests_upgrade \
   --ssh-private-key $(ffx config get ssh.priv | tr -d '"') \
   --ffx-path $(fx get-build-dir)/host-tools/ffx \
   --build-id 123456789... \
-  --fuchsia-build-dir $(fx get-build-dir)
+  --fuchsia-build-dir $(fx get-build-dir) \
+  --device fuchsia-5254-475e-82ef \
+  --device-hostname fe80::e493:5839:b86a:f7f1%qem
 ```
-
-There are more options to the test, to see them all run
-`$(fx get-build-dir)/host_x64/system_tests_upgrade -- -h`.
 
 ### Reboot Testing
 
@@ -95,15 +99,17 @@ configurable number of times, or errs out if a problem occurs. This
 can be done by running:
 
 ```sh
-% $(fx get-build-dir)/host_x64/system_tests_reboot \
+% cd $(fx get-build-dir) && host_x64/system_tests_reboot \
   --ssh-private-key $(ffx config get ssh.priv | tr -d '"') \
   --ffx-path $(fx get-build-dir)/host-tools/ffx \
-  --fuchsia-build-dir $(fx get-build-dir)
+  --fuchsia-build-dir $(fx get-build-dir) \
+  --device fuchsia-5254-475e-82ef \
+  --device-hostname fe80::e493:5839:b86a:f7f1%qem
 ```
 
 Or if you want to test a build, you can use:
 
-* `--builder-name fuchsia/global.ci/core.x64-release-nuc_in_basic_envs`, to test
+* `--builder-name fuchsia/global.ci/core.x64-release`, to test
   the latest build published by that builder.
 * `--build-id 1234...` to test the specific build.
 
@@ -121,8 +127,10 @@ for you. You can run it like this:
   --tty /dev/ttyUSB0 \
   $(fx get-build-dir)/host_x64/system_tests_upgrade \
   --ffx-path $(fx get-build-dir)/host-tools/ffx \
-  --builder-name fuchsia/global.ci/core.x64-release-nuc_in_basic_envs \
-  --fuchsia-build-dir $(fx get-build-dir)
+  --builder-name fuchsia/global.ci/core.x64-release \
+  --fuchsia-build-dir $(fx get-build-dir) \
+  --device fuchsia-5254-475e-82ef \
+  --device-hostname fe80::e493:5839:b86a:f7f1%qem
 ```
 
 This will setup a `tmux` with 3 windows, one for the serial session on
@@ -131,41 +139,63 @@ the `tmux` windows will be saved into `~/logs`.
 
 See the `run-test --help` for more options.
 
-## Running the tests locally in the Fuchsia Emulator (experimental)
+## Running the tests locally in the Fuchsia Emulator
 
-At the moment, the build script `fx qemu` does not bring up a configuration that
-can be OTA-ed. Until this is implemented, the `bin/` directory contains some
-helper scripts that bring up an OTA-able Fuchsia emulator. Follow these
-instructions to it.
+The Fuchsia emulator supports running the tests locally. This is fully supported
+on x64 only at present. Support for arm64 is work in progress. Follow these
+instructions:
 
-The `create-emu` script will create a Fuchsia EFI image:
-
-```sh
-% ./bin/create-emu some/image
-```
-
-This image can then be used by running:
+Build a supported x64 product with enabled system tests:
 
 ```sh
-% fx qemu --uefi -D some/path/to/image
+% fx set core.x64 --with //src/sys/pkg:e2e_tests
+
+% fx build
 ```
 
-Each script supports `--help` to see other supported flags.
+Start the emulator in `--uefi` mode, providing valid keys and metadata files for
+signing the ZBI (needed for Fuchsia's verified boot). For testing purposes, the
+test keys included in the Fuchsia source can be used:
 
-These scripts wrap `fx make-fuchsia-vol` to create the Fuchsia image, and
-`//zircon/scripts/run-zircon` to run QEMU.
+```sh
+% ffx emu start --net tap -H --uefi \
+  --vbmeta-key \
+    third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem \
+  --vbmeta-key-metadata \
+    third_party/android/platform/external/avb/test/data/atx_metadata.bin
+```
 
-Once the VM has finished paving, you can then use it with the upgrade tests:
+### N+1 OTA test
+
+After the emulator has started up, a local "N+1 OTA test". can be performed.
+This is helpful to verify that the build which is currently in the `out`
+directory does not have a bug that prevents being OTA'ed in the future.
+This test creates a no-op change (called OTA N-prime in the log later) and
+performs an OTA to this new version:
+
+```sh
+% cd $(fx get-build-dir) && host_x64/system_tests_upgrade \
+  --ssh-private-key $(ffx config get ssh.priv | tr -d '"') \
+  --ffx-path $(fx get-build-dir)/host-tools/ffx \
+  --fuchsia-build-dir $(fx get-build-dir) \
+  --device fuchsia-5254-475e-82ef \
+  --device-hostname fe80::e493:5839:b86a:f7f1%qem
+```
+
+### Last Known Good to local build OTA
+
+Instead of the mentioned N+1 OTA, it is also possible to perform an OTA test
+from the LKG (**L**ast **K**known **G**ood) build from the Fuchsia build
+infrastructure (if you have successfully authenticated to cipd, see above at
+the top of the document). This will verify that the build in the local `out`
+directory will successfully boot coming from a previous version.
 
 ```sh
 % $(fx get-build-dir)/host_x64/system_tests_upgrade \
   --ssh-private-key $(ffx config get ssh.priv | tr -d '"') \
   --ffx-path $(fx get-build-dir)/host-tools/ffx \
-  --builder-name fuchsia/global.ci/workstation_eng.x64-release-e2e-isolated \
+  --builder-name fuchsia/global.ci/core.x64-release \
   --fuchsia-build-dir $(fx get-build-dir) \
-  --device fuchsia-5254-0063-5e7a
+  --device fuchsia-5254-475e-82ef \
+  --device-hostname fe80::e493:5839:b86a:f7f1%qem
 ```
-
-Note that your QEMU device will always be named `fuchsia-5254-0063-5e7a`.
-Explicitly naming the device for the test will help prevent accidental upgrades
-to your other devices.
