@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/fidl/toolchain.gni")
 import("//sdk/categories/compatibility.gni")
 
 visibility = []
@@ -52,7 +53,7 @@ idk_category_marker_template("public") {
   visibility = []
 }
 
-if (is_host) {
+if (is_host || is_fidl_toolchain) {
   # Currently, depending on these markers just has the effect of not depending
   # on one of the SDK category markers above. Nothing asserts on them.
   # TODO(https://fxbug.dev/314822328): Only exclude checks when appropriate.
@@ -66,7 +67,10 @@ if (is_host) {
     visibility = []
     foreach(target, ffx_subtool_fidl_allowlist) {
       visibility += [
+        "${target}_compile_fidlc",
         "${target}_fdomain.actual",
+        "${target}_ir_root",
+        "${target}_lint",
         "${target}_rust.actual",
       ]
     }
@@ -89,7 +93,7 @@ if (is_host) {
 group("marker_allowlist") {
   visibility = all_idk_category_markers_targets
 
-  if (is_host) {
+  if (is_host || is_fidl_toolchain) {
     visibility += [
       ":marker-allowed-for-ffx-subtool",
       ":marker-allowed-for-host-test",

@@ -46,12 +46,6 @@ foreach(category, _all_idk_categories) {
 # may be applied on any toolchain. Thus, it is critical that no toolchain be
 # specified in these lists.
 #
-# Note: Currently, only some FIDL-related targets and ffx tools and plugins take
-# dependencies on markers, so such `assert_no_deps` does not guarantee that
-# there are no, for example, uses of FIDL libraries from incompatible SDK
-# categories in the target's dependency tree
-# TODO(https://fxbug.dev/314822328): Increase coverage.
-#
 # For each category:
 # 1. Initialize marker incompatibility lists to all markers.
 # 2. Remove the compatible markers from the list.

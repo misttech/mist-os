@@ -124,7 +124,6 @@ template("ffx_plugin") {
     # TODO(https://fxbug.dev/314822328): Reframe the markers in terms of stability.
     # Also, there are exceptions - see https://fxbug.dev/42081073 and
     # https://fxbug.dev/326090508.
-    # TODO(https://fxbug.dev/314822328): Improve this logic to cascade properly.
     #
     # Plugins may specify an IDK category in which to be included. Otherwise,
     # they are only used within the platform environment.
@@ -134,10 +133,10 @@ template("ffx_plugin") {
       # and the default was changed to not in an IDK. Continue to treat those
       # as "partner", and use the "internal" marker for plugins not specifying
       # a category.
-      # TODO(https://fxbug.dev/314822328): For all uses of "not-yet-specified",
+      # TODO(https://fxbug.dev/398052139): For all uses of "not-yet-specified",
       # either replace them with "partner" or remove them as appropriate. Then
       # use invoker.sdk_category` directly in the individual targets to avoid
-      # this refereence counting as a use for all of them.
+      # the reference here counting as a use for all of the targets.
       sdk_category = invoker.sdk_category
       if (sdk_category == "not-yet-specified") {
         sdk_category = "partner"
