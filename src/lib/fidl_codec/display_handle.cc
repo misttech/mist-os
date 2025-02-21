@@ -57,6 +57,7 @@ void ShortObjTypeName(zx_obj_type_t obj_type, PrettyPrinter& printer) {
     ShortObjTypeNameCase(ZX_OBJ_TYPE_CLOCK, "Clock");
     ShortObjTypeNameCase(ZX_OBJ_TYPE_STREAM, "Stream");
     ShortObjTypeNameCase(ZX_OBJ_TYPE_MSI, "Msi");
+    ShortObjTypeNameCase(ZX_OBJ_TYPE_COUNTER, "Counter");
     default:
       printer << obj_type;
       return;
