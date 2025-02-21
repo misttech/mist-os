@@ -23,6 +23,7 @@ use crate::fs::proc::sysrq::sysrq_node;
 use crate::fs::proc::thread_self::thread_self_node;
 use crate::fs::proc::uid_cputime::uid_cputime_node;
 use crate::fs::proc::uid_io::uid_io_node;
+use crate::fs::proc::uid_procstat::uid_procstat_node;
 use crate::fs::proc::uptime::uptime_node;
 use crate::mm::PAGE_SIZE;
 use crate::task::{CurrentTask, KernelStats};
@@ -30,8 +31,7 @@ use crate::vfs::{
     emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
     fs_node_impl_symlink, unbounded_seek, BytesFile, DirectoryEntryType, DirentSink, DynamicFile,
     DynamicFileBuf, DynamicFileSource, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, StaticDirectoryBuilder, StubEmptyFile,
-    SymlinkTarget,
+    FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, StubEmptyFile, SymlinkTarget,
 };
 
 use maplit::btreemap;
@@ -95,19 +95,7 @@ impl ProcDirectory {
             "slabinfo".into() => stub_node(current_task, fs, "/proc/slabinfo", bug_ref!("https://fxbug.dev/322894195")),
             "uid_cputime".into() => uid_cputime_node(current_task, fs),
             "uid_io".into() => uid_io_node(current_task, fs),
-            "uid_procstat".into() => {
-                let mut dir = StaticDirectoryBuilder::new(fs);
-                dir.entry(
-                    current_task,
-                    "set",
-                    StubEmptyFile::new_node(
-                        "/proc/uid_procstat/set",
-                        bug_ref!("https://fxbug.dev/322894041"),
-                    ),
-                    mode!(IFREG, 0o222),
-                );
-                dir.build(current_task)
-            },
+            "uid_procstat".into() => uid_procstat_node(current_task, fs),
             "version".into() => {
                 let release = KERNEL_RELEASE;
                 let user = "build-user@build-host";
