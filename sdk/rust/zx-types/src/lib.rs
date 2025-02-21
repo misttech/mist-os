@@ -400,6 +400,10 @@ multiconst!(zx_signals_t, [
 
     // Vmo
     ZX_VMO_ZERO_CHILDREN        = ZX_OBJECT_SIGNAL_3;
+
+    // Counter
+    ZX_COUNTER_POSITIVE          = ZX_OBJECT_SIGNAL_4;
+    ZX_COUNTER_NON_POSITIVE      = ZX_OBJECT_SIGNAL_5;
 ]);
 
 multiconst!(zx_obj_type_t, [
@@ -433,6 +437,7 @@ multiconst!(zx_obj_type_t, [
     ZX_OBJ_TYPE_STREAM              = 31;
     ZX_OBJ_TYPE_MSI                 = 32;
     ZX_OBJ_TYPE_IOB                 = 33;
+    ZX_OBJ_TYPE_COUNTER             = 34;
 ]);
 
 // System ABI commits to having no more than 64 object types.
