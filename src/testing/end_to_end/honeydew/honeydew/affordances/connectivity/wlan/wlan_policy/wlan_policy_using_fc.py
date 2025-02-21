@@ -227,6 +227,13 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
                 "create_client_controller() before connect()"
             )
 
+        _LOGGER.debug(
+            "Calling fuchsia.wlan.policy/ClientController.Connect("
+            'ssid="%s", type="%s")',
+            target_ssid,
+            security_type,
+        )
+
         try:
             resp = await self._client_controller.proxy.connect(
                 id=NetworkIdentifier(target_ssid, security_type).to_fidl(),
@@ -263,6 +270,10 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
             updates_server, updates
         )
         task = self.loop().create_task(client_state_updates_server.serve())
+
+        _LOGGER.debug(
+            "Calling fuchsia.wlan.policy/ClientProvider.GetController()"
+        )
 
         try:
             self._client_provider_proxy.get_controller(
@@ -301,6 +312,10 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
 
         client, server = Channel.create()
         iterator = f_wlan_policy.NetworkConfigIterator.Client(client.take())
+
+        _LOGGER.debug(
+            "Calling fuchsia.wlan.policy/ClientController.GetSavedNetworks()"
+        )
 
         try:
             self._client_controller.proxy.get_saved_networks(
@@ -401,6 +416,14 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
                 "create_client_controller() before remove_network()"
             )
 
+        _LOGGER.debug(
+            "Calling fuchsia.wlan.policy/ClientController.RemoveNetwork("
+            'ssid="%s", type="%s", credential="%s")',
+            target_ssid,
+            security_type,
+            target_pwd,
+        )
+
         try:
             res = await self._client_controller.proxy.remove_network(
                 config=f_wlan_policy.NetworkConfig(
@@ -447,6 +470,14 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
                 "create_client_controller() before save_network()"
             )
 
+        _LOGGER.debug(
+            "Calling fuchsia.wlan.policy/ClientController.SaveNetwork("
+            'ssid="%s", type="%s", credential="%s")',
+            target_ssid,
+            security_type,
+            target_pwd,
+        )
+
         try:
             res = await self._client_controller.proxy.save_network(
                 config=f_wlan_policy.NetworkConfig(
@@ -489,6 +520,10 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
         client, server = Channel.create()
         iterator = f_wlan_policy.ScanResultIterator.Client(client.take())
 
+        _LOGGER.debug(
+            "Calling fuchsia.wlan.policy/ClientController.ScanForNetworks()"
+        )
+
         try:
             self._client_controller.proxy.scan_for_networks(
                 iterator=server.take(),
@@ -522,6 +557,13 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
             self.create_client_controller()
             return
 
+        _LOGGER.debug(
+            "WLAN client state updates server is being restarted; unconsumed "
+            "updates will be lost! This can be a source of race conditions if "
+            "this is being called in the middle of a test that is expecting a "
+            "contiguous stream of WLAN events."
+        )
+
         # Replace the existing ClientStateUpdates server without giving up our
         # handle to ClientController. This is necessary since the ClientProvider
         # API is designed to only allow a single caller to make ClientController
@@ -542,6 +584,10 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
         )
         task = self._async_adapter_loop.create_task(
             client_state_updates_server.serve()
+        )
+
+        _LOGGER.debug(
+            "Calling fuchsia.wlan.policy/ClientListener.GetListener()"
         )
 
         try:
@@ -575,6 +621,10 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
                 "Client controller has not been initialized; call "
                 "create_client_controller() before start_client_connections()"
             )
+
+        _LOGGER.debug(
+            "Calling fuchsia.wlan.policy/ClientController.StartClientConnections()"
+        )
 
         try:
             resp = (
@@ -610,6 +660,10 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
                 "Client controller has not been initialized; call "
                 "create_client_controller() before stop_client_connections()"
             )
+
+        _LOGGER.debug(
+            "Calling fuchsia.wlan.policy/ClientController.StopClientConnections()"
+        )
 
         try:
             resp = await self._client_controller.proxy.stop_client_connections()
