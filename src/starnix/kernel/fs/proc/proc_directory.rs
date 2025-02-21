@@ -22,6 +22,7 @@ use crate::fs::proc::sysctl::{net_directory, sysctl_directory};
 use crate::fs::proc::sysrq::sysrq_node;
 use crate::fs::proc::thread_self::thread_self_node;
 use crate::fs::proc::uid_cputime::uid_cputime_node;
+use crate::fs::proc::uid_io::uid_io_node;
 use crate::fs::proc::uptime::uptime_node;
 use crate::mm::PAGE_SIZE;
 use crate::task::{CurrentTask, KernelStats};
@@ -93,19 +94,7 @@ impl ProcDirectory {
             "pagetypeinfo".into() => stub_node(current_task, fs, "/proc/pagetypeinfo", bug_ref!("https://fxbug.dev/322894315")),
             "slabinfo".into() => stub_node(current_task, fs, "/proc/slabinfo", bug_ref!("https://fxbug.dev/322894195")),
             "uid_cputime".into() => uid_cputime_node(current_task, fs),
-            "uid_io".into() => {
-                let mut dir = StaticDirectoryBuilder::new(fs);
-                dir.entry(
-                    current_task,
-                    "stats",
-                    StubEmptyFile::new_node(
-                        "/proc/uid_io/stats",
-                        bug_ref!("https://fxbug.dev/322893966"),
-                    ),
-                    mode!(IFREG, 0o444),
-                );
-                dir.build(current_task)
-            },
+            "uid_io".into() => uid_io_node(current_task, fs),
             "uid_procstat".into() => {
                 let mut dir = StaticDirectoryBuilder::new(fs);
                 dir.entry(
