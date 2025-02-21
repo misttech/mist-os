@@ -10,7 +10,7 @@
             ],
         },
 
-        // These are tests that excercise panic or other error conditions which
+        // These are tests that exercise panic or other error conditions which
         // trigger error logs.
         {
             type: "expect_pass_with_err_logs",

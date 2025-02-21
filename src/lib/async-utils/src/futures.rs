@@ -8,66 +8,6 @@ use std::pin::Pin;
 
 use futures::future::FusedFuture;
 use futures::{task, Future};
-use pin_project::pin_project;
-
-/// Future for the [`FutureExt::replace_value`] method.
-#[derive(Debug)]
-#[must_use = "futures do nothing unless you `.await` or poll them"]
-#[pin_project]
-pub struct ReplaceValue<Fut: Future<Output = ()>, T> {
-    #[pin]
-    future: Fut,
-    value: Option<T>,
-}
-
-/// An extension trait for [`futures::Future`] that provides specialized adapters.
-pub trait FutureExt: Future<Output = ()> {
-    /// Map this future's output to a different type, returning a new future of
-    /// the resulting type.
-    ///
-    /// This function is similar to futures::FutureExt::map except:
-    ///
-    /// - it takes a value instead of a closure
-    ///
-    /// - it returns a type that can be named
-    ///
-    /// This function is useful when a mapped future is needed and boxing is not
-    /// desired.
-    fn replace_value<T>(self, value: T) -> ReplaceValue<Self, T>
-    where
-        Self: Sized,
-    {
-        ReplaceValue::new(self, value)
-    }
-}
-
-impl<Fut: Future<Output = ()>, T> ReplaceValue<Fut, T> {
-    fn new(future: Fut, value: T) -> Self {
-        Self { future, value: Some(value) }
-    }
-}
-
-impl<T: ?Sized + Future<Output = ()>> FutureExt for T {}
-
-impl<Fut: Future<Output = ()>, T: Unpin> Future for ReplaceValue<Fut, T> {
-    type Output = T;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        let this = self.project();
-        let () = futures::ready!(this.future.poll(cx));
-        task::Poll::Ready(
-            this.value
-                .take()
-                .expect("ReplaceValue must not be polled after it returned `Poll::Ready`"),
-        )
-    }
-}
-
-impl<Fut: Future<Output = ()> + Unpin, T: Unpin> FusedFuture for ReplaceValue<Fut, T> {
-    fn is_terminated(&self) -> bool {
-        self.value.is_none()
-    }
-}
 
 /// A future that yields to the executor only once.
 ///
@@ -140,27 +80,6 @@ impl FusedFuture for YieldToExecutorOnce {
 
 #[cfg(test)]
 mod tests {
-    use fuchsia_async as fasync;
-
-    #[fasync::run_singlethreaded(test)]
-    async fn replace_value_trivial() {
-        use super::FutureExt as _;
-
-        let value = "hello world";
-        assert_eq!(futures::future::ready(()).replace_value(value).await, value);
-    }
-
-    #[test]
-    fn replace_value_is_terminated() {
-        use super::FutureExt as _;
-        use futures::future::{FusedFuture as _, FutureExt as _};
-
-        let fut = &mut futures::future::ready(()).replace_value(());
-        assert!(!fut.is_terminated());
-        assert_eq!(fut.now_or_never(), Some(()));
-        assert!(fut.is_terminated());
-    }
-
     #[test]
     fn yield_to_executor_once() {
         use futures::future::FusedFuture as _;

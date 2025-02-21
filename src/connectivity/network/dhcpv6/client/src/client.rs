@@ -8,6 +8,7 @@ use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::net::{IpAddr, SocketAddr};
 use std::ops::Add;
+use std::pin::Pin;
 use std::str::FromStr as _;
 use std::time::Duration;
 
@@ -21,8 +22,6 @@ use fidl_fuchsia_net_dhcpv6::{
 use fidl_fuchsia_net_dhcpv6_ext::{
     AddressConfig, ClientConfig, InformationConfig, NewClientParams,
 };
-use futures::future::{AbortHandle, Abortable, Aborted};
-use futures::stream::futures_unordered::FuturesUnordered;
 use futures::{select, stream, Future, FutureExt as _, StreamExt as _, TryStreamExt as _};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_name as fnet_name,
@@ -31,7 +30,6 @@ use {
 
 use anyhow::{Context as _, Result};
 use assert_matches::assert_matches;
-use async_utils::futures::{FutureExt as _, ReplaceValue};
 use byteorder::{NetworkEndian, WriteBytesExt as _};
 use dns_server_watcher::DEFAULT_DNS_PORT;
 use log::{debug, error, warn};
@@ -101,7 +99,37 @@ pub enum ClientError {
 /// NOTE: This does not take [jumbograms](https://tools.ietf.org/html/rfc2675) into account.
 const MAX_UDP_DATAGRAM_SIZE: usize = 65_535;
 
-type TimerFut = ReplaceValue<fasync::Timer, dhcpv6_core::client::ClientTimerType>;
+#[pin_project::pin_project]
+struct Timers {
+    #[pin]
+    retransmission: fasync::Timer,
+    #[pin]
+    refresh: fasync::Timer,
+    #[pin]
+    renew: fasync::Timer,
+    #[pin]
+    rebind: fasync::Timer,
+    #[pin]
+    restart_server_discovery: fasync::Timer,
+
+    #[cfg(test)]
+    scheduled: HashSet<dhcpv6_core::client::ClientTimerType>,
+}
+
+impl Default for Timers {
+    fn default() -> Self {
+        let unscheduled = || fasync::Timer::new(fasync::MonotonicInstant::INFINITE);
+        Self {
+            retransmission: unscheduled(),
+            refresh: unscheduled(),
+            renew: unscheduled(),
+            rebind: unscheduled(),
+            restart_server_discovery: unscheduled(),
+            #[cfg(test)]
+            scheduled: Default::default(),
+        }
+    }
+}
 
 /// A DHCPv6 client.
 pub(crate) struct Client<S: for<'a> AsyncSocket<'a>> {
@@ -128,10 +156,8 @@ pub(crate) struct Client<S: for<'a> AsyncSocket<'a>> {
     socket: S,
     /// The address to send outgoing messages to.
     server_addr: SocketAddr,
-    /// A collection of abort handles to all currently scheduled timers.
-    timer_abort_handles: HashMap<dhcpv6_core::client::ClientTimerType, AbortHandle>,
-    /// A set of all scheduled timers.
-    timer_futs: FuturesUnordered<Abortable<TimerFut>>,
+    /// All timers.
+    timers: Pin<Box<Timers>>,
     /// A stream of FIDL requests to this client.
     request_stream: ClientRequestStream,
 }
@@ -317,8 +343,6 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
             socket: socket_fn().map_err(ClientError::SocketCreate)?,
             server_addr,
             request_stream,
-            timer_abort_handles: HashMap::new(),
-            timer_futs: FuturesUnordered::new(),
             // Server watcher's API requires blocking iff the first call would return an empty list,
             // so initialize this field with a hash of an empty list.
             last_observed_dns_hash: hash(&Vec::<Ipv6Addr>::new()),
@@ -327,6 +351,7 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
             prefixes: Default::default(),
             prefixes_changed: false,
             prefixes_responder: None,
+            timers: Box::pin(Default::default()),
         };
         let () = client.run_actions(actions).await?;
         Ok(client)
@@ -536,18 +561,23 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
         timer_type: dhcpv6_core::client::ClientTimerType,
         MonotonicInstant(instant): MonotonicInstant,
     ) {
-        let (handle, reg) = AbortHandle::new_pair();
-        match self.timer_abort_handles.insert(timer_type, handle) {
-            // Abort the previous handle.
-            Some(handle) => handle.abort(),
-            None => {}
-        }
-
-        self.timer_futs.push(Abortable::new(
-            fasync::Timer::new(fasync::MonotonicInstant::from_zx(instant))
-                .replace_value(timer_type),
-            reg,
-        ))
+        let timers = self.timers.as_mut().project();
+        let timer = match timer_type {
+            dhcpv6_core::client::ClientTimerType::Retransmission => timers.retransmission,
+            dhcpv6_core::client::ClientTimerType::Refresh => timers.refresh,
+            dhcpv6_core::client::ClientTimerType::Renew => timers.renew,
+            dhcpv6_core::client::ClientTimerType::Rebind => timers.rebind,
+            dhcpv6_core::client::ClientTimerType::RestartServerDiscovery => {
+                timers.restart_server_discovery
+            }
+        };
+        #[cfg(test)]
+        let _: bool = if instant == zx::MonotonicInstant::INFINITE {
+            timers.scheduled.remove(&timer_type)
+        } else {
+            timers.scheduled.insert(timer_type)
+        };
+        timer.reset(fasync::MonotonicInstant::from_zx(instant));
     }
 
     /// Cancels a previously scheduled timer for `timer_type`.
@@ -555,10 +585,7 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
     /// If a timer was not previously scheduled for `timer_type`, this
     /// call is effectively a no-op.
     fn cancel_timer(&mut self, timer_type: dhcpv6_core::client::ClientTimerType) {
-        match self.timer_abort_handles.remove(&timer_type) {
-            Some(handle) => handle.abort(),
-            None => {}
-        }
+        self.schedule_timer(timer_type, MonotonicInstant(zx::MonotonicInstant::INFINITE))
     }
 
     /// Handles a timeout.
@@ -645,36 +672,43 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
     ///
     /// The returned `Option` is `None` if `request_stream` on the client is closed.
     async fn handle_next_event(&mut self, buf: &mut [u8]) -> Result<Option<()>, ClientError> {
-        select! {
-            timer_res = self.timer_futs.select_next_some() => {
-                match timer_res {
-                    Ok(timer_type) => {
-                        let () = self.handle_timeout(timer_type).await?;
-                        Ok(Some(()))
-                    },
-                    // The timer was aborted, do nothing.
-                    Err(Aborted) => {
-                        debug!("timer aborted");
-                        Ok(Some(()))
-                    }
-                }
+        let timers = self.timers.as_mut().project();
+        let timer_type = select! {
+            () = timers.retransmission => {
+                dhcpv6_core::client::ClientTimerType::Retransmission
+            },
+            () = timers.refresh => {
+                dhcpv6_core::client::ClientTimerType::Refresh
+            },
+            () = timers.renew => {
+                dhcpv6_core::client::ClientTimerType::Renew
+            },
+            () = timers.rebind => {
+                dhcpv6_core::client::ClientTimerType::Rebind
+            },
+            () = timers.restart_server_discovery => {
+                dhcpv6_core::client::ClientTimerType::RestartServerDiscovery
             },
             recv_from_res = self.socket.recv_from(buf).fuse() => {
                 let (size, _addr) = recv_from_res.map_err(ClientError::SocketRecv)?;
                 let () = self.handle_message_recv(&buf[..size]).await?;
-                Ok(Some(()))
+                return Ok(Some(()));
             },
             request = self.request_stream.try_next() => {
-                match request {
-                    Ok(request) => {
-                        request.map(|request| self.handle_client_request(request)).transpose()
-                    }
-                    Err(e) => {
-                        Err(ClientError::Fidl(e))
-                    }
-                }
+                let request = request.map_err(ClientError::Fidl)?;
+                return request.map(|request| self.handle_client_request(request)).transpose();
             }
-        }
+        };
+        let () = self.handle_timeout(timer_type).await?;
+        Ok(Some(()))
+    }
+
+    #[cfg(test)]
+    fn assert_scheduled(
+        &self,
+        timers: impl IntoIterator<Item = dhcpv6_core::client::ClientTimerType>,
+    ) {
+        assert_eq!(self.timers.as_ref().scheduled, timers.into_iter().collect())
     }
 }
 
@@ -812,7 +846,7 @@ pub(crate) async fn serve_client(
 
 #[cfg(test)]
 mod tests {
-    use std::pin::{pin, Pin};
+    use std::pin::pin;
     use std::task::Poll;
 
     use fidl::endpoints::{
@@ -1328,8 +1362,10 @@ mod tests {
                 // unrealistic in tests.
                 if self
                     .client
-                    .timer_abort_handles
-                    .contains_key(&dhcpv6_core::client::ClientTimerType::Refresh)
+                    .timers
+                    .as_ref()
+                    .scheduled
+                    .contains(&dhcpv6_core::client::ClientTimerType::Refresh)
                 {
                     self.client
                         .handle_timeout(dhcpv6_core::client::ClientTimerType::Refresh)
@@ -1338,16 +1374,14 @@ mod tests {
                 } else {
                     panic!("no refresh timer is scheduled and refresh is requested in test");
                 }
-                // Allow the client to handle the timeout-aborted event.
-                self.handle_next_event().await;
             }
 
             // Drive both the DHCPv6 client's event handling logic and the DNS server
             // watcher until the DNS server watcher receives an update from the client (or
             // the client unexpectedly exits).
-            fn run(&mut self) -> Pin<Box<dyn Future<Output = WatchServersResponse> + '_>> {
+            fn run(&mut self) -> impl Future<Output = WatchServersResponse> + use<'_, 'a> {
                 let Self { client, buf, watcher_fut } = self;
-                Box::pin(async move {
+                async move {
                     let client_fut = async {
                         loop {
                             client
@@ -1364,7 +1398,7 @@ mod tests {
                         () = client_fut => panic!("test client returned unexpectedly"),
                         r = watcher_fut => r,
                     }
-                })
+                }
             }
         }
 
@@ -1395,7 +1429,7 @@ mod tests {
             // the netstack has delivered the UDP packet to the client by the time the
             // `send_to` call returned.
             exec.run_singlethreaded(test.handle_next_event());
-            assert_matches!(exec.run_until_stalled(&mut test.run()), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut pin!(test.run())), Poll::Pending);
 
             // Send a list of DNS servers, the watcher should be updated accordingly.
             exec.run_singlethreaded(test.refresh_client());
@@ -1453,7 +1487,7 @@ mod tests {
             // the netstack has delivered the UDP packet to the client by the time the
             // `send_to` call returned.
             exec.run_singlethreaded(test.handle_next_event());
-            assert_matches!(exec.run_until_stalled(&mut test.run()), Poll::Pending);
+            assert_matches!(exec.run_until_stalled(&mut pin!(test.run())), Poll::Pending);
 
             // Send a different list of DNS servers, should update watcher.
             exec.run_singlethreaded(test.refresh_client());
@@ -1850,16 +1884,10 @@ mod tests {
         .expect("failed to create test client");
 
         // Stateless DHCP client starts by scheduling a retransmission timer.
-        assert_eq!(
-            client.timer_abort_handles.keys().collect::<Vec<_>>(),
-            vec![&dhcpv6_core::client::ClientTimerType::Retransmission]
-        );
+        client.assert_scheduled([dhcpv6_core::client::ClientTimerType::Retransmission]);
 
         let () = client.cancel_timer(dhcpv6_core::client::ClientTimerType::Retransmission);
-        assert_eq!(
-            client.timer_abort_handles.keys().collect::<Vec<_>>(),
-            Vec::<&dhcpv6_core::client::ClientTimerType>::new()
-        );
+        client.assert_scheduled([]);
 
         let now = MonotonicInstant::now();
         let () = client.schedule_timer(
@@ -1870,15 +1898,10 @@ mod tests {
             dhcpv6_core::client::ClientTimerType::Retransmission,
             now + Duration::from_nanos(2),
         );
-        assert_eq!(
-            client.timer_abort_handles.keys().collect::<HashSet<_>>(),
-            vec![
-                &dhcpv6_core::client::ClientTimerType::Retransmission,
-                &dhcpv6_core::client::ClientTimerType::Refresh
-            ]
-            .into_iter()
-            .collect()
-        );
+        client.assert_scheduled([
+            dhcpv6_core::client::ClientTimerType::Retransmission,
+            dhcpv6_core::client::ClientTimerType::Refresh,
+        ]);
 
         // We are allowed to reschedule a timer to fire at a new time.
         let now = MonotonicInstant::now();
@@ -1892,22 +1915,13 @@ mod tests {
         );
 
         let () = client.cancel_timer(dhcpv6_core::client::ClientTimerType::Refresh);
-        assert_eq!(
-            client.timer_abort_handles.keys().collect::<Vec<_>>(),
-            vec![&dhcpv6_core::client::ClientTimerType::Retransmission]
-        );
+        client.assert_scheduled([dhcpv6_core::client::ClientTimerType::Retransmission]);
 
         // Ok to cancel a timer that is not scheduled.
         client.cancel_timer(dhcpv6_core::client::ClientTimerType::Refresh);
 
         let () = client.cancel_timer(dhcpv6_core::client::ClientTimerType::Retransmission);
-        assert_eq!(
-            client
-                .timer_abort_handles
-                .keys()
-                .collect::<Vec<&dhcpv6_core::client::ClientTimerType>>(),
-            Vec::<&dhcpv6_core::client::ClientTimerType>::new()
-        );
+        client.assert_scheduled([]);
 
         // Ok to cancel a timer that is not scheduled.
         client.cancel_timer(dhcpv6_core::client::ClientTimerType::Retransmission);
@@ -1938,10 +1952,7 @@ mod tests {
             v6::MessageType::InformationRequest,
         )
         .await;
-        assert_eq!(
-            client.timer_abort_handles.keys().collect::<Vec<_>>(),
-            vec![&dhcpv6_core::client::ClientTimerType::Retransmission]
-        );
+        client.assert_scheduled([dhcpv6_core::client::ClientTimerType::Retransmission]);
 
         let mut buf = vec![0u8; MAX_UDP_DATAGRAM_SIZE];
         // Trigger a retransmission.
@@ -1954,10 +1965,7 @@ mod tests {
             )
             .await;
         assert_eq!(got_client_id, client_id);
-        assert_eq!(
-            client.timer_abort_handles.keys().collect::<Vec<_>>(),
-            vec![&dhcpv6_core::client::ClientTimerType::Retransmission]
-        );
+        client.assert_scheduled([dhcpv6_core::client::ClientTimerType::Retransmission]);
 
         // Message targeting another transaction ID should be ignored.
         let () = send_msg_with_options(
@@ -1970,20 +1978,14 @@ mod tests {
         .await
         .expect("failed to send test message");
         assert_matches!(client.handle_next_event(&mut buf).await, Ok(Some(())));
-        assert_eq!(
-            client.timer_abort_handles.keys().collect::<Vec<_>>(),
-            vec![&dhcpv6_core::client::ClientTimerType::Retransmission]
-        );
+        client.assert_scheduled([dhcpv6_core::client::ClientTimerType::Retransmission]);
 
         // Invalid messages should be discarded. Empty buffer is invalid.
         let size =
             server_socket.send_to(&[], client_addr).await.expect("failed to send test message");
         assert_eq!(size, 0);
         assert_matches!(client.handle_next_event(&mut buf).await, Ok(Some(())));
-        assert_eq!(
-            client.timer_abort_handles.keys().collect::<Vec<_>>(),
-            vec![&dhcpv6_core::client::ClientTimerType::Retransmission]
-        );
+        client.assert_scheduled([dhcpv6_core::client::ClientTimerType::Retransmission]);
 
         // Message targeting this client should cause the client to transition state.
         let () = send_msg_with_options(
@@ -1996,17 +1998,9 @@ mod tests {
         .await
         .expect("failed to send test message");
         assert_matches!(client.handle_next_event(&mut buf).await, Ok(Some(())));
-        assert_eq!(
-            client.timer_abort_handles.keys().collect::<Vec<_>>(),
-            vec![&dhcpv6_core::client::ClientTimerType::Refresh]
-        );
-        // Discard aborted retransmission timer.
-        assert_matches!(client.handle_next_event(&mut buf).await, Ok(Some(())));
+        client.assert_scheduled([dhcpv6_core::client::ClientTimerType::Refresh]);
 
         // Reschedule a shorter timer for Refresh so we don't spend time waiting in test.
-        client.cancel_timer(dhcpv6_core::client::ClientTimerType::Refresh);
-        // Discard cancelled refresh timer.
-        assert_matches!(client.handle_next_event(&mut buf).await, Ok(Some(())));
         client.schedule_timer(
             dhcpv6_core::client::ClientTimerType::Refresh,
             MonotonicInstant::now() + Duration::from_nanos(1),
@@ -2021,10 +2015,7 @@ mod tests {
         )
         .await;
         assert_eq!(got_client_id, client_id,);
-        assert_eq!(
-            client.timer_abort_handles.keys().collect::<Vec<_>>(),
-            vec![&dhcpv6_core::client::ClientTimerType::Retransmission]
-        );
+        client.assert_scheduled([dhcpv6_core::client::ClientTimerType::Retransmission]);
 
         let test_fut = async {
             assert_matches!(client.handle_next_event(&mut buf).await, Ok(Some(())));
@@ -2093,10 +2084,7 @@ mod tests {
         // Starting the client in stateful should send out a solicit.
         let _: ReceivedMessage =
             assert_received_message(&server_socket, client_addr, v6::MessageType::Solicit).await;
-        assert_eq!(
-            client.timer_abort_handles.keys().collect::<Vec<_>>(),
-            vec![&dhcpv6_core::client::ClientTimerType::Retransmission]
-        );
+        client.assert_scheduled([dhcpv6_core::client::ClientTimerType::Retransmission]);
 
         let mut buf = vec![0u8; MAX_UDP_DATAGRAM_SIZE];
         // Drop the channel should cause `handle_next_event(&mut buf)` to return `None`.
@@ -2105,7 +2093,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    #[should_panic]
+    #[should_panic = "received unexpected refresh timeout in state InformationRequesting"]
     async fn test_handle_next_event_respects_timer_order() {
         let (_client_end, client_stream) = create_request_stream::<ClientMarker>();
 
@@ -2126,17 +2114,11 @@ mod tests {
         let mut buf = vec![0u8; MAX_UDP_DATAGRAM_SIZE];
         // A retransmission timer is scheduled when starting the client in stateless mode. Cancel
         // it and create a new one with a longer timeout so the test is not flaky.
-        let () = client.cancel_timer(dhcpv6_core::client::ClientTimerType::Retransmission);
-        // Discard cancelled retransmission timer.
-        assert_matches!(client.handle_next_event(&mut buf).await, Ok(Some(())));
         let () = client.schedule_timer(
             dhcpv6_core::client::ClientTimerType::Retransmission,
             MonotonicInstant::now() + Duration::from_secs(1_000_000),
         );
-        assert_eq!(
-            client.timer_abort_handles.keys().collect::<Vec<_>>(),
-            vec![&dhcpv6_core::client::ClientTimerType::Retransmission]
-        );
+        client.assert_scheduled([dhcpv6_core::client::ClientTimerType::Retransmission]);
 
         // Trigger a message receive, the message is later discarded because transaction ID doesn't
         // match.
@@ -2153,10 +2135,7 @@ mod tests {
         // is far into the future.
         assert_matches!(client.handle_next_event(&mut buf).await, Ok(Some(())));
         // The retransmission timer is still here.
-        assert_eq!(
-            client.timer_abort_handles.keys().collect::<Vec<_>>(),
-            vec![&dhcpv6_core::client::ClientTimerType::Retransmission]
-        );
+        client.assert_scheduled([dhcpv6_core::client::ClientTimerType::Retransmission]);
 
         // Inserts a refresh timer that precedes the retransmission.
         let () = client.schedule_timer(
@@ -2164,20 +2143,16 @@ mod tests {
             MonotonicInstant::now() + Duration::from_nanos(1),
         );
         // This timer is scheduled.
-        assert_eq!(
-            client.timer_abort_handles.keys().collect::<HashSet<_>>(),
-            vec![
-                &dhcpv6_core::client::ClientTimerType::Retransmission,
-                &dhcpv6_core::client::ClientTimerType::Refresh
-            ]
-            .into_iter()
-            .collect()
-        );
+        client.assert_scheduled([
+            dhcpv6_core::client::ClientTimerType::Retransmission,
+            dhcpv6_core::client::ClientTimerType::Refresh,
+        ]);
 
         // Now handle_next_event(&mut buf) should trigger a refresh because it
         // precedes retransmission. Refresh is not expected while in
         // InformationRequesting state and should lead to a panic.
-        assert_matches!(client.handle_next_event(&mut buf).await, Ok(Some(())));
+        let unreachable = client.handle_next_event(&mut buf).await;
+        panic!("{unreachable:?}");
     }
 
     #[fuchsia::test]
