@@ -36,6 +36,8 @@ toc:
     path: /docs/reference/kernel_objects/event.md
   - title: "Event pair"
     path: /docs/reference/kernel_objects/eventpair.md
+  - title: "Counter"
+    path: /docs/reference/kernel_objects/counter.md
   - title: "Futex"
     path: /docs/reference/kernel_objects/futex.md
 - title: "Memory and address space"

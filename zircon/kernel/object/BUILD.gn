@@ -12,6 +12,7 @@ zx_library("object") {
     "bus_transaction_initiator_dispatcher.cc",
     "channel_dispatcher.cc",
     "clock_dispatcher.cc",
+    "counter_dispatcher.cc",
     "diagnostics.cc",
     "dispatcher.cc",
     "event_dispatcher.cc",

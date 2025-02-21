@@ -19,7 +19,10 @@ Symbols:
   - { Name: _zx_clock_get_monotonic, Type: Func }
   - { Name: _zx_clock_read, Type: Func }
   - { Name: _zx_clock_update, Type: Func }
+  - { Name: _zx_counter_add, Type: Func }
   - { Name: _zx_counter_create, Type: Func }
+  - { Name: _zx_counter_read, Type: Func }
+  - { Name: _zx_counter_write, Type: Func }
   - { Name: _zx_cprng_add_entropy, Type: Func }
   - { Name: _zx_cprng_draw, Type: Func }
   - { Name: _zx_deadline_after, Type: Func }
@@ -228,7 +231,10 @@ Symbols:
   - { Name: zx_clock_get_monotonic, Type: Func, Weak: true }
   - { Name: zx_clock_read, Type: Func, Weak: true }
   - { Name: zx_clock_update, Type: Func, Weak: true }
+  - { Name: zx_counter_add, Type: Func, Weak: true }
   - { Name: zx_counter_create, Type: Func, Weak: true }
+  - { Name: zx_counter_read, Type: Func, Weak: true }
+  - { Name: zx_counter_write, Type: Func, Weak: true }
   - { Name: zx_cprng_add_entropy, Type: Func, Weak: true }
   - { Name: zx_cprng_draw, Type: Func, Weak: true }
   - { Name: zx_deadline_after, Type: Func, Weak: true }

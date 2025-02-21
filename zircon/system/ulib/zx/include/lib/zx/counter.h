@@ -28,6 +28,11 @@ class counter final : public object<counter> {
   }
 
   static zx_status_t create(uint32_t options, counter* result);
+
+  zx_status_t add(int64_t value) const { return zx_counter_add(get(), value); }
+  zx_status_t read(int64_t* value) const { return zx_counter_read(get(), value); }
+  zx_status_t write(int64_t value) const { return zx_counter_write(get(), value); }
+
 } ZX_AVAILABLE_SINCE(HEAD);
 
 typedef unowned<counter> unowned_counter ZX_AVAILABLE_SINCE(HEAD);

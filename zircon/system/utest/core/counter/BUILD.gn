@@ -6,6 +6,7 @@ source_set("counter") {
   testonly = true
   sources = [ "counter.cc" ]
   deps = [
+    "//sdk/lib/fit",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
