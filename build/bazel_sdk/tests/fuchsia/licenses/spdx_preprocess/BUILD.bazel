@@ -1,0 +1,65 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
+load(
+    "@fuchsia_sdk//fuchsia:licenses.bzl",
+    "fuchsia_licenses_preprocess",
+    "fuchsia_licenses_spdx",
+)
+load("@rules_license//rules:license.bzl", "license")
+
+fuchsia_licenses_preprocess(
+    name = "license_cut_after_preprocess",
+    cut_after = "License for Bar.",
+    input = "license.spdx.json",
+    license_id = "LicenseRef-CutAfter",
+    output = "license_preprocessed_cut_after.spdx.json",
+)
+
+fuchsia_licenses_preprocess(
+    name = "license_cut_entirely_preprocess",
+    cut_entirely = True,
+    input = ":license_cut_after_preprocess",
+    license_id = "LicenseRef-CutEntirely",
+    output = "license_preprocessed.spdx.json",
+)
+
+license(
+    name = "license_preprocessed",
+    package_name = "Test Package",
+    license_text = "license_cut_entirely_preprocess",
+)
+
+genrule(
+    name = "target_with_licenses",
+    outs = ["out.txt"],
+    applicable_licenses = [
+        ":license_preprocessed",
+    ],
+    cmd = "echo \"hello\" > \"$@\"",
+)
+
+fuchsia_licenses_spdx(
+    name = "actual_licenses.spdx.json",
+    document_namespace = "some_namespace",
+    licenses_cross_refs_base_url = "https://fuchsia.googlesource.com/sdk-integration/tests/",
+    target = ":target_with_licenses",
+)
+
+diff_test(
+    name = "golden_test",
+    failure_message = """
+When the diffs don't match, you may update them via:
+    ./build/bazel_sdk/tests/scripts/bazel_test.py \\
+      --test_target //:licenses_tests \\
+      --output_base /tmp/bazel_sdk_tests_output
+    cp \\
+      /tmp/bazel_sdk_tests_output/execroot/sdk-integration/bazel-out/aarch64-fastbuild/bin/fuchsia/licenses/spdx_dedup/actual_licenses.spdx.json \\
+      ~/fuchsia/build/bazel_sdk/tests/fuchsia/licenses/spdx_dedup/expected_licenses.spdx.json
+""",
+    file1 = ":actual_licenses.spdx.json",
+    file2 = "expected_licenses.spdx.json",
+    visibility = ["//visibility:public"],
+)

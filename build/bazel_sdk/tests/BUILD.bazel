@@ -60,6 +60,7 @@ test_suite(
         "//fuchsia/licenses/spdx:deprecated_golden_test",
         "//fuchsia/licenses/spdx:golden_test",
         "//fuchsia/licenses/spdx_dedup:golden_test",
+        "//fuchsia/licenses/spdx_preprocess:golden_test",
         "//tools/licenses:classification_types_test",
         "//tools/licenses:spdx_types_test",
     ],

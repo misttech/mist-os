@@ -1,0 +1,55 @@
+{
+    "spdxVersion": "SPDX-2.2",
+    "SPDXID": "SPDXRef-DOCUMENT",
+    "name": "my_root_package",
+    "documentNamespace": "",
+    "creationInfo": {
+        "creators": [
+            "Tool: generate_licenses_spdx.py"
+        ]
+    },
+    "dataLicense": "CC0-1.0",
+    "documentDescribes": [
+        "SPDXRef-CutAfter",
+        "SPDXRef-CutEntirely"
+    ],
+    "packages": [
+        {
+            "SPDXID": "SPDXRef-CutAfter",
+            "name": "Component A",
+            "licenseConcluded": "LicenseRef-CutAfter"
+        },
+        {
+            "SPDXID": "SPDXRef-CutEntirely",
+            "name": "Component Bar from SPDX",
+            "licenseConcluded": "LicenseRef-CutEntirely"
+        }
+    ],
+    "relationships": [
+        {
+            "spdxElementId": "SPDXRef-CutAfter",
+            "relatedSpdxElement": "SPDXRef-CutEntirely",
+            "relationshipType": "CONTAINS"
+        }
+    ],
+    "hasExtractedLicensingInfos": [
+        {
+            "name": "Bar's license from SPDX",
+            "licenseId": "LicenseRef-CutAfter",
+            "extractedText": "License for Bar.\nThis is not a real software license. This is just for testing.\n",
+            "crossRefs": [
+                {
+                    "url": "http://bar"
+                }
+            ],
+            "seeAlsos": [
+                "http://bar"
+            ]
+        },
+        {
+            "name": "Baz license",
+            "licenseId": "LicenseRef-CutEntirely",
+            "extractedText": "Baz License. This is not a real software license. This is just for testing.\n"
+        }
+    ]
+}
