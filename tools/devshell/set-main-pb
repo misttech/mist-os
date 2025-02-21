@@ -48,23 +48,35 @@ TMP="$OUT.tmp"
 rm -f $TMP
 
 PRETTY_OUT=${OUT#$FUCHSIA_DIR/}
-echo "Adding to $PRETTY_OUT:"
-echo "  $GN_ARGS_ENTRY"
 
+# Loop over every line in args.gn.
 found=false
 while IFS= read -r line; do
-  if [[ $line =~ "main_pb_label" ]]; then
+  if [[ $line == $GN_ARGS_ENTRY ]]; then
+    # Exit early, because we already have this main PB set.
+    echo "main_pb_label already set to $LABEL."
+    echo "args.gn not changed."
+    rm -f $TMP
+    exit 0
+  elif [[ $line =~ "main_pb_label" ]]; then
+    # Replace the current main PB with the new one.
+    echo "Adding to $PRETTY_OUT:"
+    echo "  $GN_ARGS_ENTRY"
     found=true
     echo "$GN_ARGS_ENTRY" >> $TMP
   else
-    echo $line >> $TMP
+    # Not a relevant line, so pass it through.
+    echo "${line}" >> $TMP
   fi
 done < "$OUT"
+
+# If we didn't find an existing main PB, then we add it to the end.
 if [[ "$found" = false ]]; then
   echo "$GN_ARGS_ENTRY" >> $TMP
 fi
+
+# Replace the real args.gn with the temporary file.
 mv $TMP $OUT
-rm -f $TMP
 
 echo ""
 echo "Running 'fx gen'"
