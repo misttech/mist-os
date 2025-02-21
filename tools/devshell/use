@@ -65,6 +65,7 @@ function main {
   if [[ -e "${full_build_dir}/args.gn" ]]; then
     fx-change-build-dir "${build_dir}"
     fx-check-default-target
+    exit $?
   else
     echo "\"${build_dir}\" is not a valid build dir."
     echo ""

@@ -286,18 +286,38 @@ function fx-config-read {
   _FX_LOCK_FILE="${FUCHSIA_BUILD_DIR}.build_lock"
 }
 
-# If the fx default target is set, check whether a ffx default target is
-# overshadowing it. If so, emit a helpful warning.
+# If the fx default target is set, provide a best-effort check against whether
+# a ffx default target is overshadowing it. If so, emit a helpful warning.
+# To minimize DX disruptions, suggests the user to verify if ffx hasn't been
+# built yet.
 function fx-check-default-target {
   # Refresh $FUCHSIA_NODENAME.
   fx-export-default-target
-  local effective_default_target=$(ffx target default get)
-  if [[ -n "$FUCHSIA_NODENAME" && "$FUCHSIA_NODENAME" != "$effective_default_target" ]]; then
-    fx-warn "The build level device \"$FUCHSIA_NODENAME\" is being overridden by the user level device \"$effective_default_target\"."
-    fx-warn "Here are all of the ffx default values set: $(ffx config get --select all target.default)"
-    fx-warn 'Please run `ffx target default unset; ffx target default unset --level global` to fix this.'
-    exit 1
+
+  # Skip check if fx device is not set.
+  if [[ -z "$FUCHSIA_NODENAME" ]]; then
+    return 0
   fi
+
+  # Skip check with warning if ffx hasn't been built.
+  local ffx_binary="${FUCHSIA_BUILD_DIR}/host-tools/ffx"
+  if [[ ! -x "${ffx_binary}" ]]; then
+    fx-warn "ffx not found in build directory, skipping verification that effective target device is \"$FUCHSIA_NODENAME\"."
+    fx-warn 'Please run `ffx target default get` after the build to confirm.'
+    return 0
+  fi
+
+  # Check passes if ffx default target agrees with fx device.
+  local effective_default_target
+  effective_default_target="$($ffx_binary target default get)"
+  if [[ "$FUCHSIA_NODENAME" == "$effective_default_target" ]]; then
+    return 0
+  fi
+
+  fx-error "The build level device \"$FUCHSIA_NODENAME\" is being overridden by the user level device \"$effective_default_target\"."
+  fx-error "Here are all of the ffx default values set: $(ffx config get --select all target.default)"
+  fx-error 'Please run `ffx target default unset; ffx target default unset --level global` to fix this.'
+  return 1
 }
 
 function fx-change-build-dir {
