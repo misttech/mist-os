@@ -19,7 +19,7 @@ use crate::fs::proc::self_symlink::self_node;
 use crate::fs::proc::stat::stat_node;
 use crate::fs::proc::swaps::swaps_node;
 use crate::fs::proc::sysctl::{net_directory, sysctl_directory};
-use crate::fs::proc::sysrq::SysRqNode;
+use crate::fs::proc::sysrq::sysrq_node;
 use crate::fs::proc::thread_self::thread_self_node;
 use crate::fs::proc::uptime::uptime_node;
 use crate::mm::PAGE_SIZE;
@@ -79,13 +79,7 @@ impl ProcDirectory {
             "uptime".into() => uptime_node(current_task, fs),
             "loadavg".into() => loadavg_node(current_task, fs),
             "config.gz".into() => config_gz_node(current_task, fs),
-            "sysrq-trigger".into() => fs.create_node(
-                current_task,
-                SysRqNode::new(kernel),
-                // This file is normally writable only by root.
-                // (https://man7.org/linux/man-pages/man5/proc.5.html)
-                FsNodeInfo::new_factory(mode!(IFREG, 0o200), FsCred::root()),
-            ),
+            "sysrq-trigger".into() => sysrq_node(current_task, fs),
             "asound".into() => stub_node(current_task, fs, "/proc/asound", bug_ref!("https://fxbug.dev/322893329")),
             "diskstats".into() => stub_node(current_task, fs, "/proc/diskstats", bug_ref!("https://fxbug.dev/322893370")),
             "filesystems".into() => bytes_node(current_task, fs, b"fxfs".to_vec()),
