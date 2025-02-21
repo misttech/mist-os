@@ -8,11 +8,14 @@
 #include <lib/fdio/directory.h>
 
 #include <cstddef>
+#include <cstdint>
 
 #include <fbl/algorithm.h>
 
 #include "src/graphics/tests/common/utils.h"
 #include "src/lib/fsl/handles/object_info.h"
+
+#include <vulkan/vulkan.hpp>
 
 constexpr vk::SysmemColorSpaceFUCHSIA kDefaultRgbColorSpace(
     static_cast<uint32_t>(fuchsia::images2::ColorSpace::SRGB));
@@ -353,6 +356,7 @@ std::optional<uint32_t> VulkanExtensionTest::InitializeDirectImageMemory(
     return std::nullopt;
   }
   vk_device_memory_ = std::move(vk_device_memory);
+  vk_device_memory_size_ = requirements.size;
 
   auto bind_result = ctx_->device()->bindImageMemory(*vk_image_, *vk_device_memory_, 0u);
   if (bind_result != vk::Result::eSuccess) {
@@ -545,14 +549,17 @@ bool VulkanExtensionTest::IsMemoryTypeCoherent(uint32_t memoryTypeIndex) {
                            vk::MemoryPropertyFlagBits::eHostCoherent);
 }
 
-void VulkanExtensionTest::WriteLinearImage(vk::DeviceMemory memory, bool is_coherent,
-                                           uint32_t width, uint32_t height, uint32_t fill) {
+void VulkanExtensionTest::WriteImage(vk::DeviceMemory memory, bool is_coherent,
+                                     VkDeviceSize size_in_bytes, uint32_t fill) {
   void *addr;
   vk::Result result =
       ctx_->device()->mapMemory(memory, 0 /* offset */, VK_WHOLE_SIZE, vk::MemoryMapFlags{}, &addr);
   ASSERT_EQ(vk::Result::eSuccess, result);
 
-  for (uint32_t i = 0; i < width * height; i++) {
+  VkDeviceSize word_count = size_in_bytes / sizeof(uint32_t);
+  ASSERT_EQ(word_count * sizeof(uint32_t), size_in_bytes);
+
+  for (uint32_t i = 0; i < word_count; i++) {
     reinterpret_cast<uint32_t *>(addr)[i] = fill;
   }
 
@@ -591,8 +598,9 @@ void VulkanExtensionTest::WriteLinearColorImageComplete(vk::DeviceMemory memory,
   ctx_->device()->unmapMemory(memory);
 }
 
-void VulkanExtensionTest::CheckLinearImage(vk::DeviceMemory memory, bool is_coherent,
-                                           uint32_t width, uint32_t height, uint32_t fill) {
+void VulkanExtensionTest::CheckLinearImage(vk::Image image, vk::DeviceMemory memory,
+                                           bool is_coherent, uint32_t width, uint32_t height,
+                                           uint32_t fill) {
   void *addr;
   vk::Result result =
       ctx_->device()->mapMemory(memory, 0 /* offset */, VK_WHOLE_SIZE, vk::MemoryMapFlags{}, &addr);
@@ -603,15 +611,22 @@ void VulkanExtensionTest::CheckLinearImage(vk::DeviceMemory memory, bool is_cohe
     EXPECT_EQ(vk::Result::eSuccess, ctx_->device()->invalidateMappedMemoryRanges(1, &range));
   }
 
+  vk::SubresourceLayout layout = vulkan_context().device()->getImageSubresourceLayout(
+      image, vk::ImageSubresource(vk::ImageAspectFlagBits::eColor, 0, 0));
+  vk::DeviceSize bytes_per_row = layout.rowPitch;
+
   uint32_t error_count = 0;
   constexpr uint32_t kMaxErrors = 10;
-  for (uint32_t i = 0; i < width * height; i++) {
-    EXPECT_EQ(fill, reinterpret_cast<uint32_t *>(addr)[i]) << "i " << i;
-    if (reinterpret_cast<uint32_t *>(addr)[i] != fill) {
-      error_count++;
-      if (error_count > kMaxErrors) {
-        printf("Skipping reporting remaining errors\n");
-        break;
+  for (uint32_t y = 0; y < height; y++) {
+    auto row_ptr = reinterpret_cast<uint8_t *>(addr) + y * bytes_per_row;
+    for (uint32_t x = 0; x < width; x++) {
+      EXPECT_EQ(fill, reinterpret_cast<uint32_t *>(row_ptr)[x]) << "x " << x << " y " << y;
+      if (reinterpret_cast<uint32_t *>(row_ptr)[x] != fill) {
+        error_count++;
+        if (error_count > kMaxErrors) {
+          printf("Skipping reporting remaining errors\n");
+          break;
+        }
       }
     }
   }
