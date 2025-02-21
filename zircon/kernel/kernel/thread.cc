@@ -2006,7 +2006,7 @@ void thread_secondary_cpu_entry() {
 
   // CAREFUL: This must happen after the idle/power thread is revived, since creating the DPC thread
   // can contend on VM locks and could cause this CPU to go idle.
-  current_cpu.dpc_queue.InitForCurrentCpu();
+  current_cpu.dpc_runner.InitForCurrentCpu();
 
   // Remove ourselves from the Scheduler's bookkeeping.
   {

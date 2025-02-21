@@ -26,7 +26,7 @@
 zx_status_t Dpc::Queue() {
   DEBUG_ASSERT(func_);
 
-  DpcQueue* dpc_queue = nullptr;
+  DpcRunner* dpc_runner = nullptr;
   {
     Guard<SpinLock, IrqSave> guard{Dpc::Lock::Get()};
 
@@ -34,15 +34,15 @@ zx_status_t Dpc::Queue() {
       return ZX_ERR_ALREADY_EXISTS;
     }
 
-    dpc_queue = &percpu::GetCurrent().dpc_queue;
+    dpc_runner = &percpu::GetCurrent().dpc_runner;
 
     // Put this Dpc at the tail of the list. Signal the worker outside the lock.
-    dpc_queue->EnqueueLocked(this);
+    dpc_runner->EnqueueLocked(this);
   }
 
   // Signal outside of the lock to avoid lock order inversion with the thread
   // lock.
-  dpc_queue->Signal();
+  dpc_runner->Signal();
   return ZX_OK;
 }
 
@@ -51,10 +51,10 @@ void Dpc::Invoke() {
     func_(this);
 }
 
-void DpcQueue::EnqueueLocked(Dpc* dpc) { list_.push_back(dpc); }
-void DpcQueue::Signal() { event_.Signal(); }
+void DpcRunner::EnqueueLocked(Dpc* dpc) { list_.push_back(dpc); }
+void DpcRunner::Signal() { event_.Signal(); }
 
-zx_status_t DpcQueue::Shutdown(zx_instant_mono_t deadline) {
+zx_status_t DpcRunner::Shutdown(zx_instant_mono_t deadline) {
   Thread* t;
   Event* event;
   {
@@ -78,7 +78,7 @@ zx_status_t DpcQueue::Shutdown(zx_instant_mono_t deadline) {
   return t->Join(nullptr, deadline);
 }
 
-void DpcQueue::TransitionOffCpu(DpcQueue& source) {
+void DpcRunner::TransitionOffCpu(DpcRunner& source) {
   Guard<SpinLock, IrqSave> guard{Dpc::Lock::Get()};
 
   // |source|'s cpu is shutting down. Assert that we are migrating to the current cpu.
@@ -101,9 +101,9 @@ void DpcQueue::TransitionOffCpu(DpcQueue& source) {
   source.cpu_ = INVALID_CPU;
 }
 
-int DpcQueue::WorkerThread(void* unused) { return percpu::GetCurrent().dpc_queue.Work(); }
+int DpcRunner::WorkerThread(void* unused) { return percpu::GetCurrent().dpc_runner.Work(); }
 
-int DpcQueue::Work() {
+int DpcRunner::Work() {
   for (;;) {
     // Wait for a Dpc to fire.
     [[maybe_unused]] zx_status_t err = event_.Wait();
@@ -137,11 +137,11 @@ int DpcQueue::Work() {
   return 0;
 }
 
-void DpcQueue::InitForCurrentCpu() {
+void DpcRunner::InitForCurrentCpu() {
   if constexpr (DEBUG_ASSERT_IMPLEMENTED) {
     Thread* const current_thread = Thread::Current::Get();
     SingleChainLockGuard guard{IrqSaveOption, current_thread->get_lock(),
-                               CLT_TAG("DpcQueue::InitForCurrentCpu")};
+                               CLT_TAG("DpcRunner::InitForCurrentCpu")};
     const cpu_mask_t mask = current_thread->scheduler_state().hard_affinity();
     DEBUG_ASSERT_MSG(ktl::popcount(mask) == 1, "mask %#x", mask);
   }
@@ -149,7 +149,7 @@ void DpcQueue::InitForCurrentCpu() {
   {
     Guard<SpinLock, IrqSave> guard{Dpc::Lock::Get()};
 
-    // This cpu's DpcQueue was initialized on a previous hotplug event.
+    // This cpu's DpcRunner was initialized on a previous hotplug event.
     if (initialized_) {
       return;
     }
@@ -162,7 +162,7 @@ void DpcQueue::InitForCurrentCpu() {
   const cpu_num_t cpu = arch_curr_cpu_num();
   char name[10];
   snprintf(name, sizeof(name), "dpc-%u", cpu);
-  Thread* thread = Thread::Create(name, &DpcQueue::WorkerThread, nullptr, DPC_THREAD_PRIORITY);
+  Thread* thread = Thread::Create(name, &DpcRunner::WorkerThread, nullptr, DPC_THREAD_PRIORITY);
   ASSERT(thread != nullptr);
   thread->SetCpuAffinity(cpu_num_to_mask(cpu));
 
@@ -186,8 +186,8 @@ void DpcQueue::InitForCurrentCpu() {
 }
 
 static void dpc_init(unsigned int level) {
-  // Initialize the DpcQueue for the main cpu.
-  percpu::GetCurrent().dpc_queue.InitForCurrentCpu();
+  // Initialize the DpcRunner for the main cpu.
+  percpu::GetCurrent().dpc_runner.InitForCurrentCpu();
 }
 
 LK_INIT_HOOK(dpc, dpc_init, LK_INIT_LEVEL_THREADING)

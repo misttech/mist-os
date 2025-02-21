@@ -46,62 +46,61 @@ class Dpc : public fbl::DoublyLinkedListable<Dpc*, fbl::NodeOptions::AllowCopyMo
   // Returns ZX_ERR_ALREADY_EXISTS if |this| is already queued.
   zx_status_t Queue() TA_EXCL(chainlock_transaction_token);
 
-  // A single spinlock protects the data members of all DPC queues.
+  // A single spinlock protects the data members of all DpcRunners.
   //
   // Take care to drop this lock before calling any code that might acquire a chainlock.
   DECLARE_SINGLETON_SPINLOCK(Lock);
 
  private:
-  friend class DpcQueue;
+  friend class DpcRunner;
 
-  // The DpcQueue this Dpc gets enqueued onto is the only thing to actually Invoke this Dpc,
-  // on its worker thread.
+  // Called by DpcRunner.
   void Invoke() TA_EXCL(Dpc::Lock::Get());
 
   Func* const func_;
   void* const arg_;
 };
 
-// Each cpu maintains a DpcQueue, in its percpu structure.
-class DpcQueue {
+// Each cpu maintains a DpcRunner, in its percpu structure.
+class DpcRunner {
  public:
-  // Initializes this DpcQueue for the current cpu.
+  // Initializes this DpcRunner for the current cpu.
   //
   // The calling thread must have hard-affinity to exactly one CPU.
   void InitForCurrentCpu();
 
-  // Begins the Dpc shutdown process for the owning cpu.
+  // Begins the DpcRunner shutdown process.
   //
-  // Shutting down a Dpc queue is a two-phase process.  This is the first phase.  See
+  // Shutting down a DpcRunner is a two-phase process.  This is the first phase.  See
   // |TransitionOffCpu| for the second phase.
   //
   // This method:
-  // - tells the owning cpu's Dpc thread to stop servicing its queue then
+  // - tells the owning cpu's DpcRunner's thread to stop servicing its queue then
   // - waits, up to |deadline|, for it to finish any in-progress DPC and join
   //
-  // Because this method blocks until the Dpc thread has terminated, it is critical that the caller
+  // Because this method blocks until the thread has terminated, it is critical that the caller
   // not hold any locks that might be needed by any previously queued DPCs.  Otheriwse, deadlock may
   // occur.
   //
-  // Upon successful completion, this DpcQueue may contain unexecuted Dpcs and new ones
+  // Upon successful completion, this DpcRunner may contain unexecuted DPCs and new ones
   // may be added by |Queue|.  However, they will not execute (on any cpu) until
   // |TransitionOffCpu| is called.
   //
   // Once |Shutdown| has completed successfully, finish the shutdown process by calling
   // |TransitionOffCpu| on some cpu other than the owning cpu.
   //
-  // If |Shutdown| fails, this DpcQueue is left in an undefined state and
+  // If |Shutdown| fails, this DpcRunner is left in an undefined state and
   // |TransitionOffCpu| must not be called.
   zx_status_t Shutdown(zx_instant_mono_t deadline);
 
-  // Moves queued Dpcs from |source| to this DpcQueue.
+  // Moves queued Dpcs from |source| to this DpcRunner.
   //
   // This is the second phase of Dpc shutdown.  See |Shutdown|.
   //
   // This must only be called after |Shutdown| has completed successfully.
   //
   // This must only be called on the current cpu.
-  void TransitionOffCpu(DpcQueue& source);
+  void TransitionOffCpu(DpcRunner& source);
 
   // These are called by Dpc::Queue.
   void EnqueueLocked(Dpc* dpc) TA_REQ(Dpc::Lock::Get());
@@ -111,10 +110,10 @@ class DpcQueue {
   static int WorkerThread(void* unused);
   int Work();
 
-  // The cpu that owns this DpcQueue.
+  // The cpu that owns this DpcRunner.
   cpu_num_t cpu_ TA_GUARDED(Dpc::Lock::Get()) = INVALID_CPU;
 
-  // Whether the DpcQueue has been initialized for the owning cpu.
+  // Whether the DpcRunner has been initialized for the owning cpu.
   bool initialized_ TA_GUARDED(Dpc::Lock::Get()) = false;
 
   // Request the thread_ to stop by setting to true.

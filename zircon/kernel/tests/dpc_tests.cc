@@ -112,6 +112,6 @@ static bool test_dpc_requeue() {
 }
 
 UNITTEST_START_TESTCASE(dpc_tests)
-UNITTEST("basic test of dpc_queue", test_dpc_queue)
+UNITTEST("basic test of Dpc::Queue", test_dpc_queue)
 UNITTEST("repeatedly queue the same dpc", test_dpc_requeue)
 UNITTEST_END_TESTCASE(dpc_tests, "dpc_tests", "Tests of DPCs")

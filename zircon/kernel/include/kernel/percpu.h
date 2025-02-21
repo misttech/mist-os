@@ -74,8 +74,8 @@ struct percpu {
   // kernel counters arena
   int64_t* counters;
 
-  // Each cpu maintains a DpcQueue.
-  DpcQueue dpc_queue;
+  // Each cpu maintains a DpcRunner.
+  DpcRunner dpc_runner;
 
   // Page state counts are percpu because they change frequently and we don't want to pay for either
   // heavy synchronization, or transferring the counters between CPUs a lot. Using percpu relaxed
