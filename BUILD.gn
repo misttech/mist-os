@@ -2062,14 +2062,6 @@ group("discoverable_packages") {
   testonly = true
   visibility = [ "//build/images/updates:universe_packages" ]
   public_deps = discoverable_package_labels + [ ":discoverable_tests" ]
-
-  # For all configurations other than bringup, add //bundles/tools to
-  # the discoverable package set, as generally-available platform tools,
-  # as all products were including them in discoverable_package_labels
-  # anyway.
-  if (!use_bringup_assembly) {
-    public_deps += [ "//bundles/tools" ]
-  }
   assert_no_deps = [
     "//build/validate:config_data_tag",
     "//build/validate:shell_command_tag",
