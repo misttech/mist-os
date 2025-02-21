@@ -15,13 +15,13 @@ rustc_library("lib") {
   deps = [
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/daemon:lib",
+    "//src/developer/ffx/lib/executor:lib",
     "//src/developer/ffx/lib/sdk:lib",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tempfile",
-    "//third_party/rust_crates:thiserror",
   ]
 
   _subtool_search_test_data =
@@ -36,10 +36,7 @@ rustc_library("lib") {
     "SUBTOOL_SEARCH_HOST_TOOLS=${_subtool_search_host_tools}",
   ]
 
-  sources = [
-    "src/lib.rs",
-    "src/test.rs",
-  ]
+  sources = [ "src/lib.rs" ]
 }
 
 group("tests") {

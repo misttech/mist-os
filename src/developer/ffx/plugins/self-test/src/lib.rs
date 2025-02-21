@@ -5,6 +5,7 @@
 use crate::test::*;
 use anyhow::Result;
 use errors::ffx_error;
+use ffx_executor::FfxExecutor;
 use ffx_selftest_args::SelftestCommand;
 use ffx_writer::SimpleWriter;
 use fho::{FfxMain, FfxTool};
@@ -79,7 +80,7 @@ pub async fn selftest(cmd: SelftestCommand) -> Result<()> {
 
 async fn test_isolated() -> Result<()> {
     let isolate = new_isolate("isolated").await?;
-    let out = isolate.ffx(&["config", "get", "test.is-isolated"]).await?;
+    let out = isolate.exec_ffx(&["config", "get", "test.is-isolated"]).await?;
     assert_eq!(out.stdout, "true\n");
 
     Ok(())

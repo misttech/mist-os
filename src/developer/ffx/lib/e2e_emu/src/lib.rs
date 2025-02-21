@@ -6,15 +6,14 @@ use anyhow::{ensure, Context as _};
 use async_stream::stream;
 use diagnostics_data::LogsData;
 use ffx_config::{EnvironmentContext, TestEnv};
+use ffx_executor::FfxExecutor;
 use ffx_isolate::Isolate;
-use fuchsia_async::TimeoutExt;
 use futures::channel::mpsc::TrySendError;
 use futures::{Stream, StreamExt};
 use serde::Deserialize;
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
-use std::time::Duration;
 use tempfile::TempDir;
 use tracing::info;
 
@@ -97,7 +96,7 @@ impl IsolatedEmulator {
             .expect("PRODUCT_BUNDLE_PATH env var must be set -- run this test with 'fx test'");
         let mut emulator_cmd = this
             .ffx_isolate
-            .ffx_cmd(&[
+            .make_ffx_cmd(&[
                 "emu",
                 "start",
                 "--headless",
@@ -113,22 +112,16 @@ impl IsolatedEmulator {
                 "TERM=dumb",
                 &product_bundle_path,
             ])
-            .await
             .context("creating emulator command")?;
 
         let emu = emulator_cmd.spawn().context("spawning emulator command")?;
-
-        this.ffx(&["target", "wait"])
-            .on_timeout(Duration::from_secs(120), || anyhow::bail!("emulator never started"))
-            .await?;
 
         *this.emu_state.lock().unwrap() = Some(EmuState { emu });
 
         info!("streaming system logs to output directory");
         let mut system_logs_command = this
             .ffx_isolate
-            .ffx_cmd(&this.make_args(&["log", "--severity", "TRACE", "--no-color"]))
-            .await
+            .make_ffx_cmd(&this.make_args(&["log", "--severity", "TRACE", "--no-color"]))
             .context("creating log streaming command")?;
 
         let emulator_system_log =
@@ -136,8 +129,10 @@ impl IsolatedEmulator {
                 .context("creating system log file")?;
         system_logs_command.stdout(emulator_system_log);
 
-        // ffx log prints lots of warnings about symbolization
-        system_logs_command.stderr(std::process::Stdio::null());
+        let emulator_stderr_log =
+            std::fs::File::create(this.ffx_isolate.log_dir().join("system_err.log"))
+                .context("creating system stderr log file")?;
+        system_logs_command.stderr(emulator_stderr_log);
 
         this.children
             .lock()
@@ -204,8 +199,8 @@ impl IsolatedEmulator {
 
     /// Run an ffx command, logging stdout & stderr as INFO messages.
     pub async fn ffx(&self, args: &[&str]) -> anyhow::Result<()> {
-        info!("running `ffx {args:?}`");
-        let output = self.ffx_isolate.ffx(&self.make_args(args)).await.context("running ffx")?;
+        let output =
+            self.ffx_isolate.exec_ffx(&self.make_args(args)).await.context("ffx() running ffx")?;
         if !output.stdout.is_empty() {
             info!("stdout:\n{}", output.stdout);
         }
@@ -218,8 +213,11 @@ impl IsolatedEmulator {
 
     /// Run an ffx command, returning stdout and logging stderr as an INFO message.
     pub async fn ffx_output(&self, args: &[&str]) -> anyhow::Result<String> {
-        info!("running `ffx {args:?}`");
-        let output = self.ffx_isolate.ffx(&self.make_args(args)).await.context("running ffx")?;
+        let output = self
+            .ffx_isolate
+            .exec_ffx(&self.make_args(args))
+            .await
+            .context("ffx_output() running ffx")?;
         if !output.stderr.is_empty() {
             info!("stderr:\n{}", output.stderr);
         }
@@ -233,8 +231,10 @@ impl IsolatedEmulator {
 
     /// Create an ffx command, which allows for streaming stdout/stderr.
     pub async fn ffx_cmd_capture(&self, args: &[&str]) -> anyhow::Result<Command> {
-        let mut cmd =
-            self.ffx_isolate.ffx_cmd(&self.make_args(args)).await.context("running ffx")?;
+        let mut cmd = self
+            .ffx_isolate
+            .make_ffx_cmd(&self.make_args(args))
+            .context("ffx_cmd_capture() running ffx")?;
         cmd.stdout(Stdio::piped());
         Ok(cmd)
     }

@@ -89,7 +89,8 @@ pub(crate) async fn new_ffx_isolate(name: &str, sdk_root_dir: PathBuf) -> Result
     Ok(ffx_isolate)
 }
 
-#[fuchsia::main(logging_minimum_severity = "info")]
+// Note: setting logging to "info" will print superfluous information to stdout.
+#[fuchsia::main(logging_minimum_severity = "warn")]
 async fn main() -> Result<()> {
     let args = argh::from_env::<Args>();
 

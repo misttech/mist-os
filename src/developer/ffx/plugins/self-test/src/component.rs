@@ -4,6 +4,7 @@
 
 use crate::test::*;
 use anyhow::*;
+use ffx_executor::FfxExecutor;
 
 pub mod include_target {
     use super::*;
@@ -13,7 +14,7 @@ pub mod include_target {
         isolate.start_daemon().await?;
         let target_nodeaddr = get_target_addr();
 
-        let out = isolate.ffx(&["--target", &target_nodeaddr, "component", "list"]).await?;
+        let out = isolate.exec_ffx(&["--target", &target_nodeaddr, "component", "list"]).await?;
 
         ensure!(out.status.success(), "status is unexpected: {:?}", out);
         ensure!(!out.stdout.is_empty(), "stdout is unexpectedly empty: {:?}", out);
