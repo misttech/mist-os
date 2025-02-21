@@ -312,6 +312,7 @@ static_library("standalone") {
   visibility = [
     "./*",
     "//src/devices/bin/driver_manager/tests/modules/*",
+    "//zircon/kernel/lib/userabi/vdso/*",
   ]
 
   complete_static_lib = true
