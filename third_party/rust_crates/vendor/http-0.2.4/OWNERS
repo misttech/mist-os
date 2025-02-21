@@ -2,13 +2,17 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
+include /src/developer/ffx/daemon/protocols/repo/OWNERS
+include /src/developer/ffx/lib/pkg/OWNERS
+include /src/developer/ffx/plugins/repository/OWNERS
 include /src/lib/fuchsia-hyper/OWNERS
 include /src/lib/gcs/OWNERS
 include /src/lib/http-uri-ext/OWNERS
 include /src/sys/lib/fidl-fuchsia-pkg-ext/OWNERS
 include /src/sys/pkg/OWNERS
-include /src/sys/pkg/lib/omaha-client/OWNERS
 include /third_party/rust_crates/vendor/http-body-0.4.4/OWNERS
 include /third_party/rust_crates/vendor/hyper-0.14.19/OWNERS
-include /third_party/rust_crates/vendor/tuf-0.3.0-beta11/OWNERS
+include /third_party/rust_crates/vendor/hyper-rustls-0.24.2/OWNERS
+include /third_party/rust_crates/vendor/omaha_client-0.2.1/OWNERS
+include /third_party/rust_crates/vendor/tuf-0.3.0-beta13/OWNERS
 include /tools/doc_checker/OWNERS

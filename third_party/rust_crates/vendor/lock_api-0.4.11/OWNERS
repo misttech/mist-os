@@ -2,6 +2,7 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
+include /src/lib/diagnostics/inspect/derive/OWNERS
 include /src/lib/fuchsia-sync/OWNERS
 include /src/starnix/OWNERS
 include /third_party/rust_crates/vendor/parking_lot-0.11.1/OWNERS

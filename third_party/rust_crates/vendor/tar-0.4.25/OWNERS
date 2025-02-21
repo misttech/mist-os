@@ -4,5 +4,6 @@
 
 include /src/developer/ffx/OWNERS
 include /src/devices/lib/OWNERS
-include /src/starnix/OWNERS
+include /src/starnix/tools/OWNERS
+include /tools/OWNERS
 include /tools/clidoc/OWNERS

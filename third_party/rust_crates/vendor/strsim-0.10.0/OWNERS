@@ -4,5 +4,4 @@
 
 include /scripts/fxtest/OWNERS
 include /third_party/rust_crates/vendor/darling_core-0.12.4/OWNERS
-include /third_party/rust_crates/vendor/strsim-0.8.0/OWNERS
 include /tools/cmc/OWNERS

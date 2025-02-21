@@ -2,5 +2,5 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /src/sys/pkg/lib/omaha-client/OWNERS
 include /third_party/rust_crates/vendor/ecdsa-0.14.8/OWNERS
+include /third_party/rust_crates/vendor/omaha_client-0.2.1/OWNERS

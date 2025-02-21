@@ -2,12 +2,11 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /src/connectivity/policy/netcfg/OWNERS
+include /src/connectivity/policy/OWNERS
 include /src/developer/ffx/lib/symbol-index/OWNERS
 include /src/developer/ffx/plugins/coverage/OWNERS
 include /src/developer/ffx/plugins/fuzz/OWNERS
 include /src/diagnostics/OWNERS
-include /src/diagnostics/iquery/OWNERS
 include /src/lib/testing/expectation/OWNERS
 include /src/settings/OWNERS
 include /src/sys/test_manager/OWNERS

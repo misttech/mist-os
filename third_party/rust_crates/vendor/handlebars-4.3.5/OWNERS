@@ -5,7 +5,9 @@
 include /src/developer/ffx/plugins/emulator/OWNERS
 include /src/lib/assembly/OWNERS
 include /src/lib/intl/OWNERS
+include /src/testing/OWNERS
 include /tools/create/OWNERS
 include /tools/fidl/fidldoc/OWNERS
+include /tools/lib/OWNERS
 include /tools/lib/config_client/OWNERS
 include /tools/testgen/OWNERS

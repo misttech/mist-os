@@ -2,10 +2,12 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /src/graphics/lib/compute/OWNERS
-include /third_party/rust_crates/vendor/concurrent-queue-2.1.0/OWNERS
+include /src/graphics/OWNERS
+include /third_party/rust_crates/vendor/concurrent-queue-2.5.0/OWNERS
 include /third_party/rust_crates/vendor/crossbeam-0.8.0/OWNERS
 include /third_party/rust_crates/vendor/crossbeam-channel-0.5.1/OWNERS
 include /third_party/rust_crates/vendor/crossbeam-deque-0.8.1/OWNERS
 include /third_party/rust_crates/vendor/crossbeam-epoch-0.9.4/OWNERS
 include /third_party/rust_crates/vendor/crossbeam-queue-0.3.1/OWNERS
+include /third_party/rust_crates/vendor/rayon-core-1.12.1/OWNERS
+include /third_party/rust_crates/vendor/ringbuf-0.4.4/OWNERS

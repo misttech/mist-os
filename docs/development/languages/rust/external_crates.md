@@ -303,7 +303,7 @@ graph.
 The tool discovers which build targets depend on a given crate, which means it
 needs the metadata from the completion of a maximal "kitchen sink" build:
 
-1. Run `fx set core.x64 --with //bundles/buildbot/core --with //bundles/kitchen_sink`
+1. Run `fx set core.x64 --with //bundles/buildbot/core --with //bundles/kitchen_sink --with-host '//tools/gn_desc:install_gn_desc(//build/toolchain:host_x64)'`
 2. Run `fx update-3p-owners --rust-metadata
    <FUCHSIA_BUILD_DIR>/rustlang/3p-crates-metadata.json`.
 

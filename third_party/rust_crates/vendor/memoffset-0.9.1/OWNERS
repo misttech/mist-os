@@ -3,4 +3,4 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /src/starnix/OWNERS
-include /third_party/rust_crates/vendor/nix-0.26.2/OWNERS
+include /third_party/rust_crates/forks/nix-0.29.0/OWNERS

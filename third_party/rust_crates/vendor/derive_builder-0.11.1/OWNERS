@@ -4,3 +4,4 @@
 
 include /src/connectivity/network/dhcpv4/OWNERS
 include /src/sys/pkg/OWNERS
+include /third_party/rust_crates/vendor/mock-omaha-server-0.3.3/OWNERS

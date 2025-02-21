@@ -18,6 +18,7 @@ include /src/lib/diagnostics/OWNERS
 include /src/lib/injectable-time/OWNERS
 include /src/lib/testing/fuchsia-hyper-test-support/OWNERS
 include /src/lib/ui/carnelian/OWNERS
+include /src/lib/versioning/version-history/OWNERS
 include /src/storage/OWNERS
 include /src/sys/lib/elf_runner/OWNERS
 include /src/sys/pkg/OWNERS
@@ -25,9 +26,12 @@ include /src/sys/pkg/bin/omaha-client/OWNERS
 include /src/sys/time/OWNERS
 include /third_party/rust_crates/forks/fatfs/OWNERS
 include /third_party/rust_crates/vendor/chrono-english-0.1.7/OWNERS
+include /third_party/rust_crates/vendor/omaha_client-0.2.1/OWNERS
 include /third_party/rust_crates/vendor/schemars-0.8.10/OWNERS
 include /third_party/rust_crates/vendor/simplelog-0.10.2/OWNERS
 include /third_party/rust_crates/vendor/toml_edit-0.2.1/OWNERS
-include /third_party/rust_crates/vendor/tuf-0.3.0-beta11/OWNERS
+include /third_party/rust_crates/vendor/tuf-0.3.0-beta13/OWNERS
+include /third_party/rust_crates/vendor/valico-2.4.2/OWNERS
 include /tools/create/OWNERS
+include /tools/funnel/OWNERS
 include /tools/testgen/OWNERS

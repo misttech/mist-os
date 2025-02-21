@@ -4,6 +4,5 @@
 
 include /src/developer/ffx/plugins/assembly/OWNERS
 include /src/developer/ffx/plugins/platform/preflight/OWNERS
-include /src/lib/assembly/OWNERS
 include /src/sys/lib/component_debug/OWNERS
 include /third_party/rust_crates/vendor/clap-2.34.0/OWNERS

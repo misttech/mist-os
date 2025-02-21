@@ -2,6 +2,5 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /third_party/rust_crates/vendor/password-hash-0.4.2/OWNERS
 include /third_party/rust_crates/vendor/pem-rfc7468-0.6.0/OWNERS
 include /third_party/rust_crates/vendor/spki-0.6.0/OWNERS

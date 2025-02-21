@@ -3,7 +3,7 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /src/connectivity/lib/internet-checksum/OWNERS
-include /src/connectivity/network/netstack3/OWNERS
+include /src/connectivity/network/OWNERS
 include /src/lib/async-gunzip/OWNERS
 include /src/lib/dense-map/OWNERS
 include /src/storage/OWNERS

@@ -3,6 +3,4 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /src/developer/ffx/OWNERS
-include /src/lib/diagnostics/OWNERS
-include /src/sys/component_manager/OWNERS
-include /third_party/rust_crates/vendor/tracing-subscriber-0.3.15/OWNERS
+include /third_party/rust_crates/vendor/tracing-subscriber-0.3.18/OWNERS

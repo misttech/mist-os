@@ -2,8 +2,8 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
+include /src/connectivity/lib/network-device/rust/OWNERS
 include /src/connectivity/overnet/OWNERS
+include /src/developer/lib/OWNERS
 include /src/storage/OWNERS
 include /src/sys/fuzzing/OWNERS
-include /third_party/rust_crates/vendor/async-channel-1.8.0/OWNERS
-include /third_party/rust_crates/vendor/async-lock-2.6.0/OWNERS

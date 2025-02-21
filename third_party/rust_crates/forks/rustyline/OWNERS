@@ -7,4 +7,3 @@ include /src/connectivity/lowpan/tools/lowpanctl/OWNERS
 include /src/developer/ffx/plugins/driver/OWNERS
 include /src/developer/ffx/plugins/fuzz/OWNERS
 include /src/power/OWNERS
-include /src/security/lib/scrutiny/OWNERS

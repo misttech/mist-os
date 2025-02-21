@@ -11,6 +11,7 @@ include /src/connectivity/network/dhcpv4/OWNERS
 include /src/connectivity/wlan/OWNERS
 include /src/connectivity/wlan/tools/wlantool/OWNERS
 include /src/connectivity/wlan/wlancfg/OWNERS
+include /src/developer/ffx/lib/symbolize/OWNERS
 include /src/developer/ffx/plugins/assembly/OWNERS
 include /src/developer/ffx/plugins/fuzz/OWNERS
 include /src/developer/ffx/plugins/wlan/OWNERS
@@ -19,6 +20,7 @@ include /src/lib/assembly/OWNERS
 include /src/media/OWNERS
 include /src/performance/memory/OWNERS
 include /src/security/lib/scrutiny/OWNERS
+include /src/starnix/OWNERS
 include /src/storage/OWNERS
 include /src/sys/fuzzing/OWNERS
 include /src/sys/lib/component_id_index/OWNERS

@@ -4,3 +4,4 @@
 
 include /src/diagnostics/OWNERS
 include /src/lib/diagnostics/OWNERS
+include /src/sys/lib/bitflags-serde-legacy/OWNERS

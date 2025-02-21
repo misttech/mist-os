@@ -2,6 +2,5 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /third_party/rust_crates/vendor/async-executor-1.5.0/OWNERS
 include /third_party/rust_crates/vendor/blocking-1.3.0/OWNERS
 include /third_party/rust_crates/vendor/futures-lite-1.11.3/OWNERS

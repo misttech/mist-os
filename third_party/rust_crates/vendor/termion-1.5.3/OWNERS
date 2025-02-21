@@ -3,15 +3,17 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /src/developer/ffx/OWNERS
+include /src/developer/ffx/plugins/component/OWNERS
 include /src/developer/ffx/plugins/fuzz/OWNERS
 include /src/developer/ffx/plugins/inspect/OWNERS
 include /src/developer/ffx/plugins/platform/preflight/OWNERS
+include /src/developer/ffx/plugins/session/OWNERS
 include /src/developer/ffx/plugins/target/update/OWNERS
 include /src/developer/ffx/plugins/trace/OWNERS
+include /src/developer/ffx/tools/profiler/OWNERS
 include /src/developer/ffx/tools/starnix/OWNERS
 include /src/lib/diagnostics/OWNERS
 include /src/lib/structured_ui/OWNERS
-include /src/security/lib/scrutiny/OWNERS
 include /src/sys/fuzzing/OWNERS
 include /src/sys/lib/socket-to-stdio/OWNERS
 include /src/sys/pkg/OWNERS

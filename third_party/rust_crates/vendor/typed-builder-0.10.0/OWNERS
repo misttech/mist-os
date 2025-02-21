@@ -4,4 +4,4 @@
 
 include /src/sys/lib/fidl-fuchsia-pkg-ext/OWNERS
 include /src/sys/pkg/OWNERS
-include /src/sys/pkg/lib/omaha-client/OWNERS
+include /third_party/rust_crates/vendor/omaha_client-0.2.1/OWNERS

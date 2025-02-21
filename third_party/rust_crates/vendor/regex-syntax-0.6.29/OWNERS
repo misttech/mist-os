@@ -2,3 +2,5 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
+include /third_party/rust_crates/ask2patch/regex-automata/OWNERS
+include /third_party/rust_crates/vendor/regex-1.7.3/OWNERS

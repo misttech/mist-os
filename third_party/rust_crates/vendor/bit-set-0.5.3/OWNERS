@@ -4,4 +4,4 @@
 
 include /src/connectivity/network/netlink/OWNERS
 include /third_party/rust_crates/vendor/fancy-regex-0.8.0/OWNERS
-include /third_party/rust_crates/vendor/proptest-1.0.0/OWNERS
+include /third_party/rust_crates/vendor/proptest-1.5.0/OWNERS

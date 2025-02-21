@@ -9,6 +9,5 @@ include /third_party/rust_crates/vendor/digest-0.10.7/OWNERS
 include /third_party/rust_crates/vendor/elliptic-curve-0.12.3/OWNERS
 include /third_party/rust_crates/vendor/ff-0.12.1/OWNERS
 include /third_party/rust_crates/vendor/group-0.12.1/OWNERS
-include /third_party/rust_crates/vendor/password-hash-0.4.2/OWNERS
 include /third_party/rust_crates/vendor/sec1-0.3.0/OWNERS
 include /third_party/rust_crates/vendor/universal-hash-0.5.1/OWNERS

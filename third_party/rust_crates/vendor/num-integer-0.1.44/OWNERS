@@ -2,7 +2,6 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /third_party/rust_crates/vendor/chrono-0.4.19/OWNERS
 include /third_party/rust_crates/vendor/num-0.4.0/OWNERS
 include /third_party/rust_crates/vendor/num-bigint-0.4.3/OWNERS
 include /third_party/rust_crates/vendor/num-iter-0.1.42/OWNERS

@@ -3,4 +3,4 @@
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
 include /src/connectivity/bluetooth/OWNERS
-include /third_party/rust_crates/forks/pulldown-cmark/OWNERS
+include /third_party/rust_crates/vendor/pulldown-cmark-0.9.3/OWNERS
