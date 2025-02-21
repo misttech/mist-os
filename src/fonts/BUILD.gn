@@ -10,6 +10,21 @@ import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
 import("//src/fonts/build/fonts.gni")
 
+group("fonts") {
+  public_deps = [
+    # XXX: looks like all external deps no longer use //fonts, and the inclusion
+    # of the fonts package is now due to assembly.
+    # ":pkg",
+    # XXX: external dependencies on //src/fonts are intending just to get the
+    # package, but that layout does not follow the convention of directory
+    # targets including all their tests and buildable artifacts. For now these
+    # need to be disabled, and all external consumers only intending to import
+    # fonts support should be moved to using //src/fonts:pkg instead.
+    # ":open-fonts",
+    # ":tests",
+  ]
+}
+
 group("tests") {
   testonly = true
   public_deps = [
@@ -29,7 +44,10 @@ group("tests") {
 # such as Chromium tests.
 group("downstream_test_deps") {
   testonly = true
-  public_deps = [ ":downstream-test-fonts-collection" ]
+  public_deps = [
+    ":downstream-test-fonts-collection",
+    ":fonts",
+  ]
 }
 
 rustc_binary("font_provider") {

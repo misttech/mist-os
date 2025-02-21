@@ -134,6 +134,7 @@ group("no_e2e_dep") {
     "//scripts/sdk/gn:tests",
     "//src/diagnostics:tests",
     "//src/media/bundles:services",
+    "//src/media/bundles:tools",
     "//third_party:tests",
 
     # Used by tests, which must not themselves add WebEngine to the product.
