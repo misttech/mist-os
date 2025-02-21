@@ -208,13 +208,23 @@ zx_status_t VirtioPciDevice::Init() {
   // Ack and set the driver status bit
   DriverStatusAck();
 
-  if (!(DeviceFeaturesSupported() & VIRTIO_F_VERSION_1)) {
-    // Declaring non-support until there is a need in the future.
-    FDF_LOG(ERROR, "Legacy virtio interface is not supported by this driver");
+  const virtio_abi::GpuDeviceFeatures::Flags device_supported_features = DeviceFeaturesSupported();
+
+  if ((device_supported_features & virtio_abi::GpuDeviceFeatures::kVirtioVersion1) == 0) {
+    FDF_LOG(ERROR, "Legacy virtio (below 1.0) not supported by this driver");
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  DriverFeaturesAck(VIRTIO_F_VERSION_1);
+  FDF_LOG(INFO, "GPU device features: 0x%016" PRIx64, device_supported_features);
+
+  virtio_abi::GpuDeviceFeatures::Flags driver_supported_features =
+      virtio_abi::GpuDeviceFeatures::kVirtioVersion1;
+  if ((device_supported_features & virtio_abi::GpuDeviceFeatures::kGpuEdid) != 0) {
+    driver_supported_features |= virtio_abi::GpuDeviceFeatures::kGpuEdid;
+  }
+
+  DriverFeaturesAck(driver_supported_features);
+  features_ = driver_supported_features;
 
   zx_status_t status = DeviceStatusFeaturesOk();
   if (status != ZX_OK) {

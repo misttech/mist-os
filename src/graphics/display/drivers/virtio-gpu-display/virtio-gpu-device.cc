@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <span>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/vector.h>
@@ -116,6 +117,48 @@ zx::result<fbl::Vector<DisplayInfo>> VirtioGpuDevice::GetDisplayInfo() {
     ZX_DEBUG_ASSERT(alloc_checker.check());
   }
   return zx::ok(std::move(display_infos));
+}
+
+zx::result<fbl::Vector<uint8_t>> VirtioGpuDevice::GetDisplayEdid(uint32_t scanout_id) {
+  if ((pci_device().Features() & virtio_abi::GpuDeviceFeatures::kGpuEdid) == 0) {
+    // EDID support is optional, and this driver can work without it.
+    FDF_LOG(TRACE, "virtio implementation does not support EDID");
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  const virtio_abi::GetExtendedDisplayIdCommand command = {
+      .header = {.type = virtio_abi::ControlType::kGetExtendedDisplayIdCommand},
+      .scanout_id = scanout_id,
+  };
+
+  const auto& response =
+      virtio_device_->ExchangeControlqRequestResponse<virtio_abi::ExtendedDisplayIdResponse>(
+          command);
+  if (response.header.type != virtio_abi::ControlType::kExtendedDisplayIdResponse) {
+    FDF_LOG(ERROR, "Unexpected response type: %s (0x%04" PRIx32 ")",
+            ControlTypeToString(response.header.type), static_cast<uint32_t>(response.header.type));
+    return zx::error(ZX_ERR_IO);
+  }
+
+  if (response.edid_size > virtio_abi::ExtendedDisplayIdResponse::kMaxEdidSize) {
+    FDF_LOG(ERROR, "Reported EDID size %" PRIu32 " exceeds maximum supported size %d",
+            response.edid_size, virtio_abi::ExtendedDisplayIdResponse::kMaxEdidSize);
+    return zx::error(ZX_ERR_IO);
+  }
+  const std::span<const uint8_t> response_edid_bytes(response.edid_bytes, response.edid_size);
+
+  fbl::AllocChecker alloc_checker;
+  fbl::Vector<uint8_t> edid_bytes;
+  edid_bytes.resize(response_edid_bytes.size(), &alloc_checker);
+  if (!alloc_checker.check()) {
+    FDF_LOG(ERROR, "Failed to allocate memory for EDID bytes");
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
+  std::ranges::copy(response_edid_bytes, edid_bytes.begin());
+  ZX_DEBUG_ASSERT(edid_bytes.size() == response_edid_bytes.size());
+
+  return zx::ok(std::move(edid_bytes));
 }
 
 namespace {

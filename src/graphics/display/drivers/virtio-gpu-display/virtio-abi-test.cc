@@ -37,6 +37,14 @@ static_assert(std::is_standard_layout_v<DisplayInfoResponse>);
 static_assert(sizeof(DisplayInfoResponse) == size_t{24} * 17);
 static_assert(alignof(DisplayInfoResponse) == 8);
 
+static_assert(std::is_standard_layout_v<GetExtendedDisplayIdCommand>);
+static_assert(sizeof(GetExtendedDisplayIdCommand) == 32);
+static_assert(alignof(GetExtendedDisplayIdCommand) == 8);
+
+static_assert(std::is_standard_layout_v<ExtendedDisplayIdResponse>);
+static_assert(sizeof(ExtendedDisplayIdResponse) == 1056);
+static_assert(alignof(ExtendedDisplayIdResponse) == 8);
+
 static_assert(std::is_standard_layout_v<Create2DResourceCommand>);
 static_assert(sizeof(Create2DResourceCommand) == 40);
 static_assert(alignof(Create2DResourceCommand) == 8);

@@ -37,6 +37,52 @@ enum class CapsetId : uint32_t {
   kCapsetCrossDomain = 5,
 };
 
+// GPU device-specific feature bits are in virtio13 5.7.3 "Feature bits".
+// Generic feature bits are in virtio13 6 "Reserved Feature Bits".
+struct GpuDeviceFeatures {
+  using Flags = uint64_t;
+
+  // VirGL mode is supported.
+  //
+  // VIRTIO_GPU_F_VIRGL in virtio13 5.7.3 "Feature bits"
+  static constexpr Flags kGpuVirGl = uint64_t{1} << 0;
+
+  // EDID is supported.
+  //
+  // VIRTIO_GPU_F_EDID in virtio13 5.7.3 "Feature bits"
+  static constexpr Flags kGpuEdid = uint64_t{1} << 1;
+
+  // Assigning resource UUIDs is supported.
+  //
+  // VIRTIO_GPU_F_RESOURCE_UUID in virtio13 5.7.3 "Feature bits"
+  static constexpr Flags kGpuResourceUuid = uint64_t{1} << 2;
+
+  // Size-based blob resources are supported.
+  //
+  // VIRTIO_GPU_F_RESOURCE_BLOB in virtio13 5.7.3 "Feature bits"
+  static constexpr Flags kGpuResourceBlob = uint64_t{1} << 3;
+
+  // Multiple GPU contexts and timelines are supported.
+  //
+  // VIRTIO_GPU_F_CONTEXT_INIT in virtio13 5.7.3 "Feature bits"
+  static constexpr Flags kGpuMultipleContexts = uint64_t{1} << 4;
+
+  // Modern virtio (1.0 and above) specification supported.
+  //
+  // VIRTIO_F_VERSION_1 in virtio13 6 "Reserved Feature Bits"
+  static constexpr Flags kVirtioVersion1 = uint64_t{1} << 32;
+
+  // Packed virtqueue layout supported.
+  //
+  // VIRTIO_F_RING_PACKED in virtio13 6 "Reserved Feature Bits"
+  static constexpr Flags kPackedQueueFormat = uint64_t{1} << 34;
+
+  // Each virtqueue can be reset individually.
+  //
+  // VIRTIO_F_RING_RESET in virtio13 6 "Reserved Feature Bits"
+  static constexpr Flags kPerQueueReset = uint64_t{1} << 40;
+};
+
 // GPU device configuration.
 //
 // struct virtio_gpu_config in virtio13 5.7.4 "Device configuration layout"
@@ -117,6 +163,8 @@ enum class ControlType : uint32_t {
   // VIRTIO_GPU_CMD_GET_CAPSET
   kGetCapabilitySetCommand = 0x0109,
 
+  // Command encoded by `GetExtendedDisplayIdCommand`.
+  //
   // VIRTIO_GPU_CMD_GET_EDID
   kGetExtendedDisplayIdCommand = 0x010a,
 
@@ -155,6 +203,8 @@ enum class ControlType : uint32_t {
   // VIRTIO_GPU_RESP_OK_CAPSET
   kCapabilitySetResponse = 0x1103,
 
+  // Response encoded by `ExtendedDisplayIdResponse`.
+  //
   // VIRTIO_GPU_RESP_OK_EDID
   kExtendedDisplayIdResponse = 0x1104,
 
@@ -287,13 +337,42 @@ constexpr int kMaxScanouts = 16;
 
 // Response to a VIRTIO_GPU_CMD_GET_DISPLAY_INFO command.
 //
-// struct virtio_gpu_resp_display_info in virtio12 5.7.6.8 "Device Operation:
+// struct virtio_gpu_resp_display_info in virtio13 5.7.6.8 "Device Operation:
 // controlq", under the VIRTIO_GPU_CMD_GET_DISPLAY_INFO command description
 struct DisplayInfoResponse {
   // `type` must be `kDisplayInfoResponse`.
   ControlHeader header;
 
   ScanoutInfo scanouts[kMaxScanouts];
+};
+
+// struct virtio_gpu_get_edid in virtio13 5.7.6.8 "Device Operation: controlq",
+// under the VIRTIO_GPU_CMD_GET_EDID command description
+struct GetExtendedDisplayIdCommand {
+  // `type` must be `kGetExtendedDisplayIdCommand`.
+  ControlHeader header;
+
+  uint32_t scanout_id;
+  uint32_t padding = 0;
+};
+
+// Response to a VIRTIO_GPU_CMD_GET_EDID command.
+//
+// struct virtio_gpu_resp_edid in virtio13 5.7.6.8 "Device Operation: controlq",
+// under the VIRTIO_GPU_CMD_GET_EDID command description
+struct ExtendedDisplayIdResponse {
+  // Hardcoded size in struct virtio_gpu_resp_edid::edid in virtio13.
+  static constexpr int kMaxEdidSize = 1024;
+
+  // `type` must be `kGetExtendedDisplayIdResponse`.
+  ControlHeader header;
+
+  // Number of meaningful bytes in `edid_bytes`.
+  //
+  // Must be at most `kMaxEdidSize`.
+  uint32_t edid_size;
+  uint32_t padding;
+  uint8_t edid_bytes[kMaxEdidSize];
 };
 
 // enum virtio_gpu_formats in virtio13 5.7.6.8 "Device Operation:

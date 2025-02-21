@@ -66,6 +66,11 @@ class VirtioPciDevice : public virtio::Device {
 
   size_t GetCapabilitySetLimit() const { return capability_set_limit_; }
 
+  // The optional features negotiated with the virtio device.
+  //
+  // Must only be called after Init() succeeds.
+  uint64_t Features() const { return features_; }
+
   // Synchronous request/response exchange on the main `controlq` virtqueue.
   void ExchangeControlqVariableLengthRequestResponse(
       cpp20::span<const uint8_t> request, std::function<void(cpp20::span<uint8_t>)> callback);
@@ -205,6 +210,9 @@ class VirtioPciDevice : public virtio::Device {
 
   // The number of capability sets supported by the virtio device.
   size_t capability_set_limit_ = {};
+
+  // The optional features negotiated with the virtio device.
+  uint64_t features_ = false;
 };
 
 template <typename ResponseType, typename RequestType>

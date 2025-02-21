@@ -54,6 +54,12 @@ class VirtioGpuDevice {
   // VIRTIO_GPU_CMD_GET_DISPLAY_INFO.
   zx::result<fbl::Vector<DisplayInfo>> GetDisplayInfo();
 
+  // Retrieves the VESA EDID for a scanout.
+  //
+  // virtio13 5.7.6.8 "Device Operation: controlq", operation
+  // VIRTIO_GPU_CMD_GET_EDID.
+  zx::result<fbl::Vector<uint8_t>> GetDisplayEdid(uint32_t scanout_id);
+
   // Creates a 2D resource on the virtio host.
   //
   // Returns the allocated resource ID. The returned ID is guaranteed to not

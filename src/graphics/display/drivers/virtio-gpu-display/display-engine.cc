@@ -27,6 +27,7 @@
 
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
+#include <fbl/string_buffer.h>
 
 #include "src/graphics/display/drivers/virtio-gpu-display/imported-image.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-gpu-device.h"
@@ -408,7 +409,8 @@ void DisplayEngine::virtio_gpu_flusher() {
 zx_status_t DisplayEngine::Start() {
   FDF_LOG(TRACE, "Start()");
 
-  // Get the display info and see if we find a valid pmode
+  // virtio13 5.7.5 "Device Requirements: Device Initialization"
+
   zx::result<fbl::Vector<DisplayInfo>> display_infos_result = gpu_device_->GetDisplayInfo();
   if (display_infos_result.is_error()) {
     FDF_LOG(ERROR, "Failed to get display info: %s", display_infos_result.status_string());
@@ -422,12 +424,21 @@ zx_status_t DisplayEngine::Start() {
   }
   current_display_ = *current_display;
 
+  zx::result<fbl::Vector<uint8_t>> display_edid_result =
+      gpu_device_->GetDisplayEdid(current_display->scanout_id);
+
+  // EDID support is optional, and the driver can proceed without it.
+  if (display_edid_result.is_ok()) {
+    current_display_edid_bytes_ = std::move(display_edid_result).value();
+  }
+
   FDF_LOG(INFO,
           "Found display at (%" PRIu32 ", %" PRIu32 ") size %" PRIu32 "x%" PRIu32
           ", flags 0x%08" PRIx32,
           current_display_.scanout_info.geometry.x, current_display_.scanout_info.geometry.y,
           current_display_.scanout_info.geometry.width,
           current_display_.scanout_info.geometry.height, current_display_.scanout_info.flags);
+  LogEdidBytes();
 
   // Set the mouse cursor position to (0,0); the result is not critical.
   zx::result<uint32_t> move_cursor_result =
@@ -462,6 +473,48 @@ zx_status_t DisplayEngine::Init() {
   }
 
   return ZX_OK;
+}
+
+void DisplayEngine::LogEdidBytes() {
+  if (current_display_edid_bytes_.is_empty()) {
+    FDF_LOG(INFO, "EDID not available");
+    return;
+  }
+
+  if constexpr (ZX_DEBUG_ASSERT_IMPLEMENTED) {
+    std::span<const uint8_t> bytes(current_display_edid_bytes_);
+
+    // The virtio-gpu implementation in QEmu 9.2 reports a zero-padded EDID that
+    // takes up the maximum buffer size in the virtio-gpu 1.3 specification.
+    //
+    // Trimming the trailing zeros significantly reduces the log output size.
+    const size_t original_size = bytes.size();
+    while (!bytes.empty() && bytes.back() == 0) {
+      bytes = bytes.subspan(0, bytes.size() - 1);
+    }
+
+    FDF_LOG(INFO, "--- BEGIN EDID DATA: %zu BYTES ---", original_size);
+    for (size_t line_start = 0; line_start < bytes.size();) {
+      // The logger truncates lines that exceed 1,024 bytes. We pack the bytes
+      // as compactly as possible, while meeting the constraint of mapping to
+      // the C++ initializer syntax used in our unit tests.
+      static constexpr int kMaxLoggingLineSize = 1020;
+      // Each byte is logged using 6 characters -- "0xcc, ".
+      static constexpr int kByteLoggingSize = 6;
+      static constexpr int kMaxLineBytes = kMaxLoggingLineSize / kByteLoggingSize;
+      const size_t line_byte_count = std::min<size_t>(kMaxLineBytes, bytes.size() - line_start);
+      fbl::StringBuffer<1020> line;
+      for (size_t i = 0; i < line_byte_count; ++i) {
+        line.AppendPrintf("0x%02x, ", bytes[line_start + i]);
+      }
+      FDF_LOG(INFO, "%s", line.c_str());
+      line_start += line_byte_count;
+    }
+    FDF_LOG(INFO, "--- END EDID DATA: %zu BYTES; SKIPPED %zu ZERO BYTES ---", original_size,
+            original_size - bytes.size());
+  } else {
+    FDF_LOG(INFO, "EDID available, uses %zu bytes", current_display_edid_bytes_.size());
+  }
 }
 
 }  // namespace virtio_display

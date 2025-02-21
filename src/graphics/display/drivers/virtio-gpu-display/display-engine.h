@@ -102,7 +102,12 @@ class DisplayEngine final : public display::DisplayEngineInterface {
   ImportedImages* imported_images_for_testing() { return &imported_images_; }
 
  private:
+  void LogEdidBytes();
+
   DisplayInfo current_display_;
+
+  // Empty if the display does not have EDID information.
+  fbl::Vector<uint8_t> current_display_edid_bytes_;
 
   // Flush thread
   void virtio_gpu_flusher();
