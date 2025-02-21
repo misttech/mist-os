@@ -38,25 +38,28 @@ void DisplayEngineEventsBanjo::SetListener(
 
 void DisplayEngineEventsBanjo::OnDisplayAdded(
     display::DisplayId display_id, cpp20::span<const display::ModeAndId> preferred_modes,
-    cpp20::span<const display::PixelFormat> pixel_formats) {
-  ZX_DEBUG_ASSERT(preferred_modes.size() == 1);
+    cpp20::span<const uint8_t> edid_bytes, cpp20::span<const display::PixelFormat> pixel_formats) {
+  ZX_DEBUG_ASSERT(preferred_modes.size() <= 1);
   ZX_DEBUG_ASSERT(pixel_formats.size() == 1);
-
-  ZX_DEBUG_ASSERT(preferred_modes[0].id() == display::ModeId(1));
-
-  const display_mode_t banjo_preferred_mode = preferred_modes[0].mode().ToBanjo();
-  const cpp20::span<const display_mode_t> banjo_preferred_modes(&banjo_preferred_mode, 1);
 
   const fuchsia_images2_pixel_format_enum_value_t banjo_pixel_format = pixel_formats[0].ToBanjo();
   const cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> banjo_pixel_formats(
       &banjo_pixel_format, 1);
 
+  display_mode_t banjo_preferred_mode = {};
+  cpp20::span<const display_mode_t> banjo_preferred_modes;
+  if (!preferred_modes.empty()) {
+    ZX_DEBUG_ASSERT(preferred_modes[0].id() == display::ModeId(1));
+    banjo_preferred_mode = preferred_modes[0].mode().ToBanjo();
+    banjo_preferred_modes = cpp20::span<const display_mode_t>(&banjo_preferred_mode, 1);
+  }
+
   const raw_display_info_t banjo_display_info = {
       .display_id = display::ToBanjoDisplayId(display_id),
       .preferred_modes_list = banjo_preferred_modes.data(),
       .preferred_modes_count = banjo_preferred_modes.size(),
-      .edid_bytes_list = nullptr,
-      .edid_bytes_count = 0,
+      .edid_bytes_list = edid_bytes.data(),
+      .edid_bytes_count = edid_bytes.size(),
       .pixel_formats_list = banjo_pixel_formats.data(),
       .pixel_formats_count = banjo_pixel_formats.size(),
   };

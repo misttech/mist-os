@@ -68,11 +68,90 @@ TEST_F(DisplayEngineEventsBanjoTest, OnDisplayAddedWithPreferredMode) {
     EXPECT_EQ(480u, info->preferred_modes_list[0].v_addressable);
     EXPECT_EQ(640 * 480 * 60u, info->preferred_modes_list[0].pixel_clock_hz);
 
+    EXPECT_EQ(0u, info->edid_bytes_count);
+    EXPECT_EQ(nullptr, info->edid_bytes_list);
+
     cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> banjo_pixel_formats(
         info->pixel_formats_list, info->pixel_formats_count);
     EXPECT_THAT(banjo_pixel_formats, ::testing::ElementsAreArray(expected_banjo_pixel_formats));
   });
   interface_.OnDisplayAdded(kDisplayId, kPreferredModes, kPixelFormats);
+}
+
+TEST_F(DisplayEngineEventsBanjoTest, OnDisplayAddedWithEdidBytes) {
+  static constexpr display::DisplayId kDisplayId(42);
+  static constexpr display::PixelFormat kPixelFormat = display::PixelFormat::kB8G8R8A8;
+  static constexpr cpp20::span<const display::PixelFormat> kPixelFormats(&kPixelFormat, 1);
+  static constexpr cpp20::span<const display::ModeAndId> kEmptyPreferredModes;
+
+  static constexpr uint64_t banjo_display_id = display::ToBanjoDisplayId(kDisplayId);
+  static constexpr fuchsia_images2_pixel_format_enum_value_t expected_banjo_pixel_format =
+      kPixelFormat.ToBanjo();
+  static constexpr cpp20::span<const fuchsia_images2_pixel_format_enum_value_t>
+      expected_banjo_pixel_formats(&expected_banjo_pixel_format, 1);
+
+  std::array<uint8_t, 256> edid_bytes;
+  for (size_t i = 0; i < edid_bytes.size(); ++i) {
+    edid_bytes[i] = static_cast<uint8_t>(i);
+  }
+
+  mock_.ExpectOnDisplayAdded([&](const raw_display_info_t* info) {
+    EXPECT_EQ(banjo_display_id, info->display_id);
+
+    EXPECT_EQ(0u, info->preferred_modes_count);
+    EXPECT_EQ(nullptr, info->preferred_modes_list);
+
+    cpp20::span<const uint8_t> banjo_edid_bytes(info->edid_bytes_list, info->edid_bytes_count);
+    EXPECT_THAT(banjo_edid_bytes, ::testing::ElementsAreArray(edid_bytes));
+
+    cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> banjo_pixel_formats(
+        info->pixel_formats_list, info->pixel_formats_count);
+    EXPECT_THAT(banjo_pixel_formats, ::testing::ElementsAreArray(expected_banjo_pixel_formats));
+  });
+  interface_.OnDisplayAdded(kDisplayId, kEmptyPreferredModes, edid_bytes, kPixelFormats);
+}
+
+TEST_F(DisplayEngineEventsBanjoTest, OnDisplayAddedWithPreferredModeAndEdidBytes) {
+  std::array<uint8_t, 256> edid_bytes;
+  for (size_t i = 0; i < edid_bytes.size(); ++i) {
+    edid_bytes[i] = static_cast<uint8_t>(i);
+  }
+
+  static constexpr display::DisplayId kDisplayId(42);
+  static constexpr display::ModeAndId kDisplayModeAndId({
+      .id = display::ModeId(1),
+      .mode = display::Mode({
+          .active_width = 640,
+          .active_height = 480,
+          .refresh_rate_millihertz = 60'000,
+      }),
+  });
+  static constexpr cpp20::span<const display::ModeAndId> kPreferredModes(&kDisplayModeAndId, 1);
+  static constexpr display::PixelFormat kPixelFormat = display::PixelFormat::kB8G8R8A8;
+  static constexpr cpp20::span<const display::PixelFormat> kPixelFormats(&kPixelFormat, 1);
+
+  static constexpr uint64_t banjo_display_id = display::ToBanjoDisplayId(kDisplayId);
+  static constexpr fuchsia_images2_pixel_format_enum_value_t expected_banjo_pixel_format =
+      kPixelFormat.ToBanjo();
+  static constexpr cpp20::span<const fuchsia_images2_pixel_format_enum_value_t>
+      expected_banjo_pixel_formats(&expected_banjo_pixel_format, 1);
+
+  mock_.ExpectOnDisplayAdded([&](const raw_display_info_t* info) {
+    EXPECT_EQ(banjo_display_id, info->display_id);
+
+    ASSERT_EQ(1u, info->preferred_modes_count);
+    EXPECT_EQ(640u, info->preferred_modes_list[0].h_addressable);
+    EXPECT_EQ(480u, info->preferred_modes_list[0].v_addressable);
+    EXPECT_EQ(640 * 480 * 60u, info->preferred_modes_list[0].pixel_clock_hz);
+
+    cpp20::span<const uint8_t> banjo_edid_bytes(info->edid_bytes_list, info->edid_bytes_count);
+    EXPECT_THAT(banjo_edid_bytes, ::testing::ElementsAreArray(edid_bytes));
+
+    cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> banjo_pixel_formats(
+        info->pixel_formats_list, info->pixel_formats_count);
+    EXPECT_THAT(banjo_pixel_formats, ::testing::ElementsAreArray(expected_banjo_pixel_formats));
+  });
+  interface_.OnDisplayAdded(kDisplayId, kPreferredModes, edid_bytes, kPixelFormats);
 }
 
 TEST_F(DisplayEngineEventsBanjoTest, OnDisplayAddedWithNoListener) {

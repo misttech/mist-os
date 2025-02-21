@@ -8,6 +8,8 @@
 #include <lib/stdcompat/span.h>
 #include <lib/zx/time.h>
 
+#include <cstdint>
+
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/mode-and-id.h"
@@ -34,10 +36,20 @@ class DisplayEngineEventsInterface {
 
   virtual void OnDisplayAdded(display::DisplayId display_id,
                               cpp20::span<const display::ModeAndId> preferred_modes,
-                              cpp20::span<const display::PixelFormat> pixel_formats) = 0;
+                              cpp20::span<const display::PixelFormat> pixel_formats);
   virtual void OnDisplayRemoved(display::DisplayId display_id) = 0;
   virtual void OnDisplayVsync(display::DisplayId display_id, zx::time timestamp,
                               display::DriverConfigStamp config_stamp) = 0;
+
+  // OOT drivers must not use the EDID display API.
+  // The interface is not stabilized and will change.
+  virtual void OnDisplayAdded(display::DisplayId display_id,
+                              cpp20::span<const display::ModeAndId> preferred_modes,
+                              cpp20::span<const uint8_t> edid_bytes,
+                              cpp20::span<const display::PixelFormat> pixel_formats) = 0;
+
+  // OOT drivers must not use the capture API.
+  // The interface is not stabilized and will change.
   virtual void OnCaptureComplete() = 0;
 
  protected:
