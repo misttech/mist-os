@@ -200,19 +200,9 @@ template("fidl_library") {
   # the build targets are created, the resulting API summery file will be empty.
   assert(!is_stable || requires_compatibility_tests)
 
-  # Do not add libraries here.
-  # If the ffx tool or plugin is not included in an IDK, try removing the
-  # category from its build rule. If you really must use an unstable API from
-  # an ffx tool or plugin in the IDK, add the library to
-  # `//src/developer/ffx/build/ffx_subtool_allowlist.gni` instead.
-  # TODO(https://fxbug.dev/377756547): Remove this when FDomain passes API review.
-  _is_unstable_partner_internal = library_name == "fuchsia.fdomain"
-  assert(!_is_unstable_partner_internal ||
-             (invoker.sdk_category == "partner_internal" && is_stable == false),
-         "Do you need to remove this library from the allowlist?")
   assert(
       is_stable || !defined(invoker.sdk_category) || is_in_internal_only_idk ||
-          invoker.sdk_category == "partner" || _is_unstable_partner_internal,
+          invoker.sdk_category == "partner",
       "Libraries in category '${sdk_category_string_for_assert}' must specify `stable=true`.")
 
   # Make sure  the same variables are forwarded to both fidl_ir() instances.

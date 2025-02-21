@@ -84,6 +84,10 @@ ffx_subtool_fidl_allowlist = [
   # used by ffx target update
   "//src/sys/pkg/fidl/fuchsia.update.installer:fuchsia.update.installer",
 
+  # TODO(https://fxbug.dev/377756547): Remove this when FDomain passes API
+  # review.
+  "//sdk/fidl/fuchsia.fdomain:fuchsia.fdomain",
+
   # Used by Honeydew via "fuchsia.wlan.device.service".
   # Though this is not ffx, it uses the same mechanism for host tools.
   # TODO(https://fxbug.dev/326090508): Add these to the SDK or remove usage.

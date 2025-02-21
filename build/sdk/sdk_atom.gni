@@ -238,6 +238,7 @@ template("sdk_atom") {
       "`meta.stable` must be set if and only if the type ('${type}') is one of ${_types_supporting_unstable_atoms}.")
   if (defined(meta.stable)) {
     if (meta.stable) {
+      # TODO(https://fxbug.dev/372986936): Remove when no more uses.
       assert(category != "internal",
              "Atoms in SDK category '${category}' cannot be `stable`.")
       add_stable_property = true
@@ -248,12 +249,6 @@ template("sdk_atom") {
       is_category_supporting_unstable =
           _categories_supporting_unstable_atoms + [ category ] - [ category ] !=
           _categories_supporting_unstable_atoms
-
-      # TODO(https://fxbug.dev/377756547): Remove this when FDomain passes API review.
-      if (category == "partner_internal" &&
-          target_name == "fuchsia.fdomain_sdk") {
-        is_category_supporting_unstable = true
-      }
 
       assert(
           is_category_supporting_unstable,
