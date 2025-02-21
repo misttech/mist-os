@@ -777,7 +777,7 @@ function track-build-event {
     ninja_switches="$(metrics-sanitize-string "${ninja_switches}")"
     fuchsia_targets="$(metrics-sanitize-string "${fuchsia_targets}")"
 
-    args_gn="$(grep -E 'build_info_board|build_info_product|rbe_mode|is_debug|optimize|select_variant' "${build_dir}"/args.gn | paste -sd ';' -)"
+    args_gn="$(grep -E 'build_info_board|build_info_product|rbe_mode|is_debug|optimize|select_variant|compilation_mode' "${build_dir}"/args.gn | paste -sd ';' -)"
     args_gn="${args_gn//[[:blank:]]/}" # remove blanks
   else
     switches=""
