@@ -138,7 +138,8 @@ zx::result<fidl::InterfaceHandle<fuchsia::hardware::block::Block>> GetFxfsPartit
   }
   auto [device_client, device_server] = *std::move(device_endpoints);
   flags |= fio::OpenFlags::kBlockDevice;
-  // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
+  // TODO(https://fxbug.dev/397501864): Support opening block devices with the new
+  // fuchsia.io/Directory.Open signature, or add a separate protocol for this purpose.
   auto device_open_result =
       fidl::WireCall(dir_client)
           ->DeprecatedOpen(flags, {}, fidl::StringView::FromExternal(image_path.filename().c_str()),

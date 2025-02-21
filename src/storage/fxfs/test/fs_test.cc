@@ -61,7 +61,8 @@ TEST_P(DeviceTest, TestWriteThenRead) {
 
   // Re-open file as block device i.e. using OpenFlag.BLOCK_DEVICE.
   fdio_cpp::FdioCaller caller(fs().GetRootFd());
-  // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
+  // TODO(https://fxbug.dev/397501864): Support opening block devices with the new
+  // fuchsia.io/Directory.Open signature, or add a separate protocol for this purpose.
   ASSERT_EQ(fidl::WireCall(caller.directory())
                 ->DeprecatedOpen(fuchsia_io::wire::OpenFlags::kRightReadable |
                                      fuchsia_io::wire::OpenFlags::kRightWritable |
@@ -128,7 +129,8 @@ TEST_P(DeviceTest, TestGroupWritesThenReads) {
   auto [client, server] = fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
 
   fdio_cpp::FdioCaller caller(fs().GetRootFd());
-  // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
+  // TODO(https://fxbug.dev/397501864): Support opening block devices with the new
+  // fuchsia.io/Directory.Open signature, or add a separate protocol for this purpose.
   ASSERT_EQ(fidl::WireCall(caller.directory())
                 ->DeprecatedOpen(fuchsia_io::wire::OpenFlags::kRightReadable |
                                      fuchsia_io::wire::OpenFlags::kRightWritable |
@@ -217,7 +219,8 @@ TEST_P(DeviceTest, TestWriteThenFlushThenRead) {
   auto [client, server] = fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
 
   fdio_cpp::FdioCaller caller(fs().GetRootFd());
-  // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
+  // TODO(https://fxbug.dev/397501864): Support opening block devices with the new
+  // fuchsia.io/Directory.Open signature, or add a separate protocol for this purpose.
   ASSERT_EQ(fidl::WireCall(caller.directory())
                 ->DeprecatedOpen(fuchsia_io::wire::OpenFlags::kRightReadable |
                                      fuchsia_io::wire::OpenFlags::kRightWritable |
@@ -279,7 +282,8 @@ TEST_P(DeviceTest, TestInvalidGroupRequests) {
   auto [client, server] = fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
 
   fdio_cpp::FdioCaller caller(fs().GetRootFd());
-  // TODO(https://fxbug.dev/378924259): Migrate to new Open signature.
+  // TODO(https://fxbug.dev/397501864): Support opening block devices with the new
+  // fuchsia.io/Directory.Open signature, or add a separate protocol for this purpose.
   ASSERT_EQ(fidl::WireCall(caller.directory())
                 ->DeprecatedOpen(fuchsia_io::wire::OpenFlags::kRightReadable |
                                      fuchsia_io::wire::OpenFlags::kRightWritable |

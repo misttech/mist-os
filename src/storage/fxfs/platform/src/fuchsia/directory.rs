@@ -863,6 +863,9 @@ impl VfsDirectory for FxDirectory {
                     )
                 } else if node.is::<FxFile>() {
                     let node = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
+                    // TODO(https://fxbug.dev/397501864): Support opening block devices with the new
+                    // fuchsia.io/Directory.Open signature (e.g. via the `open3` impl below), or add
+                    // a separate protocol for this purpose.
                     if flags.contains(fio::OpenFlags::BLOCK_DEVICE) {
                         if node.is_verified_file() {
                             log::error!("Tried to expose a verified file as a block device.");
