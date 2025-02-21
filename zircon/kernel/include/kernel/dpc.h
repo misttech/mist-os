@@ -23,28 +23,14 @@ class Dpc : public fbl::DoublyLinkedListable<Dpc*, fbl::NodeOptions::AllowCopyMo
  public:
   using Func = void(Dpc*);
 
-  explicit Dpc(Func* func = nullptr, void* arg = nullptr) : func_(func), arg_(arg) {}
+  explicit Dpc(Func* func, void* arg = nullptr) : func_(func), arg_(arg) {
+    DEBUG_ASSERT(func_ != nullptr);
+  }
 
   template <class ArgType>
   ArgType* arg() {
     return static_cast<ArgType*>(arg_);
   }
-
-  // Queue this object and signal the worker thread to execute it.
-  //
-  // |Queue| will not block, but it may wait briefly for a spinlock.
-  //
-  // |Queue| may return before or after the Dpc has executed.  It is the
-  // caller's responsibility to ensure that a queued Dpc object is not destroyed
-  // prior to its execution.
-  //
-  // Note: it is important that the thread calling Queue() not be holding its
-  // own lock when calling queue if there is _any_ possibility that the DPC
-  // thread could be involved in a PI interaction with the thread who is
-  // performing the queue operation.
-  //
-  // Returns ZX_ERR_ALREADY_EXISTS if |this| is already queued.
-  zx_status_t Queue() TA_EXCL(chainlock_transaction_token);
 
   // A single spinlock protects the data members of all DpcRunners.
   //
@@ -85,9 +71,9 @@ class DpcRunner {
   // not hold any locks that might be needed by any previously queued DPCs.  Otheriwse, deadlock may
   // occur.
   //
-  // Upon successful completion, this DpcRunner may contain unexecuted DPCs and new ones
-  // may be added by |Queue|.  However, they will not execute (on any cpu) until
-  // |TransitionOffCpu| is called.
+  // Upon successful completion, this DpcRunner may contain unexecuted DPCs and new ones may be
+  // added by |Enqueue|.  However, they will not execute (on any cpu) until |TransitionOffCpu| is
+  // called.
   //
   // Once |Shutdown| has completed successfully, finish the shutdown process by calling
   // |TransitionOffCpu| on some cpu other than the owning cpu.
@@ -105,9 +91,21 @@ class DpcRunner {
   // This must only be called on the current cpu.
   void TransitionOffCpu(DpcRunner& source);
 
-  // These are called by Dpc::Queue.
-  void EnqueueLocked(Dpc* dpc) TA_REQ(Dpc::Lock::Get());
-  void Signal() TA_EXCL(Dpc::Lock::Get());
+  // Enqueue |dpc| and signal its worker thread to execute it.
+  //
+  // |Enqueue| will not block, but it may wait briefly for a spinlock.
+  //
+  // |Enqueue| may return before or after the Dpc has executed.  It is the
+  // caller's responsibility to ensure that a queued Dpc object is not destroyed
+  // prior to its execution.
+  //
+  // Note: it is important that the thread calling Enqueue() not be holding its
+  // own lock if there is _any_ possibility that the DPC thread could be
+  // involved in a PI interaction with the thread who is performing the enqueue
+  // operation.
+  //
+  // Returns ZX_ERR_ALREADY_EXISTS if |dpc| is already queued.
+  static zx_status_t Enqueue(Dpc& dpc) TA_EXCL(chainlock_transaction_token);
 
  private:
   // Queue encapsulates a list of Dpc tasks and a thread that pops tasks off the list and executes
@@ -134,7 +132,7 @@ class DpcRunner {
     // |Shutdown| of |source|.
     void TakeFromLocked(Queue& source) TA_REQ(Dpc::Lock::Get());
 
-    void EnqueueLocked(Dpc* dpc) TA_REQ(Dpc::Lock::Get());
+    void EnqueueLocked(Dpc& dpc) TA_REQ(Dpc::Lock::Get());
     void Signal() TA_EXCL(Dpc::Lock::Get());
 
    private:

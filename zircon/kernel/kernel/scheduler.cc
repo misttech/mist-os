@@ -3012,7 +3012,7 @@ void Scheduler::PowerLevelControl::TimerHandler(Timer* timer, zx_instant_mono_t 
   // and its power level requests are no longer relevant.
   PowerLevelControl* power_level_control = static_cast<PowerLevelControl*>(arg);
   if (power_level_control->cpu() == arch_curr_cpu_num()) {
-    power_level_control->request_dpc_.Queue();
+    DpcRunner::Enqueue(power_level_control->request_dpc_);
   }
 }
 

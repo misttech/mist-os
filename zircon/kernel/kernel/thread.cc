@@ -1015,7 +1015,7 @@ __NO_RETURN void Thread::Current::Exit(int retcode) {
   // locks and queue a DPC to clean ourselves up.
   ASSERT(queue_free_dpc);
   Dpc free_dpc(&Thread::FreeDpc, current_thread);
-  [[maybe_unused]] zx_status_t status = free_dpc.Queue();
+  [[maybe_unused]] zx_status_t status = DpcRunner::Enqueue(free_dpc);
   DEBUG_ASSERT(status == ZX_OK);
 
   // Relock our thread one last time before dropping into our final reschedule

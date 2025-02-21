@@ -38,33 +38,7 @@ constexpr SchedulerState::BaseProfile kProfile{
 
 }  // namespace
 
-zx_status_t Dpc::Queue() {
-  DEBUG_ASSERT(func_);
-
-  DpcRunner* dpc_runner = nullptr;
-  {
-    Guard<SpinLock, IrqSave> guard{Dpc::Lock::Get()};
-
-    if (InContainer()) {
-      return ZX_ERR_ALREADY_EXISTS;
-    }
-
-    dpc_runner = &percpu::GetCurrent().dpc_runner;
-
-    // Put this Dpc at the tail of the list. Signal the worker outside the lock.
-    dpc_runner->EnqueueLocked(this);
-  }
-
-  // Signal outside of the lock to avoid lock order inversion with the thread
-  // lock.
-  dpc_runner->Signal();
-  return ZX_OK;
-}
-
-void Dpc::Invoke() {
-  if (func_)
-    func_(this);
-}
+void Dpc::Invoke() { func_(this); }
 
 void DpcRunner::InitForCurrentCpu() {
   if constexpr (DEBUG_ASSERT_IMPLEMENTED) {
@@ -93,9 +67,6 @@ void DpcRunner::InitForCurrentCpu() {
   queue_.Init(cpu, "dpc-", kProfile);
 }
 
-void DpcRunner::EnqueueLocked(Dpc* dpc) { queue_.EnqueueLocked(dpc); }
-void DpcRunner::Signal() { queue_.Signal(); }
-
 zx_status_t DpcRunner::Shutdown(zx_instant_mono_t deadline) { return queue_.Shutdown(deadline); }
 
 void DpcRunner::TransitionOffCpu(DpcRunner& source) {
@@ -109,6 +80,27 @@ void DpcRunner::TransitionOffCpu(DpcRunner& source) {
 
   source.initialized_ = false;
   source.cpu_ = INVALID_CPU;
+}
+
+zx_status_t DpcRunner::Enqueue(Dpc& dpc) {
+  DpcRunner::Queue* queue = nullptr;
+  {
+    Guard<SpinLock, IrqSave> guard{Dpc::Lock::Get()};
+
+    if (dpc.InContainer()) {
+      return ZX_ERR_ALREADY_EXISTS;
+    }
+
+    queue = &percpu::GetCurrent().dpc_runner.queue_;
+
+    // Put this Dpc at the tail of the list. Signal the worker outside the lock.
+    queue->EnqueueLocked(dpc);
+  }
+
+  // Signal outside of the lock to avoid lock order inversion with the thread
+  // lock.
+  queue->Signal();
+  return ZX_OK;
 }
 
 void DpcRunner::Queue::Init(cpu_num_t cpu, const char* name_prefix,
@@ -174,7 +166,7 @@ void DpcRunner::Queue::TakeFromLocked(Queue& source) {
   source.stop_ = false;
 }
 
-void DpcRunner::Queue::EnqueueLocked(Dpc* dpc) { list_.push_back(dpc); }
+void DpcRunner::Queue::EnqueueLocked(Dpc& dpc) { list_.push_back(&dpc); }
 void DpcRunner::Queue::Signal() { event_.Signal(); }
 
 int DpcRunner::Queue::DoWork() {
