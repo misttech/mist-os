@@ -48,7 +48,6 @@
 #include "src/graphics/display/drivers/coordinator/display-info.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/layer.h"
-#include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/drivers/coordinator/post-display-task.h"
 #include "src/graphics/display/drivers/coordinator/vsync-monitor.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
@@ -56,6 +55,7 @@
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 #include "src/graphics/display/lib/edid/edid.h"
 
 namespace fidl_display = fuchsia_hardware_display;
@@ -688,21 +688,24 @@ zx::result<std::span<const display::DisplayTiming>> Controller::GetDisplayTiming
   return zx::error(ZX_ERR_NOT_FOUND);
 }
 
-zx::result<fbl::Array<CoordinatorPixelFormat>> Controller::GetSupportedPixelFormats(
+zx::result<fbl::Vector<display::PixelFormat>> Controller::GetSupportedPixelFormats(
     display::DisplayId display_id) {
-  fbl::Array<CoordinatorPixelFormat> formats_out;
-  for (auto& display : displays_) {
-    if (display.id == display_id) {
-      fbl::AllocChecker alloc_checker;
-      size_t size = display.pixel_formats.size();
-      formats_out = fbl::Array<CoordinatorPixelFormat>(
-          new (&alloc_checker) CoordinatorPixelFormat[size], size);
-      if (!alloc_checker.check()) {
-        return zx::error(ZX_ERR_NO_MEMORY);
-      }
-      std::copy(display.pixel_formats.begin(), display.pixel_formats.end(), formats_out.begin());
-      return zx::ok(std::move(formats_out));
+  fbl::Array<display::PixelFormat> formats_out;
+  for (const DisplayInfo& display_info : displays_) {
+    if (display_info.id != display_id) {
+      continue;
     }
+
+    fbl::AllocChecker alloc_checker;
+    fbl::Vector<display::PixelFormat> pixel_formats;
+    pixel_formats.reserve(display_info.pixel_formats.size(), &alloc_checker);
+    if (!alloc_checker.check()) {
+      return zx::error(ZX_ERR_NO_MEMORY);
+    }
+    std::ranges::copy(display_info.pixel_formats, std::back_inserter(pixel_formats));
+    ZX_DEBUG_ASSERT(pixel_formats.size() == display_info.pixel_formats.size());
+
+    return zx::ok(std::move(pixel_formats));
   }
   return zx::error(ZX_ERR_NOT_FOUND);
 }

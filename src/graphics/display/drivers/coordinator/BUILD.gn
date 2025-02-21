@@ -67,8 +67,6 @@ source_set("shared") {
     "image.h",
     "layer.cc",
     "layer.h",
-    "migration-util.cc",
-    "migration-util.h",
     "vsync-monitor.cc",
     "vsync-monitor.h",
     "waiting-image-list.cc",

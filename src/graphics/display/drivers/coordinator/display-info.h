@@ -24,11 +24,11 @@
 #include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
-#include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 #include "src/graphics/display/lib/edid/edid.h"
 
 namespace display_coordinator {
@@ -75,7 +75,7 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, display::Display
   std::optional<Edid> edid;
   std::optional<display::DisplayTiming> mode;
 
-  fbl::Vector<CoordinatorPixelFormat> pixel_formats;
+  fbl::Vector<display::PixelFormat> pixel_formats;
 
   // Flag indicating that the display is ready to be published to clients.
   bool init_done = false;

@@ -27,9 +27,9 @@
 #include <fbl/string_printf.h>
 #include <pretty/hexdump.h>
 
-#include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
+#include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 #include "src/graphics/display/lib/edid/edid.h"
 
 namespace display_coordinator {
@@ -91,9 +91,9 @@ void DisplayInfo::InitializeInspect(inspect::Node* parent_node) {
 // static
 zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(
     const raw_display_info_t& banjo_display_info) {
-  fbl::AllocChecker ac;
-  fbl::RefPtr<DisplayInfo> out = fbl::AdoptRef(new (&ac) DisplayInfo);
-  if (!ac.check()) {
+  fbl::AllocChecker alloc_checker;
+  fbl::RefPtr<DisplayInfo> out = fbl::AdoptRef(new (&alloc_checker) DisplayInfo);
+  if (!alloc_checker.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -101,15 +101,26 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(
   out->layer_count = 0;
   out->id = display::ToDisplayId(banjo_display_info.display_id);
 
-  zx::result get_display_info_pixel_formats_result =
-      CoordinatorPixelFormat::CreateFblVectorFromBanjoVector(
-          std::span(banjo_display_info.pixel_formats_list, banjo_display_info.pixel_formats_count));
-  if (get_display_info_pixel_formats_result.is_error()) {
-    FDF_LOG(ERROR, "Cannot convert pixel formats to FIDL pixel format value: %s",
-            get_display_info_pixel_formats_result.status_string());
-    return get_display_info_pixel_formats_result.take_error();
+  fbl::Vector<display::PixelFormat> pixel_formats;
+  pixel_formats.reserve(banjo_display_info.pixel_formats_count, &alloc_checker);
+  if (!alloc_checker.check()) {
+    FDF_LOG(ERROR, "AddedDisplayInfo creation failed: out of memory allocating pixel formats");
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
-  out->pixel_formats = std::move(get_display_info_pixel_formats_result.value());
+  for (size_t i = 0; i < banjo_display_info.pixel_formats_count; ++i) {
+    const uint32_t banjo_pixel_format = banjo_display_info.pixel_formats_list[i];
+    if (!display::PixelFormat::IsSupported(banjo_pixel_format)) {
+      FDF_LOG(ERROR, "AddedDisplayInfo creation failed: unsupported pixel format %" PRIu32,
+              banjo_pixel_format);
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+    display::PixelFormat pixel_format(banjo_pixel_format);
+
+    ZX_DEBUG_ASSERT(pixel_formats.size() < banjo_display_info.pixel_formats_count);
+    pixel_formats.push_back(pixel_format, &alloc_checker);
+    ZX_DEBUG_ASSERT(alloc_checker.check());
+  }
+  out->pixel_formats = std::move(pixel_formats);
 
   if (banjo_display_info.preferred_modes_count != 0) {
     ZX_DEBUG_ASSERT(banjo_display_info.preferred_modes_count == 1);

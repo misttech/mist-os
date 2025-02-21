@@ -27,7 +27,6 @@
 #include <memory>
 #include <span>
 
-#include <fbl/array.h>
 #include <fbl/mutex.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
@@ -39,7 +38,6 @@
 #include "src/graphics/display/drivers/coordinator/engine-driver-client.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
-#include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/drivers/coordinator/vsync-monitor.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
@@ -47,6 +45,7 @@
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 
 namespace display_coordinator {
 
@@ -131,7 +130,7 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   zx::result<std::span<const display::DisplayTiming>> GetDisplayTimings(
       display::DisplayId display_id) __TA_REQUIRES(mtx());
 
-  zx::result<fbl::Array<CoordinatorPixelFormat>> GetSupportedPixelFormats(
+  zx::result<fbl::Vector<display::PixelFormat>> GetSupportedPixelFormats(
       display::DisplayId display_id) __TA_REQUIRES(mtx());
 
   // Calls `callback` with a const DisplayInfo& matching the given `display_id`.

@@ -24,7 +24,6 @@
 #include <variant>
 #include <vector>
 
-#include <fbl/array.h>
 #include <fbl/auto_lock.h>
 #include <fbl/intrusive_double_list.h>
 #include <fbl/ref_ptr.h>
@@ -39,7 +38,6 @@
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/layer.h"
-#include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/api-types/cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/buffer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
@@ -49,6 +47,7 @@
 #include "src/graphics/display/lib/api-types/cpp/event-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/layer-id.h"
+#include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 #include "src/graphics/display/lib/api-types/cpp/vsync-ack-cookie.h"
 
 namespace display_coordinator {
@@ -91,7 +90,7 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, display:
   fbl::DoublyLinkedList<LayerNode*> draft_layers_;
   fbl::DoublyLinkedList<LayerNode*> applied_layers_;
 
-  fbl::Array<CoordinatorPixelFormat> pixel_formats_;
+  fbl::Vector<display::PixelFormat> pixel_formats_;
 
   bool has_draft_nonlayer_config_change_ = false;
 
