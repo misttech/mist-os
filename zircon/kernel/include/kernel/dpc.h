@@ -61,6 +61,9 @@ class Dpc : public fbl::DoublyLinkedListable<Dpc*, fbl::NodeOptions::AllowCopyMo
   void* const arg_;
 };
 
+// A DpcRunner is responsible for running queued Dpcs.  Under the hood, a given runner may manage
+// multiple independent queues of Dpcs.
+//
 // Each cpu maintains a DpcRunner, in its percpu structure.
 class DpcRunner {
  public:
@@ -107,6 +110,49 @@ class DpcRunner {
   void Signal() TA_EXCL(Dpc::Lock::Get());
 
  private:
+  // Queue encapsulates a list of Dpc tasks and a thread that pops tasks off the list and executes
+  // them in order.
+  //
+  // A Queue must be initialized (|Init|) prior to use.  A Queue that's been initialized must be
+  // |Shutdown| before it may be reinitialized.
+  class Queue {
+   public:
+    // Initialize |cpu|'s queue.
+    //
+    // Creates a thread with |name_prefix| and scheduler |profile| that will service this Queue.
+    void Init(cpu_num_t cpu, const char* name_prefix, const SchedulerState::BaseProfile& profile);
+
+    // Begins the shutdown process for this Queue.  After a successful |Shutdown|, this Queue's
+    // remaining contents should be moved into elsewhere by calling |TakeFromLocked| on another
+    // Queue.
+    //
+    // Signals the worker thread to terminate and waits until it has terminated or |deadline| is
+    // reached.  If shutdown fails, the object is left in an inconsistent state.
+    zx_status_t Shutdown(zx_instant_mono_t deadline);
+
+    // Moves any queued Dpcs from |source| to |this|.  May only be called after a successful
+    // |Shutdown| of |source|.
+    void TakeFromLocked(Queue& source) TA_REQ(Dpc::Lock::Get());
+
+    void EnqueueLocked(Dpc* dpc) TA_REQ(Dpc::Lock::Get());
+    void Signal() TA_EXCL(Dpc::Lock::Get());
+
+   private:
+    int DoWork();
+
+    // Request the thread_ to stop by setting to true.
+    //
+    // This guarded by the static global dpc_lock.
+    bool stop_ TA_GUARDED(Dpc::Lock::Get()) = false;
+
+    fbl::DoublyLinkedList<Dpc*> list_ TA_GUARDED(Dpc::Lock::Get());
+
+    // The thread that executes DPCs queued in list_.
+    Thread* thread_ TA_GUARDED(Dpc::Lock::Get()) = nullptr;
+
+    Event event_;
+  };
+
   static int WorkerThread(void* unused);
   int Work();
 
@@ -116,17 +162,7 @@ class DpcRunner {
   // Whether the DpcRunner has been initialized for the owning cpu.
   bool initialized_ TA_GUARDED(Dpc::Lock::Get()) = false;
 
-  // Request the thread_ to stop by setting to true.
-  //
-  // This guarded by the static global dpc_lock.
-  bool stop_ TA_GUARDED(Dpc::Lock::Get()) = false;
-
-  fbl::DoublyLinkedList<Dpc*> list_ TA_GUARDED(Dpc::Lock::Get());
-
-  // Each cpu maintains a dedicated thread for processing Dpcs.
-  Thread* thread_ TA_GUARDED(Dpc::Lock::Get()) = nullptr;
-
-  Event event_;
+  Queue queue_;
 };
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_DPC_H_

@@ -13,15 +13,30 @@
 #include <zircon/listnode.h>
 #include <zircon/types.h>
 
+#include <arch/ops.h>
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/event.h>
 #include <kernel/lockdep.h>
 #include <kernel/percpu.h>
+#include <kernel/scheduler.h>
 #include <kernel/spinlock.h>
 #include <ktl/bit.h>
 #include <lk/init.h>
 
 #define DPC_THREAD_PRIORITY HIGH_PRIORITY
+
+namespace {
+
+// The Dpc thread for timers may use up to 150us out of every 300us (i.e. 50% of the CPU) in
+// the worst case. DPCs usually take only a small fraction of this and have a much lower
+// frequency than 3.333KHz.
+//
+// TODO(https://fxbug.dev/42114336): Make this runtime tunable. It may be necessary to change
+// the Dpc deadline params later in boot, after configuration is loaded somehow.
+constexpr SchedulerState::BaseProfile kProfile{
+    SchedDeadlineParams{SchedDuration{ZX_USEC(150)}, SchedDuration{ZX_USEC(300)}}};
+
+}  // namespace
 
 zx_status_t Dpc::Queue() {
   DEBUG_ASSERT(func_);
@@ -51,16 +66,82 @@ void Dpc::Invoke() {
     func_(this);
 }
 
-void DpcRunner::EnqueueLocked(Dpc* dpc) { list_.push_back(dpc); }
-void DpcRunner::Signal() { event_.Signal(); }
+void DpcRunner::InitForCurrentCpu() {
+  if constexpr (DEBUG_ASSERT_IMPLEMENTED) {
+    Thread* const current_thread = Thread::Current::Get();
+    SingleChainLockGuard guard{IrqSaveOption, current_thread->get_lock(),
+                               CLT_TAG("DpcRunner::InitForCurrentCpu")};
+    const cpu_mask_t mask = current_thread->scheduler_state().hard_affinity();
+    DEBUG_ASSERT_MSG(ktl::popcount(mask) == 1, "mask %#x", mask);
+  }
 
-zx_status_t DpcRunner::Shutdown(zx_instant_mono_t deadline) {
+  const cpu_num_t cpu = arch_curr_cpu_num();
+
+  {
+    Guard<SpinLock, IrqSave> guard{Dpc::Lock::Get()};
+
+    // This cpu's DpcRunner was initialized on a previous hotplug event.
+    if (initialized_) {
+      return;
+    }
+
+    DEBUG_ASSERT(cpu_ == INVALID_CPU);
+    cpu_ = cpu;
+    initialized_ = true;
+  }
+
+  queue_.Init(cpu, "dpc-", kProfile);
+}
+
+void DpcRunner::EnqueueLocked(Dpc* dpc) { queue_.EnqueueLocked(dpc); }
+void DpcRunner::Signal() { queue_.Signal(); }
+
+zx_status_t DpcRunner::Shutdown(zx_instant_mono_t deadline) { return queue_.Shutdown(deadline); }
+
+void DpcRunner::TransitionOffCpu(DpcRunner& source) {
+  Guard<SpinLock, IrqSave> guard{Dpc::Lock::Get()};
+
+  // |source|'s cpu is shutting down. Assert that we are migrating to the current cpu.
+  DEBUG_ASSERT(cpu_ == arch_curr_cpu_num());
+  DEBUG_ASSERT(cpu_ != source.cpu_);
+
+  source.queue_.TakeFromLocked(source.queue_);
+
+  source.initialized_ = false;
+  source.cpu_ = INVALID_CPU;
+}
+
+void DpcRunner::Queue::Init(cpu_num_t cpu, const char* name_prefix,
+                            const SchedulerState::BaseProfile& profile) {
+  char name[ZX_MAX_NAME_LEN];
+  snprintf(name, sizeof(name), "%s%u", name_prefix, cpu);
+
+  thread_start_routine entry = [](void* arg) -> int {
+    return reinterpret_cast<DpcRunner::Queue*>(arg)->DoWork();
+  };
+
+  Thread* thread = Thread::Create(name, entry, this, DPC_THREAD_PRIORITY);
+  ASSERT(thread != nullptr);
+  thread->SetBaseProfile(profile);
+  thread->SetCpuAffinity(cpu_num_to_mask(cpu));
+
+  {
+    Guard<SpinLock, IrqSave> guard{Dpc::Lock::Get()};
+    thread_ = thread;
+  }
+
+  thread->Resume();
+}
+
+zx_status_t DpcRunner::Queue::Shutdown(zx_instant_mono_t deadline) {
   Thread* t;
   Event* event;
   {
     Guard<SpinLock, IrqSave> guard{Dpc::Lock::Get()};
 
-    // Ask the Dpc's thread to terminate.
+    DEBUG_ASSERT(thread_ != nullptr);
+
+    // Ask the thread to terminate.
     DEBUG_ASSERT(!stop_);
     stop_ = true;
 
@@ -78,14 +159,8 @@ zx_status_t DpcRunner::Shutdown(zx_instant_mono_t deadline) {
   return t->Join(nullptr, deadline);
 }
 
-void DpcRunner::TransitionOffCpu(DpcRunner& source) {
-  Guard<SpinLock, IrqSave> guard{Dpc::Lock::Get()};
-
-  // |source|'s cpu is shutting down. Assert that we are migrating to the current cpu.
-  DEBUG_ASSERT(cpu_ == arch_curr_cpu_num());
-  DEBUG_ASSERT(cpu_ != source.cpu_);
-
-  // The Dpc's thread must already have been stopped by a call to |Shutdown|.
+void DpcRunner::Queue::TakeFromLocked(Queue& source) {
+  // The thread must have already been stopped by a call to |Shutdown|.
   DEBUG_ASSERT(source.stop_);
   DEBUG_ASSERT(source.thread_ == nullptr);
 
@@ -97,13 +172,12 @@ void DpcRunner::TransitionOffCpu(DpcRunner& source) {
   source.event_.Unsignal();
   DEBUG_ASSERT(source.list_.is_empty());
   source.stop_ = false;
-  source.initialized_ = false;
-  source.cpu_ = INVALID_CPU;
 }
 
-int DpcRunner::WorkerThread(void* unused) { return percpu::GetCurrent().dpc_runner.Work(); }
+void DpcRunner::Queue::EnqueueLocked(Dpc* dpc) { list_.push_back(dpc); }
+void DpcRunner::Queue::Signal() { event_.Signal(); }
 
-int DpcRunner::Work() {
+int DpcRunner::Queue::DoWork() {
   for (;;) {
     // Wait for a Dpc to fire.
     [[maybe_unused]] zx_status_t err = event_.Wait();
@@ -135,54 +209,6 @@ int DpcRunner::Work() {
   }
 
   return 0;
-}
-
-void DpcRunner::InitForCurrentCpu() {
-  if constexpr (DEBUG_ASSERT_IMPLEMENTED) {
-    Thread* const current_thread = Thread::Current::Get();
-    SingleChainLockGuard guard{IrqSaveOption, current_thread->get_lock(),
-                               CLT_TAG("DpcRunner::InitForCurrentCpu")};
-    const cpu_mask_t mask = current_thread->scheduler_state().hard_affinity();
-    DEBUG_ASSERT_MSG(ktl::popcount(mask) == 1, "mask %#x", mask);
-  }
-
-  {
-    Guard<SpinLock, IrqSave> guard{Dpc::Lock::Get()};
-
-    // This cpu's DpcRunner was initialized on a previous hotplug event.
-    if (initialized_) {
-      return;
-    }
-
-    DEBUG_ASSERT(cpu_ == INVALID_CPU);
-    DEBUG_ASSERT(!stop_);
-    DEBUG_ASSERT(thread_ == nullptr);
-  }
-
-  const cpu_num_t cpu = arch_curr_cpu_num();
-  char name[10];
-  snprintf(name, sizeof(name), "dpc-%u", cpu);
-  Thread* thread = Thread::Create(name, &DpcRunner::WorkerThread, nullptr, DPC_THREAD_PRIORITY);
-  ASSERT(thread != nullptr);
-  thread->SetCpuAffinity(cpu_num_to_mask(cpu));
-
-  // The Dpc thread may use up to 150us out of every 300us (i.e. 50% of the CPU)
-  // in the worst case. DPCs usually take only a small fraction of this and have
-  // a much lower frequency than 3.333KHz.
-  // TODO(https://fxbug.dev/42114336): Make this runtime tunable. It may be necessary to change the
-  // Dpc deadline params later in boot, after configuration is loaded somehow.
-  thread->SetBaseProfile(SchedulerState::BaseProfile{
-      SchedDeadlineParams{SchedDuration{ZX_USEC(150)}, SchedDuration{ZX_USEC(300)}}});
-
-  {
-    Guard<SpinLock, IrqSave> guard{Dpc::Lock::Get()};
-    cpu_ = cpu;
-    initialized_ = true;
-    stop_ = false;
-    thread_ = thread;
-  }
-
-  thread->Resume();
 }
 
 static void dpc_init(unsigned int level) {
