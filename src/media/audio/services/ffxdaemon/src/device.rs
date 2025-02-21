@@ -11,11 +11,11 @@ use fidl::endpoints::{create_proxy, ServerEnd};
 use fuchsia_audio::device::{DevfsSelector, RegistrySelector, Selector};
 use fuchsia_audio::{stop_listener, Format};
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path};
-
+use futures::lock::Mutex;
 use futures::{AsyncWriteExt, StreamExt};
 use std::collections::{btree_map, BTreeMap};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
 use std::time::Duration;
 use {
     fidl_fuchsia_audio_controller as fac, fidl_fuchsia_audio_device as fadevice,
@@ -34,7 +34,8 @@ pub trait DeviceControl {
         element_id: fadevice::ElementId,
         format: Format,
     ) -> Result<Box<dyn RingBuffer>, Error>;
-    fn set_gain(&mut self, gain_state: fhaudio::GainState) -> Result<(), Error>;
+
+    async fn set_gain(&mut self, gain_state: fhaudio::GainState) -> Result<(), Error>;
 }
 
 pub struct StreamConfigDevice {
@@ -55,7 +56,7 @@ impl DeviceControl for StreamConfigDevice {
         Ok(Box::new(ring_buffer))
     }
 
-    fn set_gain(&mut self, gain_state: fhaudio::GainState) -> Result<(), Error> {
+    async fn set_gain(&mut self, gain_state: fhaudio::GainState) -> Result<(), Error> {
         self.proxy.set_gain(&gain_state).map_err(|e| anyhow!("Error setting gain state: {e}"))
     }
 }
@@ -74,7 +75,7 @@ impl DeviceControl for CompositeDevice {
         Err(anyhow!("Creating ring buffers for Composite devices not supported yet in ffx audio."))
     }
 
-    fn set_gain(&mut self, _gain_state: fhaudio::GainState) -> Result<(), Error> {
+    async fn set_gain(&mut self, _gain_state: fhaudio::GainState) -> Result<(), Error> {
         Err(anyhow!(
             "Setting gain not supported for Composite devices not supported yet in ffx audio."
         ))
@@ -130,7 +131,7 @@ impl DeviceControl for RegistryDevice {
         Ok(Box::new(ring_buffer))
     }
 
-    fn set_gain(&mut self, _gain_state: fhaudio::GainState) -> Result<(), Error> {
+    async fn set_gain(&mut self, _gain_state: fhaudio::GainState) -> Result<(), Error> {
         Err(anyhow!("set gain is not supported for Registry devices"))
     }
 }
@@ -251,11 +252,12 @@ impl Device {
         Self { device_controller }
     }
 
-    pub fn set_gain(&mut self, gain_state: fhaudio::GainState) -> Result<(), Error> {
+    pub async fn set_gain(&mut self, gain_state: fhaudio::GainState) -> Result<(), Error> {
         self.device_controller
             .lock()
-            .unwrap()
+            .await
             .set_gain(gain_state)
+            .await
             .map_err(|e| anyhow!("Error setting device gain state: {e}"))
     }
 
@@ -269,7 +271,7 @@ impl Device {
         let format = Format::from(spec);
 
         let ring_buffer =
-            self.device_controller.lock().unwrap().create_ring_buffer(element_id, format).await?;
+            self.device_controller.lock().await.create_ring_buffer(element_id, format).await?;
 
         let mut silenced_frames = 0u64;
         let mut late_wakeups = 0;
@@ -438,7 +440,7 @@ impl Device {
         cancel_server: Option<ServerEnd<fac::RecordCancelerMarker>>,
     ) -> Result<fac::RecorderRecordResponse, ControllerError> {
         let ring_buffer =
-            self.device_controller.lock().unwrap().create_ring_buffer(element_id, format).await?;
+            self.device_controller.lock().await.create_ring_buffer(element_id, format).await?;
 
         // Hardware might not use all bytes in vmo. Only want to read frames hardware will write to.
         let bytes_in_rb = ring_buffer.vmo_buffer().data_size_bytes();

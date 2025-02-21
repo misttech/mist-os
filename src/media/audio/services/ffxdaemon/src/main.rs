@@ -22,9 +22,10 @@ use fuchsia_audio::Format;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
+use futures::lock::Mutex;
 use futures::{StreamExt, TryStreamExt};
 use log::error;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 use {fidl_fuchsia_audio_controller as fac, fuchsia_async as fasync};
 
@@ -75,7 +76,7 @@ pub async fn handle_play_request(
                 )
             })?;
 
-            let device_control = device_control_connector.lock().unwrap().connect(selector).await?;
+            let device_control = device_control_connector.lock().await.connect(selector).await?;
             let mut device = Device::new(device_control);
 
             device.play(ring_buffer_element_id, wav_socket, request.active_channels_bitmask).await
@@ -151,7 +152,7 @@ pub async fn handle_record_request(
                 )
             })?;
 
-            let device_control = device_control_connector.lock().unwrap().connect(selector).await?;
+            let device_control = device_control_connector.lock().await.connect(selector).await?;
             let mut device = Device::new(device_control);
 
             device
@@ -203,10 +204,10 @@ async fn serve_device_control(
                     payload.gain_state.ok_or_else(|| anyhow!("No gain state specified"))?;
 
                 let device_control =
-                    device_control_connector.lock().unwrap().connect(selector).await?;
+                    device_control_connector.lock().await.connect(selector).await?;
                 let mut device = Device::new(device_control);
 
-                device.set_gain(gain_state)?;
+                device.set_gain(gain_state).await?;
                 responder.send(Ok(())).map_err(|e| anyhow!("Error sending response: {e}"))
             }
             _ => Err(anyhow!("Request {request_name} not supported.")),
