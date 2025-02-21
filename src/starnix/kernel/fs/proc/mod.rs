@@ -28,6 +28,7 @@ pub mod uid_io;
 pub mod uid_procstat;
 pub mod uptime;
 pub mod vmstat;
+pub mod zoneinfo;
 
 pub use fs::{get_proc_fs, proc_fs};
 pub use sysctl::{ProcSysNetDev, SystemLimits};

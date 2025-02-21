@@ -26,17 +26,17 @@ use crate::fs::proc::uid_io::uid_io_node;
 use crate::fs::proc::uid_procstat::uid_procstat_node;
 use crate::fs::proc::uptime::uptime_node;
 use crate::fs::proc::vmstat::vmstat_node;
-use crate::mm::PAGE_SIZE;
-use crate::task::{CurrentTask, KernelStats};
+use crate::fs::proc::zoneinfo::zoneinfo_node;
+use crate::task::CurrentTask;
 use crate::vfs::{
     emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
-    fs_node_impl_symlink, unbounded_seek, BytesFile, DirectoryEntryType, DirentSink, DynamicFile,
-    DynamicFileBuf, DynamicFileSource, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, StubEmptyFile, SymlinkTarget,
+    fs_node_impl_symlink, unbounded_seek, BytesFile, DirectoryEntryType, DirentSink, FileObject,
+    FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+    SeekTarget, StubEmptyFile, SymlinkTarget,
 };
 
 use maplit::btreemap;
-use starnix_logging::{bug_ref, log_error, BugRef};
+use starnix_logging::{bug_ref, BugRef};
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
@@ -61,8 +61,7 @@ pub struct ProcDirectory {
 impl ProcDirectory {
     /// Returns a new `ProcDirectory` exposing information about `kernel`.
     pub fn new(current_task: &CurrentTask, fs: &FileSystemHandle) -> Arc<ProcDirectory> {
-        let kernel = current_task.kernel();
-
+        // First add all the nodes that are always present in the top-level proc directory.
         let mut nodes = btreemap! {
             "cpuinfo".into() => cpuinfo_node(current_task, fs),
             "cmdline".into() => cmdline_node(current_task, fs),
@@ -107,13 +106,10 @@ impl ProcDirectory {
             },
             "vmallocinfo".into() => stub_node(current_task, fs, "/proc/vmallocinfo", bug_ref!("https://fxbug.dev/322894183")),
             "vmstat".into() => vmstat_node(current_task, fs),
-            "zoneinfo".into() => fs.create_node(
-                current_task,
-                ZoneInfoFile::new_node(&kernel.stats),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
+            "zoneinfo".into() => zoneinfo_node(current_task, fs),
         };
 
+        // Then optionally add the nodes that are only present in some configurations.
         if let Some(pressure_directory) = pressure_directory(current_task, fs) {
             nodes.insert("pressure".into(), pressure_directory);
         }
@@ -269,62 +265,5 @@ impl FsNodeOps for MountsSymlink {
         _current_task: &CurrentTask,
     ) -> Result<SymlinkTarget, Errno> {
         Ok(SymlinkTarget::Path("self/mounts".into()))
-    }
-}
-
-#[derive(Clone)]
-struct ZoneInfoFile {
-    kernel_stats: Arc<KernelStats>,
-}
-
-impl ZoneInfoFile {
-    pub fn new_node(kernel_stats: &Arc<KernelStats>) -> impl FsNodeOps {
-        DynamicFile::new_node(Self { kernel_stats: kernel_stats.clone() })
-    }
-}
-
-impl DynamicFileSource for ZoneInfoFile {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let mem_stats = self
-            .kernel_stats
-            .get()
-            .get_memory_stats_extended(zx::MonotonicInstant::INFINITE)
-            .map_err(|e| {
-                log_error!("FIDL error getting memory stats: {e}");
-                errno!(EIO)
-            })?;
-
-        let userpager_total = mem_stats.vmo_pager_total_bytes.unwrap_or_default() / *PAGE_SIZE;
-        let userpager_active = mem_stats.vmo_pager_newest_bytes.unwrap_or_default() / *PAGE_SIZE;
-
-        let nr_active_file = userpager_active;
-        let nr_inactive_file = userpager_total.saturating_sub(userpager_active);
-        let free = mem_stats.free_bytes.unwrap_or_default() / *PAGE_SIZE;
-        let present = mem_stats.total_bytes.unwrap_or_default() / *PAGE_SIZE;
-
-        // Pages min: minimum number of free pages the kernel tries to maintain in this memory zone.
-        // Can be set by writing to `/proc/sys/vm/min_free_kbytes`. It is observed to be ~3% of the
-        // total memory.
-        let pages_min = present * 3 / 100;
-        // Pages low: more aggressive memory reclaimation when free pages fall below this level.
-        // Typically ~4% of the total memory.
-        let pages_low = present * 4 / 100;
-        // Pages high: page reclamation begins when free pages drop below this level.
-        // Typically ~4% of the total memory.
-        let pages_high = present * 6 / 100;
-
-        // Only required fields are written. Add more fields as needed.
-        writeln!(sink, "Node 0, zone   Normal")?;
-        writeln!(sink, "  per-node stats")?;
-        writeln!(sink, "      nr_inactive_file {}", nr_inactive_file)?;
-        writeln!(sink, "      nr_active_file {}", nr_active_file)?;
-        writeln!(sink, "  pages free     {}", free)?;
-        writeln!(sink, "        min      {}", pages_min)?;
-        writeln!(sink, "        low      {}", pages_low)?;
-        writeln!(sink, "        high     {}", pages_high)?;
-        writeln!(sink, "        present  {}", present)?;
-        writeln!(sink, "  pagesets")?;
-
-        Ok(())
     }
 }

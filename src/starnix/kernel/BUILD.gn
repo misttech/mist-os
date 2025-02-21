@@ -171,6 +171,7 @@ rustc_library("starnix_core") {
     "fs/proc/uid_procstat.rs",
     "fs/proc/uptime.rs",
     "fs/proc/vmstat.rs",
+    "fs/proc/zoneinfo.rs",
     "fs/sysfs/bus_collection_directory.rs",
     "fs/sysfs/cpu_class_directory.rs",
     "fs/sysfs/device_directory.rs",
