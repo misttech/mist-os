@@ -76,7 +76,8 @@ void DisplayEngine::OnCoordinatorConnected() {
 
   const cpp20::span<const display::ModeAndId> preferred_modes(&mode_and_id, 1);
   const cpp20::span<const display::PixelFormat> pixel_formats(&kSupportedPixelFormat, 1);
-  engine_events_.OnDisplayAdded(kDisplayId, preferred_modes, pixel_formats);
+  engine_events_.OnDisplayAdded(kDisplayId, preferred_modes, current_display_edid_bytes_,
+                                pixel_formats);
 }
 
 zx::result<> DisplayEngine::ImportBufferCollection(
