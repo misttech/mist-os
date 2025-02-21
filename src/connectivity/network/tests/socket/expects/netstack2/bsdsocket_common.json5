@@ -68,6 +68,7 @@
 
                 // Netstack2 does not support fuchsia socket marks.
                 "ZxioSocketMarkTest/ZxioSocketMarkTest.SetAndGet/*",
+                "ZxioSocketCreationOptions/ZxioSocketCreationOptions.MarksCorrect/*",
             ],
         },
     ],

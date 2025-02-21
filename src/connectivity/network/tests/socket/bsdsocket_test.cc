@@ -25,6 +25,15 @@
 #include "src/connectivity/network/tests/os.h"
 #include "util.h"
 
+#if defined(__Fuchsia__)
+#include <fidl/fuchsia.posix.socket/cpp/wire.h>
+#include <lib/fdio/get_client.h>
+#include <lib/zxio/bsdsocket.h>
+#include <lib/zxio/zxio.h>
+
+#include <unordered_map>
+#endif
+
 namespace {
 
 std::pair<sockaddr_storage, socklen_t> InitLoopbackAddr(const SocketDomain& domain) {
@@ -2119,7 +2128,6 @@ INSTANTIATE_TEST_SUITE_P(NetSocket, IcmpSocketTest,
                                          std::make_pair(SocketDomain::IPv6(), IPPROTO_ICMPV6)));
 
 #if defined(__Fuchsia__)
-#include <lib/zxio/bsdsocket.h>
 
 using SocketKindAndMarkDomain = std::tuple<SocketDomain, SocketType, uint8_t>;
 class ZxioSocketMarkTest : public SocketOptionTestBase,
@@ -2187,5 +2195,109 @@ INSTANTIATE_TEST_SUITE_P(
     testing::Combine(testing::Values(SocketDomain::IPv4(), SocketDomain::IPv6()),
                      testing::Values(SocketType::Stream(), SocketType::Dgram()),
                      testing::Values(ZXIO_SOCKET_MARK_DOMAIN_1, ZXIO_SOCKET_MARK_DOMAIN_2)));
+
+using SocketKindAndMarks = std::tuple<SocketDomain, SocketType, std::vector<zxio_socket_mark_t>>;
+
+// Tests of this fixure will initializes a `zxio_t *` (accessible from `zxio` method) using
+// `zxio_socket_with_options`.
+class ZxioSocketCreationOptions : public testing::TestWithParam<SocketKindAndMarks> {
+ protected:
+  ZxioSocketCreationOptions()
+      : sock_domain_(std::get<0>(GetParam())),
+        sock_type_(std::get<1>(GetParam())),
+        marks_(std::get<2>(GetParam())) {}
+
+  void SetUp() override {
+    // We don't need to use `out_context` as an 'out' parameter here, so we just use it
+    // to provide the allocated `zxio_storage_t` for the allocation function.
+    void* alloc_context = &storage_;
+    int16_t out_code;
+    zxio_socket_creation_options_t opts = {
+        .num_marks = marks_.size(),
+        .marks = marks_.data(),
+    };
+    zx_status_t status =
+        zxio_socket_with_options(&service_connector, sock_domain_.Get(), sock_type_.Get(), 0, opts,
+                                 &zxio_storage_alloc, &alloc_context, &out_code);
+    ASSERT_EQ(status, ZX_OK);
+    ASSERT_EQ(out_code, 0);
+  }
+
+  void TearDown() override { zxio_close(&storage_.io, true); }
+
+  const std::vector<zxio_socket_mark_t>& marks() const { return marks_; }
+  zxio_t* zxio() { return &storage_.io; }
+
+ private:
+  static zx_status_t service_connector(const char* service_name, zx_handle_t* provider_handle) {
+    if (strcmp(service_name, fidl::DiscoverableProtocolName<fuchsia_posix_socket::Provider>) == 0) {
+      *provider_handle =
+          get_client<fuchsia_posix_socket::Provider>().value().client_end().channel().get();
+      return ZX_OK;
+    }
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  static zx_status_t zxio_storage_alloc(zxio_object_type_t, zxio_storage_t** out_storage,
+                                        void** out_context) {
+    *out_storage = static_cast<zxio_storage_t*>(*out_context);
+    return ZX_OK;
+  }
+  const SocketDomain sock_domain_;
+  const SocketType sock_type_;
+  // Marks in the creation opts.
+  std::vector<zxio_socket_mark_t> marks_;
+  zxio_storage_t storage_;
+};
+
+TEST_P(ZxioSocketCreationOptions, MarksCorrect) {
+  // Expected marks on the created socket.
+  std::unordered_map<zxio_socket_mark_domain_t, zxio_socket_mark_t> expected;
+  // Calculate the expected marks because the last mark wins.
+  for (const auto domain : {ZXIO_SOCKET_MARK_DOMAIN_1, ZXIO_SOCKET_MARK_DOMAIN_2}) {
+    expected[domain] = {.domain = domain};
+  }
+  for (const auto& mark : marks()) {
+    expected[mark.domain] = mark;
+  }
+
+  for (const auto& [_, expected] : expected) {
+    int16_t out_code = 0;
+    socklen_t optlen = sizeof(zxio_socket_mark_t);
+    zxio_socket_mark_t opt = {
+        .domain = expected.domain,
+    };
+    auto status = zxio_getsockopt(zxio(), SOL_SOCKET, SO_FUCHSIA_MARK, &opt, &optlen, &out_code);
+    ASSERT_EQ(status, ZX_OK);
+    ASSERT_EQ(out_code, 0);
+    ASSERT_EQ(optlen, sizeof(zxio_socket_mark_t));
+    EXPECT_EQ(opt.value, expected.value);
+    EXPECT_EQ(opt.is_present, expected.is_present);
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    ZxioSocketCreationOptions, ZxioSocketCreationOptions,
+    testing::Combine(
+        testing::Values(SocketDomain::IPv4(), SocketDomain::IPv6()),
+        testing::Values(SocketType::Stream(), SocketType::Dgram()),
+        testing::Values(
+            std::vector<zxio_socket_mark_t>{
+                {.value = 100, .domain = ZXIO_SOCKET_MARK_DOMAIN_1, .is_present = true}},
+            std::vector<zxio_socket_mark_t>{
+                {.value = 100, .domain = ZXIO_SOCKET_MARK_DOMAIN_2, .is_present = true}},
+            std::vector<zxio_socket_mark_t>{
+                {.value = 100, .domain = ZXIO_SOCKET_MARK_DOMAIN_1, .is_present = true},
+                {.value = 200, .domain = ZXIO_SOCKET_MARK_DOMAIN_2, .is_present = true}},
+            std::vector<zxio_socket_mark_t>{
+                {.value = 0, .domain = ZXIO_SOCKET_MARK_DOMAIN_1, .is_present = false},
+                {.value = 200, .domain = ZXIO_SOCKET_MARK_DOMAIN_2, .is_present = true}},
+            std::vector<zxio_socket_mark_t>{
+                {.value = 0, .domain = ZXIO_SOCKET_MARK_DOMAIN_1, .is_present = true},
+                {.value = 200, .domain = ZXIO_SOCKET_MARK_DOMAIN_1, .is_present = true}},
+            std::vector<zxio_socket_mark_t>{
+                {.value = 200, .domain = ZXIO_SOCKET_MARK_DOMAIN_1, .is_present = true},
+                {.value = 0, .domain = ZXIO_SOCKET_MARK_DOMAIN_1, .is_present = false}})));
+
 #endif
 }  // namespace
