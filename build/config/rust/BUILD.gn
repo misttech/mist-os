@@ -55,6 +55,10 @@ config("time-passes") {
   rustflags = [ "-Ztime-passes" ]
 }
 
+config("edition_2024") {
+  rustflags = [ "--edition=2024" ]
+}
+
 config("edition_2021") {
   rustflags = [ "--edition=2021" ]
 }
