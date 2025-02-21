@@ -1,0 +1,30 @@
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library zx;
+
+@transport("Syscall")
+// TODO(https://fxbug.dev/339884866): Our versioning tooling does not yet
+// support availability annotations for vDSO entry points. Enable this
+// annotation once it's supported.
+// @available(added=HEAD)
+closed protocol Counter {
+    ///
+    /// TODO(https://fxbug.dev/382751863): Fill in the sections below.
+    ///
+    /// ## Summary
+    ///
+    /// ## Declaration
+    ///
+    /// ## Description
+    ///
+    /// ## Return value
+    ///
+    /// ## Errors
+    ///
+    strict Create(struct {
+        options uint32;
+    }) -> (resource struct {
+        out Handle:COUNTER;
+    }) error Status;
+};

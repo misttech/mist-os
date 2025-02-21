@@ -28,6 +28,7 @@ zx_library("zx") {
       "lib/zx/bti.h",
       "lib/zx/channel.h",
       "lib/zx/clock.h",
+      "lib/zx/counter.h",
       "lib/zx/debuglog.h",
       "lib/zx/event.h",
       "lib/zx/eventpair.h",
@@ -63,6 +64,7 @@ zx_library("zx") {
     sources += [
       "bti.cc",
       "channel.cc",
+      "counter.cc",
       "debuglog.cc",
       "event.cc",
       "eventpair.cc",

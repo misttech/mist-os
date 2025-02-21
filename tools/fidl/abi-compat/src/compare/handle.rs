@@ -37,6 +37,7 @@ pub enum HandleType {
     Clock = 30,
     Stream = 31,
     MSI = 32,
+    Counter = 34,
 }
 
 impl Display for HandleType {
@@ -70,6 +71,7 @@ impl Display for HandleType {
             HandleType::Clock => write!(f, "zx.Handle:CLOCK"),
             HandleType::Stream => write!(f, "zx.Handle:STREAM"),
             HandleType::MSI => write!(f, "zx.Handle:MSI"),
+            HandleType::Counter => write!(f, "zx.Handle:COUNTER"),
         }
     }
 }

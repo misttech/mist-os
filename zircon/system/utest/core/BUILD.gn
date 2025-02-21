@@ -24,6 +24,7 @@ core_tests = [
   "channel-iovec",
   "channel-write-etc",
   "clock",
+  "counter",
   "elf-tls",
   "event-pair",
   "exceptions",

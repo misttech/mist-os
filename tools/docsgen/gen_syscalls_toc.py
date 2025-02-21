@@ -44,7 +44,7 @@ README_SECTIONS = [
     ("Sockets", "socket"),
     ("Streams", "stream"),
     ("Fifos", "fifo"),
-    ("Events and Event Pairs", "event"),
+    ("Events, Event Pairs, and Counters", "event"),
     ("Ports", "port"),
     ("Futexes", "futex"),
     ("Virtual Memory Objects (VMOs)", "vmo"),
@@ -113,7 +113,7 @@ def get_topic(filename: str) -> str:
     # There are some special cases
     if topic == "vmar" and filename == "vmar_unmap_handle_close_thread_exit.md":
         topic = "multi-function"
-    elif topic == "eventpair":
+    elif topic in ["eventpair", "counter"]:
         topic = "event"
     elif topic == "system":
         if filename == "system_get_event.md":

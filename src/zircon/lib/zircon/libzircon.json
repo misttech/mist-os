@@ -16,6 +16,7 @@
     "zx_clock_get_monotonic",
     "zx_clock_read",
     "zx_clock_update",
+    "zx_counter_create",
     "zx_cprng_add_entropy",
     "zx_cprng_draw",
     "zx_deadline_after",

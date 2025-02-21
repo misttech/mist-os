@@ -114,6 +114,7 @@ TEST(TypesTests, GoodHandleSubtype) {
   static_assert(HandleSubtype::kBti == static_cast<HandleSubtype>(ZX_OBJ_TYPE_BTI));
   static_assert(HandleSubtype::kChannel == static_cast<HandleSubtype>(ZX_OBJ_TYPE_CHANNEL));
   static_assert(HandleSubtype::kClock == static_cast<HandleSubtype>(ZX_OBJ_TYPE_CLOCK));
+  static_assert(HandleSubtype::kCounter == static_cast<HandleSubtype>(ZX_OBJ_TYPE_COUNTER));
   static_assert(HandleSubtype::kEvent == static_cast<HandleSubtype>(ZX_OBJ_TYPE_EVENT));
   static_assert(HandleSubtype::kEventpair == static_cast<HandleSubtype>(ZX_OBJ_TYPE_EVENTPAIR));
   static_assert(HandleSubtype::kException == static_cast<HandleSubtype>(ZX_OBJ_TYPE_EXCEPTION));

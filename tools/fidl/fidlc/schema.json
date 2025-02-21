@@ -698,6 +698,7 @@
                 "bti",
                 "channel",
                 "clock",
+                "counter",
                 "debuglog",
                 "event",
                 "eventpair",

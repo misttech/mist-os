@@ -453,6 +453,16 @@
         "start_offset": 2953,
         "end_offset": 2956
       }
+    },
+    {
+      "identifier": "zx/ObjType.COUNTER",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "COUNTER",
+        "start_offset": 3189,
+        "end_offset": 3196
+      }
     }
   ],
   "consts": [],
