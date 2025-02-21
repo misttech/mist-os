@@ -119,6 +119,7 @@ impl DaemonEventHandler {
             &[
                 TargetUpdateFilter::Ids(identify.ids.as_deref().unwrap_or(&[])),
                 TargetUpdateFilter::NetAddrs(&addrs),
+                TargetUpdateFilter::LegacyNodeName(&nodename),
             ],
             update.build(),
             // It was never made clear why we don't want to make a new target here, which is what
@@ -925,6 +926,10 @@ mod test {
     use chrono::Utc;
     use ffx_daemon_target::target::{TargetAddrEntry, TargetAddrStatus};
     use fidl_fuchsia_developer_ffx::DaemonProxy;
+    use fidl_fuchsia_developer_remotecontrol::{
+        IdentifyHostResponse, RemoteControlRequest, RemoteControlRequestStream,
+    };
+    use futures::StreamExt;
     use std::cell::RefCell;
     use std::collections::BTreeSet;
     use std::str::FromStr;
@@ -958,7 +963,7 @@ mod test {
         (proxy, d, task)
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_open_rcs_on_fastboot_error() {
         let (_proxy, daemon, _task) = spawn_test_daemon();
         let target = Target::new_for_usb("abc");
@@ -967,7 +972,7 @@ mod test {
         assert!(result.is_err());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_open_rcs_on_zedboot_error() {
         let (_proxy, daemon, _task) = spawn_test_daemon();
         let target = Target::new_with_netsvc_addrs(
@@ -979,7 +984,7 @@ mod test {
         assert!(result.is_err());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_target_empty() {
         let tempdir = tempfile::tempdir().expect("Creating tempdir");
         let socket_path = tempdir.path().join("ascendd.sock");
@@ -990,7 +995,7 @@ mod test {
         assert_eq!(nodename, d.get_target(None).await.unwrap().nodename().unwrap());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_target_query() {
         let tempdir = tempfile::tempdir().expect("Creating tempdir");
         let socket_path = tempdir.path().join("ascendd.sock");
@@ -1004,7 +1009,7 @@ mod test {
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_target_collection_empty_error() {
         let tempdir = tempfile::tempdir().expect("Creating tempdir");
         let socket_path = tempdir.path().join("ascendd.sock");
@@ -1012,7 +1017,7 @@ mod test {
         assert_eq!(DaemonError::TargetCacheEmpty, d.get_target(None).await.unwrap_err());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_target_ambiguous() {
         let tempdir = tempfile::tempdir().expect("Creating tempdir");
         let socket_path = tempdir.path().join("ascendd.sock");
@@ -1024,7 +1029,7 @@ mod test {
         assert_eq!(DaemonError::TargetAmbiguous, d.get_target(None).await.unwrap_err());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_target_expiry() {
         let local_node = overnet_core::Router::new(None).unwrap();
         let tempdir = tempfile::tempdir().expect("Creating tempdir");
@@ -1046,7 +1051,7 @@ mod test {
         assert_eq!(TargetConnectionState::Disconnected, target.get_connection_state());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_ephemeral_target_expiry() {
         let local_node = overnet_core::Router::new(None).unwrap();
         let tempdir = tempfile::tempdir().expect("Creating tempdir");
@@ -1115,7 +1120,7 @@ mod test {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_handle_overnet_peers_known_peer_exclusion() {
         let queue = events::Queue::<DaemonEvent>::new(&Rc::new(NullDaemonEventSynthesizer {}));
         let mut known_peers: HashSet<PeerSetElement> = Default::default();
@@ -1147,7 +1152,7 @@ mod test {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_handle_overnet_peer_leave_and_return() {
         let queue = events::Queue::<DaemonEvent>::new(&Rc::new(NullDaemonEventSynthesizer {}));
         let mut known_peers: HashSet<PeerSetElement> = Default::default();
@@ -1224,5 +1229,50 @@ mod test {
         assert_eq!(event_log.borrow().len(), 2);
         assert_matches!(event_log.borrow()[0], DaemonEvent::OvernetPeer(_));
         assert_matches!(event_log.borrow()[1], DaemonEvent::OvernetPeer(_));
+    }
+
+    #[fuchsia::test]
+    async fn test_daemon_event_handler_merges_peers_by_node() {
+        const NODE_NAME: &str = "teletecternicon";
+        let local_node = overnet_core::Router::new(None).unwrap();
+        let target_collection = Rc::new(TargetCollection::new());
+
+        local_node
+            .register_service(RemoteControlMarker::PROTOCOL_NAME.to_string(), |ch| {
+                let mut stream = RemoteControlRequestStream::from_channel(
+                    fuchsia_async::Channel::from_channel(ch),
+                );
+
+                fuchsia_async::Task::spawn(async move {
+                    while let Some(Ok(event)) = stream.next().await {
+                        match event {
+                            RemoteControlRequest::IdentifyHost { responder } => responder
+                                .send(Ok(&IdentifyHostResponse {
+                                    nodename: Some(NODE_NAME.to_owned()),
+                                    product_config: Some("gShoe".to_owned()),
+                                    ..IdentifyHostResponse::default()
+                                }))
+                                .unwrap(),
+                            other => panic!("Unexpected RCS request: {other:?}"),
+                        }
+                    }
+                })
+                .detach();
+
+                Ok(())
+            })
+            .await
+            .unwrap();
+
+        target_collection.merge_insert(Target::new_named(NODE_NAME));
+        let event = DaemonEventHandler::new(local_node.clone(), target_collection.clone());
+        event.handle_overnet_peer(local_node.node_id().0).await;
+
+        let mut targets = target_collection.targets(None);
+        let target = targets.pop().unwrap();
+        assert!(targets.is_empty());
+
+        assert_eq!(NODE_NAME, target.nodename.as_ref().unwrap());
+        assert_eq!("gShoe", target.product_config.as_ref().unwrap());
     }
 }
