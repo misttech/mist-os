@@ -85,6 +85,7 @@ if (is_fuchsia) {
   assembled_system("fuchsia_assembly") {
     testonly = fuchsia_zbi_testonly
     include_legacy_bundle = true
+    legacy_bundle_must_be_empty = true
 
     generate_fvm = !fxfs_blob
     generate_fxfs = fxfs_blob
