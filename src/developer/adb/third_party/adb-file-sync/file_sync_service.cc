@@ -119,24 +119,18 @@ static bool secure_mkdirs(fidl::WireSyncClient<fuchsia_io::Directory>& parent,
   return true;
 }
 */
+
 static bool do_lstat_v1(zx::socket& socket, const std::vector<std::string>& path,
                         fidl::WireSyncClient<fuchsia_io::Directory>& component) {
   syncmsg msg = {};
   msg.stat_v1.id = ID_LSTAT_V1;
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
-  if (endpoints.is_error()) {
-    FX_LOGS(ERROR) << "Failed to create endpoints " << endpoints.error_value();
-    return false;
-  }
-
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Node>::Create();
   if (!path.empty()) {
-    auto result =
-        component->DeprecatedOpen(fuchsia_io::OpenFlags::kRightReadable, {},
-                                  fidl::StringView::FromExternal(ConcatenateRelativePath(path)),
-                                  std::move(endpoints->server));
+    auto result = component->Open(fidl::StringView::FromExternal(ConcatenateRelativePath(path)),
+                                  fuchsia_io::kPermReadable, {}, server.TakeChannel());
     if (!result.ok()) {
-      FX_LOGS(ERROR) << "Failed to open file " << result.error();
+      FX_LOGS(ERROR) << "Failed to open file: " << result.error();
       return false;
     }
   }
@@ -145,41 +139,36 @@ static bool do_lstat_v1(zx::socket& socket, const std::vector<std::string>& path
   if (path.empty()) {
     auto result = component->GetAttr();
     if (!result.ok()) {
-      FX_LOGS(ERROR) << "GetAttr failed with " << result.error();
+      FX_LOGS(ERROR) << "GetAttr failed: " << result.error();
       return false;
     }
     attr = result.Unwrap()->attributes;
   } else {
-    auto result = fidl::WireCall(endpoints->client)->GetAttr();
+    auto result = fidl::WireCall(client)->GetAttr();
     if (!result.ok()) {
-      FX_LOGS(ERROR) << "GetAttr failed with " << result.error();
+      FX_LOGS(ERROR) << "GetAttr failed: " << result.error();
       return false;
     }
     attr = result.Unwrap()->attributes;
   }
+
   msg.stat_v1.mode = attr.mode;
   msg.stat_v1.size = static_cast<uint32_t>(attr.storage_size);
   msg.stat_v1.time = static_cast<uint32_t>(attr.modification_time);
   return WriteFdExactly(socket, &msg.stat_v1, sizeof(msg.stat_v1));
 }
+
 static bool do_stat_v2(zx::socket& socket, uint32_t id, const std::vector<std::string>& path,
                        fidl::WireSyncClient<fuchsia_io::Directory>& component) {
   syncmsg msg = {};
   msg.stat_v2.id = id;
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
-  if (endpoints.is_error()) {
-    FX_LOGS(ERROR) << "Failed to create endpoints " << endpoints.error_value();
-    return false;
-  }
-
+  auto [client, server] = fidl::Endpoints<fuchsia_io::Node>::Create();
   if (!path.empty()) {
-    auto result =
-        component->DeprecatedOpen(fuchsia_io::OpenFlags::kRightReadable, {},
-                                  fidl::StringView::FromExternal(ConcatenateRelativePath(path)),
-                                  std::move(endpoints->server));
+    auto result = component->Open(fidl::StringView::FromExternal(ConcatenateRelativePath(path)),
+                                  fuchsia_io::kPermReadable, {}, server.TakeChannel());
     if (!result.ok()) {
-      FX_LOGS(ERROR) << "Failed to open file " << result.error();
+      FX_LOGS(ERROR) << "Failed to open file: " << result.error();
       return false;
     }
   }
@@ -193,14 +182,14 @@ static bool do_stat_v2(zx::socket& socket, uint32_t id, const std::vector<std::s
       attr = result->attributes;
     }
   } else {
-    auto result = fidl::WireCall(endpoints->client)->GetAttr();
+    auto result = fidl::WireCall(client)->GetAttr();
     status = result.status();
     if (result.ok()) {
       attr = result->attributes;
     }
   }
   if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "GetAttr failed with " << status;
+    FX_LOGS(ERROR) << "GetAttr failed: " << status;
     msg.stat_v2.error = status;
   } else {
     msg.stat_v2.dev = attr.id;
@@ -233,23 +222,16 @@ static bool do_list(zx::socket& socket, const std::vector<std::string>& path,
   syncmsg msg;
   msg.dent.id = ID_DENT;
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
-  if (endpoints.is_error()) {
-    FX_LOGS(ERROR) << "Failed to create endpoints " << endpoints.error_value();
-    return false;
-  }
+  auto [directory_client, directory_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
   if (!path.empty()) {
-    if (auto open =
-            component->DeprecatedOpen(fuchsia_io::OpenFlags::kRightReadable, {},
-                                      fidl::StringView::FromExternal(ConcatenateRelativePath(path)),
-                                      std::move(endpoints->server));
+    if (auto open = component->Open(fidl::StringView::FromExternal(ConcatenateRelativePath(path)),
+                                    fuchsia_io::kPermReadable, {}, directory_server.TakeChannel());
         !open.ok()) {
       FX_LOGS(ERROR) << "Failed to open file " << open.error();
       return false;
     }
   }
-  fidl::WireSyncClient<fuchsia_io::Directory> directory(
-      fidl::ClientEnd<fuchsia_io::Directory>(endpoints->client.TakeChannel()));
+  fidl::WireSyncClient<fuchsia_io::Directory> directory(std::move(directory_client));
   auto& dir_ptr = path.empty() ? component : directory;
 
   if (auto rewind = dir_ptr->Rewind(); !rewind.ok()) {
@@ -279,15 +261,10 @@ static bool do_list(zx::socket& socket, const std::vector<std::string>& path,
 
       std::string name(it + sizeof(dirent_t), it + sizeof(dirent_t) + dent->size);
 
-      auto endpoints = fidl::CreateEndpoints<fuchsia_io::File>();
-      fidl::WireSyncClient<fuchsia_io::File> file(std::move(endpoints->client));
-      if (endpoints.is_error()) {
-        FX_LOGS(ERROR) << "Failed to create channel " << endpoints.status_value();
-        goto increment;
-      }
-      if (auto open = dir_ptr->DeprecatedOpen(
-              fuchsia_io::OpenFlags::kRightReadable, {}, fidl::StringView::FromExternal(name),
-              fidl::ServerEnd<fuchsia_io::Node>(endpoints->server.TakeChannel()));
+      auto [file_client, file_server] = fidl::Endpoints<fuchsia_io::File>::Create();
+      fidl::WireSyncClient<fuchsia_io::File> file(std::move(file_client));
+      if (auto open = dir_ptr->Open(fidl::StringView::FromExternal(name), fuchsia_io::kPermReadable,
+                                    {}, file_server.TakeChannel());
           !open.ok()) {
         FX_LOGS(ERROR) << "Failed to open file " << open.error();
         goto increment;
@@ -371,18 +348,13 @@ static bool handle_send_file(zx::socket& socket, const std::vector<std::string>&
   //     // by all filesystems, so we don't check for success. b/12441485
   //     fchmod(fd, mode);
   // }
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::File>();
-  fidl::WireSyncClient<fuchsia_io::File> file(std::move(endpoints->client));
-  if (endpoints.is_error()) {
-    FX_LOGS(ERROR) << "Failed to create channel " << endpoints.status_value();
-    SendSyncFail(socket, "Create endpoints failed");
-    goto fail;
-  }
-  if (auto open = component->DeprecatedOpen(
-          fuchsia_io::OpenFlags::kRightWritable | fuchsia_io::OpenFlags::kCreate |
-              fuchsia_io::OpenFlags::kTruncate | fuchsia_io::OpenFlags::kNotDirectory,
-          {}, fidl::StringView::FromExternal(ConcatenateRelativePath(path)),
-          fidl::ServerEnd<fuchsia_io::Node>(endpoints->server.TakeChannel()));
+  auto [client, server] = fidl::Endpoints<fuchsia_io::File>::Create();
+  fidl::WireSyncClient<fuchsia_io::File> file(std::move(client));
+  if (auto open =
+          component->Open(fidl::StringView::FromExternal(ConcatenateRelativePath(path)),
+                          fuchsia_io::kPermWritable | fuchsia_io::Flags::kFlagMaybeCreate |
+                              fuchsia_io::Flags::kProtocolFile | fuchsia_io::Flags::kFileTruncate,
+                          {}, server.TakeChannel());
       !open.ok()) {
     SendSyncFail(socket, "Open failed");
     FX_LOGS(INFO) << "Open failed " << open.error();
@@ -553,21 +525,16 @@ static bool do_recv(zx::socket& socket, const std::vector<std::string>& path,
                     fidl::WireSyncClient<fuchsia_io::Directory>& component) {
   // __android_log_security_bswrite(SEC_TAG_ADB_RECV_FILE, path);
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::File>();
-  if (endpoints.is_error()) {
-    FX_LOGS(ERROR) << "Could not create endpoint " << endpoints.status_value();
-    return false;
-  }
-  if (auto open = component->DeprecatedOpen(
-          fuchsia_io::OpenFlags::kRightReadable | fuchsia_io::OpenFlags::kNotDirectory, {},
-          fidl::StringView::FromExternal(ConcatenateRelativePath(path)),
-          fidl::ServerEnd<fuchsia_io::Node>(endpoints->server.TakeChannel()));
+  auto [client, server] = fidl::Endpoints<fuchsia_io::File>::Create();
+  if (auto open = component->Open(fidl::StringView::FromExternal(ConcatenateRelativePath(path)),
+                                  fuchsia_io::kPermReadable | fuchsia_io::Flags::kProtocolFile, {},
+                                  server.TakeChannel());
       !open.ok()) {
-    FX_LOGS(INFO) << "Open failed " << open.error();
+    FX_LOGS(INFO) << "Open failed: " << open.error();
     SendSyncFail(socket, "open failed");
     return false;
   }
-  fidl::WireSyncClient<fuchsia_io::File> file(std::move(endpoints->client));
+  fidl::WireSyncClient<fuchsia_io::File> file(std::move(client));
 
   syncmsg msg;
   msg.data.id = ID_DATA;
