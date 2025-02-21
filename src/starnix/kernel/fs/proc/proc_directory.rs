@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::DeviceMode;
 use crate::fs::proc::cgroups::cgroups_node;
 use crate::fs::proc::cmdline::cmdline_node;
 use crate::fs::proc::config_gz::config_gz_node;
@@ -13,6 +12,7 @@ use crate::fs::proc::kallsyms::kallsyms_node;
 use crate::fs::proc::kmsg::kmsg_node;
 use crate::fs::proc::loadavg::loadavg_node;
 use crate::fs::proc::meminfo::meminfo_node;
+use crate::fs::proc::misc::misc_node;
 use crate::fs::proc::pid_directory::pid_directory;
 use crate::fs::proc::pressure_directory::pressure_directory;
 use crate::fs::proc::self_symlink::self_node;
@@ -26,23 +26,21 @@ use crate::mm::PAGE_SIZE;
 use crate::task::{CurrentTask, KernelStats};
 use crate::vfs::{
     emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
-    fs_node_impl_symlink, unbounded_seek, BytesFile, BytesFileOps, DirectoryEntryType, DirentSink,
-    DynamicFile, DynamicFileBuf, DynamicFileSource, FileObject, FileOps, FileSystemHandle, FsNode,
-    FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, StaticDirectoryBuilder,
-    StubEmptyFile, SymlinkTarget,
+    fs_node_impl_symlink, unbounded_seek, BytesFile, DirectoryEntryType, DirentSink, DynamicFile,
+    DynamicFileBuf, DynamicFileSource, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle,
+    FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, StaticDirectoryBuilder, StubEmptyFile,
+    SymlinkTarget,
 };
 
 use maplit::btreemap;
 use starnix_logging::{bug_ref, log_error, BugRef};
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::auth::FsCred;
-use starnix_uapi::device_type::{DeviceType, MISC_MAJOR};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::version::{KERNEL_RELEASE, KERNEL_VERSION};
 use starnix_uapi::{errno, off_t, pid_t};
-use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -91,11 +89,7 @@ impl ProcDirectory {
             "asound".into() => stub_node(current_task, fs, "/proc/asound", bug_ref!("https://fxbug.dev/322893329")),
             "diskstats".into() => stub_node(current_task, fs, "/proc/diskstats", bug_ref!("https://fxbug.dev/322893370")),
             "filesystems".into() => bytes_node(current_task, fs, b"fxfs".to_vec()),
-            "misc".into() => fs.create_node(
-                current_task,
-                MiscFile::new_node(),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
+            "misc".into() => misc_node(current_task, fs),
             // Starnix does not support dynamically loading modules.
             // Instead, we pretend to have loaded a single module, ferris (named after
             // Rust's 🦀), to avoid breaking code that assumes the modules list is
@@ -327,28 +321,6 @@ impl FsNodeOps for MountsSymlink {
         _current_task: &CurrentTask,
     ) -> Result<SymlinkTarget, Errno> {
         Ok(SymlinkTarget::Path("self/mounts".into()))
-    }
-}
-
-#[derive(Clone, Debug)]
-struct MiscFile;
-impl MiscFile {
-    pub fn new_node() -> impl FsNodeOps {
-        BytesFile::new_node(Self)
-    }
-}
-impl BytesFileOps for MiscFile {
-    fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        let registery = &current_task.kernel().device_registry;
-        let devices = registery.list_minor_devices(
-            DeviceMode::Char,
-            DeviceType::new_range(MISC_MAJOR, DeviceMode::Char.minor_range()),
-        );
-        let mut contents = String::new();
-        for (device_type, name) in devices {
-            contents.push_str(&format!("{:3} {}\n", device_type.minor(), name));
-        }
-        Ok(contents.into_bytes().into())
     }
 }
 

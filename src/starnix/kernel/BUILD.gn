@@ -155,6 +155,7 @@ rustc_library("starnix_core") {
     "fs/proc/kmsg.rs",
     "fs/proc/loadavg.rs",
     "fs/proc/meminfo.rs",
+    "fs/proc/misc.rs",
     "fs/proc/mod.rs",
     "fs/proc/pid_directory.rs",
     "fs/proc/pressure_directory.rs",

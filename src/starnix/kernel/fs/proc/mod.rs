@@ -13,6 +13,7 @@ pub mod kallsyms;
 pub mod kmsg;
 pub mod loadavg;
 pub mod meminfo;
+pub mod misc;
 pub mod pid_directory;
 mod pressure_directory;
 mod proc_directory;
