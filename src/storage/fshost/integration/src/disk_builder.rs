@@ -212,7 +212,7 @@ pub struct DiskBuilder {
     // Only used if `format` is Some.
     corrupt_data: bool,
     gpt: bool,
-    extra_volumes: Vec<&'static str>,
+    with_account_and_virtualization: bool,
     // Note: fvm also means fxfs acting as the volume manager when using fxblob.
     format_volume_manager: bool,
     legacy_data_label: bool,
@@ -237,7 +237,7 @@ impl DiskBuilder {
             volumes_spec: VolumesSpec { fxfs_blob: false, create_data_partition: true },
             corrupt_data: false,
             gpt: false,
-            extra_volumes: Vec::new(),
+            with_account_and_virtualization: false,
             format_volume_manager: true,
             legacy_data_label: false,
             fs_switch: None,
@@ -302,8 +302,8 @@ impl DiskBuilder {
         self
     }
 
-    pub fn with_extra_volume(&mut self, volume_name: &'static str) -> &mut Self {
-        self.extra_volumes.push(volume_name);
+    pub fn with_account_and_virtualization(&mut self) -> &mut Self {
+        self.with_account_and_virtualization = true;
         self
     }
 
@@ -401,12 +401,6 @@ impl DiskBuilder {
         )
         .expect("failed to connect to the Blob service");
         self.blob_hash = Some(write_test_blob(blob_creator, &BLOB_CONTENTS).await);
-
-        for volume in &self.extra_volumes {
-            fs.create_volume(volume, CreateOptions::default(), MountOptions::default())
-                .await
-                .expect("failed to make extra fxfs volume");
-        }
 
         if self.data_spec.format.is_some() {
             self.init_data_fxfs(FxfsType::FxBlob(fs, crypt_realm)).await;
@@ -509,9 +503,9 @@ impl DiskBuilder {
             }
         }
 
-        for volume in &self.extra_volumes {
+        if self.with_account_and_virtualization {
             fvm.create_volume(
-                volume,
+                "account",
                 CreateOptions {
                     type_guid: Some(DATA_TYPE_GUID),
                     guid: Some(Uuid::new_v4().into_bytes()),
@@ -520,7 +514,18 @@ impl DiskBuilder {
                 MountOptions::default(),
             )
             .await
-            .expect("failed to make extra fvm volume");
+            .expect("failed to make fvm account volume");
+            fvm.create_volume(
+                "virtualization",
+                CreateOptions {
+                    type_guid: Some(DATA_TYPE_GUID),
+                    guid: Some(Uuid::new_v4().into_bytes()),
+                    ..Default::default()
+                },
+                MountOptions::default(),
+            )
+            .await
+            .expect("failed to make fvm virtualization volume");
         }
 
         fvm.shutdown().await.expect("fvm shutdown failed");
