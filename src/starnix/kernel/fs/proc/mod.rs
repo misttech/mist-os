@@ -4,6 +4,7 @@
 
 pub mod cgroups;
 pub mod cmdline;
+pub mod config_gz;
 pub mod cpuinfo;
 pub mod device_tree;
 pub mod devices;

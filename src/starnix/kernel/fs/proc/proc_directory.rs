@@ -5,6 +5,7 @@
 use crate::device::DeviceMode;
 use crate::fs::proc::cgroups::cgroups_node;
 use crate::fs::proc::cmdline::cmdline_node;
+use crate::fs::proc::config_gz::config_gz_node;
 use crate::fs::proc::cpuinfo::cpuinfo_node;
 use crate::fs::proc::device_tree::device_tree_node;
 use crate::fs::proc::devices::devices_node;
@@ -79,11 +80,7 @@ impl ProcDirectory {
             "net".into() => net_directory(current_task, fs),
             "uptime".into() => uptime_node(current_task, fs),
             "loadavg".into() => loadavg_node(current_task, fs),
-            "config.gz".into() => fs.create_node(
-                current_task,
-                ConfigFile::new_node(),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
+            "config.gz".into() => config_gz_node(current_task, fs),
             "sysrq-trigger".into() => fs.create_node(
                 current_task,
                 SysRqNode::new(kernel),
@@ -330,24 +327,6 @@ impl FsNodeOps for MountsSymlink {
         _current_task: &CurrentTask,
     ) -> Result<SymlinkTarget, Errno> {
         Ok(SymlinkTarget::Path("self/mounts".into()))
-    }
-}
-
-#[derive(Clone, Debug)]
-struct ConfigFile;
-impl ConfigFile {
-    pub fn new_node() -> impl FsNodeOps {
-        DynamicFile::new_node(Self)
-    }
-}
-impl DynamicFileSource for ConfigFile {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let contents = std::fs::read("/pkg/data/config.gz").map_err(|e| {
-            log_error!("Error reading /pkg/data/config.gz: {e}");
-            errno!(EIO)
-        })?;
-        sink.write(&contents);
-        Ok(())
     }
 }
 
