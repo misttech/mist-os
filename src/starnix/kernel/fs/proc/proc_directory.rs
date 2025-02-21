@@ -25,6 +25,7 @@ use crate::fs::proc::uid_cputime::uid_cputime_node;
 use crate::fs::proc::uid_io::uid_io_node;
 use crate::fs::proc::uid_procstat::uid_procstat_node;
 use crate::fs::proc::uptime::uptime_node;
+use crate::fs::proc::vmstat::vmstat_node;
 use crate::mm::PAGE_SIZE;
 use crate::task::{CurrentTask, KernelStats};
 use crate::vfs::{
@@ -105,11 +106,7 @@ impl ProcDirectory {
                 bytes_node(current_task, fs, version_string.into())
             },
             "vmallocinfo".into() => stub_node(current_task, fs, "/proc/vmallocinfo", bug_ref!("https://fxbug.dev/322894183")),
-            "vmstat".into() => fs.create_node(
-                current_task,
-                VmStatFile::new_node(&kernel.stats),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-            ),
+            "vmstat".into() => vmstat_node(current_task, fs),
             "zoneinfo".into() => fs.create_node(
                 current_task,
                 ZoneInfoFile::new_node(&kernel.stats),
@@ -327,54 +324,6 @@ impl DynamicFileSource for ZoneInfoFile {
         writeln!(sink, "        high     {}", pages_high)?;
         writeln!(sink, "        present  {}", present)?;
         writeln!(sink, "  pagesets")?;
-
-        Ok(())
-    }
-}
-
-#[derive(Clone)]
-struct VmStatFile {
-    kernel_stats: Arc<KernelStats>,
-}
-
-impl VmStatFile {
-    pub fn new_node(kernel_stats: &Arc<KernelStats>) -> impl FsNodeOps {
-        DynamicFile::new_node(Self { kernel_stats: kernel_stats.clone() })
-    }
-}
-
-// Fake an increment, since the current clients only care about the number increasing and not
-// what the number is.
-static VM_STAT_HACK_COUNTER: std::sync::atomic::AtomicUsize =
-    std::sync::atomic::AtomicUsize::new(0);
-
-impl DynamicFileSource for VmStatFile {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let mem_stats = self
-            .kernel_stats
-            .get()
-            .get_memory_stats_extended(zx::MonotonicInstant::INFINITE)
-            .map_err(|e| {
-                log_error!("FIDL error getting memory stats: {e}");
-                errno!(EIO)
-            })?;
-
-        let userpager_total = mem_stats.vmo_pager_total_bytes.unwrap_or_default() / *PAGE_SIZE;
-        let userpager_active = mem_stats.vmo_pager_newest_bytes.unwrap_or_default() / *PAGE_SIZE;
-
-        let nr_active_file = userpager_active;
-        let nr_inactive_file = userpager_total.saturating_sub(userpager_active);
-
-        // Only fields required so far are written. Add more fields as needed.
-        writeln!(sink, "workingset_refault_file {}", 0)?;
-        writeln!(sink, "nr_inactive_file {}", nr_inactive_file)?;
-        writeln!(sink, "nr_active_file {}", nr_active_file)?;
-        writeln!(
-            sink,
-            "pgscan_kswapd {}",
-            VM_STAT_HACK_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-        )?;
-        writeln!(sink, "pgscan_direct {}", 0)?;
 
         Ok(())
     }
