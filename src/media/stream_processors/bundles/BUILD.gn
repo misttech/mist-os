@@ -7,11 +7,6 @@ group("services") {
   deps = []
 }
 
-group("tools") {
-  testonly = true
-  deps = []
-}
-
 group("examples") {
   testonly = true
   deps = []

@@ -12,10 +12,8 @@ group("core-tools") {
   testonly = true
   public_deps = [
     "//src/developer/debug/debug_agent",
-    "//src/fonts",
     "//src/graphics/lib/magma:magma-tools",
     "//src/media/audio/consumer/bundles:services",
-    "//src/media/bundles:tools",
     "//src/performance/trace",
     "//src/recovery/factory_reset:tools",
     "//src/sys/pkg/bin/far",

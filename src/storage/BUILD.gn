@@ -44,9 +44,14 @@ group("tests") {
 group("tools") {
   deps = [
     "factory/export_ffs:export-ffs",
-    "fxfs/tools",
     "tools",
-    "volume_image/ftl:ftl-volume-extractor-host",
-    "volume_image/ftl:nandoob-converter-host",
+  ]
+}
+
+group("host_tools") {
+  deps = [
+    "fxfs/tools($host_toolchain)",
+    "volume_image/ftl:ftl-volume-extractor-host($host_toolchain)",
+    "volume_image/ftl:nandoob-converter-host($host_toolchain)",
   ]
 }

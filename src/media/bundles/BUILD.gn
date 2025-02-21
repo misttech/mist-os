@@ -25,14 +25,6 @@ group("services") {
   ]
 }
 
-group("tools") {
-  testonly = true
-  deps = [
-    "//src/media/sounds/bundles:tools",
-    "//src/media/stream_processors/bundles:tools",
-  ]
-}
-
 group("examples") {
   testonly = true
   deps = [
