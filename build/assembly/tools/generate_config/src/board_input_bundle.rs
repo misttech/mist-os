@@ -9,7 +9,6 @@ use assembly_config_schema::{
     BoardInputBundle, BoardProvidedConfig, PackageDetails, PackageSet, PackagedDriverDetails,
 };
 use assembly_container::AssemblyContainer;
-use assembly_file_relative_path::FileRelativePathBuf;
 use camino::Utf8PathBuf;
 use serde::{Deserialize, Serialize};
 
@@ -40,7 +39,7 @@ pub fn new(args: &BoardInputBundleArgs) -> Result<()> {
         for driver in drivers_config.drivers {
             let DriverInformation { package, set, components } = driver;
             collected_drivers.push(PackagedDriverDetails {
-                package: FileRelativePathBuf::Resolved(package),
+                package: package.into(),
                 set,
                 components,
             })

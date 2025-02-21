@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use assembly_container::WalkPaths;
-use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
+use camino::Utf8PathBuf;
 use fuchsia_url::boot_url::BootUrl;
 use fuchsia_url::AbsoluteComponentUrl;
 use moniker::Moniker;
@@ -15,28 +15,16 @@ use std::str::FromStr;
 pub use diagnostics_log_types::Severity;
 
 /// Diagnostics configuration options for the diagnostics area.
-#[derive(
-    Debug,
-    Default,
-    Deserialize,
-    Serialize,
-    PartialEq,
-    JsonSchema,
-    SupportsFileRelativePaths,
-    WalkPaths,
-)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(default, deny_unknown_fields)]
 pub struct DiagnosticsConfig {
     pub archivist: Option<ArchivistConfig>,
     /// The set of pipeline config files to supply to archivist.
-    #[file_relative_paths]
     #[walk_paths]
     pub archivist_pipelines: Vec<ArchivistPipeline>,
     pub additional_serial_log_components: Vec<String>,
-    #[file_relative_paths]
     #[walk_paths]
     pub sampler: SamplerConfig,
-    #[file_relative_paths]
     #[walk_paths]
     pub memory_monitor: MemoryMonitorConfig,
     /// The set of log levels components will receive as their initial interest.
@@ -52,9 +40,7 @@ pub enum ArchivistConfig {
 }
 
 /// A single archivist pipeline config.
-#[derive(
-    Debug, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths, WalkPaths,
-)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(deny_unknown_fields)]
 pub struct ArchivistPipeline {
     /// The name of the pipeline.
@@ -62,9 +48,8 @@ pub struct ArchivistPipeline {
     /// The files to add to the pipeline.
     /// Zero files is not valid.
     #[schemars(schema_with = "crate::vec_path_schema")]
-    #[file_relative_paths]
     #[walk_paths]
-    pub files: Vec<FileRelativePathBuf>,
+    pub files: Vec<Utf8PathBuf>,
 }
 
 #[derive(Debug, PartialEq, Clone, JsonSchema)]
@@ -126,81 +111,48 @@ impl From<PipelineType> for String {
 }
 
 /// Diagnostics configuration options for the sampler configuration area.
-#[derive(
-    Debug,
-    Default,
-    Deserialize,
-    Serialize,
-    PartialEq,
-    JsonSchema,
-    SupportsFileRelativePaths,
-    WalkPaths,
-)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(default, deny_unknown_fields)]
 pub struct SamplerConfig {
     /// The metrics configs to pass to sampler.
     #[schemars(schema_with = "crate::vec_path_schema")]
-    #[file_relative_paths]
     #[walk_paths]
-    pub metrics_configs: Vec<FileRelativePathBuf>,
+    pub metrics_configs: Vec<Utf8PathBuf>,
 
     /// The fire configs to pass to sampler.
     #[schemars(schema_with = "crate::vec_path_schema")]
-    #[file_relative_paths]
     #[walk_paths]
-    pub fire_configs: Vec<FileRelativePathBuf>,
+    pub fire_configs: Vec<Utf8PathBuf>,
 
     /// The FIRE config to pass to sampler.
-    #[file_relative_paths]
     #[walk_paths]
     pub fire: FireConfig,
 }
 
 /// Diagnostics configuration options for Sampler FIRE projects.
-#[derive(
-    Debug,
-    Default,
-    Deserialize,
-    Serialize,
-    PartialEq,
-    JsonSchema,
-    SupportsFileRelativePaths,
-    WalkPaths,
-)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(default, deny_unknown_fields)]
 pub struct FireConfig {
     /// Component configuration files containing mapping from component attribution
     /// to Cobalt metric ID.
     #[schemars(schema_with = "crate::vec_path_schema")]
-    #[file_relative_paths]
     #[walk_paths]
-    pub component_configs: Vec<FileRelativePathBuf>,
+    pub component_configs: Vec<Utf8PathBuf>,
 
     /// FIRE project templates.
     #[schemars(schema_with = "crate::vec_path_schema")]
-    #[file_relative_paths]
     #[walk_paths]
-    pub project_templates: Vec<FileRelativePathBuf>,
+    pub project_templates: Vec<Utf8PathBuf>,
 }
 
 /// Diagnostics configuration options for the memory monitor configuration area.
-#[derive(
-    Debug,
-    Default,
-    Deserialize,
-    Serialize,
-    PartialEq,
-    JsonSchema,
-    SupportsFileRelativePaths,
-    WalkPaths,
-)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(default, deny_unknown_fields)]
 pub struct MemoryMonitorConfig {
     /// The memory buckets config file to provide to memory monitor.
     #[schemars(schema_with = "crate::option_path_schema")]
-    #[file_relative_paths]
     #[walk_paths]
-    pub buckets: Option<FileRelativePathBuf>,
+    pub buckets: Option<Utf8PathBuf>,
     /// Control whether a pressure change should trigger a capture.
     pub capture_on_pressure_change: bool,
     /// Expected delay between scheduled captures upon imminent OOM, in

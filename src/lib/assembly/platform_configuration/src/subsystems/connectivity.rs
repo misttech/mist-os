@@ -11,7 +11,6 @@ use assembly_config_schema::platform_config::connectivity_config::{
     WlanRecoveryProfile, WlanRoamingMode, WlanRoamingPolicy, WlanRoamingProfile,
 };
 use assembly_constants::{FileEntry, PackageDestination, PackageSetDestination};
-use assembly_file_relative_path::FileRelativePathBuf;
 
 pub(crate) struct ConnectivitySubsystemConfig;
 impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySubsystemConfig {
@@ -45,7 +44,7 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
         }
         if let Some(mdns_config) = &connectivity_config.mdns.config {
             builder.package("mdns").config_data(FileEntry {
-                source: mdns_config.clone().into(),
+                source: mdns_config.clone(),
                 destination: "assembly.config".into(),
             })?;
         }
@@ -101,21 +100,22 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                 }
             }
 
-            let config_src =
-                connectivity_config.network.netcfg_config_path.clone().unwrap_or_else(|| {
-                    FileRelativePathBuf::Resolved(context.get_resource("netcfg_default.json"))
-                });
+            let config_src = connectivity_config
+                .network
+                .netcfg_config_path
+                .clone()
+                .unwrap_or_else(|| context.get_resource("netcfg_default.json"));
             let config_dir = builder
                 .add_domain_config(PackageSetDestination::Blob(PackageDestination::NetcfgConfig))
                 .directory("netcfg-config");
             config_dir.entry(FileEntry {
-                source: config_src.into(),
+                source: config_src,
                 destination: "netcfg_default.json".into(),
             })?;
 
             if let Some(netstack_config_path) = &connectivity_config.network.netstack_config_path {
                 builder.package("netstack").config_data(FileEntry {
-                    source: netstack_config_path.clone().into(),
+                    source: netstack_config_path.clone(),
                     destination: "default.json".into(),
                 })?;
             }
@@ -124,7 +124,7 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                 &connectivity_config.network.google_maps_api_key_path
             {
                 builder.package("emergency").config_data(FileEntry {
-                    source: google_maps_api_key_path.clone().into(),
+                    source: google_maps_api_key_path.clone(),
                     destination: "google_maps_api_key.txt".into(),
                 })?;
             }

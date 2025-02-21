@@ -284,13 +284,11 @@ Resulting product is not supported and may misbehave!
 
     // Add devicetree binary
     if let Some(devicetree_path) = &board_config.devicetree {
-        builder
-            .add_devicetree(devicetree_path.as_utf8_pathbuf())
-            .context("Adding devicetree binary")?;
+        builder.add_devicetree(devicetree_path).context("Adding devicetree binary")?;
     }
     if let Some(devicetree_overlay_path) = &board_config.devicetree_overlay {
         builder
-            .add_devicetree_overlay(devicetree_overlay_path.as_utf8_pathbuf())
+            .add_devicetree_overlay(devicetree_overlay_path)
             .context("Adding devicetree binary overlay")?;
     }
 

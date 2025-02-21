@@ -5,17 +5,14 @@
 use crate::{BoardArgs, HybridBoardArgs};
 
 use anyhow::Result;
-use assembly_config_schema::board_config::DirectoryPathBuf;
 use assembly_config_schema::BoardInformation;
-use assembly_container::AssemblyContainer;
-use assembly_file_relative_path::FileRelativePathBuf;
+use assembly_container::{AssemblyContainer, DirectoryPathBuf};
 
 pub fn new(args: &BoardArgs) -> Result<()> {
     let mut config = BoardInformation::from_config_path(&args.config)?;
     for (i, board_input_bundle) in args.board_input_bundles.iter().enumerate() {
         let key = format!("tmp{}", i);
-        let directory =
-            DirectoryPathBuf(FileRelativePathBuf::FileRelative(board_input_bundle.clone()));
+        let directory = DirectoryPathBuf(board_input_bundle.clone());
         config.input_bundles.map.insert(key, directory);
     }
 

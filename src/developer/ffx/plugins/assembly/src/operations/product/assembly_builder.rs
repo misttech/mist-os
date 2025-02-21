@@ -1989,15 +1989,12 @@ mod tests {
                 ("base_a".to_string(), write_empty_pkg(outdir, "base_a", None).into()),
                 (
                     "base_b".to_string(),
-                    ProductPackageDetails {
-                        manifest: FileRelativePathBuf::Resolved(base_b_pathbuf),
-                        config_data: Vec::default(),
-                    },
+                    ProductPackageDetails { manifest: base_b_pathbuf, config_data: Vec::default() },
                 ),
                 (
                     "base_c".to_string(),
                     ProductPackageDetails {
-                        manifest: FileRelativePathBuf::Resolved(base_c_pathbuf),
+                        manifest: base_c_pathbuf,
                         config_data: vec![
                             ProductConfigData {
                                 destination: "dest/path/cfg.txt".into(),

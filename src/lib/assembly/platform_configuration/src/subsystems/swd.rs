@@ -101,12 +101,12 @@ impl DefineSubsystemConfiguration<SwdConfig> for SwdSubsystemConfig {
         }
 
         for tuf_config in &subsystem_config.tuf_config_paths {
-            let path: Utf8PathBuf = tuf_config.clone().into();
+            let path: Utf8PathBuf = tuf_config.clone();
             let filename = path.file_name().ok_or_else(|| {
                 anyhow!("Failed to get the filename from the tuf config: {}", &tuf_config)
             })?;
             builder.package("pkg-resolver").config_data(FileEntry {
-                source: tuf_config.clone().into(),
+                source: tuf_config.clone(),
                 destination: format!("repositories/{}", filename),
             })?;
         }
@@ -165,7 +165,7 @@ impl SwdSubsystemConfig {
 
                 if let Some(channel_config) = channels_path {
                     builder.package("omaha-client").config_data(FileEntry {
-                        source: channel_config.clone().into(),
+                        source: channel_config.clone(),
                         destination: "channel_config.json".into(),
                     })?;
                 }

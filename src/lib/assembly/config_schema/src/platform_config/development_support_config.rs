@@ -3,21 +3,12 @@
 // found in the LICENSE file.
 
 use assembly_container::WalkPaths;
-use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
+use camino::Utf8PathBuf;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Platform configuration options for enabling development support.
-#[derive(
-    Debug,
-    Default,
-    Deserialize,
-    Serialize,
-    PartialEq,
-    JsonSchema,
-    SupportsFileRelativePaths,
-    WalkPaths,
-)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(default, deny_unknown_fields)]
 pub struct DevelopmentSupportConfig {
     /// Override the build-type enablement of development support, to include
@@ -31,17 +22,15 @@ pub struct DevelopmentSupportConfig {
 
     /// Path to a file containing ssh keys that are authorized to connect to the
     /// device.
-    #[file_relative_paths]
     #[walk_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
-    pub authorized_ssh_keys_path: Option<FileRelativePathBuf>,
+    pub authorized_ssh_keys_path: Option<Utf8PathBuf>,
 
     /// Path to a file containing CA certs that are trusted roots for signed ssh
     /// keys that are authorized to connect to the device.
-    #[file_relative_paths]
     #[walk_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
-    pub authorized_ssh_ca_certs_path: Option<FileRelativePathBuf>,
+    pub authorized_ssh_ca_certs_path: Option<Utf8PathBuf>,
 
     /// Whether to include sl4f.
     pub include_sl4f: bool,

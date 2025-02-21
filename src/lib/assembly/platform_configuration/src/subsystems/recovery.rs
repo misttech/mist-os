@@ -90,7 +90,7 @@ impl DefineSubsystemConfiguration<(&RecoveryConfig, &VolumeConfig)> for Recovery
                 .directory("system-recovery-config");
 
             let logo_source = if let Some(logo) = &config.logo {
-                logo.clone().to_utf8_pathbuf()
+                logo.clone()
             } else {
                 context.get_resource("fuchsia-logo.riv")
             };
@@ -101,7 +101,7 @@ impl DefineSubsystemConfiguration<(&RecoveryConfig, &VolumeConfig)> for Recovery
             if let Some(instructions_source) = &config.instructions {
                 directory
                     .entry(FileEntry {
-                        source: instructions_source.clone().to_utf8_pathbuf(),
+                        source: instructions_source.clone(),
                         destination: "instructions.txt".to_owned(),
                     })
                     .context("Adding instructions.txt to system-recovery-config")?;

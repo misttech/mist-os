@@ -3,25 +3,15 @@
 // found in the LICENSE file.
 
 use assembly_container::WalkPaths;
-use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
+use camino::Utf8PathBuf;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Configuration options for the forensics area.
-#[derive(
-    Debug,
-    Default,
-    Deserialize,
-    Serialize,
-    PartialEq,
-    JsonSchema,
-    SupportsFileRelativePaths,
-    WalkPaths,
-)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(default, deny_unknown_fields)]
 pub struct ForensicsConfig {
     pub feedback: FeedbackConfig,
-    #[file_relative_paths]
     #[walk_paths]
     pub cobalt: CobaltConfig,
 }
@@ -38,20 +28,10 @@ pub struct FeedbackConfig {
 }
 
 /// Configuration options for the cobalt configuration area.
-#[derive(
-    Debug,
-    Default,
-    Deserialize,
-    Serialize,
-    PartialEq,
-    JsonSchema,
-    SupportsFileRelativePaths,
-    WalkPaths,
-)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(default, deny_unknown_fields)]
 pub struct CobaltConfig {
     #[schemars(schema_with = "crate::option_path_schema")]
-    #[file_relative_paths]
     #[walk_paths]
-    pub api_key: Option<FileRelativePathBuf>,
+    pub api_key: Option<Utf8PathBuf>,
 }

@@ -3,25 +3,15 @@
 // found in the LICENSE file.
 
 use assembly_container::WalkPaths;
-use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use assembly_images_config::ProductFilesystemConfig;
+use camino::Utf8PathBuf;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Platform configuration options for storage support.
-#[derive(
-    Debug,
-    Default,
-    Deserialize,
-    Serialize,
-    PartialEq,
-    JsonSchema,
-    SupportsFileRelativePaths,
-    WalkPaths,
-)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(default, deny_unknown_fields)]
 pub struct StorageConfig {
-    #[file_relative_paths]
     #[walk_paths]
     pub component_id_index: ComponentIdIndexConfig,
 
@@ -47,23 +37,13 @@ pub struct StorageConfig {
 /// consistent storage IDs to use for component monikers. If the monikers
 /// change, the IDs can stay consistent, ensuring that the storage does not
 /// need to be migrated to a new location.
-#[derive(
-    Debug,
-    Default,
-    Deserialize,
-    Serialize,
-    PartialEq,
-    JsonSchema,
-    SupportsFileRelativePaths,
-    WalkPaths,
-)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(default)]
 pub struct ComponentIdIndexConfig {
     /// An optional index to use for product-provided components.
-    #[file_relative_paths]
     #[walk_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
-    pub product_index: Option<FileRelativePathBuf>,
+    pub product_index: Option<Utf8PathBuf>,
 }
 
 /// Platform configuration options for the factory data store.

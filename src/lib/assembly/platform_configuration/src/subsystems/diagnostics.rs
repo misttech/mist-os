@@ -182,11 +182,11 @@ impl<'a> DefineSubsystemConfiguration<DiagnosticsSubsystemConfig<'a>> for Diagno
                 insert_disabled(pipelines, name)?;
             } else {
                 for file in files {
-                    let filename = file.as_utf8_pathbuf().file_name().ok_or_else(|| {
+                    let filename = file.file_name().ok_or_else(|| {
                         anyhow!("Failed to get filename for archivist pipeline: {}", &file)
                     })?;
                     pipelines.entry(FileEntry {
-                        source: file.clone().into(),
+                        source: file.clone(),
                         destination: format!("{name}/{filename}"),
                     })?;
                 }
@@ -240,13 +240,13 @@ impl<'a> DefineSubsystemConfiguration<DiagnosticsSubsystemConfig<'a>> for Diagno
             .context("Adding component id index to sampler".to_string())?;
 
         for metrics_config in &sampler.metrics_configs {
-            let filename = metrics_config.as_utf8_pathbuf().file_name().ok_or_else(|| {
+            let filename = metrics_config.file_name().ok_or_else(|| {
                 anyhow!("Failed to get filename for metrics config: {}", &metrics_config)
             })?;
             builder
                 .package("sampler")
                 .config_data(FileEntry {
-                    source: metrics_config.clone().into(),
+                    source: metrics_config.clone(),
                     destination: format!("metrics/assembly/{}", filename),
                 })
                 .context(format!("Adding metrics config to sampler: {}", &metrics_config))?;
@@ -255,13 +255,13 @@ impl<'a> DefineSubsystemConfiguration<DiagnosticsSubsystemConfig<'a>> for Diagno
             // Ensure that the fire_config is the correct format.
             let _ = read_config::<ComponentIdInfoList>(&fire_config)
                 .with_context(|| format!("Parsing fire config: {}", &fire_config))?;
-            let filename = fire_config.as_utf8_pathbuf().file_name().ok_or_else(|| {
+            let filename = fire_config.file_name().ok_or_else(|| {
                 anyhow!("Failed to get filename for fire config: {}", &fire_config)
             })?;
             builder
                 .package("sampler")
                 .config_data(FileEntry {
-                    source: fire_config.clone().into(),
+                    source: fire_config.clone(),
                     destination: format!("fire/assembly/{}", filename),
                 })
                 .context(format!("Adding fire config to sampler: {}", &fire_config))?;
@@ -270,13 +270,13 @@ impl<'a> DefineSubsystemConfiguration<DiagnosticsSubsystemConfig<'a>> for Diagno
             // Ensure that the fire_config is the correct format.
             let _ = read_config::<ComponentIdInfoList>(&fire_config)
                 .with_context(|| format!("Parsing fire config: {}", &fire_config))?;
-            let filename = fire_config.as_utf8_pathbuf().file_name().ok_or_else(|| {
+            let filename = fire_config.file_name().ok_or_else(|| {
                 anyhow!("Failed to get filename for fire config: {}", &fire_config)
             })?;
             builder
                 .package("sampler")
                 .config_data(FileEntry {
-                    source: fire_config.clone().into(),
+                    source: fire_config.clone(),
                     destination: format!("fire/assembly/{}", filename),
                 })
                 .context(format!("Adding fire config to sampler: {}", &fire_config))?;
@@ -598,10 +598,7 @@ mod tests {
             ..ConfigurationContext::default_for_tests()
         };
         let diagnostics = DiagnosticsConfig {
-            sampler: SamplerConfig {
-                fire_configs: vec![fire_config_path.into()],
-                ..Default::default()
-            },
+            sampler: SamplerConfig { fire_configs: vec![fire_config_path], ..Default::default() },
             ..Default::default()
         };
         let mut builder = ConfigurationBuilderImpl::default();
@@ -633,10 +630,7 @@ mod tests {
             ..ConfigurationContext::default_for_tests()
         };
         let diagnostics = DiagnosticsConfig {
-            sampler: SamplerConfig {
-                fire_configs: vec![fire_config_path.into()],
-                ..Default::default()
-            },
+            sampler: SamplerConfig { fire_configs: vec![fire_config_path], ..Default::default() },
             ..Default::default()
         };
         let mut builder = ConfigurationBuilderImpl::default();

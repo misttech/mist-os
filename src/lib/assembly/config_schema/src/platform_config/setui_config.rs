@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use assembly_container::WalkPaths;
-use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
+use camino::Utf8PathBuf;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -23,16 +23,7 @@ pub enum ICUType {
 }
 
 /// Platform configuration options for the input area.
-#[derive(
-    Debug,
-    Default,
-    Deserialize,
-    Serialize,
-    PartialEq,
-    JsonSchema,
-    SupportsFileRelativePaths,
-    WalkPaths,
-)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(default, deny_unknown_fields)]
 pub struct SetUiConfig {
     /// If set, the setui config is added to the product configuration.
@@ -43,20 +34,17 @@ pub struct SetUiConfig {
     pub with_camera: bool,
 
     #[schemars(schema_with = "crate::option_path_schema")]
-    #[file_relative_paths]
     #[walk_paths]
-    pub display: Option<FileRelativePathBuf>,
+    pub display: Option<Utf8PathBuf>,
 
     #[schemars(schema_with = "crate::option_path_schema")]
-    #[file_relative_paths]
     #[walk_paths]
-    pub interface: Option<FileRelativePathBuf>,
+    pub interface: Option<Utf8PathBuf>,
 
     /// The setui agents to start
     #[schemars(schema_with = "crate::option_path_schema")]
-    #[file_relative_paths]
     #[walk_paths]
-    pub agent: Option<FileRelativePathBuf>,
+    pub agent: Option<Utf8PathBuf>,
 
     /// If an external brightness controller is being used (as opposed to
     /// brightness being controlled by setui)
@@ -64,13 +52,11 @@ pub struct SetUiConfig {
 
     /// The input devices used with settings UI
     #[schemars(schema_with = "crate::option_path_schema")]
-    #[file_relative_paths]
     #[walk_paths]
-    pub input_device_config: Option<FileRelativePathBuf>,
+    pub input_device_config: Option<Utf8PathBuf>,
 
     /// The lights (LEDs) controlled by settings UI
     #[schemars(schema_with = "crate::option_path_schema")]
-    #[file_relative_paths]
     #[walk_paths]
-    pub light_hardware_config: Option<FileRelativePathBuf>,
+    pub light_hardware_config: Option<Utf8PathBuf>,
 }

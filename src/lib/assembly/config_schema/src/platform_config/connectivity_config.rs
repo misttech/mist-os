@@ -5,28 +5,17 @@
 use std::num::NonZeroU8;
 
 use assembly_container::WalkPaths;
-use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
+use camino::Utf8PathBuf;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Platform configuration options for the connectivity area.
-#[derive(
-    Debug,
-    Default,
-    Deserialize,
-    Serialize,
-    PartialEq,
-    JsonSchema,
-    SupportsFileRelativePaths,
-    WalkPaths,
-)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(default, deny_unknown_fields)]
 pub struct PlatformConnectivityConfig {
-    #[file_relative_paths]
     #[walk_paths]
     pub network: PlatformNetworkConfig,
     pub wlan: PlatformWlanConfig,
-    #[file_relative_paths]
     #[walk_paths]
     pub mdns: MdnsConfig,
     pub thread: ThreadConfig,
@@ -36,16 +25,7 @@ pub struct PlatformConnectivityConfig {
 }
 
 /// Platform configuration options for the network area.
-#[derive(
-    Debug,
-    Default,
-    Deserialize,
-    Serialize,
-    PartialEq,
-    JsonSchema,
-    SupportsFileRelativePaths,
-    WalkPaths,
-)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(default, deny_unknown_fields)]
 pub struct PlatformNetworkConfig {
     /// Only used to control networking for the `utility` and `minimal`
@@ -54,15 +34,13 @@ pub struct PlatformNetworkConfig {
 
     pub netstack_version: NetstackVersion,
 
-    #[file_relative_paths]
     #[walk_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
-    pub netcfg_config_path: Option<FileRelativePathBuf>,
+    pub netcfg_config_path: Option<Utf8PathBuf>,
 
-    #[file_relative_paths]
     #[walk_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
-    pub netstack_config_path: Option<FileRelativePathBuf>,
+    pub netstack_config_path: Option<Utf8PathBuf>,
 
     /// Number of threads used by Netstack3.
     ///
@@ -72,10 +50,9 @@ pub struct PlatformNetworkConfig {
     /// as the system netstack.
     pub netstack_thread_count: Option<NetstackThreadCount>,
 
-    #[file_relative_paths]
     #[walk_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
-    pub google_maps_api_key_path: Option<FileRelativePathBuf>,
+    pub google_maps_api_key_path: Option<Utf8PathBuf>,
 
     /// Controls how long the http client will wait when it is idle before it
     /// escrows its FIDL connections back to the component framework and exits.
@@ -214,16 +191,7 @@ pub enum WlanRoamingMode {
 // LINT.ThenChange(//src/connectivity/wlan/wlancfg/src/client/roaming/lib.rs)
 
 /// Platform configuration options to use for the mdns area.
-#[derive(
-    Debug,
-    Default,
-    Deserialize,
-    Serialize,
-    PartialEq,
-    JsonSchema,
-    SupportsFileRelativePaths,
-    WalkPaths,
-)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(deny_unknown_fields)]
 pub struct MdnsConfig {
     /// Enable a wired service so that ffx can discover the device.
@@ -231,10 +199,9 @@ pub struct MdnsConfig {
     pub publish_fuchsia_dev_wired_service: Option<bool>,
 
     /// Service config file.
-    #[file_relative_paths]
     #[walk_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
-    pub config: Option<FileRelativePathBuf>,
+    pub config: Option<Utf8PathBuf>,
 }
 
 /// Platform configuration options to use for the thread area.

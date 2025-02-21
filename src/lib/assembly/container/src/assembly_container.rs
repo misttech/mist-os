@@ -10,7 +10,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use depfile::Depfile;
 use pathdiff::diff_paths;
 use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fs::{copy, create_dir_all};
 use std::path::Path;
 use walkdir::WalkDir;
@@ -305,6 +305,39 @@ where
             value.walk_paths_with_dest(found, dest)?;
         }
         Ok(())
+    }
+}
+
+/// A path to a directory that should be copied wholesale inside an
+/// AssemblyContainer.
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
+pub struct DirectoryPathBuf(pub Utf8PathBuf);
+
+impl WalkPaths for DirectoryPathBuf {
+    fn walk_paths_with_dest<F: WalkPathsFn>(
+        &mut self,
+        found: &mut F,
+        dest: Utf8PathBuf,
+    ) -> Result<()> {
+        found(&mut self.0, dest, FileType::Directory)
+    }
+}
+
+impl std::fmt::Display for DirectoryPathBuf {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl AsRef<Utf8Path> for DirectoryPathBuf {
+    fn as_ref(&self) -> &Utf8Path {
+        &self.0
+    }
+}
+
+impl AsRef<std::path::Path> for DirectoryPathBuf {
+    fn as_ref(&self) -> &std::path::Path {
+        self.0.as_std_path()
     }
 }
 

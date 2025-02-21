@@ -50,7 +50,7 @@ fn find_package_in_product<'a>(
     config.product.packages.base.iter_mut().chain(&mut config.product.packages.cache).find_map(
         |(name, pkg)| {
             if name == package_name.as_ref() {
-                return Some(pkg.manifest.as_mut_utf8_pathbuf());
+                return Some(&mut pkg.manifest);
             }
             return None;
         },

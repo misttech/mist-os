@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use assembly_container::WalkPaths;
-use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
+use camino::Utf8PathBuf;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -23,17 +23,7 @@ pub enum MemorySize {
 /// This config exists in both board and platform configs, to allow board config
 /// to override static defaults, and to allow platform config to override board
 /// config.
-#[derive(
-    Clone,
-    Debug,
-    Default,
-    Deserialize,
-    Serialize,
-    PartialEq,
-    JsonSchema,
-    SupportsFileRelativePaths,
-    WalkPaths,
-)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(default, deny_unknown_fields)]
 pub struct PlatformSysmemConfig {
     /// Overrides the board-driver-specified size for sysmem's contiguous memory
@@ -75,10 +65,9 @@ pub struct PlatformSysmemConfig {
     /// platform_config::PlatformConfig.sysmem field are logically after entries
     /// in BoardProvidedConfig.sysmem_format_costs field.
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    #[file_relative_paths]
     #[walk_paths]
     #[schemars(schema_with = "crate::vec_path_schema")]
-    pub format_costs: Vec<FileRelativePathBuf>,
+    pub format_costs: Vec<Utf8PathBuf>,
 }
 
 /// Board configuration options for sysmem.

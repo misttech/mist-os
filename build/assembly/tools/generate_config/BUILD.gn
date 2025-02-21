@@ -19,7 +19,6 @@ rustc_binary("generate_config") {
   deps = [
     "//src/lib/assembly/config_schema",
     "//src/lib/assembly/container",
-    "//src/lib/assembly/file_relative_path",
     "//src/lib/assembly/util",
     "//src/sys/pkg/lib/fuchsia-pkg",
     "//third_party/rust_crates:anyhow",

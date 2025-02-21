@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use assembly_container::WalkPaths;
-use assembly_file_relative_path::SupportsFileRelativePaths;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -41,9 +40,7 @@ pub mod virtualization_config;
 
 /// Platform configuration options.  These are the options that pertain to the
 /// platform itself, not anything provided by the product.
-#[derive(
-    Debug, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths, WalkPaths,
-)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(deny_unknown_fields)]
 pub struct PlatformConfig {
     /// The minimum service-level that the platform will provide, or the main
@@ -80,19 +77,16 @@ pub struct PlatformConfig {
 
     /// Platform configuration options for the connectivity area.
     #[serde(default)]
-    #[file_relative_paths]
     #[walk_paths]
     pub connectivity: connectivity_config::PlatformConnectivityConfig,
 
     /// Platform configuration options for enabling developer support.
     #[serde(default)]
-    #[file_relative_paths]
     #[walk_paths]
     pub development_support: development_support_config::DevelopmentSupportConfig,
 
     /// Platform configuration options for the diagnostics area.
     #[serde(default)]
-    #[file_relative_paths]
     #[walk_paths]
     pub diagnostics: diagnostics_config::DiagnosticsConfig,
 
@@ -102,13 +96,11 @@ pub struct PlatformConfig {
 
     /// Platform configuration for the factory store providers
     #[serde(default)]
-    #[file_relative_paths]
     #[walk_paths]
     pub factory_store_providers: factory_store_providers_config::FactoryStoreProvidersConfig,
 
     /// Platform configuration options for the forensics area.
     #[serde(default)]
-    #[file_relative_paths]
     #[walk_paths]
     pub forensics: forensics_config::ForensicsConfig,
 
@@ -130,7 +122,6 @@ pub struct PlatformConfig {
 
     /// Platform configuration options for recovery.
     #[serde(default)]
-    #[file_relative_paths]
     #[walk_paths]
     pub recovery: recovery_config::RecoveryConfig,
 
@@ -140,7 +131,6 @@ pub struct PlatformConfig {
 
     /// Platform configuration options for the SWD subsystem.
     #[serde(default)]
-    #[file_relative_paths]
     #[walk_paths]
     pub software_delivery: swd_config::SwdConfig,
 
@@ -150,7 +140,6 @@ pub struct PlatformConfig {
 
     /// Platform configuration options for storage support.
     #[serde(default)]
-    #[file_relative_paths]
     #[walk_paths]
     pub storage: storage_config::StorageConfig,
 
@@ -160,13 +149,11 @@ pub struct PlatformConfig {
     /// BoardProvidedConfig.sysmem_format_costs which can be specified for the
     /// board.
     #[serde(default)]
-    #[file_relative_paths]
     #[walk_paths]
     pub sysmem: sysmem_config::PlatformSysmemConfig,
 
     /// Platform configuration options for the UI area.
     #[serde(default)]
-    #[file_relative_paths]
     #[walk_paths]
     pub ui: ui_config::PlatformUiConfig,
 
@@ -191,7 +178,6 @@ pub struct PlatformConfig {
     ///
     /// SetUI is added to the platform config on all Standard systems.
     #[serde(default)]
-    #[file_relative_paths]
     #[walk_paths]
     pub setui: setui_config::SetUiConfig,
 
@@ -199,7 +185,6 @@ pub struct PlatformConfig {
     ///
     /// sounds to play on various system events.
     #[serde(default)]
-    #[file_relative_paths]
     #[walk_paths]
     pub system_sounds: system_sounds_config::SystemSoundsConfig,
 
@@ -214,7 +199,6 @@ pub struct PlatformConfig {
 
     /// Platform configuration options for the power area.
     #[serde(default)]
-    #[file_relative_paths]
     #[walk_paths]
     pub power: power_config::PowerConfig,
 

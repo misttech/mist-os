@@ -56,5 +56,7 @@
 mod assembly_container;
 mod merge;
 
-pub use assembly_container::{AssemblyContainer, FileType, WalkPaths, WalkPathsFn};
+pub use assembly_container::{
+    AssemblyContainer, DirectoryPathBuf, FileType, WalkPaths, WalkPathsFn,
+};
 pub use assembly_container_macro::{assembly_container, WalkPaths};

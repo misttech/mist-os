@@ -3,14 +3,12 @@
 // found in the LICENSE file.
 
 use assembly_container::WalkPaths;
-use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
+use camino::Utf8PathBuf;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Platform configuration options for the starnix area.
-#[derive(
-    Debug, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths, WalkPaths,
-)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(default, deny_unknown_fields)]
 pub struct PowerConfig {
     /// Whether power suspend/resume is supported.
@@ -33,9 +31,8 @@ pub struct PowerConfig {
 
     /// Configuration of devices and drivers for power-metrics collection
     #[schemars(schema_with = "crate::option_path_schema")]
-    #[file_relative_paths]
     #[walk_paths]
-    pub metrics_logging_config: Option<FileRelativePathBuf>,
+    pub metrics_logging_config: Option<Utf8PathBuf>,
 }
 
 impl Default for PowerConfig {

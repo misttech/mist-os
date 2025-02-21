@@ -3,15 +3,13 @@
 // found in the LICENSE file.
 
 use assembly_container::WalkPaths;
-use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
+use camino::Utf8PathBuf;
 use input_device_constants::InputDeviceType;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Platform configuration options for the UI area.
-#[derive(
-    Debug, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths, WalkPaths,
-)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(default, deny_unknown_fields)]
 pub struct PlatformUiConfig {
     /// Whether UI should be enabled on the product.
@@ -19,9 +17,8 @@ pub struct PlatformUiConfig {
 
     /// The sensor config to provide to the input pipeline.
     #[schemars(schema_with = "crate::option_path_schema")]
-    #[file_relative_paths]
     #[walk_paths]
-    pub sensor_config: Option<FileRelativePathBuf>,
+    pub sensor_config: Option<Utf8PathBuf>,
 
     /// The minimum frame duration for frame scheduler.
     pub frame_scheduler_min_predicted_frame_duration_in_us: u64,

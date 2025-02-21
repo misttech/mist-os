@@ -19,10 +19,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
         if let Some(path) = &config.metrics_logging_config {
             builder
                 .package("metrics-logger")
-                .config_data(FileEntry {
-                    source: path.as_utf8_pathbuf().into(),
-                    destination: "config.json".into(),
-                })
+                .config_data(FileEntry { source: path.into(), destination: "config.json".into() })
                 .context("Setting metrics-logger config data path")?;
         }
 
@@ -30,7 +27,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
             builder
                 .bootfs()
                 .file(FileEntry {
-                    source: energy_model_config.as_utf8_pathbuf().into(),
+                    source: energy_model_config.into(),
                     destination: BootfsDestination::EnergyModelConfig,
                 })
                 .context("Adding energy model config file for processor power management")?;
@@ -40,7 +37,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
             builder
                 .bootfs()
                 .file(FileEntry {
-                    source: power_manager_config.as_utf8_pathbuf().into(),
+                    source: power_manager_config.into(),
                     destination: BootfsDestination::PowerManagerNodeConfig,
                 })
                 .context("Adding power_manager config file")?;
@@ -51,7 +48,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
             builder
                 .bootfs()
                 .file(FileEntry {
-                    source: system_power_mode_config.as_utf8_pathbuf().into(),
+                    source: system_power_mode_config.into(),
                     destination: BootfsDestination::SystemPowerModeConfig,
                 })
                 .context("Adding system power mode configuration file")?;
@@ -61,7 +58,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
             builder
                 .bootfs()
                 .file(FileEntry {
-                    source: thermal_config.as_utf8_pathbuf().into(),
+                    source: thermal_config.into(),
                     destination: BootfsDestination::PowerManagerThermalConfig,
                 })
                 .context("Adding power_manager's thermal config file")?;
@@ -151,7 +148,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
             builder
                 .bootfs()
                 .file(FileEntry {
-                    source: cpu_manager_config.as_utf8_pathbuf().into(),
+                    source: cpu_manager_config.into(),
                     destination: BootfsDestination::CpuManagerNodeConfig,
                 })
                 .context("Adding cpu_manager config file")?;
@@ -172,7 +169,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
         {
             builder.platform_bundle("power_metrics_recorder");
             builder.package("metrics-logger-standalone").config_data(FileEntry {
-                source: config.as_utf8_pathbuf().into(),
+                source: config.into(),
                 destination: "config.json".to_string(),
             })?;
         }
