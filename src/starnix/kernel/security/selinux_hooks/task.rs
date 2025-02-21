@@ -633,6 +633,18 @@ pub fn set_procattr(
                 }
             }
 
+            // Check that ptrace permission is allowed if the process is traced.
+            if let Some(ptracer) = current_task.ptracer_task().upgrade() {
+                let tracer_sid = ptracer.security_state.lock().current_sid;
+                check_permission(
+                    &permission_check,
+                    tracer_sid,
+                    new_sid,
+                    ProcessPermission::Ptrace,
+                    audit_context,
+                )?;
+            }
+
             current_task.security_state.lock().current_sid = new_sid
         }
         ProcAttr::Previous => {

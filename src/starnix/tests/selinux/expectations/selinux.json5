@@ -25,7 +25,6 @@
                 "*capable_sys*",
                 "*cgroupfs_label*",
                 "*checkreqprot*",
-                "*dyntrace*",
                 "*fdreceive*",
                 "*inet_socket*",
                 "*ioctl*",

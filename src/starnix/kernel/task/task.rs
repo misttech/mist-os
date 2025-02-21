@@ -1183,8 +1183,10 @@ impl Task {
             proc_pid_directory_cache: Mutex::new(None),
             security_state,
         };
+
         #[cfg(any(test, debug_assertions))]
         {
+            // Note that `Kernel::pids` is already locked by the caller of `Task::new()`.
             let _l1 = task.read();
             let _l2 = task.persistent_info.lock();
         }
