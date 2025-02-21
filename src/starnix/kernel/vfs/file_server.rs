@@ -241,7 +241,6 @@ impl StarnixNodeConnection {
         let offset = match pos {
             directory::traversal_position::TraversalPosition::Start => 0,
             directory::traversal_position::TraversalPosition::Name(_) => return error!(EINVAL),
-            directory::traversal_position::TraversalPosition::Bytes(_) => return error!(EINVAL),
             directory::traversal_position::TraversalPosition::Index(v) => *v as i64,
             directory::traversal_position::TraversalPosition::End => {
                 return Ok((directory::traversal_position::TraversalPosition::End, sink.seal()));

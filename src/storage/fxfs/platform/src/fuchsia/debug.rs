@@ -378,7 +378,6 @@ impl Directory for ObjectDirectory {
         let object_id = match pos {
             TraversalPosition::Start => 0,
             TraversalPosition::Name(_) => return Err(zx::Status::BAD_STATE),
-            TraversalPosition::Bytes(_) => return Err(zx::Status::BAD_STATE),
             TraversalPosition::Index(object_id) => *object_id,
             TraversalPosition::End => u64::MAX,
         };
