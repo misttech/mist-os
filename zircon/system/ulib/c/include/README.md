@@ -319,7 +319,18 @@ The precise details for each step are:
       ```shell
       fx build //zircon/public/sysroot/sdk:sysroot_sdk
       ```
-      This should modify the `llvm-libc-golden` files in the source tree.
+      This should modify the `llvm-libc-golden` files in the source tree,
+      and perhaps also the `llvm-libc-generated.json` file.
+      **Note:** It may be necessary to run this build at least twice to pick
+      up all kinds of changes; to be safe, repeat until `nothing to do`.
+      **Note:** If files are removed upstream, this should `git rm -f`
+      the corresponding `llvm-libc-golden` files, but it won't in all
+      cases `git add` new files that were used before.  It's a good idea to do:
+      ```shell
+      git add zircon/system/ulib/c/include/llvm-libc-generated
+      ```
+      That should be fine to do whether there are new files or not, and
+      ensures that your next `git commit` will include everything new.
    4. Land this change as a normal commit through Gerrit.
       Be sure to use `Fixed: nnn` in the commit log.  For example:
       ```
@@ -352,50 +363,32 @@ state of the Fuchsia repository!**
 
 #### Adding or removing llvm-libc header files
 
-The soft transition procedure above may run into problems if llvm-libc adds or
-removes some of its header files.  All the llvm-libc headers to be used are
-listed in [`libc_headers.gni`](libc_headers.gni).  Any newly added or removed
-files must be updated in that list before `llvm-libc-golden` can be updated.
+Currently all the end-user API headers taken from llvm-libc are generated.  The
+`llvm_libc_generated_headers` list in [`BUILD.gn`](BUILD.gn) is the source of
+truth about which headers to generate from the llvm-libc sources.  Edit that
+list to add or remove a generated header.  Any hand-written headers that are
+included transitively should be picked up automatically.
 
-That same list of header file names drives both the checking / updating of
-`llvm-libc-golden` and the copying from there into the sysroot, and both are
-part of the same GN / Ninja build.  This creates a bit of a circularity when
-adding a new file.  Follow these steps to add a new file to the list:
+The soft transition procedure above not only updates the `llvm-libc-golden`
+files but also [`llvm-libc-generated.json`](llvm-libc-generated.json).  The
+JSON file is used by the `gn gen` phase of the build code; this is implemented
+in [`libc_headers.gni`](libc_headers.gni).  It lists each generated llvm-libc
+header file, along with the list of hand-written files that it uses, to inform
+the build machinery which files to maintain in the `llvm-libc-golden` directory
+and ultimately to install for users.  This file itself is generated from the
+llvm-libc sources and its `hdrgen` tool, and the `llvm_libc_generated_headers`
+list in [`BUILD.gn`](BUILD.gn).  With `update_goldens = true`, the build will
+update the JSON file in the source tree (without, the build will fail if the
+JSON file needs to be updated due to a change in `BUILD.gn` or in llvm-libc).
+Updating the JSON file may have changed what `llvm-libc-golden` files the build
+knows about, so the next incremental build should finish the job; a third build
+is prudent just to double-check that no more golden files are left to update.
 
- 1. Edit [`libc_headers.gni`](libc_headers.gni), and go to the end of the file.
-    Inside the final `}`, add a line or two like this:
-    ```gn
-      llvm_libc_public_headers += [ "new-header-file.h" ]
-      llvm_libc_generated_headers += [ "new-generated-header-file.h" ]
-    ```
-    This gets new files into the lists that drive the `llvm-libc-golden`
-    update, but not into the list that drives the sysroot construction.
- 2. Run a build.  Any build will probably do it, but all that's needed is:
-    ```shell
-    fx build -- check-llvm-libc-golden
-    ```
-    This should create the new files in `llvm-libc-golden` (assuming you
-    have `update_goldens = true` set already).
- 3. Go back to `libc_headers.gni` and remove what was added above.  Instead,
-    merge the new files into the main `llvm_libc_public_headers` and/or
-    `llvm_libc_generated_headers` lists near the top.
- 4. Run another build.  What's essential is:
-    ```shell
-    fx build //zircon/public/sysroot/sdk:sysroot_sdk
-    ```
-
-To remove files, it should be simpler:
-
- 1. Edit [`libc_headers.gni`](libc_headers.gni) to remove the obsolete file
-    names from the `llvm_libc_headers` list near the top of the file.
- 2. Run a build, as in the final step for adding a file.
-
-In either case, make sure that `git` is up to date with the new or removed
-files in `llvm-libc-golden` before creating your Gerrit change.  The checking /
-update script with `update_goldens = true` will try to handle this for you by
-running some `git rm` and `git add` commands.  But that won't catch all cases.
-After the local build with `update_goldens = true` is happy, then it should
-always be safe and sufficient to do:
+Once everything is right in the local checkout, make sure that `git` is up to
+date with the new or removed files in `llvm-libc-golden` before creating your
+Gerrit change.  The checking / update script with `update_goldens = true` will
+try to handle this for you by running some `git rm` and `git add` commands.
+But that won't catch all cases.  It should always be safe and sufficient to do:
 ```shell
 git add -A zircon/system/ulib/c/include/llvm-libc-golden
 ```

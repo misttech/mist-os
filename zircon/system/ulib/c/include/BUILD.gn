@@ -31,7 +31,19 @@ import("libc_headers.gni")
 # llvm-libc roll to complete.  Finally, the flag must be set back to false
 # along with rebuilding with `update_goldens=true` in `args.gn` to update the
 # API summary files for the SDK, for a change that go through API review.
-llvm_libc_soft_transition = true  # TODO(mcgrathr): for llvm PR #127319
+llvm_libc_soft_transition = false
+
+# Files generated from "$llvm_libc/include/*.yaml" files.  This list drives the
+# generation work done here, including regenerating llvm-libc-generated.json
+# using the golden_files() mechanism.  However, the golden JSON file in the
+# source tree is what drives the libc_headers.gni lists that everything else
+# uses.  After changing this list, the next build with update_goldens=true will
+# update the JSON file in the sources; that will necessitate another build to
+# pick up the new lists and complete the update of llvm-libc-golden files.
+llvm_libc_generated_headers = [
+  "fenv.h",
+  "malloc.h",
+]
 
 # Generated headers go into this directory, always the same in every toolchain.
 gen_dir =
@@ -44,24 +56,23 @@ gen_dir =
 # checking only happens in the $default_toolchain and is not repeated
 # elsewhere.
 group("include") {
+  public_deps = [ ":check-llvm-libc-json($default_toolchain)" ]
   if (!llvm_libc_soft_transition) {
-    public_deps = [ ":check-llvm-libc-golden($default_toolchain)" ]
+    public_deps += [ ":check-llvm-libc-golden($default_toolchain)" ]
   }
 }
 
 if (current_toolchain == default_toolchain) {
   # If the comparisons list goes directly into golden_files() as a list of
   # scopes, then each golden file will be an input and Ninja will insist that
-  # it already exist before running anything.  With the list it in a JSON file,
+  # it already exist before running anything.  With the list in a JSON file,
   # the golden_files() action gets a chance to run and create new files.
   generated_file("check-llvm-libc-golden.manifest") {
     visibility = [ ":check-llvm-libc-golden" ]
     outputs = [ "$target_gen_dir/$target_name" ]
     output_conversion = "json"
     contents = []
-    foreach(file,
-            libc_headers.llvm_libc_public_headers +
-                libc_headers.llvm_libc_impl_headers) {
+    foreach(file, libc_headers.llvm_libc_impl_headers) {
       contents += [
         {
           candidate = rebase_path(file, root_build_dir, "$llvm_libc/include")
@@ -69,7 +80,7 @@ if (current_toolchain == default_toolchain) {
         },
       ]
     }
-    foreach(file, libc_headers.llvm_libc_generated_headers) {
+    foreach(file, llvm_libc_generated_headers) {
       contents += [
         {
           candidate = rebase_path(file, root_build_dir, gen_dir)
@@ -101,7 +112,7 @@ if (current_toolchain == default_toolchain) {
 
     sources = []
     generated_headers = []
-    foreach(header, libc_headers.llvm_libc_generated_headers) {
+    foreach(header, llvm_libc_generated_headers) {
       header_dir = get_path_info(header, "dir")
       header_name = get_path_info(header, "name")
       if (header_dir == ".") {
@@ -141,6 +152,44 @@ if (current_toolchain == default_toolchain) {
       # present for analysis.
       generated_sources = rebase_path(generated_headers, root_build_dir)
     }
+  }
+
+  python_action("llvm-libc-json") {
+    visibility = [ ":*" ]
+    binary_label = ":hdrgen"
+
+    sources = []
+    foreach(header, llvm_libc_generated_headers) {
+      header_dir = get_path_info(header, "dir")
+      header_name = get_path_info(header, "name")
+      if (header_dir == ".") {
+        header_dir = ""
+      } else {
+        header_dir += "/"
+      }
+      sources += [ "$llvm_libc/include/$header_dir$header_name.yaml" ]
+    }
+
+    outputs = [ "$target_gen_dir/llvm-libc-generated.json" ]
+    depfile = "${outputs[0]}.d"
+    args = [
+             "--output=" + rebase_path(outputs[0], root_build_dir),
+             "--depfile=" + rebase_path(depfile, root_build_dir),
+             "--write-if-changed",
+             "--json",
+           ] + rebase_path(sources, root_build_dir)
+  }
+
+  golden_files("check-llvm-libc-json") {
+    visibility = [ ":*" ]
+    deps = [ ":llvm-libc-json" ]
+    _json_outputs = get_target_outputs(deps[0])
+    comparisons = [
+      {
+        golden = libc_headers.llvm_libc_json_file
+        candidate = _json_outputs[0]
+      },
+    ]
   }
 }
 
@@ -183,13 +232,11 @@ basic_source_set("headers") {
     public += [ "${libc_headers.musl_dir}/$file" ]
   }
 
-  foreach(file,
-          libc_headers.llvm_libc_public_headers +
-              libc_headers.llvm_libc_impl_headers) {
+  foreach(file, libc_headers.llvm_libc_impl_headers) {
     public += [ "$llvm_libc/include/$file" ]
   }
 
-  foreach(file, libc_headers.llvm_libc_generated_headers) {
+  foreach(file, llvm_libc_generated_headers) {
     public += [ "$gen_dir/$file" ]
   }
   public_deps += [ ":llvm-libc-generated-headers($default_toolchain)" ]

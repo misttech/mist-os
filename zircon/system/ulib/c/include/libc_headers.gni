@@ -29,27 +29,6 @@ libc_headers = {
   ]
   root_impl_headers = []
 
-  # Files taken from llvm-libc's include/ directory in some fashion.
-  # See README.md about the two different fashions.
-  llvm_libc_public_headers = []
-  llvm_libc_impl_headers = [
-    "__llvm-libc-common.h",
-    "llvm-libc-macros/fenv-macros.h",
-    "llvm-libc-macros/malloc-macros.h",
-    "llvm-libc-types/fenv_t.h",
-    "llvm-libc-types/fexcept_t.h",
-    "llvm-libc-types/size_t.h",
-  ]
-
-  # Files generated from corresponding `.h.def` and `.yaml` files.  These files
-  # are used in all the same ways as the $llvm_libc_public_headers list once
-  # they've been generated, with gen/... files in the build serving as the
-  # "source of truth" `.h` file rather than sources in the llvm-libc checkout.
-  llvm_libc_generated_headers = [
-    "fenv.h",
-    "malloc.h",
-  ]
-
   # Files inherited from the legacy musl fork.  These are maintained within the
   # source tree and have no other active source of truth, but they are not
   # original to Fuchsia.  These will eventually be replaced or moved elsewhere.
@@ -204,9 +183,26 @@ libc_headers = {
     "wait.h",
   ]
 
+  # This file is regenerated based on the $llvm_libc_generated_headers list and
+  # updated as a golden file.  It gives details about each generated public
+  # header.
+  llvm_libc_json_file = "$root_dir/llvm-libc-generated.json"
+  llvm_libc_json_data = read_file(llvm_libc_json_file, "json")
+
+  # Accumulate the list of the public headers and merge the lists of
+  # implementation headers each one uses, removing duplicates.
+  llvm_libc_public_headers = []
+  llvm_libc_impl_headers = []
+  foreach(header, llvm_libc_json_data) {
+    llvm_libc_public_headers += [ header.name ]
+    llvm_libc_impl_headers += header.includes
+    llvm_libc_impl_headers -= header.includes
+    llvm_libc_impl_headers += header.includes
+  }
+
   # These headers will get tested for standalone use.
-  all_public_headers = root_public_headers + musl_public_headers +
-                       llvm_libc_public_headers + llvm_libc_generated_headers
+  all_public_headers =
+      root_public_headers + musl_public_headers + llvm_libc_public_headers
 
   # This is in the format used by sysroot_entries.gni; it uses only this.
   sysroot_entries = [
@@ -219,8 +215,7 @@ libc_headers = {
     {
       sdk = {
         include_dir = golden_dir
-        headers = llvm_libc_public_headers + llvm_libc_generated_headers +
-                  llvm_libc_impl_headers
+        headers = llvm_libc_public_headers + llvm_libc_impl_headers
         deps = [ root_dir ]
       }
     },
