@@ -722,7 +722,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8722279020473085649"`
+**Current value for `target_cpu = "arm64"`:** `"8722233716072876993"`
 
 From //out/not-default/args.gn:10
 
@@ -730,7 +730,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8722279020473085649"`
+**Current value for `target_cpu = "riscv64"`:** `"8722233716072876993"`
 
 From //out/not-default/args.gn:10
 
@@ -738,7 +738,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8722279020473085649"`
+**Current value for `target_cpu = "x64"`:** `"8722233716072876993"`
 
 From //out/not-default/args.gn:10
 
@@ -1046,7 +1046,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.lsan.a"
-  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
+  clang_rt_cxx = ""
 }
 }
   tsan = {
@@ -1141,7 +1141,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.hwasan.a"
-  clang_rt_cxx = "../../../../out/not-default/libclang_rt.hwasan_cxx.a"
+  clang_rt_cxx = ""
 }
 }
   lsan = {
@@ -1208,7 +1208,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.lsan.a"
-  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
+  clang_rt_cxx = ""
 }
 }
   tsan = {
@@ -1820,7 +1820,7 @@ This should never be set as a build argument.
 }
   lsan = {
   shared = {
-  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
+  clang_rt = ""
 }
   static = {
   clang_rt = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.lsan.a"
@@ -2382,27 +2382,7 @@ assembled images, and so will not be able to cause the inclusion of
 As these cannot be part of the legacy AIB for a product, there is no
 "legacy" version of this argument.
 
-**Current value for `target_cpu = "arm64"`:** `["//bundles/tools"]`
-
-From //products/core.gni:29
-
-**Overridden from the default:** `[]`
-
-From //BUILD.gn:71
-
-**Current value for `target_cpu = "riscv64"`:** `["//src/developer/debug/debug_agent"]`
-
-From //products/minimal.gni:36
-
-**Overridden from the default:** `[]`
-
-From //BUILD.gn:71
-
-**Current value for `target_cpu = "x64"`:** `["//bundles/tools"]`
-
-From //products/core.gni:29
-
-**Overridden from the default:** `[]`
+**Current value (from the default):** `[]`
 
 From //BUILD.gn:71
 
