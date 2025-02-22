@@ -32,6 +32,7 @@
                 "OEMCryptoClientTest.OEMCryptoMemoryCopyBufferForOutOfRangeHandleLength",
                 "OEMCryptoClientTest.ClearCopyTestInvalidSubsampleFlag",
                 "OEMCryptoClientTest.CanLoadTestKeys",
+                "OEMCryptoSessionTests.Provisioning_IncrementCounterAPI18",
             ],
         },
         {
@@ -42,7 +43,6 @@
                 "OEMCryptoLoadsCertificateAlternates.ForbidPrepAndSign",
                 "OEMCryptoSessionTests.ClearKcbAPI17",
                 "OEMCryptoSessionTests.CheckMinimumPatchLevel",
-                "OEMCryptoSessionTests.Provisioning_IncrementCounterAPI18",
                 "OEMCryptoSessionTests.License_IncrementCounterAPI18",
                 "OEMCryptoSessionTests.MasterGeneration_IncrementCounterAPI18",
                 "OEMCryptoKeyboxTest.NormalGetDeviceId",
@@ -160,7 +160,6 @@
                 "OEMCryptoProv40Test.GetDeviceId",
                 "OEMCryptoProv40Test.ProvisionOemCert",
                 "OEMCryptoProv40Test.ProvisionDrmCert",
-
                 "Prov4CastProvisioningBasic/OEMCryptoProv40CastTest.ProvisionCastWorks/0",
                 "Prov4CastProvisioningBasic/OEMCryptoProv40CastTest.ProvisionCastWorks/1",
 
@@ -168,10 +167,8 @@
                 "OEMCryptoSessionTests.OEMCryptoMemoryPrepareLicenseRequestForHugeRequestMessageLength",
                 "OEMCryptoSessionTests.OEMCryptoMemoryPrepareLicenseRequestForHugeCoreMessageLength",
                 "OEMCryptoSessionTests.OEMCryptoMemoryPrepareLicenseRequestForHugeSignatureLength",
-
                 "OEMCryptoLicenseTestAPI16.LoadKeyWithBadNonce2",
                 "OEMCryptoLicenseTestAPI16.LoadKeyWithBadNonce3",
-
                 "OEMCryptoMemoryLicenseTest.OEMCryptoMemoryLoadEntitledKeysForHugeSubstringContentKeyIdLength",
                 "OEMCryptoMemoryLicenseTest.OEMCryptoMemoryLoadEntitledKeysForHugeSubstringContentKeyIdOffset",
                 "OEMCryptoMemoryLicenseTest.OEMCryptoMemoryLoadEntitledKeysForOutOfRangeSubstringContentKeyIdLength",
@@ -190,7 +187,6 @@
                 "OEMCryptoMemoryLicenseTest.OEMCryptoMemoryLoadEntitledKeysForOutOfRangeSubstringContentKeyDataOffset",
                 "OEMCryptoMemoryLicenseTest.OEMCryptoMemoryLoadEntitledKeysForHugeEntitlementKeyIdLength",
                 "OEMCryptoMemoryLicenseTest.OEMCryptoMemoryLoadEntitledKeysForHugeContentKeyIdLength",
-
                 "TestAll/OEMCryptoLicenseTest.FailDecryptWithoutGettingAHandle/0",
                 "TestAll/OEMCryptoLicenseTest.FailDecryptWithoutGettingAHandle/1",
                 "TestAll/OEMCryptoLicenseTest.FailDecryptWithoutGettingAHandle/2",
@@ -371,7 +367,6 @@
                 "TestAll/OEMCryptoLicenseTest.EntitledKeySessionMultipleKeySessionsAPI17/0",
                 "TestAll/OEMCryptoLicenseTest.EntitledKeySessionMultipleKeySessionsAPI17/1",
                 "TestAll/OEMCryptoLicenseTest.EntitledKeySessionMultipleKeySessionsAPI17/2",
-
                 "TestAll/OEMCryptoEntitlementLicenseTest.LoadEntitlementKeysAPI17/0",
                 "TestAll/OEMCryptoEntitlementLicenseTest.LoadEntitlementKeysAPI17/1",
                 "TestAll/OEMCryptoEntitlementLicenseTest.LoadEntitlementKeysAPI17/2",
@@ -492,7 +487,6 @@
                 "TestAll/OEMCryptoLicenseOverflowTest.OEMCryptoMemoryLoadLicenseForHugeResponseLength/1",
                 "TestAll/OEMCryptoLicenseOverflowTest.OEMCryptoMemoryLoadLicenseForHugeCoreMessageLength/0",
                 "TestAll/OEMCryptoLicenseOverflowTest.OEMCryptoMemoryLoadLicenseForHugeCoreMessageLength/1",
-
                 "TestAll/OEMCryptoRefreshTest.RefreshWithNonce/0",
                 "TestAll/OEMCryptoRefreshTest.RefreshWithNonce/1",
                 "TestAll/OEMCryptoRefreshTest.RefreshNoNonce/0",
@@ -505,7 +499,6 @@
                 "TestAll/OEMCryptoRefreshTest.RenewLicenseLoadSuccess/1",
                 "TestAll/OEMCryptoRefreshTest.RenewLicenseLoadOutsideRentalDuration/0",
                 "TestAll/OEMCryptoRefreshTest.RenewLicenseLoadOutsideRentalDuration/1",
-
                 "TestAPI16/OEMCryptoRefreshTestAPI16.RefreshNoLicense/0",
                 "TestAPI16/OEMCryptoRefreshTestAPI16.RefreshNoLicense/1",
                 "TestAPI16/OEMCryptoRefreshTestAPI16.RefreshNoLicense/2",

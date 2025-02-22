@@ -1390,7 +1390,9 @@ extern "C" fn TEE_CipherInit(
     IV: *mut ::std::os::raw::c_void,
     IVLen: usize,
 ) {
-    unimplemented!()
+    let operation = *OperationHandle::from_binding(&operation);
+    let iv = slice_from_raw_parts(IV, IVLen);
+    context::with_current_mut(|context| context.operations.init_cipher(operation, iv));
 }
 
 #[no_mangle]
@@ -1401,7 +1403,30 @@ extern "C" fn TEE_CipherUpdate(
     destData: *mut ::std::os::raw::c_void,
     destLen: *mut usize,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!destLen.is_null());
+
+    to_tee_result(|| -> TeeResult {
+        let operation = *OperationHandle::from_binding(&operation);
+
+        // SAFETY: `destLen` checked as non-null above.
+        let initialDestLen = unsafe { *destLen };
+
+        context::with_current_mut(|context| {
+            let dest = slice_from_raw_parts_mut(destData, initialDestLen);
+
+            if buffers_overlap(srcData, srcLen, destData, initialDestLen) {
+                assert_eq!(srcData, destData);
+                context.operations.update_cipher_in_place(operation, dest);
+                return Ok(());
+            }
+            let src = slice_from_raw_parts(srcData, srcLen);
+            context.operations.update_cipher(operation, src, dest).map_err(|len| {
+                // SAFETY: destLen checked as non-null above.
+                unsafe { *destLen = len };
+                Error::ShortBuffer
+            })
+        })
+    }())
 }
 
 #[no_mangle]
@@ -1412,7 +1437,30 @@ extern "C" fn TEE_CipherDoFinal(
     destData: *mut ::std::os::raw::c_void,
     destLen: *mut usize,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!destLen.is_null());
+
+    to_tee_result(|| -> TeeResult {
+        let operation = *OperationHandle::from_binding(&operation);
+
+        // SAFETY: `destLen` checked as non-null above.
+        let initialDestLen = unsafe { *destLen };
+
+        context::with_current_mut(|context| {
+            let dest = slice_from_raw_parts_mut(destData, initialDestLen);
+
+            if buffers_overlap(srcData, srcLen, destData, initialDestLen) {
+                assert_eq!(srcData, destData);
+                context.operations.finalize_cipher_in_place(operation, dest);
+                return Ok(());
+            }
+            let src = slice_from_raw_parts(srcData, srcLen);
+            context.operations.finalize_cipher(operation, src, dest).map_err(|len| {
+                // SAFETY: destLen checked as non-null above.
+                unsafe { *destLen = len };
+                Error::ShortBuffer
+            })
+        })
+    }())
 }
 
 #[no_mangle]

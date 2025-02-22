@@ -5,11 +5,16 @@
 use std::cell::{RefCell, RefMut};
 use std::cmp::min;
 use std::collections::HashMap;
+use std::iter;
+use std::marker::PhantomData;
 use std::rc::Rc;
 
 use aes::{Aes128, Aes192, Aes256};
+use cbc::{Decryptor as CbcDecryptor, Encryptor as CbcEncryptor};
 use cmac::Cmac;
-use digest::{DynDigest as Digest, KeyInit as _};
+use crypto_common::{KeyInit, KeyIvInit};
+use digest::DynDigest as Digest;
+use ecb::{Decryptor as EcbDecryptor, Encryptor as EcbEncryptor};
 use hmac::Hmac;
 use sha1::Sha1;
 use sha2::{Sha224, Sha256, Sha384, Sha512};
@@ -39,6 +44,8 @@ pub fn is_algorithm_supported(alg: Algorithm, element: EccCurve) -> bool {
         | Algorithm::Sha256
         | Algorithm::Sha384
         | Algorithm::Sha512
+        | Algorithm::AesCbcNopad
+        | Algorithm::AesEcbNopad
         | Algorithm::AesCmac
         | Algorithm::HmacSha1
         | Algorithm::HmacSha224
@@ -106,10 +113,260 @@ enum MacType {
     HmacSha512,
 }
 
+// A cipher abstraction conveniently shaped for our API glue needs.
+trait Cipher {
+    fn block_size(&self) -> usize;
+    fn set_iv(&mut self, iv: &[u8]);
+    fn reset(&mut self);
+    fn encrypt(&self, input: &[u8], output: &mut [u8]);
+    fn encrypt_in_place(&self, inout: &mut [u8]);
+    fn decrypt(&self, input: &[u8], output: &mut [u8]);
+    fn decrypt_in_place(&self, inout: &mut [u8]);
+}
+
+impl<C: PreCipher> Cipher for C {
+    fn set_iv(&mut self, iv: &[u8]) {
+        self.set_iv(iv)
+    }
+
+    fn reset(&mut self) {
+        self.reset()
+    }
+
+    fn block_size(&self) -> usize {
+        debug_assert_eq!(C::Encryptor::block_size(), C::Decryptor::block_size());
+        C::Encryptor::block_size()
+    }
+
+    fn encrypt(&self, input: &[u8], output: &mut [u8]) {
+        self.new_encryptor().encrypt(input, output);
+    }
+
+    fn encrypt_in_place(&self, inout: &mut [u8]) {
+        self.new_encryptor().encrypt_in_place(inout)
+    }
+
+    fn decrypt(&self, input: &[u8], output: &mut [u8]) {
+        self.new_decryptor().decrypt(input, output)
+    }
+
+    fn decrypt_in_place(&self, inout: &mut [u8]) {
+        self.new_decryptor().decrypt_in_place(inout)
+    }
+}
+
+// Ideally, we'd just use a trait like this in place of Cipher, but the
+// presence of associated types makes it non-dyn-compatible.
+trait PreCipher {
+    type Encryptor: Encryptor;
+    type Decryptor: Decryptor;
+
+    fn set_iv(&mut self, iv: &[u8]);
+    fn reset(&mut self);
+
+    // The minting of new encryptors or decryptors in general should happen
+    // only after set_iv() has been called.
+    fn new_encryptor(&self) -> Self::Encryptor;
+    fn new_decryptor(&self) -> Self::Decryptor;
+}
+
+trait Encryptor {
+    fn block_size() -> usize;
+    fn encrypt(&mut self, input: &[u8], output: &mut [u8]);
+    fn encrypt_in_place(&mut self, inout: &mut [u8]);
+}
+
+trait Decryptor {
+    fn block_size() -> usize;
+    fn decrypt(&mut self, input: &[u8], output: &mut [u8]);
+    fn decrypt_in_place(&mut self, inout: &mut [u8]);
+}
+
+// A general cipher type that requires an initialization vector.
+struct CipherWithIv<E, D>
+where
+    E: Encryptor + KeyIvInit,
+    D: Decryptor + KeyIvInit,
+{
+    key: Vec<u8>,
+    iv: Vec<u8>,
+    phantom: PhantomData<(E, D)>,
+}
+
+impl<E, D> CipherWithIv<E, D>
+where
+    E: Encryptor + KeyIvInit,
+    D: Decryptor + KeyIvInit,
+{
+    fn new(key: &[u8]) -> Self {
+        Self { key: key.to_vec(), iv: Vec::new(), phantom: PhantomData::default() }
+    }
+}
+
+impl<E, D> PreCipher for CipherWithIv<E, D>
+where
+    E: Encryptor + KeyIvInit,
+    D: Decryptor + KeyIvInit,
+{
+    type Encryptor = E;
+    type Decryptor = D;
+
+    fn set_iv(&mut self, iv: &[u8]) {
+        self.iv = iv.to_vec()
+    }
+
+    fn reset(&mut self) {
+        self.iv.clear()
+    }
+
+    fn new_encryptor(&self) -> E {
+        E::new_from_slices(&self.key, &self.iv).unwrap()
+    }
+
+    fn new_decryptor(&self) -> D {
+        D::new_from_slices(&self.key, &self.iv).unwrap()
+    }
+}
+
+// A general cipher type that does not require an initialization vector.
+struct CipherWithoutIv<E, D>
+where
+    E: Encryptor + KeyInit,
+    D: Decryptor + KeyInit,
+{
+    key: Vec<u8>,
+    phantom: PhantomData<(E, D)>,
+}
+
+impl<E, D> CipherWithoutIv<E, D>
+where
+    E: Encryptor + KeyInit,
+    D: Decryptor + KeyInit,
+{
+    fn new(key: &[u8]) -> Self {
+        Self { key: key.to_vec(), phantom: PhantomData::default() }
+    }
+}
+
+impl<E, D> PreCipher for CipherWithoutIv<E, D>
+where
+    E: Encryptor + KeyInit,
+    D: Decryptor + KeyInit,
+{
+    type Encryptor = E;
+    type Decryptor = D;
+
+    // Why not panic? Two reasons:
+    // * the spec does not prescribe any behaviour for calling CipherInit(iv)
+    //   for an algorithm that does require an IV, though it does prescribe
+    //   ignoring any IVs passed to MAC algorithms with MacInit(), so there's
+    //   an argument for consistency;
+    // * it simplifies the one intended callsite of CipherInit() to make
+    //   set_iv() and unconditional call.
+    fn set_iv(&mut self, _iv: &[u8]) {}
+
+    fn reset(&mut self) {}
+
+    fn new_encryptor(&self) -> E {
+        E::new_from_slice(&self.key).unwrap()
+    }
+    fn new_decryptor(&self) -> D {
+        D::new_from_slice(&self.key).unwrap()
+    }
+}
+
+// Provides Encryptor and Decryptor implementations for some of the
+// RustCrypto-shaped encryptors and decryptors (which sadly don't implement
+// some official trait themselves encoding their API).
+//
+// We use token trees in the macro matcher to permit the use of `$encryptor<C>`
+// and `$decryptor<C>`, which wouldn't parse if specified more naturally as
+// type paths.
+macro_rules! rustcrypto_encryptor_and_decryptor {
+    ($encryptor:tt, $decryptor:tt) => {
+        impl<C> Encryptor for $encryptor<C>
+        where
+            C: cipher::BlockCipher + cipher::BlockEncryptMut,
+        {
+            fn block_size() -> usize {
+                C::block_size()
+            }
+
+            fn encrypt(&mut self, input: &[u8], output: &mut [u8]) {
+                use cipher::BlockEncryptMut;
+
+                assert!(output.len() >= input.len());
+                let block_size = C::block_size();
+                let chunks =
+                    iter::zip(input.chunks_exact(block_size), output.chunks_exact_mut(block_size));
+                for (in_block, out_block) in chunks {
+                    self.encrypt_block_b2b_mut(in_block.into(), out_block.into());
+                }
+            }
+
+            fn encrypt_in_place(&mut self, inout: &mut [u8]) {
+                use cipher::BlockEncryptMut;
+
+                for block in inout.chunks_exact_mut(C::block_size()) {
+                    self.encrypt_block_mut(block.into())
+                }
+            }
+        }
+
+        impl<C> Decryptor for $decryptor<C>
+        where
+            C: cipher::BlockCipher + cipher::BlockDecryptMut,
+        {
+            fn block_size() -> usize {
+                C::block_size()
+            }
+
+            fn decrypt(&mut self, input: &[u8], output: &mut [u8]) {
+                use cipher::BlockDecryptMut;
+
+                assert!(output.len() >= input.len());
+                let block_size = C::block_size();
+                let chunks =
+                    iter::zip(input.chunks_exact(block_size), output.chunks_exact_mut(block_size));
+                for (in_block, out_block) in chunks {
+                    self.decrypt_block_b2b_mut(in_block.into(), out_block.into());
+                }
+            }
+
+            fn decrypt_in_place(&mut self, inout: &mut [u8]) {
+                use cipher::BlockDecryptMut;
+
+                for block in inout.chunks_exact_mut(C::block_size()) {
+                    self.decrypt_block_mut(block.into())
+                }
+            }
+        }
+    };
+}
+
+rustcrypto_encryptor_and_decryptor!(CbcEncryptor, CbcDecryptor);
+rustcrypto_encryptor_and_decryptor!(EcbEncryptor, EcbDecryptor);
+
+type AesCbcNopad<C> = CipherWithIv<cbc::Encryptor<C>, cbc::Decryptor<C>>;
+type Aes128CbcNopad = AesCbcNopad<Aes128>;
+type Aes192CbcNopad = AesCbcNopad<Aes192>;
+type Aes256CbcNopad = AesCbcNopad<Aes256>;
+
+type AesEcbNopad<C> = CipherWithoutIv<ecb::Encryptor<C>, ecb::Decryptor<C>>;
+type Aes128EcbNopad = AesEcbNopad<Aes128>;
+type Aes192EcbNopad = AesEcbNopad<Aes192>;
+type Aes256EcbNopad = AesEcbNopad<Aes256>;
+
+enum CipherType {
+    AesCbcNopad,
+    AesEcbNopad,
+}
+
 // Encapsulated an abstracted helper classes particular to supported
 // algorithms.
 enum Helper {
     Digest(Box<dyn Digest>),
+    Cipher(Option<Box<dyn Cipher>>, CipherType),
     Mac(Option<Box<dyn Mac>>, MacType),
     // TODO(https://fxbug.dev/360942581): Add more...
 }
@@ -122,6 +379,8 @@ impl Helper {
             Algorithm::Sha256 => Ok(Helper::Digest(Box::new(Sha256::default()))),
             Algorithm::Sha384 => Ok(Helper::Digest(Box::new(Sha384::default()))),
             Algorithm::Sha512 => Ok(Helper::Digest(Box::new(Sha512::default()))),
+            Algorithm::AesCbcNopad => Ok(Helper::Cipher(None, CipherType::AesCbcNopad)),
+            Algorithm::AesEcbNopad => Ok(Helper::Cipher(None, CipherType::AesEcbNopad)),
             Algorithm::AesCmac => Ok(Helper::Mac(None, MacType::AesCmac)),
             Algorithm::HmacSha1 => Ok(Helper::Mac(None, MacType::HmacSha1)),
             Algorithm::HmacSha224 => Ok(Helper::Mac(None, MacType::HmacSha224)),
@@ -139,18 +398,42 @@ impl Helper {
                 assert!(matches!(key, Key::Data(NoKey {})));
                 digest.reset()
             }
+            Helper::Cipher(cipher, cipher_type) => {
+                let Key::Aes(AesKey { secret }) = key else {
+                    panic!("Wrong key type ({:?}) - expected AES", key.get_type());
+                };
+
+                match cipher_type {
+                    CipherType::AesCbcNopad => {
+                        let cbc: Box<dyn Cipher> = match secret.len() {
+                            16 => Box::new(Aes128CbcNopad::new(&secret)),
+                            24 => Box::new(Aes192CbcNopad::new(&secret)),
+                            32 => Box::new(Aes256CbcNopad::new(&secret)),
+                            len => panic!("Invalid AES key length: {len}"),
+                        };
+                        *cipher = Some(cbc);
+                    }
+                    CipherType::AesEcbNopad => {
+                        let ecb: Box<dyn Cipher> = match secret.len() {
+                            16 => Box::new(Aes128EcbNopad::new(&secret)),
+                            24 => Box::new(Aes192EcbNopad::new(&secret)),
+                            32 => Box::new(Aes256EcbNopad::new(&secret)),
+                            len => panic!("Invalid AES key length: {len}"),
+                        };
+                        *cipher = Some(ecb);
+                    }
+                }
+            }
             Helper::Mac(mac, mac_type) => match mac_type {
                 MacType::AesCmac => {
                     let Key::Aes(AesKey { secret }) = key else {
                         panic!("Wrong key type ({:?}) - expected AES", key.get_type());
                     };
-                    let cmac: Box<dyn Mac> = if secret.len() == 16 {
-                        Box::new(AesCmac128::new_from_slice(&secret).unwrap())
-                    } else if secret.len() == 24 {
-                        Box::new(AesCmac192::new_from_slice(&secret).unwrap())
-                    } else {
-                        assert_eq!(secret.len(), 32, "Invalid AES key length: {}", secret.len());
-                        Box::new(AesCmac256::new_from_slice(&secret).unwrap())
+                    let cmac: Box<dyn Mac> = match secret.len() {
+                        16 => Box::new(AesCmac128::new_from_slice(&secret).unwrap()),
+                        24 => Box::new(AesCmac192::new_from_slice(&secret).unwrap()),
+                        32 => Box::new(AesCmac256::new_from_slice(&secret).unwrap()),
+                        len => panic!("Invalid AES key length: {len}"),
                     };
                     *mac = Some(cmac);
                 }
@@ -191,6 +474,11 @@ impl Helper {
     fn reset(&mut self) {
         match self {
             Helper::Digest(digest) => digest.reset(),
+            Helper::Cipher(cipher, _) => {
+                if let Some(cipher) = cipher {
+                    cipher.reset()
+                }
+            }
             Helper::Mac(mac, _) => {
                 if let Some(mac) = mac {
                     mac.reset()
@@ -235,6 +523,14 @@ impl Operation {
             digest
         } else {
             panic!("{:?} is not a digest algorithm", self.algorithm)
+        }
+    }
+
+    fn as_cipher(&mut self) -> &mut Box<dyn Cipher> {
+        if let Helper::Cipher(ref mut cipher, _) = &mut self.helper {
+            cipher.as_mut().expect("TEE_SetKey() has not yet been called")
+        } else {
+            panic!("{:?} is not a cipher algorithm", self.algorithm)
         }
     }
 
@@ -287,9 +583,6 @@ impl Operation {
                         assert!(usage.contains(Usage::ENCRYPT | Usage::VERIFY));
                     } else {
                         assert!(usage.contains(Usage::DECRYPT | Usage::SIGN));
-                    }
-                    if !matches!(key, Key::Aes(_)) {
-                        panic!("Wrong key type ({:?}) - expected AES", key.get_type());
                     }
                 }
                 _ => return Err(Error::NotImplemented),
@@ -414,6 +707,74 @@ impl Operation {
     fn extract_digest(&mut self, buf: &mut [u8]) -> usize {
         self.finalize_digest();
         self.extract_finalized(buf)
+    }
+
+    // See TEE_CipherInit()
+    fn init_cipher(&mut self, iv: &[u8]) {
+        if self.state == OpState::Active {
+            self.as_cipher().reset();
+        } else {
+            assert_eq!(self.state, OpState::Initial);
+        }
+
+        self.as_cipher().set_iv(iv);
+
+        // Currently supported MAC algorithms don't deal in initialization vectors.
+        self.state = OpState::Active;
+    }
+
+    // The error value indicates the minimum required size of the output buffer
+    // (i.e., the total number of full blocks to encrypt/decrypt).
+    fn update_cipher(&mut self, src: &[u8], dest: &mut [u8]) -> Result<(), usize> {
+        assert_eq!(self.state, OpState::Active);
+
+        let block_size = self.as_cipher().block_size();
+        let num_blocks_in = src.len() / block_size;
+        let num_blocks_out = dest.len() / block_size;
+
+        // The output buffer size should be at least the total size of the
+        // number of full blocks in `src` to encrypt/decrypt.
+        if num_blocks_in > num_blocks_out {
+            return Err(num_blocks_in * block_size);
+        }
+
+        if self.mode == Mode::Encrypt {
+            self.as_cipher().encrypt(src, dest);
+        } else {
+            assert_eq!(self.mode, Mode::Decrypt);
+            self.as_cipher().decrypt(src, dest);
+        }
+        Ok(())
+    }
+
+    fn update_cipher_in_place(&mut self, inout: &mut [u8]) {
+        assert_eq!(self.state, OpState::Active);
+
+        if self.mode == Mode::Encrypt {
+            self.as_cipher().encrypt_in_place(inout);
+        } else {
+            assert_eq!(self.mode, Mode::Decrypt);
+            self.as_cipher().decrypt_in_place(inout);
+        }
+    }
+
+    // The error value indicates the minimum required size of the output buffer
+    // (i.e., the total number of full blocks to encrypt/decrypt, which should
+    // be the same size as `src` itself).
+    fn finalize_cipher(&mut self, src: &[u8], dest: &mut [u8]) -> Result<(), usize> {
+        let block_size = self.as_cipher().block_size();
+        assert_eq!(src.len() % block_size, 0);
+        assert!(dest.len() >= src.len());
+        self.update_cipher(src, dest)?;
+        self.state = OpState::Initial;
+        Ok(())
+    }
+
+    fn finalize_cipher_in_place(&mut self, inout: &mut [u8]) {
+        let block_size = self.as_cipher().block_size();
+        assert_eq!(inout.len() % block_size, 0);
+        self.update_cipher_in_place(inout);
+        self.state = OpState::Initial;
     }
 
     // See TEE_MACInit().
@@ -625,6 +986,36 @@ impl Operations {
 
     pub fn extract_digest<'a>(&mut self, operation: OperationHandle, buf: &'a mut [u8]) -> usize {
         self.get_mut(operation).extract_digest(buf)
+    }
+
+    pub fn init_cipher(&mut self, operation: OperationHandle, iv: &[u8]) {
+        self.get_mut(operation).init_cipher(iv)
+    }
+
+    pub fn update_cipher(
+        &mut self,
+        operation: OperationHandle,
+        input: &[u8],
+        output: &mut [u8],
+    ) -> Result<(), usize> {
+        self.get_mut(operation).update_cipher(input, output)
+    }
+
+    pub fn update_cipher_in_place(&mut self, operation: OperationHandle, inout: &mut [u8]) {
+        self.get_mut(operation).update_cipher_in_place(inout)
+    }
+
+    pub fn finalize_cipher(
+        &mut self,
+        operation: OperationHandle,
+        input: &[u8],
+        output: &mut [u8],
+    ) -> Result<(), usize> {
+        self.get_mut(operation).finalize_cipher(input, output)
+    }
+
+    pub fn finalize_cipher_in_place(&mut self, operation: OperationHandle, inout: &mut [u8]) {
+        self.get_mut(operation).finalize_cipher_in_place(inout)
     }
 
     pub fn init_mac(&mut self, operation: OperationHandle, iv: &[u8]) {
