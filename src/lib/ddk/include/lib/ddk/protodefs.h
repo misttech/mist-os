@@ -102,8 +102,8 @@ DDK_PROTOCOL_DEF(TEST_PARENT,             83,   "test-parent", PF_NOPUB)
 // 84 was PBUS.
 DDK_PROTOCOL_DEF(PDEV,                    85,   "platform-dev", 0)
 DDK_PROTOCOL_DEF(I2C_HID,                 86,   "i2c-hid", 0)
-DDK_PROTOCOL_DEF(SERIAL,                  87,   "serial", 0)
-DDK_PROTOCOL_DEF(SERIAL_IMPL,             88,   "serial-impl", 0)
+// SERIAL was 87
+// SERIAL_IMPL was 88
 // 89 was SHARED_DMA
 DDK_PROTOCOL_DEF(CLOCK,                   90,   "clock", PF_NOPUB)
 DDK_PROTOCOL_DEF(CLOCK_IMPL,              91,   "clock-impl", 0)
@@ -140,7 +140,7 @@ DDK_PROTOCOL_DEF(SPI,                     121, "spi", 0)
 DDK_PROTOCOL_DEF(SPI_IMPL,                122, "spi-impl", 0)
 DDK_PROTOCOL_DEF(SECURE_MEM,              123, "securemem", 0)
 DDK_PROTOCOL_DEF(DEVHOST_TEST,            124, "tdh", 0)
-DDK_PROTOCOL_DEF(SERIAL_IMPL_ASYNC,       125, "serial-impl-async", 0)
+// 125 was SERIAL_IMPL_ASYNC
 DDK_PROTOCOL_DEF(AT_TRANSPORT,            126, "at-transport", 0)
 // 127 was pwm
 DDK_PROTOCOL_DEF(PWM_IMPL,                128, "pwm-impl", 0)

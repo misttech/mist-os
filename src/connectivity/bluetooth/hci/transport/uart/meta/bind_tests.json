@@ -1,14 +1,14 @@
 [
     {
         "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.bluetooth.BIND_PROTOCOL.DEVICE"
+            "fuchsia.hardware.serialimpl.Service": "fuchsia.hardware.serialimpl.Service.ZirconTransport"
         },
         "expected": "abort",
-        "name": "Incorrect_Protocol"
+        "name": "Incorrect_transport"
     },
     {
         "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.serial.BIND_PROTOCOL.IMPL_ASYNC",
+            "fuchsia.hardware.serialimpl.Service": "fuchsia.hardware.serialimpl.Service.DriverTransport",
             "fuchsia.BIND_SERIAL_CLASS": "fuchsia.serial.BIND_SERIAL_CLASS.BLUETOOTH_HCI"
         },
         "expected": "match",
