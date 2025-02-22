@@ -2002,8 +2002,8 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                     last_ack,
                     last_wnd,
                     expiry: _,
-                    last_wnd_scale: _,
-                }) => (*last_ack, *last_wnd, WindowScale::default(), *last_seq, true),
+                    last_wnd_scale,
+                }) => (*last_ack, *last_wnd, *last_wnd_scale, *last_seq, true),
             };
 
             // Reset the connection if we receive new data while the socket is being closed
