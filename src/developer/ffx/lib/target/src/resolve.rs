@@ -297,11 +297,20 @@ async fn get_handle_info(
     handle: TargetHandle,
     context: &EnvironmentContext,
 ) -> Result<ffx::TargetInfo> {
-    let (target_state, addresses) = match handle.state {
-        TargetState::Unknown => (ffx::TargetState::Unknown, None),
-        TargetState::Product(target_addrs) => (ffx::TargetState::Product, Some(target_addrs)),
-        TargetState::Fastboot(_) => (ffx::TargetState::Fastboot, None),
-        TargetState::Zedboot => (ffx::TargetState::Zedboot, None),
+    let mut serial_number = None;
+    let (target_state, fastboot_interface, addresses) = match handle.state {
+        TargetState::Unknown => (ffx::TargetState::Unknown, None, None),
+        TargetState::Product(target_addrs) => (ffx::TargetState::Product, None, Some(target_addrs)),
+        TargetState::Fastboot(state) => {
+            serial_number.replace(state.serial_number);
+            let fastboot_connection = match state.connection_state {
+                FastbootConnectionState::Usb => ffx::FastbootInterface::Usb,
+                FastbootConnectionState::Tcp(_) => ffx::FastbootInterface::Tcp,
+                FastbootConnectionState::Udp(_) => ffx::FastbootInterface::Udp,
+            };
+            (ffx::TargetState::Fastboot, Some(fastboot_connection), None)
+        }
+        TargetState::Zedboot => (ffx::TargetState::Zedboot, None, None),
     };
     let RetrievedTargetInfo { rcs_state, product_config, board_config, ssh_address } =
         if let Some(ref target_addrs) = addresses {
@@ -318,6 +327,8 @@ async fn get_handle_info(
         target_state: Some(target_state),
         board_config,
         product_config,
+        serial_number,
+        fastboot_interface,
         ssh_address: ssh_address.map(|a| TargetAddr::from(a).into()),
         ..Default::default()
     })
