@@ -15,6 +15,7 @@ assert(is_host)
 visibility = [
   ":*",
   "cpp:*",
+  "tests:*",
 ]
 
 conformance_test_source = "$target_gen_dir/conformance_test.py"
@@ -28,6 +29,9 @@ gidl("conformance_tests_py") {
 }
 
 python_host_test("fuchsia_controller_conformance_tests") {
+  # Allow tests to be public instead of using the default visibility for this BUILD.gn file.
+  visibility = []
+  visibility = [ "*" ]
   libraries = [
     ":fidl_bindings",
     ":fuchsia_controller_py",
@@ -41,7 +45,7 @@ python_host_test("fuchsia_controller_conformance_tests") {
 }
 
 rustc_staticlib("lib") {
-  visibility += [ "tests:*" ]
+  test_visibility = [ "*" ]
   output_name = "fuchsia_controller"
   edition = "2021"
   with_unit_tests = true
@@ -148,7 +152,11 @@ group("fuchsia-controller") {
 
 group("tests") {
   testonly = true
-  visibility += [ "*" ]
+
+  # Allow tests to be public instead of using the default visibility for this BUILD.gn file.
+  visibility = []
+  visibility = [ "*" ]
+
   deps = [
     ":lib_test",
     "tests:fuchsia_controller_encode_test",
@@ -173,8 +181,10 @@ group("tests") {
 }
 
 group("host_tests") {
+  # Allow tests to be public instead of using the default visibility for this BUILD.gn file.
+  visibility = []
+  visibility = [ "*" ]
   testonly = true
-  visibility += [ "//src/developer/ffx/lib:host_tests" ]
   deps = []
 
   # TODO(https://fxbug.dev/42078138): These tests fail on mac builders. This is most likely
