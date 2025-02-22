@@ -38,6 +38,25 @@ pub trait DeviceControl {
     async fn set_gain(&mut self, gain_state: fhaudio::GainState) -> Result<(), Error>;
 }
 
+pub struct CompositeDevice {
+    pub _proxy: fhaudio::CompositeProxy,
+}
+
+#[async_trait]
+impl DeviceControl for CompositeDevice {
+    async fn create_ring_buffer(
+        &mut self,
+        _element_id: fadevice::ElementId,
+        _format: Format,
+    ) -> Result<Box<dyn RingBuffer>, Error> {
+        Err(anyhow!("Creating ring buffers for Composite devices not supported yet in ffx audio."))
+    }
+
+    async fn set_gain(&mut self, _gain_state: fhaudio::GainState) -> Result<(), Error> {
+        Err(anyhow!("Setting gain for Composite devices not supported yet in ffx audio."))
+    }
+}
+
 pub struct StreamConfigDevice {
     proxy: fhaudio::StreamConfigProxy,
 }
@@ -58,27 +77,6 @@ impl DeviceControl for StreamConfigDevice {
 
     async fn set_gain(&mut self, gain_state: fhaudio::GainState) -> Result<(), Error> {
         self.proxy.set_gain(&gain_state).map_err(|e| anyhow!("Error setting gain state: {e}"))
-    }
-}
-
-pub struct CompositeDevice {
-    pub _proxy: fhaudio::CompositeProxy,
-}
-
-#[async_trait]
-impl DeviceControl for CompositeDevice {
-    async fn create_ring_buffer(
-        &mut self,
-        _element_id: fadevice::ElementId,
-        _format: Format,
-    ) -> Result<Box<dyn RingBuffer>, Error> {
-        Err(anyhow!("Creating ring buffers for Composite devices not supported yet in ffx audio."))
-    }
-
-    async fn set_gain(&mut self, _gain_state: fhaudio::GainState) -> Result<(), Error> {
-        Err(anyhow!(
-            "Setting gain not supported for Composite devices not supported yet in ffx audio."
-        ))
     }
 }
 
@@ -141,6 +139,15 @@ fn connect_to_devfs_device(devfs: DevfsSelector) -> Result<Box<dyn DeviceControl
     let protocol_path = devfs.path().join("device_protocol");
 
     match devfs.0.device_type {
+        fadevice::DeviceType::Composite => {
+            // DFv2 Composite drivers do not use a connector/trampoline as StreamConfig above.
+            // TODO(https://fxbug.dev/326339971): Fall back to CompositeConnector for DFv1 drivers
+            let proxy =
+                connect_to_protocol_at_path::<fhaudio::CompositeMarker>(protocol_path.as_str())
+                    .context("Failed to connect to Composite")?;
+
+            Ok(Box::new(CompositeDevice { _proxy: proxy }))
+        }
         fadevice::DeviceType::Input | fadevice::DeviceType::Output => {
             let connector_proxy =
                 connect_to_protocol_at_path::<fhaudio::StreamConfigConnectorMarker>(
@@ -151,15 +158,6 @@ fn connect_to_devfs_device(devfs: DevfsSelector) -> Result<Box<dyn DeviceControl
             connector_proxy.connect(server_end).context("Failed to call Connect")?;
 
             Ok(Box::new(StreamConfigDevice { proxy }))
-        }
-        fadevice::DeviceType::Composite => {
-            // DFv2 Composite drivers do not use a connector/trampoline as StreamConfig above.
-            // TODO(https://fxbug.dev/326339971): Fall back to CompositeConnector for DFv1 drivers
-            let proxy =
-                connect_to_protocol_at_path::<fhaudio::CompositeMarker>(protocol_path.as_str())
-                    .context("Failed to connect to Composite")?;
-
-            Ok(Box::new(CompositeDevice { _proxy: proxy }))
         }
         _ => Err(anyhow!("Unsupported DeviceType for connect_to_device_controller()")),
     }

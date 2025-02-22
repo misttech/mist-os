@@ -1205,16 +1205,16 @@ impl From<(Info, Selector)> for InfoResult {
     }
 }
 
-pub struct HardwareCompositeInfo {
-    properties: fhaudio::CompositeProperties,
-    dai_formats: BTreeMap<fhaudio_sigproc::ElementId, Vec<fhaudio::DaiSupportedFormats>>,
-    ring_buffer_formats: BTreeMap<fhaudio_sigproc::ElementId, Vec<fhaudio::SupportedFormats>>,
-}
-
 pub struct HardwareCodecInfo {
     properties: fhaudio::CodecProperties,
     dai_formats: Vec<fhaudio::DaiSupportedFormats>,
     plug_state: fhaudio::PlugState,
+}
+
+pub struct HardwareCompositeInfo {
+    properties: fhaudio::CompositeProperties,
+    dai_formats: BTreeMap<fhaudio_sigproc::ElementId, Vec<fhaudio::DaiSupportedFormats>>,
+    ring_buffer_formats: BTreeMap<fhaudio_sigproc::ElementId, Vec<fhaudio::SupportedFormats>>,
 }
 
 pub struct HardwareDaiInfo {
@@ -1232,8 +1232,8 @@ pub struct HardwareStreamConfigInfo {
 
 /// Information about a device from its hardware protocol.
 pub enum HardwareInfo {
-    Composite(HardwareCompositeInfo),
     Codec(HardwareCodecInfo),
+    Composite(HardwareCompositeInfo),
     Dai(HardwareDaiInfo),
     StreamConfig(HardwareStreamConfigInfo),
 }
@@ -1241,8 +1241,8 @@ pub enum HardwareInfo {
 impl HardwareInfo {
     pub fn unique_instance_id(&self) -> Option<UniqueInstanceId> {
         let id = match self {
-            HardwareInfo::Composite(composite) => composite.properties.unique_id,
             HardwareInfo::Codec(codec) => codec.properties.unique_id,
+            HardwareInfo::Composite(composite) => composite.properties.unique_id,
             HardwareInfo::Dai(dai) => dai.properties.unique_id,
             HardwareInfo::StreamConfig(stream_config) => stream_config.properties.unique_id,
         };
@@ -1251,8 +1251,8 @@ impl HardwareInfo {
 
     pub fn manufacturer(&self) -> Option<String> {
         match self {
-            HardwareInfo::Composite(composite) => composite.properties.manufacturer.clone(),
             HardwareInfo::Codec(codec) => codec.properties.manufacturer.clone(),
+            HardwareInfo::Composite(composite) => composite.properties.manufacturer.clone(),
             HardwareInfo::Dai(dai) => dai.properties.manufacturer.clone(),
             HardwareInfo::StreamConfig(stream_config) => {
                 stream_config.properties.manufacturer.clone()
@@ -1262,8 +1262,8 @@ impl HardwareInfo {
 
     pub fn product_name(&self) -> Option<String> {
         match self {
-            HardwareInfo::Composite(composite) => composite.properties.product.clone(),
             HardwareInfo::Codec(codec) => codec.properties.product.clone(),
+            HardwareInfo::Composite(composite) => composite.properties.product.clone(),
             HardwareInfo::Dai(dai) => dai.properties.product_name.clone(),
             HardwareInfo::StreamConfig(stream_config) => stream_config.properties.product.clone(),
         }
@@ -1320,6 +1320,7 @@ impl HardwareInfo {
         }
 
         match self {
+            HardwareInfo::Codec(_) => None,
             HardwareInfo::Composite(composite) => Some(
                 composite
                     .ring_buffer_formats
@@ -1329,7 +1330,6 @@ impl HardwareInfo {
                     })
                     .collect(),
             ),
-            HardwareInfo::Codec(_) => None,
             HardwareInfo::Dai(dai) => Some({
                 let pcm_format_sets =
                     supported_formats_to_pcm_format_sets(&dai.ring_buffer_formats);
@@ -1360,6 +1360,12 @@ impl HardwareInfo {
         }
 
         match self {
+            HardwareInfo::Codec(codec) => Some({
+                let dai_format_sets = dai_supported_formats_to_dai_format_sets(&codec.dai_formats);
+                let mut map = BTreeMap::new();
+                map.insert(fadevice::DEFAULT_DAI_INTERCONNECT_ELEMENT_ID, dai_format_sets);
+                map
+            }),
             HardwareInfo::Composite(composite) => Some(
                 composite
                     .dai_formats
@@ -1372,12 +1378,6 @@ impl HardwareInfo {
                     })
                     .collect(),
             ),
-            HardwareInfo::Codec(codec) => Some({
-                let dai_format_sets = dai_supported_formats_to_dai_format_sets(&codec.dai_formats);
-                let mut map = BTreeMap::new();
-                map.insert(fadevice::DEFAULT_DAI_INTERCONNECT_ELEMENT_ID, dai_format_sets);
-                map
-            }),
             HardwareInfo::Dai(dai) => Some({
                 let dai_format_sets = dai_supported_formats_to_dai_format_sets(&dai.dai_formats);
                 let mut map = BTreeMap::new();
@@ -1390,9 +1390,9 @@ impl HardwareInfo {
 
     pub fn gain_state(&self) -> Option<GainState> {
         match self {
+            HardwareInfo::Codec(_) | HardwareInfo::Dai(_) => None,
             // TODO(https://fxbug.dev/334981374): Support gain state for hardware Composite
             HardwareInfo::Composite(_) => None,
-            HardwareInfo::Codec(_) | HardwareInfo::Dai(_) => None,
             HardwareInfo::StreamConfig(stream_config) => {
                 stream_config.gain_state.clone().try_into().ok()
             }
@@ -1401,9 +1401,9 @@ impl HardwareInfo {
 
     pub fn plug_event(&self) -> Option<PlugEvent> {
         match self {
+            HardwareInfo::Codec(codec) => codec.plug_state.clone().try_into().ok(),
             // TODO(https://fxbug.dev/334980316): Support plug state for hardware Composite
             HardwareInfo::Composite(_) => None,
-            HardwareInfo::Codec(codec) => codec.plug_state.clone().try_into().ok(),
             HardwareInfo::Dai(_) => None,
             HardwareInfo::StreamConfig(stream_config) => {
                 stream_config.plug_state.clone().try_into().ok()
@@ -1592,6 +1592,22 @@ async fn get_hw_codec_info(codec: &fhaudio::CodecProxy) -> Result<HardwareCodecI
     Ok(HardwareCodecInfo { properties, dai_formats, plug_state })
 }
 
+/// Returns information about a Composite device from its hardware protocol.
+async fn get_hw_composite_info(
+    composite: &fhaudio::CompositeProxy,
+) -> Result<HardwareCompositeInfo> {
+    let properties =
+        composite.get_properties().await.bug_context("Failed to call Composite.GetProperties")?;
+
+    // TODO(https://fxbug.dev/333120537): Support fetching DAI formats for hardware Composite
+    let dai_formats = BTreeMap::new();
+
+    // TODO(https://fxbug.dev/333120537): Support fetching ring buffer formats for hardware Composite
+    let ring_buffer_formats = BTreeMap::new();
+
+    Ok(HardwareCompositeInfo { properties, dai_formats, ring_buffer_formats })
+}
+
 /// Returns information about a Dai device from its hardware protocol.
 async fn get_hw_dai_info(dai: &fhaudio::DaiProxy) -> Result<HardwareDaiInfo> {
     let properties = dai.get_properties().await.bug_context("Failed to call Dai.GetProperties")?;
@@ -1611,22 +1627,6 @@ async fn get_hw_dai_info(dai: &fhaudio::DaiProxy) -> Result<HardwareDaiInfo> {
         .bug_context("Failed to get ring buffer formats")?;
 
     Ok(HardwareDaiInfo { properties, dai_formats, ring_buffer_formats })
-}
-
-/// Returns information about a Composite device from its hardware protocol.
-async fn get_hw_composite_info(
-    composite: &fhaudio::CompositeProxy,
-) -> Result<HardwareCompositeInfo> {
-    let properties =
-        composite.get_properties().await.bug_context("Failed to call Composite.GetProperties")?;
-
-    // TODO(https://fxbug.dev/333120537): Support fetching DAI formats for hardware Composite
-    let dai_formats = BTreeMap::new();
-
-    // TODO(https://fxbug.dev/333120537): Support fetching ring buffer formats for hardware Composite
-    let ring_buffer_formats = BTreeMap::new();
-
-    Ok(HardwareCompositeInfo { properties, dai_formats, ring_buffer_formats })
 }
 
 /// Returns information about a StreamConfig device from its hardware protocol.

@@ -41,6 +41,17 @@ pub fn connect_hw_codec(
     Ok(proxy)
 }
 
+/// Connects to the `fuchsia.hardware.audio.Composite` protocol node in the `dev_class` directory
+/// at `path`.
+pub fn connect_hw_composite(
+    dev_class: &fio::DirectoryProxy,
+    path: &str,
+) -> Result<fhaudio::CompositeProxy> {
+    // DFv2 Composite drivers do not use a connector/trampoline like Codec/Dai/StreamConfig.
+    connect_to_named_protocol_at_dir_root::<fhaudio::CompositeMarker>(dev_class, path)
+        .bug_context("Failed to connect to Composite")
+}
+
 /// Connects to the `fuchsia.hardware.audio.Dai` protocol node in the `dev_class` directory
 /// at `path`.
 pub fn connect_hw_dai(dev_class: &fio::DirectoryProxy, path: &str) -> Result<fhaudio::DaiProxy> {
@@ -52,17 +63,6 @@ pub fn connect_hw_dai(dev_class: &fio::DirectoryProxy, path: &str) -> Result<fha
     connector_proxy.connect(server_end).bug_context("Failed to call Connect")?;
 
     Ok(proxy)
-}
-
-/// Connects to the `fuchsia.hardware.audio.Composite` protocol node in the `dev_class` directory
-/// at `path`.
-pub fn connect_hw_composite(
-    dev_class: &fio::DirectoryProxy,
-    path: &str,
-) -> Result<fhaudio::CompositeProxy> {
-    // DFv2 Composite drivers do not use a connector/trampoline like Codec/Dai/StreamConfig.
-    connect_to_named_protocol_at_dir_root::<fhaudio::CompositeMarker>(dev_class, path)
-        .bug_context("Failed to connect to Composite")
 }
 
 /// Connects to the `fuchsia.hardware.audio.StreamConfig` protocol node in the `dev_class` directory
