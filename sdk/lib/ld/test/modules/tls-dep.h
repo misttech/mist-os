@@ -16,6 +16,7 @@ extern thread_local int tls_dep_data;
 extern thread_local char tls_dep_bss[2];
 
 int* get_tls_dep_data();
+char* get_tls_dep_bss0();
 char* get_tls_dep_bss1();
 int* get_tls_dep_weak();
 

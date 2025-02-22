@@ -2,10 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/elfldltl/layout.h>
+
 #include <latch>
 #include <stop_token>
 #include <thread>
 
+#include "dl-iterate-phdr-tests.h"
 #include "dl-load-tests.h"
 #include "startup-symbols.h"
 
@@ -16,6 +19,8 @@ TYPED_TEST_SUITE(DlTests, dl::testing::TestTypes);
 
 using dl::testing::IsUndefinedSymbolErrMsg;
 using dl::testing::RunFunction;
+
+using size_type = elfldltl::Elf<>::size_type;
 
 TYPED_TEST(DlTests, TlsDescStaticStartupModules) {
   const std::string kStaticTlsDescModuleFile = "static-tls-desc-module.so";
@@ -47,6 +52,62 @@ TYPED_TEST(DlTests, TlsGetAddrStaticStartupModules) {
   auto open = this->DlOpen(kStaticTlsModuleFile.c_str(), RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(open.is_ok()) << open.error_value();
   EXPECT_TRUE(open.value()) << open.error_value();
+
+  ASSERT_TRUE(this->DlClose(open.value()).is_ok());
+}
+
+// Test that the relocations for TLS variables with global dynamic access are
+// correct using __tls_get_addr. This test uses a mock __tls_get_addr function
+// that simply returns the GOT pointer that is passed to it. This test checks
+// that the GOT data is as expected.
+TYPED_TEST(DlTests, TlsGetAddrGlobalDynamicReloc) {
+  const std::string kTlsModuleFile = "tls-get-addr-global-dynamic-reloc.so";
+  constexpr size_type kExpectedDataOffset = 0u;
+  constexpr size_type kExpectedBssOffset = 32u;
+
+  if constexpr (!TestFixture::kSupportsDynamicTls) {
+    GTEST_SKIP() << "test requires dynamic TLS support";
+  }
+
+  this->ExpectRootModule(kTlsModuleFile);
+
+  auto open = this->DlOpen(kTlsModuleFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open.is_ok()) << open.error_value();
+  EXPECT_TRUE(open.value()) << open.error_value();
+
+  // TODO(https://fxbug.dev/342480690): use OpenModule API.
+  auto tls_data = this->DlSym(open.value(), "get_tls_dep_data");
+  if (tls_data.is_error()) {
+    EXPECT_THAT(tls_data.error_value().take_str(),
+                IsUndefinedSymbolErrMsg("get_tls_dep_data", kTlsModuleFile));
+    ASSERT_TRUE(this->DlClose(open.value()).is_ok());
+    GTEST_SKIP() << "test requires __tls_get_addr to resolve symbols";
+  }
+  ASSERT_TRUE(tls_data.is_ok()) << tls_data.error_value();
+  ASSERT_TRUE(tls_data.value());
+
+  auto* tls_data_got = RunFunction<elfldltl::Elf<>::TlsGetAddrGot<>*>(tls_data.value());
+
+  auto info = GetPhdrInfoForModule(this, kTlsModuleFile);
+
+  // Check that the TLS modid for this symbol matches the TLS modid in dl_phdr_info.
+  EXPECT_EQ(tls_data_got->tls_modid(), info.tls_modid());
+
+  // The offset of the tls_data variable should be zero since it's the only
+  // initialized TLS variable in the file.
+  EXPECT_EQ(tls_data_got->offset + elfldltl::TlsTraits<>::kTlsRelativeBias, kExpectedDataOffset);
+
+  // Check the GOT values for an uninitialized variable.
+  auto tls_bss = this->DlSym(open.value(), "get_tls_dep_bss0");
+  ASSERT_TRUE(tls_bss.is_ok()) << tls_bss.error_value();
+  ASSERT_TRUE(tls_bss.value());
+
+  auto* tls_bss_got = RunFunction<elfldltl::Elf<>::TlsGetAddrGot<>*>(tls_bss.value());
+  EXPECT_EQ(tls_bss_got->tls_modid(), info.tls_modid());
+
+  // The offset of this uninitialized variable will always follow the
+  // initialized int variable.
+  EXPECT_EQ(tls_bss_got->offset + elfldltl::TlsTraits<>::kTlsRelativeBias, kExpectedBssOffset);
 
   ASSERT_TRUE(this->DlClose(open.value()).is_ok());
 }

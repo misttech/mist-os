@@ -96,6 +96,7 @@ group("dl-test-data.deps") {
     ":tls-desc-dep-module",
     ":tls-desc-initial-dep-module",
     ":tls-desc-ld-dep-module",
+    ":tls-get-addr-global-dynamic-reloc",
     ":tls-initial-dep-module",
     ":tls-ld-dep-module",
   ]
@@ -1958,6 +1959,36 @@ test_loadable_module("static-tls-module") {
 
   # workaround for b/349448459 to remote-link successfully
   configs += [ "//build/config:remote_link_scandeps_workaround" ]
+}
+
+source_set("mock-tls-get-addr") {
+  visibility = [ ":*" ]
+  testonly = true
+
+  sources = [ "mock-tls-get-addr.cc" ]
+  deps = [
+    "//sdk/lib/ld:abi-headers",
+    "//src/lib/elfldltl",
+  ]
+}
+
+# TODO(https://fxbug.dev/342480690): use tls-dep-module and make it a
+# symbol-suffixed module. Put tls-dep sources into a souce_set that can be
+# shared by targets.
+test_loadable_module("tls-get-addr-global-dynamic-reloc") {
+  public = [ "tls-dep.h" ]
+  sources = [ "tls-dep.cc" ]
+  deps = [
+    ":mock-tls-get-addr",
+    "//zircon/system/public",
+  ]
+
+  # TODO(https://fxbug.dev/42085421): LTO insists on using IE accesses here. Remove this
+  # when the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
+  remove_configs = [ "//build/config/lto" ]
+  configs = [ "//build/config/lto:no-lto" ]
+
+  configs += [ "//build/config:no-tlsdesc" ]
 }
 
 test_executable("llvm-profdata") {

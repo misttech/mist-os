@@ -17,18 +17,22 @@
 
 namespace dl::testing {
 
-struct ModulePhdrInfo {
+class ModulePhdrInfo {
+ public:
   using Elf = elfldltl::Elf<>;
   using Phdr = Elf::Phdr;
 
-  // TODO(https://fxbug.dev/331421403): Support tls_data, tls_modid fields.
+  // TODO(https://fxbug.dev/331421403): Support tls_data field.
   explicit constexpr ModulePhdrInfo(const dl_phdr_info& info)
       : name_(info.dlpi_name),
         addr_(info.dlpi_addr),
         phdr_(info.dlpi_phdr),
-        phnum_(info.dlpi_phnum) {}
+        phnum_(info.dlpi_phnum),
+        tls_modid_(info.dlpi_tls_modid) {}
 
   constexpr auto operator<=>(const ModulePhdrInfo&) const = default;
+
+  constexpr size_t tls_modid() const { return tls_modid_; }
 
   std::string basename() const {
     auto path = std::filesystem::path(name_);
@@ -53,17 +57,13 @@ struct ModulePhdrInfo {
     return false;
   }
 
+ private:
   std::string_view name_;
   uintptr_t addr_;
   const void* phdr_;
   uint16_t phnum_;
+  size_t tls_modid_;
 };
-
-template <typename OS>
-decltype(auto) operator<<(OS&& os, const ModulePhdrInfo info) {
-  return std::forward<OS>(os) << std::format("[name=\"{}\", addr={:x}, phdr={:p}, phnum={}]",
-                                             info.name_, info.addr_, info.phdr_, info.phnum_);
-}
 
 using ModuleInfoList = std::vector<ModulePhdrInfo>;
 

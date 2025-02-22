@@ -17,6 +17,8 @@ __EXPORT alignas(kTlsDepAlign) thread_local char tls_dep_bss[2];
 
 __EXPORT int* get_tls_dep_data() { return &tls_dep_data; }
 
+__EXPORT char* get_tls_dep_bss0() { return &tls_dep_bss[0]; }
+
 __EXPORT char* get_tls_dep_bss1() { return &tls_dep_bss[1]; }
 
 __EXPORT int* get_tls_dep_weak() { return &tls_dep_weak; }
