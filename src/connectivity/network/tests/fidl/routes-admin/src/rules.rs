@@ -489,7 +489,7 @@ async fn multi_network<I: FidlRuleAdminIpExt + FidlRouteAdminIpExt + FidlRouteIp
             let proxy = fposix_socket::StreamSocketSynchronousProxy::new(channel);
             proxy
                 .set_mark(
-                    fposix_socket::MarkDomain::Mark1,
+                    fnet::MarkDomain::Mark1,
                     &fposix_socket::OptionalUint32::Value(mark),
                     zx::Instant::INFINITE,
                 )

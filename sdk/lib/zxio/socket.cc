@@ -488,29 +488,29 @@ SockOptResult GetSockOptProcessor::StoreOption(const fuchsia_net::wire::SocketAd
 struct FidlSocketMarkWithDomain {
   FidlSocketMarkWithDomain() = default;
   explicit FidlSocketMarkWithDomain(fsocket::wire::OptionalUint32 mark,
-                                    fsocket::wire::MarkDomain domain)
+                                    fnet::wire::MarkDomain domain)
       : mark(mark), domain(domain) {}
 
   fsocket::wire::OptionalUint32 mark;
-  fsocket::wire::MarkDomain domain;
+  fnet::wire::MarkDomain domain;
 };
 
-zxio_socket_mark_domain_t from_fidl_mark_domain(fsocket::wire::MarkDomain domain) {
+zxio_socket_mark_domain_t from_fidl_mark_domain(fnet::wire::MarkDomain domain) {
   switch (domain) {
-    case fsocket::wire::MarkDomain::kMark1:
+    case fnet::wire::MarkDomain::kMark1:
       return ZXIO_SOCKET_MARK_DOMAIN_1;
-    case fsocket::wire::MarkDomain::kMark2:
+    case fnet::wire::MarkDomain::kMark2:
       return ZXIO_SOCKET_MARK_DOMAIN_2;
   }
 }
 
-fit::result<int16_t, fsocket::wire::MarkDomain> into_fidl_mark_domain(
+fit::result<int16_t, fnet::wire::MarkDomain> into_fidl_mark_domain(
     zxio_socket_mark_domain_t domain) {
   switch (domain) {
     case ZXIO_SOCKET_MARK_DOMAIN_1:
-      return fit::success(fsocket::wire::MarkDomain::kMark1);
+      return fit::success(fnet::wire::MarkDomain::kMark1);
     case ZXIO_SOCKET_MARK_DOMAIN_2:
-      return fit::success(fsocket::wire::MarkDomain::kMark2);
+      return fit::success(fnet::wire::MarkDomain::kMark2);
     default:
       return fit::as_error<int16_t>(EINVAL);
   }

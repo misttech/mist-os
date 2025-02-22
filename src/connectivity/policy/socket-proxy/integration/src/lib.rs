@@ -7,8 +7,8 @@
 use anyhow::{anyhow, Context as _, Error};
 use assert_matches::assert_matches;
 use fidl::endpoints::create_endpoints;
-use fidl_fuchsia_net::SocketAddress;
-use fidl_fuchsia_posix_socket::{self as fposix_socket, MarkDomain, OptionalUint32};
+use fidl_fuchsia_net::{self as fnet, MarkDomain, SocketAddress};
+use fidl_fuchsia_posix_socket::{self as fposix_socket, OptionalUint32};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
@@ -171,6 +171,19 @@ async fn inner_provider_mock(
         .add_fidl_service(IncomingService::RawProvider);
     let _ = fs.serve_connection(handles.outgoing_dir)?;
 
+    fn into_marks(
+        marks: fnet::Marks,
+    ) -> (fposix_socket::OptionalUint32, fposix_socket::OptionalUint32) {
+        let fnet::Marks { mark_1, mark_2, __source_breaking } = marks;
+        let into_optional_uint32 = |opt: Option<u32>| {
+            opt.map_or_else(
+                || fposix_socket::OptionalUint32::Unset(fposix_socket::Empty),
+                |v| fposix_socket::OptionalUint32::Value(v),
+            )
+        };
+        (into_optional_uint32(mark_1), into_optional_uint32(mark_2))
+    }
+
     fs.for_each_concurrent(0, |service| {
         let marks = marks.clone();
         async move {
@@ -264,19 +277,7 @@ async fn inner_provider_mock(
                                     opts,
                                     responder,
                                 } => {
-                                    let mut mark_1 = OptionalUint32::Unset(fposix_socket::Empty);
-                                    let mut mark_2 = OptionalUint32::Unset(fposix_socket::Empty);
-                                    for fposix_socket::Marks { domain, mark } in opts.marks.unwrap()
-                                    {
-                                        match domain {
-                                            fposix_socket::MarkDomain::Mark1 => {
-                                                mark_1 = mark;
-                                            }
-                                            fposix_socket::MarkDomain::Mark2 => {
-                                                mark_2 = mark;
-                                            }
-                                        }
-                                    }
+                                    let (mark_1, mark_2) = into_marks(opts.marks.unwrap());
                                     marks.lock().await.push((
                                         Arc::new(Mutex::new(mark_1)),
                                         Arc::new(Mutex::new(mark_2)),
@@ -300,19 +301,7 @@ async fn inner_provider_mock(
                                     responder,
                                 } => {
                                     use fposix_socket::ProviderDatagramSocketWithOptionsResponse::*;
-                                    let mut mark_1 = OptionalUint32::Unset(fposix_socket::Empty);
-                                    let mut mark_2 = OptionalUint32::Unset(fposix_socket::Empty);
-                                    for fposix_socket::Marks { domain, mark } in opts.marks.unwrap()
-                                    {
-                                        match domain {
-                                            fposix_socket::MarkDomain::Mark1 => {
-                                                mark_1 = mark;
-                                            }
-                                            fposix_socket::MarkDomain::Mark2 => {
-                                                mark_2 = mark;
-                                            }
-                                        }
-                                    }
+                                    let (mark_1, mark_2) = into_marks(opts.marks.unwrap());
                                     marks.lock().await.push((
                                         Arc::new(Mutex::new(mark_1)),
                                         Arc::new(Mutex::new(mark_2)),
@@ -389,19 +378,7 @@ async fn inner_provider_mock(
                                     opts,
                                     responder,
                                 } => {
-                                    let mut mark_1 = OptionalUint32::Unset(fposix_socket::Empty);
-                                    let mut mark_2 = OptionalUint32::Unset(fposix_socket::Empty);
-                                    for fposix_socket::Marks { domain, mark } in opts.marks.unwrap()
-                                    {
-                                        match domain {
-                                            fposix_socket::MarkDomain::Mark1 => {
-                                                mark_1 = mark;
-                                            }
-                                            fposix_socket::MarkDomain::Mark2 => {
-                                                mark_2 = mark;
-                                            }
-                                        }
-                                    }
+                                    let (mark_1, mark_2) = into_marks(opts.marks.unwrap());
                                     marks.lock().await.push((
                                         Arc::new(Mutex::new(mark_1)),
                                         Arc::new(Mutex::new(mark_2)),

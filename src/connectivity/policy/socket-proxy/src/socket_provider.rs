@@ -6,7 +6,8 @@
 
 use anyhow::{Context as _, Error};
 use fidl::endpoints::{ClientEnd, ProtocolMarker, Proxy as _};
-use fidl_fuchsia_posix_socket::{self as fposix_socket, MarkDomain, OptionalUint32};
+use fidl_fuchsia_net::{self as fnet, MarkDomain};
+use fidl_fuchsia_posix_socket::{self as fposix_socket, OptionalUint32};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_inspect_derive::{IValue, Inspect, Unit};
 use futures::lock::Mutex;
@@ -67,7 +68,7 @@ macro_rules! impl_markable {
             impl Markable for $ty {
                 fn mark(
                     &self,
-                    domain: fposix_socket::MarkDomain,
+                    domain: fnet::MarkDomain,
                     mark: OptionalUint32,
                 ) -> impl Future<Output = Result<Result<(), fposix::Errno>, fidl::Error>> {
                     self.set_mark(domain, &mark)

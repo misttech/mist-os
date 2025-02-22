@@ -163,11 +163,11 @@ impl<I: IpExt + IpSockAddrExt> SocketWorkerHandler for SocketWorkerState<I> {
         _spawners: &worker::TaskSpawnerCollection<()>,
     ) {
         let fposix_socket::SocketCreationOptions { marks, __source_breaking } = options;
-        for fposix_socket::Marks { domain, mark } in marks.iter().flatten() {
+        for (domain, mark) in marks.into_iter().map(fidl_fuchsia_net_ext::Marks::from).flatten() {
             ctx.api().raw_ip_socket().set_mark(
                 &self.id,
-                (*domain).into_core(),
-                (*mark).into_core(),
+                domain.into_core(),
+                netstack3_core::routes::Mark(Some(mark)),
             );
         }
     }

@@ -1268,22 +1268,22 @@ impl TryFromFidl<fnet_interfaces_admin::NudConfiguration> for NudUserConfigUpdat
     }
 }
 
-impl TryFromFidl<fposix_socket::MarkDomain> for netstack3_core::routes::MarkDomain {
+impl TryFromFidl<fidl_net::MarkDomain> for netstack3_core::routes::MarkDomain {
     type Error = Never;
 
-    fn try_from_fidl(fidl: fposix_socket::MarkDomain) -> Result<Self, Self::Error> {
+    fn try_from_fidl(fidl: fidl_net::MarkDomain) -> Result<Self, Self::Error> {
         Ok(match fidl {
-            fposix_socket::MarkDomain::Mark1 => netstack3_core::routes::MarkDomain::Mark1,
-            fposix_socket::MarkDomain::Mark2 => netstack3_core::routes::MarkDomain::Mark2,
+            fidl_net::MarkDomain::Mark1 => netstack3_core::routes::MarkDomain::Mark1,
+            fidl_net::MarkDomain::Mark2 => netstack3_core::routes::MarkDomain::Mark2,
         })
     }
 }
 
-impl IntoFidl<fposix_socket::MarkDomain> for netstack3_core::routes::MarkDomain {
-    fn into_fidl(self) -> fposix_socket::MarkDomain {
+impl IntoFidl<fidl_net::MarkDomain> for netstack3_core::routes::MarkDomain {
+    fn into_fidl(self) -> fidl_net::MarkDomain {
         match self {
-            netstack3_core::routes::MarkDomain::Mark1 => fposix_socket::MarkDomain::Mark1,
-            netstack3_core::routes::MarkDomain::Mark2 => fposix_socket::MarkDomain::Mark2,
+            netstack3_core::routes::MarkDomain::Mark1 => fidl_net::MarkDomain::Mark1,
+            netstack3_core::routes::MarkDomain::Mark2 => fidl_net::MarkDomain::Mark2,
         }
     }
 }

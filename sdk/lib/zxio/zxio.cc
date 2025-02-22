@@ -10,7 +10,6 @@
 #include <ifaddrs.h>
 #include <lib/fidl/cpp/wire/arena.h>
 #include <lib/fidl/cpp/wire/envelope.h>
-#include <lib/fidl/cpp/wire/vector_view.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/eventpair.h>
 #include <lib/zx/result.h>
@@ -32,6 +31,7 @@
 
 #include "private.h"
 
+namespace fnet = fuchsia_net;
 namespace fsocket = fuchsia_posix_socket;
 namespace frawsocket = fuchsia_posix_socket_raw;
 namespace fpacketsocket = fuchsia_posix_socket_packet;
@@ -732,10 +732,6 @@ zx_status_t zxio_socket_inner(zxio_service_connector service_connector, int doma
   static_assert(kMaxSocketCreationOptionsArenaSize <= 128);
 
   if (opts.has_value()) {
-    if (opts->marks.size() > fsocket::wire::kMaxSocketCreationMarks) {
-      *out_code = EINVAL;
-      return ZX_OK;
-    }
     for (const auto& mark : opts->marks) {
       if (mark.domain != ZXIO_SOCKET_MARK_DOMAIN_1 && mark.domain != ZXIO_SOCKET_MARK_DOMAIN_2) {
         *out_code = EINVAL;
@@ -746,30 +742,29 @@ zx_status_t zxio_socket_inner(zxio_service_connector service_connector, int doma
   fidl::Arena<kMaxSocketCreationOptionsArenaSize> arena;
   // Must check that `opts` has value.
   auto creation_opts = [&arena, &opts]() -> fsocket::wire::SocketCreationOptions {
-    auto fidl_marks = fidl::ObjectView<fidl::VectorView<fsocket::wire::Marks>>(
-        arena,
-        /* args for VectorView */ arena, opts->marks.size());
-    for (size_t i = 0; i < opts->marks.size(); i++) {
-      fsocket::wire::MarkDomain mark_domain;
-      switch (opts->marks[i].domain) {
+    auto fidl_marks = fnet::wire::Marks::Builder(arena);
+    for (auto& mark : opts->marks) {
+      switch (mark.domain) {
         case ZXIO_SOCKET_MARK_DOMAIN_1:
-          mark_domain = fsocket::wire::MarkDomain::kMark1;
+          if (mark.is_present) {
+            fidl_marks.mark_1(mark.value);
+          } else {
+            fidl_marks.clear_mark_1();
+          }
           break;
         case ZXIO_SOCKET_MARK_DOMAIN_2:
-          mark_domain = fsocket::wire::MarkDomain::kMark2;
+          if (mark.is_present) {
+            fidl_marks.mark_2(mark.value);
+          } else {
+            fidl_marks.clear_mark_2();
+          }
           break;
         default:
           // We did the validation before.
           __builtin_unreachable();
       }
-      (*fidl_marks)[i] = fsocket::wire::Marks{
-          .domain = mark_domain,
-          .mark = opts->marks[i].is_present
-                      ? fsocket::wire::OptionalUint32::WithValue(opts->marks[i].value)
-                      : fsocket::wire::OptionalUint32::WithUnset(fsocket::wire::Empty{}),
-      };
     }
-    return fsocket::wire::SocketCreationOptions::Builder(arena).marks(fidl_marks).Build();
+    return fsocket::wire::SocketCreationOptions::Builder(arena).marks(fidl_marks.Build()).Build();
   };
 #else
   if (opts.has_value()) {

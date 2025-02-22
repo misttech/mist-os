@@ -1352,8 +1352,13 @@ where
         _spawners: &worker::TaskSpawnerCollection<()>,
     ) {
         let fposix_socket::SocketCreationOptions { marks, __source_breaking } = options;
-        for fposix_socket::Marks { domain, mark } in marks.iter().flat_map(|m| m.iter()) {
-            T::set_mark(ctx, &self.info.id, (*domain).into_core(), (*mark).into_core())
+        for (domain, mark) in marks.into_iter().map(fidl_fuchsia_net_ext::Marks::from).flatten() {
+            T::set_mark(
+                ctx,
+                &self.info.id,
+                domain.into_core(),
+                netstack3_core::routes::Mark(Some(mark)),
+            )
         }
     }
 
@@ -2502,12 +2507,12 @@ where
         Ok(self.data.ip_recv_tos)
     }
 
-    fn set_mark(self, domain: fposix_socket::MarkDomain, mark: fposix_socket::OptionalUint32) {
+    fn set_mark(self, domain: fnet::MarkDomain, mark: fposix_socket::OptionalUint32) {
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         T::set_mark(ctx, id, domain.into_core(), mark.into_core())
     }
 
-    fn get_mark(self, domain: fposix_socket::MarkDomain) -> fposix_socket::OptionalUint32 {
+    fn get_mark(self, domain: fnet::MarkDomain) -> fposix_socket::OptionalUint32 {
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         T::get_mark(ctx, id, domain.into_core()).into_fidl()
     }

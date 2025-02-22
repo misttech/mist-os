@@ -4877,7 +4877,7 @@ async fn tos_tclass_send<
 #[test_matrix(
     [fposix_socket::Domain::Ipv4, fposix_socket::Domain::Ipv6],
     [fposix_socket::DatagramSocketProtocol::Udp, fposix_socket::DatagramSocketProtocol::IcmpEcho],
-    [fposix_socket::MarkDomain::Mark1, fposix_socket::MarkDomain::Mark2],
+    [fnet::MarkDomain::Mark1, fnet::MarkDomain::Mark2],
     [
         fposix_socket::OptionalUint32::Unset(fposix_socket::Empty),
         fposix_socket::OptionalUint32::Value(0)
@@ -4887,7 +4887,7 @@ async fn datagram_socket_mark(
     name: &str,
     domain: fposix_socket::Domain,
     proto: fposix_socket::DatagramSocketProtocol,
-    mark_domain: fposix_socket::MarkDomain,
+    mark_domain: fnet::MarkDomain,
     mark: fposix_socket::OptionalUint32,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
@@ -4904,7 +4904,7 @@ async fn datagram_socket_mark(
 #[netstack_test]
 #[test_matrix(
     [fposix_socket::Domain::Ipv4, fposix_socket::Domain::Ipv6],
-    [fposix_socket::MarkDomain::Mark1, fposix_socket::MarkDomain::Mark2],
+    [fnet::MarkDomain::Mark1, fnet::MarkDomain::Mark2],
     [
         fposix_socket::OptionalUint32::Unset(fposix_socket::Empty),
         fposix_socket::OptionalUint32::Value(0)
@@ -4913,7 +4913,7 @@ async fn datagram_socket_mark(
 async fn stream_socket_mark(
     name: &str,
     domain: fposix_socket::Domain,
-    mark_domain: fposix_socket::MarkDomain,
+    mark_domain: fnet::MarkDomain,
     mark: fposix_socket::OptionalUint32,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
@@ -4936,7 +4936,7 @@ async fn stream_socket_mark(
         fposix_socket_raw::ProtocolAssociation::Unassociated(fposix_socket_raw::Empty),
         fposix_socket_raw::ProtocolAssociation::Associated(0)
     ],
-    [fposix_socket::MarkDomain::Mark1, fposix_socket::MarkDomain::Mark2],
+    [fnet::MarkDomain::Mark1, fnet::MarkDomain::Mark2],
     [
         fposix_socket::OptionalUint32::Unset(fposix_socket::Empty),
         fposix_socket::OptionalUint32::Value(0)
@@ -4946,7 +4946,7 @@ async fn raw_socket_mark(
     name: &str,
     domain: fposix_socket::Domain,
     proto: fposix_socket_raw::ProtocolAssociation,
-    mark_domain: fposix_socket::MarkDomain,
+    mark_domain: fnet::MarkDomain,
     mark: fposix_socket::OptionalUint32,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
