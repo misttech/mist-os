@@ -722,7 +722,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8722233716072876993"`
+**Current value for `target_cpu = "arm64"`:** `"8722188410679794417"`
 
 From //out/not-default/args.gn:10
 
@@ -730,7 +730,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8722233716072876993"`
+**Current value for `target_cpu = "riscv64"`:** `"8722188410679794417"`
 
 From //out/not-default/args.gn:10
 
@@ -738,7 +738,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8722233716072876993"`
+**Current value for `target_cpu = "x64"`:** `"8722188410679794417"`
 
 From //out/not-default/args.gn:10
 
@@ -1141,7 +1141,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.hwasan.a"
-  clang_rt_cxx = ""
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.hwasan_cxx.a"
 }
 }
   lsan = {
@@ -1150,7 +1150,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "lib/clang/20/lib/armv7-unknown-linux-gnueabihf/libclang_rt.lsan.a"
-  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
+  clang_rt_cxx = ""
 }
 }
   tsan = {
@@ -1208,7 +1208,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.lsan.a"
-  clang_rt_cxx = ""
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
 }
 }
   tsan = {
@@ -1820,7 +1820,7 @@ This should never be set as a build argument.
 }
   lsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
 }
   static = {
   clang_rt = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.lsan.a"
