@@ -824,6 +824,28 @@ impl IoTrait for WriteFromMem<'_> {
     }
 }
 
+struct Trim<'a> {
+    device: &'a Device,
+    ops: FuturesUnordered<BoxFuture<'a, Result<(), zx::Status>>>,
+}
+
+impl IoTrait for Trim<'_> {
+    async fn add_op(
+        &mut self,
+        offset: u64,
+        len: u64,
+        trace_flow_id: u64,
+    ) -> Result<(), zx::Status> {
+        self.ops.push(Box::pin(self.device.trim_traced(offset..offset + len, trace_flow_id)));
+        Ok(())
+    }
+
+    async fn flush(&mut self) -> Result<(), zx::Status> {
+        while self.ops.try_next().await?.is_some() {}
+        Ok(())
+    }
+}
+
 struct MountedVolumeInner {
     pub scope: ExecutionScope,
     pub block_server: BlockServer<SessionManager<PartitionInterface>>,
@@ -1520,12 +1542,24 @@ impl Interface for PartitionInterface {
 
     async fn trim(
         &self,
-        _device_block_offset: u64,
-        _block_count: u32,
-        _trace_flow_id: Option<NonZero<u64>>,
+        device_block_offset: u64,
+        block_count: u32,
+        trace_flow_id: Option<NonZero<u64>>,
     ) -> Result<(), zx::Status> {
-        // TODO(https://fxbug.dev/397990875)
-        todo!();
+        let device = &self.fvm.device;
+        self.fvm
+            .do_io(
+                Trim { device, ops: FuturesUnordered::new() },
+                self.partition_index,
+                device_block_offset,
+                block_count,
+                trace_id(trace_flow_id),
+            )
+            .await
+            .map_err(|error| {
+                warn!(error:?; "Trim failed");
+                map_to_status(error)
+            })
     }
 
     async fn get_volume_info(
@@ -3027,5 +3061,55 @@ mod tests {
             connect_to_protocol_at_dir_svc::<AdminMarker>(&fixture.outgoing_dir).unwrap();
         admin_proxy.shutdown().await.unwrap();
         fixture.component.scope.wait().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_trim() {
+        let trim_called = Arc::new(AtomicBool::new(false));
+
+        struct Observer(Arc<AtomicBool>);
+
+        impl fake_block_server::Observer for Observer {
+            fn trim(&self, _device_block_offset: u64, _block_count: u32) {
+                self.0.store(true, Ordering::Relaxed)
+            }
+        }
+
+        let contents = std::fs::read("/pkg/data/golden-fvm.blk").unwrap();
+        let fake_server = Arc::new(
+            FakeServerOptions {
+                block_count: Some(contents.len() as u64 / BLOCK_SIZE as u64),
+                block_size: BLOCK_SIZE,
+                initial_content: Some(&contents),
+                observer: Some(Box::new(Observer(trim_called.clone()))),
+                ..Default::default()
+            }
+            .into(),
+        );
+
+        let fixture = Fixture::from_fake_server(fake_server).await;
+
+        let volume_proxy = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
+            &fixture.outgoing_dir,
+            "volumes/data",
+        )
+        .unwrap();
+
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+        volume_proxy
+            .mount(dir_server_end, MountOptions::default())
+            .await
+            .expect("mount failed (FIDL)")
+            .expect("mount failed");
+
+        let client = RemoteBlockClient::new(
+            &connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(&dir_proxy).unwrap(),
+        )
+        .await
+        .unwrap();
+
+        client.trim(0..8192).await.unwrap();
+
+        assert!(trim_called.load(Ordering::Relaxed));
     }
 }
