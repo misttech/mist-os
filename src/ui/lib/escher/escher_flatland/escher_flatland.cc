@@ -27,8 +27,8 @@
 
 namespace escher {
 
-// We might want to detect changes in the view size, and recreate the swapchain when it happens.
-constexpr vk::Extent2D kExtent = vk::Extent2D(800, 600);
+const fuchsia_ui_composition::TransformId kTransform = {1};
+const fuchsia_ui_composition::TransformId kTransformNone = {0};
 
 VulkanInstance::Params GetVulkanInstanceParams() {
   VulkanInstance::Params instance_params{
@@ -60,7 +60,7 @@ vk::SurfaceKHR CreateSurface(const vk::Instance& instance,
   return surface;
 }
 
-VulkanSwapchain CreateSwapchain(Escher& escher, vk::SurfaceKHR surface,
+VulkanSwapchain CreateSwapchain(Escher& escher, vk::SurfaceKHR surface, vk::Extent2D extent,
                                 vk::SwapchainKHR old_swapchain) {
   vk::PhysicalDevice physical_device = escher.vk_physical_device();
   vk::Device device = escher.vk_device();
@@ -113,7 +113,7 @@ VulkanSwapchain CreateSwapchain(Escher& escher, vk::SurfaceKHR surface,
                                     .setMinImageCount(kDesiredNumOfSwapchainImages)
                                     .setImageFormat(kFormat)
                                     .setImageColorSpace(kColorSpace)
-                                    .setImageExtent(kExtent)
+                                    .setImageExtent(extent)
                                     .setImageArrayLayers(1)
                                     .setImageUsage(kImageUsage)
                                     .setImageSharingMode(vk::SharingMode::eExclusive)
@@ -142,8 +142,8 @@ VulkanSwapchain CreateSwapchain(Escher& escher, vk::SurfaceKHR surface,
   for (auto& im : images) {
     ImageInfo image_info;
     image_info.format = kFormat;
-    image_info.width = kExtent.width;
-    image_info.height = kExtent.height;
+    image_info.width = extent.width;
+    image_info.height = extent.height;
     image_info.usage = kImageUsage;
 
     auto escher_image =
@@ -152,7 +152,7 @@ VulkanSwapchain CreateSwapchain(Escher& escher, vk::SurfaceKHR surface,
     escher_images.push_back(escher_image);
   }
 
-  return VulkanSwapchain(swapchain_return.value, escher_images, kExtent.width, kExtent.height,
+  return VulkanSwapchain(swapchain_return.value, escher_images, extent.width, extent.height,
                          kFormat, kColorSpace);
 }
 
@@ -174,57 +174,71 @@ void escher::EscherFlatland::RenderFrame(RenderFrameFn render_frame) {
         vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f}),
         {vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)});
 
-    render_frame(output_image, frame);
+    render_frame(output_image, image_extent_, frame);
 
     frame->cmds()->TransitionImageLayout(output_image, vk::ImageLayout::eTransferDstOptimal,
                                          vk::ImageLayout::ePresentSrcKHR);
 
     frame->EndFrame(render_finished, []() {});
   });
-
-  async::PostTask(async_get_default_dispatcher(), [&] { RenderFrame(render_frame); });
 }
 
-EscherFlatland::EscherFlatland() {
-  auto instance = VulkanInstance::New(GetVulkanInstanceParams());
-  FX_CHECK(instance);
+void escher::EscherFlatland::RenderLoop(RenderFrameFn render_frame) {
+  RenderFrame(render_frame);
+  async::PostTask(dispatcher_, [&] { RenderLoop(render_frame); });
+}
 
-  // Create a channel, and put the endpoints into a view token and a view-creation token.
-  fuchsia_ui_views::ViewCreationToken view_creation_token;
-  fuchsia_ui_views::ViewportCreationToken viewport_creation_token;
+void escher::EscherFlatland::SetVisible(bool is_visible) {
+  fuchsia_ui_composition::TransformId transform_id = is_visible ? kTransform : kTransformNone;
+  const auto& set_root_transform_result = flatland_->SetRootTransform(transform_id);
+  if (!set_root_transform_result.is_ok()) {
+    FX_LOGS(FATAL) << "SetRootTransform failed: " << set_root_transform_result.error_value();
+  }
+  fuchsia_ui_composition::PresentArgs present_args;
+  const auto& present_result = flatland_->Present({{.args = std::move(present_args)}});
+  if (!present_result.is_ok()) {
+    FX_LOGS(FATAL) << "Present failed: " << present_result.error_value();
+  }
+}
+
+EscherFlatland::EscherFlatland(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {
+  // Create graphical_presenter_token and local_flatland_view_token.
+  fuchsia_ui_views::ViewCreationToken local_flatland_view_token;
+  fuchsia_ui_views::ViewportCreationToken graphical_presenter_token;
   {
-    zx::channel view_creation_channel, viewport_creation_channel;
-    zx::channel::create(0, &view_creation_channel, &viewport_creation_channel);
-    FX_CHECK(view_creation_channel && viewport_creation_channel);
-    view_creation_token.value(std::move(view_creation_channel));
-    viewport_creation_token.value(std::move(viewport_creation_channel));
+    zx::channel::create(0, &local_flatland_view_token.value(), &graphical_presenter_token.value());
+    FX_CHECK(local_flatland_view_token.value() && graphical_presenter_token.value());
   }
 
-  auto surface = CreateSurface(instance->vk_instance(), std::move(view_creation_token));
+  // Connect to Flatland and create View.
+  zx::result flatland_client_end = component::Connect<fuchsia_ui_composition::Flatland>();
+  FX_CHECK(flatland_client_end.is_ok());
+  flatland_ = fidl::SyncClient(std::move(*flatland_client_end));
+  auto parent_viewport_watcher_endpoints =
+      fidl::CreateEndpoints<fuchsia_ui_composition::ParentViewportWatcher>();
+  if (!parent_viewport_watcher_endpoints.is_ok()) {
+    FX_LOGS(ERROR) << "CreateEndpoints failed.";
+  }
+  auto [parent_viewport_watcher_client_end, parent_viewport_watcher_server_end] =
+      std::move(parent_viewport_watcher_endpoints.value());
+  parent_viewport_watcher_.Bind(std::move(parent_viewport_watcher_client_end), dispatcher_);
+  const auto& create_view_result = flatland_->CreateView(
+      {{.token = std::move(local_flatland_view_token.value()),
+        .parent_viewport_watcher = std::move(parent_viewport_watcher_server_end)}});
+  if (!create_view_result.is_ok()) {
+    FX_LOGS(FATAL) << "CreateView failed: " << create_view_result.error_value();
+  }
 
-  auto device = VulkanDeviceQueues::New(
-      instance,
-      {{VK_FUCHSIA_EXTERNAL_MEMORY_EXTENSION_NAME, VK_KHR_MAINTENANCE1_EXTENSION_NAME,
-        VK_KHR_BIND_MEMORY_2_EXTENSION_NAME, VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME},
-       {},
-       std::move(surface)});
-
-  auto filesystem = HackFilesystem::New();
-  escher_ = std::make_unique<Escher>(device, filesystem, nullptr);
-
-  auto swapchain = CreateSwapchain(*escher_, surface, vk::SwapchainKHR());
-  swapchain_helper_ = std::make_unique<VulkanSwapchainHelper>(swapchain, device->vk_device(),
-                                                              device->vk_main_queue());
-
+  // Connect the swapchain view to the graphical presenter.
   zx::result presenter_client_end = component::Connect<fuchsia_element::GraphicalPresenter>();
 
   FX_CHECK(presenter_client_end.is_ok());
   fidl::SyncClient presenter_client{std::move(*presenter_client_end)};
 
-  // Connect the swapchain view to the graphical presenter.
+  // Connect the flatland view to the graphical presenter.
   {
     fuchsia_element::ViewSpec spec;
-    spec.viewport_creation_token(std::move(viewport_creation_token));
+    spec.viewport_creation_token(std::move(graphical_presenter_token.value()));
 
     auto controller_endpoints = fidl::CreateEndpoints<fuchsia_element::ViewController>();
     FX_CHECK(controller_endpoints.is_ok());
@@ -234,6 +248,81 @@ EscherFlatland::EscherFlatland() {
           .view_controller_request = std::move(controller_endpoints->server)}});
     FX_CHECK(result.is_ok()) << "error value: " << result.error_value();
   }
+
+  // Get the layout size.
+  const auto& get_layout_result = parent_viewport_watcher_.sync()->GetLayout();
+  if (!get_layout_result.ok()) {
+    FX_LOGS(FATAL) << "GetLayout failed: " << get_layout_result.error().FormatDescription().c_str();
+  }
+  const fuchsia_math::SizeU logical_size = {get_layout_result->info.logical_size().width,
+                                            get_layout_result->info.logical_size().height};
+
+  // Create local_flatland_viewport_token and swapchain_view_token.
+  fuchsia_ui_views::ViewCreationToken swapchain_view_token;
+  fuchsia_ui_views::ViewportCreationToken local_flatland_viewport_token;
+  {
+    zx::channel::create(0, &swapchain_view_token.value(), &local_flatland_viewport_token.value());
+    FX_CHECK(swapchain_view_token.value() && local_flatland_viewport_token.value());
+  }
+
+  // Create viewport for swapchain.
+  const auto& set_debug_name_result = flatland_->SetDebugName({"escher_clockface"});
+  if (!set_debug_name_result.is_ok()) {
+    FX_LOGS(FATAL) << "SetDebugName failed: " << set_debug_name_result.error_value();
+  }
+  const auto& create_transform_result = flatland_->CreateTransform(kTransform);
+  if (!create_transform_result.is_ok()) {
+    FX_LOGS(FATAL) << "CreateTransform failed: " << create_transform_result.error_value();
+  }
+  const fuchsia_ui_composition::ContentId kContent = {1};
+  fuchsia_ui_composition::ViewportProperties viewport_properties;
+  viewport_properties.logical_size(logical_size);
+  auto child_view_watcher_endpoints =
+      fidl::CreateEndpoints<fuchsia_ui_composition::ChildViewWatcher>();
+  if (!child_view_watcher_endpoints.is_ok()) {
+    FX_LOGS(ERROR) << "CreateEndpoints failed.";
+  }
+  auto [child_view_watcher_client_end, child_view_watcher_server_end] =
+      std::move(child_view_watcher_endpoints.value());
+  const auto& create_viewport_result =
+      flatland_->CreateViewport({{.viewport_id = kContent,
+                                  .token = std::move(local_flatland_viewport_token.value()),
+                                  .properties = std::move(viewport_properties),
+                                  .child_view_watcher = std::move(child_view_watcher_server_end)}});
+  if (!create_viewport_result.is_ok()) {
+    FX_LOGS(FATAL) << "CreateViewport failed: " << create_viewport_result.error_value();
+  }
+  const auto& set_content_result =
+      flatland_->SetContent({{.transform_id = kTransform, .content_id = kContent}});
+  if (!set_content_result.is_ok()) {
+    FX_LOGS(FATAL) << "SetContent failed: " << set_content_result.error_value();
+  }
+  fuchsia_ui_composition ::PresentArgs present_args;
+  const auto& present_result = flatland_->Present({{.args = std::move(present_args)}});
+  if (!present_result.is_ok()) {
+    FX_LOGS(FATAL) << "Present failed: " << present_result.error_value();
+  }
+
+  // Create Vulkan resources
+  auto instance = escher::VulkanInstance::New(GetVulkanInstanceParams());
+  FX_CHECK(instance);
+  auto surface = CreateSurface(instance->vk_instance(), std::move(swapchain_view_token.value()));
+  auto device = escher::VulkanDeviceQueues::New(
+      instance,
+      {{VK_FUCHSIA_EXTERNAL_MEMORY_EXTENSION_NAME, VK_KHR_MAINTENANCE1_EXTENSION_NAME,
+        VK_KHR_BIND_MEMORY_2_EXTENSION_NAME, VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME},
+       {},
+       std::move(surface)});
+
+  auto filesystem = escher::HackFilesystem::New();
+  escher_ = std::make_unique<escher::Escher>(device, filesystem, nullptr);
+
+  image_extent_ = vk::Extent2D(logical_size.width(), logical_size.height());
+  FX_LOGS(INFO) << "viewport size: (" << logical_size.width() << ", " << logical_size.height()
+                << ").";
+  auto swapchain = CreateSwapchain(*escher_, surface, image_extent_, vk::SwapchainKHR());
+  swapchain_helper_ = std::make_unique<escher::VulkanSwapchainHelper>(
+      swapchain, device->vk_device(), device->vk_main_queue());
 
   {
     auto frame = escher_->NewFrame("escher_flatland-init", 1, false);

@@ -16,9 +16,6 @@
 #include "src/ui/lib/escher/escher_flatland/escher_flatland.h"
 #include "src/ui/lib/escher/renderer/frame.h"
 
-// We might want to detect changes in the view size, and recreate the swapchain when it happens.
-constexpr vk::Extent2D kExtent = vk::Extent2D(800, 600);
-
 std::string GetCurrentTimeString(void) {
   // TODO(https://fxbug.dev/344700148): This clock is broken, and always returns 21:10:26.
   // In the interim, consider replacing the following code with native Zircon calls.
@@ -30,12 +27,13 @@ std::string GetCurrentTimeString(void) {
 }
 
 int main(int argc, char** argv) {
-  escher::EscherFlatland escher_flatland;
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher());
+  escher::EscherFlatland escher_flatland(loop.dispatcher());
 
   escher::DebugFont debug_font = escher_flatland.debug_font();
   escher::RenderFrameFn render_frame = [&debug_font](const escher::ImagePtr& output_image,
+                                                     const vk::Extent2D image_extent,
                                                      const escher::FramePtr& frame) {
     static int32_t dir_x = 3;
     static int32_t dir_y = 1;
@@ -53,9 +51,9 @@ int main(int argc, char** argv) {
       dir_x *= -1;
     if (dir_y < 0 && pos_y <= 0)
       dir_y *= -1;
-    if (dir_x > 0 && (pos_x + kWidth) >= static_cast<int32_t>(kExtent.width))
+    if (dir_x > 0 && (pos_x + kWidth) >= static_cast<int32_t>(image_extent.width))
       dir_x *= -1;
-    if (dir_y > 0 && (pos_y + kHeight) >= static_cast<int32_t>(kExtent.height))
+    if (dir_y > 0 && (pos_y + kHeight) >= static_cast<int32_t>(image_extent.height))
       dir_y *= -1;
 
     pos_x += dir_x;
@@ -64,8 +62,10 @@ int main(int argc, char** argv) {
     debug_font.Blit(frame->cmds(), time_string.c_str(), output_image, {pos_x, pos_y}, kScale);
   };
 
-  async::PostTask(loop.dispatcher(),
-                  [&escher_flatland, &render_frame] { escher_flatland.RenderFrame(render_frame); });
+  async::PostTask(loop.dispatcher(), [&]() mutable {
+    escher_flatland.RenderLoop(render_frame);
+    escher_flatland.SetVisible(true);
+  });
 
   loop.Run();
 
