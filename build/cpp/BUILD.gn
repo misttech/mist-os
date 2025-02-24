@@ -280,7 +280,7 @@ config("fidl-wire-deprecated-mutable-tables") {
 
     #------------------
     #------------------
-    "//src/media/audio/drivers/virtual_audio:virtual_audio_driver-driver",
+    "//src/media/audio/drivers/virtual-audio-legacy:virtual-audio-legacy-driver",
 
     #------------------
     #------------------

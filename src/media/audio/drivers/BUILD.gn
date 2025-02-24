@@ -20,8 +20,8 @@ group("drivers") {
     "intel-hda/controller:intel-hda",
     "testing:drivers",
     "usb-audio",
-    "virtual-audio-dfv2:virtual-audio-dfv2-driver-component",
-    "virtual_audio:virtual_audio_driver",
+    "virtual-audio-dfv2",
+    "virtual-audio-legacy",
   ]
   if (target_cpu == "arm64") {
     deps += [
