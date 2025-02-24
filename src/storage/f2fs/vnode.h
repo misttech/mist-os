@@ -113,7 +113,6 @@ class VnodeF2fs : public fs::PagedVnode,
       __TA_EXCLUDES(mutex_);
   void OnNoPagedVmoClones() final __TA_REQUIRES(mutex_);
 
-  void ReleasePagedVmoUnsafe() __TA_REQUIRES(mutex_);
   void ReleasePagedVmo() __TA_EXCLUDES(mutex_);
 
   virtual zx_status_t InitInodeMetadata() __TA_EXCLUDES(mutex_)
@@ -139,7 +138,7 @@ class VnodeF2fs : public fs::PagedVnode,
   zx_status_t TruncateHole(pgoff_t pg_start, pgoff_t pg_end, bool evict = true)
       __TA_EXCLUDES(f2fs::GetGlobalLock());
   void TruncateToSize() __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
-  void EvictVnode() __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
+  void Purge() __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
   // Caller ensures that this data page is never allocated.
   zx_status_t GetNewDataPage(pgoff_t index, bool new_i_size, LockedPage *out)
       __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());

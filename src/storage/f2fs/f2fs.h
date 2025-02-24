@@ -213,8 +213,6 @@ class F2fs final {
   FuchsiaDispatcher dispatcher_;
   PlatformVfs *const vfs_ = nullptr;
   std::unique_ptr<f2fs::BcacheMapper> bc_;
-  // for unittest
-  std::unique_ptr<PlatformVfs> vfs_for_tests_;
 
   MountOptions mount_options_;
 
@@ -243,6 +241,9 @@ class F2fs final {
   std::unique_ptr<InspectTree> inspect_tree_;
   std::atomic<MemoryPressure> current_memory_pressure_level_ = MemoryPressure::kUnknown;
   std::unique_ptr<MemoryPressureWatcher> memory_pressure_watcher_;
+
+  // for unittest
+  std::unique_ptr<PlatformVfs> vfs_for_tests_;
 };
 
 }  // namespace f2fs
