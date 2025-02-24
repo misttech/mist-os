@@ -1,5 +1,5 @@
 {
-    "short_description": "Overnet USB driver",
+    "short_description": "USB function device for host communication",
     "manufacturer": "",
     "families": [
         "generic"

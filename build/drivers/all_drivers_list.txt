@@ -58,7 +58,7 @@
 //src/connectivity/openthread/drivers/ot-radio:ot-radio-sherlock-mfg_driver
 //src/connectivity/openthread/drivers/ot-radio:ot-radio-sherlock_driver
 //src/connectivity/openthread/tests/fake-drivers/fake-ot-radio:fake-ot-radio-driver-driver
-//src/connectivity/overnet/usb:overnet-usb-driver
+//src/connectivity/overnet/usb/overnet-usb:overnet-usb-driver
 //src/connectivity/telephony/drivers/qmi-fake-transport:fake_qmi_driver-driver
 //src/connectivity/telephony/drivers/qmi-usb-transport:qmi_driver-driver
 //src/connectivity/telephony/tests/fake-drivers/at-fake-transport:fake_at_driver-driver

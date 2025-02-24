@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/connectivity/overnet/usb/overnet_usb.h"
+#include "overnet_usb.h"
 
 #include <fidl/fuchsia.hardware.usb.function/cpp/fidl.h>
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
@@ -126,7 +126,7 @@ zx::result<> OvernetUsb::Start() {
   function_.SetInterface(this, &usb_function_interface_protocol_ops_);
 
   fdf::NodeAddArgs args;
-  args.name("overnet_usb");
+  args.name("overnet-usb");
 
   auto controller_eps = fidl::CreateEndpoints<fdf::NodeController>();
   if (controller_eps.is_error()) {

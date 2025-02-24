@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_CONNECTIVITY_OVERNET_USB_OVERNET_USB_H_
-#define SRC_CONNECTIVITY_OVERNET_USB_OVERNET_USB_H_
+#ifndef SRC_CONNECTIVITY_OVERNET_USB_OVERNET_USB_OVERNET_USB_H_
+#define SRC_CONNECTIVITY_OVERNET_USB_OVERNET_USB_OVERNET_USB_H_
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.overnet/cpp/fidl.h>
@@ -382,4 +382,4 @@ class OvernetUsb : public fdf::DriverBase,
   async_dispatcher_t* dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
 };
 
-#endif  // SRC_CONNECTIVITY_OVERNET_USB_OVERNET_USB_H_
+#endif  // SRC_CONNECTIVITY_OVERNET_USB_OVERNET_USB_OVERNET_USB_H_
