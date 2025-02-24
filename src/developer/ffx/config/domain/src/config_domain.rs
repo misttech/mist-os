@@ -457,7 +457,10 @@ mod tests {
             FileStates::check_paths(rfc_root.clone(), &["manifest/bazel_sdk.ensure"]).unwrap();
         let mut known_state = FileStates::default();
         assert_matches!(
-            domain.needs_sdk_update(&SdkRoot::Full(rfc_root_sdk.clone().into()), &mut known_state),
+            domain.needs_sdk_update(
+                &SdkRoot::Full { root: rfc_root_sdk.clone().into(), manifest: None },
+                &mut known_state
+            ),
             Some(_),
             "sdk example with different existing state should need updating"
         );
@@ -467,14 +470,17 @@ mod tests {
         );
         assert_matches!(
             domain.needs_sdk_update(
-                &SdkRoot::Full(rfc_root_sdk.into()),
+                &SdkRoot::Full { root: rfc_root_sdk.into(), manifest: None },
                 &mut rfc_root_states.clone()
             ),
             None,
             "sdk example with correct state should not need updating"
         );
         assert_matches!(
-            domain.needs_sdk_update(&SdkRoot::Full(rfc_root.into()), &mut rfc_root_states.clone()),
+            domain.needs_sdk_update(
+                &SdkRoot::Full { root: rfc_root.into(), manifest: None },
+                &mut rfc_root_states.clone()
+            ),
             Some(_),
             "sdk example with invalid sdk root should need updating"
         );

@@ -5,12 +5,14 @@
 use anyhow::{ensure, Context as _};
 use async_stream::stream;
 use diagnostics_data::LogsData;
-use ffx_config::{EnvironmentContext, TestEnv};
+use ffx_config::environment::ExecutableKind;
+use ffx_config::{ConfigMap, EnvironmentContext};
 use ffx_executor::FfxExecutor;
 use ffx_isolate::Isolate;
 use futures::channel::mpsc::TrySendError;
 use futures::{Stream, StreamExt};
 use serde::Deserialize;
+use std::env;
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
@@ -31,7 +33,6 @@ pub struct IsolatedEmulator {
 
     // We need to hold the below variables but not interact with them.
     _temp_dir: TempDir,
-    _test_env: TestEnv,
 }
 
 impl IsolatedEmulator {
@@ -52,7 +53,16 @@ impl IsolatedEmulator {
 
         info!(%name, "making ffx isolate");
         let temp_dir = tempfile::TempDir::new().context("making temp dir")?;
-        let test_env = ffx_config::test_init().await.context("setting up ffx test config")?;
+
+        // Start with the non-isolated environment context - then build the isolate.
+        let env_context = EnvironmentContext::detect(
+            ExecutableKind::Test,
+            ConfigMap::new(),
+            &env::current_dir().expect("current directory"),
+            None,
+            false,
+        )
+        .expect("new detected context");
 
         // Create paths to the files to hold the ssh key pair.
         // The key is not generated here, since ffx will generate the
@@ -62,7 +72,7 @@ impl IsolatedEmulator {
         let ssh_priv_key = temp_dir.path().join("ssh_private_key");
         let ssh_pub_key = temp_dir.path().join("ssh_public_key");
 
-        let ffx_isolate = Isolate::new_in_test(name, ssh_priv_key.clone(), &test_env.context)
+        let ffx_isolate = Isolate::new_in_test(name, ssh_priv_key.clone(), &env_context)
             .await
             .context("creating ffx isolate")?;
 
@@ -72,7 +82,6 @@ impl IsolatedEmulator {
             package_server_name,
             ffx_isolate,
             _temp_dir: temp_dir,
-            _test_env: test_env,
             emu_state: Mutex::new(None),
             children: Mutex::new(vec![]),
         };

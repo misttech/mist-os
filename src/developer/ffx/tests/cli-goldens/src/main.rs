@@ -78,7 +78,7 @@ pub(crate) async fn new_ffx_isolate(name: &str, sdk_root_dir: PathBuf) -> Result
         name,
         SearchContext::Runtime {
             ffx_path: ffx_path,
-            sdk_root: Some(SdkRoot::Full(sdk_root_dir)),
+            sdk_root: Some(SdkRoot::Full { root: sdk_root_dir.into(), manifest: None }),
             subtool_search_paths,
         },
         PathBuf::from("."),

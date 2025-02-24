@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::bail;
+use ffx_config::environment::ExecutableKind;
+use ffx_config::{ConfigMap, EnvironmentContext};
 use fuchsia_async as fasync;
 use std::env;
 use std::path::PathBuf;
@@ -56,12 +58,19 @@ where
     F: FnOnce(TestContext) -> Fut + Send + 'static,
     Fut: futures::future::Future<Output = ()>,
 {
-    let test_env = ffx_config::test_init().await.expect("config init");
-
+    // Start with the non-isolated environment context - then build the isolate.
+    let env_context = EnvironmentContext::detect(
+        ExecutableKind::Test,
+        ConfigMap::new(),
+        &env::current_dir().expect("current directory"),
+        None,
+        false,
+    )
+    .expect("new detected context");
     // Not actually used. ffx will generate an ssh key for usage with the emulator.
     let ssh_path = OUT_DIR.join("ssh");
 
-    let isolate = ffx_isolate::Isolate::new_in_test(case_name, ssh_path, &test_env.context)
+    let isolate = ffx_isolate::Isolate::new_in_test(case_name, ssh_path, &env_context)
         .await
         .expect("create isolate");
     let config = TestContext { isolate, emulator_allowed };

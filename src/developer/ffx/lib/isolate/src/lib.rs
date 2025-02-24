@@ -26,13 +26,13 @@ pub enum SearchContext {
 
 impl SearchContext {
     fn sdk_config(&self) -> Option<FfxSdkConfig> {
-        match &self {
+        match self {
             SearchContext::Runtime { sdk_root: Some(sdk_root), .. } => Some(sdk_root.to_config()),
             SearchContext::Build { build_root } => {
                 // TODO(392136182): Do not refer to hardcoded SDK paths. This support is being
                 // removed.
                 let root = Some(build_root.join("sdk/exported/core"));
-                Some(FfxSdkConfig { root, module: None })
+                Some(FfxSdkConfig { root, manifest: None, module: None })
             }
             _ => None,
         }
