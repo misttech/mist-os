@@ -40,27 +40,6 @@ fn remove_test_type(program: &mut fdata::Dictionary) -> Result<TestType, Error> 
     }
 }
 
-fn take_opt_str_value_from_dict(
-    dict: &mut fdata::Dictionary,
-    name: &str,
-) -> Result<Option<String>, Error> {
-    match take_value(dict, name) {
-        Some(fdata::DictionaryValue::Str(value)) => Ok(Some(value.clone())),
-        Some(_) => Err(anyhow!("{} must a string", name)),
-        _ => Ok(None),
-    }
-}
-
-fn take_value<'a>(dict: &mut fdata::Dictionary, key: &str) -> Option<fdata::DictionaryValue> {
-    let entries = dict.entries.as_mut()?;
-    for i in 0..entries.len() {
-        if entries[i].key == key {
-            return entries.remove(i).value.map(|b| *b);
-        }
-    }
-    None
-}
-
 async fn component_runner_from_start_info(
     start_info: ComponentStartInfo,
 ) -> Result<ComponentRunnerProxy, Error> {
