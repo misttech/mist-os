@@ -512,6 +512,9 @@ zx::result<> FuchsiaVfs::ServeResult(Open2Result open_result, fuchsia_io::Rights
       break;
     }
     case VnodeProtocol::kService: {
+      if (flags & ~(fuchsia_io::Flags::kProtocolService)) {
+        return zx::error(ZX_ERR_INVALID_ARGS);
+      }
       return zx::make_result(vnode->ConnectService(std::move(object_request)));
     }
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)

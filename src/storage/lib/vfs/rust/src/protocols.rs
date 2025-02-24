@@ -310,8 +310,13 @@ impl ProtocolsExt for fio::Flags {
     }
 
     fn to_service_options(&self) -> Result<ServiceOptions, Status> {
-        if !self.difference(fio::Flags::PROTOCOL_SERVICE).is_empty()
-            && !self.contains(fio::Flags::PROTOCOL_NODE)
+        // This should not be called if fio::Flags::PROTOCOL_NODE was set (`to_node_options` would
+        // be called instead).
+        assert!(!self.contains(fio::Flags::PROTOCOL_NODE));
+        if !self
+            .intersection(fio::MASK_KNOWN_PROTOCOLS)
+            .difference(fio::Flags::PROTOCOL_SERVICE)
+            .is_empty()
         {
             return if self.is_dir_allowed() {
                 Err(Status::NOT_DIR)
@@ -320,6 +325,10 @@ impl ProtocolsExt for fio::Flags {
             } else {
                 Err(Status::WRONG_TYPE)
             };
+        }
+
+        if !self.difference(fio::Flags::PROTOCOL_SERVICE).is_empty() {
+            return Err(Status::INVALID_ARGS);
         }
 
         Ok(ServiceOptions)

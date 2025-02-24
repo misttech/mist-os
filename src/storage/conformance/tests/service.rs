@@ -6,6 +6,7 @@ use fidl_test_placeholders::EchoMarker;
 
 use assert_matches::assert_matches;
 use fidl_fuchsia_io as fio;
+use futures::TryFutureExt;
 use io_conformance_util::test_harness::TestHarness;
 use io_conformance_util::DirectoryProxyExt as _;
 use zx::Status;
@@ -102,6 +103,46 @@ async fn open_service_with_wrong_protocol() {
             .await
             .unwrap_err();
         assert_eq!(status, expected_error);
+    }
+}
+
+#[fuchsia::test]
+async fn open_service_with_other_flags_should_fail() {
+    let harness = TestHarness::new().await;
+    if !harness.config.supports_services {
+        return;
+    }
+    let svc_dir = harness.open_service_directory().await;
+
+    // No need to test for all flag possibilities; just test some flags.
+    for (flags, expected_error) in [
+        (fio::Flags::PERM_READ, Status::INVALID_ARGS),
+        (fio::Flags::PERM_TRAVERSE, Status::INVALID_ARGS),
+        (fio::Flags::FLAG_SEND_REPRESENTATION, Status::INVALID_ARGS),
+        (fio::Flags::PERM_GET_ATTRIBUTES, Status::INVALID_ARGS),
+    ] {
+        let (proxy, server) = create_proxy::<EchoMarker>();
+        svc_dir
+            .open(
+                EchoMarker::PROTOCOL_NAME,
+                fio::Flags::PROTOCOL_SERVICE | flags,
+                &fio::Options::default(),
+                server.into_channel(),
+            )
+            .expect("Failed wire call open3");
+
+        let echo_response_status = proxy
+            .echo_string(Some(TEST_STRING))
+            .map_err(|e| {
+                if let fidl::Error::ClientChannelClosed { status, .. } = e {
+                    status
+                } else {
+                    panic!("Unhandled FIDL error: {:?}", e);
+                }
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(echo_response_status, expected_error);
     }
 }
 
