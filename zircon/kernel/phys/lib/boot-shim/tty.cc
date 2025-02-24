@@ -64,7 +64,10 @@ std::optional<Tty> TtyFromCmdline(std::string_view cmdline) {
   if (index_start == std::string_view::npos) {
     return std::nullopt;
   }
-  auto index = BootOptions::ParseInt(arg.substr(index_start));
+
+  // console=ttyTYPENNNN,arg2,arg3
+  std::string_view index_str = arg.substr(index_start, arg.substr(index_start).find_first_of(", "));
+  auto index = BootOptions::ParseInt(index_str);
   if (!index) {
     return std::nullopt;
   }

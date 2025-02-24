@@ -44,6 +44,14 @@ TEST(TtyFromCmdlineTest, SerialEntryWithIndexIsTtySN) {
     EXPECT_EQ(tty->vendor, "");
     EXPECT_EQ(tty->index, 1234);
   }
+
+  {
+    auto tty = boot_shim::TtyFromCmdline("foo console=ttyS1234,arg2,arg3 foobar");
+    ASSERT_TRUE(tty);
+    EXPECT_EQ(tty->type, boot_shim::TtyType::kSerial);
+    EXPECT_EQ(tty->vendor, "");
+    EXPECT_EQ(tty->index, 1234);
+  }
 }
 
 TEST(TtyFromCmdlineTest, EntryWithIndexIsTtyN) {
@@ -69,6 +77,14 @@ TEST(TtyFromCmdlineTest, EntryWithIndexIsTtyN) {
     EXPECT_EQ(tty->type, boot_shim::TtyType::kAny);
     EXPECT_EQ(tty->index, 1234);
     EXPECT_EQ(tty->vendor, "");
+  }
+
+  {
+    auto tty = boot_shim::TtyFromCmdline("foo console=tty1234,arg2,arg3 foobar");
+    ASSERT_TRUE(tty);
+    EXPECT_EQ(tty->type, boot_shim::TtyType::kAny);
+    EXPECT_EQ(tty->vendor, "");
+    EXPECT_EQ(tty->index, 1234);
   }
 }
 
@@ -96,6 +112,14 @@ TEST(TtyFromCmdlineTest, AmlEntryWithIndexIsTtyAMLN) {
     EXPECT_EQ(tty->index, 12345);
     EXPECT_EQ(tty->vendor, "amlogic");
   }
+
+  {
+    auto tty = boot_shim::TtyFromCmdline("foo console=ttyAML1234,arg2,arg3 foobar");
+    ASSERT_TRUE(tty);
+    EXPECT_EQ(tty->type, boot_shim::TtyType::kAml);
+    EXPECT_EQ(tty->vendor, "amlogic");
+    EXPECT_EQ(tty->index, 1234);
+  }
 }
 
 TEST(TtyFromCmdlineTest, AmlEntryWithIndexIsTtyMSMN) {
@@ -121,6 +145,14 @@ TEST(TtyFromCmdlineTest, AmlEntryWithIndexIsTtyMSMN) {
     EXPECT_EQ(tty->type, boot_shim::TtyType::kMsm);
     EXPECT_EQ(tty->index, 12345);
     EXPECT_EQ(tty->vendor, "qcom");
+  }
+
+  {
+    auto tty = boot_shim::TtyFromCmdline("foo console=ttyMSM1234,arg2,arg3 foobar");
+    ASSERT_TRUE(tty);
+    EXPECT_EQ(tty->type, boot_shim::TtyType::kMsm);
+    EXPECT_EQ(tty->vendor, "qcom");
+    EXPECT_EQ(tty->index, 1234);
   }
 }
 
