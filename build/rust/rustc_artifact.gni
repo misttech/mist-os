@@ -184,6 +184,83 @@ template("rustc_artifact") {
       if (defined(invoker.rust_auxiliary_name)) {
         _aux_target_name = invoker.rust_auxiliary_name
       }
+
+      rust_auxiliary(_aux_target_name) {
+        forward_variables_from(invoker,
+                               [
+                                 "actual_name",
+                                 "aliased_deps",
+                                 "configs",
+                                 "crate_name",
+                                 "crate_root",
+                                 "crate_type",
+                                 "define_rustdoc_test_override",
+                                 "disable_clippy",
+                                 "disable_rustdoc",
+                                 "enable_clippy_first_party",
+                                 "include_rustdoc_first_party",
+                                 "original_target_name",
+                                 "quiet_clippy",
+                                 "quiet_rustdoc",
+                                 "rust_crate_type",
+                                 "rustdoc_args",
+                                 "rustdoc_merge",
+                                 "rustdoc_out_dir",
+                                 "rustenv",
+                                 "sources",
+                                 "testonly",
+                                 "visibility",
+                                 "zip_rustdoc_to",
+                               ])
+
+        if (!defined(actual_name)) {
+          actual_name = _group_name
+        }
+
+        invoker_deps = invoker.deps
+        rustflags = _rustflags
+
+        if (!defined(configs)) {
+          configs = []
+        }
+        configs += [ "//build/config/rust:edition_${invoker.edition}" ]
+
+        # Add the global lint defaults.
+        configs += [ "//build/config/rust/lints:clippy_warn_default" ]
+
+        # Add production-oriented lints to non-test code.
+        if (!(defined(testonly) && testonly)) {
+          configs += [ "//build/config/rust/lints:clippy_warn_production" ]
+        }
+
+        # rustdoc should not be data_dep'd for third party crates
+        include_rustdoc_first_party = true
+
+        # We should only generate clippy lints for first party crates,
+        # as lints for third party crates aren't actionable
+        enable_clippy_first_party =
+            !defined(invoker.disable_clippy) || !invoker.disable_clippy
+
+        if (rust_crate_type == "bin") {
+          # search index size, mostly.
+          disable_rustdoc_binary = true
+        }
+
+        if (rust_crate_type == "rlib" || rust_crate_type == "proc-macro") {
+          if (defined(invoker.output_dir)) {
+            searchdir_path = invoker.output_dir
+          } else {
+            searchdir_path =
+                get_label_info(":${_actual_target_name}", "target_out_dir")
+            if (rust_one_rlib_per_dir) {
+              searchdir_path += "/" + _actual_target_name
+            }
+          }
+          rlib_path = "${searchdir_path}/lib${crate_name}.rlib"
+        }
+      }
+    } else {
+      not_needed(invoker, [ "original_target_name" ])
     }
 
     # Every first party Rust target is actually a group of both target_name.actual
@@ -232,6 +309,15 @@ template("rustc_artifact") {
       crate_name = string_replace(invoker.crate_name, "-", "_")
       crate_root = invoker.crate_root
 
+      # Don't define Rust auxiliary deps targets for targets that go through
+      # rustc_artifact, because this template defines a rust_auxiliary target
+      # above. aux_deps targets are only useful for third-party targets that use
+      # GN builtin Rust templates (rust_library and rust_proc_macro).
+      if (invoker.target_type == "rust_library" ||
+          invoker.target_type == "rust_proc_macro") {
+        define_aux_deps = false
+      }
+
       rustflags = _rustflags
       if (rust_rbe_enable) {
         rustflags += [ "--remote-flag=--label='" +
@@ -251,9 +337,6 @@ template("rustc_artifact") {
       if (defined(invoker.configs)) {
         configs = invoker.configs
       }
-      assert(
-          defined(invoker.edition),
-          "Rust targets must set an edition. For new rust targets use: `edition = \"2021\"`")
       configs += [ "//build/config/rust:edition_${invoker.edition}" ]
 
       inputs = _local_inputs + _flag_inputs
@@ -305,48 +388,8 @@ template("rustc_artifact") {
         deps += [ "//src/lib/fdio/rust:fdio_for_rust_stdlib" ]
       }
 
-      # Add the global lint defaults.
-      configs += [ "//build/config/rust/lints:clippy_warn_default" ]
-
-      # Add production-oriented lints to non-test code.
-      if (!(defined(testonly) && testonly)) {
-        configs += [ "//build/config/rust/lints:clippy_warn_production" ]
-      }
       if (defined(visibility)) {
         visibility += [ ":${_group_name}" ]
-      }
-
-      if (_should_define_rust_aux) {
-        forward_variables_from(invoker,
-                               [
-                                 "define_rustdoc_test_override",
-                                 "disable_clippy",
-                                 "disable_rustdoc",
-                                 "original_target_name",
-                                 "quiet_clippy",
-                                 "rust_crate_type",
-                                 "rustdoc_args",
-                                 "rustdoc_merge",
-                                 "rustdoc_out_dir",
-                                 "zip_rustdoc_to",
-                               ])
-
-        rust_auxiliary_name = _aux_target_name
-
-        # We already depend on the aux target here, in the group above.
-        # This keeps rustdoc and clippy out of the critical path for
-        # rustc_artifact targets, which are the ones that get built by default
-        # anyway.
-        no_rust_aux_build_config_dep = true
-
-        # rustdoc should not be data_dep'd for third party crates
-        include_rustdoc_first_party = true
-
-        # We should only generate clippy lints for first party crates,
-        # as lints for third party crates aren't actionable
-        enable_clippy_first_party = true
-      } else {
-        not_needed(invoker, [ "original_target_name" ])
       }
     }
   }

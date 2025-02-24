@@ -19,7 +19,7 @@ import("//build/rust/rust_auxiliary_args.gni")
 #  public_deps
 #  testonly
 #
-template("_rust_aux_deps") {
+template("rust_aux_deps") {
   _deps_target = "${target_name}.deps"
   _deps_output = "${target_gen_dir}/${_deps_target}"
   generated_file(_deps_target) {
@@ -38,7 +38,8 @@ template("_rust_aux_deps") {
 
   # rustdoc only needs to work with rmeta, so we tell it to
   # use the rmeta to avoid having to download rlibs with remote building.
-  action("${target_name}.deps.rmeta") {
+  _deps_rmeta_target = "${target_name}.deps.rmeta"
+  action(_deps_rmeta_target) {
     forward_variables_from(invoker, [ "testonly" ])
 
     inputs = [ _deps_output ]
@@ -52,7 +53,8 @@ template("_rust_aux_deps") {
     ]
   }
 
-  generated_file("${target_name}.transdeps") {
+  _transdeps_target = "${target_name}.transdeps"
+  generated_file(_transdeps_target) {
     forward_variables_from(invoker,
                            [
                              "data_deps",
@@ -60,9 +62,17 @@ template("_rust_aux_deps") {
                              "public_deps",
                              "testonly",
                            ])
-    visibility = [ ":*" ]
     outputs = [ "${target_gen_dir}/${target_name}" ]
     data_keys = [ "searchdir" ]
+  }
+
+  group(target_name) {
+    forward_variables_from(invoker, [ "testonly" ])
+    public_deps = [
+      ":${_deps_rmeta_target}",
+      ":${_deps_target}",
+      ":${_transdeps_target}",
+    ]
   }
 }
 
@@ -75,24 +85,16 @@ template("_rust_aux_deps") {
 # //build/rust/rustc_artifact.gni.
 #
 # * //build/rust/rustc_{library|macro|binary|...}.gni, which is invoked by
-# first party rust code. rustc_artifact renames the target that *actual*ly
-# invokes rustc with a .actual suffix. rustc_artifact contains a group that
-# depends on the .actual subtarget, and an auxiliary .aux group.
+# first party rust code. rustc_artifact contains a group that depends on the
+# .actual subtarget, and an auxiliary .aux group.
 #
-# Rust targets have two auxiliary subtargets: {.actual}?.clippy, and
-# {.actual}?.rustdoc. These auxiliary subtargets are declared in this file.
-# This file is included by the `rust_{library|proc_macro}` targets in
-# BUILDCONFIG.gn. `gen_deps` dependencies on this {.actual?}.aux group can be
-# found in BUILDCONFIG.gn, and `data_deps` dependency on this {.actual?}.aux
-# group can be found in rustc_artifact.
+# Rust targets have two auxiliary subtargets: .clippy, and .rustdoc. These
+# auxiliary subtargets are declared in this file.
 #
-# Clippy is only built for first party targets, because these are the only
-# crates that Fuchsia developers can take action on. Rustdoc targets are
-# *generated* (a la `gen_deps`) for both first and third party targets. Rustdoc
-# subtargets can be opted out with `disable_rustdoc` on a per-target basis. Doc
-# failures are only actionable for first party crates, so when `fx build` is run,
-# docs are built only for first party crates. Actually building first party
-# rustdoc subtargets can be opted in with `include_rustdoc` on a global basis.
+# Clippy and rustdoc targets are only built for first-party targets, because
+# these are the only crates that Fuchsia developers can take action on. The
+# `rust_{library|proc_macro}` wrappers in BUILDCONFIG.gn define .dep targets,
+# which provide the necessary metadata for first-party Rust auxiliary targets.
 #
 # There are two groups: the one declared in this file, and the one declared in
 # rustc_artifact.gni. The group declared in rustc_artifact is needed to enable
@@ -104,9 +106,9 @@ template("_rust_aux_deps") {
 #     ---------------------                   ------------------------
 # <:foo> (group)                          <:foo> (alias)
 # ├───<:foo.actual> (rust_library)        ╰───<:foo-v0_1_0> (rust_library)
-# ╰───<:foo.aux> (group)                      ╰───<:foo.aux> (group)
-#     ├───<:foo.actual.clippy>                    ╰───<:foo.actual.rustdoc>
-#     ╰───<:foo.actual.rustdoc>
+# ╰───<:foo.aux> (group)                      ╰───<:foo.aux.deps> (group)
+#     ├───<:foo.clippy>
+#     ╰───<:foo.rustdoc>
 #
 # The .rustdoc subtargets are also consumed by `fx rustdoc-link`
 # (//tools/devshell/contrib/lib/rust/rustdoc-link.py). This script respects
@@ -114,6 +116,7 @@ template("_rust_aux_deps") {
 # inspecting a `rust_target_mapping.json` file in the build dir. It explicitly
 # builds all enabled docs, bypassing `include_rustdoc`, and merges their docs
 # to a central location.
+#
 template("rust_auxiliary") {
   # redefined in rustdoc tests
   if (defined(invoker.rustdoc_out_dir)) {
@@ -169,11 +172,10 @@ template("rust_auxiliary") {
   forward_variables_from(invoker, [ "aliased_deps" ])
 
   if (_define_rustdoc || _define_clippy) {
-    _deps_rmeta_target = "${target_name}.deps.rmeta"
-    _deps_rmeta_output = "${target_gen_dir}/${_deps_rmeta_target}"
-    _transdeps_target = "${target_name}.transdeps"
-    _transdeps_output = "${target_gen_dir}/${_transdeps_target}"
-    _rust_aux_deps(target_name) {
+    _aux_deps_target = "${target_name}.deps"
+    _deps_rmeta_output = "${target_gen_dir}/${_aux_deps_target}.deps.rmeta"
+    _transdeps_output = "${target_gen_dir}/${_aux_deps_target}.transdeps"
+    rust_aux_deps(_aux_deps_target) {
       forward_variables_from(invoker,
                              [
                                "data_deps",
@@ -204,11 +206,7 @@ template("rust_auxiliary") {
         quiet_clippy = false
       }
 
-      deps = _invoker_deps
-      deps += [
-        ":${_deps_rmeta_target}",
-        ":${_transdeps_target}",
-      ]
+      deps = _invoker_deps + [ ":${_aux_deps_target}" ]
       if (defined(invoker.non_rust_deps)) {
         deps += invoker.non_rust_deps
       }
@@ -324,10 +322,7 @@ template("rust_auxiliary") {
                              ])
       script = "//build/rust/rustdoc_wrapper.py"
       mnemonic = "DOC"
-      deps = _invoker_deps + [
-               ":${_deps_target}",
-               ":${_transdeps_target}",
-             ]
+      deps = _invoker_deps + [ ":${_aux_deps_target}" ]
 
       if (defined(invoker.non_rust_deps)) {
         deps += invoker.non_rust_deps
@@ -454,7 +449,6 @@ template("rust_auxiliary") {
                              "testonly",
                              "visibility",
                            ])
-
     if (defined(visibility)) {
       visibility += [ ":${_actual_name}" ]
     }

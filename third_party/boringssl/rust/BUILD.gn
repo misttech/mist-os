@@ -152,7 +152,7 @@ rustc_library("bssl-crypto.lib") {
   }
 
   # We don't maintain this code.
-  quiet_clippy = true
+  disable_clippy = true
 }
 
 config("bssl-crypto.allows") {
