@@ -52,7 +52,7 @@ bstr = { version = "1.5.0", default-features = false, features = [ "std" ] }
 bumpalo = { version = "3.2.1", features = [ "collections" ] }
 byteorder = { version = "1.4.3", features = ["i128"] }
 bytes = "1.10.0"
-camino = { version = "1.1.1", features = ["proptest1", "serde1"] }
+camino = { version = "1.1.9", features = ["proptest1", "serde1"] }
 cbc = "0.1.2"
 cfg-if = "1.0.0"
 chacha20 = "0.9.0"
@@ -531,9 +531,12 @@ reviewed_features = ["serde"]
 [gn.package.bstr."1.5.0"]
 reviewed_features = [ "std", "alloc" ]
 
-[gn.package.camino."1.1.1"]
+[gn.package.camino."1.1.9"]
 rustflags = [
+  "--cfg=absolute_path",
+  "--cfg=os_str_bytes",
   "--cfg=path_buf_capacity",
+  "--cfg=path_buf_deref_mut",
   "--cfg=shrink_to",
   "--cfg=try_reserve_2",
 ]

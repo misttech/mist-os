@@ -3,6 +3,54 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.9] - 2024-08-17
+
+### Added
+
+- Top-level function `absolute_utf8` wraps `std::path::absolute`, converting paths to UTF-8.
+  Requires Rust 1.79 and above.
+
+## [1.1.8] - 2024-08-15
+
+### Changed
+
+- Use `OsStr::as_encoded_bytes` on Rust 1.74 and above, making conversions from `OsStr` to `str` virtually free ([#93](https://github.com/camino-rs/camino/pull/93)). Thanks [@h-a-n-a](https://github.com/h-a-n-a) for your first contribution!
+
+## [1.1.7] - 2024-05-14
+
+### Fixed
+
+- Resolve `unexpected_cfg` warnings.
+
+## [1.1.6] - 2023-07-11
+
+### Added
+
+- Implement `Deserialize` for `Box<Utf8Path>`.
+
+## [1.1.5] - 2023-07-11
+
+(This release was not published due to an internal issue.)
+
+## [1.1.4] - 2023-03-09
+
+### Added
+
+- Implement `DerefMut` for `Utf8PathBuf` on Rust 1.68 and above.
+
+## [1.1.3] - 2023-02-21
+
+### Added
+
+- New method `Utf8DirEntry::into_path` to return an owned `Utf8PathBuf`.
+
+## [1.1.2] - 2022-08-12
+
+### Added
+
+- New convenience methods [`FromPathBufError::into_io_error`] and
+  [`FromPathError::into_io_error`].
+
 ## [1.1.1] - 2022-08-12
 
 ### Fixed
@@ -34,7 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New methods `canonicalize_utf8`, `read_link_utf8` and `read_dir_utf8` return `Utf8PathBuf`s, erroring out if a resulting path is not valid UTF-8.
 - New feature `proptest1` introduces proptest `Arbitrary` impls for `Utf8PathBuf` and
   `Box<Utf8Path>` ([#18], thanks [mcronce](https://github.com/mcronce) for your first contribution!)
-  
+
 [#18]: https://github.com/camino-rs/camino/pull/18
 
 ## [1.0.7] - 2022-01-16
@@ -101,6 +149,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release.
 
+[1.1.9]: https://github.com/camino-rs/camino/releases/tag/camino-1.1.9
+[1.1.8]: https://github.com/camino-rs/camino/releases/tag/camino-1.1.8
+[1.1.7]: https://github.com/camino-rs/camino/releases/tag/camino-1.1.7
+[1.1.6]: https://github.com/camino-rs/camino/releases/tag/camino-1.1.6
+[1.1.5]: https://github.com/camino-rs/camino/releases/tag/camino-1.1.5
+[1.1.4]: https://github.com/camino-rs/camino/releases/tag/camino-1.1.4
+[1.1.3]: https://github.com/camino-rs/camino/releases/tag/camino-1.1.3
+[1.1.2]: https://github.com/camino-rs/camino/releases/tag/camino-1.1.2
 [1.1.1]: https://github.com/camino-rs/camino/releases/tag/camino-1.1.1
 [1.1.0]: https://github.com/camino-rs/camino/releases/tag/camino-1.1.0
 [1.0.9]: https://github.com/camino-rs/camino/releases/tag/camino-1.0.9
