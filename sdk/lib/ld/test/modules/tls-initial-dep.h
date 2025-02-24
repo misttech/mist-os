@@ -9,7 +9,7 @@ constexpr int kTlsInitialDepDataValue = 10;
 
 extern "C" {
 
-extern thread_local int tls_intial_dep_data;
+extern constinit thread_local int tls_intial_dep_data;
 
 int* get_tls_initial_dep_data();
 

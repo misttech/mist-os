@@ -23,7 +23,7 @@ extern "C" {
 [[gnu::visibility("default")]] int* get_static_tls_var();
 
 [[gnu::visibility("default"),
-  gnu::tls_model("global-dynamic")]] extern thread_local int gStaticTlsVar;
+  gnu::tls_model("global-dynamic")]] extern constinit thread_local int gStaticTlsVar;
 }
 
 // This class interface that can be called by test modules to execute a Callback

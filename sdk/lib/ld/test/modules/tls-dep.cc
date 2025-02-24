@@ -6,14 +6,14 @@
 
 #include <zircon/compiler.h>
 
-__EXPORT thread_local int tls_dep_data = kTlsDepDataValue;
-__EXPORT alignas(kTlsDepAlign) thread_local char tls_dep_bss[2];
+__EXPORT constinit thread_local int tls_dep_data = kTlsDepDataValue;
+__EXPORT alignas(kTlsDepAlign) constinit thread_local char tls_dep_bss[2];
 
 #if !defined(HAVE_TLSDESC) || !defined(WANT_TLSDESC)
 #error "//build/config:{no-,}tlsdesc should define {HAVE,WANT}_TLSDESC"
 #elif HAVE_TLSDESC == WANT_TLSDESC
 
-[[gnu::weak]] extern thread_local int tls_dep_weak;
+[[gnu::weak]] extern constinit thread_local int tls_dep_weak;
 
 __EXPORT int* get_tls_dep_data() { return &tls_dep_data; }
 

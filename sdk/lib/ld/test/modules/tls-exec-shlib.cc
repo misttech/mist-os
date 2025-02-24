@@ -10,8 +10,8 @@
 #include "test-start.h"
 #include "tls-dep.h"
 
-[[gnu::used, gnu::retain]] alignas(64) thread_local int tls_data = 23;
-[[gnu::used, gnu::retain]] thread_local char tls_bss[2];
+[[gnu::used, gnu::retain]] alignas(64) constinit thread_local int tls_data = 23;
+[[gnu::used, gnu::retain]] constinit thread_local char tls_bss[2];
 
 using Traits = elfldltl::TlsTraits<>;
 

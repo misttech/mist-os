@@ -4,4 +4,4 @@
 
 #include "startup-symbols.h"
 
-thread_local int gStaticTlsVar = kStaticTlsDataValue;
+constinit thread_local int gStaticTlsVar = kStaticTlsDataValue;

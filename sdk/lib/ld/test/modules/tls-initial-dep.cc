@@ -6,7 +6,7 @@
 
 #include <zircon/compiler.h>
 
-__EXPORT thread_local int tls_initial_dep_data = kTlsInitialDepDataValue;
+__EXPORT constinit thread_local int tls_initial_dep_data = kTlsInitialDepDataValue;
 
 #if !defined(HAVE_TLSDESC) || !defined(WANT_TLSDESC)
 #error "//build/config:{no-,}tlsdesc should define {HAVE,WANT}_TLSDESC"

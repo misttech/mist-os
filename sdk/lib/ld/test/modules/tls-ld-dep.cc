@@ -11,12 +11,12 @@
 #elif HAVE_TLSDESC == WANT_TLSDESC
 
 __EXPORT int* get_tls_ld_dep_data() {
-  static thread_local int tls_ld_dep_data = kTlsLdDepDataValue;
+  static constinit thread_local int tls_ld_dep_data = kTlsLdDepDataValue;
   return &tls_ld_dep_data;
 }
 
 __EXPORT char* get_tls_ld_dep_bss1() {
-  static thread_local char tls_ld_dep_bss[2];
+  static constinit thread_local char tls_ld_dep_bss[2];
   return &tls_ld_dep_bss[1];
 }
 
