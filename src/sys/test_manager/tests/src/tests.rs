@@ -951,8 +951,9 @@ async fn capability_access_test() {
 
 #[fuchsia::test]
 async fn launch_chromium_test() {
-    // TODO(91934): This test is launched in the chromium realm. Once we support out of tree realm
-    // definitions we should move the definition and test to chromium.
+    // TODO(https://fxbug.dev/42173552): This test is launched in the chromium
+    // realm. Once we support out of tree realm definitions we should move the
+    // definition and test to chromium.
     let test_url = "fuchsia-pkg://fuchsia.com/test_manager_test#meta/simple_chromium_realm_test.cm";
     let (events, logs) = run_single_test(test_url, default_run_option()).await.unwrap();
 
@@ -1685,8 +1686,9 @@ async fn capability_access_test_for_suite() {
 
 #[fuchsia::test]
 async fn launch_chromium_test_for_suite() {
-    // TODO(91934): This test is launched in the chromium realm. Once we support out of tree realm
-    // definitions we should move the definition and test to chromium.
+    // TODO(https://fxbug.dev/42173552): This test is launched in the chromium
+    // realm. Once we support out of tree realm definitions we should move the
+    // definition and test to chromium.
     let test_url = "fuchsia-pkg://fuchsia.com/test_manager_test#meta/simple_chromium_realm_test.cm";
     let (events, logs) =
         run_single_test_for_suite(test_url, default_run_suite_options()).await.unwrap();
