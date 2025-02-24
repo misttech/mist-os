@@ -2,14 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZXTEST_BASE_RUNNER_H_
-#define ZXTEST_BASE_RUNNER_H_
+#ifndef ZIRCON_SYSTEM_ULIB_ZXTEST_INCLUDE_ZXTEST_BASE_RUNNER_H_
+#define ZIRCON_SYSTEM_ULIB_ZXTEST_INCLUDE_ZXTEST_BASE_RUNNER_H_
 
 #include <lib/stdcompat/span.h>
 #include <lib/stdcompat/string_view.h>
 
 #include <atomic>
 #include <cstdio>
+#include <mutex>
+#include <thread>
 
 #include <fbl/string.h>
 #include <fbl/vector.h>
@@ -294,13 +296,14 @@ class Runner {
   void DisableAsserts() { return test_driver_.DisableAsserts(); }
 
   void PushTrace(zxtest::Message* trace) { scoped_traces_.push_back(trace); }
-
   void PopTrace() { scoped_traces_.pop_back(); }
 
   cpp20::span<zxtest::Message*> GetScopedTraces() { return scoped_traces_; }
 
  private:
   friend class RunnerTestPeer;
+
+  static thread_local std::vector<zxtest::Message*> scoped_traces_;
 
   TestRef RegisterTest(const fbl::String& test_case_name, const fbl::String& test_name,
                        const SourceLocation& location, internal::TestFactory factory,
@@ -322,9 +325,6 @@ class Runner {
 
   // List of registered test cases.
   fbl::Vector<TestCase> test_cases_;
-
-  // Store the traces coming from the SCOPED_TRACE() macro.
-  std::vector<zxtest::Message*> scoped_traces_;
 
   // Serves as a |LifecycleObserver| list where events are sent to all subscribed observers.
   internal::EventBroadcaster event_broadcaster_;
@@ -359,4 +359,4 @@ int RunAllTests(int argc, char** argv);
 
 }  // namespace zxtest
 
-#endif  // ZXTEST_BASE_RUNNER_H_
+#endif  // ZIRCON_SYSTEM_ULIB_ZXTEST_INCLUDE_ZXTEST_BASE_RUNNER_H_

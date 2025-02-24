@@ -15,6 +15,8 @@ namespace zxtest {
 
 const Runner::Options Runner::kDefaultOptions;
 
+thread_local std::vector<zxtest::Message*> Runner::scoped_traces_;
+
 namespace internal {
 
 TestDriverImpl::TestDriverImpl() = default;
