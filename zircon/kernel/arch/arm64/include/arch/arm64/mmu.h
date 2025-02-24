@@ -241,14 +241,14 @@
 // Device, Device-nGnRE memory.
 #define MMU_S2_PTE_ATTR_DEVICE                  BM(2, 4, 0x1)
 
-// Device-nGnRnE memory
-#define MMU_MAIR_ATTR0                  MMU_MAIR_ATTR(0, 0x00)
-#define MMU_PTE_ATTR_STRONGLY_ORDERED   MMU_PTE_ATTR_ATTR_INDEX(0)
-
-// The following two attributes and indices must be kept in sync with those
+// The following four attributes and indices must be kept in sync with those
 // used for the boot CPU in physboot.
 //
 // LINT.IfChange
+
+// Device-nGnRnE memory
+#define MMU_MAIR_ATTR0                  MMU_MAIR_ATTR(0, 0x00)
+#define MMU_PTE_ATTR_STRONGLY_ORDERED   MMU_PTE_ATTR_ATTR_INDEX(0)
 
 // Device-nGnRE memory
 #define MMU_MAIR_ATTR1                  MMU_MAIR_ATTR(1, 0x04)
@@ -260,11 +260,11 @@
 #define MMU_MAIR_ATTR2                  MMU_MAIR_ATTR(2, 0xff)
 #define MMU_PTE_ATTR_NORMAL_MEMORY      MMU_PTE_ATTR_ATTR_INDEX(2)
 
-// LINT.ThenChange(/zircon/kernel/arch/arm64/phys/address-space.cc)
-
 // Normal Memory, Inner/Outer uncached, Write Combined
 #define MMU_MAIR_ATTR3                  MMU_MAIR_ATTR(3, 0x44)
 #define MMU_PTE_ATTR_NORMAL_UNCACHED    MMU_PTE_ATTR_ATTR_INDEX(3)
+
+// LINT.ThenChange(/zircon/kernel/arch/arm64/phys/address-space.cc)
 
 #define MMU_MAIR_ATTR4                  (0)
 #define MMU_MAIR_ATTR5                  (0)
