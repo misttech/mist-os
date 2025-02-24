@@ -762,12 +762,16 @@ def alias_declaration(ir, root_ir, recurse_guard=None) -> type:
         return type(name, (base_type,), base_params)
 
 
+class ProtocolBase:
+    pass
+
+
 def protocol_type(ir, root_ir, recurse_guard=None) -> type:
     """Constructs a Python type from a FIDL IR protocol declaration."""
     name = fidl_ident_to_py_library_member(ir.name())
     return type(
         name,
-        (object,),
+        (ProtocolBase,),
         {
             "__doc__": docstring(ir),
             "__fidl_kind__": "protocol",
@@ -780,7 +784,6 @@ def protocol_type(ir, root_ir, recurse_guard=None) -> type:
 
 
 def protocol_event_handler_type(ir: IR, root_ir) -> type:
-    name = fidl_ident_to_py_library_member(ir.name())
     properties = {
         "__doc__": docstring(ir),
         "__fidl_kind__": "event_handler",
@@ -812,15 +815,17 @@ def protocol_event_handler_type(ir: IR, root_ir) -> type:
             has_result=False,
             response_identifier=None,
         )
-    return type(name, (EventHandlerBase,), properties)
+    return type(
+        f"{fidl_ident_to_py_library_member(ir.name())}EventHandler",
+        (EventHandlerBase,),
+        properties,
+    )
 
 
 def protocol_server_type(ir: IR, root_ir) -> type:
-    name = fidl_ident_to_py_library_member(ir.name())
     properties = {
         "__doc__": docstring(ir),
         "__fidl_kind__": "server",
-        "__name__": name,
         "library": root_ir.name(),
         "method_map": {},
     }
@@ -848,15 +853,17 @@ def protocol_server_type(ir: IR, root_ir) -> type:
             has_result=method.has_result(),
             response_identifier=method.response_payload_raw_identifier(),
         )
-    return type(name, (ServerBase,), properties)
+    return type(
+        f"{fidl_ident_to_py_library_member(ir.name())}Server",
+        (ServerBase,),
+        properties,
+    )
 
 
 def protocol_client_type(ir: IR, root_ir) -> type:
-    name = fidl_ident_to_py_library_member(ir.name())
     properties = {
         "__doc__": docstring(ir),
         "__fidl_kind__": "client",
-        "__name__": name,
     }
     for method in ir.methods():
         if not method.has_request():
@@ -866,7 +873,11 @@ def protocol_client_type(ir: IR, root_ir) -> type:
         properties[method_snake_case] = protocol_method(
             method, root_ir, get_fidl_request_client_lambda
         )
-    return type(name, (FidlClient,), properties)
+    return type(
+        f"{fidl_ident_to_py_library_member(ir.name())}Client",
+        (FidlClient,),
+        properties,
+    )
 
 
 def get_fidl_method_response_payload_ident(ir: Method, root_ir) -> str:
@@ -1196,3 +1207,9 @@ class FIDLLibraryModule(ModuleType):
         setattr(t, "encode", encode_func)
         setattr(self, t.__name__, t)
         self.__all__.append(t.__name__)
+
+        if issubclass(t, ProtocolBase):
+            for nested_class in [t.Client, t.Server, t.EventHandler]:
+                setattr(nested_class, "__module__", self.fullname)
+                setattr(self, nested_class.__name__, nested_class)
+                self.__all__.append(nested_class.__name__)

@@ -45,7 +45,7 @@ class FidlClient(object):
         )
 
     def __str__(self):
-        return f"client:{self.__name__}:{self.id}"
+        return f"client:{type(self).__name__}:{self.id}"
 
     def __del__(self):
         _LOGGER.debug(f"{self} closing")
@@ -273,7 +273,7 @@ class EventHandlerBase(object):
         self.client.channel_waker.register(self.client.channel)
 
     def __str__(self):
-        return f"event:{self.client.__name__}:{self.client.id}"
+        return f"event:{type(self.client).__name__}:{self.client.id}"
 
     async def serve(self):
         while True:

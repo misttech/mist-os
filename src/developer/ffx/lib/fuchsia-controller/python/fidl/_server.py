@@ -33,7 +33,7 @@ class ServerBase(object):
     method_map: typing.Dict[Ordinal, MethodInfo] = {}
 
     def __str__(self):
-        return f"server:{self.__name__}:{self.id}"
+        return f"server:{type(self).__name__}:{self.id}"
 
     def __init__(self, channel: fc.Channel, channel_waker=None):
         global _SERVER_ID
