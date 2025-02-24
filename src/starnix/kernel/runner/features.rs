@@ -190,7 +190,7 @@ pub fn parse_features(
     structured_config: &starnix_kernel_structured_config::Config,
 ) -> Result<Features, Error> {
     let mut features = Features::default();
-    for entry in &config.features {
+    for entry in &config.program.features {
         let (raw_flag, raw_args) =
             entry.split_once(':').map(|(f, a)| (f, Some(a.to_string()))).unwrap_or((entry, None));
         match (raw_flag, raw_args) {
@@ -259,8 +259,8 @@ pub fn parse_features(
         features.kernel.enable_visual_debugging = true;
     }
 
-    features.kernel.default_uid = config.default_uid;
-    features.kernel.default_seclabel = config.default_seclabel.clone();
+    features.kernel.default_uid = config.program.default_uid.0;
+    features.kernel.default_seclabel = config.program.default_seclabel.clone();
 
     Ok(features)
 }
