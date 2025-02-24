@@ -116,8 +116,6 @@ void DisplayManager::OnDisplaysChanged(
         [[maybe_unused]] fidl::OneWayStatus set_display_mode_result =
             default_display_coordinator_->sync()->SetDisplayMode(display.id,
                                                                  display.modes[mode_index]);
-        [[maybe_unused]] fidl::OneWayStatus apply_config_result =
-            default_display_coordinator_->sync()->ApplyConfig();
       }
 
       const fuchsia_hardware_display_types::wire::Mode& mode = display.modes[mode_index];
