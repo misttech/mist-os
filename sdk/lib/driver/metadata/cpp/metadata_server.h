@@ -152,17 +152,19 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
       client.Bind(std::move(result.value()));
     }
 
-    fidl::WireResult<fuchsia_driver_metadata::Metadata::GetMetadata> result = client->GetMetadata();
+    fidl::WireResult<fuchsia_driver_metadata::Metadata::GetPersistedMetadata> result =
+        client->GetPersistedMetadata();
     if (!result.ok()) {
-      FDF_SLOG(ERROR, "Failed to send GetMetadata request.", KV("status", result.status_string()));
+      FDF_SLOG(ERROR, "Failed to send GetPersistedMetadata request.",
+               KV("status", result.status_string()));
       return zx::error(result.status());
     }
     if (result->is_error()) {
-      FDF_SLOG(ERROR, "Failed to get metadata.",
+      FDF_SLOG(ERROR, "Failed to get persisted metadata.",
                KV("status", zx_status_get_string(result->error_value())));
       return result->take_error();
     }
-    cpp20::span<uint8_t> persisted_metadata = result.value()->metadata.get();
+    cpp20::span<uint8_t> persisted_metadata = result.value()->persisted_metadata.get();
     std::vector<uint8_t> copy;
     copy.insert(copy.begin(), persisted_metadata.begin(), persisted_metadata.end());
     persisted_metadata_.emplace(std::move(copy));
@@ -202,9 +204,9 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
 
  private:
   // fuchsia.driver.metadata/Metadata protocol implementation.
-  void GetMetadata(GetMetadataCompleter::Sync& completer) override {
+  void GetPersistedMetadata(GetPersistedMetadataCompleter::Sync& completer) override {
     if (!persisted_metadata_.has_value()) {
-      FDF_LOG(ERROR, "Metadata not set. Set metadata with SetMetadata() or ForwardMetadata()");
+      FDF_LOG(WARNING, "Metadata not set");
       completer.ReplyError(ZX_ERR_BAD_STATE);
       return;
     }

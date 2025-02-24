@@ -7,11 +7,11 @@ library fuchsia.driver.metadata;
 using zx;
 
 closed protocol Metadata {
-    /// Provide the serialized metadata stored by the driver. Expected usage sees the unserialized
-    /// metadata as some generic FIDL object. The actual type of the unserialzied metadata is
-    /// decided outside of this method.
-    strict GetMetadata() -> (struct {
-        metadata vector<uint8>:MAX;
+    /// Retrieve the persisted metadata provided by the server.
+    strict GetPersistedMetadata() -> (struct {
+        /// The persisted metadata. Assumed to be a persisted FIDL object. The actual type of the
+        /// FIDL object is decided outside of this function.
+        persisted_metadata vector<uint8>:MAX;
     }) error zx.Status;
 };
 

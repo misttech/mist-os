@@ -45,12 +45,12 @@ class MetadataServerTest : public gtest::TestLoopFixture {
     fidl::ServerBinding binding{dispatcher(), std::move(server), &metadata_server,
                                 fidl::kIgnoreBindingClosure};
     fidl::Client metadata_server_client{std::move(client), dispatcher()};
-    metadata_server_client->GetMetadata().Then(
+    metadata_server_client->GetPersistedMetadata().Then(
         [expected_metadata](
-            fidl::Result<fuchsia_driver_metadata::Metadata::GetMetadata>& response) {
+            fidl::Result<fuchsia_driver_metadata::Metadata::GetPersistedMetadata>& response) {
           ASSERT_TRUE(response.is_ok());
           fit::result persisted_metadata =
-              fidl::Unpersist<fuchsia_hardware_test::Metadata>(response->metadata());
+              fidl::Unpersist<fuchsia_hardware_test::Metadata>(response->persisted_metadata());
           ASSERT_TRUE(persisted_metadata.is_ok());
           ASSERT_EQ(persisted_metadata.value(), expected_metadata);
         });

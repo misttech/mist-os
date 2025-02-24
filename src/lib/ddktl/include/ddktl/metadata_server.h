@@ -67,18 +67,19 @@ zx::result<FidlType> GetMetadata(
     client.Bind(std::move(result.value()));
   }
 
-  fidl::WireResult metadata_bytes = client->GetMetadata();
-  if (!metadata_bytes.ok()) {
-    zxlogf(ERROR, "Failed to send GetMetadata request: %s", metadata_bytes.status_string());
-    return zx::error(metadata_bytes.status());
+  fidl::WireResult persisted_metadata = client->GetPersistedMetadata();
+  if (!persisted_metadata.ok()) {
+    zxlogf(ERROR, "Failed to send GetMetadata request: %s", persisted_metadata.status_string());
+    return zx::error(persisted_metadata.status());
   }
-  if (metadata_bytes->is_error()) {
-    zxlogf(ERROR, "Failed to get metadata bytes: %s",
-           zx_status_get_string(metadata_bytes->error_value()));
-    return zx::error(metadata_bytes->error_value());
+  if (persisted_metadata->is_error()) {
+    zxlogf(ERROR, "Failed to get persisted metadata: %s",
+           zx_status_get_string(persisted_metadata->error_value()));
+    return zx::error(persisted_metadata->error_value());
   }
 
-  fit::result metadata = fidl::Unpersist<FidlType>(metadata_bytes.value()->metadata.get());
+  fit::result metadata =
+      fidl::Unpersist<FidlType>(persisted_metadata.value()->persisted_metadata.get());
   if (metadata.is_error()) {
     zxlogf(ERROR, "Failed to unpersist metadata: %s",
            zx_status_get_string(metadata.error_value().status()));
@@ -115,18 +116,20 @@ zx::result<std::optional<FidlType>> GetMetadataIfExists(
 
   fidl::WireSyncClient<fuchsia_driver_metadata::Metadata> client{std::move(endpoints->client)};
 
-  fidl::WireResult metadata_bytes = client->GetMetadata();
-  if (!metadata_bytes.ok()) {
-    zxlogf(DEBUG, "Failed to send GetMetadata request: %s", metadata_bytes.status_string());
+  fidl::WireResult persisted_metadata = client->GetPersistedMetadata();
+  if (!persisted_metadata.ok()) {
+    zxlogf(DEBUG, "Failed to send GetPersistedMetadata request: %s",
+           persisted_metadata.status_string());
     return zx::ok(std::nullopt);
   }
-  if (metadata_bytes->is_error()) {
-    zxlogf(ERROR, "Failed to get metadata bytes: %s",
-           zx_status_get_string(metadata_bytes->error_value()));
-    return zx::error(metadata_bytes->error_value());
+  if (persisted_metadata->is_error()) {
+    zxlogf(ERROR, "Failed to get persisted metadata: %s",
+           zx_status_get_string(persisted_metadata->error_value()));
+    return zx::error(persisted_metadata->error_value());
   }
 
-  fit::result metadata = fidl::Unpersist<FidlType>(metadata_bytes.value()->metadata.get());
+  fit::result metadata =
+      fidl::Unpersist<FidlType>(persisted_metadata.value()->persisted_metadata.get());
   if (metadata.is_error()) {
     zxlogf(ERROR, "Failed to unpersist metadata: %s",
            zx_status_get_string(metadata.error_value().status()));
@@ -204,7 +207,7 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
       zxlogf(ERROR, "Failed to persist metadata: %s", encoded.error_value().status_string());
       return encoded.error_value().status();
     }
-    encoded_metadata_.emplace(encoded.value());
+    persisted_metadata_.emplace(encoded.value());
 
     return ZX_OK;
   }
@@ -226,20 +229,20 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
       client.Bind(std::move(result.value()));
     }
 
-    fidl::WireResult result = client->GetMetadata();
+    fidl::WireResult result = client->GetPersistedMetadata();
     if (!result.ok()) {
-      zxlogf(ERROR, "Failed to send GetMetadata request: %s", result.status_string());
+      zxlogf(ERROR, "Failed to send GetPersistedMetadata request: %s", result.status_string());
       return result.status();
     }
     if (result->is_error()) {
-      zxlogf(ERROR, "Failed to get metadata bytes: %s",
+      zxlogf(ERROR, "Failed to get persisted metadata: %s",
              zx_status_get_string(result->error_value()));
       return result->error_value();
     }
-    cpp20::span<uint8_t> metadata = result.value()->metadata.get();
+    cpp20::span<uint8_t> metadata = result.value()->persisted_metadata.get();
     std::vector<uint8_t> copy;
     copy.insert(copy.begin(), metadata.begin(), metadata.end());
-    encoded_metadata_.emplace(std::move(copy));
+    persisted_metadata_.emplace(std::move(copy));
 
     return ZX_OK;
   }
@@ -267,20 +270,20 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
 
  private:
   // fuchsia.driver.metadata/Metadata protocol implementation.
-  void GetMetadata(GetMetadataCompleter::Sync& completer) override {
-    if (!encoded_metadata_.has_value()) {
+  void GetPersistedMetadata(GetPersistedMetadataCompleter::Sync& completer) override {
+    if (!persisted_metadata_.has_value()) {
       zxlogf(ERROR, "Metadata not set. Set metadata with SetMetadata() or ForwardMetadata().");
       completer.ReplyError(ZX_ERR_BAD_STATE);
       return;
     }
-    completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(encoded_metadata_.value()));
+    completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(persisted_metadata_.value()));
   }
 
   fidl::ServerBindingGroup<fuchsia_driver_metadata::Metadata> bindings_;
 
   // Encoded metadata that will be served in this instance's fuchsia.driver.metadata/Metadata
   // protocol.
-  std::optional<std::vector<uint8_t>> encoded_metadata_;
+  std::optional<std::vector<uint8_t>> persisted_metadata_;
 
   // Name of the instance directory that will serve this instance's fuchsia.driver.metadata/Service
   // service.
