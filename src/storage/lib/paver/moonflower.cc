@@ -328,16 +328,18 @@ class MoonflowerAbrManager : public MoonflowerAbrManagerInterface {
     // Check that all of the new partitions have the same type GUID (inactive_type_guid) and have a
     // corresponding old partition, and then swap the type GUIDs.
     for (const auto& [part_name, new_part] : new_partitions) {
-      if (new_part.metadata.type_guid != inactive_type_guid) {
-        ERROR("Partition type GUID mismatch: %s partition has type %s (expected %s)\n",
-              part_name.c_str(), new_part.metadata.type_guid.ToString().c_str(),
-              inactive_type_guid.ToString().c_str());
-        return zx::error(ZX_ERR_BAD_STATE);
-      }
       auto old_part = old_partitions.find(part_name);
       if (old_part == old_partitions.end()) {
         ERROR("Failed to find corresponding %s partition.\n", part_name.c_str());
         return zx::error(ZX_ERR_BAD_STATE);
+      }
+      if (new_part.metadata.type_guid != inactive_type_guid) {
+        // Make note if the device has mixed partition type GUID assignment
+        // (https://fxbug.dev/397766186).
+        ERROR("%s partition has type GUID %s (expected %s)\n", part_name.c_str(),
+              new_part.metadata.type_guid.ToString().c_str(),
+              inactive_type_guid.ToString().c_str());
+        continue;
       }
       const Uuid& active_type_guid = old_part->second.metadata.type_guid;
 
@@ -528,9 +530,9 @@ class MoonflowerLegacyAbrManager : public MoonflowerAbrManagerInterface {
 
     // Check that all of the new partitions have the same type GUID and have a corresponding old
     // partition.
-    const std::unordered_map<std::string, gpt_partition_t*>& new_partitions =
+    std::unordered_map<std::string, gpt_partition_t*>& new_partitions =
         new_slot_is_b ? b_partitions : a_partitions;
-    const std::unordered_map<std::string, gpt_partition_t*>& old_partitions =
+    std::unordered_map<std::string, gpt_partition_t*>& old_partitions =
         new_slot_is_b ? a_partitions : b_partitions;
     auto iter = new_partitions.find("boot");
     if (iter == new_partitions.end()) {
@@ -541,16 +543,17 @@ class MoonflowerLegacyAbrManager : public MoonflowerAbrManagerInterface {
     memcpy(type_guid, iter->second->type, GPT_GUID_LEN);
     bool abort = false;
     for (const auto& [part_name, part_entry] : new_partitions) {
-      if (memcmp(part_entry->type, type_guid, GPT_GUID_LEN) != 0) {
-        ERROR("Partition type GUID mismatch: %s partition has type %s (expected %s)\n",
-              part_name.c_str(), Uuid(part_entry->type).ToString().c_str(),
-              Uuid(type_guid).ToString().c_str());
-        abort = true;
-      }
       auto iter = old_partitions.find(part_name);
       if (iter == old_partitions.end()) {
         ERROR("Failed to find corresponding %s partition.\n", part_name.c_str());
         abort = true;
+      }
+      if (memcmp(part_entry->type, type_guid, GPT_GUID_LEN) != 0) {
+        // Make note if the device has mixed partition type GUID assignment
+        // (https://fxbug.dev/397766186).
+        ERROR("%s partition has type GUID %s (expected %s)\n", part_name.c_str(),
+              Uuid(part_entry->type).ToString().c_str(), Uuid(type_guid).ToString().c_str());
+        old_partitions.erase(part_name);
       }
     }
     if (abort) {
@@ -558,12 +561,12 @@ class MoonflowerLegacyAbrManager : public MoonflowerAbrManagerInterface {
       return zx::error(ZX_ERR_BAD_STATE);
     }
 
-    // Swap the A/B partition type GUIDs.
-    for (const auto& [a_part_name, a_part_entry] : a_partitions) {
-      gpt_partition_t* b_part_entry = b_partitions[a_part_name];
-      memcpy(type_guid, a_part_entry->type, GPT_GUID_LEN);
-      memcpy(a_part_entry->type, b_part_entry->type, GPT_GUID_LEN);
-      memcpy(b_part_entry->type, type_guid, GPT_GUID_LEN);
+    // Swap the old and new partition type GUIDs.
+    for (const auto& [old_part_name, old_part_entry] : old_partitions) {
+      gpt_partition_t* new_part_entry = new_partitions[old_part_name];
+      memcpy(type_guid, old_part_entry->type, GPT_GUID_LEN);
+      memcpy(old_part_entry->type, new_part_entry->type, GPT_GUID_LEN);
+      memcpy(new_part_entry->type, type_guid, GPT_GUID_LEN);
     }
     return zx::ok();
   }

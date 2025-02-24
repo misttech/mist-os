@@ -282,6 +282,7 @@ class MoonflowerAbrClientTest : public CurrentSlotUuidTest {
   static constexpr uint8_t kFvmType[GPT_GUID_LEN] = GPT_FVM_TYPE_GUID;
   static constexpr uint8_t kVbMetaType[GPT_GUID_LEN] = GPT_VBMETA_ABR_TYPE_GUID;
   static constexpr uint8_t kBootloaderType[GPT_GUID_LEN] = GPT_BOOTLOADER_ABR_TYPE_GUID;
+  static constexpr uint8_t kFactoryType[GPT_GUID_LEN] = GPT_FACTORY_TYPE_GUID;
 
   IsolatedDevmgr::Args DevmgrArgs() override {
     IsolatedDevmgr::Args args;
@@ -300,6 +301,8 @@ class MoonflowerAbrClientTest : public CurrentSlotUuidTest {
         PartitionDescription{"super", uuid::Uuid(kFvmType), 0x24, 0x1},
         PartitionDescription{"vbmeta_a", uuid::Uuid(kVbMetaType), 0x25, 0x1},
         PartitionDescription{"vbmeta_b", uuid::Uuid(kBootloaderType), 0x26, 0x1},
+        PartitionDescription{"flipped_guid_a", uuid::Uuid(kBootloaderType), 0x27, 0x1},
+        PartitionDescription{"flipped_guid_b", uuid::Uuid(kFactoryType), 0x28, 0x1},
     }));
 
     zx::result devices = CreateBlockDevices();
@@ -380,6 +383,8 @@ void MoonflowerAbrClientTest::MoonflowerTest() {
   ASSERT_NO_FATAL_FAILURE(CheckPartitionState(2, "super", kFvmType, &attributes));
   ASSERT_NO_FATAL_FAILURE(CheckPartitionState(3, "vbmeta_a", kVbMetaType, &attributes));
   ASSERT_NO_FATAL_FAILURE(CheckPartitionState(4, "vbmeta_b", kBootloaderType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(5, "flipped_guid_a", kBootloaderType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(6, "flipped_guid_b", kFactoryType, &attributes));
 
   ASSERT_OK(abr_client_->MarkSlotActive(kAbrSlotIndexB));
   AbrClientFlush();
@@ -399,6 +404,8 @@ void MoonflowerAbrClientTest::MoonflowerTest() {
   ASSERT_NO_FATAL_FAILURE(CheckPartitionState(2, "super", kFvmType, &attributes));
   ASSERT_NO_FATAL_FAILURE(CheckPartitionState(3, "vbmeta_a", kBootloaderType, &attributes));
   ASSERT_NO_FATAL_FAILURE(CheckPartitionState(4, "vbmeta_b", kVbMetaType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(5, "flipped_guid_a", kBootloaderType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(6, "flipped_guid_b", kFactoryType, &attributes));
 
   ASSERT_OK(abr_client_->MarkSlotSuccessful(kAbrSlotIndexB));
   AbrClientFlush();
@@ -418,6 +425,8 @@ void MoonflowerAbrClientTest::MoonflowerTest() {
   ASSERT_NO_FATAL_FAILURE(CheckPartitionState(2, "super", kFvmType, &attributes));
   ASSERT_NO_FATAL_FAILURE(CheckPartitionState(3, "vbmeta_a", kBootloaderType, &attributes));
   ASSERT_NO_FATAL_FAILURE(CheckPartitionState(4, "vbmeta_b", kVbMetaType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(5, "flipped_guid_a", kBootloaderType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(6, "flipped_guid_b", kFactoryType, &attributes));
 
   ASSERT_OK(abr_client_->MarkSlotActive(kAbrSlotIndexA));
   AbrClientFlush();
@@ -437,6 +446,8 @@ void MoonflowerAbrClientTest::MoonflowerTest() {
   ASSERT_NO_FATAL_FAILURE(CheckPartitionState(2, "super", kFvmType, &attributes));
   ASSERT_NO_FATAL_FAILURE(CheckPartitionState(3, "vbmeta_a", kVbMetaType, &attributes));
   ASSERT_NO_FATAL_FAILURE(CheckPartitionState(4, "vbmeta_b", kBootloaderType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(5, "flipped_guid_a", kFactoryType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(6, "flipped_guid_b", kBootloaderType, &attributes));
 
   ASSERT_OK(abr_client_->MarkSlotSuccessful(kAbrSlotIndexA));
   AbrClientFlush();
@@ -456,6 +467,8 @@ void MoonflowerAbrClientTest::MoonflowerTest() {
   ASSERT_NO_FATAL_FAILURE(CheckPartitionState(2, "super", kFvmType, &attributes));
   ASSERT_NO_FATAL_FAILURE(CheckPartitionState(3, "vbmeta_a", kVbMetaType, &attributes));
   ASSERT_NO_FATAL_FAILURE(CheckPartitionState(4, "vbmeta_b", kBootloaderType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(5, "flipped_guid_a", kFactoryType, &attributes));
+  ASSERT_NO_FATAL_FAILURE(CheckPartitionState(6, "flipped_guid_b", kBootloaderType, &attributes));
 }
 
 class MoonflowerAbrClientWithStorageHostTest : public MoonflowerAbrClientTest {
