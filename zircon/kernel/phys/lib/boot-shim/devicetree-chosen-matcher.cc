@@ -30,7 +30,18 @@ devicetree::ScanState DevicetreeChosenNodeMatcherBase::HandleTtyNode(
     return devicetree::ScanState::kActive;
   }
 
-  if (!uart_matcher_(decoder)) {
+  auto compatible_list = compatible->AsStringList();
+  if (!compatible_list) {
+    return devicetree::ScanState::kActive;
+  }
+
+  // Verify that the `tty.type` has the right prefix, vendor.
+  bool possible_tty =
+      tty_->vendor.empty() || std::ranges::any_of(*compatible_list, [this](std::string_view entry) {
+        return entry.starts_with(tty_->vendor);
+      });
+
+  if (!possible_tty || !uart_matcher_(decoder)) {
     return devicetree::ScanState::kActive;
   }
 

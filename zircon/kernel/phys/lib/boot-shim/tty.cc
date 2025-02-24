@@ -22,6 +22,22 @@ constexpr std::string_view kAmlType = "AML";
 constexpr std::string_view kMsmType = "MSM";
 constexpr std::string_view kConsoleArg = "console=";
 
+constexpr std::string_view TtyVendor(TtyType type) {
+  switch (type) {
+    case boot_shim::TtyType::kAny:
+    case boot_shim::TtyType::kSerial:
+      return "";
+
+    case boot_shim::TtyType::kMsm:
+      return "qcom";
+
+    case boot_shim::TtyType::kAml:
+      return "amlogic";
+  }
+
+  __UNREACHABLE;
+}
+
 }  // namespace
 
 std::optional<Tty> TtyFromCmdline(std::string_view cmdline) {
@@ -67,7 +83,7 @@ std::optional<Tty> TtyFromCmdline(std::string_view cmdline) {
     return std::nullopt;
   }
 
-  return Tty{.type = type, .index = static_cast<size_t>(*index)};
+  return Tty{.type = type, .index = static_cast<size_t>(*index), .vendor = TtyVendor(type)};
 }
 
 }  // namespace boot_shim
