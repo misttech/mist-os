@@ -50,7 +50,6 @@ fuchsia_product(
     name = "image.x64",
     board_config = "//boards:x64",
     legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
-    legacy_bundle_must_be_empty = True,
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config",
 )
@@ -82,7 +81,6 @@ fuchsia_product(
     name = "image.arm64",
     board_config = "//boards:arm64",
     legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
-    legacy_bundle_must_be_empty = True,
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config",
 )
@@ -114,7 +112,6 @@ fuchsia_product(
     name = "image.vim3",
     board_config = "//boards:vim3",
     legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
-    legacy_bundle_must_be_empty = True,
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config",
 )
@@ -140,7 +137,6 @@ fuchsia_product(
     name = "image.emac",
     board_config = "//boards/emac",
     legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
-    legacy_bundle_must_be_empty = True,
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config",
 )
@@ -165,7 +161,6 @@ fuchsia_product(
     name = "image.riscv64",
     board_config = "//boards:riscv64",
     legacy_bundle = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
-    legacy_bundle_must_be_empty = True,
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_config",
 )
