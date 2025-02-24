@@ -34,6 +34,10 @@ import("//build/python/python_action.gni")
 #   product_bundle_name (optional; default = target_name)
 #     [str] The name of the product bundle to assign the tests to.
 #
+#   environments (optional; default = [])
+#     [list of scopes] The environments to run these tests on.
+#     See //docs/contribute/testing/environments.md.
+#
 template("product_bundle_test_group") {
   assert(defined(invoker.tests), "tests is a required parameter")
 
@@ -54,6 +58,11 @@ template("product_bundle_test_group") {
     _product_bundle_name = invoker.product_bundle_name
   }
 
+  _environments = []
+  if (defined(invoker.environments)) {
+    _environments = invoker.environments
+  }
+
   _tests_json = "${target_out_dir}/${target_name}/tests.json"
 
   generated_file(target_name) {
@@ -69,6 +78,7 @@ template("product_bundle_test_group") {
       pb_test_groups = [
         {
           product_bundle_name = _product_bundle_name
+          environments = _environments
           tests_json = rebase_path(_tests_json, root_build_dir)
         },
       ]

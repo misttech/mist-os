@@ -55,15 +55,19 @@ def build_tests_json(build_dir: Path) -> T.Set[Path]:
     # test.
     for test_group in test_groups:
         product_bundle_name = test_group["product_bundle_name"]
+        environments = test_group.get("environments", [])
         product_bundle_tests_file = build_dir / test_group["tests_json"]
         # Read the tests.json that is assigned to this specific product bundle.
         with open(product_bundle_tests_file, "r") as inner_tests_json:
             product_bundle_tests = json.load(inner_tests_json)
-        # Update the test spec to include the product bundle target.
+        # Update the test spec to include the product bundle target and
+        # environments.
         for test in product_bundle_tests:
             name = test["test"]["name"] + "-" + product_bundle_name
             test["test"]["name"] = name
             test["product_bundle"] = product_bundle_name
+            if environments:
+                test["environments"] = environments
         tests += product_bundle_tests
 
     # Write the final list of tests to tests.json if the contents changed.

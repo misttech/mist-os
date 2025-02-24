@@ -57,7 +57,7 @@ class BuildTestsJsonTest(unittest.TestCase):
 
         return (inputs, tests)
 
-    def test_only_tests_from_metadata(self):
+    def test_only_tests_from_metadata_no_environments(self):
         tests_from_metadata = [
             {"test": {"name": "test1"}},
             {"test": {"name": "test2"}},
@@ -92,16 +92,29 @@ class BuildTestsJsonTest(unittest.TestCase):
         tests_json_path = self.build_dir / "pb_tests.json"
         tests_json_path.write_text(tests_json)
 
+        env = {"dimensions": {"device_type": "Vim3"}}
         test_groups = [
-            {"product_bundle_name": "my_pb", "tests_json": str(tests_json_path)}
+            {
+                "product_bundle_name": "my_pb",
+                "environments": [env],
+                "tests_json": str(tests_json_path),
+            }
         ]
         (_, tests) = self._test(tests_from_metadata, test_groups)
 
         expected_tests_json = [
             {"test": {"name": "test1"}},
             {"test": {"name": "test2"}},
-            {"product_bundle": "my_pb", "test": {"name": "test1-my_pb"}},
-            {"product_bundle": "my_pb", "test": {"name": "test2-my_pb"}},
+            {
+                "product_bundle": "my_pb",
+                "environments": [env],
+                "test": {"name": "test1-my_pb"},
+            },
+            {
+                "product_bundle": "my_pb",
+                "environments": [env],
+                "test": {"name": "test2-my_pb"},
+            },
         ]
         self.assertEqual(expected_tests_json, tests)
 
