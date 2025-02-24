@@ -63,9 +63,6 @@ template("fidl_library") {
   assert(defined(invoker.sources), "sources is required")
   assert(defined(invoker.library_name), "library_name is required")
   assert(defined(invoker.fidl_ir_json), "fidl_ir_json is required")
-  assert(!(defined(invoker.stable) && invoker.stable == false &&
-               defined(invoker.versioned)),
-         "`stable` must not be `false` when `versioned` is specified")
   assert(!defined(invoker.available) ||
              (defined(invoker.testonly) && invoker.testonly),
          "the `available` parameter is only allowed on `testonly` libraries")
@@ -189,8 +186,14 @@ template("fidl_library") {
       "Libraries that require compatibility tests or are publishable in an IDK must be in an allowlist to ensure they are compatibility tested and included in the IDK.")
 
   assert(
-      requires_compatibility_tests == defined(invoker.stable),
+      requires_compatibility_tests == defined(invoker.stable) ||
+          is_unversioned_vendor_sdk,
       "`stable` must be specified if and only if `sdk_category` is specified.")
+
+  assert(
+      !(defined(invoker.stable) && invoker.stable == false &&
+            defined(invoker.versioned) && invoker.versioned != "unversioned"),
+      "`stable` must not be `false` when `versioned` is specified")
 
   is_stable = defined(invoker.stable) && invoker.stable
 
