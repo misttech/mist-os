@@ -12,9 +12,18 @@ import sys
 import typing
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import List, Tuple
+from types import NoneType, UnionType
+from typing import List, Optional, Tuple, Union
 
 import fuchsia_controller_py as fc
+
+_ZX_TYPES = [
+    "zx.handle",
+    "zx.channel",
+    "zx.socket",
+    "zx.event",
+]
+
 
 # These can be updated to use TypeAlias when python is updated to 3.10+
 TXID_Type = int
@@ -75,8 +84,8 @@ class FrameworkError(IntEnum):
 @dataclass
 class GenericResult:
     fidl_type: str
-    response: typing.Optional[object] = None
-    err: typing.Optional[object] = None
+    response: Optional[object] = None
+    err: Optional[object] = None
     framework_err: FrameworkError | None = None
 
     @property
@@ -145,8 +154,14 @@ def construct_response_object(
     return obj
 
 
-def unwrap_type(ty):
+def unwrap_innermost_type(
+    ty: type, globalns=None, localns=None, _original_ty: type | None = None
+) -> type:
     """Takes a type `ty`, then removes the meta-typing surrounding it.
+
+    This function recursively removes meta-typing and *DOES NOT* support multiple type arguments at
+    at any level of recursion. For example, calling this function on the type `tuple[int, str]` will
+    raise an AssertionError.
 
     Args:
       ty: a Python type.
@@ -154,17 +169,64 @@ def unwrap_type(ty):
     Returns:
         The Python type after removing indirection.
 
-    This is because when a user imports fidl.[foo_library], they may import a recursive type, which
-    cannot be defined at runtime. This will then return an actual type (since everything will be
-    resolvable at this point).
+    This is because FIDL libraries may include recursive types, and resolving them must be deferred
+    to the moment of encoding and decoding after all libraries have been loaded.
     """
-    while True:
+    # Keep the original type unwrap_innermost_type was called with for a better exception message.
+    if _original_ty is None:
+        _original_ty = ty
+
+    # ForwardRef of a _ZX_TYPE
+    if isinstance(ty, typing.ForwardRef) and ty.__forward_arg__ in _ZX_TYPES:
+        return int
+
+    # ForwardRef of any type
+    if isinstance(ty, typing.ForwardRef):
+        # TODO(https://fxbug.dev/396778959): This is a funny way to resolve a ForwardRef into
+        # its inner stringized type without a pulic Python API that directly does the
+        # resolution. In newer versions of Python, ForwardRef will gain an evaluate() method to
+        # simplify this. (This effectively stabilizes the existing private _evaluate() method in
+        # Python 3.11.)
+        def _f() -> ty:
+            pass
+
         try:
-            ty = typing.get_args(ty)[0]
-        except IndexError:
-            if ty.__class__ is typing.ForwardRef:
-                return ty.__forward_arg__
-            return ty
+            return unwrap_innermost_type(
+                typing.get_type_hints(_f, globalns=globalns, localns=localns)[
+                    "return"
+                ],
+                _original_ty=_original_ty,
+            )
+        except NameError as e:
+            e.add_note(f"Failed unwrapping a ForwardRef: {_original_ty}")
+            raise e
+
+    ty_args = typing.get_args(ty)
+
+    # Base Case. No more meta-typing exists.
+    if len(ty_args) == 0:
+        return ty
+
+    # Simple layer of meta-typing with a single type arguments.
+    if len(ty_args) == 1:
+        return unwrap_innermost_type(ty_args[0], _original_ty=_original_ty)
+
+    # Meta-typing layer that's effectively an Optional. The Optional type technically has two
+    # arguments, but unwrap_innermost_type discards the type(None).
+    if (
+        len(ty_args) == 2
+        and NoneType in ty_args
+        and (typing.get_origin(ty) in (Union, UnionType))
+    ):
+        ty_args = list(ty_args)
+        ty_args.remove(type(None))
+        return unwrap_innermost_type(ty_args[0], _original_ty=_original_ty)
+
+    # The meta-typing layer is not an Optional, not an instance of ForwardRef, and has multiple
+    # arguments.
+    raise RuntimeError(
+        f"Failed to remove meta-typing with multiple type arguments: {_original_ty}"
+    )
 
 
 def get_type_from_import(i):
@@ -187,22 +249,19 @@ def get_type_from_import(i):
 
 
 def construct_from_name_and_type(constructed_obj, sub_parsed_obj, name, ty):
-    unwrapped_ty = unwrap_type(ty)
-    handle_types = ["zx.handle", "zx.channel", "zx.socket", "zx.event"]
-    ty_str = str(unwrapped_ty)
-    if ty_str in handle_types or ty_str.endswith(".Server"):
-        setattr(constructed_obj, name, sub_parsed_obj)
-        return
     if sub_parsed_obj is None:
         setattr(constructed_obj, name, None)
         return
+
+    unwrapped_ty = unwrap_innermost_type(ty)
     unwrapped_module = unwrapped_ty.__module__
     if unwrapped_module.startswith("fidl."):
-        obj = get_type_from_import(
-            f"{unwrapped_module}.{unwrapped_ty.__name__}"
-        )
+        if str(unwrapped_ty).endswith("Server"):
+            setattr(constructed_obj, name, sub_parsed_obj)
+            return
+
         if isinstance(sub_parsed_obj, dict):
-            sub_obj = make_default_obj(obj)
+            sub_obj = make_default_obj(unwrapped_ty)
             construct_result(sub_obj, sub_parsed_obj)
             setattr(constructed_obj, name, sub_obj)
         elif isinstance(sub_parsed_obj, list):
@@ -213,7 +272,7 @@ def construct_from_name_and_type(constructed_obj, sub_parsed_obj, name, ty):
                     if isinstance(item, list):
                         results.append(handle_list(item))
                         continue
-                    sub_obj = make_default_obj(obj)
+                    sub_obj = make_default_obj(unwrapped_ty)
                     if item is None:
                         sub_obj = None
                     elif isinstance(sub_obj, enum.Enum):
@@ -245,7 +304,7 @@ def construct_result(constructed_obj, parsed_obj):
         # Since there is only one item for the union, no need to continue with iterating
         # elements.
         return
-    elements = type(constructed_obj).__annotations__
+    elements = inspect.get_annotations(type(constructed_obj), eval_str=True)
     for name, ty in elements.items():
         if parsed_obj.get(name) is None:
             setattr(constructed_obj, name, None)

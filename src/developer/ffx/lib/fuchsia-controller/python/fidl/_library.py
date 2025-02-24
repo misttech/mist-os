@@ -364,10 +364,10 @@ def fidl_import_to_library_path(name: str) -> str:
 def type_annotation(type_ir, root_ir, recurse_guard=None) -> type:
     """Attempts to turn a type's IR representation into a type annotation for class constructions."""
 
-    def wrap_optional(annotation):
+    def wrap_optional(annotation, module=None):
         try:
             if type(annotation) == str:
-                annotation = ForwardRef(annotation)
+                annotation = ForwardRef(annotation, module=module)
             if type_ir["nullable"]:
                 return Optional[annotation]
         except KeyError:
@@ -400,8 +400,11 @@ def type_annotation(type_ir, root_ir, recurse_guard=None) -> type:
                 )
             )
         elif type_ir["role"] == "server":
+            protocol = type_ir["protocol"]
+            module = fidl_ident_to_py_import(protocol)
             return wrap_optional(
-                fidl_ident_to_py_library_member(type_ir["protocol"]) + ".Server"
+                f"{fidl_ident_to_py_library_member(protocol)}.Server",
+                module=module,
             )
         else:
             raise TypeError(
@@ -1084,22 +1087,7 @@ def get_type_by_identifier(ident: str, loader_ir, recurse_guard=None) -> type:
     member_name = fidl_ident_to_py_library_member(ident)
     mod = load_fidl_module(fidl_ident_to_py_import(ident))
     if not hasattr(mod, member_name):
-        if recurse_guard is not None:
-            return ForwardRef(member_name)
-        # library.name/Ident for example.
-        ident = f"{fidl_import_to_fidl_library(mod.__fullname__)}/{member_name}"
-        # e.g. protocol, struct, union, etc.
-        ty = mod.__ir__.declaration(ident)
-        # IR for library.name/Ident
-        ty_decl = getattr(mod.__ir__, f"{ty}_decls")[ident]
-        ty_definition = globals()[f"{ty}_type"](
-            ty_decl, mod.__ir__, recurse_guard=True
-        )
-        if ty == "const":
-            # This line might not actually be possible to hit.
-            mod._export_const(ty_definition)
-        else:
-            mod._export_type(ty_definition)
+        return ForwardRef(f"{member_name}", module=mod.__name__)
     return getattr(mod, member_name)
 
 
@@ -1142,47 +1130,47 @@ class FIDLLibraryModule(ModuleType):
 
     def _export_protocols(self) -> None:
         for decl in self.__ir__.protocol_declarations():
-            if decl.name() not in self.__all__:
+            if fidl_ident_to_py_library_member(decl.name()) not in self.__all__:
                 self._export_type(protocol_type(decl, self.__ir__))
 
     def _export_structs(self) -> None:
         for decl in self.__ir__.struct_declarations():
-            if decl.name() not in self.__all__:
+            if fidl_ident_to_py_library_member(decl.name()) not in self.__all__:
                 self._export_type(struct_type(decl, self.__ir__))
 
     def _export_tables(self) -> None:
         for decl in self.__ir__.table_declarations():
-            if decl.name() not in self.__all__:
+            if fidl_ident_to_py_library_member(decl.name()) not in self.__all__:
                 self._export_type(table_type(decl, self.__ir__))
 
     def _export_experimental_resources(self) -> None:
         for decl in self.__ir__.experimental_resource_declarations():
-            if decl.name() not in self.__all__:
+            if fidl_ident_to_py_library_member(decl.name()) not in self.__all__:
                 self._export_type(experimental_resource_type(decl, self.__ir__))
 
     def _export_bits(self) -> None:
         for decl in self.__ir__.bits_declarations():
-            if decl.name() not in self.__all__:
+            if fidl_ident_to_py_library_member(decl.name()) not in self.__all__:
                 self._export_type(bits_type(decl))
 
     def _export_enums(self) -> None:
         for decl in self.__ir__.enum_declarations():
-            if decl.name() not in self.__all__:
+            if fidl_ident_to_py_library_member(decl.name()) not in self.__all__:
                 self._export_type(enum_type(decl))
 
     def _export_consts(self) -> None:
         for decl in self.__ir__.const_declarations():
-            if decl.name() not in self.__all__:
+            if fidl_ident_to_py_library_member(decl.name()) not in self.__all__:
                 self._export_fidl_const(const_declaration(decl, self.__ir__))
 
     def _export_aliases(self) -> None:
         for decl in self.__ir__.alias_declarations():
-            if decl.name() not in self.__all__:
+            if fidl_ident_to_py_library_member(decl.name()) not in self.__all__:
                 self._export_type(alias_declaration(decl, self.__ir__))
 
     def _export_unions(self) -> None:
         for decl in self.__ir__.union_declarations():
-            if decl.name() not in self.__all__:
+            if fidl_ident_to_py_library_member(decl.name()) not in self.__all__:
                 self._export_type(union_type(decl, self.__ir__))
 
     def _export_fidl_const(self, c: FIDLConstant) -> None:
