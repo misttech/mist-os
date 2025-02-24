@@ -3084,8 +3084,8 @@ template("_fuchsia_shared_library") {
       rust_barrier = []
 
       if (defined(invoker.crate_type)) {
-        rlib = [ "--extern=$crate_name=$_link_output_path" ]
-        searchdir = [ "-Ldependency=$_link_output_dir" ]
+        rlib = [ "--extern=${crate_name}=${_link_output_path}" ]
+        searchdir = [ "-Ldependency=${_link_output_dir}" ]
       }
     }
   }
@@ -3827,12 +3827,7 @@ template("rust_library") {
     _define_aux_deps = invoker.define_aux_deps && _define_aux_deps
   }
   if (_define_aux_deps) {
-    # Reuse the name (without .actual) defined in rustc_artifact.gni
-    if (defined(invoker.rust_auxiliary_name)) {
-      _rust_auxiliary_name = invoker.rust_auxiliary_name
-    } else {
-      _rust_auxiliary_name = "${target_name}.aux"
-    }
+    _rust_auxiliary_name = "${target_name}.aux"
     rust_aux_deps(_rust_auxiliary_name) {
       forward_variables_from(invoker,
                              [
@@ -3935,11 +3930,7 @@ template("rust_proc_macro") {
     }
     if (_define_aux_deps) {
       # Reuse the name (without .actual) defined in rustc_artifact.gni
-      if (defined(invoker.rust_auxiliary_name)) {
-        _rust_auxiliary_name = invoker.rust_auxiliary_name
-      } else {
-        _rust_auxiliary_name = "${target_name}.aux"
-      }
+      _rust_auxiliary_name = "${target_name}.aux"
       rust_aux_deps(_rust_auxiliary_name) {
         forward_variables_from(invoker,
                                [
