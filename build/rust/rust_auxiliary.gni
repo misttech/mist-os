@@ -32,7 +32,14 @@ template("rust_aux_deps") {
                            ])
     outputs = [ _deps_output ]
     visibility = [ ":*" ]
-    data_keys = [ "rlib" ]
+
+    # rust_rlib is a list of `--extern` flags [0] following the format expected
+    # by rustc. For example:
+    #
+    #   --extern=foo=path/to/libfoo.rlib
+    #
+    # [0] https://doc.rust-lang.org/rustc/command-line-arguments.html#--extern-specify-where-an-external-library-is-located
+    data_keys = [ "rust_rlib" ]
     walk_keys = [ "rust_barrier" ]
   }
 
@@ -63,7 +70,14 @@ template("rust_aux_deps") {
                              "testonly",
                            ])
     outputs = [ "${target_gen_dir}/${target_name}" ]
-    data_keys = [ "searchdir" ]
+
+    # rust_searchdir is a list of `-Ldependency` flags [0] following the format
+    # expected by rustc. For example:
+    #
+    #   -Ldependency=path/to/lib/dir
+    #
+    # [0] https://doc.rust-lang.org/rustc/command-line-arguments.html#-l-add-a-directory-to-the-library-search-path
+    data_keys = [ "rust_searchdir" ]
   }
 
   group(target_name) {

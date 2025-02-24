@@ -3084,8 +3084,8 @@ template("_fuchsia_shared_library") {
       rust_barrier = []
 
       if (defined(invoker.crate_type)) {
-        rlib = [ "--extern=${crate_name}=${_link_output_path}" ]
-        searchdir = [ "-Ldependency=${_link_output_dir}" ]
+        rust_rlib = [ "--extern=${crate_name}=${_link_output_path}" ]
+        rust_searchdir = [ "-Ldependency=${_link_output_dir}" ]
       }
     }
   }
@@ -3881,8 +3881,8 @@ template("rust_library") {
         forward_variables_from(invoker.metadata, "*")
       }
 
-      rlib = [ "--extern=${crate_name}=${_rlib_path}" ]
-      searchdir = [ "-Ldependency=${_searchdir_path}" ]
+      rust_rlib = [ "--extern=${crate_name}=${_rlib_path}" ]
+      rust_searchdir = [ "-Ldependency=${_searchdir_path}" ]
       rust_barrier = []
     }
   }
@@ -3979,8 +3979,8 @@ template("rust_proc_macro") {
         if (defined(invoker.metadata)) {
           forward_variables_from(invoker.metadata, "*")
         }
-        rlib = [ "--extern=${crate_name}=${_rlib_path}" ]
-        searchdir = [ "-Ldependency=${_searchdir_path}" ]
+        rust_rlib = [ "--extern=${crate_name}=${_rlib_path}" ]
+        rust_searchdir = [ "-Ldependency=${_searchdir_path}" ]
         rust_barrier = []
       }
     }
