@@ -10,6 +10,7 @@ use fho::{FfxMain, FfxTool};
 use fidl_fuchsia_diagnostics::{LogSettingsMarker, LogSettingsProxy, StreamParameters};
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
 use fidl_fuchsia_sys2::RealmQueryProxy;
+use futures::{select, FutureExt};
 use log_command::{
     dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, LogEntry, LogProcessingResult,
     LogSubCommand, Symbolize, Timestamp, WatchCommand, WriterContainer,
@@ -17,6 +18,7 @@ use log_command::{
 use std::io::Write;
 use target_connector::Connector;
 use target_holders::RemoteControlProxyHolder;
+use tokio::signal::ctrl_c;
 use transactional_symbolizer::{RealSymbolizerProcess, TransactionalSymbolizer};
 
 mod condition_variable;
@@ -97,8 +99,11 @@ where
     W: ToolIO<OutputItem = LogEntry> + Write + 'static,
 {
     let formatter = DefaultLogFormatter::<W>::new_from_args(&cmd, writer);
-    log_loop(cmd, formatter, symbolizer, rcs_connector, include_timestamp).await?;
-    Ok(())
+    let future = log_loop(cmd, formatter, symbolizer, rcs_connector, include_timestamp);
+    select! {
+        res = future.fuse() => res,
+        _ = ctrl_c().fuse() => Ok(()),
+    }
 }
 
 struct DeviceConnection {
