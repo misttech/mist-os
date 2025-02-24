@@ -61,10 +61,10 @@ pub fn __track_stub_inner(
     if *context_count == 0 {
         match flags {
             Some(flags) => {
-                log::warn!(tag = "track_stub", location:%; "{bug} {message}: 0x{flags:x}");
+                log::debug!(tag = "track_stub", location:%; "{bug} {message}: 0x{flags:x}");
             }
             None => {
-                log::warn!(tag = "track_stub", location:%; "{bug} {message}");
+                log::debug!(tag = "track_stub", location:%; "{bug} {message}");
             }
         }
     }
