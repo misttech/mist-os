@@ -86,7 +86,7 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, display:
   // configuration's list.
   bool draft_has_layer_list_change_ = false;
 
-  bool pending_apply_layer_change_;
+  bool pending_apply_layer_change_ = false;
   fbl::DoublyLinkedList<LayerNode*> draft_layers_;
   fbl::DoublyLinkedList<LayerNode*> applied_layers_;
 
