@@ -173,6 +173,10 @@ group("chrono-english") {
   public_deps = [ ":chrono-english-v0_1_7" ]
 }
 
+group("ciborium") {
+  public_deps = [ ":ciborium-v0_2_2" ]
+}
+
 group("cipher") {
   public_deps = [ ":cipher-v0_4_4" ]
 }
@@ -183,6 +187,12 @@ group("clap") {
 
 group("cmac") {
   public_deps = [ ":cmac-v0_7_2" ]
+}
+
+if (current_os == "fuchsia") {
+  group("coset") {
+    public_deps = [ ":coset-v0_3_8" ]
+  }
 }
 
 group("crc") {
@@ -896,6 +906,8 @@ group("serde") {
 
 group("serde_cbor") {
   public_deps = [ ":serde_cbor-v0_11_1" ]
+
+  visibility = serde_cbor_visibility
 }
 
 group("serde_derive") {
@@ -3404,6 +3416,98 @@ rust_library("chrono-english-v0_1_7") {
   applicable_licenses = [ ":chrono-english-v0_1_7.license" ]
 }
 
+license("ciborium-v0_2_2.license") {
+  public_package_name = "ciborium"
+  license_files = [ "//third_party/rust_crates/vendor/ciborium-0.2.2/LICENSE" ]
+}
+
+rust_library("ciborium-v0_2_2") {
+  crate_name = "ciborium"
+  crate_root = "//third_party/rust_crates/vendor/ciborium-0.2.2/src/lib.rs"
+  output_name = "ciborium-7e1de1763b824327"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":ciborium-io-v0_2_2" ]
+  deps += [ ":ciborium-ll-v0_2_2" ]
+  deps += [ ":serde-v1_0_204" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=7e1de1763b824327",
+    "-Cextra-filename=-7e1de1763b824327",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":ciborium-v0_2_2.license" ]
+}
+
+license("ciborium-io-v0_2_2.license") {
+  public_package_name = "ciborium_io"
+  license_files =
+      [ "//third_party/rust_crates/vendor/ciborium-io-0.2.2/LICENSE" ]
+}
+
+rust_library("ciborium-io-v0_2_2") {
+  crate_name = "ciborium_io"
+  crate_root = "//third_party/rust_crates/vendor/ciborium-io-0.2.2/src/lib.rs"
+  output_name = "ciborium_io-a1b8048999aec10a"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=a1b8048999aec10a",
+    "-Cextra-filename=-a1b8048999aec10a",
+    "--cfg=feature=\"alloc\"",
+    "--cfg=feature=\"std\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":ciborium-io-v0_2_2.license" ]
+}
+
+license("ciborium-ll-v0_2_2.license") {
+  public_package_name = "ciborium_ll"
+  license_files =
+      [ "//third_party/rust_crates/vendor/ciborium-ll-0.2.2/LICENSE" ]
+}
+
+rust_library("ciborium-ll-v0_2_2") {
+  crate_name = "ciborium_ll"
+  crate_root = "//third_party/rust_crates/vendor/ciborium-ll-0.2.2/src/lib.rs"
+  output_name = "ciborium_ll-b367e15c516de259"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":ciborium-io-v0_2_2" ]
+  deps += [ ":half-v2_4_1" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=b367e15c516de259",
+    "-Cextra-filename=-b367e15c516de259",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":ciborium-ll-v0_2_2.license" ]
+}
+
 license("cipher-v0_4_4.license") {
   public_package_name = "cipher"
   license_files = [
@@ -3707,6 +3811,37 @@ rust_library("core-foundation-sys-v0_8_3") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":core-foundation-sys-v0_8_3.license" ]
+}
+
+license("coset-v0_3_8.license") {
+  public_package_name = "coset"
+  license_files = [ "//third_party/rust_crates/vendor/coset-0.3.8/LICENSE" ]
+}
+
+rust_library("coset-v0_3_8") {
+  crate_name = "coset"
+  crate_root = "//third_party/rust_crates/vendor/coset-0.3.8/src/lib.rs"
+  output_name = "coset-c7a9d80a17a336b0"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":ciborium-io-v0_2_2" ]
+  deps += [ ":ciborium-v0_2_2" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=c7a9d80a17a336b0",
+    "-Cextra-filename=-c7a9d80a17a336b0",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":coset-v0_3_8.license" ]
 }
 
 license("cpufeatures-v0_2_1.license") {
@@ -4146,6 +4281,35 @@ rust_library("crossterm_winapi-v0_7_0") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ "//build/licenses:fuchsia_license" ]
+}
+
+license("crunchy-v0_2_3.license") {
+  public_package_name = "crunchy"
+  license_files = [ "//third_party/rust_crates/vendor/crunchy-0.2.3/LICENSE" ]
+}
+
+rust_library("crunchy-v0_2_3") {
+  crate_name = "crunchy"
+  crate_root = "//third_party/rust_crates/vendor/crunchy-0.2.3/src/lib.rs"
+  output_name = "crunchy-28e73714e3c25ade"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=28e73714e3c25ade",
+    "-Cextra-filename=-28e73714e3c25ade",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"limit_128\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":crunchy-v0_2_3.license" ]
 }
 
 license("crypto-bigint-v0_4_9.license") {
@@ -6903,6 +7067,40 @@ rust_library("half-v1_6_0") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":half-v1_6_0.license" ]
+}
+
+license("half-v2_4_1.license") {
+  public_package_name = "half"
+  license_files = [
+    "//third_party/rust_crates/vendor/half-2.4.1/LICENSE",
+    "//third_party/rust_crates/vendor/half-2.4.1/LICENSES",
+  ]
+}
+
+rust_library("half-v2_4_1") {
+  crate_name = "half"
+  crate_root = "//third_party/rust_crates/vendor/half-2.4.1/src/lib.rs"
+  output_name = "half-bfe987eddd5bdc88"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":cfg-if-v1_0_0" ]
+  if (false) {
+    deps += [ ":crunchy-v0_2_3" ]
+  }
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=bfe987eddd5bdc88",
+    "-Cextra-filename=-bfe987eddd5bdc88",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":half-v2_4_1.license" ]
 }
 
 license("handlebars-v4_3_5.license") {

@@ -518,6 +518,15 @@
                 "notes": [
                     "Validation test files for //build/bazel/fuchsia_idk/generate_repository.py"
                 ]
+            },
+            {
+                "paths": [
+                    "third_party/rust_crates/vendor/half-2.4.1"
+                ],
+                "notes": [
+                    "Unblocking the landing of some Rust crates that have a different LICENSE layout.",
+                    "More info in https://fxbug.dev/397749809"
+                ]
             }
         ]
     }
