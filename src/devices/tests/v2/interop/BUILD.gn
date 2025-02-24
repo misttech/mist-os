@@ -139,6 +139,5 @@ fuchsia_unittest_package("interop_test") {
     ":root",
     ":v1",
     "//sdk/lib/driver_test_realm:driver_test_realm_component",
-    "//src/devices/bin/driver_host:component",
   ]
 }

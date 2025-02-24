@@ -96,6 +96,5 @@ fuchsia_unittest_package("runtime-dispatcher-test") {
     ":leaf",
     ":root",
     "//sdk/lib/driver_test_realm:driver_test_realm_component",
-    "//src/devices/bin/driver_host:component",
   ]
 }

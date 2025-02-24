@@ -47,8 +47,5 @@ fuchsia_test_package("package") {
       max_severity = "ERROR"
     }
   }
-  deps = [
-    "//src/devices/bin/driver_host:component",
-    "//src/devices/misc/drivers/packaged:component",
-  ]
+  deps = [ "//src/devices/misc/drivers/packaged:component" ]
 }

@@ -64,6 +64,5 @@ fuchsia_unittest_package("devfs_services_test") {
     ":bin",
     ":root",
     "//sdk/lib/driver_test_realm:driver_test_realm_component",
-    "//src/devices/bin/driver_host:component",
   ]
 }
