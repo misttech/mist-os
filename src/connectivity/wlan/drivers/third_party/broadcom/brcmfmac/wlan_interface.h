@@ -87,6 +87,7 @@ class WlanInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacI
   void QuerySecuritySupport(QuerySecuritySupportCompleter::Sync& completer) override;
   void QuerySpectrumManagementSupport(
       QuerySpectrumManagementSupportCompleter::Sync& completer) override;
+  void QueryTelemetrySupport(QueryTelemetrySupportCompleter::Sync& completer) override;
   void StartScan(StartScanRequestView request, StartScanCompleter::Sync& completer) override;
   void Connect(ConnectRequestView request, ConnectCompleter::Sync& completer) override;
   void Reconnect(ReconnectRequestView request, ReconnectCompleter::Sync& completer) override;

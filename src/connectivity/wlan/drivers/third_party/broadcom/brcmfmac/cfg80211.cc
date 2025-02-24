@@ -5062,6 +5062,14 @@ void brcmf_if_query_spectrum_management_support(
   resp->dfs.supported = brcmf_feat_is_enabled(ifp, BRCMF_FEAT_DFS);
 }
 
+void brcmf_if_query_telemetry_support(net_device* ndev,
+                                      fuchsia_wlan_stats::wire::TelemetrySupport* resp,
+                                      fidl::AnyArena& arena) {
+  BRCMF_IFDBG(WLANIF, ndev, "Telemetry support request received from SME.");
+
+  *resp = fuchsia_wlan_stats::wire::TelemetrySupport::Builder(arena).Build();
+}
+
 namespace {
 
 zx_status_t brcmf_convert_antenna_id(const histograms_report_t& histograms_report,
