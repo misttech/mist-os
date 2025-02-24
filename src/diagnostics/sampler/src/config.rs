@@ -5,7 +5,6 @@
 use anyhow::Error;
 use sampler_component_config::Config as ComponentConfig;
 use sampler_config::runtime::ProjectConfig;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 /// Container for all configurations needed to instantiate the Sampler infrastructure.
@@ -21,16 +20,14 @@ pub struct SamplerConfig {
 
 impl SamplerConfig {
     pub fn new(config: ComponentConfig) -> Result<Self, Error> {
-        let root = PathBuf::from(config.configs_path);
-        let mut sampler_config_dir = root.clone();
-        sampler_config_dir.push("metrics");
-        let mut fire_config_dir = root;
-        fire_config_dir.push("fire");
-        let project_configs =
-            sampler_config::load_project_configs(sampler_config_dir, Some(fire_config_dir))?
-                .into_iter()
-                .map(Arc::new)
-                .collect();
-        Ok(Self { project_configs, minimum_sample_rate_sec: config.minimum_sample_rate_sec })
+        let ComponentConfig { minimum_sample_rate_sec, project_configs } = config;
+        let project_configs = project_configs
+            .into_iter()
+            .map(|config| {
+                let config: ProjectConfig = serde_json::from_str(&config)?;
+                Ok(Arc::new(config))
+            })
+            .collect::<Result<Vec<_>, Error>>()?;
+        Ok(Self { project_configs, minimum_sample_rate_sec })
     }
 }

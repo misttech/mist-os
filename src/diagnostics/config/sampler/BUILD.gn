@@ -2,106 +2,40 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/config_data_for_assembly.gni")
-import("//build/config.gni")
+import("//src/diagnostics/build/sampler/merge_configs.gni")
 
-# The list of Sampler configuration files in the current directory that
-# are used to configure data to be sent to Cobalt. Files that are not listed
-# in this variable will be ignored.
-project_files = [
-  "archivist.json",
-  "bt_host.json",
-  "driver_manager_all.json",
-  "fshost.json",
-  "netstack.json",
-  "netstack3.json",
-  "power_metrics_recorder.json",
-  "setui.json",
-  "system-update-committer.json",
-
-  # TODO(https://fxbug.dev/): remove driver_manager_all.json and bring back these
-  #"audio-drivers.json",
-  #"connectivity-wlan.json",
-  #"display.json",
-  #"ftl.json",
-  #"fvm.json",
-  #"radar.json",
-  #"sdmmc.json",
-  #"sysmem.json",
-]
-
-fire_components_file = [ "fire/components.json5" ]
-
-fire_project_files = [
-  "fire/projects/cpu.json5",
-  "fire/projects/crashes.json5",
-  "fire/projects/escrow.json5",
-  "fire/projects/minfs.json5",
-]
-
-# Install FIRE config into the "sampler" package
-
-config_data_for_assembly("fire_config_component_list") {
-  for_pkg = "sampler"
-  sources = fire_components_file
-  outputs = [ "fire/fuchsia/{{source_file_part}}" ]
-}
-
-config_data_for_assembly("fire_config_projects") {
-  for_pkg = "sampler"
-  sources = fire_project_files
-  outputs = [ "fire/fuchsia/projects/{{source_file_part}}" ]
-}
-
-# Install Sampler config into the "sampler" package
-
-config_data_for_assembly("sampler_config_internal") {
-  for_pkg = "sampler"
-  sources = project_files
-
-  # The component will see this as /config/metrics/fuchsia/foo.json
-  outputs = [ "metrics/fuchsia/{{source_file_part}}" ]
-}
-
-# Validate Sampler config
-
-resource("sampler-validation-resources") {
-  sources = project_files
-
-  # The component will see this as /pkg/config/metrics/fuchsia/foo.json
-  outputs = [ "config/metrics/fuchsia/{{source_file_part}}" ]
-}
-
-resource("fire-component-config-validation-resources") {
-  sources = fire_components_file
-
-  # The component will see this as /pkg/config/fire/fuchsia/components.json5
-  outputs = [ "config/fire/fuchsia/{{source_file_part}}" ]
-}
-
-resource("fire-project-config-validation-resources") {
-  sources = fire_project_files
-
-  # The component will see this as /pkg/config/fire/fuchsia/projects/foo.json5
-  outputs = [ "config/fire/fuchsia/projects/{{source_file_part}}" ]
-}
-
-# Test component for config validation.
-fuchsia_unittest_component("config-validation-component") {
-  deps = [
-    ":fire-component-config-validation-resources",
-    ":fire-project-config-validation-resources",
-    ":sampler-validation-resources",
-    "//src/diagnostics/sampler/tests:config-validation",
+merged_sampler_config("default-config") {
+  fire_project_templates = [
+    "//src/diagnostics/config/sampler/fire/projects/cpu.json5",
+    "//src/diagnostics/config/sampler/fire/projects/crashes.json5",
+    "//src/diagnostics/config/sampler/fire/projects/escrow.json5",
+    "//src/diagnostics/config/sampler/fire/projects/minfs.json5",
   ]
-}
 
-# This target name must be unique in the build tree
-fuchsia_test_package("sampler-config-validation") {
-  test_components = [ ":config-validation-component" ]
-}
+  fire_component_configs =
+      [ "//src/diagnostics/config/sampler/fire/components.json5" ]
 
-group("tests") {
-  testonly = true
-  deps = [ ":sampler-config-validation" ]
+  project_configs = [
+    "//src/diagnostics/config/sampler/archivist.json",
+    "//src/diagnostics/config/sampler/bt_host.json",
+    "//src/diagnostics/config/sampler/driver_manager_all.json",
+    "//src/diagnostics/config/sampler/fshost.json",
+    "//src/diagnostics/config/sampler/netstack.json",
+    "//src/diagnostics/config/sampler/netstack3.json",
+    "//src/diagnostics/config/sampler/power_metrics_recorder.json",
+    "//src/diagnostics/config/sampler/setui.json",
+    "//src/diagnostics/config/sampler/system-update-committer.json",
+
+    # TODO(https://fxbug.dev/300170322): remove driver_manager_all.json and bring back these
+    #"audio-drivers.json",
+    #"connectivity-wlan.json",
+    #"display.json",
+    #"ftl.json",
+    #"fvm.json",
+    #"radar.json",
+    #"sdmmc.json",
+    #"sysmem.json",
+  ]
+
+  output = "${target_gen_dir}/default_sampler_config.json"
 }

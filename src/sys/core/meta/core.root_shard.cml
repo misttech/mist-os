@@ -26,6 +26,7 @@
         {
             config: [
                 "fuchsia.bluetooth.LegacyPairing",
+                "fuchsia.diagnostics.sampler.ProjectConfigs",
                 "fuchsia.fonts.FontManifest",
                 "fuchsia.fonts.VerboseLogging",
                 "fuchsia.fshost.FxfsBlob",

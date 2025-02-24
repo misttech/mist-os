@@ -117,16 +117,19 @@ pub struct SamplerConfig {
     /// The metrics configs to pass to sampler.
     #[schemars(schema_with = "crate::vec_path_schema")]
     #[walk_paths]
-    pub metrics_configs: Vec<Utf8PathBuf>,
-
-    /// The fire configs to pass to sampler.
-    #[schemars(schema_with = "crate::vec_path_schema")]
-    #[walk_paths]
-    pub fire_configs: Vec<Utf8PathBuf>,
+    pub project_configs: Vec<Utf8PathBuf>,
 
     /// The FIRE config to pass to sampler.
     #[walk_paths]
     pub fire: FireConfig,
+
+    // TODO(https://fxbug.dev/395159893): these are obsolete and unused. Remove.
+    #[schemars(schema_with = "crate::vec_path_schema")]
+    #[walk_paths]
+    pub metrics_configs: Vec<Utf8PathBuf>,
+    #[schemars(schema_with = "crate::vec_path_schema")]
+    #[walk_paths]
+    pub fire_configs: Vec<Utf8PathBuf>,
 }
 
 /// Diagnostics configuration options for Sampler FIRE projects.

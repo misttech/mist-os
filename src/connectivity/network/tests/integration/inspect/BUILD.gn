@@ -37,6 +37,7 @@ rustc_test("netstack2_inspect_tests") {
     "//src/lib/network/packet",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:itertools",
+    "//third_party/rust_crates:serde_json5",
     "//third_party/rust_crates:test-case",
   ]
 
@@ -81,6 +82,7 @@ rustc_test("netstack3_inspect_tests") {
     "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:libc",
     "//third_party/rust_crates:regex",
+    "//third_party/rust_crates:serde_json5",
     "//third_party/rust_crates:socket2",
     "//third_party/rust_crates:test-case",
   ]
@@ -130,7 +132,7 @@ resource("ns2-sampler-config") {
 
 resource("ns3-sampler-config") {
   sources = [ "//src/diagnostics/config/sampler/netstack3.json" ]
-  outputs = [ "data/sampler-config/netstack3.json" ]
+  outputs = [ "data/sampler-config/netstack.json" ]
 }
 
 fuchsia_unittest_package("netstack3-inspect-integration-test") {

@@ -23,9 +23,10 @@ impl ComponentIdIndexBuilder {
 
     /// Build the final index by merging all the indices from the product and
     /// optionally the core component id index.
-    pub fn build(self, outdir: impl AsRef<Utf8Path>) -> Result<Utf8PathBuf> {
+    pub fn build(self, outdir: impl AsRef<Utf8Path>) -> Result<(Index, Utf8PathBuf)> {
         let merged_index =
             Index::merged_from_json5_files(&self.indices).context("merging index files")?;
+        let index = merged_index.clone();
         let merged_index_fidl: ComponentIdIndex =
             merged_index.try_into().context("converting index into fidl")?;
         let bytes = persist(&merged_index_fidl).context("Could not fidl-encode index")?;
@@ -33,7 +34,7 @@ impl ComponentIdIndexBuilder {
         let path = outdir.as_ref().join("component_id_index.fidlbin");
         std::fs::write(&path, bytes)
             .context("Could not write merged FIDL-encoded index to file")?;
-        Ok(path)
+        Ok((index, path))
     }
 }
 
@@ -63,7 +64,7 @@ mod tests {
         let outdir = tempfile::TempDir::new().unwrap();
         let outdir_path = Utf8PathBuf::from_path_buf(outdir.path().to_path_buf()).unwrap();
         let builder = ComponentIdIndexBuilder::default();
-        let path = builder.build(&outdir_path).unwrap();
+        let (_, path) = builder.build(&outdir_path).unwrap();
         assert_eq!(path, outdir_path.join("component_id_index.fidlbin"));
     }
 
@@ -89,7 +90,7 @@ mod tests {
         let mut builder = ComponentIdIndexBuilder::default();
         builder.index(&index1_path);
         builder.index(&index2_path);
-        let path = builder.build(&outdir_path).unwrap();
+        let (_, path) = builder.build(&outdir_path).unwrap();
         assert_eq!(path, outdir_path.join("component_id_index.fidlbin"));
         let index = component_id_index::Index::from_fidl_file(&path).unwrap();
 

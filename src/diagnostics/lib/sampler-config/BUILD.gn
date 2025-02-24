@@ -13,6 +13,7 @@ rustc_library("sampler-config") {
     "//src/connectivity/network/tests/integration/inspect/*",
     "//src/diagnostics/lib/sampler-config/*",
     "//src/diagnostics/sampler/*",
+    "//src/diagnostics/tools/merge_sampler_configs:*",
     "//src/lib/assembly/platform_configuration/*",
   ]
 
@@ -22,16 +23,14 @@ rustc_library("sampler-config") {
     "//src/sys/lib/component_id_index",
     "//src/sys/lib/moniker",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:glob",
-    "//third_party/rust_crates:log",
     "//third_party/rust_crates:serde",
-    "//third_party/rust_crates:serde_json5",
     "//third_party/rust_crates:thiserror",
   ]
 
   test_deps = [
     "//src/lib/fuchsia",
     "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:serde_json5",
   ]
 
   sources = [

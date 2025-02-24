@@ -258,10 +258,6 @@ async fn sampler_inspect_test() {
     assert_data_tree!(
         hierarchy,
         root: {
-            config: {
-                minimum_sample_rate_sec: 1u64,
-                configs_path: "/pkg/data/config",
-            },
             sampler_executor_stats: {
                 healthily_exited_samplers: 0u64,
                 errorfully_exited_samplers: 0u64,

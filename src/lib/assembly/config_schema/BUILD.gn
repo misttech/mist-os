@@ -31,6 +31,7 @@ rustc_library("config_schema") {
   ]
 
   inputs = [ _git_info ]
+
   deps = [
     "//src/lib/assembly/constants",
     "//src/lib/assembly/container",

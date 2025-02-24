@@ -11,6 +11,11 @@
     ],
     offer: [
         {
+            config: [ "fuchsia.diagnostics.sampler.ProjectConfigs" ],
+            from: "parent",
+            to: "#sampler",
+        },
+        {
             protocol: [ "fuchsia.diagnostics.ArchiveAccessor" ],
             from: "parent/diagnostics-accessors",
             to: [ "#sampler" ],
@@ -19,12 +24,6 @@
             protocol: [ "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister" ],
             from: "parent",
             to: "#sampler",
-        },
-        {
-            directory: "config-data",
-            from: "parent",
-            to: "#sampler",
-            subdir: "sampler",
         },
         {
             protocol: "fuchsia.metrics.MetricEventLoggerFactory",

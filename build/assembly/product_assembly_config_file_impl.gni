@@ -76,9 +76,14 @@ template("product_assembly_config_file") {
     },
     {
       node_path = "platform.diagnostics.sampler"
+      fields = [ "project_configs" ]
+      is_list = true
+    },
+    {
+      node_path = "platform.diagnostics.sampler.fire"
       fields = [
-        "fire_configs",
-        "metrics_configs",
+        "component_configs",
+        "project_templates",
       ]
       is_list = true
     },

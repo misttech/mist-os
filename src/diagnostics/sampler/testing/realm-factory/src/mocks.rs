@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 
 use component_id_index::{Index, InstanceId};
-use fidl::persist;
-use fidl_fuchsia_component_internal::ComponentIdIndex;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::{SinkExt, StreamExt, TryStreamExt};
@@ -18,7 +16,7 @@ use {
 
 /// Test data for moniker <-> ID file.
 /// This will be sent to Sampler as though it were coming from Product Assembly.
-pub(crate) fn id_file_vmo() -> zx::Vmo {
+pub(crate) fn fake_index() -> Index {
     let mut index = Index::default();
     let id: InstanceId =
         InstanceId::from_str("1111222233334444111111111111111111111111111111111111111111111111")
@@ -28,11 +26,7 @@ pub(crate) fn id_file_vmo() -> zx::Vmo {
         InstanceId::from_str("2222222233334444111111111111111111111111111111111111111111112222")
             .unwrap();
     index.insert(Moniker::try_from("not_listed_1").unwrap(), id).unwrap();
-    let index_fidl: ComponentIdIndex = ComponentIdIndex::from(index);
-    let index_bytes = persist(&index_fidl).unwrap();
-    let vmo = zx::Vmo::create(index_bytes.len() as u64).unwrap();
-    vmo.write(&index_bytes, 0).unwrap();
-    vmo
+    index
 }
 
 pub fn serve_reboot_server(

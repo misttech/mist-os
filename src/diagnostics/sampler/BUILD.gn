@@ -39,6 +39,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:log",
+    "//third_party/rust_crates:serde_json",
   ]
 
   test_deps = [
@@ -74,7 +75,7 @@ fuchsia_component("sampler-component") {
   deps = [ "//src/diagnostics/launcher:bin" ]
 }
 
-fuchsia_structured_config_values("sampler-prod-config") {
+fuchsia_structured_config_values("default-config-values") {
   values_source = "configs/default.json5"
   cm_label = ":sampler-manifest"
 }
@@ -85,8 +86,8 @@ fuchsia_structured_config_rust_lib("sampler-component-config") {
 
 fuchsia_package("sampler") {
   deps = [
+    ":default-config-values",
     ":sampler-component",
-    ":sampler-prod-config",
   ]
 }
 

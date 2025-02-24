@@ -8,4 +8,5 @@
 
 mod index;
 
+pub use component_id_index::Index;
 pub use index::ComponentIdIndexBuilder;

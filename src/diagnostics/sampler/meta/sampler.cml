@@ -13,20 +13,22 @@
     },
     use: [
         {
-            protocol: "fuchsia.diagnostics.ArchiveAccessor",
-            from: "parent",
+            config: "fuchsia.diagnostics.sampler.ProjectConfigs",
+            key: "project_configs",
+            availability: "optional",
+            type: "vector",
+            max_count: 1024,
+            element: {
+                type: "string",
+                max_size: 100000,
+            },
         },
         {
-            protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
-        },
-        {
-            protocol: "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
-            from: "parent",
-        },
-        {
-            directory: "config-data",
-            rights: [ "r*" ],
-            path: "/config/data",
+            protocol: [
+                "fuchsia.diagnostics.ArchiveAccessor",
+                "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
+                "fuchsia.metrics.MetricEventLoggerFactory",
+            ],
         },
     ],
     expose: [
@@ -37,9 +39,20 @@
     ],
     config: {
         minimum_sample_rate_sec: { type: "int64" },
-        configs_path: {
-            type: "string",
-            max_size: 128,
+
+        // Sampler project configurations in JSON. See:
+        // [`ProjectConfig`](https://cs.opensource.google/fuchsia/fuchsia/+/main:src/diagnostics/lib/sampler-config/src/runtime/mod.rs)
+        // for the schema.
+        // LINT.IfChange
+        project_configs: {
+            type: "vector",
+            max_count: 1024,
+            element: {
+                type: "string",
+                max_size: 100000,
+            },
         },
+
+        // LINT.ThenChange(//src/lib/assembly/platform_configuration/src/subsystems/diagnostics.rs)
     },
 }

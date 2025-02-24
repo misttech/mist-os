@@ -1973,12 +1973,6 @@ assembly_input_bundle("common_standard") {
     },
   ]
 
-  config_data_labels = [
-    "//src/diagnostics/config/sampler:sampler_config_internal",
-    "//src/diagnostics/config/sampler:fire_config_component_list",
-    "//src/diagnostics/config/sampler:fire_config_projects",
-  ]
-
   compiled_packages = [
     {
       name = "core"
@@ -4672,6 +4666,9 @@ assembly_resources_directory("resources") {
     "${icu_tzres_path}/zoneinfo64.res",
     "${root_gen_dir}/src/lib/icu/tzdata/revision.txt",
 
+    # Diagnostics sampler resources.
+    "${root_gen_dir}/src/diagnostics/config/sampler/default_sampler_config.json",
+
     # Core shard templates.
     "//src/connectivity/weave/meta/weavestack.core_shard.cml.template",
     "//src/developer/forensics/flash_ts_feedback_id/meta/flash_ts_feedback_id.core_shard.cml.template",
@@ -4684,6 +4681,7 @@ assembly_resources_directory("resources") {
   ]
   deps = [
     "//build/info:version",
+    "//src/diagnostics/config/sampler:default-config",
     "//src/lib/icu/tzdata:revision",
   ]
 }

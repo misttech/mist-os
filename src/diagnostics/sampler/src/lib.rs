@@ -1,6 +1,8 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
+use crate::config::SamplerConfig;
 use anyhow::{Context, Error};
 use argh::FromArgs;
 use fuchsia_component::client::connect_to_protocol;
@@ -40,12 +42,7 @@ pub async fn main() -> Result<(), Error> {
     // Starting service.
     inspect::component::health().set_starting_up();
 
-    let component_config = ComponentConfig::take_from_startup_handle();
-    inspector
-        .root()
-        .record_child("config", |config_node| component_config.record_inspect(config_node));
-
-    let sampler_config = config::SamplerConfig::new(component_config)?;
+    let sampler_config = SamplerConfig::new(ComponentConfig::take_from_startup_handle())?;
 
     // Create endpoint for the reboot watcher register.
     let (reboot_watcher_client, reboot_watcher_request_stream) =

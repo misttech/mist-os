@@ -5,10 +5,11 @@
 use crate::common::DomainConfigDirectoryBuilder;
 use crate::subsystems::prelude::*;
 use anyhow::{anyhow, Context};
-use assembly_component_id_index::ComponentIdIndexBuilder;
+use assembly_component_id_index::{ComponentIdIndexBuilder, Index};
 use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType};
 use assembly_config_schema::platform_config::diagnostics_config::{
-    ArchivistConfig, ArchivistPipeline, DiagnosticsConfig, PipelineType, Severity,
+    ArchivistConfig, ArchivistPipeline, DiagnosticsConfig, FireConfig, PipelineType, SamplerConfig,
+    Severity,
 };
 use assembly_config_schema::platform_config::storage_config::StorageConfig;
 use assembly_constants::{
@@ -16,7 +17,9 @@ use assembly_constants::{
 };
 use assembly_util::read_config;
 use camino::{Utf8Path, Utf8PathBuf};
-use sampler_config::assembly::ComponentIdInfoList;
+use sampler_config::assembly::{
+    ComponentIdInfoList, MergedSamplerConfig, ProjectConfig, ProjectTemplate,
+};
 use std::collections::BTreeSet;
 
 const ALLOWED_SERIAL_LOG_COMPONENTS: &[&str] = &[
@@ -223,7 +226,8 @@ impl<'a> DefineSubsystemConfiguration<DiagnosticsSubsystemConfig<'a>> for Diagno
 
         // Build the component id index and add it as a bootfs file.
         let gendir = context.get_gendir().context("Getting gendir for diagnostics subsystem")?;
-        let index_path = build_index(context, config.storage, gendir)?;
+        let (instance_id_index, index_path) =
+            build_instance_id_index(context, config.storage, gendir)?;
         builder
             .bootfs()
             .file(FileEntry {
@@ -231,56 +235,31 @@ impl<'a> DefineSubsystemConfiguration<DiagnosticsSubsystemConfig<'a>> for Diagno
                 source: index_path.clone(),
             })
             .with_context(|| format!("Adding bootfs file {}", &index_path))?;
-        builder
-            .package("sampler")
-            .config_data(FileEntry {
-                source: index_path,
-                destination: "component_id_index".to_string(),
-            })
-            .context("Adding component id index to sampler".to_string())?;
 
-        for metrics_config in &sampler.metrics_configs {
-            let filename = metrics_config.file_name().ok_or_else(|| {
-                anyhow!("Failed to get filename for metrics config: {}", &metrics_config)
-            })?;
-            builder
-                .package("sampler")
-                .config_data(FileEntry {
-                    source: metrics_config.clone(),
-                    destination: format!("metrics/assembly/{}", filename),
+        let default_sampler_config: MergedSamplerConfig =
+            read_config(context.get_resource("default_sampler_config.json"))?;
+
+        let project_configs =
+            load_project_configs(sampler, default_sampler_config, &instance_id_index)?
+                .into_iter()
+                .map(|project_config| {
+                    serde_json::to_string(&project_config)
+                        .context("failed to serialize project config")
                 })
-                .context(format!("Adding metrics config to sampler: {}", &metrics_config))?;
-        }
-        for fire_config in &sampler.fire.component_configs {
-            // Ensure that the fire_config is the correct format.
-            let _ = read_config::<ComponentIdInfoList>(&fire_config)
-                .with_context(|| format!("Parsing fire config: {}", &fire_config))?;
-            let filename = fire_config.file_name().ok_or_else(|| {
-                anyhow!("Failed to get filename for fire config: {}", &fire_config)
-            })?;
-            builder
-                .package("sampler")
-                .config_data(FileEntry {
-                    source: fire_config.clone(),
-                    destination: format!("fire/assembly/{}", filename),
-                })
-                .context(format!("Adding fire config to sampler: {}", &fire_config))?;
-        }
-        for fire_config in &sampler.fire_configs {
-            // Ensure that the fire_config is the correct format.
-            let _ = read_config::<ComponentIdInfoList>(&fire_config)
-                .with_context(|| format!("Parsing fire config: {}", &fire_config))?;
-            let filename = fire_config.file_name().ok_or_else(|| {
-                anyhow!("Failed to get filename for fire config: {}", &fire_config)
-            })?;
-            builder
-                .package("sampler")
-                .config_data(FileEntry {
-                    source: fire_config.clone(),
-                    destination: format!("fire/assembly/{}", filename),
-                })
-                .context(format!("Adding fire config to sampler: {}", &fire_config))?;
-        }
+                .collect::<Result<Vec<String>, _>>()?;
+
+        // LINT.IfChange
+        builder.set_config_capability(
+            "fuchsia.diagnostics.sampler.ProjectConfigs",
+            Config::new(
+                ConfigValueType::Vector {
+                    nested_type: ConfigNestedValueType::String { max_size: 100000 },
+                    max_count: 1024,
+                },
+                project_configs.into(),
+            ),
+        )?;
+        // LINT.ThenChange(//src/diagnostics/sampler/meta/sampler.cml)
 
         builder.set_config_capability(
             "fuchsia.memory.CaptureOnPressureChange",
@@ -314,11 +293,75 @@ impl<'a> DefineSubsystemConfiguration<DiagnosticsSubsystemConfig<'a>> for Diagno
     }
 }
 
-fn build_index(
+fn load_project_configs(
+    sampler: &SamplerConfig,
+    default_config: MergedSamplerConfig,
+    instance_id_index: &Index,
+) -> anyhow::Result<Vec<ProjectConfig>> {
+    let MergedSamplerConfig { mut project_configs, fire_project_templates, fire_component_configs } =
+        default_config;
+    let SamplerConfig { project_configs: additional_project_configs, fire: fire_config, .. } =
+        sampler;
+
+    project_configs.reserve(fire_project_templates.len());
+    for project_config_path in additional_project_configs {
+        // NOTE: instead of requiring files, we could require the config directly.
+        let config: ProjectConfig = read_config(project_config_path).with_context(|| {
+            format!("failed to read sampler config file: {project_config_path}")
+        })?;
+        project_configs.push(config);
+    }
+    let (fire_project_templates, fire_component_configs) = load_fire_configs(
+        fire_project_templates,
+        fire_component_configs,
+        fire_config,
+        instance_id_index,
+    )?;
+
+    for fire_template in fire_project_templates {
+        let config = fire_template
+            .expand(&fire_component_configs)
+            .context("failed to expand fire template")?;
+        project_configs.push(config);
+    }
+    Ok(project_configs)
+}
+
+fn load_fire_configs(
+    mut fire_templates: Vec<ProjectTemplate>,
+    default_fire_components: Vec<ComponentIdInfoList>,
+    fire_config: &FireConfig,
+    instance_id_index: &Index,
+) -> anyhow::Result<(Vec<ProjectTemplate>, ComponentIdInfoList)> {
+    let FireConfig { component_configs, project_templates } = fire_config;
+
+    for project_template_path in project_templates {
+        let config: ProjectTemplate = read_config(project_template_path).with_context(|| {
+            format!("failed to read sampler fire config file: {project_template_path}")
+        })?;
+        fire_templates.push(config);
+    }
+
+    let mut fire_components = Vec::new();
+    fire_components.extend(default_fire_components.into_iter().flat_map(|c| c.into_iter()));
+    for component_config_path in component_configs {
+        let config: ComponentIdInfoList =
+            read_config(component_config_path).with_context(|| {
+                format!("failed to read fire components config file: {component_config_path}")
+            })?;
+        fire_components.extend(config.into_iter());
+    }
+
+    let mut fire_components = ComponentIdInfoList::new(fire_components);
+    fire_components.add_instance_ids(instance_id_index);
+    Ok((fire_templates, fire_components))
+}
+
+fn build_instance_id_index(
     context: &ConfigurationContext<'_>,
     storage_config: &StorageConfig,
     gendir: impl AsRef<Utf8Path>,
-) -> anyhow::Result<Utf8PathBuf> {
+) -> anyhow::Result<(Index, Utf8PathBuf)> {
     // Build and add the component id index.
     let mut index_builder = ComponentIdIndexBuilder::default();
 
@@ -377,6 +420,14 @@ mod tests {
                             "moniker": "/core/foo/bar",
                         },
                     ]
+                }),
+            );
+            this.write(
+                "default_sampler_config.json",
+                json!({
+                    "fire_project_templates": [],
+                    "fire_component_configs": [],
+                    "project_configs": [],
                 }),
             );
             this
@@ -598,7 +649,13 @@ mod tests {
             ..ConfigurationContext::default_for_tests()
         };
         let diagnostics = DiagnosticsConfig {
-            sampler: SamplerConfig { fire_configs: vec![fire_config_path], ..Default::default() },
+            sampler: SamplerConfig {
+                fire: FireConfig {
+                    component_configs: vec![fire_config_path],
+                    project_templates: vec![],
+                },
+                ..Default::default()
+            },
             ..Default::default()
         };
         let mut builder = ConfigurationBuilderImpl::default();
@@ -630,7 +687,13 @@ mod tests {
             ..ConfigurationContext::default_for_tests()
         };
         let diagnostics = DiagnosticsConfig {
-            sampler: SamplerConfig { fire_configs: vec![fire_config_path], ..Default::default() },
+            sampler: SamplerConfig {
+                fire: FireConfig {
+                    project_templates: vec![fire_config_path],
+                    component_configs: vec![],
+                },
+                ..Default::default()
+            },
             ..Default::default()
         };
         let mut builder = ConfigurationBuilderImpl::default();
