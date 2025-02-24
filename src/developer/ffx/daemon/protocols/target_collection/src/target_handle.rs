@@ -327,6 +327,24 @@ mod tests {
                                     }))
                                     .unwrap();
                             }
+                            fidl_rcs::RemoteControlRequest::ConnectCapability {
+                                moniker,
+                                capability_set,
+                                capability_name,
+                                server_channel,
+                                responder,
+                            } => {
+                                assert_eq!(capability_set, fsys::OpenDirType::ExposedDir);
+                                assert_eq!(moniker, "/core/remote-control");
+                                assert_eq!(
+                                    capability_name,
+                                    "fuchsia.developer.remotecontrol.RemoteControl"
+                                );
+                                knock_channels.push(server_channel);
+                                responder.send(Ok(())).unwrap();
+                            }
+                            // TODO(https://fxbug.dev/384054758): Remove when all clients call
+                            // ConnectCapability first.
                             fidl_rcs::RemoteControlRequest::DeprecatedOpenCapability {
                                 moniker,
                                 capability_set,

@@ -118,12 +118,11 @@ impl RemoteControlService {
                 self.clone().identify_host(responder).await?;
                 Ok(())
             }
-            rcs::RemoteControlRequest::DeprecatedOpenCapability {
+            rcs::RemoteControlRequest::ConnectCapability {
                 moniker,
                 capability_set,
                 capability_name,
                 server_channel,
-                flags: _,
                 responder,
             } => {
                 responder.send(
@@ -133,11 +132,12 @@ impl RemoteControlService {
                 )?;
                 Ok(())
             }
-            rcs::RemoteControlRequest::ConnectCapability {
+            rcs::RemoteControlRequest::DeprecatedOpenCapability {
                 moniker,
                 capability_set,
                 capability_name,
                 server_channel,
+                flags: _,
                 responder,
             } => {
                 responder.send(

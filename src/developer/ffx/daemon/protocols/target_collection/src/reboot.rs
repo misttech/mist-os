@@ -414,6 +414,14 @@ mod tests {
         fuchsia_async::Task::local(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
+                    RemoteControlRequest::ConnectCapability {
+                        server_channel, responder, ..
+                    } => {
+                        setup_admin(server_channel).unwrap();
+                        responder.send(Ok(())).unwrap();
+                    }
+                    // TODO(https://fxbug.dev/384054758): Remove when all clients call
+                    // ConnectCapability first.
                     RemoteControlRequest::DeprecatedOpenCapability {
                         server_channel,
                         responder,
@@ -422,7 +430,7 @@ mod tests {
                         setup_admin(server_channel).unwrap();
                         responder.send(Ok(())).unwrap();
                     }
-                    _ => assert!(false),
+                    _ => panic!("Unhandled request: {req:?}"),
                 }
             }
         })

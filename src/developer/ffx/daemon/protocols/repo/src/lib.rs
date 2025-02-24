@@ -1594,6 +1594,23 @@ mod tests {
 
                 match (req, target.as_deref()) {
                     (
+                        rcs::RemoteControlRequest::ConnectCapability {
+                            moniker: _,
+                            capability_set: _,
+                            server_channel,
+                            capability_name,
+                            responder,
+                        },
+                        Some(TARGET_NODENAME),
+                    ) => {
+                        assert_eq!("svc/fuchsia.posix.socket.Provider", capability_name);
+                        events_closure.lock().unwrap().push(RcsEvent::ReverseTcp);
+                        fasync::Task::spawn(test_socket_provider(server_channel)).detach();
+                        responder.send(Ok(())).unwrap()
+                    }
+                    // TODO(https://fxbug.dev/384054758): Remove when all clients call
+                    // ConnectCapability first.
+                    (
                         rcs::RemoteControlRequest::DeprecatedOpenCapability {
                             moniker: _,
                             capability_set: _,

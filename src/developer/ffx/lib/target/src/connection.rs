@@ -308,6 +308,35 @@ pub mod testing {
                 rcs_fidl::RemoteControlRequest::EchoString { value, responder } => {
                     responder.send(&value).unwrap()
                 }
+                rcs_fidl::RemoteControlRequest::ConnectCapability {
+                    capability_name,
+                    server_channel,
+                    responder,
+                    ..
+                } => match capability_name.as_str() {
+                    rcs_fidl::RemoteControlMarker::PROTOCOL_NAME => {
+                        fuchsia_async::Task::local(async {
+                            let mut stream = fidl::endpoints::ServerEnd::<
+                                rcs_fidl::RemoteControlMarker,
+                            >::new(server_channel)
+                            .into_stream();
+                            while let Ok(Some(request)) = stream.try_next().await {
+                                match request {
+                                    rcs_fidl::RemoteControlRequest::EchoString {
+                                        value,
+                                        responder,
+                                    } => responder.send(&value).unwrap(),
+                                    _ => unreachable!(),
+                                }
+                            }
+                        })
+                        .detach();
+                        responder.send(Ok(())).unwrap();
+                    }
+                    c => panic!("Received an unexpected capability name: {c}"),
+                },
+                // TODO(https://fxbug.dev/384054758): Remove when all clients call ConnectCapability
+                // first.
                 rcs_fidl::RemoteControlRequest::DeprecatedOpenCapability {
                     capability_name,
                     server_channel,

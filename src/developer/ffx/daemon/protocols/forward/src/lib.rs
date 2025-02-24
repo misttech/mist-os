@@ -385,6 +385,21 @@ mod tests {
                 let mut server = server.into_stream();
                 while let Some(request) = server.next().await {
                     match request.unwrap() {
+                        rcs::RemoteControlRequest::ConnectCapability {
+                            moniker: _,
+                            capability_set,
+                            capability_name,
+                            server_channel,
+                            responder,
+                        } => {
+                            assert_eq!(sys2::OpenDirType::NamespaceDir, capability_set);
+                            assert_eq!("svc/fuchsia.posix.socket.Provider", capability_name);
+                            fuchsia_async::Task::spawn(test_socket_provider(server_channel))
+                                .detach();
+                            responder.send(Ok(())).unwrap();
+                        }
+                        // TODO(https://fxbug.dev/384054758): Remove when all clients call
+                        // ConnectCapability first.
                         rcs::RemoteControlRequest::DeprecatedOpenCapability {
                             moniker: _,
                             capability_set,
