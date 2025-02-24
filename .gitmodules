@@ -738,3 +738,8 @@
 	url = https://fuchsia.googlesource.com/third_party/spirv-tools
 	name = third_party/spirv-tools
 	ignore = all
+[submodule "third_party/github.com/ARMmbed/mbedtls"]
+	path = third_party/github.com/ARMmbed/mbedtls
+	url = https://fuchsia.googlesource.com/third_party/github.com/ARMmbed/mbedtls
+	name = third_party/github.com/ARMmbed/mbedtls
+	ignore = all
