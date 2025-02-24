@@ -715,6 +715,7 @@ mod tests {
     use futures::FutureExt as _;
     use std::borrow::Cow;
     use std::future::poll_fn;
+    use std::num::NonZero;
     use std::pin::pin;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::{Arc, Mutex};
@@ -748,6 +749,7 @@ mod tests {
             block_count: u32,
             vmo: &Arc<zx::Vmo>,
             vmo_offset: u64,
+            _trace_flow_id: Option<NonZero<u64>>,
         ) -> Result<(), zx::Status> {
             if let Some(read_hook) = &self.read_hook {
                 read_hook(device_block_offset, block_count, vmo, vmo_offset).await
@@ -763,11 +765,12 @@ mod tests {
             _vmo: &Arc<zx::Vmo>,
             _vmo_offset: u64,
             _opts: WriteOptions,
+            _trace_flow_id: Option<NonZero<u64>>,
         ) -> Result<(), zx::Status> {
             unreachable!();
         }
 
-        async fn flush(&self) -> Result<(), zx::Status> {
+        async fn flush(&self, _trace_flow_id: Option<NonZero<u64>>) -> Result<(), zx::Status> {
             unreachable!();
         }
 
@@ -775,6 +778,7 @@ mod tests {
             &self,
             _device_block_offset: u64,
             _block_count: u32,
+            _trace_flow_id: Option<NonZero<u64>>,
         ) -> Result<(), zx::Status> {
             unreachable!();
         }
@@ -1005,6 +1009,7 @@ mod tests {
             block_count: u32,
             _vmo: &Arc<zx::Vmo>,
             vmo_offset: u64,
+            _trace_flow_id: Option<NonZero<u64>>,
         ) -> Result<(), zx::Status> {
             if self.return_errors {
                 Err(zx::Status::INTERNAL)
@@ -1026,6 +1031,7 @@ mod tests {
             _vmo: &Arc<zx::Vmo>,
             vmo_offset: u64,
             _opts: WriteOptions,
+            _trace_flow_id: Option<NonZero<u64>>,
         ) -> Result<(), zx::Status> {
             if self.return_errors {
                 Err(zx::Status::NOT_SUPPORTED)
@@ -1040,7 +1046,7 @@ mod tests {
             }
         }
 
-        async fn flush(&self) -> Result<(), zx::Status> {
+        async fn flush(&self, _trace_flow_id: Option<NonZero<u64>>) -> Result<(), zx::Status> {
             if self.return_errors {
                 Err(zx::Status::NO_RESOURCES)
             } else {
@@ -1051,7 +1057,12 @@ mod tests {
             }
         }
 
-        async fn trim(&self, device_block_offset: u64, block_count: u32) -> Result<(), zx::Status> {
+        async fn trim(
+            &self,
+            device_block_offset: u64,
+            block_count: u32,
+            _trace_flow_id: Option<NonZero<u64>>,
+        ) -> Result<(), zx::Status> {
             if self.return_errors {
                 Err(zx::Status::NO_MEMORY)
             } else {

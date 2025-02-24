@@ -38,6 +38,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt::Formatter;
 use std::future::Future;
 use std::marker::PhantomData;
+use std::num::NonZero;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -463,6 +464,7 @@ impl Fvm {
         partition_index: u16,
         device_block_offset: u64,
         block_count: u32,
+        trace_flow_id: u64,
     ) -> Result<(), Error> {
         let inner = self.inner.read().await;
         let Some(PartitionState { mappings, .. }) = inner.partition_state.get(&partition_index)
@@ -506,7 +508,7 @@ impl Fvm {
             let physical_offset =
                 data_start + mapping.to * slice_size + (offset - mapping.from.start * slice_size);
 
-            io.add_op(physical_offset, len).await?;
+            io.add_op(physical_offset, len, trace_flow_id).await?;
             offset += len;
             total_len -= len;
         }
@@ -679,9 +681,18 @@ impl Fvm {
 // Trait to abstract over the difference between reads and writes.
 trait IoTrait {
     // Called to get the future that performs the read or write.
-    fn add_op(&mut self, offset: u64, len: u64) -> impl Future<Output = Result<(), zx::Status>>;
+    fn add_op(
+        &mut self,
+        offset: u64,
+        len: u64,
+        trace_flow_id: u64,
+    ) -> impl Future<Output = Result<(), zx::Status>>;
 
     fn flush(&mut self) -> impl Future<Output = Result<(), zx::Status>>;
+}
+
+fn trace_id(trace_flow_id: Option<NonZero<u64>>) -> u64 {
+    trace_flow_id.map(|v| v.get()).unwrap_or_default()
 }
 
 struct Read<'a> {
@@ -692,10 +703,16 @@ struct Read<'a> {
 }
 
 impl IoTrait for Read<'_> {
-    async fn add_op(&mut self, offset: u64, len: u64) -> Result<(), zx::Status> {
-        self.ops.push(Box::pin(self.device.read_at(
+    async fn add_op(
+        &mut self,
+        offset: u64,
+        len: u64,
+        trace_flow_id: u64,
+    ) -> Result<(), zx::Status> {
+        self.ops.push(Box::pin(self.device.read_at_traced(
             MutableBufferSlice::new_with_vmo_id(self.vmo_id, self.vmo_offset, len),
             offset,
+            trace_flow_id,
         )));
         self.vmo_offset += len;
         Ok(())
@@ -720,11 +737,16 @@ impl<'a> ReadToMem<'a> {
 }
 
 impl IoTrait for ReadToMem<'_> {
-    async fn add_op(&mut self, offset: u64, len: u64) -> Result<(), zx::Status> {
+    async fn add_op(
+        &mut self,
+        offset: u64,
+        len: u64,
+        trace_flow_id: u64,
+    ) -> Result<(), zx::Status> {
         // We don't care about performance, so we issue the operation immediately.
         let (head, tail) = std::mem::take(&mut self.buffer).split_at_mut(len as usize);
         self.buffer = tail;
-        self.device.read_at(MutableBufferSlice::Memory(head), offset).await?;
+        self.device.read_at_traced(MutableBufferSlice::Memory(head), offset, trace_flow_id).await?;
         Ok(())
     }
 
@@ -742,11 +764,17 @@ struct Write<'a> {
 }
 
 impl IoTrait for Write<'_> {
-    async fn add_op(&mut self, offset: u64, len: u64) -> Result<(), zx::Status> {
-        self.ops.push(Box::pin(self.device.write_at_with_opts(
+    async fn add_op(
+        &mut self,
+        offset: u64,
+        len: u64,
+        trace_flow_id: u64,
+    ) -> Result<(), zx::Status> {
+        self.ops.push(Box::pin(self.device.write_at_with_opts_traced(
             BufferSlice::new_with_vmo_id(self.vmo_id, self.vmo_offset, len),
             offset,
             self.options,
+            trace_flow_id,
         )));
         self.vmo_offset += len;
         Ok(())
@@ -771,11 +799,23 @@ impl<'a> WriteFromMem<'a> {
 }
 
 impl IoTrait for WriteFromMem<'_> {
-    async fn add_op(&mut self, offset: u64, len: u64) -> Result<(), zx::Status> {
+    async fn add_op(
+        &mut self,
+        offset: u64,
+        len: u64,
+        trace_flow_id: u64,
+    ) -> Result<(), zx::Status> {
         // We don't care about performance, so we issue the operation immediately.
         let (head, tail) = self.buffer.split_at(len as usize);
         self.buffer = tail;
-        self.device.write_at(BufferSlice::Memory(head), offset).await?;
+        self.device
+            .write_at_with_opts_traced(
+                BufferSlice::Memory(head),
+                offset,
+                WriteOptions::empty(),
+                trace_flow_id,
+            )
+            .await?;
         Ok(())
     }
 
@@ -1366,6 +1406,7 @@ impl Interface for PartitionInterface {
         block_count: u32,
         vmo: &Arc<zx::Vmo>,
         vmo_offset: u64,
+        trace_flow_id: Option<NonZero<u64>>,
     ) -> Result<(), zx::Status> {
         debug!(
             "read {}: @{device_block_offset}, count={block_count}, vmo_offset={vmo_offset}",
@@ -1389,6 +1430,7 @@ impl Interface for PartitionInterface {
                     self.partition_index,
                     device_block_offset,
                     block_count,
+                    trace_id(trace_flow_id),
                 )
                 .await
         } else {
@@ -1403,6 +1445,7 @@ impl Interface for PartitionInterface {
                     self.partition_index,
                     device_block_offset,
                     block_count,
+                    trace_id(trace_flow_id),
                 )
                 .await
         }
@@ -1419,6 +1462,7 @@ impl Interface for PartitionInterface {
         vmo: &Arc<zx::Vmo>,
         vmo_offset: u64,
         options: WriteOptions,
+        trace_flow_id: Option<NonZero<u64>>,
     ) -> Result<(), zx::Status> {
         debug!(
             "write {}: @{device_block_offset}, count={block_count}, vmo_offset={vmo_offset}",
@@ -1443,6 +1487,7 @@ impl Interface for PartitionInterface {
                     self.partition_index,
                     device_block_offset,
                     block_count,
+                    trace_id(trace_flow_id),
                 )
                 .await
         } else {
@@ -1459,6 +1504,7 @@ impl Interface for PartitionInterface {
                     self.partition_index,
                     device_block_offset,
                     block_count,
+                    trace_id(trace_flow_id),
                 )
                 .await
         }
@@ -1468,11 +1514,17 @@ impl Interface for PartitionInterface {
         })
     }
 
-    async fn flush(&self) -> Result<(), zx::Status> {
-        self.fvm.device.flush().await
+    async fn flush(&self, trace_flow_id: Option<NonZero<u64>>) -> Result<(), zx::Status> {
+        self.fvm.device.flush_traced(trace_id(trace_flow_id)).await
     }
 
-    async fn trim(&self, _device_block_offset: u64, _block_count: u32) -> Result<(), zx::Status> {
+    async fn trim(
+        &self,
+        _device_block_offset: u64,
+        _block_count: u32,
+        _trace_flow_id: Option<NonZero<u64>>,
+    ) -> Result<(), zx::Status> {
+        // TODO(https://fxbug.dev/397990875)
         todo!();
     }
 

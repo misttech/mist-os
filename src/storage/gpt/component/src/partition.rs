@@ -6,6 +6,7 @@ use block_client::{VmoId, WriteOptions};
 
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::num::NonZero;
 use std::sync::{Arc, Mutex};
 
 /// PartitionBackend is an implementation of block_server's Interface which is backed by a windowed
@@ -42,9 +43,12 @@ impl block_server::async_interface::Interface for PartitionBackend {
         block_count: u32,
         vmo: &Arc<zx::Vmo>,
         vmo_offset: u64, // *bytes* not blocks
+        trace_flow_id: Option<NonZero<u64>>,
     ) -> Result<(), zx::Status> {
         let vmoid = self.get_vmoid(vmo)?;
-        self.partition.read(device_block_offset, block_count, vmoid.as_ref(), vmo_offset).await
+        self.partition
+            .read(device_block_offset, block_count, vmoid.as_ref(), vmo_offset, trace_flow_id)
+            .await
     }
 
     async fn write(
@@ -54,17 +58,25 @@ impl block_server::async_interface::Interface for PartitionBackend {
         vmo: &Arc<zx::Vmo>,
         vmo_offset: u64, // *bytes* not blocks
         opts: WriteOptions,
+        trace_flow_id: Option<NonZero<u64>>,
     ) -> Result<(), zx::Status> {
         let vmoid = self.get_vmoid(vmo)?;
-        self.partition.write(device_block_offset, length, vmoid.as_ref(), vmo_offset, opts).await
+        self.partition
+            .write(device_block_offset, length, vmoid.as_ref(), vmo_offset, opts, trace_flow_id)
+            .await
     }
 
-    async fn flush(&self) -> Result<(), zx::Status> {
-        self.partition.flush().await
+    async fn flush(&self, trace_flow_id: Option<NonZero<u64>>) -> Result<(), zx::Status> {
+        self.partition.flush(trace_flow_id).await
     }
 
-    async fn trim(&self, device_block_offset: u64, block_count: u32) -> Result<(), zx::Status> {
-        self.partition.trim(device_block_offset, block_count).await
+    async fn trim(
+        &self,
+        device_block_offset: u64,
+        block_count: u32,
+        trace_flow_id: Option<NonZero<u64>>,
+    ) -> Result<(), zx::Status> {
+        self.partition.trim(device_block_offset, block_count, trace_flow_id).await
     }
 }
 

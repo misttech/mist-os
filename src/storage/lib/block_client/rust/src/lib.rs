@@ -36,6 +36,9 @@ pub mod cache;
 
 const TEMP_VMO_SIZE: usize = 65536;
 
+/// If a trace flow ID isn't specified for requests, one will be generated.
+pub const NO_TRACE_ID: u64 = 0;
+
 pub use block_driver::{BlockIoFlag, BlockOpcode};
 
 fn fidl_to_status(error: fidl::Error) -> zx::Status {
@@ -272,13 +275,15 @@ pub trait BlockClient: Send + Sync {
         &self,
         buffer_slice: MutableBufferSlice<'_>,
         device_offset: u64,
-    ) -> Result<(), zx::Status>;
+    ) -> Result<(), zx::Status> {
+        self.read_at_traced(buffer_slice, device_offset, 0).await
+    }
 
-    async fn write_at_with_opts(
+    async fn read_at_traced(
         &self,
-        buffer_slice: BufferSlice<'_>,
+        buffer_slice: MutableBufferSlice<'_>,
         device_offset: u64,
-        opts: WriteOptions,
+        trace_flow_id: u64,
     ) -> Result<(), zx::Status>;
 
     /// Writes the data in |buffer_slice| to the device.
@@ -287,14 +292,49 @@ pub trait BlockClient: Send + Sync {
         buffer_slice: BufferSlice<'_>,
         device_offset: u64,
     ) -> Result<(), zx::Status> {
-        self.write_at_with_opts(buffer_slice, device_offset, WriteOptions::empty()).await
+        self.write_at_with_opts_traced(
+            buffer_slice,
+            device_offset,
+            WriteOptions::empty(),
+            NO_TRACE_ID,
+        )
+        .await
     }
 
+    async fn write_at_with_opts(
+        &self,
+        buffer_slice: BufferSlice<'_>,
+        device_offset: u64,
+        opts: WriteOptions,
+    ) -> Result<(), zx::Status> {
+        self.write_at_with_opts_traced(buffer_slice, device_offset, opts, NO_TRACE_ID).await
+    }
+
+    async fn write_at_with_opts_traced(
+        &self,
+        buffer_slice: BufferSlice<'_>,
+        device_offset: u64,
+        opts: WriteOptions,
+        trace_flow_id: u64,
+    ) -> Result<(), zx::Status>;
+
     /// Trims the given range on the block device.
-    async fn trim(&self, device_range: Range<u64>) -> Result<(), zx::Status>;
+    async fn trim(&self, device_range: Range<u64>) -> Result<(), zx::Status> {
+        self.trim_traced(device_range, NO_TRACE_ID).await
+    }
+
+    async fn trim_traced(
+        &self,
+        device_range: Range<u64>,
+        trace_flow_id: u64,
+    ) -> Result<(), zx::Status>;
+
+    async fn flush(&self) -> Result<(), zx::Status> {
+        self.flush_traced(NO_TRACE_ID).await
+    }
 
     /// Sends a flush request to the underlying block device.
-    async fn flush(&self) -> Result<(), zx::Status>;
+    async fn flush_traced(&self, trace_flow_id: u64) -> Result<(), zx::Status>;
 
     /// Closes the fifo.
     async fn close(&self) -> Result<(), zx::Status>;
@@ -369,7 +409,7 @@ impl Common {
                     "request id in use!"
                 );
                 request.reqid = request_id;
-                if request.trace_flow_id == 0 {
+                if request.trace_flow_id == NO_TRACE_ID {
                     request.trace_flow_id = generate_trace_flow_id(request_id);
                 }
                 let trace_flow_id = request.trace_flow_id;
@@ -405,6 +445,7 @@ impl Common {
         &self,
         buffer_slice: MutableBufferSlice<'_>,
         device_offset: u64,
+        trace_flow_id: u64,
     ) -> Result<(), zx::Status> {
         match buffer_slice {
             MutableBufferSlice::VmoId { vmo_id, offset, length } => {
@@ -421,6 +462,7 @@ impl Common {
                         .map_err(|_| zx::Status::INVALID_ARGS)?,
                     vmo_offset: self.to_blocks(offset)?,
                     dev_offset: self.to_blocks(device_offset)?,
+                    trace_flow_id,
                     ..Default::default()
                 })
                 .await?
@@ -441,6 +483,7 @@ impl Common {
                         length: block_count,
                         vmo_offset: 0,
                         dev_offset: device_block,
+                        trace_flow_id,
                         ..Default::default()
                     })
                     .await?;
@@ -461,6 +504,7 @@ impl Common {
         buffer_slice: BufferSlice<'_>,
         device_offset: u64,
         opts: WriteOptions,
+        trace_flow_id: u64,
     ) -> Result<(), zx::Status> {
         let flags = if opts.contains(WriteOptions::FORCE_ACCESS) {
             BlockIoFlag::FORCE_ACCESS.bits()
@@ -482,6 +526,7 @@ impl Common {
                         .map_err(|_| zx::Status::INVALID_ARGS)?,
                     vmo_offset: self.to_blocks(offset)?,
                     dev_offset: self.to_blocks(device_offset)?,
+                    trace_flow_id,
                     ..Default::default()
                 })
                 .await?;
@@ -503,6 +548,7 @@ impl Common {
                         length: block_count,
                         vmo_offset: 0,
                         dev_offset: device_block,
+                        trace_flow_id,
                         ..Default::default()
                     })
                     .await?;
@@ -517,7 +563,7 @@ impl Common {
         Ok(())
     }
 
-    async fn trim(&self, device_range: Range<u64>) -> Result<(), zx::Status> {
+    async fn trim(&self, device_range: Range<u64>, trace_flow_id: u64) -> Result<(), zx::Status> {
         let length = self.to_blocks(device_range.end - device_range.start)? as u32;
         let dev_offset = self.to_blocks(device_range.start)?;
         self.send(BlockFifoRequest {
@@ -529,12 +575,13 @@ impl Common {
             vmoid: block_driver::BLOCK_VMOID_INVALID,
             length,
             dev_offset,
+            trace_flow_id,
             ..Default::default()
         })
         .await
     }
 
-    async fn flush(&self) -> Result<(), zx::Status> {
+    async fn flush(&self, trace_flow_id: u64) -> Result<(), zx::Status> {
         self.send(BlockFifoRequest {
             command: BlockFifoCommand {
                 opcode: BlockOpcode::Flush.into_primitive(),
@@ -542,6 +589,7 @@ impl Common {
                 ..Default::default()
             },
             vmoid: block_driver::BLOCK_VMOID_INVALID,
+            trace_flow_id,
             ..Default::default()
         })
         .await
@@ -651,29 +699,31 @@ impl BlockClient for RemoteBlockClient {
         self.common.detach_vmo(vmo_id).await
     }
 
-    async fn read_at(
+    async fn read_at_traced(
         &self,
         buffer_slice: MutableBufferSlice<'_>,
         device_offset: u64,
+        trace_flow_id: u64,
     ) -> Result<(), zx::Status> {
-        self.common.read_at(buffer_slice, device_offset).await
+        self.common.read_at(buffer_slice, device_offset, trace_flow_id).await
     }
 
-    async fn write_at_with_opts(
+    async fn write_at_with_opts_traced(
         &self,
         buffer_slice: BufferSlice<'_>,
         device_offset: u64,
         opts: WriteOptions,
+        trace_flow_id: u64,
     ) -> Result<(), zx::Status> {
-        self.common.write_at(buffer_slice, device_offset, opts).await
+        self.common.write_at(buffer_slice, device_offset, opts, trace_flow_id).await
     }
 
-    async fn trim(&self, range: Range<u64>) -> Result<(), zx::Status> {
-        self.common.trim(range).await
+    async fn trim_traced(&self, range: Range<u64>, trace_flow_id: u64) -> Result<(), zx::Status> {
+        self.common.trim(range, trace_flow_id).await
     }
 
-    async fn flush(&self) -> Result<(), zx::Status> {
-        self.common.flush().await
+    async fn flush_traced(&self, trace_flow_id: u64) -> Result<(), zx::Status> {
+        self.common.flush(trace_flow_id).await
     }
 
     async fn close(&self) -> Result<(), zx::Status> {
@@ -764,7 +814,7 @@ impl RemoteBlockClientSync {
         buffer_slice: MutableBufferSlice<'_>,
         device_offset: u64,
     ) -> Result<(), zx::Status> {
-        block_on(self.common.read_at(buffer_slice, device_offset))
+        block_on(self.common.read_at(buffer_slice, device_offset, NO_TRACE_ID))
     }
 
     pub fn write_at(
@@ -772,11 +822,16 @@ impl RemoteBlockClientSync {
         buffer_slice: BufferSlice<'_>,
         device_offset: u64,
     ) -> Result<(), zx::Status> {
-        block_on(self.common.write_at(buffer_slice, device_offset, WriteOptions::empty()))
+        block_on(self.common.write_at(
+            buffer_slice,
+            device_offset,
+            WriteOptions::empty(),
+            NO_TRACE_ID,
+        ))
     }
 
     pub fn flush(&self) -> Result<(), zx::Status> {
-        block_on(self.common.flush())
+        block_on(self.common.flush(NO_TRACE_ID))
     }
 
     pub fn close(&self) -> Result<(), zx::Status> {
@@ -867,6 +922,7 @@ mod tests {
     use futures::stream::StreamExt as _;
     use ramdevice_client::RamdiskClient;
     use std::borrow::Cow;
+    use std::num::NonZero;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
 
@@ -1292,6 +1348,7 @@ mod tests {
                 _block_count: u32,
                 _vmo: &Arc<zx::Vmo>,
                 _vmo_offset: u64,
+                _trace_flow_id: Option<NonZero<u64>>,
             ) -> Result<(), zx::Status> {
                 unreachable!();
             }
@@ -1303,11 +1360,12 @@ mod tests {
                 _vmo: &Arc<zx::Vmo>,
                 _vmo_offset: u64,
                 _opts: WriteOptions,
+                _trace_flow_id: Option<NonZero<u64>>,
             ) -> Result<(), zx::Status> {
                 unreachable!();
             }
 
-            async fn flush(&self) -> Result<(), zx::Status> {
+            async fn flush(&self, _trace_flow_id: Option<NonZero<u64>>) -> Result<(), zx::Status> {
                 self.flush_called.store(true, Ordering::Relaxed);
                 Ok(())
             }
@@ -1316,6 +1374,7 @@ mod tests {
                 &self,
                 _device_block_offset: u64,
                 _block_count: u32,
+                _trace_flow_id: Option<NonZero<u64>>,
             ) -> Result<(), zx::Status> {
                 unreachable!();
             }

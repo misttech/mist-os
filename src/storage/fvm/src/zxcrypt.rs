@@ -49,7 +49,7 @@ impl Key {
         // Read the first block which contains Zxcrypt's header.
         let block_size = fvm.device.block_size() as usize;
         let mut data = AlignedMem::<ZxcryptHeaderAndKey>::new(block_size);
-        fvm.do_io(ReadToMem::new(&fvm.device, &mut data), partition_index, 0, 1).await?;
+        fvm.do_io(ReadToMem::new(&fvm.device, &mut data), partition_index, 0, 1, 0).await?;
         let (zxcrypt_header, _) = ZxcryptHeaderAndKey::ref_from_prefix(&data).unwrap();
 
         ensure!(zxcrypt_header.magic == ZXCRYPT_MAGIC, zx::Status::WRONG_TYPE);
@@ -97,7 +97,7 @@ impl Key {
 
         // Make sure the first two slices are allocated.
         fvm.ensure_allocated(partition_index, 2).await?;
-        fvm.do_io(WriteFromMem::new(&fvm.device, &data), partition_index, 0, 1).await?;
+        fvm.do_io(WriteFromMem::new(&fvm.device, &data), partition_index, 0, 1, 0).await?;
 
         Ok(Self {
             data_cipher: Aes256::new(GenericArray::from_slice(&unwrapped_key[..32])),
@@ -107,6 +107,12 @@ impl Key {
     }
 }
 
+struct Op {
+    offset: u64,
+    len: u64,
+    trace_flow_id: u64,
+}
+
 pub struct EncryptedRead<'a> {
     device: &'a Device,
     key: &'a Key,
@@ -114,7 +120,7 @@ pub struct EncryptedRead<'a> {
     target_vmo: &'a zx::Vmo,
     vmo_offset: u64,
     buffer: BufferGuard<'a, RemoteBlockClient>,
-    ops: Vec<(u64, u64)>,
+    ops: Vec<Op>,
     queued_len: u64,
 }
 
@@ -140,19 +146,24 @@ impl<'a> EncryptedRead<'a> {
 }
 
 impl IoTrait for EncryptedRead<'_> {
-    async fn add_op(&mut self, mut offset: u64, mut len: u64) -> Result<(), zx::Status> {
+    async fn add_op(
+        &mut self,
+        mut offset: u64,
+        mut len: u64,
+        trace_flow_id: u64,
+    ) -> Result<(), zx::Status> {
         loop {
             let space = BUFFER_SIZE as u64 - self.queued_len;
             if space >= len {
                 break;
             }
-            self.ops.push((offset, space));
+            self.ops.push(Op { offset, len: space, trace_flow_id });
             self.queued_len += space;
             self.flush().await?;
             offset += space;
             len -= space;
         }
-        self.ops.push((offset, len));
+        self.ops.push(Op { offset, len, trace_flow_id });
         self.queued_len += len;
         Ok(())
     }
@@ -160,18 +171,21 @@ impl IoTrait for EncryptedRead<'_> {
     async fn flush(&mut self) -> Result<(), zx::Status> {
         // Read into the buffer.
         let mut buf_offset = 0;
-        let futures = FuturesUnordered::from_iter(self.ops.drain(..).map(|(offset, len)| {
-            let fut = self.device.read_at(
-                MutableBufferSlice::new_with_vmo_id(
-                    self.buffer.vmo_id(),
-                    self.buffer.vmo_offset() + buf_offset,
-                    len,
-                ),
-                offset,
-            );
-            buf_offset += len;
-            fut
-        }));
+        let futures = FuturesUnordered::from_iter(self.ops.drain(..).map(
+            |Op { offset, len, trace_flow_id }| {
+                let fut = self.device.read_at_traced(
+                    MutableBufferSlice::new_with_vmo_id(
+                        self.buffer.vmo_id(),
+                        self.buffer.vmo_offset() + buf_offset,
+                        len,
+                    ),
+                    offset,
+                    trace_flow_id,
+                );
+                buf_offset += len;
+                fut
+            },
+        ));
         self.queued_len = 0;
         let () = futures.try_collect().await?;
 
@@ -201,7 +215,7 @@ pub struct EncryptedWrite<'a> {
     vmo_offset: u64,
     options: WriteOptions,
     buffer: BufferGuard<'a, RemoteBlockClient>,
-    ops: Vec<(u64, u64)>,
+    ops: Vec<Op>,
     queued_len: u64,
 }
 
@@ -229,19 +243,24 @@ impl<'a> EncryptedWrite<'a> {
 }
 
 impl IoTrait for EncryptedWrite<'_> {
-    async fn add_op(&mut self, mut offset: u64, mut len: u64) -> Result<(), zx::Status> {
+    async fn add_op(
+        &mut self,
+        mut offset: u64,
+        mut len: u64,
+        trace_flow_id: u64,
+    ) -> Result<(), zx::Status> {
         loop {
             let space = BUFFER_SIZE as u64 - self.queued_len;
             if space >= len {
                 break;
             }
-            self.ops.push((offset, space));
+            self.ops.push(Op { offset, len: space, trace_flow_id });
             self.queued_len += space;
             self.flush().await?;
             offset += space;
             len -= space;
         }
-        self.ops.push((offset, len));
+        self.ops.push(Op { offset, len, trace_flow_id });
         self.queued_len += len;
         Ok(())
     }
@@ -264,8 +283,8 @@ impl IoTrait for EncryptedWrite<'_> {
 
         // Write to the device.
         let mut buf_offset = 0;
-        FuturesUnordered::from_iter(self.ops.drain(..).map(|(offset, len)| {
-            let fut = self.device.write_at_with_opts(
+        FuturesUnordered::from_iter(self.ops.drain(..).map(|Op { offset, len, trace_flow_id }| {
+            let fut = self.device.write_at_with_opts_traced(
                 BufferSlice::new_with_vmo_id(
                     self.buffer.vmo_id(),
                     self.buffer.vmo_offset() + buf_offset,
@@ -273,6 +292,7 @@ impl IoTrait for EncryptedWrite<'_> {
                 ),
                 offset,
                 self.options,
+                trace_flow_id,
             );
             buf_offset += len;
             fut

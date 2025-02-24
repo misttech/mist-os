@@ -7,6 +7,7 @@ use block_server::async_interface::{Interface, SessionManager};
 use block_server::{BlockServer, PartitionInfo, WriteOptions};
 use fidl::endpoints::Proxy as _;
 use std::borrow::Cow;
+use std::num::NonZero;
 use std::sync::Arc;
 use {
     fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume,
@@ -165,6 +166,7 @@ impl Interface for Data {
         block_count: u32,
         vmo: &Arc<zx::Vmo>,
         vmo_offset: u64,
+        _trace_flow_id: Option<NonZero<u64>>,
     ) -> Result<(), zx::Status> {
         if let Some(observer) = self.observer.as_ref() {
             observer.read(device_block_offset, block_count, vmo, vmo_offset);
@@ -185,6 +187,7 @@ impl Interface for Data {
         vmo: &Arc<zx::Vmo>,
         vmo_offset: u64,
         opts: WriteOptions,
+        _trace_flow_id: Option<NonZero<u64>>,
     ) -> Result<(), zx::Status> {
         if let Some(observer) = self.observer.as_ref() {
             match observer.write(device_block_offset, block_count, vmo, vmo_offset, opts) {
@@ -199,14 +202,19 @@ impl Interface for Data {
         )
     }
 
-    async fn flush(&self) -> Result<(), zx::Status> {
+    async fn flush(&self, _trace_flow_id: Option<NonZero<u64>>) -> Result<(), zx::Status> {
         if let Some(observer) = self.observer.as_ref() {
             observer.flush();
         }
         Ok(())
     }
 
-    async fn trim(&self, device_block_offset: u64, block_count: u32) -> Result<(), zx::Status> {
+    async fn trim(
+        &self,
+        device_block_offset: u64,
+        block_count: u32,
+        _trace_flow_id: Option<NonZero<u64>>,
+    ) -> Result<(), zx::Status> {
         if let Some(observer) = self.observer.as_ref() {
             observer.trim(device_block_offset, block_count);
         }

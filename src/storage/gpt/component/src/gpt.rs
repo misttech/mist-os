@@ -15,6 +15,7 @@ use block_server::BlockServer;
 use futures::lock::Mutex;
 use futures::stream::TryStreamExt as _;
 use std::collections::BTreeMap;
+use std::num::NonZero;
 use std::ops::Range;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
@@ -31,6 +32,10 @@ pub struct GptPartition {
     block_client: Arc<RemoteBlockClient>,
     block_range: Range<u64>,
     index: u32,
+}
+
+fn trace_id(trace_flow_id: Option<NonZero<u64>>) -> u64 {
+    trace_flow_id.map(|v| v.get()).unwrap_or_default()
 }
 
 impl GptPartition {
@@ -90,6 +95,7 @@ impl GptPartition {
         block_count: u32,
         vmo_id: &VmoId,
         vmo_offset: u64, // *bytes* not blocks
+        trace_flow_id: Option<NonZero<u64>>,
     ) -> Result<(), zx::Status> {
         let dev_offset = self
             .absolute_offset(device_block_offset, block_count)
@@ -99,7 +105,7 @@ impl GptPartition {
             vmo_offset,
             (block_count * self.block_size()) as u64,
         );
-        self.block_client.read_at(buffer, dev_offset).await
+        self.block_client.read_at_traced(buffer, dev_offset, trace_id(trace_flow_id)).await
     }
 
     pub async fn write(
@@ -109,6 +115,7 @@ impl GptPartition {
         vmo_id: &VmoId,
         vmo_offset: u64, // *bytes* not blocks
         opts: WriteOptions,
+        trace_flow_id: Option<NonZero<u64>>,
     ) -> Result<(), zx::Status> {
         let dev_offset = self
             .absolute_offset(device_block_offset, block_count)
@@ -118,20 +125,28 @@ impl GptPartition {
             vmo_offset,
             (block_count * self.block_size()) as u64,
         );
-        self.block_client.write_at_with_opts(buffer, dev_offset, opts).await
+        self.block_client
+            .write_at_with_opts_traced(buffer, dev_offset, opts, trace_id(trace_flow_id))
+            .await
     }
 
-    pub async fn flush(&self) -> Result<(), zx::Status> {
-        self.block_client.flush().await
+    pub async fn flush(&self, trace_flow_id: Option<NonZero<u64>>) -> Result<(), zx::Status> {
+        self.block_client.flush_traced(trace_id(trace_flow_id)).await
     }
 
     pub async fn trim(
         &self,
         mut device_block_offset: u64,
         block_count: u32,
+        trace_flow_id: Option<NonZero<u64>>,
     ) -> Result<(), zx::Status> {
         device_block_offset = self.absolute_offset(device_block_offset, block_count)?;
-        self.block_client.trim(device_block_offset..device_block_offset + block_count as u64).await
+        self.block_client
+            .trim_traced(
+                device_block_offset..device_block_offset + block_count as u64,
+                trace_id(trace_flow_id),
+            )
+            .await
     }
 
     // Converts a relative range specified by [offset, offset+len) into an absolute offset in the
