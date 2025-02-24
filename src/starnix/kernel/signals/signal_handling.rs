@@ -407,6 +407,8 @@ pub fn dispatch_signal_handler(
         stack_bottom.checked_sub(SIG_STACK_SIZE as u64).ok_or_else(|| errno!(EINVAL))?,
     );
 
+    // Check that if the stack pointer is inside altstack, the entire signal stack is inside
+    // altstack.
     if let Some(alt_stack) = signal_state.alt_stack {
         if sigaltstack_contains_pointer(&alt_stack, stack_pointer)
             != sigaltstack_contains_pointer(&alt_stack, stack_bottom)
