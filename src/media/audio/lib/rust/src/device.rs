@@ -40,6 +40,12 @@ impl From<fadevice::DeviceType> for Type {
     }
 }
 
+impl From<Type> for fadevice::DeviceType {
+    fn from(value: Type) -> Self {
+        value.0
+    }
+}
+
 impl FromStr for Type {
     type Err = String;
 

@@ -1663,7 +1663,7 @@ async fn get_hardware_info(
 ) -> Result<HardwareInfo> {
     let protocol_path = selector.relative_path();
 
-    match selector.device_type().0 {
+    match fadevice::DeviceType::from(selector.device_type()) {
         fadevice::DeviceType::Codec => {
             let codec = connect::connect_hw_codec(dev_class, protocol_path.as_str())?;
             let codec_info = get_hw_codec_info(&codec).await?;

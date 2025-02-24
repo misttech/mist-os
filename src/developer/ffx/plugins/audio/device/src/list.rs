@@ -67,7 +67,8 @@ impl QueryExt for DevfsSelector {
             is_match = is_match && (name == &self.0.name);
         }
         if let Some(device_type) = &query.device_type {
-            is_match = is_match && (device_type.0 == self.0.device_type);
+            is_match =
+                is_match && (fadevice::DeviceType::from(device_type.clone()) == self.0.device_type);
         }
         is_match
     }
