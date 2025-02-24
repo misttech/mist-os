@@ -2522,8 +2522,7 @@ impl FsNode {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        // TODO: https://fxbug.dev/397357288 - upgrade to security::check_task_capable.
-        if !current_task.creds().has_capability(CAP_FSETID) {
+        if !security::check_task_capable_noaudit(current_task, CAP_FSETID) {
             self.update_attributes(locked, current_task, |info| {
                 info.clear_suid_and_sgid_bits();
                 Ok(())
