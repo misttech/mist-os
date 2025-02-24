@@ -10,7 +10,6 @@
             "container",
         ],
         init: [],
-        init_user: "root:x:0:0",
         kernel_cmdline: "",
         mounts: [
             "/:remote_bundle:data/system:nosuid,nodev,relatime",
