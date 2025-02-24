@@ -79,7 +79,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2113
+From //build/config/BUILDCONFIG.gn:2114
 
 ### allowed_test_device_types
 
@@ -722,7 +722,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8722097800076068321"`
+**Current value for `target_cpu = "arm64"`:** `"8722052494083846673"`
 
 From //out/not-default/args.gn:10
 
@@ -730,7 +730,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8722097800076068321"`
+**Current value for `target_cpu = "riscv64"`:** `"8722052494083846673"`
 
 From //out/not-default/args.gn:10
 
@@ -738,7 +738,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8722097800076068321"`
+**Current value for `target_cpu = "x64"`:** `"8722052494083846673"`
 
 From //out/not-default/args.gn:10
 
@@ -1141,7 +1141,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.hwasan.a"
-  clang_rt_cxx = "../../../../out/not-default/libclang_rt.hwasan_cxx.a"
+  clang_rt_cxx = ""
 }
 }
   lsan = {
@@ -1213,7 +1213,7 @@ This should never be set as a build argument.
 }
   tsan = {
   shared = {
-  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
+  clang_rt = ""
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
@@ -2847,7 +2847,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1893
+From //build/config/BUILDCONFIG.gn:1894
 
 ### fastboot_product
 
@@ -3476,7 +3476,7 @@ and the analysis overhead turned off by default.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:27
+From //build/config/BUILDCONFIG.gn:28
 
 ### is_debug
 
@@ -3824,7 +3824,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1685
+From //build/config/BUILDCONFIG.gn:1686
 
 ### legacy_base_package_labels
 
@@ -4671,7 +4671,7 @@ Sets if we should output breakpad symbols for Fuchsia binaries.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:30
+From //build/config/BUILDCONFIG.gn:31
 
 ### output_gsym
 
@@ -4679,7 +4679,7 @@ Controls whether we should output GSYM files for Fuchsia binaries.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:33
+From //build/config/BUILDCONFIG.gn:34
 
 ### override_idk_buildable_api_levels
 
@@ -5642,7 +5642,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2103
+From //build/config/BUILDCONFIG.gn:2104
 
 ### select_variant_canonical
 
@@ -5652,7 +5652,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2108
+From //build/config/BUILDCONFIG.gn:2109
 
 ### select_variant_shortcuts
 
@@ -5717,7 +5717,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1900
+From //build/config/BUILDCONFIG.gn:1901
 
 ### size_checker_input
 
@@ -6179,7 +6179,7 @@ for details and documentation for each field.
 }
 ```
 
-From //build/config/BUILDCONFIG.gn:99
+From //build/config/BUILDCONFIG.gn:100
 
 ### truncate_build_info_commit_date
 
@@ -6746,7 +6746,7 @@ This allows testing for a Zircon-specific toolchain with:
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:116
+From //build/config/BUILDCONFIG.gn:117
 
 ### zircon_tracelog
 
