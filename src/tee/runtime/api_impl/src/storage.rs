@@ -170,31 +170,11 @@ impl<const SIZE_MIN: u32, const SIZE_MAX: u32, const SIZE_MULTIPLE: u32> KeyType
 }
 
 pub type AesKey = SimpleSymmetricKey<128, 256, 64>; // 128, 192, or 256
-pub type DesKey = SimpleSymmetricKey<64, 64, 64>; // 64
-pub type Des3Key = SimpleSymmetricKey<128, 192, 64>; // 128 or 192
-pub type Sm4Key = SimpleSymmetricKey<128, 128, 128>; // 128
-pub type HmacMd5Key = SimpleSymmetricKey<64, 512, 8>;
 pub type HmacSha1Key = SimpleSymmetricKey<80, 512, 8>;
 pub type HmacSha224Key = SimpleSymmetricKey<112, 512, 8>;
 pub type HmacSha256Key = SimpleSymmetricKey<192, 1024, 8>;
 pub type HmacSha384Key = SimpleSymmetricKey<256, 512, 8>;
 pub type HmacSha512Key = SimpleSymmetricKey<256, 512, 8>;
-pub type HmacSha3_224Key = SimpleSymmetricKey<192, 1024, 8>;
-pub type HmacSha3_256Key = SimpleSymmetricKey<256, 1024, 8>;
-pub type HmacSha3_384Key = SimpleSymmetricKey<256, 512, 8>;
-pub type HmacSha3_512Key = SimpleSymmetricKey<256, 512, 8>;
-pub type HmacSm3Key = SimpleSymmetricKey<80, 1024, 8>;
-pub type GenericSecretKey = SimpleSymmetricKey<8, 4096, 8>;
-
-// TODO(https://fxbug.dev/371213067): Properly implement KeyType.
-#[allow(dead_code)]
-#[derive(Clone)]
-pub struct RsaPublicKey {
-    modulus: Vec<u8>,  // TEE_ATTR_RSA_MODULUS
-    exponent: Vec<u8>, // TEE_ATTR_RSA_PUBLIC_EXPONENT
-}
-
-impl KeyType for RsaPublicKey {}
 
 // TODO(https://fxbug.dev/371213067): Properly implement KeyType.
 #[allow(dead_code)]
@@ -212,57 +192,6 @@ pub struct RsaKeypair {
 }
 
 impl KeyType for RsaKeypair {}
-
-// TODO(https://fxbug.dev/371213067): Properly implement KeyType.
-#[allow(dead_code)]
-#[derive(Clone)]
-pub struct DsaPublicKey {
-    prime: Vec<u8>,    // TEE_ATTR_DSA_PRIME
-    subprime: Vec<u8>, // TEE_ATTR_DSA_SUBPRIME
-    base: Vec<u8>,     // TEE_ATTR_DSA_BASE
-    public: Vec<u8>,   // TEE_ATTR_DSA_PUBLIC_VALUE
-}
-
-impl KeyType for DsaPublicKey {}
-
-// TODO(https://fxbug.dev/371213067): Properly implement KeyType.
-#[allow(dead_code)]
-#[derive(Clone)]
-pub struct DsaKeypair {
-    prime: Vec<u8>,    // TEE_ATTR_DSA_PRIME
-    subprime: Vec<u8>, // TEE_ATTR_DSA_SUBPRIME
-    base: Vec<u8>,     // TEE_ATTR_DSA_BASE
-    public: Vec<u8>,   // TEE_ATTR_DSA_PUBLIC_VALUE
-    private: Vec<u8>,  // TEE_ATTR_DSA_PRIVATE_VALUE
-}
-
-impl KeyType for DsaKeypair {}
-
-// TODO(https://fxbug.dev/371213067): Properly implement KeyType.
-#[allow(dead_code)]
-#[derive(Clone)]
-pub struct DhKeypair {
-    prime: Vec<u8>,   // TEE_ATTR_DH_PRIME
-    base: Vec<u8>,    // TEE_ATTR_DH_BASE
-    public: Vec<u8>,  // TEE_ATTR_DH_PUBLIC_VALUE
-    private: Vec<u8>, // TEE_ATTR_DH_PRIVATE_VALUE
-
-    subprime: Vec<u8>,   // TEE_ATTR_DH_SUBPRIME
-    x_bits: ValueFields, // TEE_ATTR_DH_X_BITS
-}
-
-impl KeyType for DhKeypair {}
-
-// TODO(https://fxbug.dev/371213067): Properly implement KeyType.
-#[allow(dead_code)]
-#[derive(Clone)]
-pub struct EccPublicKey {
-    x: Vec<u8>,         // TEE_ATTR_ECC_PUBLIC_VALUE_X
-    y: Vec<u8>,         // TEE_ATTR_ECC_PUBLIC_VALUE_Y
-    curve: ValueFields, // TEE_ATTR_ECC_CURVE
-}
-
-impl KeyType for EccPublicKey {}
 
 // TODO(https://fxbug.dev/371213067): Properly implement KeyType.
 #[allow(dead_code)]
@@ -310,40 +239,14 @@ impl KeyType for NoKey {
 #[derive(Clone)]
 pub enum Key {
     Aes(AesKey),
-    Des(DesKey),
-    Des3(Des3Key),
-    HmacMd5(HmacMd5Key),
     HmacSha1(HmacSha1Key),
     HmacSha224(HmacSha224Key),
     HmacSha256(HmacSha256Key),
     HmacSha384(HmacSha384Key),
     HmacSha512(HmacSha512Key),
-    HmacSha3_224(HmacSha3_224Key),
-    HmacSha3_256(HmacSha3_256Key),
-    HmacSha3_384(HmacSha3_384Key),
-    HmacSha3_512(HmacSha3_512Key),
-    RsaPublicKey(RsaPublicKey),
     RsaKeypair(RsaKeypair),
-    DsaPublicKey(DsaPublicKey),
-    DsaKeypair(DsaKeypair),
-    DhKeypair(DhKeypair),
-    EcdsaPublicKey(EccPublicKey),
     EcdsaKeypair(EccKeypair),
-    EcdhPublicKey(EccPublicKey),
     EcdhKeypair(EccKeypair),
-    Ed25519PublicKey(EccPublicKey),
-    Ed25519Keypair(EccKeypair),
-    X25519PublicKey(EccPublicKey),
-    X25519Keypair(EccKeypair),
-    Sm2DsaPublicKey(EccPublicKey),
-    Sm2DsaKeypair(EccKeypair),
-    Sm2KepPublicKey(EccPublicKey),
-    Sm2KepKeypair(EccKeypair),
-    Sm2PkePublicKey(EccPublicKey),
-    Sm2PkeKeypair(EccKeypair),
-    Sm4(Sm4Key),
-    HmacSm3(HmacSm3Key),
-    GenericSecret(GenericSecretKey),
     Data(NoKey),
 }
 
@@ -352,40 +255,14 @@ macro_rules! get_key_variant {
     ($key:ident) => {
         match $key {
             Key::Aes(key) => key,
-            Key::Des(key) => key,
-            Key::Des3(key) => key,
-            Key::HmacMd5(key) => key,
             Key::HmacSha1(key) => key,
             Key::HmacSha224(key) => key,
             Key::HmacSha256(key) => key,
             Key::HmacSha384(key) => key,
             Key::HmacSha512(key) => key,
-            Key::HmacSha3_224(key) => key,
-            Key::HmacSha3_256(key) => key,
-            Key::HmacSha3_384(key) => key,
-            Key::HmacSha3_512(key) => key,
-            Key::RsaPublicKey(key) => key,
             Key::RsaKeypair(key) => key,
-            Key::DsaPublicKey(key) => key,
-            Key::DsaKeypair(key) => key,
-            Key::DhKeypair(key) => key,
-            Key::EcdsaPublicKey(key) => key,
             Key::EcdsaKeypair(key) => key,
-            Key::EcdhPublicKey(key) => key,
             Key::EcdhKeypair(key) => key,
-            Key::Ed25519PublicKey(key) => key,
-            Key::Ed25519Keypair(key) => key,
-            Key::X25519PublicKey(key) => key,
-            Key::X25519Keypair(key) => key,
-            Key::Sm2DsaPublicKey(key) => key,
-            Key::Sm2DsaKeypair(key) => key,
-            Key::Sm2KepPublicKey(key) => key,
-            Key::Sm2KepKeypair(key) => key,
-            Key::Sm2PkePublicKey(key) => key,
-            Key::Sm2PkeKeypair(key) => key,
-            Key::Sm4(key) => key,
-            Key::HmacSm3(key) => key,
-            Key::GenericSecret(key) => key,
             Key::Data(key) => key,
         }
     };
@@ -395,86 +272,30 @@ impl Key {
     pub fn new(type_: Type, max_size: u32) -> TeeResult<Key> {
         match type_ {
             Type::Aes => AesKey::new(max_size).map(Self::Aes),
-            Type::Des => DesKey::new(max_size).map(Self::Des),
-            Type::Des3 => Des3Key::new(max_size).map(Self::Des3),
-            Type::Md5 => HmacMd5Key::new(max_size).map(Self::HmacMd5),
             Type::HmacSha1 => HmacSha1Key::new(max_size).map(Self::HmacSha1),
             Type::HmacSha224 => HmacSha224Key::new(max_size).map(Self::HmacSha224),
             Type::HmacSha256 => HmacSha256Key::new(max_size).map(Self::HmacSha256),
             Type::HmacSha384 => HmacSha384Key::new(max_size).map(Self::HmacSha384),
             Type::HmacSha512 => HmacSha512Key::new(max_size).map(Self::HmacSha512),
-            Type::HmacSha3_224 => HmacSha3_224Key::new(max_size).map(Self::HmacSha3_224),
-            Type::HmacSha3_256 => HmacSha3_256Key::new(max_size).map(Self::HmacSha3_256),
-            Type::HmacSha3_384 => HmacSha3_384Key::new(max_size).map(Self::HmacSha3_384),
-            Type::HmacSha3_512 => HmacSha3_512Key::new(max_size).map(Self::HmacSha3_512),
-            Type::RsaPublicKey => RsaPublicKey::new(max_size).map(Self::RsaPublicKey),
             Type::RsaKeypair => RsaKeypair::new(max_size).map(Self::RsaKeypair),
-            Type::DsaPublicKey => DsaPublicKey::new(max_size).map(Self::DsaPublicKey),
-            Type::DsaKeypair => DsaKeypair::new(max_size).map(Self::DsaKeypair),
-            Type::DhKeypair => DhKeypair::new(max_size).map(Self::DhKeypair),
-            Type::EcdsaPublicKey => EccPublicKey::new(max_size).map(Self::EcdsaPublicKey),
             Type::EcdsaKeypair => EccKeypair::new(max_size).map(Self::EcdsaKeypair),
-            Type::EcdhPublicKey => EccPublicKey::new(max_size).map(Self::EcdhPublicKey),
             Type::EcdhKeypair => EccKeypair::new(max_size).map(Self::EcdhKeypair),
-            Type::Ed25519PublicKey => EccPublicKey::new(max_size).map(Self::Ed25519PublicKey),
-            Type::Ed25519Keypair => EccKeypair::new(max_size).map(Self::Ed25519Keypair),
-            Type::X25519PublicKey => EccPublicKey::new(max_size).map(Self::X25519PublicKey),
-            Type::X25519Keypair => EccKeypair::new(max_size).map(Self::X25519Keypair),
-            Type::Sm2DsaPublicKey => EccPublicKey::new(max_size).map(Self::Sm2DsaPublicKey),
-            Type::Sm2DsaKeypair => EccKeypair::new(max_size).map(Self::Sm2DsaKeypair),
-            Type::Sm2KepPublicKey => EccPublicKey::new(max_size).map(Self::Sm2KepPublicKey),
-            Type::Sm2KepKeypair => EccKeypair::new(max_size).map(Self::Sm2KepKeypair),
-            Type::Sm2PkePublicKey => EccPublicKey::new(max_size).map(Self::Sm2PkePublicKey),
-            Type::Sm2PkeKeypair => EccKeypair::new(max_size).map(Self::Sm2PkeKeypair),
-            Type::Sm4 => Sm4Key::new(max_size).map(Self::Sm4),
-            Type::HmacSm3 => HmacSm3Key::new(max_size).map(Self::HmacSm3),
-            Type::GenericSecret => GenericSecretKey::new(max_size).map(Self::GenericSecret),
             Type::Data => NoKey::new(max_size).map(Self::Data),
-
-            // TODO(https://fxbug.dev/376093162): Handling of this type is
-            // absent from the spec.
-            Type::Hkdf => Err(Error::NotSupported),
-            Type::CorruptedObject => Err(Error::NotSupported),
+            _ => Err(Error::NotSupported),
         }
     }
 
     pub fn get_type(&self) -> Type {
         match self {
             Key::Aes(_) => Type::Aes,
-            Key::Des(_) => Type::Des,
-            Key::Des3(_) => Type::Des3,
-            Key::HmacMd5(_) => Type::Md5,
             Key::HmacSha1(_) => Type::HmacSha1,
             Key::HmacSha224(_) => Type::HmacSha224,
             Key::HmacSha256(_) => Type::HmacSha256,
             Key::HmacSha384(_) => Type::HmacSha384,
             Key::HmacSha512(_) => Type::HmacSha512,
-            Key::HmacSha3_224(_) => Type::HmacSha3_224,
-            Key::HmacSha3_256(_) => Type::HmacSha3_256,
-            Key::HmacSha3_384(_) => Type::HmacSha3_384,
-            Key::HmacSha3_512(_) => Type::HmacSha3_512,
-            Key::RsaPublicKey(_) => Type::RsaPublicKey,
             Key::RsaKeypair(_) => Type::RsaKeypair,
-            Key::DsaPublicKey(_) => Type::DsaPublicKey,
-            Key::DsaKeypair(_) => Type::DsaKeypair,
-            Key::DhKeypair(_) => Type::DhKeypair,
-            Key::EcdsaPublicKey(_) => Type::EcdsaPublicKey,
             Key::EcdsaKeypair(_) => Type::EcdsaKeypair,
-            Key::EcdhPublicKey(_) => Type::EcdhPublicKey,
             Key::EcdhKeypair(_) => Type::EcdhKeypair,
-            Key::Ed25519PublicKey(_) => Type::Ed25519PublicKey,
-            Key::Ed25519Keypair(_) => Type::Ed25519Keypair,
-            Key::X25519PublicKey(_) => Type::X25519PublicKey,
-            Key::X25519Keypair(_) => Type::X25519Keypair,
-            Key::Sm2DsaPublicKey(_) => Type::Sm2DsaPublicKey,
-            Key::Sm2DsaKeypair(_) => Type::Sm2DsaKeypair,
-            Key::Sm2KepPublicKey(_) => Type::Sm2KepPublicKey,
-            Key::Sm2KepKeypair(_) => Type::Sm2KepKeypair,
-            Key::Sm2PkePublicKey(_) => Type::Sm2PkePublicKey,
-            Key::Sm2PkeKeypair(_) => Type::Sm2PkeKeypair,
-            Key::Sm4(_) => Type::Sm4,
-            Key::HmacSm3(_) => Type::HmacSm3,
-            Key::GenericSecret(_) => Type::GenericSecret,
             Key::Data(_) => Type::Data,
         }
     }
