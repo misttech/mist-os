@@ -368,7 +368,7 @@ pub fn deliver_signal(
 /// Prepares `current` state to execute the signal handler stored in `action`.
 ///
 /// This function stores the state required to restore after the signal handler on the stack.
-pub fn dispatch_signal_handler(
+fn dispatch_signal_handler(
     task: &Task,
     registers: &mut RegisterState,
     extended_pstate: &ExtendedPstateState,
