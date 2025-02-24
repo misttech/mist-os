@@ -244,10 +244,10 @@ template("fidl_library") {
       _unversioned_libraries_used_by_sdk_prebuilts_or_ctf + [ library_name ] -
       [ library_name ] != _unversioned_libraries_used_by_sdk_prebuilts_or_ctf
 
-  # TODO(https://fxbug.dev/364422340): Remove when internal library properly versioned.
+  # TODO(https://fxbug.dev/364422340): Remove when the internal "zx" library is properly versioned.
   _is_internal_zx_library =
-      get_label_info(main_target_name, "label_no_toolchain") ==
-      "//zircon/vdso/zx:zx" && !defined(invoker.sdk_category)
+      get_label_info(":${main_target_name}", "label_no_toolchain") ==
+      "//zircon/vdso:zx" && !defined(invoker.sdk_category)
 
   # //sdk/banjo/fuchsia.sysmem is the only Banjo library with versioning.
   # Banjo libraries do not have an SDK category and are not marked stable,
