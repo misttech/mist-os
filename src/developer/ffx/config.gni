@@ -58,9 +58,6 @@ dual_mode_plugins = [
   "//src/developer/ffx/plugins/repository:ffx_repository",
 ]
 
-# The full set of plugins you'd expect in a 'large', fully integrated ffx
-all_ffx_plugins = required_ffx_plugins + dual_mode_plugins
-
 # Config default files from tools listed above so they can be included in
 # the build.
 dual_mode_defaults = [
