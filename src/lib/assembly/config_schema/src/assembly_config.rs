@@ -216,7 +216,6 @@ mod tests {
     use super::*;
     use crate::common::PackageSet;
     use crate::platform_config::media_config::{AudioConfig, PlatformMediaConfig};
-    // use crate::platform_config::swd_config::{OtaConfigs, UpdateChecker};
     use crate::platform_config::{BuildType, FeatureSupportLevel};
     use crate::product_config::ProductPackageDetails;
     use assembly_util as util;
