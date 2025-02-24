@@ -520,7 +520,7 @@ class WlanPolicyFCTests(unittest.TestCase):
 
             with self.subTest(msg="NetworkConfigChangeError"):
                 res = f_wlan_policy.ClientControllerRemoveNetworkResult()
-                res.err = (
+                res.err = int(
                     f_wlan_policy.NetworkConfigChangeError.CREDENTIAL_LEN_ERROR
                 )
                 client_controller.remove_network.return_value = _async_response(
@@ -535,7 +535,7 @@ class WlanPolicyFCTests(unittest.TestCase):
 
             with self.subTest(msg="ZxStatus"):
                 res = f_wlan_policy.ClientControllerRemoveNetworkResult()
-                res.err = (
+                res.err = int(
                     f_wlan_policy.NetworkConfigChangeError.CREDENTIAL_LEN_ERROR
                 )
                 client_controller.remove_network.reset_mock()
@@ -570,7 +570,7 @@ class WlanPolicyFCTests(unittest.TestCase):
 
             with self.subTest(msg="NetworkConfigChangeError"):
                 res = f_wlan_policy.ClientControllerSaveNetworkResult()
-                res.err = (
+                res.err = int(
                     f_wlan_policy.NetworkConfigChangeError.CREDENTIAL_LEN_ERROR
                 )
                 client_controller.save_network.return_value = _async_response(
@@ -585,7 +585,7 @@ class WlanPolicyFCTests(unittest.TestCase):
 
             with self.subTest(msg="ZxStatus"):
                 res = f_wlan_policy.ClientControllerSaveNetworkResult()
-                res.err = (
+                res.err = int(
                     f_wlan_policy.NetworkConfigChangeError.CREDENTIAL_LEN_ERROR
                 )
                 client_controller.save_network.reset_mock()

@@ -437,7 +437,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
             if res.err:
                 raise wlan_errors.HoneydewWlanError(
                     "ClientController.SaveNetworks() NetworkConfigChangeError "
-                    f"{res.err.name}"
+                    f"{res.err}"
                 )
         except ZxStatus as status:
             raise wlan_errors.HoneydewWlanError(
@@ -491,7 +491,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
             if res.err:
                 raise wlan_errors.HoneydewWlanError(
                     "ClientController.SaveNetworks() NetworkConfigChangeError "
-                    f"{res.err.name}"
+                    f"{res.err}"
                 )
         except ZxStatus as status:
             raise wlan_errors.HoneydewWlanError(
