@@ -722,7 +722,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8722052494083846673"`
+**Current value for `target_cpu = "arm64"`:** `"8722007190464897105"`
 
 From //out/not-default/args.gn:10
 
@@ -730,7 +730,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8722052494083846673"`
+**Current value for `target_cpu = "riscv64"`:** `"8722007190464897105"`
 
 From //out/not-default/args.gn:10
 
@@ -738,7 +738,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8722052494083846673"`
+**Current value for `target_cpu = "x64"`:** `"8722007190464897105"`
 
 From //out/not-default/args.gn:10
 
@@ -1046,7 +1046,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.lsan.a"
-  clang_rt_cxx = ""
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
 }
 }
   tsan = {
@@ -1054,7 +1054,7 @@ This should never be set as a build argument.
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
 }
   static = {
-  clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
+  clang_rt = ""
   clang_rt_cxx = "../../../../out/not-default/libclang_rt.tsan_cxx.a"
 }
 }
@@ -1208,12 +1208,12 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.lsan.a"
-  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
+  clang_rt_cxx = ""
 }
 }
   tsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
@@ -1820,7 +1820,7 @@ This should never be set as a build argument.
 }
   lsan = {
   shared = {
-  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
+  clang_rt = ""
 }
   static = {
   clang_rt = "lib/clang/20/lib/x86_64-unknown-fuchsia/libclang_rt.lsan.a"
@@ -5390,7 +5390,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"fk7e1EWro1qluL58YPArkkTYO1ym9a5d6gesU_Sw94IC"`
+**Current value (from the default):** `"gLtQ-5ur3yitHZ0td65E1YNv6oD7rohi7anZtDG0KygC"`
 
 From //build/rust/config.gni:42
 
