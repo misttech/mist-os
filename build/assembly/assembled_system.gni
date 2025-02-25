@@ -15,9 +15,6 @@ import("//src/developer/ffx/build/ffx_action.gni")
 
 # Assembles a Fuchsia system.
 #
-# Given base, cache, and universe packages, assembles a Fuchsia system
-# containing those packages.
-#
 # Metadata parameters:
 #
 #   generate_image_metadata (optional, default=true)
@@ -89,12 +86,6 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #
 #   cache_packages (optional)
 #     [list of labels] The packages to cache in the images.
-#
-#   universe_packages (optional)
-#     [list of labels] The packages to build in addition to the base and cache
-#     sets. These packages do not contribute to the produced images directly,
-#     however they may contribute to the config-data and shell-commands meta
-#     packages.
 #
 #   bootfs_labels (optional)
 #     [list of labels] The objects installed on the bootfs partition of the
@@ -232,16 +223,12 @@ template("assembled_system") {
 
   _base_packages = []
   _cache_packages = []
-  _universe_packages = []
 
   if (defined(invoker.base_packages)) {
     _base_packages = invoker.base_packages
   }
   if (defined(invoker.cache_packages)) {
     _cache_packages = invoker.cache_packages
-  }
-  if (defined(invoker.universe_packages)) {
-    _universe_packages = invoker.universe_packages
   }
 
   _additional_boot_args = []
@@ -250,7 +237,6 @@ template("assembled_system") {
   }
 
   # Defaults to true if the invoker doesn't pass "include_shell_commands"
-  _include_shell_commands = _supports_blobs
   if (defined(invoker.include_shell_commands)) {
     if (invoker.include_shell_commands) {
       assert(
@@ -258,15 +244,12 @@ template("assembled_system") {
           "Shell command package generation is only valid if the fvm is being created.")
     }
     _include_shell_commands = invoker.include_shell_commands
-  }
-
-  if (!_include_shell_commands) {
-    not_needed([ "_universe_packages" ])
+  } else {
+    _include_shell_commands = _supports_blobs
   }
 
   if (!_include_legacy_bundle) {
     not_needed([
-                 "_universe_packages",
                  "_additional_boot_args",
                  "_include_assembly_inputs",
                ])
@@ -312,8 +295,7 @@ template("assembled_system") {
       }
 
       if (_include_shell_commands) {
-        shell_command_packages =
-            _base_packages + _universe_packages + _cache_packages
+        shell_command_packages = _base_packages + _cache_packages
       }
 
       supports_blobs = _supports_blobs
@@ -329,6 +311,8 @@ template("assembled_system") {
       output_directory = "${files.legacy_assembly_input_bundle_dir}"
       gn_targets_name = labels.bazel_legacy_aib
     }
+  } else {
+    not_needed([ "_include_shell_commands" ])
   }
 
   if (_legacy_bundle_only) {
