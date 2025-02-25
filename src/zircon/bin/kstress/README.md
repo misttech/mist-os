@@ -8,7 +8,7 @@ directly at the shell prompt.
 Build and run the test component like so:
 
 ```
-fx set core.x64 --with src/zircon/tests/stress-tests:tests
+fx set core.x64 --with-test src/zircon/tests/stress-tests:tests
 fx build
 fx qemu
 fx test vm-stress-test
