@@ -91,12 +91,6 @@ kernel_vaddr            .req x23
 
   // Write back SCTLR
   msr sctlr_el1, tmp
-
-  // This label is used by the kernel as the boundary of the instruction memory
-  // executed by secondary CPUs with caches off, which must be flushed by the
-  // boot CPU before execution.
-.label arm64_secondary_entry_caches_on_asm, global
-
 .Lmmu_on_pc:
   isb
 

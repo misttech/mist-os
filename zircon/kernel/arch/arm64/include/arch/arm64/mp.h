@@ -83,12 +83,6 @@ void arm64_init_percpu_early();
 // entrypoint of arm64_secondary_entry().
 extern "C" void arm64_secondary_start();
 
-// This is not a real function respecting of the call ABI, but rather is a
-// marker in the arm64_secondary_entry_asm() giving the end of the
-// instruction memory executed by secondary CPUs with caches off, which must
-// be flushed by the boot CPU before execution.
-extern "C" void arm64_secondary_entry_caches_on_asm();
-
 extern uint arm_num_cpus;
 
 // Use the x20 register to always point at the local cpu structure for fast access.

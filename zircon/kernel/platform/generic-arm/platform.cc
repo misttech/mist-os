@@ -151,18 +151,10 @@ zx_status_t platform_start_cpu(cpu_num_t cpu_id, uint64_t mpid) {
   // tables. We explicitly clean that memory to the point of coherency and
   // issue a memory barrier to commit them.
   //
-  // Coherency around the instruction memory also relies on the fact that we
-  // configured the boot CPU page table walkers to access memory through caches
-  // (via TCR_EL1.IRGN1).
+  // TODO(https://fxbug.dev/42164859): Explicitly clean the pre-caches-on
+  // instruction memory as well.
   clean_data_object(root_lower_page_table_phys);
   clean_data_object(root_kernel_page_table_phys);
-
-  vaddr_t caches_off_instruction_memory_start = reinterpret_cast<uintptr_t>(&arm64_secondary_start);
-  vaddr_t caches_off_instruction_memory_end =
-      reinterpret_cast<uintptr_t>(&arm64_secondary_entry_caches_on_asm);
-  arch_clean_cache_range(caches_off_instruction_memory_start,
-                         caches_off_instruction_memory_end - caches_off_instruction_memory_start);
-
   arch::ThreadMemoryBarrier();
 
   uintptr_t kernel_secondary_entry_paddr =
