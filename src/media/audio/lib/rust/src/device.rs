@@ -47,7 +47,6 @@ impl From<AdrDevType> for Type {
         let device_type = match value {
             AdrDevType::Codec => fac::DeviceType::Codec,
             AdrDevType::Composite => fac::DeviceType::Composite,
-            AdrDevType::Dai => fac::DeviceType::Dai,
             AdrDevType::Input => fac::DeviceType::Input,
             AdrDevType::Output => fac::DeviceType::Output,
             _ => panic!("Unexpected device type"),
@@ -67,7 +66,6 @@ impl From<Type> for AdrDevType {
         match value.0 {
             fac::DeviceType::Codec => AdrDevType::Codec,
             fac::DeviceType::Composite => AdrDevType::Composite,
-            fac::DeviceType::Dai => AdrDevType::Dai,
             fac::DeviceType::Input => AdrDevType::Input,
             fac::DeviceType::Output => AdrDevType::Output,
             _ => panic!("Unexpected device type"),

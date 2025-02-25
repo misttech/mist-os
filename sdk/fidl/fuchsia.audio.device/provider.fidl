@@ -20,7 +20,7 @@ open protocol Provider {
         /// Required.
         2: device_type DeviceType;
 
-        /// The client_end of the protocol channel (Codec, Composite, Dai or StreamConfig)
+        /// The client_end of the protocol channel (Codec, Composite or StreamConfig)
         /// that this service will use to configure/observe the device.
         /// For now, `AddDevice` only accepts a `codec_client`, `composite_client` or
         /// `stream_config_client` here.
@@ -28,7 +28,7 @@ open protocol Provider {
         /// Required.
         /// # Deprecation
         ///
-        /// Codec, Dai and StreamConfig are not supported anymore, instead use an
+        /// Codec and StreamConfig are not supported anymore, instead use an
         /// [Audio Composite](https://fuchsia.dev/fuchsia-src/development/audio/drivers/composite)
         /// , see
         /// [Audio Drivers Architecture](https://fuchsia.dev/fuchsia-src/development/audio/drivers/architecture)

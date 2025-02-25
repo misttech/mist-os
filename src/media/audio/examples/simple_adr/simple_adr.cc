@@ -111,8 +111,6 @@ inline std::ostream& operator<<(std::ostream& out,
       return (out << "kCodec");
     case fuchsia_audio_device::DeviceType::kComposite:
       return (out << "kComposite");
-    case fuchsia_audio_device::DeviceType::kDai:
-      return (out << "kDai");
     case fuchsia_audio_device::DeviceType::kInput:
       return (out << "kInput");
     case fuchsia_audio_device::DeviceType::kOutput:

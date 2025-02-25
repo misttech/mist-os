@@ -62,8 +62,6 @@ bool ClientIsValidForDeviceType(const fad::DeviceType& device_type,
       return (device_type == fad::DeviceType::kCodec);
     case fad::DriverClient::Tag::kComposite:
       return (device_type == fad::DeviceType::kComposite);
-    case fad::DriverClient::Tag::kDai:
-      return (device_type == fad::DeviceType::kDai);
     case fad::DriverClient::Tag::kStreamConfig:
       return (device_type == fad::DeviceType::kInput || device_type == fad::DeviceType::kOutput);
     default:
@@ -758,7 +756,6 @@ bool ValidateDeviceInfo(const fad::Info& device_info) {
         return false;
       }
       break;
-    case fad::DeviceType::kDai:
     default:
       FX_LOGS(WARNING) << __func__ << ": unsupported DeviceType: " << device_info.device_type();
       return false;

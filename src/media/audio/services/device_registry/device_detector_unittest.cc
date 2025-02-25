@@ -402,7 +402,6 @@ TEST_F(DeviceDetectorTest, DetectExistingDevices) {
       case fad::DeviceType::kOutput:
         EXPECT_TRUE(device.client.stream_config()->is_valid());
         break;
-      case fad::DeviceType::kDai:
       default:
         ADD_FAILURE() << "Unknown device_type after test";
         break;
@@ -504,7 +503,6 @@ TEST_F(DeviceDetectorTest, DetectHotplugDevices) {
       case fad::DeviceType::kOutput:
         EXPECT_TRUE(device.client.stream_config()->is_valid());
         break;
-      case fad::DeviceType::kDai:
       default:
         ADD_FAILURE() << "Unknown device_type after test";
         break;

@@ -419,8 +419,6 @@ inline std::ostream& operator<<(
         return (out << "CODEC");
       case fuchsia_audio_device::DeviceType::kComposite:
         return (out << "COMPOSITE");
-      case fuchsia_audio_device::DeviceType::kDai:
-        return (out << "DAI");
       case fuchsia_audio_device::DeviceType::kInput:
         return (out << "INPUT");
       case fuchsia_audio_device::DeviceType::kOutput:

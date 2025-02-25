@@ -174,10 +174,6 @@ Device::Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
       stream_config_client_ = {driver_client_.stream_config().take().value(), dispatcher,
                                &stream_config_handler_};
       break;
-    case fad::DeviceType::kDai:
-      ADR_WARN_METHOD() << "Dai device type is not yet implemented";
-      OnError(ZX_ERR_WRONG_TYPE);
-      return;
     default:
       ADR_WARN_METHOD() << "Unknown DeviceType" << device_type_;
       // Set device to error state
@@ -289,9 +285,6 @@ bool Device::IsInitializationComplete() {
       return has_stream_config_properties() && has_health_state() &&
              checked_for_signalprocessing() && ring_buffer_format_sets_retrieved() &&
              has_gain_state() && has_plug_state();
-    case fad::DeviceType::kDai:
-      ADR_WARN_METHOD() << "Don't yet support Dai";
-      return false;
     default:
       ADR_WARN_METHOD() << "Invalid device_type_";
       return false;
@@ -339,7 +332,6 @@ void Device::OnInitializationResponse() {
           << "   " << (has_plug_state() ? "PLUG" : "plug")                                 //
           << "   " << (has_gain_state() ? "GAIN" : "gain");
       break;
-    case fad::DeviceType::kDai:
     default:
       ADR_WARN_METHOD() << "Invalid device_type_";
       return;
@@ -1634,7 +1626,7 @@ fad::Info Device::CreateDeviceInfo() {
       .device_type = device_type_,
       .device_name = name_,
   }};
-  // Required for Composite; optional for Codec, Dai and StreamConfig:
+  // Required for Composite; optional for Codec and StreamConfig:
   if (supports_signalprocessing()) {
     info.signal_processing_elements(sig_proc_elements_);
     info.signal_processing_topologies(sig_proc_topologies_);
@@ -1643,11 +1635,11 @@ fad::Info Device::CreateDeviceInfo() {
     // Optional for all device types.
     info.manufacturer(codec_properties_->manufacturer())
         .product(codec_properties_->product())
-        // Required for Dai and StreamConfig; optional for Codec:
+        // Required for StreamConfig; optional for Codec:
         .is_input(codec_properties_->is_input())
-        // Required for Codec and Dai; optional for Composite; absent for StreamConfig:
+        // Required for Codec; optional for Composite; absent for StreamConfig:
         .dai_format_sets(dai_format_sets())
-        // Required for Codec and StreamConfig; absent for Composite and Dai:
+        // Required for Codec and StreamConfig; absent for Composite:
         .plug_detect_caps(*codec_properties_->plug_detect_capabilities() ==
                                   fha::PlugDetectCapabilities::kHardwired
                               ? fad::PlugDetectCapabilities::kHardwired
@@ -1663,22 +1655,22 @@ fad::Info Device::CreateDeviceInfo() {
     info.manufacturer(composite_properties_->manufacturer())
         .product(composite_properties_->product())
         .unique_instance_id(composite_properties_->unique_id())
-        // Required for Dai and StreamConfig; optional for Composite; absent for Codec:
+        // Required for StreamConfig; optional for Composite; absent for Codec:
         .ring_buffer_format_sets(element_ring_buffer_format_sets_)
-        // Required for Codec and Dai; optional for Composite; absent for StreamConfig:
+        // Required for Codec; optional for Composite; absent for StreamConfig:
         .dai_format_sets(element_dai_format_sets_)
-        // Required for Composite, Dai and StreamConfig; absent for Codec:
+        // Required for Composite and StreamConfig; absent for Codec:
         .clock_domain(composite_properties_->clock_domain());
   } else if (is_stream_config()) {
     // Optional for all device types:
     info.manufacturer(stream_config_properties_->manufacturer())
         .product(stream_config_properties_->product())
         .unique_instance_id(stream_config_properties_->unique_id())
-        // Required for Dai and StreamConfig; optional for Codec; absent for Composite:
+        // Required for StreamConfig; optional for Codec; absent for Composite:
         .is_input(stream_config_properties_->is_input())
-        // Required for Dai and StreamConfig; optional for Composite; absent for Codec:
+        // Required for StreamConfig; optional for Composite; absent for Codec:
         .ring_buffer_format_sets(ring_buffer_format_sets())
-        // Required for StreamConfig; absent for Codec, Composite and Dai:
+        // Required for StreamConfig; absent for Codec and Composite:
         .gain_caps(fad::GainCapabilities{{
             .min_gain_db = stream_config_properties_->min_gain_db(),
             .max_gain_db = stream_config_properties_->max_gain_db(),
@@ -1686,12 +1678,12 @@ fad::Info Device::CreateDeviceInfo() {
             .can_mute = stream_config_properties_->can_mute(),
             .can_agc = stream_config_properties_->can_agc(),
         }})
-        // Required for Codec and StreamConfig; absent for Composite and Dai:
+        // Required for Codec and StreamConfig; absent for Composite:
         .plug_detect_caps(*stream_config_properties_->plug_detect_capabilities() ==
                                   fha::PlugDetectCapabilities::kHardwired
                               ? fad::PlugDetectCapabilities::kHardwired
                               : fad::PlugDetectCapabilities::kPluggable)
-        // Required for Composite, Dai and StreamConfig; absent for Codec:
+        // Required for Composite and StreamConfig; absent for Codec:
         .clock_domain(stream_config_properties_->clock_domain());
   }
 

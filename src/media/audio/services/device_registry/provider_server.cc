@@ -80,13 +80,6 @@ void ProviderServer::AddDevice(AddDeviceRequest& request, AddDeviceCompleter::Sy
     return;
   }
 
-  // Remove this, when ADR supports the other driver_client types
-  if (*request.device_type() == fad::DeviceType::kDai) {
-    ADR_WARN_METHOD() << "AudioDeviceRegistry does not yet support this client type";
-    completer.Reply(fit::error(fad::ProviderAddDeviceError::kWrongClientType));
-    return;
-  }
-
   ADR_LOG_METHOD(kLogDeviceDetection)
       << "request to add " << request.device_type() << " '" << *request.device_name() << "'";
 

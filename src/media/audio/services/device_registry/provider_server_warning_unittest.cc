@@ -359,41 +359,6 @@ TEST_F(ProviderServerCompositeWarningTest, WrongDriverClient) {
 }
 
 /////////////////////
-// Dai tests
-//
-// Remove this test, once fad::Provider/AddDevice supports the Dai driver type.
-TEST_F(ProviderServerDaiWarningTest, Unsupported) {
-  auto provider = CreateTestProviderServer();
-  ASSERT_EQ(ProviderServer::count(), 1u);
-  auto fake_driver = CreateFakeStreamConfigInput();
-  auto received_callback = false;
-
-  provider->client()
-      ->AddDevice({{
-          .device_name = "Test device name",
-          .device_type = fad::DeviceType::kDai,
-          // Set a Dai device_type and driver_client -- which ADR doesn't yet support.
-          .driver_client = fad::DriverClient::WithDai(
-              // (as elsewhere, the zx::channel is from FakeStreamConfig, but that's irrelevant)
-              fidl::ClientEnd<fha::Dai>(fake_driver->Enable().TakeChannel())),
-      }})
-      .Then([&received_callback](fidl::Result<fad::Provider::AddDevice>& result) {
-        received_callback = true;
-        ASSERT_TRUE(result.is_error());
-        ASSERT_TRUE(result.error_value().is_domain_error()) << result.error_value();
-        EXPECT_EQ(result.error_value().domain_error(),
-                  fad::ProviderAddDeviceError::kWrongClientType)
-            << result.error_value();
-      });
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service()->devices().size(), 0u);
-  EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
-  EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
-}
-
-/////////////////////
 // StreamConfig tests
 //
 TEST_F(ProviderServerStreamConfigWarningTest, MissingDeviceName) {

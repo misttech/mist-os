@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_MEDIA_RVICES_DEVICE_REGISTRY_DEVICE_UNITTEST_H_
-#define SRC_MEDIA_RVICES_DEVICE_REGISTRY_DEVICE_UNITTEST_H_
+#ifndef SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_DEVICE_UNITTEST_H_
+#define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_DEVICE_UNITTEST_H_
 
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
@@ -480,7 +480,7 @@ class CompositeTest : public DeviceTestBase {
                             fuchsia_audio_device::ControlSetDaiFormatError expected_error) {
     auto error_match = notify()->dai_format_errors().find(element_id);
     if (error_match == notify()->dai_format_errors().end()) {
-      ADR_WARN_METHOD() << "No dai format errors for element " << element_id;
+      ADR_WARN_METHOD() << "No Dai format errors for element " << element_id;
       return false;
     }
 
@@ -711,4 +711,4 @@ class StreamConfigTest : public DeviceTestBase {
 
 }  // namespace media_audio
 
-#endif  // SRC_MEDIA_RVICES_DEVICE_REGISTRY_DEVICE_UNITTEST_H_
+#endif  // SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_DEVICE_UNITTEST_H_

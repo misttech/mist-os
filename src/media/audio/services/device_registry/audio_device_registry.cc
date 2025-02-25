@@ -65,9 +65,6 @@ void AudioDeviceRegistry::DeviceDetected(std::string_view name, fad::DeviceType 
     case fad::DriverClient::Tag::kStreamConfig:
       FX_CHECK(driver_client.stream_config()->is_valid());
       break;
-    case fad::DriverClient::Tag::kDai:
-      ADR_WARN_OBJECT() << "Dai device detected but not yet supported";
-      return;
     default:
       FX_CHECK(!driver_client.IsUnknown());
   }
