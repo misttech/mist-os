@@ -377,9 +377,7 @@ pub struct DeviceConfig {
     /// at this time.
     pub storage: DataAmount,
 
-    /// The amount of virtual storage to allocate to the guest's storage device, which will be
-    /// populated by the GuestConfig's fvm_image. Only one virtual storage device is supported
-    /// at this time.
+    /// Whether vsock support is enabled for this device and what cid it has been allocated.
     pub vsock: Option<VsockDevice>,
 }
 
