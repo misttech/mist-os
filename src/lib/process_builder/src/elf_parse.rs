@@ -493,11 +493,11 @@ pub type Elf64Sym = elf64_sym;
 #[derive(Debug, Default, Copy, Clone, IntoBytes, KnownLayout, FromBytes, Immutable)]
 pub struct elf32_sym {
     pub st_name: Elf32Word,
+    pub st_value: Elf32Addr,
+    pub st_size: Elf32Word,
     pub st_info: u8,
     pub st_other: u8,
     pub st_shndx: Elf32Half,
-    pub st_value: Elf32Addr,
-    pub st_size: Elf32Word,
 }
 pub type Elf32Sym = elf32_sym;
 
