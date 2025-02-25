@@ -45,18 +45,14 @@ INTEGRATION_DIR="${FUCHSIA_DIR}/integration"
 INTEGRATION_HASH="$(git -C "$INTEGRATION_DIR" rev-parse HEAD)"
 INTEGRATION_STAMP="$(git -C "$INTEGRATION_DIR" log -n1 --date=unix --format=%cd)"
 
-# Get the same metadata (hash and commit timestamp) about yesterday's last
-# integration.git commit*.
-#
-# (*) "Yesterday's last integration.git commit" isn't exactly right - the commit
-# in question is actually "the most recent commit made to integration.git before
-# midnight (UTC) on the day that integration.git HEAD was committed.
+# Get the same metadata (hash and commit timestamp) about the last commit to
+# fuchsia.git on the day before the day that JIRI_HEAD was committed
 
-# Get the date when HEAD was committed, which is probably today. Looks like
+# Get the date when JIRI_HEAD was committed, which is probably today. Looks like
 # `YYYY-MM-DD`.
-TODAY="$(git -C "$INTEGRATION_DIR" log -n1 --date=iso-strict --format=%cI | cut -b 1-11)"
-DAILY_HASH="$(git -C "$INTEGRATION_DIR" log -n1 --until "${TODAY}T00:00:00Z" --format=%H)"
-DAILY_STAMP="$(git -C "$INTEGRATION_DIR" log -n1 --until "${TODAY}T00:00:00Z" --date=unix --format=%cd)"
+TODAY="$( TZ=UTC0 git log -n1 --format=%cd --date=format-local:%Y-%m-%d JIRI_HEAD)"
+DAILY_HASH="$(git log -n1 --until "${TODAY}T00:00:00Z" --format=%H)"
+DAILY_STAMP="$(git log -n1 --until "${TODAY}T00:00:00Z" --date=unix --format=%cd)"
 
 # Write $1 to the path given in $2, but only if doing so would actually change
 # $2.
