@@ -16,21 +16,6 @@
 
 namespace unwinder {
 
-enum UnwindTableSectionType {
-  // The .eh_frame section. This section conforms to the specification found at
-  // https://refspecs.linuxfoundation.org/LSB_5.0.0/LSB-Core-generic/LSB-Core-generic/ehframechpt.html.
-  // This section may be found in live processes (it is an allocated section) or in a stripped
-  // and/or unstripped binary. It is possible for this section to also be found in split debug
-  // info binaries.
-  kEhFrame = 1,
-  // Indicates that this is the .debug_frame section. This is a debug section and conforms to the
-  // specification found here: http://www.dwarfstd.org/doc/DWARF5.pdf. Note that this section may be
-  // compressed, and since the file reading API is abstracted from this library, it is the
-  // responsibility of the backing ELF file Memory object to decompress the debug_frames section if
-  // necessary. This section will always fail to load when memory is provided from a live process.
-  kDebugFrame = 4,
-};
-
 // Represents the Call Frame Information (CFI) from the .eh_frame and/or the .debug_frame section
 // of one ELF module.
 //
@@ -92,11 +77,9 @@ class CfiModule {
   [[nodiscard]] Error LoadEhFrame();
   [[nodiscard]] Error LoadDebugFrame();
 
-  // Helpers to decode CIE and FDE in either the eh_frame or debug_frame sections. |type|
-  // determines the exact decoding details based on the section.
-  [[nodiscard]] Error DecodeFde(UnwindTableSectionType type, uint64_t fde_ptr, DwarfCie& cie,
-                                DwarfFde& fde);
-  [[nodiscard]] Error DecodeCie(UnwindTableSectionType type, uint64_t cie_ptr, DwarfCie& cie);
+  // Helpers to decode CIE and FDE. Version could be 1 or 4.
+  [[nodiscard]] Error DecodeFde(uint8_t version, uint64_t fde_ptr, DwarfCie& cie, DwarfFde& fde);
+  [[nodiscard]] Error DecodeCie(uint8_t version, uint64_t cie_ptr, DwarfCie& cie);
 
   // Inputs. Use const to prevent accidental modification.
   Memory* const elf_;
