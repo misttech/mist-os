@@ -41,6 +41,7 @@
                 "*perf_event*",
                 "*rxdir*",
                 "*sem*",
+                "*setattr*",
                 "*shm*",
                 "*stat*",
                 "*sysctl*",

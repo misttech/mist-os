@@ -39,7 +39,6 @@ use starnix_uapi::{
 };
 use std::collections::HashSet;
 use std::sync::{Arc, OnceLock};
-use syncio::zxio_node_attr_has_t;
 
 /// Maximum supported size for the extended attribute value used to store SELinux security
 /// contexts in a filesystem node extended attributes.
@@ -985,37 +984,6 @@ pub(super) fn check_fs_node_getattr_access(
         current_sid,
         file_sid,
         CommonFilePermission::GetAttr.for_class(file_class),
-        current_task.into(),
-    )
-}
-
-/// Checks whether `current_task` can set attributes on `node`.
-pub fn check_fs_node_setattr_access(
-    security_server: &SecurityServer,
-    current_task: &CurrentTask,
-    fs_node: &FsNode,
-    attributes: &zxio_node_attr_has_t,
-) -> Result<(), Errno> {
-    let current_sid = current_task.security_state.lock().current_sid;
-    let FsNodeSidAndClass { class: file_class, .. } = fs_node_effective_sid_and_class(fs_node);
-
-    let permissions = if attributes.mode
-        || attributes.uid
-        || attributes.gid
-        || attributes.access_time
-        || attributes.modification_time
-        || attributes.change_time
-    {
-        [CommonFilePermission::SetAttr.for_class(file_class)]
-    } else {
-        [CommonFilePermission::Write.for_class(file_class)]
-    };
-
-    has_fs_node_permissions(
-        &security_server.as_permission_check(),
-        current_sid,
-        fs_node,
-        &permissions,
         current_task.into(),
     )
 }

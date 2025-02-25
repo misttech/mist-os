@@ -25,7 +25,6 @@ use starnix_uapi::signals::Signal;
 use starnix_uapi::unmount_flags::UnmountFlags;
 use starnix_uapi::{errno, error};
 use std::sync::Arc;
-use syncio::zxio_node_attr_has_t;
 
 bitflags::bitflags! {
     /// The flags about which permissions should be checked when opening an FsNode. Used in the
@@ -558,19 +557,6 @@ pub fn check_file_fcntl_access(
             fcntl_cmd,
             fcntl_arg,
         )
-    })
-}
-
-/// Checks whether `current_task` can set attributes on `node`.
-/// Corresponds to the `inode_setattr()` LSM hook.
-pub fn check_fs_node_setattr_access(
-    current_task: &CurrentTask,
-    node: &FsNode,
-    attributes: &zxio_node_attr_has_t,
-) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_fs_node_setattr_access");
-    if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::check_fs_node_setattr_access(security_server, current_task, node, attributes)
     })
 }
 
