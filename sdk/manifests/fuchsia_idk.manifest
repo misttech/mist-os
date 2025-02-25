@@ -235,7 +235,6 @@ fidl_library://fidl/fuchsia.component.resolution
 fidl_library://fidl/fuchsia.component.runner
 fidl_library://fidl/fuchsia.component.sandbox
 fidl_library://fidl/fuchsia.component.test
-fidl_library://fidl/fuchsia.component.types
 fidl_library://fidl/fuchsia.data
 fidl_library://fidl/fuchsia.debugdata
 fidl_library://fidl/fuchsia.developer.tiles

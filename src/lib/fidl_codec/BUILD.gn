@@ -165,7 +165,6 @@ generated_file("stripped_sdk_fidl_json") {
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.component.test:fuchsia.component.test_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.component.types:fuchsia.component.types_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.data:fuchsia.data_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_sdk($fidl_toolchain)",
