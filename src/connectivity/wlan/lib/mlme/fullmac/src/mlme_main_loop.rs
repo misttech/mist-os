@@ -174,6 +174,9 @@ impl<D: DeviceOps> MlmeMainLoop<D> {
             QuerySpectrumManagementSupport(responder) => {
                 responder.respond(self.device.query_spectrum_management_support()?)
             }
+            QueryTelemetrySupport(responder) => {
+                responder.respond(self.device.query_telemetry_support()?)
+            }
             GetIfaceCounterStats(responder) => {
                 responder.respond(self.device.get_iface_counter_stats()?)
             }
@@ -840,6 +843,28 @@ mod handle_mlme_request_tests {
         assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::OnLinkStateChanged { req })) => {
             assert_eq!(req.online, Some(expected_link_state));
         });
+    }
+
+    #[test]
+    fn test_query_telemetry_support() {
+        let mut h = TestHelper::set_up();
+        let mocked_support = Ok(fidl_stats::TelemetrySupport {
+            inspect_counter_configs: Some(vec![fidl_stats::InspectCounterConfig {
+                counter_id: Some(1),
+                counter_name: Some("foo_counter".to_string()),
+                ..Default::default()
+            }]),
+            ..Default::default()
+        });
+        h.fake_device.lock().unwrap().query_telemetry_support_mock.replace(mocked_support.clone());
+        let (support_responder, mut support_receiver) = wlan_sme::responder::Responder::new();
+        let fidl_req = wlan_sme::MlmeRequest::QueryTelemetrySupport(support_responder);
+
+        h.mlme.handle_mlme_request(fidl_req).unwrap();
+
+        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::QueryTelemetrySupport)));
+        let support = assert_variant!(support_receiver.try_recv(), Ok(Some(support)) => support);
+        assert_eq!(support, mocked_support);
     }
 
     #[test]

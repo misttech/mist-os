@@ -6,7 +6,7 @@ use anyhow::{format_err, Context};
 use fidl::endpoints::ClientEnd;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac,
-    fidl_fuchsia_wlan_mlme as fidl_mlme,
+    fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_stats as fidl_stats,
 };
 
 /// This trait abstracts how Device accomplish operations. Test code
@@ -23,6 +23,7 @@ pub trait DeviceOps {
     fn query_spectrum_management_support(
         &self,
     ) -> anyhow::Result<fidl_common::SpectrumManagementSupport>;
+    fn query_telemetry_support(&self) -> anyhow::Result<Result<fidl_stats::TelemetrySupport, i32>>;
     fn start_scan(&self, req: fidl_fullmac::WlanFullmacImplStartScanRequest) -> anyhow::Result<()>;
     fn connect(&self, req: fidl_fullmac::WlanFullmacImplConnectRequest) -> anyhow::Result<()>;
     fn reconnect(&self, req: fidl_fullmac::WlanFullmacImplReconnectRequest) -> anyhow::Result<()>;
@@ -120,6 +121,12 @@ impl DeviceOps for FullmacDevice {
             .map_err(|e| {
                 format_err!("Driver returned error on QuerySpectrumManagementSupport: {}", e)
             })
+    }
+
+    fn query_telemetry_support(&self) -> anyhow::Result<Result<fidl_stats::TelemetrySupport, i32>> {
+        self.fullmac_impl_sync_proxy
+            .query_telemetry_support(zx::MonotonicInstant::INFINITE)
+            .context("FIDL error on QueryTelemetrySupport")
     }
 
     fn start_scan(&self, req: fidl_fullmac::WlanFullmacImplStartScanRequest) -> anyhow::Result<()> {
@@ -260,6 +267,7 @@ pub mod test_utils {
         StopBss { req: fidl_fullmac::WlanFullmacImplStopBssRequest },
         SetKeys { req: fidl_fullmac::WlanFullmacImplSetKeysRequest },
         EapolTx { req: fidl_fullmac::WlanFullmacImplEapolTxRequest },
+        QueryTelemetrySupport,
         GetIfaceCounterStats,
         GetIfaceHistogramStats,
         SaeHandshakeResp { resp: fidl_fullmac::WlanFullmacImplSaeHandshakeRespRequest },
@@ -280,6 +288,7 @@ pub mod test_utils {
         pub query_mac_sublayer_support_mock: Option<fidl_common::MacSublayerSupport>,
         pub query_security_support_mock: Option<fidl_common::SecuritySupport>,
         pub query_spectrum_management_support_mock: Option<fidl_common::SpectrumManagementSupport>,
+        pub query_telemetry_support_mock: Option<Result<fidl_stats::TelemetrySupport, i32>>,
 
         pub set_keys_resp_mock: Option<fidl_fullmac::WlanFullmacSetKeysResp>,
         pub get_iface_counter_stats_mock: Option<fidl_mlme::GetIfaceCounterStatsResponse>,
@@ -348,6 +357,9 @@ pub mod test_utils {
                             dfs: fidl_common::DfsFeature { supported: false },
                         },
                     ),
+                    query_telemetry_support_mock: Some(Ok(fidl_stats::TelemetrySupport {
+                        ..Default::default()
+                    })),
                     set_keys_resp_mock: None,
                     get_iface_counter_stats_mock: None,
                     get_iface_histogram_stats_mock: None,
@@ -400,6 +412,13 @@ pub mod test_utils {
                 .query_spectrum_management_support_mock
                 .clone()
                 .ok_or(format_err!(""))
+        }
+
+        fn query_telemetry_support(
+            &self,
+        ) -> anyhow::Result<Result<fidl_stats::TelemetrySupport, i32>> {
+            self.driver_call_sender.send(DriverCall::QueryTelemetrySupport);
+            self.mocks.lock().unwrap().query_telemetry_support_mock.clone().ok_or(format_err!(""))
         }
 
         // Cannot mark fn unsafe because it has to match fn signature in FullDeviceInterface

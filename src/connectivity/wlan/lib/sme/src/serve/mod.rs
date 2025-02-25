@@ -529,6 +529,27 @@ mod tests {
     }
 
     #[test]
+    fn generic_sme_query_telemetry_support_for_client() {
+        let (mut helper, mut serve_fut) =
+            start_generic_sme_test(fidl_common::WlanMacRole::Client).unwrap();
+        let telemetry_proxy = get_telemetry_proxy(&mut helper, &mut serve_fut);
+
+        // Forward request to MLME.
+        let mut support_fut = telemetry_proxy.query_telemetry_support();
+        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+
+        // Mock response from MLME. Use a fake error code to make the response easily verifiable.
+        let support_req = assert_variant!(helper.exec.run_until_stalled(&mut helper.mlme_req_stream.next()), Poll::Ready(Some(req)) => req);
+        let support_responder = assert_variant!(support_req, crate::MlmeRequest::QueryTelemetrySupport(responder) => responder);
+        support_responder.respond(Err(1337));
+
+        // Verify that the response made it to us without alteration.
+        assert_variant!(helper.exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        let support_result = assert_variant!(helper.exec.run_until_stalled(&mut support_fut), Poll::Ready(Ok(support_result)) => support_result);
+        assert_eq!(support_result, Err(1337));
+    }
+
+    #[test]
     fn generic_sme_get_histogram_stats_for_client() {
         let (mut helper, mut serve_fut) =
             start_generic_sme_test(fidl_common::WlanMacRole::Client).unwrap();

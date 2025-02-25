@@ -20,12 +20,12 @@ pub mod serve;
 #[cfg(test)]
 pub mod test_utils;
 
-use fidl_fuchsia_wlan_common as fidl_common;
 use fidl_fuchsia_wlan_mlme::{self as fidl_mlme, MlmeEvent};
 use futures::channel::mpsc;
 use thiserror::Error;
 use wlan_common::sink::UnboundedSink;
 use wlan_common::timer;
+use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_stats as fidl_stats};
 
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Config {
@@ -76,6 +76,7 @@ pub enum MlmeRequest {
     QueryMacSublayerSupport(responder::Responder<fidl_common::MacSublayerSupport>),
     QuerySecuritySupport(responder::Responder<fidl_common::SecuritySupport>),
     QuerySpectrumManagementSupport(responder::Responder<fidl_common::SpectrumManagementSupport>),
+    QueryTelemetrySupport(responder::Responder<Result<fidl_stats::TelemetrySupport, i32>>),
 }
 
 impl MlmeRequest {
@@ -107,6 +108,7 @@ impl MlmeRequest {
             Self::QueryMacSublayerSupport(_) => "QueryMacSublayerSupport",
             Self::QuerySecuritySupport(_) => "QuerySecuritySupport",
             Self::QuerySpectrumManagementSupport(_) => "QuerySpectrumManagementSupport",
+            Self::QueryTelemetrySupport(_) => "QueryTelemetrySupport",
         }
     }
 }

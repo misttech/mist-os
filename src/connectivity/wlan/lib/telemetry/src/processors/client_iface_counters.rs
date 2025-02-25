@@ -7,6 +7,7 @@ use fuchsia_async::TimeoutExt;
 use futures::lock::Mutex;
 
 use log::{error, warn};
+use std::collections::HashMap;
 use std::sync::Arc;
 use windowed_stats::experimental::clock::Timed;
 use windowed_stats::experimental::series::interpolation::LastSample;
@@ -17,6 +18,7 @@ use windowed_stats::experimental::serve::{InspectedTimeMatrix, TimeMatrixClient}
 // Include a timeout on stats calls so that if the driver deadlocks, telemtry doesn't get stuck.
 const GET_IFACE_STATS_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(5);
 
+#[derive(Debug)]
 enum IfaceState {
     NotAvailable,
     Created { iface_id: u16, telemetry_proxy: Option<fidl_fuchsia_wlan_sme::TelemetryProxy> },
@@ -26,6 +28,7 @@ pub struct ClientIfaceCountersLogger {
     iface_state: Arc<Mutex<IfaceState>>,
     monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
     time_series_stats: IfaceCountersTimeSeries,
+    driver_inspect_counter_configs: Arc<Mutex<HashMap<u16, String>>>,
 }
 
 impl ClientIfaceCountersLogger {
@@ -44,6 +47,7 @@ impl ClientIfaceCountersLogger {
             iface_state: Arc::new(Mutex::new(IfaceState::NotAvailable)),
             monitor_svc_proxy,
             time_series_stats,
+            driver_inspect_counter_configs: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -51,7 +55,36 @@ impl ClientIfaceCountersLogger {
         let (proxy, server) = fidl::endpoints::create_proxy();
         let telemetry_proxy = match self.monitor_svc_proxy.get_sme_telemetry(iface_id, server).await
         {
-            Ok(Ok(())) => Some(proxy),
+            Ok(Ok(())) => {
+                let inspect_counter_configs = match proxy.query_telemetry_support().await {
+                    Ok(Ok(support)) => support.inspect_counter_configs,
+                    Ok(Err(code)) => {
+                        warn!("Failed to query telemetry support with status code {}. No driver-specific counters will be captured", code);
+                        None
+                    }
+                    Err(e) => {
+                        error!("Failed to query telemetry support with error {}. No driver-specific counters will be captured", e);
+                        None
+                    }
+                };
+                {
+                    let mut driver_inspect_counter_configs =
+                        self.driver_inspect_counter_configs.lock().await;
+                    for inspect_counter_config in inspect_counter_configs.unwrap_or(vec![]) {
+                        if let fidl_stats::InspectCounterConfig {
+                            counter_id: Some(counter_id),
+                            counter_name: Some(counter_name),
+                            ..
+                        } = inspect_counter_config
+                        {
+                            let _counter_name = driver_inspect_counter_configs
+                                .entry(counter_id)
+                                .or_insert_with(|| counter_name);
+                        }
+                    }
+                }
+                Some(proxy)
+            }
             Ok(Err(e)) => {
                 error!("Request for SME telemetry for iface {} completed with error {}. No telemetry will be captured.", iface_id, e);
                 None
@@ -180,8 +213,48 @@ mod tests {
     use std::pin::pin;
     use std::task::Poll;
     use windowed_stats::experimental::testing::{MockTimeMatrix, TimeMatrixCall};
+    use wlan_common::assert_variant;
 
     const IFACE_ID: u16 = 66;
+
+    #[fuchsia::test]
+    fn test_handle_iface_created() {
+        let mut test_helper = setup_test();
+        let time_series = MockIfaceCountersTimeSeries::default();
+        let logger = ClientIfaceCountersLogger::new_helper(
+            test_helper.monitor_svc_proxy.clone(),
+            time_series.build(),
+        );
+
+        let mut handle_iface_created_fut = pin!(logger.handle_iface_created(IFACE_ID));
+        assert_eq!(
+            test_helper.run_and_handle_get_sme_telemetry(&mut handle_iface_created_fut),
+            Poll::Pending
+        );
+
+        let mocked_inspect_counter_configs = vec![fidl_stats::InspectCounterConfig {
+            counter_id: Some(1),
+            counter_name: Some("foo_counter".to_string()),
+            ..Default::default()
+        }];
+        let telemetry_support = fidl_stats::TelemetrySupport {
+            inspect_counter_configs: Some(mocked_inspect_counter_configs),
+            ..Default::default()
+        };
+        assert_eq!(
+            test_helper.run_and_respond_query_telemetry_support(
+                &mut handle_iface_created_fut,
+                Ok(&telemetry_support)
+            ),
+            Poll::Ready(())
+        );
+
+        assert_variant!(logger.iface_state.try_lock().as_deref(), Some(IfaceState::Created { .. }));
+        assert_eq!(
+            *logger.driver_inspect_counter_configs.try_lock().unwrap(),
+            HashMap::from([(1u16, "foo_counter".to_string())])
+        );
+    }
 
     #[fuchsia::test]
     fn test_handle_periodic_telemetry() {
@@ -193,11 +266,7 @@ mod tests {
         );
 
         // Transition to IfaceCreated state
-        let mut handle_iface_created_fut = pin!(logger.handle_iface_created(IFACE_ID));
-        assert_eq!(
-            test_helper.run_and_handle_get_sme_telemetry(&mut handle_iface_created_fut),
-            Poll::Ready(())
-        );
+        handle_iface_created(&mut test_helper, &logger);
 
         let is_connected = true;
         let mut test_fut = pin!(logger.handle_periodic_telemetry(is_connected));
@@ -243,11 +312,7 @@ mod tests {
         );
 
         // Transition to IfaceCreated state
-        let mut handle_iface_created_fut = pin!(logger.handle_iface_created(IFACE_ID));
-        assert_eq!(
-            test_helper.run_and_handle_get_sme_telemetry(&mut handle_iface_created_fut),
-            Poll::Ready(())
-        );
+        handle_iface_created(&mut test_helper, &logger);
 
         let mut handle_iface_destroyed_fut = pin!(logger.handle_iface_destroyed(IFACE_ID));
         assert_eq!(
@@ -265,6 +330,22 @@ mod tests {
             Poll::Ready(Ok(None)) => (),
             other => panic!("unexpected variant: {:?}", other),
         }
+    }
+
+    fn handle_iface_created(test_helper: &mut TestHelper, logger: &ClientIfaceCountersLogger) {
+        let mut handle_iface_created_fut = pin!(logger.handle_iface_created(IFACE_ID));
+        assert_eq!(
+            test_helper.run_and_handle_get_sme_telemetry(&mut handle_iface_created_fut),
+            Poll::Pending
+        );
+        let telemetry_support = fidl_stats::TelemetrySupport::default();
+        assert_eq!(
+            test_helper.run_and_respond_query_telemetry_support(
+                &mut handle_iface_created_fut,
+                Ok(&telemetry_support)
+            ),
+            Poll::Ready(())
+        );
     }
 
     #[derive(Debug, Default)]

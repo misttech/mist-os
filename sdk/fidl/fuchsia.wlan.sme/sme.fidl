@@ -353,6 +353,9 @@ closed protocol ApSme {
 };
 
 closed protocol Telemetry {
+    strict QueryTelemetrySupport() -> (struct {
+        resp fuchsia.wlan.stats.TelemetrySupport;
+    }) error zx.Status;
     strict GetCounterStats() -> (struct {
         stats fuchsia.wlan.stats.IfaceCounterStats;
     }) error zx.Status;

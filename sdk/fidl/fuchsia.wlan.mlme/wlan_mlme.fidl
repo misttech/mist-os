@@ -7,6 +7,7 @@ library fuchsia.wlan.mlme;
 using fuchsia.wlan.common;
 using fuchsia.wlan.ieee80211 as ieee80211;
 using fuchsia.wlan.internal as internal;
+using fuchsia.wlan.stats;
 using zx;
 
 // Stub types for communicating between the wlan service and the MLME drivers. Based on the 802.11
@@ -637,6 +638,9 @@ closed protocol MLME {
     strict QuerySpectrumManagementSupport() -> (struct {
         resp fuchsia.wlan.common.SpectrumManagementSupport;
     });
+    strict QueryTelemetrySupport() -> (struct {
+        resp fuchsia.wlan.stats.TelemetrySupport;
+    }) error zx.Status;
 
     strict GetIfaceCounterStats() -> (struct {
         resp GetIfaceCounterStatsResponse;
