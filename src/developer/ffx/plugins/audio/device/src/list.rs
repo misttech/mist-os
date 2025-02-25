@@ -12,7 +12,7 @@ use fuchsia_audio::Registry;
 use serde::{Serialize, Serializer};
 use std::fmt::Display;
 use {
-    fidl_fuchsia_audio_device as fadevice, fidl_fuchsia_hardware_audio as fhaudio,
+    fidl_fuchsia_audio_controller as fac, fidl_fuchsia_audio_device as fadevice,
     fidl_fuchsia_io as fio,
 };
 
@@ -68,7 +68,7 @@ impl QueryExt for DevfsSelector {
         }
         if let Some(device_type) = &query.device_type {
             is_match =
-                is_match && (fadevice::DeviceType::from(device_type.clone()) == self.0.device_type);
+                is_match && (fac::DeviceType::from(device_type.clone()) == self.0.device_type);
         }
         is_match
     }
@@ -143,11 +143,10 @@ impl From<DevfsSelector> for ListResultDevice {
     fn from(value: DevfsSelector) -> Self {
         Self {
             device_name: value.0.name.clone(),
-            // TODO(https://fxbug.dev/327490666): Fix incorrect STREAMCONFIG device_type
-            device_type: HardwareDeviceType(fhaudio::DeviceType::StreamConfig),
+            device_type: HardwareDeviceType::from(DeviceType::from(value.0.device_type)),
             is_input: match value.0.device_type {
-                fadevice::DeviceType::Input => Some(true),
-                fadevice::DeviceType::Output => Some(false),
+                fac::DeviceType::Input => Some(true),
+                fac::DeviceType::Output => Some(false),
                 _ => None,
             },
             path: Some(value.path().to_string()),
@@ -229,6 +228,8 @@ mod test {
     use super::*;
     use test_case::test_case;
     use {fidl_fuchsia_audio_controller as fac, fidl_fuchsia_audio_device as fadevice};
+    // Separate this to a distinct alias, to clarify when various 'DeviceType's are used.
+    use fadevice::DeviceType as AdrDevType;
 
     #[test_case(
         DeviceQuery {
@@ -250,7 +251,7 @@ mod test {
         DeviceQuery {
             name: None,
             token_id: None,
-            device_type: Some(fadevice::DeviceType::Input.into())
+            device_type: Some(fac::DeviceType::Input.into())
         };
         "device type"
     )]
@@ -258,14 +259,14 @@ mod test {
         DeviceQuery {
             name: Some("some-name".to_string()),
             token_id: None,
-            device_type: Some(DeviceType::from(fadevice::DeviceType::Input))
+            device_type: Some(DeviceType::from(fac::DeviceType::Input))
         };
         "name and device type"
     )]
     fn test_query_matches_devfsselector(query: DeviceQuery) {
         let selector = DevfsSelector(fac::Devfs {
             name: "some-name".to_string(),
-            device_type: fadevice::DeviceType::Input,
+            device_type: fac::DeviceType::Input,
         });
         assert!(selector.matches(&query));
     }
@@ -282,7 +283,7 @@ mod test {
         DeviceQuery {
             name: Some("some-name".to_string()),
             token_id: Some(123),
-            device_type: Some(DeviceType::from(fadevice::DeviceType::Input))
+            device_type: Some(DeviceType::from(fac::DeviceType::Input))
         };
         "contains token id"
     )]
@@ -290,14 +291,14 @@ mod test {
         DeviceQuery {
             name: None,
             token_id: None,
-            device_type: Some(DeviceType::from(fadevice::DeviceType::Output))
+            device_type: Some(DeviceType::from(fac::DeviceType::Output))
         };
         "wrong device type"
     )]
     fn test_query_does_not_match_devfsselector(query: DeviceQuery) {
         let selector = DevfsSelector(fac::Devfs {
             name: "some-name".to_string(),
-            device_type: fadevice::DeviceType::Input,
+            device_type: fac::DeviceType::Input,
         });
         assert!(!selector.matches(&query));
     }
@@ -338,7 +339,7 @@ mod test {
         DeviceQuery {
             name: None,
             token_id: None,
-            device_type: Some(fadevice::DeviceType::Input.into())
+            device_type: Some(fac::DeviceType::Composite.into())
         };
         "device type"
     )]
@@ -346,7 +347,7 @@ mod test {
         DeviceQuery {
             name: None,
             token_id: Some(1),
-            device_type: Some(DeviceType::from(fadevice::DeviceType::Input))
+            device_type: Some(DeviceType::from(fac::DeviceType::Composite))
         };
         "token id and device type"
     )]
@@ -354,7 +355,7 @@ mod test {
         let info = DeviceInfo::from(fadevice::Info {
             token_id: Some(1),
             device_name: Some("some-name".to_string()),
-            device_type: Some(fadevice::DeviceType::Input),
+            device_type: Some(AdrDevType::Composite),
             ..Default::default()
         });
         assert!(info.matches(&query));
@@ -372,7 +373,7 @@ mod test {
         DeviceQuery {
             name: Some("incorrect".to_string()),
             token_id: Some(1),
-            device_type: Some(DeviceType::from(fadevice::DeviceType::Input))
+            device_type: Some(DeviceType::from(fac::DeviceType::Composite))
         };
         "wrong name"
     )]
@@ -380,7 +381,7 @@ mod test {
         DeviceQuery {
             name: None,
             token_id: None,
-            device_type: Some(DeviceType::from(fadevice::DeviceType::Output))
+            device_type: Some(DeviceType::from(fac::DeviceType::Codec))
         };
         "wrong device type"
     )]
@@ -388,7 +389,7 @@ mod test {
         let info = DeviceInfo::from(fadevice::Info {
             token_id: Some(1),
             device_name: Some("some-name".to_string()),
-            device_type: Some(fadevice::DeviceType::Input),
+            device_type: Some(AdrDevType::Composite),
             ..Default::default()
         });
         assert!(!info.matches(&query));

@@ -139,8 +139,8 @@ fn connect_to_devfs_device(devfs: DevfsSelector) -> Result<Box<dyn DeviceControl
     let protocol_path = devfs.path().join("device_protocol");
 
     match devfs.0.device_type {
-        fadevice::DeviceType::Composite => {
-            // DFv2 Composite drivers do not use a connector/trampoline as StreamConfig above.
+        fac::DeviceType::Composite => {
+            // DFv2 Composite drivers do not use a connector/trampoline as StreamConfig below.
             // TODO(https://fxbug.dev/326339971): Fall back to CompositeConnector for DFv1 drivers
             let proxy =
                 connect_to_protocol_at_path::<fhaudio::CompositeMarker>(protocol_path.as_str())
@@ -148,7 +148,7 @@ fn connect_to_devfs_device(devfs: DevfsSelector) -> Result<Box<dyn DeviceControl
 
             Ok(Box::new(CompositeDevice { _proxy: proxy }))
         }
-        fadevice::DeviceType::Input | fadevice::DeviceType::Output => {
+        fac::DeviceType::Input | fac::DeviceType::Output => {
             let connector_proxy =
                 connect_to_protocol_at_path::<fhaudio::StreamConfigConnectorMarker>(
                     protocol_path.as_str(),

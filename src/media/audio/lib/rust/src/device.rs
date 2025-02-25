@@ -13,10 +13,12 @@ use {
     fidl_fuchsia_audio_controller as fac, fidl_fuchsia_audio_device as fadevice,
     fidl_fuchsia_hardware_audio as fhaudio, fidl_fuchsia_io as fio, zx_types,
 };
+// Separate this to a distinct alias, to clarify when various 'DeviceType's are used.
+use fadevice::DeviceType as AdrDevType;
 
 /// The type of an audio device.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Type(pub fadevice::DeviceType);
+pub struct Type(fac::DeviceType);
 
 impl Type {
     /// Returns the devfs class for this device.
@@ -24,25 +26,52 @@ impl Type {
     /// e.g. /dev/class/{class}/some_device
     pub fn devfs_class(&self) -> &str {
         match self.0 {
-            fadevice::DeviceType::Codec => "codec",
-            fadevice::DeviceType::Composite => "audio-composite",
-            fadevice::DeviceType::Dai => "dai",
-            fadevice::DeviceType::Input => "audio-input",
-            fadevice::DeviceType::Output => "audio-output",
+            fac::DeviceType::Codec => "codec",
+            fac::DeviceType::Composite => "audio-composite",
+            fac::DeviceType::Dai => "dai",
+            fac::DeviceType::Input => "audio-input",
+            fac::DeviceType::Output => "audio-output",
             _ => panic!("Unexpected device type"),
         }
     }
 }
 
-impl From<fadevice::DeviceType> for Type {
-    fn from(value: fadevice::DeviceType) -> Self {
+impl From<Type> for fac::DeviceType {
+    fn from(value: Type) -> Self {
+        value.0
+    }
+}
+
+impl From<AdrDevType> for Type {
+    fn from(value: AdrDevType) -> Self {
+        let device_type = match value {
+            AdrDevType::Codec => fac::DeviceType::Codec,
+            AdrDevType::Composite => fac::DeviceType::Composite,
+            AdrDevType::Dai => fac::DeviceType::Dai,
+            AdrDevType::Input => fac::DeviceType::Input,
+            AdrDevType::Output => fac::DeviceType::Output,
+            _ => panic!("Unexpected device type"),
+        };
+        Self(device_type)
+    }
+}
+
+impl From<fac::DeviceType> for Type {
+    fn from(value: fac::DeviceType) -> Self {
         Self(value)
     }
 }
 
-impl From<Type> for fadevice::DeviceType {
+impl From<Type> for AdrDevType {
     fn from(value: Type) -> Self {
-        value.0
+        match value.0 {
+            fac::DeviceType::Codec => AdrDevType::Codec,
+            fac::DeviceType::Composite => AdrDevType::Composite,
+            fac::DeviceType::Dai => AdrDevType::Dai,
+            fac::DeviceType::Input => AdrDevType::Input,
+            fac::DeviceType::Output => AdrDevType::Output,
+            _ => panic!("Unexpected device type"),
+        }
     }
 }
 
@@ -51,11 +80,13 @@ impl FromStr for Type {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let device_type = match s.to_lowercase().as_str() {
-            "composite" => Ok(fadevice::DeviceType::Composite),
-            "input" => Ok(fadevice::DeviceType::Input),
-            "output" => Ok(fadevice::DeviceType::Output),
+            "codec" => Ok(fac::DeviceType::Codec),
+            "composite" => Ok(fac::DeviceType::Composite),
+            "dai" => Ok(fac::DeviceType::Dai),
+            "input" => Ok(fac::DeviceType::Input),
+            "output" => Ok(fac::DeviceType::Output),
             _ => Err(format!(
-                "Invalid device type: {}. Expected one of: Composite, Input, Output",
+                "Invalid device type: {}. Expected one of: Codec, Composite, Dai, Input, Output",
                 s
             )),
         }?;
@@ -67,11 +98,11 @@ impl FromStr for Type {
 impl Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self.0 {
-            fadevice::DeviceType::Codec => "Codec",
-            fadevice::DeviceType::Composite => "Composite",
-            fadevice::DeviceType::Dai => "Dai",
-            fadevice::DeviceType::Input => "Input",
-            fadevice::DeviceType::Output => "Output",
+            fac::DeviceType::Codec => "Codec",
+            fac::DeviceType::Composite => "Composite",
+            fac::DeviceType::Dai => "Dai",
+            fac::DeviceType::Input => "Input",
+            fac::DeviceType::Output => "Output",
             _ => "<unknown>",
         };
         f.write_str(s)
@@ -84,15 +115,15 @@ impl TryFrom<(HardwareType, Option<Direction>)> for Type {
     fn try_from(value: (HardwareType, Option<Direction>)) -> Result<Self, Self::Error> {
         let (type_, direction) = value;
         let device_type = match type_.0 {
-            fhaudio::DeviceType::Codec => Ok(fadevice::DeviceType::Codec),
-            fhaudio::DeviceType::Composite => Ok(fadevice::DeviceType::Composite),
-            fhaudio::DeviceType::Dai => Ok(fadevice::DeviceType::Dai),
+            fhaudio::DeviceType::Codec => Ok(fac::DeviceType::Codec),
+            fhaudio::DeviceType::Composite => Ok(fac::DeviceType::Composite),
+            fhaudio::DeviceType::Dai => Ok(fac::DeviceType::Dai),
             fhaudio::DeviceType::StreamConfig => Ok(
                 match direction
                     .ok_or_else(|| format!("direction is missing for StreamConfig type"))?
                 {
-                    Direction::Input => fadevice::DeviceType::Input,
-                    Direction::Output => fadevice::DeviceType::Output,
+                    Direction::Input => fac::DeviceType::Input,
+                    Direction::Output => fac::DeviceType::Output,
                 },
             ),
             _ => Err(format!("unknown device type")),
@@ -139,12 +170,10 @@ impl Display for HardwareType {
 impl From<Type> for HardwareType {
     fn from(value: Type) -> Self {
         let hw_type = match value.0 {
-            fadevice::DeviceType::Codec => fhaudio::DeviceType::Codec,
-            fadevice::DeviceType::Composite => fhaudio::DeviceType::Composite,
-            fadevice::DeviceType::Dai => fhaudio::DeviceType::Dai,
-            fadevice::DeviceType::Input | fadevice::DeviceType::Output => {
-                fhaudio::DeviceType::StreamConfig
-            }
+            fac::DeviceType::Codec => fhaudio::DeviceType::Codec,
+            fac::DeviceType::Composite => fhaudio::DeviceType::Composite,
+            fac::DeviceType::Dai => fhaudio::DeviceType::Dai,
+            fac::DeviceType::Input | fac::DeviceType::Output => fhaudio::DeviceType::StreamConfig,
             _ => panic!("Unexpected device type"),
         };
         Self(hw_type)
@@ -310,7 +339,7 @@ impl Info {
     }
 
     pub fn device_type(&self) -> Type {
-        Type(self.0.device_type.expect("missing 'device_type'"))
+        Type::from(self.0.device_type.expect("missing 'device_type'"))
     }
 
     pub fn device_name(&self) -> &str {
@@ -657,11 +686,11 @@ pub async fn list_devfs(
     dev_class: &fio::DirectoryProxy,
 ) -> Result<Vec<DevfsSelector>, ListDevfsError> {
     const TYPES: &[Type] = &[
-        Type(fadevice::DeviceType::Codec),
-        Type(fadevice::DeviceType::Composite),
-        Type(fadevice::DeviceType::Dai),
-        Type(fadevice::DeviceType::Input),
-        Type(fadevice::DeviceType::Output),
+        Type(fac::DeviceType::Codec),
+        Type(fac::DeviceType::Composite),
+        Type(fac::DeviceType::Dai),
+        Type(fac::DeviceType::Input),
+        Type(fac::DeviceType::Output),
     ];
 
     let mut selectors = vec![];
@@ -716,10 +745,10 @@ mod test {
     use test_case::test_case;
     use vfs::pseudo_directory;
 
-    #[test_case("composite", fadevice::DeviceType::Composite; "composite")]
-    #[test_case("input", fadevice::DeviceType::Input; "input")]
-    #[test_case("output", fadevice::DeviceType::Output; "output")]
-    fn test_parse_type(s: &str, expected_type: fadevice::DeviceType) {
+    #[test_case("composite", fac::DeviceType::Composite; "composite")]
+    #[test_case("input", fac::DeviceType::Input; "input")]
+    #[test_case("output", fac::DeviceType::Output; "output")]
+    fn test_parse_type(s: &str, expected_type: fac::DeviceType) {
         assert_eq!(Type(expected_type), s.parse::<Type>().unwrap());
     }
 
@@ -741,25 +770,25 @@ mod test {
         assert!("not a valid hardware device type".parse::<Type>().is_err());
     }
 
-    #[test_case(fhaudio::DeviceType::Codec, None, fadevice::DeviceType::Codec; "Codec")]
-    #[test_case(fhaudio::DeviceType::Composite, None, fadevice::DeviceType::Composite; "Composite")]
-    #[test_case(fhaudio::DeviceType::Dai, None, fadevice::DeviceType::Dai; "Dai")]
+    #[test_case(fhaudio::DeviceType::Codec, None, fac::DeviceType::Codec; "Codec")]
+    #[test_case(fhaudio::DeviceType::Composite, None, fac::DeviceType::Composite; "Composite")]
+    #[test_case(fhaudio::DeviceType::Dai, None, fac::DeviceType::Dai; "Dai")]
     #[test_case(
         fhaudio::DeviceType::StreamConfig,
         Some(Direction::Input),
-        fadevice::DeviceType::Input;
+        fac::DeviceType::Input;
         "StreamConfig input"
     )]
     #[test_case(
         fhaudio::DeviceType::StreamConfig,
         Some(Direction::Output),
-        fadevice::DeviceType::Output;
+        fac::DeviceType::Output;
         "StreamConfig output"
     )]
     fn test_from_hardware_type_with_direction(
         hardware_type: fhaudio::DeviceType,
         direction: Option<Direction>,
-        expected_type: fadevice::DeviceType,
+        expected_type: fac::DeviceType,
     ) {
         assert_eq!(
             Type(expected_type),
@@ -768,27 +797,27 @@ mod test {
     }
 
     #[test_case(
-        fac::Devfs { name: "3d99d780".to_string(), device_type: fadevice::DeviceType::Codec },
+        fac::Devfs { name: "3d99d780".to_string(), device_type: fac::DeviceType::Codec },
         "/dev/class/codec/3d99d780";
         "codec"
     )]
     #[test_case(
-        fac::Devfs { name: "3d99d780".to_string(), device_type: fadevice::DeviceType::Composite },
+        fac::Devfs { name: "3d99d780".to_string(), device_type: fac::DeviceType::Composite },
         "/dev/class/audio-composite/3d99d780";
         "composite"
     )]
     #[test_case(
-        fac::Devfs { name: "3d99d780".to_string(), device_type: fadevice::DeviceType::Dai },
+        fac::Devfs { name: "3d99d780".to_string(), device_type: fac::DeviceType::Dai },
         "/dev/class/dai/3d99d780";
         "dai"
     )]
     #[test_case(
-        fac::Devfs { name: "3d99d780".to_string(), device_type: fadevice::DeviceType::Input },
+        fac::Devfs { name: "3d99d780".to_string(), device_type: fac::DeviceType::Input },
         "/dev/class/audio-input/3d99d780";
         "input"
     )]
     #[test_case(
-        fac::Devfs { name: "3d99d780".to_string(), device_type: fadevice::DeviceType::Output },
+        fac::Devfs { name: "3d99d780".to_string(), device_type: fac::DeviceType::Output },
         "/dev/class/audio-output/3d99d780";
         "output"
     )]
@@ -834,27 +863,27 @@ mod test {
             vec![
                 DevfsSelector(fac::Devfs {
                     name: "codec-0".to_string(),
-                    device_type: fadevice::DeviceType::Codec,
+                    device_type: fac::DeviceType::Codec,
                 }),
                 DevfsSelector(fac::Devfs {
                     name: "composite-0".to_string(),
-                    device_type: fadevice::DeviceType::Composite,
+                    device_type: fac::DeviceType::Composite,
                 }),
                 DevfsSelector(fac::Devfs {
                     name: "dai-0".to_string(),
-                    device_type: fadevice::DeviceType::Dai,
+                    device_type: fac::DeviceType::Dai,
                 }),
                 DevfsSelector(fac::Devfs {
                     name: "input-0".to_string(),
-                    device_type: fadevice::DeviceType::Input,
+                    device_type: fac::DeviceType::Input,
                 }),
                 DevfsSelector(fac::Devfs {
                     name: "input-1".to_string(),
-                    device_type: fadevice::DeviceType::Input,
+                    device_type: fac::DeviceType::Input,
                 }),
                 DevfsSelector(fac::Devfs {
                     name: "output-0".to_string(),
-                    device_type: fadevice::DeviceType::Output,
+                    device_type: fac::DeviceType::Output,
                 }),
             ],
             selectors

@@ -10,6 +10,35 @@ using fuchsia.hardware.audio;
 using fuchsia.io;
 using zx;
 
+/// For devices with Dai or StreamConfig drivers, there is only one RING_BUFFER entity. When a
+/// method requires us to address the RingBuffer by ID, we use element_id 0. Dai and StreamConfig
+/// drivers that implement signalprocessing must not assign this ID to other elements.
+const DEFAULT_RING_BUFFER_ELEMENT_ID fuchsia.hardware.audio.signalprocessing.ElementId = 0;
+
+/// For devices with Codec or Dai drivers, there is only one DAI_INTERCONNECT entity. When a method
+/// requires us to address the interconnect by ID, we use element_id 1. Codec and Dai drivers that
+/// implement signalprocessing must not assign this ID to other elements.
+const DEFAULT_DAI_INTERCONNECT_ELEMENT_ID fuchsia.hardware.audio.signalprocessing.ElementId = 1;
+
+type DeviceType = flexible enum {
+    /// The device uses the `fuchsia.hardware.audio/Codec` protocol.
+    CODEC = 1;
+
+    /// The device uses the `fuchsia.hardware.audio/Composite` protocol.
+    COMPOSITE = 2;
+
+    /// The device uses the `fuchsia.hardware.audio/Dai` protocol.
+    DAI = 3;
+
+    /// The device uses the `fuchsia.hardware.audio/StreamConfig` protocol and
+    /// is an audio source.
+    INPUT = 4;
+
+    /// The device uses the `fuchsia.hardware.audio/StreamConfig` protocol and
+    /// is an audio destination.
+    OUTPUT = 5;
+};
+
 /// Identifies an audio device.
 type DeviceSelector = flexible union {
     /// Driver node in devfs, e.g. `/dev/class/audio-input/3d99d780`.
@@ -18,7 +47,7 @@ type DeviceSelector = flexible union {
         name fuchsia.io.Name;
 
         /// Device type.
-        device_type fuchsia.audio.device.DeviceType;
+        device_type DeviceType;
     };
 
     /// A device available through the `fuchsia.audio.device/Registry` protocol.
@@ -33,8 +62,7 @@ type DeviceRingBuffer = struct {
     /// The ID of an ENDPOINT (with type RING_BUFFER) signal processing element
     /// of the desired ring buffer.
     ///
-    /// For Dai and StreamConfig devices, this should be
-    /// `fuchsia.audio.device.DEFAULT_RING_BUFFER_ELEMENT_ID`.
+    /// For Dai and StreamConfig devices, this should be `DEFAULT_RING_BUFFER_ELEMENT_ID`.
     ring_buffer_element_id fuchsia.hardware.audio.signalprocessing.ElementId;
 };
 

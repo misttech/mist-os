@@ -4,6 +4,7 @@
 
 use crate::{connect, serde_ext};
 use camino::Utf8PathBuf;
+use fac::{DEFAULT_DAI_INTERCONNECT_ELEMENT_ID, DEFAULT_RING_BUFFER_ELEMENT_ID};
 use ffx_command_error::{bug, user_error, FfxContext as _, Result};
 use fuchsia_audio::dai::{
     DaiFormatSet, DaiFrameFormat, DaiFrameFormatClocking, DaiFrameFormatJustification,
@@ -29,7 +30,8 @@ use std::collections::BTreeMap;
 use std::fmt::{Display, Write};
 use zx_status::Status;
 use {
-    fidl_fuchsia_audio_device as fadevice, fidl_fuchsia_hardware_audio as fhaudio,
+    fidl_fuchsia_audio_controller as fac, fidl_fuchsia_audio_device as fadevice,
+    fidl_fuchsia_hardware_audio as fhaudio,
     fidl_fuchsia_hardware_audio_signalprocessing as fhaudio_sigproc, fidl_fuchsia_io as fio,
     zx_types,
 };
@@ -1334,14 +1336,14 @@ impl HardwareInfo {
                 let pcm_format_sets =
                     supported_formats_to_pcm_format_sets(&dai.ring_buffer_formats);
                 let mut map = BTreeMap::new();
-                map.insert(fadevice::DEFAULT_RING_BUFFER_ELEMENT_ID, pcm_format_sets);
+                map.insert(DEFAULT_RING_BUFFER_ELEMENT_ID, pcm_format_sets);
                 map
             }),
             HardwareInfo::StreamConfig(stream_config) => Some({
                 let pcm_format_sets =
                     supported_formats_to_pcm_format_sets(&stream_config.supported_formats);
                 let mut map = BTreeMap::new();
-                map.insert(fadevice::DEFAULT_RING_BUFFER_ELEMENT_ID, pcm_format_sets);
+                map.insert(DEFAULT_RING_BUFFER_ELEMENT_ID, pcm_format_sets);
                 map
             }),
         }
@@ -1363,7 +1365,7 @@ impl HardwareInfo {
             HardwareInfo::Codec(codec) => Some({
                 let dai_format_sets = dai_supported_formats_to_dai_format_sets(&codec.dai_formats);
                 let mut map = BTreeMap::new();
-                map.insert(fadevice::DEFAULT_DAI_INTERCONNECT_ELEMENT_ID, dai_format_sets);
+                map.insert(DEFAULT_DAI_INTERCONNECT_ELEMENT_ID, dai_format_sets);
                 map
             }),
             HardwareInfo::Composite(composite) => Some(
@@ -1381,7 +1383,7 @@ impl HardwareInfo {
             HardwareInfo::Dai(dai) => Some({
                 let dai_format_sets = dai_supported_formats_to_dai_format_sets(&dai.dai_formats);
                 let mut map = BTreeMap::new();
-                map.insert(fadevice::DEFAULT_DAI_INTERCONNECT_ELEMENT_ID, dai_format_sets);
+                map.insert(DEFAULT_DAI_INTERCONNECT_ELEMENT_ID, dai_format_sets);
                 map
             }),
             HardwareInfo::StreamConfig(_) => None,
@@ -1663,23 +1665,23 @@ async fn get_hardware_info(
 ) -> Result<HardwareInfo> {
     let protocol_path = selector.relative_path();
 
-    match fadevice::DeviceType::from(selector.device_type()) {
-        fadevice::DeviceType::Codec => {
+    match fac::DeviceType::from(selector.device_type()) {
+        fac::DeviceType::Codec => {
             let codec = connect::connect_hw_codec(dev_class, protocol_path.as_str())?;
             let codec_info = get_hw_codec_info(&codec).await?;
             Ok(HardwareInfo::Codec(codec_info))
         }
-        fadevice::DeviceType::Composite => {
+        fac::DeviceType::Composite => {
             let composite = connect::connect_hw_composite(dev_class, protocol_path.as_str())?;
             let composite_info = get_hw_composite_info(&composite).await?;
             Ok(HardwareInfo::Composite(composite_info))
         }
-        fadevice::DeviceType::Dai => {
+        fac::DeviceType::Dai => {
             let dai = connect::connect_hw_dai(dev_class, protocol_path.as_str())?;
             let dai_info = get_hw_dai_info(&dai).await?;
             Ok(HardwareInfo::Dai(dai_info))
         }
-        fadevice::DeviceType::Input | fadevice::DeviceType::Output => {
+        fac::DeviceType::Input | fac::DeviceType::Output => {
             let stream_config =
                 connect::connect_hw_streamconfig(dev_class, protocol_path.as_str())?;
             let stream_config_info = get_hw_stream_config_info(&stream_config).await?;
@@ -1829,7 +1831,7 @@ mod test {
             supported_dai_formats: Some({
                 let mut map = BTreeMap::new();
                 map.insert(
-                    fadevice::DEFAULT_DAI_INTERCONNECT_ELEMENT_ID,
+                    DEFAULT_DAI_INTERCONNECT_ELEMENT_ID,
                     vec![fhaudio::DaiSupportedFormats {
                         number_of_channels: vec![1, 2],
                         sample_formats: vec![
@@ -1874,7 +1876,7 @@ mod test {
             supported_ring_buffer_formats: Some({
                 let mut map = BTreeMap::new();
                 map.insert(
-                    fadevice::DEFAULT_RING_BUFFER_ELEMENT_ID,
+                    DEFAULT_RING_BUFFER_ELEMENT_ID,
                     vec![PcmFormatSet {
                         channel_sets: vec![
                             ChannelSet::try_from(vec![ChannelAttributes::default()]).unwrap(),

@@ -7,8 +7,8 @@ use ffx_command_error::{bug, return_bug, FfxContext as _, Result};
 use fidl::endpoints::create_proxy;
 use fuchsia_audio::device::Selector;
 use {
-    fidl_fuchsia_audio_device as fadevice, fidl_fuchsia_hardware_audio as fhaudio,
-    fidl_fuchsia_io as fio,
+    fidl_fuchsia_audio_controller as fac, fidl_fuchsia_audio_device as fadevice,
+    fidl_fuchsia_hardware_audio as fhaudio, fidl_fuchsia_io as fio,
 };
 
 /// Connect to an instance of a FIDL protocol hosted in `directory` using the given `path`.
@@ -113,19 +113,19 @@ pub async fn connect_device_control(
             let protocol_path = devfs_selector.relative_path();
 
             match devfs_selector.0.device_type {
-                fadevice::DeviceType::Codec => {
+                fac::DeviceType::Codec => {
                     let codec = connect_hw_codec(dev_class, protocol_path.as_str())?;
                     Box::new(control::HardwareCodec(codec))
                 }
-                fadevice::DeviceType::Composite => {
+                fac::DeviceType::Composite => {
                     let composite = connect_hw_composite(dev_class, protocol_path.as_str())?;
                     Box::new(control::HardwareComposite(composite))
                 }
-                fadevice::DeviceType::Dai => {
+                fac::DeviceType::Dai => {
                     let dai = connect_hw_dai(dev_class, protocol_path.as_str())?;
                     Box::new(control::HardwareDai(dai))
                 }
-                fadevice::DeviceType::Input | fadevice::DeviceType::Output => {
+                fac::DeviceType::Input | fac::DeviceType::Output => {
                     let streamconfig = connect_hw_streamconfig(dev_class, protocol_path.as_str())?;
                     Box::new(control::HardwareStreamConfig(streamconfig))
                 }

@@ -8,6 +8,7 @@
 use crate::list::DeviceQuery;
 use async_trait::async_trait;
 use blocking::Unblock;
+use fac::DEFAULT_RING_BUFFER_ELEMENT_ID;
 use ffx_audio_device_args::{DeviceCommand, RecordCommand, SetCommand, SetSubCommand, SubCommand};
 use ffx_command_error::{user_error, Result};
 use ffx_optional_moniker::{exposed_dir, optional_moniker};
@@ -236,8 +237,7 @@ async fn device_play(
         .duplicate_handle(fidl::Rights::SAME_RIGHTS)
         .bug_context("Error duplicating socket")?;
 
-    let ring_buffer_element_id =
-        ring_buffer_element_id.unwrap_or(fadevice::DEFAULT_RING_BUFFER_ELEMENT_ID);
+    let ring_buffer_element_id = ring_buffer_element_id.unwrap_or(DEFAULT_RING_BUFFER_ELEMENT_ID);
 
     let request = fac::PlayerPlayRequest {
         wav_source: Some(remote_socket),
@@ -286,7 +286,7 @@ where
     let (record_remote, record_local) = fidl::Socket::create_datagram();
 
     let ring_buffer_element_id =
-        record_command.element_id.unwrap_or(fadevice::DEFAULT_RING_BUFFER_ELEMENT_ID);
+        record_command.element_id.unwrap_or(DEFAULT_RING_BUFFER_ELEMENT_ID);
 
     let request = fac::RecorderRecordRequest {
         source: Some(fac::RecordSource::DeviceRingBuffer(fac::DeviceRingBuffer {
@@ -373,6 +373,7 @@ mod tests {
     use super::*;
     use ffx_audio_common::tests::SINE_WAV;
     use ffx_writer::{SimpleWriter, TestBuffer, TestBuffers};
+    use fidl_fuchsia_audio_controller as fac;
     use fuchsia_audio::device::DevfsSelector;
     use fuchsia_audio::format::SampleType;
     use fuchsia_audio::Format;
@@ -380,7 +381,6 @@ mod tests {
     use std::fs;
     use std::os::unix::fs::PermissionsExt;
     use tempfile::TempDir;
-    use {fidl_fuchsia_audio_controller as fac, fidl_fuchsia_audio_device as fadevice};
 
     #[fuchsia::test]
     pub async fn test_play_success() -> Result<()> {
@@ -391,10 +391,10 @@ mod tests {
 
         let selector = Selector::from(fac::Devfs {
             name: "abc123".to_string(),
-            device_type: fadevice::DeviceType::Output,
+            device_type: fac::DeviceType::Output,
         });
 
-        let ring_buffer_element_id = Some(fadevice::DEFAULT_RING_BUFFER_ELEMENT_ID);
+        let ring_buffer_element_id = Some(DEFAULT_RING_BUFFER_ELEMENT_ID);
         let ring_buffer_active_channels_bitmask = Some(1);
 
         let (play_remote, play_local) = fidl::Socket::create_datagram();
@@ -451,10 +451,10 @@ mod tests {
 
         let selector = Selector::from(fac::Devfs {
             name: "abc123".to_string(),
-            device_type: fadevice::DeviceType::Output,
+            device_type: fac::DeviceType::Output,
         });
 
-        let element_id = Some(fadevice::DEFAULT_RING_BUFFER_ELEMENT_ID);
+        let element_id = Some(DEFAULT_RING_BUFFER_ELEMENT_ID);
         let active_channels_bitmask = Some(1);
 
         device_play(
@@ -494,12 +494,12 @@ mod tests {
                 frames_per_second: 48000,
                 channels: 1,
             },
-            element_id: Some(fadevice::DEFAULT_RING_BUFFER_ELEMENT_ID),
+            element_id: Some(DEFAULT_RING_BUFFER_ELEMENT_ID),
         };
 
         let selector = Selector::from(fac::Devfs {
             name: "abc123".to_string(),
-            device_type: fadevice::DeviceType::Input,
+            device_type: fac::DeviceType::Input,
         });
 
         let (cancel_proxy, cancel_server) = create_proxy::<fac::RecordCancelerMarker>();
@@ -545,12 +545,12 @@ mod tests {
                 frames_per_second: 48000,
                 channels: 1,
             },
-            element_id: Some(fadevice::DEFAULT_RING_BUFFER_ELEMENT_ID),
+            element_id: Some(DEFAULT_RING_BUFFER_ELEMENT_ID),
         };
 
         let selector = Selector::from(fac::Devfs {
             name: "abc123".to_string(),
-            device_type: fadevice::DeviceType::Input,
+            device_type: fac::DeviceType::Input,
         });
 
         let (cancel_proxy, cancel_server) = create_proxy::<fac::RecordCancelerMarker>();
@@ -583,11 +583,11 @@ mod tests {
         let devices = list::Devices::Devfs(vec![
             DevfsSelector(fac::Devfs {
                 name: "abc123".to_string(),
-                device_type: fadevice::DeviceType::Input,
+                device_type: fac::DeviceType::Input,
             }),
             DevfsSelector(fac::Devfs {
                 name: "abc123".to_string(),
-                device_type: fadevice::DeviceType::Output,
+                device_type: fac::DeviceType::Output,
             }),
         ]);
 
@@ -613,11 +613,11 @@ mod tests {
         let devices = list::Devices::Devfs(vec![
             DevfsSelector(fac::Devfs {
                 name: "abc123".to_string(),
-                device_type: fadevice::DeviceType::Input,
+                device_type: fac::DeviceType::Input,
             }),
             DevfsSelector(fac::Devfs {
                 name: "abc123".to_string(),
-                device_type: fadevice::DeviceType::Output,
+                device_type: fac::DeviceType::Output,
             }),
         ]);
 
