@@ -20,6 +20,13 @@
             url: "fuchsia-pkg://fuchsia.com/bt-fastpair-provider#meta/bt-fastpair-provider.cm",
         },
     ],
+    offer: [
+        {
+            protocol: "fuchsia.scheduler.RoleManager",
+            from: "void",
+            to: "#bt-host-collection",
+        },
+    ],
     expose: [
         {
             protocol: "fuchsia.bluetooth.rfcomm.test.RfcommTest",

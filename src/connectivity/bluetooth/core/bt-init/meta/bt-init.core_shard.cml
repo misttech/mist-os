@@ -43,6 +43,11 @@
             from: "#cobalt",
             to: [ "#bluetooth-core" ],
         },
+        {
+            protocol: "fuchsia.scheduler.RoleManager",
+            from: "parent",
+            to: "#bluetooth-core",
+        },
 
         // Only needed when `bt-fastpair-provider` is present, so that
         // `bluetooth-core` can forward the offer.
