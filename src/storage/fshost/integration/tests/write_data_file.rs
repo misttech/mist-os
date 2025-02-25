@@ -59,13 +59,11 @@ async fn unformatted() {
     fixture.tear_down().await;
 }
 
-// TODO(https://fxbug.dev/42073877) write_data_file not supported for fxblob.
 #[fuchsia::test]
-#[cfg_attr(feature = "fxblob", ignore)]
-async fn no_existing_data_partition() {
+async fn no_existing_data_volume() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("ramdisk_image", true);
-    builder.with_disk().format_volumes(volumes_spec());
+    builder.with_disk().with_gpt().format_volumes(volumes_spec());
     builder
         .with_zbi_ramdisk()
         .format_volumes(VolumesSpec { create_data_partition: false, ..volumes_spec() });
