@@ -142,7 +142,7 @@ fn rust_bench_log(c: &mut Criterion, input_size: usize) {
             black_box(
                 fidl::encoding::Encoder::<'_, fidl::encoding::NoHandleResourceDialect>::encode::<
                     ftl::Logs,
-                >(&mut buf, &mut handle_buf, &input),
+                >(&mut buf, &mut handle_buf, black_box(&input)),
             )
             .unwrap();
         });
@@ -158,7 +158,7 @@ fn rust_bench_log(c: &mut Criterion, input_size: usize) {
                     fidl::encoding::Context {
                         wire_format_version: fidl::encoding::WireFormatVersion::V2,
                     },
-                    &decode_buf,
+                    black_box(&decode_buf),
                     &mut decode_handle_buf,
                     &mut out,
                 )).unwrap();
