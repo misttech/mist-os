@@ -3929,7 +3929,7 @@ template("rust_proc_macro") {
       _define_aux_deps = invoker.define_aux_deps && _define_aux_deps
     }
     if (_define_aux_deps) {
-      # Reuse the name defined in rustc_artifact.gni
+      # Reuse the name (without .actual) defined in rustc_artifact.gni
       _rust_auxiliary_name = "${target_name}.aux"
       rust_aux_deps(_rust_auxiliary_name) {
         forward_variables_from(invoker,

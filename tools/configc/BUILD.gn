@@ -49,7 +49,9 @@ if (is_host) {
   sdk_host_tool("configc_sdk") {
     category = "partner"
     output_name = "configc"
-    deps = [ ":configc" ]
+
+    # depending on :configc doesn't work, need one of the gen'd targets
+    deps = [ ":configc.actual" ]
   }
 
   install_host_tools("install") {

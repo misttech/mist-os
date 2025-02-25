@@ -24,7 +24,7 @@ if (is_host) {
   }
   host_test_data("host-test-data") {
     sources = [ "$target_gen_dir/quebec.doc.zip" ]
-    public_deps = [ ":quebec.rustdoc" ]
+    public_deps = [ ":quebec.actual.rustdoc" ]
     outputs = [ "$target_gen_dir/quebec.doc.zip.copy" ]
   }
 }

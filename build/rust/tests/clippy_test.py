@@ -70,16 +70,16 @@ class TestClippy(unittest.TestCase):
         with open(FAKE_OUT / TEST_DIR / "a.aux.deps.deps") as f:
             self.assertEqual(
                 f.read().splitlines(),
-                ["--extern=b=obj/build/rust/tests/b/libb.rlib"],
+                ["--extern=b=obj/build/rust/tests/b.actual/libb.rlib"],
             )
         with open(FAKE_OUT / TEST_DIR / "b.aux.deps.deps") as f:
             self.assertEqual(
                 f.read().splitlines(),
-                ["--extern=c=obj/build/rust/tests/c/libc.rlib"],
+                ["--extern=c=obj/build/rust/tests/c.actual/libc.rlib"],
             )
         with open(FAKE_OUT / TEST_DIR / "a.aux.deps.transdeps") as f:
             self.assertIn(
-                "-Ldependency=obj/build/rust/tests/b",
+                "-Ldependency=obj/build/rust/tests/b.actual",
                 f.read().splitlines(),
             )
 
@@ -87,14 +87,16 @@ class TestClippy(unittest.TestCase):
         output = run_clippy(
             "--get-outputs", "-f", FAKE_ROOT / "build/rust/tests/b/lib.rs"
         )
-        self.assertIn(str(TEST_DIR / "b.clippy"), set(output.splitlines()))
+        self.assertIn(
+            str(TEST_DIR / "b.actual.clippy"), set(output.splitlines())
+        )
 
         output = run_clippy(
             "--get-outputs", "-f", FAKE_ROOT / "build/rust/tests/a/main.rs"
         )
         for label in {
-            str(TEST_DIR / "a.clippy"),
-            str(TEST_DIR / "a_test.clippy"),
+            str(TEST_DIR / "a.actual.clippy"),
+            str(TEST_DIR / "a_test.actual.clippy"),
         }:
             self.assertIn(label, set(output.splitlines()))
 
@@ -110,8 +112,8 @@ class TestClippy(unittest.TestCase):
         self.assertEqual(
             sorted(outputs),
             [
-                "gen/build/rust/tests/a.clippy",
-                "gen/build/rust/tests/a_test.clippy",
+                "gen/build/rust/tests/a.actual.clippy",
+                "gen/build/rust/tests/a_test.actual.clippy",
             ],
         )
 

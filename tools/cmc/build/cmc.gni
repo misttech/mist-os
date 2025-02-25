@@ -21,7 +21,11 @@ template("cmc") {
                              "testonly",
                              "visibility",
                            ])
-    tool = "//tools/cmc"
+
+    # //tools/cmc is a group that contains a clippy target.
+    # //tools/cmc:cmc.actual is the actual executable target.
+    # Depending on the executable target lets GN correctly apply assert_no_deps logic.
+    tool = "//tools/cmc:cmc.actual"
     tool_output_name = "cmc"
     mnemonic = "CMC"
   }

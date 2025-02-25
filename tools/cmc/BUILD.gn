@@ -116,7 +116,11 @@ fuchsia_unittest_package("cmc_integration_test") {
 }
 
 install_host_tools("install") {
-  deps = [ ":cmc" ]
+  # cmc is a group that contains a clippy target.
+  # cmc.actual is the actual executable target.
+  # Depending on the executable target lets GN correctly apply assert_no_deps logic.
+  deps = [ ":cmc.actual" ]
+
   outputs = [ "cmc" ]
 }
 
