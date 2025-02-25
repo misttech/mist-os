@@ -11,7 +11,7 @@ use block_client::{
     BlockClient, BufferSlice, MutableBufferSlice, RemoteBlockClient, VmoId, WriteOptions,
 };
 use block_server::async_interface::{Interface, SessionManager};
-use block_server::{BlockServer, PartitionInfo};
+use block_server::{BlockServer, DeviceInfo, PartitionInfo};
 use device::Device;
 use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, ServerEnd};
 use fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream};
@@ -1115,17 +1115,18 @@ impl Component {
         format: bool,
     ) -> Result<(), Error> {
         let fvm = self.fvm();
-        let partition_info = {
+        let device_info = {
             let inner = fvm.inner.read().await;
             let partition =
                 &inner.metadata.partitions.get(&partition_index).ok_or(zx::Status::INTERNAL)?;
-            PartitionInfo {
+            DeviceInfo::Partition(PartitionInfo {
+                device_flags: fvm.device.block_flags(),
                 block_range: None, // Supplied via `get_volume_info`.
                 type_guid: partition.type_guid,
                 instance_guid: partition.guid,
-                name: Some(partition.name().to_string()),
+                name: partition.name().to_string(),
                 flags: 0,
-            }
+            })
         };
 
         let key = if let Some(crypt) = options.crypt {
@@ -1141,7 +1142,7 @@ impl Component {
 
         let block_server = BlockServer::new(
             fvm.block_size(),
-            Arc::new(PartitionInterface { partition_index, partition_info, key, fvm: fvm.clone() }),
+            Arc::new(PartitionInterface { partition_index, device_info, key, fvm: fvm.clone() }),
         );
 
         let server_end = server_end.into_channel();
@@ -1404,7 +1405,7 @@ impl Component {
 
 struct PartitionInterface {
     partition_index: u16,
-    partition_info: PartitionInfo,
+    device_info: DeviceInfo,
     key: Option<zxcrypt::Key>,
     fvm: Arc<Fvm>,
 }
@@ -1418,8 +1419,8 @@ impl Interface for PartitionInterface {
         self.fvm.device.detach_vmo(vmo);
     }
 
-    async fn get_info(&self) -> Result<Cow<'_, PartitionInfo>, zx::Status> {
-        Ok(Cow::Borrowed(&self.partition_info))
+    async fn get_info(&self) -> Result<Cow<'_, DeviceInfo>, zx::Status> {
+        Ok(Cow::Borrowed(&self.device_info))
     }
 
     async fn read(
@@ -1897,6 +1898,7 @@ mod tests {
         StartOptions, StartupMarker, VolumeMarker, VolumesMarker,
     };
     use fidl_fuchsia_hardware_block::BlockMarker;
+    use fs_management::DATA_TYPE_GUID;
     use fuchsia_component::client::{
         connect_to_named_protocol_at_dir_root, connect_to_protocol_at_dir_svc,
     };
@@ -1905,8 +1907,8 @@ mod tests {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use {
-        fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio,
-        fuchsia_async as fasync,
+        fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume,
+        fidl_fuchsia_io as fio, fuchsia_async as fasync,
     };
 
     struct Fixture {
@@ -3111,5 +3113,56 @@ mod tests {
         client.trim(0..8192).await.unwrap();
 
         assert!(trim_called.load(Ordering::Relaxed));
+    }
+
+    #[fuchsia::test]
+    async fn test_volume_info() {
+        let contents = std::fs::read("/pkg/data/golden-fvm.blk").unwrap();
+        let fake_server = Arc::new(
+            FakeServerOptions {
+                flags: fblock::Flag::READONLY,
+                block_count: Some(contents.len() as u64 / BLOCK_SIZE as u64),
+                block_size: BLOCK_SIZE,
+                initial_content: Some(&contents),
+                ..Default::default()
+            }
+            .into(),
+        );
+
+        let fixture = Fixture::from_fake_server(fake_server).await;
+
+        let volume_proxy = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
+            &fixture.outgoing_dir,
+            "volumes/data",
+        )
+        .unwrap();
+
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+        volume_proxy
+            .mount(dir_server_end, MountOptions::default())
+            .await
+            .expect("mount failed (FIDL)")
+            .expect("mount failed");
+
+        let proxy = connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(&dir_proxy).unwrap();
+        let info = proxy.get_info().await.expect("FIDL error").expect("get_info failed");
+        assert_eq!(info.block_count, 16448);
+        assert_eq!(info.block_size, 512);
+        assert_eq!(info.flags, fblock::Flag::READONLY);
+
+        let partition_metadata =
+            proxy.get_metadata().await.expect("FIDL error").expect("get_metadata failed");
+        assert_eq!(partition_metadata.name, Some("data".to_string()));
+        assert_eq!(partition_metadata.type_guid.unwrap().value, DATA_TYPE_GUID);
+        assert_eq!(partition_metadata.instance_guid.unwrap().value, [0u8; 16]);
+        assert_eq!(partition_metadata.start_block_offset, None);
+        assert_eq!(partition_metadata.num_blocks, None);
+        assert_eq!(partition_metadata.flags, Some(0));
+
+        let (status, _, volume_info) = proxy.get_volume_info().await.expect("FIDL error");
+        assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
+        let volume_info = volume_info.unwrap();
+        assert_eq!(volume_info.partition_slice_count, 257);
+        assert_eq!(volume_info.slice_limit, 0);
     }
 }

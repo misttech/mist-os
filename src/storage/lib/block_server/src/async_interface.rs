@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{DecodedRequest, IntoSessionManager, Operation, PartitionInfo, SessionHelper};
+use super::{DecodedRequest, DeviceInfo, IntoSessionManager, Operation, SessionHelper};
 use anyhow::Error;
 use block_protocol::{BlockFifoRequest, WriteOptions};
 use fuchsia_async::{self as fasync, FifoReadable as _, FifoWritable as _};
@@ -26,8 +26,8 @@ pub trait Interface: Send + Sync + Unpin + 'static {
     /// Called whenever a VMO is detached.
     fn on_detach_vmo(&self, _vmo: &zx::Vmo) {}
 
-    /// Called to get partition information.
-    fn get_info(&self) -> impl Future<Output = Result<Cow<'_, PartitionInfo>, zx::Status>> + Send;
+    /// Called to get block/partition information.
+    fn get_info(&self) -> impl Future<Output = Result<Cow<'_, DeviceInfo>, zx::Status>> + Send;
 
     /// Called for a request to read bytes.
     fn read(
@@ -180,7 +180,7 @@ impl<I: Interface> super::SessionManager for SessionManager<I> {
         Ok(())
     }
 
-    async fn get_info(&self) -> Result<Cow<'_, PartitionInfo>, zx::Status> {
+    async fn get_info(&self) -> Result<Cow<'_, DeviceInfo>, zx::Status> {
         self.interface.get_info().await
     }
 

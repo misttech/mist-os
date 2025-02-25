@@ -33,7 +33,7 @@ impl block_server::async_interface::Interface for PartitionBackend {
         Ok(())
     }
 
-    async fn get_info(&self) -> Result<Cow<'_, block_server::PartitionInfo>, zx::Status> {
+    async fn get_info(&self) -> Result<Cow<'_, block_server::DeviceInfo>, zx::Status> {
         Ok(Cow::Owned(self.partition.get_info().await?))
     }
 

@@ -13,36 +13,36 @@ namespace block_server {
 BlockServer::BlockServer(const PartitionInfo& info, Interface* interface)
     : interface_(interface),
       server_(block_server_new(
-          reinterpret_cast<const internal::PartitionInfo*>(&info),
-          internal::Callbacks{
-              .context = this,
-              .start_thread =
-                  [](void* context, const void* arg) {
-                    reinterpret_cast<BlockServer*>(context)->interface_->StartThread(Thread(arg));
-                  },
-              .on_new_session =
-                  [](void* context, const internal::Session* session) {
-                    reinterpret_cast<BlockServer*>(context)->interface_->OnNewSession(
-                        Session(session));
-                  },
-              .on_requests =
-                  [](void* context, const internal::Session* session, Request* requests,
-                     uintptr_t request_count) {
-                    // Use a union so that the destructor for session does not run.
-                    union U {
-                      U(const internal::Session* session) : session(session) {}
-                      ~U() {}
-                      Session session;
-                    } u(session);
-                    reinterpret_cast<BlockServer*>(context)->interface_->OnRequests(
-                        u.session, std::span<Request>(requests, request_count));
-                  },
-              .log =
-                  [](void* context, const char* msg, size_t len) {
-                    reinterpret_cast<BlockServer*>(context)->interface_->Log(
-                        std::string_view(msg, len));
-                  },
-          })) {}
+          &info, internal::Callbacks{
+                     .context = this,
+                     .start_thread =
+                         [](void* context, const void* arg) {
+                           reinterpret_cast<BlockServer*>(context)->interface_->StartThread(
+                               Thread(arg));
+                         },
+                     .on_new_session =
+                         [](void* context, const internal::Session* session) {
+                           reinterpret_cast<BlockServer*>(context)->interface_->OnNewSession(
+                               Session(session));
+                         },
+                     .on_requests =
+                         [](void* context, const internal::Session* session, Request* requests,
+                            uintptr_t request_count) {
+                           // Use a union so that the destructor for session does not run.
+                           union U {
+                             U(const internal::Session* session) : session(session) {}
+                             ~U() {}
+                             Session session;
+                           } u(session);
+                           reinterpret_cast<BlockServer*>(context)->interface_->OnRequests(
+                               u.session, std::span<Request>(requests, request_count));
+                         },
+                     .log =
+                         [](void* context, const char* msg, size_t len) {
+                           reinterpret_cast<BlockServer*>(context)->interface_->Log(
+                               std::string_view(msg, len));
+                         },
+                 })) {}
 
 Session& Session::operator=(Session&& other) {
   if (this == &other)

@@ -4,6 +4,7 @@
 
 use block_client::{BlockClient, RemoteBlockClient, VmoId};
 use event_listener::Event;
+use fidl_fuchsia_hardware_block::Flag;
 use fuchsia_async as fasync;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
@@ -22,6 +23,10 @@ impl<C: BlockClient> DeviceImpl<C> {
     pub async fn new(client: C) -> Result<Self, zx::Status> {
         let buffers = Buffers::new(&client).await?;
         Ok(Self { client, vmo_ids: Mutex::default(), buffers })
+    }
+
+    pub fn block_flags(&self) -> Flag {
+        self.client.block_flags()
     }
 
     /// Ataches `vmo`.  NOTE: This assumes that the pointer &zx::Vmo will remain stable.

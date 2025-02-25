@@ -19,16 +19,7 @@ using RequestId = internal::RequestId;
 using TraceFlowId = uint64_t;
 using Operation = internal::Operation;
 using Request = internal::Request;
-
-struct PartitionInfo {
-  uint64_t start_block;
-  uint64_t block_count;
-  uint32_t block_size;
-  uint8_t type_guid[16];
-  uint8_t instance_guid[16];
-  const char* name;
-  uint64_t flags;
-};
+using PartitionInfo = internal::PartitionInfo;
 
 // Represents a session.  New sessions appear via `OnNewSession`.
 class Session {

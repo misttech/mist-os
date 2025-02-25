@@ -912,7 +912,7 @@ mod tests {
         BlockClient, BlockFifoRequest, BlockFifoResponse, BufferSlice, MutableBufferSlice,
         RemoteBlockClient, RemoteBlockClientSync, WriteOptions,
     };
-    use block_server::{BlockServer, PartitionInfo};
+    use block_server::{BlockServer, DeviceInfo, PartitionInfo};
     use fidl::endpoints::RequestStream as _;
     use fidl_fuchsia_hardware_block as block;
     use fuchsia_async::{self as fasync, FifoReadable as _, FifoWritable as _};
@@ -1332,14 +1332,15 @@ mod tests {
             flush_called: Arc<AtomicBool>,
         }
         impl block_server::async_interface::Interface for Interface {
-            async fn get_info(&self) -> Result<Cow<'_, PartitionInfo>, zx::Status> {
-                Ok(Cow::Owned(PartitionInfo {
+            async fn get_info(&self) -> Result<Cow<'_, DeviceInfo>, zx::Status> {
+                Ok(Cow::Owned(DeviceInfo::Partition(PartitionInfo {
+                    device_flags: fidl_fuchsia_hardware_block::Flag::empty(),
                     block_range: Some(0..1000),
                     type_guid: [0; 16],
                     instance_guid: [0; 16],
-                    name: Some("foo".to_string()),
+                    name: "foo".to_string(),
                     flags: 0,
-                }))
+                })))
             }
 
             async fn read(

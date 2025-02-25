@@ -219,7 +219,7 @@ impl Matcher for FxblobMatcher {
             return false;
         }
         match device.partition_label().await {
-            Ok(label) => {
+            Ok(label) if !label.is_empty() => {
                 // There are a few different labels used depending on the device. If we don't see
                 // any of them, this isn't the right partition.
                 // TODO(https://fxbug.dev/344018917): Use another mechanism to keep
@@ -228,10 +228,10 @@ impl Matcher for FxblobMatcher {
                     return false;
                 }
             }
-            // If there is an error getting the partition label, it might be because this device
-            // doesn't support labels (like if it's directly on a raw disk in an emulator).
-            // Continue with content sniffing.
-            Err(_) => (),
+            // If there is an error getting the partition label, or if the label is empty, it might
+            // be because this device doesn't support labels (like if it's directly on a raw disk in
+            // an emulator).  Continue with content sniffing.
+            _ => (),
         }
         device.content_format().await.ok() == Some(DiskFormat::Fxfs)
     }

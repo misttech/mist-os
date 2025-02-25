@@ -21,16 +21,31 @@ use {
 pub mod async_interface;
 pub mod c_interface;
 
-/// Information associated with the block device.
+#[derive(Clone)]
+pub enum DeviceInfo {
+    Block(BlockInfo),
+    Partition(PartitionInfo),
+}
+
+/// Information associated with non-partition block devices.
+#[derive(Clone)]
+pub struct BlockInfo {
+    pub device_flags: fblock::Flag,
+    pub block_count: u64,
+}
+
+/// Information associated with a block device that is also a partition.
 #[derive(Clone)]
 pub struct PartitionInfo {
+    /// The device flags reported by the underlying device.
+    pub device_flags: fblock::Flag,
     /// If `block_range` is None, the partition is a volume and may not be contiguous.
     /// In this case, the server will use the `get_volume_info` method to get the count of assigned
     /// slices and use that (along with the slice and block sizes) to determine the block count.
     pub block_range: Option<Range<u64>>,
     pub type_guid: [u8; 16],
     pub instance_guid: [u8; 16],
-    pub name: Option<String>,
+    pub name: String,
     pub flags: u64,
 }
 
@@ -114,8 +129,8 @@ pub trait SessionManager: 'static {
         block_size: u32,
     ) -> impl Future<Output = Result<(), Error>> + Send;
 
-    /// Called to get partition information for Partition::GetTypeGuid, etc.
-    fn get_info(&self) -> impl Future<Output = Result<Cow<'_, PartitionInfo>, zx::Status>> + Send;
+    /// Called to get block/partition information for Block::GetInfo, Partition::GetTypeGuid, etc.
+    fn get_info(&self) -> impl Future<Output = Result<Cow<'_, DeviceInfo>, zx::Status>> + Send;
 
     /// Called to handle the GetVolumeInfo FIDL call.
     fn get_volume_info(
@@ -184,20 +199,30 @@ impl<SM: SessionManager> BlockServer<SM> {
         request: fvolume::VolumeRequest,
     ) -> Result<Option<impl Future<Output = Result<(), Error>> + Send>, Error> {
         match request {
-            fvolume::VolumeRequest::GetInfo { responder } => match self.partition_info().await {
+            fvolume::VolumeRequest::GetInfo { responder } => match self.device_info().await {
                 Ok(info) => {
-                    let block_count = if let Some(range) = info.block_range.as_ref() {
-                        range.end - range.start
-                    } else {
-                        let volume_info = self.session_manager.get_volume_info().await?;
-                        volume_info.0.slice_size * volume_info.1.partition_slice_count
-                            / self.block_size as u64
+                    let (block_count, flags) = match info.as_ref() {
+                        DeviceInfo::Block(BlockInfo { block_count, device_flags }) => {
+                            (*block_count, *device_flags)
+                        }
+                        DeviceInfo::Partition(partition_info) => {
+                            let block_count = if let Some(range) =
+                                partition_info.block_range.as_ref()
+                            {
+                                range.end - range.start
+                            } else {
+                                let volume_info = self.session_manager.get_volume_info().await?;
+                                volume_info.0.slice_size * volume_info.1.partition_slice_count
+                                    / self.block_size as u64
+                            };
+                            (block_count, partition_info.device_flags)
+                        }
                     };
                     responder.send(Ok(&fblock::BlockInfo {
                         block_count,
                         block_size: self.block_size,
                         max_transfer_size: fblock::MAX_TRANSFER_UNBOUNDED,
-                        flags: fblock::Flag::empty(),
+                        flags,
                     }))?;
                 }
                 Err(status) => responder.send(Err(status.into_raw()))?,
@@ -213,48 +238,53 @@ impl<SM: SessionManager> BlockServer<SM> {
                         .open_session(session.into_stream(), self.block_size),
                 ));
             }
-            fvolume::VolumeRequest::GetTypeGuid { responder } => {
-                match self.partition_info().await {
-                    Ok(info) => {
-                        let mut guid =
-                            fpartition::Guid { value: [0u8; fpartition::GUID_LENGTH as usize] };
-                        guid.value.copy_from_slice(&info.type_guid);
-                        responder.send(zx::sys::ZX_OK, Some(&guid))?;
-                    }
-                    Err(status) => {
-                        responder.send(status.into_raw(), None)?;
-                    }
-                }
-            }
-            fvolume::VolumeRequest::GetInstanceGuid { responder } => {
-                match self.partition_info().await {
-                    Ok(info) => {
-                        let mut guid =
-                            fpartition::Guid { value: [0u8; fpartition::GUID_LENGTH as usize] };
-                        guid.value.copy_from_slice(&info.instance_guid);
-                        responder.send(zx::sys::ZX_OK, Some(&guid))?;
-                    }
-                    Err(status) => {
-                        responder.send(status.into_raw(), None)?;
-                    }
-                }
-            }
-            fvolume::VolumeRequest::GetName { responder } => match self.partition_info().await {
+            fvolume::VolumeRequest::GetTypeGuid { responder } => match self.device_info().await {
                 Ok(info) => {
-                    let status = if info.name.is_some() {
-                        zx::sys::ZX_OK
+                    if let DeviceInfo::Partition(partition_info) = info.as_ref() {
+                        let mut guid =
+                            fpartition::Guid { value: [0u8; fpartition::GUID_LENGTH as usize] };
+                        guid.value.copy_from_slice(&partition_info.type_guid);
+                        responder.send(zx::sys::ZX_OK, Some(&guid))?;
                     } else {
-                        zx::sys::ZX_ERR_NOT_SUPPORTED
-                    };
-                    responder.send(status, info.name.as_ref().map(|s| s.as_str()))?;
+                        responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED, None)?;
+                    }
                 }
                 Err(status) => {
                     responder.send(status.into_raw(), None)?;
                 }
             },
-            fvolume::VolumeRequest::GetMetadata { responder } => {
-                match self.partition_info().await {
+            fvolume::VolumeRequest::GetInstanceGuid { responder } => {
+                match self.device_info().await {
                     Ok(info) => {
+                        if let DeviceInfo::Partition(partition_info) = info.as_ref() {
+                            let mut guid =
+                                fpartition::Guid { value: [0u8; fpartition::GUID_LENGTH as usize] };
+                            guid.value.copy_from_slice(&partition_info.instance_guid);
+                            responder.send(zx::sys::ZX_OK, Some(&guid))?;
+                        } else {
+                            responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED, None)?;
+                        }
+                    }
+                    Err(status) => {
+                        responder.send(status.into_raw(), None)?;
+                    }
+                }
+            }
+            fvolume::VolumeRequest::GetName { responder } => match self.device_info().await {
+                Ok(info) => {
+                    if let DeviceInfo::Partition(partition_info) = info.as_ref() {
+                        responder.send(zx::sys::ZX_OK, Some(&partition_info.name))?;
+                    } else {
+                        responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED, None)?;
+                    }
+                }
+                Err(status) => {
+                    responder.send(status.into_raw(), None)?;
+                }
+            },
+            fvolume::VolumeRequest::GetMetadata { responder } => match self.device_info().await {
+                Ok(info) => {
+                    if let DeviceInfo::Partition(info) = info.as_ref() {
                         let mut type_guid =
                             fpartition::Guid { value: [0u8; fpartition::GUID_LENGTH as usize] };
                         type_guid.value.copy_from_slice(&info.type_guid);
@@ -262,7 +292,7 @@ impl<SM: SessionManager> BlockServer<SM> {
                             fpartition::Guid { value: [0u8; fpartition::GUID_LENGTH as usize] };
                         instance_guid.value.copy_from_slice(&info.instance_guid);
                         responder.send(Ok(&fpartition::PartitionGetMetadataResponse {
-                            name: info.name.clone(),
+                            name: Some(info.name.clone()),
                             type_guid: Some(type_guid),
                             instance_guid: Some(instance_guid),
                             start_block_offset: info.block_range.as_ref().map(|range| range.start),
@@ -274,9 +304,9 @@ impl<SM: SessionManager> BlockServer<SM> {
                             ..Default::default()
                         }))?;
                     }
-                    Err(status) => responder.send(Err(status.into_raw()))?,
                 }
-            }
+                Err(status) => responder.send(Err(status.into_raw()))?,
+            },
             fvolume::VolumeRequest::QuerySlices { responder, start_slices } => {
                 match self.session_manager.query_slices(&start_slices).await {
                     Ok(mut results) => {
@@ -325,7 +355,7 @@ impl<SM: SessionManager> BlockServer<SM> {
         Ok(None)
     }
 
-    async fn partition_info(&self) -> Result<Cow<'_, PartitionInfo>, zx::Status> {
+    async fn device_info(&self) -> Result<Cow<'_, DeviceInfo>, zx::Status> {
         self.session_manager.get_info().await
     }
 }
@@ -706,7 +736,7 @@ impl From<RequestId> for GroupOrRequest {
 
 #[cfg(test)]
 mod tests {
-    use super::{BlockServer, PartitionInfo};
+    use super::{BlockServer, DeviceInfo, PartitionInfo};
     use block_protocol::{BlockFifoCommand, BlockFifoRequest, BlockFifoResponse, WriteOptions};
     use fidl_fuchsia_hardware_block_driver::{BlockIoFlag, BlockOpcode};
     use fuchsia_async::{FifoReadable as _, FifoWritable as _};
@@ -721,7 +751,10 @@ mod tests {
     use std::sync::{Arc, Mutex};
     use std::task::{Context, Poll};
     use zx::{AsHandleRef as _, HandleBased as _};
-    use {fidl_fuchsia_hardware_block_volume as fvolume, fuchsia_async as fasync};
+    use {
+        fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume,
+        fuchsia_async as fasync,
+    };
 
     #[derive(Default)]
     struct MockInterface {
@@ -739,8 +772,8 @@ mod tests {
             Ok(())
         }
 
-        async fn get_info(&self) -> Result<Cow<'_, PartitionInfo>, zx::Status> {
-            Ok(Cow::Owned(test_partition_info()))
+        async fn get_info(&self) -> Result<Cow<'_, DeviceInfo>, zx::Status> {
+            Ok(Cow::Owned(test_device_info()))
         }
 
         async fn read(
@@ -794,14 +827,15 @@ mod tests {
 
     const BLOCK_SIZE: u32 = 512;
 
-    fn test_partition_info() -> PartitionInfo {
-        PartitionInfo {
+    fn test_device_info() -> DeviceInfo {
+        DeviceInfo::Partition(PartitionInfo {
+            device_flags: fblock::Flag::READONLY,
             block_range: Some(12..34),
             type_guid: [1; 16],
             instance_guid: [2; 16],
-            name: Some("foo".to_string()),
+            name: "foo".to_string(),
             flags: 0xabcd,
-        }
+        })
     }
 
     #[fuchsia::test]
@@ -814,7 +848,12 @@ mod tests {
                 block_server.handle_requests(stream).await.unwrap();
             },
             async {
-                let partition_info = test_partition_info();
+                let expected_info = test_device_info();
+                let partition_info = if let DeviceInfo::Partition(info) = &expected_info {
+                    info
+                } else {
+                    unreachable!()
+                };
 
                 let block_info = proxy.get_info().await.unwrap().unwrap();
                 assert_eq!(
@@ -822,6 +861,7 @@ mod tests {
                     partition_info.block_range.as_ref().unwrap().end
                         - partition_info.block_range.as_ref().unwrap().start
                 );
+                assert_eq!(block_info.flags, fblock::Flag::READONLY);
 
                 // TODO(https://fxbug.dev/348077960): Check max_transfer_size
 
@@ -835,7 +875,7 @@ mod tests {
 
                 let (status, name) = proxy.get_name().await.unwrap();
                 assert_eq!(status, zx::sys::ZX_OK);
-                assert_eq!(&name, &partition_info.name);
+                assert_eq!(name.as_ref(), Some(&partition_info.name));
 
                 let metadata = proxy.get_metadata().await.unwrap().expect("get_flags failed");
                 assert_eq!(metadata.name, name);
@@ -999,8 +1039,8 @@ mod tests {
             Ok(())
         }
 
-        async fn get_info(&self) -> Result<Cow<'_, PartitionInfo>, zx::Status> {
-            Ok(Cow::Owned(test_partition_info()))
+        async fn get_info(&self) -> Result<Cow<'_, DeviceInfo>, zx::Status> {
+            Ok(Cow::Owned(test_device_info()))
         }
 
         async fn read(

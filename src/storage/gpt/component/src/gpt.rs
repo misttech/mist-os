@@ -20,7 +20,10 @@ use std::ops::Range;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 use zx::AsHandleRef as _;
-use {fidl_fuchsia_storage_partitions as fpartitions, fuchsia_async as fasync};
+use {
+    fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_storage_partitions as fpartitions,
+    fuchsia_async as fasync,
+};
 
 fn partition_directory_entry_name(index: u32) -> String {
     format!("part-{:03}", index)
@@ -75,14 +78,15 @@ impl GptPartition {
         self.block_client.detach_vmo(vmoid).await
     }
 
-    pub async fn get_info(&self) -> Result<block_server::PartitionInfo, zx::Status> {
+    pub async fn get_info(&self) -> Result<block_server::DeviceInfo, zx::Status> {
         if let Some(gpt) = self.gpt.upgrade() {
-            let inner = gpt.inner.lock().await;
-            inner
+            gpt.inner
+                .lock()
+                .await
                 .gpt
                 .partitions()
                 .get(&self.index)
-                .map(convert_partition_info)
+                .map(|info| convert_partition_info(info, self.block_client.block_flags()))
                 .ok_or(zx::Status::BAD_STATE)
         } else {
             Err(zx::Status::BAD_STATE)
@@ -163,14 +167,18 @@ impl GptPartition {
     }
 }
 
-fn convert_partition_info(info: &gpt::PartitionInfo) -> block_server::PartitionInfo {
-    block_server::PartitionInfo {
+fn convert_partition_info(
+    info: &gpt::PartitionInfo,
+    device_flags: fblock::Flag,
+) -> block_server::DeviceInfo {
+    block_server::DeviceInfo::Partition(block_server::PartitionInfo {
+        device_flags,
         block_range: Some(info.start_block..info.start_block + info.num_blocks),
         type_guid: info.type_guid.to_bytes(),
         instance_guid: info.instance_guid.to_bytes(),
-        name: Some(info.label.clone()),
+        name: info.label.clone(),
         flags: info.flags,
-    }
+    })
 }
 
 struct PendingTransaction {
@@ -223,7 +231,6 @@ impl Inner {
                     .checked_add(info.num_blocks)
                     .ok_or_else(|| anyhow!("Overflow in partition range"))?,
         ));
-        // TODO(https://fxbug.dev/376745136): propagate block flags from parent to children
         let block_server = Arc::new(BlockServer::new(parent.block_size, partition));
         self.partitions_dir.add_entry(
             &partition_directory_entry_name(index),
@@ -938,7 +945,7 @@ mod tests {
         part_1_proxy
             .update_metadata(fpartitions::PartitionUpdateMetadataRequest {
                 transaction: Some(transaction.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap()),
-                flags: Some(u64::MAX),
+                flags: Some(1234),
                 ..Default::default()
             })
             .await
@@ -953,14 +960,13 @@ mod tests {
         let (status, guid) = part_0_block.get_type_guid().await.expect("FIDL error");
         assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
         assert_eq!(guid.unwrap().value, [0xffu8; 16]);
-        // TODO(https://fxbug.dev/371060853): Check flags after they can be read through the
-        // Partition protocol
         let part_1_block =
             connect_to_named_protocol_at_dir_root::<fvolume::VolumeMarker>(&part_1_dir, "volume")
                 .expect("Failed to open Volume service");
-        let (status, guid) = part_1_block.get_type_guid().await.expect("FIDL error");
-        assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
-        assert_eq!(guid.unwrap().value, PART_TYPE_GUID);
+        let metadata =
+            part_1_block.get_metadata().await.expect("FIDL error").expect("get_metadata failed");
+        assert_eq!(metadata.type_guid.unwrap().value, PART_TYPE_GUID);
+        assert_eq!(metadata.flags, Some(1234));
 
         runner.shutdown().await;
     }
@@ -1205,6 +1211,69 @@ mod tests {
 
         assert_eq!(client.block_count(), 2);
         assert_eq!(client.block_size(), 512);
+
+        runner.shutdown().await;
+    }
+
+    #[fuchsia::test]
+    async fn partition_info() {
+        const PART_TYPE_GUID: [u8; 16] = [2u8; 16];
+        const PART_INSTANCE_GUID: [u8; 16] = [2u8; 16];
+        const PART_NAME: &str = "part";
+
+        let (block_device, partitions_dir) = setup_with_options(
+            FakeServerOptions {
+                block_count: Some(8),
+                block_size: 512,
+                flags: fblock::Flag::READONLY | fblock::Flag::REMOVABLE,
+                ..Default::default()
+            },
+            vec![PartitionInfo {
+                label: PART_NAME.to_string(),
+                type_guid: Guid::from_bytes(PART_TYPE_GUID),
+                instance_guid: Guid::from_bytes(PART_INSTANCE_GUID),
+                start_block: 4,
+                num_blocks: 1,
+                flags: 0xabcd,
+            }],
+        )
+        .await;
+
+        let partitions_dir_clone = partitions_dir.clone();
+        let runner = GptManager::new(block_device.block_proxy(), partitions_dir_clone)
+            .await
+            .expect("load should succeed");
+
+        let (part_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+        let flags =
+            fio::Flags::PERM_CONNECT | fio::Flags::PERM_TRAVERSE | fio::Flags::PERM_ENUMERATE;
+        let options = fio::Options::default();
+        let scope = vfs::execution_scope::ExecutionScope::new();
+        partitions_dir
+            .clone()
+            .open3(
+                scope.clone(),
+                vfs::path::Path::validate_and_split("part-000").unwrap(),
+                flags.clone(),
+                &mut ObjectRequest::new(flags, &options, server_end.into_channel().into()),
+            )
+            .unwrap();
+        let part_block =
+            connect_to_named_protocol_at_dir_root::<fvolume::VolumeMarker>(&part_dir, "volume")
+                .expect("Failed to open Volume service");
+        let info = part_block.get_info().await.expect("FIDL error").expect("get_info failed");
+        assert_eq!(info.block_count, 1);
+        assert_eq!(info.block_size, 512);
+        assert_eq!(info.flags, fblock::Flag::READONLY | fblock::Flag::REMOVABLE);
+
+        let metadata =
+            part_block.get_metadata().await.expect("FIDL error").expect("get_metadata failed");
+        assert_eq!(metadata.name, Some(PART_NAME.to_string()));
+        assert_eq!(metadata.type_guid.unwrap().value, PART_TYPE_GUID);
+        assert_eq!(metadata.instance_guid.unwrap().value, PART_INSTANCE_GUID);
+        assert_eq!(metadata.start_block_offset, Some(4));
+        assert_eq!(metadata.num_blocks, Some(1));
+        assert_eq!(metadata.flags, Some(0xabcd));
 
         runner.shutdown().await;
     }

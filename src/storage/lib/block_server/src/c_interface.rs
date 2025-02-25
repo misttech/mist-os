@@ -23,7 +23,7 @@ pub struct SessionManager {
     open_sessions: Mutex<HashMap<usize, Weak<Session>>>,
     condvar: Condvar,
     mbox: ExecutorMailbox,
-    info: super::PartitionInfo,
+    info: super::DeviceInfo,
 }
 
 unsafe impl Send for SessionManager {}
@@ -93,7 +93,7 @@ impl super::SessionManager for SessionManager {
         result
     }
 
-    async fn get_info(&self) -> Result<Cow<'_, super::PartitionInfo>, zx::Status> {
+    async fn get_info(&self) -> Result<Cow<'_, super::DeviceInfo>, zx::Status> {
         Ok(Cow::Borrowed(&self.info))
     }
 }
@@ -354,6 +354,7 @@ impl Drop for BlockServer {
 
 #[repr(C)]
 pub struct PartitionInfo {
+    pub device_flags: u32,
     pub start_block: u64,
     pub block_count: u64,
     pub block_size: u32,
@@ -372,18 +373,19 @@ type zx_handle_t = zx::sys::zx_handle_t;
 type zx_status_t = zx::sys::zx_status_t;
 
 impl PartitionInfo {
-    unsafe fn to_rust(&self) -> super::PartitionInfo {
-        super::PartitionInfo {
+    unsafe fn to_rust(&self) -> super::DeviceInfo {
+        super::DeviceInfo::Partition(super::PartitionInfo {
+            device_flags: fblock::Flag::from_bits_truncate(self.device_flags),
             block_range: Some(self.start_block..self.start_block + self.block_count),
             type_guid: self.type_guid,
             instance_guid: self.instance_guid,
             name: if self.name.is_null() {
-                None
+                "".to_string()
             } else {
-                Some(String::from_utf8_lossy(CStr::from_ptr(self.name).to_bytes()).to_string())
+                String::from_utf8_lossy(CStr::from_ptr(self.name).to_bytes()).to_string()
             },
             flags: self.flags,
-        }
+        })
     }
 }
 
