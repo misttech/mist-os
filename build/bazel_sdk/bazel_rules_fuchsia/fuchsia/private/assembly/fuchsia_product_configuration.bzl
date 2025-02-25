@@ -193,6 +193,7 @@ _fuchsia_prebuilt_product_configuration = rule(
         "build_type": attr.string(
             doc = "Build type of the product config. Must match the prebuilts.",
             mandatory = True,
+            values = [BUILD_TYPES.ENG, BUILD_TYPES.USER, BUILD_TYPES.USER_DEBUG],
         ),
     } | COMPATIBILITY.HOST_ATTRS,
 )
