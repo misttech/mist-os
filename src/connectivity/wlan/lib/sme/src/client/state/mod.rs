@@ -2136,7 +2136,7 @@ mod tests {
     use wlan_common::ie::fake_ies::{fake_probe_resp_wsc_ie_bytes, get_vendor_ie_bytes_for_wsc_ie};
     use wlan_common::ie::rsn::rsne::Rsne;
     use wlan_common::test_utils::fake_features::{
-        fake_mac_sublayer_support, fake_security_support, fake_spectrum_management_support_empty,
+        fake_security_support, fake_spectrum_management_support_empty,
     };
     use wlan_common::test_utils::fake_stas::IesOverrides;
     use wlan_common::{assert_variant, fake_bss_description, timer};
@@ -5186,7 +5186,6 @@ mod tests {
                     &test_utils::fake_device_info([1u8; 6].into()),
                     &fake_spectrum_management_support_empty(),
                 )),
-                mac_sublayer_support: fake_mac_sublayer_support(),
                 security_support: fake_security_support(),
             };
             TestHelper { mlme_stream, time_stream, context, inspector, executor }

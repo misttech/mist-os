@@ -59,9 +59,6 @@ mod internal {
         pub(crate) timer: Timer<Event>,
         pub att_id: ConnectionAttemptId,
         pub(crate) inspect: Arc<inspect::SmeTree>,
-        // TODO(https://fxbug.dev/335283785): Remove or explain unused code.
-        #[allow(dead_code)]
-        pub mac_sublayer_support: fidl_common::MacSublayerSupport,
         pub security_support: fidl_common::SecuritySupport,
     }
 }
@@ -658,7 +655,6 @@ impl ClientSme {
         inspector: fuchsia_inspect::Inspector,
         inspect_node: fuchsia_inspect::Node,
         persistence_req_sender: auto_persist::PersistenceReqSender,
-        mac_sublayer_support: fidl_common::MacSublayerSupport,
         security_support: fidl_common::SecuritySupport,
         spectrum_management_support: fidl_common::SpectrumManagementSupport,
     ) -> (Self, MlmeSink, MlmeStream, timer::EventStream<Event>) {
@@ -697,7 +693,6 @@ impl ClientSme {
                     timer,
                     att_id: 0,
                     inspect,
-                    mac_sublayer_support,
                     security_support,
                 },
             },
@@ -985,7 +980,7 @@ mod tests {
         security::{wep::WEP40_KEY_BYTES, wpa::credential::PSK_SIZE_BYTES},
         test_utils::{
             fake_features::{
-                fake_mac_sublayer_support, fake_security_support, fake_security_support_empty,
+                fake_security_support, fake_security_support_empty,
                 fake_spectrum_management_support_empty,
             },
             fake_stas::{FakeProtectionCfg, IesOverrides},
@@ -1613,19 +1608,12 @@ mod tests {
         let sme_root_node = inspector.root().create_child("sme");
         let (persistence_req_sender, _persistence_receiver) =
             test_utils::create_inspect_persistence_channel();
-        let mut mac_sublayer_support = fake_mac_sublayer_support();
-        // TODO(https://fxbug.dev/42178810) - FullMAC still uses the old state machine. Once FullMAC is
-        //                         fully transitioned, this override will no longer be
-        //                         necessary.
-        mac_sublayer_support.device.mac_implementation_type =
-            fidl_common::MacImplementationType::Fullmac;
         let (mut sme, _mlme_sink, mut mlme_stream, _time_stream) = ClientSme::new(
             ClientConfig::from_config(SmeConfig::default().with_wep(), false),
             test_utils::fake_device_info(*CLIENT_ADDR),
             inspector,
             sme_root_node,
             persistence_req_sender,
-            mac_sublayer_support,
             fake_security_support(),
             fake_spectrum_management_support_empty(),
         );
@@ -2134,7 +2122,6 @@ mod tests {
             inspector,
             sme_root_node,
             persistence_req_sender,
-            fake_mac_sublayer_support(),
             fake_security_support(),
             fake_spectrum_management_support_empty(),
         );
@@ -2204,19 +2191,12 @@ mod tests {
         let sme_root_node = inspector.root().create_child("sme");
         let (persistence_req_sender, _persistence_receiver) =
             test_utils::create_inspect_persistence_channel();
-        let mut mac_sublayer_support = fake_mac_sublayer_support();
-        // TODO(https://fxbug.dev/42178810) - FullMAC still uses the old state machine. Once FullMAC is
-        //                         fully transitioned, this override will no longer be
-        //                         necessary.
-        mac_sublayer_support.device.mac_implementation_type =
-            fidl_common::MacImplementationType::Fullmac;
         let (client_sme, _mlme_sink, mlme_stream, time_stream) = ClientSme::new(
             ClientConfig::default(),
             test_utils::fake_device_info(*CLIENT_ADDR),
             inspector,
             sme_root_node,
             persistence_req_sender,
-            mac_sublayer_support,
             fake_security_support(),
             fake_spectrum_management_support_empty(),
         );

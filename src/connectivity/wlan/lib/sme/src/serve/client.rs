@@ -31,7 +31,6 @@ type Sme = client_sme::ClientSme;
 pub fn serve(
     cfg: crate::Config,
     device_info: fidl_mlme::DeviceInfo,
-    mac_sublayer_support: fidl_common::MacSublayerSupport,
     security_support: fidl_common::SecuritySupport,
     spectrum_management_support: fidl_common::SpectrumManagementSupport,
     event_stream: MlmeEventStream,
@@ -53,7 +52,6 @@ pub fn serve(
         inspector,
         inspect_node,
         persistence_req_sender,
-        mac_sublayer_support,
         security_support,
         spectrum_management_support,
     );

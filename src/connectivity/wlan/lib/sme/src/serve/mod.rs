@@ -149,7 +149,6 @@ pub fn create_sme(
             let (mlme_req_sink, mlme_req_stream, fut) = client::serve(
                 cfg,
                 device_info,
-                mac_sublayer_support,
                 security_support,
                 spectrum_management_support,
                 mlme_event_stream,
