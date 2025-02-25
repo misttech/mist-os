@@ -34,6 +34,11 @@
 #      as tests from the package.
 #      Type: list[string] (optional)
 #
+# If the template defines `fidl_coverage = true` then for the `in_development`
+# API level, a Lacewing test will be created that wraps the device test and
+# reports its FIDL activity in the test artifacts. See
+# `sdk/ctf/build/scripts/snoop_fidl.py` for more details.
+#
 # See generate_pkgdir-tests for an example.
 
 import("//sdk/ctf/build/internal/fuchsia_package_with_test.gni")
@@ -48,6 +53,10 @@ import("//src/lib/vulkan/vulkan.gni")
 # subpackage it in a new test component with a generated manifest.
 template("pre_packaged_test_with_names") {
   test_info = invoker.test_info
+
+  # TODO (b/396759044): Decide whether to wrap these tests in the
+  # Lacewing FIDL snooper.
+  not_needed(invoker, [ "fidl_coverage" ])
   package_name = test_info.name
   assert(defined(test_info.test_component_names),
          "Expected test_component_names for a pre-packaged test.")
@@ -105,15 +114,24 @@ template("pre_packaged_test_with_names") {
 }
 
 template("generate_archivist_integration_test_cases") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
 
   # TODO(https://fxbug.dev/383560524): This is disabled until we fix an error in the test.
   if (defined(invoker.api_level) && invoker.api_level == "25") {
-    not_needed([ "test_info" ])
+    not_needed([
+                 "test_info",
+                 "fidl_coverage",
+               ])
     group(target_name) {
     }
   } else {
     fuchsia_package_with_test(target_name) {
+      # This test needs to override the default CTF realm.
+      device_test_realm = "/core/testing/system-tests"
       test_component = "//src/diagnostics/archivist/tests/integration:test_root"
       test_component_name = "test_root.cm"
       subpackages = [
@@ -125,9 +143,16 @@ template("generate_archivist_integration_test_cases") {
 }
 
 template("generate_fuchsia-diagnostics-tests") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   if (defined(invoker.api_level) && invoker.api_level == "17") {
-    not_needed([ "test_info" ])
+    not_needed([
+                 "test_info",
+                 "fidl_coverage",
+               ])
     group(target_name) {
     }
   } else {
@@ -143,7 +168,11 @@ template("generate_fuchsia-diagnostics-tests") {
 }
 
 template("generate_fuchsia-diagnostics-log-tests") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     subpackages = [
       test_info.target_label,
@@ -155,7 +184,11 @@ template("generate_fuchsia-diagnostics-log-tests") {
 }
 
 template("generate_fidl-hlcpp-unit-tests") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     subpackages = [
       test_info.target_label,
@@ -167,7 +200,11 @@ template("generate_fidl-hlcpp-unit-tests") {
 }
 
 template("generate_fidl-hlcpp-conformance-tests") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     subpackages = [
       test_info.target_label,
@@ -180,7 +217,11 @@ template("generate_fidl-hlcpp-conformance-tests") {
 }
 
 template("generate_svc-tests") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     subpackages = [
       test_info.target_label,
@@ -192,7 +233,11 @@ template("generate_svc-tests") {
 }
 
 template("generate_vulkan-loader-tests") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     subpackages = [
       test_info.target_label,
@@ -210,7 +255,11 @@ template("generate_vulkan-loader-tests") {
 }
 
 template("generate_fuchsia-intl-tests") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component = "//sdk/ctf/tests/fidl/fuchsia.intl:test-root"
     test_component_name = "test-root.cm"
@@ -222,27 +271,45 @@ template("generate_fuchsia-intl-tests") {
 }
 
 template("generate_timekeeper-integration") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
 
   # TODO: b/365558387 - This CTF test should be completely
   # retracted.
-  not_needed([ "test_info" ])
+  not_needed([
+               "test_info",
+               "fidl_coverage",
+             ])
   group(target_name) {
   }
 }
 
 template("generate_faketime-integration") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
 
   # TODO: b/365558387 - This CTF test should be completely
   # retracted.
-  not_needed([ "test_info" ])
+  not_needed([
+               "test_info",
+               "fidl_coverage",
+             ])
   group(target_name) {
   }
 }
 
 template("generate_fdio-spawn-tests") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component = "//sdk/ctf/tests/pkg/fdio:test-root"
     test_component_name = "test-root.cm"
@@ -254,7 +321,11 @@ template("generate_fdio-spawn-tests") {
 }
 
 template("generate_fuchsia-driver-test_tests") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     subpackages = [
       test_info.target_label,
@@ -270,7 +341,11 @@ template("generate_fuchsia-driver-test_tests") {
 }
 
 template("generate_fuchsia-settings-tests") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component = "//sdk/ctf/tests/fidl/fuchsia.settings:test-root"
     test_component_name = "test-root.cm"
@@ -282,7 +357,11 @@ template("generate_fuchsia-settings-tests") {
 }
 
 template("generate_fuchsia-element-tests") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     subpackages = [
       test_info.target_label,
@@ -294,7 +373,11 @@ template("generate_fuchsia-element-tests") {
 }
 
 template("generate_fuchsia-hwinfo-tests") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     subpackages = [ test_info.target_label ]
     test_component = "//sdk/ctf/tests/fidl/fuchsia.hwinfo:test-root"
@@ -305,7 +388,11 @@ template("generate_fuchsia-hwinfo-tests") {
 # NOTE: Versions 16/17 are disabled as we no longer provide builds for these
 # versions. These tests were updated in https://fxbug.dev/355034859.
 template("generate_pkgdir-tests") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   _disabled_versions = [
     "16",
     "17",
@@ -313,7 +400,10 @@ template("generate_pkgdir-tests") {
   if (defined(invoker.api_level) &&
       _disabled_versions + [ invoker.api_level ] - [ invoker.api_level ] !=
       _disabled_versions) {
-    not_needed([ "test_info" ])
+    not_needed([
+                 "test_info",
+                 "fidl_coverage",
+               ])
     group(target_name) {
     }
   } else {
@@ -329,7 +419,11 @@ template("generate_pkgdir-tests") {
 }
 
 template("generate_simulate-scan-wlan-hw-sim-tests") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   _disabled_versions = [
     "15",
     "16",
@@ -339,7 +433,10 @@ template("generate_simulate-scan-wlan-hw-sim-tests") {
   if (defined(invoker.api_level) &&
       _disabled_versions + [ invoker.api_level ] - [ invoker.api_level ] !=
       _disabled_versions) {
-    not_needed([ "test_info" ])
+    not_needed([
+                 "test_info",
+                 "fidl_coverage",
+               ])
     group(target_name) {
     }
   } else {
@@ -361,7 +458,11 @@ template("generate_simulate-scan-wlan-hw-sim-tests") {
 }
 
 template("generate_basic-driver-test") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   _disabled_versions = [
     "17",
     "18",
@@ -369,7 +470,10 @@ template("generate_basic-driver-test") {
   if (defined(invoker.api_level) &&
       _disabled_versions + [ invoker.api_level ] - [ invoker.api_level ] !=
       _disabled_versions) {
-    not_needed([ "test_info" ])
+    not_needed([
+                 "test_info",
+                 "fidl_coverage",
+               ])
     group(target_name) {
     }
   } else {
@@ -386,12 +490,19 @@ template("generate_basic-driver-test") {
 }
 
 template("generate_nodegroup_test") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   _disabled_versions = [ "18" ]
   if (defined(invoker.api_level) &&
       _disabled_versions + [ invoker.api_level ] - [ invoker.api_level ] !=
       _disabled_versions) {
-    not_needed([ "test_info" ])
+    not_needed([
+                 "test_info",
+                 "fidl_coverage",
+               ])
     group(target_name) {
     }
   } else {
@@ -413,7 +524,11 @@ template("generate_realm_integration_tests-ctf") {
 }
 
 template("generate_touch-test-suite") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component = "//src/ui/tests/conformance_input_tests:touch-conformance-test-component"
     test_component_name = "touch-conformance-test.cm"
@@ -438,7 +553,11 @@ template("generate_touch-test-suite") {
 }
 
 template("generate_mouse-test-suite") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component = "//src/ui/tests/conformance_input_tests:mouse-conformance-test-component"
     test_component_name = "mouse-conformance-test.cm"
@@ -463,7 +582,11 @@ template("generate_mouse-test-suite") {
 }
 
 template("generate_key-test-suite") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component =
         "//src/ui/tests/conformance_input_tests:key-conformance-test-component"
@@ -489,7 +612,11 @@ template("generate_key-test-suite") {
 }
 
 template("generate_focus-test-suite") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component = "//src/ui/tests/conformance_input_tests:focus-conformance-test-component"
     test_component_name = "focus-conformance-test.cm"
@@ -514,7 +641,11 @@ template("generate_focus-test-suite") {
 }
 
 template("generate_media-button-test-suite") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component = "//src/ui/tests/conformance_input_tests:media-button-conformance-test-component"
     test_component_name = "media-button-conformance-test.cm"
@@ -539,7 +670,11 @@ template("generate_media-button-test-suite") {
 }
 
 template("generate_flatland-allocation-test-suite") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component = "//src/ui/scenic/tests:flatland-allocation-test-component"
     test_component_name = "flatland-allocation-test.cm"
@@ -557,7 +692,11 @@ template("generate_flatland-allocation-test-suite") {
 }
 
 template("generate_flatland-touch-integration-test-suite") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component =
         "//src/ui/scenic/tests:flatland-touch-integration-test-component"
@@ -576,7 +715,11 @@ template("generate_flatland-touch-integration-test-suite") {
 }
 
 template("generate_flatland-focus-integration-test-suite") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component =
         "//src/ui/scenic/tests:flatland-focus-integration-test-component"
@@ -595,7 +738,11 @@ template("generate_flatland-focus-integration-test-suite") {
 }
 
 template("generate_flatland-view-ref-installed-integration-test-suite") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component = "//src/ui/scenic/tests:flatland-view-ref-installed-integration-test-component"
     test_component_name = "flatland-view-ref-installed-integration-test.cm"
@@ -617,7 +764,11 @@ template("generate_flatland-view-ref-installed-integration-test-suite") {
 }
 
 template("generate_flatland-view-integration-test-suite") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component =
         "//src/ui/scenic/tests:flatland-view-integration-test-component"
@@ -636,7 +787,11 @@ template("generate_flatland-view-integration-test-suite") {
 }
 
 template("generate_cpu-renderer-integration-test-suite") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component =
         "//src/ui/scenic/tests:cpu-renderer-integration-test-component"
@@ -654,7 +809,11 @@ template("generate_cpu-renderer-integration-test-suite") {
 }
 
 template("generate_null-renderer-integration-test-suite") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component =
         "//src/ui/scenic/tests:null-renderer-integration-test-component"
@@ -672,7 +831,11 @@ template("generate_null-renderer-integration-test-suite") {
 }
 
 template("generate_observer-registry-integration-test-suite") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component =
         "//src/ui/scenic/tests:observer-registry-integration-test-component"
@@ -691,7 +854,11 @@ template("generate_observer-registry-integration-test-suite") {
 }
 
 template("generate_scoped-observer-registry-integration-test-suite") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component = "//src/ui/scenic/tests:scoped-observer-registry-integration-test-component"
     test_component_name = "scoped-observer-registry-integration-test.cm"
@@ -709,7 +876,11 @@ template("generate_scoped-observer-registry-integration-test-suite") {
 }
 
 template("generate_flatland-protected-memory-integration-test-suite") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component = "//src/ui/scenic/tests:flatland-protected-memory-integration-test-component"
     test_component_name = "flatland-protected-memory-integration-test.cm"
@@ -731,7 +902,11 @@ template("generate_flatland-protected-memory-integration-test-suite") {
 }
 
 template("generate_screen-capture-integration-test-suite") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component =
         "//src/ui/scenic/tests:screen-capture-integration-test-component"
@@ -750,7 +925,11 @@ template("generate_screen-capture-integration-test-suite") {
 }
 
 template("generate_screen-capture2-integration-test-suite") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component =
         "//src/ui/scenic/tests:screen-capture2-integration-test-component"
@@ -769,7 +948,11 @@ template("generate_screen-capture2-integration-test-suite") {
 }
 
 template("generate_display-ownership-integration-test-suite") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component =
         "//src/ui/scenic/tests:display-ownership-integration-test-component"
@@ -788,7 +971,11 @@ template("generate_display-ownership-integration-test-suite") {
 }
 
 template("generate_singleton-display-integration-test-suite") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component =
         "//src/ui/scenic/tests:singleton-display-integration-test-component"
@@ -807,7 +994,11 @@ template("generate_singleton-display-integration-test-suite") {
 }
 
 template("generate_flatland-mouse-integration-test-suite") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component =
         "//src/ui/scenic/tests:flatland-mouse-integration-test-component"
@@ -826,7 +1017,11 @@ template("generate_flatland-mouse-integration-test-suite") {
 }
 
 template("generate_flatland-pixeltest-general-suite") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component =
         "//src/ui/scenic/tests:flatland-pixeltest-general-component"
@@ -845,7 +1040,11 @@ template("generate_flatland-pixeltest-general-suite") {
 }
 
 template("generate_flatland-pixeltest-flip-and-orientation-suite") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component = "//src/ui/scenic/tests:flatland-pixeltest-flip-and-orientation-component"
     test_component_name = "flatland-pixeltest-flip-and-orientation.cm"
@@ -863,7 +1062,11 @@ template("generate_flatland-pixeltest-flip-and-orientation-suite") {
 }
 
 template("generate_flatland-pixeltest-yuv-suite") {
-  forward_variables_from(invoker, [ "test_info" ])
+  forward_variables_from(invoker,
+                         [
+                           "test_info",
+                           "fidl_coverage",
+                         ])
   fuchsia_package_with_test(target_name) {
     test_component = "//src/ui/scenic/tests:flatland-pixeltest-yuv-component"
     test_component_name = "flatland-pixeltest-yuv.cm"
@@ -910,11 +1113,16 @@ template("generate_ctf_test") {
       testonly = true
       package_name = prebuilt_package.package_name
       archive_path = "$root_build_dir/cts/${prebuilt_package.archive_name}.far"
-      deps = [ prebuilt_package.archive_gn_label ]
+      deps = [ "${prebuilt_package.archive_gn_label}($default_toolchain)" ]
     }
   }
 
   target("generate_${prebuilt_package.package_name}", target_name) {
+    # fidl_coverage will be forwarded in each "generate_foo" target defined above.
+    # It can be un-forwarded to disable it for a specific test, or set to false
+    # here to disable it for all tests.
+    fidl_coverage = true
+
     # If you change these properties, change the docs at the top of this file.
     test_info = {
       name = prebuilt_package.package_name
