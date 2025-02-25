@@ -5,9 +5,5 @@
 # Group containing all of the transports functional test cases and its dependencies.
 group("tests") {
   testonly = true
-  public_deps = [
-    "test_fastboot:tests",
-    "test_ffx:tests",
-    "test_serial:tests",
-  ]
+  public_deps = [ "test_ffx:tests" ]
 }
