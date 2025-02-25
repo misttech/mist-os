@@ -99,6 +99,7 @@
                 "fuchsia.diagnostics.host.ArchiveAccessor",
                 "fuchsia.diagnostics.LogSettings",
                 "fuchsia.driver.development.Manager",
+                "fuchsia.driver.registrar.DriverRegistrar",
                 "fuchsia.feedback.DataProvider",
                 "fuchsia.fshost.Admin",
                 "fuchsia.hardware.power.statecontrol.Admin",

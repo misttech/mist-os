@@ -170,6 +170,11 @@
             to: "#console-launcher",
         },
         {
+            protocol: [ "fuchsia.driver.registrar.DriverRegistrar" ],
+            from: "#driver_index",
+            to: "#console-launcher",
+        },
+        {
             protocol: [
                 "fuchsia.scheduler.deprecated.ProfileProvider",
                 "fuchsia.scheduler.RoleManager",
