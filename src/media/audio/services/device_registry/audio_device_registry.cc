@@ -62,11 +62,9 @@ void AudioDeviceRegistry::DeviceDetected(std::string_view name, fad::DeviceType 
     case fad::DriverClient::Tag::kComposite:
       FX_CHECK(driver_client.composite()->is_valid());
       break;
-    case fad::DriverClient::Tag::kStreamConfig:
-      FX_CHECK(driver_client.stream_config()->is_valid());
-      break;
     default:
-      FX_CHECK(!driver_client.IsUnknown());
+      ADR_WARN_OBJECT() << "Device detected but not supported";
+      return;
   }
   AddDevice(Device::Create(this->shared_from_this(), thread_->dispatcher(), name, device_type,
                            std::move(driver_client)));

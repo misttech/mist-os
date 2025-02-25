@@ -13,20 +13,6 @@
         {
             directory: "dev-class",
             from: "parent",
-            as: "dev-audio-input",
-            to: "#audio_device_registry",
-            subdir: "audio-input",
-        },
-        {
-            directory: "dev-class",
-            from: "parent",
-            as: "dev-audio-output",
-            to: "#audio_device_registry",
-            subdir: "audio-output",
-        },
-        {
-            directory: "dev-class",
-            from: "parent",
             as: "dev-audio-composite",
             to: "#audio_device_registry",
             subdir: "audio-composite",

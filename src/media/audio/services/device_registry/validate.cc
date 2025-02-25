@@ -62,8 +62,6 @@ bool ClientIsValidForDeviceType(const fad::DeviceType& device_type,
       return (device_type == fad::DeviceType::kCodec);
     case fad::DriverClient::Tag::kComposite:
       return (device_type == fad::DeviceType::kComposite);
-    case fad::DriverClient::Tag::kStreamConfig:
-      return (device_type == fad::DeviceType::kInput || device_type == fad::DeviceType::kOutput);
     default:
       return false;
   }
@@ -149,88 +147,6 @@ std::vector<fad::PcmFormatSet> TranslateRingBufferFormatSets(
     translated_ring_buffer_format_sets.emplace_back(pcm_format_set);
   }
   return translated_ring_buffer_format_sets;
-}
-
-bool ValidateStreamProperties(const fha::StreamProperties& stream_props,
-                              std::optional<const fha::GainState> gain_state,
-                              std::optional<const fha::PlugState> plug_state) {
-  ADR_LOG(kLogDeviceMethods);
-  LogStreamProperties(stream_props);
-
-  if (!stream_props.is_input() || !stream_props.min_gain_db() || !stream_props.max_gain_db() ||
-      !stream_props.gain_step_db() || !stream_props.plug_detect_capabilities() ||
-      !stream_props.clock_domain()) {
-    FX_LOGS(WARNING) << "Incomplete StreamConfig/GetProperties response";
-    return false;
-  }
-
-  if ((stream_props.manufacturer().has_value() && stream_props.manufacturer()->empty()) ||
-      (stream_props.product().has_value() && stream_props.product()->empty())) {
-    FX_LOGS(WARNING) << __func__
-                     << ": manufacturer and product, if present, must not be empty strings";
-    return false;
-  }
-
-  // Eliminate NaN or infinity values
-  if (!std::isfinite(*stream_props.min_gain_db())) {
-    FX_LOGS(WARNING) << "min_gain_db is NaN or infinity";
-    return false;
-  }
-  if (!std::isfinite(*stream_props.max_gain_db())) {
-    FX_LOGS(WARNING) << "max_gain_db is NaN or infinity";
-    return false;
-  }
-  if (!std::isfinite(*stream_props.gain_step_db())) {
-    FX_LOGS(WARNING) << "gain_step_db is NaN or infinity";
-    return false;
-  }
-
-  if (*stream_props.min_gain_db() > *stream_props.max_gain_db()) {
-    FX_LOGS(WARNING) << "GetProperties: min_gain_db cannot exceed max_gain_db: "
-                     << *stream_props.min_gain_db() << "," << *stream_props.max_gain_db();
-    return false;
-  }
-  if (*stream_props.gain_step_db() > *stream_props.max_gain_db() - *stream_props.min_gain_db()) {
-    FX_LOGS(WARNING) << "GetProperties: gain_step_db cannot exceed max_gain_db-min_gain_db: "
-                     << *stream_props.gain_step_db() << ","
-                     << *stream_props.max_gain_db() - *stream_props.min_gain_db();
-    return false;
-  }
-  if (*stream_props.gain_step_db() < 0.0f) {
-    FX_LOGS(WARNING) << "GetProperties: gain_step_db (" << *stream_props.gain_step_db()
-                     << ") cannot be negative";
-    return false;
-  }
-
-  // If we already have this device's GainState, double-check against that.
-  if (gain_state.has_value()) {
-    if (*gain_state->gain_db() < *stream_props.min_gain_db() ||
-        *gain_state->gain_db() > *stream_props.max_gain_db()) {
-      FX_LOGS(WARNING) << "Gain range reported by GetProperties does not include current gain_db: "
-                       << *gain_state->gain_db();
-      return false;
-    }
-
-    // Device can't mute (or doesn't say it can), but says it is currently muted...
-    if (!stream_props.can_mute().value_or(false) && gain_state->muted().value_or(false)) {
-      FX_LOGS(WARNING) << "GetProperties reports can_mute FALSE, but device is muted";
-      return false;
-    }
-    // Device doesn't have AGC (or doesn't say it does), but says AGC is currently enabled...
-    if (!stream_props.can_agc().value_or(false) && gain_state->agc_enabled().value_or(false)) {
-      FX_LOGS(WARNING) << "GetProperties reports can_agc FALSE, but AGC is enabled";
-      return false;
-    }
-  }
-
-  // If we already have this device's PlugState, double-check against that.
-  if (plug_state.has_value() && !(*plug_state->plugged()) &&
-      *stream_props.plug_detect_capabilities() == fha::PlugDetectCapabilities::kHardwired) {
-    FX_LOGS(WARNING) << "GetProperties reports HARDWIRED, but StreamConfig reports as UNPLUGGED";
-    return false;
-  }
-
-  return true;
 }
 
 bool ValidateRingBufferFormatSets(
@@ -623,50 +539,12 @@ bool ValidateCompositeProperties(const fha::CompositeProperties& composite_props
   return true;
 }
 
-bool ValidateGainState(const fha::GainState& gain_state,
-                       std::optional<const fha::StreamProperties> stream_props) {
-  ADR_LOG(kLogDeviceMethods);
-  LogGainState(gain_state);
-
-  if (!gain_state.gain_db()) {
-    FX_LOGS(WARNING) << "Incomplete StreamConfig/WatchGainState response";
-    return false;
-  }
-
-  // Eliminate NaN or infinity values
-  if (!std::isfinite(*gain_state.gain_db())) {
-    FX_LOGS(WARNING) << "gain_db is NaN or infinity";
-    return false;
-  }
-
-  // If we already have this device's GainCapabilities, double-check against those.
-  if (stream_props.has_value()) {
-    if (*gain_state.gain_db() < *stream_props->min_gain_db() ||
-        *gain_state.gain_db() > *stream_props->max_gain_db()) {
-      FX_LOGS(WARNING) << "gain_db is out of range: " << *gain_state.gain_db();
-      return false;
-    }
-    // Device reports it can't mute (or doesn't say it can), then DOES say that it is muted....
-    if (!stream_props->can_mute().value_or(false) && gain_state.muted().value_or(false)) {
-      FX_LOGS(WARNING) << "StreamProperties.can_mute is false, but gain_state.muted is true";
-      return false;
-    }
-    // Device reports it can't AGC (or doesn't say it can), then DOES say that AGC is enabled....
-    if (!stream_props->can_agc().value_or(false) && gain_state.agc_enabled().value_or(false)) {
-      FX_LOGS(WARNING) << "StreamProperties.can_agc is false, but gain_state.agc_enabled is true";
-      return false;
-    }
-  }
-
-  return true;
-}
-
 bool ValidatePlugState(const fha::PlugState& plug_state,
                        std::optional<fha::PlugDetectCapabilities> plug_detect_capabilities) {
   LogPlugState(plug_state);
 
   if (!plug_state.plugged() || !plug_state.plug_state_time()) {
-    FX_LOGS(WARNING) << "Incomplete StreamConfig/WatchPlugState response: required field missing";
+    FX_LOGS(WARNING) << "Incomplete Codec/WatchPlugState response: required field missing";
     return false;
   }
 
@@ -724,7 +602,7 @@ bool ValidateDeviceInfo(const fad::Info& device_info) {
         return false;
       }
       if (device_info.ring_buffer_format_sets().has_value() ||
-          device_info.gain_caps().has_value() || device_info.clock_domain().has_value()) {
+          device_info.clock_domain().has_value()) {
         FX_LOGS(WARNING) << __func__ << ": invalid DeviceInfo fields are populated";
         return false;
       }
@@ -736,22 +614,7 @@ bool ValidateDeviceInfo(const fad::Info& device_info) {
         FX_LOGS(WARNING) << __func__ << ": incomplete DeviceInfo instance";
         return false;
       }
-      if (device_info.is_input().has_value() || device_info.gain_caps().has_value() ||
-          device_info.plug_detect_caps().has_value()) {
-        FX_LOGS(WARNING) << __func__ << ": invalid DeviceInfo fields are populated";
-        return false;
-      }
-      break;
-    case fad::DeviceType::kInput:
-    case fad::DeviceType::kOutput:
-      if (!device_info.is_input().has_value() || !device_info.gain_caps().has_value() ||
-          !device_info.ring_buffer_format_sets().has_value() ||
-          device_info.ring_buffer_format_sets()->empty() ||
-          !device_info.plug_detect_caps().has_value() || !device_info.clock_domain().has_value()) {
-        FX_LOGS(WARNING) << __func__ << ": incomplete DeviceInfo instance";
-        return false;
-      }
-      if (device_info.dai_format_sets().has_value()) {
+      if (device_info.is_input().has_value() || device_info.plug_detect_caps().has_value()) {
         FX_LOGS(WARNING) << __func__ << ": invalid DeviceInfo fields are populated";
         return false;
       }
@@ -999,7 +862,7 @@ bool ValidateDynamicsElementState(const fhasp::ElementState& element_state,
     if (  // id is required
         !band_state.id().has_value() ||
         // id must be unique (not duplicated in another band_state).
-        band_state_ids.find(*band_state.id()) != band_state_ids.end() ||
+        band_state_ids.contains(*band_state.id()) ||
         // id must be contained in the Element.bands vector.
         std::none_of(element.type_specific()->dynamics()->bands()->cbegin(),
                      element.type_specific()->dynamics()->bands()->cend(),
@@ -1073,7 +936,7 @@ bool ValidateSettableDynamicsElementState(const fhasp::SettableElementState& ele
     if (  // id is required
         !band_state.id().has_value() ||
         // id must be unique (not duplicated in another band_state).
-        band_state_ids.find(*band_state.id()) != band_state_ids.end() ||
+        band_state_ids.contains(*band_state.id()) ||
         // id must be contained in the Element.bands vector.
         std::none_of(element.type_specific()->dynamics()->bands()->cbegin(),
                      element.type_specific()->dynamics()->bands()->cend(),
@@ -1659,7 +1522,7 @@ bool ValidateDynamicsElement(const fhasp::Element& element) {
   // Band ids must be unique.
   std::unordered_set<uint64_t> band_ids;
   for (const auto& band : *element.type_specific()->dynamics()->bands()) {
-    if (!band.id().has_value() || band_ids.find(*band.id()) != band_ids.end()) {
+    if (!band.id().has_value() || band_ids.contains(*band.id())) {
       FX_LOGS(WARNING) << "Missing or duplicate DynamicsBand.id";
       return false;
     }
@@ -1712,7 +1575,7 @@ bool ValidateEqualizerElement(const fhasp::Element& element) {
   // Band ids must be unique.
   std::unordered_set<uint64_t> band_ids;
   for (const auto& band : *element.type_specific()->equalizer()->bands()) {
-    if (!band.id().has_value() || band_ids.find(*band.id()) != band_ids.end()) {
+    if (!band.id().has_value() || band_ids.contains(*band.id())) {
       FX_LOGS(WARNING) << "Missing or duplicate EqualizerBand.id";
       return false;
     }
@@ -1865,12 +1728,12 @@ bool ValidateTopology(const fhasp::Topology& topology,
 
   // An EdgePair cannot refer to an unknown ElementId, nor describe a single-element loop.
   for (const auto& edge_pair : edge_pairs) {
-    if (element_map.find(edge_pair.processing_element_id_from()) == element_map.end()) {
+    if (!element_map.contains(edge_pair.processing_element_id_from())) {
       FX_LOGS(WARNING) << "Element_id_from " << edge_pair.processing_element_id_from()
                        << " not found in element list";
       return false;
     }
-    if (element_map.find(edge_pair.processing_element_id_to()) == element_map.end()) {
+    if (!element_map.contains(edge_pair.processing_element_id_to())) {
       FX_LOGS(WARNING) << "Element_id_to " << edge_pair.processing_element_id_to()
                        << " not found in element list";
       return false;

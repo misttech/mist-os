@@ -111,27 +111,14 @@ open protocol Control {
     /// single processing node (via `SetElementState`).
     compose fuchsia.hardware.audio.signalprocessing.SignalProcessing;
 
-    /// Change the device's overall gain state.
-    ///
-    /// Should only be called for StreamConfig devices.
-    //
-    // TODO(https://fxbug.dev/42052918): Remove legacy gain aspects once driver API does.
-    // Going forward, gain will be handled by `SignalProcessing`.
-    flexible SetGain(table {
-        /// The gain state to be set.
-        ///
-        /// Required.
-        1: target_state GainState;
-    }) -> (table {}) error ControlSetGainError;
-
     /// Create the ring buffer used to pass audio to/from this device. If the device is
     /// Composite, then the targeted RING_BUFFER ENDPOINT must be identified by `element_id`.
     ///
-    /// Should only be called for Composite and StreamConfig devices.
+    /// Should only be called for Composite devices.
     flexible CreateRingBuffer(resource table {
         /// The element ID for an `ENDPOINT` of type `RING_BUFFER`.
         ///
-        /// Required for Composite; ignored for StreamConfig.
+        /// Required.
         1: element_id ElementId;
 
         /// Additional requirements about the actual ring buffer being created.
@@ -201,30 +188,6 @@ open protocol Control {
     ///
     /// Should only be called for Codec and Composite devices.
     flexible Reset() -> (table {}) error ControlResetError;
-};
-
-/// Errors returned by `Control/SetGain`.
-type ControlSetGainError = flexible enum {
-    /// This device has encountered an error and can no longer be controlled.
-    DEVICE_ERROR = 1;
-
-    /// This device type does not support the method that was called.
-    WRONG_DEVICE_TYPE = 2;
-
-    /// The required `target_state` is missing.
-    INVALID_GAIN_STATE = 3;
-
-    /// The required `target_state.gain_db` is missing.
-    INVALID_GAIN_DB = 4;
-
-    /// The specified gain is outside the device's allowed range.
-    GAIN_OUT_OF_RANGE = 5;
-
-    /// MUTE is requested, but the device has no MUTE control.
-    MUTE_UNAVAILABLE = 6;
-
-    /// Enabling AGC is requested, but the device has no AGC.
-    AGC_UNAVAILABLE = 7;
 };
 
 /// Errors returned by `Control/CreateRingBuffer`.

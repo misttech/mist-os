@@ -14,6 +14,7 @@
 
 #include <gtest/gtest.h>
 
+#include "src/media/audio/services/device_registry/common_unittest.h"
 #include "src/media/audio/services/device_registry/inspector.h"
 
 using ::inspect::BoolPropertyValue;
@@ -237,10 +238,10 @@ TEST_F(InspectorTest, DetectedDevice) {
 // The relevant field is `removed at` -- located at // root/Devices/[device name]/
 TEST_F(InspectorTest, RemovedDevice) {
   auto before_add = zx::clock::get_monotonic();
-  auto fake_driver = CreateAndAddFakeStreamConfigOutput();
+  auto fake_driver = CreateAndAddFakeComposite();
 
   auto before_drop = zx::clock::get_monotonic();
-  fake_driver->DropStreamConfig();
+  fake_driver->DropComposite();
   RunLoopUntilIdle();
 
   auto hierarchy = GetHierarchy();
@@ -269,9 +270,6 @@ TEST_F(InspectorTest, RemovedDevice) {
   EXPECT_GT(device_node->node().properties().size(), 3u);
   EXPECT_GT(device_node->node().get_property<IntPropertyValue>(std::string(kAddedAt))->value(),
             before_add.get());
-  // We couldn't check kIsInput earlier but can now: StreamConfig has in/out
-  EXPECT_EQ(device_node->node().get_property<BoolPropertyValue>(std::string(kIsInput))->value(),
-            false);
   EXPECT_GT(device_node->node().get_property<IntPropertyValue>(std::string(kRemovedAt))->value(),
             before_drop.get());
   EXPECT_EQ(device_node->children().size(), 1u);
@@ -315,7 +313,7 @@ TEST_F(InspectorTest, CreateRegistryServer) {
 // root/FIDL servers/ObserverServer instances/0/
 // We don't test kDestroyedAt because of unpredictable cleanup timing.
 TEST_F(InspectorTest, CreateObserverServer) {
-  auto fake_driver = CreateAndAddFakeStreamConfigOutput();
+  auto fake_driver = CreateAndAddFakeComposite();
   auto registry = CreateTestRegistryServer();
   std::optional<TokenId> added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_EQ(RegistryServer::count(), 1u);
@@ -390,7 +388,7 @@ TEST_F(InspectorTest, CreateControlCreatorServer) {
 // root/FIDL servers/ControlServer instances/0/
 // We don't test kDestroyedAt because of unpredictable cleanup timing.
 TEST_F(InspectorTest, CreateControlServer) {
-  auto fake_driver = CreateAndAddFakeStreamConfigOutput();
+  auto fake_driver = CreateAndAddFakeComposite();
   auto registry = CreateTestRegistryServer();
   std::optional<TokenId> added_device_id = WaitForAddedDeviceTokenId(registry->client());
   ASSERT_EQ(RegistryServer::count(), 1u);
@@ -434,11 +432,12 @@ TEST_F(InspectorTest, CreateControlServer) {
 // We don't test kDestroyedAt because of unpredictable cleanup timing.
 TEST_F(InspectorTest, CreateRingBufferServer) {
   // start of RingBuffer testcase setup, same as other RingBuffer unittests
-  auto fake_driver = CreateFakeStreamConfigOutput();
-  fake_driver->AllocateRingBuffer(8192);
-  auto device =
-      Device::Create(adr_service(), dispatcher(), "Test output name", fad::DeviceType::kOutput,
-                     fad::DriverClient::WithStreamConfig(fake_driver->Enable()));
+  auto fake_driver = CreateFakeComposite();
+  auto element_id = FakeComposite::kMaxRingBufferElementId;
+  fake_driver->ReserveRingBufferSize(element_id, 8192);
+  auto device = Device::Create(adr_service(), dispatcher(), "Test composite name",
+                               fad::DeviceType::kComposite,
+                               fad::DriverClient::WithComposite(fake_driver->Enable()));
   adr_service()->AddDevice(device);
   RunLoopUntilIdle();
   auto registry = CreateTestRegistryServer();
@@ -455,9 +454,8 @@ TEST_F(InspectorTest, CreateRingBufferServer) {
   auto ring_buffer_client = fidl::Client<fad::RingBuffer>(
       std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler().get());
   auto before_create = zx::clock::get_monotonic();
-  auto ring_buffer = adr_service()->CreateRingBufferServer(std::move(ring_buffer_server_end),
-                                                           control->server_ptr(), device_to_control,
-                                                           fad::kDefaultRingBufferElementId);
+  auto ring_buffer = adr_service()->CreateRingBufferServer(
+      std::move(ring_buffer_server_end), control->server_ptr(), device_to_control, 0);
   RunLoopUntilIdle();
   EXPECT_TRUE(ring_buffer_client.is_valid());
   // end of RingBuffer testcase setup, same as other RingBuffer unittests
@@ -672,11 +670,12 @@ TEST_F(InspectorTest, ProviderAddedDevice) {
 // We test multiple start/stop calls, to validate running intervals are tracked separately.
 TEST_F(InspectorTest, StartStop) {
   // start of RingBuffer testcase setup, same as other RingBuffer unittests
-  auto fake_driver = CreateFakeStreamConfigOutput();
-  fake_driver->AllocateRingBuffer(8192);
-  auto device =
-      Device::Create(adr_service(), dispatcher(), "Test output name", fad::DeviceType::kOutput,
-                     fad::DriverClient::WithStreamConfig(fake_driver->Enable()));
+  auto fake_driver = CreateFakeComposite();
+  auto element_id = FakeComposite::kMaxRingBufferElementId;
+  fake_driver->ReserveRingBufferSize(element_id, 8192);
+  auto device = Device::Create(adr_service(), dispatcher(), "Test composite name",
+                               fad::DeviceType::kComposite,
+                               fad::DriverClient::WithComposite(fake_driver->Enable()));
   adr_service()->AddDevice(device);
   RunLoopUntilIdle();
   auto registry = CreateTestRegistryServer();
@@ -693,9 +692,17 @@ TEST_F(InspectorTest, StartStop) {
   auto ring_buffer_client = fidl::Client<fad::RingBuffer>(
       std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler().get());
   bool received_callback = false;
+
+  auto requested_format = SafeRingBufferFormatFromElementRingBufferFormatSets(
+      element_id, device->ring_buffer_format_sets());
+  uint32_t requested_ring_buffer_bytes = 2000;
   control->client()
       ->CreateRingBuffer({{
-          .options = kDefaultRingBufferOptions,
+          .element_id = element_id,
+          .options = fad::RingBufferOptions{{
+              .format = requested_format,
+              .ring_buffer_min_bytes = requested_ring_buffer_bytes,
+          }},
           .ring_buffer_server = std::move(ring_buffer_server_end),
       }})
       .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
@@ -719,8 +726,8 @@ TEST_F(InspectorTest, StartStop) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_TRUE(fake_driver->started());
-  EXPECT_EQ(start_time0, fake_driver->mono_start_time());
+  EXPECT_TRUE(fake_driver->started(element_id));
+  EXPECT_EQ(start_time0, fake_driver->mono_start_time(element_id));
   EXPECT_GT(start_time0.get(), before_start0.get());
 
   auto before_stop0 = zx::clock::get_monotonic();
@@ -733,7 +740,7 @@ TEST_F(InspectorTest, StartStop) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_FALSE(fake_driver->started());
+  EXPECT_FALSE(fake_driver->started(element_id));
   auto after_stop0 = zx::clock::get_monotonic();
 
   // Now we do another start/stop, to validate multiple `running intervals`.
@@ -750,8 +757,8 @@ TEST_F(InspectorTest, StartStop) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_TRUE(fake_driver->started());
-  EXPECT_EQ(start_time1, fake_driver->mono_start_time());
+  EXPECT_TRUE(fake_driver->started(element_id));
+  EXPECT_EQ(start_time1, fake_driver->mono_start_time(element_id));
   EXPECT_GT(start_time1.get(), before_start1.get());
 
   auto before_stop1 = zx::clock::get_monotonic();
@@ -764,7 +771,7 @@ TEST_F(InspectorTest, StartStop) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_FALSE(fake_driver->started());
+  EXPECT_FALSE(fake_driver->started(element_id));
   auto after_stop1 = zx::clock::get_monotonic();
 
   auto hierarchy = GetHierarchy();
@@ -788,7 +795,7 @@ TEST_F(InspectorTest, StartStop) {
   ASSERT_EQ(ring_buffer_element_node->node()
                 .get_property<UintPropertyValue>(std::string(kElementId))
                 ->value(),
-            fad::kDefaultRingBufferElementId);
+            element_id);
   ASSERT_FALSE(ring_buffer_element_node->children().empty());
 
   auto ring_buffer_instance_node = ring_buffer_element_node->children().begin();
@@ -835,11 +842,13 @@ TEST_F(InspectorTest, StartStop) {
 // We test multiple SetActiveChannels calls to ensure these are tracked separately.
 TEST_F(InspectorTest, SetActiveChannels) {
   // start of RingBuffer testcase setup, same as other RingBuffer unittests
-  auto fake_driver = CreateFakeStreamConfigOutput();
-  fake_driver->AllocateRingBuffer(8192);
-  auto device =
-      Device::Create(adr_service(), dispatcher(), "Test output name", fad::DeviceType::kOutput,
-                     fad::DriverClient::WithStreamConfig(fake_driver->Enable()));
+  auto fake_driver = CreateFakeComposite();
+  auto element_id = FakeComposite::kMaxRingBufferElementId;
+  fake_driver->EnableActiveChannelsSupport(element_id);
+  fake_driver->ReserveRingBufferSize(element_id, 8192);
+  auto device = Device::Create(adr_service(), dispatcher(), "Test composite name",
+                               fad::DeviceType::kComposite,
+                               fad::DriverClient::WithComposite(fake_driver->Enable()));
   adr_service()->AddDevice(device);
   RunLoopUntilIdle();
   auto registry = CreateTestRegistryServer();
@@ -856,9 +865,16 @@ TEST_F(InspectorTest, SetActiveChannels) {
   auto ring_buffer_client = fidl::Client<fad::RingBuffer>(
       std::move(ring_buffer_client_end), dispatcher(), ring_buffer_fidl_handler().get());
   bool received_callback = false;
+  auto requested_format = SafeRingBufferFormatFromElementRingBufferFormatSets(
+      element_id, device->ring_buffer_format_sets());
+  uint32_t requested_ring_buffer_bytes = 2000;
   control->client()
       ->CreateRingBuffer({{
-          .options = kDefaultRingBufferOptions,
+          .element_id = element_id,
+          .options = fad::RingBufferOptions{{
+              .format = requested_format,
+              .ring_buffer_min_bytes = requested_ring_buffer_bytes,
+          }},
           .ring_buffer_server = std::move(ring_buffer_server_end),
       }})
       .Then([&received_callback](fidl::Result<fad::Control::CreateRingBuffer>& result) {
@@ -927,7 +943,7 @@ TEST_F(InspectorTest, SetActiveChannels) {
   ASSERT_EQ(ring_buffer_element_node->node()
                 .get_property<UintPropertyValue>(std::string(kElementId))
                 ->value(),
-            fad::kDefaultRingBufferElementId);
+            element_id);
   ASSERT_FALSE(ring_buffer_element_node->children().empty());
 
   auto ring_buffer_instance_node = ring_buffer_element_node->children().begin();

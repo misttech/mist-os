@@ -107,7 +107,6 @@ class Device : public std::enable_shared_from_this<Device> {
       ElementId element_id,
       // TODO(https://fxbug.dev/42069015): Consider using media_audio::Format internally.
       const fuchsia_audio::Format& client_format);
-  bool SetGain(fuchsia_hardware_audio::GainState& gain_state);
 
   void SetDaiFormat(ElementId element_id, const fuchsia_hardware_audio::DaiFormat& dai_formats);
 
@@ -151,13 +150,6 @@ class Device : public std::enable_shared_from_this<Device> {
   bool is_composite() const {
     return (device_type_ == fuchsia_audio_device::DeviceType::kComposite);
   }
-  bool is_stream_config_input() const {
-    return (device_type_ == fuchsia_audio_device::DeviceType::kInput);
-  }
-  bool is_stream_config_output() const {
-    return (device_type_ == fuchsia_audio_device::DeviceType::kOutput);
-  }
-  bool is_stream_config() const { return (is_stream_config_input() || is_stream_config_output()); }
 
   // Assigned by this service, guaranteed unique for this boot session, but not across reboots.
   TokenId token_id() const { return token_id_; }
@@ -203,7 +195,6 @@ class Device : public std::enable_shared_from_this<Device> {
 
   bool has_codec_properties() const { return codec_properties_.has_value(); }
   bool has_composite_properties() const { return composite_properties_.has_value(); }
-  bool has_stream_config_properties() const { return stream_config_properties_.has_value(); }
   bool has_health_state() const { return health_state_.has_value(); }
   bool dai_format_sets_retrieved() const { return dai_format_sets_retrieved_; }
   bool ring_buffer_format_sets_retrieved() const { return ring_buffer_format_sets_retrieved_; }
@@ -213,7 +204,6 @@ class Device : public std::enable_shared_from_this<Device> {
   const std::unordered_set<ElementId>& element_ids() const { return element_ids_; }
 
   bool has_plug_state() const { return plug_state_.has_value(); }
-  bool has_gain_state() const { return gain_state_.has_value(); }
   bool checked_for_signalprocessing() const { return supports_signalprocessing_.has_value(); }
   bool supports_signalprocessing() const { return supports_signalprocessing_.value_or(false); }
   void SetSignalProcessingSupported(bool is_supported);
@@ -230,7 +220,6 @@ class Device : public std::enable_shared_from_this<Device> {
   friend class DeviceTest;
   friend class CodecTest;
   friend class CompositeTest;
-  friend class StreamConfigTest;
   friend class DeviceWarningTest;
   friend class AudioDeviceRegistryServerTestBase;
 
@@ -246,8 +235,8 @@ class Device : public std::enable_shared_from_this<Device> {
   //
   // Device initialization is essentially a "wait for multiple objects" operation.
   // The following methods query/retrieve the required information during initialization.
-  // We use 'Retrieve...' for internal methods, to avoid confusion with the methods on StreamConfig
-  // or RingBuffer, which are generally 'Get...'.
+  // We use 'Retrieve...' for internal methods, to avoid confusion with the methods on RingBuffer,
+  // which are generally 'Get...'.
   //
   void RetrieveDeviceProperties();
   void RetrieveHealthState();
@@ -255,7 +244,6 @@ class Device : public std::enable_shared_from_this<Device> {
   void RetrieveDaiFormatSets();
   void RetrieveRingBufferFormatSets();
   void RetrievePlugState();
-  void RetrieveGainState();
 
   // Each of the above 'Retrieve...' methods update the related piece of device state, then call
   // either `OnInitializationResponse` or `OnError`.
@@ -312,10 +300,6 @@ class Device : public std::enable_shared_from_this<Device> {
   void RetrieveCompositeProperties();
   static void SanitizeCompositePropertiesStrings(
       std::optional<fuchsia_hardware_audio::CompositeProperties>& composite_properties);
-
-  void RetrieveStreamProperties();
-  static void SanitizeStreamPropertiesStrings(
-      std::optional<fuchsia_hardware_audio::StreamProperties>& stream_properties);
 
   std::shared_ptr<ControlNotify> GetControlNotify();
   bool DropControl();
@@ -408,9 +392,6 @@ class Device : public std::enable_shared_from_this<Device> {
   std::optional<fidl::Client<fuchsia_hardware_audio::Composite>> composite_client_;
   FidlErrorHandler<fuchsia_hardware_audio::Composite> composite_handler_;
 
-  std::optional<fidl::Client<fuchsia_hardware_audio::StreamConfig>> stream_config_client_;
-  FidlErrorHandler<fuchsia_hardware_audio::StreamConfig> stream_config_handler_;
-
   // Assigned by this service, guaranteed unique for this boot session, but not across reboots.
   const TokenId token_id_;
 
@@ -419,9 +400,7 @@ class Device : public std::enable_shared_from_this<Device> {
   // Initialization is complete (state becomes Initialized) when these optionals have values.
   std::optional<fuchsia_hardware_audio::CodecProperties> codec_properties_;
   std::optional<fuchsia_hardware_audio::CompositeProperties> composite_properties_;
-  std::optional<fuchsia_hardware_audio::StreamProperties> stream_config_properties_;
   std::optional<std::vector<fuchsia_hardware_audio::SupportedFormats>> ring_buffer_format_sets_;
-  std::optional<fuchsia_hardware_audio::GainState> gain_state_;
   std::optional<fuchsia_hardware_audio::PlugState> plug_state_;
   std::optional<bool> health_state_;
 

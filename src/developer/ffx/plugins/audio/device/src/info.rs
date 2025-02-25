@@ -1459,7 +1459,6 @@ impl RegistrySignalProcessingInfo {
 /// Information about a device from `fuchsia.audio.device.Registry`.
 pub struct RegistryInfo {
     device_info: DeviceInfo,
-    gain_state: Option<GainState>,
     plug_event: Option<PlugEvent>,
     signal_processing: Option<RegistrySignalProcessingInfo>,
 }
@@ -1494,14 +1493,14 @@ impl Info {
     pub fn gain_state(&self) -> Option<GainState> {
         match self {
             Info::Hardware(hw_info) => hw_info.gain_state(),
-            Info::Registry(registry_info) => registry_info.gain_state.clone(),
+            Info::Registry(_) => None,
         }
     }
 
     pub fn gain_capabilities(&self) -> Option<GainCapabilities> {
         match self {
             Info::Hardware(hw_info) => hw_info.gain_capabilities(),
-            Info::Registry(registry_info) => registry_info.device_info.gain_capabilities(),
+            Info::Registry(_) => None,
         }
     }
 
@@ -1719,8 +1718,7 @@ async fn get_registry_info(
 
     let registry_info = RegistryInfo {
         device_info,
-        // TODO(https://fxbug.dev/329150383): Supports gain_state/plug_state/plug_time for ADR devices
-        gain_state: None,
+        // TODO(https://fxbug.dev/329150383): Support plug_state/plug_time for ADR devices
         plug_event: None,
         signal_processing,
     };

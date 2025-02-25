@@ -24,8 +24,6 @@ source_set("fakes") {
     "fake_composite_ring_buffer.cc",
     "fake_composite_ring_buffer.h",
     "fake_device_presence_watcher.h",
-    "fake_stream_config.cc",
-    "fake_stream_config.h",
   ]
 
   public_deps = [

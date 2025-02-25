@@ -47,8 +47,6 @@ impl From<AdrDevType> for Type {
         let device_type = match value {
             AdrDevType::Codec => fac::DeviceType::Codec,
             AdrDevType::Composite => fac::DeviceType::Composite,
-            AdrDevType::Input => fac::DeviceType::Input,
-            AdrDevType::Output => fac::DeviceType::Output,
             _ => panic!("Unexpected device type"),
         };
         Self(device_type)
@@ -66,8 +64,6 @@ impl From<Type> for AdrDevType {
         match value.0 {
             fac::DeviceType::Codec => AdrDevType::Codec,
             fac::DeviceType::Composite => AdrDevType::Composite,
-            fac::DeviceType::Input => AdrDevType::Input,
-            fac::DeviceType::Output => AdrDevType::Output,
             _ => panic!("Unexpected device type"),
         }
     }
@@ -353,7 +349,7 @@ impl Info {
     }
 
     pub fn gain_capabilities(&self) -> Option<GainCapabilities> {
-        self.0.gain_caps.clone().and_then(|gain_caps| GainCapabilities::try_from(gain_caps).ok())
+        None
     }
 
     pub fn clock_domain(&self) -> Option<ClockDomain> {
@@ -562,25 +558,11 @@ impl From<PlugState> for fadevice::PlugState {
     }
 }
 
-// TODO(https://fxbug.dev/102027): Remove legacy gain aspects once driver API does.
-// Going forward, gain will be handled by `SignalProcessing`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GainState {
     pub gain_db: f32,
     pub muted: Option<bool>,
     pub agc_enabled: Option<bool>,
-}
-
-impl TryFrom<fadevice::GainState> for GainState {
-    type Error = String;
-
-    fn try_from(value: fadevice::GainState) -> Result<Self, Self::Error> {
-        Ok(Self {
-            gain_db: value.gain_db.ok_or_else(|| "missing 'gain_db'".to_string())?,
-            muted: value.muted,
-            agc_enabled: value.agc_enabled,
-        })
-    }
 }
 
 impl TryFrom<fhaudio::GainState> for GainState {
@@ -595,8 +577,6 @@ impl TryFrom<fhaudio::GainState> for GainState {
     }
 }
 
-// TODO(https://fxbug.dev/102027): Remove legacy gain aspects once driver API does.
-// Going forward, gain will be handled by `SignalProcessing`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GainCapabilities {
     pub min_gain_db: f32,
@@ -604,20 +584,6 @@ pub struct GainCapabilities {
     pub gain_step_db: f32,
     pub can_mute: Option<bool>,
     pub can_agc: Option<bool>,
-}
-
-impl TryFrom<fadevice::GainCapabilities> for GainCapabilities {
-    type Error = String;
-
-    fn try_from(value: fadevice::GainCapabilities) -> Result<Self, Self::Error> {
-        Ok(Self {
-            min_gain_db: value.min_gain_db.ok_or_else(|| "missing 'min_gain_db'".to_string())?,
-            max_gain_db: value.max_gain_db.ok_or_else(|| "missing 'max_gain_db'".to_string())?,
-            gain_step_db: value.gain_step_db.ok_or_else(|| "missing 'gain_step_db'".to_string())?,
-            can_mute: value.can_mute,
-            can_agc: value.can_agc,
-        })
-    }
 }
 
 impl TryFrom<&fhaudio::StreamProperties> for GainCapabilities {

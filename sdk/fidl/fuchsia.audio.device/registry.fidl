@@ -21,42 +21,42 @@ type Info = table {
     /// A device identifier that is guaranteed unique for this boot session, but
     /// may change across reboots.
     ///
-    /// Required for all device types.
+    /// Required.
     1: token_id TokenId;
 
-    /// The protocol used by the driver, and (if StreamConfig) its directionality.
+    /// The protocol used by the driver.
     ///
-    /// Required for all device types.
+    /// Required.
     2: device_type DeviceType;
 
     /// The device's high-level name, as received from devfs or the `Provider/AddDevice` caller.
     /// This string must be non-empty.
     ///
-    /// Required for all device types.
+    /// Required.
     3: device_name string:MAX_STRING_SIZE;
 
     /// The name of the device's manufacturer.
     /// If present, this string must be non-empty.
     ///
-    /// Optional for all device types.
+    /// Optional.
     4: manufacturer string:MAX_STRING_SIZE;
 
     /// The device's high-level product name.
     /// If present, this string must be non-empty.
     ///
-    /// Optional for all device types.
+    /// Optional.
     5: product string:MAX_STRING_SIZE;
 
     /// A 16-character ID provided by the driver that (if present) can be used
     /// to differentiate instances of the same device. This value should not
     /// change across system reboots.
     ///
-    /// Optional for all device types.
+    /// Optional.
     6: unique_instance_id array<uint8, UNIQUE_INSTANCE_ID_SIZE>;
 
     /// Whether the device is a source (is_input TRUE) or destination (is_input FALSE) of audio.
     ///
-    /// Required for StreamConfig; optional for Codec; absent for Composite.
+    /// Optional for Codec; absent for Composite.
     7: is_input bool;
 
     /// The union of all formats the device can support, across all combinations of device
@@ -67,7 +67,7 @@ type Info = table {
     /// absent, rather than populated with an empty vector).
     /// If present, must contain at least one element.
     ///
-    /// Required for StreamConfig; optional for Composite; absent for Codec.
+    /// Optional for Composite; absent for Codec.
     8: ring_buffer_format_sets vector<ElementRingBufferFormatSet>:MAX_COUNT_PROCESSING_ELEMENTS;
 
     /// The union of all DAI formats the device can support, across all combinations
@@ -78,21 +78,13 @@ type Info = table {
     /// rather than populated with an empty vector).
     /// If present, must contain at least one element.
     ///
-    /// Required for Codec; optional for Composite; absent for StreamConfig.
+    /// Required for Codec; optional for Composite.
     9: dai_format_sets vector<ElementDaiFormatSet>:MAX_COUNT_PROCESSING_ELEMENTS;
-
-    /// The device's gain/mute capabilities.
-    ///
-    /// Required for StreamConfig; absent for Codec and Composite.
-    //
-    // TODO(https://fxbug.dev/42052918): Remove legacy gain aspects once driver API does.
-    // Going forward, gain will be handled by `SignalProcessing`.
-    10: gain_caps GainCapabilities;
 
     /// The device's hot-plug capabilities.
     ///
-    /// Required for Codec and StreamConfig; absent for Composite.
-    11: plug_detect_caps PlugDetectCapabilities;
+    /// Required for Codec; absent for Composite.
+    10: plug_detect_caps PlugDetectCapabilities;
 
     /// An identifier for the clock domain in which the device's clock hardware
     /// operates. Devices in the same clock domain remain perfectly
@@ -109,54 +101,22 @@ type Info = table {
     /// *  `CLOCK_DOMAIN_EXTERNAL` means the hardware is not synchronized with any
     ///    other known clocks (even any other clocks in `CLOCK_DOMAIN_EXTERNAL`).
     ///
-    /// Required for Composite and StreamConfig; absent for Codec.
-    12: clock_domain ClockDomain;
+    /// Required for Composite; absent for Codec.
+    11: clock_domain ClockDomain;
 
     /// The vector of supported signal-processing elements.
     /// If present, must contain at least one element.
     ///
-    /// Required for Composite; optional for Codec and StreamConfig.
-    13: signal_processing_elements
+    /// Required for Composite; optional for Codec.
+    12: signal_processing_elements
             vector<fuchsia.hardware.audio.signalprocessing.Element>:fuchsia.hardware.audio.signalprocessing.MAX_COUNT_PROCESSING_ELEMENTS;
 
     /// The vector of supported signal-processing topologies.
     /// If present, must contain at least one element.
     ///
-    /// Required for Composite; optional for Codec and StreamConfig.
-    14: signal_processing_topologies
+    /// Required for Composite; optional for Codec.
+    13: signal_processing_topologies
             vector<fuchsia.hardware.audio.signalprocessing.Topology>:fuchsia.hardware.audio.signalprocessing.MAX_COUNT_TOPOLOGIES;
-};
-
-/// The device's overall gain capabilities.
-//
-// TODO(https://fxbug.dev/42052918): Remove legacy gain aspects once driver API does.
-// Going forward, gain will be handled by `SignalProcessing`.
-type GainCapabilities = table {
-    /// The device's minimum gain, in decibels.
-    ///
-    /// Required.
-    1: min_gain_db float32;
-
-    /// The device's maximum gain, in decibels.
-    ///
-    /// Required.
-    2: max_gain_db float32;
-
-    /// The precision of each gain-change step, in decibels.
-    ///
-    /// Required.
-    3: gain_step_db float32;
-
-    /// If true, the device contains a distinct MUTE control. If false or
-    /// absent, it does not.
-    ///
-    /// Optional.
-    4: can_mute bool;
-
-    /// Automatic Gain Control. If absent, this hardware does not support AGC.
-    ///
-    /// Optional.
-    5: can_agc bool;
 };
 
 /// The device's hot-plug capabilities.
@@ -252,29 +212,13 @@ open protocol Observer {
     /// elements, and watch for changes to those elements.
     ///
     /// These methods must be supported by Composite devices,
-    /// but are optional for Codec and StreamConfig devices.
+    /// but are optional for Codec devices.
     compose fuchsia.hardware.audio.signalprocessing.Reader;
-
-    /// Request notification of any change to the device's gain state.
-    ///
-    /// Note: this only notifies of changes to controls described in the
-    /// device's`Info` table (`GainCapabilities` specifically). Use
-    /// `WatchElementState` for gain processing exposed as `SignalProcessing`
-    /// (`GetTopologies`, `GetElements`).
-    ///
-    /// Should only be called for StreamConfig devices.
-    //
-    // TODO(https://fxbug.dev/42052918): Remove legacy gain aspects once driver API does.
-    // Going forward, gain will be handled by `SignalProcessing`.
-    flexible WatchGainState() -> (table {
-        /// The device's most recent gain state.
-        1: state GainState;
-    }) error ObserverWatchGainStateError;
 
     /// Request notification of any change to the device's plug state. When
     /// called for the first time, it will return immediately.
     ///
-    /// Should only be called for Codec or StreamConfig devices.
+    /// Should only be called for Codec devices.
     flexible WatchPlugState() -> (table {
         /// The device's current plug state.
         1: state PlugState;
@@ -287,23 +231,11 @@ open protocol Observer {
     ///
     /// This clock will be in the domain specified in the device's `Info` table.
     ///
-    /// Should only be called for Composite or StreamConfig devices.
+    /// Should only be called for Composite devices.
     flexible GetReferenceClock() -> (resource table {
         /// The device's reference clock.
         1: reference_clock zx.Handle:CLOCK;
     }) error ObserverGetReferenceClockError;
-};
-
-/// Errors returned by `Observer/WatchGainState`.
-type ObserverWatchGainStateError = flexible enum {
-    /// This device has encountered an error and can no longer be observed.
-    DEVICE_ERROR = 1;
-
-    /// This device type does not support the method that was called.
-    WRONG_DEVICE_TYPE = 2;
-
-    /// The previous `WatchGainState` call has not yet completed.
-    ALREADY_PENDING = 3;
 };
 
 /// Errors returned by `Observer/WatchPlugState`.

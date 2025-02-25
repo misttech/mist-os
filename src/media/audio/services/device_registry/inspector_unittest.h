@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_MEDIA_RVICES_DEVICE_REGISTRY_INSPECTOR_UNITTEST_H_
-#define SRC_MEDIA_RVICES_DEVICE_REGISTRY_INSPECTOR_UNITTEST_H_
+#ifndef SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_INSPECTOR_UNITTEST_H_
+#define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_INSPECTOR_UNITTEST_H_
 
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <lib/inspect/cpp/hierarchy.h>
@@ -43,7 +43,7 @@ class InspectorTest : public AudioDeviceRegistryServerTestBase {
   static inline const fuchsia_audio_device::RingBufferOptions kDefaultRingBufferOptions{{
       .format = fuchsia_audio::Format{{.sample_type = fuchsia_audio::SampleType::kInt16,
                                        .channel_count = 2,
-                                       .frames_per_second = 48000}},
+                                       .frames_per_second = 22000}},
       .ring_buffer_min_bytes = 2000,
   }};
 
@@ -59,15 +59,6 @@ class InspectorTest : public AudioDeviceRegistryServerTestBase {
         Device::Create(adr_service(), dispatcher(), "Test composite name",
                        fuchsia_audio_device::DeviceType::kComposite,
                        fuchsia_audio_device::DriverClient::WithComposite(fake_driver->Enable())));
-    RunLoopUntilIdle();
-    return fake_driver;
-  }
-
-  std::shared_ptr<FakeStreamConfig> CreateAndAddFakeStreamConfigOutput() {
-    auto fake_driver = CreateFakeStreamConfigOutput();
-    adr_service()->AddDevice(Device::Create(
-        adr_service(), dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
-        fuchsia_audio_device::DriverClient::WithStreamConfig(fake_driver->Enable())));
     RunLoopUntilIdle();
     return fake_driver;
   }
@@ -94,4 +85,4 @@ class InspectorTest : public AudioDeviceRegistryServerTestBase {
 
 }  // namespace media_audio
 
-#endif  // SRC_MEDIA_RVICES_DEVICE_REGISTRY_INSPECTOR_UNITTEST_H_
+#endif  // SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_INSPECTOR_UNITTEST_H_

@@ -28,7 +28,6 @@
 #include "src/media/audio/services/device_registry/registry_server.h"
 #include "src/media/audio/services/device_registry/testing/fake_codec.h"
 #include "src/media/audio/services/device_registry/testing/fake_composite.h"
-#include "src/media/audio/services/device_registry/testing/fake_stream_config.h"
 #include "src/media/audio/services/device_registry/validate.h"
 
 namespace media_audio {
@@ -66,18 +65,9 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
                                            composite_endpoints->client.TakeChannel(), dispatcher());
   }
 
-  // Create a FakeStreamConfig that can mock a real device that has been detected, using default
-  // settings. From here, the fake StreamConfig can be customized before it is enabled.
-  std::shared_ptr<FakeStreamConfig> CreateFakeStreamConfigInput() {
-    return CreateFakeStreamConfig(true);
-  }
-  std::shared_ptr<FakeStreamConfig> CreateFakeStreamConfigOutput() {
-    return CreateFakeStreamConfig(false);
-  }
-
   // Device
   // Create a Device object (backed by a fake driver); insert it to ADR as if it had been detected.
-  // Through the stream_config connection, this will communicate with the fake driver.
+  // Through the driver_client connection, this will communicate with the fake driver.
   void AddDeviceForDetection(std::string_view name, fuchsia_audio_device::DeviceType device_type,
                              fuchsia_audio_device::DriverClient driver_client) {
     ASSERT_TRUE(ClientIsValidForDeviceType(device_type, driver_client));
@@ -211,7 +201,7 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
                                     public FidlHandler {
    public:
     explicit ObserverFidlHandler(AudioDeviceRegistryServerTestBase* parent) : FidlHandler(parent) {}
-    // Invoked when the underlying driver disconnects its Codec/StreamConfig.
+    // Invoked when the underlying driver disconnects its driver_client protocol.
     void on_fidl_error(fidl::UnbindInfo error) override {
       LogFidlClientError(error, "Observer");
       parent()->observer_fidl_error_status_ = error.status();
@@ -312,18 +302,6 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
 
   std::shared_ptr<media_audio::AudioDeviceRegistry> adr_service_ =
       std::make_shared<media_audio::AudioDeviceRegistry>(server_thread_);
-
-  // Create a FakeStreamConfig that can mock a real device that has been detected, using default
-  // settings. From here, the fake StreamConfig can be customized before it is enabled.
-  std::shared_ptr<FakeStreamConfig> CreateFakeStreamConfig(bool is_input = false) {
-    EXPECT_EQ(dispatcher(), test_loop().dispatcher());
-    auto stream_config_endpoints = fidl::Endpoints<fuchsia_hardware_audio::StreamConfig>::Create();
-    auto fake_stream = std::make_shared<FakeStreamConfig>(
-        stream_config_endpoints.server.TakeChannel(), stream_config_endpoints.client.TakeChannel(),
-        dispatcher());
-    fake_stream->set_is_input(is_input);
-    return fake_stream;
-  }
 
   std::shared_ptr<FakeCodec> CreateFakeCodec(std::optional<bool> is_input = false) {
     EXPECT_EQ(dispatcher(), test_loop().dispatcher());

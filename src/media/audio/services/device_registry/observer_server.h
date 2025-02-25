@@ -34,7 +34,6 @@ class ObserverServer
   // ObserverNotify
   void DeviceIsRemoved() final;
   void DeviceHasError() final;
-  void GainStateIsChanged(const fuchsia_audio_device::GainState&) final;
   void PlugStateIsChanged(const fuchsia_audio_device::PlugState& new_plug_state,
                           zx::time plug_change_time) final;
   void TopologyIsChanged(TopologyId topology_id) final;
@@ -43,7 +42,6 @@ class ObserverServer
       fuchsia_hardware_audio_signalprocessing::ElementState element_state) final;
 
   // fuchsia.audio.device.Observer implementation
-  void WatchGainState(WatchGainStateCompleter::Sync& completer) final;
   void WatchPlugState(WatchPlugStateCompleter::Sync& completer) final;
   void GetReferenceClock(GetReferenceClockCompleter::Sync& completer) final;
   // We complain but don't close the connection, to accommodate older and newer clients.
@@ -59,7 +57,6 @@ class ObserverServer
                          WatchElementStateCompleter::Sync& completer) final;
   void WatchTopology(WatchTopologyCompleter::Sync& completer) final;
 
-  void MaybeCompleteWatchGainState();
   void MaybeCompleteWatchPlugState();
   void MaybeCompleteWatchTopology();
   void MaybeCompleteWatchElementState(ElementId element_id);
@@ -80,9 +77,6 @@ class ObserverServer
   static inline uint64_t count_ = 0;
 
   explicit ObserverServer(std::shared_ptr<const Device> device);
-
-  std::optional<fuchsia_audio_device::GainState> new_gain_state_to_notify_;
-  std::optional<WatchGainStateCompleter::Async> watch_gain_state_completer_;
 
   std::optional<fuchsia_audio_device::ObserverWatchPlugStateResponse> new_plug_state_to_notify_;
   std::optional<WatchPlugStateCompleter::Async> watch_plug_state_completer_;

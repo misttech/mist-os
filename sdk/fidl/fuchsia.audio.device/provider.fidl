@@ -14,21 +14,18 @@ open protocol Provider {
         /// Required.
         1: device_name string:MAX_STRING_SIZE;
 
-        /// Indicates the protocol used by the device, as well as (if StreamConfig) whether
-        /// it is an input (a source of audio) or an output (a destination for audio).
+        /// Indicates the protocol used by the device.
         ///
         /// Required.
         2: device_type DeviceType;
 
-        /// The client_end of the protocol channel (Codec, Composite or StreamConfig)
+        /// The client_end of the protocol channel (Codec or Composite)
         /// that this service will use to configure/observe the device.
-        /// For now, `AddDevice` only accepts a `codec_client`, `composite_client` or
-        /// `stream_config_client` here.
         ///
         /// Required.
         /// # Deprecation
         ///
-        /// Codec and StreamConfig are not supported anymore, instead use an
+        /// Codec is not supported anymore, instead use an
         /// [Audio Composite](https://fuchsia.dev/fuchsia-src/development/audio/drivers/composite)
         /// , see
         /// [Audio Drivers Architecture](https://fuchsia.dev/fuchsia-src/development/audio/drivers/architecture)

@@ -40,11 +40,6 @@ const MAX_STRING_SIZE uint32 = fuchsia.hardware.audio.MAX_UI_STRING_SIZE;
 const MAX_COUNT_PROCESSING_ELEMENTS uint32
         = fuchsia.hardware.audio.signalprocessing.MAX_COUNT_PROCESSING_ELEMENTS;
 
-/// For devices with StreamConfig drivers, there is only one RING_BUFFER entity. When a
-/// method requires us to address the RingBuffer by ID, we use element_id 0. StreamConfig
-/// drivers that implement signalprocessing should not assign this ID to other elements.
-const DEFAULT_RING_BUFFER_ELEMENT_ID ElementId = 0;
-
 /// For devices with Codec drivers, there is only one DAI_INTERCONNECT entity. When a method
 /// requires us to address the interconnect by ID, we use element_id 1. Codec drivers that
 /// implement signalprocessing should not assign this ID to other elements.
@@ -53,7 +48,7 @@ const DEFAULT_DAI_INTERCONNECT_ELEMENT_ID ElementId = 1;
 /// The protocol channel used to configure and observe a device.
 /// # Deprecation
 ///
-/// Codec and StreamConfig are not supported anymore, instead use an
+/// Codec drivers are not supported anymore, instead use an
 /// [Audio Composite](https://fuchsia.dev/fuchsia-src/development/audio/drivers/composite), see
 /// [Audio Drivers Architecture](https://fuchsia.dev/fuchsia-src/development/audio/drivers/architecture)
 @available(deprecated=HEAD)
@@ -63,30 +58,15 @@ type DriverClient = flexible resource union {
 
     /// Populated for drivers that use the `fuchsia_hardware_audio.Composite` interface.
     2: composite client_end:fuchsia.hardware.audio.Composite;
-
-    /// Populated for drivers that use the `fuchsia_hardware_audio.StreamConfig` interface.
-    3: stream_config client_end:fuchsia.hardware.audio.StreamConfig;
 };
 
-/// The protocol used by the driver, and (if StreamConfig) its directionality.
+/// The protocol used by the driver.
 type DeviceType = flexible enum {
     /// The device uses the `fuchsia.hardware.audio/Codec` protocol.
     CODEC = 1;
 
     /// The device uses the `fuchsia.hardware.audio/Composite` protocol.
     COMPOSITE = 2;
-
-    /// The device uses `fuchsia.hardware.audio/StreamConfig` and is a source of audio streams.
-    // We maintain this enum as entirely distinct from `OUTPUT`, despite their using the same
-    // protocol, because the two device types are detected at entirely different devfs locations
-    // (`dev/class/audio-input` vs. `dev/class/audio-output`).
-    INPUT = 3;
-
-    /// Device uses `fuchsia.hardware.audio/StreamConfig` and is a destination for audio streams.
-    // We maintain this enum as entirely distinct from `INPUT`, despite their using the same
-    // protocol, because the two device types are detected at entirely different devfs locations
-    // (`dev/class/audio-output` vs. `dev/class/audio-input`).
-    OUTPUT = 4;
 };
 
 /// This table contains vectors representing three dimensions of device
@@ -115,9 +95,7 @@ type PcmFormatSet = table {
 /// This table represents the possible RingBuffer formats that this endpoint can support.
 type ElementRingBufferFormatSet = table {
     /// The ID of the element being described. This must match an ENDPOINT (RING_BUFFER) entry
-    /// in the list of elements contained in the device's `Info` table. If describing the
-    /// supported RingBuffer formats for a StreamConfig device, this value should be
-    /// `DEFAULT_RING_BUFFER_ELEMENT_ID` (0).
+    /// in the list of elements contained in the device's `Info` table.
     ///
     /// Required.
     1: element_id ElementId;
@@ -170,25 +148,4 @@ type ChannelAttributes = table {
     ///
     /// Optional.
     2: max_frequency uint32;
-};
-
-/// The device's current state of gain.
-//
-// TODO(https://fxbug.dev/102027): Remove legacy gain aspects once driver API does.
-// Going forward, gain will be handled by `SignalProcessing`.
-type GainState = table {
-    /// Device-wide gain, in decibels.
-    ///
-    /// Required.
-    1: gain_db float32;
-
-    /// Mute state for all channels. If absent, all channels are unmuted.
-    ///
-    /// Optional.
-    2: muted bool;
-
-    /// Automatic Gain Control. If absent, disabled.
-    ///
-    /// Optional.
-    3: agc_enabled bool;
 };

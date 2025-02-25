@@ -129,66 +129,6 @@ std::shared_ptr<RingBufferServer> ControlServer::TryGetRingBufferServer(ElementI
 }
 
 // fuchsia.audio.device.Control implementation
-void ControlServer::SetGain(SetGainRequest& request, SetGainCompleter::Sync& completer) {
-  ADR_LOG_METHOD(kLogControlServerMethods);
-
-  if (device_has_error_) {
-    ADR_WARN_METHOD() << "device has an error";
-    completer.Reply(fit::error(fad::ControlSetGainError::kDeviceError));
-    return;
-  }
-
-  if (!device_->is_stream_config()) {
-    ADR_WARN_METHOD() << "Unsupported method for device_type " << device_->device_type();
-    completer.Reply(fit::error(fad::ControlSetGainError::kWrongDeviceType));
-    return;
-  }
-
-  if (!request.target_state()) {
-    ADR_WARN_METHOD() << "required field 'target_state' is missing";
-    completer.Reply(fit::error(fad::ControlSetGainError::kInvalidGainState));
-    return;
-  }
-
-  auto& gain_caps = *device_->info()->gain_caps();
-  if (!request.target_state()->gain_db()) {
-    ADR_WARN_METHOD() << "required field `target_state.gain_db` is missing";
-    completer.Reply(fit::error(fad::ControlSetGainError::kInvalidGainDb));
-    return;
-  }
-
-  if (*request.target_state()->gain_db() > *gain_caps.max_gain_db() ||
-      *request.target_state()->gain_db() < *gain_caps.min_gain_db()) {
-    ADR_WARN_METHOD() << "gain_db (" << *request.target_state()->gain_db() << ") is out of range ["
-                      << *gain_caps.min_gain_db() << ", " << *gain_caps.max_gain_db() << "]";
-    completer.Reply(fit::error(fad::ControlSetGainError::kGainOutOfRange));
-    return;
-  }
-
-  if (request.target_state()->muted().value_or(false) && !(*gain_caps.can_mute())) {
-    ADR_WARN_METHOD() << "device cannot MUTE";
-    completer.Reply(fit::error(fad::ControlSetGainError::kMuteUnavailable));
-    return;
-  }
-
-  if (request.target_state()->agc_enabled().value_or(false) && !(*gain_caps.can_agc())) {
-    ADR_WARN_METHOD() << "device cannot AGC";
-    completer.Reply(fit::error(fad::ControlSetGainError::kAgcUnavailable));
-    return;
-  }
-
-  fha::GainState gain_state{{.gain_db = *request.target_state()->gain_db()}};
-  if (request.target_state()->muted().has_value()) {
-    gain_state.muted(*request.target_state()->muted());
-  }
-  if (request.target_state()->agc_enabled().has_value()) {
-    gain_state.agc_enabled(*request.target_state()->agc_enabled());
-  }
-  device_->SetGain(gain_state);
-
-  completer.Reply(fit::success(fad::ControlSetGainResponse{}));
-}
-
 void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
                                      CreateRingBufferCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogControlServerMethods);
@@ -200,27 +140,24 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
     return;
   }
 
-  if (!device_->is_stream_config() && !device_->is_composite()) {
+  if (!device_->is_composite()) {
     ADR_WARN_METHOD() << "Unsupported method for device_type " << device_->device_type();
     completer.Reply(fit::error(fad::ControlCreateRingBufferError::kWrongDeviceType));
     return;
   }
-  ElementId element_id = fad::kDefaultRingBufferElementId;
   // Fail on missing parameters.
-  if (device_->is_composite()) {
-    if (!request.element_id()) {
-      ADR_WARN_METHOD() << "required field 'element_id' is missing";
-      completer.Reply(fit::error(fad::ControlCreateRingBufferError::kInvalidElementId));
-      return;
-    }
-    element_id = *request.element_id();
-    auto& rb_ids = device_->ring_buffer_ids();
-    if (rb_ids.find(element_id) == rb_ids.end()) {
-      ADR_WARN_METHOD() << "required field 'element_id' (" << element_id
-                        << ") does not refer to an element of type RING_BUFFER";
-      completer.Reply(fit::error(fad::ControlCreateRingBufferError::kInvalidElementId));
-      return;
-    }
+  if (!request.element_id()) {
+    ADR_WARN_METHOD() << "required field 'element_id' is missing";
+    completer.Reply(fit::error(fad::ControlCreateRingBufferError::kInvalidElementId));
+    return;
+  }
+  ElementId element_id = *request.element_id();
+  auto& rb_ids = device_->ring_buffer_ids();
+  if (rb_ids.find(element_id) == rb_ids.end()) {
+    ADR_WARN_METHOD() << "required field 'element_id' (" << element_id
+                      << ") does not refer to an element of type RING_BUFFER";
+    completer.Reply(fit::error(fad::ControlCreateRingBufferError::kInvalidElementId));
+    return;
   }
 
   if (create_ring_buffer_completers_.find(element_id) != create_ring_buffer_completers_.end()) {
@@ -315,11 +252,6 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
   AddChildServer(ring_buffer_server);
   ring_buffer_servers_.insert_or_assign(element_id, ring_buffer_server);
 }
-
-// This is only here because ControlNotify includes the methods from ObserverNotify. It might be
-// helpful for ControlServer to know when its SetGain call took effect, but this isn't needed.
-// ControlServer also has no gain-related hanging-get to complete.
-void ControlServer::GainStateIsChanged(const fad::GainState&) { ADR_LOG_METHOD(kLogNotifyMethods); }
 
 // This is only here because ControlNotify includes the methods from ObserverNotify. ControlServer
 // doesn't have a role to play in plug state changes, nor a client hanging-get to complete.
@@ -650,7 +582,7 @@ void ControlServer::GetTopologies(GetTopologiesCompleter::Sync& completer) {
   }
 
   FX_CHECK(device_);
-  if (!device_->is_codec() && !device_->is_composite() && !device_->is_stream_config()) {
+  if (!device_->is_codec() && !device_->is_composite()) {
     ADR_WARN_METHOD() << "This device_type does not support " << __func__;
     completer.Reply(zx::error(ZX_ERR_WRONG_TYPE));
     return;
@@ -679,7 +611,7 @@ void ControlServer::WatchTopology(WatchTopologyCompleter::Sync& completer) {
   }
 
   FX_CHECK(device_);
-  if (!device_->is_codec() && !device_->is_composite() && !device_->is_stream_config()) {
+  if (!device_->is_codec() && !device_->is_composite()) {
     ADR_WARN_METHOD() << "This device_type does not support " << __func__;
     completer.Close(ZX_ERR_WRONG_TYPE);
     return;
@@ -713,7 +645,7 @@ void ControlServer::SetTopology(SetTopologyRequest& request,
   }
 
   FX_CHECK(device_);
-  if (!device_->is_codec() && !device_->is_composite() && !device_->is_stream_config()) {
+  if (!device_->is_codec() && !device_->is_composite()) {
     ADR_WARN_METHOD() << "unsupported method for this device_type";
     completer.Reply(zx::error(ZX_ERR_WRONG_TYPE));
     return;
@@ -777,7 +709,7 @@ void ControlServer::GetElements(GetElementsCompleter::Sync& completer) {
   }
 
   FX_CHECK(device_);
-  if (!device_->is_codec() && !device_->is_composite() && !device_->is_stream_config()) {
+  if (!device_->is_codec() && !device_->is_composite()) {
     ADR_WARN_METHOD() << "This device_type does not support " << __func__;
     completer.Reply(zx::error(ZX_ERR_WRONG_TYPE));
     return;
@@ -807,7 +739,7 @@ void ControlServer::WatchElementState(WatchElementStateRequest& request,
   }
 
   FX_CHECK(device_);
-  if (!device_->is_codec() && !device_->is_composite() && !device_->is_stream_config()) {
+  if (!device_->is_codec() && !device_->is_composite()) {
     ADR_WARN_METHOD() << "This device_type does not support " << __func__;
     completer.Close(ZX_ERR_WRONG_TYPE);
     return;
@@ -851,7 +783,7 @@ void ControlServer::SetElementState(SetElementStateRequest& request,
   }
 
   FX_CHECK(device_);
-  if (!device_->is_codec() && !device_->is_composite() && !device_->is_stream_config()) {
+  if (!device_->is_codec() && !device_->is_composite()) {
     ADR_WARN_METHOD() << "unsupported method for this device_type";
     completer.Reply(zx::error(ZX_ERR_WRONG_TYPE));
     return;

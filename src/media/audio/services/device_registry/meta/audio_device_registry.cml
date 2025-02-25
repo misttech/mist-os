@@ -22,16 +22,6 @@
     ],
     use: [
         {
-            directory: "dev-audio-input",
-            rights: [ "r*" ],
-            path: "/dev/class/audio-input",
-        },
-        {
-            directory: "dev-audio-output",
-            rights: [ "r*" ],
-            path: "/dev/class/audio-output",
-        },
-        {
             directory: "dev-audio-composite",
             rights: [ "r*" ],
             path: "/dev/class/audio-composite",

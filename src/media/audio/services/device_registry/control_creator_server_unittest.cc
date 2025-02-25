@@ -18,7 +18,6 @@ namespace fad = fuchsia_audio_device;
 class ControlCreatorServerTest : public AudioDeviceRegistryServerTestBase {};
 class ControlCreatorServerCodecTest : public ControlCreatorServerTest {};
 class ControlCreatorServerCompositeTest : public ControlCreatorServerTest {};
-class ControlCreatorServerStreamConfigTest : public ControlCreatorServerTest {};
 
 /////////////////////
 // Device-less tests
@@ -86,42 +85,6 @@ TEST_F(ControlCreatorServerCompositeTest, CreateControl) {
   adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
                                           fad::DeviceType::kComposite,
                                           fad::DriverClient::WithComposite(fake_driver->Enable())));
-
-  RunLoopUntilIdle();
-  ASSERT_EQ(adr_service()->devices().size(), 1u);
-  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
-  auto control_endpoints = fidl::Endpoints<fad::Control>::Create();
-  auto control_client =
-      fidl::Client<fad::Control>(std::move(control_endpoints.client), dispatcher());
-  auto received_callback = false;
-
-  control_creator->client()
-      ->Create({{
-          .token_id = (*adr_service()->devices().begin())->token_id(),
-          .control_server = std::move(control_endpoints.server),
-      }})
-      .Then([&received_callback](fidl::Result<fad::ControlCreator::Create>& result) mutable {
-        received_callback = true;
-        EXPECT_TRUE(result.is_ok()) << result.error_value();
-      });
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(received_callback);
-  EXPECT_EQ(ControlServer::count(), 1u);
-  EXPECT_FALSE(control_creator_fidl_error_status().has_value());
-}
-
-/////////////////////
-// StreamConfig tests
-//
-// Validate the ControlCreator/CreateControl method for StreamConfig devices.
-TEST_F(ControlCreatorServerStreamConfigTest, CreateControl) {
-  auto control_creator = CreateTestControlCreatorServer();
-  ASSERT_EQ(ControlCreatorServer::count(), 1u);
-  auto fake_driver = CreateFakeStreamConfigOutput();
-  adr_service()->AddDevice(
-      Device::Create(adr_service(), dispatcher(), "Test output name", fad::DeviceType::kOutput,
-                     fad::DriverClient::WithStreamConfig(fake_driver->Enable())));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);

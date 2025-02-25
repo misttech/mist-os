@@ -80,6 +80,13 @@ void ProviderServer::AddDevice(AddDeviceRequest& request, AddDeviceCompleter::Sy
     return;
   }
 
+  if (*request.device_type() != fad::DeviceType::kCodec &&
+      *request.device_type() != fad::DeviceType::kComposite) {
+    ADR_WARN_METHOD() << "AudioDeviceRegistry does not support this client type";
+    completer.Reply(fit::error(fad::ProviderAddDeviceError::kWrongClientType));
+    return;
+  }
+
   ADR_LOG_METHOD(kLogDeviceDetection)
       << "request to add " << request.device_type() << " '" << *request.device_name() << "'";
 

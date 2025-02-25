@@ -103,44 +103,6 @@ TEST(ValidateTest, ValidateCompositeProperties) {
   }}));
 }
 
-TEST(ValidateTest, ValidateStreamProperties) {
-  fha::StreamProperties stream_properties{{
-      .is_input = false,
-      .min_gain_db = 0.0f,
-      .max_gain_db = 0.0f,
-      .gain_step_db = 0.0f,
-      .plug_detect_capabilities = fha::PlugDetectCapabilities::kHardwired,
-      .clock_domain = fha::kClockDomainMonotonic,
-  }};
-  fha::GainState gain_state{{.gain_db = 0.0f}};
-  fha::PlugState plug_state{{.plugged = true, .plug_state_time = 0}};
-
-  EXPECT_TRUE(ValidateStreamProperties(stream_properties));
-  EXPECT_TRUE(ValidateStreamProperties(stream_properties, gain_state));
-  EXPECT_TRUE(ValidateStreamProperties(stream_properties, gain_state, plug_state));
-
-  stream_properties = {{
-      .unique_id = {{255, 255, 255, 255, 255, 255, 255, 255,  //
-                     255, 255, 255, 255, 255, 255, 255, 255}},
-      .is_input = true,
-      .can_mute = true,
-      .can_agc = true,
-      .min_gain_db = -10.0f,
-      .max_gain_db = 10.0f,
-      .gain_step_db = 20.0f,
-      .plug_detect_capabilities = fha::PlugDetectCapabilities::kCanAsyncNotify,
-      .manufacturer = "Fuchsia2",
-      .product = "Test2",
-      .clock_domain = fha::kClockDomainExternal,
-  }};
-  gain_state = {{.muted = true, .agc_enabled = true, .gain_db = -4.2f}};
-  plug_state = {{.plugged = false, .plug_state_time = zx::clock::get_monotonic().get()}};
-
-  EXPECT_TRUE(ValidateStreamProperties(stream_properties));
-  EXPECT_TRUE(ValidateStreamProperties(stream_properties, gain_state));
-  EXPECT_TRUE(ValidateStreamProperties(stream_properties, gain_state, plug_state));
-}
-
 // TODO(https://fxbug.dev/42069012): Unittest ValidateDeviceInfo, incl. manuf & prod 256 chars long
 
 fha::SupportedFormats CompliantFormatSet() {
@@ -184,87 +146,6 @@ TEST(ValidateTest, ValidateRingBufferProperties) {
       // turn_on_delay (optional) is missing
       .driver_transfer_bytes = 128,
   }}));
-}
-
-TEST(ValidateTest, ValidateGainState) {
-  EXPECT_TRUE(ValidateGainState(fha::GainState{{
-      // muted (optional) is missing: NOT muted
-      // agc_enabled (optional) is missing: NOT enabled
-      .gain_db = -42.0f,
-  }}  // If StreamProperties is not provided, assume the device cannot mute or agc
-                                ));
-  EXPECT_TRUE(
-      ValidateGainState(fha::GainState{{
-                            .muted = false,
-                            .agc_enabled = false,
-                            .gain_db = 0,
-                        }},
-                        // If StreamProperties is not provided, assume the device cannot mute or agc
-                        std::nullopt));
-  EXPECT_TRUE(
-      ValidateGainState(fha::GainState{{
-                            .muted = false,
-                            .agc_enabled = true,
-                            .gain_db = -12.0f,
-                        }},
-                        fha::StreamProperties{{
-                            .is_input = false,
-                            // can_mute (optional) is missing: device cannot mute
-                            .can_agc = true,
-                            .min_gain_db = -12.0f,
-                            .max_gain_db = 12.0f,
-                            .gain_step_db = 0.5f,
-                            .plug_detect_capabilities = fha::PlugDetectCapabilities::kHardwired,
-                            .clock_domain = fha::kClockDomainMonotonic,
-                        }}));
-  EXPECT_TRUE(
-      ValidateGainState(fha::GainState{{
-                            .muted = true,
-                            .agc_enabled = false,
-                            .gain_db = -12.0f,
-                        }},
-                        fha::StreamProperties{{
-                            .is_input = false,
-                            .can_mute = true,
-                            // can_agc (optional) is missing: device cannot agc
-                            .min_gain_db = -24.0f,
-                            .max_gain_db = -12.0f,
-                            .gain_step_db = 2.0f,
-                            .plug_detect_capabilities = fha::PlugDetectCapabilities::kHardwired,
-                            .clock_domain = fha::kClockDomainMonotonic,
-                        }}));
-  EXPECT_TRUE(
-      ValidateGainState(fha::GainState{{
-                            // muted (optional) is missing: NOT muted
-                            .agc_enabled = false,
-                            .gain_db = -12.0f,
-                        }},
-                        fha::StreamProperties{{
-                            .is_input = false,
-                            .can_mute = false,
-                            .can_agc = true,
-                            .min_gain_db = -12.0f,
-                            .max_gain_db = 12.0f,
-                            .gain_step_db = 0.5f,
-                            .plug_detect_capabilities = fha::PlugDetectCapabilities::kHardwired,
-                            .clock_domain = fha::kClockDomainMonotonic,
-                        }}));
-  EXPECT_TRUE(
-      ValidateGainState(fha::GainState{{
-                            .muted = false,
-                            // agc_enabled (optional) is missing: NOT enabled
-                            .gain_db = -12.0f,
-                        }},
-                        fha::StreamProperties{{
-                            .is_input = false,
-                            .can_mute = true,
-                            .can_agc = false,
-                            .min_gain_db = -24.0f,
-                            .max_gain_db = -12.0f,
-                            .gain_step_db = 2.0f,
-                            .plug_detect_capabilities = fha::PlugDetectCapabilities::kHardwired,
-                            .clock_domain = fha::kClockDomainMonotonic,
-                        }}));
 }
 
 TEST(ValidateTest, ValidatePlugState) {

@@ -43,7 +43,6 @@ class ControlServer
   //
   void DeviceIsRemoved() final;
   void DeviceHasError() final;
-  void GainStateIsChanged(const fuchsia_audio_device::GainState&) final;
   void PlugStateIsChanged(const fuchsia_audio_device::PlugState& new_plug_state,
                           zx::time plug_change_time) final;
   void TopologyIsChanged(TopologyId topology_id) final;
@@ -74,7 +73,6 @@ class ControlServer
 
   // fuchsia.audio.device.Control
   //
-  void SetGain(SetGainRequest& request, SetGainCompleter::Sync& completer) final;
   void CreateRingBuffer(CreateRingBufferRequest& request,
                         CreateRingBufferCompleter::Sync& completer) final;
   void SetDaiFormat(SetDaiFormatRequest& request, SetDaiFormatCompleter::Sync& completer) final;

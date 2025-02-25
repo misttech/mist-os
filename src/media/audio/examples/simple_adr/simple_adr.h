@@ -65,14 +65,13 @@ class MediaApp {
   static void ConnectToControlCreator();
   bool ConnectToControl();
 
-  void ObserveStreamOutput();
+  void ObserveDevice();
   void ConnectToRingBuffer();
 
   bool MapRingBufferVmo();
   void WriteAudioToVmo();
   void StartRingBuffer();
 
-  void ChangeGainByDbAfter(float change_db, zx::duration wait_duration, int32_t iterations);
   void StopRingBuffer();
 
   async::Loop& loop_;
@@ -89,8 +88,6 @@ class MediaApp {
   fuchsia_audio::RingBuffer ring_buffer_;
   uint64_t ring_buffer_size_;  // From fuchsia.mem.Buffer/size and kBytesPerFrame
   fzl::VmoMapper ring_buffer_mapper_;
-  float max_gain_db_;
-  float min_gain_db_;
   int16_t* rb_start_;
   size_t channels_per_frame_ = 0;
 
