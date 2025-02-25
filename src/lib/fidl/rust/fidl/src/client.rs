@@ -93,6 +93,10 @@ impl<T> QueryResponseFut<T> {
     }
 }
 
+const TXID_INTEREST_MASK: u32 = 0xFFFFFF;
+const TXID_GENERATION_SHIFT: usize = 24;
+const TXID_GENERATION_MASK: u8 = 0x7F;
+
 /// A FIDL transaction id. Will not be zero for a message that includes a response.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Txid(u32);
@@ -102,13 +106,25 @@ struct InterestId(usize);
 
 impl InterestId {
     fn from_txid(txid: Txid) -> Self {
-        InterestId(txid.0 as usize - 1)
+        InterestId((txid.0 & TXID_INTEREST_MASK) as usize - 1)
     }
 }
 
 impl Txid {
-    fn from_interest_id(int_id: InterestId) -> Self {
-        Txid((int_id.0 + 1) as u32)
+    fn from_interest_id(int_id: InterestId, generation: u8) -> Self {
+        // Base the transaction id on the slab slot + 1
+        // (slab slots are zero-based and txid zero is special)
+        let id = (int_id.0 as u32 + 1) & TXID_INTEREST_MASK;
+        // And a 7-bit generation number.
+        let generation = (generation & TXID_GENERATION_MASK) as u32;
+
+        // Combine them:
+        //  - top bit zero to indicate a userspace generated txid.
+        //  - 7 bits of generation
+        //  - 24 bits based on the interest id
+        let txid = generation << TXID_GENERATION_SHIFT | id;
+
+        Txid(txid)
     }
 
     /// Get the raw u32 transaction ID.
@@ -451,8 +467,14 @@ struct Interests<D: ResourceDialect> {
     messages: Slab<MessageInterest<D>>,
     events: VecDeque<D::MessageBufEtc>,
     event_listener: EventListener,
-    // The number of wakers registered waiting for either a message or an event.
+    /// The number of wakers registered waiting for either a message or an event.
     waker_count: usize,
+    /// Txid generation.
+    /// This is incremented every time we mint a new txid (see register_msg_interest).
+    /// The lower 7 bits are incorporated into the txid.
+    /// This is so that a client repeatedly making calls will have distinct txids for each call.
+    /// Not necessary for correctness but _very_ useful for tracing and debugging.
+    generation: u8,
 }
 
 impl<D: ResourceDialect> Default for Interests<D> {
@@ -462,6 +484,7 @@ impl<D: ResourceDialect> Default for Interests<D> {
             events: Default::default(),
             event_listener: Default::default(),
             waker_count: 0,
+            generation: 0,
         }
     }
 }
@@ -582,9 +605,13 @@ impl<D: ResourceDialect> Interests<D> {
     /// This function returns a new transaction ID which should be used to send a message
     /// via the channel. Responses are then received using `poll_recv_msg_response`.
     fn register_msg_interest(&mut self) -> Txid {
+        self.generation = self.generation.wrapping_add(1);
         // TODO(cramertj) use `try_from` here and assert that the conversion from
         // `usize` to `u32` hasn't overflowed.
-        Txid::from_interest_id(InterestId(self.messages.insert(MessageInterest::WillPoll)))
+        Txid::from_interest_id(
+            InterestId(self.messages.insert(MessageInterest::WillPoll)),
+            self.generation,
+        )
     }
 }
 
@@ -1024,9 +1051,9 @@ mod tests {
     const EVENT_ORDINAL: u64 = 854 << 23;
 
     #[rustfmt::skip]
-    fn expected_sent_bytes(tx_id_low_byte: u8) -> [u8; 24] {
+    fn expected_sent_bytes(txid_index: u8, txid_generation: u8) -> [u8; 24] {
         [
-            tx_id_low_byte, 0, 0, 0, // 32 bit tx_id
+            txid_index, 0, 0, txid_generation, // 32 bit tx_id
             2, 0, 0, // flags
             MAGIC_NUMBER_INITIAL,
             0, 0, 0, 0, // low bytes of 64 bit ordinal
@@ -1034,6 +1061,10 @@ mod tests {
             SEND_DATA, // 8 bit data
             0, 0, 0, 0, 0, 0, 0, // 7 bytes of padding after our 1 byte of data
         ]
+    }
+
+    fn expected_sent_bytes_oneway() -> [u8; 24] {
+        expected_sent_bytes(0, 0)
     }
 
     fn send_transaction(header: TransactionHeader, channel: &zx::Channel) {
@@ -1061,8 +1092,7 @@ mod tests {
         client.send::<u8>(SEND_DATA, SEND_ORDINAL, DynamicFlags::empty()).context("sending")?;
         let mut received = MessageBufEtc::new();
         server_end.read_etc(&mut received).context("reading")?;
-        let one_way_tx_id = 0;
-        assert_eq!(received.bytes(), expected_sent_bytes(one_way_tx_id));
+        assert_eq!(received.bytes(), expected_sent_bytes_oneway());
         Ok(())
     }
 
@@ -1275,8 +1305,7 @@ mod tests {
         let receiver = async move {
             let mut buffer = MessageBufEtc::new();
             server.recv_etc_msg(&mut buffer).await.expect("failed to recv msg");
-            let one_way_tx_id = 0;
-            assert_eq!(buffer.bytes(), expected_sent_bytes(one_way_tx_id));
+            assert_eq!(buffer.bytes(), expected_sent_bytes_oneway());
         };
 
         // add a timeout to receiver so if test is broken it doesn't take forever
@@ -1303,7 +1332,7 @@ mod tests {
         let receiver = async move {
             server.recv_etc_msg(&mut buffer).await.expect("failed to recv msg");
             let two_way_tx_id = 1u8;
-            assert_eq!(buffer.bytes(), expected_sent_bytes(two_way_tx_id));
+            assert_eq!(buffer.bytes(), expected_sent_bytes(two_way_tx_id, 1));
 
             let (bytes, handles) = (&mut vec![], &mut vec![]);
             let header =
@@ -1857,7 +1886,7 @@ mod tests {
         let mut buffer = MessageBufEtc::new();
         executor.run_singlethreaded(server.recv_etc_msg(&mut buffer)).expect("failed to recv msg");
         let two_way_tx_id = 1u8;
-        assert_eq!(buffer.bytes(), expected_sent_bytes(two_way_tx_id));
+        assert_eq!(buffer.bytes(), expected_sent_bytes(two_way_tx_id, 1));
 
         let (bytes, handles) = (&mut vec![], &mut vec![]);
         let header =
@@ -1940,7 +1969,7 @@ mod tests {
         let receiver = async move {
             server.recv_etc_msg(&mut buffer).await.expect("failed to recv msg");
             let two_way_tx_id = 1u8;
-            assert_eq!(buffer.bytes(), expected_sent_bytes(two_way_tx_id));
+            assert_eq!(buffer.bytes(), expected_sent_bytes(two_way_tx_id, 1));
 
             let (bytes, handles) = (&mut vec![], &mut vec![]);
             let header =
@@ -1982,7 +2011,7 @@ mod tests {
             let mut buffer = MessageBufEtc::new();
             server.recv_etc_msg(&mut buffer).await.expect("failed to recv msg");
             let two_way_tx_id = 1u8;
-            assert_eq!(buffer.bytes(), expected_sent_bytes(two_way_tx_id));
+            assert_eq!(buffer.bytes(), expected_sent_bytes(two_way_tx_id, 1));
 
             let (bytes, handles) = (&mut vec![], &mut vec![]);
             let header =
@@ -2027,7 +2056,7 @@ mod tests {
         let receiver = async move {
             server.recv_etc_msg(&mut buffer).await.expect("failed to recv msg");
             let two_way_tx_id = 1u8;
-            assert_eq!(buffer.bytes(), expected_sent_bytes(two_way_tx_id));
+            assert_eq!(buffer.bytes(), expected_sent_bytes(two_way_tx_id, 1));
 
             let (bytes, handles) = (&mut vec![], &mut vec![]);
             let header =
