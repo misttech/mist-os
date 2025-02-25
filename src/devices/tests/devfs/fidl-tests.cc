@@ -80,7 +80,8 @@ TEST(FidlTestCase, OpenPkg) {
 
 TEST(FidlTestCase, BasicDevClass) {
   auto endpoints = fidl::Endpoints<fio::Node>::Create();
-  ASSERT_OK(fdio_service_connect("/dev/class", endpoints.server.channel().release()));
+  ASSERT_OK(fdio_open3("/dev/class", uint64_t{fio::wire::kPermReadable},
+                       endpoints.server.channel().release()));
   const fidl::WireResult result = fidl::WireCall(endpoints.client)->Query();
   ASSERT_OK(result.status());
   const auto& response = result.value();
@@ -91,7 +92,8 @@ TEST(FidlTestCase, BasicDevClass) {
 
 TEST(FidlTestCase, BasicDevZero) {
   auto endpoints = fidl::Endpoints<fio::Node>::Create();
-  ASSERT_OK(fdio_service_connect("/dev/zero", endpoints.server.channel().release()));
+  ASSERT_OK(fdio_open3("/dev/zero", uint64_t{fio::wire::kPermReadable},
+                       endpoints.server.channel().release()));
   const fidl::WireResult result = fidl::WireCall(endpoints.client)->Query();
   ASSERT_OK(result.status());
   const auto& response = result.value();
@@ -148,7 +150,8 @@ TEST(FidlTestCase, DirectoryWatcherExisting) {
   zx::result watcher_endpoints = fidl::CreateEndpoints<fio::DirectoryWatcher>();
   ASSERT_OK(watcher_endpoints.status_value());
 
-  ASSERT_OK(fdio_service_connect("/dev/class", endpoints.server.channel().release()));
+  ASSERT_OK(fdio_open3("/dev/class", uint64_t{fio::wire::kPermReadable},
+                       endpoints.server.channel().release()));
 
   const fidl::WireResult result =
       fidl::WireCall(endpoints.client)
@@ -175,7 +178,8 @@ TEST(FidlTestCase, DirectoryWatcherExisting) {
 TEST(FidlTestCase, DirectoryWatcherWithClosedHalf) {
   auto endpoints = fidl::Endpoints<fio::Directory>::Create();
 
-  ASSERT_OK(fdio_service_connect("/dev/class", endpoints.server.channel().release()));
+  ASSERT_OK(fdio_open3("/dev/class", uint64_t{fio::wire::kPermReadable},
+                       endpoints.server.channel().release()));
 
   {
     zx::result watcher_endpoints = fidl::CreateEndpoints<fio::DirectoryWatcher>();

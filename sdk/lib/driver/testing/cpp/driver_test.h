@@ -258,9 +258,10 @@ class DriverTestCommon {
 
   fidl::ClientEnd<fuchsia_io::Directory> ConnectToDriverSvcDir() {
     auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-    zx_status_t status = fdio_open3_at(outgoing_directory_client_.handle()->get(), "/svc",
-                                       static_cast<uint64_t>(fuchsia_io::Flags::kProtocolDirectory),
-                                       server_end.TakeChannel().release());
+    zx_status_t status = fdio_open3_at(
+        outgoing_directory_client_.handle()->get(), "/svc",
+        uint64_t{fuchsia_io::wire::kPermReadable | fuchsia_io::wire::Flags::kProtocolDirectory},
+        server_end.TakeChannel().release());
     ZX_ASSERT_MSG(ZX_OK == status, "Failed to fdio_open3_at '/svc' on the driver's outgoing: %s.",
                   zx_status_get_string(status));
     return std::move(client_end);

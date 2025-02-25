@@ -204,9 +204,10 @@ TEST_F(VulkanLoader, GoldfishSyncDeviceFs) {
   };
 
   for (auto& device_class : kDeviceClassList) {
-    fuchsia::io::NodeSyncPtr device_ptr;
-    EXPECT_EQ(ZX_OK, fdio_service_connect_at(dev_fs.client.channel().get(), device_class,
-                                             device_ptr.NewRequest().TakeChannel().release()));
+    fuchsia::io::DirectorySyncPtr device_ptr;
+    EXPECT_EQ(ZX_OK, fdio_open3_at(dev_fs.client.channel().get(), device_class,
+                                   uint64_t{fuchsia::io::PERM_READABLE},
+                                   device_ptr.NewRequest().TakeChannel().release()));
 
     // Check that the directory is connected to something.
     std::vector<uint8_t> protocol;
