@@ -7,17 +7,16 @@ use crate::mutable_state::{state_accessor, state_implementation};
 use crate::security;
 use crate::signals::{KernelSignal, RunState, SignalInfo, SignalState};
 use crate::task::{
-    set_thread_role, AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask,
-    EventHandler, Kernel, ProcessEntryRef, ProcessExitInfo, PtraceEvent, PtraceEventData,
-    PtraceState, PtraceStatus, SchedulerPolicy, SeccompFilterContainer, SeccompState,
-    SeccompStateValue, ThreadGroup, ThreadState, UtsNamespaceHandle, WaitCanceler, Waiter,
-    ZombieProcess,
+    AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, EventHandler, Kernel,
+    ProcessEntryRef, ProcessExitInfo, PtraceEvent, PtraceEventData, PtraceState, PtraceStatus,
+    SchedulerPolicy, SeccompFilterContainer, SeccompState, SeccompStateValue, ThreadGroup,
+    ThreadState, UtsNamespaceHandle, WaitCanceler, Waiter, ZombieProcess,
 };
 use crate::vfs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsNodeHandle, FsString};
 use bitflags::bitflags;
 use fuchsia_inspect_contrib::profile_duration;
 use macro_rules_attribute::apply;
-use starnix_logging::{log_debug, log_warn, set_current_task_info, set_zx_name};
+use starnix_logging::{log_warn, set_current_task_info, set_zx_name};
 use starnix_sync::{LockBefore, Locked, MmDumpable, Mutex, RwLock, TaskRelease};
 use starnix_types::ownership::{
     OwnedRef, Releasable, ReleasableByRef, ReleaseGuard, TempRef, WeakRef,
@@ -1262,17 +1261,7 @@ impl Task {
             updater(&mut state.scheduler_policy);
             state.scheduler_policy
         };
-
-        let Some(role_manager) = &self.thread_group.kernel.role_manager else {
-            log_debug!("thread role update requested in kernel without ProfileProvider, skipping");
-            return Ok(());
-        };
-        let thread = self.thread.read();
-        let Some(thread) = thread.as_ref() else {
-            log_debug!("thread role update requested for task without thread, skipping");
-            return Ok(());
-        };
-        set_thread_role(role_manager, thread, new_scheduler_policy)?;
+        self.thread_group.kernel.scheduler.set_thread_role(self, new_scheduler_policy)?;
         Ok(())
     }
 
