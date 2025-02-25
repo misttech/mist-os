@@ -2292,6 +2292,28 @@ assembly_input_bundle("bluetooth_a2dp") {
   ]
 }
 
+# For configurations without A2DP support to enable A2DP testing.
+#
+# feature_set_levels: standard
+# build-types: eng
+#
+assembly_input_bundle("bluetooth_a2dp_with_consumer") {
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [
+            "//src/connectivity/bluetooth/profiles/bt-a2dp/meta/bt-a2dp-eager-with-audio-consumer.core_shard.cml",
+            "//src/media/audio/consumer/meta/audio_consumer.core_shard.cml",
+          ]
+        },
+      ]
+    },
+  ]
+}
+
 # Bluetooth profile support: AVRCP
 #
 # feature_set_levels: minimal
