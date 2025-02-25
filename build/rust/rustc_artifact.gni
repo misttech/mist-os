@@ -214,7 +214,7 @@ template("rustc_artifact") {
                                ])
 
         if (!defined(actual_name)) {
-          actual_name = _actual_target_name
+          actual_name = _group_name
         }
 
         invoker_deps = invoker.deps
@@ -275,6 +275,9 @@ template("rustc_artifact") {
                                "visibility",
                              ])
       public_deps = [ ":${_actual_target_name}" ]
+      if (_should_define_rust_aux) {
+        public_deps += [ ":${_aux_target_name}" ]
+      }
       metadata = {
         test_component_manifest_program_barrier = [ ":${_actual_target_name}" ]
         link_output_barrier = [ ":${_actual_target_name}" ]
@@ -383,19 +386,6 @@ template("rustc_artifact") {
                          invoker.target_type == "shared_library" ||
                          invoker.target_type == "loadable_module")) {
         deps += [ "//src/lib/fdio/rust:fdio_for_rust_stdlib" ]
-      }
-
-      if (_should_define_rust_aux) {
-        if (!defined(data_deps)) {
-          data_deps = []
-        }
-
-        # Auxiliary targets are added as a dependency here to make sure it goes
-        # through the same toolchain redirection as the main target. Use
-        # data_deps to allow more parallelism in the build.
-        #
-        # See details in http://b/396658029#comment6.
-        data_deps += [ ":${_aux_target_name}" ]
       }
 
       if (defined(visibility)) {

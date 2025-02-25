@@ -87,16 +87,14 @@ class TestClippy(unittest.TestCase):
         output = run_clippy(
             "--get-outputs", "-f", FAKE_ROOT / "build/rust/tests/b/lib.rs"
         )
-        self.assertIn(
-            str(TEST_DIR / "b.actual.clippy"), set(output.splitlines())
-        )
+        self.assertIn(str(TEST_DIR / "b.clippy"), set(output.splitlines()))
 
         output = run_clippy(
             "--get-outputs", "-f", FAKE_ROOT / "build/rust/tests/a/main.rs"
         )
         for label in {
-            str(TEST_DIR / "a.actual.clippy"),
-            str(TEST_DIR / "a_test.actual.clippy"),
+            str(TEST_DIR / "a.clippy"),
+            str(TEST_DIR / "a_test.clippy"),
         }:
             self.assertIn(label, set(output.splitlines()))
 
@@ -112,8 +110,8 @@ class TestClippy(unittest.TestCase):
         self.assertEqual(
             sorted(outputs),
             [
-                "gen/build/rust/tests/a.actual.clippy",
-                "gen/build/rust/tests/a_test.actual.clippy",
+                "gen/build/rust/tests/a.clippy",
+                "gen/build/rust/tests/a_test.clippy",
             ],
         )
 
