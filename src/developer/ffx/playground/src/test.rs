@@ -24,6 +24,7 @@ async fn test_interpreter(
     if with_fidl {
         ns.load(test_fidl::TEST_FIDL).unwrap();
         ns.load(test_fidl::FUCHSIA_IO_FIDL).unwrap();
+        ns.load(test_fidl::FUCHSIA_UNKNOWN_FIDL).unwrap();
     }
     let fs_root = with_dirs.unwrap_or_else(|| fidl::endpoints::create_endpoints().0);
     let (interpreter, fut) = Interpreter::new(ns, fs_root).await;
