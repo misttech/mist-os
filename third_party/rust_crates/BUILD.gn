@@ -7076,7 +7076,8 @@ license("half-v2_4_1.license") {
   public_package_name = "half"
   license_files = [
     "//third_party/rust_crates/vendor/half-2.4.1/LICENSE",
-    "//third_party/rust_crates/vendor/half-2.4.1/LICENSES",
+    "//third_party/rust_crates/vendor/half-2.4.1/LICENSES/Apache-2.0.txt",
+    "//third_party/rust_crates/vendor/half-2.4.1/LICENSES/MIT.txt",
   ]
 }
 

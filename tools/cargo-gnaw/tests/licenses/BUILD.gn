@@ -44,7 +44,7 @@ rust_library("defines_specific_license-v1_0_1") {
 license("license_collection_types-v1_0_0.license") {
   public_package_name = "license_collection_types"
   license_files = [
-    "//licenses",
+    "//licenses/scan_for_licenses/LICENSES/my_file.txt",
     "//licenses/scan_for_licenses/copyright.txt",
     "//licenses/scan_for_licenses/license-1.txt",
   ]
@@ -77,6 +77,7 @@ rust_library("license_collection_types-v1_0_0") {
 license("scan_for_licenses-v1_0_1.license") {
   public_package_name = "scan_for_licenses"
   license_files = [
+    "//licenses/scan_for_licenses/LICENSES/my_file.txt",
     "//licenses/scan_for_licenses/copyright.txt",
     "//licenses/scan_for_licenses/license-1.txt",
   ]
