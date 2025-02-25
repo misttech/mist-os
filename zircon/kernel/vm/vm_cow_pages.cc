@@ -806,7 +806,9 @@ bool VmCowPages::DedupZeroPage(vm_page_t* page, uint64_t offset) {
     return false;
   }
 
-  RangeChangeUpdateLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::RemoveWrite);
+  RangeChangeUpdateSelfLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::RemoveWrite,
+                              RangeChangeChildren::Deferred);
+  RangeChangeUpdateCowChildrenLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::RemoveWrite);
 
   if (IsZeroPage(page_or_marker->Page())) {
     // Replace the slot with a marker.
@@ -1049,7 +1051,9 @@ zx_status_t VmCowPages::ReplaceWithHiddenNodeLocked(fbl::RefPtr<VmCowPages>* rep
   // nodes are immutable, even for pages that the clone cannot see we want the parent_clone to
   // move them back out before modifying them.
   // Note: We could eagerly move these pages into the parent_clone instead.
-  RangeChangeUpdateLocked(VmCowRange(0, size_), RangeChangeOp::RemoveWrite);
+  RangeChangeUpdateSelfLocked(VmCowRange(0, size_), RangeChangeOp::RemoveWrite,
+                              RangeChangeChildren::Deferred);
+  RangeChangeUpdateCowChildrenLocked(VmCowRange(0, size_), RangeChangeOp::RemoveWrite);
 
   VmCowPagesOptions options = inheritable_options();
   fbl::AllocChecker ac;
@@ -1678,10 +1682,12 @@ VmPageOrMarker VmCowPages::CompleteAddPageLocked(AddPageTransaction& transaction
     // reference cannot be mapped in, and we can skip the range update.
     if (!old.IsReference()) {
       // other mappings may have covered this offset into the vmo, so unmap those ranges
-      RangeChangeUpdateLocked(VmCowRange(transaction.offset(), PAGE_SIZE),
-                              transaction.overwrite() == CanOverwriteContent::NonZero
-                                  ? RangeChangeOp::Unmap
-                                  : RangeChangeOp::UnmapZeroPage);
+      const RangeChangeOp op = transaction.overwrite() == CanOverwriteContent::NonZero
+                                   ? RangeChangeOp::Unmap
+                                   : RangeChangeOp::UnmapZeroPage;
+      RangeChangeUpdateSelfLocked(VmCowRange(transaction.offset(), PAGE_SIZE), op,
+                                  RangeChangeChildren::Deferred);
+      RangeChangeUpdateCowChildrenLocked(VmCowRange(transaction.offset(), PAGE_SIZE), op);
     }
   }
 
@@ -1779,7 +1785,10 @@ zx_status_t VmCowPages::AddNewPagesLocked(uint64_t start_offset, list_node_t* pa
 
   if (do_range_update) {
     // other mappings may have covered this offset into the vmo, so unmap those ranges
-    RangeChangeUpdateLocked(VmCowRange(start_offset, offset - start_offset), RangeChangeOp::Unmap);
+    RangeChangeUpdateSelfLocked(VmCowRange(start_offset, offset - start_offset),
+                                RangeChangeOp::Unmap, RangeChangeChildren::Deferred);
+    RangeChangeUpdateCowChildrenLocked(VmCowRange(start_offset, offset - start_offset),
+                                       RangeChangeOp::Unmap);
   }
 
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
@@ -3070,7 +3079,9 @@ zx::result<uint64_t> VmCowPages::UnmapAndFreePagesLocked(uint64_t offset, uint64
   DEBUG_ASSERT(!parent_);
 
   // unmap all of the pages in this range on all the mapping regions
-  RangeChangeUpdateLocked(VmCowRange(offset, len), RangeChangeOp::Unmap);
+  RangeChangeUpdateSelfLocked(VmCowRange(offset, len), RangeChangeOp::Unmap,
+                              RangeChangeChildren::Deferred);
+  RangeChangeUpdateCowChildrenLocked(VmCowRange(offset, len), RangeChangeOp::Unmap);
 
   list_node_t freed_list;
   list_initialize(&freed_list);
@@ -3373,8 +3384,9 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
     // Unmap any page that is touched by this range in any of our, or our childrens, mapping
     // regions. We do this on the assumption we are going to be able to free pages either completely
     // or by turning them into markers and it's more efficient to unmap once in bulk here.
-    RangeChangeUpdateLocked(VmCowRange(page_start_base, page_end_base - page_start_base),
-                            RangeChangeOp::Unmap);
+    const VmCowRange range = VmCowRange(page_start_base, page_end_base - page_start_base);
+    RangeChangeUpdateSelfLocked(range, RangeChangeOp::Unmap, RangeChangeChildren::Deferred);
+    RangeChangeUpdateCowChildrenLocked(range, RangeChangeOp::Unmap);
   }
 
   // Pages removed from this object are put into freed_list, while pages removed from any ancestor
@@ -4115,8 +4127,11 @@ void VmCowPages::UnpinLocked(VmCowRange range) {
           } else {
             // Complete any existing range and then start again at this offset.
             if (completely_unpin_len > 0) {
-              RangeChangeUpdateLocked(VmCowRange(completely_unpin_start, completely_unpin_len),
-                                      RangeChangeOp::DebugUnpin);
+              const VmCowRange range_update =
+                  VmCowRange(completely_unpin_start, completely_unpin_len);
+              RangeChangeUpdateSelfLocked(range_update, RangeChangeOp::DebugUnpin,
+                                          RangeChangeChildren::Deferred);
+              RangeChangeUpdateCowChildrenLocked(range_update, RangeChangeOp::DebugUnpin);
             }
             completely_unpin_start = off;
             completely_unpin_len = PAGE_SIZE;
@@ -4139,8 +4154,10 @@ void VmCowPages::UnpinLocked(VmCowRange range) {
 #if (DEBUG_ASSERT_IMPLEMENTED)
   // Check any leftover range.
   if (completely_unpin_len > 0) {
-    RangeChangeUpdateLocked(VmCowRange(completely_unpin_start, completely_unpin_len),
-                            RangeChangeOp::DebugUnpin);
+    const VmCowRange range_update = VmCowRange(completely_unpin_start, completely_unpin_len);
+    RangeChangeUpdateSelfLocked(range_update, RangeChangeOp::DebugUnpin,
+                                RangeChangeChildren::Deferred);
+    RangeChangeUpdateCowChildrenLocked(range_update, RangeChangeOp::DebugUnpin);
   }
 #endif
 
@@ -4305,7 +4322,9 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
     }
 
     // unmap all of the pages in this range on all the mapping regions
-    RangeChangeUpdateLocked(VmCowRange(start, len), RangeChangeOp::Unmap);
+    RangeChangeUpdateSelfLocked(VmCowRange(start, len), RangeChangeOp::Unmap,
+                                RangeChangeChildren::Deferred);
+    RangeChangeUpdateCowChildrenLocked(VmCowRange(start, len), RangeChangeOp::Unmap);
 
     // Resolve any outstanding page requests tracked by the page source that are now out-of-bounds.
     if (page_source_) {
@@ -4381,7 +4400,9 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
     const uint64_t len = end - start;
 
     // inform all our children or mapping that there's new bits
-    RangeChangeUpdateLocked(VmCowRange(start, len), RangeChangeOp::Unmap);
+    RangeChangeUpdateSelfLocked(VmCowRange(start, len), RangeChangeOp::Unmap,
+                                RangeChangeChildren::Deferred);
+    RangeChangeUpdateCowChildrenLocked(VmCowRange(start, len), RangeChangeOp::Unmap);
 
     // If pager-backed, need to insert a dirty zero interval beyond the old size.
     if (is_source_preserving_page_content()) {
@@ -4609,7 +4630,9 @@ zx_status_t VmCowPages::TakePagesWithParentLocked(VmCowRange range, VmPageSplice
   }
 
   if (new_pages_len) {
-    RangeChangeUpdateLocked(range.WithLength(new_pages_len), RangeChangeOp::Unmap);
+    RangeChangeUpdateSelfLocked(range.WithLength(new_pages_len), RangeChangeOp::Unmap,
+                                RangeChangeChildren::Deferred);
+    RangeChangeUpdateCowChildrenLocked(range.WithLength(new_pages_len), RangeChangeOp::Unmap);
   }
 
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
@@ -4697,7 +4720,8 @@ zx_status_t VmCowPages::TakePagesLocked(VmCowRange range, VmPageSpliceList* page
   }
 
   *taken_len = range.len;
-  RangeChangeUpdateLocked(range, RangeChangeOp::Unmap);
+  RangeChangeUpdateSelfLocked(range, RangeChangeOp::Unmap, RangeChangeChildren::Deferred);
+  RangeChangeUpdateCowChildrenLocked(range, RangeChangeOp::Unmap);
 
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
@@ -4826,7 +4850,10 @@ zx_status_t VmCowPages::SupplyPagesLocked(VmCowRange range, VmPageSpliceList* pa
         // We hit the end of a run of absent pages, so notify the page source
         // of any new pages that were added and reset the tracking variables.
         if (new_pages_len) {
-          RangeChangeUpdateLocked(VmCowRange(new_pages_start, new_pages_len), RangeChangeOp::Unmap);
+          RangeChangeUpdateSelfLocked(VmCowRange(new_pages_start, new_pages_len),
+                                      RangeChangeOp::Unmap, RangeChangeChildren::Deferred);
+          RangeChangeUpdateCowChildrenLocked(VmCowRange(new_pages_start, new_pages_len),
+                                             RangeChangeOp::Unmap);
           if (page_source_) {
             page_source_->OnPagesSupplied(new_pages_start, new_pages_len);
           }
@@ -4920,7 +4947,10 @@ zx_status_t VmCowPages::SupplyPagesLocked(VmCowRange range, VmPageSpliceList* pa
   // number of pages in the splice list.
   DEBUG_ASSERT(offset == end || status != ZX_OK);
   if (new_pages_len) {
-    RangeChangeUpdateLocked(VmCowRange(new_pages_start, new_pages_len), RangeChangeOp::Unmap);
+    RangeChangeUpdateSelfLocked(VmCowRange(new_pages_start, new_pages_len), RangeChangeOp::Unmap,
+                                RangeChangeChildren::Deferred);
+    RangeChangeUpdateCowChildrenLocked(VmCowRange(new_pages_start, new_pages_len),
+                                       RangeChangeOp::Unmap);
     if (page_source_) {
       page_source_->OnPagesSupplied(new_pages_start, new_pages_len);
     }
@@ -5445,8 +5475,10 @@ zx_status_t VmCowPages::WritebackBeginLocked(VmCowRange range, bool is_zero_rang
   // than the Dirty pages found in the page list traversal above, but we choose to do this once for
   // the entire range instead of per page; pages in the AwaitingClean and Clean states will already
   // have their write permission removed, so this is a no-op for them.
-  RangeChangeUpdateLocked(VmCowRange(start_offset, end_offset - start_offset),
-                          RangeChangeOp::RemoveWrite);
+  const VmCowRange range_update = VmCowRange(start_offset, end_offset - start_offset);
+  RangeChangeUpdateSelfLocked(range_update, RangeChangeOp::RemoveWrite,
+                              RangeChangeChildren::Deferred);
+  RangeChangeUpdateCowChildrenLocked(range_update, RangeChangeOp::RemoveWrite);
 
   VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
   return ZX_OK;
@@ -5599,7 +5631,9 @@ void VmCowPages::DetachSourceLocked() {
   // optimization. Only the userpager is expected to access (dirty) pages beyond this point, in
   // order to write back their contents, where the cost of the writeback is presumably much larger
   // than page faults to update hardware page table mappings for resident pages.
-  RangeChangeUpdateLocked(VmCowRange(0, size_), RangeChangeOp::Unmap);
+  RangeChangeUpdateSelfLocked(VmCowRange(0, size_), RangeChangeOp::Unmap,
+                              RangeChangeChildren::Deferred);
+  RangeChangeUpdateCowChildrenLocked(VmCowRange(0, size_), RangeChangeOp::Unmap);
 
   __UNINITIALIZED BatchPQRemove page_remover(&freed_list);
 
@@ -5645,7 +5679,16 @@ void VmCowPages::DetachSourceLocked() {
   FreePagesLocked(&freed_list, /*freeing_owned_pages=*/true);
 }
 
-void VmCowPages::RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op) {
+void VmCowPages::RangeChangeUpdateSelfLocked(VmCowRange range, RangeChangeOp op,
+                                             RangeChangeChildren children) {
+  canary_.Assert();
+  ASSERT(children == RangeChangeChildren::Deferred || children_list_len_ == 0);
+  if (paged_ref_ && !range.is_empty()) {
+    paged_backlink_locked(this)->RangeChangeUpdateLocked(range, op);
+  }
+}
+
+void VmCowPages::RangeChangeUpdateCowChildrenLocked(VmCowRange range, RangeChangeOp op) {
   canary_.Assert();
 
   // Helper for doing checking and performing a range change on a single candidate node. Although
@@ -5718,11 +5761,6 @@ void VmCowPages::RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op) {
 
   if (range.is_empty()) {
     return;
-  }
-
-  // Perform any range change for this separately before processing any children.
-  if (paged_ref_) {
-    paged_backlink_locked(this)->RangeChangeUpdateLocked(range, op);
   }
 
   // Set the initial parent to this so we can start processing the subtree.
@@ -5843,7 +5881,9 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEvictionLocked(vm_page_t* pa
   }
 
   // Remove any mappings to this page before we remove it.
-  RangeChangeUpdateLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap);
+  RangeChangeUpdateSelfLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap,
+                              RangeChangeChildren::Deferred);
+  RangeChangeUpdateCowChildrenLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap);
 
   // Use RemovePage over just writing to page_or_marker so that the page list has the opportunity
   // to release any now empty intermediate nodes.
@@ -5891,7 +5931,9 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompressionLocked(vm_page_t*
     DEBUG_ASSERT(page_or_marker->IsPage());
     DEBUG_ASSERT(page_or_marker->Page() == page);
 
-    RangeChangeUpdateLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap);
+    RangeChangeUpdateSelfLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap,
+                                RangeChangeChildren::Deferred);
+    RangeChangeUpdateCowChildrenLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap);
 
     // Start compression of the page by swapping the page list to contain the temporary reference.
     // Ensure the compression system is aware of the page's current share_count so it can track any
@@ -6053,7 +6095,9 @@ void VmCowPages::SwapPageInListLocked(uint64_t offset, vm_page_t* old_page, vm_p
   DEBUG_ASSERT(new_page->state() == vm_page_state::OBJECT);
 
   // unmap before removing old page
-  RangeChangeUpdateLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap);
+  RangeChangeUpdateSelfLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap,
+                              RangeChangeChildren::Deferred);
+  RangeChangeUpdateCowChildrenLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap);
 
   // The caller is required to have provided us a page that exists, so this can never fail.
   VmPageOrMarkerRef p = page_list_.LookupMutable(offset);

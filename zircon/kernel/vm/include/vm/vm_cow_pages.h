@@ -597,9 +597,24 @@ class VmCowPages final : public VmHierarchyBase,
   bool DebugValidateVmoPageBorrowingLocked() const TA_REQ(lock());
 
   using RangeChangeOp = VmObject::RangeChangeOp;
-  // Apply the specified operation to all mappings in the given range. This is applied to all
-  // descendants within the range.
-  void RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op) TA_REQ(lock());
+  // Applies the specific operation to all mappings in the given range against this object. The
+  // operations is not applied to descendants/cow children.
+  enum class RangeChangeChildren : bool {
+    // The caller acknowledges that they may need to apply updates to mappings in the children, and
+    // promise to do so. A failure to actually perform the child range updates cannot be detected,
+    // but by requiring callers to explicitly acknowledge that they need to is intended to minimize
+    // errors.
+    Deferred,
+    // The caller states that they know that they have no children and therefore do not need to
+    // perform a range change on them. It is an error, and will trigger an assertion failure, to
+    // supply this if there are children.
+    AssumeNone,
+  };
+  void RangeChangeUpdateSelfLocked(VmCowRange range, RangeChangeOp op, RangeChangeChildren children)
+      TA_REQ(lock());
+  // Applies the specific operation to all mappings in the given range for against descendants/cow
+  // children. The operation is not applied for this object.
+  void RangeChangeUpdateCowChildrenLocked(VmCowRange range, RangeChangeOp op) TA_REQ(lock());
 
   // Promote pages in the specified range for reclamation under memory pressure. |offset| will be
   // rounded down to the page boundary, and |len| will be rounded up to the page boundary.
