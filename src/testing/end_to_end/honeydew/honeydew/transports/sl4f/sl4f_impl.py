@@ -10,7 +10,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from honeydew import errors
-from honeydew.interfaces.transports import ffx as ffx_interface
+from honeydew.transports.ffx import ffx as ffx_interface
 from honeydew.transports.sl4f import errors as sl4f_errors
 from honeydew.transports.sl4f import sl4f as sl4f_interface
 from honeydew.typing import custom_types

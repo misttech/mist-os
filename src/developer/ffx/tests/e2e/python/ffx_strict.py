@@ -14,7 +14,7 @@ import zipfile
 from typing import Any, List, Optional, Text, Tuple
 
 import ffxtestcase
-from honeydew.errors import FfxCommandError
+from honeydew.transports.ffx.errors import FfxCommandError
 from mobly import asserts, test_runner
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)

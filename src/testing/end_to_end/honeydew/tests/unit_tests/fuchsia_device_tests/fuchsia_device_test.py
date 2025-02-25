@@ -47,8 +47,11 @@ from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )
-from honeydew.transports import ffx as ffx_transport
 from honeydew.transports.fastboot import fastboot_impl
+from honeydew.transports.ffx import config as ffx_config
+from honeydew.transports.ffx import errors as ffx_errors
+from honeydew.transports.ffx import ffx as ffx_transport
+from honeydew.transports.ffx import ffx_impl
 from honeydew.transports.fuchsia_controller import errors as fc_errors
 from honeydew.transports.fuchsia_controller import fuchsia_controller_impl
 from honeydew.transports.serial import serial as serial_interface
@@ -128,7 +131,7 @@ _INSPECT_DATA_BAD_VERSION = """
 _INPUT_ARGS: dict[str, Any] = {
     "device_name": "fuchsia-emulator",
     "device_serial_socket": "/tmp/socket",
-    "ffx_config": custom_types.FFXConfig(
+    "ffx_config_data": ffx_config.FfxConfigData(
         isolate_dir=fuchsia_controller.IsolateDir("/tmp/isolate"),
         logs_dir="/tmp/logs",
         binary_path="/bin/ffx",
@@ -218,7 +221,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
                 autospec=True,
             ) as mock_fc_create_context,
             mock.patch.object(
-                ffx_transport.FFX,
+                ffx_impl.FfxImpl,
                 "check_connection",
                 autospec=True,
             ) as mock_ffx_check_connection,
@@ -244,7 +247,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
                     ip_port=None,
                     serial_socket=_INPUT_ARGS["device_serial_socket"],
                 ),
-                ffx_config=_INPUT_ARGS["ffx_config"],
+                ffx_config_data=_INPUT_ARGS["ffx_config_data"],
                 config={
                     "affordances": {
                         "bluetooth": {
@@ -272,7 +275,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
                 autospec=True,
             ) as mock_fc_create_context,
             mock.patch.object(
-                ffx_transport.FFX,
+                ffx_impl.FfxImpl,
                 "check_connection",
                 autospec=True,
             ) as mock_ffx_check_connection,
@@ -298,7 +301,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
                     ip_port=None,
                     serial_socket=_INPUT_ARGS["device_serial_socket"],
                 ),
-                ffx_config=_INPUT_ARGS["ffx_config"],
+                ffx_config_data=_INPUT_ARGS["ffx_config_data"],
                 config={
                     "affordances": {
                         "bluetooth": {
@@ -465,7 +468,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         )
 
     @mock.patch.object(
-        ffx_transport.FFX,
+        ffx_impl.FfxImpl,
         "run",
         autospec=True,
     )
@@ -529,7 +532,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         )
 
     @mock.patch.object(
-        ffx_transport.FFX,
+        ffx_impl.FfxImpl,
         "run",
         return_value="".join(wlan_policy_using_fc._REQUIRED_CAPABILITIES),
         autospec=True,
@@ -562,7 +565,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         )
 
     @mock.patch.object(
-        ffx_transport.FFX,
+        ffx_impl.FfxImpl,
         "run",
         return_value="".join(wlan_using_fc._REQUIRED_CAPABILITIES),
         autospec=True,
@@ -596,7 +599,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
 
     # List all the tests related to static properties
     @mock.patch.object(
-        ffx_transport.FFX,
+        ffx_impl.FfxImpl,
         "get_target_board",
         return_value=_MOCK_ARGS["board"],
         autospec=True,
@@ -635,7 +638,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         self.assertEqual(self.fd_fc_obj.model, "default-model")
 
     @mock.patch.object(
-        ffx_transport.FFX,
+        ffx_impl.FfxImpl,
         "get_target_product",
         return_value=_MOCK_ARGS["product"],
         autospec=True,
@@ -749,7 +752,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         "check_connection",
         autospec=True,
     )
-    @mock.patch.object(ffx_transport.FFX, "check_connection", autospec=True)
+    @mock.patch.object(ffx_impl.FfxImpl, "check_connection", autospec=True)
     def test_health_check_fc(
         self,
         mock_ffx_check_connection: mock.Mock,
@@ -776,7 +779,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch.object(
-        ffx_transport.FFX,
+        ffx_impl.FfxImpl,
         "check_connection",
         autospec=True,
     )
@@ -804,9 +807,9 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch.object(
-        ffx_transport.FFX,
+        ffx_impl.FfxImpl,
         "check_connection",
-        side_effect=errors.FfxConnectionError("ffx connection error"),
+        side_effect=ffx_errors.FfxConnectionError("ffx connection error"),
         autospec=True,
     )
     def test_health_check_exception(
@@ -888,7 +891,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        ffx_transport.FFX,
+        ffx_impl.FfxImpl,
         "run",
         autospec=True,
     )
@@ -926,7 +929,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         [
             param(
                 label="with_FfxCommandError",
-                side_effect=errors.FfxCommandError("error"),
+                side_effect=ffx_errors.FfxCommandError("error"),
                 expected_error=errors.InspectError,
             ),
             param(
@@ -936,14 +939,14 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             ),
             param(
                 label="with_someother_error",
-                side_effect=errors.FfxTimeoutError("error"),
-                expected_error=errors.FfxTimeoutError,
+                side_effect=ffx_errors.FfxTimeoutError("error"),
+                expected_error=ffx_errors.FfxTimeoutError,
             ),
         ],
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        ffx_transport.FFX,
+        ffx_impl.FfxImpl,
         "run",
         autospec=True,
     )
@@ -963,7 +966,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         mock_ffx_run.assert_called_once()
 
     @mock.patch.object(
-        ffx_transport.FFX,
+        ffx_impl.FfxImpl,
         "run",
         autospec=True,
     )
@@ -1268,7 +1271,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         mock_send_snapshot_command.assert_called()
 
     @mock.patch.object(
-        ffx_transport.FFX,
+        ffx_impl.FfxImpl,
         "wait_for_rcs_disconnection",
         autospec=True,
     )
@@ -1281,9 +1284,9 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         mock_ffx_wait_for_rcs_disconnection.assert_called()
 
     @mock.patch.object(
-        ffx_transport.FFX,
+        ffx_impl.FfxImpl,
         "wait_for_rcs_disconnection",
-        side_effect=errors.FfxCommandError("error"),
+        side_effect=ffx_errors.FfxCommandError("error"),
         autospec=True,
     )
     def test_wait_for_offline_fail(
@@ -1298,7 +1301,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         mock_ffx_wait_for_rcs_disconnection.assert_called()
 
     @mock.patch.object(
-        ffx_transport.FFX,
+        ffx_impl.FfxImpl,
         "wait_for_rcs_connection",
         autospec=True,
     )
@@ -1311,9 +1314,9 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         mock_ffx_wait_for_rcs_connection.assert_called()
 
     @mock.patch.object(
-        ffx_transport.FFX,
+        ffx_impl.FfxImpl,
         "wait_for_rcs_connection",
-        side_effect=errors.FfxCommandError("error"),
+        side_effect=ffx_errors.FfxCommandError("error"),
         autospec=True,
     )
     def test_wait_for_online_fail(

@@ -12,7 +12,7 @@ import fidl.fuchsia_ui_test_input as f_test_input
 from honeydew import errors
 from honeydew.affordances.ui.user_input import types as ui_custom_types
 from honeydew.affordances.ui.user_input import user_input_using_fc
-from honeydew.transports import ffx as ffx_transport
+from honeydew.transports.ffx import ffx as ffx_transport
 from honeydew.transports.fuchsia_controller import (
     fuchsia_controller as fc_transport,
 )

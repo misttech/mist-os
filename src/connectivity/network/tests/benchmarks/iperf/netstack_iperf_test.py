@@ -216,7 +216,7 @@ def generate_result(
 
 
 class IperfServer:
-    def __init__(self, ffx: honeydew.transports.ffx.FFX) -> None:
+    def __init__(self, ffx: honeydew.transports.ffx.ffx.FFX) -> None:
         self._process: subprocess.Popen[bytes] = ffx.popen(
             ["target", "ssh", f"iperf3 --server --port {LISTEN_PORT} --json"],
             text=False,

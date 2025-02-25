@@ -27,8 +27,8 @@ from honeydew.affordances.ui.user_input import user_input
 from honeydew.auxiliary_devices.power_switch import (
     power_switch as power_switch_interface,
 )
-from honeydew.interfaces.transports import ffx as ffx_transport
 from honeydew.transports.fastboot import fastboot as fastboot_transport
+from honeydew.transports.ffx import ffx as ffx_transport
 from honeydew.transports.fuchsia_controller import (
     fuchsia_controller as fuchsia_controller_transport,
 )
@@ -141,7 +141,7 @@ class FuchsiaDevice(abc.ABC):
             FFX object.
 
         Raises:
-            errors.FfxCommandError: Failed to instantiate.
+            FfxCommandError: Failed to instantiate.
         """
 
     @properties.Transport

@@ -13,7 +13,7 @@ from honeydew import errors
 from honeydew.affordances.ui.user_input import errors as user_input_errors
 from honeydew.affordances.ui.user_input import types as ui_custom_types
 from honeydew.affordances.ui.user_input import user_input
-from honeydew.transports import ffx
+from honeydew.transports.ffx import ffx
 from honeydew.transports.fuchsia_controller import (
     fuchsia_controller as fc_transport,
 )

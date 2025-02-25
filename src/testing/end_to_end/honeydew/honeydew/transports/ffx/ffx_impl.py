@@ -1,62 +1,23 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Provides methods for Host-(Fuchsia)Target interactions via FFX."""
+"""FFX transport ABC implementation"""
 
-import atexit
 import ipaddress
 import json
 import logging
 import subprocess
 from typing import Any
 
-import fuchsia_controller_py as fuchsia_controller
-
 from honeydew import errors
-from honeydew.interfaces.transports import ffx as ffx_interface
+from honeydew.transports.ffx import config as ffx_config
+from honeydew.transports.ffx import errors as ffx_errors
+from honeydew.transports.ffx import ffx as ffx_interface
+from honeydew.transports.ffx.types import TargetInfoData
 from honeydew.typing import custom_types
-from honeydew.typing.ffx import TargetInfoData
 from honeydew.utils import host_shell, properties
 
 _FFX_BINARY: str = "ffx"
-
-_FFX_CONFIG_CMDS: dict[str, list[str]] = {
-    "LOG_DIR": [
-        "config",
-        "set",
-        "log.dir",
-    ],
-    "LOG_LEVEL": [
-        "config",
-        "set",
-        "log.level",
-    ],
-    "MDNS": [
-        "config",
-        "set",
-        "discovery.mdns.enabled",
-    ],
-    "SUB_TOOLS_PATH": [
-        "config",
-        "set",
-        "ffx.subtool-search-paths",
-    ],
-    "PROXY_TIMEOUT": [
-        "config",
-        "set",
-        "proxy.timeout_secs",
-    ],
-    "SSH_KEEPALIVE_TIMEOUT": [
-        "config",
-        "set",
-        "ssh.keepalive_timeout",
-    ],
-    "DAEMON_START": [
-        "daemon",
-        "start",
-        "--background",
-    ],
-}
 
 _FFX_CMDS: dict[str, list[str]] = {
     "TARGET_ADD": ["target", "add"],
@@ -76,185 +37,7 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 _DEVICE_NOT_CONNECTED: str = "Timeout attempting to reach target"
 
 
-class FfxConfig:
-    """Provides methods to configure FFX."""
-
-    def __init__(self) -> None:
-        self._setup_done: bool = False
-
-    def setup(
-        self,
-        binary_path: str | None,
-        isolate_dir: str | None,
-        logs_dir: str,
-        logs_level: str | None,
-        enable_mdns: bool,
-        subtools_search_path: str | None = None,
-        proxy_timeout_secs: int | None = None,
-        ssh_keepalive_timeout: int | None = None,
-    ) -> None:
-        """Sets up configuration need to be used while running FFX command.
-
-        Args:
-            binary_path: absolute path to the FFX binary.
-            isolate_dir: Directory that will be passed to `--isolate-dir`
-                arg of FFX. If set to None, a random directory will be created.
-            logs_dir: Directory that will be passed to `--config log.dir`
-                arg of FFX
-            logs_level: logs level that will be passed to `--config log.level`
-                arg of FFX
-            enable_mdns: Whether or not mdns need to be enabled. This will be
-                passed to `--config discovery.mdns.enabled` arg of FFX
-            subtools_search_path: A path of where ffx should look for plugins.
-                Default value is None which means, it will not update
-                proxy_timeout_secs
-            proxy_timeout_secs: Proxy timeout in secs. Default value is None
-                which means, it will not update proxy_timeout_secs
-            ssh_keepalive_timeout: SSH keep-alive timeout in secs.
-                Default value is None which means, it will not update
-                ssh_keepalive_timeout
-
-        Raises:
-            errors.FfxConfigError: If setup has already been called once.
-
-        Note:
-            * This method should be called only once to ensure daemon logs are
-              going to single location.
-            * If this method is not called then FFX logs will not be saved and
-              will use the system level FFX daemon (instead of spawning new one
-              using isolation).
-            * FFX daemon clean up is already handled by this method though users
-              can manually call close() to clean up earlier in the process if
-              necessary.
-        """
-        if self._setup_done:
-            raise errors.FfxConfigError("setup has already been called once.")
-
-        # Prevent FFX daemon leaks by ensuring clean up occurs upon normal
-        # program termination.
-        atexit.register(self._atexit_callback)
-
-        self._ffx_binary: str = binary_path if binary_path else _FFX_BINARY
-        self._isolate_dir: fuchsia_controller.IsolateDir | None = (
-            fuchsia_controller.IsolateDir(isolate_dir)
-        )
-        self._logs_dir: str = logs_dir
-        self._logs_level: str | None = logs_level
-        self._mdns_enabled: bool = enable_mdns
-        self._subtools_search_path: str | None = subtools_search_path
-        self._proxy_timeout_secs: int | None = proxy_timeout_secs
-        self._ssh_keepalive_timeout: int | None = ssh_keepalive_timeout
-
-        self._run(_FFX_CONFIG_CMDS["LOG_DIR"] + [self._logs_dir])
-
-        if self._logs_level is not None:
-            self._run(_FFX_CONFIG_CMDS["LOG_LEVEL"] + [self._logs_level])
-
-        self._run(_FFX_CONFIG_CMDS["MDNS"] + [str(self._mdns_enabled).lower()])
-
-        # Setting this based on the recommendation from awdavies@ for below
-        # FuchsiaController error:
-        #   FFX Library Error: Timeout attempting to reach target
-        if self._proxy_timeout_secs is not None:
-            self._run(
-                _FFX_CONFIG_CMDS["PROXY_TIMEOUT"]
-                + [str(self._proxy_timeout_secs)]
-            )
-
-        if self._ssh_keepalive_timeout is not None:
-            self._run(
-                _FFX_CONFIG_CMDS["SSH_KEEPALIVE_TIMEOUT"]
-                + [str(self._ssh_keepalive_timeout)]
-            )
-
-        if self._subtools_search_path is not None:
-            self._run(
-                _FFX_CONFIG_CMDS["SUB_TOOLS_PATH"]
-                + [self._subtools_search_path]
-            )
-
-        self._run(_FFX_CONFIG_CMDS["DAEMON_START"])
-
-        self._setup_done = True
-
-    def close(self) -> None:
-        """Clean up method.
-
-        Raises:
-            errors.FfxConfigError: When called before calling `FfxConfig.setup`
-        """
-        if self._setup_done is False:
-            raise errors.FfxConfigError("close called before calling setup.")
-
-        # Setting to None will delete the `self._isolate_dir.directory()`
-        self._isolate_dir = None
-
-        self._setup_done = False
-
-    def get_config(self) -> custom_types.FFXConfig:
-        """Returns the FFX configuration information that has been set.
-
-        Returns:
-            custom_types.FFXConfig
-
-        Raises:
-            errors.FfxConfigError: When called before `FfxConfig.setup` or after
-                `FfxConfig.close`.
-        """
-        if self._setup_done is False:
-            raise errors.FfxConfigError(
-                "get_config called before calling setup."
-            )
-        if self._isolate_dir is None:
-            raise errors.FfxConfigError(
-                "get_config called after calling close."
-            )
-
-        return custom_types.FFXConfig(
-            binary_path=self._ffx_binary,
-            isolate_dir=self._isolate_dir,
-            logs_dir=self._logs_dir,
-            logs_level=self._logs_level,
-            mdns_enabled=self._mdns_enabled,
-            subtools_search_path=self._subtools_search_path,
-            proxy_timeout_secs=self._proxy_timeout_secs,
-            ssh_keepalive_timeout=self._ssh_keepalive_timeout,
-        )
-
-    def _atexit_callback(self) -> None:
-        try:
-            self.close()
-        except errors.FfxConfigError:
-            pass
-
-    def _run(
-        self,
-        cmd: list[str],
-    ) -> None:
-        """Executes `ffx {cmd}`.
-
-        Args:
-            cmd: FFX command to run.
-
-        Raises:
-            errors.FfxConfigError: In case of any other FFX command failure, or
-                when called after `FfxConfig.close`.
-        """
-        if self._isolate_dir is None:
-            raise errors.FfxConfigError("_run called after calling close.")
-
-        ffx_args: list[str] = []
-        ffx_args.extend(["--isolate-dir", self._isolate_dir.directory()])
-        ffx_cmd: list[str] = [self._ffx_binary] + ffx_args + cmd
-
-        try:
-            host_shell.run(cmd=ffx_cmd)
-            return
-        except errors.HostCmdError as err:
-            raise errors.FfxConfigError(err) from err
-
-
-class FFX(ffx_interface.FFX):
+class FfxImpl(ffx_interface.FFX):
     """Provides methods for Host-(Fuchsia)Target interactions via FFX.
 
     Args:
@@ -266,14 +49,14 @@ class FFX(ffx_interface.FFX):
         while running ffx commands (ex: `ffx -t <target_ip> <command>`).
 
     Raises:
-        errors.FfxConnectionError: In case of failed to check FFX connection.
-        errors.FfxCommandError: In case of failure.
+        FfxConnectionError: In case of failed to check FFX connection.
+        FfxCommandError: In case of failure.
     """
 
     def __init__(
         self,
         target_name: str,
-        config: custom_types.FFXConfig,
+        config_data: ffx_config.FfxConfigData,
         target_ip_port: custom_types.IpPort | None = None,
     ) -> None:
         invalid_target_name: bool = False
@@ -287,7 +70,7 @@ class FFX(ffx_interface.FFX):
                 f"{target_name=} is an IP address instead of target name"
             )
 
-        self._config: custom_types.FFXConfig = config
+        self._config_data: ffx_config.FfxConfigData = config_data
 
         self._target_name: str = target_name
 
@@ -304,21 +87,21 @@ class FFX(ffx_interface.FFX):
         self.check_connection()
 
     @properties.PersistentProperty
-    def config(self) -> custom_types.FFXConfig:
+    def config(self) -> ffx_config.FfxConfigData:
         """Returns the FFX configuration associated with this instance of FFX
         object.
 
         Returns:
-            custom_types.FFXConfig
+            FFXConfig
         """
-        return self._config
+        return self._config_data
 
     def add_target(self) -> None:
         """Adds a target to the ffx collection
 
         Raises:
-            errors.DeviceNotConnectedError: If FFX fails to reach target.
-            errors.FfxCommandError: In case of other FFX command failure.
+            DeviceNotConnectedError: If FFX fails to reach target.
+            FfxCommandError: In case of other FFX command failure.
         """
         cmd: list[str] = _FFX_CMDS["TARGET_ADD"] + [str(self._target_ip_port)]
         ffx_cmd: list[str] = self.generate_ffx_cmd(
@@ -332,18 +115,18 @@ class FFX(ffx_interface.FFX):
                 raise errors.DeviceNotConnectedError(
                     f"{self._target_name} is not connected to host"
                 ) from err
-            raise errors.FfxCommandError(err) from err
+            raise ffx_errors.FfxCommandError(err) from err
 
     def check_connection(self) -> None:
         """Checks the FFX connection from host to Fuchsia device.
 
         Raises:
-            errors.FfxConnectionError
+            FfxConnectionError
         """
         try:
             self.wait_for_rcs_connection()
         except errors.HoneydewError as err:
-            raise errors.FfxConnectionError(
+            raise ffx_errors.FfxConnectionError(
                 f"FFX connection check failed for {self._target_name} with err: {err}"
             ) from err
 
@@ -354,8 +137,8 @@ class FFX(ffx_interface.FFX):
             Output of `ffx -t {target} target show`.
 
         Raises:
-            errors.DeviceNotConnectedError: If FFX fails to reach target.
-            errors.FfxCommandError: In case of other FFX command failure.
+            DeviceNotConnectedError: If FFX fails to reach target.
+            FfxCommandError: In case of other FFX command failure.
         """
         cmd: list[str] = _FFX_CMDS["TARGET_SHOW"]
         output: str = self.run(cmd=cmd)
@@ -373,7 +156,7 @@ class FFX(ffx_interface.FFX):
             Output of `ffx --machine json target list <target>`.
 
         Raises:
-            errors.FfxCommandError: In case of FFX command failure.
+            FfxCommandError: In case of FFX command failure.
         """
         cmd: list[str] = _FFX_CMDS["TARGET_LIST"] + [self._target]
         output: str = self.run(
@@ -389,7 +172,7 @@ class FFX(ffx_interface.FFX):
         if len(target_info_from_target_list) == 1:
             return target_info_from_target_list[0]
         else:
-            raise errors.FfxCommandError(
+            raise ffx_errors.FfxCommandError(
                 f"'{self._target_name}' is not connected to host"
             )
 
@@ -400,8 +183,8 @@ class FFX(ffx_interface.FFX):
             Target name.
 
         Raises:
-            errors.DeviceNotConnectedError: If FFX fails to reach target.
-            errors.FfxCommandError: In case of other FFX command failure.
+            DeviceNotConnectedError: If FFX fails to reach target.
+            FfxCommandError: In case of other FFX command failure.
         """
         ffx_target_show_info: TargetInfoData = self.get_target_information()
         return ffx_target_show_info.target.name
@@ -413,8 +196,8 @@ class FFX(ffx_interface.FFX):
             (Target SSH IP Address, Target SSH Port)
 
         Raises:
-            errors.DeviceNotConnectedError: If FFX fails to reach target.
-            errors.FfxCommandError: In case of other FFX command failure.
+            DeviceNotConnectedError: If FFX fails to reach target.
+            FfxCommandError: In case of other FFX command failure.
         """
         cmd: list[str] = _FFX_CMDS["TARGET_SSH_ADDRESS"]
         output: str = self.run(cmd=cmd)
@@ -436,8 +219,8 @@ class FFX(ffx_interface.FFX):
             Target's board.
 
         Raises:
-            errors.DeviceNotConnectedError: If FFX fails to reach target.
-            errors.FfxCommandError: In case of other FFX command failure.
+            DeviceNotConnectedError: If FFX fails to reach target.
+            FfxCommandError: In case of other FFX command failure.
         """
         target_show_info: TargetInfoData = self.get_target_information()
         return (
@@ -451,8 +234,8 @@ class FFX(ffx_interface.FFX):
             Target's product.
 
         Raises:
-            errors.DeviceNotConnectedError: If FFX fails to reach target.
-            errors.FfxCommandError: In case of other FFX command failure.
+            DeviceNotConnectedError: If FFX fails to reach target.
+            FfxCommandError: In case of other FFX command failure.
         """
         target_show_info: TargetInfoData = self.get_target_information()
         return (
@@ -490,9 +273,9 @@ class FFX(ffx_interface.FFX):
             an empty string.
 
         Raises:
-            errors.DeviceNotConnectedError: If FFX fails to reach target.
-            errors.FfxTimeoutError: In case of FFX command timeout.
-            errors.FfxCommandError: In case of other FFX command failure.
+            DeviceNotConnectedError: If FFX fails to reach target.
+            FfxTimeoutError: In case of FFX command timeout.
+            FfxCommandError: In case of other FFX command failure.
         """
         ffx_cmd: list[str] = self.generate_ffx_cmd(
             cmd=cmd,
@@ -513,9 +296,9 @@ class FFX(ffx_interface.FFX):
                 raise errors.DeviceNotConnectedError(
                     f"{self._target_name} is not connected to host"
                 ) from err
-            raise errors.FfxCommandError(err) from err
+            raise ffx_errors.FfxCommandError(err) from err
         except errors.HoneydewTimeoutError as err:
-            raise errors.FfxTimeoutError(err) from err
+            raise ffx_errors.FfxTimeoutError(err) from err
 
     def popen(  # type: ignore[no-untyped-def]
         self,
@@ -583,8 +366,8 @@ class FFX(ffx_interface.FFX):
             empty string.
 
         Raises:
-            errors.DeviceNotConnectedError: If FFX fails to reach target.
-            errors.FfxCommandError: In case of other FFX command failure.
+            DeviceNotConnectedError: If FFX fails to reach target.
+            FfxCommandError: In case of other FFX command failure.
         """
         cmd: list[str] = _FFX_CMDS["TEST_RUN"][:]
         cmd.append(component_url)
@@ -614,8 +397,8 @@ class FFX(ffx_interface.FFX):
             True, otherwise an empty string.
 
         Raises:
-            errors.DeviceNotConnectedError: If FFX fails to reach target.
-            errors.FfxCommandError: In case of other FFX command failure.
+            DeviceNotConnectedError: If FFX fails to reach target.
+            FfxCommandError: In case of other FFX command failure.
         """
         ffx_cmd: list[str] = _FFX_CMDS["TARGET_SSH"][:]
         ffx_cmd.append(cmd)
@@ -625,8 +408,8 @@ class FFX(ffx_interface.FFX):
         """Wait until FFX is able to establish a RCS connection to the target.
 
         Raises:
-            errors.DeviceNotConnectedError: If FFX fails to reach target.
-            errors.FfxCommandError: In case of other FFX command failure.
+            DeviceNotConnectedError: If FFX fails to reach target.
+            FfxCommandError: In case of other FFX command failure.
         """
         _LOGGER.info("Waiting for %s to connect to host...", self._target_name)
 
@@ -639,8 +422,8 @@ class FFX(ffx_interface.FFX):
         """Wait until FFX is able to disconnect RCS connection to the target.
 
         Raises:
-            errors.DeviceNotConnectedError: If FFX fails to reach target.
-            errors.FfxCommandError: In case of other FFX command failure.
+            DeviceNotConnectedError: If FFX fails to reach target.
+            FfxCommandError: In case of other FFX command failure.
         """
         _LOGGER.info(
             "Waiting for %s to disconnect from host...", self._target_name

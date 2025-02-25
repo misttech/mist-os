@@ -3,8 +3,6 @@
 # found in the LICENSE file.
 """ABC with methods for Host-(Fuchsia)Target interactions via FFX."""
 
-# TODO(b/397438776): This file will be deleted after impacted tests have been pointed to honeydew.transports.ffx.ffx.py
-
 import abc
 import subprocess
 from typing import Any

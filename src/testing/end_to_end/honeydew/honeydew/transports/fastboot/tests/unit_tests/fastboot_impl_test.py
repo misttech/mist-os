@@ -18,9 +18,10 @@ from honeydew.auxiliary_devices.power_switch import (
     power_switch as power_switch_interface,
 )
 from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.transports import ffx
 from honeydew.transports.fastboot import errors as fastboot_errors
 from honeydew.transports.fastboot import fastboot_impl
+from honeydew.transports.ffx import errors as ffx_errors
+from honeydew.transports.ffx import ffx
 from honeydew.transports.serial import errors as serial_errors
 from honeydew.transports.serial import serial as serial_interface
 from honeydew.utils import common, host_shell
@@ -532,7 +533,7 @@ class FastbootTests(unittest.TestCase):
         """Test case for Fastboot._get_fastboot_node() when called without
         fastboot_node_id arg results in an exception."""
         self.ffx_obj.get_target_info_from_target_list.side_effect = (
-            errors.FfxCommandError("error")
+            ffx_errors.FfxCommandError("error")
         )
         with self.assertRaises(errors.FuchsiaDeviceError):
             self.fastboot_obj._get_fastboot_node()
@@ -630,6 +631,6 @@ class FastbootTests(unittest.TestCase):
     def test_boot_to_fastboot_mode_using_ffx(self) -> None:
         """Test case for Fastboot.boot_to_fastboot_mode_using_ffx() when device is not in
         fuchsia mode"""
-        self.ffx_obj.run.side_effect = errors.FfxCommandError("error")
+        self.ffx_obj.run.side_effect = ffx_errors.FfxCommandError("error")
 
         self.fastboot_obj._boot_to_fastboot_mode_using_ffx()

@@ -22,7 +22,7 @@ from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller_using_starnix,
 )
 from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.transports import ffx as ffx_transport
+from honeydew.transports.ffx import ffx as ffx_transport
 
 # TODO: b/354239403: This can not be done today, but probably should be done at
 # some point:

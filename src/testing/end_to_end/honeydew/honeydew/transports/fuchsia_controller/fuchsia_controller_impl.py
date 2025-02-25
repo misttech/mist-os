@@ -7,6 +7,7 @@ import logging
 
 import fuchsia_controller_py as fuchsia_controller
 
+from honeydew.transports.ffx import config as ffx_config
 from honeydew.transports.fuchsia_controller import errors as fc_errors
 from honeydew.transports.fuchsia_controller import (
     fuchsia_controller as fuchsia_controller_interface,
@@ -33,11 +34,11 @@ class FuchsiaControllerImpl(fuchsia_controller_interface.FuchsiaController):
     def __init__(
         self,
         target_name: str,
-        config: custom_types.FFXConfig,
+        ffx_config_data: ffx_config.FfxConfigData,
         target_ip_port: custom_types.IpPort | None = None,
     ) -> None:
         self._target_name: str = target_name
-        self._config: custom_types.FFXConfig = config
+        self._ffx_config_data: ffx_config.FfxConfigData = ffx_config_data
 
         self._target_ip_port: custom_types.IpPort | None = target_ip_port
 
@@ -62,7 +63,7 @@ class FuchsiaControllerImpl(fuchsia_controller_interface.FuchsiaController):
         try:
             # To run Fuchsia-Controller in isolation
             isolate_dir: fuchsia_controller.IsolateDir | None = (
-                self._config.isolate_dir
+                self._ffx_config_data.isolate_dir
             )
             config: dict[str, str] = {}
             msg: str = (

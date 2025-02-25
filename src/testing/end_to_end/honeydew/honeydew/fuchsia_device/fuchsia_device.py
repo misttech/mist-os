@@ -66,12 +66,14 @@ from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )
-from honeydew.interfaces.transports import ffx as ffx_transport_interface
-from honeydew.transports import ffx as ffx_transport
 from honeydew.transports.fastboot import (
     fastboot as fastboot_transport_interface,
 )
 from honeydew.transports.fastboot import fastboot_impl
+from honeydew.transports.ffx import errors as ffx_errors
+from honeydew.transports.ffx import ffx as ffx_transport_interface
+from honeydew.transports.ffx import ffx_impl
+from honeydew.transports.ffx.config import FfxConfigData
 from honeydew.transports.fuchsia_controller import errors as fc_errors
 from honeydew.transports.fuchsia_controller import (
     fuchsia_controller as fuchsia_controller_transport_interface,
@@ -163,14 +165,14 @@ class FuchsiaDevice(
                 }
 
     Raises:
-        errors.FFXCommandError: if FFX connection check fails.
+        FFXCommandError: if FFX connection check fails.
         FuchsiaControllerError: if FC connection check fails.
     """
 
     def __init__(
         self,
         device_info: custom_types.DeviceInfo,
-        ffx_config: custom_types.FFXConfig,
+        ffx_config_data: FfxConfigData,
         # intentionally made this a Dict instead of dataclass to minimize the changes in remaining Lacewing stack every time we need to add a new configuration item
         config: dict[str, Any] | None = None,
     ) -> None:
@@ -178,7 +180,7 @@ class FuchsiaDevice(
 
         self._device_info: custom_types.DeviceInfo = device_info
 
-        self._ffx_config: custom_types.FFXConfig = ffx_config
+        self._ffx_config_data: FfxConfigData = ffx_config_data
 
         self._on_device_boot_fns: list[Callable[[], None]] = []
         self._on_device_close_fns: list[Callable[[], None]] = []
@@ -198,7 +200,7 @@ class FuchsiaDevice(
             board value of the device.
 
         Raises:
-            errors.FfxCommandError: On failure.
+            FfxCommandError: On failure.
         """
         return self.ffx.get_target_board()
 
@@ -219,7 +221,7 @@ class FuchsiaDevice(
             Manufacturer of device.
 
         Raises:
-            errors.FuchsiaDeviceError: On failure.
+            FuchsiaDeviceError: On failure.
         """
         return self._product_info["manufacturer"]
 
@@ -231,7 +233,7 @@ class FuchsiaDevice(
             Model of device.
 
         Raises:
-            errors.FuchsiaDeviceError: On failure.
+            FuchsiaDeviceError: On failure.
         """
         return self._product_info["model"]
 
@@ -243,7 +245,7 @@ class FuchsiaDevice(
             product value of the device.
 
         Raises:
-            errors.FfxCommandError: On failure.
+            FfxCommandError: On failure.
         """
         return self.ffx.get_target_product()
 
@@ -255,7 +257,7 @@ class FuchsiaDevice(
             Product name of the device.
 
         Raises:
-            errors.FuchsiaDeviceError: On failure.
+            FuchsiaDeviceError: On failure.
         """
         return self._product_info["name"]
 
@@ -287,11 +289,11 @@ class FuchsiaDevice(
             FFX transport interface implementation.
 
         Raises:
-            errors.FfxCommandError: Failed to instantiate.
+            FfxCommandError: Failed to instantiate.
         """
-        ffx_obj: ffx_transport_interface.FFX = ffx_transport.FFX(
+        ffx_obj: ffx_transport_interface.FFX = ffx_impl.FfxImpl(
             target_name=self.device_name,
-            config=self._ffx_config,
+            config_data=self._ffx_config_data,
             target_ip_port=self._device_info.ip_port,
         )
         return ffx_obj
@@ -312,7 +314,7 @@ class FuchsiaDevice(
             fuchsia_controller_transport_interface.FuchsiaController
         ) = fuchsia_controller_impl.FuchsiaControllerImpl(
             target_name=self.device_name,
-            config=self._ffx_config,
+            ffx_config_data=self._ffx_config_data,
             target_ip_port=self._device_info.ip_port,
         )
         return fuchsia_controller_obj
@@ -325,7 +327,7 @@ class FuchsiaDevice(
             Fastboot transport interface implementation.
 
         Raises:
-            errors.FuchsiaDeviceError: Failed to instantiate.
+            FuchsiaDeviceError: Failed to instantiate.
         """
         fastboot_obj: fastboot_transport_interface.Fastboot = (
             fastboot_impl.FastbootImpl(
@@ -675,7 +677,7 @@ class FuchsiaDevice(
                 inspect_data_json_obj
             )
         except (
-            errors.FfxCommandError,
+            ffx_errors.FfxCommandError,
             errors.DeviceNotConnectedError,
             fuchsia_inspect.InspectDataError,
         ) as err:
@@ -856,7 +858,10 @@ class FuchsiaDevice(
         try:
             self.ffx.wait_for_rcs_disconnection()
             _LOGGER.info("%s is offline.", self.device_name)
-        except (errors.DeviceNotConnectedError, errors.FfxCommandError) as err:
+        except (
+            errors.DeviceNotConnectedError,
+            ffx_errors.FfxCommandError,
+        ) as err:
             raise errors.FuchsiaDeviceError(
                 f"'{self.device_name}' failed to go offline."
             ) from err
@@ -871,7 +876,10 @@ class FuchsiaDevice(
         try:
             self.ffx.wait_for_rcs_connection()
             _LOGGER.info("%s is online.", self.device_name)
-        except (errors.DeviceNotConnectedError, errors.FfxCommandError) as err:
+        except (
+            errors.DeviceNotConnectedError,
+            ffx_errors.FfxCommandError,
+        ) as err:
             raise errors.FuchsiaDeviceError(
                 f"'{self.device_name}' failed to go online."
             ) from err

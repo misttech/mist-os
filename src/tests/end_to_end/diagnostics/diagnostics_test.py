@@ -12,7 +12,7 @@ import logging
 from typing import Any, Dict, List
 
 from fuchsia_base_test import fuchsia_base_test
-from honeydew.interfaces.transports.ffx import FFX
+from honeydew.transports.ffx.ffx import FFX
 from mobly import asserts, test_runner
 from perf_utils.utils import FuchsiaPerfResults
 

@@ -10,7 +10,7 @@ from unittest import mock
 import png
 
 from honeydew.affordances.ui.screenshot import screenshot_using_ffx
-from honeydew.transports import ffx as ffx_transport
+from honeydew.transports.ffx import ffx as ffx_transport
 
 
 class ScreenshotUsingFfxTests(unittest.TestCase):

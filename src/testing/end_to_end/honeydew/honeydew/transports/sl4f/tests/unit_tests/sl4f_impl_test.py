@@ -12,7 +12,8 @@ from unittest import mock
 from parameterized import param, parameterized
 
 from honeydew import errors
-from honeydew.transports import ffx
+from honeydew.transports.ffx import errors as ffx_errors
+from honeydew.transports.ffx import ffx
 from honeydew.transports.sl4f import errors as sl4f_errors
 from honeydew.transports.sl4f import sl4f_impl
 from honeydew.typing import custom_types
@@ -361,7 +362,7 @@ class Sl4fImplTests(unittest.TestCase):
 
     def test_start_server_exception(self) -> None:
         """Testcase for SL4F.start_server() raising exception"""
-        self.ffx_obj.run.side_effect = errors.FfxCommandError("error")
+        self.ffx_obj.run.side_effect = ffx_errors.FfxCommandError("error")
         with self.assertRaises(sl4f_errors.Sl4fError):
             self.sl4f_obj_wo_ip.start_server()
 

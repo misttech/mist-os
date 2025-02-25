@@ -10,6 +10,7 @@ from unittest import mock
 
 import fuchsia_controller_py as fuchsia_controller
 
+from honeydew.transports.ffx import config as ffx_config
 from honeydew.transports.fuchsia_controller import errors as fc_errors
 from honeydew.transports.fuchsia_controller import fuchsia_controller_impl
 from honeydew.typing import custom_types
@@ -33,7 +34,7 @@ _INPUT_ARGS: dict[str, Any] = {
 }
 
 _MOCK_ARGS: dict[str, Any] = {
-    "ffx_config": custom_types.FFXConfig(
+    "ffx_config_data": ffx_config.FfxConfigData(
         isolate_dir=fuchsia_controller.IsolateDir("/tmp/isolate"),
         logs_dir="/tmp/logs",
         binary_path="/bin/ffx",
@@ -61,7 +62,7 @@ class FuchsiaControllerTests(unittest.TestCase):
             self.fuchsia_controller_obj_wo_device_ip = (
                 fuchsia_controller_impl.FuchsiaControllerImpl(
                     target_name=_INPUT_ARGS["target_name"],
-                    config=_MOCK_ARGS["ffx_config"],
+                    ffx_config_data=_MOCK_ARGS["ffx_config_data"],
                 )
             )
         mock_target_wait.assert_called()
@@ -79,7 +80,7 @@ class FuchsiaControllerTests(unittest.TestCase):
                 fuchsia_controller_impl.FuchsiaControllerImpl(
                     target_name=_INPUT_ARGS["target_name"],
                     target_ip_port=_INPUT_ARGS["target_ip_port"],
-                    config=_MOCK_ARGS["ffx_config"],
+                    ffx_config_data=_MOCK_ARGS["ffx_config_data"],
                 )
             )
         mock_target_wait.assert_called()

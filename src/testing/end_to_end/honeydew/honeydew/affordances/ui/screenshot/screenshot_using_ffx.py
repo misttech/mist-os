@@ -8,7 +8,7 @@ import os
 import tempfile
 
 from honeydew.affordances.ui.screenshot import screenshot, types
-from honeydew.transports import ffx as ffx_transport
+from honeydew.transports.ffx import ffx as ffx_transport
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

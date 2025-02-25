@@ -7,10 +7,10 @@ import subprocess
 import unittest
 from unittest import mock
 
-from honeydew import errors
 from honeydew.affordances.session import errors as session_errors
 from honeydew.affordances.session import session_using_ffx
-from honeydew.transports import ffx as ffx_transport
+from honeydew.transports.ffx import errors as ffx_errors
+from honeydew.transports.ffx import ffx as ffx_transport
 
 TILE_URL = "fuchsia-pkg://fuchsia.com/foo#meta/bar.cm"
 
@@ -34,7 +34,7 @@ class SessionFFXTests(unittest.TestCase):
 
     def test_start_ffx_error(self) -> None:
         """Test for ffx raise ffx error in Session.start()."""
-        self.ffx_obj.run.side_effect = errors.FfxCommandError("ffx error")
+        self.ffx_obj.run.side_effect = ffx_errors.FfxCommandError("ffx error")
 
         with self.assertRaises(session_errors.SessionError):
             self.session_obj.start()
@@ -63,7 +63,7 @@ class SessionFFXTests(unittest.TestCase):
         """Test for ffx raise ffx error in Session.add_component()."""
         self.session_obj.start()
 
-        self.ffx_obj.run.side_effect = errors.FfxCommandError("ffx error")
+        self.ffx_obj.run.side_effect = ffx_errors.FfxCommandError("ffx error")
 
         with self.assertRaises(session_errors.SessionError):
             self.session_obj.add_component(TILE_URL)
@@ -89,7 +89,7 @@ class SessionFFXTests(unittest.TestCase):
         """Test for ffx raise ffx error in Session.stop()."""
         self.session_obj.start()
 
-        self.ffx_obj.run.side_effect = errors.FfxCommandError("ffx error")
+        self.ffx_obj.run.side_effect = ffx_errors.FfxCommandError("ffx error")
 
         with self.assertRaises(session_errors.SessionError):
             self.session_obj.stop()

@@ -18,9 +18,10 @@ from honeydew.auxiliary_devices.power_switch import (
     power_switch as power_switch_interface,
 )
 from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.interfaces.transports import ffx as ffx_interface
 from honeydew.transports.fastboot import errors as fastboot_errors
 from honeydew.transports.fastboot import fastboot as fastboot_interface
+from honeydew.transports.ffx import errors as ffx_errors
+from honeydew.transports.ffx import ffx as ffx_interface
 from honeydew.transports.serial import serial as serial_interface
 from honeydew.utils import common, host_shell, properties
 
@@ -291,7 +292,7 @@ class FastbootImpl(fastboot_interface.Fastboot):
         )
         try:
             self._ffx_transport.run(cmd=_FFX_CMDS["BOOT_TO_FASTBOOT_MODE"])
-        except errors.FfxCommandError:
+        except ffx_errors.FfxCommandError:
             # Command is expected to fail as device reboots immediately
             pass
 

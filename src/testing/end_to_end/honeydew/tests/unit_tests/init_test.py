@@ -12,7 +12,8 @@ import fuchsia_controller_py as fuchsia_controller
 import honeydew
 from honeydew import errors
 from honeydew.fuchsia_device import fuchsia_device
-from honeydew.transports import ffx as ffx_transport
+from honeydew.transports.ffx import config as ffx_config
+from honeydew.transports.ffx import ffx_impl
 from honeydew.transports.fuchsia_controller import errors as fc_errors
 from honeydew.transports.fuchsia_controller import (
     fuchsia_controller_impl as fuchsia_controller_transport,
@@ -28,7 +29,7 @@ _REMOTE_TARGET_IP_PORT_OBJ: custom_types.IpPort = (
 )
 
 _INPUT_ARGS: dict[str, Any] = {
-    "ffx_config": custom_types.FFXConfig(
+    "ffx_config_data": ffx_config.FfxConfigData(
         isolate_dir=fuchsia_controller.IsolateDir("/tmp/isolate"),
         logs_dir="/tmp/logs",
         binary_path="/bin/ffx",
@@ -53,7 +54,7 @@ class InitTests(unittest.TestCase):
         "check_connection",
         autospec=True,
     )
-    @mock.patch.object(ffx_transport.FFX, "check_connection", autospec=True)
+    @mock.patch.object(ffx_impl.FfxImpl, "check_connection", autospec=True)
     @mock.patch.object(
         fuchsia_controller_transport.FuchsiaControllerImpl,
         "check_connection",
@@ -75,14 +76,14 @@ class InitTests(unittest.TestCase):
                     ip_port=None,
                     serial_socket=None,
                 ),
-                ffx_config=_INPUT_ARGS["ffx_config"],
+                ffx_config_data=_INPUT_ARGS["ffx_config_data"],
             ),
             fuchsia_device.FuchsiaDevice,
         )
 
         mock_fc_context.assert_called_once_with(
             config={},
-            isolate_dir=_INPUT_ARGS["ffx_config"].isolate_dir,
+            isolate_dir=_INPUT_ARGS["ffx_config_data"].isolate_dir,
             target=_INPUT_ARGS["target_name"],
         )
         mock_fc_check_connection.assert_called()
@@ -91,9 +92,9 @@ class InitTests(unittest.TestCase):
 
         mock_sl4f_check_connection.assert_not_called()
 
-    @mock.patch.object(ffx_transport.FFX, "check_connection", autospec=True)
+    @mock.patch.object(ffx_impl.FfxImpl, "check_connection", autospec=True)
     @mock.patch.object(
-        ffx_transport.FFX,
+        ffx_impl.FfxImpl,
         "add_target",
         autospec=True,
     )
@@ -119,14 +120,14 @@ class InitTests(unittest.TestCase):
                     ip_port=_INPUT_ARGS["target_ip_port"],
                     serial_socket=None,
                 ),
-                ffx_config=_INPUT_ARGS["ffx_config"],
+                ffx_config_data=_INPUT_ARGS["ffx_config_data"],
             ),
             fuchsia_device.FuchsiaDevice,
         )
 
         mock_fc_context.assert_called_once_with(
             config={},
-            isolate_dir=_INPUT_ARGS["ffx_config"].isolate_dir,
+            isolate_dir=_INPUT_ARGS["ffx_config_data"].isolate_dir,
             target=str(_INPUT_ARGS["target_ip_port"]),
         )
         mock_fc_check_connection.assert_called()
@@ -152,7 +153,7 @@ class InitTests(unittest.TestCase):
                     ip_port=_INPUT_ARGS["target_ip_port"],
                     serial_socket=None,
                 ),
-                ffx_config=_INPUT_ARGS["ffx_config"],
+                ffx_config_data=_INPUT_ARGS["ffx_config_data"],
             )
 
         mock_fc_fuchsia_device.assert_called()

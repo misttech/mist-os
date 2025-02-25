@@ -1,7 +1,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Unit tests for honeydew.transports.ffx.py."""
+"""Unit tests for ffx_impl.py."""
 
 import ipaddress
 import json
@@ -14,9 +14,11 @@ import fuchsia_controller_py as fuchsia_controller
 from parameterized import param, parameterized
 
 from honeydew import errors
-from honeydew.transports import ffx
+from honeydew.transports.ffx import config as ffx_config
+from honeydew.transports.ffx import errors as ffx_errors
+from honeydew.transports.ffx import ffx_impl
+from honeydew.transports.ffx import types as ffx_types
 from honeydew.typing import custom_types
-from honeydew.typing import ffx as ffx_types
 from honeydew.utils import host_shell
 
 # pylint: disable=protected-access
@@ -109,21 +111,11 @@ _FFX_TARGET_LIST_JSON: list[dict[str, Any]] = [
     }
 ]
 
-_FFX_CMD_OPTIONS: list[str] = [
-    "ffx",
-    "--isolate-dir",
-    _ISOLATE_DIR,
-]
-
-_FFX_CONFIG_SET: list[str] = _FFX_CMD_OPTIONS + [
-    "config",
-    "set",
-]
 
 _INPUT_ARGS: dict[str, Any] = {
     "target_name": _TARGET_NAME,
     "target_ip_port": _TARGET_SSH_ADDRESS,
-    "ffx_config": custom_types.FFXConfig(
+    "ffx_config_data": ffx_config.FfxConfigData(
         isolate_dir=fuchsia_controller.IsolateDir(_ISOLATE_DIR),
         logs_dir=_LOGS_DIR,
         binary_path=_BINARY_PATH,
@@ -133,7 +125,7 @@ _INPUT_ARGS: dict[str, Any] = {
         proxy_timeout_secs=_PROXY_TIMEOUT_SECS,
         ssh_keepalive_timeout=_SSH_KEEPALIVE_TIMEOUT,
     ),
-    "run_cmd": ffx._FFX_CMDS["TARGET_SHOW"],
+    "run_cmd": ffx_impl._FFX_CMDS["TARGET_SHOW"],
 }
 
 _MOCK_ARGS: dict[str, Any] = {
@@ -165,184 +157,22 @@ def _custom_test_name_func(
     return f"{test_func_name}_with_{test_label}"
 
 
-class FfxConfigTests(unittest.TestCase):
-    """Unit tests for honeydew.transports.ffx.FfxConfig"""
-
-    @mock.patch.object(
-        host_shell,
-        "run",
-        autospec=True,
-    )
-    def test_setup(self, mock_host_shell_run: mock.Mock) -> None:
-        """Test case for ffx.FfxConfig.setup()"""
-
-        ffx_config = ffx.FfxConfig()
-
-        ffx_config.setup(
-            binary_path=_BINARY_PATH,
-            isolate_dir=_ISOLATE_DIR,
-            logs_dir=_LOGS_DIR,
-            logs_level=_LOGS_LEVEL,
-            enable_mdns=_MDNS_ENABLED,
-            subtools_search_path=_SUBTOOLS_SEARCH_PATH,
-            proxy_timeout_secs=_PROXY_TIMEOUT_SECS,
-            ssh_keepalive_timeout=_SSH_KEEPALIVE_TIMEOUT,
-        )
-
-        ffx_configs_calls = [
-            mock.call(_FFX_CONFIG_SET + ["log.dir", _LOGS_DIR]),
-            mock.call(_FFX_CONFIG_SET + ["log.level", _LOGS_LEVEL.lower()]),
-            mock.call(
-                _FFX_CONFIG_SET
-                + ["discovery.mdns.enabled", str(_MDNS_ENABLED).lower()]
-            ),
-            mock.call(
-                _FFX_CONFIG_SET
-                + ["proxy.timeout_secs", str(_PROXY_TIMEOUT_SECS)]
-            ),
-            mock.call(
-                _FFX_CONFIG_SET
-                + ["ssh.keepalive_timeout", str(_SSH_KEEPALIVE_TIMEOUT)]
-            ),
-            mock.call(
-                _FFX_CONFIG_SET
-                + ["ffx.subtool-search-paths", _SUBTOOLS_SEARCH_PATH]
-            ),
-            mock.call(_FFX_CMD_OPTIONS + ["daemon", "start", "--background"]),
-        ]
-        mock_host_shell_run.assert_has_calls(ffx_configs_calls, any_order=True)
-
-        # Calling setup() again should fail
-        with self.assertRaises(errors.FfxConfigError):
-            ffx_config.setup(
-                binary_path=_BINARY_PATH,
-                isolate_dir=_ISOLATE_DIR,
-                logs_dir=_LOGS_DIR,
-                logs_level=_LOGS_LEVEL,
-                enable_mdns=_MDNS_ENABLED,
-                subtools_search_path=_SUBTOOLS_SEARCH_PATH,
-                proxy_timeout_secs=_PROXY_TIMEOUT_SECS,
-                ssh_keepalive_timeout=_SSH_KEEPALIVE_TIMEOUT,
-            )
-
-    @mock.patch.object(
-        host_shell,
-        "run",
-        side_effect=errors.HostCmdError(
-            "error",
-        ),
-        autospec=True,
-    )
-    def test_setup_raises_ffx_config_error(
-        self, mock_host_shell_run: mock.Mock
-    ) -> None:
-        """Test case for ffx.FfxConfig.setup() raises FfxConfigError"""
-
-        ffx_config = ffx.FfxConfig()
-
-        with self.assertRaises(errors.FfxConfigError):
-            ffx_config.setup(
-                binary_path=_BINARY_PATH,
-                isolate_dir=_ISOLATE_DIR,
-                logs_dir=_LOGS_DIR,
-                logs_level=_LOGS_LEVEL,
-                enable_mdns=_MDNS_ENABLED,
-                subtools_search_path=_SUBTOOLS_SEARCH_PATH,
-                proxy_timeout_secs=_PROXY_TIMEOUT_SECS,
-                ssh_keepalive_timeout=_SSH_KEEPALIVE_TIMEOUT,
-            )
-
-        mock_host_shell_run.assert_called()
-
-    @mock.patch.object(
-        ffx.FfxConfig,
-        "_run",
-        autospec=True,
-    )
-    def test_close(self, mock_ffx_config_run: mock.Mock) -> None:
-        """Test case for ffx.FfxConfig.close()"""
-
-        ffx_config = ffx.FfxConfig()
-
-        # Call setup first before calling close
-        ffx_config.setup(
-            binary_path=_BINARY_PATH,
-            isolate_dir=_ISOLATE_DIR,
-            logs_dir=_LOGS_DIR,
-            logs_level=_LOGS_LEVEL,
-            enable_mdns=_MDNS_ENABLED,
-            subtools_search_path=_SUBTOOLS_SEARCH_PATH,
-            proxy_timeout_secs=_PROXY_TIMEOUT_SECS,
-            ssh_keepalive_timeout=_SSH_KEEPALIVE_TIMEOUT,
-        )
-        mock_ffx_config_run.assert_called()
-
-        ffx_config.close()
-
-    def test_close_without_setup(self) -> None:
-        """Test case for ffx.FfxConfig.close() without calling
-        ffx.FfxConfig.setup()"""
-
-        ffx_config = ffx.FfxConfig()
-
-        # Calling setup() again should fail
-        with self.assertRaises(errors.FfxConfigError):
-            ffx_config.close()
-
-    @mock.patch.object(
-        ffx.FfxConfig,
-        "_run",
-        autospec=True,
-    )
-    def test_get_config(self, mock_ffx_config_run: mock.Mock) -> None:
-        """Test case for ffx.FfxConfig.get_config()"""
-
-        ffx_config = ffx.FfxConfig()
-
-        # Call setup first before calling close
-        ffx_config.setup(
-            binary_path=_BINARY_PATH,
-            isolate_dir=_ISOLATE_DIR,
-            logs_dir=_LOGS_DIR,
-            logs_level=_LOGS_LEVEL,
-            enable_mdns=_MDNS_ENABLED,
-            subtools_search_path=_SUBTOOLS_SEARCH_PATH,
-            proxy_timeout_secs=_PROXY_TIMEOUT_SECS,
-            ssh_keepalive_timeout=_SSH_KEEPALIVE_TIMEOUT,
-        )
-        mock_ffx_config_run.assert_called()
-
-        self.assertEqual(
-            str(ffx_config.get_config()), str(_INPUT_ARGS["ffx_config"])
-        )
-
-    def test_get_config_without_setup(self) -> None:
-        """Test case for ffx.FfxConfig.get_config() without calling
-        ffx.FfxConfig.setup()"""
-
-        ffx_config = ffx.FfxConfig()
-
-        # Calling setup() again should fail
-        with self.assertRaises(errors.FfxConfigError):
-            ffx_config.get_config()
-
-
-class FfxTests(unittest.TestCase):
-    """Unit tests for honeydew.transports.ffx.FFX"""
+class FfxImplTests(unittest.TestCase):
+    """Unit tests for ffx_impl.FfxImpl"""
 
     def setUp(self) -> None:
         super().setUp()
 
         with (
             mock.patch.object(
-                ffx.FFX,
+                ffx_impl.FfxImpl,
                 "check_connection",
                 autospec=True,
             ) as mock_ffx_check_connection,
         ):
-            self.ffx_obj_wo_ip = ffx.FFX(
+            self.ffx_obj_wo_ip = ffx_impl.FfxImpl(
                 target_name=_INPUT_ARGS["target_name"],
-                config=_INPUT_ARGS["ffx_config"],
+                config_data=_INPUT_ARGS["ffx_config_data"],
             )
         mock_ffx_check_connection.assert_called()
 
@@ -350,33 +180,35 @@ class FfxTests(unittest.TestCase):
 
         with (
             mock.patch.object(
-                ffx.FFX,
+                ffx_impl.FfxImpl,
                 "check_connection",
                 autospec=True,
             ) as mock_ffx_check_connection,
             mock.patch.object(
-                ffx.FFX,
+                ffx_impl.FfxImpl,
                 "add_target",
                 autospec=True,
             ) as mock_ffx_add_target,
         ):
-            self.ffx_obj_with_ip = ffx.FFX(
+            self.ffx_obj_with_ip = ffx_impl.FfxImpl(
                 target_name=_INPUT_ARGS["target_name"],
                 target_ip_port=_INPUT_ARGS["target_ip_port"],
-                config=_INPUT_ARGS["ffx_config"],
+                config_data=_INPUT_ARGS["ffx_config_data"],
             )
         mock_ffx_check_connection.assert_called()
         mock_ffx_add_target.assert_called()
 
     def test_ffx_init_with_ip_as_target_name(self) -> None:
-        """Test case for ffx.FFX() when called with target_name=<ip>."""
+        """Test case for ffx_impl.FfxImpl() when called with target_name=<ip>."""
         with self.assertRaises(ValueError):
-            ffx.FFX(
+            ffx_impl.FfxImpl(
                 target_name=_IPV6,
-                config=_INPUT_ARGS["ffx_config"],
+                config_data=_INPUT_ARGS["ffx_config_data"],
             )
 
-    @mock.patch.object(ffx.FFX, "wait_for_rcs_connection", autospec=True)
+    @mock.patch.object(
+        ffx_impl.FfxImpl, "wait_for_rcs_connection", autospec=True
+    )
     def test_check_connection(
         self, mock_wait_for_rcs_connection: mock.Mock
     ) -> None:
@@ -386,22 +218,24 @@ class FfxTests(unittest.TestCase):
         mock_wait_for_rcs_connection.assert_called()
 
     @mock.patch.object(
-        ffx.FFX,
+        ffx_impl.FfxImpl,
         "wait_for_rcs_connection",
-        side_effect=errors.DeviceNotConnectedError(ffx._DEVICE_NOT_CONNECTED),
+        side_effect=errors.DeviceNotConnectedError(
+            ffx_impl._DEVICE_NOT_CONNECTED
+        ),
         autospec=True,
     )
     def test_check_connection_raises(
         self, mock_wait_for_rcs_connection: mock.Mock
     ) -> None:
-        """Test case for check_connection() raising errors.FfxConnectionError"""
-        with self.assertRaises(errors.FfxConnectionError):
+        """Test case for check_connection() raising ffx_errors.FfxConnectionError"""
+        with self.assertRaises(ffx_errors.FfxConnectionError):
             self.ffx_obj_with_ip.check_connection()
 
         mock_wait_for_rcs_connection.assert_called()
 
     @mock.patch.object(
-        ffx.FFX,
+        ffx_impl.FfxImpl,
         "run",
         return_value=_MOCK_ARGS["ffx_target_show_output"],
         autospec=True,
@@ -416,7 +250,7 @@ class FfxTests(unittest.TestCase):
         mock_ffx_run.assert_called()
 
     @mock.patch.object(
-        ffx.FFX,
+        ffx_impl.FfxImpl,
         "run",
         return_value=_MOCK_ARGS["ffx_target_list_output"],
         autospec=True,
@@ -435,7 +269,7 @@ class FfxTests(unittest.TestCase):
         mock_ffx_run.assert_called()
 
     @mock.patch.object(
-        ffx.FFX,
+        ffx_impl.FfxImpl,
         "run",
         return_value="[]",
         autospec=True,
@@ -445,12 +279,12 @@ class FfxTests(unittest.TestCase):
         mock_ffx_run: mock.Mock,
     ) -> None:
         """Test case for get_target_info_from_target_list() raising exception."""
-        with self.assertRaises(errors.FfxCommandError):
+        with self.assertRaises(ffx_errors.FfxCommandError):
             self.ffx_obj_with_ip.get_target_info_from_target_list()
         mock_ffx_run.assert_called()
 
     @mock.patch.object(
-        ffx.FFX,
+        ffx_impl.FfxImpl,
         "run",
         return_value=_MOCK_ARGS["ffx_target_ssh_address_output"],
         autospec=True,
@@ -464,7 +298,7 @@ class FfxTests(unittest.TestCase):
         mock_ffx_run.assert_called()
 
     @mock.patch.object(
-        ffx.FFX,
+        ffx_impl.FfxImpl,
         "get_target_information",
         return_value=_MOCK_ARGS["ffx_target_show_object"],
         autospec=True,
@@ -472,7 +306,7 @@ class FfxTests(unittest.TestCase):
     def test_get_target_board(
         self, mock_get_target_information: mock.Mock
     ) -> None:
-        """Verify ffx.get_target_board returns board value of fuchsia device."""
+        """Verify ffx_impl.get_target_board returns board value of fuchsia device."""
         result: str = self.ffx_obj_with_ip.get_target_board()
         expected: str | None = _FFX_TARGET_SHOW_INFO.build.board
 
@@ -481,7 +315,7 @@ class FfxTests(unittest.TestCase):
         mock_get_target_information.assert_called()
 
     @mock.patch.object(
-        ffx.FFX,
+        ffx_impl.FfxImpl,
         "get_target_information",
         return_value=_MOCK_ARGS["ffx_target_show_object"],
         autospec=True,
@@ -489,7 +323,7 @@ class FfxTests(unittest.TestCase):
     def test_get_target_product(
         self, mock_get_target_information: mock.Mock
     ) -> None:
-        """Verify ffx.get_target_product returns product value of fuchsia
+        """Verify ffx_impl.get_target_product returns product value of fuchsia
         device."""
         result: str = self.ffx_obj_with_ip.get_target_product()
         expected: str | None = _FFX_TARGET_SHOW_INFO.build.product
@@ -505,7 +339,7 @@ class FfxTests(unittest.TestCase):
         autospec=True,
     )
     def test_ffx_run(self, mock_host_shell_run: mock.Mock) -> None:
-        """Test case for ffx.run()"""
+        """Test case for ffx_impl.run()"""
         self.assertEqual(
             self.ffx_obj_with_ip.run(cmd=_INPUT_ARGS["run_cmd"]),
             _EXPECTED_VALUES["ffx_target_show_output"],
@@ -519,7 +353,7 @@ class FfxTests(unittest.TestCase):
                 "--isolate-dir",
                 _ISOLATE_DIR,
             ]
-            + ffx._FFX_CMDS["TARGET_SHOW"],
+            + ffx_impl._FFX_CMDS["TARGET_SHOW"],
             capture_output=True,
             log_output=True,
             timeout=None,
@@ -531,7 +365,7 @@ class FfxTests(unittest.TestCase):
                 {
                     "label": "DeviceNotConnectedError",
                     "side_effect": errors.HostCmdError(
-                        ffx._DEVICE_NOT_CONNECTED,
+                        ffx_impl._DEVICE_NOT_CONNECTED,
                     ),
                     "expected_error": errors.DeviceNotConnectedError,
                 },
@@ -542,7 +376,7 @@ class FfxTests(unittest.TestCase):
                     "side_effect": errors.HostCmdError(
                         "command output and error",
                     ),
-                    "expected_error": errors.FfxCommandError,
+                    "expected_error": ffx_errors.FfxCommandError,
                 },
             ),
             (
@@ -551,7 +385,7 @@ class FfxTests(unittest.TestCase):
                     "side_effect": errors.HoneydewTimeoutError(
                         "timed out",
                     ),
-                    "expected_error": errors.FfxTimeoutError,
+                    "expected_error": ffx_errors.FfxTimeoutError,
                 },
             ),
         ],
@@ -567,7 +401,7 @@ class FfxTests(unittest.TestCase):
         parameterized_dict: dict[str, Any],
         mock_host_shell_run: mock.Mock,
     ) -> None:
-        """Test case for ffx.run() raising different
+        """Test case for ffx_impl.run() raising different
         exceptions."""
         mock_host_shell_run.side_effect = parameterized_dict["side_effect"]
 
@@ -577,12 +411,12 @@ class FfxTests(unittest.TestCase):
         mock_host_shell_run.assert_called()
 
     @mock.patch.object(
-        ffx.FFX,
+        ffx_impl.FfxImpl,
         "run",
         autospec=True,
     )
     def test_ffx_run_test_component(self, mock_ffx_run: mock.Mock) -> None:
-        """Test case for ffx.run_test_component()"""
+        """Test case for ffx_impl.run_test_component()"""
         self.ffx_obj_with_ip.run_test_component(
             "fuchsia-pkg://fuchsia.com/testing#meta/test.cm",
             ffx_test_args=["--foo", "bar"],
@@ -607,12 +441,12 @@ class FfxTests(unittest.TestCase):
         )
 
     @mock.patch.object(
-        ffx.FFX,
+        ffx_impl.FfxImpl,
         "run",
         autospec=True,
     )
     def test_ffx_run_ssh_cmd(self, mock_ffx_run: mock.Mock) -> None:
-        """Test case for ffx.run_ssh_cmd()"""
+        """Test case for ffx_impl.run_ssh_cmd()"""
         self.ffx_obj_with_ip.run_ssh_cmd(
             cmd="killall iperf3",
             capture_output=True,
@@ -635,7 +469,7 @@ class FfxTests(unittest.TestCase):
         autospec=True,
     )
     def test_ffx_popen(self, mock_host_shell_popen: mock.Mock) -> None:
-        """Test case for ffx.popen()"""
+        """Test case for ffx_impl.popen()"""
         self.ffx_obj_with_ip.popen(
             cmd=["a", "b", "c"],
             # Popen forwards arbitrary kvargs to subprocess.Popen
@@ -667,7 +501,7 @@ class FfxTests(unittest.TestCase):
                 {
                     "label": "DeviceNotConnectedError",
                     "side_effect": errors.HostCmdError(
-                        ffx._DEVICE_NOT_CONNECTED,
+                        ffx_impl._DEVICE_NOT_CONNECTED,
                     ),
                     "expected_error": errors.DeviceNotConnectedError,
                 },
@@ -678,7 +512,7 @@ class FfxTests(unittest.TestCase):
                     "side_effect": errors.HostCmdError(
                         "command output and error",
                     ),
-                    "expected_error": errors.FfxCommandError,
+                    "expected_error": ffx_errors.FfxCommandError,
                 },
             ),
         ],
@@ -705,7 +539,7 @@ class FfxTests(unittest.TestCase):
         mock_host_shell_run.assert_called_once()
 
     @mock.patch.object(
-        ffx.FFX,
+        ffx_impl.FfxImpl,
         "get_target_information",
         return_value=_MOCK_ARGS["ffx_target_show_object"],
         autospec=True,
@@ -718,14 +552,14 @@ class FfxTests(unittest.TestCase):
 
         mock_ffx_get_target_information.assert_called()
 
-    @mock.patch.object(ffx.FFX, "run", return_value="", autospec=True)
+    @mock.patch.object(ffx_impl.FfxImpl, "run", return_value="", autospec=True)
     def test_wait_for_rcs_connection(self, mock_ffx_run: mock.Mock) -> None:
-        """Test case for ffx.wait_for_rcs_connection()"""
+        """Test case for ffx_impl.wait_for_rcs_connection()"""
         self.ffx_obj_with_ip.wait_for_rcs_connection()
         mock_ffx_run.assert_called()
 
-    @mock.patch.object(ffx.FFX, "run", return_value="", autospec=True)
+    @mock.patch.object(ffx_impl.FfxImpl, "run", return_value="", autospec=True)
     def test_wait_for_rcs_disconnection(self, mock_ffx_run: mock.Mock) -> None:
-        """Test case for ffx.wait_for_rcs_disconnection()"""
+        """Test case for ffx_impl.wait_for_rcs_disconnection()"""
         self.ffx_obj_with_ip.wait_for_rcs_disconnection()
         self.assertEqual(mock_ffx_run.call_count, 2)
