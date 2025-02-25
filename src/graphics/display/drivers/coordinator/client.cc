@@ -716,11 +716,8 @@ void Client::CheckConfig(CheckConfigRequestView request, CheckConfigCompleter::S
 
 void Client::DiscardConfig(DiscardConfigCompleter::Sync& /*_completer*/) { DiscardConfig(); }
 
-void Client::ApplyConfig(ApplyConfigCompleter::Sync& /*_completer*/) {
-  ApplyConfigFromFidl(latest_config_stamp_ + display::ConfigStamp(1));
-}
-
-void Client::ApplyConfig3(ApplyConfig3RequestView request, ApplyConfigCompleter::Sync& _completer) {
+void Client::ApplyConfig3(ApplyConfig3RequestView request,
+                          ApplyConfig3Completer::Sync& _completer) {
   if (!request->has_stamp()) {
     FDF_LOG(ERROR, "ApplyConfig3: stamp is required; none was provided");
     TearDown(ZX_ERR_INVALID_ARGS);

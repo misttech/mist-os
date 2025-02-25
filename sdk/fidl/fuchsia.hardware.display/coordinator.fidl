@@ -438,16 +438,6 @@ closed protocol Coordinator {
     strict DiscardConfig();
 
     // TODO(https://fxbug.dev/42152065): Deprecated; use ApplyConfig3() instead.
-    //
-    /// Applies any draft changes to the current configuration. This will
-    /// not apply draft changes to layers which are not on any display.
-    ///
-    /// If the draft configuration cannot be applied, this call will silently
-    /// fail, so the client should ensure its configuration is valid by
-    /// calling [`Coordinator.CheckConfig`].
-    strict ApplyConfig();
-
-    // TODO(https://fxbug.dev/42152065): Deprecated; use ApplyConfig3() instead.
     // This is a temporary solution to support old ApplyConfig() with new OnVsync() events.
     // Remove this once the migration is done.
     //
