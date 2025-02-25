@@ -1244,6 +1244,14 @@ group("zerocopy") {
   public_deps = [ ":zerocopy-v0_8_14" ]
 }
 
+if (current_os == "fuchsia") {
+  group("zeroize") {
+    public_deps = [ ":zeroize-v1_8_1" ]
+
+    visibility = zeroize_visibility
+  }
+}
+
 if (!(current_os == "fuchsia")) {
   group("zip") {
     public_deps = [ ":zip-v0_5_5" ]
@@ -19551,6 +19559,7 @@ rust_library("zeroize-v1_8_1") {
     "-Cmetadata=dcb1c3339d7d0fd8",
     "-Cextra-filename=-dcb1c3339d7d0fd8",
     "--cfg=feature=\"alloc\"",
+    "--cfg=feature=\"default\"",
     "--cfg=feature=\"zeroize_derive\"",
   ]
 

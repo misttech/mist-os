@@ -1694,6 +1694,7 @@ dependencies = [
  "x509-cert",
  "xml-rs",
  "zerocopy 0.8.14",
+ "zeroize",
  "zip",
  "zstd",
 ]

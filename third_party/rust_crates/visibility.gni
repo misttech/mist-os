@@ -286,3 +286,19 @@ tracing_subscriber_visibility = [
   # At this time we are not enforcing restrictions on the below.
   "//third_party/*",
 ]
+
+zeroize_visibility = [
+  #  ________  _________  ________  ________
+  # |\   ____\|\___   ___\\   __  \|\   __  \
+  # \ \  \___|\|___ \  \_\ \  \|\  \ \  \|\  \
+  #  \ \_____  \   \ \  \ \ \  \\\  \ \   ____\
+  #   \|____|\  \   \ \  \ \ \  \\\  \ \  \___|
+  #     ____\_\  \   \ \__\ \ \_______\ \__\
+  #    |\_________\   \|__|  \|_______|\|__|
+  #    \|_________|
+  #
+  # This is an allowlist of targets that use the `zeroize` Rust crate.
+  #
+  # At this time only Android KeyMint is allowed to use it.
+  "//third_party/android/platform/system/keymint:*",
+]
