@@ -108,7 +108,7 @@
 #define __HAS_KERNEL__ 1
 #endif
 // Specific fuse header to use android specific extensions
-#include "src/starnix/lib/linux_uapi/third_party/fuse_kernel.h"
+#include "src/starnix/lib/linux_uapi/third_party/libfuse/fuse_kernel.h"
 #if __HAS_KERNEL__
 #undef __KERNEL__
 #endif
