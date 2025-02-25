@@ -53,14 +53,7 @@ async fn package_resolution() {
         instance.connect_to_protocol_at_exposed_dir::<fsys::RealmQueryMarker>().unwrap();
     let (exposed_dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>();
     realm_query
-        .deprecated_open(
-            ".".into(),
-            fsys::OpenDirType::ExposedDir,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::ModeType::empty(),
-            ".",
-            server_end.into_channel().into(),
-        )
+        .open_directory(".".into(), fsys::OpenDirType::ExposedDir, server_end)
         .await
         .unwrap()
         .unwrap();

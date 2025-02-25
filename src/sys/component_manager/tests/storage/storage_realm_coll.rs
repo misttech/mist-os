@@ -66,14 +66,7 @@ async fn main() {
         fuchsia_component::client::connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
     let (exposed_dir, server_end) = create_proxy();
     realm_query
-        .deprecated_open(
-            "./memfs",
-            fsys::OpenDirType::ExposedDir,
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::ModeType::empty(),
-            ".",
-            server_end,
-        )
+        .open_directory("./memfs", fsys::OpenDirType::ExposedDir, server_end)
         .await
         .unwrap()
         .unwrap();

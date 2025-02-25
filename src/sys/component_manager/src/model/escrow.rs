@@ -426,12 +426,12 @@ mod tests {
         let (_, server_end) = zx::Channel::create();
 
         let execution_scope = ExecutionScope::new();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        let mut object_request = fio::Flags::empty().to_object_request(server_end);
         assert_eq!(
             actor
                 .open_outgoing(OpenRequest::new(
                     execution_scope.clone(),
-                    fio::OpenFlags::empty(),
+                    fio::Flags::empty(),
                     "foo".try_into().unwrap(),
                     &mut object_request
                 ))
@@ -442,8 +442,8 @@ mod tests {
         assert_eq!(reason, StartReason::OutgoingDirectory);
 
         let mut outgoing = escrow.outgoing_dir.into_stream();
-        let dir_entry = outgoing.next().await.unwrap().unwrap().into_deprecated_open().unwrap();
-        assert_eq!(dir_entry.2, "foo");
+        let dir_entry = outgoing.next().await.unwrap().unwrap().into_open().unwrap();
+        assert_eq!(dir_entry.0, "foo");
 
         drop(actor);
         task_group.join().await;
@@ -461,12 +461,12 @@ mod tests {
 
         let (_, server_end) = zx::Channel::create();
         let execution_scope = ExecutionScope::new();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        let mut object_request = fio::Flags::empty().to_object_request(server_end);
         assert_eq!(
             actor
                 .open_outgoing(OpenRequest::new(
                     execution_scope.clone(),
-                    fio::OpenFlags::empty(),
+                    fio::Flags::empty(),
                     "foo".try_into().unwrap(),
                     &mut object_request
                 ))
@@ -478,8 +478,8 @@ mod tests {
         assert_matches!(TestExecutor::poll_until_stalled(&mut next_start).await, Poll::Pending);
 
         let mut outgoing = escrow.unwrap().outgoing_dir.into_stream();
-        let open = outgoing.next().await.unwrap().unwrap().into_deprecated_open().unwrap();
-        assert_eq!(open.2, "foo");
+        let open = outgoing.next().await.unwrap().unwrap().into_open().unwrap();
+        assert_eq!(open.0, "foo");
 
         drop(actor);
         task_group.join().await;
@@ -498,12 +498,12 @@ mod tests {
 
         let (_, server_end) = zx::Channel::create();
         let execution_scope = ExecutionScope::new();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        let mut object_request = fio::Flags::empty().to_object_request(server_end);
         assert_eq!(
             actor
                 .open_outgoing(OpenRequest::new(
                     execution_scope.clone(),
-                    fio::OpenFlags::empty(),
+                    fio::Flags::empty(),
                     "foo".try_into().unwrap(),
                     &mut object_request
                 ))
@@ -540,12 +540,12 @@ mod tests {
         }));
         let (_, server_end) = zx::Channel::create();
         let execution_scope = ExecutionScope::new();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        let mut object_request = fio::Flags::empty().to_object_request(server_end);
         assert_eq!(
             actor
                 .open_outgoing(OpenRequest::new(
                     execution_scope.clone(),
-                    fio::OpenFlags::empty(),
+                    fio::Flags::empty(),
                     "foo".try_into().unwrap(),
                     &mut object_request
                 ))
@@ -566,12 +566,12 @@ mod tests {
         let escrow = actor.will_start().await;
         let (client_end, server_end) = zx::Channel::create();
         let execution_scope = ExecutionScope::new();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        let mut object_request = fio::Flags::empty().to_object_request(server_end);
         assert_eq!(
             actor
                 .open_outgoing(OpenRequest::new(
                     execution_scope.clone(),
-                    fio::OpenFlags::empty(),
+                    fio::Flags::empty(),
                     "foo".try_into().unwrap(),
                     &mut object_request
                 ))
@@ -588,12 +588,12 @@ mod tests {
         let escrow = actor.will_start().await;
         let (_, server_end) = zx::Channel::create();
         let execution_scope = ExecutionScope::new();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        let mut object_request = fio::Flags::empty().to_object_request(server_end);
         assert_eq!(
             actor
                 .open_outgoing(OpenRequest::new(
                     execution_scope.clone(),
-                    fio::OpenFlags::empty(),
+                    fio::Flags::empty(),
                     "bar".try_into().unwrap(),
                     &mut object_request
                 ))
@@ -601,8 +601,8 @@ mod tests {
             Ok(())
         );
         let mut outgoing = escrow.unwrap().outgoing_dir.into_stream();
-        let open = outgoing.next().await.unwrap().unwrap().into_deprecated_open().unwrap();
-        assert_eq!(open.2, "bar");
+        let open = outgoing.next().await.unwrap().unwrap().into_open().unwrap();
+        assert_eq!(open.0, "bar");
 
         drop(actor);
         task_group.join().await;
@@ -640,12 +640,12 @@ mod tests {
 
         let (client_end, server_end) = zx::Channel::create();
         let execution_scope = ExecutionScope::new();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        let mut object_request = fio::Flags::empty().to_object_request(server_end);
         assert_eq!(
             actor
                 .open_outgoing(OpenRequest::new(
                     execution_scope.clone(),
-                    fio::OpenFlags::empty(),
+                    fio::Flags::empty(),
                     "foo".try_into().unwrap(),
                     &mut object_request
                 ))
@@ -681,12 +681,12 @@ mod tests {
 
         let (_, server_end) = zx::Channel::create();
         let execution_scope = ExecutionScope::new();
-        let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
+        let mut object_request = fio::Flags::empty().to_object_request(server_end);
         assert_eq!(
             actor
                 .open_outgoing(OpenRequest::new(
                     execution_scope.clone(),
-                    fio::OpenFlags::empty(),
+                    fio::Flags::empty(),
                     "foo".try_into().unwrap(),
                     &mut object_request
                 ))
@@ -706,8 +706,8 @@ mod tests {
             .unwrap();
 
         let mut outgoing = escrow.unwrap().outgoing_dir.into_stream();
-        let open = outgoing.next().await.unwrap().unwrap().into_deprecated_open().unwrap();
-        assert_eq!(open.2, "foo");
+        let open = outgoing.next().await.unwrap().unwrap().into_open().unwrap();
+        assert_eq!(open.0, "foo");
 
         drop(actor);
         task_group.join().await;

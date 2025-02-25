@@ -1080,15 +1080,9 @@ pub mod capability_util {
         expected_res: ExpectedResult,
     ) {
         let (file_proxy, server_end) = create_proxy::<fio::FileMarker>();
-        let flags =
-            fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY;
+        let flags = fio::PERM_WRITABLE | fio::Flags::FLAG_MAYBE_CREATE | fio::Flags::PROTOCOL_FILE;
         let res = async {
-            dir_proxy.deprecated_open(
-                flags,
-                fio::ModeType::empty(),
-                "hippos",
-                ServerEnd::new(server_end.into_channel()),
-            )?;
+            dir_proxy.open("hippos", flags, &Default::default(), server_end.into_channel())?;
             file_proxy.write(b"hippos can be stored here").await
         }
         .await;

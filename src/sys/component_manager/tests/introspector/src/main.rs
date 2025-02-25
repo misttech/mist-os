@@ -180,34 +180,32 @@ async fn setup_realm(mock_runner: Arc<MockRunner>) -> Fixture {
 
     let realm_query =
         instance.root.connect_to_protocol_at_exposed_dir::<fsys2::RealmQueryMarker>().unwrap();
-
-    let (introspector, server_end) =
-        fidl::endpoints::create_proxy::<fcomponent::IntrospectorMarker>();
+    let (exposed_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     realm_query
-        .deprecated_open(
-            ".",
-            fsys2::OpenDirType::ExposedDir,
-            fio::OpenFlags::empty(),
-            fio::ModeType::empty(),
-            fcomponent::IntrospectorMarker::PROTOCOL_NAME,
-            server_end.into_channel().into(),
-        )
+        .open_directory(".", fsys2::OpenDirType::ExposedDir, server_end)
         .await
         .unwrap()
         .unwrap();
 
-    let (realm, server_end) = fidl::endpoints::create_proxy::<fcomponent::RealmMarker>();
-    realm_query
-        .deprecated_open(
-            ".",
-            fsys2::OpenDirType::ExposedDir,
-            fio::OpenFlags::empty(),
-            fio::ModeType::empty(),
-            fcomponent::RealmMarker::PROTOCOL_NAME,
-            server_end.into_channel().into(),
+    let (introspector, server_end) =
+        fidl::endpoints::create_proxy::<fcomponent::IntrospectorMarker>();
+    exposed_dir
+        .open(
+            fcomponent::IntrospectorMarker::PROTOCOL_NAME,
+            fio::Flags::PROTOCOL_SERVICE,
+            &Default::default(),
+            server_end.into_channel(),
         )
-        .await
-        .unwrap()
+        .unwrap();
+
+    let (realm, server_end) = fidl::endpoints::create_proxy::<fcomponent::RealmMarker>();
+    exposed_dir
+        .open(
+            fcomponent::RealmMarker::PROTOCOL_NAME,
+            fio::Flags::PROTOCOL_SERVICE,
+            &Default::default(),
+            server_end.into_channel(),
+        )
         .unwrap();
 
     Fixture { _realm_instance: instance, event_stream, introspector, realm }
