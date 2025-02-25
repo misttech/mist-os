@@ -25,6 +25,7 @@ pub const LEGACY_MONIKER: &str = "core/toolbox";
 pub const MONIKER: &str = "toolbox";
 
 /// Open the service directory of the toolbox.
+// TODO(https://fxbug.dev/384054758): Transition this to ConnectCapability.
 #[cfg(not(feature = "fdomain"))]
 pub async fn open_toolbox(rcs: &RemoteControlProxy) -> Result<fio::DirectoryProxy> {
     let (query, server) = fidl::endpoints::create_proxy::<sys2::RealmQueryMarker>();

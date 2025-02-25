@@ -43,10 +43,10 @@ use {
 };
 
 #[cfg(feature = "fdomain")]
-pub use {fdomain_fuchsia_io::OpenFlags, fdomain_fuchsia_sys2::OpenDirType};
+pub use fdomain_fuchsia_sys2::OpenDirType;
 
 #[cfg(not(feature = "fdomain"))]
-pub use {fidl_fuchsia_io::OpenFlags, fidl_fuchsia_sys2::OpenDirType};
+pub use fidl_fuchsia_sys2::OpenDirType;
 
 // TODO(375266424): Turn this module on for FDomain or delete it.
 #[cfg(not(feature = "fdomain"))]
@@ -233,47 +233,70 @@ pub async fn knock_rcs(rcs_proxy: &RemoteControlProxy) -> Result<(), ffx::Target
     })
 }
 
-async fn knock_rcs_impl(rcs_proxy: &RemoteControlProxy) -> Result<(), KnockRcsError> {
-    let (knock_client, knock_remote) = rcs_proxy.client()?.create_channel();
-    let res = rcs_proxy
+#[cfg(not(feature = "fdomain"))]
+type KnockClientType = fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>;
+
+#[cfg(feature = "fdomain")]
+type KnockClientType = fidl::client::Client<fdomain_client::fidl::FDomainResourceDialect>;
+
+async fn connect_to_rcs(
+    rcs_proxy: &RemoteControlProxy,
+    moniker: &str,
+    capability_set: OpenDirType,
+    capability_name: &str,
+) -> Result<KnockClientType, KnockRcsError> {
+    let rcs_client = rcs_proxy.client()?;
+    // Try to connect via fuchsia.developer.remotecontrol/RemoteControl.ConnectCapability.
+    let (client, server) = rcs_client.create_channel();
+    #[cfg(not(feature = "fdomain"))]
+    let client = fuchsia_async::Channel::from_channel(client);
+    if let Ok(response) =
+        rcs_proxy.connect_capability(moniker, capability_set, capability_name, server).await
+    {
+        response.map_err(|e| KnockRcsError::RcsConnectCapabilityError(e))?;
+        return Ok(KnockClientType::new(client, "knock_client"));
+    }
+    // Fallback to fuchsia.developer.remotecontrol/RemoteControl.DeprecatedOpenCapability.
+    // This can be removed once we drop support for API level 27.
+    let (client, server) = rcs_proxy.client()?.create_channel();
+    #[cfg(not(feature = "fdomain"))]
+    let client = fuchsia_async::Channel::from_channel(client);
+    rcs_proxy
         .deprecated_open_capability(
-            toolbox::MONIKER,
-            OpenDirType::NamespaceDir,
-            &format!("svc/{}", RemoteControlMarker::PROTOCOL_NAME),
-            knock_remote,
-            OpenFlags::empty(),
+            moniker,
+            capability_set,
+            capability_name,
+            server,
+            Default::default(),
         )
-        .await?;
-    let knock_client = if res.is_ok() {
-        knock_client
-    } else {
-        // Fallback to the legacy remote control moniker if toolbox doesn't contain the capability.
-        let (knock_client, knock_remote) = rcs_proxy.client()?.create_channel();
-        rcs_proxy
-            .deprecated_open_capability(
+        .await?
+        .map_err(|e| KnockRcsError::RcsConnectCapabilityError(e))?;
+    return Ok(KnockClientType::new(client, "knock_client"));
+}
+
+async fn knock_rcs_impl(rcs_proxy: &RemoteControlProxy) -> Result<(), KnockRcsError> {
+    let knock_client = match connect_to_rcs(
+        rcs_proxy,
+        toolbox::MONIKER,
+        OpenDirType::NamespaceDir,
+        &format!("svc/{}", RemoteControlMarker::PROTOCOL_NAME),
+    )
+    .await
+    {
+        Ok(client) => client,
+        Err(KnockRcsError::RcsConnectCapabilityError(_)) => {
+            // Fallback to the legacy moniker if toolbox doesn't contain the capability.
+            connect_to_rcs(
+                rcs_proxy,
                 REMOTE_CONTROL_MONIKER,
                 OpenDirType::ExposedDir,
                 RemoteControlMarker::PROTOCOL_NAME,
-                knock_remote,
-                OpenFlags::empty(),
             )
             .await?
-            .map_err(|e| KnockRcsError::RcsConnectCapabilityError(e))?;
-        knock_client
+        }
+        Err(e) => return Err(e),
     };
 
-    #[cfg(not(feature = "fdomain"))]
-    let knock_client = fuchsia_async::Channel::from_channel(knock_client);
-    #[cfg(not(feature = "fdomain"))]
-    let knock_client = fidl::client::Client::<fidl::encoding::DefaultFuchsiaResourceDialect>::new(
-        knock_client,
-        "knock_client",
-    );
-    #[cfg(feature = "fdomain")]
-    let knock_client = fidl::client::Client::<fdomain_client::fidl::FDomainResourceDialect>::new(
-        knock_client,
-        "knock_client",
-    );
     let mut event_receiver = knock_client.take_event_receiver();
     let res = timeout(RCS_KNOCK_TIMEOUT, event_receiver.next()).await;
     match res {
@@ -293,12 +316,15 @@ pub async fn open_with_timeout_at(
     #[cfg(not(feature = "fdomain"))] server_end: fidl::Channel,
     #[cfg(feature = "fdomain")] server_end: fdomain_client::Channel,
 ) -> Result<()> {
+    // TODO(https://fxbug.dev/384054758): Transition this to ConnectCapability. This requires that
+    // we return the channel to the caller, as we need to fallback to the old
+    // DeprecatedOpenCapability method on failure. However, both FIDL methods consume the channel.
     let open_capability_fut = rcs_proxy.deprecated_open_capability(
         moniker,
         capability_set,
         capability_name,
         server_end,
-        OpenFlags::empty(),
+        Default::default(),
     );
     timeout::timeout(dur, open_capability_fut
         .map_ok_or_else(|e| Result::<(), anyhow::Error>::Err(anyhow::anyhow!(e)), |fidl_result| {

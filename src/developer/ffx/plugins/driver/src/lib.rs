@@ -110,16 +110,38 @@ impl DriverConnector {
             moniker: &str,
             capability: &str,
         ) -> Result<S::Proxy> {
-            let (proxy, server_end) = fidl::endpoints::create_proxy::<S>();
-            // TODO(https://fxbug.dev/384054758): Transition to RemoteControl.ConnectCapability when
-            // available at all API levels.
+            // Try to connect via fuchsia.developer.remotecontrol/RemoteControl.ConnectCapability.
+            let (proxy, server) = fidl::endpoints::create_proxy::<S>();
+            if let Ok(response) = remote_control
+                .connect_capability(
+                    moniker,
+                    fsys::OpenDirType::ExposedDir,
+                    capability,
+                    server.into_channel(),
+                )
+                .await
+            {
+                response.map_err(|e| {
+                    anyhow::anyhow!(
+                        "failed to connect to {} at {} as {}: {:?}",
+                        S::DEBUG_NAME,
+                        moniker,
+                        capability,
+                        e
+                    )
+                })?;
+                return Ok(proxy);
+            }
+            // Fallback to fuchsia.developer.remotecontrol/RemoteControl.DeprecatedOpenCapability.
+            // This can be removed once we drop support for API level 27.
+            let (proxy, server) = fidl::endpoints::create_proxy::<S>();
             remote_control
                 .deprecated_open_capability(
                     moniker,
                     fsys::OpenDirType::ExposedDir,
                     capability,
-                    server_end.into_channel(),
-                    fio::OpenFlags::empty(),
+                    server.into_channel(),
+                    Default::default(),
                 )
                 .await?
                 .map_err(|e| {
@@ -131,7 +153,7 @@ impl DriverConnector {
                         e
                     )
                 })?;
-            Ok(proxy)
+            return Ok(proxy);
         }
 
         let CapabilityOptions { capability_name, default_capability_name_for_query } =

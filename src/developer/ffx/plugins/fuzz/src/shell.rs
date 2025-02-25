@@ -8,7 +8,6 @@ use anyhow::{anyhow, bail, Context as _, Error, Result};
 use errors::ffx_bail;
 use ffx_fuzz_args::*;
 use fidl::endpoints::DiscoverableProtocolMarker as _;
-use fidl_fuchsia_io::OpenFlags;
 use fuchsia_fuzzctl::{
     get_corpus_type, get_fuzzer_urls, Manager, MonotonicDuration, OutputSink, Writer,
 };
@@ -616,20 +615,39 @@ impl<R: Reader, O: OutputSink> Shell<R, O> {
     }
 
     async fn connect_to_manager(&self) -> Result<Manager> {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fuzz::ManagerMarker>();
-        let result = self
+        // Try to connect via fuchsia.developer.remotecontrol/RemoteControl.ConnectCapability.
+        let (proxy, server) = fidl::endpoints::create_proxy::<fuzz::ManagerMarker>();
+        if let Ok(response) = self
+            .remote_control
+            .connect_capability(
+                "/core/fuzz-manager",
+                fsys::OpenDirType::ExposedDir,
+                fuzz::ManagerMarker::PROTOCOL_NAME,
+                server.into_channel(),
+            )
+            .await
+        {
+            response
+                .map_err(|e| anyhow!("{:?}", e))
+                .context("failed to connect to fuzz-manager")?;
+            return Ok(Manager::new(proxy));
+        }
+        // Fallback to fuchsia.developer.remotecontrol/RemoteControl.DeprecatedOpenCapability.
+        // This can be removed once we drop support for API level 27.
+        let (proxy, server) = fidl::endpoints::create_proxy::<fuzz::ManagerMarker>();
+        let response = self
             .remote_control
             .deprecated_open_capability(
                 "/core/fuzz-manager",
                 fsys::OpenDirType::ExposedDir,
                 fuzz::ManagerMarker::PROTOCOL_NAME,
-                server_end.into_channel(),
-                OpenFlags::empty(),
+                server.into_channel(),
+                Default::default(),
             )
             .await
             .context("fuchsia.developer.remotecontrol/OpenCapability")?;
-        result.map_err(|e| anyhow!("{:?}", e)).context("failed to connect to fuzz-manager")?;
-        Ok(Manager::new(proxy))
+        response.map_err(|e| anyhow!("{:?}", e)).context("failed to connect to fuzz-manager")?;
+        return Ok(Manager::new(proxy));
     }
 
     // Helper functions to make it easier to access and mutate `Arc` and `RefCell` fields, and to

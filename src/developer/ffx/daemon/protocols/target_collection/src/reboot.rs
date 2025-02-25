@@ -21,7 +21,6 @@ use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_hardware_power_statecontrol::{
     AdminMarker, AdminProxy, RebootOptions, RebootReason2,
 };
-use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_sys2 as fsys;
 use fuchsia_async::TimeoutExt;
 use futures::TryFutureExt;
@@ -74,19 +73,35 @@ impl RebootController {
     }
 
     async fn init_admin_proxy(&self) -> Result<AdminProxy> {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<AdminMarker>();
-        self.get_remote_proxy()
-            .await?
+        let rcs_proxy = self.get_remote_proxy().await?;
+        // Try to connect via fuchsia.developer.remotecontrol/RemoteControl.ConnectCapability.
+        let (proxy, server) = fidl::endpoints::create_proxy::<AdminMarker>();
+        if let Ok(response) = rcs_proxy
+            .connect_capability(
+                ADMIN_MONIKER,
+                fsys::OpenDirType::ExposedDir,
+                AdminMarker::PROTOCOL_NAME,
+                server.into_channel(),
+            )
+            .await
+        {
+            response.map_err(|e| anyhow!("could not get admin proxy: {e:?}"))?;
+            return Ok(proxy);
+        }
+        // Fallback to fuchsia.developer.remotecontrol/RemoteControl.DeprecatedOpenCapability.
+        // This can be removed once we drop support for API level 27.
+        let (proxy, server) = fidl::endpoints::create_proxy::<AdminMarker>();
+        rcs_proxy
             .deprecated_open_capability(
                 ADMIN_MONIKER,
                 fsys::OpenDirType::ExposedDir,
                 AdminMarker::PROTOCOL_NAME,
-                server_end.into_channel(),
-                OpenFlags::empty(),
+                server.into_channel(),
+                Default::default(),
             )
             .await?
-            .map(|_| proxy)
-            .map_err(|_| anyhow!("could not get admin proxy"))
+            .map_err(|_| anyhow!("could not get admin proxy"))?;
+        return Ok(proxy);
     }
 
     #[tracing::instrument(skip(self))]

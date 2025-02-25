@@ -222,10 +222,7 @@ mod tests {
     use std::net::{IpAddr, SocketAddr};
     use std::str::FromStr;
     use std::sync::Arc;
-    use {
-        fidl_fuchsia_developer_remotecontrol as fidl_rcs, fidl_fuchsia_io as fio,
-        fidl_fuchsia_sys2 as fsys,
-    };
+    use {fidl_fuchsia_developer_remotecontrol as fidl_rcs, fidl_fuchsia_sys2 as fsys};
 
     #[test]
     fn test_host_pipe_err_to_fidl_conversion() {
@@ -354,7 +351,7 @@ mod tests {
                                 responder,
                             } => {
                                 assert_eq!(capability_set, fsys::OpenDirType::ExposedDir);
-                                assert_eq!(flags, fio::OpenFlags::empty());
+                                assert_eq!(flags, Default::default());
                                 assert_eq!(moniker, "/core/remote-control");
                                 assert_eq!(
                                     capability_name,

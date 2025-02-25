@@ -23,7 +23,6 @@ use fidl_fuchsia_developer_ffx::{
     RepositoryRegistryMarker, TargetCollectionMarker, VersionInfo,
 };
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
-use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_overnet_protocol::NodeId;
 use fidl_fuchsia_sys2 as fsys;
 use fuchsia_async::{Task, TimeoutExt, Timer};
@@ -233,24 +232,41 @@ impl DaemonProtocolProvider for Daemon {
             .rcs()
             .ok_or_else(|| anyhow!("rcs disconnected after event fired"))
             .context("getting rcs instance")?;
-        let (server, client) = fidl::Channel::create();
-
-        // TODO(awdavies): Handle these errors properly so the client knows what happened.
+        // Try to connect via fuchsia.developer.remotecontrol/RemoteControl.ConnectCapability.
+        let (client, server) = fidl::Channel::create();
+        if let Ok(response) = rcs
+            .proxy
+            .connect_capability(moniker, fsys::OpenDirType::ExposedDir, capability_name, server)
+            .await
+        {
+            response.map_err(|e| {
+                anyhow!("Failed to connect to {capability_name} in {moniker}: {e:?}")
+            })?;
+            tracing::debug!(
+                "Returning target and proxy for {}@{}",
+                target.nodename_str(),
+                target.id()
+            );
+            return Ok((target.as_ref().into(), client));
+        }
+        // Fallback to fuchsia.developer.remotecontrol/RemoteControl.DeprecatedOpenCapability.
+        // This can be removed once we drop support for API level 27.
+        let (client, server) = fidl::Channel::create();
         rcs.proxy
             .deprecated_open_capability(
                 moniker,
                 fsys::OpenDirType::ExposedDir,
                 capability_name,
                 server,
-                OpenFlags::empty(),
+                Default::default(),
             )
             .await
-            .context("FIDL connection")?
+            .context("transport error")?
             .map_err(|e| anyhow!("{:#?}", e))
-            .context("proxy connect")?;
+            .context("DeprecatedOpenCapability")?;
 
         tracing::debug!("Returning target and proxy for {}@{}", target.nodename_str(), target.id());
-        Ok((target.as_ref().into(), client))
+        return Ok((target.as_ref().into(), client));
     }
 
     async fn get_target_info(
