@@ -10,7 +10,7 @@ use crate::fs::tmpfs::TmpFs;
 use crate::mm::syscalls::{do_mmap, sys_mremap};
 use crate::mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
 use crate::security;
-use crate::task::{CurrentTask, Kernel, SchedulerManager, Task, TaskBuilder};
+use crate::task::{CurrentTask, Kernel, Task, TaskBuilder};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_not_dir, Anon, CacheMode,
@@ -162,7 +162,7 @@ fn create_test_kernel(
         b"".into(),
         Default::default(),
         ContainerNamespace::new(),
-        SchedulerManager::empty_for_tests(),
+        None,
         None,
         fuchsia_inspect::Node::default(),
         None,

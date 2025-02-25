@@ -2,117 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::{RoleOverrides, Task};
 use fidl::HandleBased;
 use fidl_fuchsia_scheduler::{
-    RoleManagerMarker, RoleManagerSetRoleRequest, RoleManagerSynchronousProxy, RoleName, RoleTarget,
+    RoleManagerSetRoleRequest, RoleManagerSynchronousProxy, RoleName, RoleTarget,
 };
-use fuchsia_component::client::connect_to_protocol_sync;
-use starnix_logging::{impossible_error, log_debug, log_info, log_warn, track_stub};
+
+use starnix_logging::{impossible_error, log_debug, log_warn, track_stub};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{
     errno, error, sched_param, SCHED_BATCH, SCHED_DEADLINE, SCHED_FIFO, SCHED_IDLE, SCHED_NORMAL,
     SCHED_RESET_ON_FORK, SCHED_RR,
 };
 use std::cmp::Ordering;
-
-pub struct SchedulerManager {
-    role_manager: Option<RoleManagerSynchronousProxy>,
-    role_overrides: RoleOverrides,
-}
-
-impl SchedulerManager {
-    /// Create a new SchedulerManager which will apply any provided `role_overrides` before
-    /// computing a role name based on a Task's scheduler policy.
-    pub fn new(role_overrides: RoleOverrides) -> SchedulerManager {
-        let role_manager = connect_to_protocol_sync::<RoleManagerMarker>().unwrap();
-        let role_manager = if let Err(e) = SchedulerManager::set_thread_role_inner(
-            &role_manager,
-            &*fuchsia_runtime::thread_self(),
-            SchedulerPolicyKind::default().role_name(),
-        ) {
-            log_warn!("Setting thread role failed ({e:?}), will not set thread priority.");
-            None
-        } else {
-            log_info!("Thread role set successfully, scheduler manager initialized.");
-            Some(role_manager)
-        };
-
-        SchedulerManager { role_manager, role_overrides }
-    }
-
-    /// Create a new empty SchedulerManager for testing.
-    pub fn empty_for_tests() -> Self {
-        Self { role_manager: None, role_overrides: RoleOverrides::new().build().unwrap() }
-    }
-
-    /// Return the currently active role name for this task. Requires read access to `task`'s state,
-    /// should only be called by code which is not already modifying the provided `task`.
-    pub fn role_name(&self, task: &Task) -> Result<&str, Errno> {
-        let policy = task.read().scheduler_policy;
-        self.role_name_inner(task, policy)
-    }
-
-    fn role_name_inner(&self, task: &Task, policy: SchedulerPolicy) -> Result<&str, Errno> {
-        Ok(if policy.kind.is_realtime() {
-            let process_name = task
-                .thread_group
-                .read()
-                .get_task(task.thread_group.leader)
-                .ok_or_else(|| errno!(EINVAL))?
-                .command();
-            let thread_name = task.command();
-            if let Some(name) =
-                self.role_overrides.get_role_name(process_name.as_bytes(), thread_name.as_bytes())
-            {
-                name
-            } else {
-                policy.kind.role_name()
-            }
-        } else {
-            policy.kind.role_name()
-        })
-    }
-
-    /// Give the provided `task`'s Zircon thread a role.
-    ///
-    /// Requires passing the current `policy` so that this can be performed without touching
-    /// `task`'s state lock.
-    pub fn set_thread_role(&self, task: &Task, policy: SchedulerPolicy) -> Result<(), Errno> {
-        let Some(role_manager) = self.role_manager.as_ref() else {
-            log_debug!("no role manager for setting role");
-            return Ok(());
-        };
-
-        let role_name = self.role_name_inner(task, policy)?;
-        let thread = task.thread.read();
-        let Some(thread) = thread.as_ref() else {
-            log_debug!("thread role update requested for task without thread, skipping");
-            return Ok(());
-        };
-        Self::set_thread_role_inner(role_manager, thread, role_name)
-    }
-
-    fn set_thread_role_inner(
-        role_manager: &RoleManagerSynchronousProxy,
-        thread: &zx::Thread,
-        role_name: &str,
-    ) -> Result<(), Errno> {
-        log_debug!(role_name; "setting thread role");
-
-        let thread = thread.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(impossible_error)?;
-        let request = RoleManagerSetRoleRequest {
-            target: Some(RoleTarget::Thread(thread)),
-            role: Some(RoleName { role: role_name.to_string() }),
-            ..Default::default()
-        };
-        let _ = role_manager.set_role(request, zx::MonotonicInstant::INFINITE).map_err(|err| {
-            log_warn!(err:?; "Unable to set thread role.");
-            errno!(EINVAL)
-        })?;
-        Ok(())
-    }
-}
 
 // In user space, priority (niceness) is an integer from -20..19 (inclusive)
 // with the default being 0.
@@ -317,10 +218,6 @@ impl SchedulerPolicy {
 }
 
 impl SchedulerPolicyKind {
-    fn is_realtime(&self) -> bool {
-        matches!(self, Self::Fifo { .. } | Self::RoundRobin { .. })
-    }
-
     /// Returns a tuploe allowing to compare 2 policies.
     fn ordering(&self) -> (u8, u8) {
         match self {
@@ -359,11 +256,14 @@ impl SchedulerPolicyKind {
             }
 
             // Configured with priority 1-99, mapped to 28-31.
-            Self::Fifo { priority } | Self::RoundRobin { priority } => match priority {
-                1 => 29,
-                2 => 30,
-                _ => 31,
-            },
+            Self::Fifo { priority } | Self::RoundRobin { priority } => {
+                track_stub!(TODO("https://fxbug.dev/308055654"), "real SCHED_FIFO/SCHED_RR");
+                match priority {
+                    1 => 29,
+                    2 => 30,
+                    _ => 31,
+                }
+            }
         }
     }
 
@@ -386,6 +286,26 @@ pub fn max_priority_for_sched_policy(policy: u32) -> Result<u8, Errno> {
         SCHED_FIFO | SCHED_RR => Ok(99),
         _ => error!(EINVAL),
     }
+}
+
+pub fn set_thread_role(
+    role_manager: &RoleManagerSynchronousProxy,
+    thread: &zx::Thread,
+    policy: SchedulerPolicy,
+) -> Result<(), Errno> {
+    let role_name = policy.kind.role_name();
+    log_debug!(policy:?, role_name; "setting thread role");
+    let thread = thread.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(impossible_error)?;
+    let request = RoleManagerSetRoleRequest {
+        target: Some(RoleTarget::Thread(thread)),
+        role: Some(RoleName { role: role_name.to_string() }),
+        ..Default::default()
+    };
+    let _ = role_manager.set_role(request, zx::MonotonicInstant::INFINITE).map_err(|err| {
+        log_warn!(err:?; "Unable to set thread role.");
+        errno!(EINVAL)
+    })?;
+    Ok(())
 }
 
 /// Names of RoleManager roles for each static Zircon priority in the fair scheduler.

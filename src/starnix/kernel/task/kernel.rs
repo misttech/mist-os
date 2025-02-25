@@ -19,8 +19,7 @@ use crate::security;
 use crate::task::{
     AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, HrTimerManager,
     HrTimerManagerHandle, IpTables, KernelStats, KernelThreads, NetstackDevices, PidTable,
-    PsiProvider, SchedulerManager, StopState, Syslog, ThreadGroup, UtsNamespace,
-    UtsNamespaceHandle,
+    PsiProvider, StopState, Syslog, ThreadGroup, UtsNamespace, UtsNamespaceHandle,
 };
 use crate::vdso::vdso_loader::Vdso;
 use crate::vfs::crypt_service::CryptService;
@@ -39,6 +38,7 @@ use fidl::endpoints::{
 };
 use fidl_fuchsia_component_runner::{ComponentControllerControlHandle, ComponentStopInfo};
 use fidl_fuchsia_feedback::CrashReporterProxy;
+use fidl_fuchsia_scheduler::RoleManagerSynchronousProxy;
 use futures::FutureExt;
 use linux_uapi::FSCRYPT_KEY_IDENTIFIER_SIZE;
 use netlink::interfaces::InterfacesHandler;
@@ -55,7 +55,6 @@ use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::from_status_like_fdio;
 use starnix_uapi::open_flags::OpenFlags;
-use std::borrow::Cow;
 use std::collections::{BTreeMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU8, Ordering};
@@ -274,8 +273,8 @@ pub struct Kernel {
     // as well as `CurrentTask`).
     pub delayed_releaser: DelayedReleaser,
 
-    /// Manages task priorities.
-    pub scheduler: SchedulerManager,
+    /// Proxy to the scheduler role manager for adjusting task priorities.
+    pub role_manager: Option<RoleManagerSynchronousProxy>,
 
     /// The syslog manager.
     pub syslog: Syslog,
@@ -367,7 +366,7 @@ impl Kernel {
         cmdline: BString,
         features: KernelFeatures,
         container_namespace: ContainerNamespace,
-        scheduler: SchedulerManager,
+        role_manager: Option<RoleManagerSynchronousProxy>,
         crash_reporter_proxy: Option<CrashReporterProxy>,
         inspect_node: fuchsia_inspect::Node,
         framebuffer_aspect_ratio: Option<&AspectRatio>,
@@ -426,7 +425,7 @@ impl Kernel {
             stats: Arc::new(KernelStats::default()),
             psi_provider: PsiProvider::default(),
             delayed_releaser: Default::default(),
-            scheduler,
+            role_manager,
             syslog: Default::default(),
             mounts: Mounts::new(),
             hrtimer_manager,
@@ -714,16 +713,7 @@ impl Kernel {
 
                     let sched_policy = task.read().scheduler_policy;
                     if !sched_policy.is_default() {
-                        node.record_child("sched", |node| {
-                            node.record_string(
-                                "role_name",
-                                self.scheduler
-                                    .role_name(&task)
-                                    .map(|n| Cow::Borrowed(n))
-                                    .unwrap_or_else(|e| Cow::Owned(e.to_string())),
-                            );
-                            node.record_string("policy", format!("{sched_policy:?}"));
-                        });
+                        node.record_string("sched_policy", format!("{sched_policy:?}"));
                     }
                 };
                 if task.id == thread_group.leader {

@@ -13,8 +13,9 @@ use fasync::OnSignals;
 use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
 use fidl_fuchsia_component_runner::{TaskProviderRequest, TaskProviderRequestStream};
 use fidl_fuchsia_feedback::CrashReporterMarker;
+use fidl_fuchsia_scheduler::RoleManagerMarker;
 use fuchsia_async::DurationExt;
-use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_sync};
 use fuchsia_component::server::ServiceFs;
 use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt, TryStreamExt};
@@ -24,7 +25,7 @@ use starnix_core::execution::execute_task_with_prerun_result;
 use starnix_core::fs::fuchsia::create_remotefs_filesystem;
 use starnix_core::fs::tmpfs::TmpFs;
 use starnix_core::security;
-use starnix_core::task::{CurrentTask, ExitStatus, Kernel, RoleOverrides, SchedulerManager, Task};
+use starnix_core::task::{set_thread_role, CurrentTask, ExitStatus, Kernel, Task};
 use starnix_core::time::utc::update_utc_clock;
 use starnix_core::vfs::{
     FileSystemOptions, FsContext, LookupContext, Namespace, StaticDirectoryBuilder, WhatToMount,
@@ -203,31 +204,6 @@ pub struct ContainerProgram {
     /// Components can override this by setting the `uid` field in their program block.
     #[serde(default = "default_uid")]
     pub default_uid: runner::serde::StoreAsString<u32>,
-
-    /// Specifies role names to use for "realtime" tasks based on their process & thread names.
-    ///
-    /// Zircon's scheduler doesn't support configuring tasks to always preempt non-"realtime"
-    /// tasks without specifying a constant bandwidth profile. These profiles specify the period and
-    /// expected runtime of a "realtime" task, bounding the amount of work it is allowed to perform
-    /// at an elevated "realtime" priority.
-    ///
-    /// Because constant bandwidth profiles require workload-specific tuning, we can't uniformly
-    /// apply a single profile for all "realtime" tasks. Instead, this container configuration
-    /// allows us to specify different constant bandwidth profiles for different workloads.
-    #[serde(default)]
-    rt_role_overrides: Vec<RealtimeSchedulerMapping>,
-}
-
-/// Specifies a role override for a class of tasks whose process and thread names match provided
-/// patterns.
-#[derive(Debug, Default, Deserialize)]
-struct RealtimeSchedulerMapping {
-    /// The role name to use for tasks matching the provided patterns.
-    role: String,
-    /// A regular expression that will be matched against the process' command.
-    process: String,
-    /// A regular expression that will be matched against the thread's command.
-    thread: String,
 }
 
 fn default_uid() -> runner::serde::StoreAsString<u32> {
@@ -493,12 +469,16 @@ async fn create_container(
 
     // Check whether we actually have access to a role manager by trying to set our own
     // thread's role.
-    let mut rt_mappings = RoleOverrides::new();
-    for m in &config.program.rt_role_overrides {
-        rt_mappings.add(m.process.clone(), m.thread.clone(), m.role.clone());
-    }
-    let rt_mappings = rt_mappings.build().context("adding custom realtime task role")?;
-    let scheduler_manager = SchedulerManager::new(rt_mappings);
+    let role_manager = connect_to_protocol_sync::<RoleManagerMarker>().unwrap();
+    let role_manager = if let Err(e) =
+        set_thread_role(&role_manager, &*fuchsia_runtime::thread_self(), Default::default())
+    {
+        log_warn!("Setting thread role failed ({e:?}), will not set thread priority.");
+        None
+    } else {
+        log_info!("Thread role set successfully.");
+        Some(role_manager)
+    };
 
     let crash_reporter = connect_to_protocol::<CrashReporterMarker>().unwrap();
 
@@ -535,7 +515,7 @@ async fn create_container(
         kernel_cmdline,
         features.kernel.clone(),
         config.container_namespace.try_clone()?,
-        scheduler_manager,
+        role_manager,
         Some(crash_reporter),
         kernel_node,
         features.aspect_ratio.as_ref(),

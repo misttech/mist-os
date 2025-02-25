@@ -55,7 +55,7 @@ fuchsia_test_component("role_manager_test") {
 
 fuchsia_component("container") {
   testonly = true
-  manifest = "meta/container.cml"
+  manifest = "//src/starnix/containers/debian/meta/debian_container.cml"
 }
 
 starnix_linux_executable("linux_scheduler_puppet") {

@@ -30,14 +30,7 @@ async fn main() {
 
     info!("reading package profile config");
     let profiles_config = std::fs::read_to_string("/pkg/config/profiles/starnix.profiles").unwrap();
-    let mut profiles_config: ProfilesConfig = serde_json5::from_str(&profiles_config).unwrap();
-    profiles_config
-        .profiles
-        .insert("first_custom_role".to_string(), ProfileConfig { priority: 16 });
-    profiles_config
-        .profiles
-        .insert("second_custom_role".to_string(), ProfileConfig { priority: 16 });
-
+    let profiles_config: ProfilesConfig = serde_json5::from_str(&profiles_config).unwrap();
     let (fake_manager, mut requests) = FakeRoleManager::new(profiles_config);
 
     let builder = RealmBuilder::with_params(
@@ -193,31 +186,6 @@ async fn main() {
         .with_next(|koid, role| {
             assert_eq!(koid, puppet_child_thread_two_koid);
             assert_eq!(role, "fuchsia.starnix.fair.8");
-        })
-        .await;
-
-    stdin_send.write(b"thread-fifo\n").unwrap();
-    info!("waiting for child process' first FIFO thread update");
-    requests
-        .with_next(|koid, role| {
-            assert_eq!(koid, puppet_thread_one_koid);
-            assert_eq!(role, "fuchsia.starnix.fair.29");
-        })
-        .await;
-
-    info!("waiting for child process' second FIFO thread update");
-    requests
-        .with_next(|koid, role| {
-            assert_eq!(koid, puppet_thread_one_koid);
-            assert_eq!(role, "first_custom_role");
-        })
-        .await;
-
-    info!("waiting for child process' third FIFO thread update");
-    requests
-        .with_next(|koid, role| {
-            assert_eq!(koid, puppet_thread_one_koid);
-            assert_eq!(role, "second_custom_role");
         })
         .await;
 
