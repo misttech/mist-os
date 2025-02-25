@@ -13,7 +13,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{error, mode};
 
-pub fn kmsg_node(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
+pub fn kmsg_file(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
     fs.create_node(
         current_task,
         SimpleFileNode::new(|| Ok(KmsgFile)),

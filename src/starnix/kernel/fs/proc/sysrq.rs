@@ -4,10 +4,10 @@
 
 //! See https://www.kernel.org/doc/html/latest/admin-guide/sysrq.html.
 
-use crate::task::{CurrentTask, Kernel};
+use crate::task::CurrentTask;
 use crate::vfs::{
-    fileops_impl_noop_sync, AppendLockGuard, FileObject, FileOps, FileSystemHandle, FsNode,
-    FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, InputBuffer, OutputBuffer, SeekTarget,
+    fileops_impl_noop_sync, AppendLockGuard, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeOps,
+    FsStr, InputBuffer, OutputBuffer, SeekTarget,
 };
 use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, RebootOptions, RebootReason2};
 use fuchsia_component::client::connect_to_protocol_sync;
@@ -18,22 +18,12 @@ use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::{error, mode, off_t};
+use starnix_uapi::{error, off_t};
 
-pub fn sysrq_node(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
-    fs.create_node(
-        current_task,
-        SysRqNode::new(current_task.kernel()),
-        // This file is normally writable only by root.
-        // (https://man7.org/linux/man-pages/man5/proc.5.html)
-        FsNodeInfo::new_factory(mode!(IFREG, 0o200), FsCred::root()),
-    )
-}
-
-struct SysRqNode {}
+pub struct SysRqNode {}
 
 impl SysRqNode {
-    pub fn new(_kernel: &Kernel) -> Self {
+    pub fn new() -> Self {
         Self {}
     }
 }

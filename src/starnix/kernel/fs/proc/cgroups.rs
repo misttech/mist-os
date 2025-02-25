@@ -8,7 +8,7 @@ use starnix_uapi::auth::FsCred;
 use starnix_uapi::mode;
 
 /// A node that is empty, used as placeholder.
-pub fn cgroups_node(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
+pub fn cgroups_file(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
     fs.create_node(
         current_task,
         BytesFile::new_node(vec![]),

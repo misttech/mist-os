@@ -3,29 +3,16 @@
 // found in the LICENSE file.
 
 use crate::task::CurrentTask;
-use crate::vfs::{
-    fs_node_impl_symlink, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps,
-    SymlinkTarget,
-};
+use crate::vfs::{fs_node_impl_symlink, FsNode, FsNodeOps, SymlinkTarget};
 use starnix_sync::{FileOpsCore, Locked};
-use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::mode;
-
-pub fn mounts_node(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
-    MountsSymlink::new_node(current_task, fs)
-}
 
 /// A node that represents a link to `self/mounts`.
-struct MountsSymlink;
+pub struct MountsSymlink;
 
 impl MountsSymlink {
-    fn new_node(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
-        fs.create_node(
-            current_task,
-            Self,
-            FsNodeInfo::new_factory(mode!(IFLNK, 0o777), FsCred::root()),
-        )
+    pub fn new_node() -> impl FsNodeOps {
+        Self {}
     }
 }
 

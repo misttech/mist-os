@@ -2,27 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::{CurrentTask, KernelStats};
-use crate::vfs::{
-    DynamicFile, DynamicFileBuf, DynamicFileSource, FileSystemHandle, FsNodeHandle, FsNodeInfo,
-    FsNodeOps,
-};
-use starnix_uapi::auth::FsCred;
+use crate::task::KernelStats;
+use crate::vfs::{DynamicFile, DynamicFileBuf, DynamicFileSource, FsNodeOps};
+use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::{errno, mode};
 
 use std::sync::Arc;
 
-pub fn uptime_node(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
-    fs.create_node(
-        current_task,
-        UptimeFile::new_node(&current_task.kernel().stats),
-        FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-    )
-}
-
 #[derive(Clone)]
-struct UptimeFile {
+pub struct UptimeFile {
     kernel_stats: Arc<KernelStats>,
 }
 

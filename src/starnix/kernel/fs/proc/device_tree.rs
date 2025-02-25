@@ -5,7 +5,7 @@
 use crate::task::CurrentTask;
 use crate::vfs::{FileSystemHandle, FsNodeHandle, StaticDirectoryBuilder};
 
-pub fn device_tree_node(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
+pub fn device_tree_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
     let mut directory = StaticDirectoryBuilder::new(fs);
     for setup_function in &current_task.kernel().procfs_device_tree_setup {
         setup_function(&mut directory, current_task);

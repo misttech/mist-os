@@ -4,22 +4,12 @@
 
 use crate::device::DeviceMode;
 use crate::task::CurrentTask;
-use crate::vfs::{BytesFile, BytesFileOps, FileSystemHandle, FsNodeHandle, FsNodeInfo, FsNodeOps};
-use starnix_uapi::auth::FsCred;
+use crate::vfs::{BytesFile, BytesFileOps, FsNodeOps};
 use starnix_uapi::errors::Errno;
-use starnix_uapi::mode;
 
 use std::borrow::Cow;
 
-pub fn devices_node(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
-    fs.create_node(
-        current_task,
-        DevicesFile::new_node(),
-        FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-    )
-}
-
-struct DevicesFile;
+pub struct DevicesFile;
 impl DevicesFile {
     pub fn new_node() -> impl FsNodeOps {
         BytesFile::new_node(Self)

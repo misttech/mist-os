@@ -7,7 +7,7 @@ use crate::vfs::{FileSystemHandle, FsNodeHandle, StaticDirectoryBuilder, StubEmp
 use starnix_logging::bug_ref;
 use starnix_uapi::mode;
 
-pub fn uid_cputime_node(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
+pub fn uid_cputime_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
     let mut dir = StaticDirectoryBuilder::new(fs);
     dir.entry(
         current_task,

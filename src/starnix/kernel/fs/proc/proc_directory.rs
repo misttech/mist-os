@@ -2,42 +2,40 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::proc::cgroups::cgroups_node;
-use crate::fs::proc::cmdline::cmdline_node;
-use crate::fs::proc::config_gz::config_gz_node;
-use crate::fs::proc::cpuinfo::cpuinfo_node;
-use crate::fs::proc::device_tree::device_tree_node;
-use crate::fs::proc::devices::devices_node;
-use crate::fs::proc::kallsyms::kallsyms_node;
-use crate::fs::proc::kmsg::kmsg_node;
-use crate::fs::proc::loadavg::loadavg_node;
-use crate::fs::proc::meminfo::meminfo_node;
-use crate::fs::proc::misc::misc_node;
-use crate::fs::proc::mounts_symlink::mounts_node;
+use crate::fs::proc::cgroups::cgroups_file;
+use crate::fs::proc::config_gz::ConfigFile;
+use crate::fs::proc::cpuinfo::CpuinfoFile;
+use crate::fs::proc::device_tree::device_tree_directory;
+use crate::fs::proc::devices::DevicesFile;
+use crate::fs::proc::kmsg::kmsg_file;
+use crate::fs::proc::loadavg::LoadavgFile;
+use crate::fs::proc::meminfo::MeminfoFile;
+use crate::fs::proc::misc::MiscFile;
+use crate::fs::proc::mounts_symlink::MountsSymlink;
 use crate::fs::proc::pid_directory::pid_directory;
 use crate::fs::proc::pressure_directory::pressure_directory;
-use crate::fs::proc::self_symlink::self_node;
-use crate::fs::proc::stat::stat_node;
-use crate::fs::proc::swaps::swaps_node;
+use crate::fs::proc::self_symlink::SelfSymlink;
+use crate::fs::proc::stat::StatFile;
+use crate::fs::proc::swaps::SwapsFile;
 use crate::fs::proc::sysctl::{net_directory, sysctl_directory};
-use crate::fs::proc::sysrq::sysrq_node;
-use crate::fs::proc::thread_self::thread_self_node;
-use crate::fs::proc::uid_cputime::uid_cputime_node;
-use crate::fs::proc::uid_io::uid_io_node;
-use crate::fs::proc::uid_procstat::uid_procstat_node;
-use crate::fs::proc::uptime::uptime_node;
-use crate::fs::proc::vmstat::vmstat_node;
-use crate::fs::proc::zoneinfo::zoneinfo_node;
+use crate::fs::proc::sysrq::SysRqNode;
+use crate::fs::proc::thread_self::ThreadSelfSymlink;
+use crate::fs::proc::uid_cputime::uid_cputime_directory;
+use crate::fs::proc::uid_io::uid_io_directory;
+use crate::fs::proc::uid_procstat::uid_procstat_directory;
+use crate::fs::proc::uptime::UptimeFile;
+use crate::fs::proc::vmstat::VmStatFile;
+use crate::fs::proc::zoneinfo::ZoneInfoFile;
 use crate::task::CurrentTask;
 use crate::vfs::{
     emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
     unbounded_seek, BytesFile, DirectoryEntryType, DirentSink, FileObject, FileOps,
     FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget,
-    StubEmptyFile,
+    SimpleFileNode, StubEmptyFile,
 };
 
 use maplit::btreemap;
-use starnix_logging::{bug_ref, BugRef};
+use starnix_logging::{bug_ref, track_stub, BugRef};
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
@@ -62,52 +60,60 @@ pub struct ProcDirectory {
 impl ProcDirectory {
     /// Returns a new `ProcDirectory` exposing information about `kernel`.
     pub fn new(current_task: &CurrentTask, fs: &FileSystemHandle) -> Arc<ProcDirectory> {
+        let kernel = current_task.kernel();
         // First add all the nodes that are always present in the top-level proc directory.
         let mut nodes = btreemap! {
-            "cpuinfo".into() => cpuinfo_node(current_task, fs),
-            "cmdline".into() => cmdline_node(current_task, fs),
-            "devices".into() => devices_node(current_task, fs),
-            "device-tree".into() => device_tree_node(current_task, fs),
-            "self".into() => self_node(current_task, fs),
-            "thread-self".into() => thread_self_node(current_task, fs),
-            "meminfo".into() => meminfo_node(current_task, fs),
-            "kmsg".into() => kmsg_node(current_task, fs),
-            "kallsyms".into() => kallsyms_node(current_task, fs),
-            "mounts".into() => mounts_node(current_task, fs),
-            "cgroups".into() => cgroups_node(current_task, fs),
-            "stat".into() => stat_node(current_task, fs),
-            "swaps".into() => swaps_node(current_task, fs),
-            "sys".into() => sysctl_directory(current_task, fs),
-            "net".into() => net_directory(current_task, fs),
-            "uptime".into() => uptime_node(current_task, fs),
-            "loadavg".into() => loadavg_node(current_task, fs),
-            "config.gz".into() => config_gz_node(current_task, fs),
-            "sysrq-trigger".into() => sysrq_node(current_task, fs),
-            "asound".into() => stub_node(current_task, fs, "/proc/asound", bug_ref!("https://fxbug.dev/322893329")),
-            "diskstats".into() => stub_node(current_task, fs, "/proc/diskstats", bug_ref!("https://fxbug.dev/322893370")),
-            "filesystems".into() => bytes_node(current_task, fs, b"fxfs".to_vec()),
-            "misc".into() => misc_node(current_task, fs),
+            "asound".into() => stub_file(current_task, fs, "/proc/asound", bug_ref!("https://fxbug.dev/322893329")),
+            "cgroups".into() => cgroups_file(current_task, fs),
+            "cmdline".into() => {
+                let mut cmdline = Vec::from(current_task.kernel().cmdline.clone());
+                cmdline.push(b'\n');
+                read_only_file(current_task, fs, BytesFile::new_node(cmdline))
+            },
+            "config.gz".into() => read_only_file(current_task, fs, ConfigFile::new_node()),
+            "cpuinfo".into() => read_only_file(current_task, fs, CpuinfoFile::new_node()),
+            "devices".into() => read_only_file(current_task, fs, DevicesFile::new_node()),
+            "device-tree".into() => device_tree_directory(current_task, fs),
+            "diskstats".into() => stub_file(current_task, fs, "/proc/diskstats", bug_ref!("https://fxbug.dev/322893370")),
+            "filesystems".into() => bytes_file(current_task, fs, b"fxfs".to_vec()),
+            "kallsyms".into() => read_only_file(current_task, fs, SimpleFileNode::new(|| {
+                track_stub!(TODO("https://fxbug.dev/369067922"), "Provide a real /proc/kallsyms");
+                Ok(BytesFile::new(b"0000000000000000 T security_inode_copy_up".to_vec()))
+            })),
+            "kmsg".into() => kmsg_file(current_task, fs),
+            "loadavg".into() => read_only_file(current_task, fs, LoadavgFile::new_node(kernel)),
+            "meminfo".into() => read_only_file(current_task, fs, MeminfoFile::new_node(&kernel.stats)),
+            "misc".into() => read_only_file(current_task, fs, MiscFile::new_node()),
             // Starnix does not support dynamically loading modules.
             // Instead, we pretend to have loaded a single module, ferris (named after
             // Rust's 🦀), to avoid breaking code that assumes the modules list is
             // non-empty.
-            "modules".into() => bytes_node(current_task, fs, b"ferris 8192 0 - Live 0x0000000000000000\n".to_vec()),
-            "pagetypeinfo".into() => stub_node(current_task, fs, "/proc/pagetypeinfo", bug_ref!("https://fxbug.dev/322894315")),
-            "slabinfo".into() => stub_node(current_task, fs, "/proc/slabinfo", bug_ref!("https://fxbug.dev/322894195")),
-            "uid_cputime".into() => uid_cputime_node(current_task, fs),
-            "uid_io".into() => uid_io_node(current_task, fs),
-            "uid_procstat".into() => uid_procstat_node(current_task, fs),
+            "modules".into() => bytes_file(current_task, fs, b"ferris 8192 0 - Live 0x0000000000000000\n".to_vec()),
+            "mounts".into() => symlink_file(current_task, fs, MountsSymlink::new_node()),
+            "net".into() => net_directory(current_task, fs),
+            "pagetypeinfo".into() => stub_file(current_task, fs, "/proc/pagetypeinfo", bug_ref!("https://fxbug.dev/322894315")),
+            "self".into() => symlink_file(current_task, fs, SelfSymlink::new_node()),
+            "slabinfo".into() => stub_file(current_task, fs, "/proc/slabinfo", bug_ref!("https://fxbug.dev/322894195")),
+            "stat".into() => read_only_file(current_task, fs, StatFile::new_node(&kernel.stats)),
+            "swaps".into() => read_only_file(current_task, fs, SwapsFile::new_node()),
+            "sys".into() => sysctl_directory(current_task, fs),
+            "sysrq-trigger".into() => root_writable_file(current_task, fs, SysRqNode::new()),
+            "thread-self".into() => symlink_file(current_task, fs, ThreadSelfSymlink::new_node()),
+            "uid_cputime".into() => uid_cputime_directory(current_task, fs),
+            "uid_io".into() => uid_io_directory(current_task, fs),
+            "uid_procstat".into() => uid_procstat_directory(current_task, fs),
+            "uptime".into() => read_only_file(current_task, fs, UptimeFile::new_node(&kernel.stats)),
             "version".into() => {
                 let release = KERNEL_RELEASE;
                 let user = "build-user@build-host";
                 let toolchain = "clang version HEAD, LLD HEAD";
                 let version = KERNEL_VERSION;
                 let version_string = format!("Linux version {} ({}) ({}) {}\n", release, user, toolchain, version);
-                bytes_node(current_task, fs, version_string.into())
+                bytes_file(current_task, fs, version_string.into())
             },
-            "vmallocinfo".into() => stub_node(current_task, fs, "/proc/vmallocinfo", bug_ref!("https://fxbug.dev/322894183")),
-            "vmstat".into() => vmstat_node(current_task, fs),
-            "zoneinfo".into() => zoneinfo_node(current_task, fs),
+            "vmallocinfo".into() => stub_file(current_task, fs, "/proc/vmallocinfo", bug_ref!("https://fxbug.dev/322894183")),
+            "vmstat".into() => read_only_file(current_task, fs, VmStatFile::new_node(&kernel.stats)),
+            "zoneinfo".into() => read_only_file(current_task, fs, ZoneInfoFile::new_node(&kernel.stats)),
         };
 
         // Then optionally add the nodes that are only present in some configurations.
@@ -119,26 +125,45 @@ impl ProcDirectory {
     }
 }
 
-fn stub_node(
+/// Creates a stub file that logs a message with the associated bug when it is accessed.
+fn stub_file(
     current_task: &CurrentTask,
     fs: &FileSystemHandle,
     name: &'static str,
     bug: BugRef,
 ) -> FsNodeHandle {
-    fs.create_node(
-        current_task,
-        StubEmptyFile::new_node(name, bug),
-        FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-    )
+    read_only_file(current_task, fs, StubEmptyFile::new_node(name, bug))
 }
 
 /// Returns a new `BytesFile` containing the provided `bytes`.
-fn bytes_node(current_task: &CurrentTask, fs: &FileSystemHandle, bytes: Vec<u8>) -> FsNodeHandle {
-    fs.create_node(
-        current_task,
-        BytesFile::new_node(bytes),
-        FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-    )
+fn bytes_file(current_task: &CurrentTask, fs: &FileSystemHandle, bytes: Vec<u8>) -> FsNodeHandle {
+    read_only_file(current_task, fs, BytesFile::new_node(bytes))
+}
+
+/// Creates a standard read-only file suitable for use in `ProcDirectory`.
+fn read_only_file(
+    current_task: &CurrentTask,
+    fs: &FileSystemHandle,
+    ops: impl Into<Box<dyn FsNodeOps>>,
+) -> FsNodeHandle {
+    fs.create_node(current_task, ops, FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()))
+}
+
+/// Creates a file that is only writable by root.
+fn root_writable_file(
+    current_task: &CurrentTask,
+    fs: &FileSystemHandle,
+    ops: impl Into<Box<dyn FsNodeOps>>,
+) -> FsNodeHandle {
+    fs.create_node(current_task, ops, FsNodeInfo::new_factory(mode!(IFREG, 0o200), FsCred::root()))
+}
+
+fn symlink_file(
+    current_task: &CurrentTask,
+    fs: &FileSystemHandle,
+    ops: impl Into<Box<dyn FsNodeOps>>,
+) -> FsNodeHandle {
+    fs.create_node(current_task, ops, FsNodeInfo::new_factory(mode!(IFLNK, 0o777), FsCred::root()))
 }
 
 impl FsNodeOps for Arc<ProcDirectory> {

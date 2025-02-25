@@ -2,28 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::CurrentTask;
-use crate::vfs::{
-    DynamicFile, DynamicFileBuf, DynamicFileSource, FileSystemHandle, FsNodeHandle, FsNodeInfo,
-    FsNodeOps,
-};
+use crate::vfs::{DynamicFile, DynamicFileBuf, DynamicFileSource, FsNodeOps};
 use starnix_logging::log_error;
-use starnix_uapi::auth::FsCred;
+use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::{errno, mode};
-
-pub fn config_gz_node(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
-    fs.create_node(
-        current_task,
-        ConfigFile::new_node(),
-        FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-    )
-}
 
 #[derive(Clone, Debug)]
-struct ConfigFile;
+pub struct ConfigFile;
 impl ConfigFile {
-    fn new_node() -> impl FsNodeOps {
+    pub fn new_node() -> impl FsNodeOps {
         DynamicFile::new_node(Self)
     }
 }

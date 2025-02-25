@@ -3,30 +3,17 @@
 // found in the LICENSE file.
 
 use crate::task::CurrentTask;
-use crate::vfs::{
-    fs_node_impl_symlink, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps,
-    SymlinkTarget,
-};
+use crate::vfs::{fs_node_impl_symlink, FsNode, FsNodeOps, SymlinkTarget};
 use starnix_sync::{FileOpsCore, Locked};
-use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::mode;
-
-pub fn self_node(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
-    SelfSymlink::new_node(current_task, fs)
-}
 
 /// A node that represents a symlink to `proc/<pid>` where <pid> is the pid of the task that
 /// reads the `proc/self` symlink.
-struct SelfSymlink;
+pub struct SelfSymlink;
 
 impl SelfSymlink {
-    pub fn new_node(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
-        fs.create_node(
-            current_task,
-            Self,
-            FsNodeInfo::new_factory(mode!(IFLNK, 0o777), FsCred::root()),
-        )
+    pub fn new_node() -> impl FsNodeOps {
+        Self {}
     }
 }
 

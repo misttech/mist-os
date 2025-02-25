@@ -2,28 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::{CurrentTask, Kernel, TaskStateCode};
-use crate::vfs::{
-    DynamicFile, DynamicFileBuf, DynamicFileSource, FileSystemHandle, FsNodeHandle, FsNodeInfo,
-    FsNodeOps,
-};
+use crate::task::{Kernel, TaskStateCode};
+use crate::vfs::{DynamicFile, DynamicFileBuf, DynamicFileSource, FsNodeOps};
 use starnix_logging::track_stub;
-use starnix_uapi::auth::FsCred;
+use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::{errno, mode};
 
 use std::sync::{Arc, Weak};
 
-pub fn loadavg_node(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
-    fs.create_node(
-        current_task,
-        LoadavgFile::new_node(current_task.kernel()),
-        FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-    )
-}
-
 #[derive(Clone)]
-struct LoadavgFile(Weak<Kernel>);
+pub struct LoadavgFile(Weak<Kernel>);
 impl LoadavgFile {
     pub fn new_node(kernel: &Arc<Kernel>) -> impl FsNodeOps {
         DynamicFile::new_node(Self(Arc::downgrade(kernel)))
