@@ -1,0 +1,22 @@
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+@available(added=HEAD)
+library fuchsia.hardware.google.nanohub;
+
+using zx;
+
+/// Client is expected to pass the vmo handle to nanohub when issuing a DownloadFirmware request.
+@discoverable
+open protocol Device {
+    /// Request to sent to nanohub to load the firmware.
+    strict DownloadFirmware(resource struct {
+        firmware zx.Handle:<VMO, zx.Rights.MAP | zx.Rights.READ | zx.Rights.EXECUTE>;
+        // Specify the location to jump to for reading the firmware.
+        offset uint64;
+    }) -> () error zx.Status;
+};
+
+service Service {
+    download_firmware client_end:Device;
+};
