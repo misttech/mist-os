@@ -401,6 +401,8 @@ mod tests {
         ComponentInitialInterest, SamplerConfig, UrlOrMoniker,
     };
     use camino::Utf8PathBuf;
+    use sampler_config::runtime::MetricConfig;
+    use sampler_config::{CustomerId, EventCode, MetricId, MetricType, ProjectId};
     use serde_json::{json, Number, Value};
     use std::fs::File;
     use tempfile::TempDir;
@@ -415,9 +417,13 @@ mod tests {
                 "core_component_id_index.json5",
                 json!({
                     "instances": [
-                         {
-                            "instance_id": "8775ff0afe12ca578135014a5d36a7733b0f9982bcb62a888b007cb2c31a7046",
-                            "moniker": "/core/foo/bar",
+                        {
+                          "instance_id": "1111111111111111111111111111111111111111111111111111111111111111",
+                          "moniker": "/core/foo",
+                        },
+                        {
+                          "instance_id": "2222222222222222222222222222222222222222222222222222222222222222",
+                          "moniker": "/core/bar",
                         },
                     ]
                 }),
@@ -425,9 +431,51 @@ mod tests {
             this.write(
                 "default_sampler_config.json",
                 json!({
-                    "fire_project_templates": [],
-                    "fire_component_configs": [],
-                    "project_configs": [],
+                    "fire_project_templates": [
+                        {
+                            "metrics": [
+                                {
+                                    "metric_id": 3,
+                                    "metric_type": "Integer",
+                                    "selector": "component:root/samples:{INSTANCE_ID}",
+                                    "upload_once": true,
+                                },
+                            ],
+                            "poll_rate_sec": 3,
+                            "project_id": 13,
+                        }
+                    ],
+                    "fire_component_configs": [
+                       json!([
+                           {
+                               "id": 1,
+                               "label": "Foo",
+                               "moniker": "/core/foo",
+                           },
+                           {
+                               "id": 2,
+                               "label": "Bar",
+                               "moniker": "/core/bar",
+                           },
+                       ]),
+                    ],
+                    "project_configs": [
+                        {
+                            "metrics": [
+                                {
+                                    "event_codes": [
+                                        0,
+                                        1
+                                    ],
+                                    "metric_id": 104,
+                                    "metric_type": "Occurrence",
+                                    "selector": "single_counter:root/samples:counter"
+                                }
+                            ],
+                            "poll_rate_sec": 3000,
+                            "project_id": 5
+                        }
+                    ],
                 }),
             );
             this
@@ -751,6 +799,216 @@ mod tests {
                 "fuchsia-pkg://fuchsia.com/foo#meta/bar.cm:DEBUG".into(),
                 "core/coll:foo/bar:WARN".into(),
             ])
+        );
+    }
+
+    #[test]
+    fn test_load_smapler_config() {
+        let resource_dir = ResourceDir::new();
+        let fire_test_template = resource_dir.write(
+            "test_fire_template.json",
+            json!({
+                "metrics": [
+                    {
+                        "metric_id": 1,
+                        "metric_type": "IntHistogram",
+                        "selector": [
+                            "<component_manager>:root/stats/histograms:{MONIKER}",
+                        ],
+                    },
+                ],
+                "poll_rate_sec": 1200,
+                "project_id": 13,
+            }),
+        );
+        let test_components_config = resource_dir.write(
+            "test_components_config.json",
+            json!([
+                {
+                    "id": 3,
+                    "label": "Baz",
+                    "moniker": "/core/baz",
+                }
+            ]),
+        );
+        let test_sampler_project = resource_dir.write(
+            "test_project.json",
+            json!({
+                "metrics": [
+                    {
+                        "event_codes": [
+                            0,
+                            0
+                        ],
+                        "metric_id": 102,
+                        "metric_type": "Integer",
+                        "selector": "bootstrap/bar/baz:root/samples:some_integer"
+                    },
+                ],
+                "poll_rate_sec": 3,
+                "project_id": 5
+            }),
+        );
+
+        let context = ConfigurationContext {
+            feature_set_level: &FeatureSupportLevel::Standard,
+            build_type: &BuildType::User,
+            resource_dir: resource_dir.path(),
+            ..ConfigurationContext::default_for_tests()
+        };
+        let diagnostics = DiagnosticsConfig {
+            sampler: SamplerConfig {
+                project_configs: vec![test_sampler_project],
+                fire: FireConfig {
+                    component_configs: vec![test_components_config],
+                    project_templates: vec![fire_test_template],
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut builder = ConfigurationBuilderImpl::default();
+        DiagnosticsSubsystem::define_configuration(
+            &context,
+            &DiagnosticsSubsystemConfig {
+                diagnostics: &diagnostics,
+                storage: &StorageConfig::default(),
+            },
+            &mut builder,
+        )
+        .expect("defined config");
+        let config = builder.build();
+        let project_configs: Vec<ProjectConfig> = match config.configuration_capabilities
+            ["fuchsia.diagnostics.sampler.ProjectConfigs"]
+            .value()
+        {
+            Value::Array(data) => data
+                .into_iter()
+                .map(|value| match value {
+                    serde_json::Value::String(value) => {
+                        serde_json::from_str(&value).expect("valid json")
+                    }
+                    other => panic!("must be an array of strings, got: {other:?}"),
+                })
+                .collect(),
+            other => panic!("got unexpected project configs: {other:?}"),
+        };
+        assert_eq!(
+            project_configs,
+            vec![
+                ProjectConfig {
+                    project_id: ProjectId(5),
+                    customer_id: CustomerId(1),
+                    poll_rate_sec: 3000,
+                    metrics: vec![
+                        MetricConfig {
+                            selectors: vec![
+                                selectors::parse_verbose(
+                                "single_counter:root/samples:counter"
+                                    ).unwrap(),
+                            ],
+                            metric_id: MetricId(104),
+                            metric_type: MetricType::Occurrence,
+                            event_codes: vec![EventCode(0), EventCode(1)],
+                            upload_once: false,
+                            project_id: None,
+                        }
+                    ]
+                },
+                ProjectConfig {
+                    project_id: ProjectId(5),
+                    customer_id: CustomerId(1),
+                    poll_rate_sec: 3,
+                    metrics: vec![
+                        MetricConfig {
+                            selectors: vec![
+                                selectors::parse_verbose(
+                                "bootstrap/bar/baz:root/samples:some_integer"
+                                    ).unwrap(),
+                            ],
+                            metric_id: MetricId(102),
+                            metric_type: MetricType::Integer,
+                            event_codes: vec![EventCode(0), EventCode(0)],
+                            upload_once: false,
+                            project_id: None,
+                        }
+                    ]
+                },
+                ProjectConfig {
+                    project_id: ProjectId(13),
+                    customer_id: CustomerId(1),
+                    poll_rate_sec: 3,
+                    metrics: vec![
+                        MetricConfig {
+                            selectors: vec![
+                                selectors::parse_verbose(
+                                "component:root/samples:1111111111111111111111111111111111111111111111111111111111111111"
+                                    ).unwrap(),
+                            ],
+                            metric_id: MetricId(3),
+                            metric_type: MetricType::Integer,
+                            event_codes: vec![EventCode(1)],
+                            upload_once: true,
+                            project_id: None,
+                        },
+                        MetricConfig {
+                            selectors: vec![
+                                selectors::parse_verbose(
+                                "component:root/samples:2222222222222222222222222222222222222222222222222222222222222222"
+                                    ).unwrap(),
+                            ],
+                            metric_id: MetricId(3),
+                            metric_type: MetricType::Integer,
+                            event_codes: vec![EventCode(2)],
+                            upload_once: true,
+                            project_id: None,
+                        }
+                    ]
+                },
+                ProjectConfig {
+                    project_id: ProjectId(13),
+                    customer_id: CustomerId(1),
+                    poll_rate_sec: 1200,
+                    metrics: vec![
+                        MetricConfig {
+                            selectors: vec![
+                                selectors::parse_verbose(
+                                "<component_manager>:root/stats/histograms:core\\/foo"
+                                    ).unwrap(),
+                            ],
+                            metric_id: MetricId(1),
+                            metric_type: MetricType::IntHistogram,
+                            event_codes: vec![EventCode(1)],
+                            upload_once: false,
+                            project_id: None,
+                        },
+                        MetricConfig {
+                            selectors: vec![
+                                selectors::parse_verbose(
+                                "<component_manager>:root/stats/histograms:core\\/bar"
+                                    ).unwrap(),
+                            ],
+                            metric_id: MetricId(1),
+                            metric_type: MetricType::IntHistogram,
+                            event_codes: vec![EventCode(2)],
+                            upload_once: false,
+                            project_id: None,
+                        },
+                        MetricConfig {
+                            selectors: vec![
+                                selectors::parse_verbose(
+                                "<component_manager>:root/stats/histograms:core\\/baz"
+                                    ).unwrap(),
+                            ],
+                            metric_id: MetricId(1),
+                            metric_type: MetricType::IntHistogram,
+                            event_codes: vec![EventCode(3)],
+                            upload_once: false,
+                            project_id: None,
+                        },
+                    ]
+                }
+            ]
         );
     }
 }
