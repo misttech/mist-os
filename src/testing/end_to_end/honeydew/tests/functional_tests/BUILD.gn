@@ -107,6 +107,7 @@ group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
     "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test($host_toolchain)",
     "transport_tests/test_ffx:test_ffx_on_vim3",
     "//src/testing/end_to_end/honeydew/honeydew/affordances/connectivity/netstack/tests/functional_tests:netstack_test($host_toolchain)",
+    "//src/testing/end_to_end/honeydew/honeydew/affordances/location/tests/functional_tests:location_test($host_toolchain)",
     "//src/testing/end_to_end/honeydew/honeydew/affordances/rtc/tests/functional_tests:rtc_test($host_toolchain)",
     "//src/testing/end_to_end/honeydew/honeydew/affordances/session/tests/functional_tests:test_session",
     "//src/testing/end_to_end/honeydew/honeydew/affordances/tracing/tests/functional_tests:tracing_test($host_toolchain)",
@@ -120,10 +121,7 @@ group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
 
 group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
   testonly = true
-  public_deps = [
-    "//src/testing/end_to_end/honeydew/honeydew/affordances/location/tests/functional_tests:location_test($host_toolchain)",
-    "//src/testing/end_to_end/honeydew/honeydew/transports/fastboot/tests/functional_tests:fastboot_test($host_toolchain)",
-  ]
+  public_deps = [ "//src/testing/end_to_end/honeydew/honeydew/transports/fastboot/tests/functional_tests:fastboot_test($host_toolchain)" ]
 }
 
 # starnix.arm64
@@ -156,6 +154,7 @@ group_with_no_dir_target_deps("smart_display_nelson_stable_tests") {
   testonly = true
   public_deps = [
     "fuchsia_device_tests/test_fuchsia_device:nelson_test($host_toolchain)",
+    "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test($host_toolchain)",
     "transport_tests/test_ffx:test_ffx_on_nelson",
     "//src/testing/end_to_end/honeydew/honeydew/affordances/connectivity/netstack/tests/functional_tests:netstack_test($host_toolchain)",
     "//src/testing/end_to_end/honeydew/honeydew/affordances/location/tests/functional_tests:location_test($host_toolchain)",
@@ -169,10 +168,7 @@ group_with_no_dir_target_deps("smart_display_nelson_stable_tests") {
 
 group_with_no_dir_target_deps("smart_display_nelson_unstable_tests") {
   testonly = true
-  public_deps = [
-    "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test($host_toolchain)",
-    "//src/testing/end_to_end/honeydew/honeydew/affordances/tracing/tests/functional_tests:tracing_test($host_toolchain)",
-  ]
+  public_deps = [ "//src/testing/end_to_end/honeydew/honeydew/affordances/tracing/tests/functional_tests:tracing_test($host_toolchain)" ]
 }
 
 ############################## Test groups - End ###############################
