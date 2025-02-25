@@ -708,7 +708,7 @@ fuchsia_hardware_display::wire::ConfigStamp DisplayCompositor::ApplyConfig() {
 
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::ApplyConfig");
   fidl::Arena arena;
-  const fidl::OneWayStatus result = display_coordinator_.sync()->ApplyConfig3(
+  const fidl::OneWayStatus result = display_coordinator_->ApplyConfig3(
       fuchsia_hardware_display::wire::CoordinatorApplyConfig3Request::Builder(arena)
           .stamp(config_stamp)
           .Build());
