@@ -120,7 +120,7 @@ generic-array = "0.14"
 getrandom = { version = "0.2.10" }
 glob = "0.3.0"
 gpt = "3.0.0"
-half = "1.6.0"
+half = "2.4.1"
 handlebars = "4.3.5"
 heck = "0.3.1"
 hex = { version = "0.4.3", features = ["serde"] }
@@ -203,8 +203,6 @@ schemars = { version = "0.8", features = ["chrono", "preserve_order"] }
 scopeguard = "1.1.0"
 scrypt = "0.10.0"
 serde = { version = "1.0.204", features = ["derive"] }
-# TODO(https://fxbug.dev/398233730): delete in favor of ciborium.
-serde_cbor = "0.11.1"
 serde_derive = "1.0.147"
 serde_json = "1.0.128"
 serde_json5 = "0.1.0"
@@ -911,9 +909,6 @@ rustflags = ["--cfg=integer128", "--cfg=must_use_return", "--cfg=maybe_uninit"]
 
 [gn.package.schemars."0.8.10"]
 rustflags = ["--cfg=std_atomic64", "--cfg=std_atomic"]
-
-[gn.package.serde_cbor."0.11.1"]
-group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "serde_cbor_visibility" }
 
 # scoped-tls has not gone through a thorough safety review yet, and needs to be
 # re-reviewed before it can be used outside of tests.

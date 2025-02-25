@@ -390,7 +390,7 @@ group("gpt") {
 }
 
 group("half") {
-  public_deps = [ ":half-v1_6_0" ]
+  public_deps = [ ":half-v2_4_1" ]
 }
 
 group("handlebars") {
@@ -902,12 +902,6 @@ if (!(current_os == "fuchsia")) {
 
 group("serde") {
   public_deps = [ ":serde-v1_0_204" ]
-}
-
-group("serde_cbor") {
-  public_deps = [ ":serde_cbor-v0_11_1" ]
-
-  visibility = serde_cbor_visibility
 }
 
 group("serde_derive") {
@@ -7042,36 +7036,6 @@ rust_library("group-v0_12_1") {
   applicable_licenses = [ ":group-v0_12_1.license" ]
 }
 
-license("half-v1_6_0.license") {
-  public_package_name = "half"
-  license_files = [
-    "//third_party/rust_crates/vendor/half-1.6.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/half-1.6.0/LICENSE-MIT",
-  ]
-}
-
-rust_library("half-v1_6_0") {
-  crate_name = "half"
-  crate_root = "//third_party/rust_crates/vendor/half-1.6.0/src/lib.rs"
-  output_name = "half-d9b7b38cc4103d3d"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=d9b7b38cc4103d3d",
-    "-Cextra-filename=-d9b7b38cc4103d3d",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":half-v1_6_0.license" ]
-}
-
 license("half-v2_4_1.license") {
   public_package_name = "half"
   license_files = [
@@ -7100,6 +7064,9 @@ rust_library("half-v2_4_1") {
     "--edition=2021",
     "-Cmetadata=bfe987eddd5bdc88",
     "-Cextra-filename=-bfe987eddd5bdc88",
+    "--cfg=feature=\"alloc\"",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
@@ -14802,40 +14769,6 @@ rust_library("serde-v1_0_204") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":serde-v1_0_204.license" ]
-}
-
-license("serde_cbor-v0_11_1.license") {
-  public_package_name = "serde_cbor"
-  license_files = [
-    "//third_party/rust_crates/vendor/serde_cbor-0.11.1/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/serde_cbor-0.11.1/LICENSE-MIT",
-  ]
-}
-
-rust_library("serde_cbor-v0_11_1") {
-  crate_name = "serde_cbor"
-  crate_root = "//third_party/rust_crates/vendor/serde_cbor-0.11.1/src/lib.rs"
-  output_name = "serde_cbor-196735531d02fccc"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":half-v1_6_0" ]
-  deps += [ ":serde-v1_0_204" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=196735531d02fccc",
-    "-Cextra-filename=-196735531d02fccc",
-    "--cfg=feature=\"default\"",
-    "--cfg=feature=\"std\"",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":serde_cbor-v0_11_1.license" ]
 }
 
 license("serde_derive-v1_0_204.license") {

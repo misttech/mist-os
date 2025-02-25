@@ -624,7 +624,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57663b653d948a338bfb3eeba9bb2fd5fcfaecb9e199e87e1eda4d9e8b240fd9"
 dependencies = [
  "ciborium-io",
- "half 2.4.1",
+ "half",
 ]
 
 [[package]]
@@ -1514,7 +1514,7 @@ dependencies = [
  "getrandom",
  "glob",
  "gpt",
- "half 1.6.0",
+ "half",
  "handlebars",
  "heck 0.3.1",
  "hex 0.4.3",
@@ -1623,7 +1623,6 @@ dependencies = [
  "sec1 0.7.3",
  "semver 1.0.23",
  "serde",
- "serde_cbor",
  "serde_derive",
  "serde_json",
  "serde_json5",
@@ -1920,12 +1919,6 @@ dependencies = [
  "rand_core 0.6.4",
  "subtle",
 ]
-
-[[package]]
-name = "half"
-version = "1.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d36fab90f82edc3c747f9d438e06cf0a491055896f2a279638bb5beed6c40177"
 
 [[package]]
 name = "half"
@@ -4219,16 +4212,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc76f558e0cbb2a839d37354c575f1dc3fdc6546b5be373ba43d95f231bf7c12"
 dependencies = [
  "serde_derive",
-]
-
-[[package]]
-name = "serde_cbor"
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e18acfa2f90e8b735b2836ab8d538de304cbb6729a7360729ea5a895d15a622"
-dependencies = [
- "half 1.6.0",
- "serde",
 ]
 
 [[package]]
