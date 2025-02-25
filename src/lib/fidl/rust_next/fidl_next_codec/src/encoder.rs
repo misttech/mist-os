@@ -28,7 +28,7 @@ pub trait Encoder: InternalHandleEncoder {
     /// Writes zeroed bytes to the end of the encoder.
     ///
     /// Additional bytes are written to pad the written data to a multiple of [`CHUNK_SIZE`].
-    fn reserve(&mut self, len: usize);
+    fn write_zeroes(&mut self, len: usize);
 
     /// Copies bytes to the end of the encoder.
     ///
@@ -53,7 +53,7 @@ impl Encoder for Vec<Chunk> {
     }
 
     #[inline]
-    fn reserve(&mut self, len: usize) {
+    fn write_zeroes(&mut self, len: usize) {
         let count = len.div_ceil(CHUNK_SIZE);
         self.reserve(count);
         let ptr = unsafe { self.as_mut_ptr().add(self.len()) };
@@ -67,19 +67,22 @@ impl Encoder for Vec<Chunk> {
 
     #[inline]
     fn write(&mut self, bytes: &[u8]) {
+        if bytes.is_empty() {
+            return;
+        }
+
         let count = bytes.len().div_ceil(CHUNK_SIZE);
         self.reserve(count);
+
+        // Zero out the last chunk
+        unsafe {
+            self.as_mut_ptr().add(self.len() + count - 1).write(rend::u64_le::from_native(0));
+        }
         let ptr = unsafe { self.as_mut_ptr().add(self.len()).cast::<u8>() };
 
         // Copy all the bytes
         unsafe {
             ptr.copy_from_nonoverlapping(bytes.as_ptr(), bytes.len());
-        }
-
-        // Zero out any trailing bytes
-        let trailing = count * CHUNK_SIZE - bytes.len();
-        unsafe {
-            ptr.add(bytes.len()).write_bytes(0, trailing);
         }
 
         // Set the new length
@@ -120,7 +123,7 @@ impl<E: Encoder + ?Sized> EncoderExt for E {
         let pos = self.bytes_written();
 
         // Zero out the next `count` bytes
-        self.reserve(len * size_of::<T>());
+        self.write_zeroes(len * size_of::<T>());
 
         Preallocated { encoder: self, pos, remaining: len, _phantom: PhantomData }
     }

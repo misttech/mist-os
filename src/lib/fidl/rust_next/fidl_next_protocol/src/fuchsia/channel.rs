@@ -97,8 +97,8 @@ impl Encoder for Buffer {
     }
 
     #[inline]
-    fn reserve(&mut self, len: usize) {
-        Encoder::reserve(&mut self.chunks, len)
+    fn write_zeroes(&mut self, len: usize) {
+        Encoder::write_zeroes(&mut self.chunks, len)
     }
 
     #[inline]
