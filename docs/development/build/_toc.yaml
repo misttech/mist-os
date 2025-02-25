@@ -21,6 +21,8 @@ toc:
   section:
   - title: "Use developer overrides for assembly of a Fuchsia product"
     path: /docs/development/build/assembly_developer_overrides.md
+  - title: "Bazel migration guidelines"
+    path: /docs/development/build/bazel_migration_guidelines.md
   - title: "Build Clang toolchain"
     path: /docs/development/build/toolchain.md
   - title: "Build Rust for Fuchsia"
