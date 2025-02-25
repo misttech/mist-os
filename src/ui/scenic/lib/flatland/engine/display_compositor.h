@@ -322,6 +322,9 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
     uint64_t frame_number;
   };
 
+  // The next ConfigStamp value used in an ApplyConfig() call.
+  fuchsia_hardware_display::wire::ConfigStamp next_config_stamp_{1};
+
   // A queue storing all display frame configurations that are applied but not yet shown on the
   // display device.
   std::deque<ApplyConfigInfo> pending_apply_configs_;

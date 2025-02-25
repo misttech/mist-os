@@ -57,7 +57,10 @@ class MockDisplayCoordinator
                SetLayerImage2Completer::Sync&),
               (override));
 
-  MOCK_METHOD(void, ApplyConfig, (ApplyConfigCompleter::Sync&), (override));
+  MOCK_METHOD(void, ApplyConfig3,
+              (fuchsia_hardware_display::wire::CoordinatorApplyConfig3Request*,
+               ApplyConfig3Completer::Sync&),
+              (override));
 
   MOCK_METHOD(void, GetLatestAppliedConfigStamp, (GetLatestAppliedConfigStampCompleter::Sync&),
               (override));

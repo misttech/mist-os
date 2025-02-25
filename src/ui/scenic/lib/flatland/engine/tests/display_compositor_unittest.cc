@@ -939,30 +939,17 @@ TEST_F(DisplayCompositorTest, VsyncConfigStampAreProcessed) {
   DisplayInfo display_info = {resolution, {kPixelFormat}};
 
   EXPECT_CALL(*mock_display_coordinator_, DiscardConfig(_)).Times(3).WillOnce(Return());
-  EXPECT_CALL(*mock_display_coordinator_, ApplyConfig(_)).Times(2).WillRepeatedly(Return());
 
-  const fuchsia_hardware_display::wire::ConfigStamp kConfigStamp1 = {.value = 234};
-  EXPECT_CALL(*mock_display_coordinator_, GetLatestAppliedConfigStamp(_))
-      .Times(1)
-      .WillOnce(testing::Invoke(
-          [&](MockDisplayCoordinator::GetLatestAppliedConfigStampCompleter::Sync& completer) {
-            completer.Reply(kConfigStamp1);
-          }));
+  static constexpr fuchsia_hardware_display::wire::ConfigStamp kConfigStamp1(1);
+  static constexpr fuchsia_hardware_display::wire::ConfigStamp kConfigStamp2(2);
+  EXPECT_CALL(*mock_display_coordinator_, ApplyConfig3(_, _)).Times(2).WillRepeatedly(Return());
   display_compositor_->RenderFrame(1, zx::time(1), {}, {}, [](const scheduling::Timestamps&) {});
-
-  const fuchsia_hardware_display::wire::ConfigStamp kConfigStamp2 = {.value = 123};
-  EXPECT_CALL(*mock_display_coordinator_, GetLatestAppliedConfigStamp(_))
-      .Times(1)
-      .WillOnce(testing::Invoke(
-          [&](MockDisplayCoordinator::GetLatestAppliedConfigStampCompleter::Sync& completer) {
-            completer.Reply(kConfigStamp2);
-          }));
   display_compositor_->RenderFrame(2, zx::time(2), {}, {}, [](const scheduling::Timestamps&) {});
 
   EXPECT_EQ(2u, GetPendingApplyConfigs().size());
 
   // Sending another vsync should be skipped.
-  const uint64_t kConfigStamp3 = 345;
+  static constexpr fuchsia_hardware_display::wire::ConfigStamp kConfigStamp3(3);
   SendOnVsyncEvent({kConfigStamp3});
   EXPECT_EQ(2u, GetPendingApplyConfigs().size());
 
@@ -1235,14 +1222,7 @@ TEST_F(DisplayCompositorTest, DISABLED_HardwareFrameCorrectnessTest) {
   display_compositor_->AddDisplay(&display, display_info, /*num_vmos*/ 0,
                                   /*out_buffer_collection*/ nullptr);
 
-  EXPECT_CALL(*mock_display_coordinator_, ApplyConfig(_)).Times(1).WillOnce(Return());
-
-  EXPECT_CALL(*mock_display_coordinator_, GetLatestAppliedConfigStamp(_))
-      .Times(1)
-      .WillOnce(testing::Invoke(
-          [&](MockDisplayCoordinator::GetLatestAppliedConfigStampCompleter::Sync& completer) {
-            completer.Reply(fuchsia_hardware_display::wire::ConfigStamp{.value = 1});
-          }));
+  EXPECT_CALL(*mock_display_coordinator_, ApplyConfig3(_, _)).Times(1).WillOnce(Return());
 
   display_compositor_->RenderFrame(
       1, zx::time(1),
@@ -1451,14 +1431,7 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
   display_compositor_->AddDisplay(&display, display_info, /*num_vmos*/ 0,
                                   /*out_buffer_collection*/ nullptr);
 
-  EXPECT_CALL(*mock_display_coordinator_, ApplyConfig(_)).Times(1).WillOnce(Return());
-
-  EXPECT_CALL(*mock_display_coordinator_, GetLatestAppliedConfigStamp(_))
-      .Times(1)
-      .WillOnce(testing::Invoke(
-          [&](MockDisplayCoordinator::GetLatestAppliedConfigStampCompleter::Sync& completer) {
-            completer.Reply(fuchsia_hardware_display::wire::ConfigStamp{.value = 1});
-          }));
+  EXPECT_CALL(*mock_display_coordinator_, ApplyConfig3(_, _)).Times(1).WillOnce(Return());
 
   display_compositor_->RenderFrame(
       1, zx::time(1),
@@ -1841,13 +1814,7 @@ TEST_F(DisplayCompositorTest, DISABLED_ChecksDisplayImageSignalFences) {
                                     MockDisplayCoordinator::CheckConfigCompleter::Sync& completer) {
         completer.Reply(fuchsia_hardware_display_types::wire::ConfigResult::kOk, {});
       }));
-  EXPECT_CALL(*mock_display_coordinator_, ApplyConfig(_)).Times(1).WillOnce(Return());
-  EXPECT_CALL(*mock_display_coordinator_, GetLatestAppliedConfigStamp(_))
-      .Times(1)
-      .WillOnce(testing::Invoke(
-          [&](MockDisplayCoordinator::GetLatestAppliedConfigStampCompleter::Sync& completer) {
-            completer.Reply(fuchsia_hardware_display::wire::ConfigStamp{.value = 1});
-          }));
+  EXPECT_CALL(*mock_display_coordinator_, ApplyConfig3(_, _)).Times(1).WillOnce(Return());
 
   // Render image. This should end up in display.
   const auto& display_list =

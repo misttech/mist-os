@@ -703,18 +703,18 @@ fuchsia_hardware_display::wire::ConfigStamp DisplayCompositor::ApplyConfig() {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   FX_DCHECK(display_coordinator_.is_valid());
 
-  TRACE_DURATION("gfx", "flatland::DisplayCompositor::ApplyConfig");
-  {
-    const fidl::OneWayStatus result = display_coordinator_.sync()->ApplyConfig();
-    FX_DCHECK(result.ok()) << "Failed to call FIDL ApplyConfig method: " << result.status_string();
-  }
+  fuchsia_hardware_display::wire::ConfigStamp config_stamp = next_config_stamp_;
+  next_config_stamp_ = fuchsia_hardware_display::wire::ConfigStamp(next_config_stamp_.value + 1);
 
-  {
-    const auto result = display_coordinator_.sync()->GetLatestAppliedConfigStamp();
-    FX_DCHECK(result.ok()) << "Failed to call FIDL GetLatestAppliedConfigStamp method: "
-                           << result.status_string();
-    return result->stamp;
-  }
+  TRACE_DURATION("gfx", "flatland::DisplayCompositor::ApplyConfig");
+  fidl::Arena arena;
+  const fidl::OneWayStatus result = display_coordinator_.sync()->ApplyConfig3(
+      fuchsia_hardware_display::wire::CoordinatorApplyConfig3Request::Builder(arena)
+          .stamp(config_stamp)
+          .Build());
+  FX_DCHECK(result.ok()) << "Failed to call FIDL ApplyConfig method: " << result.status_string();
+
+  return config_stamp;
 }
 
 bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
