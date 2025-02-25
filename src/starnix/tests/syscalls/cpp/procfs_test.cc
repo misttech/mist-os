@@ -459,6 +459,7 @@ TEST_F(ProcTaskDirTest, SelfStatusSensibleOutput) {
   EXPECT_THAT(contents, testing::HasSubstr("\nVmExe:"));
   EXPECT_THAT(contents, testing::HasSubstr("\nVmSwap:"));
   EXPECT_THAT(contents, testing::HasSubstr("\nThreads:"));
+  EXPECT_THAT(contents, testing::HasSubstr("\nVmHWM:"));
 }
 
 TEST_F(ProcTaskDirTest, KthreadStatusSensibleOutput) {
