@@ -68,10 +68,10 @@ if (is_host || is_fidl_toolchain) {
     foreach(target, ffx_subtool_fidl_allowlist) {
       visibility += [
         "${target}_compile_fidlc",
-        "${target}_fdomain.actual",
+        "${target}_fdomain",
         "${target}_ir_root",
         "${target}_lint",
-        "${target}_rust.actual",
+        "${target}_rust",
       ]
     }
   }

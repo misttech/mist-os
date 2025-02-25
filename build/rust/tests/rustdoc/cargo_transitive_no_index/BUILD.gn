@@ -25,9 +25,9 @@ if (is_host) {
   host_test_data("host-test-data") {
     sources = [ "$target_gen_dir/sierra.doc.zip" ]
     public_deps = [
-      ":quebec.actual.rustdoc",
-      ":sierra.actual.rustdoc",
-      ":tango.actual.rustdoc",
+      ":quebec.rustdoc",
+      ":sierra.rustdoc",
+      ":tango.rustdoc",
     ]
     outputs = [ "$target_gen_dir/sierra.doc.zip.copy" ]
   }
@@ -52,7 +52,7 @@ rustc_library("tango") {
   define_rustdoc_test_override = true
   name = "tango"
   deps = [ ":quebec" ]
-  public_deps = [ ":quebec.actual.rustdoc" ]
+  public_deps = [ ":quebec.rustdoc" ]
   testonly = true
   source_root = "../src/tango.rs"
   sources = [ "../src/tango.rs" ]
@@ -66,7 +66,7 @@ rustc_library("sierra") {
   define_rustdoc_test_override = true
   name = "sierra"
   deps = [ ":tango" ]
-  public_deps = [ ":tango.actual.rustdoc" ]
+  public_deps = [ ":tango.rustdoc" ]
   testonly = true
   source_root = "../src/sierra.rs"
   sources = [ "../src/sierra.rs" ]

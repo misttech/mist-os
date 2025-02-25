@@ -6,9 +6,9 @@
 group("shac_tools") {
   testonly = true
   deps = [
-    "//build/tools/formatjson5:formatjson5.actual($host_toolchain)",
-    "//tools/cmc:cmc.actual($host_toolchain)",
-    "//tools/doc_checker:doc_checker_bin.actual($host_toolchain)",
+    "//build/tools/formatjson5:formatjson5($host_toolchain)",
+    "//tools/cmc:cmc($host_toolchain)",
+    "//tools/doc_checker:doc_checker_bin($host_toolchain)",
     "//tools/fidl/fidlc:fidl-format($host_toolchain)",
     "//tools/fidl/fidlc:fidl-lint($host_toolchain)",
     "//tools/fidl/gidl-format:gidl-format($host_toolchain)",

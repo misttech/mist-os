@@ -118,11 +118,10 @@ template("rust_aux_deps") {
 #
 #     in-tree rustc_library                   third_party rust_library
 #     ---------------------                   ------------------------
-# <:foo> (group)                          <:foo> (alias)
-# ├───<:foo.actual> (rust_library)        ╰───<:foo-v0_1_0> (rust_library)
-# ╰───<:foo.aux> (group)                      ╰───<:foo.aux.deps> (group)
-#     ├───<:foo.clippy>
-#     ╰───<:foo.rustdoc>
+# <:foo> (rust_library)                 <:foo> (alias)
+#  ╰───<:foo.aux> (group)                ╰───<:foo-v0_1_0> (rust_library)
+#      ├───<:foo.clippy>                     ╰───<:foo.aux.deps> (group)
+#      ╰───<:foo.rustdoc>
 #
 # The .rustdoc subtargets are also consumed by `fx rustdoc-link`
 # (//tools/devshell/contrib/lib/rust/rustdoc-link.py). This script respects

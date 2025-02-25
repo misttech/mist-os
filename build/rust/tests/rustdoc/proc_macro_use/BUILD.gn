@@ -25,9 +25,9 @@ if (is_host) {
   host_test_data("host-test-data") {
     sources = [ "$target_gen_dir/november.doc.zip" ]
     public_deps = [
-      ":charlie.actual.rustdoc",
-      ":march_proc_macro.actual.rustdoc",
-      ":november.actual.rustdoc",
+      ":charlie.rustdoc",
+      ":march_proc_macro.rustdoc",
+      ":november.rustdoc",
     ]
     outputs = [ "$target_gen_dir/november.doc.zip.copy" ]
   }
@@ -52,7 +52,7 @@ rustc_macro("march") {
   define_rustdoc_test_override = true
   name = "march"
   deps = [ ":charlie" ]
-  public_deps = [ ":charlie.actual.rustdoc" ]
+  public_deps = [ ":charlie.rustdoc" ]
   testonly = true
   source_root = "../src/march.rs"
   sources = [ "../src/march.rs" ]
@@ -66,7 +66,7 @@ rustc_library("november") {
   define_rustdoc_test_override = true
   name = "november"
   deps = [ ":march" ]
-  public_deps = [ ":march_proc_macro.actual.rustdoc" ]
+  public_deps = [ ":march_proc_macro.rustdoc" ]
   testonly = true
   source_root = "../src/november.rs"
   sources = [ "../src/november.rs" ]

@@ -1549,7 +1549,7 @@ group("rbe_config.metadata") {
 #   actual_label
 #       - Required: Label for target that invokes rustc
 #       - Type: label_with_toolchain
-#       - Example: //src/lib/fuchsia-async:fuchsia-async.actual(//build/toolchain:host_x64)
+#       - Example: //src/lib/fuchsia-async:fuchsia-async(//build/toolchain:host_x64)
 #   disable_clippy
 #       - Required: whether the clippy target is put into the build graph
 #       - Type: boolean
@@ -1560,14 +1560,14 @@ group("rbe_config.metadata") {
 #       - Required: Label for target that invokes clippy
 #       - Present: this field is only guaranteed for !disable_clippy
 #       - Type: label_with_toolchain
-#       - Example: //src/lib/fuchsia-async:fuchsia-async.actual.clippy(//build/toolchain:host_x64)
+#       - Example: //src/lib/fuchsia-async:fuchsia-async.clippy(//build/toolchain:host_x64)
 #   clippy_output(optional)
 #       - Required: file that contains the clippy output
 #       - Present: this field is only guaranteed for !disable_clippy
 #       - Type: path relative to $root_build_dir
-#       - Example: host_x64/gen/src/lib/fuchsia-async/fuchsia-async.actual.clippy
+#       - Example: host_x64/gen/src/lib/fuchsia-async/fuchsia-async.clippy
 #   original_label
-#       - Required: The original target name before a possible .actual suffix is added.
+#       - Required: The original target name before a possible suffix is added.
 #         May refer to a group.
 #       - Type: label_with_toolchain
 #       - Example: //src/lib/fuchsia-async:fuchsia-async(//build/toolchain:host_x64)
@@ -1575,7 +1575,7 @@ group("rbe_config.metadata") {
 #       - Required: The label of the rustdoc target
 #       - Present: this field is only guaranteed for !disable_rustdoc
 #       - Type: label_with_toolchain
-#       - Example: //src/lib/fuchsia-async:fuchsia-async.actual.rustdoc(//build/toolchain:host_x64)
+#       - Example: //src/lib/fuchsia-async:fuchsia-async.rustdoc(//build/toolchain:host_x64)
 #   rustdoc_out_dir(optional)
 #       - Required: directory in which rustdoc output is written
 #       - Present: this field is only guaranteed for !disable_rustdoc
@@ -1590,12 +1590,12 @@ group("rbe_config.metadata") {
 #       - Required: command line argument needed to pass to rustc to depend on this target.
 #       - Present: this field is not present on bin targets
 #       - Type: command line argument
-#       - Example: --extern=fuchsia_async=host_x64/obj/src/lib/fuchsia-async/fuchsia-async.actual/libfuchsia_async.rlib
+#       - Example: --extern=fuchsia_async=host_x64/obj/src/lib/fuchsia-async/fuchsia-async/libfuchsia_async.rlib
 #   searchdir(optional)
 #       - Required: command line argument needed to pass to rustc to transitively depend on this target.
 #       - Present: this field is not present on bin targets
 #       - Type: command line argument
-#       - Example: -Ldependency=host_x64/obj/src/lib/fuchsia-async/fuchsia-async.actual
+#       - Example: -Ldependency=host_x64/obj/src/lib/fuchsia-async/fuchsia-async
 #   src(optional)
 #       - Required: list of rust source code files, relative to $root_build_dir
 #       - Present: this field is only guaranteed for !disable_clippy

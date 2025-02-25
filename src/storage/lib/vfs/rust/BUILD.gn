@@ -105,11 +105,8 @@ if (is_fuchsia) {
       # the following dep path.
       #
       #   //src/storage/lib/vfs/rust:vfs --[public]-->
-      #   //src/storage/lib/vfs/rust:vfs.actual --[private]-->
       #   //src/storage/lib/trace:trace --[public]-->
-      #   //src/storage/lib/trace:trace.actual --[private]-->
       #   //src/lib/trace/rust:trace --[public]-->
-      #   //src/lib/trace/rust:trace.actual --[private]-->
       #   //zircon/system/ulib/trace-engine:trace-engine
       #
       "//zircon/system/ulib/trace-engine",
