@@ -7,6 +7,7 @@
 #include <lib/fit/function.h>
 
 #include <ctime>
+#include <string_view>
 
 #include <fbl/string_printf.h>
 #include <zxtest/base/log-sink.h>
@@ -62,6 +63,8 @@ constexpr char kUsageMsg[] = R"(
                                                        fatal failure.
     --gtest_also_run_disabled_tests[-a] BOOL           Runner will include test and testcases prefixed with
                                                        'DISABLED_' for execution and listing.
+    --gtest_output[-o] FORMAT:PATH                     FORMAT must be "json" and PATH must be a
+                                                       writable file.
 )";
 
 }  // namespace
@@ -83,6 +86,7 @@ Options Options::FromArgs(int argc, char** argv, fbl::Vector<fbl::String>* error
       {"gtest_repeat", required_argument, nullptr, 'i'},
       {"gtest_random_seed", required_argument, nullptr, 'r'},
       {"gtest_break_on_failure", optional_argument, nullptr, 'b'},
+      {"gtest_output", required_argument, nullptr, 'o'},
       {0, 0, 0, 0},
   };
   Runner::Options options;
@@ -96,7 +100,7 @@ Options Options::FromArgs(int argc, char** argv, fbl::Vector<fbl::String>* error
   // Pick a random seed by default. Overwrite it if a value was explicitly set.
   options.seed = static_cast<int>(time(nullptr));
 
-  while ((c = getopt_long(argc, argv, "f::l::b::s::a::i:r:h::", opts, &option_index)) >= 0) {
+  while ((c = getopt_long(argc, argv, "f::l::b::s::a::i:r:h:o::", opts, &option_index)) >= 0) {
     val = optarg;
     if (val == nullptr) {
       // Verifies that the flag value could be in the form -f value not just -fValue.
@@ -139,6 +143,17 @@ Options Options::FromArgs(int argc, char** argv, fbl::Vector<fbl::String>* error
         break;
       case 'a':
         options.run_disabled = GetBoolFlag(val);
+        break;
+      case 'o':
+        std::string_view v = val;
+        constexpr std::string_view kPrefix = "json:";
+        if (!v.starts_with(kPrefix)) {
+          options.help = true;
+          errors->push_back(fbl::StringPrintf(
+              "--gtest_output only supports format \"json:PATH\". Value was (%s)", val));
+          return options;
+        }
+        options.output_path = v;
         break;
     }
   }

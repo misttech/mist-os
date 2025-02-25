@@ -23,9 +23,11 @@ zxtest_headers = [
   "include/zxtest/base/test-case.h",
   "include/zxtest/base/test-driver.h",
   "include/zxtest/base/test-info.h",
+  "include/zxtest/base/json-reporter.h",
   "include/zxtest/base/test-internal.h",
   "include/zxtest/base/test.h",
   "include/zxtest/base/types.h",
+  "include/zxtest/base/timer.h",
   "include/zxtest/base/values.h",
   "include/zxtest/c/zxtest.h",
   "include/zxtest/cpp/assert.h",
@@ -41,6 +43,7 @@ zxtest_sources = [
   "c-wrappers.cc",
   "event-broadcaster.cc",
   "file-log-sink.cc",
+  "json-reporter.cc",
   "message.cc",
   "reporter.cc",
   "runner-options.cc",
@@ -48,6 +51,7 @@ zxtest_sources = [
   "test-case.cc",
   "test-info.cc",
   "test.cc",
+  "timer.cc",
   "zxtest-main.cc",
 ]
 
@@ -62,6 +66,9 @@ zxtest_public_deps = [
 
   # Needed for <fbl/string.h>, <fbl/vector.h> and <fbl/function.h>
   "//zircon/system/ulib/fbl",
+
+  # Needed for rapidjson output functions.
+  "//third_party/rapidjson",
 ]
 
 zxtest_deps = [
@@ -74,7 +81,7 @@ if (is_fuchsia) {
     # Used by the fuchsia_test_component_manifest() template.
     test_component_manifest_cml = [
       {
-        include = [ "//sdk/lib/sys/testing/elf_test_runner.shard.cml" ]
+        include = [ "//src/sys/test_runners/gtest/zxtest.shard.cml" ]
       },
     ]
   }

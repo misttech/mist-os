@@ -7,28 +7,13 @@
 
 #include <utility>
 
-#ifdef __Fuchsia__
-#include <lib/zx/clock.h>
-#include <lib/zx/time.h>
-#else
-#include <sys/time.h>
-#endif
+#include <fbl/string_printf.h>
 #include <zxtest/base/reporter.h>
 #include <zxtest/base/runner.h>
 
 namespace zxtest {
-namespace {
 
-uint64_t now() {
-#ifdef __Fuchsia__
-  return (zx::clock::get_monotonic() - zx::time(0)).to_nsecs();
-#else
-  struct timeval tv;
-  if (gettimeofday(&tv, nullptr) < 0)
-    return 0u;
-  return tv.tv_sec * 1000000000ull + tv.tv_usec * 1000ull;
-#endif
-}
+namespace {
 
 template <typename T>
 const char* Pluralize(T value, bool capitalize = false) {
@@ -41,12 +26,6 @@ const char* Pluralize(T value, bool capitalize = false) {
 }  // namespace
 
 namespace internal {
-
-Timer::Timer() : start_(now()) {}
-
-void Timer::Reset() { start_ = now(); }
-
-int64_t Timer::GetElapsedTime() const { return (now() - start_) / 1000000; }
 
 void IterationSummary::Reset() {
   failed = 0;
@@ -83,6 +62,9 @@ void Reporter::OnProgramStart(const Runner& runner) {
   if (runner.options().break_on_failure) {
     log_sink_->Write("             --gtest_break_on_failure = true\n");
   }
+  if (!runner.options().output_path.empty()) {
+    log_sink_->Write("             --gtest_output = %s\n", runner.options().output_path.c_str());
+  }
   log_sink_->Write("[==========] \n");
   log_sink_->Flush();
 }
@@ -109,7 +91,6 @@ void Reporter::OnEnvironmentSetUp(const Runner& runner) {
 
 void Reporter::OnTestCaseStart(const TestCase& test_case) {
   timers_.test_case.Reset();
-
   log_sink_->Write("[----------] %zu test%s from %s\n", test_case.MatchingTestCount(),
                    Pluralize(test_case.MatchingTestCount()), test_case.name().c_str());
   log_sink_->Flush();

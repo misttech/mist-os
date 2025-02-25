@@ -82,9 +82,6 @@ if (!is_kernel) {
   }
 
   fuchsia_unittest_package("zircon-internal-tests") {
-    deps = [
-      ":zircon-internal-unittests",
-      "//src/sys/testing/elftest",
-    ]
+    deps = [ ":zircon-internal-unittests" ]
   }
 }

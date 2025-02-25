@@ -158,6 +158,11 @@ class Runner {
 
     // Whether the test suite should stop running upon encountering the first fatal failure.
     bool break_on_failure = false;
+
+    // If set, output results to this file.
+    // Currently only the format `json:PATH` is supported, where PATH is the location of the file to
+    // be created.
+    fbl::String output_path = "";
   };
 
   // Default Runner options.
@@ -352,6 +357,8 @@ class Runner {
   bool should_register_parameterized_tests = true;
 
   bool is_running_ = false;
+
+  std::unique_ptr<internal::JsonReporter> json_reporter_ = nullptr;
 };
 
 // Entry point for C++
