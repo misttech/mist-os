@@ -172,8 +172,9 @@ mod tests {
     #[test]
     fn test_parses_new_binary_format() {
         let new_flags = NewFlags::A | NewFlags::B;
-        let new_flags_cbor = serde_cbor::to_vec(&new_flags).unwrap();
-        let legacy_flags: LegacyFlags = serde_cbor::from_slice(&new_flags_cbor).unwrap();
+        let mut new_flags_cbor: Vec<u8> = Vec::new();
+        ciborium::into_writer(&new_flags, &mut new_flags_cbor).unwrap();
+        let legacy_flags: LegacyFlags = ciborium::from_reader(new_flags_cbor.as_slice()).unwrap();
         assert_eq!(legacy_flags, LegacyFlags::A | LegacyFlags::B);
     }
 }

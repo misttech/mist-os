@@ -59,7 +59,7 @@ pub enum Error {
 
     #[cfg(fuchsia_api_level_at_least = "HEAD")]
     #[error("Failed to read cbor received")]
-    ReadCbor(#[source] serde_cbor::Error),
+    ReadCbor(#[source] anyhow::Error),
 
     #[error("Failed to parse the diagnostics data from the json received")]
     ParseDiagnosticsData(#[source] serde_json::Error),
@@ -148,7 +148,7 @@ mod private {
     pub trait Sealed {}
 }
 impl private::Sealed for serde_json::Value {}
-impl private::Sealed for serde_cbor::Value {}
+impl private::Sealed for ciborium::Value {}
 impl<D: DiagnosticsData> private::Sealed for Data<D> {}
 
 impl<D: DiagnosticsData> CheckResponse for Data<D> {
@@ -173,17 +173,17 @@ impl CheckResponse for serde_json::Value {
 }
 
 #[cfg(fuchsia_api_level_at_least = "HEAD")]
-impl SerializableValue for serde_cbor::Value {
+impl SerializableValue for ciborium::Value {
     const FORMAT_OF_VALUE: Format = Format::Cbor;
 }
 
-impl CheckResponse for serde_cbor::Value {
+impl CheckResponse for ciborium::Value {
     fn has_payload(&self) -> bool {
         match self {
-            serde_cbor::Value::Map(m) => m
-                .get(&serde_cbor::Value::Text("payload".into()))
-                .map(|p| !matches!(p, serde_cbor::Value::Null))
-                .is_some(),
+            ciborium::Value::Map(m) => {
+                let payload_key = ciborium::Value::Text("payload".into());
+                m.iter().any(|(key, _)| *key == payload_key)
+            }
             _ => false,
         }
     }
@@ -453,7 +453,7 @@ where
                         let mut buf =
                             vec![0; vmo.get_content_size().expect("Always returns Ok") as usize];
                         vmo.read(&mut buf, 0).map_err(Error::ReadVmo)?;
-                        serde_cbor::from_slice(&buf).map_err(Error::ReadCbor)?
+                        ciborium::from_reader(buf.as_slice()).map_err(|err| Error::ReadCbor(err.into()))?
                     }
                     _ => OneOrMany::Many(vec![]),
                 };
@@ -796,13 +796,12 @@ mod tests {
             result => panic!("unexpected result: {:?}", result),
         }
         let cbor_result =
-            reader.snapshot_raw::<Inspect, serde_cbor::Value>().await.expect("got result");
+            reader.snapshot_raw::<Inspect, ciborium::Value>().await.expect("got result");
         match cbor_result {
-            serde_cbor::Value::Array(values) => {
+            ciborium::Value::Array(values) => {
                 assert_eq!(values.len(), 1);
                 let json_result =
-                    serde_cbor::value::from_value::<serde_json::Value>(values[0].to_owned())
-                        .expect("Should convert cleanly to JSON");
+                    values[0].deserialized::<serde_json::Value>().expect("convert to json");
                 assert_eq!(json_result, value);
             }
             result => panic!("unexpected result: {:?}", result),

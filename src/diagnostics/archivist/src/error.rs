@@ -81,7 +81,7 @@ pub enum AccessorError {
     Serialization(#[from] serde_json::Error),
 
     #[error("CBOR serialization failure: {0}")]
-    CborSerialization(#[from] serde_cbor::Error),
+    CborSerialization(#[source] anyhow::Error),
 
     #[error("batch timeout was set on StreamParameter and on PerformanceConfiguration")]
     DuplicateBatchTimeout,

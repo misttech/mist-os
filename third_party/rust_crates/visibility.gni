@@ -302,8 +302,5 @@ serde_cbor_visibility = [
   # DO NOT add a new dependent. Instead depend on the `ciborium` crate.
   #
   # https://fxbug.dev/398233730 tracks the migration of `serde_cbor`.
-  "//src/diagnostics/archivist:*",
-  "//src/lib/diagnostics/reader/rust:*",
-  "//src/sys/lib/bitflags-serde-legacy:*",
   "//vendor/*",
 ]
