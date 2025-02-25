@@ -74,7 +74,7 @@ Categories allow you to control which events you want to see. For example:
 - Trace with no defaults, only scheduler and thread/process data:
 
 ```posix-terminal
-  ffx trace start -–categories “kernel:sched,kernel:meta”
+  ffx trace start --categories “kernel:sched,kernel:meta”
 ```
 
 ### Useful categories
