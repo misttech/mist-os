@@ -14,32 +14,33 @@
 
 namespace {
 
-VKAPI_ATTR VkBool32 VKAPI_CALL
-DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT type,
-              const VkDebugUtilsMessengerCallbackDataEXT *callback_data, void *user_data) {
+vk::Bool32 DebugCallback(vk::DebugUtilsMessageSeverityFlagBitsEXT severity,
+                         vk::DebugUtilsMessageTypeFlagsEXT type,
+                         const vk::DebugUtilsMessengerCallbackDataEXT *callback_data,
+                         void *user_data) {
   std::string severity_str{};
-  if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
+  if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose) {
     severity_str = "VERBOSE";
-  } else if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
+  } else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo) {
     severity_str = "INFO";
-  } else if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+  } else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning) {
     severity_str = "WARNING";
-  } else if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+  } else if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
     severity_str = "ERROR";
   }
 
   std::string type_str{};
-  if (type & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT) {
+  if (type & vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral) {
     type_str = "General";
-  } else if (type & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT) {
+  } else if (type & vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation) {
     type_str = "Validation";
-  } else if (type & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) {
+  } else if (type & vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance) {
     type_str = "Performance";
   } else {
     type_str = "Unknown";
   }
 
-  if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+  if (severity & vk::DebugUtilsMessageSeverityFlagBitsEXT::eError) {
     std::cerr << "VK[" << severity_str << "]\tType: " << type_str << "\tMessage:\n\t"
               << callback_data->pMessage << std::endl
               << std::endl;
@@ -48,7 +49,7 @@ DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessa
               << callback_data->pMessage << std::endl
               << std::endl;
   }
-  return VK_FALSE;
+  return vk::False;
 }
 
 }  // namespace
@@ -124,7 +125,7 @@ vk::DebugUtilsMessengerCreateInfoEXT DebugUtilsMessenger::DefaultDebugUtilsMesse
                      vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance |
                      vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation;
 
-  info.pfnUserCallback = reinterpret_cast<vk::PFN_DebugUtilsMessengerCallbackEXT>(DebugCallback);
+  info.pfnUserCallback = DebugCallback;
   return info;
 }
 

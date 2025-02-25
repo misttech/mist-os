@@ -17,8 +17,7 @@
 
 namespace {
 
-void *vkallocate(void *user_data, unsigned long size, unsigned long alignment,
-                 VkSystemAllocationScope scope) {
+void *VkAllocate(void *user_data, size_t size, size_t alignment, vk::SystemAllocationScope scope) {
   const size_t aligned_size = (size + alignment - 1) / alignment * alignment;
   void *ptr = malloc(aligned_size);
   memset(ptr, 0, aligned_size);
@@ -30,8 +29,8 @@ void *vkallocate(void *user_data, unsigned long size, unsigned long alignment,
   return ptr;
 }
 
-void *vkreallocate(void *user_data, void *original_ptr, size_t size, size_t alignment,
-                   VkSystemAllocationScope scope) {
+void *VkReallocate(void *user_data, void *original_ptr, size_t size, size_t alignment,
+                   vk::SystemAllocationScope scope) {
   const size_t aligned_size = (size + alignment - 1) / alignment * alignment;
   void *ptr = realloc(original_ptr, aligned_size);
   EXPECT_NE(ptr, nullptr);
@@ -42,7 +41,7 @@ void *vkreallocate(void *user_data, void *original_ptr, size_t size, size_t alig
   return ptr;
 }
 
-void vkfree(void *user_data, void *ptr) {
+void VkFree(void *user_data, void *ptr) {
   free(ptr);
   auto *allocations = static_cast<int *>(user_data);
   (*allocations)--;
@@ -77,9 +76,9 @@ TEST(VkContext, Allocator) {
   vk::AllocationCallbacks allocator;
   int allocations = 0;
   allocator.pUserData = &allocations;
-  allocator.pfnAllocation = reinterpret_cast<vk::PFN_AllocationFunction>(&vkallocate);
-  allocator.pfnReallocation = reinterpret_cast<vk::PFN_ReallocationFunction>(&vkreallocate);
-  allocator.pfnFree = reinterpret_cast<vk::PFN_FreeFunction>(&vkfree);
+  allocator.pfnAllocation = VkAllocate;
+  allocator.pfnReallocation = VkReallocate;
+  allocator.pfnFree = VkFree;
   std::unique_ptr<VulkanContext> ctx = VulkanContext::Builder{}.set_allocator(allocator).Unique();
   ASSERT_NE(ctx, nullptr);
   EXPECT_GT(allocations, 0);
