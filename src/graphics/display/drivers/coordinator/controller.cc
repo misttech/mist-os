@@ -321,31 +321,25 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
   vsync_monitor_.OnVsync(vsync_timestamp, vsync_config_stamp);
 
   fbl::AutoLock lock(mtx());
-  DisplayInfo* info = nullptr;
-  for (auto& display_config : displays_) {
-    if (display_config.id == display_id) {
-      info = &display_config;
-      break;
-    }
-  }
-
-  if (!info) {
-    FDF_LOG(ERROR, "No such display %" PRIu64, display_id.value());
+  auto displays_it = displays_.find(display_id);
+  if (!displays_it.IsValid()) {
+    FDF_LOG(ERROR, "Received VSync for unknown display ID: %" PRIu64, display_id.value());
     return;
   }
+  DisplayInfo& display_info = *displays_it;
 
   // See ::ApplyConfig for more explanation of how vsync image tracking works.
   //
   // If there's a pending layer change, don't process any present/retire actions
   // until the change is complete.
-  if (info->pending_layer_change) {
-    bool done = vsync_config_stamp >= info->pending_layer_change_driver_config_stamp;
+  if (display_info.pending_layer_change) {
+    bool done = vsync_config_stamp >= display_info.pending_layer_change_driver_config_stamp;
     if (done) {
-      info->pending_layer_change = false;
-      info->pending_layer_change_driver_config_stamp = display::kInvalidDriverConfigStamp;
-      info->switching_client = false;
+      display_info.pending_layer_change = false;
+      display_info.pending_layer_change_driver_config_stamp = display::kInvalidDriverConfigStamp;
+      display_info.switching_client = false;
 
-      if (client_owning_displays_ && info->delayed_apply) {
+      if (client_owning_displays_ && display_info.delayed_apply) {
         client_owning_displays_->ReapplyConfig();
       }
     }
@@ -374,7 +368,7 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
     }
   };
 
-  if (!info->pending_layer_change) {
+  if (!display_info.pending_layer_change) {
     // Each image in the `info->images` set can fall into one of the following
     // cases:
     // - being displayed (its `latest_controller_config_stamp` matches the
@@ -385,13 +379,13 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
     // - newer than the current displayed image (its
     //   `latest_controller_config_stamp` is greater than the incoming
     //   `controller_config_stamp`) and yet to be presented.
-    for (auto it = info->images.begin(); it != info->images.end();) {
+    for (auto it = display_info.images.begin(); it != display_info.images.end();) {
       bool should_retire = it->latest_driver_config_stamp() < vsync_config_stamp;
 
       // Retire any images which are older than whatever is currently in their
       // layer.
       if (should_retire) {
-        fbl::RefPtr<Image> image_to_retire = info->images.erase(it++);
+        fbl::RefPtr<Image> image_to_retire = display_info.images.erase(it++);
         // Older images may not be presented. Ending their flows here
         // ensures the correctness of traces.
         //
@@ -409,7 +403,7 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
   // logic and only return config seqnos in OnVsync() events instead.
 
   if (vsync_config_stamp != display::kInvalidDriverConfigStamp) {
-    auto& config_image_queue = info->config_image_queue;
+    auto& config_image_queue = display_info.config_image_queue;
 
     // Evict retired configurations from the queue.
     while (!config_image_queue.empty() &&
