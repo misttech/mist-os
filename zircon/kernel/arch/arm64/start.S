@@ -99,15 +99,6 @@ handoff_paddr           .req x24
   // TODO(https://fxbug.dev/42098994): Choose it randomly.
   ldr_global kernel_vaddr, kernel_relocated_base
 
-  // Set up a functional stack pointer
-  adr_global tmp, .Lboot_cpu_kstack_end
-  mov sp, tmp
-
-  // Call into the arm64 boot mapping code to give it a chance to initialize its page tables
-  adr_global x0, __executable_start
-  sub x0, kernel_vaddr, x0 // compute the delta between virtual and physical addresses
-  bl arm64_boot_map_init
-
 .Lmmu_on_pc:
   isb
 
@@ -130,7 +121,7 @@ handoff_paddr           .req x24
   dsb sy
   isb
 
-  // set up the boot stack for real
+  // set up the boot stack
   adr_global tmp, .Lboot_cpu_kstack_end
   mov sp, tmp
 
