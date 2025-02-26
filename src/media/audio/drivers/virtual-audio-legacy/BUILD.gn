@@ -27,8 +27,6 @@ fuchsia_cc_driver("virtual-audio-legacy-driver") {
   sources = [
     "virtual-audio-codec.cc",
     "virtual-audio-codec.h",
-    "virtual-audio-composite.cc",
-    "virtual-audio-composite.h",
     "virtual-audio-dai.cc",
     "virtual-audio-dai.h",
     "virtual-audio-device.cc",

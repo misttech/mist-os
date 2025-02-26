@@ -27,8 +27,8 @@ class VirtualAudioDriver;
 // Each instance of this class represents two objects:
 //
 // 1. A virtual audio device in the device tree, represented by a `VirtualAudioDriver` object.
-//    This device appears under `/dev/class/audio-{input,output}`, `/dev/class/dai`,
-//    `/dev/class/codec` or `/dev/class/audio-composite`.
+//    This device appears under `/dev/class/audio-{input,output}`, `/dev/class/dai`, or
+//    `/dev/class/codec`.
 //
 // 2. A FIDL channel (`fuchsia.virtualaudio.Device`) which controls and monitors the device.
 //

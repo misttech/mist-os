@@ -14,7 +14,6 @@
 #include <ddktl/fidl.h>
 
 #include "src/media/audio/drivers/virtual-audio-legacy/virtual-audio-codec.h"
-#include "src/media/audio/drivers/virtual-audio-legacy/virtual-audio-composite.h"
 #include "src/media/audio/drivers/virtual-audio-legacy/virtual-audio-dai.h"
 #include "src/media/audio/drivers/virtual-audio-legacy/virtual-audio-device.h"
 #include "src/media/audio/drivers/virtual-audio-legacy/virtual-audio-stream.h"
@@ -67,26 +66,26 @@ void VirtualAudioLegacy::GetDefaultConfiguration(
     GetDefaultConfigurationRequestView request, GetDefaultConfigurationCompleter::Sync& completer) {
   fidl::Arena arena;
   switch (request->type) {
-    case fuchsia_virtualaudio::wire::DeviceType::kComposite:
-      completer.ReplySuccess(fidl::ToWire(arena, VirtualAudioComposite::GetDefaultConfig()));
-      break;
     case fuchsia_virtualaudio::wire::DeviceType::kDai:
       completer.ReplySuccess(
           fidl::ToWire(arena, VirtualAudioDai::GetDefaultConfig(request->direction.is_input())));
-      break;
+      return;
     case fuchsia_virtualaudio::wire::DeviceType::kStreamConfig:
       completer.ReplySuccess(
           fidl::ToWire(arena, VirtualAudioStream::GetDefaultConfig(request->direction.is_input())));
-      break;
+      return;
     case fuchsia_virtualaudio::wire::DeviceType::kCodec:
       completer.ReplySuccess(fidl::ToWire(
           arena, VirtualAudioCodec::GetDefaultConfig(
                      (request->direction.has_is_input()
                           ? static_cast<std::optional<bool>>(request->direction.is_input())
                           : std::nullopt))));
-      break;
+      return;
     default:
-      ZX_ASSERT_MSG(0, "Unknown device type");
+      zxlogf(ERROR, "Failed to get default configuration: Device type %u not supported",
+             static_cast<uint32_t>(request->type));
+      completer.ReplyError(fuchsia_virtualaudio::wire::Error::kNotSupported);
+      return;
   }
 }
 

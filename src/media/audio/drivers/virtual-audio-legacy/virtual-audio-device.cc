@@ -10,7 +10,6 @@
 #include <memory>
 
 #include "src/media/audio/drivers/virtual-audio-legacy/virtual-audio-codec.h"
-#include "src/media/audio/drivers/virtual-audio-legacy/virtual-audio-composite.h"
 #include "src/media/audio/drivers/virtual-audio-legacy/virtual-audio-dai.h"
 #include "src/media/audio/drivers/virtual-audio-legacy/virtual-audio-stream.h"
 
@@ -25,9 +24,6 @@ VirtualAudioDevice::Create(const fuchsia_virtualaudio::Configuration& cfg,
   switch (cfg.device_specific()->Which()) {
     case fuchsia_virtualaudio::DeviceSpecific::Tag::kCodec:
       is_input = cfg.device_specific()->codec()->is_input();
-      break;
-    case fuchsia_virtualaudio::DeviceSpecific::Tag::kComposite:
-      // Composite drivers do not have a direction (is_input is undefined).
       break;
     case fuchsia_virtualaudio::DeviceSpecific::Tag::kDai:
       is_input = cfg.device_specific()->dai()->is_input();
@@ -48,11 +44,6 @@ VirtualAudioDevice::Create(const fuchsia_virtualaudio::Configuration& cfg,
   switch (cfg.device_specific()->Which()) {
     case fuchsia_virtualaudio::DeviceSpecific::Tag::kCodec:
       device->driver_ = std::make_unique<VirtualAudioCodec>(
-          cfg, device, dev_node,
-          fit::bind_member<&VirtualAudioDevice::OnDriverShutdown>(device.get()));
-      break;
-    case fuchsia_virtualaudio::DeviceSpecific::Tag::kComposite:
-      device->driver_ = std::make_unique<VirtualAudioComposite>(
           cfg, device, dev_node,
           fit::bind_member<&VirtualAudioDevice::OnDriverShutdown>(device.get()));
       break;

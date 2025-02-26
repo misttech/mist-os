@@ -529,10 +529,6 @@ bool VirtualAudioUtil::ResetAllConfigurations() {
   if (!ResetConfiguration(fuchsia::virtualaudio::DeviceType::CODEC, std::nullopt)) {
     return false;
   }
-  // Composite drivers do not have a direction (is_input is undefined); just use `true`.
-  if (!ResetConfiguration(fuchsia::virtualaudio::DeviceType::COMPOSITE, true)) {
-    return false;
-  }
 
   if (!ResetConfiguration(fuchsia::virtualaudio::DeviceType::DAI, true)) {
     return false;
