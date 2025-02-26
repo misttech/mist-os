@@ -184,7 +184,12 @@ class FfxTest(ffxtestcase.FfxTestCase):
         asserts.assert_equal(output_json["type"], "user")
         asserts.assert_equal(
             output_json["message"],
-            "Failed to create remote control proxy. Please check the connection to the target;`ffx doctor -v` may help diagnose the issue.",
+            (
+                "Failed to create remote control proxy: "
+                'Timeout attempting to reach target "this-should-not-exist". '
+                "Please check the connection to the target; "
+                "`ffx doctor -v` may help diagnose the issue."
+            ),
         )
         asserts.assert_equal(output_json["code"], 1)
 

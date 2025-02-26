@@ -44,11 +44,16 @@ impl TryFromEnv for RemoteControlProxyHolder {
             FhoConnectionBehavior::DaemonConnector(daemon) => match daemon.remote_factory().await {
                 Ok(p) => Ok(p.into()),
                 Err(e) => {
+                    let doctor_tip = "Please check the connection to the target; `ffx doctor -v` may help diagnose the issue.";
                     if let Some(ffx_e) = &e.downcast_ref::<FfxError>() {
-                        let message = format!("Failed connecting to remote control proxy: {ffx_e}");
+                        let message = format!(
+                            "Failed connecting to remote control proxy: {ffx_e}. {doctor_tip}"
+                        );
                         Err(e).user_message(message)
                     } else {
-                        Err(e).user_message("Failed to create remote control proxy. Please check the connection to the target;`ffx doctor -v` may help diagnose the issue.")
+                        let message =
+                            format!("Failed to create remote control proxy: {e}. {doctor_tip}");
+                        Err(e).user_message(message)
                     }
                 }
             },
