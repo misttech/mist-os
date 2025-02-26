@@ -10,48 +10,45 @@
 #include <fidl/fuchsia.hardware.usb.function/cpp/fidl.h>
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/ddk/driver.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/devfs/cpp/connector.h>
 #include <lib/sync/cpp/completion.h>
 #include <zircon/compiler.h>
 
 #include <mutex>
 #include <queue>
 
-#include <ddktl/device.h>
-#include <ddktl/protocol/empty-protocol.h>
 #include <usb-endpoint/usb-endpoint-client.h>
 #include <usb/descriptors.h>
 
 namespace usb_adb_function {
 
+constexpr uint32_t kBulkTxCount = 16;
+constexpr uint32_t kBulkRxCount = 16;
+constexpr size_t kVmoDataSize = 2048;
+
 constexpr uint16_t kBulkMaxPacket = 512;
+
+constexpr char kDeviceName[] = "usb-adb-function";
 
 namespace fadb = fuchsia_hardware_adb;
 namespace fendpoint = fuchsia_hardware_usb_endpoint;
 
-class UsbAdbDevice;
-using UsbAdb = ddk::Device<UsbAdbDevice, ddk::Suspendable, ddk::Unbindable,
-                           ddk::Messageable<fadb::Device>::Mixin>;
-
 // Implements USB ADB function driver.
 // Components implementing ADB protocol should open a AdbImpl FIDL connection to dev-class/adb/xxx
 // supported by this class to queue ADB messages. ADB protocol component can provide a client
-// end channel to AdbInterface during Start method call to receive ADB messages sent by the host.
-class UsbAdbDevice : public UsbAdb,
+// end channel to AdbInterface during StartAdb method call to receive ADB messages sent by the
+// host.
+class UsbAdbDevice : public fdf::DriverBase,
                      public ddk::UsbFunctionInterfaceProtocol<UsbAdbDevice>,
-                     public ddk::EmptyProtocol<ZX_PROTOCOL_ADB>,
+                     public fidl::WireServer<fadb::Device>,
                      public fidl::Server<fadb::UsbAdbImpl> {
  public:
-  // Driver bind method.
-  static zx_status_t Bind(void* ctx, zx_device_t* parent);
-
-  explicit UsbAdbDevice(zx_device_t* parent, uint32_t bulk_tx_count, uint32_t bulk_rx_count,
-                        uint32_t vmo_data_size)
-      : UsbAdb(parent),
-        bulk_tx_count_(bulk_tx_count),
-        bulk_rx_count_(bulk_rx_count),
-        vmo_data_size_(vmo_data_size),
-        function_(parent) {
+  explicit UsbAdbDevice(fdf::DriverStartArgs start_args,
+                        fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+      : fdf::DriverBase("usb_adb", std::move(start_args), std::move(driver_dispatcher)),
+        devfs_connector_(fit::bind_member<&UsbAdbDevice::Serve>(this)) {
     loop_.StartThread("usb-adb-loop");
     dispatcher_ = loop_.dispatcher();
   }
@@ -59,10 +56,9 @@ class UsbAdbDevice : public UsbAdb,
   // Initialize endpoints and request pools.
   zx_status_t Init();
 
-  // DDK lifecycle methods.
-  void DdkRelease();
-  void DdkSuspend(ddk::SuspendTxn txn);
-  void DdkUnbind(ddk::UnbindTxn txn);
+  // Driver lifecycle methods.
+  zx::result<> Start() override;
+  void PrepareStop(fdf::PrepareStopCompleter completer) override;
 
   // UsbFunctionInterface methods.
   size_t UsbFunctionInterfaceGetDescriptorsSize();
@@ -74,11 +70,11 @@ class UsbAdbDevice : public UsbAdb,
   zx_status_t UsbFunctionInterfaceSetInterface(uint8_t interface, uint8_t alt_setting);
 
   // fadb::Device methods.
-  void Start(StartRequestView request, StartCompleter::Sync& completer) override;
-  void Stop(StopCompleter::Sync& completer) override;
+  void StartAdb(StartAdbRequestView request, StartAdbCompleter::Sync& completer) override;
+  void StopAdb(StopAdbCompleter::Sync& completer) override;
 
-  // Helper method called when fadb::Device closes.
-  void Stop();
+  // Helper methods.
+  void StopImpl();
 
   // fadb::UsbAdbImpl methods.
   void QueueTx(QueueTxRequest& request, QueueTxCompleter::Sync& completer) override;
@@ -91,9 +87,16 @@ class UsbAdbDevice : public UsbAdb,
   }
 
  private:
-  const uint32_t bulk_tx_count_;
-  const uint32_t bulk_rx_count_;
-  const size_t vmo_data_size_;
+  // Helpers and fields for exposing the service via devfs.
+  void Serve(fidl::ServerEnd<fadb::Device> server) {
+    device_bindings_.AddBinding(dispatcher(), std::move(server), this, fidl::kIgnoreBindingClosure);
+  }
+  zx::result<> CreateDevfsNode();
+
+  fidl::ServerBindingGroup<fadb::Device> device_bindings_;
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
+  driver_devfs::Connector<fadb::Device> devfs_connector_;
 
   // Structure to store pending transfer requests when there are not enough USB request buffers.
   struct txn_req_t {
@@ -135,7 +138,7 @@ class UsbAdbDevice : public UsbAdb,
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
   async_dispatcher_t* dispatcher_;
 
-  // UsbAdbImpl service binding. This is created when client calls Start.
+  // UsbAdbImpl service binding. This is created when client calls StartAdb.
   std::optional<fidl::ServerBinding<fadb::UsbAdbImpl>> adb_binding_;
 
   // Set once the interface is configured.

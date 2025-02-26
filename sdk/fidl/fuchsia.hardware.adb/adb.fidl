@@ -51,12 +51,12 @@ closed protocol UsbAdbImpl {
 @discoverable
 closed protocol Device {
     /// Start USB ADB protocol with |interface|.
-    strict Start(resource struct {
+    strict StartAdb(resource struct {
         interface server_end:UsbAdbImpl;
     }) -> () error zx.Status;
 
     /// Stops USB ADB protocol.
-    strict Stop() -> () error zx.Status;
+    strict StopAdb() -> () error zx.Status;
 };
 
 /// A Provider is a provider for one service which interacts with the adb component to implement

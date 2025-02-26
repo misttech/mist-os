@@ -4,8 +4,8 @@
 
 #include "adb-function.h"
 
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
+#include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/logging/cpp/structured_logger.h>
 #include <lib/zx/vmar.h>
 #include <zircon/assert.h>
 
@@ -32,7 +32,7 @@ void CompleteTxn(CompleterType& completer, zx_status_t status) {
 
 }  // namespace
 
-void UsbAdbDevice::Start(StartRequestView request, StartCompleter::Sync& completer) {
+void UsbAdbDevice::StartAdb(StartAdbRequestView request, StartAdbCompleter::Sync& completer) {
   // Should always be started on a clean state.
   {
     std::lock_guard<std::mutex> _(bulk_in_ep_.mutex());
@@ -52,7 +52,7 @@ void UsbAdbDevice::Start(StartRequestView request, StartCompleter::Sync& complet
                        std::move(request->interface), this, [this](fidl::UnbindInfo info) {
                          zxlogf(INFO, "Device closed with reason '%s'",
                                 info.FormatDescription().c_str());
-                         Stop();
+                         StopImpl();
                        });
   // Reset interface and configure endpoints as adb binding is set now.
   zx_status_t status = function_.SetInterface(this, &usb_function_interface_protocol_ops_);
@@ -75,12 +75,12 @@ void UsbAdbDevice::Start(StartRequestView request, StartCompleter::Sync& complet
   ReceiveLocked();
 }
 
-void UsbAdbDevice::Stop(StopCompleter::Sync& completer) {
+void UsbAdbDevice::StopAdb(StopAdbCompleter::Sync& completer) {
   SetShutdownCallback([cmpl = completer.ToAsync()]() mutable { cmpl.ReplySuccess(); });
-  Stop();
+  StopImpl();
 }
 
-void UsbAdbDevice::Stop() {
+void UsbAdbDevice::StopImpl() {
   if (adb_binding_.has_value()) {
     auto result = fidl::WireSendEvent(adb_binding_.value())->OnStatusChanged(fadb::StatusFlags(0));
     if (!result.ok()) {
@@ -155,7 +155,7 @@ zx::result<> UsbAdbDevice::SendLocked() {
     }
     req->clear_buffers();
 
-    size_t to_copy = std::min(current.request.data().size() - current.start, vmo_data_size_);
+    size_t to_copy = std::min(current.request.data().size() - current.start, kVmoDataSize);
     auto actual = req->CopyTo(0, current.request.data().data() + current.start, to_copy,
                               bulk_in_ep_.GetMappedLocked());
     size_t actual_total = 0;
@@ -429,26 +429,13 @@ void UsbAdbDevice::ShutdownComplete() {
   }
 }
 
-void UsbAdbDevice::DdkUnbind(ddk::UnbindTxn txn) {
-  SetShutdownCallback([unbind_txn = std::move(txn)]() mutable { unbind_txn.Reply(); });
+void UsbAdbDevice::PrepareStop(fdf::PrepareStopCompleter completer) {
+  SetShutdownCallback([completer = std::move(completer)]() mutable { completer(zx::ok()); });
   auto status = ConfigureEndpoints(false);
   if (status != ZX_OK) {
     zxlogf(ERROR, "ConfigureEndpoints failed %s", zx_status_get_string(status));
   }
-  Stop();
-}
-
-void UsbAdbDevice::DdkRelease() { delete this; }
-
-void UsbAdbDevice::DdkSuspend(ddk::SuspendTxn txn) {
-  SetShutdownCallback([suspend_txn = std::move(txn)]() mutable {
-    suspend_txn.Reply(ZX_OK, suspend_txn.requested_state());
-  });
-  auto status = ConfigureEndpoints(false);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ConfigureEndpoints failed %s", zx_status_get_string(status));
-  }
-  Stop();
+  StopImpl();
 }
 
 zx_status_t UsbAdbDevice::InitEndpoint(
@@ -469,83 +456,105 @@ zx_status_t UsbAdbDevice::InitEndpoint(
   // TODO(127854): When we support active pinning of VMOs, adb may want to use VMOs that are not
   // perpetually pinned.
   auto actual =
-      ep.AddRequests(req_count, vmo_data_size_, fuchsia_hardware_usb_request::Buffer::Tag::kVmoId);
+      ep.AddRequests(req_count, kVmoDataSize, fuchsia_hardware_usb_request::Buffer::Tag::kVmoId);
   if (actual != req_count) {
     zxlogf(ERROR, "Wanted %u requests, only got %zu requests", req_count, actual);
   }
   return actual == 0 ? ZX_ERR_INTERNAL : ZX_OK;
 }
 
-zx_status_t UsbAdbDevice::Init() {
-  auto client =
-      DdkConnectFidlProtocol<fuchsia_hardware_usb_function::UsbFunctionService::Device>(parent_);
+zx::result<> UsbAdbDevice::CreateDevfsNode() {
+  fidl::Arena arena;
+  zx::result connector = devfs_connector_.Bind(dispatcher());
+  if (connector.is_error()) {
+    return connector.take_error();
+  }
+
+  auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena)
+                   .connector(std::move(connector.value()))
+                   .class_name("adb");
+
+  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                  .name(arena, kDeviceName)
+                  .devfs_args(devfs.Build())
+                  .Build();
+
+  // Create endpoints of the `NodeController` for the node.
+  auto controller_endpoints = fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
+
+  zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
+  ZX_ASSERT_MSG(node_endpoints.is_ok(), "Failed to create endpoints: %s",
+                node_endpoints.status_string());
+
+  fidl::WireResult result = fidl::WireCall(node())->AddChild(
+      args, std::move(controller_endpoints.server), std::move(node_endpoints->server));
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Failed to add child: status %s", result.status_string());
+    return zx::error(result.status());
+  }
+  controller_.Bind(std::move(controller_endpoints.client));
+  node_.Bind(std::move(node_endpoints->client));
+  return zx::ok();
+}
+
+zx::result<> UsbAdbDevice::Start() {
+  zx::result<ddk::UsbFunctionProtocolClient> function =
+      compat::ConnectBanjo<ddk::UsbFunctionProtocolClient>(incoming());
+  if (function.is_error()) {
+    FDF_SLOG(ERROR, "Failed to connect function", KV("status", function.status_string()));
+    return function.take_error();
+  }
+  function_ = *function;
+
+  auto client = incoming()->Connect<fuchsia_hardware_usb_function::UsbFunctionService::Device>();
+
   if (client.is_error()) {
     zxlogf(ERROR, "Failed to connect fidl protocol");
-    return client.error_value();
+    return client.take_error();
   }
 
   auto status = function_.AllocInterface(&descriptors_.adb_intf.b_interface_number);
   if (status != ZX_OK) {
     zxlogf(ERROR, "usb_function_alloc_interface failed - %d.", status);
-    return status;
+    return zx::error(status);
   }
 
   status = InitEndpoint(*client, USB_DIR_OUT, &descriptors_.bulk_out_ep.b_endpoint_address,
-                        bulk_out_ep_, bulk_rx_count_);
+                        bulk_out_ep_, kBulkRxCount);
   if (status != ZX_OK) {
     zxlogf(ERROR, "InitEndpoint failed - %d.", status);
-    return status;
+    return zx::error(status);
   }
   status = InitEndpoint(*client, USB_DIR_IN, &descriptors_.bulk_in_ep.b_endpoint_address,
-                        bulk_in_ep_, bulk_tx_count_);
+                        bulk_in_ep_, kBulkTxCount);
   if (status != ZX_OK) {
     zxlogf(ERROR, "InitEndpoint failed - %d.", status);
-    return status;
-  }
-
-  status = DdkAdd("usb-adb-function", DEVICE_ADD_NON_BINDABLE);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not add UsbAdbDevice %d.", status);
-    return status;
+    return zx::error(status);
   }
 
   status = function_.SetInterface(this, &usb_function_interface_protocol_ops_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "SetInterface failed %s", zx_status_get_string(status));
-    return status;
+    return zx::error(status);
   }
 
-  return ZX_OK;
+  auto serve_result = outgoing()->AddService<fadb::Service>(fadb::Service::InstanceHandler({
+      .adb = device_bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                            fidl::kIgnoreBindingClosure),
+  }));
+  if (serve_result.is_error()) {
+    zxlogf(ERROR, "Failed to add Device service %s", serve_result.status_string());
+    return serve_result.take_error();
+  }
+
+  if (zx::result result = CreateDevfsNode(); result.is_error()) {
+    zxlogf(ERROR, "Failed to export to devfs %s", result.status_string());
+    return result.take_error();
+  }
+
+  return zx::ok();
 }
-
-zx_status_t UsbAdbDevice::Bind(void* ctx, zx_device_t* parent) {
-  auto adb = std::make_unique<UsbAdbDevice>(parent, 16, 16, 2048);
-  if (!adb) {
-    zxlogf(ERROR, "Could not create UsbAdbDevice.");
-    return ZX_ERR_NO_MEMORY;
-  }
-  auto status = adb->Init();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not init UsbAdbDevice - %d.", status);
-    adb->DdkRelease();
-    return status;
-  }
-
-  {
-    // The DDK now owns this reference.
-    [[maybe_unused]] auto released = adb.release();
-  }
-  return ZX_OK;
-}
-
-static constexpr zx_driver_ops_t driver_ops = []() {
-  zx_driver_ops_t ops{};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = UsbAdbDevice::Bind;
-  return ops;
-}();
 
 }  // namespace usb_adb_function
 
-// clang-format off
-ZIRCON_DRIVER(usb_adb, usb_adb_function::driver_ops, "zircon", "0.1");
+FUCHSIA_DRIVER_EXPORT(usb_adb_function::UsbAdbDevice);

@@ -189,7 +189,7 @@ class FakeAdbDriver {
    public:
     explicit DeviceServer(FakeAdbDriver* adb) : impl_(&adb->impl_) {}
 
-    void Start(StartRequest& request, StartCompleter::Sync& completer) override {
+    void StartAdb(StartAdbRequest& request, StartAdbCompleter::Sync& completer) override {
       ASSERT_TRUE(expect_start_ > 0);
       expect_start_--;
       impl_->Bind(std::move(request.interface()));
@@ -197,7 +197,7 @@ class FakeAdbDriver {
       completer.Reply(fit::success());
     }
 
-    void Stop(StopCompleter::Sync& completer) override { completer.Reply(fit::success()); }
+    void StopAdb(StopAdbCompleter::Sync& completer) override { completer.Reply(fit::success()); }
 
    private:
     friend class FakeAdbDriver;

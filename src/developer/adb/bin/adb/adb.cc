@@ -21,7 +21,8 @@ constexpr char kAdbDirectory[] = "/dev/class/adb";
 void Adb::ReceiveCallback(
     fidl::WireUnownedResult<fuchsia_hardware_adb::UsbAdbImpl::Receive>& result) {
   if (!result.ok()) {
-    // TODO(https://fxbug.dev/42073024): improve the graceful shutdown story in tests and remove this.
+    // TODO(https://fxbug.dev/42073024): improve the graceful shutdown story in tests and remove
+    // this.
     if (result.is_peer_closed()) {
       FX_PLOGS(WARNING, result.status()) << "Connection to underlying UsbAdbImpl failed. Quitting.";
       return;
@@ -192,7 +193,7 @@ zx_status_t Adb::Init(DeviceConnector* connector) {
   impl_.Bind(std::move(ends->client), dispatcher_);
   impl_->Receive().Then(fit::bind_member<&Adb::ReceiveCallback>(this));
 
-  auto result = fidl::WireCall(dev.value())->Start(std::move(ends->server));
+  auto result = fidl::WireCall(dev.value())->StartAdb(std::move(ends->server));
   if (result->is_error()) {
     FX_LOGS(ERROR) << "Could not call start for UsbAdbImpl " << result->error_value();
     return result->error_value();

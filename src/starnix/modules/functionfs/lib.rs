@@ -309,7 +309,7 @@ fn connect_to_device(
     };
 
     device_proxy
-        .start(server_end, zx::MonotonicInstant::INFINITE)
+        .start_adb(server_end, zx::MonotonicInstant::INFINITE)
         .map_err(|_| errno!(EINVAL))?
         .map_err(|_| errno!(EINVAL))?;
 
@@ -397,8 +397,9 @@ impl FunctionFsRootDir {
             state.event_queue.clear();
 
             if let Some(device_proxy) = state.device_proxy.as_ref() {
-                let _ =
-                    device_proxy.stop(zx::MonotonicInstant::INFINITE).map_err(|_| errno!(EINVAL));
+                let _ = device_proxy
+                    .stop_adb(zx::MonotonicInstant::INFINITE)
+                    .map_err(|_| errno!(EINVAL));
             }
         }
     }
