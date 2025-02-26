@@ -36,7 +36,6 @@
 #include <ktl/span.h>
 #include <lk/init.h>
 #include <phys/arch/arch-handoff.h>
-#include <phys/handoff.h>
 #include <vm/arch_vm_aspace.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
@@ -2394,9 +2393,6 @@ void ArmVmICacheConsistencyManager::Finish() {
 }
 
 void arm64_mmu_early_init() {
-  arm64_boot_map_init(reinterpret_cast<uintptr_t>(__executable_start) -
-                      reinterpret_cast<uintptr_t>(KernelPhysicalLoadAddress()));
-
   // Our current ASID allocation scheme is very naive and allocates a unique ASID to every address
   // space, which means that there are often not enough ASIDs when the machine uses 8-bit ASIDs.
   // Therefore, if we detect that we are only given 8-bit ASIDs, disable their use.
