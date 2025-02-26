@@ -10,6 +10,8 @@
 #include <lib/async/cpp/task.h>
 #include <lib/component/incoming/cpp/protocol.h>
 
+#include <filesystem>
+
 #include "src/ui/lib/escher/debug/debug_font.h"
 #include "src/ui/lib/escher/escher.h"
 #include "src/ui/lib/escher/fs/hack_filesystem.h"
@@ -29,6 +31,10 @@ namespace escher {
 
 const fuchsia_ui_composition::TransformId kTransform = {1};
 const fuchsia_ui_composition::TransformId kTransformNone = {0};
+
+// Reserved hrtimer id. Do not change!
+constexpr uint64_t kHrtimerId = 8;
+static constexpr char kHrtimerDeviceDirectory[] = "/dev/class/hrtimer";
 
 VulkanInstance::Params GetVulkanInstanceParams() {
   VulkanInstance::Params instance_params{
@@ -188,6 +194,97 @@ void escher::EscherFlatland::RenderLoop(RenderFrameFn render_frame) {
   async::PostTask(dispatcher_, [&] { RenderLoop(render_frame); });
 }
 
+zx::eventpair escher::EscherFlatland::ConnectPowerResources() {
+  // Connect to sag and obtain an activity lease.
+  zx::result sag_client_end = component::Connect<fuchsia_power_system::ActivityGovernor>();
+  FX_CHECK(sag_client_end.is_ok());
+  sag_ = fidl::SyncClient(std::move(*sag_client_end));
+
+  // Hold onto an activity lease to stop going to suspend mode before running CPU and GPU commands.
+  auto setup_lease = GetActivityLease();
+
+  return setup_lease;
+}
+
+void escher::EscherFlatland::ConnectTimerResources() {
+  // Connect to hrtimer.
+  std::string path;
+  for (const auto& entry : std::filesystem::directory_iterator(kHrtimerDeviceDirectory)) {
+    path = entry.path().string();
+    break;
+  }
+  zx::result connector = component::Connect<fuchsia_hardware_hrtimer::Device>(path.c_str());
+  if (connector.is_error()) {
+    FX_LOGS(FATAL) << "Could not connect to:" << path << " status:" << connector.status_string();
+  }
+  hrtimer_device_ = fidl::Client(std::move(connector.value()), dispatcher_);
+}
+
+void escher::EscherFlatland::RenderLoopWithWakingDelay(RenderFrameFn render_frame,
+                                                       zx::eventpair wake_lease) {
+  FX_CHECK(sag_) << "Missing SAG. Make sure to \"ConnectPowerResources\" first.";
+  FX_CHECK(hrtimer_device_) << "Missing hrtimer. Make sure to \"ConnectTimerResources\" first.";
+  auto activity_lease = GetActivityLease();
+  RenderFrame(render_frame);
+
+  // TODO(https://fxbug.dev/376925106): This delay is a workaround, because we need to
+  // actually wait for gpu work to be done and Scenic to put the image on display. We
+  // currently don't have these signals as we are using the vulkan imagepipe swapchain
+  // extension. We should use Flatland directly instead and rely on OnFramePresented()
+  // signals.
+  async::PostDelayedTask(
+      dispatcher_,
+      [activity_lease = std::move(
+           activity_lease)]() mutable {  // Drop the lease as render work should be completed.
+      },
+      kSuspendDelayForComposition);
+
+  FX_CHECK(wake_lease.is_valid());
+  (*hrtimer_device_)
+      .StartAndWait2(
+          {kHrtimerId, fuchsia_hardware_hrtimer::Resolution::WithDuration(zx::usec(1).to_nsecs()),
+           static_cast<uint64_t>(delay_until_next_render_.to_usecs()), std::move(wake_lease)})
+      .Then([&](fidl::Result<fuchsia_hardware_hrtimer::Device::StartAndWait2>& result) mutable {
+        if (!result.is_ok()) {
+          if (result.error_value().domain_error() ==
+              fuchsia_hardware_hrtimer::DriverError::kCanceled) {
+            return;
+          }
+          FX_LOGS(FATAL) << "StartAndWait2 failed: " << result.error_value().FormatDescription();
+        }
+        // Drop expiration_keep_alive lease from |result| as it is a wake lease that isn't enough
+        // to start gpu. Instead get a new activity lease.
+        RenderLoopWithWakingDelay(render_frame, std::move(result.value().expiration_keep_alive()));
+      });
+}
+
+void escher::EscherFlatland::GetStatus(OnStatusFn on_status) {
+  parent_viewport_watcher_->GetStatus().Then(on_status);
+}
+
+zx::eventpair escher::EscherFlatland::GetActivityLease() {
+  FX_CHECK(sag_) << "Missing SAG. Make sure to \"ConnectPowerResources\" first.";
+  // Activity lease allows for running GPU work which is necessary.
+  auto take_activity_lease_result = sag_->TakeApplicationActivityLease(name_);
+  FX_CHECK(take_activity_lease_result.is_ok());
+  return std::move(take_activity_lease_result->token());
+}
+
+zx::eventpair escher::EscherFlatland::GetWakeLease() {
+  FX_CHECK(sag_) << "Missing SAG. Make sure to \"ConnectPowerResources\" first.";
+  auto take_wake_lease_result = sag_->TakeWakeLease(name_);
+  FX_CHECK(take_wake_lease_result.is_ok());
+  return std::move(take_wake_lease_result->token());
+}
+
+void escher::EscherFlatland::StopTimer() {
+  hrtimer_device_->Stop({kHrtimerId}).Then([](auto& result) {
+    if (!result.is_ok()) {
+      FX_LOGS(FATAL) << "Stop failed: " << result.error_value().FormatDescription();
+    }
+  });
+}
+
 void escher::EscherFlatland::SetVisible(bool is_visible) {
   fuchsia_ui_composition::TransformId transform_id = is_visible ? kTransform : kTransformNone;
   const auto& set_root_transform_result = flatland_->SetRootTransform(transform_id);
@@ -201,7 +298,8 @@ void escher::EscherFlatland::SetVisible(bool is_visible) {
   }
 }
 
-EscherFlatland::EscherFlatland(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {
+EscherFlatland::EscherFlatland(async_dispatcher_t* dispatcher, std::string name)
+    : dispatcher_(dispatcher), name_(name) {
   // Create graphical_presenter_token and local_flatland_view_token.
   fuchsia_ui_views::ViewCreationToken local_flatland_view_token;
   fuchsia_ui_views::ViewportCreationToken graphical_presenter_token;
@@ -239,6 +337,12 @@ EscherFlatland::EscherFlatland(async_dispatcher_t* dispatcher) : dispatcher_(dis
   {
     fuchsia_element::ViewSpec spec;
     spec.viewport_creation_token(std::move(graphical_presenter_token.value()));
+
+    fuchsia_element::AnnotationKey key{{.namespace_ = "window_manager", .value = "view_id"}};
+    auto value = fuchsia_element::AnnotationValue::WithText(name_);
+    fuchsia_element::Annotations annotations;
+    annotations.emplace_back(std::move(key), std::move(value));
+    spec.annotations(std::move(annotations));
 
     auto controller_endpoints = fidl::CreateEndpoints<fuchsia_element::ViewController>();
     FX_CHECK(controller_endpoints.is_ok());
@@ -325,7 +429,7 @@ EscherFlatland::EscherFlatland(async_dispatcher_t* dispatcher) : dispatcher_(dis
       swapchain, device->vk_device(), device->vk_main_queue());
 
   {
-    auto frame = escher_->NewFrame("escher_flatland-init", 1, false);
+    auto frame = escher_->NewFrame((name_ + "-init").c_str(), 1, false);
     auto gpu_uploader =
         std::make_shared<BatchGpuUploader>(escher_->GetWeakPtr(), frame->frame_number());
 

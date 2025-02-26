@@ -29,7 +29,7 @@ std::string GetCurrentTimeString(void) {
 int main(int argc, char** argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher());
-  escher::EscherFlatland escher_flatland(loop.dispatcher());
+  escher::EscherFlatland escher_flatland(loop.dispatcher(), "escher-flatland");
 
   escher::DebugFont debug_font = escher_flatland.debug_font();
   escher::RenderFrameFn render_frame = [&debug_font](const escher::ImagePtr& output_image,

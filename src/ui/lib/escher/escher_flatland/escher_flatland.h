@@ -5,6 +5,8 @@
 #ifndef SRC_UI_LIB_ESCHER_ESCHER_FLATLAND_ESCHER_FLATLAND_H_
 #define SRC_UI_LIB_ESCHER_ESCHER_FLATLAND_ESCHER_FLATLAND_H_
 
+#include <fidl/fuchsia.hardware.hrtimer/cpp/fidl.h>
+#include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <fidl/fuchsia.ui.composition/cpp/fidl.h>
 #include <fidl/fuchsia.ui.views/cpp/fidl.h>
 
@@ -15,8 +17,16 @@
 
 namespace escher {
 
+// Delay to compensate for the time it takes for Vulkan to finish rendering, Scenic to finish
+// composition and the display to show the new frame.
+constexpr zx::duration kSuspendDelayForComposition = zx::msec(200);
+
 using RenderFrameFn = std::function<void(const escher::ImagePtr& /*output_image*/,
                                          const vk::Extent2D, const escher::FramePtr&)>;
+
+using GetStatusResult =
+    fidl::WireUnownedResult<fuchsia_ui_composition::ParentViewportWatcher::GetStatus>;
+using OnStatusFn = std::function<void(GetStatusResult&)>;
 
 VulkanInstance::Params GetVulkanInstanceParams();
 vk::SurfaceKHR CreateSurface(const vk::Instance& instance,
@@ -34,9 +44,9 @@ class EscherFlatland {
   // Connects to mandatory resources on initialization, including getting the
   // size provided by the parent viewport watcher. It does not watch for future
   // size changes.
-  EscherFlatland(async_dispatcher_t* dispatcher);
+  EscherFlatland(async_dispatcher_t* dispatcher, std::string name = "escher_flatland");
 
-  // Renders a frame using the `render_frame_fn`.
+  // Renders a frame using `render_frame`.
   //
   // The target user is not an expert in Vulkan programming (it is a
   // notoriously complicated API). `RenderFrame()` makes assumptions that work
@@ -46,9 +56,21 @@ class EscherFlatland {
   // don't want to use this class anyway, except perhaps as a reference.
   void RenderFrame(RenderFrameFn render_frame);
 
-  // Renders a frame using the `render_frame_fn`, and then immediately
+  // Renders a frame using the `render_frame`, and then immediately
   // schedules another frame to be rendered using the default async dispatcher.
   void RenderLoop(RenderFrameFn render_frame);
+
+  zx::eventpair ConnectPowerResources();
+  void ConnectTimerResources();
+
+  // Renders a frame using the `render_frame`, and then schedules another
+  // frame to be rendered on a predetermined delay. Requires resources
+  // specific to power from `ConnectPowerResources` and timers from
+  // `ConnectTimerResources()`.
+  //
+  // A wake lease is passed between two consecutive render calls to ensure the
+  // system wakes after the predetermined delay.
+  void RenderLoopWithWakingDelay(RenderFrameFn render_frame, zx::eventpair wake_lease);
 
   // Presents one of two default transforms:
   // * if `is_visible`, the Transform associated with Content containing a
@@ -56,15 +78,31 @@ class EscherFlatland {
   // * otherwise, the Transform associated with no Content
   void SetVisible(bool is_visible);
 
+  // Hanging-get on GetStatus on the ParentViewportWatcher.
+  void GetStatus(OnStatusFn on_status);
+
+  zx::eventpair GetActivityLease();
+
+  zx::eventpair GetWakeLease();
+
+  // Cancels RenderLoopWithWakingDelay.
+  void StopTimer();
+
   DebugFont debug_font() { return *debug_font_.get(); };
+
+  void set_delay_until_next_render(zx::duration delay) { delay_until_next_render_ = delay; };
 
  private:
   async_dispatcher_t* dispatcher_;
+  zx::duration delay_until_next_render_;
   std::unique_ptr<Escher> escher_;
   std::unique_ptr<DebugFont> debug_font_;
   fidl::SyncClient<fuchsia_ui_composition::Flatland> flatland_;
+  fidl::Client<fuchsia_hardware_hrtimer::Device> hrtimer_device_;
   vk::Extent2D image_extent_;
+  std::string name_;
   fidl::WireClient<fuchsia_ui_composition::ParentViewportWatcher> parent_viewport_watcher_;
+  fidl::SyncClient<fuchsia_power_system::ActivityGovernor> sag_;
   std::unique_ptr<VulkanSwapchainHelper> swapchain_helper_;
 };
 
