@@ -219,24 +219,23 @@ zx_status_t crashlog_to_vmo(fbl::RefPtr<VmObject>* out, size_t* out_size) {
   return ZX_OK;
 }
 
-UserbootImage bootstrap_vmos(ktl::span<Handle*, userboot::kHandleCount> handles) {
+UserbootImage bootstrap_vmos(HandoffEnd handoff_end,
+                             ktl::span<Handle*, userboot::kHandleCount> handles) {
   // The instrumentation VMOs need to be created prior to the rootfs as the information for these
   // vmos is in the phys handoff region, which becomes inaccessible once the rootfs is created.
   zx_status_t status = InstrumentationData::GetVmos(&handles[userboot::kFirstInstrumentationData]);
   ASSERT(status == ZX_OK);
 
-  HandoffEnd end = EndHandoff();
-
   for (size_t i = 0; i < PhysVmo::kMaxExtraHandoffPhysVmos; ++i) {
-    handles[userboot::kFirstExtraPhysVmo + i] = end.extra_phys_vmos[i].release();
+    handles[userboot::kFirstExtraPhysVmo + i] = handoff_end.extra_phys_vmos[i].release();
   }
 
-  handles[userboot::kZbi] = end.zbi.release();
+  handles[userboot::kZbi] = handoff_end.zbi.release();
 
   KernelHandle<VmObjectDispatcher> vdso_kernel_handles[userboot::kNumVdsoVariants];
   KernelHandle<VmObjectDispatcher> time_values_handle;
-  const VDso* vdso =
-      VDso::Create(ktl::move(end.vdso), ktl::span{vdso_kernel_handles}, &time_values_handle);
+  const VDso* vdso = VDso::Create(ktl::move(handoff_end.vdso), ktl::span{vdso_kernel_handles},
+                                  &time_values_handle);
   handles[userboot::kTimeValues] =
       Handle::Make(ktl::move(time_values_handle), (vdso->vmo_rights() & (~ZX_RIGHT_EXECUTE)))
           .release();
@@ -301,12 +300,12 @@ UserbootImage bootstrap_vmos(ktl::span<Handle*, userboot::kHandleCount> handles)
                           &handles[userboot::kCounters]);
   ASSERT(status == ZX_OK);
 
-  return {ktl::move(end.userboot), vdso};
+  return {ktl::move(handoff_end.userboot), vdso};
 }
 
 }  // namespace
 
-void userboot_init() {
+void userboot_init(HandoffEnd handoff_end) {
   // Prepare the bootstrap message packet.  This allocates space for its
   // handles, which we'll fill in as we create things.
   MessagePacketPtr msg;
@@ -349,7 +348,7 @@ void userboot_init() {
   handles[userboot::kRootJob] = get_job_handle().release();
   ASSERT(handles[userboot::kRootJob]);
 
-  UserbootImage userboot = bootstrap_vmos(handles);
+  UserbootImage userboot = bootstrap_vmos(ktl::move(handoff_end), handles);
 
   // Make the channel that will hold the message.
   KernelHandle<ChannelDispatcher> user_handle, kernel_handle;

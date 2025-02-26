@@ -193,11 +193,15 @@ static int bootstrap2(void*) {
   arch_late_init_percpu();
   lk_primary_cpu_init_level(LK_INIT_LEVEL_ARCH_LATE, LK_INIT_LEVEL_USER - 1);
 
+  // End hand-off before shell initialization, as we want kernel state to be
+  // 'finalized' before we run any kernel scripts (e.g., for unit-testing).
+  HandoffEnd handoff_end = EndHandoff();
+
   // Give the kernel shell an opportunity to run. If it exits this function, continue booting.
   kernel_shell_init();
 
   dprintf(SPEW, "starting user space\n");
-  userboot_init();
+  userboot_init(ktl::move(handoff_end));
 
   dprintf(SPEW, "moving to last init level\n");
   lk_primary_cpu_init_level(LK_INIT_LEVEL_USER, LK_INIT_LEVEL_LAST);
