@@ -99,6 +99,7 @@
         },
         {
             protocol: [
+                "fuchsia.hardware.google.nanohub.Device",
                 "fuchsia.hardware.sockettunnel.Device",
                 "fuchsia.net.stack.Stack",
                 "fuchsia.power.battery.BatteryManager",

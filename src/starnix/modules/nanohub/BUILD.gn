@@ -9,6 +9,10 @@ fuchsia_package_with_single_component("sockettunnel") {
   manifest = "meta/sockettunnel.cml"
 }
 
+fuchsia_package_with_single_component("google_nanohub") {
+  manifest = "meta/nanohub.cml"
+}
+
 rustc_library("nanohub") {
   name = "starnix-modules-nanohub"
   edition = "2021"

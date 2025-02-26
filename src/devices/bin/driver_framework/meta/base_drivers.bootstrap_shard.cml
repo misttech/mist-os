@@ -116,6 +116,7 @@
     expose: [
         {
             service: [
+                "fuchsia.hardware.google.nanohub.Service",
                 "fuchsia.hardware.overnet.Service",
                 "fuchsia.hardware.sockettunnel.Service",
 

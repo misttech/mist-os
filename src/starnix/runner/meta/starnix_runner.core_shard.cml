@@ -165,6 +165,13 @@
             availability: "optional",
         },
         {
+            protocol: "fuchsia.hardware.google.nanohub.Device",
+            from: "#nanohub",
+            to: "#starnix_runner",
+            availability: "optional",
+            source_availability: "unknown",
+        },
+        {
             protocol: "fuchsia.hardware.sockettunnel.Device",
             from: "#sockettunnel",
             to: "#starnix_runner",

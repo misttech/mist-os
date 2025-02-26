@@ -121,6 +121,7 @@
     expose: [
         {
             service: [
+                "fuchsia.hardware.google.nanohub.Service",
                 "fuchsia.hardware.sockettunnel.Service",
 
                 // These duplicate a service advertised by devfs, below.

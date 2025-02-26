@@ -71,6 +71,7 @@
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.feedback.CrashReporter",
+                "fuchsia.hardware.google.nanohub.Device",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.hardware.sockettunnel.Device",
                 "fuchsia.kernel.Stats",

@@ -412,6 +412,7 @@
         {
             service: [
                 "fuchsia.hardware.gnss.Service",
+                "fuchsia.hardware.google.nanohub.Service",
                 "fuchsia.hardware.nfc.Service",
                 "fuchsia.hardware.sockettunnel.Service",
                 "fuchsia.hardware.spmi.DebugService",
