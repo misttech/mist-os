@@ -156,28 +156,6 @@ zx::result<> MoonflowerPartitioner::ValidatePayload(const PartitionSpec& spec,
   return zx::ok();
 }
 
-zx::result<> MoonflowerPartitioner::OnStop() const {
-  const auto state = GetShutdownSystemState(gpt_->svc_root());
-  switch (state) {
-    case SystemPowerState::kRebootBootloader:
-      ERROR("Setting one shot reboot to bootloader flag is not implemented.\n");
-      return zx::error(ZX_ERR_NOT_SUPPORTED);
-    case SystemPowerState::kRebootRecovery:
-      ERROR("Setting one shot reboot to recovery flag is not implemented.\n");
-      return zx::error(ZX_ERR_NOT_SUPPORTED);
-    case SystemPowerState::kFullyOn:
-    case SystemPowerState::kReboot:
-    case SystemPowerState::kPoweroff:
-    case SystemPowerState::kMexec:
-    case SystemPowerState::kSuspendRam:
-    case SystemPowerState::kRebootKernelInitiated:
-      // nothing to do for these cases
-      break;
-  }
-
-  return zx::ok();
-}
-
 zx::result<std::unique_ptr<DevicePartitioner>> MoonflowerPartitionerFactory::New(
     const BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
     std::shared_ptr<Context> context, fidl::ClientEnd<fuchsia_device::Controller> block_device) {
