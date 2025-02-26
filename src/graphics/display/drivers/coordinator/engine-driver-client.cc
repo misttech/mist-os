@@ -190,13 +190,19 @@ void EngineDriverClient::ApplyConfiguration(const display_config_t* display_conf
   banjo_engine_.ApplyConfiguration(display_config, config_stamp);
 }
 
-void EngineDriverClient::SetListener(const display_engine_listener_protocol_t& protocol) {
+display::EngineInfo EngineDriverClient::CompleteCoordinatorConnection(
+    const display_engine_listener_protocol_t& protocol) {
   if (use_engine_) {
-    return;
+    return display::EngineInfo({});
   }
 
   ZX_DEBUG_ASSERT(banjo_engine_.is_valid());
-  banjo_engine_.SetListener(protocol.ctx, protocol.ops);
+  engine_info_t banjo_engine_info;
+  banjo_engine_.CompleteCoordinatorConnection(protocol.ctx, protocol.ops, &banjo_engine_info);
+  if (!display::EngineInfo::IsValid(banjo_engine_info)) {
+    FDF_LOG(FATAL, "CompleteCoordinatorConnection returned invalid EngineInfo");
+  }
+  return display::EngineInfo::From(banjo_engine_info);
 }
 
 void EngineDriverClient::UnsetListener() {
@@ -293,15 +299,6 @@ zx::result<> EngineDriverClient::SetBufferCollectionConstraints(
   zx_status_t banjo_status = banjo_engine_.SetBufferCollectionConstraints(
       &banjo_usage, display::ToBanjoDriverBufferCollectionId(collection_id));
   return zx::make_result(banjo_status);
-}
-
-bool EngineDriverClient::IsCaptureSupported() {
-  if (use_engine_) {
-    return false;
-  }
-
-  ZX_DEBUG_ASSERT(banjo_engine_.is_valid());
-  return banjo_engine_.IsCaptureSupported();
 }
 
 zx::result<> EngineDriverClient::StartCapture(

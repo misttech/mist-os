@@ -50,13 +50,19 @@ namespace framebuffer_display {
 
 namespace {
 
-static constexpr display::DisplayId kDisplayId(1);
-static constexpr display::ModeId kDisplayModeId(1);
-static constexpr int kRefreshRateHz = 30;
+constexpr display::EngineInfo kEngineInfo({
+    .max_layer_count = 1,
+    .max_connected_display_count = 1,
+    .is_capture_supported = false,
+});
 
-static constexpr uint64_t kImageHandle = 0xdecafc0ffee;
+constexpr display::DisplayId kDisplayId(1);
+constexpr display::ModeId kDisplayModeId(1);
+constexpr int kRefreshRateHz = 30;
 
-static constexpr auto kVSyncInterval = zx::usec(1000000 / kRefreshRateHz);
+constexpr uint64_t kImageHandle = 0xdecafc0ffee;
+
+constexpr auto kVSyncInterval = zx::usec(1000000 / kRefreshRateHz);
 
 fuchsia_hardware_sysmem::wire::HeapProperties GetHeapProperties(fidl::AnyArena& arena) {
   fuchsia_hardware_sysmem::wire::CoherencyDomainSupport coherency_domain_support =
@@ -102,7 +108,7 @@ zx_koid_t GetCurrentProcessKoid() {
 
 // implement display controller protocol:
 
-void FramebufferDisplay::OnCoordinatorConnected() {
+display::EngineInfo FramebufferDisplay::CompleteCoordinatorConnection() {
   const display::ModeAndId mode_and_id({
       .id = kDisplayModeId,
       .mode = display::Mode({
@@ -115,6 +121,8 @@ void FramebufferDisplay::OnCoordinatorConnected() {
   const cpp20::span<const display::ModeAndId> preferred_modes(&mode_and_id, 1);
   const cpp20::span<const display::PixelFormat> pixel_formats(&properties_.pixel_format, 1);
   engine_events_.OnDisplayAdded(kDisplayId, preferred_modes, pixel_formats);
+
+  return kEngineInfo;
 }
 
 zx::result<> FramebufferDisplay::ImportBufferCollection(
@@ -387,8 +395,6 @@ zx::result<> FramebufferDisplay::SetBufferCollectionConstraints(
 
   return zx::ok();
 }
-
-bool FramebufferDisplay::IsCaptureSupported() { return false; }
 
 zx::result<> FramebufferDisplay::SetDisplayPower(display::DisplayId display_id, bool power_on) {
   return zx::error(ZX_ERR_NOT_SUPPORTED);

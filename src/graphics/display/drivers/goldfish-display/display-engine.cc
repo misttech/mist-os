@@ -109,8 +109,12 @@ zx::result<> DisplayEngine::Initialize() {
   return zx::ok();
 }
 
-void DisplayEngine::DisplayEngineSetListener(
-    const display_engine_listener_protocol_t* engine_listener) {
+void DisplayEngine::DisplayEngineCompleteCoordinatorConnection(
+    const display_engine_listener_protocol_t* display_engine_listener,
+    engine_info_t* out_banjo_engine_info) {
+  ZX_DEBUG_ASSERT(display_engine_listener != nullptr);
+  ZX_DEBUG_ASSERT(out_banjo_engine_info != nullptr);
+
   const int32_t width = primary_display_device_.width_px;
   const int32_t height = primary_display_device_.height_px;
   const int32_t refresh_rate_hz = primary_display_device_.refresh_rate_hz;
@@ -150,9 +154,15 @@ void DisplayEngine::DisplayEngineSetListener(
 
   {
     fbl::AutoLock lock(&flush_lock_);
-    engine_listener_ = ddk::DisplayEngineListenerProtocolClient(engine_listener);
+    engine_listener_ = ddk::DisplayEngineListenerProtocolClient(display_engine_listener);
     engine_listener_.OnDisplayAdded(&banjo_display_info);
   }
+
+  *out_banjo_engine_info = {
+      .max_layer_count = 1,
+      .max_connected_display_count = 1,
+      .is_capture_supported = false,
+  };
 }
 
 void DisplayEngine::DisplayEngineUnsetListener() {

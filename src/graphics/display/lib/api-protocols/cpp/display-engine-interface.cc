@@ -10,8 +10,6 @@ zx::result<> DisplayEngineInterface::SetDisplayPower(display::DisplayId display_
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
-bool DisplayEngineInterface::IsCaptureSupported() { return false; }
-
 zx::result<> DisplayEngineInterface::StartCapture(display::DriverCaptureImageId capture_image_id) {
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }

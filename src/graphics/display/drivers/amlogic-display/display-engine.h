@@ -80,9 +80,10 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
   // destructor.
   void Deinitialize();
 
-  // Implements the `fuchsia.hardware.display.controller/DisplayEngine`
-  // banjo protocol.
-  void DisplayEngineSetListener(const display_engine_listener_protocol_t* engine_listener);
+  // ddk::DisplayEngineProtocol
+  void DisplayEngineCompleteCoordinatorConnection(
+      const display_engine_listener_protocol_t* display_engine_listener,
+      engine_info_t* out_banjo_engine_info);
   void DisplayEngineUnsetListener();
   zx_status_t DisplayEngineImportBufferCollection(uint64_t banjo_driver_buffer_collection_id,
                                                   zx::channel collection_token);
@@ -101,7 +102,6 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
       const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id);
   zx_status_t DisplayEngineSetDisplayPower(uint64_t display_id, bool power_on);
 
-  bool DisplayEngineIsCaptureSupported();
   zx_status_t DisplayEngineImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
                                                  uint32_t index, uint64_t* out_capture_handle);
   zx_status_t DisplayEngineStartCapture(uint64_t capture_handle);

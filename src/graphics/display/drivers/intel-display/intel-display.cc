@@ -777,10 +777,14 @@ zx_status_t Controller::AddDisplay(std::unique_ptr<DisplayDevice> display) {
 
 // DisplayEngine methods
 
-void Controller::DisplayEngineSetListener(
-    const display_engine_listener_protocol_t* engine_listener) {
+void Controller::DisplayEngineCompleteCoordinatorConnection(
+    const display_engine_listener_protocol_t* display_engine_listener,
+    engine_info_t* out_banjo_engine_info) {
+  ZX_DEBUG_ASSERT(display_engine_listener != nullptr);
+  ZX_DEBUG_ASSERT(out_banjo_engine_info != nullptr);
+
   fbl::AutoLock lock(&display_lock_);
-  engine_listener_ = ddk::DisplayEngineListenerProtocolClient(engine_listener);
+  engine_listener_ = ddk::DisplayEngineListenerProtocolClient(display_engine_listener);
 
   // If `SetListener` occurs **after** driver initialization (i.e.
   // `driver_initialized_` is true), `SetListener` should be responsible for
@@ -794,6 +798,16 @@ void Controller::DisplayEngineSetListener(
       engine_listener_.OnDisplayAdded(&banjo_display_info);
     }
   }
+
+  *out_banjo_engine_info = {
+      // Each Tiger Lake pipe supports at most 8 layers (7 planes + 1 cursor).
+      //
+      // The total limit equals the pipe limit while we only support a single display. This
+      // limit must be revised when we implement multi-display support.
+      .max_layer_count = 8,
+      .max_connected_display_count = 1,
+      .is_capture_supported = false,
+  };
 }
 
 void Controller::DisplayEngineUnsetListener() {

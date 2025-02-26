@@ -19,6 +19,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "src/graphics/display/lib/api-protocols/cpp/mock-banjo-display-engine-listener.h"
 #include "src/graphics/display/lib/api-protocols/cpp/mock-display-engine.h"
 #include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
@@ -28,6 +29,7 @@
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
+#include "src/graphics/display/lib/api-types/cpp/engine-info.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
@@ -51,6 +53,24 @@ class DisplayEngineBanjoAdapterTest : public ::testing::Test {
   const display_engine_protocol_t display_engine_protocol_ = banjo_adapter_.GetProtocol();
   ddk::DisplayEngineProtocolClient engine_banjo_{&display_engine_protocol_};
 };
+
+TEST_F(DisplayEngineBanjoAdapterTest, CompleteCoordinatorConnection) {
+  static constexpr display::EngineInfo kEngineInfo({
+      .max_layer_count = 4,
+      .max_connected_display_count = 1,
+      .is_capture_supported = false,
+  });
+
+  testing::MockBanjoDisplayEngineListener mock_listener;
+  mock_.ExpectCompleteCoordinatorConnection([&] { return kEngineInfo; });
+
+  engine_info_t banjo_engine_info;
+  engine_banjo_.CompleteCoordinatorConnection(mock_listener.GetProtocol().ctx,
+                                              mock_listener.GetProtocol().ops, &banjo_engine_info);
+  EXPECT_EQ(kEngineInfo, display::EngineInfo::From(banjo_engine_info));
+
+  mock_listener.CheckAllCallsReplayed();
+}
 
 TEST_F(DisplayEngineBanjoAdapterTest, ImportBufferCollectionSuccess) {
   auto [buffer_collection_token_client, buffer_collection_token_server] =
@@ -405,11 +425,6 @@ TEST_F(DisplayEngineBanjoAdapterTest, SetDisplayPowerError) {
       [&](display::DisplayId display_id, bool power_on) { return zx::error(ZX_ERR_INTERNAL); });
   EXPECT_EQ(ZX_ERR_INTERNAL,
             engine_banjo_.SetDisplayPower(display::ToBanjoDisplayId(kDisplayId), true));
-}
-
-TEST_F(DisplayEngineBanjoAdapterTest, IsCaptureSupported) {
-  mock_.ExpectIsCaptureSupported([&]() { return false; });
-  EXPECT_EQ(false, engine_banjo_.IsCaptureSupported());
 }
 
 TEST_F(DisplayEngineBanjoAdapterTest, StartCaptureSuccess) {

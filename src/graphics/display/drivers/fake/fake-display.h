@@ -78,7 +78,9 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   //
   // When the driver is migrated to FIDL, these methods will only be called on
   // the Display Engine API serving dispatcher.
-  void DisplayEngineSetListener(const display_engine_listener_protocol_t* engine_listener);
+  void DisplayEngineCompleteCoordinatorConnection(
+      const display_engine_listener_protocol_t* display_engine_listener,
+      engine_info_t* out_banjo_engine_info);
   void DisplayEngineUnsetListener();
   zx_status_t DisplayEngineImportBufferCollection(uint64_t banjo_driver_buffer_collection_id,
                                                   zx::channel collection_token);
@@ -98,7 +100,6 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   zx_status_t DisplayEngineSetDisplayPower(uint64_t display_id, bool power_on);
   zx_status_t DisplayEngineImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
                                                  uint32_t index, uint64_t* out_capture_handle);
-  bool DisplayEngineIsCaptureSupported();
   zx_status_t DisplayEngineStartCapture(uint64_t capture_handle);
   zx_status_t DisplayEngineReleaseCapture(uint64_t capture_handle);
   zx_status_t DisplayEngineSetMinimumRgb(uint8_t minimum_rgb);

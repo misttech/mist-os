@@ -205,16 +205,26 @@ zx::result<> DisplayEngine::ResetDisplayEngine() {
   return zx::ok();
 }
 
-void DisplayEngine::DisplayEngineSetListener(
-    const display_engine_listener_protocol_t* engine_listener) {
+void DisplayEngine::DisplayEngineCompleteCoordinatorConnection(
+    const display_engine_listener_protocol_t* display_engine_listener,
+    engine_info_t* out_banjo_engine_info) {
+  ZX_DEBUG_ASSERT(display_engine_listener != nullptr);
+  ZX_DEBUG_ASSERT(out_banjo_engine_info != nullptr);
+
   fbl::AutoLock display_lock(&display_mutex_);
-  engine_listener_ = ddk::DisplayEngineListenerProtocolClient(engine_listener);
+  engine_listener_ = ddk::DisplayEngineListenerProtocolClient(display_engine_listener);
 
   if (display_attached_) {
     const raw_display_info_t added_display_info =
         vout_->CreateRawDisplayInfo(display_id_, kSupportedBanjoPixelFormats);
     engine_listener_.OnDisplayAdded(&added_display_info);
   }
+
+  *out_banjo_engine_info = {
+      .max_layer_count = 1,
+      .max_connected_display_count = 1,
+      .is_capture_supported = true,
+  };
 }
 
 void DisplayEngine::DisplayEngineUnsetListener() {
@@ -776,8 +786,6 @@ zx_status_t DisplayEngine::DisplayEngineSetDisplayPower(uint64_t display_id, boo
   }
   return vout_->PowerOff().status_value();
 }
-
-bool DisplayEngine::DisplayEngineIsCaptureSupported() { return true; }
 
 zx_status_t DisplayEngine::DisplayEngineImportImageForCapture(
     uint64_t banjo_driver_buffer_collection_id, uint32_t index, uint64_t* out_capture_handle) {

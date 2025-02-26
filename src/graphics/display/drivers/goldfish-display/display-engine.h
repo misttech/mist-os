@@ -50,7 +50,10 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
   // Performs initialization that cannot be done in the constructor.
   zx::result<> Initialize();
 
-  // Display controller protocol implementation.
+  // ddk::DisplayEngineProtocol
+  void DisplayEngineCompleteCoordinatorConnection(
+      const display_engine_listener_protocol_t* display_engine_listener,
+      engine_info_t* out_banjo_engine_info);
   void DisplayEngineSetListener(const display_engine_listener_protocol_t* engine_listener);
   void DisplayEngineUnsetListener();
   zx_status_t DisplayEngineImportBufferCollection(uint64_t banjo_driver_buffer_collection_id,
@@ -75,7 +78,6 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
   zx_status_t DisplayEngineSetDisplayPower(uint64_t display_id, bool power_on) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  bool DisplayEngineIsCaptureSupported() { return false; }
   zx_status_t DisplayEngineStartCapture(uint64_t capture_handle) { return ZX_ERR_NOT_SUPPORTED; }
   zx_status_t DisplayEngineReleaseCapture(uint64_t capture_handle) { return ZX_ERR_NOT_SUPPORTED; }
   zx_status_t DisplayEngineSetMinimumRgb(uint8_t minimum_rgb) { return ZX_ERR_NOT_SUPPORTED; }

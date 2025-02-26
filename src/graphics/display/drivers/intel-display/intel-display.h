@@ -97,8 +97,10 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   void PrepareStopOnPowerStateTransition(fuchsia_system_state::SystemPowerState power_state,
                                          fdf::PrepareStopCompleter completer);
 
-  // display controller protocol ops
-  void DisplayEngineSetListener(const display_engine_listener_protocol* engine_listener);
+  // ddk::DisplayEngineProtocol
+  void DisplayEngineCompleteCoordinatorConnection(
+      const display_engine_listener_protocol_t* display_engine_listener,
+      engine_info_t* out_banjo_engine_info);
   void DisplayEngineUnsetListener();
   zx_status_t DisplayEngineImportBufferCollection(uint64_t banjo_driver_buffer_collection_id,
                                                   zx::channel collection_token);
@@ -122,7 +124,6 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   zx_status_t DisplayEngineSetDisplayPower(uint64_t banjo_display_id, bool power_on) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  bool DisplayEngineIsCaptureSupported() { return false; }
   zx_status_t DisplayEngineStartCapture(uint64_t capture_handle) { return ZX_ERR_NOT_SUPPORTED; }
   zx_status_t DisplayEngineReleaseCapture(uint64_t capture_handle) { return ZX_ERR_NOT_SUPPORTED; }
   zx_status_t DisplayEngineSetMinimumRgb(uint8_t minimum_rgb) { return ZX_ERR_NOT_SUPPORTED; }

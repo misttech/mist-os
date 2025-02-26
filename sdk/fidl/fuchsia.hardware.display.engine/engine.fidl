@@ -292,19 +292,68 @@ open protocol EngineListener {
     flexible OnCaptureComplete();
 };
 
+/// Upper bound on the number of layers in one display configuration.
+///
+/// This limit applies to [`EngineInfo.max_layer_count`]. The value reflects
+/// design assumptions in the display stack. The value may be increased in the
+/// future.
+const MAX_ALLOWED_MAX_LAYER_COUNT uint16 = 8;
+
+/// Upper bound on the number of concurrently connected displays.
+///
+/// This limit applies to [`EngineInfo.max_connected_display_count`]. The value
+/// reflects design assumptions in the display stack. The value will be
+/// increased in the future, when the display stack supports multi-display
+/// systems.
+const MAX_ALLOWED_MAX_CONNECTED_DISPLAY_COUNT uint16 = 1;
+
+/// Static description of the hardware managed by a display engine driver.
+///
+/// The information here is assumed to remain immutable during a boot cycle.
+type EngineInfo = struct {
+    /// Maximum number of layers in one display configuration.
+    ///
+    /// The engine driver will never support a display configuration where the
+    /// total number of layers (across all displays) exceeds this value.
+    ///
+    /// The value may reflect hardware limitations, such as the number of image
+    /// data fetch units in the hardware, or driver implementation limitations.
+    ///
+    /// In valid instances, the value is positve and at most
+    /// [`MAX_ALLOWED_MAX_LAYER_COUNT`].
+    max_layer_count uint16;
+
+    /// Maximum number of displays that can be connected at once.
+    ///
+    /// The number of connected displays reported by the display engine
+    /// will never exceed this value.
+    ///
+    /// The value may reflect hardware limitations, such as the number of
+    /// digital display interfaces in the hardware, or driver implementation
+    /// limitations.
+    ///
+    /// In valid instances, the value is positve and at most
+    /// [`MAX_ALLOWED_MAX_CONNECTED_DISPLAY_COUNT`].
+    max_connected_display_count uint16;
+
+    /// True if the driver and hardware implement display capture.
+    is_capture_supported bool;
+};
+
 /// This protocol is `open` while under development.
 /// TODO(b/316631158): We should make it `closed` once the API is stabilized.
 @discoverable
 @transport("Driver")
 open protocol Engine {
-    /// Sets a `EngineListener` that listens to display events on this display
-    /// engine.
+    /// Starts the information flow from the engine driver to the Coordinator.
     ///
-    /// There must be exactly one `EngineListener` set for the display engine
-    /// before any other functions are called.
-    flexible SetListener(resource struct {
+    /// Must be called exactly once, before all the other calls below.
+    flexible CompleteCoordinatorConnection(resource struct {
+        /// Receives events from the engine driver.
         engine_listener client_end:EngineListener;
-    }) -> ();
+    }) -> (struct {
+        engine_info EngineInfo;
+    });
 
     /// Import a sysmem buffer collection token.
     ///
@@ -437,12 +486,6 @@ open protocol Engine {
         /// Must be >= 0 and <= 255.
         minimum_rgb uint8;
     }) -> () error zx.Status;
-
-    /// Returns true iff the display Engine supports capturing the pixels
-    /// on the display device.
-    flexible IsCaptureSupported() -> (struct {
-        is_supported bool;
-    });
 
     /// Starts capture into the resource mapped by `capture_image_id `(non-blocking)
     /// Only one active capture is allowed at a time.

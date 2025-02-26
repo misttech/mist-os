@@ -18,6 +18,7 @@
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
+#include "src/graphics/display/lib/api-types/cpp/engine-info.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types/cpp/layer-composition-operations.h"
@@ -42,7 +43,20 @@ class DisplayEngineInterface {
   DisplayEngineInterface& operator=(const DisplayEngineInterface&) = delete;
   DisplayEngineInterface& operator=(DisplayEngineInterface&&) = delete;
 
-  virtual void OnCoordinatorConnected() = 0;
+  // The engine listener is connected when this method is called.
+  //
+  // TODO(https://fxbug.com/395948218): Make this a pure virtual after all drivers are migrated.
+  virtual EngineInfo CompleteCoordinatorConnection() {
+    OnCoordinatorConnected();
+    return EngineInfo({
+        .max_layer_count = 1,
+        .max_connected_display_count = 1,
+        .is_capture_supported = false,
+    });
+  }
+
+  // TODO(https://fxbug.com/395948218): Remove after all drivers are migrated.
+  virtual void OnCoordinatorConnected() {}
 
   virtual zx::result<> ImportBufferCollection(
       display::DriverBufferCollectionId buffer_collection_id,
@@ -78,7 +92,6 @@ class DisplayEngineInterface {
 
   // OOT drivers must use the default implementation for the capture interface.
   // The interface is not stabilized and will change.
-  virtual bool IsCaptureSupported();
   virtual zx::result<> StartCapture(display::DriverCaptureImageId capture_image_id);
   virtual zx::result<> ReleaseCapture(display::DriverCaptureImageId capture_image_id);
 

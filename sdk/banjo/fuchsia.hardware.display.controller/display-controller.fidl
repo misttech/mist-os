@@ -317,22 +317,27 @@ type LayerCompositionOperations = strict bits : uint32 {
     ALPHA = 0x40;
 };
 
+/// Equivalent to the [`fuchsia.hardware.display.engine/EngineInfo`] FIDL type.
+type EngineInfo = struct {
+    max_layer_count uint16;
+    max_connected_display_count uint16;
+    is_capture_supported bool;
+};
+
 /// The client guarantees that check_configuration and apply_configuration are always
 /// made from a single thread. The client makes no other threading guarantees.
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
 closed protocol DisplayEngine {
-    /// Sets a `DisplayEngineListener` that listens to display events
-    /// on this display engine.
-    ///
-    /// There must be exactly one `DisplayEngineListener` set to
-    /// the display engine before any other functions are called.
-    strict SetListener(resource struct {
+    /// See [`fuchsia.hardware.display.engine/Engine.CompleteCoordinatorConnection`].
+    strict CompleteCoordinatorConnection(resource struct {
         engine_listener client_end:DisplayEngineListener;
-    }) -> ();
+    }) -> (struct {
+        engine_info EngineInfo;
+    });
 
-    /// Unsets the `DisplayEngineListener` connection previously
-    /// registered to the Engine.
+    /// Clears the `DisplayEngineListener` connection established by
+    /// [`DisplayEngine.CompleteCoordinatorConnection`].
     strict UnsetListener() -> ();
 
     /// Import a sysmem buffer collection token.
@@ -468,12 +473,6 @@ closed protocol DisplayEngine {
         power_on bool;
     }) -> (struct {
         s zx.Status;
-    });
-
-    /// Returns true iff the display engine supports capturing the pixels
-    /// on the display device.
-    strict IsCaptureSupported() -> (struct {
-        is_supported bool;
     });
 
     /// Starts capture into the resource mapped by capture_handle (non-blocking)

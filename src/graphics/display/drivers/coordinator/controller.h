@@ -45,6 +45,7 @@
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
+#include "src/graphics/display/lib/api-types/cpp/engine-info.h"
 #include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 
 namespace display_coordinator {
@@ -144,7 +145,7 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
 
   EngineDriverClient* engine_driver_client() { return engine_driver_client_.get(); }
 
-  bool supports_capture() { return supports_capture_; }
+  bool supports_capture() { return engine_info_->is_capture_supported(); }
 
   fdf::UnownedSynchronizedDispatcher client_dispatcher() const {
     return client_dispatcher_->borrow();
@@ -217,7 +218,8 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   display::DriverCaptureImageId pending_release_capture_image_id_ =
       display::kInvalidDriverCaptureImageId;
 
-  bool supports_capture_ = false;
+  // Populated after the engine is initialized.
+  std::optional<display::EngineInfo> engine_info_;
 
   display::DriverBufferCollectionId next_driver_buffer_collection_id_ __TA_GUARDED(mtx()) =
       display::DriverBufferCollectionId(1);

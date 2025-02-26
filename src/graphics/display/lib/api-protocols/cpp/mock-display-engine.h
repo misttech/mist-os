@@ -24,6 +24,7 @@
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
+#include "src/graphics/display/lib/api-types/cpp/engine-info.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types/cpp/layer-composition-operations.h"
@@ -39,7 +40,7 @@ namespace display::testing {
 class MockDisplayEngine : public display::DisplayEngineInterface {
  public:
   // Expectation containers for display::DisplayEngineInterface:
-  using OnCoordinatorConnectedChecker = fit::function<void()>;
+  using CompleteCoordinatorConnectionChecker = fit::function<display::EngineInfo()>;
   using ImportBufferCollectionChecker = fit::function<zx::result<>(
       display::DriverBufferCollectionId buffer_collection_id,
       fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> buffer_collection_token)>;
@@ -76,7 +77,7 @@ class MockDisplayEngine : public display::DisplayEngineInterface {
   ~MockDisplayEngine();
 
   // Expectations for display::DisplayEngineInterface:
-  void ExpectOnCoordinatorConnected(OnCoordinatorConnectedChecker checker);
+  void ExpectCompleteCoordinatorConnection(CompleteCoordinatorConnectionChecker checker);
   void ExpectImportBufferCollection(ImportBufferCollectionChecker checker);
   void ExpectReleaseBufferCollection(ReleaseBufferCollectionChecker checker);
   void ExpectImportImage(ImportImageChecker checker);
@@ -98,7 +99,7 @@ class MockDisplayEngine : public display::DisplayEngineInterface {
   void CheckAllAccessesReplayed();
 
   // display::DisplayEngineInterface:
-  void OnCoordinatorConnected() override;
+  display::EngineInfo CompleteCoordinatorConnection() override;
   zx::result<> ImportBufferCollection(
       display::DriverBufferCollectionId buffer_collection_id,
       fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> buffer_collection_token) override;
@@ -121,7 +122,6 @@ class MockDisplayEngine : public display::DisplayEngineInterface {
       const display::ImageBufferUsage& image_buffer_usage,
       display::DriverBufferCollectionId buffer_collection_id) override;
   zx::result<> SetDisplayPower(display::DisplayId display_id, bool power_on) override;
-  bool IsCaptureSupported() override;
   zx::result<> StartCapture(display::DriverCaptureImageId capture_image_id) override;
   zx::result<> ReleaseCapture(display::DriverCaptureImageId capture_image_id) override;
   zx::result<> SetMinimumRgb(uint8_t minimum_rgb) override;

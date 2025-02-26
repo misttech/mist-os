@@ -175,13 +175,23 @@ void FakeDisplay::InitializeSysmemClient() {
   }
 }
 
-void FakeDisplay::DisplayEngineSetListener(
-    const display_engine_listener_protocol_t* engine_listener) {
+void FakeDisplay::DisplayEngineCompleteCoordinatorConnection(
+    const display_engine_listener_protocol_t* display_engine_listener,
+    engine_info_t* out_banjo_engine_info) {
+  ZX_DEBUG_ASSERT(display_engine_listener != nullptr);
+  ZX_DEBUG_ASSERT(out_banjo_engine_info != nullptr);
+
   {
     std::lock_guard engine_listener_lock(engine_listener_mutex_);
-    engine_listener_client_ = ddk::DisplayEngineListenerProtocolClient(engine_listener);
+    engine_listener_client_ = ddk::DisplayEngineListenerProtocolClient(display_engine_listener);
   }
   SendDisplayInformation();
+
+  *out_banjo_engine_info = {
+      .max_layer_count = 1,
+      .max_connected_display_count = 1,
+      .is_capture_supported = IsCaptureSupported(),
+  };
 }
 
 void FakeDisplay::SendDisplayInformation() {
@@ -706,8 +716,6 @@ zx_status_t FakeDisplay::DisplayEngineImportImageForCapture(
   imported_captures_.insert(std::move(capture_image_info));
   return ZX_OK;
 }
-
-bool FakeDisplay::DisplayEngineIsCaptureSupported() { return IsCaptureSupported(); }
 
 zx_status_t FakeDisplay::DisplayEngineStartCapture(uint64_t capture_handle) {
   if (!IsCaptureSupported()) {

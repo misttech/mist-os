@@ -41,6 +41,7 @@
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
+#include "src/graphics/display/lib/api-types/cpp/engine-info.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
@@ -56,6 +57,12 @@ namespace virtio_display {
 
 namespace {
 
+constexpr display::EngineInfo kEngineInfo({
+    .max_layer_count = 1,
+    .max_connected_display_count = 1,
+    .is_capture_supported = false,
+});
+
 // TODO(https://fxbug.dev/42073721): Support more formats.
 constexpr display::PixelFormat kSupportedPixelFormat = display::PixelFormat::kB8G8R8A8;
 constexpr uint32_t kRefreshRateHz = 30;
@@ -64,7 +71,7 @@ constexpr display::ModeId kDisplayModeId(1);
 
 }  // namespace
 
-void DisplayEngine::OnCoordinatorConnected() {
+display::EngineInfo DisplayEngine::CompleteCoordinatorConnection() {
   const display::ModeAndId mode_and_id({
       .id = kDisplayModeId,
       .mode = display::Mode({
@@ -78,6 +85,8 @@ void DisplayEngine::OnCoordinatorConnected() {
   const cpp20::span<const display::PixelFormat> pixel_formats(&kSupportedPixelFormat, 1);
   engine_events_.OnDisplayAdded(kDisplayId, preferred_modes, current_display_edid_bytes_,
                                 pixel_formats);
+
+  return kEngineInfo;
 }
 
 zx::result<> DisplayEngine::ImportBufferCollection(
@@ -284,8 +293,6 @@ zx::result<> DisplayEngine::SetBufferCollectionConstraints(
 
   return zx::ok();
 }
-
-bool DisplayEngine::IsCaptureSupported() { return false; }
 
 zx::result<> DisplayEngine::SetDisplayPower(display::DisplayId display_id, bool power_on) {
   return zx::error(ZX_ERR_NOT_SUPPORTED);

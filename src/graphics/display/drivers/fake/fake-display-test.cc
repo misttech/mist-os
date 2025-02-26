@@ -582,7 +582,11 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureImage) {
   DisplayCaptureCompletion display_capture_completion = {};
   const display_engine_listener_protocol_t& controller_protocol =
       display_capture_completion.GetDisplayEngineListenerProtocol();
-  fake_display_stack_->display_engine().DisplayEngineSetListener(&controller_protocol);
+
+  engine_info_t banjo_engine_info;
+  fake_display_stack_->display_engine().DisplayEngineCompleteCoordinatorConnection(
+      &controller_protocol, &banjo_engine_info);
+  ASSERT_TRUE(banjo_engine_info.is_capture_supported);
 
   constexpr display::DriverBufferCollectionId kCaptureBufferCollectionId(1);
   constexpr uint64_t kBanjoCaptureBufferCollectionId =
@@ -804,7 +808,11 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureSolidColorFill) {
   DisplayCaptureCompletion display_capture_completion = {};
   const display_engine_listener_protocol_t& controller_protocol =
       display_capture_completion.GetDisplayEngineListenerProtocol();
-  fake_display_stack_->display_engine().DisplayEngineSetListener(&controller_protocol);
+
+  engine_info_t banjo_engine_info;
+  fake_display_stack_->display_engine().DisplayEngineCompleteCoordinatorConnection(
+      &controller_protocol, &banjo_engine_info);
+  ASSERT_TRUE(banjo_engine_info.is_capture_supported);
 
   constexpr display::DriverBufferCollectionId kCaptureBufferCollectionId(1);
   constexpr uint64_t kBanjoCaptureBufferCollectionId =
@@ -965,10 +973,6 @@ class FakeDisplayWithoutCaptureRealSysmemTest : public FakeDisplayRealSysmemTest
     };
   }
 };
-
-TEST_F(FakeDisplayWithoutCaptureRealSysmemTest, SetDisplayCaptureInterface) {
-  EXPECT_EQ(fake_display_stack_->display_engine().DisplayEngineIsCaptureSupported(), false);
-}
 
 TEST_F(FakeDisplayWithoutCaptureRealSysmemTest, ImportImageForCapture) {
   constexpr uint64_t kFakeCollectionId = 1;

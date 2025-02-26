@@ -271,10 +271,12 @@ void Controller::DisplayEngineListenerOnDisplayRemoved(uint64_t banjo_display_id
 }
 
 void Controller::DisplayEngineListenerOnCaptureComplete() {
-  if (!supports_capture_) {
+  ZX_DEBUG_ASSERT_MSG(engine_info_.has_value(),
+                      "OnCaptureComplete() called before engine connection completed");
+
+  if (!engine_info_->is_capture_supported()) {
     FDF_LOG(ERROR,
-            "OnCaptureComplete(): the display engine doesn't support "
-            "display capture.");
+            "OnCaptureComplete() called by a display engine without display capture support");
     return;
   }
 
@@ -606,9 +608,11 @@ void Controller::ReleaseImage(display::DriverImageId driver_image_id) {
 }
 
 void Controller::ReleaseCaptureImage(display::DriverCaptureImageId driver_capture_image_id) {
-  if (!supports_capture_) {
-    return;
-  }
+  ZX_DEBUG_ASSERT_MSG(engine_info_.has_value(),
+                      "CaptureImage created before engine connection completed");
+  ZX_DEBUG_ASSERT_MSG(engine_info_->is_capture_supported(),
+                      "CaptureImage created by engine without capture support");
+
   if (driver_capture_image_id == display::kInvalidDriverCaptureImageId) {
     return;
   }
@@ -902,13 +906,13 @@ zx::result<> Controller::Initialize() {
     return vsync_monitor_init_result.take_error();
   }
 
-  engine_driver_client_->SetListener({
+  engine_info_ = engine_driver_client_->CompleteCoordinatorConnection({
       .ops = &display_engine_listener_protocol_ops_,
       .ctx = this,
   });
-
-  supports_capture_ = engine_driver_client_->IsCaptureSupported();
-  FDF_LOG(INFO, "Display capture is%s supported", supports_capture_ ? "" : " not");
+  FDF_LOG(INFO, "Engine capabilities - max layers: %d, max displays: %d, display capture: %s",
+          int{engine_info_->max_layer_count()}, int{engine_info_->max_connected_display_count()},
+          engine_info_->is_capture_supported() ? "yes" : "no");
 
   return zx::ok();
 }

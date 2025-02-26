@@ -47,13 +47,15 @@ compat::DeviceServer::BanjoConfig DisplayEngineBanjoAdapter::CreateBanjoConfig()
   return banjo_config;
 }
 
-void DisplayEngineBanjoAdapter::DisplayEngineSetListener(
-    const display_engine_listener_protocol_t* display_engine_listener) {
-  ZX_DEBUG_ASSERT(display_engine_listener);
+void DisplayEngineBanjoAdapter::DisplayEngineCompleteCoordinatorConnection(
+    const display_engine_listener_protocol_t* display_engine_listener,
+    engine_info_t* out_banjo_engine_info) {
+  ZX_DEBUG_ASSERT(display_engine_listener != nullptr);
+  ZX_DEBUG_ASSERT(out_banjo_engine_info != nullptr);
+
   engine_events_.SetListener(display_engine_listener);
-  if (display_engine_listener != nullptr) {
-    engine_.OnCoordinatorConnected();
-  }
+  const EngineInfo engine_info = engine_.CompleteCoordinatorConnection();
+  *out_banjo_engine_info = engine_info.ToBanjo();
 }
 
 void DisplayEngineBanjoAdapter::DisplayEngineUnsetListener() {
@@ -227,10 +229,6 @@ zx_status_t DisplayEngineBanjoAdapter::DisplayEngineSetDisplayPower(uint64_t ban
   const display::DisplayId display_id = display::ToDisplayId(banjo_display_id);
   zx::result<> result = engine_.SetDisplayPower(display_id, power_on);
   return result.status_value();
-}
-
-bool DisplayEngineBanjoAdapter::DisplayEngineIsCaptureSupported() {
-  return engine_.IsCaptureSupported();
 }
 
 zx_status_t DisplayEngineBanjoAdapter::DisplayEngineStartCapture(uint64_t banjo_capture_handle) {
