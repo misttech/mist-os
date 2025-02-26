@@ -5,7 +5,7 @@
 use assert_matches::assert_matches;
 use component_events::events::{Event, EventStream, ExitStatus, Stopped};
 use component_events::matcher::EventMatcher;
-use diagnostics_reader::{ArchiveReader, Logs, Severity};
+use diagnostics_reader::{ArchiveReader, Severity};
 use fidl_fuchsia_hardware_power_statecontrol::{
     AdminMarker, AdminRequest, AdminRequestStream, RebootOptions, RebootReason2,
 };
@@ -41,9 +41,9 @@ async fn c_crash() {
     let container_moniker = format!("{realm_moniker}/debian_container");
     let kernel_moniker = format!("{realm_moniker}/kernel");
 
-    let mut kernel_logs = ArchiveReader::new()
+    let mut kernel_logs = ArchiveReader::logs()
         .select_all_for_moniker(&kernel_moniker)
-        .snapshot_then_subscribe::<Logs>()
+        .snapshot_then_subscribe()
         .unwrap();
 
     // Open sysrq-trigger to start the kernel, then make sure we see its logs.
@@ -167,9 +167,9 @@ async fn o_shutdown() {
     let container_moniker = format!("{realm_moniker}/debian_container");
     let kernel_moniker = format!("{realm_moniker}/kernel");
 
-    let mut kernel_logs = ArchiveReader::new()
+    let mut kernel_logs = ArchiveReader::logs()
         .select_all_for_moniker(&kernel_moniker)
-        .snapshot_then_subscribe::<Logs>()
+        .snapshot_then_subscribe()
         .unwrap();
 
     // Open sysrq-trigger to start the kernel, then make sure we see its logs.

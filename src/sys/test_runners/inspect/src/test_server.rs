@@ -5,7 +5,7 @@
 use crate::error::ComponentError;
 use crate::eval::EvaluationContext;
 use crate::spec::{Accessor, ProgramSpec};
-use diagnostics_reader::{ArchiveReader, Inspect, RetryConfig};
+use diagnostics_reader::{ArchiveReader, RetryConfig};
 use fidl::endpoints::ServerEnd;
 use fuchsia_component::client;
 use fuchsia_component::server::ServiceFs;
@@ -124,12 +124,12 @@ impl TestServer {
 
             test_stdout!(logs, "Attempting read");
 
-            match ArchiveReader::new()
+            match ArchiveReader::inspect()
                 .retry(RetryConfig::never())
                 .with_archive(proxy)
                 .with_timeout(end_time - start_time)
                 .add_selector(case.selector.as_str())
-                .snapshot_raw::<Inspect, serde_json::Value>()
+                .snapshot_raw::<serde_json::Value>()
                 .await
             {
                 Ok(json) => {

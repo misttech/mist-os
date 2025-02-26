@@ -4,7 +4,7 @@
 
 use assert_matches::assert_matches;
 use diagnostics_data::Severity;
-use diagnostics_reader::{ArchiveReader, Inspect};
+use diagnostics_reader::ArchiveReader;
 use fidl_fuchsia_sys2 as fsys;
 use fidl_fuchsia_test_manager::{
     LaunchError, LogsIteratorOption, RunBuilderMarker, RunBuilderProxy,
@@ -420,9 +420,9 @@ async fn experimental_parallel_execution_integ_test(
     )
     .await;
 
-    let data = ArchiveReader::new()
+    let data = ArchiveReader::inspect()
         .add_selector("test_manager:root")
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .expect("got inspect data");
     assert_eq!(data[0].moniker.to_string(), "test_manager");

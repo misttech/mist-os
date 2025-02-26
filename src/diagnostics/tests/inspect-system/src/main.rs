@@ -7,7 +7,7 @@ mod metrics;
 
 use anyhow::{bail, Error};
 use diagnostics::RequestId;
-use diagnostics_reader::{ArchiveReader, Inspect, RetryConfig};
+use diagnostics_reader::{ArchiveReader, RetryConfig};
 use fasync::MonotonicDuration;
 use fidl_fuchsia_diagnostics::{
     ArchiveAccessorMarker, ArchiveAccessorProxy, BatchIteratorMarker, ClientSelectorConfiguration,
@@ -175,12 +175,12 @@ async fn handle_invocation(moniker: &str, stdout: zx::Socket) -> Result<(), Erro
     stdout.write_all(b"Reading all selectors and warming up\n").await.ok();
 
     let mut selectors = vec![];
-    for value in ArchiveReader::new()
+    for value in ArchiveReader::inspect()
         .add_selector(format!("{}:root", moniker))
         .retry(RetryConfig::never())
         .with_archive(proxy)
         .with_timeout(MonotonicDuration::from_seconds(15))
-        .snapshot::<Inspect>()
+        .snapshot()
         .await?
     {
         if let Some(payload) = value.payload {
@@ -312,11 +312,11 @@ async fn get_test_cases(rid: RequestId) -> Result<Vec<ftest::Case>, Error> {
     let mut names_seen = HashSet::new();
     let mut ret = vec![];
 
-    for value in ArchiveReader::new()
+    for value in ArchiveReader::inspect()
         .retry(RetryConfig::never())
         .with_archive(proxy)
         .with_timeout(MonotonicDuration::from_seconds(60))
-        .snapshot::<Inspect>()
+        .snapshot()
         .await?
     {
         if names_seen.insert(value.moniker.clone()) {

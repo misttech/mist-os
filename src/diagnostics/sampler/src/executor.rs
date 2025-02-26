@@ -94,7 +94,7 @@ use diagnostics_hierarchy::{
     ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram, Property,
     SelectResult,
 };
-use diagnostics_reader::{ArchiveReader, Inspect, RetryConfig};
+use diagnostics_reader::{ArchiveReader, Inspect, InspectArchiveReader, RetryConfig};
 use fidl_fuchsia_metrics::{
     HistogramBucket, MetricEvent, MetricEventLoggerFactoryMarker, MetricEventLoggerFactoryProxy,
     MetricEventLoggerProxy, MetricEventPayload, ProjectSpec,
@@ -148,7 +148,7 @@ impl TaskCancellation {
         // cache with the most recent values for all the metrics we need to sample and diff!
         let project_samplers: Vec<ProjectSampler> = self.execution_context.await;
 
-        let mut reader = ArchiveReader::new();
+        let mut reader = ArchiveReader::inspect();
 
         for project_sampler in &project_samplers {
             for metric in &project_sampler.metrics {
@@ -173,7 +173,7 @@ impl TaskCancellation {
 struct RebootSnapshotProcessor {
     /// Reader constructed from the union of selectors
     /// for every [`ProjectSampler`] config.
-    reader: ArchiveReader,
+    reader: InspectArchiveReader,
     /// Vector of mutable [`ProjectSampler`] objects that will
     /// process their final samples.
     project_samplers: Vec<ProjectSampler>,
@@ -181,7 +181,7 @@ struct RebootSnapshotProcessor {
 
 impl RebootSnapshotProcessor {
     pub async fn process_reboot_sample(&mut self) -> Result<(), Error> {
-        let snapshot_data = self.reader.snapshot::<Inspect>().await?;
+        let snapshot_data = self.reader.snapshot().await?;
         for data_packet in snapshot_data {
             let moniker = data_packet.moniker;
             match data_packet.payload {
@@ -364,7 +364,7 @@ impl SamplerExecutor {
 }
 
 pub struct ProjectSampler {
-    archive_reader: ArchiveReader,
+    archive_reader: InspectArchiveReader,
     /// The metrics used by this Project.
     metrics: Vec<RefCell<MetricConfig>>,
     /// Cache from Inspect selector to last sampled property. This is the selector from
@@ -486,7 +486,7 @@ impl ProjectSampler {
 
         let mut project_sampler = ProjectSampler {
             project_id,
-            archive_reader: ArchiveReader::new(),
+            archive_reader: ArchiveReader::inspect(),
             metrics: config.metrics.iter().map(|m| RefCell::new(m.clone())).collect(),
             metric_cache: RefCell::new(HashMap::new()),
             metric_loggers,
@@ -565,7 +565,7 @@ impl ProjectSampler {
     }
 
     async fn process_next_snapshot(&mut self) -> Result<(), Error> {
-        let snapshot_data = self.archive_reader.snapshot::<Inspect>().await?;
+        let snapshot_data = self.archive_reader.snapshot().await?;
         let events_to_log = self.process_snapshot(snapshot_data).await?;
         self.log_events(events_to_log).await?;
         Ok(())
@@ -606,7 +606,7 @@ impl ProjectSampler {
     }
 
     fn rebuild_selector_data_structures(&mut self) {
-        self.archive_reader = ArchiveReader::new();
+        self.archive_reader = ArchiveReader::inspect();
         for metric in &self.metrics {
             for selector in metric.borrow().selectors.iter().cloned() {
                 self.archive_reader.add_selector(selector);
@@ -1192,7 +1192,7 @@ mod tests {
     #[fuchsia::test]
     fn test_filter_metrics() {
         let mut sampler = ProjectSampler {
-            archive_reader: ArchiveReader::new(),
+            archive_reader: ArchiveReader::inspect(),
             metrics: vec![],
             metric_cache: RefCell::new(HashMap::new()),
             metric_loggers: HashMap::new(),
@@ -1240,7 +1240,7 @@ mod tests {
     #[fuchsia::test]
     fn test_filter_metrics_with_wildcards() {
         let mut sampler = ProjectSampler {
-            archive_reader: ArchiveReader::new(),
+            archive_reader: ArchiveReader::inspect(),
             metrics: vec![],
             metric_cache: RefCell::new(HashMap::new()),
             metric_loggers: HashMap::new(),
@@ -1319,7 +1319,7 @@ mod tests {
         };
 
         let mut sampler = ProjectSampler {
-            archive_reader: ArchiveReader::new(),
+            archive_reader: ArchiveReader::inspect(),
             metrics: vec![],
             metric_cache: RefCell::new(HashMap::new()),
             metric_loggers: HashMap::new(),
@@ -1443,7 +1443,7 @@ mod tests {
         };
 
         let mut sampler = ProjectSampler {
-            archive_reader: ArchiveReader::new(),
+            archive_reader: ArchiveReader::inspect(),
             metrics: vec![],
             metric_cache: RefCell::new(HashMap::new()),
             metric_loggers: HashMap::new(),
@@ -2045,7 +2045,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_inspect_handle_name_distinguishes_data() {
         let mut sampler = ProjectSampler {
-            archive_reader: ArchiveReader::new(),
+            archive_reader: ArchiveReader::inspect(),
             metrics: vec![],
             metric_cache: RefCell::new(HashMap::new()),
             metric_loggers: HashMap::new(),
@@ -2131,7 +2131,7 @@ mod tests {
     #[fuchsia::test]
     async fn project_id_can_be_overwritten_by_the_metric_project_id() {
         let mut sampler = ProjectSampler {
-            archive_reader: ArchiveReader::new(),
+            archive_reader: ArchiveReader::inspect(),
             metrics: vec![],
             metric_cache: RefCell::new(HashMap::new()),
             metric_loggers: HashMap::new(),

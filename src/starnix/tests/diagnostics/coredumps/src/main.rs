@@ -5,7 +5,7 @@
 use anyhow::Context as _;
 use component_events::events::{EventStream, Stopped};
 use component_events::matcher::EventMatcher;
-use diagnostics_reader::{ArchiveReader, Inspect};
+use diagnostics_reader::ArchiveReader;
 use fuchsia_component_test::ScopedInstance;
 use log::info;
 use parse_starnix_inspect::CoredumpReport;
@@ -83,10 +83,10 @@ async fn main() {
 // one of their properties, etc. Return an Option here for cases where we couldn't actually read the
 // coredump report so the caller can try again..
 async fn get_coredumps_from_inspect() -> anyhow::Result<Vec<CoredumpReport>> {
-    let kernel_inspect = ArchiveReader::new()
+    let kernel_inspect = ArchiveReader::inspect()
         .select_all_for_moniker("kernel")
         .with_minimum_schema_count(1)
-        .snapshot::<Inspect>()
+        .snapshot()
         .await?;
     assert_eq!(kernel_inspect.len(), 1);
     CoredumpReport::extract_from_snapshot(&kernel_inspect[0])

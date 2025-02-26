@@ -30,7 +30,7 @@ async fn test_one_component_log_by_log() -> Result<(), Error> {
         |log_reader| {
             let client_clone = client.clone();
             async move {
-                let raw_logs = log_reader.snapshot::<Logs>().await.expect("snapshot succeeds");
+                let raw_logs = log_reader.snapshot().await.expect("snapshot succeeds");
                 let all_logs = logs_to_str(&raw_logs, None);
                 assert_eq!(all_logs.filter(|log| *log == "Started").count(), 1);
 
@@ -100,7 +100,7 @@ async fn test_two_component_log_by_log() -> Result<(), Error> {
             let server_clone = server.clone();
             let client_clone = client.clone();
             async move {
-                let raw_logs = log_reader.snapshot::<Logs>().await.expect("snapshot succeeds");
+                let raw_logs = log_reader.snapshot().await.expect("snapshot succeeds");
                 let all_logs = logs_to_str(&raw_logs, None);
                 assert_eq!(all_logs.filter(|log| *log == "Started").count(), 2);
 
@@ -187,7 +187,7 @@ async fn test_three_component_log_by_log() -> Result<(), Error> {
             let client_clone = client.clone();
             let server_clone = server.clone();
             async move {
-                let raw_logs = log_reader.snapshot::<Logs>().await.expect("snapshot succeeds");
+                let raw_logs = log_reader.snapshot().await.expect("snapshot succeeds");
                 let all_logs = logs_to_str(&raw_logs, None);
                 assert_eq!(all_logs.filter(|log| *log == "Started").count(), 3);
 

@@ -5,7 +5,7 @@
 use crate::{test_topology, utils};
 use diagnostics_assertions::{assert_data_tree, AnyProperty};
 use diagnostics_data::{InspectData, InspectHandleName};
-use diagnostics_reader::{ArchiveReader, Inspect, RetryConfig};
+use diagnostics_reader::{ArchiveReader, RetryConfig};
 use fidl_fuchsia_diagnostics::{
     All, ComponentSelector, Selector, StringSelector, SubtreeSelector, TreeNames, TreeSelector,
 };
@@ -106,7 +106,7 @@ async fn read_data(
     tree_names: TreeNames,
 ) -> Vec<InspectData> {
     let accessor = utils::connect_accessor(realm_proxy, utils::ALL_PIPELINE).await;
-    ArchiveReader::new()
+    ArchiveReader::inspect()
         .with_archive(accessor)
         .retry(retry)
         .add_selector(Selector {
@@ -120,7 +120,7 @@ async fn read_data(
             tree_names: Some(tree_names),
             ..Default::default()
         })
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .expect("got inspect data")
 }

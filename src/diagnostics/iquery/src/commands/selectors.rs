@@ -6,7 +6,7 @@ use crate::commands::types::*;
 use crate::commands::utils;
 use crate::types::Error;
 use argh::{ArgsInfo, FromArgs};
-use diagnostics_data::{Inspect, InspectData, InspectHandleName};
+use diagnostics_data::{InspectData, InspectHandleName};
 use diagnostics_hierarchy::DiagnosticsHierarchy;
 use fidl_fuchsia_diagnostics as fdiagnostics;
 use serde::ser::{Error as _, SerializeSeq};
@@ -59,7 +59,7 @@ impl Command for SelectorsCommand {
 
         utils::ensure_tree_field_is_set(&mut selectors, None)?;
         let mut results =
-            provider.snapshot::<Inspect>(self.accessor.as_deref(), selectors.into_iter()).await?;
+            provider.snapshot(self.accessor.as_deref(), selectors.into_iter()).await?;
         for result in results.iter_mut() {
             if let Some(hierarchy) = &mut result.payload {
                 hierarchy.sort();

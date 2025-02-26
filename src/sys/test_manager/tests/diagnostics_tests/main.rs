@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use diagnostics_assertions::{assert_data_tree, AnyProperty};
-use diagnostics_reader::{ArchiveReader, Inspect, Logs, Severity};
+use diagnostics_reader::{ArchiveReader, Severity};
 use fuchsia_component_test::ScopedInstance;
 use futures::{future, StreamExt};
 use log::debug;
@@ -23,9 +23,9 @@ async fn test_isolated_diagnostics_can_be_read_by_the_test() {
         .expect("failed to connect fuchsia.component.Binder");
 
     // Read inspect
-    let data = ArchiveReader::new()
+    let data = ArchiveReader::inspect()
         .add_selector(r#"coll\:auto-*:root"#)
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .expect("got inspect data");
     assert_eq!(data.len(), 1);
@@ -39,7 +39,7 @@ async fn test_isolated_diagnostics_can_be_read_by_the_test() {
 
     // Read logs
     let (subscription, mut errors) =
-        ArchiveReader::new().snapshot_then_subscribe::<Logs>().expect("subscribed").split_streams();
+        ArchiveReader::logs().snapshot_then_subscribe().expect("subscribed").split_streams();
     fasync::Task::spawn(async move {
         if let Some(error) = errors.next().await {
             panic!("Got error: {:?}", error);

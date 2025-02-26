@@ -9,7 +9,7 @@ use blobfs_ramdisk::BlobfsRamdisk;
 use cobalt_client::traits::AsEventCodes;
 use diagnostics_assertions::TreeAssertion;
 use diagnostics_hierarchy::DiagnosticsHierarchy;
-use diagnostics_reader::{ArchiveReader, ComponentSelector, Inspect};
+use diagnostics_reader::{ArchiveReader, ComponentSelector};
 use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker as _};
 use fidl::persist;
 use fidl_fuchsia_metrics::{self as fmetrics, MetricEvent, MetricEventPayload};
@@ -1030,12 +1030,12 @@ impl<B: Blobfs> TestEnv<B> {
     }
 
     pub async fn pkg_resolver_inspect_hierarchy(&self) -> DiagnosticsHierarchy {
-        let data = ArchiveReader::new()
+        let data = ArchiveReader::inspect()
             .add_selector(ComponentSelector::new(vec![
                 format!("realm_builder\\:{}", self.realm_instance.root.child_name()),
                 PKG_RESOLVER_CHILD_NAME.into(),
             ]))
-            .snapshot::<Inspect>()
+            .snapshot()
             .await
             .expect("read inspect hierarchy")
             .into_iter()

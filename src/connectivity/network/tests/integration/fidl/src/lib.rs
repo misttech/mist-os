@@ -71,7 +71,7 @@ async fn log_packets<N: Netstack>(name: &str) {
     let netstack_moniker = get_component_moniker(&realm, constants::netstack::COMPONENT_NAME)
         .await
         .expect("get netstack moniker");
-    let stream = diagnostics_reader::ArchiveReader::new()
+    let stream = diagnostics_reader::ArchiveReader::logs()
         .select_all_for_moniker(&netstack_moniker)
         .snapshot_then_subscribe()
         .expect("subscribe to snapshot");

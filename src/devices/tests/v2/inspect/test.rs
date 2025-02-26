@@ -4,15 +4,15 @@
 
 use anyhow::{format_err, Error, Result};
 use diagnostics_assertions::assert_data_tree;
-use diagnostics_reader::{ArchiveReader, DiagnosticsHierarchy, Inspect};
+use diagnostics_reader::{ArchiveReader, DiagnosticsHierarchy};
 use fuchsia_component_test::RealmBuilder;
 use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
 use {fidl_fuchsia_driver_test as fdt, fuchsia_async as fasync};
 
 async fn get_inspect_hierarchy(moniker: String) -> Result<DiagnosticsHierarchy, Error> {
-    ArchiveReader::new()
+    ArchiveReader::inspect()
         .add_selector(format!("{}:[name=root-driver]root", moniker))
-        .snapshot::<Inspect>()
+        .snapshot()
         .await?
         .into_iter()
         .next()

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use diagnostics_assertions::assert_data_tree;
-use diagnostics_reader::{ArchiveReader, Inspect};
+use diagnostics_reader::ArchiveReader;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
 
 const CHILD_URL: &str = "#meta/config_example.cm";
@@ -28,10 +28,10 @@ async fn inspect_rust() {
 
     let _instance = builder.build().await.unwrap();
 
-    let inspector = ArchiveReader::new()
+    let inspector = ArchiveReader::inspect()
         .add_selector("*/config_example_replace_none:root")
         .with_minimum_schema_count(1)
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .unwrap()
         .into_iter()
@@ -78,10 +78,10 @@ async fn inspect_rust_replace_some_values() {
 
     let _instance = builder.build().await.unwrap();
 
-    let inspector = ArchiveReader::new()
+    let inspector = ArchiveReader::inspect()
         .add_selector("*/config_example_replace_some:root")
         .with_minimum_schema_count(1)
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .unwrap()
         .into_iter()
@@ -124,10 +124,10 @@ async fn inspect_rust_replace_all_packaged_values() {
 
     let _instance = builder.build().await.unwrap();
 
-    let inspector = ArchiveReader::new()
+    let inspector = ArchiveReader::inspect()
         .add_selector("*/config_example_replace_all_packaged:root")
         .with_minimum_schema_count(1)
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .unwrap()
         .into_iter()
@@ -173,10 +173,10 @@ async fn inspect_rust_set_all_values_when_empty() {
 
     let _instance = builder.build().await.unwrap();
 
-    let inspector = ArchiveReader::new()
+    let inspector = ArchiveReader::inspect()
         .add_selector("*/config_example_set_all:root")
         .with_minimum_schema_count(1)
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .unwrap()
         .into_iter()

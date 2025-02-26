@@ -4,7 +4,7 @@
 
 use assert_matches::assert_matches;
 use attribution_testing::PrincipalIdentifier;
-use diagnostics_reader::{ArchiveReader, Logs};
+use diagnostics_reader::ArchiveReader;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl::AsHandleRef;
 use fidl_fuchsia_sys2::OpenError;
@@ -280,12 +280,12 @@ async fn init_attribution_test() -> AttributionTest {
 }
 
 async fn wait_for_log(realm: &RealmInstance, expected_log: &str) {
-    let mut reader = ArchiveReader::new();
+    let mut reader = ArchiveReader::logs();
     let selector: Moniker = realm.root.moniker().parse().unwrap();
     let selector = selectors::sanitize_moniker_for_selectors(&selector.to_string());
     let selector = format!("{}/**:root", selector);
     reader.add_selector(selector);
-    let mut logs = reader.snapshot_then_subscribe::<Logs>().unwrap();
+    let mut logs = reader.snapshot_then_subscribe().unwrap();
     loop {
         let message = logs.next().await.unwrap().unwrap();
         if message.msg().unwrap().contains(expected_log) {

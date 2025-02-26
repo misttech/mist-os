@@ -4,7 +4,7 @@
 
 use crate::{test_topology, utils};
 use diagnostics_assertions::assert_data_tree;
-use diagnostics_reader::{ArchiveReader, Logs};
+use diagnostics_reader::ArchiveReader;
 use fidl_fuchsia_archivist_test::LogPuppetLogRequest;
 use fidl_fuchsia_diagnostics::Severity;
 use futures::{FutureExt, StreamExt};
@@ -36,11 +36,10 @@ async fn component_selectors_filter_logs() {
     }
 
     // Start listening
-    let mut reader = ArchiveReader::new();
+    let mut reader = ArchiveReader::logs();
     reader.add_selector("puppet_a*:root").with_archive(accessor).with_minimum_schema_count(5);
 
-    let (mut stream, mut errors) =
-        reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
+    let (mut stream, mut errors) = reader.snapshot_then_subscribe().unwrap().split_streams();
     let _errors = fasync::Task::spawn(async move {
         if let Some(e) = errors.next().await {
             panic!("error in subscription: {e}");

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use diagnostics_reader::{ArchiveReader, Inspect};
+use diagnostics_reader::ArchiveReader;
 use fidl_inspect_selfprofile_test::PuppetMarker;
 use fuchsia_component::client::connect_to_protocol;
 use self_profiles_report::{DurationSummary, SelfProfilesReport};
@@ -21,7 +21,7 @@ async fn main() {
     for _ in 0..100 {
         puppet.run_profiled_function().await.unwrap();
     }
-    let empty_snapshot = ArchiveReader::new().snapshot::<Inspect>().await.unwrap();
+    let empty_snapshot = ArchiveReader::inspect().snapshot().await.unwrap();
     let empty_summaries = SelfProfilesReport::from_snapshot(&empty_snapshot).unwrap();
     assert_eq!(empty_summaries, &[], "summaries should be empty before profiling started");
 
@@ -30,7 +30,7 @@ async fn main() {
     for _ in 0..100 {
         puppet.run_profiled_function().await.unwrap();
     }
-    let first_snapshot = ArchiveReader::new().snapshot::<Inspect>().await.unwrap();
+    let first_snapshot = ArchiveReader::inspect().snapshot().await.unwrap();
     let first_summaries = SelfProfilesReport::from_snapshot(&first_snapshot).unwrap();
     assert_eq!(first_summaries.len(), 1, "must only be one summary, found {first_summaries:?}");
     let first_summary = &first_summaries[0];
@@ -41,7 +41,7 @@ async fn main() {
     for _ in 0..100 {
         puppet.run_profiled_function().await.unwrap();
     }
-    let second_snapshot = ArchiveReader::new().snapshot::<Inspect>().await.unwrap();
+    let second_snapshot = ArchiveReader::inspect().snapshot().await.unwrap();
     let second_summaries = SelfProfilesReport::from_snapshot(&second_snapshot).unwrap();
     assert_eq!(
         second_summaries, first_summaries,
@@ -54,7 +54,7 @@ async fn main() {
     for _ in 0..75 {
         puppet.run_profiled_function().await.unwrap();
     }
-    let third_snapshot = ArchiveReader::new().snapshot::<Inspect>().await.unwrap();
+    let third_snapshot = ArchiveReader::inspect().snapshot().await.unwrap();
     let third_summaries = SelfProfilesReport::from_snapshot(&third_snapshot).unwrap();
     assert_eq!(third_summaries.len(), 1, "must only be one summary, found {third_summaries:?}");
     let third_summary = &third_summaries[0];

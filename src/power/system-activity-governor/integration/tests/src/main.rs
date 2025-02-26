@@ -6,7 +6,7 @@ use anyhow::Result;
 use diagnostics_assertions::{
     tree_assertion, AnyProperty, AnyStringProperty, NonZeroUintProperty, TreeAssertion,
 };
-use diagnostics_reader::{ArchiveReader, Inspect};
+use diagnostics_reader::ArchiveReader;
 use fidl::endpoints::create_endpoints;
 use fidl::{AsHandleRef, HandleBased};
 use fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus};
@@ -145,7 +145,7 @@ const RESTART_DELAY: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds
 
 macro_rules! block_until_inspect_matches {
     ($sag_moniker:expr, $($tree:tt)+) => {{
-        let mut reader = ArchiveReader::new();
+        let mut reader = ArchiveReader::inspect();
 
         reader
             .select_all_for_moniker(&format!("{}/{}", REALM_FACTORY_CHILD_NAME, $sag_moniker))
@@ -153,7 +153,7 @@ macro_rules! block_until_inspect_matches {
 
         for i in 1.. {
             let Ok(data) = reader
-                .snapshot::<Inspect>()
+                .snapshot()
                 .await?
                 .into_iter()
                 .next()
@@ -1858,7 +1858,7 @@ async fn test_activity_governor_handles_1000_wake_leases() -> Result<()> {
 
     root.add_child_assertion(wake_leases_child);
 
-    let mut reader = ArchiveReader::new();
+    let mut reader = ArchiveReader::inspect();
 
     reader
         .select_all_for_moniker(&format!(
@@ -1868,7 +1868,7 @@ async fn test_activity_governor_handles_1000_wake_leases() -> Result<()> {
         .with_minimum_schema_count(1);
 
     let inspect = reader
-        .snapshot::<Inspect>()
+        .snapshot()
         .await?
         .into_iter()
         .next()
@@ -1935,7 +1935,7 @@ async fn test_activity_governor_handles_1000_acquired_wake_leases() -> Result<()
 
     root.add_child_assertion(wake_leases_child);
 
-    let mut reader = ArchiveReader::new();
+    let mut reader = ArchiveReader::inspect();
 
     reader
         .select_all_for_moniker(&format!(
@@ -1945,7 +1945,7 @@ async fn test_activity_governor_handles_1000_acquired_wake_leases() -> Result<()
         .with_minimum_schema_count(1);
 
     let inspect = reader
-        .snapshot::<Inspect>()
+        .snapshot()
         .await?
         .into_iter()
         .next()

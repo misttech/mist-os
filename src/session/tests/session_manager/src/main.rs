@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use diagnostics_hierarchy::DiagnosticsHierarchy;
-use diagnostics_reader::{ArchiveReader, Inspect};
+use diagnostics_reader::ArchiveReader;
 use fidl::endpoints::{create_endpoints, create_proxy, ServerEnd};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
@@ -99,13 +99,13 @@ async fn get_session_manager_inspect(
     realm: &fuchsia_component_test::RealmInstance,
     selector: &str,
 ) -> anyhow::Result<DiagnosticsHierarchy> {
-    ArchiveReader::new()
+    ArchiveReader::inspect()
         .add_selector(format!(
             "realm_builder\\:{}/session-manager:{}",
             realm.root.child_name(),
             selector
         ))
-        .snapshot::<Inspect>()
+        .snapshot()
         .await?
         .pop()
         .ok_or(anyhow::anyhow!("inspect data had no snapshot"))?

@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use diagnostics_assertions::{tree_assertion, AnyProperty};
-use diagnostics_reader::{ArchiveReader, Inspect};
+use diagnostics_reader::ArchiveReader;
 use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker};
 use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route, DEFAULT_COLLECTION_NAME,
@@ -26,7 +26,7 @@ const RESTART_DELAY: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds
 
 macro_rules! block_until_inspect_matches {
     ($moniker:expr, $($tree:tt)+) => {{
-        let mut reader = ArchiveReader::new();
+        let mut reader = ArchiveReader::inspect();
 
         reader
             .select_all_for_moniker($moniker)
@@ -34,7 +34,7 @@ macro_rules! block_until_inspect_matches {
 
         for i in 1.. {
             let Ok(data) = reader
-                .snapshot::<Inspect>()
+                .snapshot()
                 .await?
                 .into_iter()
                 .next()
@@ -65,7 +65,7 @@ const MACRO_LOOP_EXIT: bool = false; // useful in development; prevent hangs fro
 
 macro_rules! block_until_power_elements_match {
     ($moniker:expr, [ $(($id1:ident = $value1:expr, $id2:ident = $value2:expr)),* ]) => {{
-        let mut reader = ArchiveReader::new();
+        let mut reader = ArchiveReader::inspect();
 
         reader
             .select_all_for_moniker($moniker)
@@ -82,7 +82,7 @@ macro_rules! block_until_power_elements_match {
 
         for i in 0.. {
             let Ok(data) = reader
-                .snapshot::<Inspect>()
+                .snapshot()
                 .await?
                 .into_iter()
                 .next()

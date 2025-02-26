@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::anyhow;
-use diagnostics_data::Data;
+use diagnostics_data::{Data, Inspect};
 use fidl_fuchsia_diagnostics::ClientSelectorConfiguration::{SelectAll, Selectors};
 use fidl_fuchsia_diagnostics::{Format, Selector, SelectorArgument, StreamParameters};
 use fidl_fuchsia_diagnostics_host::{ArchiveAccessorMarker, ArchiveAccessorProxy};
@@ -112,15 +112,12 @@ impl HostArchiveReader {
 }
 
 impl DiagnosticsProvider for HostArchiveReader {
-    async fn snapshot<D>(
+    async fn snapshot(
         &self,
         accessor_path: Option<&str>,
         selectors: impl IntoIterator<Item = Selector>,
-    ) -> Result<Vec<Data<D>>, Error>
-    where
-        D: diagnostics_data::DiagnosticsData,
-    {
-        self.snapshot_diagnostics_data::<D>(accessor_path, selectors).await
+    ) -> Result<Vec<Data<Inspect>>, Error> {
+        self.snapshot_diagnostics_data::<Inspect>(accessor_path, selectors).await
     }
 
     async fn get_accessor_paths(&self) -> Result<Vec<String>, Error> {

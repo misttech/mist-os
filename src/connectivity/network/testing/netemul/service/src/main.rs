@@ -1578,12 +1578,12 @@ mod tests {
     ) {
         let TestRealm { realm } = realm;
         let realm_moniker = realm.get_moniker().await.expect("failed to get moniker");
-        let data = diagnostics_reader::ArchiveReader::new()
+        let data = diagnostics_reader::ArchiveReader::inspect()
             .add_selector(diagnostics_reader::ComponentSelector::new(vec![
                 selectors::sanitize_string_for_selectors(&realm_moniker).into_owned(),
                 component_moniker.into(),
             ]))
-            .snapshot::<diagnostics_reader::Inspect>()
+            .snapshot()
             .await
             .expect("failed to get inspect data")
             .into_iter()

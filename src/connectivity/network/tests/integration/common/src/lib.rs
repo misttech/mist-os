@@ -148,7 +148,7 @@ pub async fn get_inspect_data(
 ) -> Result<diagnostics_hierarchy::DiagnosticsHierarchy> {
     let moniker = realm.get_moniker().await.context("calling get moniker")?;
     let realm_moniker = selectors::sanitize_string_for_selectors(&moniker);
-    let mut data = diagnostics_reader::ArchiveReader::new()
+    let mut data = diagnostics_reader::ArchiveReader::inspect()
         .retry(diagnostics_reader::RetryConfig::MinSchemaCount(1))
         .add_selector(
             diagnostics_reader::ComponentSelector::new(vec![
@@ -158,7 +158,7 @@ pub async fn get_inspect_data(
             ])
             .with_tree_selector(tree_selector.into()),
         )
-        .snapshot::<diagnostics_reader::Inspect>()
+        .snapshot()
         .await
         .context("snapshot did not return any inspect data")?
         .into_iter()

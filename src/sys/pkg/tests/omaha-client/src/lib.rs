@@ -8,7 +8,7 @@ use anyhow::anyhow;
 use assert_matches::assert_matches;
 use diagnostics_assertions::{assert_data_tree, tree_assertion, AnyProperty, TreeAssertion};
 use diagnostics_hierarchy::DiagnosticsHierarchy;
-use diagnostics_reader::{ArchiveReader, Inspect};
+use diagnostics_reader::ArchiveReader;
 use fidl_fuchsia_feedback::FileReportResults;
 use fidl_fuchsia_hardware_power_statecontrol::{RebootOptions, RebootReason2};
 use fidl_fuchsia_pkg::{self as fpkg, PackageCacheRequestStream, PackageResolverRequestStream};
@@ -660,9 +660,9 @@ impl TestEnv {
             "test_driver/realm_builder\\:{}/omaha_client_service:root",
             self.realm_instance.root.child_name()
         );
-        ArchiveReader::new()
+        ArchiveReader::inspect()
             .add_selector(nested_environment_label.to_string())
-            .snapshot::<Inspect>()
+            .snapshot()
             .await
             .expect("read inspect hierarchy")
             .into_iter()

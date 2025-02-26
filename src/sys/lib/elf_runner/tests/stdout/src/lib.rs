@@ -98,10 +98,10 @@ async fn test_inner(url: &str, moniker: &str, expected: Expected) {
     waiter.await.unwrap();
 
     // read log messages
-    let mut messages = ArchiveReader::new()
+    let mut messages = ArchiveReader::logs()
         .select_all_for_moniker(full_moniker) // only return logs for this puppet
         .with_minimum_schema_count(num_expected) // retry until we have the expected number
-        .snapshot::<Logs>()
+        .snapshot()
         .await
         .unwrap()
         .into_iter()

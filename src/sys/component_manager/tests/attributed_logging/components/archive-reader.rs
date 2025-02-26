@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use diagnostics_data::{ExtendedMoniker, Logs};
+use diagnostics_data::ExtendedMoniker;
 use diagnostics_reader::ArchiveReader;
 use futures::stream::StreamExt;
 use log::info;
@@ -10,7 +10,7 @@ use std::collections::HashMap;
 
 #[fuchsia::main(logging_tags = ["archive-reader"])]
 async fn main() {
-    let reader = ArchiveReader::new();
+    let reader = ArchiveReader::logs();
     let mut non_matching_logs = vec![];
 
     type Fingerprint = Vec<&'static str>;
@@ -101,7 +101,7 @@ async fn main() {
         ]],
     );
 
-    if let Ok(mut results) = reader.snapshot_then_subscribe::<Logs>() {
+    if let Ok(mut results) = reader.snapshot_then_subscribe() {
         while let Some(Ok(log_record)) = results.next().await {
             if let Some(log_str) = log_record.msg() {
                 info!("Log from {}: {}", log_record.moniker, log_str);

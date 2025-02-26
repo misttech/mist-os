@@ -4,7 +4,7 @@
 
 use anyhow::Context as _;
 use diagnostics_assertions::assert_data_tree;
-use diagnostics_reader::{ArchiveReader, Inspect};
+use diagnostics_reader::ArchiveReader;
 use fidl_fuchsia_component::{BinderMarker, CreateChildArgs, RealmMarker};
 use fidl_fuchsia_component_decl::{
     Child, CollectionRef, ConfigOverride, ConfigSingleValue, ConfigValue, StartupMode,
@@ -52,10 +52,10 @@ async fn inspect_parent_override() -> anyhow::Result<()> {
     connect_to_protocol_at_dir_root::<BinderMarker>(&exposed_dir)
         .context("connecting to Binder")?;
 
-    let example_payload = ArchiveReader::new()
+    let example_payload = ArchiveReader::inspect()
         .add_selector(format!("{COLLECTION_NAME}\\:{child_name}:root"))
         .with_minimum_schema_count(1)
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .context("snapshotting inspect")?
         .into_iter()
@@ -102,10 +102,10 @@ async fn inspect_default_value() -> anyhow::Result<()> {
     connect_to_protocol_at_dir_root::<BinderMarker>(&exposed_dir)
         .context("connecting to Binder")?;
 
-    let example_payload = ArchiveReader::new()
+    let example_payload = ArchiveReader::inspect()
         .add_selector(format!("{COLLECTION_NAME}\\:{child_name}:root"))
         .with_minimum_schema_count(1)
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .context("snapshotting inspect")?
         .into_iter()
@@ -159,10 +159,10 @@ async fn inspect_realm_builder_parent_override() {
 
     let _instance = builder.build().await.unwrap();
 
-    let inspector = ArchiveReader::new()
+    let inspector = ArchiveReader::inspect()
         .add_selector("*/config_example_realm_builder_parent_override:root")
         .with_minimum_schema_count(1)
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .unwrap()
         .into_iter()

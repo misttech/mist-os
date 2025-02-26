@@ -5,7 +5,7 @@
 use crate::commands::types::DiagnosticsProvider;
 use crate::commands::utils::*;
 use crate::types::Error;
-use diagnostics_data::{Data, DiagnosticsData};
+use diagnostics_data::{Data, Inspect};
 use diagnostics_reader::{ArchiveReader, RetryConfig};
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, ArchiveAccessorProxy, Selector};
@@ -25,20 +25,17 @@ impl ArchiveAccessorProvider {
 }
 
 impl DiagnosticsProvider for ArchiveAccessorProvider {
-    async fn snapshot<D>(
+    async fn snapshot(
         &self,
         accessor: Option<&str>,
         selectors: impl IntoIterator<Item = Selector>,
-    ) -> Result<Vec<Data<D>>, Error>
-    where
-        D: DiagnosticsData,
-    {
+    ) -> Result<Vec<Data<Inspect>>, Error> {
         let archive = connect_to_accessor_selector(accessor, &self.query_proxy).await?;
-        ArchiveReader::new()
+        ArchiveReader::inspect()
             .with_archive(archive)
             .retry(RetryConfig::never())
             .add_selectors(selectors.into_iter())
-            .snapshot::<D>()
+            .snapshot()
             .await
             .map_err(Error::Fetch)
     }

@@ -8,7 +8,7 @@ use anyhow::anyhow;
 use assert_matches::assert_matches;
 use diagnostics_assertions::{assert_data_tree, AnyProperty};
 use diagnostics_hierarchy::DiagnosticsHierarchy;
-use diagnostics_reader::{ArchiveReader, Inspect};
+use diagnostics_reader::ArchiveReader;
 use fidl_fuchsia_hardware_power_statecontrol::{RebootOptions, RebootReason2};
 use fidl_fuchsia_paver::{self as fpaver, Configuration, ConfigurationStatus};
 use fidl_fuchsia_update::{CommitStatusProviderMarker, CommitStatusProviderProxy};
@@ -261,12 +261,12 @@ impl TestEnv {
     }
 
     async fn system_update_committer_inspect_hierarchy(&self) -> DiagnosticsHierarchy {
-        let mut data = ArchiveReader::new()
+        let mut data = ArchiveReader::inspect()
             .add_selector(format!(
                 "realm_builder\\:{}/system_update_committer:root",
                 self.realm_instance.root.child_name()
             ))
-            .snapshot::<Inspect>()
+            .snapshot()
             .await
             .expect("got inspect data");
         assert_eq!(data.len(), 1, "expected 1 match: {data:?}");

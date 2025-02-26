@@ -316,7 +316,7 @@ mod test {
 
         let iperf_moniker =
             get_component_moniker(&realm, IPERF_MONIKER).await.expect("get iperf moniker");
-        let stream = diagnostics_reader::ArchiveReader::new()
+        let stream = diagnostics_reader::ArchiveReader::logs()
             .select_all_for_moniker(&iperf_moniker)
             .snapshot_then_subscribe()
             .expect("subscribe to logs");

@@ -5,7 +5,7 @@
 use assert_matches::assert_matches;
 use component_events::events::{Event, EventStream, ExitStatus, Stopped};
 use component_events::matcher::EventMatcher;
-use diagnostics_reader::{ArchiveReader, Inspect, Logs};
+use diagnostics_reader::ArchiveReader;
 use fidl_fuchsia_io::FileProxy;
 use fuchsia_component_test::{RealmBuilder, RealmBuilderParams, RealmInstance};
 use futures::StreamExt;
@@ -31,9 +31,9 @@ async fn o_shutdown() {
     let kernel_moniker = format!("{realm_moniker}/kernel");
     let test_fxfs_moniker = format!("test-fxfs");
 
-    let mut kernel_logs = ArchiveReader::new()
+    let mut kernel_logs = ArchiveReader::logs()
         .select_all_for_moniker(&kernel_moniker)
-        .snapshot_then_subscribe::<Logs>()
+        .snapshot_then_subscribe()
         .unwrap();
 
     // Open sysrq-trigger to start the kernel, then make sure we see its logs.
@@ -51,9 +51,9 @@ async fn o_shutdown() {
     );
 
     info!("collecting test-fxfs inspect");
-    let test_fxfs_inspect = ArchiveReader::new()
+    let test_fxfs_inspect = ArchiveReader::inspect()
         .select_all_for_moniker(&test_fxfs_moniker)
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .unwrap();
     assert_eq!(test_fxfs_inspect.len(), 1);

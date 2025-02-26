@@ -4,7 +4,7 @@
 
 use assert_matches::assert_matches;
 use diagnostics_assertions::assert_data_tree;
-use diagnostics_reader::{ArchiveReader, Inspect};
+use diagnostics_reader::ArchiveReader;
 use disk_builder::Disk;
 use fidl::endpoints::{create_proxy, ServiceMarker as _};
 use fidl_fuchsia_fxfs::{
@@ -444,9 +444,9 @@ impl TestFixture {
             let selector =
                 format!("realm_builder\\:{}/test-fshost:root", self.realm.root.child_name());
             log::info!("Checking inspect for corruption event, selector={selector}");
-            let tree = ArchiveReader::new()
+            let tree = ArchiveReader::inspect()
                 .add_selector(selector)
-                .snapshot::<Inspect>()
+                .snapshot()
                 .await
                 .unwrap()
                 .into_iter()

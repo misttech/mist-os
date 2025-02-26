@@ -42,7 +42,7 @@ extern "C" {
 
 #[cfg(test)]
 mod tests {
-    use diagnostics_reader::{ArchiveReader, Logs, Severity};
+    use diagnostics_reader::{ArchiveReader, Severity};
     use futures::StreamExt;
 
     extern "C" {
@@ -56,7 +56,7 @@ mod tests {
     #[fuchsia::test(logging_minimum_severity = "TRACE")]
     async fn cpp_trace_log_appears_after_init() {
         super::init();
-        let mut logs = ArchiveReader::new().snapshot_then_subscribe::<Logs>().unwrap();
+        let mut logs = ArchiveReader::logs().snapshot_then_subscribe().unwrap();
 
         // SAFETY: basic FFI call with no invariants
         unsafe { emit_trace_log_for_testing() };
@@ -77,7 +77,7 @@ mod tests {
     #[fuchsia::test(logging_minimum_severity = "DEBUG")]
     async fn cpp_debug_log_appears_after_init() {
         super::init();
-        let mut logs = ArchiveReader::new().snapshot_then_subscribe::<Logs>().unwrap();
+        let mut logs = ArchiveReader::logs().snapshot_then_subscribe().unwrap();
 
         // SAFETY: basic FFI call with no invariants
         unsafe { emit_debug_log_for_testing() };
@@ -98,7 +98,7 @@ mod tests {
     #[fuchsia::test(logging_minimum_severity = "INFO")]
     async fn cpp_info_log_appears_after_init() {
         super::init();
-        let mut logs = ArchiveReader::new().snapshot_then_subscribe::<Logs>().unwrap();
+        let mut logs = ArchiveReader::logs().snapshot_then_subscribe().unwrap();
 
         // SAFETY: basic FFI call with no invariants
         unsafe { emit_info_log_for_testing() };
@@ -119,7 +119,7 @@ mod tests {
     #[fuchsia::test(logging_minimum_severity = "WARN")]
     async fn cpp_warn_log_appears_after_init() {
         super::init();
-        let mut logs = ArchiveReader::new().snapshot_then_subscribe::<Logs>().unwrap();
+        let mut logs = ArchiveReader::logs().snapshot_then_subscribe().unwrap();
 
         // SAFETY: basic FFI call with no invariants
         unsafe { emit_warning_log_for_testing() };
@@ -140,7 +140,7 @@ mod tests {
     #[fuchsia::test(logging_minimum_severity = "ERROR")]
     async fn cpp_error_log_appears_after_init() {
         super::init();
-        let mut logs = ArchiveReader::new().snapshot_then_subscribe::<Logs>().unwrap();
+        let mut logs = ArchiveReader::logs().snapshot_then_subscribe().unwrap();
 
         // SAFETY: basic FFI call with no invariants
         unsafe { emit_error_log_for_testing() };

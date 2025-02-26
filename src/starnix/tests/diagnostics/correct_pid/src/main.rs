@@ -4,7 +4,7 @@
 
 use component_events::events::{EventStream, ExitStatus, Stopped};
 use component_events::matcher::EventMatcher;
-use diagnostics_reader::{ArchiveReader, Inspect, Logs};
+use diagnostics_reader::ArchiveReader;
 use fidl::Socket;
 use fidl_fuchsia_component::BinderMarker;
 use fidl_fuchsia_tracing_controller::{
@@ -94,10 +94,10 @@ async fn main() {
     let (records, warnings) = fxt::parse_full_session(&trace).unwrap();
     assert!(warnings.is_empty(), "should not encounter any trace parsing warnings");
 
-    let kernel_inspect = ArchiveReader::new()
+    let kernel_inspect = ArchiveReader::inspect()
         .select_all_for_moniker("kernel")
         .with_minimum_schema_count(1)
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .unwrap()[0]
         .clone();
@@ -128,7 +128,7 @@ async fn main() {
         assert_eq!(event.category, "starnix", "starnix trace events should have starnix category");
     }
 
-    let mut logs = ArchiveReader::new().snapshot_then_subscribe::<Logs>().unwrap();
+    let mut logs = ArchiveReader::logs().snapshot_then_subscribe().unwrap();
     let hello_world_msg = loop {
         let next = logs.next().await.unwrap().unwrap();
         if next.msg() == Some("Hello, Starnix logs!") {

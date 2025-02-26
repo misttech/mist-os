@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use diagnostics_assertions::{assert_data_tree, AnyProperty};
-use diagnostics_reader::{ArchiveReader, Inspect};
+use diagnostics_reader::ArchiveReader;
 use fidl_fuchsia_component::BinderMarker;
 use fidl_fuchsia_metrics_test::MetricEventLoggerQuerierMarker;
 use fidl_fuchsia_mockrebootcontroller::MockRebootControllerMarker;
@@ -18,10 +18,10 @@ mod utils;
 
 async fn wait_for_single_counter_inspect(ns: &InstalledNamespace) {
     let accessor = connect_to_protocol_at::<fdiagnostics::ArchiveAccessorMarker>(&ns).unwrap();
-    let _ = ArchiveReader::new()
+    let _ = ArchiveReader::inspect()
         .with_archive(accessor)
         .add_selector(format!("{}:root", test_topology::COUNTER_NAME))
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .expect("got inspect data");
 }
@@ -238,10 +238,10 @@ async fn sampler_inspect_test() {
     let hierarchy = loop {
         let accessor = connect_to_protocol_at::<fdiagnostics::ArchiveAccessorMarker>(&ns).unwrap();
         // Observe verification shows up in inspect.
-        let mut data = ArchiveReader::new()
+        let mut data = ArchiveReader::inspect()
             .with_archive(accessor)
             .add_selector(format!("{}:root", test_topology::SAMPLER_NAME))
-            .snapshot::<Inspect>()
+            .snapshot()
             .await
             .expect("got inspect data");
 

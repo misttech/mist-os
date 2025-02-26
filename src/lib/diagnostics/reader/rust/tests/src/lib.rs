@@ -4,19 +4,19 @@
 
 use anyhow::Error;
 use diagnostics_assertions::assert_data_tree;
-use diagnostics_reader::{ArchiveReader, Inspect};
+use diagnostics_reader::ArchiveReader;
 use fidl_fuchsia_diagnostics::ArchiveAccessorMarker;
 use fuchsia_component::client;
 
 #[fuchsia::test]
 async fn verify_proxy_reuse() -> Result<(), Error> {
-    let mut archive_reader = ArchiveReader::new();
+    let mut archive_reader = ArchiveReader::inspect();
     let proxy =
         client::connect_to_protocol::<ArchiveAccessorMarker>().expect("connect to accessor");
     archive_reader
         .with_archive(proxy)
         .add_selector("archivist:root/archive_accessor_stats/all:connections_opened".to_string());
-    let results = archive_reader.snapshot::<Inspect>().await?;
+    let results = archive_reader.snapshot().await?;
 
     assert_eq!(results.len(), 1);
 
@@ -28,7 +28,7 @@ async fn verify_proxy_reuse() -> Result<(), Error> {
         }
     });
 
-    let results = archive_reader.snapshot::<Inspect>().await?;
+    let results = archive_reader.snapshot().await?;
 
     assert_eq!(results.len(), 1);
 
@@ -40,9 +40,9 @@ async fn verify_proxy_reuse() -> Result<(), Error> {
         }
     });
 
-    let results = ArchiveReader::new()
+    let results = ArchiveReader::inspect()
         .add_selector("archivist:root/archive_accessor_stats/all:connections_opened".to_string())
-        .snapshot::<Inspect>()
+        .snapshot()
         .await?;
 
     assert_eq!(results.len(), 1);

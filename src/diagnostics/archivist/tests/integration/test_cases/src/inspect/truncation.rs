@@ -35,13 +35,13 @@ async fn accessor_truncation_test() {
     }
 
     let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
-    let mut reader = ArchiveReader::new();
+    let mut reader = ArchiveReader::inspect();
     reader.with_archive(accessor);
     let data = reader
         .with_aggregated_result_bytes_limit(1)
         .add_selector("child_a*:root")
         .with_minimum_schema_count(3)
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .expect("got inspect data");
 
@@ -53,7 +53,7 @@ async fn accessor_truncation_test() {
         .with_aggregated_result_bytes_limit(4000)
         .add_selector("child_a*:root")
         .with_minimum_schema_count(3)
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .expect("got inspect data");
 
@@ -66,7 +66,7 @@ async fn accessor_truncation_test() {
         .add_selector("child_b*:root")
         .add_selector("child_a*:root")
         .with_minimum_schema_count(6)
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .expect("got inspect data");
 
@@ -79,7 +79,7 @@ async fn accessor_truncation_test() {
         .add_selector("child_b*:root")
         .add_selector("child_a*:root")
         .with_minimum_schema_count(6)
-        .snapshot::<Inspect>()
+        .snapshot()
         .await
         .expect("got inspect data");
 

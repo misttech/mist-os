@@ -4,7 +4,7 @@
 
 use anyhow::{anyhow, Result};
 use diagnostics_assertions::assert_data_tree;
-use diagnostics_reader::{ArchiveReader, Inspect};
+use diagnostics_reader::{ArchiveReader, InspectArchiveReader};
 use fidl::endpoints::create_proxy;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use fuchsia_inspect::hierarchy::{DiagnosticsHierarchy, Property};
@@ -18,7 +18,7 @@ use {
 /// Manages a test Realm that includes a full Power Broker instance.
 struct TestBrokerRealm {
     topology: fbroker::TopologyProxy,
-    archive_reader: ArchiveReader,
+    archive_reader: InspectArchiveReader,
     _realm: RealmInstance,
 }
 
@@ -44,7 +44,7 @@ impl TestBrokerRealm {
         let _realm = builder.build().await?;
         let topology =
             _realm.root.connect_to_protocol_at_exposed_dir::<fbroker::TopologyMarker>()?;
-        let mut archive_reader = ArchiveReader::new();
+        let mut archive_reader = ArchiveReader::inspect();
         archive_reader.add_selector(format!(
             "realm_builder\\:{}/{}:root",
             _realm.root.child_name(),
@@ -61,11 +61,11 @@ impl TestBrokerRealm {
 
 /// Gets an element's current power level represented in a Power Broker Inspect Tree.
 async fn check_inspect_element_current_level(
-    broker_archive_reader: &ArchiveReader,
+    broker_archive_reader: &InspectArchiveReader,
     element_name: &'static str,
 ) -> Result<fbroker::PowerLevel> {
     let root = broker_archive_reader
-        .snapshot::<Inspect>()
+        .snapshot()
         .await?
         .into_iter()
         .next()

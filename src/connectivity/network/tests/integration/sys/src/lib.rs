@@ -326,10 +326,10 @@ where
             }
             NetstackVersion::ProdNetstack3 | NetstackVersion::Netstack3 => {
                 // Retrieve the inspect payload from the archivist.
-                let mut archive_reader = diagnostics_reader::ArchiveReader::new();
+                let mut archive_reader = diagnostics_reader::ArchiveReader::inspect();
                 let archive_reader = archive_reader.add_selectors(selectors);
                 archive_reader
-                    .snapshot::<diagnostics_reader::Inspect>()
+                    .snapshot()
                     .await
                     .expect("snapshot failed")
                     .into_iter()
@@ -387,7 +387,7 @@ async fn emits_logs<N: Netstack>(name: &str) {
         netstack_testing_common::get_component_moniker(&realm, constants::netstack::COMPONENT_NAME)
             .await
             .expect("get netstack moniker");
-    let mut stream = diagnostics_reader::ArchiveReader::new()
+    let mut stream = diagnostics_reader::ArchiveReader::logs()
         .select_all_for_moniker(&netstack_moniker)
         .snapshot_then_subscribe()
         .expect("subscribe to netstack logs");

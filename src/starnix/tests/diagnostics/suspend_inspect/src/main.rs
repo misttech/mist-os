@@ -5,7 +5,7 @@
 use anyhow::{Context, Result};
 use component_events::events::{EventStream, Started, Stopped};
 use component_events::matcher::EventMatcher;
-use diagnostics_reader::{ArchiveReader, Inspect};
+use diagnostics_reader::ArchiveReader;
 use log::info;
 use {
     fidl_fuchsia_test_suspend as fftsu, fuchsia_async as fasync, fuchsia_component as fxc,
@@ -53,11 +53,11 @@ async fn test_suspend() -> Result<()> {
 
         // Linux program started, suspended, resumed, then stopped. The resulting
         // inspect should have been captured and ought to be available.
-        let kernel_inspect = ArchiveReader::new()
+        let kernel_inspect = ArchiveReader::inspect()
             // See notes above for moniker.
             .select_all_for_moniker("test_suite/kernel")
             .with_minimum_schema_count(1)
-            .snapshot::<Inspect>()
+            .snapshot()
             .await?;
         print!("{:?}", kernel_inspect);
         assert_eq!(kernel_inspect.len(), 1);

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::types::Error;
-use diagnostics_data::{Data, DiagnosticsData};
+use diagnostics_data::{Data, Inspect};
 use fidl_fuchsia_diagnostics::Selector;
 use fidl_fuchsia_sys2 as fsys2;
 use serde::Serialize;
@@ -19,11 +19,11 @@ pub trait Command {
 }
 
 pub trait DiagnosticsProvider: Send + Sync {
-    fn snapshot<D: DiagnosticsData>(
+    fn snapshot(
         &self,
         accessor: Option<&str>,
         selectors: impl IntoIterator<Item = Selector>,
-    ) -> impl Future<Output = Result<Vec<Data<D>>, Error>>;
+    ) -> impl Future<Output = Result<Vec<Data<Inspect>>, Error>>;
 
     /// Lists all ArchiveAccessor selectors.
     fn get_accessor_paths(&self) -> impl Future<Output = Result<Vec<String>, Error>>;

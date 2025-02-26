@@ -6,7 +6,7 @@ use component_events::descriptor::EventDescriptor;
 use component_events::events::{self, Event, EventStream};
 use component_events::matcher::EventMatcher;
 use diagnostics_assertions::assert_data_tree;
-use diagnostics_reader::{ArchiveReader, Logs};
+use diagnostics_reader::ArchiveReader;
 use fuchsia_component_test::RealmBuilder;
 use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
 use futures::StreamExt;
@@ -66,8 +66,8 @@ async fn driver_runner_test() -> Result<(), anyhow::Error> {
             .moniker_regex(r".*/driver-hosts:driver-host-\d+$"),
     ];
     check_events(events, &mut started_stream).await?;
-    let reader = ArchiveReader::new();
-    let mut results = reader.snapshot_then_subscribe::<Logs>().unwrap();
+    let reader = ArchiveReader::logs();
+    let mut results = reader.snapshot_then_subscribe().unwrap();
     let mut found = false;
     while let Some(result) = results.next().await {
         match result {

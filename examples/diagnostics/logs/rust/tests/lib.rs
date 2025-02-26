@@ -65,7 +65,7 @@ async fn launch_example_and_read_hello_world() {
 
 fn listen_to_logs(
 ) -> (impl Stream<Item = LogMessage>, impl Stream<Item = Data<Logs>>, (Task<()>, Task<()>)) {
-    let reader = ArchiveReader::new();
+    let reader = ArchiveReader::logs();
 
     let log_proxy = connect_to_protocol::<LogMarker>().unwrap();
     let options = LogFilterOptions {
@@ -88,7 +88,7 @@ fn listen_to_logs(
         let from_archivist = m.tags.iter().any(|t| t == "archivist");
         async move { !from_archivist }
     });
-    let (new_logs, mut errors) = reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
+    let (new_logs, mut errors) = reader.snapshot_then_subscribe().unwrap().split_streams();
 
     let _check_errors = Task::spawn(async move {
         if let Some(error) = errors.next().await {

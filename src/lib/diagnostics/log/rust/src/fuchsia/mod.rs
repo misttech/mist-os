@@ -407,7 +407,7 @@ macro_rules! log_every_n_seconds {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diagnostics_reader::{ArchiveReader, Logs};
+    use diagnostics_reader::ArchiveReader;
     use fidl_fuchsia_diagnostics_crasher::CrasherMarker;
     use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
     use futures::{future, StreamExt};
@@ -432,8 +432,8 @@ mod tests {
             .unwrap();
         let realm = builder.build().await.unwrap();
         let child_name = realm.root.child_name();
-        let reader = ArchiveReader::new();
-        let (logs, _) = reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
+        let reader = ArchiveReader::logs();
+        let (logs, _) = reader.snapshot_then_subscribe().unwrap().split_streams();
         let proxy = realm.root.connect_to_protocol_at_exposed_dir::<CrasherMarker>().unwrap();
         let target_moniker =
             ExtendedMoniker::parse_str(&format!("realm_builder:{}/rust-crasher", child_name))
@@ -458,8 +458,8 @@ mod tests {
 
     #[fuchsia::test(logging = false)]
     async fn verify_setting_minimum_log_severity() {
-        let reader = ArchiveReader::new();
-        let (logs, _) = reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
+        let reader = ArchiveReader::logs();
+        let (logs, _) = reader.snapshot_then_subscribe().unwrap().split_streams();
         let publisher = Publisher::new(PublisherOptions {
             tags: &["verify_setting_minimum_log_severity"],
             ..PublisherOptions::empty()
@@ -488,8 +488,8 @@ mod tests {
 
     #[fuchsia::test]
     async fn log_macro_logs_are_recorded() {
-        let reader = ArchiveReader::new();
-        let (logs, _) = reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
+        let reader = ArchiveReader::logs();
+        let (logs, _) = reader.snapshot_then_subscribe().unwrap().split_streams();
 
         let total_threads = 10;
 

@@ -8,15 +8,15 @@ use inspect_rust_codelab_testing::{IntegrationTest, TestOptions};
 // [START include_test_stuff]
 use anyhow::format_err;
 use diagnostics_assertions::{assert_data_tree, AnyProperty};
-use diagnostics_reader::{ArchiveReader, DiagnosticsHierarchy, Inspect};
+use diagnostics_reader::{ArchiveReader, DiagnosticsHierarchy};
 // [END include_test_stuff]
 
 // [START get_inspect]
 async fn get_inspect_hierarchy(test: &IntegrationTest) -> Result<DiagnosticsHierarchy, Error> {
     let moniker = test.reverser_moniker_for_selectors();
-    ArchiveReader::new()
+    ArchiveReader::inspect()
         .add_selector(format!("{}:root", moniker))
-        .snapshot::<Inspect>()
+        .snapshot()
         .await?
         .into_iter()
         .next()
