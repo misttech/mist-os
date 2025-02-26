@@ -339,10 +339,10 @@ void HandoffPrep::SetVersionString(ktl::string_view version) {
   }
 }
 
-[[noreturn]] void HandoffPrep::DoHandoff(UartDriver& uart, ktl::span<ktl::byte> zbi,
+[[noreturn]] void HandoffPrep::DoHandoff(ElfImage& kernel, UartDriver& uart,
+                                         ktl::span<ktl::byte> zbi,
                                          const KernelStorage::Bootfs& kernel_package,
-                                         const ArchPatchInfo& patch_info,
-                                         fit::inline_function<void(PhysHandoff*)> boot) {
+                                         const ArchPatchInfo& patch_info) {
   // Hand off the boot options first, which don't really change.  But keep a
   // mutable reference to update boot_options.serial later to include live
   // driver state and not just configuration like other BootOptions members do.
@@ -379,6 +379,28 @@ void HandoffPrep::SetVersionString(ktl::string_view version) {
   // Hand-off the serial driver. There may be no more logging beyond this point.
   handoff()->uart = ktl::move(uart).TakeUart();
 
-  boot(handoff());
-  ZX_PANIC("HandoffPrep::DoHandoff boot function returned!");
+  // TODO(https://fxbug.dev/42164859): For now we're loading an ELF kernel in
+  // physical address mode at an arbitrary load address, even though it's been
+  // relocated for its final virtual address.  The kernel's entry point is
+  // expected to be purely position independent long enough to switch to
+  // virtual addressing.
+  //
+  // NOTE: For real handoff with virtual addresses, this will need some inline
+  // asm to switch stacks and such. For interim hack kernels doing physical
+  // address mode handoff, they can either use the phys stack momentarily
+  // or have asm entry code that sets up its own stack.
+  kernel.set_load_address(kernel.physical_load_address());
+
+#ifdef __aarch64__
+  // Make sure all prior stores have been written back to main memory so that
+  // secondary CPUs booting with MMU/caches off will see a coherent view.
+  //
+  // TODO(https://fxbug.dev/42164859): This is expediently done to the whole
+  // cache rather than to the lines possibly holding the precise memory of
+  // interest to the secondaries. Formalize or rethink this hammer in the
+  // context of the physboot's hand-off contract with the kernel.
+  arch::CleanAndInvalidateLocalCaches();
+#endif
+  kernel.Handoff<void(PhysHandoff*)>(handoff());
+  ZX_PANIC("ElfImage::Handoff returned!");
 }
