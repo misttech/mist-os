@@ -122,7 +122,7 @@ impl Txid {
         //  - top bit zero to indicate a userspace generated txid.
         //  - 7 bits of generation
         //  - 24 bits based on the interest id
-        let txid = generation << TXID_GENERATION_SHIFT | id;
+        let txid = (generation << TXID_GENERATION_SHIFT) | id;
 
         Txid(txid)
     }
