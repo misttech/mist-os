@@ -31,6 +31,7 @@
 #include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
 
+#include "src/graphics/display/drivers/coordinator/added-display-info.h"
 #include "src/graphics/display/drivers/coordinator/capture-image.h"
 #include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
@@ -195,10 +196,19 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   zx::result<> Initialize();
 
   void HandleClientOwnershipChanges() __TA_REQUIRES(mtx());
-  void PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) __TA_EXCLUDES(mtx());
 
-  zx::result<> AddDisplay(const raw_display_info_t& banjo_display_info);
-  zx::result<> RemoveDisplay(display::DisplayId display_id);
+  // Processes a display addition notification from an engine driver.
+  //
+  // Must be called on the client dispatcher.
+  void AddDisplay(std::unique_ptr<AddedDisplayInfo> added_display_info);
+
+  // Processes a display removal notification from an engine driver.
+  //
+  // Must be called on the client dispatcher.
+  void RemoveDisplay(display::DisplayId removed_display_id);
+
+  // Must be called on the client dispatcher.
+  void PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) __TA_EXCLUDES(mtx());
 
   inspect::Inspector inspector_;
   // Currently located at bootstrap/driver_manager:root/display.

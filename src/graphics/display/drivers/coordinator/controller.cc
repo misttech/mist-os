@@ -42,6 +42,7 @@
 #include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
 
+#include "src/graphics/display/drivers/coordinator/added-display-info.h"
 #include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/drivers/coordinator/client.h"
@@ -142,140 +143,122 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
   }
 }
 
-zx::result<> Controller::AddDisplay(const raw_display_info_t& banjo_display_info) {
-  zx::result<std::unique_ptr<AddedDisplayInfo>> added_display_info_result =
-      AddedDisplayInfo::Create(banjo_display_info);
-  if (added_display_info_result.is_error()) {
-    // AddedDisplayInfo::Create() has already logged the error.
-    return added_display_info_result.take_error();
-  }
-  std::unique_ptr<AddedDisplayInfo> added_display_info =
-      std::move(added_display_info_result).value();
+void Controller::AddDisplay(std::unique_ptr<AddedDisplayInfo> added_display_info) {
+  ZX_DEBUG_ASSERT(IsRunningOnClientDispatcher());
 
   zx::result<fbl::RefPtr<DisplayInfo>> display_info_result =
       DisplayInfo::Create(std::move(*added_display_info));
   if (display_info_result.is_error()) {
-    FDF_LOG(WARNING, "Failed to add display %" PRIu64 ": %s", banjo_display_info.display_id,
-            display_info_result.status_string());
-    return display_info_result.take_error();
+    // DisplayInfo::Create() has already logged the error.
+    return;
   }
 
   fbl::RefPtr<DisplayInfo> display_info = std::move(display_info_result).value();
   display::DisplayId display_id = display_info->id();
 
+  {
+    fbl::AutoLock lock(mtx());
+    auto display_it = displays_.find(display_id);
+    if (display_it != displays_.end()) {
+      FDF_LOG(WARNING, "Display %" PRIu64 " is already created; add display request ignored",
+              display_id.value());
+      return;
+    }
+    displays_.insert(display_info);
+  }
+
+  if (display_info->edid.has_value()) {
+    PopulateDisplayTimings(display_info);
+  }
+
   fbl::AutoLock lock(mtx());
-  auto display_it = displays_.find(display_id);
-  if (display_it != displays_.end()) {
-    FDF_LOG(WARNING, "Display %" PRIu64 " is already created; add display request ignored",
-            display_id.value());
-    return zx::error(ZX_ERR_ALREADY_EXISTS);
+
+  // TODO(https://fxbug.dev/317914671): Pass parsed display metadata to driver.
+
+  const std::array<display::DisplayId, 1> added_id_candidates = {display_info->id()};
+  std::span<const display::DisplayId> added_ids(added_id_candidates);
+
+  // TODO(https://fxbug.dev/339311596): Do not trigger the client's
+  // `OnDisplaysChanged` if an added display is ignored.
+  //
+  // Dropping some add events can result in spurious removes, but
+  // those are filtered out in the clients.
+  if (!display_info->edid.has_value() || !display_info->edid->timings.is_empty()) {
+    display_info->init_done = true;
+    display_info->InitializeInspect(&root_);
+  } else {
+    FDF_LOG(WARNING, "Ignoring display with no compatible edid timings");
+    added_ids = {};
   }
-  displays_.insert(display_info);
 
-  fbl::AllocChecker alloc_checker;
-  auto post_task_state = fbl::make_unique_checked<DisplayTaskState>(&alloc_checker);
-  if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "No memory when processing hotplug");
-    return zx::error(ZX_ERR_NO_MEMORY);
+  if (virtcon_client_ready_) {
+    ZX_DEBUG_ASSERT(virtcon_client_ != nullptr);
+    virtcon_client_->OnDisplaysChanged(added_ids, /*removed_display_ids=*/{});
   }
-
-  zx::result<> post_task_result = display::PostTask(
-      std::move(post_task_state), *client_dispatcher()->async_dispatcher(),
-      [this, display_info = std::move(display_info)]() {
-        if (display_info->edid.has_value()) {
-          PopulateDisplayTimings(display_info);
-        }
-
-        // TODO(https://fxbug.dev/317914671): Pass parsed display metadata to driver.
-
-        fbl::AutoLock lock(mtx());
-
-        const std::array<display::DisplayId, 1> added_id_candidates = {display_info->id()};
-        std::span<const display::DisplayId> added_ids(added_id_candidates);
-
-        // TODO(https://fxbug.dev/339311596): Do not trigger the client's
-        // `OnDisplaysChanged` if an added display is ignored.
-        //
-        // Dropping some add events can result in spurious removes, but
-        // those are filtered out in the clients.
-        if (!display_info->edid.has_value() || !display_info->edid->timings.is_empty()) {
-          display_info->init_done = true;
-          display_info->InitializeInspect(&root_);
-        } else {
-          FDF_LOG(WARNING, "Ignoring display with no compatible edid timings");
-          added_ids = {};
-        }
-
-        if (virtcon_client_ready_) {
-          ZX_DEBUG_ASSERT(virtcon_client_ != nullptr);
-          virtcon_client_->OnDisplaysChanged(added_ids, /*removed_display_ids=*/{});
-        }
-        if (primary_client_ready_) {
-          ZX_DEBUG_ASSERT(primary_client_ != nullptr);
-          primary_client_->OnDisplaysChanged(added_ids, /*removed_display_ids=*/{});
-        }
-      });
-
-  if (post_task_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to dispatch task: %s", post_task_result.status_string());
+  if (primary_client_ready_) {
+    ZX_DEBUG_ASSERT(primary_client_ != nullptr);
+    primary_client_->OnDisplaysChanged(added_ids, /*removed_display_ids=*/{});
   }
-  return post_task_result;
 }
 
-zx::result<> Controller::RemoveDisplay(display::DisplayId display_id) {
+void Controller::RemoveDisplay(display::DisplayId removed_display_id) {
+  ZX_DEBUG_ASSERT(IsRunningOnClientDispatcher());
+
   fbl::AutoLock lock(mtx());
-  fbl::RefPtr<DisplayInfo> removed_display = displays_.erase(display_id);
+  fbl::RefPtr<DisplayInfo> removed_display = displays_.erase(removed_display_id);
   if (!removed_display) {
-    FDF_LOG(WARNING, "Unknown display %" PRIu64 " removed", display_id.value());
-    return zx::error(ZX_ERR_NOT_FOUND);
+    FDF_LOG(WARNING, "Display removal references unknown display ID: %" PRIu64,
+            removed_display_id.value());
+    return;
   }
 
   // Release references to all images on the display.
   while (removed_display->images.pop_front()) {
   }
 
-  fbl::AllocChecker alloc_checker;
-  auto post_task_state = fbl::make_unique_checked<DisplayTaskState>(&alloc_checker);
-  if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "No memory when processing hotplug");
-    return zx::error(ZX_ERR_NO_MEMORY);
+  const std::array<display::DisplayId, 1> removed_display_ids = {
+      removed_display_id,
+  };
+  if (virtcon_client_ready_) {
+    ZX_DEBUG_ASSERT(virtcon_client_ != nullptr);
+    virtcon_client_->OnDisplaysChanged(/*added_display_ids=*/{}, removed_display_ids);
   }
-  zx::result<> post_task_result = display::PostTask(
-      std::move(post_task_state), *client_dispatcher()->async_dispatcher(), [this, display_id]() {
-        fbl::AutoLock lock(mtx());
-        const std::array<display::DisplayId, 1> removed_display_ids = {
-            display_id,
-        };
-        if (virtcon_client_ready_) {
-          ZX_DEBUG_ASSERT(virtcon_client_ != nullptr);
-          virtcon_client_->OnDisplaysChanged(/*added_display_ids=*/{}, removed_display_ids);
-        }
-        if (primary_client_ready_) {
-          ZX_DEBUG_ASSERT(primary_client_ != nullptr);
-          primary_client_->OnDisplaysChanged(/*added_display_ids=*/{}, removed_display_ids);
-        }
-      });
-
-  if (post_task_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to dispatch task: %s", post_task_result.status_string());
+  if (primary_client_ready_) {
+    ZX_DEBUG_ASSERT(primary_client_ != nullptr);
+    primary_client_->OnDisplaysChanged(/*added_display_ids=*/{}, removed_display_ids);
   }
-  return post_task_result;
 }
 
 void Controller::DisplayEngineListenerOnDisplayAdded(const raw_display_info_t* banjo_display_info) {
   ZX_DEBUG_ASSERT(banjo_display_info != nullptr);
-  zx::result<> added_display_result = AddDisplay(*banjo_display_info);
-  if (added_display_result.is_error()) {
-    FDF_LOG(WARNING, "Failed to add a display %" PRIu64 ": %s", banjo_display_info->display_id,
-            added_display_result.status_string());
+
+  zx::result<std::unique_ptr<AddedDisplayInfo>> added_display_info_result =
+      AddedDisplayInfo::Create(*banjo_display_info);
+  if (added_display_info_result.is_error()) {
+    // AddedDisplayInfo::Create() has already logged the error.
+    return;
+  }
+  std::unique_ptr<AddedDisplayInfo> added_display_info =
+      std::move(added_display_info_result).value();
+
+  zx::result<> post_task_result = display::PostTask<kDisplayTaskTargetSize>(
+      *client_dispatcher()->async_dispatcher(),
+      [this, added_display_info = std::move(added_display_info)]() mutable {
+        AddDisplay(std::move(added_display_info));
+      });
+  if (post_task_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to dispatch AddDisplay task: %s", post_task_result.status_string());
   }
 }
 
 void Controller::DisplayEngineListenerOnDisplayRemoved(uint64_t banjo_display_id) {
-  display::DisplayId display_id = display::ToDisplayId(banjo_display_id);
-  zx::result<> remove_display_result = RemoveDisplay(display_id);
-  if (remove_display_result.is_error()) {
-    FDF_LOG(WARNING, "Failed to remove a display: %s", remove_display_result.status_string());
+  display::DisplayId removed_display_id = display::ToDisplayId(banjo_display_id);
+
+  zx::result<> post_task_result = display::PostTask<kDisplayTaskTargetSize>(
+      *client_dispatcher()->async_dispatcher(),
+      [this, removed_display_id]() { RemoveDisplay(removed_display_id); });
+  if (post_task_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to dispatch RemoveDisplay task: %s", post_task_result.status_string());
   }
 }
 
