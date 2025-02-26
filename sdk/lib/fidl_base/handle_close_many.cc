@@ -26,7 +26,7 @@ zx_status_t FidlHandleDispositionCloseMany(const zx_handle_disposition_t* handle
     return ZX_OK;
   }
 #ifdef __Fuchsia__
-  ZX_ASSERT_MSG(num_handles <= ZX_CHANNEL_MAX_MSG_HANDLES, " num_handles: %ld", num_handles);
+  ZX_ASSERT_MSG(num_handles <= ZX_CHANNEL_MAX_MSG_HANDLES, " num_handles: %zu", num_handles);
   zx_handle_t handles[ZX_CHANNEL_MAX_MSG_HANDLES];
   for (size_t i = 0; i < num_handles; i++) {
     handles[i] = handle_dispositions[i].handle;
@@ -42,7 +42,7 @@ zx_status_t FidlHandleInfoCloseMany(const zx_handle_info_t* handle_infos, size_t
     return ZX_OK;
   }
 #ifdef __Fuchsia__
-  ZX_ASSERT_MSG(num_handles <= ZX_CHANNEL_MAX_MSG_HANDLES, " num_handles: %ld", num_handles);
+  ZX_ASSERT_MSG(num_handles <= ZX_CHANNEL_MAX_MSG_HANDLES, " num_handles: %zu", num_handles);
   zx_handle_t handles[ZX_CHANNEL_MAX_MSG_HANDLES];
   for (size_t i = 0; i < num_handles; i++) {
     handles[i] = handle_infos[i].handle;
