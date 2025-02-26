@@ -491,6 +491,9 @@ async fn handle_touchscreen_request_stream(
                 let end_location = payload.end_location.expect("missing end location");
                 let move_event_count = payload.move_event_count.expect("missing move event count");
                 assert_ne!(move_event_count, 0);
+                let duration_nanos = payload.duration.unwrap_or(0);
+                let delay_nanos = duration_nanos / ((move_event_count as i64) + 1);
+                let delay = fasync::MonotonicDuration::from_nanos(delay_nanos);
 
                 let start_x_f = start_location.x as f64;
                 let start_y_f = start_location.y as f64;
@@ -512,6 +515,7 @@ async fn handle_touchscreen_request_stream(
                             math::Vec_ { x: event_x as i32, y: event_y as i32 },
                         )]))
                         .expect("Failed to send tap input report");
+                    delay.sleep();
                 }
 
                 // Send a report with an empty set of touch contacts, so that input

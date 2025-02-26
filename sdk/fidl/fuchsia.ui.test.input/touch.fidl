@@ -38,9 +38,7 @@ closed protocol TouchScreen {
     ///
     /// DOWN + CHANGE_1 + ... + CHANGE_n + UP, where n == `move_event_count`
     ///
-    /// Events are injected with no explicit delay in between; in other words, the
-    /// observed delay between successive events will be approximately equal to the
-    /// time required to inject a single event.
+    /// Events are injected with no explicit delay in between if `duration` not set.
     strict SimulateSwipe(table {
         /// Starting location of the swipe, in the coordinate units specified during
         /// registration.
@@ -52,6 +50,13 @@ closed protocol TouchScreen {
 
         /// Number of move events in the swipe.
         3: move_event_count uint32;
+
+        /// The duration of the swipe gesture.
+        /// Per step delay = duration / ( move_event_count + 1).
+        /// DOWN - wait per step delay - CHANGE_1 - wait per step delay - ... -
+        /// CHANGE_n - wait per step delay - UP.
+        @available(added=NEXT)
+        4: duration zx.Duration;
     }) -> ();
 
 

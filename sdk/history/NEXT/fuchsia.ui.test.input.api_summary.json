@@ -759,6 +759,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.ui.test.input/TouchScreenSimulateSwipeRequest.duration",
+        "ordinal": "4",
+        "type": "int64"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.ui.test.input/TouchScreenSimulateSwipeRequest.end_location",
         "ordinal": "2",
         "type": "fuchsia.math/Vec"
