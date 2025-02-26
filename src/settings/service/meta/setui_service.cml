@@ -26,6 +26,7 @@
                 "fuchsia.settings.NightMode",
                 "fuchsia.settings.Privacy",
                 "fuchsia.settings.Setup",
+                "fuchsia.update.verify.ComponentOtaHealthCheck",
             ],
         },
     ],
@@ -91,8 +92,14 @@
                 "fuchsia.settings.NightMode",
                 "fuchsia.settings.Privacy",
                 "fuchsia.settings.Setup",
+                "fuchsia.update.verify.ComponentOtaHealthCheck",
             ],
             from: "self",
+        },
+        {
+            protocol: "fuchsia.update.verify.ComponentOtaHealthCheck",
+            from: "self",
+            to: "framework",
         },
     ],
 }
