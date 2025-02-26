@@ -433,13 +433,15 @@ VmObject::AttributionCounts VmAddressRegion::GetAttributedMemoryLocked() {
   AttributionCounts page_counts;
 
   // Enumerate all of the subregions below us & count allocated pages.
-  EnumerateChildrenInternalLocked(
-      0, UINT64_MAX, [](VmAddressRegion* vmar, uint depth) { return true; },
-      [&page_counts](VmMapping* map, const VmAddressRegion* vmar, uint depth) {
-        AssertHeld(map->lock_ref());
-        page_counts += map->GetAttributedMemoryLocked();
-        return true;
-      });
+  VmAddressRegionEnumerator<VmAddressRegionEnumeratorType::MappingsOnly> enumerator(*this, 0,
+                                                                                    UINT64_MAX);
+  AssertHeld(enumerator.lock_ref());
+  while (auto next = enumerator.next()) {
+    if (VmMapping* map = next->region_or_mapping->as_vm_mapping_ptr(); map) {
+      AssertHeld(map->lock_ref());
+      page_counts += map->GetAttributedMemoryLocked();
+    }
+  }
 
   return page_counts;
 }
@@ -1244,17 +1246,17 @@ zx_status_t VmAddressRegion::SetMemoryPriorityLocked(MemoryPriority priority) {
   set_region_priority(this);
 
   // Enumerate all of the subregions below us.
-  EnumerateChildrenInternalLocked(
-      0, UINT64_MAX,
-      [&set_region_priority](VmAddressRegion* vmar, uint depth) {
-        set_region_priority(vmar);
-        return true;
-      },
-      [priority](VmMapping* map, const VmAddressRegion* vmar, uint depth) {
-        AssertHeld(map->lock_ref());
-        map->SetMemoryPriorityLocked(priority);
-        return true;
-      });
+  VmAddressRegionEnumerator<VmAddressRegionEnumeratorType::VmarsAndMappings> enumerator(*this, 0,
+                                                                                        UINT64_MAX);
+  AssertHeld(enumerator.lock_ref());
+  while (auto next = enumerator.next()) {
+    if (VmMapping* map = next->region_or_mapping->as_vm_mapping_ptr(); map) {
+      AssertHeld(map->lock_ref());
+      map->SetMemoryPriorityLocked(priority);
+    } else {
+      set_region_priority(next->region_or_mapping->as_vm_address_region_ptr());
+    }
+  }
   return ZX_OK;
 }
 
