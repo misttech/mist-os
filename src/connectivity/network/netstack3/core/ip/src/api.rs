@@ -32,6 +32,13 @@ use crate::internal::types::{
     RoutableIpAddr,
 };
 
+/// The options for [`RoutesApi::resolve_route`] api.
+#[derive(Debug, Clone, Default)]
+pub struct RouteResolveOptions {
+    /// The marks for the resolution.
+    pub marks: Marks,
+}
+
 /// The routes API for a specific IP version `I`.
 pub struct RoutesApi<I: Ip, C>(C, IpVersionMarker<I>);
 
@@ -150,17 +157,12 @@ where
     pub fn resolve_route(
         &mut self,
         destination: Option<RoutableIpAddr<I::Addr>>,
+        RouteResolveOptions { marks }: &RouteResolveOptions,
     ) -> Result<
         ResolvedRoute<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
         ResolveRouteError,
     > {
-        base::resolve_output_route_to_destination(
-            self.core_ctx(),
-            None,
-            None,
-            destination,
-            &Marks::default(),
-        )
+        base::resolve_output_route_to_destination(self.core_ctx(), None, None, destination, marks)
     }
 
     /// Selects the device to use for gateway routes when the device was

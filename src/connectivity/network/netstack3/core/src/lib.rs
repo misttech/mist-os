@@ -170,8 +170,9 @@ pub mod routes {
     pub use netstack3_base::WrapBroadcastMarker;
     pub use netstack3_ip::{
         AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither,
-        Generation, MarkMatcher, MarkMatchers, Metric, NextHop, RawMetric, ResolvedRoute,
-        RoutableIpAddr, RoutingTableId, Rule, RuleAction, RuleMatcher, TrafficOriginMatcher,
+        Generation, MarkMatcher, MarkMatchers, Marks, Metric, NextHop, RawMetric, ResolvedRoute,
+        RoutableIpAddr, RouteResolveOptions, RoutingTableId, Rule, RuleAction, RuleMatcher,
+        TrafficOriginMatcher,
     };
 }
 

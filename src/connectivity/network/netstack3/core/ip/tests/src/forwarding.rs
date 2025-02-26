@@ -21,8 +21,8 @@ use netstack3_core::testutil::{
 use netstack3_core::StackStateBuilder;
 use netstack3_ip::{
     AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, InternalForwarding,
-    MarkMatcher, MarkMatchers, Marks, Metric, RawMetric, ResolvedRoute, Rule, RuleAction,
-    RuleMatcher,
+    MarkMatcher, MarkMatchers, Marks, Metric, RawMetric, ResolvedRoute, RouteResolveOptions, Rule,
+    RuleAction, RuleMatcher,
 };
 
 #[ip_test(I)]
@@ -322,9 +322,10 @@ fn test_route_resolution_respects_source_address_matcher<I: TestIpExt + netstack
     // We need to lookup the route again and in this case the destination address matches the
     // more specific prefix in `second_table`, it should yield the route with a gateway.
     assert_eq!(
-        ctx.core_api()
-            .routes::<I>()
-            .resolve_route(SocketIpAddr::new(I::TEST_ADDRS.remote_ip.get())),
+        ctx.core_api().routes::<I>().resolve_route(
+            SocketIpAddr::new(I::TEST_ADDRS.remote_ip.get()),
+            &RouteResolveOptions::default()
+        ),
         Ok(expected_route_with_gateway.clone())
     );
 
@@ -343,9 +344,10 @@ fn test_route_resolution_respects_source_address_matcher<I: TestIpExt + netstack
     // because of strong host model, the default route is not usable so we will continue to the
     // main table during the second lookup and yield the route without the gateway.
     assert_eq!(
-        ctx.core_api()
-            .routes::<I>()
-            .resolve_route(SocketIpAddr::new(I::get_other_remote_ip_address(254).get())),
+        ctx.core_api().routes::<I>().resolve_route(
+            SocketIpAddr::new(I::get_other_remote_ip_address(254).get()),
+            &RouteResolveOptions::default()
+        ),
         Ok(expected_route_no_gateway.clone())
     );
 

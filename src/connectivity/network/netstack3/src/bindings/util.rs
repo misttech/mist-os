@@ -35,7 +35,8 @@ use netstack3_core::socket::{
 use netstack3_core::sync::RemoveResourceResult;
 use packet_formats::utils::NonZeroDuration;
 use {
-    fidl_fuchsia_net as fidl_net, fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net as fidl_net, fidl_fuchsia_net_ext as fnet_ext,
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
     fidl_fuchsia_net_routes_ext as fnet_routes_ext, fidl_fuchsia_net_stack as fidl_net_stack,
@@ -1208,6 +1209,23 @@ impl<I: Ip> TryIntoFidlWithContext<fnet_routes_ext::InstalledRoute<I>> for Entry
             },
             table_id: table_id.into(),
         })
+    }
+}
+
+impl TryFromFidl<fnet_ext::Marks> for netstack3_core::routes::Marks {
+    type Error = Never;
+
+    fn try_from_fidl(marks: fnet_ext::Marks) -> Result<Self, Self::Error> {
+        Ok(Self::new(marks.into_iter().map(|(domain, mark)| (domain.into_core(), mark))))
+    }
+}
+
+impl TryFromFidl<fnet_routes_ext::ResolveOptions> for netstack3_core::routes::RouteResolveOptions {
+    type Error = Never;
+
+    fn try_from_fidl(options: fnet_routes_ext::ResolveOptions) -> Result<Self, Self::Error> {
+        let fnet_routes_ext::ResolveOptions { marks } = options;
+        Ok(Self { marks: marks.into_core() })
     }
 }
 

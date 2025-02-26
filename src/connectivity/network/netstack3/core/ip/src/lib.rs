@@ -222,7 +222,7 @@ pub mod raw {
     };
 }
 
-pub use internal::api::{RoutesAnyApi, RoutesApi};
+pub use internal::api::{RouteResolveOptions, RoutesAnyApi, RoutesApi};
 pub use internal::base::{
     gen_ip_packet_id, receive_ipv4_packet, receive_ipv4_packet_action, receive_ipv6_packet,
     receive_ipv6_packet_action, resolve_output_route_to_destination, AddressStatus,

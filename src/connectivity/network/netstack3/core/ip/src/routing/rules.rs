@@ -178,7 +178,6 @@ impl Marks {
     /// # Panics
     ///
     /// Panics if the same domain is specified more than once.
-    #[cfg(any(test, feature = "testutils"))]
     pub fn new(iter: impl IntoIterator<Item = (MarkDomain, u32)>) -> Self {
         let mut marks = Self::default();
         for (domain, mark) in iter.into_iter() {

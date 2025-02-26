@@ -14,15 +14,14 @@ use fidl_fuchsia_net_routes_ext::FidlRouteIpExt;
 use fnet_routes_ext::rules::{InstalledRule, RuleAction, RuleIndex, RuleMatcher, RuleSetPriority};
 use futures::{AsyncReadExt as _, AsyncWriteExt as _, StreamExt as _};
 use net_declare::fidl_subnet;
-use net_types::ip::{GenericOverIp, Ip, IpInvariant, IpVersion, Subnet};
+use net_types::ip::{GenericOverIp, Ip, IpInvariant, IpVersion};
 use netemul::{RealmTcpListener as _, RealmTcpStream as _};
 use netstack_testing_common::interfaces::TestInterfaceExt as _;
 use netstack_testing_common::realms::{Netstack2, Netstack3, TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
-use routes_common::TestSetup;
+use routes_common::{add_default_route_for_mark, TestSetup};
 use {
-    fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
-    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
     fidl_fuchsia_net_routes_ext as fnet_routes_ext, fidl_fuchsia_posix_socket as fposix_socket,
 };
 
@@ -457,14 +456,20 @@ async fn multi_network<I: FidlRuleAdminIpExt + FidlRouteAdminIpExt + FidlRouteIp
         &route_table_provider,
         &rule_set,
         &client_iface_1,
+        None,
         SO_MARK_1,
+        routes_common::MarkMatcher::MatchMarked(SO_MARK_1),
+        routes_common::MarkMatcher::DontMatch,
     )
     .await;
     let _rs2 = add_default_route_for_mark::<I>(
         &route_table_provider,
         &rule_set,
         &client_iface_2,
+        None,
         SO_MARK_2,
+        routes_common::MarkMatcher::MatchMarked(SO_MARK_2),
+        routes_common::MarkMatcher::DontMatch,
     )
     .await;
 
@@ -547,76 +552,6 @@ async fn multi_network<I: FidlRuleAdminIpExt + FidlRouteAdminIpExt + FidlRouteIp
 
         futures::join!(client, server);
     }
-}
-
-// Creates a new route table that has a default route using the given `interface`; Also installs
-// a rule that matches on the given `mark` to lookup the created route table.
-async fn add_default_route_for_mark<
-    I: FidlRouteAdminIpExt + FidlRuleAdminIpExt + FidlRouteIpExt,
->(
-    route_table_provider: &<I::RouteTableProviderMarker as ProtocolMarker>::Proxy,
-    rule_set: &<I::RuleSetMarker as ProtocolMarker>::Proxy,
-    interface: &netemul::TestInterface<'_>,
-    mark: u32,
-) -> <I::RouteSetMarker as ProtocolMarker>::Proxy {
-    let route_table = fnet_routes_ext::admin::new_route_table::<I>(route_table_provider, None)
-        .expect("new route table");
-    let route_set =
-        fnet_routes_ext::admin::new_route_set::<I>(&route_table).expect("new route set");
-    let route_to_add = fnet_routes_ext::Route {
-        destination: Subnet::new(I::UNSPECIFIED_ADDRESS, 0).expect("subnet"),
-        action: fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget::<I> {
-            outbound_interface: interface.id(),
-            next_hop: None,
-        }),
-        properties: fnet_routes_ext::RouteProperties {
-            specified_properties: fnet_routes_ext::SpecifiedRouteProperties {
-                metric: fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty),
-            },
-        },
-    };
-    let grant = interface.get_authorization().await.expect("getting grant should succeed");
-    let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
-    fnet_routes_ext::admin::authenticate_for_interface::<I>(&route_set, proof)
-        .await
-        .expect("no FIDL error")
-        .expect("authentication should succeed");
-    assert!(fnet_routes_ext::admin::add_route::<I>(
-        &route_set,
-        &route_to_add.try_into().expect("convert to FIDL")
-    )
-    .await
-    .expect("fidl")
-    .expect("add route"));
-    fnet_routes_ext::admin::detach_route_table::<I>(&route_table).await.expect("fidl error");
-
-    let table_id =
-        fnet_routes_ext::admin::get_table_id::<I>(&route_table).await.expect("fidl error");
-
-    let auth = fnet_routes_ext::admin::get_authorization_for_route_table::<I>(&route_table)
-        .await
-        .expect("fidl error");
-    fnet_routes_ext::rules::authenticate_for_route_table::<I>(&rule_set, auth.table_id, auth.token)
-        .await
-        .expect("fidl error")
-        .expect("authentication error");
-    fnet_routes_ext::rules::add_rule::<I>(
-        &rule_set,
-        RuleIndex::new(mark),
-        fnet_routes_ext::rules::RuleMatcher {
-            mark_1: Some(fnet_routes_ext::rules::MarkMatcher::Marked {
-                mask: u32::MAX,
-                between: mark..=mark,
-            }),
-            ..Default::default()
-        },
-        fnet_routes_ext::rules::RuleAction::Lookup(table_id),
-    )
-    .await
-    .expect("fidl")
-    .expect("add rule");
-
-    route_set
 }
 
 // Netstack2 does not support fuchsia.net.routes.admin.RuleTableV{4, 6}, so it closes the

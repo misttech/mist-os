@@ -20,7 +20,7 @@ use std::collections::HashSet;
 use std::fmt::{Debug, Display};
 
 use async_utils::{fold, stream};
-use fidl_fuchsia_net_ext::{IntoExt as _, TryIntoExt as _};
+use fidl_fuchsia_net_ext::{self as fnet_ext, IntoExt as _, TryIntoExt as _};
 use futures::{Future, Stream, TryStreamExt as _};
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6, Ipv6Addr, Subnet};
 use net_types::{SpecifiedAddr, UnicastAddress, Witness as _};
@@ -1157,6 +1157,27 @@ pub async fn wait_for_routes<
         predicate(routes).then_some(())
     })
     .await
+}
+
+/// Resolve options for resolving route.
+#[derive(Debug, Default, Clone)]
+pub struct ResolveOptions {
+    /// The marks used for the route resolution.
+    pub marks: fnet_ext::Marks,
+}
+
+impl From<fnet_routes::ResolveOptions> for ResolveOptions {
+    fn from(value: fnet_routes::ResolveOptions) -> Self {
+        let fnet_routes::ResolveOptions { marks, __source_breaking } = value;
+        Self { marks: marks.map(fnet_ext::Marks::from).unwrap_or_default() }
+    }
+}
+
+impl From<ResolveOptions> for fnet_routes::ResolveOptions {
+    fn from(value: ResolveOptions) -> Self {
+        let ResolveOptions { marks } = value;
+        Self { marks: Some(marks.into()), __source_breaking: fidl::marker::SourceBreaking }
+    }
 }
 
 #[cfg(test)]
