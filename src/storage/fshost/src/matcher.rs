@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use crate::device::constants::{
-    BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL, FVM_DRIVER_PATH,
-    GPT_DRIVER_PATH, LEGACY_DATA_PARTITION_LABEL, MBR_DRIVER_PATH, NAND_BROKER_DRIVER_PATH,
+    BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL, GPT_DRIVER_PATH,
+    LEGACY_DATA_PARTITION_LABEL, MBR_DRIVER_PATH, NAND_BROKER_DRIVER_PATH,
 };
 use crate::device::{Device, DeviceTag};
 use crate::environment::Environment;
@@ -543,7 +543,7 @@ impl Matcher for FvmOnRecoveryMatcher {
             // fact that volumes don't enumerate won't be an issue.
             bail!("Recovery mode isn't supported on storage-host yet.");
         } else {
-            if let Err(err) = env.attach_driver(device, FVM_DRIVER_PATH).await {
+            if let Err(err) = env.bind_and_enumerate_fvm(device).await {
                 log::error!(err:?; "Failed to bind driver; FVM may be corrupt");
             }
         }
@@ -557,8 +557,8 @@ mod tests {
     use super::{Device, DiskFormat, Environment, Matchers};
     use crate::config::default_config;
     use crate::device::constants::{
-        BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL, FVM_DRIVER_PATH,
-        GPT_DRIVER_PATH, LEGACY_DATA_PARTITION_LABEL, NAND_BROKER_DRIVER_PATH,
+        BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL, GPT_DRIVER_PATH,
+        LEGACY_DATA_PARTITION_LABEL, NAND_BROKER_DRIVER_PATH,
     };
     use crate::device::{DeviceTag, RegisteredDevices};
     use crate::environment::Filesystem;
@@ -1023,7 +1023,7 @@ mod tests {
         let fvm_device = MockDevice::new()
             .set_content_format(DiskFormat::Fvm)
             .set_topological_path("first_prefix");
-        let mut env = MockEnv::new().expect_attach_driver(FVM_DRIVER_PATH);
+        let mut env = MockEnv::new().expect_bind_and_enumerate_fvm();
         assert!(matchers
             .match_device(Box::new(fvm_device.clone()), &mut env)
             .await
@@ -1060,7 +1060,7 @@ mod tests {
         let fvm_device = MockDevice::new()
             .set_content_format(DiskFormat::Fvm)
             .set_topological_path("first_prefix");
-        let mut env = MockEnv::new().expect_attach_driver(FVM_DRIVER_PATH);
+        let mut env = MockEnv::new().expect_bind_and_enumerate_fvm();
         assert!(matchers
             .match_device(Box::new(fvm_device.clone()), &mut env)
             .await
@@ -1086,7 +1086,7 @@ mod tests {
         let fvm_device = MockDevice::new()
             .set_content_format(DiskFormat::Fvm)
             .set_topological_path("first_prefix");
-        let mut env = MockEnv::new().expect_attach_driver(FVM_DRIVER_PATH);
+        let mut env = MockEnv::new().expect_bind_and_enumerate_fvm();
         assert!(matchers
             .match_device(Box::new(fvm_device.clone()), &mut env)
             .await
@@ -1181,7 +1181,7 @@ mod tests {
         assert!(matchers
             .match_device(
                 Box::new(MockDevice::new().set_content_format(DiskFormat::Fvm)),
-                &mut MockEnv::new().expect_attach_driver(FVM_DRIVER_PATH)
+                &mut MockEnv::new().expect_bind_and_enumerate_fvm()
             )
             .await
             .expect("match_device failed"));
@@ -1503,7 +1503,7 @@ mod tests {
             Matchers::new(&fshost_config::Config { ramdisk_image: true, ..default_config() });
 
         // The non-ramdisk should match by content format.
-        let mut env = MockEnv::new().expect_attach_driver(FVM_DRIVER_PATH);
+        let mut env = MockEnv::new().expect_bind_and_enumerate_fvm();
         assert!(matchers
             .match_device(Box::new(MockDevice::new().set_content_format(DiskFormat::Fvm)), &mut env)
             .await
@@ -1532,7 +1532,7 @@ mod tests {
 
         // The non-ramdisk FVM should be able to match on label as well.
         for label in ALL_FVM_LABELS {
-            let mut env = MockEnv::new().expect_attach_driver(FVM_DRIVER_PATH);
+            let mut env = MockEnv::new().expect_bind_and_enumerate_fvm();
             matchers =
                 Matchers::new(&fshost_config::Config { ramdisk_image: true, ..default_config() });
             assert!(matchers
