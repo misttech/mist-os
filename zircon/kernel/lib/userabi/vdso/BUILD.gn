@@ -79,6 +79,7 @@ if (toolchain_environment == "user.basic") {
       "//zircon/kernel/lib/fasttime:headers",
       "//zircon/kernel/lib/userabi:headers",
       "//zircon/system/ulib/affine",
+      "//zircon/system/ulib/concurrent:concurrent_vdso",
       "//zircon/vdso:private",
     ]
 
