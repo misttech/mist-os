@@ -95,4 +95,7 @@ zx_status_t GetProcessVmos(ProcessDispatcher* process, VmoInfoWriter& vmos, size
 // sharing into account, and does not count unmapped VMOs.
 void DumpProcessMemoryUsage(const char* prefix, size_t min_bytes);
 
+// Prints all handles and owning processes for the specified koid.
+void DumpHandlesForKoid(zx_koid_t id);
+
 #endif  // ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_DIAGNOSTICS_H_

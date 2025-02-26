@@ -11,6 +11,7 @@
 #include <zircon/syscalls-next.h>
 
 #include <lk/init.h>
+#include <object/diagnostics.h>
 #include <object/pager_dispatcher.h>
 #include <object/pager_proxy.h>
 #include <object/thread_dispatcher.h>
@@ -367,6 +368,14 @@ zx_status_t PagerProxy::WaitOnEvent(Event* event, bool suspendable) {
         printf("ERROR Page source %p blocked for %" PRIu64 " seconds. Page request timed out.\n",
                src, gBootOptions->userpager_overtime_timeout_seconds);
         Dump(0, gBootOptions->userpager_overtime_printout_limit);
+
+        // This function is called from the context of waiting on a page request, so we know that we
+        // don't hold any locks. It should be safe to iterate the root job tree to dump handle info.
+        printf("Dumping all handles for the pager object:\n");
+        DumpHandlesForKoid(pager_->get_koid());
+        printf("Dumping all handles for the pager port object:\n");
+        DumpHandlesForKoid(port_->get_koid());
+
         Thread::Current::Dump(false);
         kcounter_add(dispatcher_pager_timed_out_request_count, 1);
         return ZX_ERR_TIMED_OUT;

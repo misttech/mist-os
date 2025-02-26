@@ -481,6 +481,8 @@ void DumpProcessHandles(zx_koid_t id) {
   printf("total: %u handles\n", total);
 }
 
+}  // namespace
+
 void DumpHandlesForKoid(zx_koid_t id) {
   if (id < ZX_KOID_FIRST) {
     printf("invalid koid, non-reserved koids start at %" PRIu64 "\n", ZX_KOID_FIRST);
@@ -523,8 +525,6 @@ void DumpHandlesForKoid(zx_koid_t id) {
     printf("no handles found for koid %" PRIu64 "\n", id);
   }
 }
-
-}  // namespace
 
 void ktrace_report_live_processes() {
   // PID 0 refers to the kernel.
