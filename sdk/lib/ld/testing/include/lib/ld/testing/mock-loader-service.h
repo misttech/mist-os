@@ -98,7 +98,19 @@ class MockLoaderServiceForTest {
   MockLoaderServiceForTest(MockLoaderServiceForTest&&) = delete;
 
   // Set the prefix used on names to look up using the ambient loader service.
-  void set_path_prefix(const std::filesystem::path& path) { path_prefix_ = path; }
+  template <typename T>
+  void set_path_prefix(T&& path) {
+    path_prefix_ = std::forward<T>(path);
+  }
+
+  // Do std::filesystem::path::append to that prefix unless source is empty.
+  void path_prefix_append(const auto& source) {
+    if (!source.empty()) {
+      path_prefix_ /= source;
+    }
+  }
+
+  const std::filesystem::path& path_prefix() const { return path_prefix_; }
 
   // Fetch a VMO from the ambient loader service using the prefix set by
   // set_path_prefix().

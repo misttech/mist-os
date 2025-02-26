@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include <initializer_list>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -30,7 +31,8 @@ class LdStartupSpawnProcessTests : public ::testing::Test, public LdLoadZirconPr
   void Init(std::initializer_list<std::string_view> args = {},
             std::initializer_list<std::string_view> env = {});
 
-  void Load(std::string_view executable_name);
+  void Load(std::string_view executable_name,
+            std::optional<std::string_view> expected_config = std::nullopt);
 
   int64_t Run();
 

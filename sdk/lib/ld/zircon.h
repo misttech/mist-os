@@ -11,7 +11,6 @@
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
 
-#include <functional>
 #include <string_view>
 
 #include "startup-load.h"
@@ -22,7 +21,8 @@ using StartupModule = StartupLoadModule<elfldltl::LocalVmarLoader>;
 
 // This collects the data from the bootstrap channel.
 struct StartupData {
-  zx::vmo GetLibraryVmo(Diagnostics& diag, std::string_view name);
+  zx::vmo GetLibraryVmo(Diagnostics& diag, std::string_view name) const;
+  void ConfigLdsvc(Diagnostics& diag, std::string_view name) const;
 
   Log log;
 

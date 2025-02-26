@@ -109,7 +109,8 @@ void LdStartupSpawnProcessTests::Init(std::initializer_list<std::string_view> ar
   envp_ = std::vector<std::string>{env.begin(), env.end()};
 }
 
-void LdStartupSpawnProcessTests::Load(std::string_view executable_name) {
+void LdStartupSpawnProcessTests::Load(std::string_view executable_name,
+                                      std::optional<std::string_view> expected_config) {
   // This points GetLibVmo() to the right place.
   LdsvcPathPrefix(executable_name);
 
@@ -120,10 +121,11 @@ void LdStartupSpawnProcessTests::Load(std::string_view executable_name) {
   // the dynamic linker.  So inject an expectation before any from the test
   // itself calling Needed.
   std::string interp;
-  ASSERT_NO_FATAL_FAILURE(interp = FindInterp<elfldltl::UnownedVmoFile>(executable_.borrow()));
-  if (!interp.empty()) {
+  ASSERT_NO_FATAL_FAILURE(interp = FindInterp(executable_.borrow()));
+  if (!interp.empty() && !expected_config) {
     ASSERT_NO_FATAL_FAILURE(LdsvcExpectDependency(interp));
   }
+  LdsvcExpectConfig(ConfigFromInterp(interp, expected_config));
 
   // Prime the mock loader service from the Needed() calls.
   ASSERT_NO_FATAL_FAILURE(LdsvcExpectNeeded());

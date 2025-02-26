@@ -8,10 +8,12 @@
 #include <array>
 #include <limits>
 #include <optional>
+#include <string>
 #include <string_view>
 
 #include "constants.h"
 #include "field.h"
+#include "internal/const-string.h"
 
 namespace elfldltl {
 
@@ -527,6 +529,35 @@ struct Elf : private Layout<Class, Data> {
   static constexpr bool kIsLayout =
       kIsAnyOf<T, Ehdr, Shdr, Nhdr, Phdr, Dyn, Sym, Rel, Rela, TlsLayout<Elf>> ||
       kIsAnyOfTemplate<T, TlsGetAddrGotLayout, TlsDescGotLayout>;
+
+  // These are usable as std::string_view but also have a .c_str() method with
+  // std::string-compatible semantics.
+  static constexpr internal::ConstString kName{[]() {
+    using namespace std::literals;
+    const std::string data{ElfDataName(kData)};
+    return "elf"s + internal::ToString(kAddressBits) + data;
+  }};
+  static constexpr internal::ConstString kUpperName{[]() {
+    using namespace std::literals;
+    const std::string data{ElfDataName(kData, true)};
+    return "ELF"s + internal::ToString(kAddressBits) + data;
+  }};
+
+  // This can be used to assemble a file name based on kName and optionally
+  // machine.  The string looks like "<prefix>elf64le-<cpu><suffix>" or
+  // "<prefix>elf32le><suffix>" (for ElfMachine::kNone), etc.
+  template <const std::string_view& kPrefix, ElfMachine Machine, const std::string_view& kSuffix>
+  static constexpr internal::ConstString kFilename{[]() {
+    using namespace std::literals;
+    std::string name{kPrefix};
+    name += kName;
+    if (Machine != ElfMachine::kNone) {
+      name += '-';
+      name += ElfMachineFileName(Machine, kClass);
+    }
+    name += kSuffix;
+    return name;
+  }};
 };
 
 template <ElfData Data = ElfData::kNative>

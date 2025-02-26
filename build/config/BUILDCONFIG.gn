@@ -3027,6 +3027,8 @@ template("_fuchsia_shared_library") {
     metadata = {
       binaries = []
 
+      libprefix = [ toolchain_variant.libprefix ]
+
       # Used by link_output_rspfile(), see its documentation for details
       link_output_path = [ _link_output_path ]
       link_output_barrier = []

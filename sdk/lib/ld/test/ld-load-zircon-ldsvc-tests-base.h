@@ -5,11 +5,13 @@
 #ifndef LIB_LD_TEST_LD_LOAD_ZIRCON_LDSVC_TESTS_BASE_H_
 #define LIB_LD_TEST_LD_LOAD_ZIRCON_LDSVC_TESTS_BASE_H_
 
+#include <lib/elfldltl/soname.h>
 #include <lib/elfldltl/testing/get-test-data.h>
 #include <lib/ld/testing/mock-loader-service.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 
+#include <filesystem>
 #include <initializer_list>
 #include <string_view>
 
@@ -29,8 +31,12 @@ class LdLoadZirconLdsvcTestsBase : public LdLoadTestsBase {
  public:
   ~LdLoadZirconLdsvcTestsBase() = default;
 
-  // Expect the dynamic linker to send a Config(config) message.
-  void LdsvcExpectConfig(std::string_view config) { mock_.ExpectConfig(config); }
+  // Optionally expect the dynamic linker to send a Config(config) message.
+  void LdsvcExpectConfig(std::optional<std::string_view> config) {
+    if (config) {
+      mock_.ExpectConfig(*config);
+    }
+  }
 
   // Prime the MockLoaderService with the VMO for a dependency by name,
   // and expect the MockLoader to load that dependency for the test.
@@ -46,13 +52,49 @@ class LdLoadZirconLdsvcTestsBase : public LdLoadTestsBase {
     return elfldltl::testing::GetTestLibVmo(executable_path);
   }
 
+  static std::string FindInterp(zx::unowned_vmo vmo);
+
   void VerifyAndClearNeeded() { mock_.VerifyAndClearExpectations(); }
 
-  void LdsvcPathPrefix(std::string_view executable) {
-    mock_.set_path_prefix(std::filesystem::path("test") / executable / "lib");
+  void LdsvcPathPrefix(std::string_view executable,
+                       std::optional<std::string_view> libprefix = std::nullopt) {
+    std::filesystem::path prefix{"test"};
+    prefix /= executable;
+    prefix /= "lib";
+    if (libprefix) {
+      prefix /= *libprefix;
+    }
+    mock_.set_path_prefix(std::move(prefix));
   }
 
+  // Use the PT_INTERP string to update LdsvcPathPrefix() and then return the
+  // config found, which can be passed to LdsvcExpectConfig().  The optional
+  // argument makes it a failure if the extract Config() string doesn't match,
+  // and doesn't change LdsvcPathPrefix().
+  std::optional<std::string> ConfigFromInterp(
+      std::filesystem::path interp, std::optional<std::string_view> expected_config = std::nullopt);
+
+  // The same, but extract the PT_INTERP string from the executable file VMO.
+  std::optional<std::string> ConfigFromInterp(
+      zx::unowned_vmo executable_vmo,
+      std::optional<std::string_view> expected_config = std::nullopt) {
+    return ConfigFromInterp(FindInterp(executable_vmo->borrow()), expected_config);
+  }
+
+  // This just combines GetExecutableVmo, FindInterp, ConfigFromInterp, and
+  // LdsvcExpectConfig.
+  zx::vmo GetExecutableVmoWithInterpConfig(
+      std::string_view executable, std::optional<std::string_view> expected_config = std::nullopt);
+
+  // Uses to TestElfLoadSet::Get(test_name) to do Needed() within the test's
+  // package namespace based on the libprefix found in the TestElfObject data
+  // rather than a PT_INTERP in the file.
+  void NeededViaLoadSet(elfldltl::Soname<> set_name, std::initializer_list<std::string_view> names);
+
  protected:
+  zx::vmo GetInterp(std::string_view executable_name,
+                    std::optional<std::string_view> expected_config);
+
   void LdsvcExpectNeeded() {
     for (const auto& [name, found] : TakeNeededLibs()) {
       if (found) {

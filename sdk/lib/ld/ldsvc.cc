@@ -16,11 +16,14 @@ namespace {
 struct LdsvcOp {
   uint64_t ordinal;
   std::string_view call;
+  bool return_vmo = false;
 };
 
-constexpr LdsvcOp kLoadObject = {LDMSG_OP_LOAD_OBJECT, "load"};
+constexpr LdsvcOp kLoadObject = {
+    .ordinal = LDMSG_OP_LOAD_OBJECT, .call = "LoadObject", .return_vmo = true};
+constexpr LdsvcOp kConfig = {.ordinal = LDMSG_OP_CONFIG, .call = "Config"};
 
-zx::vmo LoaderServiceRpc(Diagnostics& diag, zx::unowned_channel ldsvc, LdsvcOp type,
+zx::vmo LoaderServiceRpc(Diagnostics& diag, const zx::channel& ldsvc, const LdsvcOp& type,
                          std::string_view name) {
   union {
     ldmsg_req_t req;
@@ -37,18 +40,18 @@ zx::vmo LoaderServiceRpc(Diagnostics& diag, zx::unowned_channel ldsvc, LdsvcOp t
 
   ldmsg_rsp_t* rsp = &ldmsg_req_rsp.rsp;
   zx::vmo vmo;
-  zx_channel_call_args_t call = {
+  const zx_channel_call_args_t call = {
       .wr_bytes = req,
       .rd_bytes = rsp,
       .rd_handles = vmo.reset_and_get_address(),
       .wr_num_bytes = static_cast<uint32_t>(req_len),
       .rd_num_bytes = sizeof(*rsp),
-      .rd_num_handles = 1u,
+      .rd_num_handles = type.return_vmo ? 1u : 0u,
   };
 
   uint32_t reply_size;
   uint32_t handle_count;
-  status = ldsvc->call(0, zx::time::infinite(), &call, &reply_size, &handle_count);
+  status = ldsvc.call(0, zx::time::infinite(), &call, &reply_size, &handle_count);
   if (status != ZX_OK) {
     diag.SystemError("zx_channel_call of ", call.wr_num_bytes,
                      "bytes to loader service: ", elfldltl::ZirconError{status});
@@ -71,6 +74,9 @@ zx::vmo LoaderServiceRpc(Diagnostics& diag, zx::unowned_channel ldsvc, LdsvcOp t
     }
     return {};
   }
+  if (!type.return_vmo) {
+    return {};
+  }
   if (!vmo) [[unlikely]] {
     diag.SystemError("fuchsia.ldsvc/", type.call, "(\"", name, "\") returned invalid VMO handle.");
     return {};
@@ -80,8 +86,12 @@ zx::vmo LoaderServiceRpc(Diagnostics& diag, zx::unowned_channel ldsvc, LdsvcOp t
 
 }  // namespace
 
-zx::vmo StartupData::GetLibraryVmo(Diagnostics& diag, std::string_view name) {
-  return LoaderServiceRpc(diag, ldsvc.borrow(), kLoadObject, name);
+zx::vmo StartupData::GetLibraryVmo(Diagnostics& diag, std::string_view name) const {
+  return LoaderServiceRpc(diag, ldsvc, kLoadObject, name);
+}
+
+void StartupData::ConfigLdsvc(Diagnostics& diag, std::string_view name) const {
+  LoaderServiceRpc(diag, ldsvc, kConfig, name);
 }
 
 }  // namespace ld

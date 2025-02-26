@@ -98,9 +98,10 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   // passive ABI module in this->module().  The allocator only guarantees two
   // mutable allocations at a time, so the caller must then promptly splice it
   // into the link_map list before the next Load call allocates the next one.
-  template <class Allocator, class File>
+  template <class Allocator, class File, class... PhdrObservers>
   [[nodiscard]] StartupLoadResult Load(Diagnostics& diag, Allocator& allocator, File&& file,
-                                       uint32_t symbolizer_modid, size_type& max_tls_modid) {
+                                       uint32_t symbolizer_modid, size_type& max_tls_modid,
+                                       PhdrObservers&&... phdr_observers) {
     // Diagnostics sent to diag during loading will be prefixed with the module
     // name, unless the name is empty as it is for the main executable.
     ScopedModuleDiagnostics module_diag(diag, this->name().str());
@@ -119,7 +120,9 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     // and phdrs fields.  Note that module().phdrs might remain empty if the
     // phdrs aren't in the load image, so DecodeFromMemory will keep using the
     // stack copy read from the file instead.
-    auto headers = decoded().LoadFromFile(diag, loader_, std::forward<File>(file));
+    constexpr ld::DecodedModuleInMemory<>::FixedPhdrAllocator phdr_allocator;
+    auto headers = decoded().LoadFromFile(diag, loader_, std::forward<File>(file), phdr_allocator,
+                                          std::forward<PhdrObservers>(phdr_observers)...);
     if (!headers) [[unlikely]] {
       return {};
     }

@@ -55,7 +55,8 @@ void LdStartupInProcessTests::Init(std::initializer_list<std::string_view> args,
                               .SetEnv(env));
 }
 
-void LdStartupInProcessTests::Load(std::string_view raw_executable_name) {
+void LdStartupInProcessTests::Load(std::string_view raw_executable_name,
+                                   std::optional<std::string_view> expected_config) {
   const std::string executable_name =
       std::string(raw_executable_name) + std::string(kTestExecutableInProcessSuffix);
 
@@ -64,11 +65,16 @@ void LdStartupInProcessTests::Load(std::string_view raw_executable_name) {
   // This points GetLibVmo() to the right place.
   LdsvcPathPrefix(executable_name);
 
+  // This will adjust GetLibVmo() to use the libprefix from PT_INTERP so the
+  // fetch of abi::kInterp will get the right install location.
+  zx::vmo executable_vmo = GetExecutableVmoWithInterpConfig(executable_name, expected_config);
+  ASSERT_TRUE(executable_vmo);
+
   // Prime the mock loader service from the Needed() calls.
   ASSERT_NO_FATAL_FAILURE(LdsvcExpectNeeded());
 
   std::optional<LoadResult> result;
-  ASSERT_NO_FATAL_FAILURE(Load(GetLibVmo(ld::abi::kInterp), result, test_vmar_));
+  ASSERT_NO_FATAL_FAILURE(Load(GetInterp(executable_name, expected_config), result, test_vmar_));
 
   entry_ = result->entry + result->loader.load_bias();
 
@@ -82,7 +88,7 @@ void LdStartupInProcessTests::Load(std::string_view raw_executable_name) {
   ASSERT_NO_FATAL_FAILURE(procargs_.AddSelfVmar(std::move(load_image_vmar)));
 
   // Send the executable VMO.
-  ASSERT_NO_FATAL_FAILURE(bootstrap().AddExecutableVmo(GetExecutableVmo(executable_name)));
+  ASSERT_NO_FATAL_FAILURE(bootstrap().AddExecutableVmo(std::move(executable_vmo)));
 
   // If a mock loader service has been set up by calls to Needed() et al, send
   // the client end over.

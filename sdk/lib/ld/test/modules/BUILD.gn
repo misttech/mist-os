@@ -3,12 +3,12 @@
 # found in the LICENSE file.
 
 import("//build/config/lto/config.gni")
-import("//build/dist/distribution_manifest.gni")
 import("//build/dist/resource.gni")
 import("//build/testing/host_test_data.gni")
 import("//build/toolchain/generated_ifs_file.gni")
 import("//build/toolchain/ifs_shared_library.gni")
 import("//build/toolchain/toolchain_environment.gni")
+import("//sdk/lib/ld/distribution_manifest_prefix.gni")
 import("//sdk/lib/ld/testing/test_elf_object.gni")
 
 # Musl's dlclose does not unload the module, which prevents being able to reuse
@@ -127,29 +127,6 @@ group("dl-unittest.deps") {
   ]
 }
 
-# This rolls up resource() equivalent metadata from $deps and applies $prefix.
-# Rolling up from here will install those files under that prefix.
-template("_test_prefix_manifest") {
-  distribution_manifest(target_name) {
-    testonly = true
-    forward_variables_from(invoker,
-                           [
-                             "deps",
-                             "prefix",
-                             "visibility",
-                           ])
-    outputs = [ "$target_gen_dir/$target_name.json" ]
-    metadata = {
-      distribution_entries_files = [
-        {
-          file = rebase_path(outputs[0], root_build_dir)
-          label = get_label_info(":$target_name", "label_with_toolchain")
-        },
-      ]
-    }
-  }
-}
-
 # Populate a build directory from resource() equivalent metadata.
 #
 # This defines an action() target that creates a subdirectory (within the build
@@ -252,9 +229,9 @@ dl_test_data_dir = "$host_test_data_dir/dl-tests"
 
 # This doesn't apply a prefix, it just collects the manifest from each
 # _test_link() as is: plain file names with no directory prefix at all.
-_test_prefix_manifest("dl-test-data.manifest") {
+distribution_manifest_prefix("dl-test-data.manifest") {
   visibility = [ ":*" ]
-  prefix = ""
+  testonly = true
   deps = [ ":dl-test-data.deps" ]
 }
 
@@ -286,9 +263,8 @@ config("runpath-origin") {
 # by the main module name.
 #
 # For Fuchsia, this is `lib/test/$name/...` and goes into the package under
-# that path.  Within that subdirectory are `bin/$name` or `lib/$name.so`
-# and various `lib/...` dependencies.  Note that underneath `lib/test/lib`
-# there is no libprefix subdirectory for instrumented builds.
+# that path.  Within that subdirectory are `bin/$name` or `lib/$name.so` and
+# various `lib/...` dependencies.
 #
 # For host test data, this populates a `test_data/elfldltl/.../$name` build
 # subdirectory with hard links.  That subdirectory is flat containing just
@@ -303,7 +279,9 @@ template("_test_data") {
     manifest_target = "$main_target.manifest"
   }
 
-  _test_prefix_manifest(manifest_target) {
+  distribution_manifest_prefix(manifest_target) {
+    testonly = true
+
     # This will collect the files from deps that would go into /pkg/... and
     # rewrite their manifest entries to use /pkg/lib/test/$name/... instead.
     #
@@ -317,6 +295,7 @@ template("_test_data") {
   }
   if (!is_fuchsia) {
     distribution_manifest_host_test_data("$main_target.test-data") {
+      testonly = true
       deps = [ ":$manifest_target" ]
       outputs = [ "$host_test_data_dir/$main_target" ]
     }
@@ -326,7 +305,8 @@ template("_test_data") {
     # Each binary target has metadata for its flat name with no subdirectory.
     # This places them all inside the lib/ subdirectory for this root module;
     # LdLoadZirconLdsvcTestsBase::GetLibVmo will find them there.
-    _test_prefix_manifest("$main_target.fuchsia-test-data") {
+    distribution_manifest_prefix("$main_target.fuchsia-test-data") {
+      testonly = true
       prefix = "lib/test/$main_target/lib"
       deps = invoker.deps
     }
@@ -390,6 +370,17 @@ template("_test_link") {
       configs -= [ "//build/config/linux:implicit-host-libs" ]
     }
     configs += [ ":nostdlibs" ]
+
+    if (invoker.target_type == "executable") {
+      # This is implicitly added first so invoker.configs override it and/or
+      # invoker.remove_configs can remove it.
+      configs += [ "//sdk/lib/ld:abi-interp" ]
+
+      # This is needed in the non-Zircon (host/Linux) toolchains to avoid
+      # having any implicit deps injected.
+      disable_syslog_backend = true
+    }
+
     if (defined(invoker.configs)) {
       configs += invoker.configs
     }
@@ -405,20 +396,14 @@ template("_test_link") {
       configs -= invoker.remove_configs
     }
 
-    if (invoker.target_type == "executable") {
-      # This is needed in the non-Zircon (host/Linux) toolchains to avoid
-      # having any implicit deps injected.
-      disable_syslog_backend = true
-    }
-
     metadata = {
       distribution_entries = [
         {
           source = rebase_path("$root_out_dir/${invoker.output_file}",
                                root_build_dir)
           if (is_fuchsia) {
-            # This is the normal install location modulo libprefix.
-            # It will get further prefixed in the .test-data target.
+            # This is the normal install location.  It will get further
+            # prefixed in the .test-data target.
             destination = "${invoker.install_dir}/${invoker.output_file}"
           } else {
             not_needed(invoker, [ "install_dir" ])
@@ -474,7 +459,12 @@ template("_test_link") {
 template("test_shared_library") {
   _test_link(target_name) {
     target_type = "shared_library"
-    install_dir = "lib"
+    if (is_fuchsia) {
+      install_dir =
+          get_path_info("lib/${toolchain_variant.libprefix}libfoo.so", "dir")
+    } else {
+      install_dir = "lib"
+    }
     output_file = "lib$target_name.so"
     forward_variables_from(invoker, "*", [ "target_type" ])
   }
@@ -597,8 +587,7 @@ foreach(in_process,
     ]
 
     if (in_process != ".module") {
-      public_configs += [ "//sdk/lib/ld:abi-interp" ]
-      deps += [ ":ld-startup.test-data($shlib_toolchain)" ]
+      deps += [ "//sdk/lib/ld:ld-startup.user" ]
       if (is_fuchsia) {
         if (in_process == "") {
           sources += [ "zircon-test-start.cc" ]
@@ -609,30 +598,6 @@ foreach(in_process,
       } else {
         sources += [ "posix-test-start.S" ]
         deps += [ "//zircon/kernel/lib/arch" ]
-      }
-    }
-  }
-}
-
-if (current_toolchain == shlib_toolchain) {
-  group("ld-startup.test-data") {
-    visibility = [ ":*" ]
-    testonly = true
-    deps = [ "//sdk/lib/ld:ld-startup.user" ]
-    metadata = {
-      if (toolchain_variant.libprefix != "" || !is_fuchsia) {
-        distribution_entries = [
-          {
-            renamed_source =
-                rebase_path("$root_out_dir/libld-startup.so", root_build_dir)
-            if (is_fuchsia) {
-              destination = "lib/ld.so.1"
-            } else {
-              destination = "${toolchain_variant.libprefix}ld.so.1"
-            }
-            label = get_label_info(":$target_name", "label_with_toolchain")
-          },
-        ]
       }
     }
   }
@@ -1249,16 +1214,18 @@ foreach(test, [ "" ] + per_test_suffices) {
 
   test_executable("symbolic-reloc$suffix") {
     can_be_in_process = true
-    sources = [
-      "interp.S",
-      "symbolic-reloc.cc",
-    ]
-    defines = [
-      "TEST_SYMBOL_SUFFIX=$sym_suffix",
-      "DYNAMIC_LINKER_PATH=\"${toolchain_variant.libprefix}ld.so.1\"",
-    ]
+    sources = [ "symbolic-reloc.cc" ]
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
     deps = [ "//zircon/system/public" ]
+
     configs = [ ":temporarily-build-as-shared" ]
+    sources += [ "interp.S" ]
+    if (is_fuchsia) {
+      libprefix = toolchain_variant.libprefix
+    } else {
+      libprefix = ""
+    }
+    defines += [ "DYNAMIC_LINKER_PATH=\"${libprefix}ld.so.1\"" ]
   }
 
   test_executable("basic-dep$suffix") {
@@ -2034,11 +2001,6 @@ foreach(suffix,
     foreach(value, symbol_filter_values) {
       deps += [ ":symbol-filter-dep$value" ]
     }
-    if (suffix != "") {
-      # symbol-filter-elf32 is also used in a remote loading test.  For
-      # convenience that test expects the stub packaged with the test modules.
-      data_deps = [ "//sdk/lib/ld:ld-stub" ]
-    }
   }
 }
 
@@ -2048,4 +2010,21 @@ foreach(value, symbol_filter_values) {
     defines = [ "VALUE=$value" ]
     deps = [ "//zircon/system/public" ]
   }
+}
+
+test_executable("ldsvc-config") {
+  can_be_in_process = true
+  defines = [ "TEST_SYMBOL_SUFFIX=" ]
+  sources = [ "basic-dep.cc" ]
+  deps = [ ":ld-dep-a" ]
+
+  # This executable is totally boring (same as :basic-dep), except it uses a
+  # different PT_INTERP string to elicit a Config() message.
+  remove_configs = [ "//sdk/lib/ld:abi-interp" ]
+  configs = [ ":ldsvc-config.libprefix" ]
+}
+
+config("ldsvc-config.libprefix") {
+  visibility = [ ":*" ]
+  ldflags = [ "-Wl,-dynamic-linker=test-libprefix/ld.so.1" ]
 }

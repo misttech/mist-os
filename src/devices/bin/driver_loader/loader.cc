@@ -14,6 +14,8 @@
 #include <lib/ld/remote-abi-stub.h>
 #include <lib/ld/remote-abi.h>
 
+#include <filesystem>
+
 #include <fbl/unique_fd.h>
 
 #include "src/devices/bin/driver_loader/diagnostics.h"
@@ -24,12 +26,13 @@ namespace fio = fuchsia_io;
 namespace {
 
 zx::result<zx::vmo> GetStubLdVmo() {
-  constexpr char kPath[] = "/pkg/lib/ld-stub.so";
+  std::filesystem::path stub_path{"/pkg/lib"};
+  stub_path /= std::string{ld::RemoteAbiStub<>::kFilename};
   const fio::wire::Flags kFlags =
       fio::wire::Flags::kProtocolFile | fio::wire::kPermReadable | fio::wire::kPermExecutable;
   fbl::unique_fd fd;
   zx_status_t status =
-      fdio_open3_fd(kPath, static_cast<uint64_t>(kFlags), fd.reset_and_get_address());
+      fdio_open3_fd(stub_path.c_str(), static_cast<uint64_t>(kFlags), fd.reset_and_get_address());
   if (status != ZX_OK) {
     return zx::error(status);
   }

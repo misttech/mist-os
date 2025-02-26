@@ -30,6 +30,7 @@ struct TestElfObject {
   std::string_view build_id_hex;
   elfldltl::Soname<> soname;
   std::span<const elfldltl::Elf<>::Phdr> load_segments;
+  std::optional<std::string_view> libprefix;
 };
 
 // References to those appear in fixed-size arrays referenced as spans.

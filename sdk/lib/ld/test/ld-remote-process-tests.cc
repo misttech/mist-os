@@ -6,6 +6,7 @@
 
 #include <lib/elfldltl/testing/diagnostics.h>
 #include <lib/ld/abi.h>
+#include <lib/ld/remote-abi-stub.h>
 #include <lib/zx/job.h>
 #include <zircon/process.h>
 
@@ -16,7 +17,8 @@ namespace ld::testing {
 LdRemoteProcessTests::LdRemoteProcessTests() = default;
 
 void LdRemoteProcessTests::SetUp() {
-  ASSERT_NO_FATAL_FAILURE(stub_ld_vmo_ = elfldltl::testing::GetTestLibVmo("ld-stub.so"));
+  ASSERT_NO_FATAL_FAILURE(stub_ld_vmo_ =
+                              elfldltl::testing::GetTestLibVmo(RemoteAbiStub<>::kFilename));
 }
 
 LdRemoteProcessTests::~LdRemoteProcessTests() = default;

@@ -7,9 +7,8 @@
 
 #include <lib/elfldltl/dwarf/cfi-entry.h>
 #include <lib/elfldltl/dwarf/eh-frame-hdr.h>
+#include <lib/elfldltl/layout.h>
 #include <lib/elfldltl/symbol.h>
-
-#include <array>
 
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
@@ -19,6 +18,9 @@
 #include "tlsdesc.h"
 
 namespace ld {
+
+inline constexpr std::string_view kRemoteAbiStubPrefix = "ld-stub-";
+inline constexpr std::string_view kRemoteAbiStubSuffix = ".so";
 
 // In the remote dynamic linking case, the passive ABI is anchored by the "stub
 // dynamic linker" (ld-stub.so in the build).  This shared library gets loaded
@@ -71,8 +73,14 @@ class RemoteAbiStub : public fbl::RefCounted<RemoteAbiStub<Elf>> {
   RemoteAbiStub(const RemoteAbiStub&) = default;
   RemoteAbiStub(RemoteAbiStub&&) = default;
 
-  // This is the ld::RemoteDecodedModule for the stub dynamic linker,
-  // the same pointer that was given to Create().
+  // This is the file name (without directory) where the stub dynamic linker
+  // file is usually installed in the remote dynamic linker's own package,
+  // usually under its lib/.
+  static constexpr auto& kFilename =
+      Elf::template kFilename<kRemoteAbiStubPrefix, Machine, kRemoteAbiStubSuffix>;
+
+  // This is the ld::RemoteDecodedModule for the stub dynamic
+  // linker, the same pointer that was given to Create().
   const RemoteModulePtr& decoded_module() const { return decoded_module_; }
 
   // Return the module-relative vaddr of the data segment.
