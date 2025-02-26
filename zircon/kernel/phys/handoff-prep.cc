@@ -191,7 +191,12 @@ void HandoffPrep::SetMemory() {
       // shouldn't actually be used by the kernel after that; mark it for
       // clean-up.
       case memalloc::Type::kTemporaryIdentityPageTables:
-        return memalloc::Type::kTemporaryPhysHandoff;
+        // TODO(https://fxbug.dev/398950948): Ideally these ranges would be
+        // passed on as temporary handoff data, but the kernel currently
+        // expects this memory to persist past boot (e.g, for later
+        // hotplugging). Pending revisiting that in the kernel, we hand off all
+        // "temporary" identity tables as permanent for now.
+        return memalloc::Type::kKernelPageTables;
 
       // An NVRAM range should no longer be treated like normal RAM. The kernel
       // will access it through PhysHandoff::nvram via its own mapping for it.
