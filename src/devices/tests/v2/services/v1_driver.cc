@@ -12,7 +12,6 @@
 #include <ddktl/device.h>
 #include <ddktl/fidl.h>
 #include <ddktl/protocol/empty-protocol.h>
-#include <ddktl/service.h>
 
 namespace add_service {
 
@@ -50,8 +49,7 @@ class AddServiceDevice : public DeviceType,
         .data = data_bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure),
     });
 
-    zx::result add_result =
-        ddk::AddService<fuchsia_services_test::Device>(zxdev(), std::move(handler));
+    zx::result add_result = DdkAddService<fuchsia_services_test::Device>(std::move(handler));
     if (add_result.is_error()) {
       zxlogf(ERROR, "Failed to add service");
       return add_result.status_value();

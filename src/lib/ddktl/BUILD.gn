@@ -29,7 +29,6 @@ source_set("ddktl") {
     "include/ddktl/metadata.h",
     "include/ddktl/metadata_server.h",
     "include/ddktl/resume-txn.h",
-    "include/ddktl/service.h",
     "include/ddktl/suspend-txn.h",
     "include/ddktl/unbind-txn.h",
   ]
