@@ -27,7 +27,7 @@ rustc_binary("battery_cli_bin") {
 }
 
 # Shell components
-fuchsia_shell_package("battery-cli") {
+fuchsia_package("battery-cli") {
   deps = [ ":battery_cli_bin" ]
 }
 

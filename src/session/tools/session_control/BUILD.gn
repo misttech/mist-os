@@ -35,7 +35,7 @@ rustc_binary("bin") {
   sources = [ "src/main.rs" ]
 }
 
-fuchsia_shell_package("session_control") {
+fuchsia_package_with_single_component("session_control") {
   manifest = "meta/session_control.cml"
   deps = [ ":bin" ]
 }

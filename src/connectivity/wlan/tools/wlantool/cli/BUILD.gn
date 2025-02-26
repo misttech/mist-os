@@ -21,6 +21,6 @@ rustc_binary("bin") {
   sources = [ "src/main.rs" ]
 }
 
-fuchsia_shell_package("wlan") {
+fuchsia_package("wlan") {
   deps = [ ":bin" ]
 }

@@ -37,7 +37,7 @@ rustc_binary("bin") {
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
-fuchsia_shell_package("log_listener_shell_pkg") {
+fuchsia_package("log_listener_shell_pkg") {
   package_name = "log_listener_shell"
   deps = [
     ":bin",

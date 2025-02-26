@@ -23,6 +23,6 @@ executable("bin") {
   ]
 }
 
-fuchsia_shell_package("simple_sine") {
+fuchsia_package("simple_sine") {
   deps = [ ":bin" ]
 }

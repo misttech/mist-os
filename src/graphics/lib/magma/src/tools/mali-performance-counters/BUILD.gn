@@ -66,7 +66,7 @@ fuchsia_test_package("mali-performance-counters-test") {
   }
 }
 
-fuchsia_shell_package("mali-performance-counters-pkg") {
+fuchsia_package("mali-performance-counters-pkg") {
   deps = [ ":mali-performance-counters-bin" ]
 }
 

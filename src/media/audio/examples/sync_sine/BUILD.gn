@@ -24,6 +24,6 @@ executable("bin") {
   ]
 }
 
-fuchsia_shell_package("sync_sine") {
+fuchsia_package("sync_sine") {
   deps = [ ":bin" ]
 }

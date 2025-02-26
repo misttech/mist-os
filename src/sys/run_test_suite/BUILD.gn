@@ -123,7 +123,7 @@ rustc_binary("bin") {
   sources = [ "src/main.rs" ]
 }
 
-fuchsia_shell_package("run_test_suite") {
+fuchsia_package("run_test_suite") {
   testonly = true
   deps = [ ":bin" ]
 }

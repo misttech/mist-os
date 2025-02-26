@@ -15,4 +15,5 @@ group("config_data_tag") {
 # This is added to all fuchsia_shell_package targets so that targets can
 # assert_no_deps that any transitive dependency includes a shell package.
 group("shell_command_tag") {
+  visibility = []
 }

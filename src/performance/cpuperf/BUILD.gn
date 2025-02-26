@@ -52,7 +52,7 @@ executable("bin") {
   ]
 }
 
-fuchsia_shell_package("cpuperf") {
+fuchsia_package("cpuperf") {
   deps = [
     ":bin",
     ":cpuperf_resources",

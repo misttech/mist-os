@@ -26,7 +26,7 @@ rustc_binary("sys_shell_bin") {
   source_root = "shell.rs"
 }
 
-fuchsia_shell_package("sys-info-shell") {
+fuchsia_package_with_single_component("sys-info-shell") {
   manifest = "meta/sys_info_shell.cml"
   deps = [ ":sys_shell_bin" ]
 }

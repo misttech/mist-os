@@ -235,7 +235,7 @@ fuchsia_package("package") {
   deps = [ ":fxfs_component" ]
 }
 
-fuchsia_shell_package("fxfs-bin") {
+fuchsia_package("fxfs-bin") {
   deps = [ ":fxfs" ]
 }
 

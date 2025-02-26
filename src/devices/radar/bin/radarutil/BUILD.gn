@@ -22,7 +22,7 @@ executable("radarutil-bin") {
   deps = common_deps
 }
 
-fuchsia_shell_package("radarutil") {
+fuchsia_package("radarutil") {
   deps = [ ":radarutil-bin" ]
 }
 

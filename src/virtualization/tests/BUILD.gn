@@ -518,7 +518,7 @@ fuchsia_component("memory_test_util_cmp") {
   manifest = "memory_test_util/meta/memory_test_util.cml"
 }
 
-fuchsia_shell_package("virtualization_test_utils_pkg") {
+fuchsia_package("virtualization_test_utils_pkg") {
   package_name = "virtualization-test-utils"
   deps = [
     ":memory_test_util_cmp",
