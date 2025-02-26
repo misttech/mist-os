@@ -29,8 +29,8 @@ struct ServiceEntry {
 };
 
 // The key values in this map represent class names that devfs recognizes.
-// Each class name has a folder automatically created under /dev/class
-// when devfs first starts up.
+// Each class name has a folder automatically created under /dev/class when devfs
+// first starts up.
 // The ServiceEntry that corresponds to each class name specifies how devfs should
 // map the offered protocol to the member protocol of a service.
 // As an example,
@@ -80,7 +80,6 @@ const std::unordered_map<std::string_view, ServiceEntry> kClassNameToService = {
     {"dai",
      {ServiceEntry::kDevfsAndService, "fuchsia.hardware.audio.DaiConnectorService",
       "dai_connector"}},
-    {"device", {ServiceEntry::kDevfs, "", ""}},
     {"devfs_service_test",
      {ServiceEntry::kDevfsAndService, "fuchsia.services.test.Device", "control"}},
     {"display-coordinator",
