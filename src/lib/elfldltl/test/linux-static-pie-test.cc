@@ -112,6 +112,6 @@ extern "C" [[noreturn]] void TestMain() {
 }
 
 // Inline functions in libc++ headers call this.
-[[noreturn]] void std::__libcpp_verbose_abort(const char* format, ...) {
+[[noreturn]] void std::__libcpp_verbose_abort(const char* format, ...) noexcept {
   Panic("libc++ abort, message lost"sv);
 }

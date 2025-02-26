@@ -76,4 +76,6 @@ extern "C" void _start(zx_handle_t bootstrap_chan, void* vdso_base) {
 }
 
 // Inline functions in libc++ headers call this.
-[[noreturn]] void std::__libcpp_verbose_abort(const char* format, ...) { __builtin_trap(); }
+[[noreturn]] void std::__libcpp_verbose_abort(const char* format, ...) noexcept {
+  __builtin_trap();
+}

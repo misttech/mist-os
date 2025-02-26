@@ -12,7 +12,7 @@ extern "C" void __assert_fail(const char*, const char*, int, const char*) { __bu
 
 extern "C" void __zx_panic(const char* format, ...) { __builtin_trap(); }
 
-void std::__libcpp_verbose_abort(const char* format, ...) { __builtin_trap(); }
+void std::__libcpp_verbose_abort(const char* format, ...) noexcept { __builtin_trap(); }
 
 // GCC has an implicit declaration of abort with default visibility even under
 // -fvisibility=hidden.  Even with an explicit attribute on the definition, it

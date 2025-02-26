@@ -96,9 +96,6 @@ if (toolchain_environment == "user.basic") {
     # Avoid libc references from assert() in libc++ header code.
     defines = [ "NDEBUG=1" ]
 
-    # TODO(https://fxbug.dev/374753100): Remove this after soft transition.
-    defines += [ "_LIBCPP_VERBOSE_ABORT_NOT_NOEXCEPT" ]
-
     ldflags = [
       # A standalone binary should indicate its stack requirements.
       "-Wl,-z,stack-size=0x20000",

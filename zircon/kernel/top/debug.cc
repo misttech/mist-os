@@ -102,7 +102,7 @@ void panic(const char* fmt, ...) {
 }
 
 // Inline functions in libc++ headers call this.
-[[noreturn]] void std::__libcpp_verbose_abort(const char* format, ...) {
+[[noreturn]] void std::__libcpp_verbose_abort(const char* format, ...) noexcept {
   va_list ap;
   va_start(ap, format);
   vpanic(__GET_CALLER(), __GET_FRAME(), format, ap);
