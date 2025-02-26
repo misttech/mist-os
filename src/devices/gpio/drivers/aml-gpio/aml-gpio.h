@@ -133,14 +133,16 @@ class AmlGpioDriver : public fdf::DriverBase {
       fidl::WireClient<fuchsia_hardware_platform_device::Device>& pdev, uint32_t mmio_id);
 
  private:
-  void OnCompatServerInitialized(fdf::StartCompleter completer);
+  fpromise::promise<void, zx_status_t> InitResources();
   void OnGetNodeDeviceInfo(const fuchsia_hardware_platform_device::wire::NodeDeviceInfo& info,
-                           fdf::StartCompleter completer);
+                           fpromise::completer<void, zx_status_t> completer);
   void OnGetBoardInfo(const fuchsia_hardware_platform_device::wire::BoardInfo& board_info,
-                      uint32_t irq_count, fdf::StartCompleter completer);
-  void MapMmios(uint32_t pid, uint32_t irq_count, fdf::StartCompleter completer);
-  void AddNode(uint32_t pid, uint32_t irq_count, std::vector<fdf::MmioBuffer> mmios,
-               fdf::StartCompleter completer);
+                      uint32_t irq_count, fpromise::completer<void, zx_status_t> completer);
+  void MapMmios(uint32_t pid, uint32_t irq_count, fpromise::completer<void, zx_status_t> completer);
+  void InitDevice(uint32_t pid, uint32_t irq_count, std::vector<fdf::MmioBuffer> mmios,
+                  fpromise::completer<void, zx_status_t> completer);
+  void AddNode(fdf::StartCompleter completer);
+  fpromise::promise<void, zx_status_t> InitCompatServer();
 
   fidl::WireClient<fuchsia_driver_framework::Node> parent_;
   fidl::WireClient<fuchsia_driver_framework::NodeController> controller_;
