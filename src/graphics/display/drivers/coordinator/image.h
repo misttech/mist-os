@@ -51,8 +51,14 @@ class Image : public fbl::RefCounted<Image>,
                                                  fbl::SizeOrder::N, DefaultDoublyLinkedListTraits>;
 
   // `controller` must be non-null, and must outlive the Image.
-  Image(Controller* controller, const display::ImageMetadata& metadata,
+  Image(Controller* controller, const display::ImageMetadata& metadata, display::ImageId id,
         display::DriverImageId driver_id, inspect::Node* parent_node, ClientId client_id);
+
+  Image(const Image&) = delete;
+  Image(Image&&) = delete;
+  Image& operator=(const Image&) = delete;
+  Image& operator=(Image&&) = delete;
+
   ~Image();
 
   display::DriverImageId driver_id() const { return driver_id_; }

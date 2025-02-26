@@ -40,10 +40,9 @@ static_assert(WaitingImageList::kMaxSize ==
                   fuchsia_hardware_display::wire::kMaxWaitingImagesPerLayer,
               "Violation of fuchsia.hardware.display.Coordinator API contract.");
 
-Layer::Layer(Controller* controller, display::DriverLayerId id) : controller_(*controller) {
-  ZX_ASSERT(controller);
-
-  this->id = id;
+Layer::Layer(Controller* controller, display::DriverLayerId id)
+    : IdMappable(id), controller_(*controller) {
+  ZX_DEBUG_ASSERT(controller != nullptr);
 
   std::memset(&draft_layer_config_, 0, sizeof(layer_t));
   std::memset(&applied_layer_config_, 0, sizeof(layer_t));

@@ -24,8 +24,17 @@ class Controller;
 class CaptureImage : public fbl::RefCounted<CaptureImage>,
                      public IdMappable<fbl::RefPtr<CaptureImage>, display::ImageId> {
  public:
-  CaptureImage(Controller* controller, display::DriverCaptureImageId driver_capture_image_id,
-               inspect::Node* parent_node, ClientId client_id);
+  // `controller` must outlive the newly created instance. `id` and
+  // `driver_capture_image_id` must be valid IDs.
+  CaptureImage(Controller* controller, display::ImageId id,
+               display::DriverCaptureImageId driver_capture_image_id, inspect::Node* parent_node,
+               ClientId client_id);
+
+  CaptureImage(const CaptureImage&) = delete;
+  CaptureImage(CaptureImage&&) = delete;
+  CaptureImage& operator=(const CaptureImage&) = delete;
+  CaptureImage& operator=(CaptureImage&&) = delete;
+
   ~CaptureImage();
 
   display::DriverCaptureImageId driver_capture_image_id() const { return driver_capture_image_id_; }

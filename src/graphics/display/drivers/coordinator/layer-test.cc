@@ -26,6 +26,7 @@
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-layer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/event-id.h"
+#include "src/graphics/display/lib/api-types/cpp/image-id.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace fhdt = fuchsia_hardware_display_types;
@@ -50,9 +51,13 @@ class LayerTest : public TestBase {
         .height = kDisplayHeight,
         .tiling_type = display::ImageTilingType::kLinear,
     });
-    fbl::RefPtr<Image> image = fbl::AdoptRef(new Image(
-        CoordinatorController(), image_metadata, import_result.value(), nullptr, ClientId(1)));
-    image->id = next_image_id_++;
+
+    display::ImageId image_id = next_image_id_;
+    ++next_image_id_;
+
+    fbl::RefPtr<Image> image =
+        fbl::AdoptRef(new Image(CoordinatorController(), image_metadata, image_id,
+                                import_result.value(), nullptr, ClientId(1)));
     return image;
   }
 

@@ -88,7 +88,7 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
       },
   };
   display_config_t test_config = {
-      .display_id = ToBanjoDisplayId(info->id),
+      .display_id = display::ToBanjoDisplayId(info->id()),
       .layer_list = test_layers,
       .layer_count = 1,
   };
@@ -152,7 +152,7 @@ zx::result<> Controller::AddDisplay(const raw_display_info_t& banjo_display_info
   }
 
   fbl::RefPtr<DisplayInfo> display_info = std::move(display_info_result).value();
-  display::DisplayId display_id = display_info->id;
+  display::DisplayId display_id = display_info->id();
 
   fbl::AutoLock lock(mtx());
   auto display_it = displays_.find(display_id);
@@ -181,7 +181,7 @@ zx::result<> Controller::AddDisplay(const raw_display_info_t& banjo_display_info
 
         fbl::AutoLock lock(mtx());
 
-        const std::array<display::DisplayId, 1> added_id_candidates = {display_info->id};
+        const std::array<display::DisplayId, 1> added_id_candidates = {display_info->id()};
         std::span<const display::DisplayId> added_ids(added_id_candidates);
 
         // TODO(https://fxbug.dev/339311596): Do not trigger the client's
@@ -391,7 +391,7 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
         //
         // NOTE: If changing this flow name or ID, please also do so in the
         // corresponding FLOW_BEGIN.
-        TRACE_FLOW_END("gfx", "present_image", image_to_retire->id.value());
+        TRACE_FLOW_END("gfx", "present_image", image_to_retire->id().value());
       } else {
         it++;
       }
@@ -491,7 +491,7 @@ void Controller::ApplyConfig(std::span<DisplayConfig*> display_configs,
     // image if there is also a pending image.
     if (switching_client || applied_layer_stamp_ != layer_stamp) {
       for (DisplayConfig* display_config : display_configs) {
-        auto displays_it = displays_.find(display_config->id);
+        auto displays_it = displays_.find(display_config->id());
         if (!displays_it.IsValid()) {
           continue;
         }
@@ -510,7 +510,7 @@ void Controller::ApplyConfig(std::span<DisplayConfig*> display_configs,
     driver_config_stamp = last_issued_driver_config_stamp_;
 
     for (DisplayConfig* display_config : display_configs) {
-      auto displays_it = displays_.find(display_config->id);
+      auto displays_it = displays_.find(display_config->id());
       if (!displays_it.IsValid()) {
         continue;
       }
@@ -547,7 +547,7 @@ void Controller::ApplyConfig(std::span<DisplayConfig*> display_configs,
 
         // NOTE: If changing this flow name or ID, please also do so in the
         // corresponding FLOW_END.
-        TRACE_FLOW_BEGIN("gfx", "present_image", applied_image->id.value());
+        TRACE_FLOW_BEGIN("gfx", "present_image", applied_image->id().value());
 
         // It's possible that the image's layer was moved between displays. The logic around
         // pending_layer_change guarantees that the old display will be done with the image
@@ -564,7 +564,7 @@ void Controller::ApplyConfig(std::span<DisplayConfig*> display_configs,
         }
         display_info.images.push_back(applied_image);
         display_info.config_image_queue.back().images.push_back(
-            {.image_id = applied_image->id, .client_id = applied_image->client_id()});
+            {.image_id = applied_image->id(), .client_id = applied_image->client_id()});
       }
     }
 
@@ -674,7 +674,7 @@ zx::result<std::span<const display::DisplayTiming>> Controller::GetDisplayTiming
     return zx::error(ZX_ERR_BAD_STATE);
   }
   for (auto& display : displays_) {
-    if (display.id == display_id) {
+    if (display.id() == display_id) {
       if (display.edid.has_value()) {
         return zx::ok(std::span(display.edid->timings));
       }
@@ -690,7 +690,7 @@ zx::result<fbl::Vector<display::PixelFormat>> Controller::GetSupportedPixelForma
     display::DisplayId display_id) {
   fbl::Array<display::PixelFormat> formats_out;
   for (const DisplayInfo& display_info : displays_) {
-    if (display_info.id != display_id) {
+    if (display_info.id() != display_id) {
       continue;
     }
 
@@ -806,7 +806,7 @@ zx_status_t Controller::CreateClient(
           int initialized_display_count = 0;
           for (const DisplayInfo& display : displays_) {
             if (display.init_done) {
-              current_displays[initialized_display_count] = display.id;
+              current_displays[initialized_display_count] = display.id();
               ++initialized_display_count;
             }
           }

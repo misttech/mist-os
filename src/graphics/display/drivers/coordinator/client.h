@@ -55,6 +55,15 @@ namespace display_coordinator {
 // Almost-POD used by Client to manage display configuration. Public state is used by Controller.
 class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, display::DisplayId> {
  public:
+  explicit DisplayConfig(display::DisplayId display_id);
+
+  DisplayConfig(const DisplayConfig&) = delete;
+  DisplayConfig& operator=(const DisplayConfig&) = delete;
+  DisplayConfig(DisplayConfig&&) = delete;
+  DisplayConfig& operator=(DisplayConfig&&) = delete;
+
+  ~DisplayConfig();
+
   void InitializeInspect(inspect::Node* parent);
 
   bool apply_layer_change() {

@@ -12,16 +12,20 @@
 #include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/image-id.h"
 
 namespace display_coordinator {
 
-CaptureImage::CaptureImage(Controller* controller,
+CaptureImage::CaptureImage(Controller* controller, display::ImageId id,
                            display::DriverCaptureImageId driver_capture_image_id,
                            inspect::Node* parent_node, ClientId client_id)
-    : driver_capture_image_id_(driver_capture_image_id),
+    : IdMappable(id),
+      driver_capture_image_id_(driver_capture_image_id),
       client_id_(client_id),
       controller_(controller) {
   ZX_DEBUG_ASSERT(controller_ != nullptr);
+  ZX_DEBUG_ASSERT(id != display::kInvalidImageId);
+  ZX_DEBUG_ASSERT(driver_capture_image_id != display::kInvalidDriverCaptureImageId);
 
   InitializeInspect(parent_node);
 }

@@ -51,12 +51,15 @@ fit::result<const char*, DisplayInfo::Edid> InitEdidFromBytes(std::span<const ui
 
 }  // namespace
 
-DisplayInfo::DisplayInfo() = default;
+DisplayInfo::DisplayInfo(display::DisplayId display_id) : IdMappable(display_id) {
+  ZX_DEBUG_ASSERT(display_id != display::kInvalidDisplayId);
+}
+
 DisplayInfo::~DisplayInfo() = default;
 
 void DisplayInfo::InitializeInspect(inspect::Node* parent_node) {
   ZX_DEBUG_ASSERT(init_done);
-  node = parent_node->CreateChild(fbl::StringPrintf("display-%" PRIu64, id.value()).c_str());
+  node = parent_node->CreateChild(fbl::StringPrintf("display-%" PRIu64, id().value()).c_str());
 
   if (mode.has_value()) {
     node.CreateUint("width", mode->horizontal_active_px, &properties);
@@ -91,15 +94,17 @@ void DisplayInfo::InitializeInspect(inspect::Node* parent_node) {
 // static
 zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(
     const raw_display_info_t& banjo_display_info) {
+  display::DisplayId display_id = display::ToDisplayId(banjo_display_info.display_id);
+  ZX_DEBUG_ASSERT(display_id != display::kInvalidDisplayId);
+
   fbl::AllocChecker alloc_checker;
-  fbl::RefPtr<DisplayInfo> out = fbl::AdoptRef(new (&alloc_checker) DisplayInfo);
+  fbl::RefPtr<DisplayInfo> out = fbl::AdoptRef(new (&alloc_checker) DisplayInfo(display_id));
   if (!alloc_checker.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   out->pending_layer_change = false;
   out->layer_count = 0;
-  out->id = display::ToDisplayId(banjo_display_info.display_id);
 
   fbl::Vector<display::PixelFormat> pixel_formats;
   pixel_formats.reserve(banjo_display_info.pixel_formats_count, &alloc_checker);

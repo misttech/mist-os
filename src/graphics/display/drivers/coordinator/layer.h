@@ -43,6 +43,12 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
  public:
   // `controller` must be non-null.
   explicit Layer(Controller* controller, display::DriverLayerId id);
+
+  Layer(const Layer&) = delete;
+  Layer(Layer&&) = delete;
+  Layer& operator=(const Layer&) = delete;
+  Layer& operator=(Layer&&) = delete;
+
   ~Layer();
 
   // The most recent image sent to the display engine for this layer.

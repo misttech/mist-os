@@ -124,7 +124,8 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, display::Display
   std::queue<ConfigImages> config_image_queue;
 
  private:
-  DisplayInfo();
+  explicit DisplayInfo(display::DisplayId display_id);
+
   inspect::Node node;
   inspect::ValueList properties;
 };

@@ -113,6 +113,12 @@ void AssertHeld(fbl::Mutex& mutex) __TA_ASSERT(mutex) {
 
 namespace display_coordinator {
 
+DisplayConfig::DisplayConfig(display::DisplayId display_id) : IdMappable(display_id) {
+  ZX_DEBUG_ASSERT(display_id != display::kInvalidDisplayId);
+}
+
+DisplayConfig::~DisplayConfig() = default;
+
 void DisplayConfig::InitializeInspect(inspect::Node* parent) {
   static std::atomic_uint64_t inspect_count;
   node_ = parent->CreateChild(fbl::StringPrintf("display-config-%ld", inspect_count++).c_str());
@@ -197,7 +203,7 @@ zx_status_t Client::ImportImageForDisplay(const display::ImageMetadata& image_me
 
   fbl::AllocChecker alloc_checker;
   fbl::RefPtr<Image> image = fbl::AdoptRef(new (&alloc_checker) Image(
-      &controller_, image_metadata, driver_image_id, &proxy_->node(), id_));
+      &controller_, image_metadata, image_id, driver_image_id, &proxy_->node(), id_));
   if (!alloc_checker.check()) {
     FDF_LOG(DEBUG, "Alloc checker failed while constructing Image.\n");
     return ZX_ERR_NO_MEMORY;
@@ -205,7 +211,6 @@ zx_status_t Client::ImportImageForDisplay(const display::ImageMetadata& image_me
   // `dc_image` is now owned by the Image instance.
   release_image.cancel();
 
-  image->id = image_id;
   images_.insert(std::move(image));
   return ZX_OK;
 }
@@ -772,13 +777,13 @@ void Client::ApplyConfigFromFidl(display::ConfigStamp new_config_stamp) {
     for (LayerNode& draft_layer_node : display_config.draft_layers_) {
       if (!draft_layer_node.layer->ResolveDraftLayerProperties()) {
         FDF_LOG(ERROR, "Failed to resolve draft layer properties for layer %" PRIu64,
-                draft_layer_node.layer->id.value());
+                draft_layer_node.layer->id().value());
         TearDown(ZX_ERR_BAD_STATE);
         return;
       }
       if (!draft_layer_node.layer->ResolveDraftImage(&fences_, latest_config_stamp_)) {
         FDF_LOG(ERROR, "Failed to resolve draft image for layer %" PRIu64,
-                draft_layer_node.layer->id.value());
+                draft_layer_node.layer->id().value());
         TearDown(ZX_ERR_BAD_STATE);
         return;
       }
@@ -796,14 +801,14 @@ void Client::ApplyConfigFromFidl(display::ConfigStamp new_config_stamp) {
         Layer* applied_layer = applied_layer_node.layer;
         // Don't migrate images between displays if there are pending images. See
         // `Controller::ApplyConfig` for more details.
-        if (applied_layer->applied_to_display_id_ != display_config.id &&
+        if (applied_layer->applied_to_display_id_ != display_config.id() &&
             applied_layer->applied_image_ != nullptr && applied_layer->HasWaitingImages()) {
           applied_layer->applied_image_ = nullptr;
 
           // This doesn't need to be reset anywhere, since we really care about the last
           // display this layer was shown on. Ignoring the 'null' display could cause
           // unusual layer changes to trigger this unnecessary, but that's not wrong.
-          applied_layer->applied_to_display_id_ = display_config.id;
+          applied_layer->applied_to_display_id_ = display_config.id();
         }
       }
       display_config.draft_has_layer_list_change_ = false;
@@ -884,14 +889,13 @@ zx_status_t Client::ImportImageForCapture(const display::ImageMetadata& image_me
 
   fbl::AllocChecker alloc_checker;
   fbl::RefPtr<CaptureImage> capture_image = fbl::AdoptRef(new (&alloc_checker) CaptureImage(
-      &controller_, driver_capture_image_id, &proxy_->node(), id_));
+      &controller_, image_id, driver_capture_image_id, &proxy_->node(), id_));
   if (!alloc_checker.check()) {
     return ZX_ERR_NO_MEMORY;
   }
   // `driver_capture_image_id` is now owned by the CaptureImage instance.
   release_image.cancel();
 
-  capture_image->id = image_id;
   capture_images_.insert(std::move(capture_image));
   return ZX_OK;
 }
@@ -1157,12 +1161,12 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
 
         // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs,
         // the client-side ID will have to be looked up in a map.
-        const display::LayerId draft_layer_id(draft_layer_node.layer->id.value());
+        const display::LayerId draft_layer_id(draft_layer_node.layer->id().value());
 
         for (uint8_t i = 0; i < 32; i++) {
           if (composition_operations & (1 << i)) {
             ops->emplace_back(fhd::wire::ClientCompositionOp{
-                .display_id = display::ToFidlDisplayId(display_config.id),
+                .display_id = display::ToFidlDisplayId(display_config.id()),
                 .layer_id = display::ToFidlLayerId(draft_layer_id),
                 .opcode = static_cast<fhdt::wire::ClientCompositionOpcode>(i),
             });
@@ -1324,16 +1328,14 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
   controller_.AssertMtxAliasHeld(*controller_.mtx());
   for (display::DisplayId added_display_id : added_display_ids) {
     fbl::AllocChecker alloc_checker;
-    auto display_config = fbl::make_unique_checked<DisplayConfig>(&alloc_checker);
+    auto display_config = fbl::make_unique_checked<DisplayConfig>(&alloc_checker, added_display_id);
     if (!alloc_checker.check()) {
       FDF_LOG(WARNING, "Out of memory when processing hotplug");
       continue;
     }
 
-    display_config->id = added_display_id;
-
     zx::result get_supported_pixel_formats_result =
-        controller_.GetSupportedPixelFormats(display_config->id);
+        controller_.GetSupportedPixelFormats(display_config->id());
     if (get_supported_pixel_formats_result.is_error()) {
       FDF_LOG(WARNING, "Failed to get pixel formats when processing hotplug: %s",
               get_supported_pixel_formats_result.status_string());
@@ -1342,14 +1344,14 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
     display_config->pixel_formats_ = std::move(get_supported_pixel_formats_result.value());
 
     zx::result<std::span<const display::DisplayTiming>> display_timings_result =
-        controller_.GetDisplayTimings(display_config->id);
+        controller_.GetDisplayTimings(display_config->id());
     if (display_timings_result.is_error()) {
       FDF_LOG(WARNING, "Failed to get display timings when processing hotplug: %s",
               display_timings_result.status_string());
       continue;
     }
 
-    display_config->applied_.display_id = ToBanjoDisplayId(display_config->id);
+    display_config->applied_.display_id = ToBanjoDisplayId(display_config->id());
     display_config->applied_.layer_list = nullptr;
     display_config->applied_.layer_count = 0;
 
@@ -1386,10 +1388,10 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
     const DisplayConfig& display_config = *display_configs_it;
 
     fhd::wire::Info fidl_display_info;
-    fidl_display_info.id = display::ToFidlDisplayId(display_config.id);
+    fidl_display_info.id = display::ToFidlDisplayId(display_config.id());
 
     zx::result<std::span<const display::DisplayTiming>> display_timings_result =
-        controller_.GetDisplayTimings(display_config.id);
+        controller_.GetDisplayTimings(display_config.id());
     ZX_DEBUG_ASSERT(display_timings_result.is_ok());
 
     std::span<const display::DisplayTiming> display_timings = display_timings_result.value();
@@ -1463,7 +1465,7 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
     if (display_config != nullptr) {
       display_config->draft_layers_.clear();
       display_config->applied_layers_.clear();
-      fidl_removed_display_ids.push_back(display::ToFidlDisplayId(display_config->id));
+      fidl_removed_display_ids.push_back(display::ToFidlDisplayId(display_config->id()));
     }
   }
 

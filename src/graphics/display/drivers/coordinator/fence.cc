@@ -100,15 +100,17 @@ void Fence::OnReady(async_dispatcher_t* dispatcher, async::WaitBase* self, zx_st
 
 Fence::Fence(FenceCallback* cb, async_dispatcher_t* event_dispatcher, display::EventId fence_id,
              zx::event event)
-    : cb_(cb),
+    : IdMappable(fence_id),
+      cb_(cb),
       event_dispatcher_(*event_dispatcher),
       fence_creation_dispatcher_(fdf::Dispatcher::GetCurrent()),
       event_(std::move(event)) {
   ZX_DEBUG_ASSERT(event_dispatcher != nullptr);
+  ZX_DEBUG_ASSERT(fence_id != display::kInvalidEventId);
+  ZX_DEBUG_ASSERT(event_.is_valid());
+
   ZX_DEBUG_ASSERT(fence_creation_dispatcher_->get() != nullptr);
 
-  id = fence_id;
-  ZX_DEBUG_ASSERT(event_.is_valid());
   zx_info_handle_basic_t info;
   zx_status_t status = event_.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
   ZX_DEBUG_ASSERT(status == ZX_OK);
@@ -225,7 +227,7 @@ void FenceCollection::OnFenceFired(FenceReference* fence) { on_fence_fired_(fenc
 void FenceCollection::OnRefForFenceDead(Fence* fence) {
   fbl::AutoLock lock(&mtx_);
   if (fence->OnRefDead()) {
-    fences_.erase(fence->id);
+    fences_.erase(fence->id());
   }
 }
 

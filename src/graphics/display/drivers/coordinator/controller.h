@@ -255,7 +255,7 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
 template <typename Callback>
 bool Controller::FindDisplayInfo(display::DisplayId display_id, Callback callback) {
   for (const DisplayInfo& display : displays_) {
-    if (display.id == display_id) {
+    if (display.id() == display_id) {
       callback(display);
       return true;
     }
