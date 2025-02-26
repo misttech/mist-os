@@ -245,6 +245,11 @@ impl DiskBuilder {
         }
     }
 
+    pub fn set_uninitialized(&mut self) -> &mut Self {
+        self.uninitialized = true;
+        self
+    }
+
     pub fn size(&mut self, size: u64) -> &mut Self {
         self.size = size;
         self

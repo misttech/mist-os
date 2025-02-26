@@ -239,6 +239,14 @@ impl TestFixtureBuilder {
             .await
             .unwrap();
 
+        // Ideally, the tests would implicitly control the order the disks are added, based on the
+        // order they are added to the builder. This would let the tests set up specific scenarios
+        // as needed. The only thing that uses these extra disks right now though is the gpt
+        // testing and they all want the disks first, so it's easier to just do it.
+        for disk in self.extra_disks.into_iter() {
+            let (vmo, type_guid) = disk.into_vmo_and_type_guid().await;
+            fixture.add_ramdisk(vmo, type_guid).await;
+        }
         if let Some(disk) = self.disk {
             let (vmo, type_guid) = disk.into_vmo_and_type_guid().await;
             let vmo_clone =
@@ -246,10 +254,6 @@ impl TestFixtureBuilder {
 
             fixture.add_ramdisk(vmo, type_guid).await;
             fixture.main_disk = Some(Disk::Prebuilt(vmo_clone, type_guid));
-        }
-        for disk in self.extra_disks.into_iter() {
-            let (vmo, type_guid) = disk.into_vmo_and_type_guid().await;
-            fixture.add_ramdisk(vmo, type_guid).await;
         }
 
         fixture

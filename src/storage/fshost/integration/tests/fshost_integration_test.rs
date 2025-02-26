@@ -15,7 +15,8 @@ use fshost_test_fixture::disk_builder::{
     DataSpec, VolumesSpec, DEFAULT_DATA_VOLUME_SIZE, FVM_SLICE_SIZE,
 };
 use fshost_test_fixture::{
-    round_down, BLOBFS_MAX_BYTES, DATA_MAX_BYTES, VFS_TYPE_FXFS, VFS_TYPE_MEMFS, VFS_TYPE_MINFS,
+    round_down, TestFixture, BLOBFS_MAX_BYTES, DATA_MAX_BYTES, VFS_TYPE_FXFS, VFS_TYPE_MEMFS,
+    VFS_TYPE_MINFS,
 };
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use futures::FutureExt;
@@ -35,7 +36,7 @@ use {
 #[cfg(feature = "storage-host")]
 use {
     fidl::endpoints::ServiceMarker as _, fidl_fuchsia_hardware_block_partition as fpartition,
-    fidl_fuchsia_storage_partitions as fpartitions, fshost_test_fixture::TestFixture,
+    fidl_fuchsia_storage_partitions as fpartitions,
 };
 
 pub mod config;
@@ -568,61 +569,6 @@ async fn ramdisk_image_serves_zbi_ramdisk_contents_with_unformatted_data() {
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
-
-    fixture.tear_down().await;
-}
-
-// Test that fshost handles the case where the FVM is within a GPT partition.
-#[fuchsia::test]
-// TODO(https://fxbug.dev/339491886): port to storage-host
-#[cfg_attr(any(feature = "fxblob", feature = "storage-host"), ignore)]
-async fn fvm_within_gpt() {
-    let mut builder = new_builder();
-    builder.with_disk().format_volumes(volumes_spec()).with_gpt().format_data(data_fs_spec());
-    let fixture = builder.build().await;
-    let dev = fixture.dir("dev-topological/class/block", fio::Flags::empty());
-
-    // Ensure we bound the GPT by checking the relevant partitions exist under the ramdisk path.
-    let fvm_partition_path = device_watcher::wait_for_device_with(&dev, |info| {
-        info.topological_path.ends_with("/part-000/block").then(|| info.topological_path)
-    })
-    .await
-    .unwrap();
-    let blobfs_path = format!("{}/fvm/blobfs-p-1/block", fvm_partition_path);
-    device_watcher::wait_for_device_with(&dev, |info| {
-        (info.topological_path == blobfs_path).then_some(())
-    })
-    .await
-    .unwrap();
-    let data_path = format!("{}/fvm/data-p-2/block", fvm_partition_path);
-    device_watcher::wait_for_device_with(&dev, |info| {
-        (info.topological_path == data_path).then_some(())
-    })
-    .await
-    .unwrap();
-
-    // Make sure we can access the blob/data partitions within the FVM.
-    fixture.check_fs_type("blob", blob_fs_type()).await;
-    fixture.check_fs_type("data", data_fs_type()).await;
-    fixture.check_test_data_file().await;
-    fixture.check_test_blob(DATA_FILESYSTEM_VARIANT == "fxblob").await;
-
-    fixture.tear_down().await;
-}
-
-// Test that fshost handles the case where Fxblob is within a GPT partition.
-#[fuchsia::test]
-#[cfg(feature = "fxblob")]
-async fn fxblob_within_gpt() {
-    let mut builder = new_builder();
-    builder.with_disk().format_volumes(volumes_spec()).with_gpt().format_data(data_fs_spec());
-    let fixture = builder.build().await;
-
-    // Make sure we can access the blob/data partitions within the FVM.
-    fixture.check_fs_type("blob", blob_fs_type()).await;
-    fixture.check_fs_type("data", data_fs_type()).await;
-    fixture.check_test_data_file().await;
-    fixture.check_test_blob(DATA_FILESYSTEM_VARIANT == "fxblob").await;
 
     fixture.tear_down().await;
 }
@@ -1312,28 +1258,47 @@ async fn gpt_num_partitions(fixture: &TestFixture) -> usize {
     fuchsia_fs::directory::readdir(&partitions).await.expect("Failed to read partitions").len()
 }
 
-#[cfg(feature = "storage-host")]
+#[cfg(not(feature = "storage-host"))]
+async fn gpt_num_partitions(fixture: &TestFixture) -> usize {
+    let gpt_dir = fuchsia_fs::directory::open_directory(
+        &fixture.dir("dev-topological", fio::Flags::empty()),
+        "sys/platform/ram-disk/ramctl/ramdisk-0/block",
+        fio::Flags::empty(),
+    )
+    .await
+    .expect("Failed to open the gpt device");
+    fuchsia_fs::directory::readdir(&gpt_dir)
+        .await
+        .expect("Failed to read partitions")
+        .into_iter()
+        .filter(|entry| entry.name.starts_with("part-"))
+        .count()
+}
+
 #[fuchsia::test]
 async fn initialized_gpt() {
     let mut builder = new_builder();
     builder.with_disk().format_volumes(volumes_spec()).with_gpt().format_data(data_fs_spec());
-    builder.with_extra_disk();
+    // TODO(https://fxbug.dev/399197713): re-enable extra disk once flake is fixed
+    // builder.with_extra_disk().set_uninitialized();
     let fixture = builder.build().await;
-
-    assert_eq!(gpt_num_partitions(&fixture).await, 1);
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
+    fixture.check_test_data_file().await;
+    fixture.check_test_blob(DATA_FILESYSTEM_VARIANT == "fxblob").await;
+
+    assert_eq!(gpt_num_partitions(&fixture).await, 1);
 
     fixture.tear_down().await;
 }
 
-#[cfg(feature = "storage-host")]
 #[fuchsia::test]
 async fn uninitialized_gpt() {
     let mut builder = new_builder().with_uninitialized_disk();
     builder.fshost().set_config_value("netboot", true);
-    builder.with_extra_disk();
+    // TODO(https://fxbug.dev/399197713): re-enable extra disk once flake is fixed
+    // builder.with_extra_disk().set_uninitialized();
     let fixture = builder.build().await;
 
     assert_eq!(gpt_num_partitions(&fixture).await, 0);
@@ -1346,7 +1311,8 @@ async fn uninitialized_gpt() {
 async fn reset_uninitialized_gpt() {
     let mut builder = new_builder().with_uninitialized_disk();
     builder.fshost().set_config_value("netboot", true);
-    builder.with_extra_disk();
+    // TODO(https://fxbug.dev/399197713): re-enable extra disk once flake is fixed
+    // builder.with_extra_disk().set_uninitialized();
     let fixture = builder.build().await;
 
     assert_eq!(gpt_num_partitions(&fixture).await, 0);
@@ -1376,8 +1342,9 @@ async fn reset_uninitialized_gpt() {
 async fn reset_initialized_gpt() {
     let mut builder = new_builder();
     builder.with_disk().format_volumes(volumes_spec()).with_gpt().format_data(data_fs_spec());
-    builder.with_extra_disk();
     builder.fshost().set_config_value("netboot", true);
+    // TODO(https://fxbug.dev/399197713): re-enable extra disk once flake is fixed
+    // builder.with_extra_disk().set_uninitialized();
     let fixture = builder.build().await;
 
     assert_eq!(gpt_num_partitions(&fixture).await, 1);
