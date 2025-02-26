@@ -10,7 +10,7 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect_derive::Inspect;
 use futures::channel::mpsc;
 use futures::future;
-use log::{debug, warn};
+use log::{debug, info, warn};
 use std::pin::pin;
 
 mod fidl_service;
@@ -22,8 +22,15 @@ mod types;
 use crate::fidl_service::run_services;
 use crate::profile_registrar::ProfileRegistrar;
 
+const THREAD_ROLE_NAME: &str = "fuchsia.bluetooth.rfcomm";
+
 #[fuchsia::main]
 pub async fn main() -> Result<(), Error> {
+    match fuchsia_scheduler::set_role_for_this_thread(THREAD_ROLE_NAME) {
+        Ok(()) => info!("Thread role set successfully."),
+        Err(e) => warn!(e:%; "Failed to set thread role."),
+    }
+
     let profile_svc = fuchsia_component::client::connect_to_protocol::<ProfileMarker>()
         .context("Failed to connect to Bluetooth Profile service")?;
 

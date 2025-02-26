@@ -24,7 +24,10 @@
         {
             protocol: "fuchsia.scheduler.RoleManager",
             from: "parent",
-            to: "#bt-host-collection",
+            to: [
+                "#bt-host-collection",
+                "#bt-rfcomm",
+            ],
         },
     ],
     expose: [
