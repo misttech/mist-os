@@ -844,11 +844,59 @@ class MappingProtectionRanges {
   // specified by range_base and range_size must be within this mappings base_ and size_. The
   // provided callback is called in virtual address order for each protection type. ZX_ERR_NEXT
   // and ZX_ERR_STOP can be used to control iteration, with any other status becoming the return
-  // value of this method.
-  zx_status_t EnumerateProtectionRanges(
-      vaddr_t mapping_base, size_t mapping_size, vaddr_t base, size_t size,
-      fit::inline_function<zx_status_t(vaddr_t region_base, size_t region_size, uint mmu_flags)>&&
-          func) const;
+  // value of this method. The callback |func| is assumed to have a type signature of:
+  // |zx_status_t(vaddr_t region_base, size_t region_size, uint mmu_flags)|
+  template <typename F>
+  zx_status_t EnumerateProtectionRanges(vaddr_t mapping_base, size_t mapping_size, vaddr_t base,
+                                        size_t size, F func) const {
+    DEBUG_ASSERT(size > 0);
+
+    // Have a short circuit for the single protect region case to avoid wavl tree processing in the
+    // common case.
+    if (protect_region_list_rest_.is_empty()) {
+      zx_status_t result = func(base, size, first_region_arch_mmu_flags_);
+      if (result == ZX_ERR_NEXT || result == ZX_ERR_STOP) {
+        return ZX_OK;
+      }
+      return result;
+    }
+
+    // See comments in the loop that explain what next and current represent.
+    auto next = protect_region_list_rest_.upper_bound(base);
+    auto current = next;
+    current--;
+    const vaddr_t range_top = base + (size - 1);
+    do {
+      // The region starting from 'current' and ending at 'next' represents a single protection
+      // domain. We first work that, remembering that either of these could be an invalid node,
+      // meaning the start or end of the mapping respectively.
+      const vaddr_t protect_region_base = current.IsValid() ? current->region_start : mapping_base;
+      const vaddr_t protect_region_top =
+          next.IsValid() ? (next->region_start - 1) : (mapping_base + (mapping_size - 1));
+      // We should only be iterating nodes that are actually part of the requested range.
+      DEBUG_ASSERT(base <= protect_region_top);
+      DEBUG_ASSERT(range_top >= protect_region_base);
+      // The region found is of an entire protection block, and could extend outside the requested
+      // range, so trim if necessary.
+      const vaddr_t region_base = ktl::max(protect_region_base, base);
+      const size_t region_len = ktl::min(protect_region_top, range_top) - region_base + 1;
+      zx_status_t result =
+          func(region_base, region_len,
+               current.IsValid() ? current->arch_mmu_flags : first_region_arch_mmu_flags_);
+      if (result != ZX_ERR_NEXT) {
+        if (result == ZX_ERR_STOP) {
+          return ZX_OK;
+        }
+        return result;
+      }
+      // Move to the next block.
+      current = next;
+      next++;
+      // Continue looping as long we operating on nodes that overlap with the requested range.
+    } while (current.IsValid() && current->region_start <= range_top);
+
+    return ZX_OK;
+  }
 
   // Merges protection ranges such that |right| is left cleared, and |this| contains the information
   // of both ranges. It is an error to call this if |this| and |right| are not virtually contiguous.
@@ -1079,13 +1127,11 @@ class VmMapping final : public VmAddressRegionOrMapping {
   // provided callback is called in virtual address order for each protection type. ZX_ERR_NEXT
   // and ZX_ERR_STOP can be used to control iteration, with any other status becoming the return
   // value of this method.
-  zx_status_t EnumerateProtectionRangesLocked(
-      vaddr_t base, size_t size,
-      fit::inline_function<zx_status_t(vaddr_t region_base, size_t region_len, uint mmu_flags)>&&
-          func) const TA_REQ(lock()) __TA_NO_THREAD_SAFETY_ANALYSIS {
+  template <typename F>
+  zx_status_t EnumerateProtectionRangesLocked(vaddr_t base, size_t size, F func) const
+      TA_REQ(lock()) {
     DEBUG_ASSERT(is_in_range_locked(base, size));
-    return ProtectRangesLocked().EnumerateProtectionRanges(base_, size_, base, size,
-                                                           ktl::move(func));
+    return ProtectRangesLocked().EnumerateProtectionRanges(base_, size_, base, size, func);
   }
 
   // The maximum number of pages that a page fault can optimistically extend the fault to include.

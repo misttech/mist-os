@@ -1387,59 +1387,6 @@ void VmMapping::CommitHighMemoryPriority() {
   MapRange(offset, len, false, true);
 }
 
-zx_status_t MappingProtectionRanges::EnumerateProtectionRanges(
-    vaddr_t mapping_base, size_t mapping_size, vaddr_t base, size_t size,
-    fit::inline_function<zx_status_t(vaddr_t region_base, size_t region_len, uint mmu_flags)>&&
-        func) const {
-  DEBUG_ASSERT(size > 0);
-
-  // Have a short circuit for the single protect region case to avoid wavl tree processing in the
-  // common case.
-  if (protect_region_list_rest_.is_empty()) {
-    zx_status_t result = func(base, size, first_region_arch_mmu_flags_);
-    if (result == ZX_ERR_NEXT || result == ZX_ERR_STOP) {
-      return ZX_OK;
-    }
-    return result;
-  }
-
-  // See comments in the loop that explain what next and current represent.
-  auto next = protect_region_list_rest_.upper_bound(base);
-  auto current = next;
-  current--;
-  const vaddr_t range_top = base + (size - 1);
-  do {
-    // The region starting from 'current' and ending at 'next' represents a single protection
-    // domain. We first work that, remembering that either of these could be an invalid node,
-    // meaning the start or end of the mapping respectively.
-    const vaddr_t protect_region_base = current.IsValid() ? current->region_start : mapping_base;
-    const vaddr_t protect_region_top =
-        next.IsValid() ? (next->region_start - 1) : (mapping_base + (mapping_size - 1));
-    // We should only be iterating nodes that are actually part of the requested range.
-    DEBUG_ASSERT(base <= protect_region_top);
-    DEBUG_ASSERT(range_top >= protect_region_base);
-    // The region found is of an entire protection block, and could extend outside the requested
-    // range, so trim if necessary.
-    const vaddr_t region_base = ktl::max(protect_region_base, base);
-    const size_t region_len = ktl::min(protect_region_top, range_top) - region_base + 1;
-    zx_status_t result =
-        func(region_base, region_len,
-             current.IsValid() ? current->arch_mmu_flags : first_region_arch_mmu_flags_);
-    if (result != ZX_ERR_NEXT) {
-      if (result == ZX_ERR_STOP) {
-        return ZX_OK;
-      }
-      return result;
-    }
-    // Move to the next block.
-    current = next;
-    next++;
-    // Continue looping as long we operating on nodes that overlap with the requested range.
-  } while (current.IsValid() && current->region_start <= range_top);
-
-  return ZX_OK;
-}
-
 template <typename F>
 zx_status_t MappingProtectionRanges::UpdateProtectionRange(vaddr_t mapping_base,
                                                            size_t mapping_size, vaddr_t base,
