@@ -664,22 +664,27 @@ impl Topology {
             return;
         };
         let (dp_level, rq_level) = (dep.dependent.level, dep.requires.level);
-        dp.inspect_edges
-            .borrow_mut()
-            .entry(rq_id.clone())
-            .or_insert_with(|| {
+        let mut inspect_edges = dp.inspect_edges.borrow_mut();
+        match inspect_edges.get_mut(&rq_id) {
+            None => {
                 let mut dp_vertex = dp.inspect_vertex.borrow_mut();
                 let mut rq_vertex = rq.inspect_vertex.borrow_mut();
-                dp_vertex.add_edge(
+                let edge = dp_vertex.add_edge(
                     &mut rq_vertex,
-                    [IGraphMeta::new(dp_level.to_string(), "unset").track_events()],
-                )
-            })
-            .meta()
-            .set(
-                dp_level.to_string(),
-                format!("{}{}", rq_level, if is_assertive { "" } else { "p" }),
-            );
+                    [IGraphMeta::new(
+                        dp_level.to_string(),
+                        format!("{}{}", rq_level, if is_assertive { "" } else { "p" }),
+                    )],
+                );
+                inspect_edges.insert(rq_id.clone(), edge);
+            }
+            Some(edge) => {
+                edge.meta().set(
+                    dp_level.to_string(),
+                    format!("{}{}", rq_level, if is_assertive { "" } else { "p" }),
+                );
+            }
+        }
     }
 
     fn remove_inspect_for_dependency(&mut self, dep: &Dependency) {
