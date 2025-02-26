@@ -127,7 +127,7 @@ pub mod ip {
     }
 
     // Re-exported types.
-    pub use netstack3_base::{SubnetMatcher, WrapBroadcastMarker};
+    pub use netstack3_base::{Mark, MarkDomain, SubnetMatcher, WrapBroadcastMarker};
     pub use netstack3_ip::device::{
         AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, AddressRemovedReason,
         CommonAddressProperties, IidGenerationConfiguration, IidSecret, IpAddressState,
@@ -170,9 +170,8 @@ pub mod routes {
     pub use netstack3_base::WrapBroadcastMarker;
     pub use netstack3_ip::{
         AddRouteError, AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither,
-        Generation, Mark, MarkDomain, MarkMatcher, MarkMatchers, Metric, NextHop, RawMetric,
-        ResolvedRoute, RoutableIpAddr, RoutingTableId, Rule, RuleAction, RuleMatcher,
-        TrafficOriginMatcher,
+        Generation, MarkMatcher, MarkMatchers, Metric, NextHop, RawMetric, ResolvedRoute,
+        RoutableIpAddr, RoutingTableId, Rule, RuleAction, RuleMatcher, TrafficOriginMatcher,
     };
 }
 

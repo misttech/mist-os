@@ -53,7 +53,7 @@ use netstack3_base::{
     trace_duration, AnyDevice, BidirectionalConverter as _, ContextPair, Control, CoreTimerContext,
     CounterContext, CtxPair, DeferredResourceRemovalContext, DeviceIdContext, EitherDeviceId,
     ExistsError, HandleableTimer, IcmpErrorCode, Inspector, InspectorDeviceExt, InspectorExt,
-    InstantBindingsTypes, IpDeviceAddr, IpExt, LocalAddressError, Mss,
+    InstantBindingsTypes, IpDeviceAddr, IpExt, LocalAddressError, Mark, MarkDomain, Mss,
     OwnedOrRefsBidirectionalConverter, PortAllocImpl, ReferenceNotifiersExt as _,
     RemoveResourceResult, RngContext, Segment, SeqNum, StrongDeviceIdentifier as _,
     TimerBindingsTypes, TimerContext, TracingContext, TxMetadataBindingsTypes,
@@ -63,7 +63,7 @@ use netstack3_filter::Tuple;
 use netstack3_ip::socket::{
     DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError, IpSockCreationError, IpSocketHandler,
 };
-use netstack3_ip::{self as ip, BaseTransportIpContext, Mark, MarkDomain, TransportIpContext};
+use netstack3_ip::{self as ip, BaseTransportIpContext, TransportIpContext};
 use packet_formats::ip::IpProto;
 use smallvec::{smallvec, SmallVec};
 use thiserror::Error;

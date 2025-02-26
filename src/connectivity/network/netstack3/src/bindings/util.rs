@@ -1268,38 +1268,38 @@ impl TryFromFidl<fnet_interfaces_admin::NudConfiguration> for NudUserConfigUpdat
     }
 }
 
-impl TryFromFidl<fidl_net::MarkDomain> for netstack3_core::routes::MarkDomain {
+impl TryFromFidl<fidl_net::MarkDomain> for netstack3_core::ip::MarkDomain {
     type Error = Never;
 
     fn try_from_fidl(fidl: fidl_net::MarkDomain) -> Result<Self, Self::Error> {
         Ok(match fidl {
-            fidl_net::MarkDomain::Mark1 => netstack3_core::routes::MarkDomain::Mark1,
-            fidl_net::MarkDomain::Mark2 => netstack3_core::routes::MarkDomain::Mark2,
+            fidl_net::MarkDomain::Mark1 => netstack3_core::ip::MarkDomain::Mark1,
+            fidl_net::MarkDomain::Mark2 => netstack3_core::ip::MarkDomain::Mark2,
         })
     }
 }
 
-impl IntoFidl<fidl_net::MarkDomain> for netstack3_core::routes::MarkDomain {
+impl IntoFidl<fidl_net::MarkDomain> for netstack3_core::ip::MarkDomain {
     fn into_fidl(self) -> fidl_net::MarkDomain {
         match self {
-            netstack3_core::routes::MarkDomain::Mark1 => fidl_net::MarkDomain::Mark1,
-            netstack3_core::routes::MarkDomain::Mark2 => fidl_net::MarkDomain::Mark2,
+            netstack3_core::ip::MarkDomain::Mark1 => fidl_net::MarkDomain::Mark1,
+            netstack3_core::ip::MarkDomain::Mark2 => fidl_net::MarkDomain::Mark2,
         }
     }
 }
 
-impl TryFromFidl<fposix_socket::OptionalUint32> for netstack3_core::routes::Mark {
+impl TryFromFidl<fposix_socket::OptionalUint32> for netstack3_core::ip::Mark {
     type Error = Never;
 
     fn try_from_fidl(fidl: fposix_socket::OptionalUint32) -> Result<Self, Self::Error> {
         Ok(match fidl {
-            fposix_socket::OptionalUint32::Value(mark) => netstack3_core::routes::Mark(Some(mark)),
-            fposix_socket::OptionalUint32::Unset(_) => netstack3_core::routes::Mark(None),
+            fposix_socket::OptionalUint32::Value(mark) => netstack3_core::ip::Mark(Some(mark)),
+            fposix_socket::OptionalUint32::Unset(_) => netstack3_core::ip::Mark(None),
         })
     }
 }
 
-impl IntoFidl<fposix_socket::OptionalUint32> for netstack3_core::routes::Mark {
+impl IntoFidl<fposix_socket::OptionalUint32> for netstack3_core::ip::Mark {
     fn into_fidl(self) -> fposix_socket::OptionalUint32 {
         match self.0 {
             Some(mark) => fposix_socket::OptionalUint32::Value(mark),

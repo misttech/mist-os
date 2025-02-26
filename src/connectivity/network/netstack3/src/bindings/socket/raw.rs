@@ -167,7 +167,7 @@ impl<I: IpExt + IpSockAddrExt> SocketWorkerHandler for SocketWorkerState<I> {
             ctx.api().raw_ip_socket().set_mark(
                 &self.id,
                 domain.into_core(),
-                netstack3_core::routes::Mark(Some(mark)),
+                netstack3_core::ip::Mark(Some(mark)),
             );
         }
     }

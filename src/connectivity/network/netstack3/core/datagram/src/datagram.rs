@@ -32,7 +32,7 @@ use netstack3_base::sync::{self, RwLock};
 use netstack3_base::{
     AnyDevice, BidirectionalConverter, ContextPair, CoreTxMetadataContext, DeviceIdContext,
     DeviceIdentifier, EitherDeviceId, ExistsError, Inspector, InspectorDeviceExt,
-    InspectorExt as _, IpDeviceAddr, LocalAddressError, NotFoundError,
+    InspectorExt as _, IpDeviceAddr, LocalAddressError, Mark, MarkDomain, NotFoundError,
     OwnedOrRefsBidirectionalConverter, ReferenceNotifiers, ReferenceNotifiersExt,
     RemoteAddressError, RemoveResourceResultWithContext, RngContext, SocketError,
     StrongDeviceIdentifier as _, TxMetadataBindingsTypes, WeakDeviceIdentifier, ZonedAddressError,
@@ -44,8 +44,8 @@ use netstack3_ip::socket::{
     SendOneShotIpPacketError, SendOptions, SocketHopLimits,
 };
 use netstack3_ip::{
-    BaseTransportIpContext, HopLimits, Mark, MarkDomain, Marks, MulticastMembershipHandler,
-    ResolveRouteError, TransportIpContext,
+    BaseTransportIpContext, HopLimits, Marks, MulticastMembershipHandler, ResolveRouteError,
+    TransportIpContext,
 };
 use packet::BufferMut;
 use packet_formats::ip::{DscpAndEcn, IpProtoExt};

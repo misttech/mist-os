@@ -275,7 +275,7 @@ impl<I: IpExt + IpSockAddrExt> worker::SocketWorkerHandler for BindingData<I> {
                     ctx.api().tcp().set_mark(
                         &id,
                         domain.into_core(),
-                        netstack3_core::routes::Mark(Some(mark)),
+                        netstack3_core::ip::Mark(Some(mark)),
                     );
                 }
             }

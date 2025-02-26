@@ -34,9 +34,9 @@ use netstack3_base::sync::{RwLock, StrongRc};
 use netstack3_base::{
     trace_duration, AnyDevice, BidirectionalConverter, ContextPair, CoreTxMetadataContext, Counter,
     CounterContext, DeviceIdContext, Inspector, InspectorDeviceExt, InstantContext,
-    LocalAddressError, PortAllocImpl, ReferenceNotifiers, RemoveResourceResultWithContext,
-    RngContext, SocketError, StrongDeviceIdentifier, TracingContext, WeakDeviceIdentifier,
-    ZonedAddressError,
+    LocalAddressError, Mark, MarkDomain, PortAllocImpl, ReferenceNotifiers,
+    RemoveResourceResultWithContext, RngContext, SocketError, StrongDeviceIdentifier,
+    TracingContext, WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_datagram::{
     self as datagram, BoundSocketState as DatagramBoundSocketState,
@@ -56,7 +56,7 @@ use netstack3_ip::socket::{
     IpSockCreateAndSendError, IpSockCreationError, IpSockSendError, SocketHopLimits,
 };
 use netstack3_ip::{
-    HopLimits, IpHeaderInfo, IpTransportContext, LocalDeliveryPacketInfo, Mark, MarkDomain,
+    HopLimits, IpHeaderInfo, IpTransportContext, LocalDeliveryPacketInfo,
     MulticastMembershipHandler, ReceiveIpPacketMeta, TransparentLocalDelivery, TransportIpContext,
     TransportReceiveError,
 };

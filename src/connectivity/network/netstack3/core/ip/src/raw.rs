@@ -16,7 +16,7 @@ use netstack3_base::socket::{DualStackIpExt, DualStackRemoteIp, SocketZonedAddrE
 use netstack3_base::sync::{PrimaryRc, StrongRc, WeakRc};
 use netstack3_base::{
     AnyDevice, ContextPair, DeviceIdContext, Inspector, InspectorDeviceExt, InspectorExt,
-    IpDeviceAddr, IpExt, ReferenceNotifiers, ReferenceNotifiersExt as _,
+    IpDeviceAddr, IpExt, Mark, MarkDomain, ReferenceNotifiers, ReferenceNotifiersExt as _,
     RemoveResourceResultWithContext, ResourceCounterContext, StrongDeviceIdentifier,
     TxMetadataBindingsTypes, WeakDeviceIdentifier, ZonedAddressError,
 };
@@ -30,7 +30,7 @@ use crate::internal::raw::counters::RawIpSocketCounters;
 use crate::internal::raw::filter::RawIpSocketIcmpFilter;
 use crate::internal::raw::protocol::RawIpSocketProtocol;
 use crate::internal::raw::state::{RawIpSocketLockedState, RawIpSocketState};
-use crate::internal::routing::rules::{Mark, MarkDomain, Marks};
+use crate::internal::routing::rules::Marks;
 use crate::internal::socket::{SendOneShotIpPacketError, SocketHopLimits};
 use crate::socket::{
     IpSockCreateAndSendError, IpSocketHandler, RouteResolutionOptions, SendOptions,

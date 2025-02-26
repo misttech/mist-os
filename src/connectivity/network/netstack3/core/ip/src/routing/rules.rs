@@ -9,7 +9,7 @@ use core::fmt::Debug;
 use core::ops::Deref as _;
 
 use net_types::ip::Ip;
-use netstack3_base::{DeviceNameMatcher, DeviceWithName, Matcher, SubnetMatcher};
+use netstack3_base::{DeviceNameMatcher, DeviceWithName, Mark, MarkDomain, Matcher, SubnetMatcher};
 
 use crate::internal::routing::PacketOrigin;
 use crate::RoutingTableId;
@@ -128,13 +128,6 @@ pub enum MarkMatcher {
     },
 }
 
-/// A socket mark.
-///
-/// A socket mark can either be `None` or a `u32`. The mark can be carried by a
-/// socket or a packet, and `None` means the socket/packet is unmarked.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct Mark(pub Option<u32>);
-
 impl Matcher<Mark> for MarkMatcher {
     fn matches(&self, Mark(actual): &Mark) -> bool {
         match self {
@@ -163,35 +156,17 @@ impl Default for Marks {
     }
 }
 
-/// Mark domains.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MarkDomain {
-    /// The first mark.
-    Mark1,
-    /// The second mark.
-    Mark2,
+fn get_mark_with_domain<T>(storage: &[T; MARK_DOMAINS], domain: MarkDomain) -> &T {
+    match domain {
+        MarkDomain::Mark1 => &storage[0],
+        MarkDomain::Mark2 => &storage[1],
+    }
 }
 
-impl MarkDomain {
-    fn get<T>(self, storage: &[T; MARK_DOMAINS]) -> &T {
-        match self {
-            Self::Mark1 => &storage[0],
-            Self::Mark2 => &storage[1],
-        }
-    }
-
-    fn get_mut<T>(self, storage: &mut [T; MARK_DOMAINS]) -> &mut T {
-        match self {
-            Self::Mark1 => &mut storage[0],
-            Self::Mark2 => &mut storage[1],
-        }
-    }
-
-    pub(crate) fn to_str(&self) -> &'static str {
-        match self {
-            MarkDomain::Mark1 => "Mark_1",
-            MarkDomain::Mark2 => "Mark_2",
-        }
+fn get_mark_with_domain_mut<T>(storage: &mut [T; MARK_DOMAINS], domain: MarkDomain) -> &mut T {
+    match domain {
+        MarkDomain::Mark1 => &mut storage[0],
+        MarkDomain::Mark2 => &mut storage[1],
     }
 }
 
@@ -215,13 +190,13 @@ impl Marks {
     /// Gets an immutable reference to the mark at the given domain.
     pub fn get(&self, domain: MarkDomain) -> &Mark {
         let Self(marks) = self;
-        domain.get(marks)
+        get_mark_with_domain(marks, domain)
     }
 
     /// Gets a mutable reference to the mark at the given domain.
     pub fn get_mut(&mut self, domain: MarkDomain) -> &mut Mark {
         let Self(marks) = self;
-        domain.get_mut(marks)
+        get_mark_with_domain_mut(marks, domain)
     }
 }
 
@@ -240,7 +215,13 @@ impl MarkMatchers {
     pub fn new(iter: impl IntoIterator<Item = (MarkDomain, MarkMatcher)>) -> Self {
         let mut mark_matchers = [None; MARK_DOMAINS];
         for (domain, matcher) in iter.into_iter() {
-            assert_eq!(core::mem::replace(domain.get_mut(&mut mark_matchers), Some(matcher)), None);
+            assert_eq!(
+                core::mem::replace(
+                    get_mark_with_domain_mut(&mut mark_matchers, domain),
+                    Some(matcher)
+                ),
+                None
+            );
         }
         MarkMatchers(mark_matchers)
     }

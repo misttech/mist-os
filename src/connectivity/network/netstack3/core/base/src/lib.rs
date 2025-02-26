@@ -59,7 +59,7 @@ pub use frame::{
 pub use inspect::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt, InspectorExt};
 pub use ip::{
     BroadcastIpExt, IcmpErrorCode, IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode, IpExt,
-    IpTypesIpExt, Mms, WrapBroadcastMarker,
+    IpTypesIpExt, Mark, MarkDomain, Mms, WrapBroadcastMarker,
 };
 pub use matchers::{DeviceNameMatcher, Matcher, SubnetMatcher};
 pub use num::PositiveIsize;

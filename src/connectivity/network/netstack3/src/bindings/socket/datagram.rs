@@ -25,7 +25,7 @@ use net_types::ip::{GenericOverIp, Ip, IpInvariant, IpVersion, Ipv4, Ipv4Addr, I
 use net_types::{MulticastAddr, SpecifiedAddr, ZonedAddr};
 use netstack3_core::device::{DeviceId, WeakDeviceId};
 use netstack3_core::error::{LocalAddressError, NotSupportedError, SocketError};
-use netstack3_core::ip::{IpSockCreateAndSendError, IpSockSendError};
+use netstack3_core::ip::{IpSockCreateAndSendError, IpSockSendError, Mark, MarkDomain};
 use netstack3_core::socket::{
     self as core_socket, ConnInfo, ConnectError, ExpectedConnError, ExpectedUnboundError,
     ListenerInfo, MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,
@@ -303,18 +303,9 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
         body: B,
     ) -> Result<(), Self::SendToError>;
 
-    fn set_mark(
-        ctx: &mut Ctx,
-        id: &Self::SocketId,
-        domain: netstack3_core::routes::MarkDomain,
-        mark: netstack3_core::routes::Mark,
-    );
+    fn set_mark(ctx: &mut Ctx, id: &Self::SocketId, domain: MarkDomain, mark: Mark);
 
-    fn get_mark(
-        ctx: &mut Ctx,
-        id: &Self::SocketId,
-        domain: netstack3_core::routes::MarkDomain,
-    ) -> netstack3_core::routes::Mark;
+    fn get_mark(ctx: &mut Ctx, id: &Self::SocketId, domain: MarkDomain) -> Mark;
 
     fn set_send_buffer(ctx: &mut Ctx, id: &Self::SocketId, send_buffer: usize);
     fn get_send_buffer(ctx: &mut Ctx, id: &Self::SocketId) -> usize;
@@ -627,20 +618,11 @@ where
         ctx.api().udp().send_to(id, remote_ip, remote_port, body)
     }
 
-    fn set_mark(
-        ctx: &mut Ctx,
-        id: &Self::SocketId,
-        domain: netstack3_core::routes::MarkDomain,
-        mark: netstack3_core::routes::Mark,
-    ) {
+    fn set_mark(ctx: &mut Ctx, id: &Self::SocketId, domain: MarkDomain, mark: Mark) {
         ctx.api().udp().set_mark(id, domain, mark)
     }
 
-    fn get_mark(
-        ctx: &mut Ctx,
-        id: &Self::SocketId,
-        domain: netstack3_core::routes::MarkDomain,
-    ) -> netstack3_core::routes::Mark {
+    fn get_mark(ctx: &mut Ctx, id: &Self::SocketId, domain: MarkDomain) -> Mark {
         ctx.api().udp().get_mark(id, domain)
     }
 
@@ -1042,20 +1024,11 @@ where
         ctx.api().icmp_echo().send_to(id, remote_ip, body)
     }
 
-    fn set_mark(
-        ctx: &mut Ctx,
-        id: &Self::SocketId,
-        domain: netstack3_core::routes::MarkDomain,
-        mark: netstack3_core::routes::Mark,
-    ) {
+    fn set_mark(ctx: &mut Ctx, id: &Self::SocketId, domain: MarkDomain, mark: Mark) {
         ctx.api().icmp_echo().set_mark(id, domain, mark)
     }
 
-    fn get_mark(
-        ctx: &mut Ctx,
-        id: &Self::SocketId,
-        domain: netstack3_core::routes::MarkDomain,
-    ) -> netstack3_core::routes::Mark {
+    fn get_mark(ctx: &mut Ctx, id: &Self::SocketId, domain: MarkDomain) -> Mark {
         ctx.api().icmp_echo().get_mark(id, domain)
     }
 
@@ -1353,12 +1326,7 @@ where
     ) {
         let fposix_socket::SocketCreationOptions { marks, __source_breaking } = options;
         for (domain, mark) in marks.into_iter().map(fidl_fuchsia_net_ext::Marks::from).flatten() {
-            T::set_mark(
-                ctx,
-                &self.info.id,
-                domain.into_core(),
-                netstack3_core::routes::Mark(Some(mark)),
-            )
+            T::set_mark(ctx, &self.info.id, domain.into_core(), Mark(Some(mark)))
         }
     }
 

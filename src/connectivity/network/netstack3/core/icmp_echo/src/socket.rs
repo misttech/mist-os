@@ -28,9 +28,9 @@ use netstack3_base::socketmap::{IterShadows as _, SocketMap};
 use netstack3_base::sync::{RwLock, StrongRc};
 use netstack3_base::{
     AnyDevice, ContextPair, CoreTxMetadataContext, CounterContext, DeviceIdContext, IcmpIpExt,
-    Inspector, InspectorDeviceExt, LocalAddressError, PortAllocImpl, ReferenceNotifiers,
-    RemoveResourceResultWithContext, RngContext, SocketError, StrongDeviceIdentifier,
-    UninstantiableWrapper, WeakDeviceIdentifier,
+    Inspector, InspectorDeviceExt, LocalAddressError, Mark, MarkDomain, PortAllocImpl,
+    ReferenceNotifiers, RemoveResourceResultWithContext, RngContext, SocketError,
+    StrongDeviceIdentifier, UninstantiableWrapper, WeakDeviceIdentifier,
 };
 use netstack3_datagram::{
     self as datagram, DatagramApi, DatagramBindingsTypes, DatagramFlowId, DatagramSocketMapSpec,
@@ -41,8 +41,8 @@ use netstack3_datagram::{
 use netstack3_ip::icmp::{EchoTransportContextMarker, IcmpRxCounters};
 use netstack3_ip::socket::SocketHopLimits;
 use netstack3_ip::{
-    IpHeaderInfo, IpTransportContext, LocalDeliveryPacketInfo, Mark, MarkDomain,
-    MulticastMembershipHandler, ReceiveIpPacketMeta, TransportIpContext, TransportReceiveError,
+    IpHeaderInfo, IpTransportContext, LocalDeliveryPacketInfo, MulticastMembershipHandler,
+    ReceiveIpPacketMeta, TransportIpContext, TransportReceiveError,
 };
 use packet::{BufferMut, ParsablePacket as _, ParseBuffer as _, Serializer};
 use packet_formats::icmp::{IcmpEchoReply, IcmpEchoRequest, IcmpPacketBuilder, IcmpPacketRaw};
