@@ -316,10 +316,9 @@ impl CgroupState {
         // SAFETY: static TempRefs are released after all signals are queued.
         let tasks = thread_group.read().tasks().map(TempRef::into_static).collect::<Vec<_>>();
         for task in tasks {
-            let waiter = Waiter::new();
-            let wait_canceler = self.wait_queue.wait_async(&waiter);
-            send_freeze_signal(&task, waiter, wait_canceler)
-                .expect("sending freeze signal should not fail");
+            let waiter = Waiter::new_ignoring_signals();
+            self.wait_queue.wait_async(&waiter);
+            send_freeze_signal(&task, waiter).expect("sending freeze signal should not fail");
         }
     }
 

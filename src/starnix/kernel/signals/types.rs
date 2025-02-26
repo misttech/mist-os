@@ -2,9 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::{
-    IntervalTimerHandle, ThreadGroupReadGuard, WaitCanceler, WaitQueue, Waiter, WaiterRef,
-};
+use crate::task::{IntervalTimerHandle, ThreadGroupReadGuard, WaitQueue, Waiter, WaiterRef};
 use starnix_sync::{InterruptibleEvent, RwLock};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS};
@@ -23,21 +21,19 @@ use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 /// Internal signal that cannot be masked, blocked or ignored.
 pub enum KernelSignal {
-    Freeze(Waiter, WaitCanceler),
+    Freeze(Waiter),
 }
 
 /// Signal info wrapper around user and internal signals.
 pub enum KernelSignalInfo {
     User(SignalInfo),
-    Freeze(Waiter, WaitCanceler),
+    Freeze(Waiter),
 }
 
 impl From<KernelSignal> for KernelSignalInfo {
     fn from(value: KernelSignal) -> Self {
         match value {
-            KernelSignal::Freeze(waiter, wait_canceler) => {
-                KernelSignalInfo::Freeze(waiter, wait_canceler)
-            }
+            KernelSignal::Freeze(waiter) => KernelSignalInfo::Freeze(waiter),
         }
     }
 }
@@ -103,6 +99,12 @@ pub enum RunState {
 
     /// This thread is blocked in an `InterruptibleEvent`.
     Event(Arc<InterruptibleEvent>),
+
+    /// This thread is frozen by a `Waiter`.
+    ///
+    /// When waiting on the `Waiter`, it should have a loop to prevent any signals except
+    /// notification.
+    Frozen(Waiter),
 }
 
 impl Default for RunState {
@@ -119,7 +121,7 @@ impl RunState {
         match self {
             RunState::Running => false,
             RunState::Waiter(waiter) => waiter.is_valid(),
-            RunState::Event(_) => true,
+            RunState::Event(_) | RunState::Frozen(_) => true,
         }
     }
 
@@ -129,6 +131,8 @@ impl RunState {
             RunState::Running => (),
             RunState::Waiter(waiter) => waiter.interrupt(),
             RunState::Event(event) => event.interrupt(),
+            // When frozen, the task immunes to any interrupts.
+            RunState::Frozen(_) => (),
         }
     }
 }
@@ -139,6 +143,7 @@ impl PartialEq<RunState> for RunState {
             (RunState::Running, RunState::Running) => true,
             (RunState::Waiter(lhs), RunState::Waiter(rhs)) => lhs == rhs,
             (RunState::Event(lhs), RunState::Event(rhs)) => Arc::ptr_eq(lhs, rhs),
+            (RunState::Frozen(lhs), RunState::Frozen(rhs)) => lhs == rhs,
             _ => false,
         }
     }
