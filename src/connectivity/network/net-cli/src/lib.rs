@@ -922,6 +922,19 @@ async fn do_if_config_set(
                         .get_or_insert(Default::default())
                         .temporary_address = Some(enabled);
                 }
+                "ipv6.ndp.dad.transmits" => {
+                    let transmits = value.parse::<u16>().map_err(|e| {
+                        user_facing_error(format!("failed to parse {value} as u16: {e}"))
+                    })?;
+                    config
+                        .ipv6
+                        .get_or_insert(Default::default())
+                        .ndp
+                        .get_or_insert(Default::default())
+                        .dad
+                        .get_or_insert(Default::default())
+                        .transmits = Some(transmits);
+                }
                 unknown_property => {
                     return Err(user_facing_error(format!(
                         "unknown configuration parameter: {unknown_property}"
