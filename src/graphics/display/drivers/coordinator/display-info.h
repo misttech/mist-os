@@ -21,6 +21,7 @@
 #include <fbl/string_printf.h>
 #include <fbl/vector.h>
 
+#include "src/graphics/display/drivers/coordinator/added-display-info.h"
 #include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
@@ -36,7 +37,8 @@ namespace display_coordinator {
 class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, display::DisplayId>,
                     public fbl::RefCounted<DisplayInfo> {
  public:
-  static zx::result<fbl::RefPtr<DisplayInfo>> Create(const raw_display_info_t& banjo_display_info);
+  // Consumes `added_display_info`.
+  static zx::result<fbl::RefPtr<DisplayInfo>> Create(AddedDisplayInfo&& added_display_info);
 
   DisplayInfo(const DisplayInfo&) = delete;
   DisplayInfo(DisplayInfo&&) = delete;

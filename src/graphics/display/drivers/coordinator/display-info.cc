@@ -27,6 +27,7 @@
 #include <fbl/string_printf.h>
 #include <pretty/hexdump.h>
 
+#include "src/graphics/display/drivers/coordinator/added-display-info.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
@@ -92,59 +93,39 @@ void DisplayInfo::InitializeInspect(inspect::Node* parent_node) {
 }
 
 // static
-zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(
-    const raw_display_info_t& banjo_display_info) {
-  display::DisplayId display_id = display::ToDisplayId(banjo_display_info.display_id);
-  ZX_DEBUG_ASSERT(display_id != display::kInvalidDisplayId);
+zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(AddedDisplayInfo&& added_display_info) {
+  ZX_DEBUG_ASSERT(added_display_info.display_id != display::kInvalidDisplayId);
+  display::DisplayId display_id = added_display_info.display_id;
 
   fbl::AllocChecker alloc_checker;
-  fbl::RefPtr<DisplayInfo> out = fbl::AdoptRef(new (&alloc_checker) DisplayInfo(display_id));
+  fbl::RefPtr<DisplayInfo> display_info =
+      fbl::AdoptRef(new (&alloc_checker) DisplayInfo(display_id));
   if (!alloc_checker.check()) {
+    FDF_LOG(ERROR, "Failed to allocate DisplayInfo for display ID: %" PRIu64, display_id.value());
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  out->pending_layer_change = false;
-  out->layer_count = 0;
+  display_info->pending_layer_change = false;
+  display_info->layer_count = 0;
 
-  fbl::Vector<display::PixelFormat> pixel_formats;
-  pixel_formats.reserve(banjo_display_info.pixel_formats_count, &alloc_checker);
-  if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "AddedDisplayInfo creation failed: out of memory allocating pixel formats");
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-  for (size_t i = 0; i < banjo_display_info.pixel_formats_count; ++i) {
-    const uint32_t banjo_pixel_format = banjo_display_info.pixel_formats_list[i];
-    if (!display::PixelFormat::IsSupported(banjo_pixel_format)) {
-      FDF_LOG(ERROR, "AddedDisplayInfo creation failed: unsupported pixel format %" PRIu32,
-              banjo_pixel_format);
-      return zx::error(ZX_ERR_INVALID_ARGS);
-    }
-    display::PixelFormat pixel_format(banjo_pixel_format);
+  display_info->pixel_formats = std::move(added_display_info.pixel_formats);
 
-    ZX_DEBUG_ASSERT(pixel_formats.size() < banjo_display_info.pixel_formats_count);
-    pixel_formats.push_back(pixel_format, &alloc_checker);
-    ZX_DEBUG_ASSERT(alloc_checker.check());
-  }
-  out->pixel_formats = std::move(pixel_formats);
+  if (!added_display_info.banjo_preferred_modes.is_empty()) {
+    ZX_DEBUG_ASSERT(added_display_info.banjo_preferred_modes.size() == 1);
 
-  if (banjo_display_info.preferred_modes_count != 0) {
-    ZX_DEBUG_ASSERT(banjo_display_info.preferred_modes_count == 1);
-
-    out->mode = display::ToDisplayTiming(banjo_display_info.preferred_modes_list[0]);
+    display_info->mode = display::ToDisplayTiming(added_display_info.banjo_preferred_modes[0]);
 
     // TODO(https://fxbug.dev/348695412): This should not be an early return.
     // `preferred_modes` should be merged and de-duplicated with the modes
     // decoded from the display's EDID, by the logic below.
-    return zx::ok(std::move(out));
+    return zx::ok(std::move(display_info));
   }
 
   auto edid_result = [&]() -> fit::result<const char*, Edid> {
-    if (banjo_display_info.edid_bytes_count != 0) {
-      std::span<const uint8_t> edid_bytes(banjo_display_info.edid_bytes_list,
-                                          banjo_display_info.edid_bytes_count);
+    if (!added_display_info.edid_bytes.is_empty()) {
       // TODO(https://fxbug.dev/348695412): Merge and de-duplicate the modes in
       // `preferred_modes` from the logic above.
-      return InitEdidFromBytes(edid_bytes);
+      return InitEdidFromBytes(added_display_info.edid_bytes);
     }
 
     return fit::error("Missing display hardware support information");
@@ -154,12 +135,12 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(
     FDF_LOG(ERROR, "Failed to initialize EDID: %s", edid_result.error_value());
     return zx::error(ZX_ERR_INTERNAL);
   }
-  out->edid = std::move(edid_result).value();
+  display_info->edid = std::move(edid_result).value();
 
   // TODO(https://fxbug.dev/343872853): Parse audio information from EDID.
 
   if (fdf::Logger::GlobalInstance()->GetSeverity() <= FUCHSIA_LOG_DEBUG) {
-    const auto& edid = out->edid->base;
+    const auto& edid = display_info->edid->base;
     std::string manufacturer_id = edid.GetManufacturerId();
     const char* manufacturer_name = edid.GetManufacturerName();
     const char* manufacturer =
@@ -173,7 +154,7 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(
             display_product_serial_number.c_str());
     edid.Print([](const char* str) { FDF_LOG(DEBUG, "%s", str); });
   }
-  return zx::ok(std::move(out));
+  return zx::ok(std::move(display_info));
 }
 
 int DisplayInfo::GetHorizontalSizeMm() const {

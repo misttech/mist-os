@@ -143,8 +143,17 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
 }
 
 zx::result<> Controller::AddDisplay(const raw_display_info_t& banjo_display_info) {
+  zx::result<std::unique_ptr<AddedDisplayInfo>> added_display_info_result =
+      AddedDisplayInfo::Create(banjo_display_info);
+  if (added_display_info_result.is_error()) {
+    // AddedDisplayInfo::Create() has already logged the error.
+    return added_display_info_result.take_error();
+  }
+  std::unique_ptr<AddedDisplayInfo> added_display_info =
+      std::move(added_display_info_result).value();
+
   zx::result<fbl::RefPtr<DisplayInfo>> display_info_result =
-      DisplayInfo::Create(banjo_display_info);
+      DisplayInfo::Create(std::move(*added_display_info));
   if (display_info_result.is_error()) {
     FDF_LOG(WARNING, "Failed to add display %" PRIu64 ": %s", banjo_display_info.display_id,
             display_info_result.status_string());

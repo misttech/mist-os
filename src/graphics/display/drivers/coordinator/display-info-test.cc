@@ -10,9 +10,13 @@
 #include <zircon/errors.h>
 #include <zircon/status.h>
 
+#include <utility>
+
 #include <gtest/gtest.h>
 
+#include "src/graphics/display/drivers/coordinator/added-display-info.h"
 #include "src/graphics/display/lib/edid-values/edid-values.h"
+#include "src/graphics/display/lib/edid/edid.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace display_coordinator {
@@ -38,10 +42,15 @@ TEST_F(DisplayInfoTest, InitializeWithEdidValueSingleBlock) {
       .pixel_formats_count = pixel_formats.size(),
   };
 
-  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result = DisplayInfo::Create(raw_display_info);
-  ASSERT_TRUE(display_info_result.is_ok())
-      << "Failed to create DisplayInfo: "
-      << zx_status_get_string(display_info_result.error_value());
+  zx::result<std::unique_ptr<AddedDisplayInfo>> added_display_info_result =
+      AddedDisplayInfo::Create(raw_display_info);
+  ASSERT_OK(added_display_info_result);
+  std::unique_ptr<AddedDisplayInfo> added_display_info =
+      std::move(added_display_info_result).value();
+
+  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result =
+      DisplayInfo::Create(std::move(*added_display_info));
+  ASSERT_OK(display_info_result);
 
   fbl::RefPtr<DisplayInfo> display_info = std::move(display_info_result).value();
   ASSERT_TRUE(display_info->edid.has_value());
@@ -67,10 +76,15 @@ TEST_F(DisplayInfoTest, InitializeWithEdidValueMultipleBlocks) {
       .pixel_formats_count = pixel_formats.size(),
   };
 
-  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result = DisplayInfo::Create(raw_display_info);
-  ASSERT_TRUE(display_info_result.is_ok())
-      << "Failed to create DisplayInfo: "
-      << zx_status_get_string(display_info_result.error_value());
+  zx::result<std::unique_ptr<AddedDisplayInfo>> added_display_info_result =
+      AddedDisplayInfo::Create(raw_display_info);
+  ASSERT_OK(added_display_info_result);
+  std::unique_ptr<AddedDisplayInfo> added_display_info =
+      std::move(added_display_info_result).value();
+
+  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result =
+      DisplayInfo::Create(std::move(*added_display_info));
+  ASSERT_OK(display_info_result);
 
   fbl::RefPtr<DisplayInfo> display_info = std::move(display_info_result).value();
   ASSERT_TRUE(display_info->edid.has_value());
@@ -100,7 +114,14 @@ TEST_F(DisplayInfoTest, InitializeWithEdidValueOfInvalidLength) {
       .pixel_formats_count = pixel_formats.size(),
   };
 
-  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result = DisplayInfo::Create(raw_display_info);
+  zx::result<std::unique_ptr<AddedDisplayInfo>> added_display_info_result =
+      AddedDisplayInfo::Create(raw_display_info);
+  ASSERT_OK(added_display_info_result);
+  std::unique_ptr<AddedDisplayInfo> added_display_info =
+      std::move(added_display_info_result).value();
+
+  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result =
+      DisplayInfo::Create(std::move(*added_display_info));
   ASSERT_FALSE(display_info_result.is_ok());
   EXPECT_STATUS(display_info_result.error_value(), ZX_ERR_INTERNAL);
 }
@@ -123,7 +144,14 @@ TEST_F(DisplayInfoTest, InitializeWithEdidValueIncomplete) {
       .pixel_formats_count = pixel_formats.size(),
   };
 
-  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result = DisplayInfo::Create(raw_display_info);
+  zx::result<std::unique_ptr<AddedDisplayInfo>> added_display_info_result =
+      AddedDisplayInfo::Create(raw_display_info);
+  ASSERT_OK(added_display_info_result);
+  std::unique_ptr<AddedDisplayInfo> added_display_info =
+      std::move(added_display_info_result).value();
+
+  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result =
+      DisplayInfo::Create(std::move(*added_display_info));
   ASSERT_FALSE(display_info_result.is_ok());
   EXPECT_STATUS(display_info_result.error_value(), ZX_ERR_INTERNAL);
 }
@@ -155,7 +183,14 @@ TEST_F(DisplayInfoTest, InitializeWithEdidValueNonDigitalDisplay) {
       .pixel_formats_count = pixel_formats.size(),
   };
 
-  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result = DisplayInfo::Create(raw_display_info);
+  zx::result<std::unique_ptr<AddedDisplayInfo>> added_display_info_result =
+      AddedDisplayInfo::Create(raw_display_info);
+  ASSERT_OK(added_display_info_result);
+  std::unique_ptr<AddedDisplayInfo> added_display_info =
+      std::move(added_display_info_result).value();
+
+  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result =
+      DisplayInfo::Create(std::move(*added_display_info));
   ASSERT_FALSE(display_info_result.is_ok());
   EXPECT_STATUS(display_info_result.error_value(), ZX_ERR_INTERNAL);
 }
