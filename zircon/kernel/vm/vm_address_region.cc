@@ -528,37 +528,6 @@ ktl::optional<vaddr_t> VmAddressRegion::CheckGapLocked(VmAddressRegionOrMapping*
   return va;
 }
 
-template <typename ON_VMAR, typename ON_MAPPING>
-zx_status_t VmAddressRegion::EnumerateChildrenInternalLocked(vaddr_t min_addr, vaddr_t max_addr,
-                                                             ON_VMAR on_vmar,
-                                                             ON_MAPPING on_mapping) {
-  canary_.Assert();
-
-  VmAddressRegionEnumerator<VmAddressRegionEnumeratorType::VmarsAndMappings> enumerator(
-      *this, min_addr, max_addr);
-  AssertHeld(enumerator.lock_ref());
-  while (auto result = enumerator.next()) {
-    // Lock is held over the entire duration so we can treat this as a raw pointer, knowing it will
-    // not go away.
-    VmAddressRegionOrMapping* curr = result->region_or_mapping;
-    if (VmMapping* mapping = curr->as_vm_mapping_ptr(); mapping) {
-      DEBUG_ASSERT(mapping != nullptr);
-      AssertHeld(mapping->lock_ref());
-      if (!on_mapping(mapping, this, result->depth)) {
-        return ZX_ERR_CANCELED;
-      }
-    } else {
-      VmAddressRegion* vmar = curr->as_vm_address_region_ptr();
-      DEBUG_ASSERT(vmar != nullptr);
-      AssertHeld(vmar->lock_ref());
-      if (!on_vmar(vmar, result->depth)) {
-        return ZX_ERR_CANCELED;
-      }
-    }
-  }
-  return ZX_OK;
-}
-
 zx_status_t VmAddressRegion::EnumerateChildren(VmEnumerator* ve) {
   canary_.Assert();
   DEBUG_ASSERT(ve != nullptr);
@@ -566,27 +535,37 @@ zx_status_t VmAddressRegion::EnumerateChildren(VmEnumerator* ve) {
   if (state_ != LifeCycleState::ALIVE) {
     return ZX_ERR_BAD_STATE;
   }
-  if (!ve->OnVmAddressRegion(this, 0)) {
-    return ZX_ERR_CANCELED;
+  zx_status_t status = ve->OnVmAddressRegion(this, 0, guard);
+  if (status != ZX_ERR_NEXT) {
+    if (status == ZX_ERR_STOP) {
+      return ZX_OK;
+    }
+    return status;
   }
-  return EnumerateChildrenLocked(ve);
-}
-
-zx_status_t VmAddressRegion::EnumerateChildrenLocked(VmEnumerator* ve) {
-  canary_.Assert();
-  DEBUG_ASSERT(ve != nullptr);
-
-  return EnumerateChildrenInternalLocked(
-      0, UINT64_MAX,
-      [ve](const VmAddressRegion* vmar, uint depth) {
-        AssertHeld(vmar->lock_ref());
-        return ve->OnVmAddressRegion(vmar, depth);
-      },
-      [ve](const VmMapping* map, const VmAddressRegion* vmar, uint depth) {
-        AssertHeld(vmar->lock_ref());
-        AssertHeld(map->lock_ref());
-        return ve->OnVmMapping(map, vmar, depth);
-      });
+  VmAddressRegionEnumerator<VmAddressRegionEnumeratorType::VmarsAndMappings> enumerator(*this, 0,
+                                                                                        UINT64_MAX);
+  AssertHeld(enumerator.lock_ref());
+  while (auto result = enumerator.next()) {
+    enumerator.pause();
+    if (VmMapping* mapping = result->region_or_mapping->as_vm_mapping_ptr(); mapping) {
+      DEBUG_ASSERT(mapping != nullptr);
+      AssertHeld(mapping->lock_ref());
+      status = ve->OnVmMapping(mapping, this, result->depth, guard);
+    } else {
+      VmAddressRegion* vmar = result->region_or_mapping->as_vm_address_region_ptr();
+      DEBUG_ASSERT(vmar != nullptr);
+      AssertHeld(vmar->lock_ref());
+      status = ve->OnVmAddressRegion(vmar, result->depth, guard);
+    }
+    if (status != ZX_ERR_NEXT) {
+      if (status == ZX_ERR_STOP) {
+        return ZX_OK;
+      }
+      return status;
+    }
+    enumerator.resume();
+  }
+  return ZX_OK;
 }
 
 bool VmAddressRegion::has_parent() const {

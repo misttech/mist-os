@@ -716,10 +716,10 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
     return base >= base_ && offset < size_ && size_ - offset >= size;
   }
 
-  // Traverses this vmar (and any sub-vmars) starting at this node, in depth-first pre-order. If any
-  // methods of |ve| return false, the traversal stops and this method returns ZX_ERR_CANCELED. If
-  // this vmar is not alive (in the LifeCycleState sense) or otherwise not enumerable this returns
-  // ZX_ERR_BAD_STATE, otherwise ZX_OK is returned if traversal completes successfully.
+  // Traverses this vmar (and any sub-vmars) starting at this node, in depth-first pre-order. See
+  // VmEnumerator for more details. If this vmar is not alive (in the LifeCycleState sense) or
+  // otherwise not enumerable this returns ZX_ERR_BAD_STATE, otherwise the result of enumeration is
+  // returned.
   zx_status_t EnumerateChildren(VmEnumerator* ve) TA_EXCL(lock());
 
  protected:
@@ -730,10 +730,6 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
   explicit VmAddressRegion(VmAspace& kernel_aspace);
   // Count the allocated pages, caller must be holding the aspace lock
   AttributionCounts GetAttributedMemoryLocked() TA_REQ(lock()) override;
-
-  // Used to implement VmAspace::EnumerateChildren and VmAddressRegion::EnumerateChildren.
-  // |aspace_->lock()| must be held.
-  zx_status_t EnumerateChildrenLocked(VmEnumerator* ve) TA_REQ(lock());
 
   zx_status_t SetMemoryPriorityLocked(MemoryPriority priority) override TA_REQ(lock());
   void CommitHighMemoryPriority() override TA_EXCL(lock());
@@ -788,10 +784,6 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
   zx_status_t AllocSpotLocked(size_t size, uint8_t align_pow2, uint arch_mmu_flags, vaddr_t* spot,
                               vaddr_t upper_limit = ktl::numeric_limits<vaddr_t>::max())
       TA_REQ(lock());
-
-  template <typename ON_VMAR, typename ON_MAPPING>
-  zx_status_t EnumerateChildrenInternalLocked(vaddr_t min_addr, vaddr_t max_addr, ON_VMAR on_vmar,
-                                              ON_MAPPING on_mapping) TA_REQ(lock());
 
   RegionList<VmAddressRegionOrMapping> subregions_ TA_GUARDED(lock());
 
@@ -1251,21 +1243,27 @@ class VmMapping final : public VmAddressRegionOrMapping {
 };
 
 // Interface for walking a VmAspace-rooted VmAddressRegion/VmMapping tree.
-// Override this class and pass an instance to VmAspace::EnumerateChildren().
+// Override this class and pass an instance to VmAddressRegion::EnumerateChildren().
+// VmAddressRegion::EnumerateChildren() will call the On* methods in depth-first pre-order.
+// ZX_ERR_NEXT and ZX_ERR_STOP can be used to control iteration, with any other status becoming the
+// return value of this method. The root VmAspace's lock is held during the traversal and passed in
+// to the callbacks as |guard|. A callback is permitted to temporarily drop the lock, using
+// |CallUnlocked|, although doing so invalidates the pointers and to use them without the lock held,
+// of after it is reacquired, they should first be turned into a RefPtr, with the caveat that they
+// might now refer to a dead, aka unmapped, object.
 class VmEnumerator {
  public:
-  // VmAspace::EnumerateChildren() will call the On* methods in depth-first
-  // pre-order. If any call returns false, the traversal will stop. The root
-  // VmAspace's lock will be held during the entire traversal.
   // |depth| will be 0 for the root VmAddressRegion.
-  virtual bool OnVmAddressRegion(const VmAddressRegion* vmar, uint depth) TA_REQ(vmar->lock()) {
-    return true;
+  virtual zx_status_t OnVmAddressRegion(const VmAddressRegion* vmar, uint depth,
+                                        Guard<CriticalMutex>& guard) TA_REQ(vmar->lock()) {
+    return ZX_ERR_NEXT;
   }
 
-  // |vmar| is the parent of |map|. The root VmAspace's lock will be held when this is called.
-  virtual bool OnVmMapping(const VmMapping* map, const VmAddressRegion* vmar, uint depth)
-      TA_REQ(map->lock()) TA_REQ(vmar->lock()) {
-    return true;
+  // |vmar| is the parent of |map|.
+  virtual zx_status_t OnVmMapping(const VmMapping* map, const VmAddressRegion* vmar, uint depth,
+                                  Guard<CriticalMutex>& guard) TA_REQ(map->lock())
+      TA_REQ(vmar->lock()) {
+    return ZX_ERR_NEXT;
   }
 
  protected:

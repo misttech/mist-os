@@ -663,13 +663,13 @@ void DumpAllVmObjects(bool hidden_only, pretty::SizeUnit format_unit) {
 class AspaceVmoDumper final : public VmEnumerator {
  public:
   explicit AspaceVmoDumper(pretty::SizeUnit format_unit) : format_unit_(format_unit) {}
-  bool OnVmMapping(const VmMapping* map, const VmAddressRegion* vmar, uint depth) final
-      TA_REQ(map->lock()) TA_REQ(vmar->lock()) {
+  zx_status_t OnVmMapping(const VmMapping* map, const VmAddressRegion* vmar, uint depth,
+                          Guard<CriticalMutex>&) final TA_REQ(map->lock()) TA_REQ(vmar->lock()) {
     auto vmo = map->vmo_locked();
     DumpVmObject(*vmo, format_unit_, ZX_HANDLE_INVALID,
                  /* rights */ 0u,
                  /* koid */ vmo->user_id());
-    return true;
+    return ZX_ERR_NEXT;
   }
 
  private:
@@ -775,8 +775,8 @@ void KillProcess(zx_koid_t id) {
 // Counts memory usage under a VmAspace.
 class VmCounter final : public VmEnumerator {
  public:
-  bool OnVmMapping(const VmMapping* map, const VmAddressRegion* vmar, uint depth)
-      TA_REQ(map->lock()) TA_REQ(vmar->lock()) override {
+  zx_status_t OnVmMapping(const VmMapping* map, const VmAddressRegion* vmar, uint depth,
+                          Guard<CriticalMutex>&) TA_REQ(map->lock()) TA_REQ(vmar->lock()) override {
     usage.mapped_bytes += map->size_locked();
 
     auto vmo = map->vmo_locked();
@@ -801,7 +801,7 @@ class VmCounter final : public VmEnumerator {
       usage.shared_bytes += counts.uncompressed_bytes;
       usage.scaled_shared_bytes += counts.scaled_uncompressed_bytes / share_count;
     }
-    return true;
+    return ZX_ERR_NEXT;
   }
 
   VmAspace::vm_usage_t usage = {};
@@ -913,29 +913,34 @@ class RestartableVmEnumerator {
    public:
     Enumerator(RestartableVmEnumerator* parent) : parent_(parent) {}
 
-    bool OnVmAddressRegion([[maybe_unused]] const VmAddressRegion* vmar,
-                           [[maybe_unused]] uint depth) override {
+    zx_status_t OnVmAddressRegion([[maybe_unused]] const VmAddressRegion* vmar,
+                                  [[maybe_unused]] uint depth, Guard<CriticalMutex>&) override {
       if constexpr (EnumerateVmar) {
         return parent_->DoEntry(
-            [vmar, depth, this] { IMPL::MakeVmarEntry(vmar, depth, &parent_->entry_); },
-            vmar->base(), depth);
+                   [vmar, depth, this] { IMPL::MakeVmarEntry(vmar, depth, &parent_->entry_); },
+                   vmar->base(), depth)
+                   ? ZX_ERR_NEXT
+                   : ZX_ERR_CANCELED;
       }
-      return true;
+      return ZX_ERR_NEXT;
     }
 
-    bool OnVmMapping([[maybe_unused]] const VmMapping* map,
-                     [[maybe_unused]] const VmAddressRegion* vmar, [[maybe_unused]] uint depth)
-        TA_REQ(map->lock()) TA_REQ(vmar->lock()) override {
+    zx_status_t OnVmMapping([[maybe_unused]] const VmMapping* map,
+                            [[maybe_unused]] const VmAddressRegion* vmar,
+                            [[maybe_unused]] uint depth, Guard<CriticalMutex>&) TA_REQ(map->lock())
+        TA_REQ(vmar->lock()) override {
       if constexpr (EnumerateMapping == MappingEnumeration::Mapping) {
         return parent_->DoEntry(
-            [map, vmar, depth, this]() {
-              // These are true as they are required for calling OnVmMapping, but we cannot pass
-              // the capabilities easily via DoEntry to this callback.
-              AssertHeld(map->lock_ref());
-              AssertHeld(vmar->lock_ref());
-              IMPL::MakeMappingEntry(map, vmar, depth, &parent_->entry_);
-            },
-            map->base_locked(), depth);
+                   [map, vmar, depth, this]() {
+                     // These are true as they are required for calling OnVmMapping, but we cannot
+                     // pass the capabilities easily via DoEntry to this callback.
+                     AssertHeld(map->lock_ref());
+                     AssertHeld(vmar->lock_ref());
+                     IMPL::MakeMappingEntry(map, vmar, depth, &parent_->entry_);
+                   },
+                   map->base_locked(), depth)
+                   ? ZX_ERR_NEXT
+                   : ZX_ERR_CANCELED;
       } else if constexpr (EnumerateMapping == MappingEnumeration::Protection) {
         struct {
           const VmMapping* map;
@@ -965,11 +970,11 @@ class RestartableVmEnumerator {
         // due to needing to fault in more of the user buffer.
         DEBUG_ASSERT_MSG(result == ZX_OK || result == ZX_ERR_BUFFER_TOO_SMALL,
                          "Unexpected status %d\n", result);
-        return result == ZX_OK ? true : false;
+        return result == ZX_OK ? ZX_ERR_NEXT : ZX_ERR_CANCELED;
       } else {
         static_assert(EnumerateMapping == MappingEnumeration::None);
       }
-      return true;
+      return ZX_ERR_NEXT;
     }
 
    private:
