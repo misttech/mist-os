@@ -808,7 +808,8 @@ bool VmCowPages::DedupZeroPage(vm_page_t* page, uint64_t offset) {
 
   RangeChangeUpdateSelfLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::RemoveWrite,
                               RangeChangeChildren::Deferred);
-  RangeChangeUpdateCowChildrenLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::RemoveWrite);
+  // No range change needs to be processed for the children since children, by virtue of being
+  // copy-on-write, cannot have a writable mapping.
 
   if (IsZeroPage(page_or_marker->Page())) {
     // Replace the slot with a marker.
@@ -5479,7 +5480,8 @@ zx_status_t VmCowPages::WritebackBeginLocked(VmCowRange range, bool is_zero_rang
   const VmCowRange range_update = VmCowRange(start_offset, end_offset - start_offset);
   RangeChangeUpdateSelfLocked(range_update, RangeChangeOp::RemoveWrite,
                               RangeChangeChildren::Deferred);
-  RangeChangeUpdateCowChildrenLocked(range_update, RangeChangeOp::RemoveWrite);
+  // No range change needs to be processed for the children since children, by virtue of being
+  // copy-on-write, cannot have a writable mapping.
 
   VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
   return ZX_OK;
