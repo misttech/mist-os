@@ -856,6 +856,10 @@ impl ImageAssemblyConfigBuilder {
             images_config,
         } = self;
 
+        if !boot_args.is_empty() {
+            bail!("Found additional boot args")
+        }
+
         let cmc_tool = tools.get_tool("cmc")?;
 
         // Add dynamically compiled packages first so they are all present
@@ -1519,7 +1523,7 @@ mod tests {
                 args: vec!["kernel_arg0".into()],
             }),
             qemu_kernel: Some("path/to/qemu/kernel".into()),
-            boot_args: vec!["boot_arg0".into()],
+            boot_args: vec![],
             bootfs_files: vec![],
             bootfs_packages: vec![],
             packages: vec![
@@ -1654,7 +1658,7 @@ mod tests {
                 vars.outdir.join("config/package_manifest.json"),
             ]
         );
-        assert_eq!(result.boot_args, vec!("boot_arg0".to_string()));
+        assert!(result.boot_args.is_empty());
         assert_eq!(
             result
                 .bootfs_files
@@ -1705,7 +1709,7 @@ mod tests {
                 vars.outdir.join("config/package_manifest.json"),
             ]
         );
-        assert_eq!(result.boot_args, vec!("boot_arg0".to_string()));
+        assert!(result.boot_args.is_empty());
         assert_eq!(
             result
                 .bootfs_files
@@ -1756,7 +1760,7 @@ mod tests {
                 vars.outdir.join("config/package_manifest.json"),
             ]
         );
-        assert_eq!(result.boot_args, vec!("boot_arg0".to_string()));
+        assert!(result.boot_args.is_empty());
         assert_eq!(
             result
                 .bootfs_files
