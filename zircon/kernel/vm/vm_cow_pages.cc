@@ -1051,9 +1051,10 @@ zx_status_t VmCowPages::ReplaceWithHiddenNodeLocked(fbl::RefPtr<VmCowPages>* rep
   // nodes are immutable, even for pages that the clone cannot see we want the parent_clone to
   // move them back out before modifying them.
   // Note: We could eagerly move these pages into the parent_clone instead.
+  // Bi-directional clones may not themselves already have children, so we are able to assume an
+  // absence here when performing the range update.
   RangeChangeUpdateSelfLocked(VmCowRange(0, size_), RangeChangeOp::RemoveWrite,
-                              RangeChangeChildren::Deferred);
-  RangeChangeUpdateCowChildrenLocked(VmCowRange(0, size_), RangeChangeOp::RemoveWrite);
+                              RangeChangeChildren::AssumeNone);
 
   VmCowPagesOptions options = inheritable_options();
   fbl::AllocChecker ac;
