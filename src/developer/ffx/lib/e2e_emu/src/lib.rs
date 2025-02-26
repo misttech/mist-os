@@ -19,16 +19,11 @@ use std::sync::Mutex;
 use tempfile::TempDir;
 use tracing::info;
 
-struct EmuState {
-    emu: std::process::Child,
-}
-
 /// An isolated environment for testing ffx against a running emulator.
 pub struct IsolatedEmulator {
     emu_name: String,
     package_server_name: String,
     ffx_isolate: Isolate,
-    emu_state: Mutex<Option<EmuState>>,
     children: Mutex<Vec<std::process::Child>>,
 
     // We need to hold the below variables but not interact with them.
@@ -82,7 +77,6 @@ impl IsolatedEmulator {
             package_server_name,
             ffx_isolate,
             _temp_dir: temp_dir,
-            emu_state: Mutex::new(None),
             children: Mutex::new(vec![]),
         };
 
@@ -103,29 +97,27 @@ impl IsolatedEmulator {
         let emulator_log = this.ffx_isolate.log_dir().join("emulator.log").display().to_string();
         let product_bundle_path = std::env::var("PRODUCT_BUNDLE_PATH")
             .expect("PRODUCT_BUNDLE_PATH env var must be set -- run this test with 'fx test'");
-        let mut emulator_cmd = this
-            .ffx_isolate
-            .make_ffx_cmd(&[
-                "emu",
-                "start",
-                "--headless",
-                "--net",
-                "user",
-                "--name",
-                &this.emu_name,
-                "--log",
-                &*emulator_log,
-                "--startup-timeout",
-                "120",
-                "--kernel-args",
-                "TERM=dumb",
-                &product_bundle_path,
-            ])
-            .context("creating emulator command")?;
 
-        let emu = emulator_cmd.spawn().context("spawning emulator command")?;
-
-        *this.emu_state.lock().unwrap() = Some(EmuState { emu });
+        // start the emulator. The start command returns when the emulator has started and an RCS connection
+        // can be made, or when the timeout was reached.
+        this.ffx(&[
+            "emu",
+            "start",
+            "--headless",
+            "--net",
+            "user",
+            "--name",
+            &this.emu_name,
+            "--log",
+            &*emulator_log,
+            "--startup-timeout",
+            "120",
+            "--kernel-args",
+            "TERM=dumb",
+            &product_bundle_path,
+        ])
+        .await
+        .context("running emulator command")?;
 
         info!("streaming system logs to output directory");
         let mut system_logs_command = this
@@ -350,14 +342,17 @@ impl IsolatedEmulator {
     }
 
     pub async fn stop(&self) {
+        match self.ffx(&["repository", "server", "stop", &self.package_server_name]).await {
+            Ok(_) => (),
+            Err(e) => {
+                tracing::error!("Error stopping repo server {}: {e}.", self.package_server_name)
+            }
+        };
+
         match self.ffx(&["emu", "stop", &self.emu_name]).await {
             Ok(()) => return,
             Err(e) => {
-                tracing::error!("Error stopping {}: {e}. Cleaning up manually.", self.emu_name);
-                let mut emu = self.emu_state.lock().unwrap();
-                if let Some(ref mut c) = emu.as_mut() {
-                    c.emu.kill().ok();
-                }
+                tracing::error!("Error stopping {}: {e}.", self.emu_name);
             }
         }
     }
@@ -372,11 +367,6 @@ impl Drop for IsolatedEmulator {
             for child in children.iter_mut() {
                 child.kill().ok();
             }
-        }
-
-        let mut emu = self.emu_state.lock().unwrap();
-        if let Some(ref mut c) = emu.take() {
-            c.emu.kill().ok();
         }
 
         info!(
