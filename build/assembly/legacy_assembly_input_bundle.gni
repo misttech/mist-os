@@ -256,7 +256,6 @@ template("legacy_assembly_input_bundle") {
   }
 
   # Construct a list of bootfs packages.
-  # Ignores any fuchsia_driver_packages and fuchsia_shell_packages
   package_manifests_list(labels.bootfs_package_list) {
     forward_variables_from(invoker,
                            [
@@ -425,15 +424,6 @@ template("legacy_assembly_input_bundle") {
       ":${labels.cache_package_list}",
       ":${labels.kernel_cmdline_args}",
     ]
-
-    if (_shell_command_packages != []) {
-      args += [
-        "--shell-commands-packages-list",
-        rebase_path(files.shell_command_manifests_list, root_build_dir),
-      ]
-      inputs += [ files.shell_command_manifests_list ]
-      deps += [ ":${labels.shell_commands_manifest_list}" ]
-    }
 
     if (_core_realm_definition != false) {
       args += [

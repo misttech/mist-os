@@ -130,16 +130,6 @@ import("fuchsia_package.gni")
 #     additively.
 #     Type: list of scopes
 #
-#   shell_commands (optional)
-#     An explicit list of dependencies included as part of the fuchsia package invocation that are
-#     shell command dependencies to include in the shell command distribution manifest and it's
-#     subsequent metadata walk
-#
-#   is_shell_package (optional)
-#     Used internally to implement fuchsia_shell_package(). Use with caution, as this flag marks
-#     all the package's binaries as shell commands and includes them in the shell_commands package
-#     during the generation of the legacy_assembly_input_bundle
-#
 #   data_deps
 #   deps
 #   testonly
@@ -174,10 +164,6 @@ template("fuchsia_package_with_single_component") {
       deps = []
     }
 
-    if (defined(invoker.shell_commands)) {
-      deps += invoker.shell_commands
-    }
-
     component_name = component_name
     visibility = [ ":*" ]
   }
@@ -186,8 +172,6 @@ template("fuchsia_package_with_single_component") {
     forward_variables_from(invoker,
                            [
                              "applicable_licenses",
-                             "is_shell_package",
-                             "shell_commands",
                              "disable_elf_binaries_checks",
                              "validate_structured_config",
                              "repository",

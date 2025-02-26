@@ -64,7 +64,7 @@ declare_args() {
   #
   # They will be compiled, and published, but not added as dependencies of the
   # assembled images, and so will not be able to cause the inclusion of
-  # 'config_data' or 'shell_command' entries.
+  # entries to the legacy bundle.
   #
   # As these cannot be part of the legacy AIB for a product, there is no
   # "legacy" version of this argument.
