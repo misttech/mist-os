@@ -57,6 +57,10 @@ impl TimeMatrixCalls {
         }
         calls
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.calls.is_empty()
+    }
 }
 
 #[derive(Clone)]
