@@ -1284,6 +1284,10 @@ impl CurrentTask {
     /// If you just need a kernel task, and not an entire userspace process, consider using
     /// `create_system_task` instead. Even better, consider using the `kthreads` threadpool.
     ///
+    /// If `seclabel` is set, or the container specified a `default_seclabel`, then it will be
+    /// resolved against the `kernel`'s active security policy, and applied to the new task.
+    /// Otherwise the task will inherit its LSM state from the "init" task.
+    ///
     /// This function creates an underlying Zircon process to host the new task.
     pub fn create_init_child_process<L>(
         locked: &mut Locked<'_, L>,
@@ -1298,9 +1302,13 @@ impl CurrentTask {
         let weak_init = kernel.pids.read().get_task(1);
         let init_task = weak_init.upgrade().ok_or_else(|| errno!(EINVAL))?;
         let initial_name_bytes = initial_name.as_bytes().to_owned();
-        let security_context = match seclabel {
-            Some(s) => security::task_for_context(&init_task, s.as_bytes().into())?,
-            None => security::task_alloc(&init_task, 0),
+
+        let security_context = if let Some(seclabel) = seclabel {
+            security::task_for_context(&init_task, seclabel.as_bytes().into())?
+        } else if let Some(default_seclabel) = kernel.features.default_seclabel.as_ref() {
+            security::task_for_context(&init_task, default_seclabel.as_bytes().into())?
+        } else {
+            security::task_alloc(&init_task, 0)
         };
 
         let task = Self::create_task(
