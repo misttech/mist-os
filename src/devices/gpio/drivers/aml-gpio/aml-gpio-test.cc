@@ -110,7 +110,7 @@ class FakePlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_dev
 
   void GetMetadata(fuchsia_hardware_platform_device::wire::DeviceGetMetadataRequest* request,
                    GetMetadataCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+    completer.ReplyError(ZX_ERR_NOT_FOUND);
   }
 
   void handle_unknown_method(
