@@ -230,8 +230,7 @@ void TraceSession::CheckAllProvidersStarted() {
       std::accumulate(tracees_.begin(), tracees_.end(), true, [](bool value, const auto& tracee) {
         bool ready = (tracee->state() == Tracee::State::kStarted ||
                       // If a provider fails to start continue tracing.
-                      // TODO(https://fxbug.dev/42096895): We should still record what providers
-                      // failed to start (but is that done in timeout handling?).
+                      // We warn which providers failed to start in the timeout handling.
                       tracee->state() == Tracee::State::kStopped);
         FX_LOGS(DEBUG) << "tracee " << *tracee->bundle() << (ready ? "" : " not") << " ready";
         return value && ready;
@@ -255,8 +254,6 @@ void TraceSession::NotifyStarted() {
     callback(std::move(result));
   }
 }
-
-void TraceSession::FinishStartingDueToTimeout() { NotifyStarted(); }
 
 void TraceSession::OnProviderStopped(TraceProviderBundle* bundle, bool write_results) {
   auto it = std::find_if(tracees_.begin(), tracees_.end(),
@@ -327,19 +324,6 @@ void TraceSession::NotifyStopped() {
   }
 }
 
-void TraceSession::FinishStoppingDueToTimeout() {
-  if (state_ == State::kStopping) {
-    FX_LOGS(DEBUG) << "Marking session as stopped, timed out waiting for tracee(s)";
-    TransitionToState(State::kStopped);
-    for (auto& tracee : tracees_) {
-      if (tracee->state() != Tracee::State::kStopped)
-        FX_LOGS(WARNING) << "Timed out waiting for trace provider " << *tracee->bundle()
-                         << " to stop";
-    }
-    NotifyStopped();
-  }
-}
-
 void TraceSession::OnProviderTerminated(TraceProviderBundle* bundle) {
   auto it = std::find_if(tracees_.begin(), tracees_.end(),
                          [bundle](const auto& tracee) { return *tracee == bundle; });
@@ -384,7 +368,39 @@ void TraceSession::TerminateSessionIfEmpty() {
   }
 }
 
-void TraceSession::FinishTerminatingDueToTimeout() {
+void TraceSession::SessionStartTimeout(async_dispatcher_t* dispatcher, async::TaskBase* task,
+                                       zx_status_t status) {
+  FX_LOGS(WARNING) << "Timed out waiting for one or more providers to ack the start request";
+  for (auto& tracee : tracees_) {
+    if (tracee->state() != Tracee::State::kStarted) {
+      FX_LOGS(WARNING) << "Timed out waiting for trace provider " << *tracee->bundle()
+                       << " to start";
+    }
+  }
+  NotifyStarted();
+}
+
+void TraceSession::SessionStopTimeout(async_dispatcher_t* dispatcher, async::TaskBase* task,
+                                      zx_status_t status) {
+  FX_LOGS(WARNING) << "Timed out waiting for one or more providers to ack the stop request";
+
+  if (state_ == State::kStopping) {
+    FX_LOGS(DEBUG) << "Marking session as stopped, timed out waiting for tracee(s)";
+    TransitionToState(State::kStopped);
+    for (auto& tracee : tracees_) {
+      if (tracee->state() != Tracee::State::kStopped) {
+        FX_LOGS(WARNING) << "Timed out waiting for trace provider " << *tracee->bundle()
+                         << " to stop";
+      }
+    }
+    NotifyStopped();
+  }
+}
+
+void TraceSession::SessionTerminateTimeout(async_dispatcher_t* dispatcher, async::TaskBase* task,
+                                           zx_status_t status) {
+  FX_LOGS(WARNING) << "Timed out waiting for one or more providers to ack the terminate request";
+
   // We do not consider pending_start_tracees_ here as we only
   // terminate them as a best effort.
   if (state_ == State::kTerminating && !tracees_.empty()) {
@@ -400,24 +416,6 @@ void TraceSession::FinishTerminatingDueToTimeout() {
     FX_DCHECK(callback);
     callback();
   }
-}
-
-void TraceSession::SessionStartTimeout(async_dispatcher_t* dispatcher, async::TaskBase* task,
-                                       zx_status_t status) {
-  FX_LOGS(WARNING) << "Waiting for start timed out.";
-  FinishStartingDueToTimeout();
-}
-
-void TraceSession::SessionStopTimeout(async_dispatcher_t* dispatcher, async::TaskBase* task,
-                                      zx_status_t status) {
-  FX_LOGS(WARNING) << "Waiting for stop timed out.";
-  FinishStoppingDueToTimeout();
-}
-
-void TraceSession::SessionTerminateTimeout(async_dispatcher_t* dispatcher, async::TaskBase* task,
-                                           zx_status_t status) {
-  FX_LOGS(WARNING) << "Waiting for termination timed out.";
-  FinishTerminatingDueToTimeout();
 }
 
 void TraceSession::RemoveDeadProvider(TraceProviderBundle* bundle) {
