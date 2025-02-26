@@ -3380,14 +3380,14 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
       *zeroed_len_out = page_end_base - page_start_base;
       return ZX_OK;
     }
-
-    // Unmap any page that is touched by this range in any of our, or our childrens, mapping
-    // regions. We do this on the assumption we are going to be able to free pages either completely
-    // or by turning them into markers and it's more efficient to unmap once in bulk here.
-    const VmCowRange range = VmCowRange(page_start_base, page_end_base - page_start_base);
-    RangeChangeUpdateSelfLocked(range, RangeChangeOp::Unmap, RangeChangeChildren::Deferred);
-    RangeChangeUpdateCowChildrenLocked(range, RangeChangeOp::Unmap);
   }
+
+  // Unmap any page that is touched by this range in any of our, or our childrens, mapping
+  // regions. We do this on the assumption we are going to be able to free pages either completely
+  // or by turning them into markers and it's more efficient to unmap once in bulk here.
+  const VmCowRange range = VmCowRange(page_start_base, page_end_base - page_start_base);
+  RangeChangeUpdateSelfLocked(range, RangeChangeOp::Unmap, RangeChangeChildren::Deferred);
+  RangeChangeUpdateCowChildrenLocked(range, RangeChangeOp::Unmap);
 
   // Pages removed from this object are put into freed_list, while pages removed from any ancestor
   // are put into ancestor_freed_list. This is so that freeing of both the lists can be handled
