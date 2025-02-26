@@ -13,7 +13,7 @@
 use std::borrow::Cow;
 use std::sync::{Arc, Weak};
 
-use starnix_core::task::CurrentTask;
+use starnix_core::task::{CgroupOps, CurrentTask};
 use starnix_core::vfs::{
     FileObject, FileOps, FsNodeOps, InputBuffer, OutputBuffer, SimpleFileNode,
 };
@@ -22,8 +22,6 @@ use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::vfs::FdEvents;
-
-use crate::cgroup::CgroupOps;
 
 pub struct EventsFile {
     cgroup: Weak<dyn CgroupOps>,

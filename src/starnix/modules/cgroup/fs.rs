@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use starnix_core::task::CurrentTask;
+use starnix_core::task::{Cgroup, CgroupOps, CgroupRoot, CurrentTask};
 use starnix_core::vfs::{
     CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNodeHandle,
     FsNodeInfo, FsStr,
 };
-use starnix_sync::{FileOpsCore, Locked, Unlocked};
+use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, mode, statfs, CGROUP2_SUPER_MAGIC, CGROUP_SUPER_MAGIC};
 
-use crate::cgroup::{Cgroup, CgroupOps, CgroupRoot};
-use starnix_sync::Mutex;
 use std::collections::HashMap;
 use std::sync::{Arc, Weak};
 
@@ -155,5 +153,31 @@ impl Hierarchy {
         let id = cgroup.id();
         let mut nodes = self.nodes.lock();
         nodes.remove(&id).ok_or_else(|| errno!(ENOENT))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::CgroupV2Fs;
+
+    use starnix_core::testing::create_kernel_task_and_unlocked;
+    use starnix_core::vfs::fs_registry::FsRegistry;
+
+    #[::fuchsia::test]
+    async fn test_filesystem_creates_nodes() {
+        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let registry = kernel.expando.get::<FsRegistry>();
+        registry.register(b"cgroup2".into(), CgroupV2Fs::new_fs);
+
+        let fs = current_task
+            .create_filesystem(&mut locked, b"cgroup2".into(), Default::default())
+            .expect("create_filesystem");
+
+        let cgroupfs = fs.downcast_ops::<CgroupV2Fs>().expect("downcast_ops");
+        let hierarchy = cgroupfs.hierarchy.clone();
+        assert!(hierarchy.nodes.lock().is_empty(), "new filesystem does not contain nodes");
+
+        let root_dir = hierarchy.root.clone();
+        assert!(root_dir.has_interface_files(), "root directory is initialized");
     }
 }

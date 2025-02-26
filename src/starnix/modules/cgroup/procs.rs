@@ -11,7 +11,7 @@
 
 use std::sync::{Arc, Weak};
 
-use starnix_core::task::{CurrentTask, ProcessEntryRef};
+use starnix_core::task::{CgroupOps, CurrentTask, ProcessEntryRef};
 use starnix_core::vfs::{
     AppendLockGuard, DynamicFile, DynamicFileBuf, DynamicFileSource, FileObject, FileOps, FsNode,
     FsNodeOps, InputBuffer,
@@ -24,8 +24,6 @@ use starnix_types::ownership::TempRef;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, error, pid_t};
-
-use crate::cgroup::CgroupOps;
 
 pub struct ControlGroupNode {
     cgroup: Weak<dyn CgroupOps>,

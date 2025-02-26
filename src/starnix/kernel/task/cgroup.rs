@@ -27,6 +27,21 @@ pub enum FreezerState {
     Frozen,
 }
 
+impl Default for FreezerState {
+    fn default() -> Self {
+        FreezerState::Thawed
+    }
+}
+
+impl std::fmt::Display for FreezerState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FreezerState::Frozen => write!(f, "1"),
+            FreezerState::Thawed => write!(f, "0"),
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct CgroupFreezerState {
     /// Cgroups's own freezer state as set by the `cgroup.freeze` file.
@@ -585,21 +600,13 @@ impl CgroupOps for Cgroup {
 
 #[cfg(test)]
 mod test {
-    use crate::CgroupV2Fs;
-
     use super::*;
-    use starnix_core::testing::create_kernel_task_and_unlocked;
-    use starnix_core::vfs::fs_registry::FsRegistry;
+    use starnix_core::testing::create_kernel_and_task;
 
     #[::fuchsia::test]
     async fn cgroup_path_from_root() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let registry = kernel.expando.get::<FsRegistry>();
-        registry.register(b"cgroup2".into(), CgroupV2Fs::new_fs);
-        let fs = current_task
-            .create_filesystem(&mut locked, b"cgroup2".into(), Default::default())
-            .expect("");
-        let root = fs.downcast_ops::<CgroupV2Fs>().expect("").root.clone();
+        let (kernel, _current_task) = create_kernel_and_task();
+        let root = CgroupRoot::new(Arc::downgrade(&kernel));
 
         let test_cgroup = root.new_child("test".into()).expect("");
         let child_cgroup = test_cgroup.new_child("child".into()).expect("");

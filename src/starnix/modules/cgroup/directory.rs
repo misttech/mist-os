@@ -13,7 +13,7 @@ use std::collections::BTreeMap;
 use std::ops::Deref;
 use std::sync::{Arc, Weak};
 
-use starnix_core::task::CurrentTask;
+use starnix_core::task::{CgroupOps, CgroupRoot, CurrentTask};
 use starnix_core::vfs::{
     BytesFile, DirectoryEntryType, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo,
     FsNodeOps, FsStr, FsString, VecDirectory, VecDirectoryEntry,
@@ -26,7 +26,6 @@ use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, error, mode};
 
-use crate::cgroup::{CgroupOps, CgroupRoot};
 use crate::events::EventsFile;
 use crate::freeze::FreezeFile;
 use crate::kill::KillFile;
@@ -150,6 +149,11 @@ impl CgroupDirectory {
 
     fn hierarchy(&self) -> Result<Arc<Hierarchy>, Errno> {
         self.hierarchy.upgrade().ok_or_else(|| errno!(ENODEV))
+    }
+
+    #[cfg(test)]
+    pub fn has_interface_files(&self) -> bool {
+        !self.interface_files.lock().is_empty()
     }
 }
 

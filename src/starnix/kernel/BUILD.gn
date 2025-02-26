@@ -220,6 +220,7 @@ rustc_library("starnix_core") {
     "syscalls/table.rs",
     "syscalls/time.rs",
     "task/abstract_socket_namespace.rs",
+    "task/cgroup.rs",
     "task/current_task.rs",
     "task/hr_timer_manager.rs",
     "task/interval_timer.rs",

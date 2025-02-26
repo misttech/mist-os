@@ -14,27 +14,10 @@
 use std::borrow::Cow;
 use std::sync::{Arc, Weak};
 
-use starnix_core::task::CurrentTask;
+use starnix_core::task::{CgroupOps, CurrentTask};
 use starnix_core::vfs::{BytesFile, BytesFileOps, FsNodeOps};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
-
-use crate::cgroup::{CgroupOps, FreezerState};
-
-impl std::fmt::Display for FreezerState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            FreezerState::Frozen => write!(f, "1"),
-            FreezerState::Thawed => write!(f, "0"),
-        }
-    }
-}
-
-impl Default for FreezerState {
-    fn default() -> Self {
-        FreezerState::Thawed
-    }
-}
 
 pub struct FreezeFile {
     cgroup: Weak<dyn CgroupOps>,

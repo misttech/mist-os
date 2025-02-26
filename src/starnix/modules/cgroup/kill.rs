@@ -11,12 +11,10 @@
 
 use std::sync::{Arc, Weak};
 
-use starnix_core::task::CurrentTask;
+use starnix_core::task::{CgroupOps, CurrentTask};
 use starnix_core::vfs::{BytesFile, BytesFileOps, FsNodeOps};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
-
-use crate::cgroup::CgroupOps;
 
 pub struct KillFile {
     cgroup: Weak<dyn CgroupOps>,

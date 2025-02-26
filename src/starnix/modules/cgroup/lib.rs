@@ -4,7 +4,6 @@
 
 #![recursion_limit = "512"]
 
-mod cgroup;
 mod directory;
 mod events;
 mod freeze;
