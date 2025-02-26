@@ -33,6 +33,7 @@
 #include <ktl/algorithm.h>
 #include <ktl/span.h>
 #include <phys/arch/arch-handoff.h>
+#include <phys/handoff.h>
 #include <vm/arch_vm_aspace.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
@@ -278,7 +279,7 @@ constexpr bool IsUserBaseSizeValid(vaddr_t base, size_t size) {
 // the kernel proper.
 paddr_t kernel_virt_to_phys(const void* va) {
   uintptr_t pa = reinterpret_cast<uintptr_t>(va);
-  pa += get_kernel_base_phys() - kernel_relocated_base;
+  pa += KernelPhysicalLoadAddress() - kernel_relocated_base;
 
   return pa;
 }

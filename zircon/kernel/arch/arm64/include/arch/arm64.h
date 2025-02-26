@@ -17,9 +17,6 @@
 
 #include <kernel/cpu.h>
 
-// Defined in platform.cc and set in start.S.
-extern vaddr_t kernel_entry_paddr;
-
 struct iframe_t;
 
 typedef struct {

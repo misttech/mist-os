@@ -36,6 +36,8 @@ namespace {
 // pointers that we must copy out of.
 BootOptions gBootOptionsInstance;
 
+paddr_t gKernelPhysicalLoadAddress;
+
 // When using physboot, other samples are available in the handoff data too.
 //
 // **NOTE** Each sample here is represented in the userland test code in
@@ -158,15 +160,22 @@ void* PhysHandoffPtrImportPhysAddr<PhysHandoffPtrEncoding::PhysAddr>(uintptr_t p
 }
 
 void HandoffFromPhys(paddr_t handoff_paddr) {
+  // This function is called first thing on kernel entry, so it should be
+  // careful on what it assumes is present.
+
   gPhysHandoff = static_cast<PhysHandoff*>(paddr_to_physmap(handoff_paddr));
 
   gBootOptionsInstance = *gPhysHandoff->boot_options;
   gBootOptions = &gBootOptionsInstance;
 
+  gKernelPhysicalLoadAddress = gPhysHandoff->kernel_physical_load_address;
+
   if (gPhysHandoff->reboot_reason) {
     platform_set_hw_reboot_reason(gPhysHandoff->reboot_reason.value());
   }
 }
+
+paddr_t KernelPhysicalLoadAddress() { return gKernelPhysicalLoadAddress; }
 
 HandoffEnd EndHandoff() {
   HandoffEnd end{

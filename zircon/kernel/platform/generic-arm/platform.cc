@@ -72,9 +72,6 @@
 
 #include <platform/ram_mappable_crashlog.h>
 
-// Set in start.S.
-paddr_t kernel_entry_paddr;
-
 static ktl::atomic<int> panic_started;
 static ktl::atomic<int> halted;
 
@@ -158,8 +155,8 @@ zx_status_t platform_start_cpu(cpu_num_t cpu_id, uint64_t mpid) {
   arch::ThreadMemoryBarrier();
 
   uintptr_t kernel_secondary_entry_paddr =
-      get_kernel_base_phys() + (reinterpret_cast<uintptr_t>(&arm64_secondary_start) -
-                                reinterpret_cast<uintptr_t>(__executable_start));
+      KernelPhysicalLoadAddress() + (reinterpret_cast<uintptr_t>(&arm64_secondary_start) -
+                                     reinterpret_cast<uintptr_t>(__executable_start));
 
   uint32_t ret = power_cpu_on(mpid, kernel_secondary_entry_paddr, 0);
   dprintf(INFO, "Trying to start cpu %u, mpid %#" PRIx64 " returned: %d\n", cpu_id, mpid, (int)ret);

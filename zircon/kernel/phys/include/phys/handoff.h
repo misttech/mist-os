@@ -115,6 +115,9 @@ struct PhysHandoff {
 
   const uint64_t magic = kMagic;
 
+  // The physical address at which the kernel is to be loaded.
+  uintptr_t kernel_physical_load_address = 0;
+
   // TODO(https://fxbug.dev/42164859): This will eventually be made a permanent pointer.
   PhysHandoffTemporaryPtr<const BootOptions> boot_options;
 
@@ -211,6 +214,9 @@ class VmObject;
 
 // Called as soon as the physmap is available to set the gPhysHandoff pointer.
 void HandoffFromPhys(paddr_t handoff_paddr);
+
+// Valid to call only after HandoffFromPhys().
+paddr_t KernelPhysicalLoadAddress();
 
 // This can be used after HandoffFromPhys and before the ZBI is handed off to
 // userboot at the very end of kernel initialization code.  Userboot calls it

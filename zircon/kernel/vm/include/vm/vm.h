@@ -70,12 +70,8 @@ extern char __data_end[];
 extern char __bss_start[];
 extern char _end[];
 
-extern paddr_t kernel_base_phys;
 extern paddr_t zero_page_paddr;
 extern vm_page_t* zero_page;
-
-// return the physical address corresponding to _start
-static inline paddr_t get_kernel_base_phys() { return kernel_base_phys; }
 
 static inline size_t get_kernel_size() { return _end - __executable_start; }
 

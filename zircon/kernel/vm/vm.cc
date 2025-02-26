@@ -42,9 +42,6 @@
 vm_page_t* zero_page;
 paddr_t zero_page_paddr;
 
-// set early in arch code to record the start address of the kernel
-paddr_t kernel_base_phys;
-
 // construct an array of kernel program segment descriptors for use here
 // and elsewhere
 namespace {

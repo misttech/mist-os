@@ -391,6 +391,7 @@ void HandoffPrep::ConstructKernelAddressSpace(const ElfImage& kernel) {
   // hand-off.
   handoff()->times = gBootTimes;
 
+  handoff()->kernel_physical_load_address = kernel.physical_load_address();
   ConstructKernelAddressSpace(kernel);
 
   // This must be called last, as this finalizes the state of memory to hand off

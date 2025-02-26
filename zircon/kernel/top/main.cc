@@ -64,6 +64,9 @@ bool ConstructorsCalled() { return lk_global_constructors_called(); }
 
 // called from arch code
 void lk_main(paddr_t handoff_paddr) {
+  HandoffFromPhys(handoff_paddr);
+  ZX_DEBUG_ASSERT(gPhysHandoff != nullptr);
+
   // Initialize debug tracing (if enabled) as early as possible. This allows
   // debug tracing to be used before the debug log comes up, and before global
   // constructors are executed.  Note that if debug tracing is configured to be
@@ -93,8 +96,6 @@ void lk_main(paddr_t handoff_paddr) {
 
   // At this point the physmap (set up in start.S) is available and all static
   // constructors (if needed) have been run.
-  HandoffFromPhys(handoff_paddr);
-  ZX_DEBUG_ASSERT(gPhysHandoff != nullptr);
 
   lk_primary_cpu_init_level(LK_INIT_LEVEL_EARLIEST, LK_INIT_LEVEL_ARCH_EARLY - 1);
 

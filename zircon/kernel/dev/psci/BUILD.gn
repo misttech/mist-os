@@ -17,5 +17,6 @@ source_set("psci") {
   deps = [
     "//zircon/kernel/dev/pdev/power",
     "//zircon/kernel/lib/console",
+    "//zircon/kernel/phys:handoff",
   ]
 }

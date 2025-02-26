@@ -83,11 +83,6 @@ handoff_paddr           .req x24
   // Save the x0 argument in a register that won't be clobbered.
   mov handoff_paddr, x0
 
-  // kernel_entry_paddr: physical address of `_start`.
-  adr tmp, _start
-  adr_global tmp2, kernel_entry_paddr
-  str tmp, [tmp2]
-
   // root_lower_page_table_phys: boot CPU TTBR0_EL1.BADDR.
   mrs page_table0, ttbr0_el1
   and page_table0, page_table0, MMU_PTE_OUTPUT_ADDR_MASK
@@ -108,12 +103,8 @@ handoff_paddr           .req x24
   adr_global tmp, .Lboot_cpu_kstack_end
   mov sp, tmp
 
-  // Save the physical address the kernel is loaded at
-  adr_global x0, __executable_start
-  adr_global x1, kernel_base_phys
-  str x0, [x1]
-
   // Call into the arm64 boot mapping code to give it a chance to initialize its page tables
+  adr_global x0, __executable_start
   sub x0, kernel_vaddr, x0 // compute the delta between virtual and physical addresses
   bl arm64_boot_map_init
 

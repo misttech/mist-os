@@ -51,9 +51,6 @@
 
   mov %r15, kernel_entry_ticks(%rip)
 
-  lea __executable_start(%rip), %rax
-  mov %rax, kernel_base_phys(%rip)
-
   // We modify the currently live address space below.
   mov $X86_CR3_BASE_MASK, %rax
   mov %cr3, %rcx

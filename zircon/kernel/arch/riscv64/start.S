@@ -56,10 +56,6 @@
   .quad __executable_start
 .popsection
 
-  // Store the physical address for C++ code to use later.
-  lla     t0, kernel_base_phys
-  sd      s2, (t0)
-
   // set the default stack
   lla     sp, boot_cpu_kstack_end
 

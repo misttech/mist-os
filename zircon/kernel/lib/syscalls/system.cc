@@ -65,6 +65,7 @@
 #include <object/resource.h>
 #include <object/user_handles.h>
 #include <object/vm_object_dispatcher.h>
+#include <phys/handoff.h>
 #include <platform/halt_helper.h>
 #include <platform/halt_token.h>
 #include <platform/timer.h>
@@ -359,7 +360,7 @@ NO_ASAN zx_status_t sys_system_mexec(zx_handle_t resource, zx_handle_t kernel_vm
       return ZX_ERR_IO_DATA_INTEGRITY;
     }
     const zbi_kernel_t* kernel = reinterpret_cast<const zbi_kernel_t*>(zbi.begin()->payload.data());
-    new_kernel_entry = get_kernel_base_phys() + kernel->entry;
+    new_kernel_entry = KernelPhysicalLoadAddress() + kernel->entry;
     ZX_ASSERT(zbi.take_error().is_ok());
   }
 
@@ -372,14 +373,15 @@ NO_ASAN zx_status_t sys_system_mexec(zx_handle_t resource, zx_handle_t kernel_vm
     return result;
   }
 
-  uintptr_t kernel_image_end = get_kernel_base_phys() + new_kernel_len;
+  uintptr_t kernel_image_end = KernelPhysicalLoadAddress() + new_kernel_len;
 
   paddr_t final_bootimage_addr = new_bootimage_addr;
   // For testing purposes, we may want the bootdata at a high address. Alternatively if our
   // coalesced VMO should overlap into the target kernel range then we also need to move it, and
   // placing it high is as good as anywhere else.
   if (gBootOptions->mexec_force_high_ramdisk ||
-      Intersects(final_bootimage_addr, bootimage_len, get_kernel_base_phys(), kernel_image_end)) {
+      Intersects(final_bootimage_addr, bootimage_len, KernelPhysicalLoadAddress(),
+                 kernel_image_end)) {
     const size_t page_count = bootimage_len / PAGE_SIZE + 1;
     fbl::AllocChecker ac;
     ktl::unique_ptr<paddr_t[]> paddrs(new (&ac) paddr_t[page_count]);
@@ -451,7 +453,7 @@ NO_ASAN zx_status_t sys_system_mexec(zx_handle_t resource, zx_handle_t kernel_vm
 
   // Op to move the new kernel into place.
   ops[ops_idx].src = (void*)new_kernel_addr;
-  ops[ops_idx].dst = (void*)get_kernel_base_phys();
+  ops[ops_idx].dst = (void*)KernelPhysicalLoadAddress();
   ops[ops_idx].len = new_kernel_len;
   ops_idx++;
 
