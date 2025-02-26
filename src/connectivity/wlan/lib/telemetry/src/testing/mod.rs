@@ -14,6 +14,7 @@ use futures::stream::FusedStream;
 use futures::task::Poll;
 use futures::TryStreamExt;
 use std::pin::pin;
+use windowed_stats::experimental::testing::MockTimeMatrixClient;
 
 trait CobaltExt {
     // Respond to MetricEventLoggerRequest and extract its MetricEvent
@@ -87,6 +88,8 @@ pub struct TestHelper {
 
     pub persistence_sender: mpsc::Sender<String>,
     persistence_stream: mpsc::Receiver<String>,
+
+    pub mock_time_matrix_client: MockTimeMatrixClient,
 
     // Note: keep the executor field last in the struct so it gets dropped last.
     pub exec: fasync::TestExecutor,
@@ -265,6 +268,8 @@ pub fn setup_test() -> TestHelper {
     const DEFAULT_BUFFER_SIZE: usize = 100; // arbitrary value
     let (persistence_sender, persistence_stream) = mpsc::channel(DEFAULT_BUFFER_SIZE);
 
+    let mock_time_matrix_client = MockTimeMatrixClient::new();
+
     TestHelper {
         inspector,
         inspect_node,
@@ -278,6 +283,7 @@ pub fn setup_test() -> TestHelper {
         telemetry_svc_stream: None,
         persistence_sender,
         persistence_stream,
+        mock_time_matrix_client,
         exec,
     }
 }

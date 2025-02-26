@@ -13,7 +13,7 @@ use windowed_stats::experimental::clock::Timed;
 use windowed_stats::experimental::series::interpolation::LastSample;
 use windowed_stats::experimental::series::statistic::LatchMax;
 use windowed_stats::experimental::series::{SamplingProfile, TimeMatrix};
-use windowed_stats::experimental::serve::{InspectedTimeMatrix, TimeMatrixClient};
+use windowed_stats::experimental::serve::{InspectSender, InspectedTimeMatrix};
 
 // Include a timeout on stats calls so that if the driver deadlocks, telemtry doesn't get stuck.
 const GET_IFACE_STATS_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(5);
@@ -32,21 +32,14 @@ pub struct ClientIfaceCountersLogger {
 }
 
 impl ClientIfaceCountersLogger {
-    pub fn new(
+    pub fn new<S: InspectSender>(
         monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
-        time_matrix_client: &TimeMatrixClient,
-    ) -> Self {
-        Self::new_helper(monitor_svc_proxy, IfaceCountersTimeSeries::new(time_matrix_client))
-    }
-
-    fn new_helper(
-        monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
-        time_series_stats: IfaceCountersTimeSeries,
+        time_matrix_client: &S,
     ) -> Self {
         Self {
             iface_state: Arc::new(Mutex::new(IfaceState::NotAvailable)),
             monitor_svc_proxy,
-            time_series_stats,
+            time_series_stats: IfaceCountersTimeSeries::new(time_matrix_client),
             driver_inspect_counter_configs: Arc::new(Mutex::new(HashMap::new())),
         }
     }
@@ -156,7 +149,7 @@ struct IfaceCountersTimeSeries {
 }
 
 impl IfaceCountersTimeSeries {
-    pub fn new(client: &TimeMatrixClient) -> Self {
+    pub fn new<S: InspectSender>(client: &S) -> Self {
         let rx_unicast_total = client.inspect_time_matrix(
             "rx_unicast_total",
             TimeMatrix::<LatchMax<u64>, LastSample>::new(
@@ -212,7 +205,7 @@ mod tests {
     use futures::TryStreamExt;
     use std::pin::pin;
     use std::task::Poll;
-    use windowed_stats::experimental::testing::{MockTimeMatrix, TimeMatrixCall};
+    use windowed_stats::experimental::testing::TimeMatrixCall;
     use wlan_common::assert_variant;
 
     const IFACE_ID: u16 = 66;
@@ -220,10 +213,9 @@ mod tests {
     #[fuchsia::test]
     fn test_handle_iface_created() {
         let mut test_helper = setup_test();
-        let time_series = MockIfaceCountersTimeSeries::default();
-        let logger = ClientIfaceCountersLogger::new_helper(
+        let logger = ClientIfaceCountersLogger::new(
             test_helper.monitor_svc_proxy.clone(),
-            time_series.build(),
+            &test_helper.mock_time_matrix_client,
         );
 
         let mut handle_iface_created_fut = pin!(logger.handle_iface_created(IFACE_ID));
@@ -259,10 +251,9 @@ mod tests {
     #[fuchsia::test]
     fn test_handle_periodic_telemetry() {
         let mut test_helper = setup_test();
-        let time_series = MockIfaceCountersTimeSeries::default();
-        let logger = ClientIfaceCountersLogger::new_helper(
+        let logger = ClientIfaceCountersLogger::new(
             test_helper.monitor_svc_proxy.clone(),
-            time_series.build(),
+            &test_helper.mock_time_matrix_client,
         );
 
         // Transition to IfaceCreated state
@@ -287,28 +278,31 @@ mod tests {
             Poll::Ready(())
         );
 
+        let mut time_matrix_calls = test_helper.mock_time_matrix_client.drain_calls();
         assert_eq!(
-            &time_series.rx_unicast_total.drain_calls()[..],
-            &[TimeMatrixCall::Fold(Timed::now(100))]
+            &time_matrix_calls.drain::<u64>("rx_unicast_total")[..],
+            &[TimeMatrixCall::Fold(Timed::now(100u64))]
         );
         assert_eq!(
-            &time_series.rx_unicast_drop.drain_calls()[..],
-            &[TimeMatrixCall::Fold(Timed::now(5))]
+            &time_matrix_calls.drain::<u64>("rx_unicast_drop")[..],
+            &[TimeMatrixCall::Fold(Timed::now(5u64))]
         );
         assert_eq!(
-            &time_series.tx_total.drain_calls()[..],
-            &[TimeMatrixCall::Fold(Timed::now(50))]
+            &time_matrix_calls.drain::<u64>("tx_total")[..],
+            &[TimeMatrixCall::Fold(Timed::now(50u64))]
         );
-        assert_eq!(&time_series.tx_drop.drain_calls()[..], &[TimeMatrixCall::Fold(Timed::now(2))]);
+        assert_eq!(
+            &time_matrix_calls.drain::<u64>("tx_drop")[..],
+            &[TimeMatrixCall::Fold(Timed::now(2u64))]
+        );
     }
 
     #[fuchsia::test]
     fn test_handle_iface_destroyed() {
         let mut test_helper = setup_test();
-        let time_series = MockIfaceCountersTimeSeries::default();
-        let logger = ClientIfaceCountersLogger::new_helper(
+        let logger = ClientIfaceCountersLogger::new(
             test_helper.monitor_svc_proxy.clone(),
-            time_series.build(),
+            &test_helper.mock_time_matrix_client,
         );
 
         // Transition to IfaceCreated state
@@ -346,24 +340,5 @@ mod tests {
             ),
             Poll::Ready(())
         );
-    }
-
-    #[derive(Debug, Default)]
-    struct MockIfaceCountersTimeSeries {
-        rx_unicast_total: MockTimeMatrix<u64>,
-        rx_unicast_drop: MockTimeMatrix<u64>,
-        tx_total: MockTimeMatrix<u64>,
-        tx_drop: MockTimeMatrix<u64>,
-    }
-
-    impl MockIfaceCountersTimeSeries {
-        fn build(&self) -> IfaceCountersTimeSeries {
-            IfaceCountersTimeSeries {
-                rx_unicast_total: self.rx_unicast_total.build_ref("rx_unicast_total"),
-                rx_unicast_drop: self.rx_unicast_drop.build_ref("rx_unicast_drop"),
-                tx_total: self.tx_total.build_ref("tx_total"),
-                tx_drop: self.tx_drop.build_ref("tx_drop"),
-            }
-        }
     }
 }

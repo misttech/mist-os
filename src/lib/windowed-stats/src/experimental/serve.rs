@@ -74,6 +74,47 @@ pub fn serve_time_matrix_inspection(
     (client, server)
 }
 
+pub trait InspectSender {
+    /// Sends a [`TimeMatrix`] to the client's inspection server.
+    ///
+    /// See [`inspect_time_matrix_with_metadata`].
+    ///
+    /// [`inspect_time_matrix_with_metadata`]: crate::experimental::serve::TimeMatrixClient::inspect_time_matrix_with_metadata
+    /// [`TimeMatrix`]: crate::experimental::series::TimeMatrix
+    fn inspect_time_matrix<F, P>(
+        &self,
+        name: impl Into<String>,
+        matrix: TimeMatrix<F, P>,
+    ) -> InspectedTimeMatrix<F::Sample>
+    where
+        TimeMatrix<F, P>: 'static + MatrixSampler<F::Sample> + Send,
+        Metadata<F>: 'static + Send + Sync,
+        F: BufferStrategy<F::Aggregation, P> + Statistic,
+        F::Sample: Send,
+        P: Interpolation<FillSample<F> = F::Sample>;
+
+    /// Sends a [`TimeMatrix`] to the client's inspection server.
+    ///
+    /// This function lazily records the given [`TimeMatrix`] to Inspect. The server end
+    /// periodically interpolates the matrix and records data as needed. The returned
+    /// [handle][`InspectedTimeMatrix`] can be used to fold samples into the matrix.
+    ///
+    /// [`InspectedTimeMatrix`]: crate::experimental::serve::InspectedTimeMatrix
+    /// [`TimeMatrix`]: crate::experimental::series::TimeMatrix
+    fn inspect_time_matrix_with_metadata<F, P>(
+        &self,
+        name: impl Into<String>,
+        matrix: TimeMatrix<F, P>,
+        metadata: impl Into<Metadata<F>>,
+    ) -> InspectedTimeMatrix<F::Sample>
+    where
+        TimeMatrix<F, P>: 'static + MatrixSampler<F::Sample> + Send,
+        Metadata<F>: 'static + Send + Sync,
+        F: BufferStrategy<F::Aggregation, P> + Statistic,
+        F::Sample: Send,
+        P: Interpolation<FillSample<F> = F::Sample>;
+}
+
 type SharedTimeMatrix = Arc<Mutex<dyn Interpolator<Error = FoldError>>>;
 
 pub struct TimeMatrixClient {
@@ -90,56 +131,6 @@ impl Clone for TimeMatrixClient {
 impl TimeMatrixClient {
     fn new(sender: mpsc::Sender<SharedTimeMatrix>, node: InspectNode) -> Self {
         Self { sender: Arc::new(Mutex::new(sender)), node }
-    }
-
-    /// Sends a [`TimeMatrix`] to the client's inspection server.
-    ///
-    /// See [`inspect_time_matrix_with_metadata`].
-    ///
-    /// [`inspect_time_matrix_with_metadata`]: crate::experimental::serve::TimeMatrixClient::inspect_time_matrix_with_metadata
-    /// [`TimeMatrix`]: crate::experimental::series::TimeMatrix
-    pub fn inspect_time_matrix<F, P>(
-        &self,
-        name: impl Into<String>,
-        matrix: TimeMatrix<F, P>,
-    ) -> InspectedTimeMatrix<F::Sample>
-    where
-        TimeMatrix<F, P>: 'static + MatrixSampler<F::Sample> + Send,
-        Metadata<F>: 'static + Send + Sync,
-        F: BufferStrategy<F::Aggregation, P> + Statistic,
-        P: Interpolation<FillSample<F> = F::Sample>,
-    {
-        self.inspect_and_record_with(name, matrix, |_node| {})
-    }
-
-    /// Sends a [`TimeMatrix`] to the client's inspection server.
-    ///
-    /// This function lazily records the given [`TimeMatrix`] to Inspect. The server end
-    /// periodically interpolates the matrix and records data as needed. The returned
-    /// [handle][`InspectedTimeMatrix`] can be used to fold samples into the matrix.
-    ///
-    /// [`InspectedTimeMatrix`]: crate::experimental::serve::InspectedTimeMatrix
-    /// [`TimeMatrix`]: crate::experimental::series::TimeMatrix
-    pub fn inspect_time_matrix_with_metadata<F, P>(
-        &self,
-        name: impl Into<String>,
-        matrix: TimeMatrix<F, P>,
-        metadata: impl Into<Metadata<F>>,
-    ) -> InspectedTimeMatrix<F::Sample>
-    where
-        TimeMatrix<F, P>: 'static + MatrixSampler<F::Sample> + Send,
-        Metadata<F>: 'static + Send + Sync,
-        F: BufferStrategy<F::Aggregation, P> + Statistic,
-        P: Interpolation<FillSample<F> = F::Sample>,
-    {
-        let metadata = Arc::new(metadata.into());
-        self.inspect_and_record_with(name, matrix, move |node| {
-            use crate::experimental::series::metadata::Metadata;
-
-            node.record_child("metadata", |node| {
-                metadata.record(node);
-            })
-        })
     }
 
     fn inspect_and_record_with<F, P, R>(
@@ -162,6 +153,46 @@ impl TimeMatrixClient {
             error!("failed to send time matrix \"{}\" to inspection server: {:?}", name, error);
         }
         InspectedTimeMatrix::new(name, matrix)
+    }
+}
+
+impl InspectSender for TimeMatrixClient {
+    fn inspect_time_matrix<F, P>(
+        &self,
+        name: impl Into<String>,
+        matrix: TimeMatrix<F, P>,
+    ) -> InspectedTimeMatrix<F::Sample>
+    where
+        TimeMatrix<F, P>: 'static + MatrixSampler<F::Sample> + Send,
+        Metadata<F>: 'static + Send + Sync,
+        F: BufferStrategy<F::Aggregation, P> + Statistic,
+        F::Sample: Send,
+        P: Interpolation<FillSample<F> = F::Sample>,
+    {
+        self.inspect_and_record_with(name, matrix, |_node| {})
+    }
+
+    fn inspect_time_matrix_with_metadata<F, P>(
+        &self,
+        name: impl Into<String>,
+        matrix: TimeMatrix<F, P>,
+        metadata: impl Into<Metadata<F>>,
+    ) -> InspectedTimeMatrix<F::Sample>
+    where
+        TimeMatrix<F, P>: 'static + MatrixSampler<F::Sample> + Send,
+        Metadata<F>: 'static + Send + Sync,
+        F: BufferStrategy<F::Aggregation, P> + Statistic,
+        F::Sample: Send,
+        P: Interpolation<FillSample<F> = F::Sample>,
+    {
+        let metadata = Arc::new(metadata.into());
+        self.inspect_and_record_with(name, matrix, move |node| {
+            use crate::experimental::series::metadata::Metadata;
+
+            node.record_child("metadata", |node| {
+                metadata.record(node);
+            })
+        })
     }
 }
 
