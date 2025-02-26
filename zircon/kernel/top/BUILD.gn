@@ -21,6 +21,7 @@ source_set("top") {
     "//zircon/kernel/kernel",
     "//zircon/kernel/lib/backtrace",
     "//zircon/kernel/lib/boot-options",
+    "//zircon/kernel/lib/code-patching:self-test",
     "//zircon/kernel/lib/console",
     "//zircon/kernel/lib/counters",
     "//zircon/kernel/lib/crashlog",

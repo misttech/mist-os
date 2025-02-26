@@ -68,12 +68,6 @@ handoff_paddr           .req x24
   // As early as possible collect the time stamp.
   sample_ticks
 
-  // This serves as a verification that code-patching was performed before
-  // the kernel was booted; if unpatched, we would trap here and halt.
-  .code_patching.start CASE_ID_SELF_TEST
-  brk #0  // Same as __builtin_trap()
-  .code_patching.end
-
   // Record the entry time stamp.
   store_ticks kernel_entry_ticks
 

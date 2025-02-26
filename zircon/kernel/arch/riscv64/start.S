@@ -24,12 +24,6 @@
   // collect the starting time stamp
   rdtime a2
 
-  // This serves as a verification that code-patching was performed before
-  // the kernel was booted; if unpatched, we would trap here and halt.
-  .code_patching.start CASE_ID_SELF_TEST
-  unimp
-  .code_patching.end
-
   // Save a0 (physboot handoff paddr) in a called-saved register for later
   // passing to lk_main after other calls below.  s0 is fp, so start with s1.
   mv      s1, a0

@@ -37,12 +37,6 @@
   // As early as possible collect the time stamp.
   sample_ticks %r15
 
-  // This serves as a verification that code-patching was performed before
-  // the kernel was booted; if unpatched, we would trap here and halt.
-  .code_patching.start CASE_ID_SELF_TEST
-  ud2  // Same as __builtin_trap()
-  .code_patching.end
-
   // Set up a temporary stack pointer
   lea _kstack_end(%rip), %rsp
 

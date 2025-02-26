@@ -6,6 +6,7 @@
 
 #include <lib/arch/ticks.h>
 #include <lib/boot-options/boot-options.h>
+#include <lib/code-patching/self-test.h>
 #include <lib/counters.h>
 #include <lib/zbitl/view.h>
 #include <platform.h>
@@ -159,9 +160,12 @@ void* PhysHandoffPtrImportPhysAddr<PhysHandoffPtrEncoding::PhysAddr>(uintptr_t p
   return paddr_to_physmap(ptr);
 }
 
+// This function is called first thing on kernel entry, so it should be
+// careful on what it assumes is present.
 void HandoffFromPhys(paddr_t handoff_paddr) {
-  // This function is called first thing on kernel entry, so it should be
-  // careful on what it assumes is present.
+  // This serves as a verification that code-patching was performed before
+  // the kernel was booted; if unpatched, we would trap here and halt.
+  CodePatchingNopTest();
 
   gPhysHandoff = static_cast<PhysHandoff*>(paddr_to_physmap(handoff_paddr));
 
