@@ -198,12 +198,13 @@ template("rustc_library") {
       forward_variables_from(invoker,
                              "*",
                              [
-                               "name",
                                "assert_no_deps",
-                               "public_configs",
                                "disable_rustdoc",
-                               "test_disable_rbe",
+                               "name",
                                "non_test_deps",
+                               "output_name",
+                               "public_configs",
+                               "test_disable_rbe",
                              ])
       if (defined(invoker.test_disable_rbe)) {
         disable_rbe = invoker.test_disable_rbe
@@ -248,7 +249,9 @@ template("rustc_library") {
                              ])
 
       # TODO: maybe just use target_name instead?
-      output_name = _crate_name
+      if (!defined(output_name)) {
+        output_name = crate_name
+      }
     }
 
     deps = []

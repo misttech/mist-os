@@ -118,6 +118,7 @@ template("rustc_dylib") {
                              "*",
                              [
                                "name",
+                               "output_name",
                                "public_deps",
                              ])
     }
@@ -133,6 +134,7 @@ template("rustc_dylib") {
                              "enforce_source_listing",
                              "features",
                              "inputs",
+                             "output_name",
                              "public_deps",
                              "sources",
                              "testonly",
@@ -171,7 +173,9 @@ template("rustc_dylib") {
           "Specifying root_out_dir as the output_dir of a Rust dylib is unsupported. Choose a directory that won't have libraries of the same name from other languages.")
 
       # TODO: maybe just use target_name instead?
-      output_name = crate_name
+      if (!defined(output_name)) {
+        output_name = crate_name
+      }
       crate_type = "dylib"
     }
 

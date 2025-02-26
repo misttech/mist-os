@@ -296,6 +296,7 @@ template("rustc_artifact") {
                                "deps",
                                "emit_tool_path",
                                "metadata",
+                               "output_name",
                                "output_prefix_override",
                                "pool",
                                "public_configs",
