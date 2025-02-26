@@ -17,7 +17,7 @@ const MAX_COUNT_RING_BUFFERS uint32
 const MAX_COUNT_DAI_INTERCONNECTS uint32
         = fuchsia.hardware.audio.signalprocessing.MAX_COUNT_PROCESSING_ELEMENTS;
 
-const CONTROL_NODE_NAME string = "sys/platform/virtual-audio/virtual-audio-legacy";
+const LEGACY_CONTROL_NODE_NAME string = "sys/platform/virtual-audio-legacy/virtual-audio-legacy";
 
 type Direction = table {
     /// Device type is input (true) or output (false)
@@ -34,7 +34,7 @@ type Direction = table {
 
 /// This protocol provides methods for adding and removing virtual audio
 /// devices. This protocol is made available through the device tree via
-/// `CONTROL_NODE_NAME`.
+/// `LEGACY_CONTROL_NODE_NAME`.
 closed protocol Control {
     /// Returns the default configuration for the given device type and direction.
     strict GetDefaultConfiguration(struct {

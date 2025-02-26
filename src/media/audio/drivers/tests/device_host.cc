@@ -25,10 +25,10 @@
 
 namespace media::audio::drivers::test {
 
-// TODO(https://fxbug.dev/42144297): Previous implementation used value-parameterized testing. Consider
-// reverting to this, moving AddDevices to a function called at static initialization time. If we
-// cannot access cmdline flags at that time, this would force us to always register admin tests,
-// skipping them at runtime based on the cmdline flag.
+// TODO(https://fxbug.dev/42144297): Previous implementation used value-parameterized testing.
+// Consider reverting to this, moving AddDevices to a function called at static initialization time.
+// If we cannot access cmdline flags at that time, this would force us to always register admin
+// tests, skipping them at runtime based on the cmdline flag.
 
 extern void RegisterBasicTestsForDevice(const DeviceEntry& device_entry);
 extern void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
@@ -153,7 +153,7 @@ void DeviceHost::DetectDevices(bool devfs_only, bool no_virtual_audio) {
 // default configuration settings (which should pass all tests).
 void DeviceHost::AddVirtualDevices() {
   const std::string kControlNodePath =
-      fxl::Concatenate({"/dev/", fuchsia::virtualaudio::CONTROL_NODE_NAME});
+      fxl::Concatenate({"/dev/", fuchsia::virtualaudio::LEGACY_CONTROL_NODE_NAME});
   zx_status_t status = fdio_service_connect(kControlNodePath.c_str(),
                                             controller_.NewRequest().TakeChannel().release());
   ASSERT_EQ(status, ZX_OK) << "fdio_service_connect failed";

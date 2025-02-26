@@ -39,7 +39,7 @@ extend uint fuchsia.BIND_PLATFORM_DEV_DID {
   FUSB302 = 0x2C,
   RAM_DISK = 0x2D,
   RAM_NAND = 0x2E,
-  VIRTUAL_AUDIO = 0x2F,
+  VIRTUAL_AUDIO_LEGACY = 0x2F,
   BT_HCI_EMULATOR = 0x30,
   POWER_CORE = 0x31,
   DEVICETREE = 0x32,
@@ -48,6 +48,7 @@ extend uint fuchsia.BIND_PLATFORM_DEV_DID {
   ADC_BUTTONS = 0x35,
   BUTTONS = 0x36,
   FAKE_AC = 0x37,
+  VIRTUAL_AUDIO = 0x39,
 };
 
 extend uint fuchsia.BIND_PLATFORM_DEV_PID {

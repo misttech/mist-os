@@ -890,7 +890,7 @@ impl AudioFacade {
     }
 
     pub fn new() -> Result<AudioFacade, Error> {
-        let path = format!("/dev/{}", fidl_fuchsia_virtualaudio::CONTROL_NODE_NAME);
+        let path = format!("/dev/{}", fidl_fuchsia_virtualaudio::LEGACY_CONTROL_NODE_NAME);
         // Connect to the virtual audio control service.
         let (control_client, control_server) = zx::Channel::create();
         let () = fdio::service_connect(&path, control_server)

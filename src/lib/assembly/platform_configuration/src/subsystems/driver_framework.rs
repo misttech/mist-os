@@ -135,6 +135,8 @@ impl DefineSubsystemConfiguration<(&DriverFrameworkConfig, &StorageConfig)>
         {
             software_names.push("virtual-audio");
             software_ids.push(bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_VIRTUAL_AUDIO);
+            software_names.push("virtual-audio-legacy");
+            software_ids.push(bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_VIRTUAL_AUDIO_LEGACY);
         }
 
         if context.board_info.provides_feature("fuchsia::fake_battery")

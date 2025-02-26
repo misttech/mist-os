@@ -86,8 +86,8 @@ void ConnectToVirtualAudio(component_testing::RealmRoot& root,
   // This file hosts a fuchsia.virtualaudio.Control channel.
   //
   // Wait for the driver to load.
-  zx::result channel =
-      device_watcher::RecursiveWaitForFile(dev_fd.get(), fuchsia::virtualaudio::CONTROL_NODE_NAME);
+  zx::result channel = device_watcher::RecursiveWaitForFile(
+      dev_fd.get(), fuchsia::virtualaudio::LEGACY_CONTROL_NODE_NAME);
   ASSERT_EQ(channel.status_value(), ZX_OK);
 
   // Turn the connection into FIDL.
@@ -175,8 +175,8 @@ void HermeticAudioRealm::Create(Options options, async_dispatcher* dispatcher,
   realm_args.set_root_driver("fuchsia-boot:///platform-bus#meta/platform-bus.cm");
   realm_args.set_software_devices(std::vector{
       fuchsia::driver::test::SoftwareDevice{
-          .device_name = "virtual-audio",
-          .device_id = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_VIRTUAL_AUDIO,
+          .device_name = "virtual-audio-legacy",
+          .device_id = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_VIRTUAL_AUDIO_LEGACY,
       },
   });
 
