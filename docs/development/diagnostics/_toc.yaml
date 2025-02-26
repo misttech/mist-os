@@ -43,7 +43,7 @@ toc:
     path: /docs/development/diagnostics/logs/severity.md
   - title: "View"
     path: /docs/development/diagnostics/logs/viewing.md
-  - title: "Logging and tests"
+  - title: "Additional logging workflows"
     path: /docs/development/diagnostics/test_and_logs.md
   - title: "Reference"
     section:
