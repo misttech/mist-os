@@ -20,7 +20,6 @@
 #include <ktl/initializer_list.h>
 #include <ktl/move.h>
 #include <ktl/string_view.h>
-#include <phys/address-space.h>
 #include <phys/allocation.h>
 #include <phys/boot-zbi.h>
 #include <phys/elf-image.h>
@@ -108,13 +107,6 @@ void RelocateElfKernel(ElfImage& elf_kernel) {
   // Prepare the handoff data structures.
   HandoffPrep prep;
   prep.Init();
-
-  // Set up the kernel's final page protections.
-  //
-  // TODO(https://fxbug.dev/42164859): Eventually we'll want to hand off more
-  // metadata relating to the mapped sections of the image, at which point this
-  // call should be reframed into machinery that updates PhysHandoff as well.
-  AddressSpace::PanicIfError(elf_kernel.MapInto(*gAddressSpace));
 
   debugf("%s: Ready to hand off at physical load address %#" PRIxPTR ", entry %#" PRIx64 "...\n",
          gSymbolize->name(), elf_kernel.load_address(), elf_kernel.entry());

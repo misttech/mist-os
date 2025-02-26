@@ -86,16 +86,9 @@ volatile pt_entry_t kasan_shadow_pd[NO_OF_PT_ENTRIES] __ALIGNED(PAGE_SIZE);  // 
 volatile uint8_t kasan_zero_page[PAGE_SIZE] __ALIGNED(PAGE_SIZE);
 #endif
 
-/* a big pile of page tables needed to map 64GB of memory into kernel space using 2MB pages */
-volatile pt_entry_t linear_map_pdp[(64ULL * GB) / (2 * MB)] __ALIGNED(PAGE_SIZE);
-
 // The number of pages occupied by page tables handed off from physboot. This
 // is incremented in X86ArchVmAspace::HandoffPageTablesFromPhysboot() below.
-//
-// TODO(https://fxbug.dev/42164859): Physmap pages are not yet handed off, but
-// they soon will be so easiest to just include those pages as the initial
-// value for now.
-static uint64_t num_handoff_mmu_pages = sizeof(linear_map_pdp) / PAGE_SIZE;
+static uint64_t num_handoff_mmu_pages = 0;
 
 // When this bit is set in the source operand of a MOV CR3, TLB entries and paging structure
 // caches for the active PCID may be preserved. If the bit is clear, entries will be cleared.
@@ -1177,34 +1170,7 @@ void x86_mmu_init() {
              g_max_vaddr_width, kX86VAddrBits);
 }
 
-// Updates the page backing a given page table created in the context of
-// start.S, in particular moving it from the WIRED to MMU state.
-//
-// TODO(https://fxbug.dev/42164859): This happens automatically for page tables
-// handed off to the kernel from physboot, so this function will go away once
-// those account for kernel aspace mappings.
-static void unwire_boot_mmu_page(const volatile pt_entry_t* table) {
-  // Convert to a phys address.
-  paddr_t paddr = kernel_base_phys + reinterpret_cast<vaddr_t>(table) -
-                  reinterpret_cast<vaddr_t>(__executable_start);
-
-  vm_page_t* page = paddr_to_vm_page(paddr);
-  ASSERT(page);
-
-  // Unwire and mark it as an MMU page.
-  pmm_unwire_page(page);
-  page->set_state(vm_page_state::MMU);
-
-  page->mmu.num_mappings = X86PageTableMmu::CountPresentEntries(table);
-}
-
 void x86_mmu_prevm_init() {
-  // Unwire and mark as in use by the MMU all the page tables that might be part of the kernel
-  // aspace as created by start.S.
-  for (size_t i = 0; i < sizeof(linear_map_pdp) / sizeof(pt_entry_t); i += NO_OF_PT_ENTRIES) {
-    unwire_boot_mmu_page(&linear_map_pdp[i]);
-  }
-
   // Use of PCID is detected late and on the boot cpu is this happens after x86_mmu_percpu_init
   // and so we enable it again here. For other CPUs, and when coming in and out of suspend, it
   // will happen correctly in x86_mmu_percpu_init.

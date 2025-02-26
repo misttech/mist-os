@@ -43,6 +43,11 @@ struct ArchPhysHandoff {
 // uses as the virtual address of the kernel load image.
 inline constexpr uint64_t kArchHandoffVirtualAddress = 0xffffffff00000000;  // -4GB
 
+// TODO(https://fxbug.dev/42164859): Make these constants the source of truth
+// for the physmap in the kernel.
+inline constexpr uint64_t kArchPhysmapVirtualBase = 0xffff'ffc0'0000'0000;
+inline constexpr uint64_t kArchPhysmapSize = 0x0000'0008'0000'0000;
+
 // Whether a peripheral range for the UART needs to be synthesized.
 inline constexpr bool kArchHandoffGenerateUartPeripheralRanges = false;
 

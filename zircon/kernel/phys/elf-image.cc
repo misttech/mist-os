@@ -226,7 +226,7 @@ void ElfImage::Relocate() {
   }
 }
 
-fit::result<AddressSpace::MapError> ElfImage::MapInto(AddressSpace& aspace) {
+fit::result<AddressSpace::MapError> ElfImage::MapInto(AddressSpace& aspace) const {
   fit::result<AddressSpace::MapError> result = fit::ok();
   load_info().VisitSegments([&](const auto& segment) {
     uint64_t vaddr = segment.vaddr() + load_bias();

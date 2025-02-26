@@ -6,7 +6,6 @@
 
 #include "handoff-prep.h"
 
-#include <ctype.h>
 #include <lib/boot-options/boot-options.h>
 #include <lib/instrumentation/debugdata.h>
 #include <lib/llvm-profdata/llvm-profdata.h>
@@ -21,6 +20,7 @@
 
 #include <ktl/algorithm.h>
 #include <ktl/tuple.h>
+#include <phys/address-space.h>
 #include <phys/allocation.h>
 #include <phys/arch/arch-handoff.h>
 #include <phys/elf-image.h>
@@ -339,6 +339,25 @@ void HandoffPrep::SetVersionString(ktl::string_view version) {
   }
 }
 
+void HandoffPrep::ConstructKernelAddressSpace(const ElfImage& kernel) {
+  // TODO(https://fxbug.dev/42164859): Reframe this logic into something that
+  // also tracks other metadata we'll need for the final form of the handoff
+  // (e.g., for VM init).
+
+  // Construct the physmap.
+  //
+  // TODO(https://fxbug.dev/42164859): Don't map as executable.
+  constexpr AddressSpace::MapSettings kRwxRam{
+      .access = {.readable = true, .writable = true, .executable = true},
+      .memory = kArchNormalMemoryType,
+  };
+  AddressSpace::PanicIfError(
+      gAddressSpace->Map(kArchPhysmapVirtualBase, kArchPhysmapSize, 0, kRwxRam));
+
+  // Construct the kernel's mapping.
+  AddressSpace::PanicIfError(kernel.MapInto(*gAddressSpace));
+}
+
 [[noreturn]] void HandoffPrep::DoHandoff(ElfImage& kernel, UartDriver& uart,
                                          ktl::span<ktl::byte> zbi,
                                          const KernelStorage::Bootfs& kernel_package,
@@ -372,8 +391,10 @@ void HandoffPrep::SetVersionString(ktl::string_view version) {
   // hand-off.
   handoff()->times = gBootTimes;
 
-  // This finalizes the state of memory to hand off to the kernel, which is affected by other set-up
-  // routines.
+  ConstructKernelAddressSpace(kernel);
+
+  // This must be called last, as this finalizes the state of memory to hand off
+  // to the kernel, which is affected by other set-up routines.
   SetMemory();
 
   // Hand-off the serial driver. There may be no more logging beyond this point.

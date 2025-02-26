@@ -574,6 +574,7 @@ if (toolchain_environment == "kernel.phys" ||
     ]
     public_deps = [ ":handoff-prep.h" ]
     deps = [
+      ":address-space",
       ":allocation",
       ":elf-image",
       ":handoff",
@@ -876,7 +877,6 @@ if (is_kernel) {
     sources = [ "physboot.cc" ]
     include_dirs = [ "//zircon/kernel/arch/$zircon_cpu/include" ]
     deps = [
-      ":address-space",
       ":allocation",
       ":boot-zbi",
       ":elf-image",

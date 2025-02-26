@@ -68,36 +68,6 @@
   and %rax, %rcx
   mov %rcx, upper_512gib_page_table_phys(%rip)
 
-  // Set up a linear map of the first 64GB
-  lea linear_map_pdp(%rip), %rsi
-  movl $32768, %ecx
-  xor  %eax, %eax
-
-  // Loop across these page tables, incrementing the address by 2MB
-0:
-  mov  %eax, %ebx
-  shll $21, %ebx
-  orl  $X86_KERNEL_PD_LP_FLAGS, %ebx    // lower word of the entry
-  movl %ebx, (%esi)
-  mov  %eax, %ebx
-  shrl $11, %ebx      // upper word of the entry
-  movl %ebx, 4(%esi)
-  addl $8,%esi
-  inc  %eax
-  loop 0b
-
-  // Point the high pdp at our linear mapping page tables
-  mov upper_512gib_page_table_phys(%rip), %rsi
-  movl $64, %ecx
-  lea linear_map_pdp(%rip), %eax
-  orl  $X86_KERNEL_PD_FLAGS, %eax
-
-0:
-  movl %eax, (%esi)
-  add  $8, %esi
-  addl $4096, %eax
-  loop 0b
-
 #if __has_feature(address_sanitizer)
   // kASAN tracks memory validity with a 'shadow map' starting at a fixed offset. The shadow map
   // tracks the validity of accesses within an eight-byte region with one byte - zero means that

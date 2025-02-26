@@ -117,22 +117,6 @@ handoff_paddr           .req x24
   sub x0, kernel_vaddr, x0 // compute the delta between virtual and physical addresses
   bl arm64_boot_map_init
 
-  // Set up the mmu according to mmu_initial_mappings
-
-  // void arm64_boot_map(pte_t* kernel_table0, vaddr_t vaddr, paddr_t paddr, size_t len,
-  //                     pte_t flags, bool allow_large_pages);
-  //
-
-  // Map a large run of physical memory at the base of the kernel's address space
-  // TODO(https://fxbug.dev/42124648): Only map the arenas.
-  mov x0, page_table1
-  mov x1, KERNEL_ASPACE_BASE
-  mov x2, 0
-  mov x3, ARCH_PHYSMAP_SIZE
-  movlit x4, MMU_PTE_KERNEL_DATA_FLAGS
-  mov x5, 1 // allow large pages
-  bl arm64_boot_map
-
 .Lmmu_on_pc:
   isb
 

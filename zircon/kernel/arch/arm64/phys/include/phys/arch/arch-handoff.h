@@ -64,7 +64,12 @@ struct ArchPhysHandoff {
   Arm64AlternateVbar alternate_vbar = Arm64AlternateVbar::kNone;
 };
 
-inline constexpr uint64_t kArchHandoffVirtualAddress = 0xffffffff10000000;
+inline constexpr uint64_t kArchHandoffVirtualAddress = 0xffff'ffff'1000'0000;
+
+// TODO(https://fxbug.dev/42164859): Make these constants the source of truth
+// for the physmap in the kernel.
+inline constexpr uint64_t kArchPhysmapVirtualBase = 0xffff'0000'0000'0000;
+inline constexpr uint64_t kArchPhysmapSize = 0x0000'0080'0000'0000;
 
 // Whether a peripheral range for the UART needs to be synthesized.
 inline constexpr bool kArchHandoffGenerateUartPeripheralRanges = true;

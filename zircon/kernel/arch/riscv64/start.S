@@ -76,20 +76,6 @@
   slli    s4, s4, PAGE_SIZE_SHIFT
   sd      s4, riscv64_kernel_bootstrap_translation_table_phys, t0
 
-  // call into the riscv64 boot mapping code to give it a chance to initialize its page tables
-  sub     a0, s3, s2  // Argument is (virtual - physical) delta.
-  call    riscv64_boot_map_init
-
-  // void riscv64_boot_map(pte_t* kernel_table0, vaddr_t vaddr, paddr_t paddr, size_t len, pte_t flags);
-
-  // map a large run of physical memory at the base of the kernel's address space
-  mv      a0, s4
-  li      a1, KERNEL_ASPACE_BASE
-  li      a2, 0
-  li      a3, ARCH_PHYSMAP_SIZE
-  li      a4, RISCV64_PTE_G | RISCV64_PTE_A | RISCV64_PTE_D | RISCV64_PTE_R | RISCV64_PTE_W | RISCV64_PTE_V
-  call    riscv64_boot_map
-
   // compute the delta between the old physical and newer high addresses
   sub     t0, s3, s2
 

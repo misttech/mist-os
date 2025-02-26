@@ -198,6 +198,8 @@ class HandoffPrep {
   // This must be the very last set-up routine called within DoHandoff().
   void SetMemory();
 
+  void ConstructKernelAddressSpace(const ElfImage& kernel);
+
   PhysHandoff* handoff_ = nullptr;
   zbitl::Image<Allocation> mexec_image_;
   HandoffVmoList extra_vmos_;
