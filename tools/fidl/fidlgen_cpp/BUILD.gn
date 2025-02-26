@@ -35,6 +35,10 @@ if (is_host) {
             candidate = "$_gen_dir/$_include_path/markers.h"
           },
           {
+            golden = "goldens/${info.name}_common_types_format.h.golden"
+            candidate = "$_gen_dir/$_include_path/common_types_format.h"
+          },
+          {
             golden = "goldens/${info.name}_common_types.h.golden"
             candidate = "$_gen_dir/$_include_path/common_types.h"
           },

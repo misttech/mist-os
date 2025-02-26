@@ -95,6 +95,7 @@ def _codegen_impl(ctx):
     base_path = ctx.attr.name + "." + ctx.attr.binding_type
 
     header_files = [
+        "common_types_format.h",
         "common_types.h",
         "driver/natural_messaging.h",
         "driver/wire_messaging.h",

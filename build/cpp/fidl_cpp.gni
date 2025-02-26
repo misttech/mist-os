@@ -461,6 +461,7 @@ template("fidl_cpp_family") {
       bindings_flavor = "cpp"
       generated_headers = [
         "fidl/$library_name/cpp/common_types.h",
+        "fidl/$library_name/cpp/common_types_format.h",
         "fidl/$library_name/cpp/markers.h",
         "fidl/$library_name/cpp/wire_types.h",
         "fidl/$library_name/cpp/natural_types.h",
@@ -591,6 +592,7 @@ template("fidl_cpp_family") {
     bindings_flavor = "cpp"
     fidlgen_tool = "//tools/fidl/fidlgen_cpp"
     generated_headers = [
+      "fidl/$library_name/cpp/common_types_format.h",
       "fidl/$library_name/cpp/common_types.h",
       "fidl/$library_name/cpp/driver/natural_messaging.h",
       "fidl/$library_name/cpp/driver/wire_messaging.h",
