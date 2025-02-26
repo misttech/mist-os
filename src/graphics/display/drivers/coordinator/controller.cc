@@ -673,39 +673,39 @@ zx::result<std::span<const display::DisplayTiming>> Controller::GetDisplayTiming
   if (unbinding_) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
-  for (auto& display : displays_) {
-    if (display.id() == display_id) {
-      if (display.edid.has_value()) {
-        return zx::ok(std::span(display.edid->timings));
-      }
 
-      ZX_DEBUG_ASSERT(display.mode.has_value());
-      return zx::ok(std::span(&*display.mode, 1));
-    }
+  auto displays_it = displays_.find(display_id);
+  if (!displays_it.IsValid()) {
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
-  return zx::error(ZX_ERR_NOT_FOUND);
+  const DisplayInfo& display_info = *displays_it;
+
+  if (display_info.edid.has_value()) {
+    return zx::ok(std::span(display_info.edid->timings));
+  }
+
+  ZX_DEBUG_ASSERT(display_info.mode.has_value());
+  return zx::ok(std::span(&display_info.mode.value(), 1));
 }
 
 zx::result<fbl::Vector<display::PixelFormat>> Controller::GetSupportedPixelFormats(
     display::DisplayId display_id) {
-  fbl::Array<display::PixelFormat> formats_out;
-  for (const DisplayInfo& display_info : displays_) {
-    if (display_info.id() != display_id) {
-      continue;
-    }
-
-    fbl::AllocChecker alloc_checker;
-    fbl::Vector<display::PixelFormat> pixel_formats;
-    pixel_formats.reserve(display_info.pixel_formats.size(), &alloc_checker);
-    if (!alloc_checker.check()) {
-      return zx::error(ZX_ERR_NO_MEMORY);
-    }
-    std::ranges::copy(display_info.pixel_formats, std::back_inserter(pixel_formats));
-    ZX_DEBUG_ASSERT(pixel_formats.size() == display_info.pixel_formats.size());
-
-    return zx::ok(std::move(pixel_formats));
+  auto displays_it = displays_.find(display_id);
+  if (!displays_it.IsValid()) {
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
-  return zx::error(ZX_ERR_NOT_FOUND);
+  const DisplayInfo& display_info = *displays_it;
+
+  fbl::AllocChecker alloc_checker;
+  fbl::Vector<display::PixelFormat> pixel_formats;
+  pixel_formats.reserve(display_info.pixel_formats.size(), &alloc_checker);
+  if (!alloc_checker.check()) {
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+  std::ranges::copy(display_info.pixel_formats, std::back_inserter(pixel_formats));
+  ZX_DEBUG_ASSERT(pixel_formats.size() == display_info.pixel_formats.size());
+
+  return zx::ok(std::move(pixel_formats));
 }
 
 namespace {
