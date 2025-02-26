@@ -74,6 +74,7 @@ if (has_board) {
   compiled_action("generate_ffx_command_list") {
     testonly = true
     visibility = [ ":*" ]
+    depfile = "${target_out_dir}/$target_name.d"
 
     # Avoid using the host tool coming from previous builds.
     can_use_previously_built_tool = false
@@ -85,7 +86,9 @@ if (has_board) {
       "--command-list",
       rebase_path(_command_list, root_build_dir),
       "--sdk-root",
-      rebase_path(_sdk_path, root_build_dir),
+      rebase_path(root_build_dir, root_build_dir),
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
     ]
 
     # Add a dependency on the SDK so ffx is up to
@@ -99,7 +102,7 @@ if (has_board) {
     golden_source_dir = "goldens"
     command_name = "ffx"
     golden_processor_tool = ":ffx_cli_goldens"
-    sdk_path = _sdk_path
+    sdk_root = root_build_dir
     visible_label =
         get_label_info(":ffx-golden-command-list", "label_no_toolchain")
 
@@ -120,7 +123,7 @@ if (has_board) {
       golden_source_dir = "goldens"
       command_name = c
       golden_processor_tool = ":ffx_cli_goldens"
-      sdk_path = _sdk_path
+      sdk_root = root_build_dir
       visible_label =
           get_label_info(":ffx-golden-command-list", "label_no_toolchain")
 

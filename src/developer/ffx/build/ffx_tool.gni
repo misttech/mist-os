@@ -163,6 +163,7 @@ template("ffx_tool") {
     ]
   }
 
+  # This is used to generate metadata about in-tree standalone ffx subtools.
   group(tool_list_metadata_target) {
     metadata = {
       # LINT.IfChange(clidoc_subtool_manifest)
@@ -181,9 +182,10 @@ template("ffx_tool") {
           if (defined(invoker.sdk_category)) {
             category = invoker.sdk_category
           }
-          executable = rebase_path("$root_out_dir/$output_name", root_build_dir)
+          executable =
+              rebase_path("$host_tools_dir/$output_name", root_build_dir)
           executable_metadata =
-              rebase_path("$root_out_dir/$output_metadata", root_build_dir)
+              rebase_path("$host_tools_dir/$output_metadata", root_build_dir)
         },
       ]
 

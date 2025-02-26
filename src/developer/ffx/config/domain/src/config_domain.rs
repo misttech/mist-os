@@ -239,7 +239,7 @@ impl ConfigDomain {
         update_cmd.env("FUCHSIA_VERSION_CHECK_FILES", join_paths(files));
 
         // check that the SDK exists at the given path.
-        if !sdk_root.manifest_exists() {
+        if sdk_root.manifest_path().is_none() {
             tracing::trace!("SDK manifest didn't exist for {sdk_root:?}");
             return Some(update_cmd);
         } else {

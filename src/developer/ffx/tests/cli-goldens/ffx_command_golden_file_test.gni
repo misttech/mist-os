@@ -14,7 +14,7 @@ template("ffx_command_golden_file_test") {
   if (defined(invoker.visible_label)) {
     _visible_label = invoker.visible_label
   }
-  _sdk_path = invoker.sdk_path
+  _sdk_root = invoker.sdk_root
   visibility = [ ":*" ]
   if (defined(invoker.visibility)) {
     visibility += invoker.visibility
@@ -52,6 +52,7 @@ template("ffx_command_golden_file_test") {
 
   compiled_action("describe_ffx_${command_name}_cli_goldens") {
     testonly = true
+    depfile = "${target_out_dir}/$target_name.d"
 
     # Avoid using the host tool coming from previous builds.
     can_use_previously_built_tool = false
@@ -72,15 +73,18 @@ template("ffx_command_golden_file_test") {
       "--gen-comparisons",
       rebase_path(_comparisons_file, root_build_dir),
       "--sdk-root",
-      rebase_path(_sdk_path, root_build_dir),
+      rebase_path(_sdk_root, root_build_dir),
       "--filter-command",
       command_name,
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
     ]
     deps = _deps
   }
 
   compiled_action("invoke_ffx_${command_name}_cli_goldens") {
     testonly = true
+    depfile = "${target_out_dir}/$target_name.d"
 
     # Avoid using prebuilt versions of the host
     # tool coming from previous builds.
@@ -96,9 +100,11 @@ template("ffx_command_golden_file_test") {
       "--out-dir",
       rebase_path(_golden_dir, root_build_dir),
       "--sdk-root",
-      rebase_path(_sdk_path, root_build_dir),
+      rebase_path(_sdk_root, root_build_dir),
       "--filter-command",
       command_name,
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
     ]
 
     deps = [

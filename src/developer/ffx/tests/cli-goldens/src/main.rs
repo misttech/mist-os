@@ -9,7 +9,8 @@ use ffx_config::environment::ExecutableKind;
 use ffx_config::{EnvironmentContext, SdkRoot};
 use ffx_isolate::{Isolate, SearchContext};
 use serde::Serialize;
-use std::fs;
+use serde_json::Value;
+use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
 
@@ -45,22 +46,15 @@ struct Args {
     #[argh(option)]
     /// top level command to use to filter output
     pub filter_command: Option<String>,
+    #[argh(option)]
+    /// GN depfile recording dependencies of the input.
+    pub depfile: Option<PathBuf>,
 }
 
 #[derive(Eq, PartialEq, Serialize, Ord, PartialOrd)]
 struct Comparison {
     pub candidate: String,
     pub golden: String,
-}
-
-#[cfg(target_arch = "x86_64")]
-fn get_tools_relpath() -> String {
-    String::from("tools/x64")
-}
-
-#[cfg(target_arch = "aarch64")]
-fn get_tools_relpath() -> String {
-    String::from("tools/arm64")
 }
 
 /// Creates a new Isolate for ffx and a temp directory for holding
@@ -72,13 +66,20 @@ pub(crate) async fn new_ffx_isolate(name: &str, sdk_root_dir: PathBuf) -> Result
         EnvironmentContext::no_context(ExecutableKind::Test, Default::default(), None, false);
 
     let subtool_search_paths = Vec::<PathBuf>::new();
-    let ffx_path = sdk_root_dir.join(get_tools_relpath()).join("ffx");
+
+    let sdk_root = SdkRoot::Full { root: sdk_root_dir.into(), manifest: None };
+    let sdk = sdk_root.clone().get_sdk()?;
+    let ffx_path = sdk.get_host_tool("ffx")?;
+
+    if !ffx_path.exists() {
+        anyhow::bail!("ffx not found at {ffx_path:?}")
+    }
 
     let ffx_isolate = Isolate::new_with_search(
         name,
         SearchContext::Runtime {
             ffx_path: ffx_path,
-            sdk_root: Some(SdkRoot::Full { root: sdk_root_dir.into(), manifest: None }),
+            sdk_root: Some(sdk_root.clone()),
             subtool_search_paths,
         },
         PathBuf::from("."),
@@ -106,6 +107,10 @@ async fn main() -> Result<()> {
             )
         })
         .expect("json");
+
+    if let Some(depfile) = args.depfile {
+        write_depfile(depfile, ffx_isolate.env_context())?;
+    }
 
     if args.commandlist_only {
         let mut out = fs::File::create(args.command_list.expect("command list path"))?;
@@ -152,6 +157,45 @@ async fn main() -> Result<()> {
                     writeln!(&mut out, "{f}")?;
                 }
             }
+        }
+    }
+
+    Ok(())
+}
+
+fn write_depfile(depfile: PathBuf, context: &EnvironmentContext) -> Result<()> {
+    let mut f = File::create(depfile)?;
+
+    if let Some(path) = context.get_sdk_root()?.manifest_path() {
+        // Read the SDK manifest. This probably should be part of the SDK interface, but
+        // for now it is a one-off.
+        let manifest: Value = serde_json::from_str(&fs::read_to_string(&path)?)?;
+        let cwd = std::env::current_dir()?;
+
+        let manifest_filename = if path.is_relative() {
+            path.display().to_string()
+        } else {
+            path.strip_prefix(cwd)?.display().to_string()
+        };
+        if let Some(atoms) = manifest.get("atoms") {
+            // Parse in-tree atom list
+            let tool_files_atoms: Vec<&Value> = atoms
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|a| {
+                    a["type"].as_str() == Some("host_tool")
+                        || a["type"].as_str() == Some("companion_host_tool")
+                })
+                .filter_map(|t| t["files"].as_array())
+                .flatten()
+                .collect();
+            for tool in tool_files_atoms {
+                writeln!(f, "{manifest_filename} : {}", tool["source"])?;
+            }
+        } else {
+            // sdk manifest
+            panic!("cli-goldens only supports in-tree sdk manifests at this time.")
         }
     }
 

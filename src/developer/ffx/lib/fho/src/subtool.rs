@@ -71,7 +71,7 @@ pub enum FhoHandler<M: FfxTool> {
     Metadata(MetadataCmd),
 }
 
-#[derive(FromArgs)]
+#[derive(Debug, FromArgs)]
 #[argh(subcommand, name = "metadata", description = "Print out this subtool's FHO metadata json")]
 pub struct MetadataCmd {
     #[argh(positional)]

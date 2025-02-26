@@ -210,14 +210,29 @@ impl SdkRoot {
         path.join(SDK_MANIFEST_PATH).exists() || path.join(SDK_BUILD_MANIFEST_PATH).exists()
     }
 
-    /// Returns true if the SDK at this root exists and has a valid manifest
-    pub fn manifest_exists(&self) -> bool {
+    /// Returns manifest path if it exists.
+    pub fn manifest_path(&self) -> Option<PathBuf> {
         match self {
-            Self::Full { root, manifest: Some(manifest) } => root.join(manifest).exists(),
-            Self::Full { root, manifest: None } => Self::is_sdk_root(root),
+            Self::Full { root, manifest: Some(manifest) } if root.join(manifest).exists() => {
+                Some(root.join(manifest))
+            }
+            Self::Full { root, manifest: None } if root.join(SDK_MANIFEST_PATH).exists() => {
+                Some(root.join(SDK_MANIFEST_PATH))
+            }
+            Self::Full { root, manifest: None } if root.join(SDK_BUILD_MANIFEST_PATH).exists() => {
+                Some(root.join(SDK_BUILD_MANIFEST_PATH))
+            }
+            Self::Full { .. } => None,
             Self::Modular { root, module } => {
-                let Ok(module_path) = module_manifest_path(root, module) else { return false };
-                module_path.exists()
+                if let Ok(module_path) = module_manifest_path(root, module) {
+                    if module_path.exists() {
+                        Some(module_path)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
             }
         }
     }
@@ -376,6 +391,16 @@ impl Sdk {
             real_paths: None,
             version: SdkVersion::Version(manifest.id),
         })
+    }
+
+    pub fn new() -> Self {
+        Sdk {
+            path_prefix: PathBuf::new(),
+            module: None,
+            parts: vec![],
+            real_paths: None,
+            version: SdkVersion::Unknown,
+        }
     }
 
     fn open_manifest(path: &Path) -> Result<fs::File> {
@@ -674,19 +699,21 @@ mod test {
     fn test_manifest_exists() {
         let core_root = core_test_data_root();
         let release_root = sdk_test_data_root();
-        assert!(
-            SdkRoot::Full { root: core_root.path().to_owned(), manifest: None }.manifest_exists()
-        );
+        assert!(SdkRoot::Full { root: core_root.path().to_owned(), manifest: None }
+            .manifest_path()
+            .is_some());
         assert!(SdkRoot::Modular {
             root: core_root.path().to_owned(),
             module: "host_tools_used_by_ffx_action_during_build".to_owned()
         }
-        .manifest_exists());
+        .manifest_path()
+        .is_some());
         assert!(SdkRoot::Full {
             root: release_root.path().to_owned(),
             manifest: Some(SDK_MANIFEST_PATH.into())
         }
-        .manifest_exists());
+        .manifest_path()
+        .is_some());
     }
 
     #[fuchsia::test]

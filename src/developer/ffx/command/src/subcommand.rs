@@ -33,7 +33,7 @@ struct SubToolLocation {
 }
 
 /// A subtool discovered in a user's workspace or sdk
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ExternalSubTool {
     cmd_line: FfxCommandLine,
     context: EnvironmentContext,
@@ -156,6 +156,7 @@ impl ToolSuite for ExternalSubToolSuite {
         // external subtools. Otherwise scan the directories. The manifest file is used when
         // ffx is being run hermetically, and should not scan and read directories.
         if subtool_manifest.exists() {
+            tracing::info!("Initializing ExternalSubToolSuite from {subtool_manifest:?} ");
             Ok(Self::with_tools_manifest(env.clone(), subtool_manifest))
         } else {
             let subtool_config: Vec<Value> = env
@@ -164,6 +165,7 @@ impl ToolSuite for ExternalSubToolSuite {
                 .get_file()
                 .await
                 .unwrap_or_else(|_| vec![]);
+            tracing::info!("Initializing ExternalSubToolSuite from {subtool_config:?}");
             Ok(Self::with_tools_from(env.clone(), &get_subtool_paths(subtool_config)))
         }
     }
@@ -215,14 +217,17 @@ impl ToolSuite for ExternalSubToolSuite {
 
     async fn command_list(&self) -> Vec<FfxToolInfo> {
         let mut tools: Vec<_> = self.workspace_tools.values().cloned().collect();
-        if let Ok(sdk) = self.context.get_sdk() {
-            for ffx_tool in sdk.get_ffx_tools() {
-                SubToolLocation::from_path(
-                    FfxToolSource::Sdk,
-                    &ffx_tool.executable,
-                    &ffx_tool.metadata,
-                )
-                .map(|loc| tools.push(loc));
+        // if we have workspace tools, there is no need to get sdk tools.
+        if tools.is_empty() {
+            if let Ok(sdk) = self.context.get_sdk() {
+                for ffx_tool in sdk.get_ffx_tools() {
+                    SubToolLocation::from_path(
+                        FfxToolSource::Sdk,
+                        &ffx_tool.executable,
+                        &ffx_tool.metadata,
+                    )
+                    .map(|loc| tools.push(loc));
+                }
             }
         }
         tools.iter().filter_map(SubToolLocation::validate_tool).collect()
@@ -234,13 +239,16 @@ impl ToolSuite for ExternalSubToolSuite {
     ) -> Result<Option<Box<(dyn ToolRunner + '_)>>> {
         // look in the workspace first
         if let Some(cmd) = self.find_workspace_tool(ffx_cmd) {
+            tracing::info!("Found workspace tool {cmd:?}");
             return Ok(Some(Box::new(cmd)));
         }
         // then try the sdk
         let sdk_cmd = self.context.get_sdk().ok().and_then(|sdk| self.find_sdk_tool(&sdk, ffx_cmd));
         if let Some(cmd) = sdk_cmd {
+            tracing::info!("Found SDK tool {cmd:?}");
             return Ok(Some(Box::new(cmd)));
         }
+        tracing::warn!("Did not find external tool for {ffx_cmd:?}");
         // and we're done
         Ok(None)
     }

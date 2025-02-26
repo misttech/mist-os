@@ -204,7 +204,7 @@ fn load_domain_sdk_root(env: &EnvironmentContext, domain: &ConfigDomain) -> Resu
         log::trace!("Running sdk update command: {cmd:?}");
         let output = run_update_command(cmd)?;
         // double check we have an sdk in place now.
-        if !sdk_root.manifest_exists() {
+        if sdk_root.manifest_path().is_none() {
             return Err(Exit {
                 message: Box::new(format!("SDK check command succeeded, but no SDK found with '{sdk_root:?}'. Output of check command:\n\n{}", String::from_utf8_lossy(&output.stdout))),
                 code: 100,
