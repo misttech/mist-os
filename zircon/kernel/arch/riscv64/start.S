@@ -57,6 +57,15 @@
   lla     shadow_call_sp, boot_shadow_call_stack
 #endif
 
+  // We modify the currently live address space below. Store the address of
+  // the root page table both here in s4 for local use and in a variable for
+  // later use by secondaries.
+  csrr    s4, satp
+  li      t0, RISCV64_SATP_PPN_MASK
+  and     s4, s4, t0
+  slli    s4, s4, PAGE_SIZE_SHIFT
+  sd      s4, riscv64_kernel_bootstrap_translation_table_phys, t0
+
   // compute the delta between the old physical and newer high addresses
   sub     t0, s3, s2
 

@@ -5,7 +5,6 @@
 // https://opensource.org/licenses/MIT
 
 #include <inttypes.h>
-#include <lib/arch/arm64/system.h>
 #include <string.h>
 #include <sys/types.h>
 
@@ -241,9 +240,8 @@ zx_status_t arm64_boot_map_v(const vaddr_t vaddr, const paddr_t paddr, const siz
     return reinterpret_cast<pte_t*>(paddr_to_physmap(pa));
   };
 
-  pte_t* root_page_table = phys_to_virt(arch::ArmTtbr1El1::Read().addr());
-  return _arm64_boot_map(root_page_table, vaddr, paddr, len, flags, alloc, phys_to_virt,
-                         allow_large_pages);
+  return _arm64_boot_map(arm64_root_kernel_page_table(), vaddr, paddr, len, flags, alloc,
+                         phys_to_virt, allow_large_pages);
 }
 
 // Walk all the page tables allocated in the boot process and move them from the WIRED to the MMU

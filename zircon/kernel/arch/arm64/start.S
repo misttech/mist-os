@@ -30,8 +30,10 @@ tmp3                    .req x11
 tmp4                    .req x12
 tmp5                    .req x13
 
-kernel_vaddr            .req x21
-handoff_paddr           .req x22
+page_table0             .req x21
+page_table1             .req x22
+kernel_vaddr            .req x23
+handoff_paddr           .req x24
 
 // Collect timestamp in tmp, tmp2.  Also clobbers tmp3-5.
 .macro sample_ticks
@@ -74,6 +76,18 @@ handoff_paddr           .req x22
 
   // Save the x0 argument in a register that won't be clobbered.
   mov handoff_paddr, x0
+
+  // root_lower_page_table_phys: boot CPU TTBR0_EL1.BADDR.
+  mrs page_table0, ttbr0_el1
+  and page_table0, page_table0, MMU_PTE_OUTPUT_ADDR_MASK
+  adr_global tmp2, root_lower_page_table_phys
+  str page_table0, [tmp2]
+
+  // root_kernel_page_table_phys: boot CPU TTBR1_EL1.BADDR.
+  mrs page_table1, ttbr1_el1
+  and page_table1, page_table1, MMU_PTE_OUTPUT_ADDR_MASK
+  adr_global tmp2, root_kernel_page_table_phys
+  str page_table1, [tmp2]
 
   // This can be any arbitrary (page-aligned) address >= KERNEL_ASPACE_BASE.
   // TODO(https://fxbug.dev/42098994): Choose it randomly.
