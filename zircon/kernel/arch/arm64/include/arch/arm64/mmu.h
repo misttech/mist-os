@@ -455,9 +455,6 @@ static_assert(((USER_ASPACE_BASE + USER_RESTRICTED_ASPACE_SIZE) &
 const uint16_t MMU_ARM64_MAX_USER_ASID_8 = (1u << 8) - 1;
 const uint16_t MMU_ARM64_MAX_USER_ASID_16 = (1u << 16) - 1;
 
-// Global accessor for the root kernel page table.
-pte_t* arm64_root_kernel_page_table();
-
 // Physical addresses of the kernel(/upper) and lower root page tables,
 // saved in start.S.
 extern paddr_t root_kernel_page_table_phys;
