@@ -7,11 +7,11 @@ import("//build/rust/rustc_library.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":starnix-cgroup-tests" ]
+  deps = [ ":starnix-cgroupfs-tests" ]
 }
 
-rustc_library("cgroup") {
-  name = "starnix-modules-cgroup"
+rustc_library("cgroupfs") {
+  name = "starnix-modules-cgroupfs"
   edition = "2021"
   version = "0.1.0"
   source_root = "lib.rs"
@@ -46,9 +46,9 @@ rustc_library("cgroup") {
   ]
 }
 
-fuchsia_unittest_package("starnix-cgroup-tests") {
-  manifest = "meta/starnix_cgroup_tests.cml"
-  deps = [ ":cgroup_test" ]
+fuchsia_unittest_package("starnix-cgroupfs-tests") {
+  manifest = "meta/starnix_cgroupfs_tests.cml"
+  deps = [ ":cgroupfs_test" ]
   test_specs = {
     log_settings = {
       # Tests exercise failure cases, so ERROR logs are expected.

@@ -17,7 +17,7 @@ use starnix_core::fs::tmpfs::tmp_fs;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::fs_registry::FsRegistry;
 use starnix_core::vfs::pipe::register_pipe_fs;
-use starnix_modules_cgroup::{CgroupV1Fs, CgroupV2Fs};
+use starnix_modules_cgroupfs::{CgroupV1Fs, CgroupV2Fs};
 use starnix_modules_device_mapper::{create_device_mapper, device_mapper_init};
 use starnix_modules_ext4::ExtFilesystem;
 use starnix_modules_functionfs::FunctionFs;
