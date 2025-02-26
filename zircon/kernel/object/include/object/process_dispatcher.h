@@ -157,9 +157,15 @@ class ProcessDispatcher final
   uintptr_t vdso_base_address() { return shareable_state_->aspace()->vdso_base_address(); }
 
   void EnumerateAspaceChildren(VmEnumerator* ve) {
-    shareable_state_->aspace()->EnumerateChildren(ve);
+    fbl::RefPtr<VmAddressRegion> root_vmar = shareable_state_->aspace()->RootVmar();
+    if (root_vmar) {
+      root_vmar->EnumerateChildren(ve);
+    }
     if (restricted_aspace_) {
-      restricted_aspace_->EnumerateChildren(ve);
+      root_vmar = restricted_aspace_->RootVmar();
+      if (root_vmar) {
+        root_vmar->EnumerateChildren(ve);
+      }
     }
   }
 

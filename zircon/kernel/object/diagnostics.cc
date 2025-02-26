@@ -811,7 +811,11 @@ class VmCounter final : public VmEnumerator {
 
 zx_status_t VmAspace::GetMemoryUsage(vm_usage_t* usage) {
   VmCounter vc;
-  if (EnumerateChildren(&vc) != ZX_OK) {
+  fbl::RefPtr<VmAddressRegion> root_vmar = RootVmar();
+  if (!root_vmar) {
+    return ZX_ERR_INTERNAL;
+  }
+  if (root_vmar->EnumerateChildren(&vc) != ZX_OK) {
     *usage = {};
     return ZX_ERR_INTERNAL;
   }

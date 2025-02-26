@@ -728,22 +728,6 @@ void VmAspace::DumpLocked(bool verbose) const {
   }
 }
 
-zx_status_t VmAspace::EnumerateChildren(VmEnumerator* ve) {
-  canary_.Assert();
-  DEBUG_ASSERT(ve != nullptr);
-  Guard<CriticalMutex> guard{&lock_};
-  if (root_vmar_ == nullptr || aspace_destroyed_) {
-    // Aspace hasn't been initialized or has already been destroyed.
-    return ZX_ERR_BAD_STATE;
-  }
-  AssertHeld(root_vmar_->lock_ref());
-  DEBUG_ASSERT(root_vmar_->IsAliveLocked());
-  if (!ve->OnVmAddressRegion(root_vmar_.get(), 0)) {
-    return ZX_ERR_CANCELED;
-  }
-  return root_vmar_->EnumerateChildrenLocked(ve);
-}
-
 void VmAspace::DumpAllAspaces(bool verbose) {
   Guard<Mutex> guard{AspaceListLock::Get()};
 
