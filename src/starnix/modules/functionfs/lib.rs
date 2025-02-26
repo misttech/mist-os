@@ -69,11 +69,13 @@ pub fn clear_wake_proxy_signal(event: &zx::EventPair, outstanding_reads: i32) {
     }
 }
 
-/// Commands that can be sent to the thread handling the ADB messages.
-/// Responses are send back via `mpsc::Sender`.
-enum Command {
-    Read(mpsc::Sender<Result<Vec<u8>, Errno>>),
-    Write(Vec<u8>, mpsc::Sender<Result<usize, Errno>>),
+struct ReadCommand {
+    response_sender: mpsc::Sender<Result<Vec<u8>, Errno>>,
+}
+
+struct WriteCommand {
+    data: Vec<u8>,
+    response_sender: mpsc::Sender<Result<usize, Errno>>,
 }
 
 /// Handle all of the ADB messages in an async context.
@@ -87,7 +89,8 @@ enum Command {
 async fn handle_adb(
     proxy: fadb::UsbAdbImpl_Proxy,
     resume_event: Option<zx::EventPair>,
-    commands: async_channel::Receiver<Command>,
+    read_commands: async_channel::Receiver<ReadCommand>,
+    write_commands: async_channel::Receiver<WriteCommand>,
 ) {
     /// Handle all of the events coming from the ADB device.
     async fn handle_events(
@@ -106,85 +109,96 @@ async fn handle_adb(
     }
 
     /// Handle the commands coming from the main thread.
-    async fn handle_commands(
-        proxy: fadb::UsbAdbImpl_Proxy,
+    async fn handle_read_commands(
+        proxy: &fadb::UsbAdbImpl_Proxy,
         outstanding_reads: &RefCell<i32>,
         resume_event: &Option<zx::EventPair>,
-        commands: async_channel::Receiver<Command>,
+        commands: async_channel::Receiver<ReadCommand>,
     ) {
         let resume_event = resume_event.as_ref();
         commands
-            .for_each_concurrent(10, |next| async {
-                match next {
-                    Command::Read(response_sender) => {
-                        outstanding_reads.replace_with(|&mut old| old + 1);
+            .for_each(|ReadCommand { response_sender }| async move {
+                outstanding_reads.replace_with(|&mut old| old + 1);
 
-                        // Queue up our receive future. We want to do this before we lower the
-                        // signal allowing us to go to sleep.
-                        let receive_future = proxy.receive();
+                // Queue up our receive future. We want to do this before we lower the
+                // signal allowing us to go to sleep.
+                let receive_future = proxy.receive();
 
-                        // Our future is queued, now we can lower our signals.
-                        resume_event.as_ref().map(|e| {
-                            clear_wake_proxy_signal(e, *outstanding_reads.borrow());
-                        });
+                // Our future is queued, now we can lower our signals.
+                resume_event.as_ref().map(|e| {
+                    clear_wake_proxy_signal(e, *outstanding_reads.borrow());
+                });
 
-                        let response = match receive_future.await {
-                            Err(err) => {
-                                log_warn!("Failed to call UsbAdbImpl.Receive: {err}");
-                                error!(EINVAL)
-                            }
-                            Ok(Err(err)) => {
-                                log_warn!("Failed to receive data from adb driver: {err}");
-                                error!(EINVAL)
-                            }
-                            Ok(Ok(payload)) => Ok(payload),
-                        };
-
-                        outstanding_reads.replace_with(|&mut old| old - 1);
-
-                        resume_event.as_ref().map(|e| {
-                            clear_wake_proxy_signal(e, *outstanding_reads.borrow());
-                        });
-
-                        response_sender
-                            .send(response)
-                            .map_err(|e| log_error!("Failed to send to main thread: {:#?}", e))
-                            .ok();
+                let response = match receive_future.await {
+                    Err(err) => {
+                        log_warn!("Failed to call UsbAdbImpl.Receive: {err}");
+                        error!(EINVAL)
                     }
-                    Command::Write(data, response_sender) => {
-                        let response = match proxy.queue_tx(&data).await {
-                            Err(err) => {
-                                log_warn!("Failed to call UsbAdbImpl.QueueTx: {err}");
-                                error!(EINVAL)
-                            }
-                            Ok(Err(err)) => {
-                                log_warn!("Failed to queue data to adb driver: {err}");
-                                error!(EINVAL)
-                            }
-                            Ok(Ok(_)) => Ok(data.len()),
-                        };
-
-                        // We can simply clear this after getting a response because we care about
-                        // reads. Allow new FIDL messages to come through and only go to sleep if
-                        // we have an outstanding read.
-                        resume_event.as_ref().map(|e| {
-                            clear_wake_proxy_signal(e, *outstanding_reads.borrow());
-                        });
-                        response_sender
-                            .send(response)
-                            .map_err(|e| log_error!("Failed to send to main thread: {:#?}", e))
-                            .ok();
+                    Ok(Err(err)) => {
+                        log_warn!("Failed to receive data from adb driver: {err}");
+                        error!(EINVAL)
                     }
+                    Ok(Ok(payload)) => Ok(payload),
                 };
+
+                outstanding_reads.replace_with(|&mut old| old - 1);
+
+                resume_event.as_ref().map(|e| {
+                    clear_wake_proxy_signal(e, *outstanding_reads.borrow());
+                });
+
+                response_sender
+                    .send(response)
+                    .map_err(|e| log_error!("Failed to send to main thread: {:#?}", e))
+                    .ok();
             })
             .await;
     }
 
-    // Run our two futures at the same time.
+    /// Handle the commands coming from the main thread.
+    async fn handle_write_commands(
+        proxy: &fadb::UsbAdbImpl_Proxy,
+        outstanding_reads: &RefCell<i32>,
+        resume_event: &Option<zx::EventPair>,
+        commands: async_channel::Receiver<WriteCommand>,
+    ) {
+        let resume_event = resume_event.as_ref();
+        commands
+            .for_each(|WriteCommand { data, response_sender }| async move {
+                let response = match proxy.queue_tx(&data).await {
+                    Err(err) => {
+                        log_warn!("Failed to call UsbAdbImpl.QueueTx: {err}");
+                        error!(EINVAL)
+                    }
+                    Ok(Err(err)) => {
+                        log_warn!("Failed to queue data to adb driver: {err}");
+                        error!(EINVAL)
+                    }
+                    Ok(Ok(_)) => Ok(data.len()),
+                };
+
+                // We can simply clear this after getting a response because we care about
+                // reads. Allow new FIDL messages to come through and only go to sleep if
+                // we have an outstanding read.
+                resume_event.as_ref().map(|e| {
+                    clear_wake_proxy_signal(e, *outstanding_reads.borrow());
+                });
+                response_sender
+                    .send(response)
+                    .map_err(|e| log_error!("Failed to send to main thread: {:#?}", e))
+                    .ok();
+            })
+            .await;
+    }
+
+    // Run our three futures at the same time.
     let outstanding_reads = RefCell::new(0);
     let event_future = handle_events(proxy.take_event_stream(), &outstanding_reads, &resume_event);
-    let commands_future = handle_commands(proxy, &outstanding_reads, &resume_event, commands);
-    futures::join!(event_future, commands_future);
+    let write_commands_future =
+        handle_write_commands(&proxy, &outstanding_reads, &resume_event, write_commands);
+    let read_commands_future =
+        handle_read_commands(&proxy, &outstanding_reads, &resume_event, read_commands);
+    futures::join!(event_future, write_commands_future, read_commands_future);
 }
 
 pub struct FunctionFs;
@@ -260,7 +274,8 @@ struct FunctionFsState {
     // respectively. /ep0 is the control endpoint and is always available.
     has_input_output_endpoints: bool,
 
-    adb_channel: Option<async_channel::Sender<Command>>,
+    adb_read_channel: Option<async_channel::Sender<ReadCommand>>,
+    adb_write_channel: Option<async_channel::Sender<WriteCommand>>,
 
     // FIDL binding to the adb driver, for start and stop calls.
     device_proxy: Option<fadb::DeviceSynchronousProxy>,
@@ -347,15 +362,24 @@ impl FunctionFsRootDir {
             connect_to_device(AdbProxyMode::WakeContainer)?;
         state.device_proxy = Some(device_proxy);
 
-        let (command_sender, command_receiver) = async_channel::unbounded();
-        state.adb_channel = Some(command_sender);
+        let (read_command_sender, read_command_receiver) = async_channel::unbounded();
+        state.adb_read_channel = Some(read_command_sender);
+
+        let (write_command_sender, write_command_receiver) = async_channel::unbounded();
+        state.adb_write_channel = Some(write_command_sender);
 
         // Spawn our future that will handle all of the ADB messages.
         kernel.kthreads.spawn_future(async move {
             let adb_proxy = fadb::UsbAdbImpl_Proxy::new(fidl::AsyncChannel::from_channel(
                 adb_proxy.into_channel(),
             ));
-            handle_adb(adb_proxy, adb_proxy_resume_event, command_receiver).await
+            handle_adb(
+                adb_proxy,
+                adb_proxy_resume_event,
+                read_command_receiver,
+                write_command_receiver,
+            )
+            .await
         });
 
         state.has_input_output_endpoints = true;
@@ -393,7 +417,8 @@ impl FunctionFsRootDir {
         if state.num_control_file_objects == 0 {
             // When all control endpoints are closed, the filesystem resets to its initial state.
             state.has_input_output_endpoints = false;
-            state.adb_channel = None;
+            state.adb_read_channel = None;
+            state.adb_write_channel = None;
             state.event_queue.clear();
 
             if let Some(device_proxy) = state.device_proxy.as_ref() {
@@ -410,10 +435,12 @@ impl FunctionFsRootDir {
     }
 
     fn write(&self, bytes: &[u8]) -> Result<usize, Errno> {
-        let bytes = Vec::from(bytes);
-        let (sender, receiver) = std::sync::mpsc::channel();
-        if let Some(channel) = self.state.lock().adb_channel.as_ref() {
-            channel.send_blocking(Command::Write(bytes, sender)).map_err(|_| errno!(EINVAL))?;
+        let data = Vec::from(bytes);
+        let (response_sender, receiver) = std::sync::mpsc::channel();
+        if let Some(channel) = self.state.lock().adb_write_channel.as_ref() {
+            channel
+                .send_blocking(WriteCommand { data, response_sender })
+                .map_err(|_| errno!(EINVAL))?;
         } else {
             return error!(ENODEV);
         }
@@ -421,9 +448,9 @@ impl FunctionFsRootDir {
     }
 
     fn read(&self) -> Result<Vec<u8>, Errno> {
-        let (sender, receiver) = std::sync::mpsc::channel();
-        if let Some(channel) = self.state.lock().adb_channel.as_ref() {
-            channel.send_blocking(Command::Read(sender)).map_err(|_| errno!(EINVAL))?;
+        let (response_sender, receiver) = std::sync::mpsc::channel();
+        if let Some(channel) = self.state.lock().adb_read_channel.as_ref() {
+            channel.send_blocking(ReadCommand { response_sender }).map_err(|_| errno!(EINVAL))?;
         } else {
             return error!(ENODEV);
         }
