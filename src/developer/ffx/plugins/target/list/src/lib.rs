@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::target_formatter::{JsonTarget, JsonTargetFormatter, TargetFormatter};
 use anyhow::Result;
 use async_trait::async_trait;
 use errors::{ffx_bail, ffx_bail_with_code};
@@ -15,9 +14,8 @@ use fidl_fuchsia_developer_ffx as ffx;
 use fuchsia_async::TimeoutExt;
 use futures::{StreamExt, TryStreamExt};
 use std::time::Duration;
+use target_formatter::{JsonTarget, JsonTargetFormatter, TargetFormatter};
 use target_holders::daemon_protocol;
-
-mod target_formatter;
 
 fn address_types_from_cmd(cmd: &ListCommand) -> AddressTypes {
     if cmd.no_ipv4 && cmd.no_ipv6 {

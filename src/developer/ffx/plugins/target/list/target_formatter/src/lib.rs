@@ -1,4 +1,4 @@
-// Copyright 2020 The Fuchsia Authors. All rights reserved.
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -237,7 +237,7 @@ impl TryFrom<ffx::TargetInfo> for SimpleTarget {
 }
 
 pub struct JsonTargetFormatter {
-    pub(crate) targets: Vec<JsonTarget>,
+    pub targets: Vec<JsonTarget>,
 }
 
 impl TryFrom<Vec<ffx::TargetInfo>> for JsonTargetFormatter {
@@ -264,10 +264,7 @@ impl TargetFormatter for JsonTargetFormatter {
 }
 
 impl JsonTargetFormatter {
-    pub(crate) fn set_default_target(
-        targets: &mut Vec<JsonTarget>,
-        default_nodename: Option<&str>,
-    ) {
+    pub fn set_default_target(targets: &mut Vec<JsonTarget>, default_nodename: Option<&str>) {
         targets
             .iter_mut()
             .find(|t| default_nodename.map(|n| t.nodename == n).unwrap_or(false))
@@ -594,55 +591,107 @@ impl TryFrom<Vec<ffx::TargetInfo>> for TabularTargetFormatter {
 mod test {
     use super::*;
     use fidl_fuchsia_net::{Ipv4Address, Ipv6Address};
-    use lazy_static::lazy_static;
     use std::collections::HashMap;
     use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, SocketAddrV6};
+    use std::sync::LazyLock;
 
-    lazy_static! {
-        static ref EMPTY_FORMATTER_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_empty_formatter_golden").trim();
-        static ref ONE_TARGET_WITH_DEFAULT_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_one_target_with_default_golden").trim();
-        static ref ONE_TARGET_NO_DEFAULT_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_one_target_no_default_golden").trim();
-        static ref EMPTY_NODENAME_WITH_DEFAULT_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_empty_nodename_with_default_golden").trim();
-        static ref EMPTY_NODENAME_WITH_DEFAULT_MULTIPLE_UNKNOWN_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_empty_nodename_with_default_multiple_unknown_golden").trim();
-        static ref EMPTY_NODENAME_NO_DEFAULT_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_empty_nodename_no_default_golden").trim();
-        static ref SIMPLE_FORMATTER_WITH_DEFAULT_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_simple_formatter_with_default_golden").trim();
-        static ref NAME_ONLY_FORMATTER_WITH_DEFAULT_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_name_only_formatter_with_default_golden").trim();
-        static ref NAME_ONLY_FORMATTER_MULTIPLE_UNKNOWN_WITH_DEFAULT_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_name_only_multiple_unknown_formatter_with_default_golden").trim();
-        static ref DEVICE_FINDER_FORMAT_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_device_finder_format_golden").trim();
-        static ref DEVICE_FINDER_FORMAT_IPV4_ONLY_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_device_finder_format_ipv4_only_golden").trim();
-        static ref DEVICE_FINDER_FORMAT_IPV6_ONLY_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_device_finder_format_ipv6_only_golden").trim();
-        static ref ADDRESSES_FORMAT_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_addresses_format_golden").trim();
-        static ref BUILD_CONFIG_FULL_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_build_config_full_golden").trim();
-        static ref BUILD_CONFIG_PRODUCT_MISSING_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_build_config_product_missing_golden").trim();
-        static ref BUILD_CONFIG_BOARD_MISSING_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_build_config_board_missing_golden").trim();
-        static ref JSON_BUILD_CONFIG_FULL_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_json_build_config_full_golden").trim();
-        static ref JSON_BUILD_CONFIG_FULL_DEFAULT_TARGET_GOLDEN: &'static str = include_str!(
-            "../test_data/target_formatter_json_build_config_full_default_target_golden"
-        ).trim();
-        static ref JSON_BUILD_CONFIG_PRODUCT_MISSING_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_json_build_config_product_missing_golden").trim();
-        static ref JSON_BUILD_CONFIG_BOARD_MISSING_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_json_build_config_board_missing_golden").trim();
-        static ref JSON_BUILD_CONFIG_BOTH_MISSING_GOLDEN: &'static str =
-            include_str!("../test_data/target_formatter_json_build_config_both_missing_golden").trim();
-    }
+    static EMPTY_FORMATTER_GOLDEN: LazyLock<String> = LazyLock::new(|| {
+        include_str!("../test_data/target_formatter_empty_formatter_golden").trim().to_owned();
+    });
+    static ONE_TARGET_WITH_DEFAULT_GOLDEN: LazyLock<String> = LazyLock::new(|| {
+        include_str!("../test_data/target_formatter_one_target_with_default_golden")
+            .trim()
+            .to_owned()
+    });
+    static ONE_TARGET_NO_DEFAULT_GOLDEN: LazyLock<String> = LazyLock::new(|| {
+        include_str!("../test_data/target_formatter_one_target_no_default_golden").trim().to_owned()
+    });
+    static EMPTY_NODENAME_WITH_DEFAULT_GOLDEN: LazyLock<String> = LazyLock::new(|| {
+        include_str!("../test_data/target_formatter_empty_nodename_with_default_golden")
+            .trim()
+            .to_owned()
+    });
+    static EMPTY_NODENAME_WITH_DEFAULT_MULTIPLE_UNKNOWN_GOLDEN: LazyLock<String> =
+        LazyLock::new(|| {
+            include_str!(
+                "../test_data/target_formatter_empty_nodename_with_default_multiple_unknown_golden"
+            )
+            .trim()
+            .to_owned()
+        });
+    static EMPTY_NODENAME_NO_DEFAULT_GOLDEN: LazyLock<String> = LazyLock::new(|| {
+        include_str!("../test_data/target_formatter_empty_nodename_no_default_golden")
+            .trim()
+            .to_owned()
+    });
+    static SIMPLE_FORMATTER_WITH_DEFAULT_GOLDEN: LazyLock<String> = LazyLock::new(|| {
+        include_str!("../test_data/target_formatter_simple_formatter_with_default_golden")
+            .trim()
+            .to_owned()
+    });
+    static NAME_ONLY_FORMATTER_WITH_DEFAULT_GOLDEN: LazyLock<String> = LazyLock::new(|| {
+        include_str!("../test_data/target_formatter_name_only_formatter_with_default_golden")
+            .trim()
+            .to_owned()
+    });
+    static NAME_ONLY_FORMATTER_MULTIPLE_UNKNOWN_WITH_DEFAULT_GOLDEN: LazyLock<String> =
+        LazyLock::new(|| {
+            include_str!("../test_data/target_formatter_name_only_multiple_unknown_formatter_with_default_golden").trim().to_owned()
+        });
+    static DEVICE_FINDER_FORMAT_GOLDEN: LazyLock<String> = LazyLock::new(|| {
+        include_str!("../test_data/target_formatter_device_finder_format_golden").trim().to_owned()
+    });
+    static DEVICE_FINDER_FORMAT_IPV4_ONLY_GOLDEN: LazyLock<String> = LazyLock::new(|| {
+        include_str!("../test_data/target_formatter_device_finder_format_ipv4_only_golden")
+            .trim()
+            .to_owned()
+    });
+    static DEVICE_FINDER_FORMAT_IPV6_ONLY_GOLDEN: LazyLock<String> = LazyLock::new(|| {
+        include_str!("../test_data/target_formatter_device_finder_format_ipv6_only_golden")
+            .trim()
+            .to_owned()
+    });
+    static ADDRESSES_FORMAT_GOLDEN: LazyLock<String> = LazyLock::new(|| {
+        include_str!("../test_data/target_formatter_addresses_format_golden").trim().to_owned()
+    });
+    static BUILD_CONFIG_FULL_GOLDEN: LazyLock<String> = LazyLock::new(|| {
+        include_str!("../test_data/target_formatter_build_config_full_golden").trim().to_owned()
+    });
+    static BUILD_CONFIG_PRODUCT_MISSING_GOLDEN: LazyLock<String> = LazyLock::new(|| {
+        include_str!("../test_data/target_formatter_build_config_product_missing_golden")
+            .trim()
+            .to_owned()
+    });
+    static BUILD_CONFIG_BOARD_MISSING_GOLDEN: LazyLock<String> = LazyLock::new(|| {
+        include_str!("../test_data/target_formatter_build_config_board_missing_golden")
+            .trim()
+            .to_owned()
+    });
+    static JSON_BUILD_CONFIG_FULL_GOLDEN: LazyLock<String> = LazyLock::new(|| {
+        include_str!("../test_data/target_formatter_json_build_config_full_golden")
+            .trim()
+            .to_owned()
+    });
+    static JSON_BUILD_CONFIG_FULL_DEFAULT_TARGET_GOLDEN: LazyLock<String> = LazyLock::new(|| {
+        include_str!("../test_data/target_formatter_json_build_config_full_default_target_golden")
+            .trim()
+            .to_owned()
+    });
+    static JSON_BUILD_CONFIG_PRODUCT_MISSING_GOLDEN: LazyLock<String> = LazyLock::new(|| {
+        include_str!("../test_data/target_formatter_json_build_config_product_missing_golden")
+            .trim()
+            .to_owned()
+    });
+    static JSON_BUILD_CONFIG_BOARD_MISSING_GOLDEN: LazyLock<String> = LazyLock::new(|| {
+        include_str!("../test_data/target_formatter_json_build_config_board_missing_golden")
+            .trim()
+            .to_owned()
+    });
+    static JSON_BUILD_CONFIG_BOTH_MISSING_GOLDEN: LazyLock<String> = LazyLock::new(|| {
+        include_str!("../test_data/target_formatter_json_build_config_both_missing_golden")
+            .trim()
+            .to_owned()
+    });
 
     fn make_valid_target() -> ffx::TargetInfo {
         ffx::TargetInfo {
@@ -687,7 +736,7 @@ mod test {
         assert_eq!(lines.join("\n"), EMPTY_FORMATTER_GOLDEN.to_string());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_formatter_one_target() {
         let formatter = TabularTargetFormatter::try_from(vec![
             make_valid_target(),
@@ -714,7 +763,7 @@ mod test {
         assert_eq!(lines.join("\n"), ONE_TARGET_NO_DEFAULT_GOLDEN.to_string());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_formatter_empty_nodename() {
         let formatter = TabularTargetFormatter::try_from(vec![
             make_valid_target(),
@@ -742,7 +791,7 @@ mod test {
         assert_eq!(lines.join("\n"), EMPTY_NODENAME_NO_DEFAULT_GOLDEN.to_string());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_formatter_multiple_empty_nodename() {
         let formatter = TabularTargetFormatter::try_from(vec![
             make_valid_target(),
@@ -781,7 +830,7 @@ mod test {
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_simple_formatter() {
         let formatter = SimpleTargetFormatter::try_from(vec![
             make_valid_target(),
@@ -828,7 +877,7 @@ mod test {
         assert_eq!(formatter.targets.len(), 5);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_name_only_formatter() {
         let formatter = NameOnlyTargetFormatter::try_from(vec![
             make_valid_target(),
@@ -855,7 +904,7 @@ mod test {
         assert_eq!(lines.join("\n"), NAME_ONLY_FORMATTER_WITH_DEFAULT_GOLDEN.to_string());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_name_only_multiple_unknown_formatter() {
         let formatter = NameOnlyTargetFormatter::try_from(vec![
             make_valid_target(),
@@ -1220,7 +1269,7 @@ mod test {
         (ip, port)
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_nonstandard_port_ipv4() {
         let target = ffx::TargetInfo {
             nodename: Some("lorberding".to_string()),
@@ -1244,7 +1293,7 @@ mod test {
         assert!(out.contains("127.0.0.1:1234"));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_nonstandard_port_ipv6() {
         let target = ffx::TargetInfo {
             nodename: Some("lorberding".to_string()),
