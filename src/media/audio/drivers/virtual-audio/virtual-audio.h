@@ -2,22 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_DFV2_VIRTUAL_AUDIO_DFV2_H_
-#define SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_DFV2_VIRTUAL_AUDIO_DFV2_H_
+#ifndef SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_H_
+#define SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_H_
 
 #include <fidl/fuchsia.virtualaudio/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
 
-#include "src/media/audio/drivers/virtual-audio-dfv2/virtual-audio-composite.h"
+#include "src/media/audio/drivers/virtual-audio/virtual-audio-composite.h"
 
 namespace virtual_audio {
 
 class VirtualAudio : public fdf::DriverBase,
                      public fidl::WireServer<fuchsia_virtualaudio::Control> {
  public:
-  static constexpr std::string_view kDriverName = "virtual_audio";
-  static constexpr std::string_view kChildNodeName = "virtual_audio";
+  static constexpr std::string_view kDriverName = "virtual-audio";
+  static constexpr std::string_view kChildNodeName = "virtual-audio";
   static constexpr std::string_view kClassName = "virtual_audio";
 
   VirtualAudio(fdf::DriverStartArgs start_args,
@@ -47,4 +47,4 @@ class VirtualAudio : public fdf::DriverBase,
 
 }  // namespace virtual_audio
 
-#endif  // SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_DFV2_VIRTUAL_AUDIO_DFV2_H_
+#endif  // SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_H_

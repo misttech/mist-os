@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/media/audio/drivers/virtual-audio-dfv2/virtual-audio-dfv2.h"
+#include "src/media/audio/drivers/virtual-audio/virtual-audio.h"
 
 #include <lib/driver/testing/cpp/driver_test.h>
 
 #include "src/lib/testing/predicates/status.h"
-#include "src/media/audio/drivers/virtual-audio-dfv2/virtual-audio-composite.h"
+#include "src/media/audio/drivers/virtual-audio/virtual-audio-composite.h"
 
 namespace virtual_audio::test {
 

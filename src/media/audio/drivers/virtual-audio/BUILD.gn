@@ -7,23 +7,23 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 import("//build/zbi/kernel_cmdline.gni")
 
-driver_bind_rules("virtual-audio-dfv2-bind") {
-  rules = "meta/virtual-audio-dfv2.bind"
+driver_bind_rules("virtual-audio-bind") {
+  rules = "meta/virtual-audio.bind"
   tests = "meta/bind-tests.json"
   deps = [ "//src/devices/bind/fuchsia.platform" ]
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":virtual-audio-dfv2-test" ]
+  deps = [ ":virtual-audio-test" ]
 }
 
 source_set("common") {
   sources = [
     "virtual-audio-composite.cc",
     "virtual-audio-composite.h",
-    "virtual-audio-dfv2.cc",
-    "virtual-audio-dfv2.h",
+    "virtual-audio.cc",
+    "virtual-audio.h",
   ]
   deps = [
     "//src/devices/lib/driver:driver_runtime",
@@ -38,26 +38,26 @@ source_set("common") {
   ]
 }
 
-fuchsia_cc_driver("virtual-audio-dfv2-driver") {
+fuchsia_cc_driver("virtual-audio-driver") {
   deps = [ ":common" ]
 }
 
-fuchsia_driver_component("virtual-audio-dfv2-driver-component") {
-  component_name = "virtual-audio-dfv2-driver"
+fuchsia_driver_component("virtual-audio-driver-component") {
+  component_name = "virtual-audio-driver"
   deps = [
-    ":virtual-audio-dfv2-bind",
-    ":virtual-audio-dfv2-driver",
+    ":virtual-audio-bind",
+    ":virtual-audio-driver",
   ]
-  info = "meta/virtual-audio-dfv2-info.json"
-  manifest = "meta/virtual-audio-dfv2-driver.cml"
+  info = "meta/virtual-audio-info.json"
+  manifest = "meta/virtual-audio-driver.cml"
 }
 
-fuchsia_driver_package("virtual-audio-dfv2") {
-  driver_components = [ ":virtual-audio-dfv2-driver-component" ]
+fuchsia_driver_package("virtual-audio") {
+  driver_components = [ ":virtual-audio-driver-component" ]
 }
 
-test("virtual-audio-dfv2-test-bin") {
-  sources = [ "virtual-audio-dfv2-test.cc" ]
+test("virtual-audio-test-bin") {
+  sources = [ "virtual-audio-test.cc" ]
   deps = [
     ":common",
     "//sdk/lib/driver/testing/cpp",
@@ -66,8 +66,8 @@ test("virtual-audio-dfv2-test-bin") {
   ]
 }
 
-fuchsia_unittest_package("virtual-audio-dfv2-test") {
-  deps = [ ":virtual-audio-dfv2-test-bin" ]
+fuchsia_unittest_package("virtual-audio-test") {
+  deps = [ ":virtual-audio-test-bin" ]
   test_specs = {
     environments = basic_envs
     log_settings = {
