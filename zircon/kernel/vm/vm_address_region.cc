@@ -532,7 +532,7 @@ zx_status_t VmAddressRegion::EnumerateChildrenInternalLocked(vaddr_t min_addr, v
                                                              ON_MAPPING on_mapping) {
   canary_.Assert();
 
-  VmAddressRegionEnumerator<VmAddressRegionEnumeratorType::UnpausableVmarOrMapping> enumerator(
+  VmAddressRegionEnumerator<VmAddressRegionEnumeratorType::VmarsAndMappings> enumerator(
       *this, min_addr, max_addr);
   AssertHeld(enumerator.lock_ref());
   while (auto result = enumerator.next()) {
@@ -672,14 +672,15 @@ zx_status_t VmAddressRegion::RangeOp(RangeOpType op, vaddr_t base, size_t len,
     return s;
   }
 
-  VmAddressRegionEnumerator<VmAddressRegionEnumeratorType::PausableMapping> enumerator(*this, base,
-                                                                                       last_addr);
+  VmAddressRegionEnumerator<VmAddressRegionEnumeratorType::MappingsOnly> enumerator(*this, base,
+                                                                                    last_addr);
   AssertHeld(enumerator.lock_ref());
   vaddr_t expected = base;
   while (auto map = enumerator.next()) {
     // Presently we hold the lock, so we know that region_or_mapping is valid, but we want to use
     // this outside of the lock later on, and so we must upgrade it to a RefPtr.
-    fbl::RefPtr<VmMapping> mapping = fbl::RefPtr<VmMapping>(map->region_or_mapping);
+    fbl::RefPtr<VmMapping> mapping = map->region_or_mapping->as_vm_mapping();
+    DEBUG_ASSERT(mapping);
     AssertHeld(mapping->lock_ref());
 
     // It's possible base is less than expected if the first mapping is not precisely aligned
@@ -988,12 +989,13 @@ zx_status_t VmAddressRegion::Protect(vaddr_t base, size_t size, uint new_arch_mm
   // Check part of the range is not mapped, or the new permissions are invalid for some mapping in
   // the range.
   {
-    VmAddressRegionEnumerator<VmAddressRegionEnumeratorType::PausableMapping> enumerator(
+    VmAddressRegionEnumerator<VmAddressRegionEnumeratorType::MappingsOnly> enumerator(
         *this, base, end_addr_byte);
     AssertHeld(enumerator.lock_ref());
     vaddr_t expected = base;
     while (auto entry = enumerator.next()) {
-      VmMapping* mapping = entry->region_or_mapping;
+      VmMapping* mapping = entry->region_or_mapping->as_vm_mapping_ptr();
+      DEBUG_ASSERT(mapping);
       AssertHeld(mapping->lock_ref());
       if (mapping->base_locked() > expected) {
         return ZX_ERR_NOT_FOUND;
@@ -1036,11 +1038,11 @@ zx_status_t VmAddressRegion::Protect(vaddr_t base, size_t size, uint new_arch_mm
     }
   }
 
-  VmAddressRegionEnumerator<VmAddressRegionEnumeratorType::PausableMapping> enumerator(
-      *this, base, end_addr_byte);
+  VmAddressRegionEnumerator<VmAddressRegionEnumeratorType::MappingsOnly> enumerator(*this, base,
+                                                                                    end_addr_byte);
   AssertHeld(enumerator.lock_ref());
   while (auto entry = enumerator.next()) {
-    VmMapping* mapping = entry->region_or_mapping;
+    VmMapping* mapping = entry->region_or_mapping->as_vm_mapping_ptr();
     DEBUG_ASSERT(mapping);
 
     // The last byte of the current region.
@@ -1276,13 +1278,16 @@ void VmAddressRegion::CommitHighMemoryPriority() {
     return;
   }
 
-  VmAddressRegionEnumerator<VmAddressRegionEnumeratorType::PausableMapping> enumerator(*this, 0,
-                                                                                       UINT64_MAX);
+  VmAddressRegionEnumerator<VmAddressRegionEnumeratorType::VmarsAndMappings> enumerator(*this, 0,
+                                                                                        UINT64_MAX);
   AssertHeld(enumerator.lock_ref());
   while (auto map = enumerator.next()) {
     // Presently we hold the lock, so we know that region_or_mapping is valid, but we want to use
     // this outside of the lock later on, and so we must upgrade it to a RefPtr.
-    fbl::RefPtr<VmMapping> mapping = fbl::RefPtr<VmMapping>(map->region_or_mapping);
+    fbl::RefPtr<VmMapping> mapping = map->region_or_mapping->as_vm_mapping();
+    if (!mapping) {
+      continue;
+    }
     enumerator.pause();
     guard.CallUnlocked(
         [mapping = ktl::move(mapping)]() mutable { mapping->CommitHighMemoryPriority(); });
