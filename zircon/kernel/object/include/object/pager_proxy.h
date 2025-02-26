@@ -80,6 +80,10 @@ class PagerProxy : public PageProvider,
   // next request.
   void OnPacketFreedLocked() TA_REQ(mtx_);
 
+  // Helper to do an informational printout if the thread has been waiting on the page request for
+  // too long.
+  void PrintOvertime(uint64_t waited_seconds) TA_EXCL(mtx_);
+
   mutable DECLARE_MUTEX(PagerProxy) mtx_;
 
   PagerDispatcher* const pager_;

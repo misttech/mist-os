@@ -311,19 +311,29 @@ void PagerProxy::SetPageSourceUnchecked(fbl::RefPtr<PageSource> src) {
   func();
 }
 
+namespace {
+
+// Helper to calculate the pager wait deadline.
+Deadline make_deadline() {
+  if (gBootOptions->userpager_overtime_wait_seconds == 0) {
+    return Deadline::infinite();
+  }
+  return Deadline::after_mono(ZX_SEC(gBootOptions->userpager_overtime_wait_seconds));
+}
+
+// Helper to determine if we've waited on the pager for longer than the specified timeout.
+bool waited_too_long(uint32_t waited) {
+  return gBootOptions->userpager_overtime_timeout_seconds > 0 &&
+         waited * gBootOptions->userpager_overtime_wait_seconds >=
+             gBootOptions->userpager_overtime_timeout_seconds;
+}
+
+}  // namespace
+
 zx_status_t PagerProxy::WaitOnEvent(Event* event, bool suspendable) {
   ThreadDispatcher::AutoBlocked by(ThreadDispatcher::Blocked::PAGER);
   kcounter_add(dispatcher_pager_total_request_count, 1);
   uint32_t waited = 0;
-  // declare a lambda to calculate our deadline to avoid an excessively large statement in our
-  // loop condition.
-  auto make_deadline = []() {
-    if (gBootOptions->userpager_overtime_wait_seconds == 0) {
-      return Deadline::infinite();
-    } else {
-      return Deadline::after_mono(ZX_SEC(gBootOptions->userpager_overtime_wait_seconds));
-    }
-  };
   // Ignore the suspend signal if not suspendable.
   const uint signal_mask = suspendable ? 0 : THREAD_SIGNAL_SUSPEND;
   zx_status_t result;
@@ -348,12 +358,15 @@ zx_status_t PagerProxy::WaitOnEvent(Event* event, bool suspendable) {
 
       // Error out if we've been waiting for longer than the specified timeout, to allow the rest of
       // the system to make progress (if possible).
-      if (gBootOptions->userpager_overtime_timeout_seconds > 0 &&
-          waited * gBootOptions->userpager_overtime_wait_seconds >=
-              gBootOptions->userpager_overtime_timeout_seconds) {
-        Guard<Mutex> guard{&mtx_};
+      if (waited_too_long(waited)) {
+        void* src;
+        {
+          Guard<Mutex> guard{&mtx_};
+          src = page_source_.get();
+        }
         printf("ERROR Page source %p blocked for %" PRIu64 " seconds. Page request timed out.\n",
-               page_source_.get(), gBootOptions->userpager_overtime_timeout_seconds);
+               src, gBootOptions->userpager_overtime_timeout_seconds);
+        Dump(0, gBootOptions->userpager_overtime_printout_limit);
         Thread::Current::Dump(false);
         kcounter_add(dispatcher_pager_timed_out_request_count, 1);
         return ZX_ERR_TIMED_OUT;
@@ -361,29 +374,7 @@ zx_status_t PagerProxy::WaitOnEvent(Event* event, bool suspendable) {
 
       // Do an informational printout of the source and ourselves if the overtime period has
       // elapsed.
-      fbl::RefPtr<PageSource> src;
-      bool do_printout = false;
-      {
-        Guard<Mutex> guard{&mtx_};
-        src = page_source_;
-        const zx_instant_mono_t now = current_mono_time();
-        if (now >= zx_time_add_duration(last_overtime_dump_,
-                                        ZX_SEC(gBootOptions->userpager_overtime_wait_seconds))) {
-          do_printout = true;
-          last_overtime_dump_ = now;
-        }
-      }
-      printf("WARNING Page source %p blocked for %" PRIu64 " seconds on event %p. %s\n", src.get(),
-             waited * gBootOptions->userpager_overtime_wait_seconds, event,
-             do_printout ? "Dump:" : "Dump skipped.");
-      // Dump out the rest of the state of the outstanding requests.
-      if (do_printout) {
-        Dump(0, gBootOptions->userpager_overtime_printout_limit);
-        if (src) {
-          // Use DumpSelf to avoid it calling our Dump method that we already performed.
-          src->DumpSelf(0, gBootOptions->userpager_overtime_printout_limit);
-        }
-      }
+      PrintOvertime(waited * gBootOptions->userpager_overtime_wait_seconds);
     }
 
     // Hold off on suspension until after the page request is resolved (or fails with a timeout).
@@ -401,15 +392,39 @@ zx_status_t PagerProxy::WaitOnEvent(Event* event, bool suspendable) {
   return result;
 }
 
+void PagerProxy::PrintOvertime(uint64_t waited_seconds) {
+  bool do_printout = false;
+  fbl::RefPtr<PageSource> src;
+  {
+    Guard<Mutex> guard{&mtx_};
+    src = page_source_;
+    const zx_instant_mono_t now = current_mono_time();
+    if (now >= zx_time_add_duration(last_overtime_dump_,
+                                    ZX_SEC(gBootOptions->userpager_overtime_wait_seconds))) {
+      do_printout = true;
+      last_overtime_dump_ = now;
+    }
+  }
+  printf("WARNING Page source %p blocked for %" PRIu64 " seconds. %s\n", src.get(), waited_seconds,
+         do_printout ? "Dump:" : "Dump skipped.");
+  // Dump out the rest of the state of the outstanding requests.
+  if (do_printout) {
+    Dump(0, gBootOptions->userpager_overtime_printout_limit);
+    if (src) {
+      // Use DumpSelf to avoid it calling our Dump method that we already performed.
+      src->DumpSelf(0, gBootOptions->userpager_overtime_printout_limit);
+    }
+  }
+}
+
 void PagerProxy::Dump(uint depth, uint32_t max_items) {
   Guard<Mutex> guard{&mtx_};
   dump::DepthPrinter printer(depth);
   char name[ZX_MAX_NAME_LEN];
   pager_->get_debug_name(name, ZX_MAX_NAME_LEN);
-  printer.Emit("pager_proxy %p pager_dispatcher <%s> page_source %p key %lu", this, name,
-               page_source_.get(), key_);
+  printer.Emit("pager_dispatcher <%s> page_source %p key %lu", name, page_source_.get(), key_);
 
-  printer.Emit("  source closed %d pager closed %d packet_busy %d complete_pending %d",
+  printer.Emit("  source_closed %d pager_closed %d packet_busy %d complete_pending %d",
                page_source_closed_, pager_dispatcher_closed_, packet_busy_, complete_pending_);
 
   if (active_request_) {
