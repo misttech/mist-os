@@ -73,9 +73,9 @@ class MockUsbFunction : public ddk::MockUsbFunction {
   zx_status_t UsbFunctionSetInterface(const usb_function_interface_protocol_t* interface) override {
     // Overriding method to store the interface passed.
     function = *interface;
-    if (on_set_interface_.has_value()) {
-      on_set_interface_.value()(*this);
-      on_set_interface_ = std::nullopt;
+    if (!on_set_interface_.empty()) {
+      on_set_interface_.front()(*this);
+      on_set_interface_.pop();
     }
     return ddk::MockUsbFunction::UsbFunctionSetInterface(interface);
   }
@@ -114,7 +114,7 @@ class MockUsbFunction : public ddk::MockUsbFunction {
   // Store request queues for each endpoint.
   std::map<uint8_t, std::vector<mock_usb_request_t>> usb_request_queues;
 
-  std::optional<fit::callback<void(MockUsbFunction&)>> on_set_interface_;
+  std::queue<fit::callback<void(MockUsbFunction&)>> on_set_interface_;
 };
 
 using FakeUsb = fake_usb_endpoint::FakeUsbFidlProvider<fuchsia_hardware_usb_function::UsbFunction,
@@ -135,6 +135,32 @@ class UsbAdbEnvironment : public fdf_testing::Environment {
     return zx::ok();
   }
 
+  // Call set_configured of usb adb to bring the interface online.
+  void EnableUsb() {
+    mock_usb_.ExpectConfigEp(ZX_OK, {}, {});
+    mock_usb_.ExpectConfigEp(ZX_OK, {}, {});
+    mock_usb_.function.ops->set_configured(mock_usb_.function.ctx, true, USB_SPEED_FULL);
+  }
+
+  void CancelAllUsbRxRequests() {
+    for (size_t i = 0; i < kBulkRxCount; i++) {
+      fake_dev_.fake_endpoint(kBulkOutEp).RequestComplete(ZX_ERR_CANCELED, 0);
+    }
+  }
+
+  // Expect that the driver will call SetInterface, and when it does so, call
+  // CancelAllUsbRxRequests.
+  //
+  // We call CancelAllUsbRxRequests only _after_ the driver calls SetInterface
+  // in order to avoid a race condition where we cancel a request, only to have
+  // the driver process the cancellation and send it back out again before
+  // `StopAdb()` gets processed.
+  void ExpectSetInterfaceAndCancelAllRxRequests() {
+    mock_usb_.ExpectSetInterface(ZX_OK, {});
+    mock_usb_.on_set_interface_.push(
+        [this](MockUsbFunction& mock_usb) { CancelAllUsbRxRequests(); });
+  }
+
   compat::DeviceServer device_server_;
   MockUsbFunction mock_usb_;
   FakeUsb fake_dev_ = FakeUsb(fdf::Dispatcher::GetCurrent()->async_dispatcher());
@@ -149,31 +175,19 @@ class UsbAdbTestConfig final {
 
 class UsbAdbTest : public zxtest::Test {
  public:
-  fidl::WireSyncClient<fadb::UsbAdbImpl> StartAdb() {
-    driver_test_.RunInEnvironmentTypeContext(
-        [](UsbAdbEnvironment& env) { env.mock_usb_.ExpectSetInterface(ZX_OK, {}); });
-
+  fidl::WireSyncClient<fadb::UsbAdbImpl> NormalStartAdb() {
     auto [client_end, server_end] = fidl::Endpoints<fadb::UsbAdbImpl>::Create();
     EXPECT_OK(client_->StartAdb(std::move(server_end)));
 
-    driver_test_.RunInEnvironmentTypeContext(
-        [](UsbAdbEnvironment& env) { env.mock_usb_.VerifyAndClear(); });
+    driver_test_.RunInEnvironmentTypeContext([](UsbAdbEnvironment& env) { env.EnableUsb(); });
 
     return fidl::WireSyncClient<fadb::UsbAdbImpl>(std::move(client_end));
   }
 
-  void ExpectUsbStopped() {
-    driver_test_.RunInEnvironmentTypeContext([this](UsbAdbEnvironment& env) {
-      env.mock_usb_.ExpectSetInterface(ZX_OK, {});
-
-      env.mock_usb_.on_set_interface_ = [this](MockUsbFunction& mock_usb) {
-        driver_test_.RunInEnvironmentTypeContext([](UsbAdbEnvironment& env) {
-          for (size_t i = 0; i < kBulkRxCount; i++) {
-            env.fake_dev_.fake_endpoint(kBulkOutEp).RequestComplete(ZX_ERR_IO_NOT_PRESENT, 0);
-          }
-        });
-      };
-    });
+  void NormalStopDriver() {
+    driver_test_.RunInEnvironmentTypeContext(
+        [](UsbAdbEnvironment& env) { env.ExpectSetInterfaceAndCancelAllRxRequests(); });
+    EXPECT_OK(driver_test_.StopDriver());
   }
 
   void SetUp() override {
@@ -191,32 +205,9 @@ class UsbAdbTest : public zxtest::Test {
     auto device = driver_test_.ConnectThroughDevfs<fadb::Device>(kDeviceName);
     EXPECT_OK(device.status_value());
     client_.Bind(std::move(device.value()));
-
-    driver_test_.RunInEnvironmentTypeContext([](UsbAdbEnvironment& env) {
-      // Call set_configured of usb adb to bring the interface online.
-      env.mock_usb_.ExpectConfigEp(ZX_OK, {}, {});
-      env.mock_usb_.ExpectConfigEp(ZX_OK, {}, {});
-      env.mock_usb_.function.ops->set_configured(env.mock_usb_.function.ctx, true, USB_SPEED_FULL);
-    });
   }
 
   void TearDown() override {
-    driver_test_.RunInEnvironmentTypeContext([this](UsbAdbEnvironment& env) {
-      env.mock_usb_.ExpectDisableEp(ZX_OK, kBulkOutEp);
-      env.mock_usb_.ExpectDisableEp(ZX_OK, kBulkInEp);
-      env.mock_usb_.ExpectSetInterface(ZX_OK, {});
-
-      env.mock_usb_.on_set_interface_ = [this](MockUsbFunction& mock_usb) {
-        driver_test_.RunInEnvironmentTypeContext([](UsbAdbEnvironment& env) {
-          for (size_t i = 0; i < kBulkRxCount; i++) {
-            env.fake_dev_.fake_endpoint(kBulkOutEp).RequestComplete(ZX_ERR_IO_NOT_PRESENT, 0);
-          }
-        });
-      };
-    });
-
-    EXPECT_OK(driver_test_.StopDriver());
-
     driver_test_.RunInEnvironmentTypeContext(
         [](UsbAdbEnvironment& env) { env.mock_usb_.VerifyAndClear(); });
   }
@@ -268,85 +259,197 @@ class EventHandler : public fidl::WireSyncEventHandler<fadb::UsbAdbImpl> {
   std::queue<fadb::StatusFlags> expected_statuses_;
 };
 
-TEST_F(UsbAdbTest, SetUpTearDown) { ASSERT_NO_FATAL_FAILURE(); }
-
-TEST_F(UsbAdbTest, StartStop) {
-  auto usb_impl = StartAdb();
-
-  EventHandler handler;
-  handler.expected_statuses_.push(fadb::StatusFlags::kOnline);
-
-  EXPECT_OK(usb_impl.HandleOneEvent(handler));
-
-  ExpectUsbStopped();
+TEST_F(UsbAdbTest, StopBeforeUsbStartsUp) {
+  // Expect disconnect.
+  driver_test_.RunInEnvironmentTypeContext(
+      [](UsbAdbEnvironment& env) { env.mock_usb_.ExpectSetInterface(ZX_OK, {}); });
+  EXPECT_OK(driver_test_.StopDriver());
 }
 
-// NOTE(hjfreyer): I couldn't get this test to pass reliably.
-//
-// Specifically, if I stop and restart the connection without the call to
-// `StopAdb`, the test passes _most_ of the time, but sometimes the driver's
-// shutdown logic takes too long and the second `StartAdb` fails because the
-// connection is still in use. However, with the call to `StopAdb`, the test
-// deadlocks.
-//
-// I tried to figure out what was going on, but I was unsuccessful. I'm planning
-// on changing the lifecycle of this driver anyways, so I don't want to invest
-// any more time in testing the present implementation.
-//
-// TEST_F(UsbAdbTest, StartStopStartStop) {
-//   EventHandler handler;
-//   handler.expected_statuses_.push(fadb::StatusFlags::kOnline);
-//   handler.expected_statuses_.push(fadb::StatusFlags::kOnline);
+TEST_F(UsbAdbTest, StartStop) {
+  auto [client_end, server_end] = fidl::Endpoints<fadb::UsbAdbImpl>::Create();
+  EXPECT_OK(client_->StartAdb(std::move(server_end)));
+  auto usb_impl = fidl::WireSyncClient<fadb::UsbAdbImpl>(std::move(client_end));
 
-//   {
-//     auto usb_impl = StartAdb();
-//     EXPECT_OK(usb_impl.HandleOneEvent(handler));
-//     SendTestData(usb_impl, 60);
+  EventHandler handler;
 
-//     ExpectReceiveData(1234);
-//     auto response = usb_impl->Receive();
-//     ASSERT_OK(response.status());
-//     ASSERT_EQ(response.value().value()->data.count(), 1234);
+  // TODO(https://fxbug.dev/398918059): Enable this assertion when
+  // HandleOneEvent supports a deadline.
+  //
+  // We don't expect an "online" event until after USB comes up.
+  // EXPECT_EQ(usb_impl.HandleOneEvent(handler, zx::deadline_after(zx::msec(1))).status(),
+  //           ZX_ERR_TIMED_OUT);
 
-//     ExpectUsbStopped();
-//     EXPECT_OK(client_->StopAdb());
-//   }
+  driver_test_.RunInEnvironmentTypeContext([](UsbAdbEnvironment& env) { env.EnableUsb(); });
 
-//   auto usb_impl = StartAdb();
-//   EXPECT_OK(usb_impl.HandleOneEvent(handler));
+  // Now we should get the event.
+  handler.expected_statuses_.push(fadb::StatusFlags::kOnline);
+  EXPECT_OK(usb_impl.HandleOneEvent(handler));
 
-//   SendTestData(usb_impl, 123);
+  libsync::Completion stop_requested;
+  driver_test_.RunInEnvironmentTypeContext([&](UsbAdbEnvironment& env) {
+    env.mock_usb_.ExpectSetInterface(ZX_OK, {});
+    env.mock_usb_.on_set_interface_.emplace(
+        [&stop_requested](MockUsbFunction& mock_usb) { stop_requested.Signal(); });
+  });
 
-//   ExpectReceiveData(808);
-//   auto response = usb_impl->Receive();
-//   ASSERT_OK(response.status());
-//   ASSERT_EQ(response.value().value()->data.count(), 808);
+  // Request a USB reset.
+  libsync::Completion stop_finished;
+  std::thread t([&]() {
+    EXPECT_OK(client_->StopAdb());
+    stop_finished.Signal();
+  });
 
-//   ExpectUsbStopped();
-// }
+  // TODO(https://fxbug.dev/398918059): Enable this assertion when
+  // HandleOneEvent supports a deadline.
+  //
+  // We don't expect an "offline" event or for StopAdb to complete until USB is shut down.
+  // EXPECT_EQ(usb_impl.HandleOneEvent(handler, zx::deadline_after(zx::msec(1))).status(),
+  //           ZX_ERR_TIMED_OUT);
+  EXPECT_EQ(stop_finished.Wait(zx::deadline_after(zx::msec(1))), ZX_ERR_TIMED_OUT);
+
+  // We call CancelAllUsbRxRequests only _after_ the driver calls SetInterface
+  // in order to avoid a race condition where we cancel a request, only to have
+  // the driver process the cancellation and send it back out again before
+  // `StopAdb()` gets processed.
+  stop_requested.Wait();
+  driver_test_.RunInEnvironmentTypeContext([&](UsbAdbEnvironment& env) {
+    env.CancelAllUsbRxRequests();
+    env.mock_usb_.ExpectSetInterface(ZX_OK, {});
+  });
+
+  handler.expected_statuses_.emplace(0);
+  EXPECT_OK(usb_impl.HandleOneEvent(handler));
+  EXPECT_EQ(usb_impl.HandleOneEvent(handler).status(), ZX_ERR_PEER_CLOSED);
+
+  stop_finished.Wait();
+  t.join();
+
+  driver_test_.RunInEnvironmentTypeContext(
+      [](UsbAdbEnvironment& env) { env.mock_usb_.ExpectSetInterface(ZX_OK, {}); });
+
+  EXPECT_OK(driver_test_.StopDriver());
+}
+
+TEST_F(UsbAdbTest, StopDriverWhileConnected) {
+  auto usb_impl = NormalStartAdb();
+
+  EventHandler handler;
+  handler.expected_statuses_.emplace(fadb::StatusFlags::kOnline);
+  EXPECT_OK(usb_impl.HandleOneEvent(handler));
+
+  driver_test_.RunInEnvironmentTypeContext(
+      [&](UsbAdbEnvironment& env) { env.ExpectSetInterfaceAndCancelAllRxRequests(); });
+
+  EXPECT_OK(driver_test_.StopDriver());
+
+  handler.expected_statuses_.emplace(0);
+  EXPECT_OK(usb_impl.HandleOneEvent(handler));
+}
+
+TEST_F(UsbAdbTest, UsbStackRequestsStop) {
+  auto usb_impl = NormalStartAdb();
+
+  EventHandler handler;
+  handler.expected_statuses_.emplace(fadb::StatusFlags::kOnline);
+  EXPECT_OK(usb_impl.HandleOneEvent(handler));
+
+  driver_test_.RunInEnvironmentTypeContext([](UsbAdbEnvironment& env) {
+    // After we call SetConfigured(), the driver will request USB stop and then
+    // start.
+    env.mock_usb_.ExpectSetInterface(ZX_OK, {});
+    env.mock_usb_.ExpectSetInterface(ZX_OK, {});
+
+    env.mock_usb_.function.ops->set_configured(env.mock_usb_.function.ctx, false, 0);
+    env.CancelAllUsbRxRequests();
+  });
+
+  handler.expected_statuses_.emplace(0);
+  EXPECT_OK(usb_impl.HandleOneEvent(handler));
+
+  driver_test_.RunInEnvironmentTypeContext(
+      [](UsbAdbEnvironment& env) { env.mock_usb_.ExpectSetInterface(ZX_OK, {}); });
+  EXPECT_OK(driver_test_.StopDriver());
+}
+
+TEST_F(UsbAdbTest, StartStopStartStop) {
+  {
+    EventHandler handler;
+    auto usb_impl = NormalStartAdb();
+    handler.expected_statuses_.push(fadb::StatusFlags::kOnline);
+    EXPECT_OK(usb_impl.HandleOneEvent(handler));
+
+    driver_test_.RunInEnvironmentTypeContext([](UsbAdbEnvironment& env) {
+      env.ExpectSetInterfaceAndCancelAllRxRequests();
+      env.mock_usb_.ExpectSetInterface(ZX_OK, {});
+    });
+    EXPECT_OK(client_->StopAdb());
+
+    handler.expected_statuses_.emplace(0);
+    EXPECT_OK(usb_impl.HandleOneEvent(handler));
+    EXPECT_EQ(usb_impl.HandleOneEvent(handler).status(), ZX_ERR_PEER_CLOSED);
+  }
+
+  {
+    EventHandler handler;
+    auto usb_impl = NormalStartAdb();
+    handler.expected_statuses_.push(fadb::StatusFlags::kOnline);
+    EXPECT_OK(usb_impl.HandleOneEvent(handler));
+
+    driver_test_.RunInEnvironmentTypeContext([](UsbAdbEnvironment& env) {
+      env.ExpectSetInterfaceAndCancelAllRxRequests();
+      env.mock_usb_.ExpectSetInterface(ZX_OK, {});
+    });
+    EXPECT_OK(client_->StopAdb());
+
+    handler.expected_statuses_.emplace(0);
+    EXPECT_OK(usb_impl.HandleOneEvent(handler));
+    EXPECT_EQ(usb_impl.HandleOneEvent(handler).status(), ZX_ERR_PEER_CLOSED);
+  }
+
+  driver_test_.RunInEnvironmentTypeContext(
+      [](UsbAdbEnvironment& env) { env.mock_usb_.ExpectSetInterface(ZX_OK, {}); });
+  EXPECT_OK(driver_test_.StopDriver());
+}
+
+TEST_F(UsbAdbTest, StartAdbAfterUsbConnectionEstablished) {
+  driver_test_.RunInEnvironmentTypeContext([](UsbAdbEnvironment& env) { env.EnableUsb(); });
+
+  auto [client_end, server_end] = fidl::Endpoints<fadb::UsbAdbImpl>::Create();
+  EXPECT_OK(client_->StartAdb(std::move(server_end)));
+
+  auto usb_impl = fidl::WireSyncClient<fadb::UsbAdbImpl>(std::move(client_end));
+
+  // We should get kOnline immediately, because we're already connected.
+  EventHandler handler;
+  handler.expected_statuses_.push(fadb::StatusFlags::kOnline);
+  EXPECT_OK(usb_impl.HandleOneEvent(handler));
+
+  ASSERT_NO_FATAL_FAILURE(NormalStopDriver());
+}
 
 TEST_F(UsbAdbTest, SendAdbMessage) {
-  auto usb_impl = StartAdb();
+  auto usb_impl = NormalStartAdb();
 
   // Sending data that fits within a single VMO request
-  SendTestData(usb_impl, kVmoDataSize - 2);
+  ASSERT_NO_FATAL_FAILURE(SendTestData(usb_impl, kVmoDataSize - 2));
   // Sending data that is exactly fills up a single VMO request
-  SendTestData(usb_impl, kVmoDataSize);
+  ASSERT_NO_FATAL_FAILURE(SendTestData(usb_impl, kVmoDataSize));
   // Sending data that exceeds a single VMO request
-  SendTestData(usb_impl, kVmoDataSize + 2);
+  ASSERT_NO_FATAL_FAILURE(SendTestData(usb_impl, kVmoDataSize + 2));
   // Sending data that exceeds kBulkTxRxCount VMO requests (the last packet should be stored in
   // queue)
-  SendTestData(usb_impl, kVmoDataSize * kBulkTxCount + 2);
+  ASSERT_NO_FATAL_FAILURE(SendTestData(usb_impl, kVmoDataSize * kBulkTxCount + 2));
   // Sending data that exceeds kBulkTxRxCount + 1 VMO requests (probably unneeded test, but added
   // for good measure.)
-  SendTestData(usb_impl, kVmoDataSize * (kBulkTxCount + 1) + 2);
+  ASSERT_NO_FATAL_FAILURE(SendTestData(usb_impl, kVmoDataSize * (kBulkTxCount + 1) + 2));
 
-  ExpectUsbStopped();
+  ASSERT_NO_FATAL_FAILURE(NormalStopDriver());
 }
 
 TEST_F(UsbAdbTest, RecvAdbMessage) {
   constexpr uint32_t kReceiveSize = kVmoDataSize - 2;
-  auto usb_impl = StartAdb();
+  auto usb_impl = NormalStartAdb();
 
   // Queue a receive request before the data is available. The request will not get an immediate
   // reply. Data fits within a single VMO request.
@@ -362,10 +465,10 @@ TEST_F(UsbAdbTest, RecvAdbMessage) {
   // happens first.
   zx::nanosleep(zx::deadline_after(zx::msec(1)));
 
-  ExpectReceiveData(kReceiveSize);
+  ASSERT_NO_FATAL_FAILURE(ExpectReceiveData(kReceiveSize));
   t.join();
 
-  ExpectUsbStopped();
+  ASSERT_NO_FATAL_FAILURE(NormalStopDriver());
 }
 
 }  // namespace usb_adb_function

@@ -35,11 +35,51 @@ constexpr char kDeviceName[] = "usb-adb-function";
 namespace fadb = fuchsia_hardware_adb;
 namespace fendpoint = fuchsia_hardware_usb_endpoint;
 
-// Implements USB ADB function driver.
-// Components implementing ADB protocol should open a AdbImpl FIDL connection to dev-class/adb/xxx
-// supported by this class to queue ADB messages. ADB protocol component can provide a client
-// end channel to AdbInterface during StartAdb method call to receive ADB messages sent by the
-// host.
+// The driver's internal state machine. Begins in kAwaitingUsbConnection.
+enum class State : uint8_t {
+  // In kAwaitingUsbConnection, we have called function_.SetInterface(this), and
+  // are waiting for the function driver to call SetConfigured(true). Calls to
+  // SetConfigured(false) are ignored.
+  //
+  // Once SetConfigured(true) has been called, we:
+  // - Send USB "receive" requests to the endpoint,
+  // - Tell any connected UsbAdbImpl clients that the device is online, and
+  // - Move to kConnected.
+  //
+  // If a fadb::Device client requests shutdown by calling StopAdb() or closing
+  // a UsbAdbImpl connection, we call function_.SetInterface(nullptr), and move
+  // to kStoppingUsb. Likewise if PrepareStop is called.
+  kAwaitingUsbConnection,
+
+  // In kConnected, the USB connection is live, and we respond to any
+  // QueueTx/Receive requests from UsbAdbImpl clients.
+  //
+  // If any of the following happen:
+  // - A fadb::Device client calls StopAdb().
+  // - A UsbAdbImpl client closes their channel.
+  // - The USB function driver calls SetConfigured(false)
+  // - PrepareStop get called.
+  //
+  // ... we call function_.SetInterface(nullptr) and move to kStoppingUsb. (We
+  // hold onto the responder for any calls to StopAdb()).
+  kConnected,
+
+  // In kStoppingUsb, we wait for all outstanding USB requests to be completed.
+  // Once they have been, we:
+  // - Return OK to any StopAdb() calls that triggered the stoppage (or
+  //   happened while in kStoppingUsb).
+  // - Tell any connected UsbAdbImpl clients that the device is
+  //   offline,
+  // - Close all UsbAdbImpl connections.
+  //
+  // At that point, if the stoppage was caused by a call to PrepareStop (or
+  // PrepareStop we called while shutting down), we respond that the driver has
+  // shutdown successfully. Otherwise, we restart the USB connection by calling
+  // function_.SetInterface(this), and move back to kAwaitingUsbConnection.
+  kStoppingUsb,
+};
+
+// Implements the USB ADB function driver.
 class UsbAdbDevice : public fdf::DriverBase,
                      public ddk::UsbFunctionInterfaceProtocol<UsbAdbDevice>,
                      public fidl::WireServer<fadb::Device>,
@@ -77,17 +117,16 @@ class UsbAdbDevice : public fdf::DriverBase,
   void QueueTx(QueueTxRequest& request, QueueTxCompleter::Sync& completer) override;
   void Receive(ReceiveCompleter::Sync& completer) override;
 
-  // Public for testing
-  void SetShutdownCallback(fit::callback<void()> cb) {
-    std::lock_guard<async::sequence_checker> _(checker_);
-    shutdown_callback_ = std::move(cb);
-  }
-
  private:
   mutable async::sequence_checker checker_;
 
-  // Helper methods.
-  void StopImpl() __TA_REQUIRES(checker_);
+  State state_ __TA_GUARDED(checker_) = State::kAwaitingUsbConnection;
+
+  // State transition helpers.
+  void StartUsb() __TA_REQUIRES(checker_);
+  void EnableEndpoints() __TA_REQUIRES(checker_);
+  void ResetOrStopUsb() __TA_REQUIRES(checker_);
+  void CheckUsbStopComplete() __TA_REQUIRES(checker_);
 
   // Helpers and fields for exposing the service via devfs.
   void Serve(fidl::ServerEnd<fadb::Device> server) {
@@ -107,14 +146,13 @@ class UsbAdbDevice : public fdf::DriverBase,
     QueueTxCompleter::Async completer;
   };
 
-  // Helper method to perform bookkeeping and insert requests back to the free pool.
-  zx_status_t InsertUsbRequest(fuchsia_hardware_usb_request::Request req,
-                               usb::EndpointClient<UsbAdbDevice>& ep) __TA_REQUIRES(checker_);
+  // Helper methods to get free request buffer and queue the request for transmitting.
+  void SendQueued() __TA_REQUIRES(checker_);
+  bool SendQueuedOnce() __TA_REQUIRES(checker_);
 
-  // Helper method to get free request buffer and queue the request for transmitting.
-  zx::result<> SendQueued() __TA_REQUIRES(checker_);
-  // Helper method to get free request buffer and queue the request for receiving.
+  // Helper methods to get free request buffer and queue the request for receiving.
   void ReceiveQueued() __TA_REQUIRES(checker_);
+  bool ReceiveQueuedOnce() __TA_REQUIRES(checker_);
 
   // USB request completion callback methods - these run on the driver
   // dispatcher.
@@ -125,19 +163,8 @@ class UsbAdbDevice : public fdf::DriverBase,
   void TxCompleteCallback(fendpoint::Completion completion);
   void RxCompleteCallback(fendpoint::Completion completion);
 
-  // Helper method to configure endpoints
-  zx_status_t ConfigureEndpoints(bool enable) __TA_REQUIRES(checker_);
-
   uint8_t bulk_out_addr() const { return descriptors_.bulk_out_ep.b_endpoint_address; }
   uint8_t bulk_in_addr() const { return descriptors_.bulk_in_ep.b_endpoint_address; }
-
-  bool Online() const __TA_REQUIRES(checker_) {
-    return (status_ == fadb::StatusFlags::kOnline) && !shutdown_callback_.has_value();
-  }
-
-  // Called when shutdown is in progress and all pending requests are completed. Invokes shutdown
-  // completion callback.
-  void ShutdownComplete() __TA_REQUIRES(checker_);
 
   ddk::UsbFunctionProtocolClient function_;
 
@@ -145,18 +172,14 @@ class UsbAdbDevice : public fdf::DriverBase,
   async::Loop usb_loop_{&kAsyncLoopConfigNeverAttachToThread};
   async_dispatcher_t* usb_dispatcher_;
 
-  // UsbAdbImpl service binding. This is created when client calls StartAdb.
+  // UsbAdbImpl service binding. ServerEnds passed into StartAdb() end up here.
   std::optional<fidl::ServerBinding<fadb::UsbAdbImpl>> adb_binding_ __TA_GUARDED(checker_);
 
-  // Set once the interface is configured.
-  fadb::StatusFlags status_ __TA_GUARDED(checker_) = fadb::StatusFlags(0);
-
+  // Callbacks to call when the USB stack has been brought down and it's safe to
+  // call AdbStart().
+  std::vector<StopAdbCompleter::Async> stop_completers_ __TA_GUARDED(checker_);
   // Holds Stop callback to be invoked once shutdown is complete.
-  std::optional<fit::callback<void()>> shutdown_callback_ __TA_GUARDED(checker_);
-  // `stop_completed_` ensures that `shutdown_callback_` is only called after `Stop()` has finished
-  // all its necessary operations including deconfiguring endpoints, etc. In practice, this is not
-  // important, but this facilitates orderly shutdown which avoids flakes in tests.
-  bool stop_completed_ __TA_GUARDED(checker_) = false;
+  std::optional<fdf::PrepareStopCompleter> shutdown_callback_ __TA_GUARDED(checker_);
 
   // USB ADB interface descriptor.
   struct {
