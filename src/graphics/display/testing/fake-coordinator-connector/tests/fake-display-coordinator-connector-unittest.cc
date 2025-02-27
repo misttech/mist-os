@@ -30,7 +30,7 @@ class FakeDisplayCoordinatorConnectorTest : public gtest::TestLoopFixture {
     TestLoopFixture::SetUp();
 
     constexpr fake_display::FakeDisplayDeviceConfig kFakeDisplayDeviceConfig = {
-        .periodic_vsync = true,
+        .periodic_vsync = false,
         .no_buffer_access = false,
     };
     coordinator_connector_ = std::make_unique<display::FakeDisplayCoordinatorConnector>(
