@@ -4,12 +4,10 @@
 
 use crate::handle::handle_type;
 use crate::responder::Responder;
-use crate::{ordinals, Error, Event, EventPair, Handle, OnFDomainSignals, Socket};
+use crate::{ordinals, AsHandleRef, Error, Event, EventPair, Handle, OnFDomainSignals, Socket};
 use fidl_fuchsia_fdomain as proto;
-use futures::channel::mpsc::UnboundedReceiver;
 use futures::future::Either;
-use futures::stream::{FusedStream, Stream};
-use futures::FutureExt;
+use futures::stream::Stream;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Weak};
@@ -116,20 +114,30 @@ pub enum HandleOp<'h> {
 impl Channel {
     /// Reads a message from the channel.
     pub fn recv_msg(&self) -> impl Future<Output = Result<MessageBuf, Error>> {
-        let client = self.0.client();
+        let client = self.0.client.clone();
         let handle = self.0.proto();
 
-        let result = client.map(move |client| {
-            client
-                .transaction(
-                    ordinals::READ_CHANNEL,
-                    proto::ChannelReadChannelRequest { handle },
-                    Responder::ReadChannel,
-                )
-                .map(move |f| f.map(|message| MessageBuf::from_proto(&client, message)))
-        });
+        futures::future::poll_fn(move |ctx| {
+            let client = client.upgrade().ok_or(Error::ClientLost)?;
+            client.poll_channel(handle, ctx, false).map(|x| {
+                x.expect("Got stream termination indication from non-streaming read!")
+                    .map(|x| MessageBuf::from_proto(&client, x))
+            })
+        })
+    }
 
-        async move { result?.await }
+    /// Poll a channel for a message to read.
+    pub fn recv_from(&self, cx: &mut Context<'_>, buf: &mut MessageBuf) -> Poll<Result<(), Error>> {
+        let client = self.0.client()?;
+        match ready!(client.poll_channel(self.0.proto(), cx, false))
+            .expect("Got stream termination indication from non-streaming read!")
+        {
+            Ok(msg) => {
+                *buf = MessageBuf::from_proto(&client, msg);
+                Poll::Ready(Ok(()))
+            }
+            Err(e) => Poll::Ready(Err(e)),
+        }
     }
 
     /// Writes a message into the channel.
@@ -222,13 +230,13 @@ impl Channel {
     /// buffer, so it may lead to memory issues if you don't intend to use the
     /// messages from the channel as fast as they come.
     pub fn stream(self) -> Result<(ChannelMessageStream, ChannelWriter), Error> {
-        let (sender, messages) = futures::channel::mpsc::unbounded();
-        self.0.client()?.start_channel_streaming(self.0.proto(), sender)?;
+        let client = self.client()?;
+        client.start_channel_streaming(self.0.proto())?;
 
         let a = Arc::new(self);
         let b = Arc::clone(&a);
 
-        Ok((ChannelMessageStream { channel: a, messages }, ChannelWriter(b)))
+        Ok((ChannelMessageStream(a), ChannelWriter(b)))
     }
 }
 
@@ -263,10 +271,7 @@ impl ChannelWriter {
 
 /// A stream of data issuing from a socket.
 #[derive(Debug)]
-pub struct ChannelMessageStream {
-    channel: Arc<Channel>,
-    messages: UnboundedReceiver<Result<proto::ChannelMessage, Error>>,
-}
+pub struct ChannelMessageStream(Arc<Channel>);
 
 impl ChannelMessageStream {
     /// Turn a `ChannelMessageStream` and its accompanying `ChannelWriter` back
@@ -275,53 +280,45 @@ impl ChannelMessageStream {
     /// # Panics
     /// If this stream and the writer passed didn't come from the same call to
     /// `Channel::stream`.
-    pub fn rejoin(
-        mut self,
-        writer: ChannelWriter,
-    ) -> (Channel, UnboundedReceiver<Result<proto::ChannelMessage, Error>>) {
-        assert!(Arc::ptr_eq(&self.channel, &writer.0), "Tried to join stream with wrong writer!");
-        if let Ok(client) = self.channel.0.client() {
-            client.stop_channel_streaming(self.channel.0.proto())
+    pub fn rejoin(mut self, writer: ChannelWriter) -> Channel {
+        assert!(Arc::ptr_eq(&self.0, &writer.0), "Tried to join stream with wrong writer!");
+        if let Ok(client) = self.0 .0.client() {
+            client.stop_channel_streaming(self.0 .0.proto())
         }
         std::mem::drop(writer);
-        let channel = std::mem::replace(&mut self.channel, Arc::new(Channel(Handle::invalid())));
-        let (_, r) = futures::channel::mpsc::unbounded();
-        let messages = std::mem::replace(&mut self.messages, r);
-        (Arc::try_unwrap(channel).expect("Stream pointer no longer unique!"), messages)
+        let channel = std::mem::replace(&mut self.0, Arc::new(Channel(Handle::invalid())));
+        Arc::try_unwrap(channel).expect("Stream pointer no longer unique!")
     }
 
     /// Whether this stream is closed.
     pub fn is_closed(&self) -> bool {
-        self.messages.is_terminated()
+        let Ok(client) = self.0.client() else {
+            return true;
+        };
+
+        !client.channel_is_streaming(self.0 .0.proto())
     }
 
     /// Get a reference to the inner channel.
     pub fn as_channel(&self) -> &Channel {
-        &*self.channel
+        &*self.0
     }
 }
 
 impl Stream for ChannelMessageStream {
     type Item = Result<MessageBuf, Error>;
-    fn poll_next(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match ready!(Pin::new(&mut self.messages).poll_next(ctx)) {
-            Some(Ok(c)) => {
-                if let Ok(client) = self.channel.0.client() {
-                    Poll::Ready(Some(Ok(MessageBuf::from_proto(&client, c))))
-                } else {
-                    Poll::Ready(None)
-                }
-            }
-            Some(Err(e)) => Poll::Ready(Some(Err(e))),
-            None => Poll::Ready(None),
-        }
+    fn poll_next(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let Ok(client) = self.0.client() else { return Poll::Ready(None) };
+        client
+            .poll_channel(self.0 .0.proto(), ctx, true)
+            .map(|x| x.map(|x| x.map(|x| MessageBuf::from_proto(&client, x))))
     }
 }
 
 impl Drop for ChannelMessageStream {
     fn drop(&mut self) {
-        if let Ok(client) = self.channel.0.client() {
-            client.stop_channel_streaming(self.channel.0.proto());
+        if let Ok(client) = self.0.client() {
+            client.stop_channel_streaming(self.0 .0.proto());
         }
     }
 }

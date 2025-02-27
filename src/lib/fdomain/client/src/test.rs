@@ -279,10 +279,7 @@ async fn channel_async() {
     futures::future::join(read_side, write_side).await;
 }
 
-// TODO: We can re-enable this test in a bit. An upcoming CL reworks a bunch of
-// our internals and then this starts working again.
 #[fuchsia::test]
-#[ignore]
 async fn bad_tx() {
     let (client, fault_injector) = TestFDomain::new_client();
 
@@ -293,4 +290,36 @@ async fn bad_tx() {
     let err = b.recv_msg().await.unwrap_err();
     let err2 = b.recv_msg().await.unwrap_err();
     assert_eq!(err.to_string(), err2.to_string());
+}
+
+#[fuchsia::test]
+async fn channel_read_stream_read() {
+    let (client, _) = TestFDomain::new_client();
+
+    let (a, b) = client.create_channel();
+
+    let read_1 = b.recv_msg();
+    let read_2 = b.recv_msg();
+
+    let test_str_a = b"Feral Cats Move In Mysterious Ways";
+    let test_str_b = b"Almost all of our feelings were programmed in to us.";
+    let test_str_c = b"Joyous Throbbing! Jubilant Pulsing!";
+    a.write(test_str_a, Vec::new()).await.unwrap();
+    a.write(test_str_b, Vec::new()).await.unwrap();
+    a.write(test_str_c, Vec::new()).await.unwrap();
+    a.write(test_str_b, Vec::new()).await.unwrap();
+
+    let (mut stream, writer) = b.stream().unwrap();
+    let read_1 = read_1.await.unwrap();
+    let read_2 = read_2.await.unwrap();
+
+    assert_eq!(test_str_a, read_1.bytes.as_slice());
+    assert_eq!(test_str_b, read_2.bytes.as_slice());
+
+    let stream_read = stream.next().await.unwrap().unwrap();
+    assert_eq!(test_str_c, stream_read.bytes.as_slice());
+
+    let b = stream.rejoin(writer);
+    let read_3 = b.recv_msg().await.unwrap();
+    assert_eq!(test_str_b, read_3.bytes.as_slice());
 }

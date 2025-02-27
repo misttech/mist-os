@@ -124,11 +124,7 @@ impl ::fidl::encoding::ProxyChannelBox<FDomainResourceDialect> for FDomainProxyC
     }
 
     fn unbox(self) -> Channel {
-        // We drop the queue of pending data here. The FIDL client has some
-        // invariants it maintains that should make it very unlikely that
-        // there's anything to read from it.
-        let (channel, _) = self.0.into_inner().unwrap().rejoin(self.1);
-        channel
+        self.0.into_inner().unwrap().rejoin(self.1)
     }
 
     fn as_channel(&self) -> &Channel {
