@@ -5700,9 +5700,8 @@ void VmCowPages::RangeChangeUpdateCowChildrenLocked(VmCowRange range, RangeChang
   // Returns true if the passed in |candidate| had some overlap with the operation range, and hence
   // its children also need to be walked. If false is returned the children of |candidate| can be
   // skipped.
-  auto check_candidate = [range, op](VmCowPages* candidate,
-                                     uint64_t cur_accumulative_offset) -> bool {
-    AssertHeld(candidate->lock_ref());
+  auto check_candidate = [range, op](VmCowPages* candidate, uint64_t cur_accumulative_offset)
+                             TA_REQ(candidate->lock()) -> bool {
     uint64_t candidate_offset = 0;
     uint64_t candidate_len = 0;
     if (!GetIntersect(cur_accumulative_offset, candidate->size_, range.offset, range.len,
