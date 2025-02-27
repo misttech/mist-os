@@ -7,14 +7,8 @@ use {fidl_next_test_benchmark as ftb_next, fidl_test_benchmark as ftb};
 
 use rand::Rng;
 
-impl Generate for ftb::Address {
-    fn generate(rng: &mut impl Rng) -> Self {
-        Self { x0: rng.gen(), x1: rng.gen(), x2: rng.gen(), x3: rng.gen() }
-    }
-}
-
-impl Generate for ftb_next::Address {
-    fn generate(rng: &mut impl Rng) -> Self {
+impl_generate! {
+    for ftb::Address, ftb_next::Address => rng {
         Self { x0: rng.gen(), x1: rng.gen(), x2: rng.gen(), x3: rng.gen() }
     }
 }
@@ -67,24 +61,10 @@ fn generate_request(rng: &mut impl Rng) -> String {
     )
 }
 
-impl Generate for ftb::Log {
-    fn generate(rng: &mut impl Rng) -> Self {
+impl_generate! {
+    for ftb::Log, ftb_next::Log => rng {
         Self {
-            address: ftb::Address::generate(rng),
-            identity: "-".into(),
-            userid: USERID[rng.gen_range(0..USERID.len())].into(),
-            date: generate_date(rng),
-            request: generate_request(rng),
-            code: CODES[rng.gen_range(0..CODES.len())],
-            size: rng.gen_range(0..100_000_000),
-        }
-    }
-}
-
-impl Generate for ftb_next::Log {
-    fn generate(rng: &mut impl Rng) -> Self {
-        Self {
-            address: ftb_next::Address::generate(rng),
+            address: Generate::generate(rng),
             identity: "-".into(),
             userid: USERID[rng.gen_range(0..USERID.len())].into(),
             date: generate_date(rng),

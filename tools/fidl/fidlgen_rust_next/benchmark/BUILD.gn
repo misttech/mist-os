@@ -29,8 +29,10 @@ rustc_binary("bin") {
   ]
 
   sources = [
+    "src/_macros.rs",
     "src/log.rs",
     "src/main.rs",
     "src/mesh.rs",
+    "src/minecraft.rs",
   ]
 }

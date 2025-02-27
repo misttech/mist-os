@@ -2,17 +2,61 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#[macro_use]
+mod _macros;
 mod log;
 mod mesh;
+mod minecraft;
+
+use core::mem::MaybeUninit;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use fidl_next::{DecoderExt as _, EncoderExt as _};
-
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng as _};
 
 pub trait Generate {
     fn generate(rng: &mut impl Rng) -> Self;
+}
+
+impl Generate for bool {
+    fn generate(rng: &mut impl Rng) -> Self {
+        rng.gen_bool(0.5)
+    }
+}
+
+impl Generate for u32 {
+    fn generate(rng: &mut impl Rng) -> Self {
+        rng.gen()
+    }
+}
+
+impl<T: Generate> Generate for Box<T> {
+    fn generate(rng: &mut impl Rng) -> Self {
+        Box::new(T::generate(rng))
+    }
+}
+
+impl<T: Generate> Generate for Option<T> {
+    fn generate(rng: &mut impl Rng) -> Self {
+        if rng.gen_bool(0.5) {
+            Some(T::generate(rng))
+        } else {
+            None
+        }
+    }
+}
+
+impl<T: Generate, const N: usize> Generate for [T; N] {
+    fn generate(rng: &mut impl Rng) -> Self {
+        let mut result = MaybeUninit::<[T; N]>::uninit();
+        for i in 0..N {
+            unsafe {
+                result.as_mut_ptr().cast::<T>().add(i).write(T::generate(rng));
+            }
+        }
+        unsafe { result.assume_init() }
+    }
 }
 
 fn generate_vec<T: Generate>(rng: &mut impl Rng, size: usize) -> Vec<T> {
@@ -135,9 +179,18 @@ fn bench_log(c: &mut Criterion) {
         bench_rust(c, "mesh", mesh::generate_input_rust(input_size), input_size, || {
             fidl_test_benchmark::Mesh { triangles: Vec::new() }
         });
+        bench_rust(c, "minecraft", minecraft::generate_input_rust(input_size), input_size, || {
+            fidl_test_benchmark::Players { players: Vec::new() }
+        });
 
         bench_rust_next(c, "log", log::generate_input_rust_next(input_size), input_size);
         bench_rust_next(c, "mesh", mesh::generate_input_rust_next(input_size), input_size);
+        bench_rust_next(
+            c,
+            "minecraft",
+            minecraft::generate_input_rust_next(input_size),
+            input_size,
+        );
     }
 }
 
