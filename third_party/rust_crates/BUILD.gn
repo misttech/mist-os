@@ -294,6 +294,12 @@ group("elliptic-curve") {
 }
 
 if (current_os == "fuchsia") {
+  group("enumn") {
+    public_deps = [ ":enumn-v0_1_14($host_toolchain)" ]
+  }
+}
+
+if (current_os == "fuchsia") {
   group("euclid") {
     public_deps = [ ":euclid-v0_22_1" ]
   }
@@ -5614,6 +5620,39 @@ rust_proc_macro("enum-as-inner-v0_5_1") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":enum-as-inner-v0_5_1.license" ]
+}
+
+license("enumn-v0_1_14.license") {
+  public_package_name = "enumn"
+  license_files = [
+    "//third_party/rust_crates/vendor/enumn-0.1.14/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/enumn-0.1.14/LICENSE-MIT",
+  ]
+}
+
+rust_proc_macro("enumn-v0_1_14") {
+  crate_name = "enumn"
+  crate_root = "//third_party/rust_crates/vendor/enumn-0.1.14/src/lib.rs"
+  output_name = "enumn-5d07ac38428bdced"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":proc-macro2-v1_0_86" ]
+  deps += [ ":quote-v1_0_38" ]
+  deps += [ ":syn-v2_0_87" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=5d07ac38428bdced",
+    "-Cextra-filename=-5d07ac38428bdced",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":enumn-v0_1_14.license" ]
 }
 
 license("error-chain-v0_12_0.license") {
