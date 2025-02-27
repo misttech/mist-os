@@ -6,8 +6,6 @@ library fuchsia.serial;
 
 extend uint fuchsia.BIND_PROTOCOL {
   DEVICE = 0x57,
-  IMPL = 0x58,
-  IMPL_ASYNC = 0x7D,
 };
 
 extend uint fuchsia.BIND_SERIAL_CLASS {
