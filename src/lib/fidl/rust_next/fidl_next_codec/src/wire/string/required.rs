@@ -71,7 +71,13 @@ unsafe impl<D: Decoder + ?Sized> Decode<D> for WireString {
             WireVector::decode_raw(vec.as_mut(), decoder)?;
         }
         let vec = unsafe { vec.deref_unchecked() };
-        from_utf8(vec.as_slice())?;
+
+        // Check if the string is valid ASCII (fast path)
+        if !vec.as_slice().is_ascii() {
+            // Fall back to checking if the string is valid UTF-8 (slow path)
+            // We're using `from_utf8` more like an `is_utf8` here.
+            let _ = from_utf8(vec.as_slice())?;
+        }
 
         Ok(())
     }

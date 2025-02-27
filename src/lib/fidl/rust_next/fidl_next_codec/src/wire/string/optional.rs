@@ -69,7 +69,12 @@ unsafe impl<D: Decoder + ?Sized> Decode<D> for WireOptionalString {
         }
         let vec = unsafe { vec.deref_unchecked() };
         if let Some(bytes) = vec.as_ref() {
-            from_utf8(bytes)?;
+            // Check if the string is valid ASCII (fast path)
+            if !bytes.as_slice().is_ascii() {
+                // Fall back to checking if the string is valid UTF-8 (slow path)
+                // We're using `from_utf8` more like an `is_utf8` here.
+                let _ = from_utf8(bytes)?;
+            }
         }
 
         Ok(())
