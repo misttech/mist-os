@@ -6,6 +6,7 @@
 
 #include <lib/syslog/cpp/macros.h>
 
+#include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/shared/zx_status.h"
 #include "src/developer/debug/zxdb/common/leb.h"
 #include "src/developer/debug/zxdb/expr/expr.h"
@@ -17,6 +18,7 @@
 #include "src/developer/debug/zxdb/expr/resolve_ptr_ref.h"
 #include "src/developer/debug/zxdb/symbols/function.h"
 #include "src/developer/debug/zxdb/symbols/modified_type.h"
+#include "src/developer/debug/zxdb/symbols/template_parameter.h"
 #include "src/developer/debug/zxdb/symbols/variable.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -381,10 +383,10 @@ void PrettyArray::Format(FormatNode* node, const FormatOptions& options,
   // Evaluate the expressions with this context to make the members in the current scope.
   auto pretty_context = fxl::MakeRefCounted<PrettyEvalContext>(context, node, options);
 
-  EvalExpressions({ptr_expr_, size_expr_}, pretty_context, true,
-                  [cb = std::move(cb), weak_node = node->GetWeakPtr(), options,
+  EvalExpressions({ptr_expr_, len_expr_, type_expr_}, pretty_context, true,
+                  [this, cb = std::move(cb), weak_node = node->GetWeakPtr(), options,
                    context](std::vector<ErrOrValue> results) mutable {
-                    FX_DCHECK(results.size() == 2u);
+                    FX_DCHECK(results.size() == 3u);
                     if (!weak_node)
                       return;
 
@@ -395,8 +397,31 @@ void PrettyArray::Format(FormatNode* node, const FormatOptions& options,
                     if (Err err = results[1].value().PromoteTo64(&len); err.has_error())
                       return weak_node->SetDescribedError(err);
 
-                    FormatArrayNode(weak_node.get(), results[0].value(), len, options, context,
-                                    std::move(cb));
+                    const Type* type = nullptr;
+                    // It is valid for a PrettyArray instance to not specify a type expression,
+                    // which will not result in an error, so we have to also check if a type
+                    // expression string was provided.
+                    if (results[2].ok() && !type_expr_.empty()) {
+                      // For now the only use case we have for this is when the erased type is
+                      // stored as the sole template parameter of a PhantomData member in Rust. In
+                      // the future we may need to plumb some additional information for specific
+                      // types here that tells this code where to get the real type we're looking
+                      // for from relative to the type we have here.
+                      auto collection = results[2].value().type()->As<Collection>();
+                      FX_DCHECK(collection);
+                      FX_DCHECK(collection->template_params().size() == 1);
+
+                      type = collection->template_params()[0]
+                                 .Get()
+                                 ->As<TemplateParameter>()
+                                 ->type()
+                                 .Get()
+                                 ->As<Type>();
+                      FX_DCHECK(type);
+                    }
+
+                    FormatArrayNode(weak_node.get(), results[0].value(), len, type, options,
+                                    context, std::move(cb));
                   });
 }
 

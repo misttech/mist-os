@@ -6,6 +6,7 @@
 
 #include <lib/syslog/cpp/macros.h>
 
+#include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/zxdb/common/adapters.h"
 #include "src/developer/debug/zxdb/common/string_util.h"
 #include "src/developer/debug/zxdb/expr/eval_context.h"
@@ -487,7 +488,7 @@ bool TryFormatArrayOrString(FormatNode* node, const Type* type, const FormatOpti
       FormatCharArrayNode(node, value_type, node->value().data().bytes().data(), length, true,
                           truncated);
     } else {
-      FormatArrayNode(node, node->value(), *array->num_elts(), options, eval_context,
+      FormatArrayNode(node, node->value(), *array->num_elts(), nullptr, options, eval_context,
                       std::move(cb));
     }
     return true;
@@ -840,15 +841,27 @@ void FormatCharPointerNode(FormatNode* node, uint64_t ptr, const Type* char_type
 }
 
 void FormatArrayNode(FormatNode* node, const ExprValue& value, int elt_count,
-                     const FormatOptions& options, const fxl::RefPtr<EvalContext>& eval_context,
-                     fit::deferred_callback cb) {
+                     const Type* erased_type, const FormatOptions& options,
+                     const fxl::RefPtr<EvalContext>& eval_context, fit::deferred_callback cb) {
   node->set_description_kind(FormatNode::kArray);
 
   if (elt_count < 0)
     return node->SetDescribedError(Err("Invalid array size of %d.", elt_count));
   int print_count = std::min(static_cast<int>(options.max_array_size), elt_count);
 
-  ResolveArray(eval_context, value, 0, print_count,
+  // Check for PhantomData on this type, which in rust will mark that the type of the pointer is not
+  // pointing to instances of the type. This is typical for types that do not otherwise keep the
+  // type info of what they are pointing to, commonly known as "type erasure". These members are not
+  // named consistently, so we have to check the types of all members.
+
+  // At this point |value| is pointing to the actual array data. Sometimes that could be a simple
+  // bag of bytes that doesn't have the actual type that this pointer points to (it'll appear here
+  // as a uint8_t* in C++ or a u8* in Rust). We need to get the actual type that's contained in this
+  // array and use that to make sure that the size calculations when we fetch the array memory
+  // correct. This resolution will happen as part of |ResolveArray|, but we need to pass in the type
+  // from |node|'s value, which may not be the same as |value|'s type.
+
+  ResolveArray(eval_context, erased_type, value, 0, print_count,
                [weak_node = node->GetWeakPtr(), elt_count,
                 cb = std::move(cb)](ErrOrValueVector result) mutable {
                  if (!weak_node)

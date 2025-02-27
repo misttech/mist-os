@@ -7,6 +7,7 @@
 
 #include <initializer_list>
 #include <map>
+#include <utility>
 
 #include "lib/fit/defer.h"
 #include "lib/fit/function.h"
@@ -99,17 +100,31 @@ class PrettyType {
 
 class PrettyArray : public PrettyType {
  public:
-  PrettyArray(const std::string& ptr_expr, const std::string& size_expr,
+  PrettyArray(std::string ptr_expr, std::string len_expr, std::string type_expr,
               std::initializer_list<std::pair<std::string, std::string>> getters = {})
-      : PrettyType(getters), ptr_expr_(ptr_expr), size_expr_(size_expr) {}
+      : PrettyType(getters),
+        ptr_expr_(std::move(ptr_expr)),
+        len_expr_(std::move(len_expr)),
+        type_expr_(std::move(type_expr)) {}
 
   void Format(FormatNode* node, const FormatOptions& options,
               const fxl::RefPtr<EvalContext>& context, fit::deferred_callback cb) override;
   EvalArrayFunction GetArrayAccess() const override;
 
  private:
-  const std::string ptr_expr_;   // Expression to compute array start pointer.
-  const std::string size_expr_;  // Expression to compute array size.
+  // Expression to compute array start pointer.
+  const std::string ptr_expr_;
+
+  // Expression to compute the number of elements to print. If |type_expr_| is provided, then that
+  // type will be used instead of the pointed-to type of |ptr_expr_| for the memory fetching
+  // calculation.
+  const std::string len_expr_;
+
+  // Expression to a type to use for calculating the size of the array being pointed to. When
+  // supplied, this type will take precedence over the pointed-to type of |ptr_expr_|. This is used
+  // in particular for types that use implementations that erase the type of the underlying pointer.
+  // See the pretty printer for Rust's alloc::vec::Vec for an example.
+  const std::string type_expr_;
 };
 
 // A generic container who's contents is populated by the expression. This allows non-contiguous
