@@ -636,13 +636,7 @@ impl TaskMutableState {
 
     /// Thaw the task if has been frozen
     pub fn thaw(&mut self) {
-        if let RunState::Frozen(waiter) = self.run_state() {
-            waiter.notify();
-        }
-    }
-
-    pub fn is_frozen(&self) -> bool {
-        matches!(self.run_state(), RunState::Frozen(_))
+        self.freeze_canceler.take().map(|canceler| canceler.cancel());
     }
 }
 

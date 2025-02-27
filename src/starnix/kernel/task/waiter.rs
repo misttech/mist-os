@@ -475,7 +475,6 @@ impl PortWaiter {
         self: &Arc<Self>,
         locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
-        run_state: RunState,
         deadline: zx::MonotonicInstant,
     ) -> Result<(), Errno>
     where
@@ -510,7 +509,7 @@ impl PortWaiter {
         current_task.trigger_delayed_releaser(locked);
 
         if is_waiting {
-            current_task.run_in_state(run_state, callback)
+            current_task.run_in_state(RunState::Waiter(WaiterRef::from_port(self)), callback)
         } else {
             callback()
         }
@@ -624,7 +623,7 @@ impl std::fmt::Debug for PortWaiter {
 }
 
 /// A type that can put a thread to sleep waiting for a condition.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Waiter {
     // TODO(https://g-issues.fuchsia.dev/issues/303068424): Avoid `PortWaiter`
     // when operating purely over FDs backed by starnix.
@@ -647,23 +646,6 @@ impl Waiter {
         WaiterRef::from_port(&self.inner)
     }
 
-    /// Freeze the task until the waiter is woken up.
-    ///
-    /// No signal, e.g. EINTR (interrupt), should be received.
-    pub fn freeze<L>(&self, locked: &mut Locked<'_, L>, current_task: &CurrentTask)
-    where
-        L: LockEqualOrBefore<FileOpsCore>,
-    {
-        self.inner
-            .wait_until(
-                locked,
-                current_task,
-                RunState::Frozen(self.clone()),
-                zx::MonotonicInstant::INFINITE,
-            )
-            .expect("no signals");
-    }
-
     /// Wait until the waiter is woken up.
     ///
     /// If the wait is interrupted (see [`Waiter::interrupt`]), this function returns EINTR.
@@ -675,12 +657,7 @@ impl Waiter {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        self.inner.wait_until(
-            locked,
-            current_task,
-            RunState::Waiter(WaiterRef::from_port(&self.inner)),
-            zx::MonotonicInstant::INFINITE,
-        )
+        self.inner.wait_until(locked, current_task, zx::MonotonicInstant::INFINITE)
     }
 
     /// Wait until the given deadline has passed or the waiter is woken up.
@@ -714,12 +691,7 @@ impl Waiter {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        self.inner.wait_until(
-            locked,
-            current_task,
-            RunState::Waiter(WaiterRef::from_port(&self.inner)),
-            deadline,
-        )
+        self.inner.wait_until(locked, current_task, deadline)
     }
 
     fn create_wait_entry(&self, filter: WaitEvents) -> WaitEntry {
@@ -790,12 +762,6 @@ impl Drop for Waiter {
 impl Default for Waiter {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl PartialEq for Waiter {
-    fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.inner, &other.inner)
     }
 }
 
