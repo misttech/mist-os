@@ -59,9 +59,11 @@
 'third_party/rust_crates/vendor/hyper' = ["src/lib/fuchsia-hyper/OWNERS"]
 
 # security team
+'third_party/rust_crates/vendor/aes-gcm-siv' = ["src/security/OWNERS"]
 'third_party/rust_crates/vendor/hyper-rustls' = ["src/security/OWNERS"]
 'third_party/rust_crates/vendor/openssl-probe' = ["src/security/OWNERS"]
 'third_party/rust_crates/vendor/pem' = ["src/security/OWNERS"]
+'third_party/rust_crates/vendor/pkcs8' = ["src/security/OWNERS"]
 'third_party/rust_crates/vendor/rand' = ["src/security/OWNERS"]
 'third_party/rust_crates/vendor/rand_chacha' = ["src/security/OWNERS"]
 'third_party/rust_crates/vendor/rand_core' = ["src/security/OWNERS"]
