@@ -378,12 +378,16 @@ impl KernelResourcesBuilder {
                         // TODO(https://fxbug.dev/393078902): also take into account the fractional
                         // part.
                         resource_type: Some(fplugin::ResourceType::Vmo(fplugin::Vmo {
-                            committed_bytes: Some(info_vmo.committed_scaled_bytes),
-                            populated_bytes: Some(info_vmo.populated_scaled_bytes),
                             parent: match info_vmo.parent_koid.raw_koid() {
                                 0 => None,
                                 k => Some(k),
                             },
+                            private_committed_bytes: Some(info_vmo.committed_private_bytes),
+                            private_populated_bytes: Some(info_vmo.populated_private_bytes),
+                            scaled_committed_bytes: Some(info_vmo.committed_scaled_bytes),
+                            scaled_populated_bytes: Some(info_vmo.populated_scaled_bytes),
+                            total_committed_bytes: Some(info_vmo.committed_bytes),
+                            total_populated_bytes: Some(info_vmo.populated_bytes),
                             ..Default::default()
                         })),
                         ..Default::default()

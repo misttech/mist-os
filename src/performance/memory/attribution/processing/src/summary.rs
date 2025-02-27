@@ -51,7 +51,7 @@ impl MemorySummary {
                 match &resource.resource.resource_type {
                     fplugin::ResourceType::Job(_) | fplugin::ResourceType::Process(_) => {}
                     fplugin::ResourceType::Vmo(vmo) => {
-                        undigested += vmo.committed_bytes.unwrap();
+                        undigested += vmo.scaled_populated_bytes.unwrap();
                     }
                     _ => todo!(),
                 }
@@ -115,15 +115,15 @@ impl MemorySummary {
                     ));
                 }
                 fplugin::ResourceType::Vmo(vmo_info) => {
-                    output.committed_total += vmo_info.committed_bytes.unwrap();
-                    output.populated_total += vmo_info.populated_bytes.unwrap();
+                    output.committed_total += vmo_info.total_committed_bytes.unwrap();
+                    output.populated_total += vmo_info.total_populated_bytes.unwrap();
                     output.committed_scaled +=
-                        vmo_info.committed_bytes.unwrap() as f64 / share_count as f64;
+                        vmo_info.scaled_committed_bytes.unwrap() as f64 / share_count as f64;
                     output.populated_scaled +=
-                        vmo_info.populated_bytes.unwrap() as f64 / share_count as f64;
+                        vmo_info.scaled_populated_bytes.unwrap() as f64 / share_count as f64;
                     if share_count == 1 {
-                        output.committed_private += vmo_info.committed_bytes.unwrap();
-                        output.populated_private += vmo_info.populated_bytes.unwrap();
+                        output.committed_private += vmo_info.private_committed_bytes.unwrap();
+                        output.populated_private += vmo_info.private_populated_bytes.unwrap();
                     }
                     output
                         .vmos
@@ -241,13 +241,15 @@ pub struct VmoSummary {
 impl VmoSummary {
     fn merge(&mut self, vmo_info: &Vmo, share_count: usize) {
         self.count += 1;
-        self.committed_total += vmo_info.committed_bytes.unwrap();
-        self.populated_total += vmo_info.populated_bytes.unwrap();
-        self.committed_scaled += vmo_info.committed_bytes.unwrap() as f64 / share_count as f64;
-        self.populated_scaled += vmo_info.populated_bytes.unwrap() as f64 / share_count as f64;
+        self.committed_total += vmo_info.total_committed_bytes.unwrap();
+        self.populated_total += vmo_info.total_populated_bytes.unwrap();
+        self.committed_scaled +=
+            vmo_info.scaled_committed_bytes.unwrap() as f64 / share_count as f64;
+        self.populated_scaled +=
+            vmo_info.scaled_populated_bytes.unwrap() as f64 / share_count as f64;
         if share_count == 1 {
-            self.committed_private += vmo_info.committed_bytes.unwrap();
-            self.populated_private += vmo_info.populated_bytes.unwrap();
+            self.committed_private += vmo_info.private_committed_bytes.unwrap();
+            self.populated_private += vmo_info.private_populated_bytes.unwrap();
         }
     }
 }

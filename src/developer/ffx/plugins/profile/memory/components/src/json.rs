@@ -299,12 +299,22 @@ impl JsonConvertible for fplugin::ResourceType {
                 "process": [vmos.to_json(), mappings.to_json()],
             }),
             fplugin::ResourceType::Vmo(fplugin::Vmo {
-                committed_bytes,
-                populated_bytes,
                 parent,
+                private_committed_bytes,
+                private_populated_bytes,
+                scaled_committed_bytes,
+                scaled_populated_bytes,
+                total_committed_bytes,
+                total_populated_bytes,
                 __source_breaking: _,
             }) => json!({
-                "vmo": [committed_bytes.to_json(), populated_bytes.to_json(), parent.to_json()],
+                "vmo": [parent.to_json(),
+                        private_committed_bytes.to_json(),
+                        private_populated_bytes.to_json(),
+                        scaled_committed_bytes.to_json(),
+                        scaled_populated_bytes.to_json(),
+                        total_committed_bytes.to_json(),
+                        total_populated_bytes.to_json()],
             }),
             fplugin::ResourceType::__SourceBreaking { unknown_ordinal: _ } => unimplemented!(),
         }
@@ -331,9 +341,13 @@ impl JsonConvertible for fplugin::ResourceType {
         if let Some(vmo) = obj.get("vmo") {
             let Some(arr) = vmo.as_array() else { return None };
             return Some(fplugin::ResourceType::Vmo(fplugin::Vmo {
-                committed_bytes: arr.get(0).map(|v| u64::from_json(v)).flatten(),
-                populated_bytes: arr.get(1).map(|v| u64::from_json(v)).flatten(),
-                parent: arr.get(2).map(|v| u64::from_json(v)).flatten(),
+                parent: arr.get(0).map(|v| u64::from_json(v)).flatten(),
+                private_committed_bytes: arr.get(1).map(|v| u64::from_json(v)).flatten(),
+                private_populated_bytes: arr.get(2).map(|v| u64::from_json(v)).flatten(),
+                scaled_committed_bytes: arr.get(3).map(|v| u64::from_json(v)).flatten(),
+                scaled_populated_bytes: arr.get(4).map(|v| u64::from_json(v)).flatten(),
+                total_committed_bytes: arr.get(5).map(|v| u64::from_json(v)).flatten(),
+                total_populated_bytes: arr.get(6).map(|v| u64::from_json(v)).flatten(),
                 ..Default::default()
             }));
         }
@@ -625,8 +639,12 @@ mod tests {
                     koid: Some(1002),
                     name_index: Some(2),
                     resource_type: Some(fplugin::ResourceType::Vmo(fplugin::Vmo {
-                        committed_bytes: Some(1024),
-                        populated_bytes: Some(2048),
+                        private_committed_bytes: Some(1024),
+                        private_populated_bytes: Some(2048),
+                        scaled_committed_bytes: Some(1024),
+                        scaled_populated_bytes: Some(2048),
+                        total_committed_bytes: Some(1024),
+                        total_populated_bytes: Some(2048),
                         ..Default::default()
                     })),
                     ..Default::default()
@@ -635,8 +653,12 @@ mod tests {
                     koid: Some(1003),
                     name_index: Some(3),
                     resource_type: Some(fplugin::ResourceType::Vmo(fplugin::Vmo {
-                        committed_bytes: Some(1024),
-                        populated_bytes: Some(2048),
+                        private_committed_bytes: Some(1024),
+                        private_populated_bytes: Some(2048),
+                        scaled_committed_bytes: Some(1024),
+                        scaled_populated_bytes: Some(2048),
+                        total_committed_bytes: Some(1024),
+                        total_populated_bytes: Some(2048),
                         ..Default::default()
                     })),
                     ..Default::default()
@@ -665,8 +687,12 @@ mod tests {
                     koid: Some(1006),
                     name_index: Some(6),
                     resource_type: Some(fplugin::ResourceType::Vmo(fplugin::Vmo {
-                        committed_bytes: Some(1024),
-                        populated_bytes: Some(2048),
+                        private_committed_bytes: Some(1024),
+                        private_populated_bytes: Some(2048),
+                        scaled_committed_bytes: Some(1024),
+                        scaled_populated_bytes: Some(2048),
+                        total_committed_bytes: Some(1024),
+                        total_populated_bytes: Some(2048),
                         ..Default::default()
                     })),
                     ..Default::default()
@@ -675,8 +701,12 @@ mod tests {
                     koid: Some(1007),
                     name_index: Some(7),
                     resource_type: Some(fplugin::ResourceType::Vmo(fplugin::Vmo {
-                        committed_bytes: Some(1024),
-                        populated_bytes: Some(2048),
+                        private_committed_bytes: Some(1024),
+                        private_populated_bytes: Some(2048),
+                        scaled_committed_bytes: Some(1024),
+                        scaled_populated_bytes: Some(2048),
+                        total_committed_bytes: Some(1024),
+                        total_populated_bytes: Some(2048),
                         ..Default::default()
                     })),
                     ..Default::default()
@@ -705,8 +735,12 @@ mod tests {
                     koid: Some(1010),
                     name_index: Some(10),
                     resource_type: Some(fplugin::ResourceType::Vmo(fplugin::Vmo {
-                        committed_bytes: Some(1024),
-                        populated_bytes: Some(2048),
+                        private_committed_bytes: Some(1024),
+                        private_populated_bytes: Some(2048),
+                        scaled_committed_bytes: Some(1024),
+                        scaled_populated_bytes: Some(2048),
+                        total_committed_bytes: Some(1024),
+                        total_populated_bytes: Some(2048),
                         ..Default::default()
                     })),
                     ..Default::default()
@@ -938,9 +972,13 @@ mod tests {
                         2,
                         {
                             "vmo": [
+                                null,
                                 1024,
                                 2048,
-                                null
+                                1024,
+                                2048,
+                                1024,
+                                2048
                             ]
                         }
                     ],
@@ -949,9 +987,13 @@ mod tests {
                         3,
                         {
                             "vmo": [
+                                null,
                                 1024,
                                 2048,
-                                null
+                                1024,
+                                2048,
+                                1024,
+                                2048
                             ]
                         }
                     ],
@@ -985,9 +1027,13 @@ mod tests {
                         6,
                         {
                             "vmo": [
+                                null,
                                 1024,
                                 2048,
-                                null
+                                1024,
+                                2048,
+                                1024,
+                                2048
                             ]
                         }
                     ],
@@ -996,9 +1042,13 @@ mod tests {
                         7,
                         {
                             "vmo": [
+                                null,
                                 1024,
                                 2048,
-                                null
+                                1024,
+                                2048,
+                                1024,
+                                2048
                             ]
                         }
                     ],
@@ -1032,9 +1082,13 @@ mod tests {
                         10,
                         {
                             "vmo": [
+                                null,
                                 1024,
                                 2048,
-                                null
+                                1024,
+                                2048,
+                                1024,
+                                2048
                             ]
                         }
                     ]
