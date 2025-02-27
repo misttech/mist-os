@@ -707,7 +707,7 @@ impl EHandle {
     /// to create shorter-lived child scopes.
     ///
     /// Most users should create an owned scope with
-    /// [`Scope::new`][crate::Scope::new] instead of using this method.
+    /// [`Scope::new_with_name`][crate::Scope::new_with_name] instead of using this method.
     pub fn global_scope(&self) -> &ScopeHandle {
         &self.root_scope
     }

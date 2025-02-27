@@ -22,6 +22,7 @@ use tokio::task::AbortHandle;
 /// of that API.
 ///
 /// [docs]: https://fuchsia-docs.firebaseapp.com/rust/fuchsia_async/struct.Scope.html
+#[derive(Debug)]
 pub struct Scope {
     inner: ScopeHandle,
 }
@@ -33,9 +34,27 @@ impl Scope {
             inner: ScopeHandle {
                 inner: Arc::new(ScopeInner {
                     state: Condition::new(ScopeState { all_tasks: HashMap::new() }),
+                    name: String::new(),
                 }),
             },
         }
+    }
+
+    /// Returns a new scope that is a child of the root scope of the executor.
+    pub fn new_with_name(name: &str) -> Self {
+        Self {
+            inner: ScopeHandle {
+                inner: Arc::new(ScopeInner {
+                    state: Condition::new(ScopeState { all_tasks: HashMap::new() }),
+                    name: name.to_string(),
+                }),
+            },
+        }
+    }
+
+    /// Returns the name of the scope.
+    pub fn name(&self) -> &str {
+        &self.inner.inner.name
     }
 
     /// Creates a [`ScopeHandle`] to this scope.
@@ -194,7 +213,7 @@ impl ScopeHandle {
 
 impl fmt::Debug for ScopeHandle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Scope").finish()
+        f.debug_struct("Scope").field("name", &self.inner.name).finish()
     }
 }
 
@@ -230,6 +249,7 @@ impl Eq for WeakScopeRef {
 
 struct ScopeInner {
     state: Condition<ScopeState>,
+    name: String,
 }
 
 struct ScopeState {
@@ -250,7 +270,7 @@ mod tests {
     #[test]
     fn on_no_tasks() {
         let mut executor = TestExecutor::new();
-        let scope = Scope::new();
+        let scope = Scope::new_with_name("on_no_tasks");
         let _task1 = scope.spawn(std::future::ready(()));
         let task2 = scope.compute(pending::<()>());
 
@@ -272,7 +292,7 @@ mod tests {
     #[test]
     fn wake_all() {
         let mut executor = TestExecutor::new();
-        let scope = Scope::new();
+        let scope = Scope::new_with_name("wake_all");
 
         let poll_count = Arc::new(AtomicU64::new(0));
 
