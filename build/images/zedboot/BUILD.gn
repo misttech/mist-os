@@ -35,9 +35,7 @@ assembled_system("zedboot_assembly") {
 
   # Bazel assembly should not depend on any targets from GN assembly other
   # than the legacy AIB.
-  include_legacy_bundle = true
-  legacy_bundle_only = use_bazel_images_only
-  legacy_bundle_must_be_empty = true
+  include_legacy_bundle = false
 
   base_packages = []
 

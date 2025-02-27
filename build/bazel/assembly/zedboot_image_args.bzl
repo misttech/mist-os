@@ -15,7 +15,6 @@ load(
 )
 
 ZEDBOOT_IMAGE_ARGS = {
-    "legacy_bundle": "//build/bazel/assembly/assembly_input_bundles:legacy_zedboot",
     "platform_artifacts": "//build/bazel/assembly/assembly_input_bundles:platform_bringup",
 }
 

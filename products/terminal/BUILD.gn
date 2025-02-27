@@ -15,7 +15,6 @@ bazel_inputs = [
   "//src/fonts/asset_providers:open-fonts-collection-bazel",
   "//build/images/flash:esp.bazel_input",
   "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
-  "//build/images/zedboot:zedboot.bazel_legacy_aib",
 
   # Cache packages.
   "//src/ui/bin/terminal:terminal.bazel_input",
