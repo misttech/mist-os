@@ -37,7 +37,11 @@ if [[ -z $LABEL ]]; then
     while IFS= read -r line; do
         echo "  $line"
     done <<< "$AVAILABLE"
+
+    echo ""
+    echo "Tip: Try zsh-completion with //scripts/zsh-completion/README.md"
   fi
+
   exit 1
 fi
 

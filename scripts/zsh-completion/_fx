@@ -16,6 +16,14 @@ __fx_build_dir() {
   compadd $(cd ${fuchsia_dir} >/dev/null 2>&1; echo out/^*.zircon/args.gn(N:h))
 }
 
+__fx_product_bundle() {
+  # product bundles are found in product_bundles.json
+  local -r absolute_build_dir="${fuchsia_dir}/${fuchsia_build_dir}"
+  local -r product_bundles_file="${absolute_build_dir}/product_bundles.json"
+  local -a -r product_bundles=( $(cd ${fuchsia_dir} >/dev/null 2>&1; jq -r ".[].name" $product_bundles_file) )
+  compadd -a product_bundles
+}
+
 __fx_gn_target() {
   # use a cache of "gn ls" that's updated when build.ninja changes.
   local -r absolute_build_dir="${fuchsia_dir}/${fuchsia_build_dir}"
