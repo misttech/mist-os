@@ -909,6 +909,10 @@ mod tests {
         fn get_container(&mut self) -> Option<&mut ServingMultiVolumeFilesystem> {
             unreachable!();
         }
+
+        fn register_filesystem(&mut self, _filesystem: Filesystem) {
+            unreachable!();
+        }
     }
 
     impl Drop for MockEnv {

@@ -129,6 +129,11 @@ pub trait Environment: Send + Sync {
 
     /// Returns the container's ServingMultiVolumeFilesystem if the container has been set.
     fn get_container(&mut self) -> Option<&mut ServingMultiVolumeFilesystem>;
+
+    /// Register a running filesystem with the environment. This allows the filesystem to continue
+    /// to exist for the lifetime of fshost, and the environment will shut it down cleanly at the
+    /// right time.
+    fn register_filesystem(&mut self, filesystem: Filesystem);
 }
 
 pub enum Filesystem {
@@ -138,7 +143,7 @@ pub enum Filesystem {
         // We hold onto crypt service here to avoid it prematurely shutting down.
         // Fxfs may expect to find it in via VFS at a later time and it stops running
         // when all channels are closed.
-        #[allow(dead_code)] CryptService,
+        #[allow(dead_code)] Option<CryptService>,
         ServingMultiVolumeFilesystem,
         String,
     ),
@@ -338,6 +343,7 @@ pub struct FshostEnvironment {
     inspector: finspect::Inspector,
     watcher: Watcher,
     registered_devices: Arc<RegisteredDevices>,
+    other_filesystems: Vec<Filesystem>,
 }
 
 impl FshostEnvironment {
@@ -360,6 +366,7 @@ impl FshostEnvironment {
             inspector,
             watcher,
             registered_devices: Arc::new(RegisteredDevices::default()),
+            other_filesystems: Vec::new(),
         }
     }
 
@@ -1030,6 +1037,13 @@ impl Environment for FshostEnvironment {
         self.data.shutdown(self.container.maybe_fs()).await.unwrap_or_else(|error| {
             log::error!(error:?; "failed to shut down data");
         });
+        // Shut down any other dynamic filesystems we happen to know about before we shut down
+        // anything that could potentially be hosting them.
+        for mut fs in self.other_filesystems.drain(..) {
+            fs.shutdown(None).await.unwrap_or_else(|error| {
+                log::error!(error:?; "failed to shut down other filesystem");
+            })
+        }
         if let Some(container) = self.container.take() {
             container.into_fs().shutdown().await.unwrap_or_else(|error| {
                 log::error!(error:?; "failed to shut down container");
@@ -1047,6 +1061,10 @@ impl Environment for FshostEnvironment {
 
     fn get_container(&mut self) -> Option<&mut ServingMultiVolumeFilesystem> {
         self.container.maybe_fs()
+    }
+
+    fn register_filesystem(&mut self, filesystem: Filesystem) {
+        self.other_filesystems.push(filesystem);
     }
 }
 
@@ -1185,7 +1203,7 @@ impl FilesystemLauncher {
                     match fxfs::unlock_data_volume(&mut serving_multi_vol_fs, &self.config).await? {
                         Some((crypt_service, volume_name, _)) => {
                             Ok(ServeFilesystemStatus::Serving(Filesystem::ServingMultiVolume(
-                                crypt_service,
+                                Some(crypt_service),
                                 serving_multi_vol_fs,
                                 volume_name,
                             )))
@@ -1370,7 +1388,7 @@ impl FilesystemLauncher {
                 fxfs::init_data_volume(&mut serving_multi_vol_fs, &self.config)
                     .await
                     .context("initializing data volume encryption")?;
-            Filesystem::ServingMultiVolume(crypt_service, serving_multi_vol_fs, volume_name)
+            Filesystem::ServingMultiVolume(Some(crypt_service), serving_multi_vol_fs, volume_name)
         } else {
             Filesystem::Serving(fs.serve().await.context("serving single volume data partition")?)
         };

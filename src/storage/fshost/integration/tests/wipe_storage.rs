@@ -15,8 +15,7 @@ use fshost_test_fixture::disk_builder::VolumesSpec;
 use fshost_test_fixture::write_test_blob;
 use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio};
 
-// TODO(https://fxbug.dev/391889311): Remove the not storage-host feature
-#[cfg(all(feature = "fxblob", not(feature = "storage-host")))]
+#[cfg(feature = "fxblob")]
 use {fshost::StarnixVolumeProviderMarker, fshost_test_fixture::STARNIX_VOLUME_NAME};
 
 pub mod config;
@@ -109,8 +108,7 @@ async fn write_blob() {
 }
 
 #[fuchsia::test]
-// TODO(https://fxbug.dev/391889311): Remove the not storage-host feature
-#[cfg(all(feature = "fxblob", not(feature = "storage-host")))]
+#[cfg(feature = "fxblob")]
 async fn wipe_storage_deletes_starnix_volume() {
     let mut builder = new_builder();
     builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec()).with_gpt();

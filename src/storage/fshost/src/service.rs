@@ -10,7 +10,7 @@ use crate::device::constants::{
 };
 use crate::device::{BlockDevice, Device, DeviceTag};
 use crate::environment::{
-    Container, Environment, FilesystemLauncher, FxfsContainer, ServeFilesystemStatus,
+    self, Container, Environment, FilesystemLauncher, FxfsContainer, ServeFilesystemStatus,
 };
 use anyhow::{anyhow, ensure, Context, Error};
 use device_watcher::recursive_wait_and_open;
@@ -310,8 +310,11 @@ async fn wipe_storage_fxblob(
         &fio::Options::default(),
         blob_creator.into_channel(),
     )?;
-    // Prevent fs_management from shutting down the filesystem when it's dropped.
-    let _ = serving_fxfs.take_exposed_dir();
+    environment.lock().await.register_filesystem(environment::Filesystem::ServingMultiVolume(
+        None,
+        serving_fxfs,
+        String::new(),
+    ));
     Ok(())
 }
 
@@ -442,8 +445,7 @@ async fn wipe_storage_fvm(
             blob_creator.into_channel(),
         )?;
     }
-    // Prevent fs_management from shutting down the filesystem when it's dropped.
-    let _ = started_blobfs.take_exposed_dir();
+    environment.lock().await.register_filesystem(environment::Filesystem::Serving(started_blobfs));
     Ok(())
 }
 
