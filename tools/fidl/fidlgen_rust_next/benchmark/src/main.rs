@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 mod log;
+mod mesh;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use fidl_next::{DecoderExt as _, EncoderExt as _};
@@ -31,7 +32,7 @@ fn make_rng() -> StdRng {
     ])
 }
 
-fn bench_rust<T, D>(c: &mut Criterion, input: T, input_size: usize, default: D)
+fn bench_rust<T, D>(c: &mut Criterion, name: &str, input: T, input_size: usize, default: D)
 where
     T: fidl::encoding::TypeMarker,
     for<'a> &'a T: fidl::encoding::Encode<T, fidl::encoding::NoHandleResourceDialect>,
@@ -47,7 +48,7 @@ where
     )
     .unwrap();
 
-    c.bench_function(&format!("rust/encode/{input_size}x"), move |b| {
+    c.bench_function(&format!("rust/{name}/encode/{input_size}x"), move |b| {
         let mut buf = Vec::new();
         let mut handle_buf = Vec::new();
         b.iter(|| {
@@ -65,7 +66,7 @@ where
     });
 
     c.bench_function(
-        &format!("rust/decode_natural/{input_size}x"),
+        &format!("rust/{name}/decode_natural/{input_size}x"),
         move |b| {
             b.iter(|| {
                 let mut out = default();
@@ -83,7 +84,7 @@ where
     );
 }
 
-fn bench_rust_next<T, W>(c: &mut Criterion, mut input: T, input_size: usize)
+fn bench_rust_next<T, W>(c: &mut Criterion, name: &str, mut input: T, input_size: usize)
 where
     T: 'static + fidl_next::Encode<Vec<fidl_next::Chunk>> + fidl_next::TakeFrom<W>,
     W: for<'a> fidl_next::Decode<&'a mut [fidl_next::Chunk]>,
@@ -91,7 +92,7 @@ where
     let mut decode_chunks = Vec::new();
     decode_chunks.encode_next(&mut input).unwrap();
 
-    c.bench_function(&format!("rust_next/encode/{input_size}x"), move |b| {
+    c.bench_function(&format!("rust_next/{name}/encode/{input_size}x"), move |b| {
         let mut chunks = Vec::new();
         b.iter(|| {
             chunks.clear();
@@ -100,7 +101,7 @@ where
     });
 
     let decode_wire_chunks = decode_chunks.clone();
-    c.bench_function(&format!("rust_next/decode_wire/{input_size}x"), move |b| {
+    c.bench_function(&format!("rust_next/{name}/decode_wire/{input_size}x"), move |b| {
         b.iter_batched_ref(
             || decode_wire_chunks.clone(),
             |decode_chunks| {
@@ -111,7 +112,7 @@ where
         );
     });
 
-    c.bench_function(&format!("rust_next/decode_natural/{input_size}x"), move |b| {
+    c.bench_function(&format!("rust_next/{name}/decode_natural/{input_size}x"), move |b| {
         b.iter_batched_ref(
             || decode_chunks.clone(),
             |decode_chunks| {
@@ -128,10 +129,15 @@ fn bench_log(c: &mut Criterion) {
     const INPUT_SIZES: [usize; 4] = [1, 10, 100, 1000];
 
     for input_size in INPUT_SIZES {
-        bench_rust(c, log::generate_input_rust(input_size), input_size, || {
+        bench_rust(c, "log", log::generate_input_rust(input_size), input_size, || {
             fidl_test_benchmark::Logs { logs: Vec::new() }
         });
-        bench_rust_next(c, log::generate_input_rust_next(input_size), input_size);
+        bench_rust(c, "mesh", mesh::generate_input_rust(input_size), input_size, || {
+            fidl_test_benchmark::Mesh { triangles: Vec::new() }
+        });
+
+        bench_rust_next(c, "log", log::generate_input_rust_next(input_size), input_size);
+        bench_rust_next(c, "mesh", mesh::generate_input_rust_next(input_size), input_size);
     }
 }
 

@@ -24,3 +24,22 @@ type Log = struct {
 type Logs = struct {
     logs vector<Log>;
 };
+
+// Mesh benchmark types
+
+type Vector3 = struct {
+    x float32;
+    y float32;
+    z float32;
+};
+
+type Triangle = struct {
+    v0 Vector3;
+    v1 Vector3;
+    v2 Vector3;
+    normal Vector3;
+};
+
+type Mesh = struct {
+    triangles vector<Triangle>;
+};

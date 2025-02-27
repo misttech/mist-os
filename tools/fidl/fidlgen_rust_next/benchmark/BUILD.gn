@@ -31,5 +31,6 @@ rustc_binary("bin") {
   sources = [
     "src/log.rs",
     "src/main.rs",
+    "src/mesh.rs",
   ]
 }
