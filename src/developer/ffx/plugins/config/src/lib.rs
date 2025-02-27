@@ -15,12 +15,16 @@ use ffx_config_plugin_args::{
     SubCommand,
 };
 use ffx_ssh::{SshKeyErrorKind, SshKeyFiles};
+use ffx_writer::{ToolIO, VerifiedMachineWriter};
 use fho::{FfxMain, FfxTool};
+use schemars::JsonSchema;
+use serde::Serialize;
 use serde_json::Value;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 
 #[derive(FfxTool)]
+#[no_target]
 pub struct ConfigTool {
     #[command]
     config: ConfigCommand,
@@ -29,14 +33,31 @@ pub struct ConfigTool {
 
 fho::embedded_plugin!(ConfigTool);
 
+#[derive(Debug, Serialize, JsonSchema, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ConfigToolMessage {
+    Message(String),
+    Data(Value),
+}
+
+impl std::fmt::Display for ConfigToolMessage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let message = match self {
+            Self::Message(message) => message.to_owned(),
+            Self::Data(data) => format!("{}", data),
+        };
+        write!(f, "{}", message)
+    }
+}
+
 #[async_trait::async_trait(?Send)]
 impl FfxMain for ConfigTool {
-    type Writer = ffx_writer::SimpleWriter;
+    type Writer = VerifiedMachineWriter<ConfigToolMessage>;
 
-    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
         match &self.config.sub {
             SubCommand::CheckSshKeys(check_ssh_cmd) => {
-                exec_check_ssh_keys(&self.ctx, check_ssh_cmd, writer).await
+                exec_check_ssh_keys(&self.ctx, check_ssh_cmd, &mut writer).await
             }
             SubCommand::Env(env) => exec_env(&self.ctx, env, writer).await,
             SubCommand::Get(get_cmd) => exec_get(&self.ctx, get_cmd, writer).await,
@@ -222,28 +243,31 @@ async fn exec_analytics(analytics_cmd: &AnalyticsCommand) -> Result<()> {
     Ok(())
 }
 
-async fn exec_check_ssh_keys<W: Write>(
+async fn exec_check_ssh_keys(
     ctx: &EnvironmentContext,
     _check_ssh_command: &SshKeyCommand,
-    mut writer: W,
+    writer: &mut VerifiedMachineWriter<ConfigToolMessage>,
 ) -> Result<()> {
     match SshKeyFiles::load(Some(&ctx)).await {
         Ok(ssh_files) => {
             match ssh_files.check_keys(true) {
-                Ok(message) => writeln!(writer, "{message}")?,
+                Ok(message) => {
+                    writer.item(&ConfigToolMessage::Message(message))?;
+                }
                 Err(e) => match e.kind {
-                    SshKeyErrorKind::BadKeyType => {
-                        writeln!(writer, "SSH keys type not supported: {}", e.message)?
-                    }
-                    SshKeyErrorKind::BadConfiguration => {
-                        writeln!(writer, "SSH keys configuration problem: {e}")?
-                    }
-                    _ => writeln!(writer, "SSH keys problem: {e}.")?,
+                    SshKeyErrorKind::BadKeyType => writer.item(&ConfigToolMessage::Message(
+                        format!("SSH keys type not supported: {}", e.message),
+                    ))?,
+                    SshKeyErrorKind::BadConfiguration => writer.item(
+                        &ConfigToolMessage::Message(format!("SSH keys configuration problem: {e}")),
+                    )?,
+                    _ => writer
+                        .item(&ConfigToolMessage::Message(format!("SSH keys problem: {e}.")))?,
                 },
             };
         }
         Err(e) => {
-            writeln!(writer, "Could not get SSH key paths {e}")?;
+            writer.item(&ConfigToolMessage::Message(format!("Could not get SSH key paths {e}")))?;
         }
     };
     Ok(())
@@ -259,6 +283,7 @@ mod test {
     use super::*;
     use errors::{FfxError, IntoExitCode};
     use ffx_config::{test_init, SelectMode};
+    use ffx_writer::{Format, TestBuffers};
     use serde_json::json;
 
     #[fuchsia::test]
@@ -571,7 +596,6 @@ mod test {
     #[fuchsia::test]
     async fn test_exec_check_mismatched_ssh_keys() {
         let test_env = test_init().await.expect("test env");
-        let mut writer = Vec::<u8>::new();
 
         let auth_key_path1 = test_env.isolate_root.path().join("authorized_keys1");
         let private_path1 = test_env.isolate_root.path().join("privatekey1");
@@ -614,23 +638,48 @@ mod test {
         };
         other_keys.create_keys_if_needed(false).expect("Initializing other keys");
 
-        exec_check_ssh_keys(&test_env.context, &SshKeyCommand {}, &mut writer)
-            .await
-            .expect("no error");
-        assert_eq!(format!("Keys repaired: KeyMismatch:Could not find matching public key for the private key {}.\n", private_path1.to_string_lossy()), String::from_utf8_lossy(&writer));
+        let cmd = ConfigCommand { sub: SubCommand::CheckSshKeys(SshKeyCommand {}) };
+        let tool = ConfigTool { config: cmd, ctx: test_env.context.clone() };
+        let buffers = TestBuffers::default();
+        let writer = <ConfigTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
 
-        let mut post_repair_writer = Vec::<u8>::new();
+        let result = tool.main(writer).await;
+        assert!(result.is_ok());
 
-        exec_check_ssh_keys(&test_env.context, &SshKeyCommand {}, &mut post_repair_writer)
-            .await
-            .expect("no error");
-        assert_eq!("SSH Public/Private keys match\n", String::from_utf8_lossy(&post_repair_writer));
+        let output = buffers.into_stdout_str();
+
+        let expected_message = format!("{}\n",
+            serde_json::to_string(
+                &ConfigToolMessage::Message(
+                    format!("Keys repaired: KeyMismatch:Could not find matching public key for the private key {}.", private_path1.to_string_lossy())
+                )
+            ).expect("Should be a string")
+        );
+        assert_eq!(expected_message, output);
+
+        let cmd = ConfigCommand { sub: SubCommand::CheckSshKeys(SshKeyCommand {}) };
+        let tool = ConfigTool { config: cmd, ctx: test_env.context.clone() };
+        let buffers = TestBuffers::default();
+        let writer = <ConfigTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
+
+        let result = tool.main(writer).await;
+        let output = buffers.into_stdout_str();
+        assert!(result.is_ok());
+
+        let expected_message = format!(
+            "{}\n",
+            serde_json::to_string(&ConfigToolMessage::Message(format!(
+                "SSH Public/Private keys match"
+            )))
+            .expect("Should be a string")
+        );
+
+        assert_eq!(expected_message, output);
     }
 
     #[fuchsia::test]
     async fn test_exec_check_ok_ssh_keys() {
         let test_env = test_init().await.expect("test env");
-        let mut writer = Vec::<u8>::new();
 
         let auth_key_path = test_env.isolate_root.path().join("authorized_keys");
         let private_path = test_env.isolate_root.path().join("privatekey");
@@ -666,17 +715,28 @@ mod test {
             keys.private_key.display().to_string(),
             private_path.to_string_lossy().to_string()
         );
+        let cmd = ConfigCommand { sub: SubCommand::CheckSshKeys(SshKeyCommand {}) };
+        let tool = ConfigTool { config: cmd, ctx: test_env.context.clone() };
+        let buffers = TestBuffers::default();
+        let writer = <ConfigTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
 
-        exec_check_ssh_keys(&test_env.context, &SshKeyCommand {}, &mut writer)
-            .await
-            .expect("no error");
-        assert_eq!("SSH Public/Private keys match\n", String::from_utf8_lossy(&writer));
+        let result = tool.main(writer).await;
+        assert!(result.is_ok());
+        let expected_message = format!(
+            "{}\n",
+            serde_json::to_string(&ConfigToolMessage::Message(
+                "SSH Public/Private keys match".to_string()
+            ))
+            .expect("Should be a string")
+        );
+
+        let output = buffers.into_stdout_str();
+        assert_eq!(expected_message, output);
     }
 
     #[fuchsia::test]
     async fn test_exec_check_empty_ssh_keys() {
         let test_env = test_init().await.expect("test env");
-        let mut writer = Vec::<u8>::new();
 
         let auth_key_path = test_env.isolate_root.path().join("authorized_keys");
         let private_path = test_env.isolate_root.path().join("privatekey");
@@ -711,15 +771,23 @@ mod test {
             private_path.to_string_lossy().to_string()
         );
 
-        exec_check_ssh_keys(&test_env.context, &SshKeyCommand {}, &mut writer)
-            .await
-            .expect("no error");
-        assert_eq!(
-            format!(
-                "Keys repaired: FileNotFound:Private key {} does not exist.\n",
+        let cmd = ConfigCommand { sub: SubCommand::CheckSshKeys(SshKeyCommand {}) };
+        let tool = ConfigTool { config: cmd, ctx: test_env.context.clone() };
+        let buffers = TestBuffers::default();
+        let writer = <ConfigTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
+
+        let result = tool.main(writer).await;
+        assert!(result.is_ok());
+
+        let output = buffers.into_stdout_str();
+        let expected_message = format!(
+            "{}\n",
+            serde_json::to_string(&ConfigToolMessage::Message(format!(
+                "Keys repaired: FileNotFound:Private key {} does not exist.",
                 private_path.to_string_lossy()
-            ),
-            String::from_utf8_lossy(&writer)
+            ),))
+            .expect("Should be a string")
         );
+        assert_eq!(expected_message, output);
     }
 }
