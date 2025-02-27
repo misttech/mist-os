@@ -1709,9 +1709,9 @@ void riscv64_mmu_early_init() {
   riscv_asid_mask = (riscv64_csr_read(satp) >> RISCV64_SATP_ASID_SHIFT) & RISCV64_SATP_ASID_MASK;
   riscv64_csr_write(satp, satp_orig);
 
-  paddr_t bootstrap_root_paddr = (satp & RISCV64_SATP_PPN_MASK) << PAGE_SIZE_SHIFT;
+  riscv64_kernel_bootstrap_translation_table_phys = (satp & RISCV64_SATP_PPN_MASK) << PAGE_SIZE_SHIFT;
   pte_t* bootstrap_translation_table =
-      reinterpret_cast<pte_t*>(paddr_to_physmap(bootstrap_root_paddr));
+      reinterpret_cast<pte_t*>(paddr_to_physmap(riscv64_kernel_bootstrap_translation_table_phys));
 
   // Fill in all of the unused top level page table pointers for the kernel half of the kernel
   // top level table. These entries will be copied to all new address spaces, thus ensuring the

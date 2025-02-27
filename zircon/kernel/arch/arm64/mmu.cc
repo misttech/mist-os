@@ -11,6 +11,7 @@
 #include <bits.h>
 #include <debug.h>
 #include <inttypes.h>
+#include <lib/arch/arm64/system.h>
 #include <lib/arch/cache.h>
 #include <lib/arch/intrin.h>
 #include <lib/boot-options/boot-options.h>
@@ -75,10 +76,6 @@ uint64_t kernel_relocated_base = kArchHandoffVirtualAddress;
 // saved in start.S.
 paddr_t root_kernel_page_table_phys;
 paddr_t root_lower_page_table_phys;
-
-pte_t* arm64_root_kernel_page_table() {
-  return static_cast<pte_t*>(paddr_to_physmap(root_kernel_page_table_phys));
-}
 
 namespace {
 
@@ -1828,7 +1825,7 @@ zx_status_t ArmArchVmAspace::Init() {
     top_index_shift_ = MMU_KERNEL_TOP_SHIFT;
     page_size_shift_ = MMU_KERNEL_PAGE_SIZE_SHIFT;
 
-    tt_virt_ = static_cast<volatile pte_t*>(arm64_root_kernel_page_table());
+    tt_virt_ = static_cast<volatile pte_t*>(paddr_to_physmap(root_kernel_page_table_phys));
     tt_phys_ = root_kernel_page_table_phys;
     tt_page_ = Pmm::Node().PaddrToPage(root_kernel_page_table_phys);
     DEBUG_ASSERT(tt_page_);
@@ -2393,6 +2390,9 @@ void ArmVmICacheConsistencyManager::Finish() {
 }
 
 void arm64_mmu_early_init() {
+  root_lower_page_table_phys = arch::ArmTtbr0El1::Read().addr();
+  root_kernel_page_table_phys = arch::ArmTtbr1El1::Read().addr();
+
   // Our current ASID allocation scheme is very naive and allocates a unique ASID to every address
   // space, which means that there are often not enough ASIDs when the machine uses 8-bit ASIDs.
   // Therefore, if we detect that we are only given 8-bit ASIDs, disable their use.
