@@ -21,6 +21,7 @@
 #include "src/graphics/display/drivers/amlogic-display/encoder-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/gpio-mux-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
+#include "src/graphics/display/drivers/amlogic-display/pll-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/power-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
@@ -290,7 +291,12 @@ void HdmiHost::HostOff() {
   hhi_mmio_.Write32(0, HHI_HDMI_PHY_CNTL0);
   hhi_mmio_.Write32(0, HHI_HDMI_PHY_CNTL3);
   /* Disable HPLL */
-  hhi_mmio_.Write32(0, HHI_HDMI_PLL_CNTL0);
+  HdmiPllControl0::Get()
+      .ReadFrom(&hhi_mmio_)
+      .set_hdmi_clock_out2_enabled(false)
+      .set_hdmi_clock_out_enabled(false)
+      .set_pll_enabled(false)
+      .WriteTo(&hhi_mmio_);
 }
 
 zx_status_t HdmiHost::ModeSet(const display::DisplayTiming& timing) {
