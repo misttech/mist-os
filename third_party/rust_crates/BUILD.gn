@@ -315,6 +315,12 @@ group("fatfs") {
   public_deps = [ ":fatfs-v0_3_6" ]
 }
 
+if (current_os == "fuchsia") {
+  group("flagset") {
+    public_deps = [ ":flagset-v0_4_6" ]
+  }
+}
+
 group("flate2") {
   public_deps = [ ":flate2-v1_0_14" ]
 }

@@ -1498,6 +1498,7 @@ dependencies = [
  "event-listener 5.3.1",
  "fancy-regex",
  "fatfs",
+ "flagset",
  "flate2",
  "foreign-types",
  "foreign-types-shared",

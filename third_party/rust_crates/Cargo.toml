@@ -273,6 +273,7 @@ coset = { version = "0.3.8", features = ["std"] }
 # ct-logs = "0.6"
 der = { version = "0.7.9", features = ["alloc", "derive", "flagset", "oid", "zeroize"] }
 euclid = { version = "0.22.1", features = [ "serde" ] }
+flagset = "0.4.6"
 getopts = "0.2"
 hyper-rustls = { version = "0.24.2", default-features = false }
 lipsum = "0.6.0"
