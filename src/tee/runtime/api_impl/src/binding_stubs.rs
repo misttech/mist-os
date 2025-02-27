@@ -10,8 +10,6 @@
 #![allow(non_snake_case)]
 #![allow(unused_variables)]
 
-use crate::props::is_propset_pseudo_handle;
-use crate::{context, crypto, mem, storage, time};
 use num_traits::FromPrimitive;
 use tee_internal::binding::{
     TEE_Attribute, TEE_BigInt, TEE_BigIntFMM, TEE_BigIntFMMContext, TEE_Identity,
@@ -24,6 +22,9 @@ use tee_internal::{
     ObjectEnumHandle, ObjectHandle, OperationHandle, PropSetHandle, Result as TeeResult,
     Storage as TeeStorage, Type, Usage, ValueFields, Whence, OBJECT_ID_MAX_LEN,
 };
+
+use crate::props::is_propset_pseudo_handle;
+use crate::{context, crypto, mem, storage, time, ErrorWithSize};
 
 // This function returns a list of the C entry point that we want to expose from
 // this program. They need to be referenced from main to ensure that the linker
@@ -839,10 +840,10 @@ extern "C" fn TEE_GetObjectBufferAttribute(
             context.storage.get_object_buffer_attribute(object, id, buffer)
         }) {
             Ok(written) => {
-                debug_assert!(written.len() <= initial_size);
-                (written.len(), Ok(()))
+                debug_assert!(written <= initial_size);
+                (written, Ok(()))
             }
-            Err(err) => (err.actual_size, Err(err.error)),
+            Err(err) => (err.size, Err(err.error)),
         };
         // SAFETY: `size` nullity checked above.
         unsafe {
@@ -1352,10 +1353,11 @@ extern "C" fn TEE_DigestDoFinal(
         let hash = slice_from_raw_parts_mut(hash, initialHashLen);
         context::with_current_mut(|context| {
             context.operations.update_and_finalize_digest_into(operation, chunk, hash).map_err(
-                |len| {
+                |ErrorWithSize { error, size }| {
+                    debug_assert_eq!(error, Error::ShortBuffer);
                     // SAFETY: hashLen checked as non-null above.
-                    unsafe { *hashLen = len };
-                    Error::ShortBuffer
+                    unsafe { *hashLen = size };
+                    error
                 },
             )
         })
@@ -1420,11 +1422,14 @@ extern "C" fn TEE_CipherUpdate(
                 return Ok(());
             }
             let src = slice_from_raw_parts(srcData, srcLen);
-            context.operations.update_cipher(operation, src, dest).map_err(|len| {
-                // SAFETY: destLen checked as non-null above.
-                unsafe { *destLen = len };
-                Error::ShortBuffer
-            })
+            context.operations.update_cipher(operation, src, dest).map_err(
+                |ErrorWithSize { error, size }| {
+                    debug_assert_eq!(error, Error::ShortBuffer);
+                    // SAFETY: destLen checked as non-null above.
+                    unsafe { *destLen = size };
+                    error
+                },
+            )
         })
     }())
 }
@@ -1454,11 +1459,14 @@ extern "C" fn TEE_CipherDoFinal(
                 return Ok(());
             }
             let src = slice_from_raw_parts(srcData, srcLen);
-            context.operations.finalize_cipher(operation, src, dest).map_err(|len| {
-                // SAFETY: destLen checked as non-null above.
-                unsafe { *destLen = len };
-                Error::ShortBuffer
-            })
+            context.operations.finalize_cipher(operation, src, dest).map_err(
+                |ErrorWithSize { error, size }| {
+                    debug_assert_eq!(error, Error::ShortBuffer);
+                    // SAFETY: destLen checked as non-null above.
+                    unsafe { *destLen = size };
+                    error
+                },
+            )
         })
     }())
 }
@@ -1508,11 +1516,14 @@ extern "C" fn TEE_MACComputeFinal(
         let mac = slice_from_raw_parts_mut(mac, initialMacLen);
 
         context::with_current_mut(|context| {
-            context.operations.compute_final_mac(operation, message, mac).map_err(|len| {
-                // SAFETY: macLen checked as non-null above.
-                unsafe { *macLen = len };
-                Error::ShortBuffer
-            })
+            context.operations.compute_final_mac(operation, message, mac).map_err(
+                |ErrorWithSize { error, size }| {
+                    debug_assert_eq!(error, Error::ShortBuffer);
+                    // SAFETY: macLen checked as non-null above.
+                    unsafe { *macLen = size };
+                    error
+                },
+            )
         })
     }())
 }

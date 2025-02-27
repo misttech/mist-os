@@ -25,6 +25,7 @@ use crate::storage::{
     AesKey, HmacSha1Key, HmacSha224Key, HmacSha256Key, HmacSha384Key, HmacSha512Key, Key,
     KeyType as _, NoKey, Object,
 };
+use crate::ErrorWithSize;
 
 type AesCmac128 = Cmac<Aes128>;
 type AesCmac192 = Cmac<Aes192>;
@@ -685,14 +686,14 @@ impl Operation {
         &mut self,
         last_chunk: &[u8],
         buf: &mut [u8],
-    ) -> Result<(), usize> {
+    ) -> Result<(), ErrorWithSize> {
         assert_eq!(self.mode, Mode::Digest);
 
         if let (true, left_to_extract) = self.is_extracting() {
             assert!(last_chunk.is_empty());
 
             if left_to_extract > buf.len() {
-                return Err(left_to_extract);
+                return Err(ErrorWithSize::short_buffer(left_to_extract));
             }
 
             let written = self.extract_digest(buf);
@@ -705,7 +706,7 @@ impl Operation {
             let digest = self.as_digest();
             let output_size = digest.output_size();
             if output_size > buf.len() {
-                return Err(output_size);
+                return Err(ErrorWithSize::short_buffer(output_size));
             }
 
             if !last_chunk.is_empty() {
@@ -754,7 +755,7 @@ impl Operation {
 
     // The error value indicates the minimum required size of the output buffer
     // (i.e., the total number of full blocks to encrypt/decrypt).
-    fn update_cipher(&mut self, src: &[u8], dest: &mut [u8]) -> Result<(), usize> {
+    fn update_cipher(&mut self, src: &[u8], dest: &mut [u8]) -> Result<(), ErrorWithSize> {
         assert_eq!(self.state, OpState::Active);
 
         let block_size = self.as_cipher().block_size();
@@ -764,7 +765,7 @@ impl Operation {
         // The output buffer size should be at least the total size of the
         // number of full blocks in `src` to encrypt/decrypt.
         if num_blocks_in > num_blocks_out {
-            return Err(num_blocks_in * block_size);
+            return Err(ErrorWithSize::short_buffer(num_blocks_in * block_size));
         }
 
         if self.mode == Mode::Encrypt {
@@ -790,7 +791,7 @@ impl Operation {
     // The error value indicates the minimum required size of the output buffer
     // (i.e., the total number of full blocks to encrypt/decrypt, which should
     // be the same size as `src` itself).
-    fn finalize_cipher(&mut self, src: &[u8], dest: &mut [u8]) -> Result<(), usize> {
+    fn finalize_cipher(&mut self, src: &[u8], dest: &mut [u8]) -> Result<(), ErrorWithSize> {
         let block_size = self.as_cipher().block_size();
         assert_eq!(src.len() % block_size, 0);
         assert!(dest.len() >= src.len());
@@ -833,13 +834,17 @@ impl Operation {
     }
 
     // See TEE_MACComputeFinal().
-    fn compute_final_mac(&mut self, message: &[u8], output: &mut [u8]) -> Result<(), usize> {
+    fn compute_final_mac(
+        &mut self,
+        message: &[u8],
+        output: &mut [u8],
+    ) -> Result<(), ErrorWithSize> {
         assert_eq!(self.mode, Mode::Mac);
         assert_eq!(self.state, OpState::Active);
 
         let output_size = self.as_mac().output_size();
         if output.len() < output_size {
-            return Err(output_size);
+            return Err(ErrorWithSize::short_buffer(output_size));
         }
 
         // Make sure we validate the output buffer size before updating the
@@ -1009,7 +1014,7 @@ impl Operations {
         operation: OperationHandle,
         last_chunk: &[u8],
         buf: &mut [u8],
-    ) -> Result<(), usize> {
+    ) -> Result<(), ErrorWithSize> {
         self.get_mut(operation).update_and_finalize_digest_into(last_chunk, buf)
     }
 
@@ -1026,7 +1031,7 @@ impl Operations {
         operation: OperationHandle,
         input: &[u8],
         output: &mut [u8],
-    ) -> Result<(), usize> {
+    ) -> Result<(), ErrorWithSize> {
         self.get_mut(operation).update_cipher(input, output)
     }
 
@@ -1039,7 +1044,7 @@ impl Operations {
         operation: OperationHandle,
         input: &[u8],
         output: &mut [u8],
-    ) -> Result<(), usize> {
+    ) -> Result<(), ErrorWithSize> {
         self.get_mut(operation).finalize_cipher(input, output)
     }
 
@@ -1060,7 +1065,7 @@ impl Operations {
         operation: OperationHandle,
         message: &[u8],
         mac: &mut [u8],
-    ) -> Result<(), usize> {
+    ) -> Result<(), ErrorWithSize> {
         self.get_mut(operation).compute_final_mac(message, mac)
     }
 

@@ -23,6 +23,7 @@ use tee_internal::{
 use thiserror::Error;
 
 use crate::crypto::Rng;
+use crate::ErrorWithSize;
 
 type P256SecretKey = elliptic_curve::SecretKey<NistP256>;
 
@@ -1339,18 +1340,10 @@ impl Storage {
     }
 }
 
-/// Encapsulates an error of get_object_buffer_attribute(), which includes the
-/// actual length of the desired buffer attribute in the case where the
-/// caller-provided was too small.
-pub struct GetObjectBufferAttributeError {
-    pub error: Error,
-    pub actual_size: usize,
-}
-
 impl Storage {
     /// Returns the requested buffer-type attribute associated with the given
-    /// object, if any. It is written to the provided buffer and it is this
-    /// written subslice that is returned.
+    /// object, if any. It is written to the provided buffer and the size of
+    /// what is written is returned.
     ///
     /// Returns a wrapped value of Error::ItemNotFound if the object does not have
     /// such an attribute.
@@ -1360,41 +1353,31 @@ impl Storage {
     ///
     /// Panics if `object` is not a valid handle or if `attribute_id` is not of
     /// buffer type.
-    pub fn get_object_buffer_attribute<'a>(
+    pub fn get_object_buffer_attribute(
         &self,
         object: ObjectHandle,
         attribute_id: AttributeId,
-        buffer: &'a mut [u8],
-    ) -> Result<&'a [u8], GetObjectBufferAttributeError> {
+        buffer: &mut [u8],
+    ) -> Result<usize, ErrorWithSize> {
         assert!(!attribute_id.value());
 
-        let copy_from_key = |obj: &dyn Object,
-                             buffer: &'a mut [u8]|
-         -> Result<&'a [u8], GetObjectBufferAttributeError> {
+        let copy_from_key = |obj: &dyn Object, buffer: &mut [u8]| -> Result<usize, ErrorWithSize> {
             if !attribute_id.public() {
                 assert!(obj.usage().contains(Usage::EXTRACTABLE));
             }
 
             let attr = obj.key().buffer_attribute(attribute_id);
             let bytes = match &attr {
-                None => {
-                    return Err(GetObjectBufferAttributeError {
-                        error: Error::ItemNotFound,
-                        actual_size: 0,
-                    })
-                }
+                None => return Err(ErrorWithSize::new(Error::ItemNotFound)),
                 Some(BufferAttribute::Slice(bytes)) => bytes,
                 Some(BufferAttribute::Vector(bytes)) => bytes.as_slice(),
             };
             if buffer.len() < bytes.len() {
-                Err(GetObjectBufferAttributeError {
-                    error: Error::ShortBuffer,
-                    actual_size: bytes.len(),
-                })
+                Err(ErrorWithSize::short_buffer(bytes.len()))
             } else {
                 let written = &mut buffer[..bytes.len()];
                 written.copy_from_slice(bytes);
-                Ok(written)
+                Ok(written.len())
             }
         };
 
