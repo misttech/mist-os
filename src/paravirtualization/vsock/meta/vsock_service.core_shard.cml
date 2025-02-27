@@ -11,11 +11,9 @@
     ],
     offer: [
         {
-            directory: "dev-class",
+            service: "fuchsia.hardware.vsock.Service",
             from: "parent",
-            as: "dev-vsock",
             to: "#vsock",
-            subdir: "vsock",
         },
         {
             protocol: "fuchsia.hardware.vsock.Device",

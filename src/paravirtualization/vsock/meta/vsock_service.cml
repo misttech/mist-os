@@ -41,10 +41,7 @@
             default: false,
         },
         {
-            directory: "dev-vsock",
-            rights: [ "r*" ],
-            path: "/dev/class/vsock",
-            availability: "optional",
+            service: [ "fuchsia.hardware.vsock.Service" ],
         },
         {
             protocol: [ "fuchsia.hardware.vsock.Device-Loopback" ],

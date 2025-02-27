@@ -37,12 +37,9 @@ namespace virtio {
 namespace vsock = fuchsia_hardware_vsock;
 
 class SocketDevice;
-using DeviceType =
-    ddk::Device<SocketDevice, ddk::Unbindable, ddk::Messageable<vsock::Device>::Mixin>;
+using DeviceType = ddk::Device<SocketDevice, ddk::Unbindable>;
 
-class SocketDevice : public Device,
-                     public DeviceType,
-                     public ddk::EmptyProtocol<ZX_PROTOCOL_VSOCK> {
+class SocketDevice : public Device, public DeviceType, public fidl::WireServer<vsock::Device> {
  public:
   struct ConnectionKey;
 
@@ -432,6 +429,8 @@ class SocketDevice : public Device,
   async::WaitMethod<SocketDevice, &SocketDevice::CallbacksSignalled> callback_closed_handler_
       TA_GUARDED(lock_);
   uint64_t bti_contiguity_ TA_GUARDED(lock_);
+
+  fidl::ServerBindingGroup<fuchsia_hardware_vsock::Device> bindings_;
 };
 
 }  // namespace virtio

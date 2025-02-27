@@ -132,7 +132,7 @@ DDK_PROTOCOL_DEF(NNA,                     113,  "nna", PF_NOPUB)
 DDK_PROTOCOL_DEF(GPU,                     114, "gpu", 0)
 DDK_PROTOCOL_DEF(RTC,                     115, "rtc", 0)
 DDK_PROTOCOL_DEF(TEE,                     116, "tee", 0)
-DDK_PROTOCOL_DEF(VSOCK,                   117, "vsock", 0)
+// 117 was vsock
 DDK_PROTOCOL_DEF(SYSMEM,                  118, "sysmem", 0)
 DDK_PROTOCOL_DEF(MLG,                     119, "mlg", 0)
 DDK_PROTOCOL_DEF(ZXCRYPT,                 120, "zxcrypt", 0)

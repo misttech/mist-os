@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <memory>
 
+#include <ddktl/device.h>
 #include <fbl/algorithm.h>
 #include <fbl/array.h>
 #include <fbl/auto_lock.h>
@@ -220,6 +221,17 @@ zx_status_t SocketDevice::Init() {
   }
   timer_wait_handler_.set_object(tx_retry_timer_.get());
   timer_wait_handler_.set_trigger(ZX_TIMER_SIGNALED);
+
+  // Export the service
+  zx::result<> result = DdkAddService<fuchsia_hardware_vsock::Service>(
+      fuchsia_hardware_vsock::Service::InstanceHandler({
+          .device = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                            fidl::kIgnoreBindingClosure),
+      }));
+  if (result.is_error()) {
+    zxlogf(ERROR, "%s: failed to add service: %s", tag(), result.status_string());
+    return result.status_value();
+  }
 
   // Initialize the zx_device and publish us.
   zx_status_t status = DdkAdd("virtio-vsock");

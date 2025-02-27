@@ -417,6 +417,7 @@
                 "fuchsia.hardware.sockettunnel.Service",
                 "fuchsia.hardware.spmi.DebugService",
                 "fuchsia.hardware.suspend.SuspendService",
+                "fuchsia.hardware.vsock.Service",
                 "fuchsia.storage.ftl.Service",
                 "fuchsia.sysinfo.Service",
 
@@ -482,7 +483,6 @@
                 "fuchsia.hardware.usb.peripheral.Service",
                 "fuchsia.hardware.usb.tester.Service",
                 "fuchsia.hardware.usb.virtualbustest.Service",
-                "fuchsia.hardware.vsock.Service",
                 "fuchsia.input.report.Service",
                 "fuchsia.lowpan.spinel.Service",
                 "fuchsia.power.battery.InfoService",
