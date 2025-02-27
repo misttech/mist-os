@@ -33,6 +33,14 @@ import("libc_headers.gni")
 # API summary files for the SDK, for a change that go through API review.
 llvm_libc_soft_transition = false
 
+# When the llvm-libc hdrgen sources change incompatibly, then a more thorough
+# kind of soft transition is required.  In that case, there's no way to do any
+# header generation.  So even libc's own code has to use the llvm-libc-golden
+# files instead of "current" files.  This scenario is much more rare than the
+# generic llvm_libc_soft_transition scenario.
+llvm_libc_hdrgen_transition =
+    true  # TODO(mcgrathr): hdrgen python layout changed
+
 # Files generated from "$llvm_libc/include/*.yaml" files.  This list drives the
 # generation work done here, including regenerating llvm-libc-generated.json
 # using the golden_files() mechanism.  However, the golden JSON file in the
@@ -46,9 +54,11 @@ llvm_libc_generated_headers = [
 ]
 
 # Generated headers go into this directory, always the same in every toolchain.
-gen_dir =
-    get_label_info("//third_party/llvm-libc/src/include($default_toolchain)",
-                   "target_gen_dir")
+if (!llvm_libc_hdrgen_transition) {
+  gen_dir =
+      get_label_info("//third_party/llvm-libc/src/include($default_toolchain)",
+                     "target_gen_dir")
+}
 
 # This target is in an sdk.deps list in sysroot_entries, to ensure that the
 # llvm-libc-golden copies are up to date.  It does nothing during a soft
@@ -56,13 +66,15 @@ gen_dir =
 # checking only happens in the $default_toolchain and is not repeated
 # elsewhere.
 group("include") {
-  public_deps = [ ":check-llvm-libc-json($default_toolchain)" ]
-  if (!llvm_libc_soft_transition) {
+  if (!llvm_libc_hdrgen_transition) {
+    public_deps = [ ":check-llvm-libc-json($default_toolchain)" ]
+  }
+  if (!llvm_libc_soft_transition && !llvm_libc_hdrgen_transition) {
     public_deps += [ ":check-llvm-libc-golden($default_toolchain)" ]
   }
 }
 
-if (current_toolchain == default_toolchain) {
+if (current_toolchain == default_toolchain && !llvm_libc_hdrgen_transition) {
   # If the comparisons list goes directly into golden_files() as a list of
   # scopes, then each golden file will be an input and Ninja will insist that
   # it already exist before running anything.  With the list in a JSON file,
@@ -232,14 +244,25 @@ basic_source_set("headers") {
     public += [ "${libc_headers.musl_dir}/$file" ]
   }
 
-  foreach(file, libc_headers.llvm_libc_impl_headers) {
-    public += [ "$llvm_libc/include/$file" ]
-  }
+  if (llvm_libc_hdrgen_transition) {
+    # When hdrgen is not available, libc code will use the llvm-libc-golden
+    # files that everything else is using via the sysroot, rather than the
+    # $llvm_libc/include and generated files, but directly and still not via
+    # the sysroot.
+    foreach(file,
+            libc_headers.llvm_libc_impl_headers + llvm_libc_generated_headers) {
+      public += [ "llvm-libc-golden/$file" ]
+    }
+  } else {
+    foreach(file, libc_headers.llvm_libc_impl_headers) {
+      public += [ "$llvm_libc/include/$file" ]
+    }
 
-  foreach(file, llvm_libc_generated_headers) {
-    public += [ "$gen_dir/$file" ]
+    foreach(file, llvm_libc_generated_headers) {
+      public += [ "$gen_dir/$file" ]
+    }
+    public_deps += [ ":llvm-libc-generated-headers($default_toolchain)" ]
   }
-  public_deps += [ ":llvm-libc-generated-headers($default_toolchain)" ]
 
   public_deps += [ "//zircon/system/public" ]
 }
@@ -247,13 +270,19 @@ basic_source_set("headers") {
 config("headers.config") {
   visibility = [ ":*" ]
   cflags = []
-  foreach(dir,
-          [
-            ".",
-            libc_headers.musl_dir,
-            gen_dir,
-            "$llvm_libc/include",
-          ]) {
+  dirs = [
+    ".",
+    libc_headers.musl_dir,
+  ]
+  if (llvm_libc_hdrgen_transition) {
+    dirs += [ "llvm-libc-golden" ]
+  } else {
+    dirs += [
+      gen_dir,
+      "$llvm_libc/include",
+    ]
+  }
+  foreach(dir, dirs) {
     cflags += [
       "-idirafter",
       rebase_path(dir, root_build_dir),
@@ -262,24 +291,26 @@ config("headers.config") {
   asmflags = cflags
 }
 
-python_binary("hdrgen") {
-  visibility = [ ":*" ]
+if (!llvm_libc_hdrgen_transition) {
+  python_binary("hdrgen") {
+    visibility = [ ":*" ]
 
-  hdrgen_dir = "$llvm_libc/utils/hdrgen"
-  main_source = "$hdrgen_dir/main.py"
-  sources = [
-    "$hdrgen_dir/enumeration.py",
-    "$hdrgen_dir/function.py",
-    "$hdrgen_dir/gpu_headers.py",
-    "$hdrgen_dir/header.py",
-    "$hdrgen_dir/macro.py",
-    "$hdrgen_dir/object.py",
-    "$hdrgen_dir/type.py",
-    "$hdrgen_dir/yaml_to_classes.py",
-  ]
-  deps = [ "//third_party/pyyaml:yaml" ]
+    hdrgen_dir = "$llvm_libc/utils/hdrgen"
+    main_source = "$hdrgen_dir/main.py"
+    sources = [
+      "$hdrgen_dir/enumeration.py",
+      "$hdrgen_dir/function.py",
+      "$hdrgen_dir/gpu_headers.py",
+      "$hdrgen_dir/header.py",
+      "$hdrgen_dir/macro.py",
+      "$hdrgen_dir/object.py",
+      "$hdrgen_dir/type.py",
+      "$hdrgen_dir/yaml_to_classes.py",
+    ]
+    deps = [ "//third_party/pyyaml:yaml" ]
 
-  enable_mypy = false
+    enable_mypy = false
+  }
 }
 
 # Generate standlaone "#include <foo.h>" compile-time tests for each public
