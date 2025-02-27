@@ -10,6 +10,12 @@
 {%- endif %}
 pub struct {{ protocol_name }};
 
+{% if protocol.attributes.attributes.contains_key("discoverable") %}
+    impl ::fidl_next::bind::Discoverable for {{ protocol_name }} {
+        const PROTOCOL_NAME: &'static str = "{{ protocol.name.decl_name().snake() }}";
+    }
+{% endif %}
+
 pub mod {{ module_name }} {
     {% for method in protocol.methods %}
         {% let method_name = filters::ident(method.name.camel())? %}

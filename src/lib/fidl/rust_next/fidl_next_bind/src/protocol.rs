@@ -2,6 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+/// A discoverable protocol.
+pub trait Discoverable {
+    /// The service name to use to connect to this discoverable protocol.
+    const PROTOCOL_NAME: &'static str;
+}
+
 /// A method of a protocol.
 pub trait Method {
     /// The ordinal associated with the method;

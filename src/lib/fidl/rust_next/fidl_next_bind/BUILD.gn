@@ -14,7 +14,7 @@ rustc_library("fidl_next_bind") {
     "src/client.rs",
     "src/endpoint.rs",
     "src/lib.rs",
-    "src/method.rs",
+    "src/protocol.rs",
     "src/server.rs",
     "src/service.rs",
   ]

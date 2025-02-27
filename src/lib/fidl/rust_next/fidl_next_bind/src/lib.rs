@@ -24,13 +24,13 @@
 mod buffer;
 mod client;
 mod endpoint;
-mod method;
+mod protocol;
 mod server;
 mod service;
 
 pub use self::buffer::*;
 pub use self::client::*;
 pub use self::endpoint::*;
-pub use self::method::*;
+pub use self::protocol::*;
 pub use self::server::*;
 pub use self::service::*;

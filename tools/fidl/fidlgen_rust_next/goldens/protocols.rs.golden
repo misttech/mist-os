@@ -6,6 +6,10 @@
 #[derive(Debug)]
 pub struct AnotherDiscoverableProtocol;
 
+impl ::fidl_next::bind::Discoverable for AnotherDiscoverableProtocol {
+    const PROTOCOL_NAME: &'static str = "another_discoverable_protocol";
+}
+
 pub mod another_discoverable_protocol {}
 
 /// A helper trait for the `AnotherDiscoverableProtocol` client sender.
@@ -1183,6 +1187,10 @@ where
 /// The type corresponding to the DiscoverableProtocol protocol.
 #[derive(Debug)]
 pub struct DiscoverableProtocol;
+
+impl ::fidl_next::bind::Discoverable for DiscoverableProtocol {
+    const PROTOCOL_NAME: &'static str = "discoverable_protocol";
+}
 
 pub mod discoverable_protocol {
 
@@ -2998,6 +3006,10 @@ where
 /// The type corresponding to the PlatformServer protocol.
 #[derive(Debug)]
 pub struct PlatformServer;
+
+impl ::fidl_next::bind::Discoverable for PlatformServer {
+    const PROTOCOL_NAME: &'static str = "platform_server";
+}
 
 pub mod platform_server {}
 
