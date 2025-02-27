@@ -25,6 +25,7 @@ if (is_host) {
       "//third_party/rust_crates:structopt",
       "//third_party/rust_crates:thiserror",
       "//third_party/rust_crates:tokio",
+      "//third_party/rust_crates:valico",
     ]
 
     test_deps = [
@@ -34,9 +35,12 @@ if (is_host) {
     ]
 
     sources = [
+      "src/builder.rs",
       "src/env.rs",
       "src/errors.rs",
+      "src/logger.rs",
       "src/main.rs",
+      "src/name.rs",
       "src/opts.rs",
       "src/params.rs",
       "src/parsers.rs",

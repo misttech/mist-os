@@ -7,6 +7,7 @@
 
 use crate::env::EnvLike;
 use crate::errors::BuildError;
+use crate::name::Name;
 use serde::Deserialize;
 use serde_json::Value;
 use serde_json5;
@@ -22,11 +23,11 @@ const TYPE_TAG: &str = "type";
 const ITEMS_TAG: &str = "items";
 
 /// A JSON schema. `Schema` holds a test config schema in two forms: A serde_json Value suitable
-/// for validating JSON against the schema, and a 'deserialized' idiomatic form for guiding the
-/// processing of test parameters in command lines and environment variables. In this latter form,
-/// the schema includes only what's required for that purpose. For example, object types have no
-/// properties (because object types are not allowed in command lines or environment variables).
-/// Descriptions are also absent as well as enums, which are only used in formal validation.
+/// for validating JSON against the schema, and an idiomatic form for guiding the processing of test
+/// parameters in command lines and environment variables. In this latter form, the schema includes
+/// only what's required for that purpose. For example, object types have no properties (because
+/// object types are not allowed in command lines or environment variables). Descriptions are also
+/// absent as well as enums, which are only used in formal validation.
 #[derive(Deserialize, Debug, Default, PartialEq)]
 pub struct Schema {
     // `Value` form of the schema for validation using `valico::json_schema``.
@@ -34,7 +35,7 @@ pub struct Schema {
     pub as_value: Value,
 
     // Table of deserialized properties.
-    pub properties: HashMap<String, PropertyScheme>,
+    pub properties: HashMap<Name, PropertyScheme>,
 }
 
 impl Schema {
@@ -89,7 +90,7 @@ pub struct PropertyScheme {
 }
 
 impl PropertyScheme {
-    fn validate(&self, name: &str) -> Result<(), BuildError> {
+    fn validate(&self, name: &Name) -> Result<(), BuildError> {
         match &self.items {
             Some(boxed_scheme) => {
                 if self.property_type != PropertyType::Array {

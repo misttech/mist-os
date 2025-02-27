@@ -4,8 +4,11 @@
 
 use anyhow::Error;
 
+mod builder;
 mod env;
 mod errors;
+mod logger;
+mod name;
 mod opts;
 mod params;
 mod parsers;
