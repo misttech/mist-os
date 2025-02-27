@@ -44,19 +44,7 @@ class DisplayEngineInterface {
   DisplayEngineInterface& operator=(DisplayEngineInterface&&) = delete;
 
   // The engine listener is connected when this method is called.
-  //
-  // TODO(https://fxbug.com/395948218): Make this a pure virtual after all drivers are migrated.
-  virtual EngineInfo CompleteCoordinatorConnection() {
-    OnCoordinatorConnected();
-    return EngineInfo({
-        .max_layer_count = 1,
-        .max_connected_display_count = 1,
-        .is_capture_supported = false,
-    });
-  }
-
-  // TODO(https://fxbug.com/395948218): Remove after all drivers are migrated.
-  virtual void OnCoordinatorConnected() {}
+  virtual EngineInfo CompleteCoordinatorConnection() = 0;
 
   virtual zx::result<> ImportBufferCollection(
       display::DriverBufferCollectionId buffer_collection_id,
