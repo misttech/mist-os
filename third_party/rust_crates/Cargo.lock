@@ -1592,7 +1592,7 @@ dependencies = [
  "pin-project",
  "pin-project-lite",
  "pkcs1",
- "pkcs8 0.9.0",
+ "pkcs8 0.10.2",
  "png",
  "pretty",
  "pretty_assertions",

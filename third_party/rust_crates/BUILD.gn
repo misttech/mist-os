@@ -701,7 +701,7 @@ if (current_os == "fuchsia") {
 }
 
 group("pkcs8") {
-  public_deps = [ ":pkcs8-v0_9_0" ]
+  public_deps = [ ":pkcs8-v0_10_2" ]
 }
 
 group("png") {
