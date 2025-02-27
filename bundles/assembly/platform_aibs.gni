@@ -364,6 +364,9 @@ _userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
 
                          # Development and debug tools for power framework
                          "power_framework_development_support",
+
+                         # Sensors support with playback.
+                         "sensors_framework_eng",
                        ]
 
 userdebug_platform_aib_names = user_platform_aib_names + _userdebug_aib_names
@@ -418,9 +421,6 @@ eng_only_platform_aib_names =
       "intel_hda",
       "video_development_support",
 
-      # Sensors support with playback.
-      "sensors_framework_eng",
-
       # Fake power sensor
       "fake_power_sensor",
 
@@ -469,6 +469,8 @@ experimental_aib_names = [
   "timekeeper_wake_alarms_aml_hrtimer",
   "trusted_execution_environment",
   "session_manager_enable_pkg_cache",
+
+  "sensors_framework_eng",
 ]
 
 # Ensure that we do not list any experimental AIBs as required
