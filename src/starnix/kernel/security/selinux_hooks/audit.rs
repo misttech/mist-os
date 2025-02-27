@@ -7,7 +7,9 @@ use selinux::permission_check::{PermissionCheck, PermissionCheckResult};
 use selinux::{ClassPermission, Permission, SecurityId};
 use starnix_core::task::{CurrentTask, Task};
 use starnix_core::vfs::{FileObject, FileSystem, FsNode};
-use starnix_logging::{log_warn, BugRef, __track_stub_inner};
+use starnix_logging::{
+    log_warn, BugRef, __track_stub_inner, trace_instant, CATEGORY_STARNIX_SECURITY,
+};
 use std::fmt::{Display, Error};
 
 /// Container for a reference to kernel state from which to include details when emitting audit
@@ -103,6 +105,15 @@ pub(super) fn audit_decision(
     permission: Permission,
     audit_data: Auditable<'_>,
 ) {
+    trace_instant!(
+        CATEGORY_STARNIX_SECURITY,
+        match (result.permit, result.todo_bug) {
+            (true, None) => c"audit.granted",
+            (true, Some(_)) => c"audit.todo_deny",
+            _ => c"audit.denied",
+        },
+        fuchsia_trace::Scope::Thread
+    );
     let decision = if let Some(todo_bug) = result.todo_bug {
         // If `todo_bug` is set then this check is being granted to accommodate errata, rather than
         // the denial being enforced.

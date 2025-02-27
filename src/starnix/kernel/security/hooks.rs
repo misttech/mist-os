@@ -12,7 +12,7 @@ use crate::vfs::{
 };
 use fuchsia_inspect_contrib::profile_duration;
 use selinux::{FileSystemMountOptions, SecurityPermission, SecurityServer};
-use starnix_logging::log_debug;
+use starnix_logging::{log_debug, trace_duration, CATEGORY_STARNIX_SECURITY};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_types::ownership::TempRef;
 use starnix_uapi::arc_key::WeakKey;
@@ -26,6 +26,13 @@ use starnix_uapi::unmount_flags::UnmountFlags;
 use starnix_uapi::{errno, error};
 use std::sync::Arc;
 use syncio::zxio_node_attr_has_t;
+
+macro_rules! track_hook_duration {
+    ($cname:literal) => {{
+        trace_duration!(CATEGORY_STARNIX_SECURITY, $cname);
+        profile_duration!($cname.to_str().unwrap());
+    }};
+}
 
 bitflags::bitflags! {
     /// The flags about which permissions should be checked when opening an FsNode. Used in the
@@ -120,7 +127,7 @@ where
 /// Returns the security state structure for the kernel, based on the supplied "selinux" argument
 /// contents.
 pub fn kernel_init_security(enabled: bool, exceptions_config: String) -> KernelState {
-    profile_duration!("security.hooks.kernel_init_security");
+    track_hook_duration!(c"security.hooks.kernel_init_security");
     KernelState { state: enabled.then(|| selinux_hooks::kernel_init_security(exceptions_config)) }
 }
 
@@ -131,7 +138,7 @@ pub fn sb_eat_lsm_opts(
     kernel: &Kernel,
     mount_params: &mut MountParams,
 ) -> Result<FileSystemMountOptions, Errno> {
-    profile_duration!("security.hooks.sb_eat_lsm_opts");
+    track_hook_duration!(c"security.hooks.sb_eat_lsm_opts");
     if let Some(state) = &kernel.security_state.state {
         if state.server.has_policy() {
             return selinux_hooks::sb_eat_lsm_opts(mount_params);
@@ -146,7 +153,7 @@ pub fn file_system_init_security(
     name: &'static FsStr,
     mount_options: &FileSystemMountOptions,
 ) -> Result<FileSystemState, Errno> {
-    profile_duration!("security.hooks.file_system_init_security");
+    track_hook_duration!(c"security.hooks.file_system_init_security");
     Ok(FileSystemState { state: selinux_hooks::file_system_init_security(name, mount_options)? })
 }
 
@@ -155,7 +162,7 @@ pub fn file_system_init_security(
 // TODO: https://fxbug.dev/366405587 - Merge this logic into `file_system_resolve_security()` and
 // remove this extra hook.
 pub fn file_system_post_init_security(kernel: &Kernel, file_system: &FileSystemHandle) {
-    profile_duration!("security.hooks.file_system_post_init_security");
+    track_hook_duration!(c"security.hooks.file_system_post_init_security");
     if let Some(state) = &kernel.security_state.state {
         if !state.server.has_policy() {
             // TODO: https://fxbug.dev/367585803 - Revise locking to guard against a policy load
@@ -178,7 +185,7 @@ pub fn file_system_resolve_security<L>(
 where
     L: LockEqualOrBefore<FileOpsCore>,
 {
-    profile_duration!("security.hooks.file_system_resolve_security");
+    track_hook_duration!(c"security.hooks.file_system_resolve_security");
     if_selinux_else_default_ok_with_context(locked, current_task, |locked, security_server| {
         selinux_hooks::file_system_resolve_security(
             locked,
@@ -202,7 +209,7 @@ pub fn file_permission(
     file: &FileObject,
     permission_flags: PermissionFlags,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.file_permission");
+    track_hook_duration!(c"security.hooks.file_permission");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::file_permission(security_server, current_task, file, permission_flags)
     })
@@ -221,7 +228,7 @@ pub fn fs_node_init_with_dentry<L>(
 where
     L: LockEqualOrBefore<FileOpsCore>,
 {
-    profile_duration!("security.hooks.fs_node_init_with_dentry");
+    track_hook_duration!(c"security.hooks.fs_node_init_with_dentry");
     // TODO: https://fxbug.dev/367585803 - Don't use `if_selinux_else()` here, because the `has_policy()`
     // check is racey, so doing non-trivial work in the "else" path is unsafe. Instead, call the SELinux
     // hook implementation, and let it label, or queue, the `FsNode` based on the `FileSystem` label
@@ -242,7 +249,7 @@ pub fn fs_node_init_with_dentry_no_xattr(
     current_task: &CurrentTask,
     dir_entry: &DirEntryHandle,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.fs_node_init_with_dentry_no_xattr");
+    track_hook_duration!(c"security.hooks.fs_node_init_with_dentry_no_xattr");
     // TODO: https://fxbug.dev/367585803 - Don't use `if_selinux_else()` here, because the `has_policy()`
     // check is racey, so doing non-trivial work in the "else" path is unsafe. Instead, call the SELinux
     // hook implementation, and let it label, or queue, the `FsNode` based on the `FileSystem` label
@@ -291,7 +298,7 @@ pub fn fs_node_init_on_create(
     parent: &FsNode,
     name: &FsStr,
 ) -> Result<Option<FsNodeSecurityXattr>, Errno> {
-    profile_duration!("security.hooks.fs_node_init_on_create");
+    track_hook_duration!(c"security.hooks.fs_node_init_on_create");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::fs_node_init_on_create(
             security_server,
@@ -307,7 +314,7 @@ pub fn fs_node_init_on_create(
 /// are not linked into any filesystem directory structure create anonymous nodes, labeled by this
 /// hook rather than `fs_node_init_on_create()` above.
 pub fn fs_node_init_anon(current_task: &CurrentTask, new_node: &FsNode, node_type: &str) {
-    profile_duration!("security.hooks.fs_node_init_anon");
+    track_hook_duration!(c"security.hooks.fs_node_init_anon");
     if_selinux_else(
         current_task,
         |security_server| {
@@ -326,7 +333,7 @@ pub fn check_fs_node_create_access(
     mode: FileMode,
     name: &FsStr,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_fs_node_create_access");
+    track_hook_duration!(c"security.hooks.check_fs_node_create_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::check_fs_node_create_access(
             security_server,
@@ -347,7 +354,7 @@ pub fn check_fs_node_symlink_access(
     name: &FsStr,
     old_path: &FsStr,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_fs_node_symlink_access");
+    track_hook_duration!(c"security.hooks.check_fs_node_symlink_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::check_fs_node_symlink_access(
             security_server,
@@ -368,7 +375,7 @@ pub fn check_fs_node_mkdir_access(
     mode: FileMode,
     name: &FsStr,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_fs_node_mkdir_access");
+    track_hook_duration!(c"security.hooks.check_fs_node_mkdir_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::check_fs_node_mkdir_access(security_server, current_task, parent, mode, name)
     })
@@ -386,7 +393,7 @@ pub fn check_fs_node_mknod_access(
     name: &FsStr,
     device_id: DeviceType,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_fs_node_mknod_access");
+    track_hook_duration!(c"security.hooks.check_fs_node_mknod_access");
     assert!(!mode.is_reg());
 
     if_selinux_else_default_ok(current_task, |security_server| {
@@ -408,7 +415,7 @@ pub fn check_fs_node_link_access(
     parent: &FsNode,
     child: &FsNode,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_fs_node_link_access");
+    track_hook_duration!(c"security.hooks.check_fs_node_link_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::check_fs_node_link_access(security_server, current_task, parent, child)
     })
@@ -421,7 +428,7 @@ pub fn check_fs_node_unlink_access(
     parent: &FsNode,
     child: &FsNode,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_fs_node_unlink_access");
+    track_hook_duration!(c"security.hooks.check_fs_node_unlink_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::check_fs_node_unlink_access(security_server, current_task, parent, child)
     })
@@ -434,7 +441,7 @@ pub fn check_fs_node_rmdir_access(
     parent: &FsNode,
     child: &FsNode,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_fs_node_rmdir_access");
+    track_hook_duration!(c"security.hooks.check_fs_node_rmdir_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::check_fs_node_rmdir_access(security_server, current_task, parent, child)
     })
@@ -451,7 +458,7 @@ pub fn check_fs_node_rename_access(
     new_parent: &FsNode,
     replaced_node: Option<&FsNode>,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_fs_node_rename_access");
+    track_hook_duration!(c"security.hooks.check_fs_node_rename_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::check_fs_node_rename_access(
             security_server,
@@ -470,7 +477,7 @@ pub fn check_fs_node_read_link_access(
     current_task: &CurrentTask,
     fs_node: &FsNode,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_fs_node_read_link_access");
+    track_hook_duration!(c"security.hooks.check_fs_node_read_link_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::check_fs_node_read_link_access(security_server, current_task, fs_node)
     })
@@ -483,7 +490,7 @@ pub fn fs_node_permission(
     fs_node: &FsNode,
     permission_flags: PermissionFlags,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.fs_node_permission");
+    track_hook_duration!(c"security.hooks.fs_node_permission");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::fs_node_permission(security_server, current_task, fs_node, permission_flags)
     })
@@ -492,7 +499,7 @@ pub fn fs_node_permission(
 /// Returns the security state for a new file object created by `current_task`.
 /// Corresponds to the `file_alloc_security()` LSM hook.
 pub fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
-    profile_duration!("security.hooks.file_alloc_security");
+    track_hook_duration!(c"security.hooks.file_alloc_security");
     FileObjectState { state: selinux_hooks::file_alloc_security(current_task) }
 }
 
@@ -503,7 +510,7 @@ pub fn check_file_ioctl_access(
     file: &FileObject,
     request: u32,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_file_ioctl_access");
+    track_hook_duration!(c"security.hooks.check_file_ioctl_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::check_file_ioctl_access(security_server, current_task, file, request)
     })
@@ -521,7 +528,7 @@ pub fn fs_node_copy_up<'a>(
     current_task: &'a CurrentTask,
     fs_node: &FsNode,
 ) -> Result<Option<selinux_hooks::ScopedFsCreate<'a>>, Errno> {
-    profile_duration!("security.hooks.fs_node_copy_up");
+    track_hook_duration!(c"security.hooks.fs_node_copy_up");
     if_selinux_else_default_ok(current_task, |_security_server| {
         Ok(Some(selinux_hooks::fs_node_copy_up(current_task, fs_node)))
     })
@@ -535,7 +542,7 @@ pub fn fs_node_copy_up<'a>(
 ///
 /// Corresponds to the `file_lock()` LSM hook.
 pub fn check_file_lock_access(current_task: &CurrentTask, file: &FileObject) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_file_lock_access");
+    track_hook_duration!(c"security.hooks.check_file_lock_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::check_file_lock_access(security_server, current_task, file)
     })
@@ -549,7 +556,7 @@ pub fn check_file_fcntl_access(
     fcntl_cmd: u32,
     fcntl_arg: u64,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_file_fcntl_access");
+    track_hook_duration!(c"security.hooks.check_file_fcntl_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::check_file_fcntl_access(
             security_server,
@@ -568,7 +575,7 @@ pub fn check_fs_node_setattr_access(
     node: &FsNode,
     attributes: &zxio_node_attr_has_t,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_fs_node_setattr_access");
+    track_hook_duration!(c"security.hooks.check_fs_node_setattr_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::check_fs_node_setattr_access(security_server, current_task, node, attributes)
     })
@@ -577,14 +584,14 @@ pub fn check_fs_node_setattr_access(
 /// Return the default initial `TaskState` for kernel tasks.
 /// Corresponds to the `task_alloc()` LSM hook, in the special case when current_task is null.
 pub fn task_alloc_for_kernel() -> TaskState {
-    profile_duration!("security.hooks.task_alloc_for_kernel");
+    track_hook_duration!(c"security.hooks.task_alloc_for_kernel");
     TaskState(selinux_hooks::TaskAttrs::for_kernel().into())
 }
 
 /// Returns `TaskState` for a new `Task`, based on that of `task`, and the specified clone flags.
 /// Corresponds to the `task_alloc()` LSM hook.
 pub fn task_alloc(task: &Task, clone_flags: u64) -> TaskState {
-    profile_duration!("security.hooks.task_alloc");
+    track_hook_duration!(c"security.hooks.task_alloc");
     let attrs = if task.kernel().security_state.state.is_some() {
         selinux_hooks::task::task_alloc(&task, clone_flags)
     } else {
@@ -599,7 +606,7 @@ pub fn task_alloc(task: &Task, clone_flags: u64) -> TaskState {
 /// /proc/<pid> `FsNode`s when they are created.
 /// Corresponds to the `task_to_inode` LSM hook.
 pub fn task_to_fs_node(current_task: &CurrentTask, task: &TempRef<'_, Task>, fs_node: &FsNode) {
-    profile_duration!("security.hooks.task_to_fs_node");
+    track_hook_duration!(c"security.hooks.task_to_fs_node");
     // The fs_node_init_with_task hook doesn't require any policy-specific information. Only check
     // if SElinux is enabled before running it.
     if current_task.kernel().security_state.state.is_some() {
@@ -612,7 +619,7 @@ pub fn task_to_fs_node(current_task: &CurrentTask, task: &TempRef<'_, Task>, fs_
 /// The difference from those hooks is that this one bypasses the access-checks that would be
 /// performed by `set_procattr()`.
 pub fn task_for_context(task: &Task, context: &FsStr) -> Result<TaskState, Errno> {
-    profile_duration!("security.hooks.task_for_context");
+    track_hook_duration!(c"security.hooks.task_for_context");
     Ok(TaskState(
         if_selinux_else(
             task,
@@ -633,7 +640,7 @@ pub fn task_for_context(task: &Task, context: &FsStr) -> Result<TaskState, Errno
 /// If the task's current SID cannot be resolved then an empty string is returned.
 /// This combines the `task_getsecid()` and `secid_to_secctx()` hooks, in effect.
 pub fn task_get_context(current_task: &CurrentTask, target: &Task) -> Result<Vec<u8>, Errno> {
-    profile_duration!("security.hooks.task_get_context");
+    track_hook_duration!(c"security.hooks.task_get_context");
     if_selinux_else(
         current_task,
         |security_server| {
@@ -649,7 +656,7 @@ pub fn check_task_capable_noaudit(
     task: &Task,
     capabilities: starnix_uapi::auth::Capabilities,
 ) -> bool {
-    profile_duration!("security.hooks.check_task_capable_noaudit");
+    track_hook_duration!(c"security.hooks.check_task_capable_noaudit");
     return task.creds().has_capability(capabilities)
         && if_selinux_else(
             task,
@@ -670,7 +677,7 @@ pub fn check_task_capable(
     task: &Task,
     capabilities: starnix_uapi::auth::Capabilities,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_task_capable");
+    track_hook_duration!(c"security.hooks.check_task_capable");
     if !task.creds().has_capability(capabilities) {
         return error!(EPERM);
     }
@@ -689,7 +696,7 @@ pub fn check_task_capable(
 /// this hook doesn't actually modify the task's label, but instead verifies whether the task has
 /// the "fork" permission on itself.
 pub fn check_task_create_access(current_task: &CurrentTask) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_task_create_access");
+    track_hook_duration!(c"security.hooks.check_task_create_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::task::check_task_create_access(
             &security_server.as_permission_check(),
@@ -704,7 +711,7 @@ pub fn check_exec_access(
     current_task: &CurrentTask,
     executable_node: &FsNode,
 ) -> Result<ResolvedElfState, Errno> {
-    profile_duration!("security.hooks.check_exec_access");
+    track_hook_duration!(c"security.hooks.check_exec_access");
     if_selinux_else(
         current_task,
         |security_server| {
@@ -717,7 +724,7 @@ pub fn check_exec_access(
 /// Updates the SELinux thread group state on exec.
 /// Corresponds to the `bprm_committing_creds()` and `bprm_committed_creds()` hooks.
 pub fn update_state_on_exec(current_task: &CurrentTask, elf_security_state: &ResolvedElfState) {
-    profile_duration!("security.hooks.update_state_on_exec");
+    track_hook_duration!(c"security.hooks.update_state_on_exec");
     if_selinux_else(
         current_task,
         |security_server| {
@@ -734,7 +741,7 @@ pub fn update_state_on_exec(current_task: &CurrentTask, elf_security_state: &Res
 /// Checks if `source` may exercise the "getsched" permission on `target`.
 /// Corresponds to the `task_getscheduler()` LSM hook.
 pub fn check_getsched_access(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_getsched_access");
+    track_hook_duration!(c"security.hooks.check_getsched_access");
     if_selinux_else_default_ok(source, |security_server| {
         selinux_hooks::task::check_getsched_access(
             &security_server.as_permission_check(),
@@ -747,7 +754,7 @@ pub fn check_getsched_access(source: &CurrentTask, target: &Task) -> Result<(), 
 /// Checks if setsched is allowed.
 /// Corresponds to the `task_setscheduler()` LSM hook.
 pub fn check_setsched_access(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_setsched_access");
+    track_hook_duration!(c"security.hooks.check_setsched_access");
     if_selinux_else_default_ok(source, |security_server| {
         selinux_hooks::task::check_setsched_access(
             &security_server.as_permission_check(),
@@ -760,7 +767,7 @@ pub fn check_setsched_access(source: &CurrentTask, target: &Task) -> Result<(), 
 /// Checks if getpgid is allowed.
 /// Corresponds to the `task_getpgid()` LSM hook.
 pub fn check_getpgid_access(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_getpgid_access");
+    track_hook_duration!(c"security.hooks.check_getpgid_access");
     if_selinux_else_default_ok(source, |security_server| {
         selinux_hooks::task::check_getpgid_access(
             &security_server.as_permission_check(),
@@ -773,7 +780,7 @@ pub fn check_getpgid_access(source: &CurrentTask, target: &Task) -> Result<(), E
 /// Checks if setpgid is allowed.
 /// Corresponds to the `task_setpgid()` LSM hook.
 pub fn check_setpgid_access(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_setpgid_access");
+    track_hook_duration!(c"security.hooks.check_setpgid_access");
     if_selinux_else_default_ok(source, |security_server| {
         selinux_hooks::task::check_setpgid_access(
             &security_server.as_permission_check(),
@@ -786,7 +793,7 @@ pub fn check_setpgid_access(source: &CurrentTask, target: &Task) -> Result<(), E
 /// Called when the current task queries the session Id of the `target` task.
 /// Corresponds to the `task_getsid()` LSM hook.
 pub fn check_task_getsid(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_task_getsid");
+    track_hook_duration!(c"security.hooks.check_task_getsid");
     if_selinux_else_default_ok(source, |security_server| {
         selinux_hooks::task::check_task_getsid(
             &security_server.as_permission_check(),
@@ -803,7 +810,7 @@ pub fn check_signal_access(
     target: &Task,
     signal: Signal,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_signal_access");
+    track_hook_duration!(c"security.hooks.check_signal_access");
     if_selinux_else_default_ok(source, |security_server| {
         selinux_hooks::task::check_signal_access(
             &security_server.as_permission_check(),
@@ -817,7 +824,7 @@ pub fn check_signal_access(
 /// Checks whether the `parent_tracer_task` is allowed to trace the `current_task`.
 /// Corresponds to the `ptrace_traceme()` LSM hook.
 pub fn ptrace_traceme(current_task: &CurrentTask, parent_tracer_task: &Task) -> Result<(), Errno> {
-    profile_duration!("security.hooks.ptrace_traceme");
+    track_hook_duration!(c"security.hooks.ptrace_traceme");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::task::ptrace_access_check(
             &security_server.as_permission_check(),
@@ -831,7 +838,7 @@ pub fn ptrace_traceme(current_task: &CurrentTask, parent_tracer_task: &Task) -> 
 /// This fills the role of both of the LSM `ptrace_traceme` and `ptrace_access_check` hooks.
 /// Corresponds to the `ptrace_access_check()` LSM hook.
 pub fn ptrace_access_check(current_task: &CurrentTask, tracee_task: &Task) -> Result<(), Errno> {
-    profile_duration!("security.hooks.ptrace_access_check");
+    track_hook_duration!(c"security.hooks.ptrace_access_check");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::task::ptrace_access_check(
             &security_server.as_permission_check(),
@@ -849,7 +856,7 @@ pub fn task_prlimit(
     check_get_rlimit: bool,
     check_set_rlimit: bool,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.task_prlimit");
+    track_hook_duration!(c"security.hooks.task_prlimit");
     if_selinux_else_default_ok(source, |security_server| {
         selinux_hooks::task::task_prlimit(
             &security_server.as_permission_check(),
@@ -864,7 +871,7 @@ pub fn task_prlimit(
 /// Check permission before mounting `fs`.
 /// Corresponds to the `sb_kern_mount()` LSM hook.
 pub fn sb_kern_mount(current_task: &CurrentTask, fs: &FileSystem) -> Result<(), Errno> {
-    profile_duration!("security.hooks.sb_kern_mount");
+    track_hook_duration!(c"security.hooks.sb_kern_mount");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::superblock::sb_kern_mount(
             &security_server.as_permission_check(),
@@ -882,7 +889,7 @@ pub fn sb_mount(
     path: &NamespaceNode,
     flags: MountFlags,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.sb_mount");
+    track_hook_duration!(c"security.hooks.sb_mount");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::superblock::sb_mount(
             &security_server.as_permission_check(),
@@ -900,7 +907,7 @@ pub fn sb_remount(
     mount: &Mount,
     new_mount_options: FileSystemMountOptions,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.sb_remount");
+    track_hook_duration!(c"security.hooks.sb_remount");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::superblock::sb_remount(security_server, mount, new_mount_options)
     })
@@ -909,7 +916,7 @@ pub fn sb_remount(
 /// Checks if `current_task` has the permission to get the filesystem statistics of `fs`.
 /// Corresponds to the `sb_statfs()` LSM hook.
 pub fn sb_statfs(current_task: &CurrentTask, fs: &FileSystem) -> Result<(), Errno> {
-    profile_duration!("security.hooks.sb_statfs");
+    track_hook_duration!(c"security.hooks.sb_statfs");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::superblock::sb_statfs(
             &security_server.as_permission_check(),
@@ -927,7 +934,7 @@ pub fn sb_umount(
     node: &NamespaceNode,
     flags: UnmountFlags,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.sb_umount");
+    track_hook_duration!(c"security.hooks.sb_umount");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::superblock::sb_umount(
             &security_server.as_permission_check(),
@@ -944,7 +951,7 @@ pub fn check_fs_node_getattr_access(
     current_task: &CurrentTask,
     fs_node: &FsNode,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_fs_node_getattr_access");
+    track_hook_duration!(c"security.hooks.check_fs_node_getattr_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::check_fs_node_getattr_access(security_server, current_task, fs_node)
     })
@@ -962,7 +969,7 @@ pub fn check_fs_node_setxattr_access(
     value: &FsStr,
     op: XattrOp,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_fs_node_setxattr_access");
+    track_hook_duration!(c"security.hooks.check_fs_node_setxattr_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::check_fs_node_setxattr_access(
             security_server,
@@ -981,7 +988,7 @@ pub fn check_fs_node_getxattr_access(
     fs_node: &FsNode,
     name: &FsStr,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_fs_node_getxattr_access");
+    track_hook_duration!(c"security.hooks.check_fs_node_getxattr_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::check_fs_node_getxattr_access(security_server, current_task, fs_node, name)
     })
@@ -992,7 +999,7 @@ pub fn check_fs_node_listxattr_access(
     current_task: &CurrentTask,
     fs_node: &FsNode,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_fs_node_listxattr_access");
+    track_hook_duration!(c"security.hooks.check_fs_node_listxattr_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::check_fs_node_listxattr_access(security_server, current_task, fs_node)
     })
@@ -1004,7 +1011,7 @@ pub fn check_fs_node_removexattr_access(
     fs_node: &FsNode,
     name: &FsStr,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.check_fs_node_removexattr_access");
+    track_hook_duration!(c"security.hooks.check_fs_node_removexattr_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::check_fs_node_removexattr_access(
             security_server,
@@ -1022,7 +1029,7 @@ pub fn check_fs_node_removexattr_access(
 ///
 /// Corresponds to the `inode_listsecurity()` LSM hook.
 pub fn fs_node_listsecurity(current_task: &CurrentTask, fs_node: &FsNode) -> Option<FsString> {
-    profile_duration!("security.hooks.fs_node_listsecurity");
+    track_hook_duration!(c"security.hooks.fs_node_listsecurity");
     if_selinux_else(current_task, |_| selinux_hooks::fs_node_listsecurity(fs_node), || None)
 }
 
@@ -1043,7 +1050,7 @@ pub fn fs_node_getsecurity<L>(
 where
     L: LockEqualOrBefore<FileOpsCore>,
 {
-    profile_duration!("security.hooks.fs_node_getsecurity");
+    track_hook_duration!(c"security.hooks.fs_node_getsecurity");
     if_selinux_else_with_context(
         locked,
         current_task,
@@ -1095,7 +1102,7 @@ pub fn fs_node_setsecurity<L>(
 where
     L: LockEqualOrBefore<FileOpsCore>,
 {
-    profile_duration!("security.hooks.fs_node_setsecurity");
+    track_hook_duration!(c"security.hooks.fs_node_setsecurity");
     if_selinux_else_with_context(
         locked,
         current_task,
@@ -1145,7 +1152,7 @@ pub fn get_procattr(
     target: &Task,
     attr: ProcAttr,
 ) -> Result<Vec<u8>, Errno> {
-    profile_duration!("security.hooks.get_procattr");
+    track_hook_duration!(c"security.hooks.get_procattr");
     if_selinux_else(
         current_task,
         |security_server| {
@@ -1163,7 +1170,7 @@ pub fn set_procattr(
     attr: ProcAttr,
     context: &[u8],
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.set_procattr");
+    track_hook_duration!(c"security.hooks.set_procattr");
     if_selinux_else(
         current_task,
         |security_server| {
@@ -1196,7 +1203,7 @@ pub fn selinuxfs_policy_loaded<L>(locked: &mut Locked<'_, L>, current_task: &Cur
 where
     L: LockEqualOrBefore<FileOpsCore>,
 {
-    profile_duration!("security.hooks.selinuxfs_policy_loaded");
+    track_hook_duration!(c"security.hooks.selinuxfs_policy_loaded");
     if_selinux_else_with_context(
         locked,
         current_task,
@@ -1220,7 +1227,7 @@ pub fn selinuxfs_check_access(
     current_task: &CurrentTask,
     permission: SecurityPermission,
 ) -> Result<(), Errno> {
-    profile_duration!("security.hooks.selinuxfs_check_access");
+    track_hook_duration!(c"security.hooks.selinuxfs_check_access");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::selinuxfs_check_access(security_server, current_task, permission)
     })

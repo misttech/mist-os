@@ -17,6 +17,9 @@ pub const CATEGORY_STARNIX: &'static CStr = c"starnix";
 // The trace category used for memory manager related traces.
 pub const CATEGORY_STARNIX_MM: &'static CStr = c"starnix:mm";
 
+// The trace category used for security related traces.
+pub const CATEGORY_STARNIX_SECURITY: &'static CStr = c"starnix:security";
+
 // The name used to track the duration in Starnix while executing a task.
 pub const NAME_RUN_TASK: &'static CStr = c"RunTask";
 
