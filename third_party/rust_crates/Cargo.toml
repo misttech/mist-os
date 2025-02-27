@@ -194,6 +194,7 @@ regex = "1.7.3"
 regex-syntax = "0.8.3"
 rend = { version = "0.5.2", features = ["zerocopy-0_8"] }
 ring = "0.17.8"
+rsa = { version = "0.9.7", default-features = false }
 rustc-hash = "1.0.1"
 rustls = { version = "0.21.12", features = ["dangerous_configuration"] }
 rustls-pemfile = "1.0.4"
@@ -412,6 +413,7 @@ nix_0_29_0 = { package = "nix", path = "forks/nix-0.29.0" }
 nom-7_1_3 = { package = "nom", path = "forks/nom" }
 nom-language = { package = "nom-language", path = "forks/nom-language-0.1.0" }
 notify = { path = "forks/notify" }
+num-bigint-dig = { path = "forks/num-bigint-dig" }
 # FIXME(118248): We can unfork once undefined behavior is resolved.
 prettytable-rs = { path = "forks/prettytable-rs" }
 #pulldown-cmark = { path = "forks/pulldown-cmark" }
@@ -733,6 +735,9 @@ env_vars = ["OUT_DIR=../../../../compat/num-bigint"]
 
 [gn.package.num-bigint."0.4.3".platform."cfg(target_arch = \"x86_64\")"]
 rustflags = ["--cfg=use_addcarry"]
+
+[gn.package.num-bigint-dig."0.8.4"]
+rustflags = ["--cfg=has_i128"]
 
 [gn.package.num-complex."0.4.0"]
 rustflags = ["--cfg=has_i128", "--cfg=has_const_fn"]
