@@ -59,3 +59,21 @@ FIDL generated code:
 
 - Generated binding for FIDL types containing tables or unions require arena
   allocations.
+
+## Testing
+
+This foundational library is thoroughly covered by unit tests.
+
+The large number of tests can overwhelm the CI/CQ infrastructure for storing
+test results, when combined with the automated test multiplication feature. We
+work around this limitation by adding the following CL footers.
+
+```
+Multiply: display-api-types-cpp: 1
+Multiply: display-api-types-cpp17: 1
+```
+
+This workaround is acceptable given the current library scope and design.
+Concretely, test flakiness is not a significant concern because the library only
+has straightforward data conversion logic, without any non-determinism sources
+such as threading or I/O with other systems.
