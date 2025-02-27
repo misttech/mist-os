@@ -86,8 +86,8 @@ where
         if self.disabled.get() {
             return Some(entry);
         }
-        let LogEntry { timestamp, data } = entry;
-        match self.symbolize_internal(LogEntry { timestamp, data }).await {
+        let LogEntry { data } = entry;
+        match self.symbolize_internal(LogEntry { data }).await {
             Ok(entry) => Some(entry),
             Err(ReadError::EmptyOutputFromSymbolizer) => None,
             Err(error) => {
@@ -770,7 +770,6 @@ mod tests {
 
     fn create_target_log_entry(msg: impl Into<String>, timestamp: i64) -> (LogEntry, Data<Logs>) {
         let txn = LogEntry {
-            timestamp: Timestamp::from_nanos(timestamp),
             data: LogData::TargetLog(
                 LogsDataBuilder::new(BuilderArgs {
                     component_url: Some("ffx".into()),
@@ -835,10 +834,7 @@ mod tests {
         *txn_data.msg_mut().unwrap() = "Hello world!\n\n\nTest line 2\nTXN:0:nothing".into();
         assert_eq!(
             fake_waker.clone().poll_while_woke(symbolize_task_0.as_mut()),
-            Poll::Ready(Some(LogEntry {
-                data: LogData::TargetLog(txn_data.clone()),
-                timestamp: Timestamp::from_nanos(0),
-            }))
+            Poll::Ready(Some(LogEntry { data: LogData::TargetLog(txn_data.clone()) }))
         );
         // TXN 1 should still not be completed.
         assert_eq!(fake_waker.clone().poll_while_woke(symbolize_task_1.as_mut()), Poll::Pending);
@@ -856,10 +852,7 @@ mod tests {
         *txn_data_2.msg_mut().unwrap() = "Hello world 2!".into();
         assert_eq!(
             fake_waker.clone().poll_while_woke(symbolize_task_1.as_mut()),
-            Poll::Ready(Some(LogEntry {
-                data: LogData::TargetLog(txn_data_2.clone()),
-                timestamp: Timestamp::from_nanos(1),
-            }))
+            Poll::Ready(Some(LogEntry { data: LogData::TargetLog(txn_data_2.clone()) }))
         );
     }
 

@@ -365,7 +365,6 @@ mod tests {
         assert_eq!(
             serde_json::from_str::<LogEntry>(&output).unwrap(),
             LogEntry {
-                timestamp: Timestamp::from_nanos(1),
                 data: LogData::TargetLog(
                     LogsDataBuilder::new(BuilderArgs {
                         component_url: Some("ffx".into()),

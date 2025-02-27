@@ -70,12 +70,17 @@ impl From<LogsData> for LogData {
 pub struct LogEntry {
     /// The log
     pub data: LogData,
-    /// The timestamp of the log translated to UTC
-    #[serde(
-        serialize_with = "diagnostics_data::serialize_timestamp",
-        deserialize_with = "diagnostics_data::deserialize_timestamp"
-    )]
-    pub timestamp: Timestamp,
+}
+
+impl LogEntry {
+    fn utc_timestamp(&self, boot_ts: Option<Timestamp>) -> Timestamp {
+        Timestamp::from_nanos(match &self.data {
+            LogData::TargetLog(data) => {
+                data.metadata.timestamp.into_nanos()
+                    + boot_ts.map(|value| value.into_nanos()).unwrap_or(0)
+            }
+        })
+    }
 }
 
 // Required if we want to use ffx's built-in I/O, but
@@ -96,16 +101,11 @@ pub trait Symbolize {
     async fn symbolize(&self, entry: LogEntry) -> Option<LogEntry>;
 }
 
-async fn handle_value<S>(one: Data<Logs>, boot_ts: Timestamp, symbolizer: &S) -> Option<LogEntry>
+async fn handle_value<S>(one: Data<Logs>, symbolizer: &S) -> Option<LogEntry>
 where
     S: Symbolize + ?Sized,
 {
-    let entry = LogEntry {
-        timestamp: Timestamp::from_nanos(
-            one.metadata.timestamp.into_nanos() + boot_ts.into_nanos(),
-        ),
-        data: one.into(),
-    };
+    let entry = LogEntry { data: one.into() };
     symbolizer.symbolize(entry).await
 }
 
@@ -129,7 +129,6 @@ fn generate_timestamp_message(boot_timestamp: Timestamp) -> LogEntry {
             ))
             .build(),
         ),
-        timestamp: Timestamp::from_nanos(0),
     }
 }
 
@@ -144,7 +143,6 @@ where
     F: LogFormatter + BootTimeAccessor,
     S: Symbolize + ?Sized,
 {
-    let boot_ts = formatter.get_boot_timestamp();
     let mut decoder = Box::pin(LogsDataStream::new(socket).fuse());
     let mut symbolize_pending = FuturesUnordered::new();
     if include_timestamp && !formatter.is_utc_time_format() {
@@ -157,7 +155,7 @@ where
     } {
         match value {
             Either::Left(Some(log)) => {
-                symbolize_pending.push(handle_value(log, boot_ts, symbolizer));
+                symbolize_pending.push(handle_value(log, symbolizer));
             }
             Either::Right(Some(Some(symbolized))) => match formatter.push_log(symbolized).await? {
                 LogProcessingResult::Exit => {
@@ -252,8 +250,8 @@ where
 }
 
 /// Converts from UTC time to boot time.
-fn utc_to_boot(boot_ts: Timestamp, utc: i64) -> Timestamp {
-    Timestamp::from_nanos(utc - boot_ts.into_nanos())
+fn utc_to_boot(boot_ts: Timestamp, utc: Timestamp) -> Timestamp {
+    Timestamp::from_nanos(utc.into_nanos() - boot_ts.into_nanos())
 }
 
 #[async_trait(?Send)]
@@ -400,11 +398,14 @@ where
         };
         if timestamp.is_boot {
             callback(
-                &utc_to_boot(self.get_boot_timestamp(), log_entry.timestamp.into_nanos()),
+                &utc_to_boot(
+                    self.get_boot_timestamp(),
+                    log_entry.utc_timestamp(self.boot_ts_nanos),
+                ),
                 &timestamp.timestamp,
             )
         } else {
-            callback(&log_entry.timestamp, &timestamp.timestamp)
+            callback(&log_entry.utc_timestamp(self.boot_ts_nanos), &timestamp.timestamp)
         }
     }
 
@@ -601,13 +602,7 @@ mod test {
         )
         .await
         .unwrap();
-        assert_eq!(
-            formatter.logs,
-            vec![LogEntry {
-                data: LogData::TargetLog(target_log),
-                timestamp: Timestamp::from_nanos(0)
-            }]
-        );
+        assert_eq!(formatter.logs, vec![LogEntry { data: LogData::TargetLog(target_log) }]);
     }
 
     #[fuchsia::test]
@@ -694,14 +689,8 @@ mod test {
         assert_eq!(
             formatter.logs,
             vec![
-                LogEntry {
-                    data: LogData::TargetLog(target_log_0),
-                    timestamp: Timestamp::from_nanos(0)
-                },
-                LogEntry {
-                    data: LogData::TargetLog(target_log_1),
-                    timestamp: Timestamp::from_nanos(1)
-                }
+                LogEntry { data: LogData::TargetLog(target_log_0) },
+                LogEntry { data: LogData::TargetLog(target_log_1) }
             ]
         );
     }
@@ -871,7 +860,6 @@ mod test {
 
     fn log_entry() -> LogEntry {
         LogEntry {
-            timestamp: Timestamp::from_nanos(0),
             data: LogData::TargetLog(
                 logs_data_builder().add_tag("tag1").add_tag("tag2").set_message("message").build(),
             ),
@@ -968,18 +956,9 @@ mod test {
         assert_eq!(
             formatter.logs,
             vec![
-                LogEntry {
-                    data: LogData::TargetLog(target_log_0),
-                    timestamp: Timestamp::from_nanos(0)
-                },
-                LogEntry {
-                    data: LogData::TargetLog(target_log_2),
-                    timestamp: Timestamp::from_nanos(2)
-                },
-                LogEntry {
-                    data: LogData::TargetLog(target_log_4),
-                    timestamp: Timestamp::from_nanos(4)
-                }
+                LogEntry { data: LogData::TargetLog(target_log_0) },
+                LogEntry { data: LogData::TargetLog(target_log_2) },
+                LogEntry { data: LogData::TargetLog(target_log_4) }
             ],
         );
     }
