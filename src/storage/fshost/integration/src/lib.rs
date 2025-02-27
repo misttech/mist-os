@@ -239,10 +239,12 @@ impl TestFixtureBuilder {
             .await
             .unwrap();
 
-        // Ideally, the tests would implicitly control the order the disks are added, based on the
-        // order they are added to the builder. This would let the tests set up specific scenarios
-        // as needed. The only thing that uses these extra disks right now though is the gpt
-        // testing and they all want the disks first, so it's easier to just do it.
+        // The order of adding disks matters here, unfortunately. fshost should not change behavior
+        // based on the order disks appear, but because we take the first available that matches
+        // whatever relevant criteria, it's useful to test that matchers don't get clogged up by
+        // previous disks.
+        // TODO(https://fxbug.dev/380353856): This type of testing should be irrelevant once the
+        // block devices are determined by configuration options instead of heuristically.
         for disk in self.extra_disks.into_iter() {
             let (vmo, type_guid) = disk.into_vmo_and_type_guid().await;
             fixture.add_ramdisk(vmo, type_guid).await;
