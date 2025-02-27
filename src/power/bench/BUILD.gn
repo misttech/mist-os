@@ -11,7 +11,7 @@ if (is_fuchsia) {
     name = "power_framework_microbenchmarks"
     with_unit_tests = false
     testonly = true
-    edition = "2018"
+    edition = "2021"
     sources = [
       "src/daemon_work.rs",
       "src/main.rs",

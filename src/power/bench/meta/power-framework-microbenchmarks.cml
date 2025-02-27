@@ -5,6 +5,7 @@
     include: [
         "//src/power/bench/meta/share.cml",
         "sys/testing/elf_test_runner.shard.cml",
+        "trace/client.shard.cml",
     ],
     program: {
         binary: "bin/power_framework_microbenchmarks",

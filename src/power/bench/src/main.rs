@@ -40,9 +40,7 @@ fn bench_toggle_lease(
 
 fn get_sag_benches() -> criterion::Benchmark {
     let sag_arc = sag_work::obtain_sag_proxy();
-    criterion::Benchmark::new("TakeWakeLease", move |b| {
-        bench_take_wake_lease(b, sag_arc.clone())
-    })
+    criterion::Benchmark::new("TakeWakeLease", move |b| bench_take_wake_lease(b, sag_arc.clone()))
 }
 
 fn get_daemon_benches() -> criterion::Benchmark {
