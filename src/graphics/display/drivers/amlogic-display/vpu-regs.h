@@ -122,8 +122,7 @@
 // Registers needed for Video Loopback mode
 #define VPU_WR_BACK_MISC_CTRL (0x1a0d << 2)
 #define VPU_WRBACK_CTRL (0x1df9 << 2)
-#define VPU_VDIN0_WRARB_REQEN_SLV (0x12c1 << 2)
-#define VPU_VDIN1_COM_CTRL0 (0x1302 << 2)
+
 #define VPU_VDIN1_MATRIX_CTRL (0x1310 << 2)
 #define VPU_VDIN1_COEF00_01 (0x1311 << 2)
 #define VPU_VDIN1_COEF02_10 (0x1312 << 2)
@@ -134,13 +133,6 @@
 #define VPU_VDIN1_OFFSET2 (0x1317 << 2)
 #define VPU_VDIN1_PRE_OFFSET0_1 (0x1318 << 2)
 #define VPU_VDIN1_PRE_OFFSET2 (0x1319 << 2)
-#define VPU_VDIN1_LFIFO_CTRL (0x131a << 2)
-#define VPU_VDIN1_INTF_WIDTHM1 (0x131c << 2)
-#define VPU_VDIN1_WR_CTRL2 (0x131f << 2)
-#define VPU_VDIN1_WR_CTRL (0x1320 << 2)
-#define VPU_VDIN1_WR_H_START_END (0x1321 << 2)
-#define VPU_VDIN1_WR_V_START_END (0x1322 << 2)
-#define VPU_VDIN1_MISC_CTRL (0x2782 << 2)
 
 #define VPU_MAFBC_BLOCK_ID (0x3a00 << 2)
 #define VPU_MAFBC_IRQ_RAW_STATUS (0x3a01 << 2)
@@ -262,52 +254,6 @@ class VdinPreOffset2Reg : public hwreg::RegisterBase<VdinPreOffset2Reg, uint32_t
  public:
   DEF_FIELD(10, 0, preoffset2);
   static auto Get() { return hwreg::RegisterAddr<VdinPreOffset2Reg>(VPU_VDIN1_PRE_OFFSET2); }
-};
-
-class VdinLFifoCtrlReg : public hwreg::RegisterBase<VdinLFifoCtrlReg, uint32_t> {
- public:
-  DEF_FIELD(11, 0, fifo_buf_size);
-  static auto Get() { return hwreg::RegisterAddr<VdinLFifoCtrlReg>(VPU_VDIN1_LFIFO_CTRL); }
-};
-
-class VdinIntfWidthM1Reg : public hwreg::RegisterBase<VdinIntfWidthM1Reg, uint32_t> {
- public:
-  static auto Get() { return hwreg::RegisterAddr<VdinIntfWidthM1Reg>(VPU_VDIN1_INTF_WIDTHM1); }
-};
-
-class VdInWrCtrlReg : public hwreg::RegisterBase<VdInWrCtrlReg, uint32_t> {
- public:
-  DEF_BIT(27, eol_sel);
-  DEF_BIT(21, done_status_clear_bit);
-  DEF_BIT(19, word_swap);
-  DEF_FIELD(13, 12, memory_format);
-  DEF_BIT(10, write_ctrl);
-  DEF_BIT(9, write_req_urgent);
-  DEF_BIT(8, write_mem_enable);
-  DEF_FIELD(7, 0, canvas_idx);
-  static auto Get() { return hwreg::RegisterAddr<VdInWrCtrlReg>(VPU_VDIN1_WR_CTRL); }
-};
-
-class VdInWrHStartEndReg : public hwreg::RegisterBase<VdInWrHStartEndReg, uint32_t> {
- public:
-  DEF_BIT(29, reverse_enable);
-  DEF_FIELD(28, 16, start);
-  DEF_FIELD(12, 0, end);
-  static auto Get() { return hwreg::RegisterAddr<VdInWrHStartEndReg>(VPU_VDIN1_WR_H_START_END); }
-};
-
-class VdInWrVStartEndReg : public hwreg::RegisterBase<VdInWrVStartEndReg, uint32_t> {
- public:
-  DEF_BIT(29, reverse_enable);
-  DEF_FIELD(28, 16, start);
-  DEF_FIELD(12, 0, end);
-  static auto Get() { return hwreg::RegisterAddr<VdInWrVStartEndReg>(VPU_VDIN1_WR_V_START_END); }
-};
-
-class VdInMiscCtrlReg : public hwreg::RegisterBase<VdInMiscCtrlReg, uint32_t> {
- public:
-  DEF_BIT(4, mif_reset);
-  static auto Get() { return hwreg::RegisterAddr<VdInMiscCtrlReg>(VPU_VDIN1_MISC_CTRL); }
 };
 
 class AfbcCommandReg : public RegisterBase<AfbcCommandReg, uint32_t> {

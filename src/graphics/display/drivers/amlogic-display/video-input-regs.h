@@ -190,14 +190,15 @@ class VideoInputCommandStatus0 : public hwreg::RegisterBase<VideoInputCommandSta
 
   // Indicates that the write of raw pixels from input source to RAM is done.
   //
-  // Cleared by `clear_direct_write_done` bit in `VDIN0/1_WR_CTRL` register.
+  // Cleared by `clear_direct_write_done` bit in the `VideoInputWriteControl`
+  // register.
   DEF_BIT(2, direct_write_done);
 
   // Indicates that the write of noise-reduced (NR) pixels from input source to
   // RAM is done.
   //
-  // Cleared by `clear_noise_reduced_write_done` bit in `VDIN0/1_WR_CTRL`
-  // register.
+  // Cleared by `clear_noise_reduced_write_done` bit in the
+  // `VideoInputWriteControl` register.
   DEF_BIT(1, noise_reduced_write_done);
 
   // Current field for interlaced input.
@@ -236,6 +237,20 @@ class VideoInputCommandStatus0 : public hwreg::RegisterBase<VideoInputCommandSta
 class VideoInputChannelFifoControl2
     : public hwreg::RegisterBase<VideoInputChannelFifoControl2, uint32_t> {
  public:
+  // Bits 25 and 23-20 provide additional configuration on decimation.
+  // These bits are not defined because this driver currently does not support
+  // decimation.
+
+  // True iff input decimation subsampling is enabled.
+  DEF_BIT(24, decimation_data_enabled);
+
+  // Only 1 / (decimation_ratio_minus_one + 1) of the pixels will be sampled.
+  // Setting this field to zero effectively disables decimation.
+  DEF_FIELD(19, 16, decimation_ratio_minus_one);
+
+  // Bits 7-0 configure VDI 5. These bits are not defined because this driver
+  // currently does not support decimation.
+
   static hwreg::RegisterAddr<VideoInputChannelFifoControl2> Get(VideoInputModuleId video_input) {
     switch (video_input) {
       case VideoInputModuleId::kVideoInputModule0:
@@ -245,20 +260,6 @@ class VideoInputChannelFifoControl2
     }
     ZX_DEBUG_ASSERT_MSG(false, "Invalid video input module ID: %d", static_cast<int>(video_input));
   }
-
-  // Bits 25 and 23-20 provide additional configuration on decimation.
-  // These bits are not defined because this driver currently does not support
-  // decimation.
-
-  // True iff input decimation subsampling is enabled.
-  DEF_BIT(24, decimation_data_enabled);
-
-  // Only 1 / (decimation_ratio_minus_1 + 1) of the pixels will be sampled.
-  // Setting this field to zero effectively disables decimation.
-  DEF_FIELD(19, 16, decimation_ratio_minus_1);
-
-  // Bits 7-0 configure VDI 5. These bits are not defined because this driver
-  // currently does not support decimation.
 };
 
 // VDIN0_ASFIFO_CTRL3, VDIN1_ASFIFO_CTRL3
@@ -497,6 +498,440 @@ class WritebackMuxControl : public hwreg::RegisterBase<WritebackMuxControl, uint
                         static_cast<uint32_t>(mux_selection));
     return *this;
   }
+};
+
+// VDIN0_LFIFO_CTRL, VDIN1_LFIFO_CTRL.
+//
+// A311D Datasheet, Section 10.2.3.42 VDIN, Pages 1092, 1114.
+// S905D2 Datasheet, Section 7.2.3.41 VDIN, Pages 783, 807.
+// S905D3 Datasheet, Section 8.2.3.42 VDIN, Pages 719, 742.
+class VideoInputLinearFifoControl
+    : public hwreg::RegisterBase<VideoInputLinearFifoControl, uint32_t> {
+ public:
+  static hwreg::RegisterAddr<VideoInputLinearFifoControl> Get(VideoInputModuleId video_input) {
+    switch (video_input) {
+      case VideoInputModuleId::kVideoInputModule0:
+        return {0x121a * sizeof(uint32_t)};
+      case VideoInputModuleId::kVideoInputModule1:
+        return {0x131a * sizeof(uint32_t)};
+    }
+    ZX_DEBUG_ASSERT_MSG(false, "Invalid video input module ID: %d", static_cast<int>(video_input));
+  }
+
+  DEF_FIELD(11, 0, linear_fifo_buffer_size_pixels);
+};
+
+// VDIN0_INTF_WIDTHM1, VDIN1_INTF_WIDTHM1.
+//
+// A311D Datasheet, Section 10.2.3.42 VDIN, Pages 1092, 1114.
+// S905D2 Datasheet, Section 7.2.3.41 VDIN, Pages 783, 807.
+// S905D3 Datasheet, Section 8.2.3.42 VDIN, Pages 720, 742.
+class VideoInputInterfaceWidth : public hwreg::RegisterBase<VideoInputInterfaceWidth, uint32_t> {
+ public:
+  static hwreg::RegisterAddr<VideoInputInterfaceWidth> Get(VideoInputModuleId video_input) {
+    switch (video_input) {
+      case VideoInputModuleId::kVideoInputModule0:
+        return {0x121c * sizeof(uint32_t)};
+      case VideoInputModuleId::kVideoInputModule1:
+        return {0x131c * sizeof(uint32_t)};
+    }
+    ZX_DEBUG_ASSERT_MSG(false, "Invalid video input module ID: %d", static_cast<int>(video_input));
+  }
+
+  // Bit 26 and bit 25 provide additional control over the memory interface
+  // write behavior. They are not used by the driver for capture, so we don't
+  // define them.
+
+  // Width minus one of the input video after up/downscaling but before
+  // cropping (window function), in pixels.
+  //
+  // It's preferred to use width() and set_width() helpers instead.
+  DEF_FIELD(12, 0, width_minus_one_px);
+
+  int width_px() const {
+    // The value `width_minus_one_px() + 1` falls within the `int` range
+    // because `width_minus_one_px()` has only 13 bits.
+    return static_cast<int>(width_minus_one_px()) + 1;
+  }
+
+  // Sets the input image width to `width_px` pixels.
+  //
+  // `width_px` must be positive and not greater than 2^13 (8192).
+  VideoInputInterfaceWidth& set_width_px(int width_px) {
+    ZX_DEBUG_ASSERT(width_px > 0);
+    ZX_DEBUG_ASSERT(width_px <= (1 << 13));
+    // `width - 1` always fits in the register field because it is guaranteed
+    // to be non-negative and is less than 2^13.
+    return set_width_minus_one_px(static_cast<uint32_t>(width_px - 1));
+  }
+};
+
+// VDIN0_WR_H_START_END, VDIN1_WR_H_START_END.
+//
+// A311D Datasheet, Section 10.2.3.42 VDIN, Pages 1094, 1116.
+// S905D2 Datasheet, Section 7.2.3.41 VDIN, Pages 785, 809.
+// S905D3 Datasheet, Section 8.2.3.42 VDIN, Pages 721, 743.
+// Display Write Back App-Note, Amlogic (Google internal), Page 4.
+class VideoInputWriteRangeHorizontal
+    : public hwreg::RegisterBase<VideoInputWriteRangeHorizontal, uint32_t> {
+ public:
+  enum class Endianness : uint8_t {
+    // In big-endian mode, the memory interface writes 8-bit YUV444 capture
+    // images in the following byte order (without 64-bit pair swaps):
+    //    Y5  V4  U4  Y4  V3  U3  Y3  V2    U2  Y2  V1  U1  Y1  V0  U0  Y0
+    //    U10 Y10 V9  U9  Y9  V8  U8  Y8    V7  U7  Y7  V6  U6  Y6  V5  U5
+    //    V15 U15 Y15 V14 U14 Y14 V13 U13   Y13 V12 U12 Y12 V11 U11 Y11 V10 ...
+    kBig = 0,
+    // In little-endian mode, the memory interface writes 8-bit YUV444 capture
+    // images in the following byte order (without 64-bit pair swaps):
+    //    V0  U0  Y0  V1  U1  Y1  V2  U2    Y2  V3  U3  Y3  V4  U4  Y4  V5
+    //    U5  Y5  V6  U6  Y6  V7  U7  Y7    V8  U8  Y8  V9  U9  Y9  V10 U10
+    //    Y10 V11 U11 Y11 V12 U12 Y12 V13   U13 Y13 V14 U14 Y14 V15 U15 Y15
+    kLittle = 1,
+  };
+
+  static hwreg::RegisterAddr<VideoInputWriteRangeHorizontal> Get(VideoInputModuleId video_input) {
+    switch (video_input) {
+      case VideoInputModuleId::kVideoInputModule0:
+        return {0x1221 * sizeof(uint32_t)};
+      case VideoInputModuleId::kVideoInputModule1:
+        return {0x1321 * sizeof(uint32_t)};
+    }
+    ZX_DEBUG_ASSERT_MSG(false, "Invalid video input module ID: %d", static_cast<int>(video_input));
+  }
+
+  // Byte ordering ("endianness") for every 128-bit (16-byte) chunk.
+  //
+  // This bit is not documented in any datasheet. Experiments on Khadas
+  // VIM3 (A311D), Astro (S905D2) and Nelson (S905D3) all confirm that
+  // this bit is available and functions as described above for both VDINs.
+  DEF_ENUM_FIELD(Endianness, 30, 30, endianness_128_bit);
+
+  // If true, the captured contents are flipped horizontally.
+  //
+  // This bit is documented for VDIN0 but not for VDIN1 in Amlogic datasheets.
+  // Both "Display Write Back App-Note" and experiments on Khadas VIM3
+  // (A311D) confirm that this bit is available and functions as described
+  // above for both VDINs.
+  DEF_BIT(29, horizontally_flipped);
+
+  // The leftmost column (inclusive) to write on the write image buffer, in
+  // pixels.
+  //
+  // Must be less than or equal to `right_px_inclusive`.
+  //
+  // The Amlogic datasheets specify that this field uses bits 28-16 for VDIN0
+  // bits 27-16 for VDIN1. However, both the "Display Write Back App-Note"
+  // and experiments on Khadas VIM3 (A311D) confirm that it actually uses
+  // bits 28-16 for both VDINs.
+  //
+  // It's preferred to use the `SetHorizontalRange()` helper method.
+  DEF_FIELD(28, 16, left_px_inclusive);
+
+  // The rightmost column (inclusive) to write on the write image buffer, in
+  // pixels.
+  //
+  // Must be greater than or equal to `left_px_inclusive`.
+  //
+  // The Amlogic datasheets specify that this field uses bits 12-0 for VDIN0
+  // bits 11-0 for VDIN1. However, both the "Display Write Back App-Note"
+  // and experiments on Khadas VIM3 (A311D) confirm that it actually uses
+  // bits 12-0 for both VDINs.
+  //
+  // It's preferred to use the `SetHorizontalRange()` helper method.
+  DEF_FIELD(12, 0, right_px_inclusive);
+
+  // Sets the horizontal range of the write image buffer to
+  // `[left_px_inclusive, right_px_inclusive]`.
+  //
+  // `left_px_inclusive` must be less than or equal to `right_px_inclusive`.
+  //
+  // Both `left_px_inclusive` and `right_px_inclusive` must be non-negative and
+  // less than 2^13 (8192).
+  VideoInputWriteRangeHorizontal& SetHorizontalRange(int left_px_inclusive,
+                                                     int right_px_inclusive) {
+    ZX_DEBUG_ASSERT(left_px_inclusive >= 0);
+    ZX_DEBUG_ASSERT(left_px_inclusive < (1 << 13));
+    ZX_DEBUG_ASSERT(right_px_inclusive >= 0);
+    ZX_DEBUG_ASSERT(right_px_inclusive < (1 << 13));
+    ZX_DEBUG_ASSERT(left_px_inclusive <= right_px_inclusive);
+
+    return set_left_px_inclusive(left_px_inclusive).set_right_px_inclusive(right_px_inclusive);
+  }
+};
+
+// VDIN0_WR_V_START_END, VDIN1_WR_V_START_END.
+//
+// A311D Datasheet, Section 10.2.3.42 VDIN, Pages 1094, 1116.
+// S905D2 Datasheet, Section 7.2.3.41 VDIN, Pages 785, 809.
+// S905D3 Datasheet, Section 8.2.3.42 VDIN, Pages 721, 743.
+class VideoInputWriteRangeVertical
+    : public hwreg::RegisterBase<VideoInputWriteRangeVertical, uint32_t> {
+ public:
+  static hwreg::RegisterAddr<VideoInputWriteRangeVertical> Get(VideoInputModuleId video_input) {
+    switch (video_input) {
+      case VideoInputModuleId::kVideoInputModule0:
+        return {0x1222 * sizeof(uint32_t)};
+      case VideoInputModuleId::kVideoInputModule1:
+        return {0x1322 * sizeof(uint32_t)};
+    }
+    ZX_DEBUG_ASSERT_MSG(false, "Invalid video input module ID: %d", static_cast<int>(video_input));
+  }
+
+  // If true, the captured contents are flipped vertically.
+  //
+  // This bit is documented for VDIN0 but not documented for VDIN1 in any
+  // Amlogic datasheets. Both "Display Write Back App-Note" and experiments on
+  // Khadas VIM3 (A311D) show that both video input modules have this bit
+  // available.
+  DEF_BIT(29, vertically_flipped);
+
+  // The top row (inclusive) to write on the write image buffer, in lines.
+  //
+  // Must be less than or equal to `bottom_inclusive`.
+  //
+  // The Amlogic datasheets specify that this field uses bits 28-16 for VDIN0
+  // bits 27-16 for VDIN1. However, both the "Display Write Back App-Note"
+  // and experiments on Khadas VIM3 (A311D) confirm that it actually uses
+  // bits 28-16 for both VDINs.
+  //
+  // It's preferred to use the `SetVerticalRange()` helper method.
+  DEF_FIELD(28, 16, top_line_inclusive);
+
+  // The bottom row (inclusive) to write on the write image buffer, in lines.
+  //
+  // Must be greater than or equal to `top_inclusive`.
+  //
+  // The Amlogic datasheets specify that this field uses bits 12-0 for VDIN0
+  // bits 11-0 for VDIN1. However, both the "Display Write Back App-Note"
+  // and experiments on Khadas VIM3 (A311D) confirm that it actually uses
+  // bits 12-0 for both VDINs.
+  //
+  // It's preferred to use the `SetVerticalRange()` helper method.
+  DEF_FIELD(12, 0, bottom_line_inclusive);
+
+  // Set the vertical range of the write image buffer to `[top_line_inclusive,
+  // bottom_line_inclusive]`.
+  //
+  // `top_line_inclusive` must be less than or equal to `bottom_line_inclusive`.
+  //
+  // Both `top_line_inclusive` and `bottom_line_inclusive` must be non-negative
+  // and less than 2^13 (8192).
+  VideoInputWriteRangeVertical& SetVerticalRange(int top_line_inclusive,
+                                                 int bottom_line_inclusive) {
+    ZX_DEBUG_ASSERT(top_line_inclusive >= 0);
+    ZX_DEBUG_ASSERT(top_line_inclusive < (1 << 13));
+    ZX_DEBUG_ASSERT(bottom_line_inclusive >= 0);
+    ZX_DEBUG_ASSERT(bottom_line_inclusive < (1 << 13));
+    ZX_DEBUG_ASSERT(top_line_inclusive <= bottom_line_inclusive);
+
+    return set_top_line_inclusive(top_line_inclusive)
+        .set_bottom_line_inclusive(bottom_line_inclusive);
+  }
+};
+
+// VDIN0_WR_CTRL, VDIN1_WR_CTRL.
+//
+// A311D Datasheet, Section 10.2.3.42 VDIN, Pages 1093, 1115-1116.
+// S905D2 Datasheet, Section 7.2.3.41 VDIN, Pages 784-785, 808-809.
+// S905D3 Datasheet, Section 8.2.3.42 VDIN, Pages 720-721, 743.
+// Private correspondence with Amlogic (Re: display loopback mode), June 27,
+// 2019.
+class VideoInputWriteControl : public hwreg::RegisterBase<VideoInputWriteControl, uint32_t> {
+ public:
+  enum class ChromaHorizontalSubsamplingMode : uint8_t {
+    // Only the chroma channels of even pixels in a row are sampled.
+    // The image is downsampled to YUV 4:2:x format.
+    kEvenPixelsOnly = 0,
+    // Only the chroma channels of odd pixels in a row are sampled.
+    // The image is downsampled to YUV 4:2:x format.
+    kOddPixelsOnly = 1,
+    // The average value of chroma channel of each pixel pair in a row are
+    // sampled.
+    // The image is downsampled to YUV 4:2:x format.
+    kAveragedPixels = 2,
+    // The Chroma channels of all pixels are used; no subsampling is performed.
+    // The image is downsampled to YUV 4:4:x format.
+    //
+    // To use this subsampling mode, `write_format` must be `kSemiPlanar`.
+    kAllPixels = 3,
+  };
+
+  enum class LineEndIndicator : uint8_t {
+    // Uses EOL (End of Line) as the line-end indication. The precise
+    // definition of "EOL" is unclear from the datasheets.
+    kEol = 0,
+    // Uses the line width, as specified in the `VideoInputInterfaceWidth`
+    // register, to determine line endings.
+    kWidth = 1,
+  };
+
+  enum class ChromaChannelLayout : uint8_t {
+    // First Cb (U), then Cr (V). Used in the NV12 chroma subplane.
+    kCbCr = 0,
+    // First Cr (V), then Cb (U). Used in the NV21 chroma subplane.
+    kCrCb = 1,
+  };
+
+  enum class ChromaVerticalSubsamplingMode : uint8_t {
+    // Only the chroma channels of pixels in even rows will be sampled.
+    // The image will be downsampled to YUV 4:x:0 format.
+    kEvenRowsOnly = 0,
+    // Only the chroma channels of pixels in odd rows will be sampled.
+    // The image will be downsampled to YUV 4:x:0 format.
+    kOddRowsOnly = 1,
+    kReserved = 2,
+    // Chroma channels of all rows will be used; no subsampling is performed.
+    // The image will be downsampled to YUV 4:x:x format.
+    kAllRows = 3,
+  };
+
+  enum class YuvSamplingStorageFormat : uint8_t {
+    // Image is in a YUV 4:2:2 packed (single-planar) format, stored in the Luma
+    // canvas.
+    // The detailed macropixel encoding is unclear.
+    kYuv422Packed = 0,
+    // Image is in a YUV 4:4:4 packed (single-planar) format, stored in the Luma
+    // canvas.
+    //
+    // Note: RGB888 format can be considered as a special YUV 4:4:4 packed
+    // format where the R/G/B channels correspond to Y/Cb/Cr channels
+    // respectively.
+    kYuv444Packed = 1,
+    // Image is in a YUV semi-planar format. The Luma plane is stored in the
+    // Luma canvas and the Chroma plane is stored in the Chroma canvas.
+    kSemiPlanar = 2,
+    // Image is in a YUV 4:2:2 10-bit "fully packed" (single-planar) format,
+    // stored in the Luma canvas.
+    // The detailed macropixel encoding is unclear.
+    kYuv422FullyPackedMode = 3,
+  };
+
+  static hwreg::RegisterAddr<VideoInputWriteControl> Get(VideoInputModuleId video_input) {
+    switch (video_input) {
+      case VideoInputModuleId::kVideoInputModule0:
+        return {0x1220 * sizeof(uint32_t)};
+      case VideoInputModuleId::kVideoInputModule1:
+        return {0x1320 * sizeof(uint32_t)};
+    }
+    ZX_DEBUG_ASSERT_MSG(false, "Invalid video input module ID: %d", static_cast<int>(video_input));
+  }
+
+  // Effective iff `yuv_sampling_storage_format` is `kYuv422Packed` or
+  // `kSemiPlanar`.
+  DEF_ENUM_FIELD(ChromaHorizontalSubsamplingMode, 31, 30, chroma_horizontal_subsampling_mode);
+
+  // True iff the clock gate for the memory interface is disabled, which means
+  // that the memory interface uses a free running clock (i.e. a clock that is
+  // not interrupted nor gated).
+  DEF_BIT(29, memory_interface_clock_gate_disabled);
+
+  // If true, the counter field for memory interface responses is cleared.
+  // The register it clears is unknown from the datasheets.
+  DEF_BIT(28, memory_interface_response_counter_cleared);
+
+  // Selects the line end indicator in the memory write interface.
+  DEF_ENUM_FIELD(LineEndIndicator, 27, 27, line_end_indicator_selection);
+
+  // True iff the frame is reset on each Vsync.
+  DEF_BIT(23, frame_reset_on_vsync);
+
+  // True iff a software reset is performed on the line FIFO on each Vsync.
+  DEF_BIT(22, line_fifo_reset_on_vsync);
+
+  // If true, the `direct_write_done` bit of the `VideoInputCommandStatus0`
+  // register is cleared.
+  DEF_BIT(21, direct_write_done_cleared);
+
+  // If true, the `noise_reduced_write_done` bit of the
+  // `VideoInputCommandStatus0` register is cleared.
+  DEF_BIT(20, noise_reduced_write_done_cleared);
+
+  // True iff the data is reordered by swapping consecutive pairs of 64-bit
+  // chunks.
+  DEF_BIT(19, consecutive_64bit_pairs_reordered);
+
+  // The layout of channels in each macropixel of the chroma subplane.
+  //
+  // Effective iff `yuv_sampling_storage_format` is `kSemiPlanar`.
+  DEF_ENUM_FIELD(ChromaChannelLayout, 18, 18, chroma_channel_layout);
+
+  // Effective iff `yuv_sampling_storage_format` is `kSemiPlanar`.
+  DEF_ENUM_FIELD(ChromaVerticalSubsamplingMode, 17, 16, chroma_vertical_subsampling_mode);
+
+  // YUV sampling and storage format of the image to write.
+  DEF_ENUM_FIELD(YuvSamplingStorageFormat, 13, 12, yuv_sampling_storage_format);
+
+  // True iff the value of `luma_canvas_address` is double-buffered. In that
+  // case, the new value written to the register field is applied on each Vsync.
+  DEF_BIT(11, luma_canvas_address_double_buffered);
+
+  // If true, unpauses the write request.
+  //
+  // This bit is not in any datasheet but was mentioned in private
+  // correspondence with Amlogic. Experiments on Khadas VIM3 (A311D),
+  // Astro (S905D2) and Nelson (S905D3) all show that this bit is available
+  // and functions as described above.
+  DEF_BIT(10, write_request_unpaused);
+
+  // True iff the next memory write request is of higher priority.
+  DEF_BIT(9, write_request_urgent);
+
+  // True iff the memory write interface allows memory write requests.
+  DEF_BIT(8, write_request_enabled);
+
+  // The address to the Luma canvas for the memory interface to write to.
+  DEF_FIELD(7, 0, luma_canvas_address);
+};
+
+// VDIN_MISC_CTRL
+//
+// This register is not documented in A311D or S905D2 datasheets, but it
+// appears in S905D3 datasheets and private correspondence with Amlogic.
+//
+// Experiments on Khadas VIM3 board (A311D) and Astro (S905D2) show that
+// the bits defined in this class are available and have the same function
+// as S905D3.
+//
+// S905D3 Datasheet, Section 8.2.3.1 "VPU Registers", Page 314.
+// Private correspondence with Amlogic (Re: display loopback mode), June 27,
+// 2019.
+class VideoInputMiscellaneousControl
+    : public hwreg::RegisterBase<VideoInputMiscellaneousControl, uint32_t> {
+ public:
+  static hwreg::RegisterAddr<VideoInputMiscellaneousControl> Get() {
+    return {0x2782 * sizeof(uint32_t)};
+  }
+
+  DEF_RSVDZ_FIELD(31, 26);
+
+  // Bits 25-6, as defined in the datasheets, provide additional control over
+  // the VDIN output behavior. They are not defined because the the driver
+  // doesn't use them.
+
+  // If true, the memory interface of video input module 1 (VDIN1) is reset.
+  //
+  // Experiments on Khadas VIM3 (A311D) show that the memory interface is reset
+  // when the bit is held true for 1us.
+  DEF_BIT(4, video_input_module1_memory_interface_reset);
+
+  // If true, the memory interface of video input module 0 (VDIN0) is reset.
+  //
+  // Experiments on Khadas VIM3 (A311D) show that the memory interface is
+  // reset when the bit is held true for 1us.
+  DEF_BIT(3, video_input_module0_memory_interface_reset);
+
+  // If true, the video input module 1 (VDIN1) is reset.
+  //
+  // Experiments on Khadas VIM3 (A311D) shows that the memory interface is
+  // reset when the bit is held true for 1us.
+  DEF_BIT(1, video_input_module1_reset);
+
+  // If true, the video input module 0 (VDIN0) is reset.
+  //
+  // Experiments on Khadas VIM3 (A311D) show that the video input module is
+  // reset when the bit is held true for 1us.
+  DEF_BIT(0, video_input_module0_reset);
 };
 
 }  // namespace amlogic_display
