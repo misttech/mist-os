@@ -31,7 +31,6 @@ if (is_fuchsia) {
     testonly = true
     product_assembly_config_label = ":assembly_product_config"
     board_config_label = board_configuration_label
-    include_shell_commands = false
     generate_vbmeta = use_vbmeta
   }
 }

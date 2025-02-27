@@ -80,7 +80,7 @@ def make_package_path(package_name: str) -> str:
 
 TestSetupArgs = namedtuple(
     "TestSetupArgs",
-    "base, cache, bootfs_packages, kernel, boot_args, shell_commands_file, bootfs",
+    "base, cache, bootfs_packages, kernel, boot_args, bootfs",
 )
 SOURCE_DIR = "source"
 OUTDIR = "outdir"
@@ -151,7 +151,6 @@ def setup_temp_dir(
             bootfs_packages,
             kernel,
             boot_args,
-            shell_commands_file,
             bootfs,
         )
     finally:
@@ -173,7 +172,6 @@ class MakeLegacyConfig(unittest.TestCase):
                 bootfs_packages,
                 kernel,
                 boot_args,
-                shell_commands_file,
                 bootfs,
             ) = setup_args
             # Create the outdir path, and perform the "copying" into the
@@ -186,7 +184,6 @@ class MakeLegacyConfig(unittest.TestCase):
                 boot_args=boot_args,
                 config_data_entries=[],
                 outdir=OUTDIR,
-                shell_commands=shell_commands_file,
                 core_realm_shards=[
                     os.path.join(SOURCE_DIR, "core/realm/shard1.cml"),
                     os.path.join(SOURCE_DIR, "core/realm/shard2.cml"),
@@ -221,7 +218,6 @@ class MakeLegacyConfig(unittest.TestCase):
                 aib.base_drivers,
                 [],
             )
-            self.assertEqual(aib.shell_commands, shell_commands_file)
             self.assertEqual(
                 aib.packages_to_compile,
                 [
@@ -478,7 +474,6 @@ class MakeLegacyConfig(unittest.TestCase):
                 boot_args=[],
                 config_data_entries=[],
                 outdir=OUTDIR,
-                shell_commands=dict(),
                 core_realm_shards=[],
                 bootfs_files_package=None,
             )
@@ -536,7 +531,6 @@ class MakeLegacyConfig(unittest.TestCase):
                     boot_args=[],
                     config_data_entries=[],
                     outdir=OUTDIR,
-                    shell_commands=dict(),
                     core_realm_shards=[],
                     bootfs_files_package=None,
                 ),

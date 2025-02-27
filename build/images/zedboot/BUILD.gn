@@ -25,7 +25,6 @@ assembled_system("zedboot_assembly") {
   testonly = true
   output_dir = root_build_dir
   image_name = "zedboot"
-  include_shell_commands = false
   generate_vbmeta = use_vbmeta
   use_bringup_platform_bundles_only = true
   product_assembly_config_label = _product_config

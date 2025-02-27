@@ -110,10 +110,6 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     [list of labels] Dependencies with metadata including additional kernel
 #     command arguments to add to the ZBI.
 #
-#   include_shell_commands (default: true)
-#     [bool] Whether to include shell commands. Should be set to false for
-#     build without shell access.
-#
 #   kernel_zbi (optional; default: "//zircon/kernel")
 #     [label] Label of the zircon kernel to use.  This needs to use the `images`
 #     metadata key to provide the `path` and `name` fields (see the
@@ -236,18 +232,6 @@ template("assembled_system") {
     _additional_boot_args = invoker.additional_boot_args
   }
 
-  # Defaults to true if the invoker doesn't pass "include_shell_commands"
-  if (defined(invoker.include_shell_commands)) {
-    if (invoker.include_shell_commands) {
-      assert(
-          _supports_blobs,
-          "Shell command package generation is only valid if the fvm is being created.")
-    }
-    _include_shell_commands = invoker.include_shell_commands
-  } else {
-    _include_shell_commands = _supports_blobs
-  }
-
   if (!_include_legacy_bundle) {
     not_needed([
                  "_additional_boot_args",
@@ -294,10 +278,6 @@ template("assembled_system") {
         not_needed(invoker, [ "core_realm_definition" ])
       }
 
-      if (_include_shell_commands) {
-        shell_command_packages = _base_packages + _cache_packages
-      }
-
       supports_blobs = _supports_blobs
       base_packages = _base_packages
       cache_packages = _cache_packages
@@ -311,8 +291,6 @@ template("assembled_system") {
       output_directory = "${files.legacy_assembly_input_bundle_dir}"
       gn_targets_name = labels.bazel_legacy_aib
     }
-  } else {
-    not_needed([ "_include_shell_commands" ])
   }
 
   if (_legacy_bundle_only) {
@@ -462,7 +440,6 @@ template("assembled_system") {
       copy_zbi_signed = "${_namespace}.copy_zbi_signed"
       copy_zbi_manifest = "${_namespace}.copy_zbi_manifest"
       copy_images = "${_namespace}.copy_images"
-      shell_commands = "${_namespace}.shell_commands"
       assembly_generated_packages = "${_namespace}.assembly_generated_packages"
       compare_command_logs = "${_namespace}.compare_command_logs"
       compare_images_manifests = "${_namespace}.compare_images_manifests"
@@ -1179,7 +1156,6 @@ template("assembled_system") {
         package_barrier = []
         assembly_package_barrier = []
         driver_package_barrier = []
-        shell_commands_barrier = []
         system_image_package_barrier = []
         system_image_extra_package_manifest_barrier = []
         test_component_manifest_barrier = []
