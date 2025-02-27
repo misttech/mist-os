@@ -26,6 +26,7 @@ impl<___E> ::fidl_next::Encode<___E> for BitsMember
 where
     ___E: ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         _: &mut ___E,
@@ -92,6 +93,7 @@ impl<___E> ::fidl_next::Encode<___E> for Op
 where
     ___E: ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         _: &mut ___E,
@@ -193,6 +195,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -226,6 +229,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     OverrideTest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -318,6 +322,7 @@ impl<___E> ::fidl_next::Encode<___E> for Flags
 where
     ___E: ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         _: &mut ___E,
@@ -402,6 +407,7 @@ impl<___E> ::fidl_next::Encode<___E> for FunctionApplication
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -602,6 +608,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -643,6 +650,7 @@ where
     ___E: ?Sized,
     Expression: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -843,6 +851,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnionMember
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -873,6 +882,7 @@ where
     ___E: ?Sized,
     UnionMember: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -1053,6 +1063,7 @@ impl<___E> ::fidl_next::Encode<___E> for TableData
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -1080,6 +1091,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     TableData: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -1154,6 +1166,7 @@ impl<___E> ::fidl_next::Encode<___E> for TableMember
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -1276,6 +1289,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -1306,6 +1320,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     SomeProtocolSomeMethodRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -1381,6 +1396,7 @@ impl<___E> ::fidl_next::Encode<___E> for SomeProtocolSomeMethodResponse
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -1408,6 +1424,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     SomeProtocolSomeMethodResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -1475,6 +1492,7 @@ impl<___E> ::fidl_next::Encode<___E> for SomeProtocolSomeMethodError
 where
     ___E: ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         _: &mut ___E,
@@ -1568,6 +1586,7 @@ impl<___E> ::fidl_next::Encode<___E> for SomeProtocolSomeMethodResult
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -1600,6 +1619,7 @@ where
     ___E: ?Sized,
     SomeProtocolSomeMethodResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,

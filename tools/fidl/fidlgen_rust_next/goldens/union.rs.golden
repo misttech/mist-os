@@ -13,6 +13,7 @@ impl<___E> ::fidl_next::Encode<___E> for Empty
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -37,6 +38,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     Empty: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -96,6 +98,7 @@ impl<___E> ::fidl_next::Encode<___E> for EmptyFlexibleUnion
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -122,6 +125,7 @@ where
     ___E: ?Sized,
     EmptyFlexibleUnion: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -291,6 +295,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -325,6 +330,7 @@ where
     ___E: ?Sized,
     ExplicitFlexibleUnion: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -510,6 +516,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -544,6 +551,7 @@ where
     ___E: ?Sized,
     ExplicitFoo: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -723,6 +731,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -750,6 +759,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     Pizza: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -818,6 +828,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -845,6 +856,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     Pasta: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -924,6 +936,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -954,6 +967,7 @@ where
     ___E: ?Sized,
     ExplicitPizzaOrPasta: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -1133,6 +1147,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -1163,6 +1178,7 @@ where
     ___E: ?Sized,
     ExplicitStrictFoo: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -1342,6 +1358,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -1372,6 +1389,7 @@ where
     ___E: ?Sized,
     ExplicitUnion: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -1549,6 +1567,7 @@ impl<___E> ::fidl_next::Encode<___E> for FieldCollision
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -1575,6 +1594,7 @@ where
     ___E: ?Sized,
     FieldCollision: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -1765,6 +1785,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -1799,6 +1820,7 @@ where
     ___E: ?Sized,
     FlexibleFoo: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -1982,6 +2004,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -2016,6 +2039,7 @@ where
     ___E: ?Sized,
     FlexiblePizzaOrPasta: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -2201,6 +2225,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -2239,6 +2264,7 @@ where
     ___E: ?Sized,
     FlexibleUnion: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -2452,6 +2478,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -2490,6 +2517,7 @@ where
     ___E: ?Sized,
     NewerSimpleUnion: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -2693,6 +2721,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -2720,6 +2749,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     NullableUnionStruct: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -2792,6 +2822,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -2826,6 +2857,7 @@ where
     ___E: ?Sized,
     OlderSimpleUnion: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -3003,6 +3035,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -3033,6 +3066,7 @@ where
     ___E: ?Sized,
     PizzaOrPasta: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -3206,6 +3240,7 @@ impl<___E> ::fidl_next::Encode<___E> for ReverseOrdinalUnion
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -3236,6 +3271,7 @@ where
     ___E: ?Sized,
     ReverseOrdinalUnion: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -3445,6 +3481,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -3471,6 +3508,7 @@ where
     ___E: ?Sized,
     StrictBoundedUnion: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -3637,6 +3675,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -3667,6 +3706,7 @@ where
     ___E: ?Sized,
     StrictFoo: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -3846,6 +3886,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -3876,6 +3917,7 @@ where
     ___E: ?Sized,
     StrictPizzaOrPasta: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -4057,6 +4099,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -4091,6 +4134,7 @@ where
     ___E: ?Sized,
     StrictSimpleUnion: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -4285,6 +4329,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -4319,6 +4364,7 @@ where
     ___E: ?Sized,
     StrictUnion: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -4524,6 +4570,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -4551,6 +4598,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     StructWithNullableUnion: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -4620,6 +4668,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -4651,6 +4700,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -4725,6 +4775,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -4756,6 +4807,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -5031,6 +5083,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -5065,6 +5118,7 @@ where
     ___E: ?Sized,
     Union: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -5270,6 +5324,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnionContainingEmptyStruct
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -5302,6 +5357,7 @@ where
     ___E: ?Sized,
     UnionContainingEmptyStruct: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -5498,6 +5554,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -5531,6 +5588,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnionSandwich: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -5617,6 +5675,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -5647,6 +5706,7 @@ where
     ___E: ?Sized,
     UnionWithAttributes: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,

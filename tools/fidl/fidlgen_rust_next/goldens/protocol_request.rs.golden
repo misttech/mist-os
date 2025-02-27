@@ -101,6 +101,7 @@ where
 
     ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -128,6 +129,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     ParentGetChildResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -196,6 +198,7 @@ where
 
     ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -223,6 +226,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     ParentGetChildRequestResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -291,6 +295,7 @@ where
 
     ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -318,6 +323,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     ParentTakeChildRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -386,6 +392,7 @@ where
 
     ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -413,6 +420,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     ParentTakeChildRequestRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,

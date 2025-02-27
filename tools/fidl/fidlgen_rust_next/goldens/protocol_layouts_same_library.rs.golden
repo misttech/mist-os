@@ -25,6 +25,7 @@ impl<___E> ::fidl_next::Encode<___E> for ComposedProtocolOneWayAnonComposedReque
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -133,6 +134,7 @@ impl<___E> ::fidl_next::Encode<___E> for ComposedProtocolTwoWayAnonComposedReque
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -159,6 +161,7 @@ where
     ___E: ?Sized,
     ComposedProtocolTwoWayAnonComposedRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -356,6 +359,7 @@ impl<___E> ::fidl_next::Encode<___E> for ComposedProtocolTwoWayAnonComposedRespo
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -474,6 +478,7 @@ impl<___E> ::fidl_next::Encode<___E> for ComposedProtocolTwoWayAnonComposedWithE
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -585,6 +590,7 @@ impl<___E> ::fidl_next::Encode<___E> for ComposedProtocolTwoWayAnonComposedWithE
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -612,6 +618,7 @@ where
     ___E: ?Sized,
     ComposedProtocolTwoWayAnonComposedWithErrorResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -808,6 +815,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -840,6 +848,7 @@ where
     ___E: ?Sized,
     ComposedProtocolTwoWayAnonComposedWithErrorResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -1035,6 +1044,7 @@ impl<___E> ::fidl_next::Encode<___E> for ComposedProtocolOnAnonComposedRequest
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -1061,6 +1071,7 @@ where
     ___E: ?Sized,
     ComposedProtocolOnAnonComposedRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -1257,6 +1268,7 @@ impl<___E> ::fidl_next::Encode<___E> for TablePayload
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -1363,6 +1375,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnionPayload
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -1389,6 +1402,7 @@ where
     ___E: ?Sized,
     UnionPayload: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -1571,6 +1585,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -1603,6 +1618,7 @@ where
     ___E: ?Sized,
     ComposedProtocolTwoWayNamedComposedWithErrorResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -2331,6 +2347,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -2362,6 +2379,7 @@ where
     ___E: ?Sized,
     MainProtocolTwoWayLocalWithErrorResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -2555,6 +2573,7 @@ impl<___E> ::fidl_next::Encode<___E> for MainProtocolOneWayAnonRequest
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -2663,6 +2682,7 @@ impl<___E> ::fidl_next::Encode<___E> for MainProtocolTwoWayAnonRequest
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -2693,6 +2713,7 @@ where
     ___E: ?Sized,
     MainProtocolTwoWayAnonRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -2889,6 +2910,7 @@ impl<___E> ::fidl_next::Encode<___E> for MainProtocolTwoWayAnonResponse
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -3005,6 +3027,7 @@ impl<___E> ::fidl_next::Encode<___E> for MainProtocolTwoWayAnonWithErrorRequest
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -3115,6 +3138,7 @@ impl<___E> ::fidl_next::Encode<___E> for MainProtocolTwoWayAnonWithErrorResponse
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -3145,6 +3169,7 @@ where
     ___E: ?Sized,
     MainProtocolTwoWayAnonWithErrorResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -3339,6 +3364,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -3370,6 +3396,7 @@ where
     ___E: ?Sized,
     MainProtocolTwoWayAnonWithErrorResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -3562,6 +3589,7 @@ impl<___E> ::fidl_next::Encode<___E> for MainProtocolOnAnonRequest
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -3592,6 +3620,7 @@ where
     ___E: ?Sized,
     MainProtocolOnAnonRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,

@@ -204,6 +204,7 @@ where
 
     ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -312,6 +313,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     Testing: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,

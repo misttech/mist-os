@@ -13,6 +13,7 @@ impl<___E> ::fidl_next::Encode<___E> for Empty
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -37,6 +38,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     Empty: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -96,6 +98,7 @@ impl<___E> ::fidl_next::Encode<___E> for EmptyProtocolSendRequest
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -123,6 +126,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     EmptyProtocolSendRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -187,6 +191,7 @@ impl<___E> ::fidl_next::Encode<___E> for EmptyProtocolReceiveRequest
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -214,6 +219,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     EmptyProtocolReceiveRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -278,6 +284,7 @@ impl<___E> ::fidl_next::Encode<___E> for EmptyProtocolSendAndReceiveRequest
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -305,6 +312,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     EmptyProtocolSendAndReceiveRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -371,6 +379,7 @@ impl<___E> ::fidl_next::Encode<___E> for EmptyProtocolSendAndReceiveResponse
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -398,6 +407,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     EmptyProtocolSendAndReceiveResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,

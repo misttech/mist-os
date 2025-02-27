@@ -17,6 +17,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -43,6 +44,7 @@ where
     ___E: ?Sized,
     UnionSize12Alignment4: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -211,6 +213,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -244,6 +247,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     SandwichUnionSize12Alignment4: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -328,6 +332,7 @@ impl<___E> ::fidl_next::Encode<___E> for StructSize16Alignment8
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -358,6 +363,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     StructSize16Alignment8: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -433,6 +439,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -460,6 +467,7 @@ where
     ___E: ?Sized,
     UnionSize24Alignment8: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -634,6 +642,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -667,6 +676,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     SandwichUnionSize24Alignment8: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -751,6 +761,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -777,6 +788,7 @@ where
     ___E: ?Sized,
     UnionSize36Alignment4: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -945,6 +957,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -978,6 +991,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     SandwichUnionSize36Alignment4: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -1060,6 +1074,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnionSize8Alignment4
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -1086,6 +1101,7 @@ where
     ___E: ?Sized,
     UnionSize8Alignment4: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -1274,6 +1290,7 @@ impl<___E> ::fidl_next::Encode<___E> for SandwichUnionSize8Alignment4
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -1307,6 +1324,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     SandwichUnionSize8Alignment4: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,

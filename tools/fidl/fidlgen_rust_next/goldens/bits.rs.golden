@@ -24,6 +24,7 @@ impl<___E> ::fidl_next::Encode<___E> for EmptyBits
 where
     ___E: ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         _: &mut ___E,
@@ -97,6 +98,7 @@ impl<___E> ::fidl_next::Encode<___E> for FlexibleBits
 where
     ___E: ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         _: &mut ___E,
@@ -171,6 +173,7 @@ impl<___E> ::fidl_next::Encode<___E> for MyBits
 where
     ___E: ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         _: &mut ___E,
@@ -253,6 +256,7 @@ impl<___E> ::fidl_next::Encode<___E> for StrictBits
 where
     ___E: ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         _: &mut ___E,

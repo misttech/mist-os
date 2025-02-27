@@ -37,6 +37,7 @@ where
         ___E: ::fidl_next::fuchsia::HandleEncoder,
     {% endif %}
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,

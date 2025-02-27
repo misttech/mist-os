@@ -32,6 +32,7 @@ impl<___E> ::fidl_next::Encode<___E> for ExampleBits
 where
     ___E: ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         _: &mut ___E,
@@ -104,6 +105,7 @@ impl<___E> ::fidl_next::Encode<___E> for ExampleEnum
 where
     ___E: ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         _: &mut ___E,
@@ -187,6 +189,7 @@ impl<___E> ::fidl_next::Encode<___E> for ExampleProtocolMethodRequest
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -214,6 +217,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     ExampleProtocolMethodRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -416,6 +420,7 @@ impl<___E> ::fidl_next::Encode<___E> for ExampleStruct
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -443,6 +448,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     ExampleStruct: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -517,6 +523,7 @@ impl<___E> ::fidl_next::Encode<___E> for ExampleTable
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -623,6 +630,7 @@ impl<___E> ::fidl_next::Encode<___E> for ExampleUnion
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -649,6 +657,7 @@ where
     ___E: ?Sized,
     ExampleUnion: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,

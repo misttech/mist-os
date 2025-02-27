@@ -105,6 +105,7 @@ impl<___E> ::fidl_next::Encode<___E> for ChannelProtocolMethodARequest
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -135,6 +136,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     ChannelProtocolMethodARequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -210,6 +212,7 @@ impl<___E> ::fidl_next::Encode<___E> for ChannelProtocolEventARequest
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -240,6 +243,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     ChannelProtocolEventARequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -315,6 +319,7 @@ impl<___E> ::fidl_next::Encode<___E> for ChannelProtocolMethodBRequest
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -345,6 +350,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     ChannelProtocolMethodBRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -418,6 +424,7 @@ impl<___E> ::fidl_next::Encode<___E> for ChannelProtocolMethodBResponse
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -445,6 +452,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     ChannelProtocolMethodBResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -511,6 +519,7 @@ where
 
     ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -538,6 +547,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     ChannelProtocolTakeHandleRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -608,6 +618,7 @@ where
 
     ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -635,6 +646,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     ChannelProtocolMutateSocketRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -705,6 +717,7 @@ where
 
     ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -732,6 +745,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     ChannelProtocolMutateSocketResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -1293,6 +1307,7 @@ impl<___E> ::fidl_next::Encode<___E> for ErrorEnum
 where
     ___E: ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         _: &mut ___E,
@@ -1385,6 +1400,7 @@ where
 
     ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -1412,6 +1428,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     HandleRightsProtocolNoResponseMethodRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -1482,6 +1499,7 @@ where
 
     ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -1509,6 +1527,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     HandleRightsProtocolResponseMethodRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -1579,6 +1598,7 @@ where
 
     ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -1606,6 +1626,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     HandleRightsProtocolResponseMethodResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -1676,6 +1697,7 @@ where
 
     ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -1703,6 +1725,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     HandleRightsProtocolAnEventRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -2051,6 +2074,7 @@ impl<___E> ::fidl_next::Encode<___E> for ManyParametersFifteenRequest
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -2120,6 +2144,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     ManyParametersFifteenRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -2424,6 +2449,7 @@ impl<___E> ::fidl_next::Encode<___E> for TheUnion
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -2454,6 +2480,7 @@ where
     ___E: ?Sized,
     TheUnion: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -2638,6 +2665,7 @@ impl<___E> ::fidl_next::Encode<___E> for MethodWithUnionUnionMethodRequest
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -2665,6 +2693,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     MethodWithUnionUnionMethodRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -2731,6 +2760,7 @@ impl<___E> ::fidl_next::Encode<___E> for MethodWithUnionUnionMethodResponse
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -2758,6 +2788,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     MethodWithUnionUnionMethodResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -3081,6 +3112,7 @@ where
 
     ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -3117,6 +3149,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     ProtocolEnds: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -3216,6 +3249,7 @@ impl<___E> ::fidl_next::Encode<___E> for SyscallProtocolMethodCRequest
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -3246,6 +3280,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     SyscallProtocolMethodCRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -3459,6 +3494,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -3490,6 +3526,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     WithAndWithoutRequestResponseNoRequestWithResponseResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -3561,6 +3598,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -3592,6 +3630,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     WithAndWithoutRequestResponseWithRequestNoResponseRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -3664,6 +3703,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -3695,6 +3735,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     WithAndWithoutRequestResponseWithRequestEmptyResponseRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -3766,6 +3807,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -3797,6 +3839,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     WithAndWithoutRequestResponseWithRequestWithResponseRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -3869,6 +3912,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -3900,6 +3944,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     WithAndWithoutRequestResponseWithRequestWithResponseResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -3971,6 +4016,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -4000,6 +4046,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     WithAndWithoutRequestResponseOnWithResponseRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -4582,6 +4629,7 @@ impl<___E> ::fidl_next::Encode<___E> for WithErrorSyntaxResponseAsStructResponse
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -4615,6 +4663,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     WithErrorSyntaxResponseAsStructResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -4701,6 +4750,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -4732,6 +4782,7 @@ where
     ___E: ?Sized,
     WithErrorSyntaxResponseAsStructResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -4920,6 +4971,7 @@ impl<___E> ::fidl_next::Encode<___E> for WithErrorSyntaxErrorAsPrimitiveResponse
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -4944,6 +4996,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     WithErrorSyntaxErrorAsPrimitiveResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -5007,6 +5060,7 @@ impl<___E> ::fidl_next::Encode<___E> for WithErrorSyntaxErrorAsPrimitiveResult
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -5038,6 +5092,7 @@ where
     ___E: ?Sized,
     WithErrorSyntaxErrorAsPrimitiveResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -5264,6 +5319,7 @@ impl<___E> ::fidl_next::Encode<___E> for WithErrorSyntaxErrorAsEnumResponse
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -5288,6 +5344,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     WithErrorSyntaxErrorAsEnumResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -5351,6 +5408,7 @@ impl<___E> ::fidl_next::Encode<___E> for WithErrorSyntaxErrorAsEnumResult
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -5383,6 +5441,7 @@ where
     ___E: ?Sized,
     WithErrorSyntaxErrorAsEnumResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -5613,6 +5672,7 @@ where
 
     ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -5640,6 +5700,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     WithErrorSyntaxHandleInResultResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -5712,6 +5773,7 @@ where
 
     ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -5743,6 +5805,7 @@ where
     ___E: ?Sized,
     WithErrorSyntaxHandleInResultResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -6212,6 +6275,7 @@ where
 
     ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -6239,6 +6303,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     WithProtocolEndsClientEndsRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -6313,6 +6378,7 @@ where
 
     ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -6340,6 +6406,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     WithProtocolEndsClientEndsResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -6416,6 +6483,7 @@ where
 
     ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -6443,6 +6511,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     WithProtocolEndsServerEndsRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -6517,6 +6586,7 @@ where
 
     ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -6544,6 +6614,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     WithProtocolEndsServerEndsResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -6615,6 +6686,7 @@ where
 
     ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -6642,6 +6714,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     WithProtocolEndsStructContainingEndsRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -6712,6 +6785,7 @@ where
 
     ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -6739,6 +6813,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     WithProtocolEndsStructContainingEndsResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,

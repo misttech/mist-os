@@ -13,6 +13,7 @@ impl<___E> ::fidl_next::Encode<___E> for SerializableStruct
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -37,6 +38,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     SerializableStruct: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -100,6 +102,7 @@ impl<___E> ::fidl_next::Encode<___E> for SerializableTable
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -181,6 +184,7 @@ impl<___E> ::fidl_next::Encode<___E> for SerializableUnion
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -207,6 +211,7 @@ where
     ___E: ?Sized,
     SerializableUnion: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,

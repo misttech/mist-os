@@ -17,6 +17,7 @@ impl<___E> ::fidl_next::Encode<___E> for Int16Int8
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -47,6 +48,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     Int16Int8: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -120,6 +122,7 @@ impl<___E> ::fidl_next::Encode<___E> for ArrayInt16Int8
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -147,6 +150,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     ArrayInt16Int8: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -213,6 +217,7 @@ impl<___E> ::fidl_next::Encode<___E> for Int8Int32
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -243,6 +248,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     Int8Int32: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -322,6 +328,7 @@ where
 
     ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -352,6 +359,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     NonInlineStructTestStruct: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -433,6 +441,7 @@ impl<___E> ::fidl_next::Encode<___E> for StructPaddingTestStruct
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -466,6 +475,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     StructPaddingTestStruct: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -552,6 +562,7 @@ where
 
     ___E: ::fidl_next::fuchsia::HandleEncoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -582,6 +593,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     TopLevelStruct: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,

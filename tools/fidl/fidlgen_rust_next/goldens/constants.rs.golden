@@ -27,6 +27,7 @@ impl<___E> ::fidl_next::Encode<___E> for Bits
 where
     ___E: ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         _: &mut ___E,
@@ -112,6 +113,7 @@ impl<___E> ::fidl_next::Encode<___E> for BitsType
 where
     ___E: ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         _: &mut ___E,
@@ -184,6 +186,7 @@ impl<___E> ::fidl_next::Encode<___E> for Enum
 where
     ___E: ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         _: &mut ___E,
@@ -268,6 +271,7 @@ impl<___E> ::fidl_next::Encode<___E> for EnumType
 where
     ___E: ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         _: &mut ___E,
@@ -383,6 +387,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -422,6 +427,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     Struct: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,

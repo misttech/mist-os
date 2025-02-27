@@ -20,6 +20,7 @@ impl<___E> ::fidl_next::Encode<___E> for DocCommentWithQuotes
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -44,6 +45,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     DocCommentWithQuotes: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,

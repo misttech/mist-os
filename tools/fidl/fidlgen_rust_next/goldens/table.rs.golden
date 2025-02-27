@@ -19,6 +19,7 @@ impl<___E> ::fidl_next::Encode<___E> for EmptyTable
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -104,6 +105,7 @@ impl<___E> ::fidl_next::Encode<___E> for ExtensionTable
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -207,6 +209,7 @@ impl<___E> ::fidl_next::Encode<___E> for NewerSimpleTable
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -383,6 +386,7 @@ impl<___E> ::fidl_next::Encode<___E> for OlderSimpleTable
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -511,6 +515,7 @@ impl<___E> ::fidl_next::Encode<___E> for ReverseOrdinalTable
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -693,6 +698,7 @@ impl<___E> ::fidl_next::Encode<___E> for SimpleTable
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -1216,6 +1222,7 @@ impl<___E> ::fidl_next::Encode<___E> for SixtyFourOrdinalTable
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -3100,6 +3107,7 @@ impl<___E> ::fidl_next::Encode<___E> for TableWithAttributes
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,

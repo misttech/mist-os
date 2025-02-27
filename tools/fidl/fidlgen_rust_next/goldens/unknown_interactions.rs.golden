@@ -16,6 +16,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -47,6 +48,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -119,6 +121,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -152,6 +155,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -373,6 +377,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -485,6 +490,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -513,6 +519,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -577,6 +584,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarDriverProtocolSt
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -611,6 +619,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -850,6 +859,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -882,6 +892,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -954,6 +965,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -989,6 +1001,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -1239,6 +1252,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -1273,6 +1287,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -1488,6 +1503,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -1523,6 +1539,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -1743,6 +1760,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -1861,6 +1879,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -1896,6 +1915,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -2709,6 +2729,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolStrictTw
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -2740,6 +2761,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -2809,6 +2831,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolStrictTw
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -2842,6 +2865,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -3053,6 +3077,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolStrictTw
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -3162,6 +3187,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolStrictTw
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -3188,6 +3214,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsAjarProtocolStrictTwoWayErrResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -3252,6 +3279,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolStrictTw
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -3284,6 +3312,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsAjarProtocolStrictTwoWayErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -3518,6 +3547,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -3549,6 +3579,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -3618,6 +3649,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolStrictTw
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -3652,6 +3684,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -3892,6 +3925,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolStrictTw
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -3925,6 +3959,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -4134,6 +4169,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -4168,6 +4204,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -4376,6 +4413,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolStrictTw
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -4491,6 +4529,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -4525,6 +4564,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -4723,6 +4763,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolStrictEv
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -4752,6 +4793,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsAjarProtocolStrictEventFieldsRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -4821,6 +4863,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolStrictEv
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -4852,6 +4895,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsAjarProtocolStrictEventUnionRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -5063,6 +5107,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolStrictEv
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -5174,6 +5219,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolFlexible
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -5205,6 +5251,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -5274,6 +5321,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolFlexible
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -5307,6 +5355,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsAjarProtocolFlexibleEventUnionRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -5518,6 +5567,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsAjarProtocolFlexible
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -6596,6 +6646,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -6627,6 +6678,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -6699,6 +6751,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -6733,6 +6786,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -6954,6 +7008,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -7066,6 +7121,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -7094,6 +7150,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -7161,6 +7218,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -7195,6 +7253,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -7438,6 +7497,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -7470,6 +7530,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -7542,6 +7603,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -7577,6 +7639,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -7829,6 +7892,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -7863,6 +7927,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -8080,6 +8145,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -8115,6 +8181,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -8337,6 +8404,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -8457,6 +8525,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -8492,6 +8561,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -9281,6 +9351,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsClosedProtocolStrict
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -9312,6 +9383,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -9381,6 +9453,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsClosedProtocolStrict
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -9414,6 +9487,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -9627,6 +9701,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsClosedProtocolStrict
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -9736,6 +9811,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsClosedProtocolStrict
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -9764,6 +9840,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsClosedProtocolStrictTwoWayErrResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -9828,6 +9905,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsClosedProtocolStrict
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -9860,6 +9938,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsClosedProtocolStrictTwoWayErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -10096,6 +10175,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -10127,6 +10207,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -10199,6 +10280,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -10233,6 +10315,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -10476,6 +10559,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -10509,6 +10593,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -10720,6 +10805,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -10754,6 +10840,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -10967,6 +11054,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -11082,6 +11170,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -11116,6 +11205,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -11318,6 +11408,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsClosedProtocolStrict
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -11349,6 +11440,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsClosedProtocolStrictEventFieldsRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -11418,6 +11510,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsClosedProtocolStrict
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -11451,6 +11544,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsClosedProtocolStrictEventUnionRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -11662,6 +11756,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsClosedProtocolStrict
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -12516,6 +12611,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolStrict
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -12547,6 +12643,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -12616,6 +12713,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolStrict
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -12649,6 +12747,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -12862,6 +12961,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolStrict
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -12971,6 +13071,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolStrict
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -12999,6 +13100,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsDriverProtocolStrictTwoWayErrResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -13063,6 +13165,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolStrict
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -13095,6 +13198,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsDriverProtocolStrictTwoWayErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -13331,6 +13435,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -13362,6 +13467,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -13434,6 +13540,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -13468,6 +13575,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -13711,6 +13819,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -13744,6 +13853,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -13955,6 +14065,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -13989,6 +14100,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -14202,6 +14314,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -14317,6 +14430,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -14351,6 +14465,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -14551,6 +14666,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolFlexib
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -14577,6 +14693,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsDriverProtocolFlexibleTwoWayResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -14641,6 +14758,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolFlexib
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -14674,6 +14792,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsDriverProtocolFlexibleTwoWayResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -14921,6 +15040,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -14952,6 +15072,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -15021,6 +15142,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolFlexib
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -15056,6 +15178,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -15311,6 +15434,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -15344,6 +15468,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -15553,6 +15678,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -15588,6 +15714,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -15807,6 +15934,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -15922,6 +16050,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -15957,6 +16086,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -16163,6 +16293,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolFlexib
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -16191,6 +16322,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -16257,6 +16389,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsDriverProtocolFlexib
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -16296,6 +16429,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -16568,6 +16702,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -16599,6 +16734,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -16673,6 +16809,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -16712,6 +16849,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -16997,6 +17135,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -17031,6 +17170,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -17248,6 +17388,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -17287,6 +17428,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -17527,6 +17669,7 @@ impl<___E> ::fidl_next::Encode<___E>
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -17647,6 +17790,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -17686,6 +17830,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -18958,6 +19103,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictTwoWay
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -18987,6 +19133,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsProtocolStrictTwoWayFieldsResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -19056,6 +19203,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictTwoWay
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -19087,6 +19235,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsProtocolStrictTwoWayUnionResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -19296,6 +19445,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictTwoWay
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -19405,6 +19555,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictTwoWay
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -19431,6 +19582,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsProtocolStrictTwoWayErrResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -19495,6 +19647,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictTwoWay
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -19526,6 +19679,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsProtocolStrictTwoWayErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -19756,6 +19910,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictTwoWay
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -19787,6 +19942,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -19856,6 +20012,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictTwoWay
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -19888,6 +20045,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsProtocolStrictTwoWayFieldsErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -20125,6 +20283,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictTwoWay
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -20156,6 +20315,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsProtocolStrictTwoWayUnionErrResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -20361,6 +20521,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -20393,6 +20554,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsProtocolStrictTwoWayUnionErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -20598,6 +20760,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictTwoWay
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -20713,6 +20876,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -20745,6 +20909,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsProtocolStrictTwoWayTableErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -20938,6 +21103,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoW
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -20964,6 +21130,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsProtocolFlexibleTwoWayResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -21028,6 +21195,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoW
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -21060,6 +21228,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsProtocolFlexibleTwoWayResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -21300,6 +21469,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoW
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -21329,6 +21499,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -21398,6 +21569,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoW
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -21431,6 +21603,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsProtocolFlexibleTwoWayFieldsResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -21679,6 +21852,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoW
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -21710,6 +21884,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsProtocolFlexibleTwoWayUnionResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -21915,6 +22090,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -21948,6 +22124,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsProtocolFlexibleTwoWayUnionResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -22162,6 +22339,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoW
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -22277,6 +22455,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -22310,6 +22489,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsProtocolFlexibleTwoWayTableResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -22512,6 +22692,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoW
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -22538,6 +22719,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsProtocolFlexibleTwoWayErrResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -22604,6 +22786,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoW
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -22641,6 +22824,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsProtocolFlexibleTwoWayErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -22911,6 +23095,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoW
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -22942,6 +23127,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -23013,6 +23199,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoW
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -23052,6 +23239,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -23325,6 +23513,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoW
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -23358,6 +23547,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -23565,6 +23755,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -23602,6 +23793,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -23833,6 +24025,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleTwoW
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -23950,6 +24143,7 @@ where
 
     ___E: ::fidl_next::Encoder,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -23987,6 +24181,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsProtocolFlexibleTwoWayTableErrResult: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -24208,6 +24403,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictEventF
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -24237,6 +24433,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsProtocolStrictEventFieldsRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -24306,6 +24503,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictEventU
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -24337,6 +24535,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsProtocolStrictEventUnionRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -24546,6 +24745,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolStrictEventT
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -24657,6 +24857,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleEven
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -24686,6 +24887,7 @@ where
     ___E: ::fidl_next::Encoder + ?Sized,
     UnknownInteractionsProtocolFlexibleEventFieldsRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -24755,6 +24957,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleEven
 where
     ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,
@@ -24786,6 +24989,7 @@ where
     ___E: ?Sized,
     UnknownInteractionsProtocolFlexibleEventUnionRequest: ::fidl_next::Encode<___E>,
 {
+    #[inline]
     fn encode_option(
         this: Option<&mut Self>,
         encoder: &mut ___E,
@@ -24995,6 +25199,7 @@ impl<___E> ::fidl_next::Encode<___E> for UnknownInteractionsProtocolFlexibleEven
 where
     ___E: ::fidl_next::Encoder + ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         encoder: &mut ___E,

@@ -36,6 +36,7 @@ impl<___E> ::fidl_next::Encode<___E> for {{ name }}
 where
     ___E: ?Sized,
 {
+    #[inline]
     fn encode(
         &mut self,
         _: &mut ___E,
