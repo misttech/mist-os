@@ -34,7 +34,7 @@ namespace wlan {
 namespace brcmfmac {
 namespace {
 
-constexpr uint32_t kEthernetMtu = 1500;
+constexpr uint32_t kEthernetMtu = 1514;
 
 }  // namespace
 
