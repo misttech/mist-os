@@ -2356,6 +2356,90 @@ fn listener_updates_connecting_networks_correctly_on_new_saved_network() {
     assert_eq!(network.status, Some(types::DisconnectStatus::ConnectionStopped));
 }
 
+#[fuchsia::test]
+fn listener_updates_connecting_networks_correctly_on_stop_client_connections() {
+    let mut exec = fasync::TestExecutor::new();
+    let mut test_values =
+        test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false, RoamingPolicy::Disabled);
+
+    // No request has been sent yet. Future should be idle.
+    assert_variant!(
+        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
+        Poll::Pending
+    );
+
+    // Initial update should reflect client connections are disabled
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.listener_updates_stream,
+    );
+    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsDisabled);
+    assert_eq!(networks.unwrap().len(), 0);
+
+    // Get ready for client connections
+    let _iface_sme_stream = prepare_client_interface(&mut exec, &mut test_values);
+
+    // Check for a listener update saying client connections are enabled
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.listener_updates_stream,
+    );
+    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
+    assert_eq!(networks.unwrap().len(), 0);
+
+    // Generate network ID
+    let network_id =
+        fidl_policy::NetworkIdentifier { ssid: TEST_SSID.clone().to_vec(), type_: Saved::Wpa2 };
+    let network_config = fidl_policy::NetworkConfig {
+        id: Some(network_id.clone()),
+        credential: Some(TEST_CREDS.wpa_pass_min.policy.clone()),
+        ..Default::default()
+    };
+
+    // Save the network
+    let save_fut = test_values.external_interfaces.client_controller.save_network(&network_config);
+    let save_fut = pin!(save_fut);
+
+    // Continue processing the save request. Connect process starts, and save request returns once the scan has been queued.
+    let save_resp =
+        run_while(&mut exec, &mut test_values.internal_objects.internal_futures, save_fut);
+    assert_variant!(save_resp, Ok(Ok(())));
+
+    // Check for a listener update saying we're connecting
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.listener_updates_stream,
+    );
+    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsEnabled);
+    let mut networks = networks.unwrap();
+    assert_eq!(networks.len(), 1);
+    let network = networks.pop().unwrap();
+    assert_eq!(network.id.unwrap(), network_id.clone());
+    assert_eq!(network.state.unwrap(), types::ConnectionState::Connecting);
+
+    // Disable client connections before the connection has completed.
+    let stop_connections_fut =
+        test_values.external_interfaces.client_controller.stop_client_connections();
+    let mut stop_connections_fut = pin!(stop_connections_fut);
+    assert_variant!(exec.run_until_stalled(&mut stop_connections_fut), Poll::Pending);
+
+    // Check for a listener update that connections are disabled and the pending connection was cancelled.
+    let fidl_policy::ClientStateSummary { state, networks, .. } = get_client_state_update(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut test_values.external_interfaces.listener_updates_stream,
+    );
+    assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsDisabled);
+    let mut networks = networks.unwrap();
+    assert_eq!(networks.len(), 1);
+    let network = networks.pop().unwrap();
+    assert_eq!(network.state.unwrap(), types::ConnectionState::Disconnected);
+    assert_eq!(network.id.unwrap(), network_id.clone());
+}
+
 // Trait alias for a roam scan solicit func. Function should emulate a scenario that could trigger a
 // roam scan, and returns the scan request responder if one is triggered, None otherwise. Direct
 // trait aliases exist, but are an unstable feature: https://github.com/rust-lang/rfcs/pull/1733.

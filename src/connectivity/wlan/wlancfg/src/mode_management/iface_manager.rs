@@ -807,32 +807,53 @@ impl IfaceManagerService {
     ) -> LocalBoxFuture<'static, Result<(), Error>> {
         self.telemetry_sender.send(TelemetryEvent::ClearEstablishConnectionStartTime);
 
+        // Cancel any ongoing network selection, since a disconnect makes it invalid.
+        if !self.connection_selection_futures.is_empty() {
+            info!(
+                "Client connections stopping, ignoring results from ongoing connection selections."
+            );
+            self.connection_selection_futures.clear();
+        }
+
         let client_ifaces: Vec<ClientIfaceContainer> = self.clients.drain(..).collect();
         let phy_manager = self.phy_manager.clone();
         let update_sender = self.client_update_sender.clone();
 
         let fut = async move {
             // Disconnect and discard all of the configured client ifaces.
+            let mut cancelled_connection_networks = vec![];
             for mut client_iface in client_ifaces {
-                let client = match client_iface.client_state_machine.as_mut() {
-                    Some(state_machine) => state_machine,
-                    None => continue,
-                };
-                let (responder, receiver) = oneshot::channel();
-                match client.disconnect(reason, responder) {
-                    Ok(()) => {}
-                    Err(e) => error!("failed to issue disconnect: {:?}", e),
-                }
-                match receiver.await {
-                    Ok(()) => {}
-                    Err(e) => error!("failed to disconnect: {:?}", e),
+                if let ClientIfaceContainerConfig::Configured(network_id) = client_iface.config {
+                    client_iface.config = ClientIfaceContainerConfig::Unconfigured;
+                    match client_iface.client_state_machine.as_mut() {
+                        Some(state_machine) => {
+                            let (responder, receiver) = oneshot::channel();
+                            match state_machine.disconnect(reason, responder) {
+                                Ok(()) => {}
+                                Err(e) => error!("failed to issue disconnect: {:?}", e),
+                            }
+                            match receiver.await {
+                                Ok(()) => {}
+                                Err(e) => error!("failed to disconnect: {:?}", e),
+                            }
+                        }
+                        None => {
+                            // Any pending connections have been cancelled. Send a listener update
+                            // to marked them as Disconnected.
+                            cancelled_connection_networks.push(listener::ClientNetworkState {
+                                id: network_id,
+                                state: client_types::ConnectionState::Disconnected,
+                                status: Some(client_types::DisconnectStatus::ConnectionStopped),
+                            });
+                        }
+                    }
                 }
             }
 
             // Signal to the update listener that client connections have been disabled.
             let update = listener::ClientStateUpdate {
                 state: fidl_fuchsia_wlan_policy::WlanClientState::ConnectionsDisabled,
-                networks: vec![],
+                networks: cancelled_connection_networks,
             };
             if let Err(e) = update_sender.unbounded_send(listener::Message::NotifyListeners(update))
             {
