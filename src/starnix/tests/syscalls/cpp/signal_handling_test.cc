@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <sys/syscall.h>
+#include <ucontext.h>
 #include <unistd.h>
 
 #include <climits>
@@ -1154,6 +1155,63 @@ TEST(SignalHandling, Repro347756382) {
   SAFE_SYSCALL(waitpid(pid, &status, 0));
   EXPECT_TRUE(WIFEXITED(status));
   EXPECT_EQ(WEXITSTATUS(status), 0);
+}
+
+#if defined(__x86_64__)
+#define INLINE_RAISE_SIGUSR1(tid) \
+  __asm__ volatile("syscall;" ::"a"(SYS_kill), "D"(tid), "S"(SIGUSR1))
+#elif defined(__aarch64__)
+#define INLINE_RAISE_SIGUSR1(tid)                               \
+  do {                                                          \
+    register intptr_t x0 asm("x0") = tid;                       \
+    register intptr_t x1 asm("x1") = SIGUSR1;                   \
+    register intptr_t number asm("x8") = SYS_kill;              \
+    __asm__ volatile("svc #0" ::"r"(x0), "r"(x1), "r"(number)); \
+  } while (0)
+#elif defined(__arm__)
+#define INLINE_RAISE_SIGUSR1(tid)                               \
+  do {                                                          \
+    register intptr_t r0 asm("r0") = tid;                       \
+    register intptr_t r1 asm("r1") = SIGUSR1;                   \
+    register intptr_t number asm("r7") = SYS_kill;              \
+    __asm__ volatile("svc #0" ::"r"(r0), "r"(r1), "r"(number)); \
+  } while (0)
+#elif defined(__riscv)
+#define INLINE_RAISE_SIGUSR1(tid)                              \
+  do {                                                         \
+    register intptr_t a0 asm("a0") = tid;                      \
+    register intptr_t a1 asm("a1") = SIGUSR1;                  \
+    register intptr_t number asm("a7") = SYS_kill;             \
+    __asm__ volatile("ecall" ::"r"(a0), "r"(a1), "r"(number)); \
+  } while (0)
+#else
+#error "Unsupported architecture"
+#endif
+
+TEST(SignalHandling, SetContextInSignal) {
+  static ucontext_t context = {};
+  static volatile bool after_setcontext = false;
+
+  pid_t self_tid = gettid();
+  struct sigaction sigusr1_action = {};
+  sigusr1_action.sa_flags = SA_SIGINFO;
+  sigusr1_action.sa_sigaction = [](int sig, siginfo_t *info, void *ucontext_ptr) {
+    memcpy(&context, ucontext_ptr, sizeof(context));
+  };
+  SAFE_SYSCALL(sigaction(SIGUSR1, &sigusr1_action, nullptr));
+  INLINE_RAISE_SIGUSR1(self_tid);
+  if (after_setcontext) {
+    // This is the expected exit of the test. The signal should change the
+    // context so that it returns here.
+    return;
+  }
+  after_setcontext = true;
+  sigusr1_action.sa_sigaction = [](int sig, siginfo_t *info, void *ucontext_ptr) {
+    memcpy(ucontext_ptr, &context, sizeof(context));
+  };
+  SAFE_SYSCALL(sigaction(SIGUSR1, &sigusr1_action, nullptr));
+  INLINE_RAISE_SIGUSR1(self_tid);
+  FAIL() << "Test should not return here.";
 }
 
 }  // namespace
