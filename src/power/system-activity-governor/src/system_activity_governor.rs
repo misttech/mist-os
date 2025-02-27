@@ -13,6 +13,7 @@ use fidl::endpoints::{create_endpoints, Proxy};
 use fidl_fuchsia_power_system::{
     self as fsystem, ApplicationActivityLevel, CpuLevel, ExecutionStateLevel,
 };
+use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_inspect::{
     BoolProperty as IBool, IntProperty as IInt, Node as INode, Property, UintProperty as IUint,
 };
@@ -29,8 +30,11 @@ use std::rc::Rc;
 use zx::{AsHandleRef, HandleBased};
 use {
     fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_observability as fobs,
-    fidl_fuchsia_power_suspend as fsuspend, fuchsia_async as fasync,
+    fidl_fuchsia_power_suspend as fsuspend,
 };
+
+const RESUME_SUSPENDING_LEASE_DROP_DELAY: std::time::Duration =
+    std::time::Duration::from_millis(100);
 
 type NotifyFn = Box<dyn Fn(&fsuspend::SuspendStats, fsuspend::StatsWatchResponder) -> bool>;
 type StatsHangingGet = HangingGet<fsuspend::SuspendStats, fsuspend::StatsWatchResponder, NotifyFn>;
@@ -396,14 +400,14 @@ pub struct SystemActivityGovernor {
     /// element state to external clients.
     is_running_signal: async_lock::OnceCell<()>,
     /// The flag used to synchronize the resume_control_lease.
-    /// It's set to true when a resume_control_lease is created and to false
+    /// It's unset when a resume_control_lease is created and is set
     /// when it needs to be dropped.
     // TODO(https://fxbug.dev/372695129): Optimize resume_control_lease.
-    waiting_for_es_activation_after_resume: Cell<bool>,
+    es_activation_after_resume_signal: Rc<RefCell<async_lock::OnceCell<()>>>,
     /// The lease which hold execution_state at suspending state temporarily
     /// after suspension.
-    resume_control_lease: RefCell<Option<fbroker::LeaseControlProxy>>,
-    /// Temporarily holds the boot_contro_leasel
+    resume_control_lease: Rc<RefCell<Option<fbroker::LeaseControlProxy>>>,
+    /// Temporarily holds the boot_control lease.
     booting_lease: Rc<RefCell<Option<fidl::endpoints::ClientEnd<fbroker::LeaseControlMarker>>>>,
 }
 
@@ -536,8 +540,8 @@ impl SystemActivityGovernor {
             cpu_manager,
             boot_control,
             element_power_level_names,
-            waiting_for_es_activation_after_resume: Cell::new(false),
-            resume_control_lease: RefCell::new(None),
+            es_activation_after_resume_signal: Rc::new(RefCell::new(async_lock::OnceCell::new())),
+            resume_control_lease: Rc::new(RefCell::new(None)),
             is_running_signal: async_lock::OnceCell::new(),
             booting_lease: Rc::new(RefCell::new(None)),
         }))
@@ -645,8 +649,7 @@ impl SystemActivityGovernor {
                         // If entering Active, SAG drops the resume control lease to re-enable
                         // suspension.
                         if new_power_level == ExecutionStateLevel::Active.into_primitive() {
-                            this.waiting_for_es_activation_after_resume.set(false);
-                            drop(this.resume_control_lease.borrow_mut().take());
+                            let _ = this.es_activation_after_resume_signal.borrow().set(()).await;
                         }
 
                         update_fn(new_power_level).await;
@@ -907,7 +910,8 @@ impl SuspendResumeListener for SystemActivityGovernor {
 
     async fn on_suspend_ended(&self) {
         log::debug!("on_suspend_ended");
-        self.waiting_for_es_activation_after_resume.set(true);
+        // Reset Execution State activation signal at each resume transition.
+        let _ = self.es_activation_after_resume_signal.borrow_mut().take();
 
         let lease = self
             .execution_state
@@ -924,8 +928,23 @@ impl SuspendResumeListener for SystemActivityGovernor {
             lease_status = lease.watch_status(lease_status).await.unwrap();
         }
 
-        if self.waiting_for_es_activation_after_resume.get() {
+        if !self.es_activation_after_resume_signal.borrow().is_initialized() {
             let _ = self.resume_control_lease.borrow_mut().insert(lease);
+
+            let resume_control_lease = self.resume_control_lease.clone();
+            let es_activation_after_resume_signal = self.es_activation_after_resume_signal.clone();
+            fasync::Task::local(async move {
+                let _ = es_activation_after_resume_signal
+                    .borrow()
+                    .wait()
+                    .on_timeout(RESUME_SUSPENDING_LEASE_DROP_DELAY, || {
+                        log::info!("Dropping resume control lease due to timeout");
+                        &()
+                    })
+                    .await;
+                drop(resume_control_lease.borrow_mut().take());
+            })
+            .detach();
         }
     }
 

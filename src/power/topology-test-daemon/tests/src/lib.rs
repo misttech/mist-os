@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use diagnostics_assertions::{tree_assertion, AnyProperty};
+use diagnostics_assertions::{tree_assertion, AnyProperty, NonZeroUintProperty};
 use diagnostics_reader::ArchiveReader;
 use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker};
 use fuchsia_component_test::{
@@ -322,8 +322,8 @@ async fn test_system_activity_control() -> Result<()> {
 
     let _ = system_activity_control.stop_application_activity().await.unwrap();
 
-    // After a suspend attempt, due to SAG's self-lease of Execution State, the CPU element will go
-    // to level 1 and Execution State will go to level 1.
+    // After a suspend attempt, SAG will auto-suspend since no lease is acquired.
+    // The number of suspend attempts is unbounded, so it can be any non zero value.
     block_until_inspect_matches!(
         &env.sag_moniker,
         root: contains {
@@ -341,23 +341,17 @@ async fn test_system_activity_control() -> Result<()> {
             },
             suspend_stats: {
                ref fobs::SUSPEND_SUCCESS_COUNT: 0u64,
-               ref fobs::SUSPEND_FAIL_COUNT: 1u64,
+               ref fobs::SUSPEND_FAIL_COUNT: NonZeroUintProperty,
                ref fobs::SUSPEND_LAST_FAILED_ERROR: zx::sys::ZX_ERR_NOT_SUPPORTED as i64,
                ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
                ref fobs::SUSPEND_LAST_DURATION: -1i64,
             },
-            suspend_events: {
-                "0": {
-                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
-                },
+            suspend_events: contains {
                 "1": {
                     ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
                 "2": {
                     ref fobs::SUSPEND_FAILED_AT: AnyProperty,
-                },
-                "3": {
-                    ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
                 },
             },
             "fuchsia.inspect.Health": contains {

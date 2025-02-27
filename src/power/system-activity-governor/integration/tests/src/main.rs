@@ -295,13 +295,15 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
             booting: false,
             power_elements: {
                 execution_state: {
-                    power_level: 1u64,
+                    // Due to timeout of the resume lease, expect this to be 0.
+                    power_level: 0u64,
                 },
                 application_activity: {
                     power_level: 0u64,
                 },
                 cpu: {
-                    power_level: 1u64,
+                    // Due to timeout of the resume lease, expect this to be 0.
+                    power_level: 0u64,
                 },
             },
             suspend_stats: {
@@ -325,56 +327,11 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 "3": {
                     ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
                 },
-            },
-            ref fobs::WAKE_LEASES_NODE: {},
-            config: {
-                use_suspender: true,
-                wait_for_suspending_token: false,
-            },
-            "fuchsia.inspect.Health": contains {
-                status: "OK",
-            },
-        }
-    );
-
-    // Continue incrementing success count on falling edge of Execution State level transitions.
-    let suspend_lease_control = lease(&suspend_controller, 1).await?;
-
-    block_until_inspect_matches!(
-        activity_governor_moniker,
-        root: {
-            booting: false,
-            power_elements: {
-                execution_state: {
-                    power_level: 2u64,
-                },
-                application_activity: {
-                    power_level: 1u64,
-                },
-                cpu: {
-                    power_level: 1u64,
-                },
-            },
-            suspend_stats: {
-                ref fobs::SUSPEND_SUCCESS_COUNT: 1u64,
-                ref fobs::SUSPEND_FAIL_COUNT: 0u64,
-                ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
-                ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
-                ref fobs::SUSPEND_LAST_DURATION: 1u64,
-            },
-            ref fobs::SUSPEND_EVENTS_NODE: {
-                "0": {
+                "4": {
                     ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
                 },
-                "1": {
+                "5": {
                     ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
-                },
-                "2": {
-                    ref fobs::SUSPEND_LAST_TIMESTAMP: 2u64,
-                    ref fobs::SUSPEND_RESUMED_AT: AnyProperty,
-                },
-                "3": {
-                    ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
                 },
             },
             ref fobs::WAKE_LEASES_NODE: {},
@@ -388,7 +345,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
         }
     );
 
-    drop(suspend_lease_control);
+    // Suspend again and check if the success counter increments.
     assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
     suspend_device
         .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
@@ -412,13 +369,15 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
             booting: false,
             power_elements: {
                 execution_state: {
-                    power_level: 1u64,
+                    // Due to timeout of the resume lease, expect this to be 0.
+                    power_level: 0u64,
                 },
                 application_activity: {
                     power_level: 0u64,
                 },
                 cpu: {
-                    power_level: 1u64,
+                    // Due to timeout of the resume lease, expect this to be 0.
+                    power_level: 0u64,
                 },
             },
             suspend_stats: {
@@ -454,6 +413,12 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                 },
                 "7": {
                     ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
+                },
+                "8": {
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
+                },
+                "9": {
+                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
             },
             ref fobs::WAKE_LEASES_NODE: {},
@@ -538,13 +503,15 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
             booting: false,
             power_elements: {
                 execution_state: {
-                    power_level: 1u64,
+                    // Due to timeout of the resume lease, expect this to be 0.
+                    power_level: 0u64,
                 },
                 application_activity: {
                     power_level: 0u64,
                 },
                 cpu: {
-                    power_level: 1u64,
+                    // Due to timeout of the resume lease, expect this to be 0.
+                    power_level: 0u64,
                 },
             },
             suspend_stats: {
@@ -566,7 +533,13 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
                 },
                 "3": {
                     ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
+                },
+                "4": {
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
                  },
+                "5": {
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
+                },
             },
             ref fobs::WAKE_LEASES_NODE: {},
             config: {
@@ -650,13 +623,15 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
             booting: false,
             power_elements: {
                 execution_state: {
-                    power_level: 1u64,
+                    // Due to timeout of the resume lease, expect this to be 0.
+                    power_level: 0u64,
                 },
                 application_activity: {
                     power_level: 0u64,
                 },
                 cpu: {
-                    power_level: 1u64,
+                    // Due to timeout of the resume lease, expect this to be 0.
+                    power_level: 0u64,
                 },
             },
             suspend_stats: {
@@ -678,7 +653,13 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                 },
                 "3": {
                     ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
-                 },
+                },
+                "4": {
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
+                },
+                "5": {
+                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
+                },
             },
             ref fobs::WAKE_LEASES_NODE: {},
             config: {
@@ -690,9 +671,6 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
             },
         }
     );
-
-    // Lease and drop to allow suspend again.
-    lease(&suspend_controller, 1).await?;
 
     assert_eq!(0u64, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
     suspend_device
@@ -711,13 +689,15 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
             booting: false,
             power_elements: {
                 execution_state: {
-                    power_level: 1u64,
+                    // Due to timeout of the resume lease, expect this to be 0.
+                    power_level: 0u64,
                 },
                 application_activity: {
                     power_level: 0u64,
                 },
                 cpu: {
-                    power_level: 1u64,
+                    // Due to timeout of the resume lease, expect this to be 0.
+                    power_level: 0u64,
                 },
             },
             suspend_stats: {
@@ -752,7 +732,13 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                 },
                 "7": {
                     ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
+                },
+                "8": {
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
                  },
+                "9": {
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
+                },
             },
         }
     );
@@ -890,13 +876,15 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
             booting: false,
             power_elements: {
                 execution_state: {
-                    power_level: 1u64,
+                    // Due to timeout of the resume lease, expect this to be 0.
+                    power_level: 0u64,
                 },
                 application_activity: {
                     power_level: 0u64,
                 },
                 cpu: {
-                    power_level: 1u64,
+                    // Due to timeout of the resume lease, expect this to be 0.
+                    power_level: 0u64,
                 },
             },
             suspend_stats: {
@@ -919,6 +907,12 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
                 },
                 "3": {
                     ref fobs::SUSPEND_LOCK_DROPPED_AT: AnyProperty,
+                },
+                "4": {
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
+                },
+                "5": {
+                   ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
             },
             ref fobs::WAKE_LEASES_NODE: {},
@@ -2296,7 +2290,8 @@ async fn test_acquire_wake_lease_blocks_during_suspend() -> Result<()> {
             booting: false,
             power_elements: contains {
                 execution_state: {
-                    power_level: 1u64,
+                    // Due to timeout of the resume lease, expect this to be 0.
+                    power_level: 0u64,
                 },
             },
             ref fobs::SUSPEND_EVENTS_NODE: {
@@ -2330,6 +2325,12 @@ async fn test_acquire_wake_lease_blocks_during_suspend() -> Result<()> {
                 },
                 "8": {
                     ref fobs::SUSPEND_BLOCKER_DROPPED_AT: AnyProperty,
+                },
+                "9": {
+                    ref fobs::SUSPEND_LOCK_ACQUIRED_AT: AnyProperty,
+                },
+                "10": {
+                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
                 },
             },
             config: {
