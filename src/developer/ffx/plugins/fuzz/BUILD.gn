@@ -20,7 +20,6 @@ ffx_plugin("ffx_fuzz") {
   ]
   args_deps = [
     "shell_args",
-    "//src/developer/ffx/core:lib",
     "//third_party/rust_crates:argh",
   ]
   deps = [

@@ -12,7 +12,6 @@ rustc_library("ffx_triage_lib") {
   deps = [
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_rust",
     "//src/developer/ffx/config:lib",
-    "//src/developer/ffx/core:lib",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/target/holders:lib",

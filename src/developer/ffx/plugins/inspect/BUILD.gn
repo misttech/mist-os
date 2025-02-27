@@ -65,7 +65,6 @@ ffx_plugin("ffx_inspect") {
   ]
 
   args_deps = [
-    "//src/developer/ffx/core:lib",
     "//src/diagnostics/iquery:lib",
     "//third_party/rust_crates:argh",
   ]

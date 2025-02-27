@@ -11,7 +11,6 @@ ffx_plugin("ffx_driver") {
   edition = "2021"
   with_unit_tests = true
   args_deps = [
-    "//src/developer/ffx/core:lib",
     "//src/devices/bin/driver_tools:lib",
     "//third_party/rust_crates:argh",
   ]

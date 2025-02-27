@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use argh::{ArgsInfo, FromArgs, SubCommand};
-use ffx_core::ffx_command;
 use shell_args::{derive_subcommand, valid_when};
 use std::collections::HashMap;
 
@@ -32,7 +31,6 @@ use std::collections::HashMap;
 //  * Individual shell commands with `AutoComplete` implementations.
 
 /// Command line arguments for a command run from the command-line.
-#[ffx_command()]
 #[derive(Clone, Debug, ArgsInfo, FromArgs, PartialEq)]
 #[argh(subcommand, name = "fuzz", description = "Start and manage fuzzers.")]
 pub struct FuzzCommand {

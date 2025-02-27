@@ -4,9 +4,7 @@
 
 use argh::{ArgsInfo, FromArgs};
 use driver_tools::args::DriverSubCommand;
-use ffx_core::ffx_command;
 
-#[ffx_command()]
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "driver", description = "Support driver development workflows")]
 pub struct DriverCommand {
