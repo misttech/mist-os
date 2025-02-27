@@ -20,6 +20,7 @@ pub struct HealthCheckConfig {
 pub enum VerifyComponent {
     Storage,
     Netstack,
+    Setui,
 }
 
 impl VerifyComponent {
@@ -28,6 +29,7 @@ impl VerifyComponent {
         match *self {
             VerifyComponent::Storage => "bootstrap/fshost",
             VerifyComponent::Netstack => "core/network/netstack",
+            VerifyComponent::Setui => "core/setui_service",
         }
     }
 }
