@@ -85,8 +85,3 @@ class StarnixError(HoneydewError):
 
 class InspectError(HoneydewError):
     """Exception to be raised for Inspect affordance related failures."""
-
-
-# TODO(b/397438776): This will be removed after impacted files have been pointed to honeydew.transports.ffx.errors.FfxCommandError
-class FfxCommandError(TransportError):
-    """Exception for errors raised by ffx commands running on host machine."""

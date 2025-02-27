@@ -9,7 +9,7 @@ import logging
 import subprocess
 
 import ffxtestcase
-import honeydew
+from honeydew.transports.ffx.errors import FfxCommandError
 from mobly import asserts, test_runner
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -96,7 +96,7 @@ class FfxTest(ffxtestcase.FfxTestCase):
         asserts.assert_equal(devices[0]["rcs_state"], "N")
         # Assert that we are not probing the device to identify the type
         asserts.assert_equal(devices[0]["target_type"], "Unknown")
-        with asserts.assert_raises(honeydew.errors.FfxCommandError):
+        with asserts.assert_raises(FfxCommandError):
             self.dut.ffx.run(["-c", "daemon.autostart=false", "daemon", "echo"])
 
     # TODO(b/355292969): re-enable when client-side discovery is re-enabled
@@ -132,7 +132,7 @@ class FfxTest(ffxtestcase.FfxTestCase):
         asserts.assert_not_equal(devices[0]["target_type"], "Unknown")
 
         # Make sure the daemon hadn't started running
-        with asserts.assert_raises(honeydew.errors.FfxCommandError):
+        with asserts.assert_raises(FfxCommandError):
             self.dut.ffx.run(["-c", "daemon.autostart=false", "daemon", "echo"])
 
     def test_local_discovery(self) -> None:

@@ -109,8 +109,6 @@ python_library("honeydew_no_testonly") {
     "interfaces/device_classes/__init__.py",
     "interfaces/device_classes/affordances_capable.py",
     "interfaces/device_classes/fuchsia_device.py",
-    "interfaces/transports/__init__.py",
-    "interfaces/transports/ffx.py",
     "transports/__init__.py",
     "transports/fastboot/__init__.py",
     "transports/fastboot/errors.py",
