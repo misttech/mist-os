@@ -722,7 +722,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8721871281684567761"`
+**Current value for `target_cpu = "arm64"`:** `"8721825976622188081"`
 
 From //out/not-default/args.gn:10
 
@@ -730,7 +730,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8721871281684567761"`
+**Current value for `target_cpu = "riscv64"`:** `"8721825976622188081"`
 
 From //out/not-default/args.gn:10
 
@@ -738,7 +738,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8721871281684567761"`
+**Current value for `target_cpu = "x64"`:** `"8721825976622188081"`
 
 From //out/not-default/args.gn:10
 
@@ -1046,7 +1046,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "lib/clang/20/lib/aarch64-unknown-fuchsia/libclang_rt.lsan.a"
-  clang_rt_cxx = ""
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
 }
 }
   tsan = {
@@ -2377,7 +2377,7 @@ https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0212_package_sets
 
 They will be compiled, and published, but not added as dependencies of the
 assembled images, and so will not be able to cause the inclusion of
-'config_data' or 'shell_command' entries.
+entries to the legacy bundle.
 
 As these cannot be part of the legacy AIB for a product, there is no
 "legacy" version of this argument.
