@@ -14,27 +14,6 @@ load(
 package(default_visibility = ["//visibility:public"])
 
 fuchsia_partition(
-    name = "zircon-a",
-    partition_name = "zircon-a",
-    slot = SLOT.A,
-    type = PARTITION_TYPE.ZBI,
-)
-
-fuchsia_partition(
-    name = "zircon-b",
-    partition_name = "zircon-b",
-    slot = SLOT.B,
-    type = PARTITION_TYPE.ZBI,
-)
-
-fuchsia_partition(
-    name = "zircon-r",
-    partition_name = "zircon-r",
-    slot = SLOT.R,
-    type = PARTITION_TYPE.ZBI,
-)
-
-fuchsia_partition(
     name = "zircon_a",
     partition_name = "zircon_a",
     slot = SLOT.A,
@@ -97,17 +76,25 @@ fuchsia_bootloader_partition(
     type = "",
 )
 
+fuchsia_bootloader_partition(
+    name = "bootloader",
+    image = "@gn_targets//build/images/flash:fuchsia_esp",
+    partition_name = "bootloader",
+    # For x64 platform there is only one bootloader and thus there is no need
+    # for multiple types and default empty string is used.
+    type = "",
+)
+
 fuchsia_partitions_configuration(
     name = "x64",
     bootloader_partitions = [
-        ":fuchsia_esp",
+        ":bootloader",
     ],
     hardware_revision = "x64",
-    # x64 uses "zircon-a" instead of "zircon_a".
     partitions = [
-        ":zircon-a",
-        ":zircon-b",
-        ":zircon-r",
+        ":zircon_a",
+        ":zircon_b",
+        ":zircon_r",
         ":vbmeta_a",
         ":vbmeta_b",
         ":vbmeta_r",

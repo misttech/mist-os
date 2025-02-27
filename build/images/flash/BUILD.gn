@@ -34,13 +34,23 @@ bazel_input_file("esp.bazel_input") {
 if (use_gigaboot) {
   flash_image_deps += [ ":esp" ]
 
-  firmware_info += [
-    {
-      name = "esp"
-      partition = "fuchsia-esp"
-      out_path = rebase_path(files.esp, root_build_dir)
-    },
-  ]
+  if (target_cpu == "x64") {
+    firmware_info += [
+      {
+        name = "esp"
+        partition = "bootloader"
+        out_path = rebase_path(files.esp, root_build_dir)
+      },
+    ]
+  } else {
+    firmware_info += [
+      {
+        name = "esp"
+        partition = "fuchsia-esp"
+        out_path = rebase_path(files.esp, root_build_dir)
+      },
+    ]
+  }
 }
 
 foreach(firmware, firmware_prebuilts) {

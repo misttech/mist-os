@@ -22,6 +22,8 @@ _standard_names = {
   fvm = "fvm"
 }
 
+# Gigaboot bootloader that is put to legacy `fuchsia-esp` partition
+# TODO(b/399522436): This should be moved to platform specific build files.
 _gigaboot = {
   testonly = true
   bootloader_partitions = [
@@ -29,6 +31,20 @@ _gigaboot = {
       image = "$root_build_dir/fuchsia.esp.blk"
       type = ""
       name = "fuchsia-esp"
+    },
+  ]
+  deps = [ "//build/images/flash:esp" ]
+}
+
+# Gigaboot bootloader that is put to `bootloader` partition.
+# TODO(b/399522436): This should be moved to platform specific build files.
+_gigaboot_bootloader = {
+  testonly = true
+  bootloader_partitions = [
+    {
+      image = "$root_build_dir/fuchsia.esp.blk"
+      type = ""
+      name = "bootloader"
     },
   ]
   deps = [ "//build/images/flash:esp" ]
@@ -45,16 +61,9 @@ if (target_cpu == "x64") {
   }
 
   generated_partitions_config("x64") {
-    forward_variables_from(_gigaboot, "*")
+    forward_variables_from(_gigaboot_bootloader, "*")
+    forward_variables_from(_standard_names, "*")
     hw_revision = "x64"
-
-    # TODO: Investigate if we can change these to the standard names.
-    zbi_a = "zircon-a"
-    zbi_b = "zircon-b"
-    zbi_r = "zircon-r"
-    vbmeta_a = "vbmeta_a"
-    vbmeta_b = "vbmeta_b"
-    vbmeta_r = "vbmeta_r"
 
     # At most one of either a fvm or fxfs will be generated, but the board
     # supports either configuration.
@@ -91,6 +100,7 @@ if (target_cpu == "riscv64") {
 }
 
 not_needed([
-             "_standard_names",
              "_gigaboot",
+             "_gigaboot_bootloader",
+             "_standard_names",
            ])

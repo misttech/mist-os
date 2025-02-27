@@ -165,7 +165,7 @@ class CurrentSlotUuidTest : public PaverTest {
 
 TEST_F(CurrentSlotUuidTest, TestZirconAIsSlotA) {
   ASSERT_NO_FATAL_FAILURE(CreateGptDevice({
-      PartitionDescription{"zircon-a", uuid::Uuid(kZirconType), 0x22, 0x1, uuid::Uuid(kTestUuid)},
+      PartitionDescription{"zircon_a", uuid::Uuid(kZirconType), 0x22, 0x1, uuid::Uuid(kTestUuid)},
   }));
 
   zx::result devices = CreateBlockDevices();
@@ -189,7 +189,7 @@ TEST_F(CurrentSlotUuidTest, TestZirconAWithUnderscore) {
 
 TEST_F(CurrentSlotUuidTest, TestZirconAMixedCase) {
   ASSERT_NO_FATAL_FAILURE(CreateGptDevice({
-      PartitionDescription{"ZiRcOn-A", uuid::Uuid(kZirconType), 0x22, 0x1, uuid::Uuid(kTestUuid)},
+      PartitionDescription{"ZiRcOn_A", uuid::Uuid(kZirconType), 0x22, 0x1, uuid::Uuid(kTestUuid)},
   }));
 
   zx::result devices = CreateBlockDevices();

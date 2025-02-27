@@ -729,17 +729,17 @@ TEST_F(FastbootFlashTest, FlashAssetZirconR) {
 }
 
 TEST_F(FastbootFlashTest, FlashAssetLegacyZirconA) {
-  TestFlashAsset("zircon-a", fuchsia_paver::wire::Configuration::kA,
+  TestFlashAsset("zircon_a", fuchsia_paver::wire::Configuration::kA,
                  fuchsia_paver::wire::Asset::kKernel);
 }
 
 TEST_F(FastbootFlashTest, FlashAssetLegacyZirconB) {
-  TestFlashAsset("zircon-b", fuchsia_paver::wire::Configuration::kB,
+  TestFlashAsset("zircon_b", fuchsia_paver::wire::Configuration::kB,
                  fuchsia_paver::wire::Asset::kKernel);
 }
 
 TEST_F(FastbootFlashTest, FlashAssetLegacyZirconR) {
-  TestFlashAsset("zircon-r", fuchsia_paver::wire::Configuration::kRecovery,
+  TestFlashAsset("zircon_r", fuchsia_paver::wire::Configuration::kRecovery,
                  fuchsia_paver::wire::Asset::kKernel);
 }
 

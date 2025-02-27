@@ -49,25 +49,25 @@ static WORKSTATION_INSTALLER_GPT: [u8; 16] = [
 /// tool generates images containing partitions with these GUIDs.
 static WORKSTATION_PARTITION_GPTS: [[u8; 16]; 5] = [
     [
-        0x28, 0x73, 0x2A, 0xC1, 0x1F, 0xF8, 0xD2, 0x11, 0xBA, 0x4B, 0x00, 0xA0, 0xC9, 0x3E, 0xC9,
-        0x3B,
-    ], // efi
+        0xfe, 0x94, 0xce, 0x5e, 0x86, 0x4c, 0xe8, 0x11, 0xa1, 0x5b, 0x48, 0x0f, 0xcf, 0x35, 0xf8,
+        0xe6,
+    ], // bootloader
     [
-        0x5D, 0x39, 0x75, 0x1D, 0xC6, 0xF2, 0x6B, 0x47, 0xA8, 0xB7, 0x45, 0xCC, 0x1C, 0x97, 0xB4,
-        0x76,
-    ], // misc
+        0x6b, 0xe1, 0x09, 0xa4, 0xaa, 0x78, 0xcc, 0x4a, 0x5c, 0x99, 0x41, 0x1a, 0x62, 0x52, 0x23,
+        0x30,
+    ], // durable_boot
     [
-        0x86, 0xCC, 0x30, 0xDE, 0x4A, 0x1F, 0x31, 0x4A, 0x93, 0xC4, 0x66, 0xF1, 0x47, 0xD3, 0x3E,
-        0x05,
-    ], // zircon-a
+        0xf6, 0xff, 0x37, 0x9b, 0x58, 0x2e, 0x6a, 0x46, 0x3a, 0x98, 0xe0, 0x04, 0x0b, 0x6d, 0x92,
+        0xf7,
+    ], // zircon_a
     [
-        0xDF, 0x04, 0xCC, 0x23, 0x78, 0xC2, 0xE7, 0x4C, 0x84, 0x71, 0x89, 0x7D, 0x1A, 0x4B, 0xCD,
-        0xF7,
-    ], // zircon-b
+        0xf6, 0xff, 0x37, 0x9b, 0x58, 0x2e, 0x6a, 0x46, 0x3a, 0x98, 0xe0, 0x04, 0x0b, 0x6d, 0x92,
+        0xf7,
+    ], // zircon_b
     [
-        0x57, 0xCF, 0xE5, 0xA0, 0xEF, 0x2D, 0xBE, 0x46, 0xA8, 0x0C, 0xA2, 0x06, 0x7C, 0x37, 0xCD,
-        0x49,
-    ], // zircon-r
+        0xf6, 0xff, 0x37, 0x9b, 0x58, 0x2e, 0x6a, 0x46, 0x3a, 0x98, 0xe0, 0x04, 0x0b, 0x6d, 0x92,
+        0xf7,
+    ], // zircon_r
 ];
 
 impl Partition {
@@ -125,7 +125,7 @@ impl Partition {
     }
 
     fn get_efi_pave_type(label: &str) -> Option<PartitionPaveType> {
-        if label.starts_with("zircon-") && label.len() == "zircon-x".len() {
+        if label.starts_with("zircon_") && label.len() == "zircon_x".len() {
             let configuration = Partition::letter_to_configuration(label.chars().last().unwrap());
             Some(PartitionPaveType::Asset { r#type: Asset::Kernel, config: configuration })
         } else if label.starts_with("vbmeta_") && label.len() == "vbmeta_x".len() {
@@ -134,7 +134,10 @@ impl Partition {
                 r#type: Asset::VerifiedBootMetadata,
                 config: configuration,
             })
-        } else if label.starts_with("efi") || label.starts_with("fuchsia.esp") {
+        } else if label.starts_with("efi")
+            || label.starts_with("fuchsia.esp")
+            || label.starts_with("bootloader")
+        {
             Some(PartitionPaveType::Bootloader)
         } else {
             None
@@ -142,7 +145,7 @@ impl Partition {
     }
 
     fn get_coreboot_pave_type(label: &str) -> Option<PartitionPaveType> {
-        if let Ok(re) = regex::Regex::new(r"^zircon-(.)\.signed$") {
+        if let Ok(re) = regex::Regex::new(r"^zircon_(.)\.signed$") {
             if let Some(captures) = re.captures(label) {
                 let config = Partition::letter_to_configuration(
                     captures.get(1).unwrap().as_str().chars().last().unwrap(),
@@ -422,16 +425,16 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_new_partition_bad_guid() -> Result<(), Error> {
-        let proxy = mock_partition("zircon-a", 512, 1000, [0xaa; 16])?;
-        let part = Partition::new("zircon-a".to_string(), proxy, BootloaderType::Efi).await?;
+        let proxy = mock_partition("zircon_a", 512, 1000, [0xaa; 16])?;
+        let part = Partition::new("zircon_a".to_string(), proxy, BootloaderType::Efi).await?;
         assert!(part.is_none());
         Ok(())
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_new_partition_zircona() -> Result<(), Error> {
-        let proxy = mock_partition("zircon-a", 512, 1000, WORKSTATION_INSTALLER_GPT)?;
-        let part = Partition::new("zircon-a".to_string(), proxy, BootloaderType::Efi).await?;
+        let proxy = mock_partition("zircon_a", 512, 1000, WORKSTATION_INSTALLER_GPT)?;
+        let part = Partition::new("zircon_a".to_string(), proxy, BootloaderType::Efi).await?;
         assert!(part.is_some());
         let part = part.unwrap();
         assert_eq!(
@@ -439,15 +442,15 @@ mod tests {
             PartitionPaveType::Asset { r#type: Asset::Kernel, config: Configuration::A }
         );
         assert_eq!(part.size, 512 * 1000);
-        assert_eq!(part.src, "zircon-a");
+        assert_eq!(part.src, "zircon_a");
         assert!(part.is_ab());
         Ok(())
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_new_partition_zirconb() -> Result<(), Error> {
-        let proxy = mock_partition("zircon-b", 20, 1000, WORKSTATION_INSTALLER_GPT)?;
-        let part = Partition::new("zircon-b".to_string(), proxy, BootloaderType::Efi).await?;
+        let proxy = mock_partition("zircon_b", 20, 1000, WORKSTATION_INSTALLER_GPT)?;
+        let part = Partition::new("zircon_b".to_string(), proxy, BootloaderType::Efi).await?;
         assert!(part.is_some());
         let part = part.unwrap();
         assert_eq!(
@@ -455,15 +458,15 @@ mod tests {
             PartitionPaveType::Asset { r#type: Asset::Kernel, config: Configuration::A }
         );
         assert_eq!(part.size, 20 * 1000);
-        assert_eq!(part.src, "zircon-b");
+        assert_eq!(part.src, "zircon_b");
         assert!(part.is_ab());
         Ok(())
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_new_partition_zirconr() -> Result<(), Error> {
-        let proxy = mock_partition("zircon-r", 40, 200, WORKSTATION_INSTALLER_GPT)?;
-        let part = Partition::new("zircon-r".to_string(), proxy, BootloaderType::Efi).await?;
+        let proxy = mock_partition("zircon_r", 40, 200, WORKSTATION_INSTALLER_GPT)?;
+        let part = Partition::new("zircon_r".to_string(), proxy, BootloaderType::Efi).await?;
         assert!(part.is_some());
         let part = part.unwrap();
         assert_eq!(
@@ -471,7 +474,7 @@ mod tests {
             PartitionPaveType::Asset { r#type: Asset::Kernel, config: Configuration::Recovery }
         );
         assert_eq!(part.size, 40 * 200);
-        assert_eq!(part.src, "zircon-r");
+        assert_eq!(part.src, "zircon_r");
         assert!(!part.is_ab());
         Ok(())
     }
@@ -541,17 +544,17 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_zircona_unsigned_coreboot() -> Result<(), Error> {
-        let proxy = mock_partition("zircon-a", 512, 1000, WORKSTATION_INSTALLER_GPT)?;
-        let part = Partition::new("zircon-a".to_string(), proxy, BootloaderType::Coreboot).await?;
+        let proxy = mock_partition("zircon_a", 512, 1000, WORKSTATION_INSTALLER_GPT)?;
+        let part = Partition::new("zircon_a".to_string(), proxy, BootloaderType::Coreboot).await?;
         assert!(part.is_none());
         Ok(())
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_zircona_signed_coreboot() -> Result<(), Error> {
-        let proxy = mock_partition("zircon-a.signed", 512, 1000, WORKSTATION_INSTALLER_GPT)?;
+        let proxy = mock_partition("zircon_a.signed", 512, 1000, WORKSTATION_INSTALLER_GPT)?;
         let part =
-            Partition::new("zircon-a.signed".to_string(), proxy, BootloaderType::Coreboot).await?;
+            Partition::new("zircon_a.signed".to_string(), proxy, BootloaderType::Coreboot).await?;
         assert!(part.is_some());
         let part = part.unwrap();
         assert_eq!(
@@ -559,7 +562,7 @@ mod tests {
             PartitionPaveType::Asset { r#type: Asset::Kernel, config: Configuration::A }
         );
         assert_eq!(part.size, 512 * 1000);
-        assert_eq!(part.src, "zircon-a.signed");
+        assert_eq!(part.src, "zircon_a.signed");
         assert!(part.is_ab());
         Ok(())
     }
@@ -582,14 +585,14 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_invalid_partitions_coreboot() -> Result<(), Error> {
-        let proxy = mock_partition("zircon-.signed", 512, 1000, WORKSTATION_INSTALLER_GPT)?;
+        let proxy = mock_partition("zircon_.signed", 512, 1000, WORKSTATION_INSTALLER_GPT)?;
         let part =
-            Partition::new("zircon-.signed".to_string(), proxy, BootloaderType::Coreboot).await?;
+            Partition::new("zircon_.signed".to_string(), proxy, BootloaderType::Coreboot).await?;
         assert!(part.is_none());
 
-        let proxy = mock_partition("zircon-aa.signed", 512, 1000, WORKSTATION_INSTALLER_GPT)?;
+        let proxy = mock_partition("zircon_aa.signed", 512, 1000, WORKSTATION_INSTALLER_GPT)?;
         let part =
-            Partition::new("zircon-aa.signed".to_string(), proxy, BootloaderType::Coreboot).await?;
+            Partition::new("zircon_aa.signed".to_string(), proxy, BootloaderType::Coreboot).await?;
         assert!(part.is_none());
 
         Ok(())
@@ -597,24 +600,24 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_invalid_partitions_efi() -> Result<(), Error> {
-        let proxy = mock_partition("zircon-", 512, 1000, WORKSTATION_INSTALLER_GPT)?;
-        let part = Partition::new("zircon-".to_string(), proxy, BootloaderType::Efi).await?;
+        let proxy = mock_partition("zircon_", 512, 1000, WORKSTATION_INSTALLER_GPT)?;
+        let part = Partition::new("zircon_".to_string(), proxy, BootloaderType::Efi).await?;
         assert!(part.is_none());
 
-        let proxy = mock_partition("zircon-aa", 512, 1000, WORKSTATION_INSTALLER_GPT)?;
-        let part = Partition::new("zircon-aa".to_string(), proxy, BootloaderType::Efi).await?;
+        let proxy = mock_partition("zircon_aa", 512, 1000, WORKSTATION_INSTALLER_GPT)?;
+        let part = Partition::new("zircon_aa".to_string(), proxy, BootloaderType::Efi).await?;
         assert!(part.is_none());
 
-        let proxy = mock_partition("zircon-a.signed", 512, 1000, WORKSTATION_INSTALLER_GPT)?;
+        let proxy = mock_partition("zircon_a.signed", 512, 1000, WORKSTATION_INSTALLER_GPT)?;
         let part =
-            Partition::new("zircon-a.signed".to_string(), proxy, BootloaderType::Efi).await?;
+            Partition::new("zircon_a.signed".to_string(), proxy, BootloaderType::Efi).await?;
         assert!(part.is_none());
         Ok(())
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_new_partition_usb_bad_guid() -> Result<(), Error> {
-        let proxy = mock_partition("zircon-a", 512, 1000, [0xaa; 16])?;
+        let proxy = mock_partition("zircon_a", 512, 1000, [0xaa; 16])?;
         let part = Partition::new("/dev/usb-bus".to_string(), proxy, BootloaderType::Efi).await?;
         assert!(part.is_none());
         Ok(())
@@ -622,7 +625,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_new_partition_usb_zircona() -> Result<(), Error> {
-        let proxy = mock_partition("zircon-a", 512, 1000, WORKSTATION_PARTITION_GPTS[2])?;
+        let proxy = mock_partition("zircon_a", 512, 1000, WORKSTATION_PARTITION_GPTS[2])?;
         let part = Partition::new("/dev/usb-bus".to_string(), proxy, BootloaderType::Efi).await?;
         assert!(part.is_some());
         let part = part.unwrap();
@@ -638,7 +641,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_new_partition_usb_zirconb() -> Result<(), Error> {
-        let proxy = mock_partition("zircon-b", 20, 1000, WORKSTATION_PARTITION_GPTS[3])?;
+        let proxy = mock_partition("zircon_b", 20, 1000, WORKSTATION_PARTITION_GPTS[3])?;
         let part = Partition::new("/dev/usb-bus".to_string(), proxy, BootloaderType::Efi).await?;
         assert!(part.is_some());
         let part = part.unwrap();
@@ -654,7 +657,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_new_partition_usb_zirconr() -> Result<(), Error> {
-        let proxy = mock_partition("zircon-r", 40, 200, WORKSTATION_PARTITION_GPTS[4])?;
+        let proxy = mock_partition("zircon_r", 40, 200, WORKSTATION_PARTITION_GPTS[4])?;
         let part = Partition::new("/dev/usb-bus".to_string(), proxy, BootloaderType::Efi).await?;
         assert!(part.is_some());
         let part = part.unwrap();

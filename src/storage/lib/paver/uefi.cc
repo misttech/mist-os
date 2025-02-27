@@ -34,19 +34,16 @@ constexpr size_t kKibibyte = 1024;
 constexpr size_t kMebibyte = kKibibyte * 1024;
 constexpr size_t kGibibyte = kMebibyte * 1024;
 
-// All UEFI boards currently use the legacy partition scheme.
-constexpr PartitionScheme kPartitionScheme = PartitionScheme::kLegacy;
-
 // TODO: Remove support after July 9th 2021.
 constexpr char kOldEfiName[] = "efi-system";
 
 // Returns the GUID for the given partition, applying EFI-specific mappings.
-Uuid PartitionType(Partition partition) {
+Uuid PartitionType(Partition partition, PartitionScheme partition_scheme) {
   if (partition == Partition::kBootloaderA) {
     // Special case for the bootloader which must be an ESP.
-    return GUID_EFI_VALUE;
+    return GUID_BOOTLOADER_VALUE;
   }
-  std::optional<Uuid> type = PartitionTypeGuid(partition, kPartitionScheme);
+  std::optional<Uuid> type = PartitionTypeGuid(partition, partition_scheme);
   // OK to assert; known types for the EfiDevicePartitioner have a GUID
   ZX_ASSERT(type);
   return *type;
@@ -112,7 +109,8 @@ zx::result<std::unique_ptr<PartitionClient>> EfiDevicePartitioner::FindPartition
   switch (spec.partition) {
     case Partition::kBootloaderA: {
       const auto filter = [](const GptPartitionMetadata& part) {
-        return FilterByTypeAndName(part, GUID_EFI_VALUE, GUID_EFI_NAME) ||
+        return FilterByTypeAndName(part, GUID_BOOTLOADER_VALUE, GUID_BOOTLOADER_NAME) ||
+               FilterByTypeAndName(part, GUID_EFI_VALUE, GUID_EFI_NAME) ||
                // TODO: Remove support after July 9th 2021.
                FilterByTypeAndName(part, GUID_EFI_VALUE, kOldEfiName);
       };
@@ -130,7 +128,9 @@ zx::result<std::unique_ptr<PartitionClient>> EfiDevicePartitioner::FindPartition
     case Partition::kVbMetaR:
     case Partition::kAbrMeta: {
       const auto filter = [&spec](const GptPartitionMetadata& part) {
-        return FilterByType(part, PartitionType(spec.partition));
+        // Try find new scheme partitions first, if fails try falling back to legacy scheme.
+        return FilterByType(part, PartitionType(spec.partition, PartitionScheme::kNew)) ||
+               FilterByType(part, PartitionType(spec.partition, PartitionScheme::kLegacy));
       };
       auto status = gpt_->FindPartition(filter);
       if (status.is_error()) {
@@ -159,19 +159,50 @@ zx::result<> EfiDevicePartitioner::ResetPartitionTables() const {
 
   const std::array<PartitionInitSpec, 9> fuchsia_partitions{
       PartitionInitSpec{
+          .name = GUID_BOOTLOADER_NAME,
+          .type = GUID_BOOTLOADER_VALUE,
+          .size_bytes = 16 * kMebibyte,
+      },
+      PartitionInitSpec::ForKnownPartition(Partition::kZirconA, PartitionScheme::kNew,
+                                           128 * kMebibyte),
+      PartitionInitSpec::ForKnownPartition(Partition::kZirconB, PartitionScheme::kNew,
+                                           128 * kMebibyte),
+      PartitionInitSpec::ForKnownPartition(Partition::kZirconR, PartitionScheme::kNew,
+                                           192 * kMebibyte),
+      PartitionInitSpec::ForKnownPartition(Partition::kVbMetaA, PartitionScheme::kNew,
+                                           64 * kKibibyte),
+      PartitionInitSpec::ForKnownPartition(Partition::kVbMetaB, PartitionScheme::kNew,
+                                           64 * kKibibyte),
+      PartitionInitSpec::ForKnownPartition(Partition::kVbMetaR, PartitionScheme::kNew,
+                                           64 * kKibibyte),
+      PartitionInitSpec::ForKnownPartition(Partition::kAbrMeta, PartitionScheme::kNew,
+                                           4 * kKibibyte),
+      PartitionInitSpec::ForKnownPartition(Partition::kFuchsiaVolumeManager, PartitionScheme::kNew,
+                                           56 * kGibibyte),
+  };
+
+  const std::array<PartitionInitSpec, 9> fuchsia_partitions_legacy{
+      PartitionInitSpec{
           .name = GUID_EFI_NAME,
           .type = GUID_EFI_VALUE,
           .size_bytes = 16 * kMebibyte,
       },
-      PartitionInitSpec::ForKnownPartition(Partition::kZirconA, kPartitionScheme, 128 * kMebibyte),
-      PartitionInitSpec::ForKnownPartition(Partition::kZirconB, kPartitionScheme, 128 * kMebibyte),
-      PartitionInitSpec::ForKnownPartition(Partition::kZirconR, kPartitionScheme, 192 * kMebibyte),
-      PartitionInitSpec::ForKnownPartition(Partition::kVbMetaA, kPartitionScheme, 64 * kKibibyte),
-      PartitionInitSpec::ForKnownPartition(Partition::kVbMetaB, kPartitionScheme, 64 * kKibibyte),
-      PartitionInitSpec::ForKnownPartition(Partition::kVbMetaR, kPartitionScheme, 64 * kKibibyte),
-      PartitionInitSpec::ForKnownPartition(Partition::kAbrMeta, kPartitionScheme, 4 * kKibibyte),
-      PartitionInitSpec::ForKnownPartition(Partition::kFuchsiaVolumeManager, kPartitionScheme,
-                                           56 * kGibibyte),
+      PartitionInitSpec::ForKnownPartition(Partition::kZirconA, PartitionScheme::kLegacy,
+                                           128 * kMebibyte),
+      PartitionInitSpec::ForKnownPartition(Partition::kZirconB, PartitionScheme::kLegacy,
+                                           128 * kMebibyte),
+      PartitionInitSpec::ForKnownPartition(Partition::kZirconR, PartitionScheme::kLegacy,
+                                           192 * kMebibyte),
+      PartitionInitSpec::ForKnownPartition(Partition::kVbMetaA, PartitionScheme::kLegacy,
+                                           64 * kKibibyte),
+      PartitionInitSpec::ForKnownPartition(Partition::kVbMetaB, PartitionScheme::kLegacy,
+                                           64 * kKibibyte),
+      PartitionInitSpec::ForKnownPartition(Partition::kVbMetaR, PartitionScheme::kLegacy,
+                                           64 * kKibibyte),
+      PartitionInitSpec::ForKnownPartition(Partition::kAbrMeta, PartitionScheme::kLegacy,
+                                           4 * kKibibyte),
+      PartitionInitSpec::ForKnownPartition(Partition::kFuchsiaVolumeManager,
+                                           PartitionScheme::kLegacy, 56 * kGibibyte),
   };
 
   std::vector<PartitionInitSpec> partitions_to_add;
@@ -186,8 +217,17 @@ zx::result<> EfiDevicePartitioner::ResetPartitionTables() const {
         if (part.type_guid == Uuid(GUID_EFI_VALUE)) {
           return part.name != GUID_EFI_NAME;
         }
+        if (part.type_guid == Uuid(GUID_BOOTLOADER_VALUE)) {
+          return part.name != GUID_BOOTLOADER_NAME;
+        }
         // For everything else, check if it's a known (Fuchsia-specific) type GUID.
         for (const auto& known_partition : fuchsia_partitions) {
+          if (part.type_guid == known_partition.type) {
+            return false;
+          }
+        }
+        // Also check for legacy partitions
+        for (const auto& known_partition : fuchsia_partitions_legacy) {
           if (part.type_guid == known_partition.type) {
             return false;
           }

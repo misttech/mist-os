@@ -201,9 +201,10 @@ inline bool IsZirconPartitionSpec(const PartitionSpec& spec) {
 }
 
 inline bool IsEfiSystemPartition(const GptPartitionMetadata& part) {
-  // Check for EFI system partition 'fuchsia-esp'.
+  // Check for EFI system partition 'fuchsia-esp' or 'bootloader'.
   // And for legacy "efi-system" partition name.
-  return FilterByTypeAndName(part, GUID_EFI_VALUE, GUID_EFI_NAME) ||
+  return FilterByTypeAndName(part, GUID_BOOTLOADER_VALUE, GUID_BOOTLOADER_NAME) ||
+         FilterByTypeAndName(part, GUID_EFI_VALUE, GUID_EFI_NAME) ||
          FilterByName(part, "efi-system");
 }
 

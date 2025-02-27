@@ -692,7 +692,7 @@ void EfiDevicePartitionerTests::ResetPartitionTablesTest() {
                             PartitionDescription{"efi", Uuid(kEfiType), 0x22, 0x1},
                             PartitionDescription{"efi-system", Uuid(kEfiType), 0x23, 0x8000},
                             PartitionDescription{GUID_EFI_NAME, Uuid(kEfiType), 0x8023, 0x8000},
-                            PartitionDescription{"ZIRCON-A", Uuid(kZirconAType), 0x10023, 0x1},
+                            PartitionDescription{"ZIRCON_A", Uuid(kZirconAType), 0x10023, 0x1},
                             PartitionDescription{"zircon_b", Uuid(kZirconBType), 0x10024, 0x1},
                             PartitionDescription{"zircon r", Uuid(kZirconRType), 0x10025, 0x1},
                             PartitionDescription{"vbmeta-a", Uuid(kVbMetaAType), 0x10026, 0x1},
@@ -725,15 +725,15 @@ void EfiDevicePartitionerTests::ResetPartitionTablesTest() {
       PartitionDescription{"efi-system", Uuid(kEfiType), 0x23, 0x8000},
       PartitionDescription{"etc", etc_guid, 0x10031, 0x400},
       // Reallocated Fuchsia partitions
-      PartitionDescription{GUID_EFI_NAME, Uuid(kEfiType), 0x8023, 0x8000},
-      PartitionDescription{GUID_ZIRCON_A_NAME, Uuid(kZirconAType), 0x10431, 0x40000},
-      PartitionDescription{GUID_ZIRCON_B_NAME, Uuid(kZirconBType), 0x50431, 0x40000},
-      PartitionDescription{GUID_ZIRCON_R_NAME, Uuid(kZirconRType), 0x90431, 0x60000},
-      PartitionDescription{GUID_VBMETA_A_NAME, Uuid(kVbMetaAType), 0xf0431, 0x80},
-      PartitionDescription{GUID_VBMETA_B_NAME, Uuid(kVbMetaBType), 0xf04b1, 0x80},
-      PartitionDescription{GUID_VBMETA_R_NAME, Uuid(kVbMetaRType), 0xf0531, 0x80},
-      PartitionDescription{GUID_ABR_META_NAME, Uuid(kAbrMetaType), 0x10023, 0x8},
-      PartitionDescription{GUID_FVM_NAME, Uuid(kFvmType), 0xf05b1, 0x7000000},
+      PartitionDescription{GUID_BOOTLOADER_NAME, Uuid(kBootloaderType), 0x8023, 0x8000},
+      PartitionDescription{GPT_ZIRCON_A_NAME, Uuid(kZirconType), 0x10431, 0x40000},
+      PartitionDescription{GPT_ZIRCON_B_NAME, Uuid(kZirconType), 0x50431, 0x40000},
+      PartitionDescription{GPT_ZIRCON_R_NAME, Uuid(kZirconType), 0x90431, 0x60000},
+      PartitionDescription{GPT_VBMETA_A_NAME, Uuid(kVbMetaType), 0xf0431, 0x80},
+      PartitionDescription{GPT_VBMETA_B_NAME, Uuid(kVbMetaType), 0xf04b1, 0x80},
+      PartitionDescription{GPT_VBMETA_R_NAME, Uuid(kVbMetaType), 0xf0531, 0x80},
+      PartitionDescription{GPT_DURABLE_BOOT_NAME, Uuid(kDurableBootType), 0x10023, 0x8},
+      PartitionDescription{GPT_FVM_NAME, Uuid(kNewFvmType), 0xf05b1, 0x7000000},
   };
   ASSERT_NO_FATAL_FAILURE(EnsurePartitionsMatch(partitions_at_end));
 
