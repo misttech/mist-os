@@ -74,7 +74,7 @@ pub struct StartCommand {
 
     /// enable persisting this repository across reboots.
     /// Default is `Ephemeral`.
-    #[argh(option, from_str_fn(ffx_repository_serve_args::parse_storage_type))]
+    #[argh(option, from_str_fn(parse_storage_type))]
     pub storage_type: Option<RepositoryStorageType>,
 
     /// resolution mechanism when alias registrations conflict. Must be either

@@ -13,7 +13,6 @@ ffx/repository/package/list.golden
 ffx/repository/package/show.golden
 ffx/repository/publish.golden
 ffx/repository/remove.golden
-ffx/repository/serve.golden
 ffx/repository/server.golden
 ffx/repository/server/list.golden
 ffx/repository/server/start.golden
