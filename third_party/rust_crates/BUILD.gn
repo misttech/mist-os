@@ -750,6 +750,10 @@ group("rand") {
   public_deps = [ ":rand-v0_8_4" ]
 }
 
+group("rand_core") {
+  public_deps = [ ":rand_core-v0_6_4" ]
+}
+
 group("rand_xorshift") {
   public_deps = [ ":rand_xorshift-v0_3_0" ]
 }

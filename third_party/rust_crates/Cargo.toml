@@ -186,6 +186,7 @@ prost = "0.11.0"
 prost-build = "0.11.1"
 prost-types = "0.11.1"
 rand = { version = "0.8", features = ["small_rng"] }
+rand_core = "0.6.4"
 rand_xorshift = "0.3"
 rayon = "1.10.0"
 ref-cast = "1.0.23"
