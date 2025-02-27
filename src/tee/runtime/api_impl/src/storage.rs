@@ -10,16 +10,21 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::{Bound, Deref, DerefMut};
 use std::rc::Rc;
 
+use elliptic_curve::sec1::ToEncodedPoint as _;
+use num_traits::FromPrimitive as _;
+use p256::NistP256;
 use rsa::traits::{PrivateKeyParts as _, PublicKeyParts as _};
 use rsa::{BigUint, RsaPrivateKey};
 use tee_internal::{
-    Attribute, AttributeId, BufferOrValue, Error, HandleFlags, MemRef, ObjectEnumHandle,
+    Attribute, AttributeId, BufferOrValue, EccCurve, Error, HandleFlags, MemRef, ObjectEnumHandle,
     ObjectHandle, ObjectInfo, Result as TeeResult, Storage as TeeStorage, Type, Usage, ValueFields,
     Whence, DATA_MAX_POSITION, OBJECT_ID_MAX_LEN,
 };
 use thiserror::Error;
 
 use crate::crypto::Rng;
+
+type P256SecretKey = elliptic_curve::SecretKey<NistP256>;
 
 pub struct Storage {
     persistent_objects: PersistentObjects,
@@ -435,17 +440,134 @@ impl KeyType for RsaKeypair {
     }
 }
 
-// TODO(https://fxbug.dev/371213067): Properly implement KeyType.
-#[allow(dead_code)]
 #[derive(Clone)]
 pub struct EccKeypair {
-    x: Vec<u8>,         // TEE_ATTR_ECC_PUBLIC_VALUE_X
-    y: Vec<u8>,         // TEE_ATTR_ECC_PUBLIC_VALUE_Y
-    private: Vec<u8>,   // TEE_ATTR_ECC_PRIVATE_VALUE
-    curve: ValueFields, // TEE_ATTR_ECC_CURVE
+    secret: Option<Box<P256SecretKey>>,
 }
 
-impl KeyType for EccKeypair {}
+// Only NIST P-256 curves are supported at this time.
+impl KeyType for EccKeypair {
+    fn new(max_size: u32) -> TeeResult<Self> {
+        if !Self::is_valid_size(max_size) {
+            return Err(Error::NotSupported);
+        }
+        Ok(Self { secret: None })
+    }
+
+    fn is_valid_size(size: u32) -> bool {
+        size == 256
+    }
+
+    fn size(&self) -> u32 {
+        256
+    }
+
+    fn max_size(&self) -> u32 {
+        256
+    }
+
+    fn buffer_attribute(&self, id: AttributeId) -> Option<BufferAttribute<'_>> {
+        let Some(secret) = &self.secret else {
+            return None;
+        };
+        match id {
+            AttributeId::EccPrivateValue => {
+                Some(BufferAttribute::Vector(secret.to_be_bytes().as_slice().to_vec()))
+            }
+            AttributeId::EccPublicValueX => Some(BufferAttribute::Vector(
+                secret
+                    .public_key()
+                    .as_affine()
+                    .to_encoded_point(/*compress=*/ false)
+                    .x()
+                    .unwrap()
+                    .as_slice()
+                    .to_vec(),
+            )),
+            AttributeId::EccPublicValueY => Some(BufferAttribute::Vector(
+                secret
+                    .public_key()
+                    .as_affine()
+                    .to_encoded_point(/*compress=*/ false)
+                    .y()
+                    .unwrap()
+                    .as_slice()
+                    .to_vec(),
+            )),
+            _ => None,
+        }
+    }
+
+    fn value_attribute(&self, id: AttributeId) -> Option<ValueFields> {
+        match id {
+            AttributeId::EccCurve => Some(ValueFields { a: EccCurve::NistP256 as u32, b: 0 }),
+            _ => None,
+        }
+    }
+
+    fn reset(&mut self) {
+        self.secret = None;
+    }
+
+    fn populate(&mut self, attributes: &[Attribute]) -> TeeResult {
+        assert!(self.secret.is_none());
+
+        let mut private_value: &[u8] = &[];
+        let mut public_value_x: &[u8] = &[];
+        let mut public_value_y: &[u8] = &[];
+        let mut curve: Option<ValueFields> = None;
+        extract_attributes!(
+            attributes,
+            AttributeId::EccPrivateValue => private_value,
+            AttributeId::EccPublicValueX => public_value_x,
+            AttributeId::EccPublicValueY => public_value_y,
+            AttributeId::EccCurve => curve
+        )
+        .unwrap();
+        assert!(!private_value.is_empty(), "Missing attribute for ECC private value");
+        assert!(!public_value_x.is_empty(), "Missing attribute for ECC public value X");
+        assert!(!public_value_y.is_empty(), "Missing attribute for ECC public value Y");
+        assert!(curve.is_some(), "Missing attribute for ECC curve");
+
+        let curve = EccCurve::from_u32(curve.unwrap().a).ok_or(Error::NotSupported)?;
+        if curve != EccCurve::NistP256 {
+            return Err(Error::NotSupported);
+        }
+
+        let secret = P256SecretKey::from_be_bytes(private_value).unwrap();
+
+        // Check that provided public parameters coincide with those computed
+        // by the private key abstraction.
+        let point = secret.public_key().as_affine().to_encoded_point(/*compress=*/ false);
+        if point.x().unwrap().as_slice() != public_value_x {
+            return Err(Error::BadParameters);
+        }
+        if point.y().unwrap().as_slice() != public_value_y {
+            return Err(Error::BadParameters);
+        }
+        self.secret = Some(Box::new(secret));
+        Ok(())
+    }
+
+    fn generate(&mut self, size: u32, params: &[Attribute]) -> TeeResult {
+        assert!(Self::is_valid_size(size));
+        assert!(size <= self.max_size());
+        assert!(self.secret.is_none());
+
+        let mut curve: Option<ValueFields> = None;
+        extract_attributes!(params, AttributeId::EccCurve => curve)
+            .map_err(|_| Error::BadParameters)?;
+        assert!(curve.is_some(), "Missing attribute for ECC curve");
+
+        let curve = EccCurve::from_u32(curve.unwrap().a).ok_or(Error::NotSupported)?;
+        if curve != EccCurve::NistP256 {
+            return Err(Error::NotSupported);
+        }
+
+        self.secret = Some(Box::new(P256SecretKey::random(&mut Rng {})));
+        Ok(())
+    }
+}
 
 #[derive(Clone)]
 pub struct NoKey {}

@@ -24,6 +24,7 @@
                 "CryptoTest.CopyToOutputBufferBasicInsecureOverlap",
                 "CryptoTest.CopyToOutputBufferBasicInsecureWithOffset",
                 "CryptoTest.CopyToOutputBufferFailsWithBadInput",
+                "CryptoTest.CreateAsymmetricKeyHandleECC",
                 "CryptoTest.CreateAsymmetricKeyHandleFailsForBadInput",
                 "CryptoTest.CreateAsymmetricKeyHandleRSA",
                 "CryptoTest.CreateKeyHandleFailsWithBadParams",
@@ -86,7 +87,6 @@
         {
             type: "expect_failure",
             matchers: [
-                "CryptoTest.CreateAsymmetricKeyHandleECC",
                 "CryptoTest.RSADecrypt",
                 "CryptoTest.RSASign",
                 "CryptoTest.WrapAndUnwrapAsymmetricKeyWorks",
