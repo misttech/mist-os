@@ -28,16 +28,16 @@ Task(id = 3)
    └─ fuchsia_async::runtime::fuchsia::timer::Timer
 Task(id = 4)
 └─ async_rust::baz (Unresumed) • async_rust.rs:??
-Scope(0x??)
+Scope("scope1")
 └─ Task(id = 2)
    └─ async_rust::baz • async_rust.rs:??
       └─ fuchsia_async::runtime::fuchsia::timer::Timer
-Scope(0x??)
+Scope("scope2")
 └─ Task(id = 5)
    └─ async_rust::baz (Unresumed) • async_rust.rs:??
 └─ Task(id = 6)
    └─ async_rust::foo::λ (Unresumed) • async_rust.rs:??
-└─ Scope(0x??)
+└─ Scope("scope2_child")
    └─ Task(id = 7)
       └─ async_rust::baz (Unresumed) • async_rust.rs:??
 
