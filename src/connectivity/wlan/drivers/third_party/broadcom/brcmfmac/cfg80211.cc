@@ -5062,12 +5062,80 @@ void brcmf_if_query_spectrum_management_support(
   resp->dfs.supported = brcmf_feat_is_enabled(ifp, BRCMF_FEAT_DFS);
 }
 
+struct Counters {
+  static constexpr std::tuple<uint16_t, const char*> FW_RX_GOOD{1, "fw_rx_good"};
+  static constexpr std::tuple<uint16_t, const char*> FW_RX_BAD{2, "fw_rx_bad"};
+  static constexpr std::tuple<uint16_t, const char*> FW_RX_OCAST{3, "fw_rx_ocast"};
+  static constexpr std::tuple<uint16_t, const char*> FW_TX_GOOD{4, "fw_tx_good"};
+  static constexpr std::tuple<uint16_t, const char*> FW_TX_BAD{5, "fw_tx_bad"};
+  static constexpr std::tuple<uint16_t, const char*> DRIVER_RX_GOOD{6, "driver_rx_good"};
+  static constexpr std::tuple<uint16_t, const char*> DRIVER_RX_BAD{7, "driver_rx_bad"};
+  static constexpr std::tuple<uint16_t, const char*> DRIVER_TX_TOTAL{8, "driver_tx_total"};
+  static constexpr std::tuple<uint16_t, const char*> DRIVER_TX_CONF{9, "driver_tx_conf"};
+  static constexpr std::tuple<uint16_t, const char*> DRIVER_TX_DROP{10, "driver_tx_drop"};
+  static constexpr std::tuple<uint16_t, const char*> DRIVER_TX_BAD{11, "driver_tx_bad"};
+  static constexpr std::tuple<uint16_t, const char*> WME_VO_RX_GOOD{12, "wme_vo_rx_good"};
+  static constexpr std::tuple<uint16_t, const char*> WME_VO_RX_BAD{13, "wme_vo_rx_bad"};
+  static constexpr std::tuple<uint16_t, const char*> WME_VO_TX_GOOD{14, "wme_vo_tx_good"};
+  static constexpr std::tuple<uint16_t, const char*> WME_VO_TX_BAD{15, "wme_vo_tx_bad"};
+  static constexpr std::tuple<uint16_t, const char*> WME_VI_RX_GOOD{16, "wme_vi_rx_good"};
+  static constexpr std::tuple<uint16_t, const char*> WME_VI_RX_BAD{17, "wme_vi_rx_bad"};
+  static constexpr std::tuple<uint16_t, const char*> WME_VI_TX_GOOD{18, "wme_vi_tx_good"};
+  static constexpr std::tuple<uint16_t, const char*> WME_VI_TX_BAD{19, "wme_vi_tx_bad"};
+  static constexpr std::tuple<uint16_t, const char*> WME_BE_RX_GOOD{20, "wme_be_rx_good"};
+  static constexpr std::tuple<uint16_t, const char*> WME_BE_RX_BAD{21, "wme_be_rx_bad"};
+  static constexpr std::tuple<uint16_t, const char*> WME_BE_TX_GOOD{22, "wme_be_tx_good"};
+  static constexpr std::tuple<uint16_t, const char*> WME_BE_TX_BAD{23, "wme_be_tx_bad"};
+  static constexpr std::tuple<uint16_t, const char*> WME_BK_RX_GOOD{24, "wme_bk_rx_good"};
+  static constexpr std::tuple<uint16_t, const char*> WME_BK_RX_BAD{25, "wme_bk_rx_bad"};
+  static constexpr std::tuple<uint16_t, const char*> WME_BK_TX_GOOD{26, "wme_bk_tx_good"};
+  static constexpr std::tuple<uint16_t, const char*> WME_BK_TX_BAD{27, "wme_bk_tx_bad"};
+};
+
+static fuchsia_wlan_stats::wire::InspectCounterConfig to_inspect_counter_config(
+    std::tuple<uint16_t, const char*> counter_id_and_name, fidl::AnyArena& arena) {
+  return fuchsia_wlan_stats::wire::InspectCounterConfig::Builder(arena)
+      .counter_id(std::get<0>(counter_id_and_name))
+      .counter_name(std::get<1>(counter_id_and_name))
+      .Build();
+}
+
 void brcmf_if_query_telemetry_support(net_device* ndev,
                                       fuchsia_wlan_stats::wire::TelemetrySupport* resp,
                                       fidl::AnyArena& arena) {
   BRCMF_IFDBG(WLANIF, ndev, "Telemetry support request received from SME.");
 
-  *resp = fuchsia_wlan_stats::wire::TelemetrySupport::Builder(arena).Build();
+  std::vector<fuchsia_wlan_stats::wire::InspectCounterConfig> inspect_counter_configs;
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::FW_RX_GOOD, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::FW_RX_BAD, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::FW_RX_OCAST, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::FW_TX_GOOD, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::FW_TX_BAD, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::DRIVER_RX_GOOD, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::DRIVER_RX_BAD, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::DRIVER_TX_TOTAL, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::DRIVER_TX_CONF, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::DRIVER_TX_DROP, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::DRIVER_TX_BAD, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::WME_VO_RX_GOOD, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::WME_VO_RX_BAD, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::WME_VO_TX_GOOD, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::WME_VO_TX_BAD, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::WME_VI_RX_GOOD, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::WME_VI_RX_BAD, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::WME_VI_TX_GOOD, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::WME_VI_TX_BAD, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::WME_BE_RX_GOOD, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::WME_BE_RX_BAD, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::WME_BE_TX_GOOD, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::WME_BE_TX_BAD, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::WME_BK_RX_GOOD, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::WME_BK_RX_BAD, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::WME_BK_TX_GOOD, arena));
+  inspect_counter_configs.push_back(to_inspect_counter_config(Counters::WME_BK_TX_BAD, arena));
+  *resp = fuchsia_wlan_stats::wire::TelemetrySupport::Builder(arena)
+              .inspect_counter_configs(fidl::VectorView(arena, inspect_counter_configs))
+              .Build();
 }
 
 namespace {
@@ -5249,6 +5317,12 @@ zx_status_t brcmf_get_histograms_report(brcmf_if* ifp, histograms_report_t* out_
 
 }  // namespace
 
+static fuchsia_wlan_stats::wire::UnnamedCounter unnamed_counter(
+    std::tuple<uint16_t, const char*> counter_id_and_name, uint64_t count) {
+  return fuchsia_wlan_stats::wire::UnnamedCounter{.id = std::get<0>(counter_id_and_name),
+                                                  .count = count};
+}
+
 zx_status_t brcmf_if_get_iface_counter_stats(net_device* ndev,
                                              fuchsia_wlan_stats::wire::IfaceCounterStats* out_stats,
                                              fidl::AnyArena& arena) {
@@ -5283,18 +5357,64 @@ zx_status_t brcmf_if_get_iface_counter_stats(net_device* ndev,
   BRCMF_DBG(DATA, "Cntrs: rxgood:%d rxbad:%d txgood:%d txbad:%d rxocast:%d", pktcnt.rx_good_pkt,
             pktcnt.rx_bad_pkt, pktcnt.tx_good_pkt, pktcnt.tx_bad_pkt, pktcnt.rx_ocast_good_pkt);
 
-  *out_stats =
-      fuchsia_wlan_stats::wire::IfaceCounterStats::Builder(arena)
-          .connection_counters(
-              fuchsia_wlan_stats::wire::ConnectionCounters::Builder(arena)
-                  .connection_id(ifp->connection_id)
-                  .rx_unicast_total(pktcnt.rx_good_pkt + pktcnt.rx_bad_pkt + ndev->stats.rx_errors)
-                  .rx_unicast_drop(pktcnt.rx_bad_pkt + ndev->stats.rx_errors)
-                  .rx_multicast(pktcnt.rx_ocast_good_pkt)
-                  .tx_total(pktcnt.tx_good_pkt + pktcnt.tx_bad_pkt + ndev->stats.tx_dropped)
-                  .tx_drop(pktcnt.tx_bad_pkt + ndev->stats.tx_dropped)
-                  .Build())
-          .Build();
+  auto stats_builder = fuchsia_wlan_stats::wire::IfaceCounterStats::Builder(arena);
+  auto connection_counters_builder =
+      fuchsia_wlan_stats::wire::ConnectionCounters::Builder(arena)
+          .connection_id(ifp->connection_id)
+          .rx_unicast_total(pktcnt.rx_good_pkt + pktcnt.rx_bad_pkt + ndev->stats.rx_errors)
+          .rx_unicast_drop(pktcnt.rx_bad_pkt + ndev->stats.rx_errors)
+          .rx_multicast(pktcnt.rx_ocast_good_pkt)
+          .tx_total(pktcnt.tx_good_pkt + pktcnt.tx_bad_pkt + ndev->stats.tx_dropped)
+          .tx_drop(pktcnt.tx_bad_pkt + ndev->stats.tx_dropped);
+
+  std::vector<fuchsia_wlan_stats::wire::UnnamedCounter> driver_counters;
+  driver_counters.push_back(unnamed_counter(Counters::FW_RX_GOOD, pktcnt.rx_good_pkt));
+  driver_counters.push_back(unnamed_counter(Counters::FW_RX_BAD, pktcnt.rx_bad_pkt));
+  driver_counters.push_back(unnamed_counter(Counters::FW_RX_OCAST, pktcnt.rx_ocast_good_pkt));
+  driver_counters.push_back(unnamed_counter(Counters::FW_TX_GOOD, pktcnt.tx_good_pkt));
+  driver_counters.push_back(unnamed_counter(Counters::FW_TX_BAD, pktcnt.rx_bad_pkt));
+  driver_counters.push_back(unnamed_counter(Counters::DRIVER_RX_GOOD, ndev->stats.rx_packets));
+  driver_counters.push_back(unnamed_counter(Counters::DRIVER_RX_BAD, ndev->stats.rx_errors));
+  driver_counters.push_back(unnamed_counter(Counters::DRIVER_TX_TOTAL, ndev->stats.tx_packets));
+  driver_counters.push_back(unnamed_counter(Counters::DRIVER_TX_CONF, ndev->stats.tx_confirmed));
+  driver_counters.push_back(unnamed_counter(Counters::DRIVER_TX_DROP, ndev->stats.tx_dropped));
+  driver_counters.push_back(unnamed_counter(Counters::DRIVER_TX_BAD, ndev->stats.tx_errors));
+
+  // Get the WME counters
+  wl_wme_cnt_t wme_cnt;
+  status = brcmf_fil_iovar_data_get(ifp, "wme_counters", &wme_cnt, sizeof(wl_wme_cnt_t), &fw_err);
+  if (status != ZX_OK) {
+    BRCMF_INFO("Unable to get WME counters err: %s fw err %s", zx_status_get_string(status),
+               brcmf_fil_get_errstr(fw_err));
+  } else {
+    driver_counters.push_back(unnamed_counter(Counters::WME_VO_RX_GOOD, wme_cnt.rx[AC_VO].packets));
+    driver_counters.push_back(
+        unnamed_counter(Counters::WME_VO_RX_BAD, wme_cnt.rx_failed[AC_VO].packets));
+    driver_counters.push_back(unnamed_counter(Counters::WME_VO_TX_GOOD, wme_cnt.tx[AC_VO].packets));
+    driver_counters.push_back(
+        unnamed_counter(Counters::WME_VO_TX_BAD, wme_cnt.tx_failed[AC_VO].packets));
+    driver_counters.push_back(unnamed_counter(Counters::WME_VI_RX_GOOD, wme_cnt.rx[AC_VI].packets));
+    driver_counters.push_back(
+        unnamed_counter(Counters::WME_VI_RX_BAD, wme_cnt.rx_failed[AC_VI].packets));
+    driver_counters.push_back(unnamed_counter(Counters::WME_VI_TX_GOOD, wme_cnt.tx[AC_VI].packets));
+    driver_counters.push_back(
+        unnamed_counter(Counters::WME_VI_TX_BAD, wme_cnt.tx_failed[AC_VI].packets));
+    driver_counters.push_back(unnamed_counter(Counters::WME_BE_RX_GOOD, wme_cnt.rx[AC_BE].packets));
+    driver_counters.push_back(
+        unnamed_counter(Counters::WME_BE_RX_BAD, wme_cnt.rx_failed[AC_BE].packets));
+    driver_counters.push_back(unnamed_counter(Counters::WME_BE_TX_GOOD, wme_cnt.tx[AC_BE].packets));
+    driver_counters.push_back(
+        unnamed_counter(Counters::WME_BE_TX_BAD, wme_cnt.tx_failed[AC_BE].packets));
+    driver_counters.push_back(unnamed_counter(Counters::WME_BK_RX_GOOD, wme_cnt.rx[AC_BK].packets));
+    driver_counters.push_back(
+        unnamed_counter(Counters::WME_BK_RX_BAD, wme_cnt.rx_failed[AC_BK].packets));
+    driver_counters.push_back(unnamed_counter(Counters::WME_BK_TX_GOOD, wme_cnt.tx[AC_BK].packets));
+    driver_counters.push_back(
+        unnamed_counter(Counters::WME_BK_TX_BAD, wme_cnt.tx_failed[AC_BK].packets));
+  }
+
+  connection_counters_builder.driver_specific_counters(fidl::VectorView(arena, driver_counters));
+  *out_stats = stats_builder.connection_counters(connection_counters_builder.Build()).Build();
   return ZX_OK;
 }
 
