@@ -4,6 +4,7 @@
 
 import("//build/python/python_action.gni")
 import("//build/python/python_binary.gni")
+import("//build/python/python_library.gni")
 import("//build/testing/golden_files.gni")
 import("../libc.gni")
 import("libc_headers.gni")
@@ -38,8 +39,7 @@ llvm_libc_soft_transition = false
 # header generation.  So even libc's own code has to use the llvm-libc-golden
 # files instead of "current" files.  This scenario is much more rare than the
 # generic llvm_libc_soft_transition scenario.
-llvm_libc_hdrgen_transition =
-    true  # TODO(mcgrathr): hdrgen python layout changed
+llvm_libc_hdrgen_transition = false
 
 # Files generated from "$llvm_libc/include/*.yaml" files.  This list drives the
 # generation work done here, including regenerating llvm-libc-generated.json
@@ -292,22 +292,35 @@ config("headers.config") {
 }
 
 if (!llvm_libc_hdrgen_transition) {
+  hdrgen_dir = "$llvm_libc/utils/hdrgen"
+
   python_binary("hdrgen") {
     visibility = [ ":*" ]
 
-    hdrgen_dir = "$llvm_libc/utils/hdrgen"
     main_source = "$hdrgen_dir/main.py"
+    deps = [ ":hdrgen.library" ]
+
+    enable_mypy = false
+  }
+
+  python_library("hdrgen.library") {
+    visibility = [ ":*" ]
+
+    library_name = "hdrgen"
+    source_root = "$hdrgen_dir/hdrgen"
     sources = [
-      "$hdrgen_dir/enumeration.py",
-      "$hdrgen_dir/function.py",
-      "$hdrgen_dir/gpu_headers.py",
-      "$hdrgen_dir/header.py",
-      "$hdrgen_dir/macro.py",
-      "$hdrgen_dir/object.py",
-      "$hdrgen_dir/type.py",
-      "$hdrgen_dir/yaml_to_classes.py",
+      "__init__.py",
+      "enumeration.py",
+      "function.py",
+      "gpu_headers.py",
+      "header.py",
+      "macro.py",
+      "main.py",
+      "object.py",
+      "type.py",
+      "yaml_to_classes.py",
     ]
-    deps = [ "//third_party/pyyaml:yaml" ]
+    library_deps = [ "//third_party/pyyaml:yaml" ]
 
     enable_mypy = false
   }
