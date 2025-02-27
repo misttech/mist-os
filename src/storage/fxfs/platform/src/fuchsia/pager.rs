@@ -441,6 +441,15 @@ pub trait PagerBacked: FxNode + Sync + Send + Sized + 'static {
     ) -> impl Future<Output = Result<buffer::Buffer<'_>, Error>> + Send;
 }
 
+/// Returns the size of reads with read-ahead that will be issued by `default_page_in`.
+pub fn default_read_size(read_alignment: u64) -> u64 {
+    if read_alignment > READ_AHEAD_SIZE {
+        read_alignment
+    } else {
+        round_down(READ_AHEAD_SIZE, read_alignment)
+    }
+}
+
 /// A generic page_in implementation that supplies pages using block-aligned reads.
 pub fn default_page_in<P: PagerBacked>(this: Arc<P>, pager_range: PageInRange<P>) {
     fxfs_trace::duration!(
@@ -459,12 +468,7 @@ pub fn default_page_in<P: PagerBacked>(this: Arc<P>, pager_range: PageInRange<P>
 
     assert!(pager_range.end() < i64::MAX as u64);
 
-    let read_alignment = this.read_alignment();
-    let readahead_alignment = if read_alignment > READ_AHEAD_SIZE {
-        read_alignment
-    } else {
-        round_down(READ_AHEAD_SIZE, read_alignment)
-    };
+    let readahead_alignment = default_read_size(this.read_alignment());
 
     // Two important subtleties to consider in this space:
     //
@@ -1883,5 +1887,16 @@ mod tests {
         );
 
         scope.wait().await;
+    }
+
+    #[fuchsia::test]
+    fn test_default_read_size() {
+        assert_eq!(default_read_size(4 * 1024), READ_AHEAD_SIZE);
+        assert_eq!(default_read_size(8 * 1024), READ_AHEAD_SIZE);
+        assert_eq!(default_read_size(32 * 1024), READ_AHEAD_SIZE);
+        assert_eq!(default_read_size(40 * 1024), 120 * 1024);
+        assert_eq!(default_read_size(64 * 1024), READ_AHEAD_SIZE);
+        assert_eq!(default_read_size(88 * 1024), 88 * 1024);
+        assert_eq!(default_read_size(132 * 1024), 132 * 1024);
     }
 }

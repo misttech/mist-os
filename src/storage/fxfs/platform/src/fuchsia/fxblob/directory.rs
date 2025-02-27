@@ -267,7 +267,7 @@ impl BlobDirectory {
                     metadata.chunk_size,
                     metadata.compressed_offsets,
                     metadata.uncompressed_size,
-                ) as Arc<dyn FxNode>;
+                )? as Arc<dyn FxNode>;
                 placeholder.commit(&node);
                 Ok(node)
             }
