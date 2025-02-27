@@ -16,6 +16,7 @@ use crypto_common::{KeyInit, KeyIvInit};
 use digest::DynDigest as Digest;
 use ecb::{Decryptor as EcbDecryptor, Encryptor as EcbEncryptor};
 use hmac::Hmac;
+use rand_core::{CryptoRng, RngCore};
 use sha1::Sha1;
 use sha2::{Sha224, Sha256, Sha384, Sha512};
 use tee_internal::{Algorithm, EccCurve, Error, Mode, OperationHandle, Result as TeeResult, Usage};
@@ -55,6 +56,34 @@ pub fn is_algorithm_supported(alg: Algorithm, element: EccCurve) -> bool {
         _ => false,
     }
 }
+
+// An RNG abstraction in the shape expected by RustCrypto APIs.
+pub(crate) struct Rng {}
+
+impl RngCore for Rng {
+    fn next_u32(&mut self) -> u32 {
+        let val = 0u32;
+        self.fill_bytes(&mut val.to_le_bytes());
+        val
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        let val = 0u64;
+        self.fill_bytes(&mut val.to_le_bytes());
+        val
+    }
+
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        zx::cprng_draw(dest)
+    }
+
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
+        self.fill_bytes(dest);
+        Ok(())
+    }
+}
+
+impl CryptoRng for Rng {}
 
 // A MAC abstraction conveniently shaped for our API glue needs.
 trait Mac {

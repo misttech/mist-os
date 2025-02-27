@@ -9,11 +9,17 @@ use std::collections::hash_map::Entry as HashMapEntry;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::{Bound, Deref, DerefMut};
 use std::rc::Rc;
+
+use rsa::traits::{PrivateKeyParts as _, PublicKeyParts as _};
+use rsa::{BigUint, RsaPrivateKey};
 use tee_internal::{
     Attribute, AttributeId, BufferOrValue, Error, HandleFlags, MemRef, ObjectEnumHandle,
     ObjectHandle, ObjectInfo, Result as TeeResult, Storage as TeeStorage, Type, Usage, ValueFields,
     Whence, DATA_MAX_POSITION, OBJECT_ID_MAX_LEN,
 };
+use thiserror::Error;
+
+use crate::crypto::Rng;
 
 pub struct Storage {
     persistent_objects: PersistentObjects,
@@ -40,6 +46,14 @@ fn is_transient_handle(object: ObjectHandle) -> bool {
 //
 // See Table 5-9: TEE_AllocateTransientObject Object Types and Key Sizes 4.
 //
+
+// A representation of a retrieved buffer attribute. Ideally, we'd just use
+// Option<&[u8]>, but some of the APIs we're gluing here like to return vector
+// representations.
+pub enum BufferAttribute<'a> {
+    Slice(&'a [u8]),
+    Vector(Vec<u8>),
+}
 
 // A internal trait representing the common key operations.
 //
@@ -70,11 +84,11 @@ pub trait KeyType {
         0
     }
 
-    fn buffer_attribute(&self, _id: AttributeId) -> Option<&Vec<u8>> {
+    fn buffer_attribute(&self, _id: AttributeId) -> Option<BufferAttribute<'_>> {
         None
     }
 
-    fn value_attribute(&self, _id: AttributeId) -> Option<&ValueFields> {
+    fn value_attribute(&self, _id: AttributeId) -> Option<ValueFields> {
         None
     }
 
@@ -89,6 +103,75 @@ pub trait KeyType {
     fn generate(&mut self, _size: u32, _params: &[Attribute]) -> TeeResult {
         unimplemented!()
     }
+}
+
+// An error type in service of extract_attributes!() below.
+#[derive(Error, Debug)]
+enum ExtractAttributeError {
+    #[error("{0:?} provided twice")]
+    ProvidedTwice(AttributeId),
+
+    #[error("Unexpected attribute: {0:?}")]
+    Unexpected(AttributeId),
+}
+
+// This trait exists only to aid in the definition of extract_attributes!
+// just below, injecting a dose of generics to support both the memory and
+// value attribute cases, which seems hard to do with macro tricks alone.
+trait ExtractAttributeInto<T> {
+    fn extract_into(self, value: &mut T) -> Result<(), ExtractAttributeError>;
+}
+
+impl<'a> ExtractAttributeInto<&'a [u8]> for &'a Attribute {
+    fn extract_into(self, value: &mut &'a [u8]) -> Result<(), ExtractAttributeError> {
+        if !value.is_empty() {
+            Err(ExtractAttributeError::ProvidedTwice(self.id))
+        } else {
+            *value = self.as_memory_reference().as_slice();
+            Ok(())
+        }
+    }
+}
+
+impl ExtractAttributeInto<Option<ValueFields>> for &Attribute {
+    fn extract_into(self, value: &mut Option<ValueFields>) -> Result<(), ExtractAttributeError> {
+        if value.is_some() {
+            Err(ExtractAttributeError::ProvidedTwice(self.id))
+        } else {
+            *value = Some(*self.as_value());
+            Ok(())
+        }
+    }
+}
+
+// Extracts the expected attributes from a list, returning
+// Result<(), ExtractAttributeError>, ensuring that only expected ones are
+// present and nothing expected is duplicated.
+//
+// Example usage:
+// ```
+// let mut mem_attr: &[u8] = &[];
+// let mut val_attr: Option<ValueFields> = None;
+// ...
+// extract_attributes!(
+//     attrs,
+//     AttributeId::A => mem_attr, // If present, will set mem_attr as the A payload
+//     AttributeId::B => val_attr, // If present, will val_attr as the B payload
+//     ...
+// ).unwrap();
+// ```
+macro_rules! extract_attributes {
+    ($attributes:expr, $($id:path => $var:ident),*) => {
+        || -> Result<(), ExtractAttributeError> {
+            for attr in $attributes {
+                match attr.id {
+                    $( $id => attr.extract_into(&mut $var)?, )*
+                    _ => return Err(ExtractAttributeError::Unexpected(attr.id)),
+                }
+            }
+            Ok(())
+        }()
+    };
 }
 
 #[derive(Clone)]
@@ -106,7 +189,7 @@ impl<const SIZE_MIN: u32, const SIZE_MAX: u32, const SIZE_MULTIPLE: u32> KeyType
         const { assert!((SIZE_MAX % SIZE_MULTIPLE) == 0) };
 
         if Self::is_valid_size(max_size) {
-            Ok(Self { secret: Vec::with_capacity(max_size as usize) })
+            Ok(Self { secret: Vec::with_capacity((max_size / u8::BITS) as usize) })
         } else {
             Err(Error::NotSupported)
         }
@@ -117,16 +200,16 @@ impl<const SIZE_MIN: u32, const SIZE_MAX: u32, const SIZE_MULTIPLE: u32> KeyType
     }
 
     fn size(&self) -> u32 {
-        self.secret.len() as u32
+        (self.secret.len() as u32) * u8::BITS
     }
 
     fn max_size(&self) -> u32 {
-        self.secret.capacity() as u32
+        (self.secret.capacity() as u32) * u8::BITS
     }
 
-    fn buffer_attribute(&self, id: AttributeId) -> Option<&Vec<u8>> {
+    fn buffer_attribute(&self, id: AttributeId) -> Option<BufferAttribute<'_>> {
         if id == AttributeId::SecretValue {
-            Some(&self.secret)
+            Some(BufferAttribute::Slice(&self.secret))
         } else {
             None
         }
@@ -139,34 +222,29 @@ impl<const SIZE_MIN: u32, const SIZE_MAX: u32, const SIZE_MULTIPLE: u32> KeyType
     fn populate(&mut self, attributes: &[Attribute]) -> TeeResult {
         debug_assert!(self.secret.is_empty());
 
-        // TODO(https://fxbug.dev/371213067): Abstract into a declarative macro
-        // for picking out required/optional attributes to be used across all
-        // populate() implementations?
-        let secret = {
-            let mut secret: &[u8] = &[];
-            let mut iter = attributes.iter();
-            while let Some(attr) = iter.next() {
-                match attr.id {
-                    AttributeId::SecretValue => {
-                        assert!(secret.is_empty(), "{:?} provided twice", attr.id);
-                        secret = attr.as_memory_reference().as_slice();
-                    }
-                    _ => panic!("Unexpected attribute: {:?}", attr.id),
-                }
-            }
-            assert!(
-                !secret.is_empty(),
-                "Missing expected attribute: {:?}",
-                AttributeId::SecretValue
-            );
-            secret
-        };
+        let mut secret: &[u8] = &[];
+        extract_attributes!(
+            attributes,
+            AttributeId::SecretValue => secret
+        )
+        .unwrap();
+        assert!(!secret.is_empty(), "Missing attribute for secret value");
+
         assert!(secret.len() <= self.secret.capacity());
         self.secret.extend_from_slice(secret);
         Ok(())
     }
 
-    // TODO(https://fxbug.dev/371213067): generate() too.
+    fn generate(&mut self, size: u32, params: &[Attribute]) -> TeeResult {
+        assert!(Self::is_valid_size(size));
+        assert!(size <= self.max_size());
+        if !params.is_empty() {
+            return Err(Error::BadParameters);
+        }
+        self.secret.resize((size / u8::BITS) as usize, 0);
+        zx::cprng_draw(self.secret.as_mut_slice());
+        Ok(())
+    }
 }
 
 pub type AesKey = SimpleSymmetricKey<128, 256, 64>; // 128, 192, or 256
@@ -176,22 +254,186 @@ pub type HmacSha256Key = SimpleSymmetricKey<192, 1024, 8>;
 pub type HmacSha384Key = SimpleSymmetricKey<256, 512, 8>;
 pub type HmacSha512Key = SimpleSymmetricKey<256, 512, 8>;
 
-// TODO(https://fxbug.dev/371213067): Properly implement KeyType.
-#[allow(dead_code)]
 #[derive(Clone)]
 pub struct RsaKeypair {
-    modulus: Vec<u8>,          // TEE_ATTR_RSA_MODULUS
-    public_exponent: Vec<u8>,  // TEE_ATTR_RSA_PUBLIC_EXPONENT
-    private_exponent: Vec<u8>, // TEE_ATTR_RSA_PRIVATE_EXPONENT
-
-    prime1: Vec<u8>,      // TEE_ATTR_RSA_PRIME1
-    prime2: Vec<u8>,      // TEE_ATTR_RSA_PRIME2
-    exponent1: Vec<u8>,   // TEE_ATTR_RSA_EXPONENT1
-    exponent2: Vec<u8>,   // TEE_ATTR_RSA_EXPONENT2
-    coefficient: Vec<u8>, // TEE_ATTR_RSA_COEFFICIENT
+    private: Option<Box<RsaPrivateKey>>,
+    max_size: u32,
 }
 
-impl KeyType for RsaKeypair {}
+impl KeyType for RsaKeypair {
+    fn new(max_size: u32) -> TeeResult<Self> {
+        if !Self::is_valid_size(max_size) {
+            return Err(Error::NotSupported);
+        }
+        Ok(Self { private: None, max_size })
+    }
+
+    fn is_valid_size(size: u32) -> bool {
+        (size % u8::BITS) == 0 && 512 <= size && size <= 4096
+    }
+
+    fn size(&self) -> u32 {
+        if let Some(private) = &self.private {
+            (private.size() as u32) * u8::BITS
+        } else {
+            0
+        }
+    }
+
+    fn max_size(&self) -> u32 {
+        self.max_size
+    }
+
+    fn buffer_attribute(&self, id: AttributeId) -> Option<BufferAttribute<'_>> {
+        let Some(private) = &self.private else {
+            return None;
+        };
+        match id {
+            AttributeId::RsaModulus => Some(BufferAttribute::Vector(private.n().to_bytes_be())),
+            AttributeId::RsaPublicExponent => {
+                Some(BufferAttribute::Vector(private.e().to_bytes_be()))
+            }
+            AttributeId::RsaPrivateExponent => {
+                Some(BufferAttribute::Vector(private.d().to_bytes_be()))
+            }
+            AttributeId::RsaPrime1 => {
+                Some(BufferAttribute::Vector(private.primes()[0].to_bytes_be()))
+            }
+            AttributeId::RsaPrime2 => {
+                Some(BufferAttribute::Vector(private.primes()[1].to_bytes_be()))
+            }
+            AttributeId::RsaExponent1 => {
+                Some(BufferAttribute::Vector(private.dp().unwrap().to_bytes_be()))
+            }
+            AttributeId::RsaExponent2 => {
+                Some(BufferAttribute::Vector(private.dq().unwrap().to_bytes_be()))
+            }
+            AttributeId::RsaCoefficient => {
+                Some(BufferAttribute::Vector(private.crt_coefficient().unwrap().to_bytes_be()))
+            }
+            _ => None,
+        }
+    }
+
+    fn reset(&mut self) {
+        self.private = None;
+    }
+
+    fn populate(&mut self, attributes: &[Attribute]) -> TeeResult {
+        assert!(self.private.is_none());
+
+        let mut modulus: &[u8] = &[];
+        let mut public_exponent: &[u8] = &[];
+        let mut private_exponent: &[u8] = &[];
+        let mut prime1: &[u8] = &[];
+        let mut prime2: &[u8] = &[];
+        let mut exponent1: &[u8] = &[];
+        let mut exponent2: &[u8] = &[];
+        let mut coefficient: &[u8] = &[];
+        extract_attributes!(
+            attributes,
+            AttributeId::RsaModulus => modulus,
+            AttributeId::RsaPublicExponent => public_exponent,
+            AttributeId::RsaPrivateExponent => private_exponent,
+            AttributeId::RsaPrime1 => prime1,
+            AttributeId::RsaPrime2 => prime2,
+            AttributeId::RsaExponent1 => exponent1,
+            AttributeId::RsaExponent2 => exponent2,
+            AttributeId::RsaCoefficient => coefficient
+        )
+        .unwrap();
+        assert!(!modulus.is_empty(), "Missing attribute for RSA modulus");
+        assert!(!public_exponent.is_empty(), "Missing attribute for RSA public exponent");
+        assert!(!private_exponent.is_empty(), "Missing attribute for RSA private exponent");
+
+        if !prime1.is_empty()
+            || prime2.is_empty()
+            || !exponent1.is_empty()
+            || !exponent2.is_empty()
+            || !coefficient.is_empty()
+        {
+            assert!(
+                !prime1.is_empty(),
+                "TEE_ATTR_RSA_PRIME1 is required if another CRT attribute is provided"
+            );
+            assert!(
+                !prime2.is_empty(),
+                "TEE_ATTR_RSA_PRIME2 is required if another CRT attribute is provided"
+            );
+            assert!(
+                !exponent1.is_empty(),
+                "TEE_ATTR_RSA_EXPONENT1 is required if another CRT attribute is provided"
+            );
+            assert!(
+                !exponent2.is_empty(),
+                "TEE_ATTR_RSA_EXPONENT2 is required if another CRT attribute is provided"
+            );
+            assert!(
+                !coefficient.is_empty(),
+                "TEE_ATTR_RSA_COEFFICIENT is required if another CRT attribute is provided"
+            );
+        }
+
+        let len: u32 = modulus.len().try_into().unwrap();
+        assert!(u8::BITS * len <= self.max_size());
+
+        let mut private_key = RsaPrivateKey::from_components(
+            BigUint::from_bytes_be(modulus),
+            BigUint::from_bytes_be(public_exponent),
+            BigUint::from_bytes_be(private_exponent),
+            vec![BigUint::from_bytes_be(prime1), BigUint::from_bytes_be(prime2)],
+        )
+        .map_err(|_| Error::BadParameters)?;
+
+        // Computes and populates the CRT coefficients accessed below and
+        // possibly in subsequent key use.
+        private_key.precompute().unwrap();
+
+        if !exponent1.is_empty() {
+            if *private_key.dp().unwrap() != BigUint::from_bytes_be(exponent1) {
+                return Err(Error::BadParameters);
+            }
+            if *private_key.dq().unwrap() != BigUint::from_bytes_be(exponent2) {
+                return Err(Error::BadParameters);
+            }
+            if private_key.crt_coefficient().unwrap() != BigUint::from_bytes_be(coefficient) {
+                return Err(Error::BadParameters);
+            }
+        }
+
+        self.private = Some(Box::new(private_key));
+        Ok(())
+    }
+
+    fn generate(&mut self, size: u32, params: &[Attribute]) -> TeeResult {
+        assert!(Self::is_valid_size(size));
+        assert!(size <= self.max_size());
+        assert!(self.private.is_none());
+
+        let mut public_exponent: &[u8] = &[];
+        extract_attributes!(params, AttributeId::RsaPublicExponent => public_exponent)
+            .map_err(|_| Error::BadParameters)?;
+
+        let mut private_key = if public_exponent.is_empty() {
+            RsaPrivateKey::new(&mut Rng {}, size as usize)
+        } else {
+            RsaPrivateKey::new_with_exp(
+                &mut Rng {},
+                size as usize,
+                &BigUint::from_bytes_be(public_exponent),
+            )
+        }
+        .unwrap();
+
+        // Computes and populates the CRT coefficients accessed below and
+        // possibly in subsequent key use.
+        private_key.precompute().unwrap();
+
+        self.private = Some(Box::new(private_key));
+
+        Ok(())
+    }
+}
 
 // TODO(https://fxbug.dev/371213067): Properly implement KeyType.
 #[allow(dead_code)]
@@ -1004,29 +1246,43 @@ impl Storage {
     ) -> Result<&'a [u8], GetObjectBufferAttributeError> {
         assert!(!attribute_id.value());
 
-        let copy_from_key = |key: &Key,
+        let copy_from_key = |obj: &dyn Object,
                              buffer: &'a mut [u8]|
          -> Result<&'a [u8], GetObjectBufferAttributeError> {
-            if let Some(bytes) = key.buffer_attribute(attribute_id) {
-                if buffer.len() < bytes.len() {
-                    Err(GetObjectBufferAttributeError {
-                        error: Error::ShortBuffer,
-                        actual_size: bytes.len(),
+            if !attribute_id.public() {
+                assert!(obj.usage().contains(Usage::EXTRACTABLE));
+            }
+
+            let attr = obj.key().buffer_attribute(attribute_id);
+            let bytes = match &attr {
+                None => {
+                    return Err(GetObjectBufferAttributeError {
+                        error: Error::ItemNotFound,
+                        actual_size: 0,
                     })
-                } else {
-                    let written = &mut buffer[..bytes.len()];
-                    written.copy_from_slice(bytes);
-                    Ok(written)
                 }
+                Some(BufferAttribute::Slice(bytes)) => bytes,
+                Some(BufferAttribute::Vector(bytes)) => bytes.as_slice(),
+            };
+            if buffer.len() < bytes.len() {
+                Err(GetObjectBufferAttributeError {
+                    error: Error::ShortBuffer,
+                    actual_size: bytes.len(),
+                })
             } else {
-                Err(GetObjectBufferAttributeError { error: Error::ItemNotFound, actual_size: 0 })
+                let written = &mut buffer[..bytes.len()];
+                written.copy_from_slice(bytes);
+                Ok(written)
             }
         };
 
         if is_transient_handle(object) {
-            copy_from_key(&self.transient_objects.get(object).key, buffer)
+            copy_from_key(self.transient_objects.get(object).deref(), buffer)
         } else {
-            copy_from_key(&self.persistent_objects.get(object).object.as_ref().borrow().key, buffer)
+            copy_from_key(
+                self.persistent_objects.get(object).object.as_ref().borrow().deref(),
+                buffer,
+            )
         }
     }
 
@@ -1044,18 +1300,21 @@ impl Storage {
     ) -> TeeResult<ValueFields> {
         assert!(!attribute_id.value());
 
-        let copy_from_key = |key: &Key| {
-            if let Some(value) = key.value_attribute(attribute_id) {
-                Ok(value.clone())
+        let copy_from_key = |obj: &dyn Object| {
+            if !attribute_id.public() {
+                assert!(obj.usage().contains(Usage::EXTRACTABLE));
+            }
+            if let Some(value) = obj.key().value_attribute(attribute_id) {
+                Ok(value)
             } else {
                 Err(Error::ItemNotFound)
             }
         };
 
         if is_transient_handle(object) {
-            copy_from_key(&self.transient_objects.get(object).key)
+            copy_from_key(self.transient_objects.get(object).deref())
         } else {
-            copy_from_key(&self.persistent_objects.get(object).object.borrow().key)
+            copy_from_key(self.persistent_objects.get(object).object.borrow().deref())
         }
     }
 
