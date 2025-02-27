@@ -139,6 +139,33 @@ class UserInputFCTests(unittest.TestCase):
                     start_location=f_math.Vec(x=1, y=2),
                     end_location=f_math.Vec(x=3, y=4),
                     move_event_count=2,
+                    duration=0,
+                ),
+            ]
+        )
+
+    def test_swipe_with_duration(self) -> None:
+        """Test for UserInput.swipe() method with duration."""
+
+        touch_device = self.user_input().create_touch_device(
+            touch_screen_size=ui_custom_types.Size(width=4, height=5),
+        )
+        touch_device._touch_screen_proxy = mock.MagicMock()  # type: ignore[attr-defined]
+
+        touch_device.swipe(
+            start_location=ui_custom_types.Coordinate(x=1, y=2),
+            end_location=ui_custom_types.Coordinate(x=3, y=4),
+            move_event_count=2,
+            duration_ms=100,
+        )
+
+        touch_device._touch_screen_proxy.simulate_swipe.assert_has_calls(  # type: ignore[attr-defined]
+            [
+                mock.call(
+                    start_location=f_math.Vec(x=1, y=2),
+                    end_location=f_math.Vec(x=3, y=4),
+                    move_event_count=2,
+                    duration=100 * 1000000,
                 ),
             ]
         )

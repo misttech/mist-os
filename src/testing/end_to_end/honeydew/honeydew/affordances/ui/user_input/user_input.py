@@ -11,7 +11,8 @@ from honeydew.affordances.ui.user_input import types
 DEFAULTS: dict[str, Any] = {
     "TOUCH_SCREEN_SIZE": types.Size(width=1000, height=1000),
     "TAP_EVENT_COUNT": 1,
-    "DURATION_MS": 300,
+    "TAP_DURATION_MS": 300,
+    "SWIPE_DURATION_MS": 0,
 }
 
 
@@ -23,7 +24,7 @@ class TouchDevice(abc.ABC):
         self,
         location: types.Coordinate,
         tap_event_count: int = DEFAULTS["TAP_EVENT_COUNT"],
-        duration_ms: int = DEFAULTS["DURATION_MS"],
+        duration_ms: int = DEFAULTS["TAP_DURATION_MS"],
     ) -> None:
         """Instantiates Taps at coordinates (x, y) for a touchscreen with
            default or custom width, height, duration, and tap event counts.
@@ -47,6 +48,7 @@ class TouchDevice(abc.ABC):
         start_location: types.Coordinate,
         end_location: types.Coordinate,
         move_event_count: int,
+        duration_ms: int = DEFAULTS["SWIPE_DURATION_MS"],
     ) -> None:
         """Instantiates a swipe event sequence that starts at `start_location` and ends at
            `end_location`, with a total number of move events equal to `move_event_count`.
@@ -59,6 +61,8 @@ class TouchDevice(abc.ABC):
             end_location: swipe end location in X, Y axis coordinate.
 
             move_event_count: Number of move events.
+
+            duration_ms: Duration of the swipe gesture in milliseconds, defaults to 0.
 
         Raises:
             UserInputError: if failed swipe operation.

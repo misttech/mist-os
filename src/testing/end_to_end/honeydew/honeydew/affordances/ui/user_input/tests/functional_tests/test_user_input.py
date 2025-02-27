@@ -61,10 +61,12 @@ class UserInputAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         # before = self.device.screenshot.take()
 
         touch_device = self.device.user_input.create_touch_device()
+
         touch_device.swipe(
             start_location=ui_custom_types.Coordinate(x=1, y=2),
             end_location=ui_custom_types.Coordinate(x=3, y=4),
             move_event_count=2,
+            duration_ms=2000,
         )
 
         # TODO(b/320543407): Re-enable the assertion once we get the example app

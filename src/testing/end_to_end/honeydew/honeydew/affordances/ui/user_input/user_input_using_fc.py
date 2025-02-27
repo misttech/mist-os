@@ -69,7 +69,7 @@ class TouchDevice(user_input.TouchDevice):
         self,
         location: ui_custom_types.Coordinate,
         tap_event_count: int = user_input.DEFAULTS["TAP_EVENT_COUNT"],
-        duration_ms: int = user_input.DEFAULTS["DURATION_MS"],
+        duration_ms: int = user_input.DEFAULTS["TAP_DURATION_MS"],
     ) -> None:
         """Instantiates Taps at coordinates (x, y) for a touchscreen with
            default or custom width, height, duration, and tap event counts.
@@ -106,6 +106,7 @@ class TouchDevice(user_input.TouchDevice):
         start_location: ui_custom_types.Coordinate,
         end_location: ui_custom_types.Coordinate,
         move_event_count: int,
+        duration_ms: int = user_input.DEFAULTS["SWIPE_DURATION_MS"],
     ) -> None:
         """Instantiates a swipe event sequence that starts at `start_location` and ends at
            `end_location`, with a total number of move events equal to `move_event_count`.
@@ -119,6 +120,8 @@ class TouchDevice(user_input.TouchDevice):
 
             move_event_count: Number of move events.
 
+            duration_ms: Duration of the swipe gesture in milliseconds, defaults to 0.
+
         Raises:
             UserInputError: if failed swipe operation.
         """
@@ -130,6 +133,7 @@ class TouchDevice(user_input.TouchDevice):
                 ),
                 end_location=f_math.Vec(x=end_location.x, y=end_location.y),
                 move_event_count=move_event_count,
+                duration=duration_ms * 1000000,  # milliseconds to nanoseconds
             )
         except fcp.ZxStatus as status:
             raise user_input_errors.UserInputError(
