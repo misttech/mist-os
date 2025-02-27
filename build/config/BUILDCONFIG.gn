@@ -2114,6 +2114,13 @@ declare_args() {
   all_toolchain_variants = []
 }
 
+# TODO(https://fxbug.dev/396658029): Remove this.
+if (include_clippy) {
+  assert(
+      select_variant == [],
+      "Use of clippy is currently not compatible with variants, if you need to build with 'select_variant', disable clippy with 'fx set ... --include-clippy=false' or 'include_clippy = false' in args.gn.  See https://fxbug.dev/396658029 for more information")
+}
+
 # Whether profile instrumentation is enabled for collecting coverage.
 is_coverage = select_variant + [
                 "coverage",
