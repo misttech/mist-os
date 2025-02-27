@@ -1,0 +1,59 @@
+# Copyright 2025 The Fuchsia Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bind/bind.gni")
+import("//build/devicetree/devicetree.gni")
+import("//build/drivers.gni")
+
+group("tests") {
+  testonly = true
+  deps = [ ":bind_test" ]
+}
+
+driver_bind_rules("bind") {
+  bind_output = "virtio_pmem.bindbc"
+  rules = "meta/virtio_pmem.bind"
+  tests = "meta/bind_tests.json"
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
+    "//src/devices/bind/fuchsia.acpi",
+    "//src/devices/bind/fuchsia.pci",
+  ]
+}
+
+fuchsia_cc_driver("driver") {
+  output_name = "virtio_pmem"
+
+  sources = [
+    "pmem.cc",
+    "pmem.h",
+    "pmem_driver.cc",
+    "virtio/pmem.h",
+  ]
+
+  deps = [
+    ":bind",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//src/devices/bin/driver_runtime",
+    "//src/devices/bus/lib/virtio:virtio-dfv2",
+  ]
+}
+
+fuchsia_driver_component("component") {
+  component_name = "virtio_pmem"
+  deps = [
+    ":bind",
+    ":driver",
+  ]
+  info = "meta/virtio_pmem-info.json"
+  manifest = "meta/virtio_pmem.cml"
+}
+
+fuchsia_driver_package("package") {
+  package_name = "virtio_pmem"
+  driver_components = [ ":component" ]
+  export_to_bazel = true
+}
