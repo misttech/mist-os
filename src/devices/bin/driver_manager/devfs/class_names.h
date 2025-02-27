@@ -7,6 +7,7 @@
 
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace driver_manager {
 
@@ -183,6 +184,20 @@ std::unordered_map<std::string_view, uint8_t> classes_that_assume_ordering({
 
     // TODO(https://fxbug.dev/42065080): Remove.
     {"thermal", 0},
+});
+
+// The list of devfs classes that offer an additional device_topology protocol.
+//
+// Do not add to this list except if you are migrating a client off
+// of fuchsia_device::Controller, or from using dev-topological
+// to access driver directly through topological paths.
+//
+// Please do not connect to the 'device_topology' directory directly.  Instead, use the library
+// for accessing topological paths at /src/devices/lib/client
+//
+const std::unordered_set<std::string> kClassesThatAllowTopologicalPath({
+    "block",
+    "devfs_service_test",
 });
 
 }  // namespace driver_manager

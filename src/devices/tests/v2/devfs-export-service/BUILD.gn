@@ -5,10 +5,15 @@
 import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/rust/rustc_test.gni")
+import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":devfs_services_test" ]
+  deps = [
+    ":devfs_services_test",
+    ":devfs_services_test_cpp",
+  ]
 }
 
 fidl("fuchsia.services.test") {
@@ -56,6 +61,28 @@ rustc_test("bin") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
     "//third_party/rust_crates:anyhow",
+  ]
+}
+
+test("devfs_topological_test") {
+  sources = [ "topo_test.cc" ]
+  deps = [
+    "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_cpp",
+    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/device-watcher/cpp",
+    "//sdk/lib/driver_test_realm/realm_builder/cpp",
+    "//sdk/lib/syslog/cpp",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
+    "//src/devices/lib/client:device_topology",
+    "//src/lib/fxl/test:gtest_main",
+  ]
+}
+fuchsia_unittest_package("devfs_services_test_cpp") {
+  deps = [
+    ":devfs_topological_test",
+    ":root",
+    "//sdk/lib/driver_test_realm:driver_test_realm_component",
   ]
 }
 

@@ -915,7 +915,13 @@ async fn assert_volumes_are_expected(fixture: &TestFixture) {
             )
             .await
             .expect("Failed to open the fvm"),
-            vec![r"^blobfs", r"data", r"^device_controller$", r"^device_protocol$"],
+            vec![
+                r"^blobfs",
+                r"data",
+                r"^device_controller$",
+                r"^device_protocol$",
+                r"^device_topology$",
+            ],
         )
     };
 

@@ -27,6 +27,35 @@ class Devfs;
 class PseudoDir;
 class DevfsDevice;
 
+// PathServer acts as a contained TopologicalPath server, allowing clients
+// to connect and vending the topological path of the devnode.
+// Pathserver checks the variable kClassesThatAllowTopologicalPath when clients
+// attempt to bind to the service, and prohibits clients from connecting to drivers
+// whose class name is not in the allowlist.
+class PathServer : public fidl::WireServer<fuchsia_device_fs::TopologicalPath> {
+ public:
+  explicit PathServer(std::string path, async_dispatcher_t* dispatcher)
+      : path_(path), dispatcher_(dispatcher) {}
+
+  // TopologicalPath protocol:
+  void GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) override {
+    completer.ReplySuccess(fidl::StringView::FromExternal(GetPath()));
+  }
+
+  void Bind(zx::channel channel, const std::string& class_name);
+
+  fidl::ProtocolHandler<fuchsia_device_fs::TopologicalPath> GetHandler() {
+    return bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure);
+  }
+
+  std::string GetPath() { return path_; }
+
+ private:
+  std::string path_;
+  async_dispatcher_t* dispatcher_;
+  fidl::ServerBindingGroup<fuchsia_device_fs::TopologicalPath> bindings_;
+};
+
 class Devnode {
  public:
   // This class represents a device in devfs. It is called "passthrough" because it sends
@@ -57,7 +86,8 @@ class Devnode {
   explicit Devnode(Devfs& devfs);
 
   // `parent` must outlive `this`.
-  Devnode(Devfs& devfs, PseudoDir& parent, Target target, fbl::String name);
+  Devnode(Devfs& devfs, PseudoDir& parent, Target target, fbl::String name, const std::string& path,
+          const std::string& class_name = "none");
 
   ~Devnode();
 
@@ -143,6 +173,7 @@ class Devnode {
   const fbl::RefPtr<VnodeImpl> node_;
 
   const std::optional<fbl::String> name_;
+  PathServer path_server_;
 
   // If service_name_ is valid, it means that there is a service advertised, and should be removed
   // upon destruction of this devnode.
@@ -190,6 +221,7 @@ class Devfs : public fidl::Server<fuchsia_component_runner::ComponentController>
     return class_entries_[std::string(class_name)];
   }
 
+  async_dispatcher_t* dispatcher() { return dispatcher_; }
   component::OutgoingDirectory& outgoing() { return outgoing_; }
 
   // Called by the Driver Runner when the special devfs driver component is

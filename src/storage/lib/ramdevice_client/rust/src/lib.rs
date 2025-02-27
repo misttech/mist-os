@@ -553,9 +553,14 @@ mod tests {
                     name: name2,
                     kind: fuchsia_fs::directory::DirentKind::File,
                 },
-            ] if [name1, name2] == [
+                fuchsia_fs::directory::DirEntry {
+                    name: name3,
+                    kind: fuchsia_fs::directory::DirentKind::File,
+                },
+            ] if [name1, name2, name3] == [
                 fidl_fuchsia_device_fs::DEVICE_CONTROLLER_NAME,
                 fidl_fuchsia_device_fs::DEVICE_PROTOCOL_NAME,
+                fidl_fuchsia_device_fs::DEVICE_TOPOLOGY_NAME,
               ]
         );
 

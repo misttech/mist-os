@@ -119,7 +119,7 @@ migrating to Bus Topology.
 
 ### Convert clients to services using the `GetTopologicalPath` tool {:#convert-services .numbered}
 
-Using `topology::GetTopologicalPath` will allow you to stop accessing topological
+Using `fdf_topology::GetTopologicalPath` will allow you to stop accessing topological
 paths directly, and allow you to convert your drivers to services
 
 Note: Please do not connect to the `fuchsia.device.fs.TopologicalPath` protocol
@@ -139,7 +139,7 @@ Add the device_topology dependency:
 
 ```gn
 deps = [
-  "//sdk/lib/driver/client:device_topology",
+  "//src/devices/lib/client:device_topology",
 ],
 ```
 
@@ -155,7 +155,7 @@ And call `GetTopologicalPath` using the service directory and instance name:
   ZX_ASSERT(watch_result.status_value() == ZX_OK);
   std::string instance_name = std::move(watch_result.value());
   // Now check the topological path of that instance:
-  zx::result<std::string> path_result = topology::GetTopologicalPath(*dir, instance_name);
+  zx::result<std::string> path_result = fdf_topology::GetTopologicalPath(*dir, instance_name);
   ZX_ASSERT(path_result.is_ok());
   if (path_result.value() == kSomePathYouWant) {
     //Open the instance
