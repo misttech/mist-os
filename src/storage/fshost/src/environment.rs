@@ -4,6 +4,8 @@
 
 mod fvm_container;
 mod fxfs_container;
+pub use fvm_container::FvmContainer;
+pub use fxfs_container::FxfsContainer;
 
 use crate::copier::recursive_copy;
 use crate::crypt::fxfs::{self, CryptService};
@@ -32,8 +34,6 @@ use fs_management::partition::fvm_allocate_partition;
 use fs_management::{Blobfs, ComponentType, F2fs, FSConfig, Fvm, Fxfs, Minfs};
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path};
 use futures::lock::Mutex;
-use fvm_container::FvmContainer;
-pub use fxfs_container::FxfsContainer;
 use std::collections::HashSet;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -794,7 +794,9 @@ impl Environment for FshostEnvironment {
             expected_format = "fvm";
             "Mounting fvm"
         );
-        let serving_fs = self.launcher.serve_fvm(device).await?;
+        let config = Fvm { component_type: ComponentType::StaticChild, ..Default::default() };
+        let serving_fs =
+            self.launcher.serve_fvm(device.block_connector()?, Box::new(config)).await?;
         self.container = Some(Box::new(FvmContainer::new(serving_fs, device.is_fshost_ramdisk())));
         Ok(())
     }
@@ -1320,12 +1322,11 @@ impl FilesystemLauncher {
     /// Starts serving Fvm without opening any volumes.
     pub async fn serve_fvm(
         &self,
-        device: &mut dyn Device,
+        block_connector: Box<dyn BlockConnector>,
+        config: Box<dyn FSConfig>,
     ) -> Result<ServingMultiVolumeFilesystem, Error> {
-        let mut fs = fs_management::filesystem::Filesystem::from_boxed_config(
-            device.block_connector()?,
-            Box::new(Fvm { component_type: ComponentType::StaticChild }),
-        );
+        let mut fs =
+            fs_management::filesystem::Filesystem::from_boxed_config(block_connector, config);
         fs.serve_multi_volume().await
     }
 

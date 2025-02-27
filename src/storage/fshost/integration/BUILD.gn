@@ -454,7 +454,6 @@ fshost_integration_test_package(
   # TODO(https://fxbug.dev/339491886): Support these components in storage-host
   enable_migration_tests = false
   enable_wipe_storage_tests = false
-  enable_write_data_file_tests = false
 
   # TODO(https://fxbug.dev/391891190): Enable failing on error logs when errors are fixed.
   allow_error_severity_logs = true
@@ -475,7 +474,6 @@ fshost_integration_test_package(
   # TODO(https://fxbug.dev/339491886): Support these components in storage-host
   enable_migration_tests = false
   enable_wipe_storage_tests = false
-  enable_write_data_file_tests = false
 
   # TODO(https://fxbug.dev/391891190): Enable failing on error logs when errors are fixed.
   allow_error_severity_logs = true

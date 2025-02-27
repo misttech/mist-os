@@ -10,7 +10,8 @@ use crate::device::constants::{
 };
 use crate::device::{BlockDevice, Device, DeviceTag};
 use crate::environment::{
-    self, Container, Environment, FilesystemLauncher, FxfsContainer, ServeFilesystemStatus,
+    self, Container, Environment, FilesystemLauncher, FvmContainer, FxfsContainer,
+    ServeFilesystemStatus,
 };
 use anyhow::{anyhow, ensure, Context, Error};
 use device_watcher::recursive_wait_and_open;
@@ -26,7 +27,7 @@ use fs_management::format::{detect_disk_format, DiskFormat};
 use fs_management::partition::{
     find_partition, fvm_allocate_partition, partition_matches_with_proxy, PartitionMatcher,
 };
-use fs_management::{filesystem, Blobfs, F2fs, Fxfs, Minfs};
+use fs_management::{filesystem, Blobfs, F2fs, Fvm, Fxfs, Minfs};
 use fuchsia_async::TimeoutExt as _;
 use fuchsia_component::client::connect_to_protocol_at_dir_root;
 use fuchsia_fs::directory::clone_onto;
@@ -475,7 +476,7 @@ async fn write_data_file(
     let content_size =
         usize::try_from(content_size).context("Failed to convert u64 content_size to usize")?;
 
-    let (mut filesystem, mut data) = if config.fxfs_blob {
+    let (mut filesystem, mut data) = if config.fxfs_blob || config.storage_host {
         // Find the device via our own matcher.
         let registered_devices = environment.lock().await.registered_devices().clone();
         let block_connector = registered_devices
@@ -485,12 +486,22 @@ async fn write_data_file(
             })
             .await
             .context("failed to get block connector for fxfs partition")?;
-        let mut container = Box::new(FxfsContainer::new(
-            launcher
-                .serve_fxblob(block_connector, Box::new(Fxfs::dynamic_child()))
-                .await
-                .context("serving Fxblob")?,
-        ));
+        let mut container: Box<dyn Container> = if config.fxfs_blob {
+            Box::new(FxfsContainer::new(
+                launcher
+                    .serve_fxblob(block_connector, Box::new(Fxfs::dynamic_child()))
+                    .await
+                    .context("serving Fxblob")?,
+            ))
+        } else {
+            Box::new(FvmContainer::new(
+                launcher
+                    .serve_fvm(block_connector, Box::new(Fvm::dynamic_child()))
+                    .await
+                    .context("serving Fvm")?,
+                false,
+            ))
+        };
         let data = container.serve_data(&launcher).await.context("serving data from Fxblob")?;
 
         (Some(container.into_fs()), data)

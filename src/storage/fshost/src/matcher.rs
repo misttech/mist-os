@@ -68,9 +68,7 @@ impl Matchers {
             if !config.netboot {
                 matchers.push(Box::new(FvmMatcher::new(config.ramdisk_image, config.storage_host)));
             }
-            // TODO(https://fxbug.dev/397770032): Support recovery mode for storage-host. See the
-            // FvmOnRecoveryMatcher for details.
-            if config.ramdisk_image || (config.netboot && !config.storage_host) {
+            if config.ramdisk_image || config.netboot {
                 matchers.push(Box::new(FvmOnRecoveryMatcher::new(config.storage_host)));
             }
         }
@@ -540,8 +538,10 @@ impl Matcher for FvmOnRecoveryMatcher {
             // make FVM components dynamic children so we can have two (one for the ramdisk, one for
             // this).  Alternatively, we can make it so that recovery doesn't bind the FVM
             // component, but we'll need to make sure that works with all recovery flows, and the
-            // fact that volumes don't enumerate won't be an issue.
-            bail!("Recovery mode isn't supported on storage-host yet.");
+            // fact that volumes don't enumerate won't be an issue.  Today, we still process the
+            // device so it gets tagged correctly, but we don't launch anything, which is a subtle
+            // behavior difference from non-storage-host.
+            log::warn!("Launching secondary FVM on recovery is not supported on storage-host yet");
         } else {
             if let Err(err) = env.bind_and_enumerate_fvm(device).await {
                 log::error!(err:?; "Failed to bind driver; FVM may be corrupt");
