@@ -1895,6 +1895,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
             let mut task_state = task.write();
 
             if signal_info.signal == SIGKILL {
+                task_state.thaw();
                 task_state.set_stopped(StopState::ForceWaking, None, None, None);
             } else if signal_info.signal == SIGCONT {
                 task_state.set_stopped(StopState::Waking, None, None, None);

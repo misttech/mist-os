@@ -46,6 +46,9 @@ const ORDERING_FOR_ATOMICS_BETWEEN_NOTIFIER_AND_NOTIFEE: Ordering = Ordering::Re
 pub struct PortEvent {
     /// The Futex used to wake up a thread when this waiter is waiting for
     /// events that don't depend on a `zx::Port`.
+    ///
+    /// This mode is subject to spurious wakeups.
+    /// See more in https://fuchsia.dev/reference/syscalls/futex_wait?hl=en#spurious_wakeups
     futex: zx::Futex,
     /// The underlying Zircon port that the waiter waits on when it is
     /// interested in events that cross process boundaries.
