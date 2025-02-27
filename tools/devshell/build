@@ -95,30 +95,6 @@ label, such as '//some/toolchain:target'.
 EOF
 }
 
-# command-stdout-to-array runs a command and stores its standard output
-# into an array (expecting one item per line, preserving spaces).
-# $1: variable name
-# $2+: command arguments.
-if [[ "${BASH_VERSION}" =~ ^3 ]]; then
-  # MacOS comes with Bash 3.x which doesn't have readarray at all
-  # so read one line at a time.
-  function command-stdout-to-array {
-    local varname="$1"
-    local line output
-    shift
-    output="$("$@")"
-    while IFS= read -r line; do
-      eval "${varname}+=(\"${line}\")"
-    done <<< "${output}"
-  }
-else
-  function command-stdout-to-array {
-    local varname="$1"
-    shift
-    readarray -t "${varname}" <<< "$("$@")"
-  }
-fi
-
 function count-ninja-log-lines {
   NINJA_LOG_FILE="${FUCHSIA_BUILD_DIR}/.ninja_log"
   if [[ -f "${NINJA_LOG_FILE}" ]]; then
@@ -437,12 +413,12 @@ job_count: "$concurrency"
       fi
       # TODO(https://fxbug.dev/328316506): Remove --allow-unknown once GN is fixed.
       local -a gn_labels  # define variable to quiet shellcheck
-      command-stdout-to-array gn_labels fx-build-api-client fx_build_args_to_labels --allow-unknown --args "${fuchsia_targets[@]}"
+      fx-command-stdout-to-array gn_labels fx-build-api-client fx_build_args_to_labels --allow-unknown --args "${fuchsia_targets[@]}"
 
       # Convert GN labels to Ninja targets now.
       # TODO(https://fxbug.dev/328316506): Remove --allow-unknown once GN is fixed.
       local -a ninja_targets  # define variable to quiet shellcheck
-      command-stdout-to-array ninja_targets fx-build-api-client gn_label_to_ninja_paths --allow-unknown "${gn_labels[@]}"
+      fx-command-stdout-to-array ninja_targets fx-build-api-client gn_label_to_ninja_paths --allow-unknown "${gn_labels[@]}"
 
       # For invalid labels, the above command will print errors to stderr directly and not list them in the result.
       # If ninja_targets is empty, we can stop here.

@@ -2,7 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# Lack of shebang in this file is intentional
+# shellcheck disable=SC2148
+
 if [[ -n "${ZSH_VERSION:-}" ]]; then
+  # shellcheck disable=SC2296,SC2298
   devshell_lib_dir=${${(%):-%x}:a:h}
   FUCHSIA_DIR="$(dirname "$(dirname "$(dirname "${devshell_lib_dir}")")")"
 else
@@ -28,9 +32,13 @@ fi
 
 export FUCHSIA_DIR
 export FUCHSIA_OUT_DIR="${FUCHSIA_OUT_DIR:-${FUCHSIA_DIR}/out}"
+# shellcheck source=/dev/null
 source "${devshell_lib_dir}/platform.sh"
+# shellcheck source=/dev/null
 source "${devshell_lib_dir}/fx-cmd-locator.sh"
+# shellcheck source=/dev/null
 source "${devshell_lib_dir}/fx-optional-features.sh"
+# shellcheck source=/dev/null
 source "${devshell_lib_dir}/generate-ssh-config.sh"
 unset devshell_lib_dir
 
@@ -59,8 +67,9 @@ fi
 # including CPU, memory, disk I/O...
 BUILD_PROFILE_ENABLED=0
 readonly fx_build_profile_config="${FUCHSIA_DIR}/.fx-build-profile-config"
-if [[ -f "$fx_build_profile_config" ]]
-then source "$fx_build_profile_config"
+if [[ -f "$fx_build_profile_config" ]]; then
+  # shellcheck source=/dev/null
+  source "$fx_build_profile_config"
   # This sets BUILD_PROFILE_ENABLED to 0 or 1.
 fi
 
@@ -68,7 +77,8 @@ fi
 # another process is running.
 readonly profile_wrap="${FUCHSIA_DIR}/build/profile/profile_wrap.sh"
 
-readonly date="$(date +%Y%m%d-%H%M%S)"
+date="$(date +%Y%m%d-%H%M%S)"
+readonly date
 
 readonly jq="$PREBUILT_JQ"
 
@@ -84,6 +94,31 @@ if [[ -o xtrace ]]; then
   RBE_WRAPPER=( "$SHELL" -x "${RBE_WRAPPER[@]}" )
 fi
 
+# fx-command-stdout-to-array runs a command and stores its standard output
+# into an array (expecting one item per line, preserving spaces).
+# $1: variable name
+# $2+: command arguments.
+if [[ "${BASH_VERSION}" =~ ^3 ]]; then
+  # MacOS comes with Bash 3.x which doesn't have readarray at all
+  # so read one line at a time.
+  function fx-command-stdout-to-array {
+    local varname="$1"
+    local line output
+    shift
+    output="$("$@")"
+    while IFS= read -r line; do
+      eval "${varname}+=(\"${line}\")"
+    done <<< "${output}"
+  }
+else
+  function fx-command-stdout-to-array {
+    local varname="$1"
+    shift
+    readarray -t "${varname}" <<< "$("$@")"
+  }
+fi
+
+
 # Use this to conditionally prefix a command with "${RBE_WRAPPER[@]}".
 # NOTE: this function depends on FUCHSIA_BUILD_DIR which is set only after
 # initialization.
@@ -98,8 +133,10 @@ function recheck-fx-rbe-enabled {
 
   # Check to see if the rbe settings indicate that the reproxy wrapper is
   # needed.
-  local needs_reproxy=($("$jq" '-r' '.final.needs_reproxy' < "${rbe_settings_file}"))
-  if [[ "$needs_reproxy" != "true" ]]; then
+  # shellcheck disable=SC2207
+  local -a needs_reproxy
+  fx-command-stdout-to-array needs_reproxy "$jq" '-r' '.final.needs_reproxy' "${rbe_settings_file}"
+  if [[ "${needs_reproxy[0]}" != "true" ]]; then
     return 1
   fi
 }
@@ -125,8 +162,9 @@ function recheck-fx-build-needs-auth() {
 
   # Return 0 if authentication is needed for build remote services,
   # otherwise return 1.
-  local needs_auth=($("$jq" '-r' '.final.needs_auth' < "${rbe_settings_file}"))
-  if [[ "$needs_auth" != "true" ]]; then
+  local -a needs_auth
+  fx-command-stdout-to-array needs_auth "$jq" '-r' '.final.needs_auth' "${rbe_settings_file}"
+  if [[ "${needs_auth[0]}" != "true" ]]; then
     return 1
   fi
 }
@@ -188,6 +226,7 @@ function fx-regenerator {
     "$@"
 }
 
+# shellcheck disable=SC2120
 function fx-gen {
   fx-regenerator "$@"
 }
@@ -212,6 +251,7 @@ function fx-build-config-load {
     fx-gen || return 1
   fi
 
+  # shellcheck source=/dev/null
   if ! source "${FUCHSIA_BUILD_DIR}/fx.config"; then
     fx-error "${FUCHSIA_BUILD_DIR}/fx.config caused internal error"
     return 1
@@ -303,6 +343,7 @@ function fx-check-default-target {
   local ffx_binary="${FUCHSIA_BUILD_DIR}/host-tools/ffx"
   if [[ ! -x "${ffx_binary}" ]]; then
     fx-warn "ffx not found in build directory, skipping verification that effective target device is \"$FUCHSIA_NODENAME\"."
+    # shellcheck disable=SC2016
     fx-warn 'Please run `ffx target default get` after the build to confirm.'
     return 0
   fi
@@ -316,6 +357,7 @@ function fx-check-default-target {
 
   fx-error "The build level device \"$FUCHSIA_NODENAME\" is being overridden by the user level device \"$effective_default_target\"."
   fx-error "Here are all of the ffx default values set: $(ffx config get --select all target.default)"
+  # shellcheck disable=SC2016
   fx-error 'Please run `ffx target default unset; ffx target default unset --level global` to fix this.'
   return 1
 }
@@ -348,6 +390,7 @@ function ffx-default-repository-name {
 # match the normal argument order of jq, but unlike with jq it's required.
 function _jq_edit {
   # Take the last argument as the path to the edited file.
+  # shellcheck disable=SC2124
   local json_file="${@: -1}"
 
   local -r tempfile="$(mktemp)"
@@ -737,15 +780,14 @@ function fx-command-run {
   local command_path
   # Use an array because the command may be multiple elements, if it comes from
   # a .fx metadata file.
-  command_path=( $(find_executable "${command_name}") )
-
-  if [[ $? -ne 0 || ! -x "${command_path[0]}" ]]; then
+  command_path="$(find_executable "${command_name}")"
+  if [[ $? -ne 0 || ! -x "${command_path}" ]]; then
     fx-error "Unknown command ${command_name}"
     exit 1
   fi
 
   shift
-  env FX_CALLER="$0" "${command_path[@]}" "$@"
+  env FX_CALLER="$0" "${command_path}" "$@"
 }
 
 function fx-command-exec {
@@ -753,15 +795,14 @@ function fx-command-exec {
   local command_path
   # Use an array because the command may be multiple elements, if it comes from
   # a .fx metadata file.
-  command_path=( $(find_executable "${command_name}") )
-
-  if [[ $? -ne 0 || ! -x "${command_path[0]}" ]]; then
+  command_path="$(find_executable "${command_name}")"
+  if [[ $? -ne 0 || ! -x "${command_path}" ]]; then
     fx-error "Unknown command ${command_name}"
     exit 1
   fi
 
   shift
-  exec env FX_CALLER="$0" "${command_path[@]}" "$@"
+  exec env FX_CALLER="$0" "${command_path}" "$@"
 }
 
 function fx-print-command-help {
@@ -877,7 +918,7 @@ function fx-cmd-locked {
   # $_FX_LOCK_FILE rather than the value at the time that trap executes to
   # ensure we delete the original file even if the value of $_FX_LOCK_FILE
   # changes for whatever reason.
-  trap "[[ -n \"${_FX_LOCK_FILE}\" ]] && rm -f \"${_FX_LOCK_FILE}\"" EXIT
+  trap "[[ -n \"\${_FX_LOCK_FILE}\" ]] && rm -f \"\${_FX_LOCK_FILE}\"" EXIT
   fx-exit-on-failure "$@"
 }
 
@@ -1008,7 +1049,6 @@ function fx-run-ninja {
   local -a rbe_wrapper_loas_args=()
   if fx-build-needs-auth
   then
-    local loas_type
     # TODO(b/342026853): automatic use of gcert for authentication in bazel
     # is now the default, and is opt-out with FX_BUILD_AUTO_AUTH=0.
     # Eventually, this will become permanent.
@@ -1067,7 +1107,8 @@ function fx-run-ninja {
     local proxy_cfg_args=()
     if [[ -r "$rbe_config_json" ]]
     then
-      all_proxy_cfgs=($("$jq" '.[] | .path' < "$rbe_config_json" | sed -e 's|"\(.*\)"|\1|'))
+      # shellcheck disable=SC2207
+      all_proxy_cfgs=($("$jq" '.[] | .path' "$rbe_config_json" | sed -e 's|"\(.*\)"|\1|'))
       # Adjust paths to be absolute.
       for f in "${all_proxy_cfgs[@]}"
       do proxy_cfg_args+=(--cfg "$FUCHSIA_BUILD_DIR/$f")  # cumulative, repeatable
@@ -1130,8 +1171,9 @@ function fx-run-ninja {
     # Note: this profile dir will get cleaned by 'fx clean'
     local profile_dir="${FUCHSIA_BUILD_DIR}/.build_profile"
     mkdir -p "$profile_dir"
-    local vmstat_log="$(env TMPDIR="$profile_dir" mktemp -t "vmstat.$date.XXXX.log")"
-    local ifconfig_log="$(env TMPDIR="$profile_dir" mktemp -t "ifconfig.$date.XXXX.log")"
+    local vmstat_log ifconfig_log
+    vmstat_log="$(env TMPDIR="$profile_dir" mktemp -t "vmstat.$date.XXXX.log")"
+    ifconfig_log="$(env TMPDIR="$profile_dir" mktemp -t "ifconfig.$date.XXXX.log")"
     profile_wrapper=(
       "$profile_wrap"
       --vmstat-log "$vmstat_log"
