@@ -9,6 +9,7 @@ use ffx_command_error::{return_bug, Result};
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
 use futures::future::LocalBoxFuture;
+use std::any::Any;
 use std::fmt;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -29,6 +30,12 @@ pub trait FhoTargetInfo {
 
     /// The address and port for the ssh service on the device.
     fn ssh_address(&self) -> Option<std::net::SocketAddr>;
+
+    /// To be used in conjunction with downcast_ref.
+    /// We cannot just use downcast_ref with generics, as it would not be
+    /// invokeable from a dyn object as per:
+    /// https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility
+    fn as_any<'a>(&'a self) -> &'a dyn Any;
 }
 
 // This trait can a.) probably use more members, and b.) be something that is made public inside of
