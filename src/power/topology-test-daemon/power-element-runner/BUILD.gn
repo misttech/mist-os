@@ -6,7 +6,6 @@ import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
 rustc_binary("bin") {
-  testonly = true
   edition = "2021"
   name = "power_element_runner"
   sources = [ "src/main.rs" ]
@@ -26,7 +25,6 @@ rustc_binary("bin") {
 }
 
 fuchsia_component("component") {
-  testonly = true
   component_name = "power-element-runner"
   manifest = "meta/power-element-runner.cml"
   deps = [ ":bin" ]
@@ -34,6 +32,5 @@ fuchsia_component("component") {
 
 fuchsia_package("package") {
   package_name = "power-element-runner"
-  testonly = true
   deps = [ ":component" ]
 }

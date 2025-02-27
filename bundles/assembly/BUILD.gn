@@ -4186,7 +4186,6 @@ assembly_input_bundle("battery_manager") {
 # build-types: eng
 #
 assembly_input_bundle("topology_test_daemon") {
-  testonly = true
   base_packages = [ "//src/power/topology-test-daemon:package" ]
   compiled_packages = [
     {

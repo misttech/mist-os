@@ -4,7 +4,6 @@
 {
     include: [
         "inspect/client.shard.cml",
-        "sys/component/realm_builder.shard.cml",
         "syslog/client.shard.cml",
         "trace/client.shard.cml",
     ],
@@ -12,6 +11,12 @@
         runner: "elf",
         binary: "bin/topology_test_daemon",
     },
+    collections: [
+        {
+            name: "elements",
+            durability: "transient",
+        },
+    ],
     capabilities: [
         {
             protocol: [
@@ -27,6 +32,17 @@
                 "fuchsia.power.system.ActivityGovernor",
             ],
             availability: "optional",
+        },
+        {
+            protocol: "fuchsia.component.Realm",
+            from: "framework",
+        },
+    ],
+    offer: [
+        {
+            protocol: [ "fuchsia.tracing.provider.Registry" ],
+            from: "parent",
+            to: "#elements",
         },
     ],
     expose: [
