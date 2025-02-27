@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-library test.log;
+library test.benchmark;
 
 type Address = struct {
     x0 uint8;

@@ -6,8 +6,8 @@ import("//build/fidl/fidl.gni")
 import("//build/rust/rustc_binary.gni")
 
 fidl("fidl") {
-  name = "test.log"
-  sources = [ "log.test.fidl" ]
+  name = "test.benchmark"
+  sources = [ "benchmark.test.fidl" ]
   excluded_checks = [
     "string-bounds-not-specified",
     "vector-bounds-not-specified",
@@ -16,7 +16,7 @@ fidl("fidl") {
 }
 
 rustc_binary("bin") {
-  name = "log"
+  name = "rust_next_benchmark"
   edition = "2021"
 
   deps = [
@@ -28,5 +28,8 @@ rustc_binary("bin") {
     "//third_party/rust_crates:rand",
   ]
 
-  sources = [ "src/main.rs" ]
+  sources = [
+    "src/log.rs",
+    "src/main.rs",
+  ]
 }
