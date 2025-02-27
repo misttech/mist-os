@@ -33,7 +33,7 @@ namespace {
 //
 // TODO(https://fxbug.dev/42114336): Make this runtime tunable. It may be necessary to change
 // the Dpc deadline params later in boot, after configuration is loaded somehow.
-constexpr SchedulerState::BaseProfile kProfile{
+constexpr SchedulerState::BaseProfile kProfileLowLatency{
     SchedDeadlineParams{SchedDuration{ZX_USEC(150)}, SchedDuration{ZX_USEC(300)}}};
 
 }  // namespace
@@ -64,10 +64,17 @@ void DpcRunner::InitForCurrentCpu() {
     initialized_ = true;
   }
 
-  queue_.Init(cpu, "dpc-", kProfile);
+  queue_general_.Init(cpu, "dpcg-", SchedulerState::BaseProfile{DEFAULT_PRIORITY});
+  queue_low_latency_.Init(cpu, "dpcll-", kProfileLowLatency);
 }
 
-zx_status_t DpcRunner::Shutdown(zx_instant_mono_t deadline) { return queue_.Shutdown(deadline); }
+zx_status_t DpcRunner::Shutdown(zx_instant_mono_t deadline) {
+  zx_status_t status = queue_general_.Shutdown(deadline);
+  if (status != ZX_OK) {
+    return status;
+  }
+  return queue_low_latency_.Shutdown(deadline);
+}
 
 void DpcRunner::TransitionOffCpu(DpcRunner& source) {
   Guard<SpinLock, IrqSave> guard{Dpc::Lock::Get()};
@@ -76,13 +83,14 @@ void DpcRunner::TransitionOffCpu(DpcRunner& source) {
   DEBUG_ASSERT(cpu_ == arch_curr_cpu_num());
   DEBUG_ASSERT(cpu_ != source.cpu_);
 
-  source.queue_.TakeFromLocked(source.queue_);
+  source.queue_general_.TakeFromLocked(source.queue_general_);
+  source.queue_low_latency_.TakeFromLocked(source.queue_low_latency_);
 
   source.initialized_ = false;
   source.cpu_ = INVALID_CPU;
 }
 
-zx_status_t DpcRunner::Enqueue(Dpc& dpc) {
+zx_status_t DpcRunner::Enqueue(Dpc& dpc, QueueType type) {
   DpcRunner::Queue* queue = nullptr;
   {
     Guard<SpinLock, IrqSave> guard{Dpc::Lock::Get()};
@@ -91,7 +99,18 @@ zx_status_t DpcRunner::Enqueue(Dpc& dpc) {
       return ZX_ERR_ALREADY_EXISTS;
     }
 
-    queue = &percpu::GetCurrent().dpc_runner.queue_;
+    // Select the queue.
+    DpcRunner& runner = percpu::GetCurrent().dpc_runner;
+    switch (type) {
+      case QueueType::General:
+        queue = &runner.queue_general_;
+        break;
+      case QueueType::LowLatency:
+        queue = &runner.queue_low_latency_;
+        break;
+      default:
+        panic("unknown QueueType %u", static_cast<uint32_t>(type));
+    };
 
     // Put this Dpc at the tail of the list. Signal the worker outside the lock.
     queue->EnqueueLocked(dpc);

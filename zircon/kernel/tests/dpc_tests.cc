@@ -62,7 +62,10 @@ static bool test_dpc_queue() {
     AutoPreemptDisabler preempt_disable;
     interrupt_saved_state_t int_state = arch_interrupt_save();
     context[i].expected_cpu = arch_curr_cpu_num();
-    DpcRunner::Enqueue(context[i].dpc);
+    // Use a mix of both general and low-latency.
+    const DpcRunner::QueueType type =
+        (i % 2) ? DpcRunner::QueueType::General : DpcRunner::QueueType::LowLatency;
+    DpcRunner::Enqueue(context[i].dpc, type);
     arch_interrupt_restore(int_state);
   }
   for (int i = 0; i < kNumDPCs; i++) {

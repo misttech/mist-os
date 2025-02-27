@@ -91,7 +91,19 @@ class DpcRunner {
   // This must only be called on the current cpu.
   void TransitionOffCpu(DpcRunner& source);
 
-  // Enqueue |dpc| and signal its worker thread to execute it.
+  // Dpc are placed into different queues depending on their ServiceLevel.  One queue for those that
+  // need to execute with |LowLatency| (e.g. signaling a TimerDispatcher from interrupt context).
+  // The other queue (|General|) is for the rest.
+  //
+  // |LowLatency| Dpcs are executed by a thread with a high-bandwidth scheduler profile so take
+  // care to avoid creating undesirable PI interactions.  In other words, don't use |LowLatency|
+  // unless you really need to, and be sure that the Dpc won't hold likely-to-be-contested locks for
+  // a significant amount of time.  See also https://fxbug.dev/395669867.
+  //
+  // |General| Dpcs are serviced by a thread with a default scheduler profile.
+  enum class QueueType : uint32_t { General, LowLatency };
+
+  // Enqueue |dpc| in the specified queue |type| and signal its worker thread to execute it.
   //
   // |Enqueue| will not block, but it may wait briefly for a spinlock.
   //
@@ -105,7 +117,8 @@ class DpcRunner {
   // operation.
   //
   // Returns ZX_ERR_ALREADY_EXISTS if |dpc| is already queued.
-  static zx_status_t Enqueue(Dpc& dpc) TA_EXCL(chainlock_transaction_token);
+  static zx_status_t Enqueue(Dpc& dpc, QueueType type = QueueType::General)
+      TA_EXCL(chainlock_transaction_token);
 
  private:
   // Queue encapsulates a list of Dpc tasks and a thread that pops tasks off the list and executes
@@ -160,7 +173,8 @@ class DpcRunner {
   // Whether the DpcRunner has been initialized for the owning cpu.
   bool initialized_ TA_GUARDED(Dpc::Lock::Get()) = false;
 
-  Queue queue_;
+  Queue queue_general_;
+  Queue queue_low_latency_;
 };
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_DPC_H_
