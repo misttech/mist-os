@@ -16,6 +16,7 @@ rustc_library("fidl_next_bind") {
     "src/lib.rs",
     "src/method.rs",
     "src/server.rs",
+    "src/service.rs",
   ]
   deps = [
     "//src/lib/fidl/rust_next/fidl_next_codec",

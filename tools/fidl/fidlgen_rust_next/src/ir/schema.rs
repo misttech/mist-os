@@ -7,8 +7,8 @@ use std::collections::HashMap;
 use serde::Deserialize;
 
 use super::{
-    Bits, CompId, CompIdent, Const, DeclType, Enum, Library, Protocol, Struct, Table, TypeAlias,
-    TypeShape, Union,
+    Bits, CompId, CompIdent, Const, DeclType, Enum, Library, Protocol, Service, Struct, Table,
+    TypeAlias, TypeShape, Union,
 };
 
 /// A FIDL JSON IR schema.
@@ -25,12 +25,10 @@ pub struct Schema {
     pub enum_declarations: HashMap<CompIdent, Enum>,
     #[serde(deserialize_with = "crate::de::index")]
     pub protocol_declarations: HashMap<CompIdent, Protocol>,
-    // pub interface_declarations: Vec<Protocol>,
-    // pub service_declarations: Vec<Service>,
+    #[serde(deserialize_with = "crate::de::index")]
+    pub service_declarations: HashMap<CompIdent, Service>,
     #[serde(deserialize_with = "crate::de::index")]
     pub struct_declarations: HashMap<CompIdent, Struct>,
-    // #[serde(deserialize_with = "crate::de::index")]
-    // pub external_struct_declarations: HashMap<CompIdent, Struct>,
     #[serde(deserialize_with = "crate::de::index")]
     pub table_declarations: HashMap<CompIdent, Table>,
     #[serde(deserialize_with = "crate::de::index")]

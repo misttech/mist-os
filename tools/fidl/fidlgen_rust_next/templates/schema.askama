@@ -24,11 +24,12 @@
             {{ self.table(schema.table_declarations[ident]) }}
         {% when DeclType::Union %}
             {{ self.union(schema.union_declarations[ident]) }}
-        {% when DeclType::NewType %} {{ todo!() }}
-        {% when DeclType::Overlay %} {{ todo!() }}
+        {% when DeclType::NewType %} {{ todo!("newtypes are not supported yet") }}
+        {% when DeclType::Overlay %} {{ todo!("overlays are not supported yet") }}
         {% when DeclType::Protocol %}
             {{ self.protocol(schema.protocol_declarations[ident]) }}
         {% when DeclType::Resource %}
-        {% when DeclType::Service %} {{ todo!() }}
+        {% when DeclType::Service %}
+            {{ self.service(schema.service_declarations[ident]) }}
     {% endmatch %}
 {% endfor %}

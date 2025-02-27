@@ -106,6 +106,7 @@ template!(bits(bits: Bits) -> BitsTemplate = "bits.askama");
 template!(cnst(cnst: Const) -> ConstTemplate = "const.askama");
 template!(enm(enm: Enum) -> EnumTemplate = "enum.askama");
 template!(protocol(protocol: Protocol) -> ProtocolTemplate = "protocol.askama");
+template!(service(service: Service) -> ServiceTemplate = "service.askama");
 template!(strct(strct: Struct) -> StructTemplate = "struct.askama");
 template!(table(table: Table) -> TableTemplate = "table.askama");
 template!(union(union: Union) -> UnionTemplate = "union.askama");

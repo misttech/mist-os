@@ -18,6 +18,7 @@ rustc_library("fidl_next_protocol") {
     "src/lockers.rs",
     "src/mpsc.rs",
     "src/server.rs",
+    "src/service.rs",
     "src/testing.rs",
     "src/transport.rs",
     "src/wire.rs",

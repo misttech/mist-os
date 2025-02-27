@@ -81,8 +81,8 @@ impl ::fidl_next::TakeFrom<{{ wire_name }}> for {{ name }} {
     fn take_from(from: &{{ wire_name }}) -> Self {
         Self {
             {% for member in table.members %}
-                {% let member_name = member.name.snake() %}
-                {{ member_name|ident }}: from.{{ member_name }}().map(::fidl_next::TakeFrom::take_from),
+                {% let member_name = filters::ident(member.name.snake())? %}
+                {{ member_name }}: from.{{ member_name }}().map(::fidl_next::TakeFrom::take_from),
             {% endfor %}
         }
     }

@@ -30,6 +30,7 @@ pub mod fuchsia;
 mod lockers;
 pub mod mpsc;
 mod server;
+mod service;
 #[cfg(test)]
 mod testing;
 mod transport;
@@ -40,5 +41,6 @@ pub use self::client::*;
 pub use self::error::*;
 pub use self::framework_error::*;
 pub use self::server::*;
+pub use self::service::*;
 pub use self::transport::*;
 pub use self::wire::*;

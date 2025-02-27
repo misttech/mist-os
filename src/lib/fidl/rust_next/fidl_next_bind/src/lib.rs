@@ -26,9 +26,11 @@ mod client;
 mod endpoint;
 mod method;
 mod server;
+mod service;
 
 pub use self::buffer::*;
 pub use self::client::*;
 pub use self::endpoint::*;
 pub use self::method::*;
 pub use self::server::*;
+pub use self::service::*;
