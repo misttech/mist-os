@@ -10,7 +10,10 @@ rustc_library("fuchsia-cprng") {
   version = "0.1.1"
   edition = "2021"
   with_unit_tests = true
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//third_party/rust_crates:fuchsia-cprng-v0_1_1",
+  ]
   source_root = "src/lib.rs"
   sources = [ source_root ]
 }

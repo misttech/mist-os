@@ -568,8 +568,7 @@ license_files = ["LICENSE-APACHE"]
 visibility = [":*"]
 
 [gn.package.fuchsia-cprng."0.1.1"]
-# Lives in-tree
-uses_fuchsia_license = true
+existing_gn_target = "//src/lib/fuchsia-cprng"
 
 [gn.package.futures-channel."0.3.30"]
 env_vars = [ "CARGO_PKG_NAME=futures-channel" ]

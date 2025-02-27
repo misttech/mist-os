@@ -107,6 +107,9 @@ pub struct TargetCfg {
 
     // Path to explicitly defined license(s).
     license_files: Option<Vec<String>>,
+
+    // Existing GN target to use in the output BUILD.gn instead of auto-generating one.
+    existing_gn_target: Option<String>,
 }
 
 /// Configuration for a single GN executable target to generate from a Cargo binary target.
@@ -492,6 +495,8 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
     // we iterate through targets.
     let mut renamed_rules = HashMap::<&GnTarget<'_>, &'_ str>::new();
     let mut unused_configs = String::new();
+    let mut existing_targets = HashMap::<&GnTarget<'_>, String>::new();
+
     if let Some(gn_pkg_cfgs) = gn_pkg_cfgs {
         for (pkg_name, versions) in gn_pkg_cfgs {
             for (pkg_version, pkg_cfg) in versions {
@@ -523,6 +528,33 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
 
                     if pkg_cfg.tests {
                         targets_with_tests.insert(target);
+                    }
+
+                    // If there is an existing GN target, there shouldn't be any other fields set.
+                    if pkg_cfg.default_cfg.existing_gn_target.is_some() {
+                        assert!(
+                        pkg_cfg.default_cfg.rustflags.is_none() &&
+                        pkg_cfg.default_cfg.env_vars.is_none() &&
+                        pkg_cfg.default_cfg.deps.is_none() &&
+                        pkg_cfg.default_cfg.configs.is_none() &&
+                        pkg_cfg.default_cfg.visibility.is_none() &&
+                        pkg_cfg.default_cfg.uses_fuchsia_license.is_none() &&
+                        pkg_cfg.platform_cfg.is_empty() &&
+                        pkg_cfg.binary.is_empty() &&
+                        pkg_cfg.reviewed_features.is_none() &&
+                        pkg_cfg.group_visibility.is_none() &&
+                        pkg_cfg.testonly.is_none() &&
+                        pkg_cfg.target_renaming.is_none(),
+                        "No other field can be set, including platform sub-configs, if an existing GN target is specified");
+                        assert!(
+                            existing_targets
+                                .insert(
+                                    target,
+                                    pkg_cfg.default_cfg.existing_gn_target.clone().unwrap()
+                                )
+                                .is_none(),
+                            "Duplicate target"
+                        );
                     }
                 } else {
                     unused_configs.push_str(&format!(
@@ -731,19 +763,29 @@ pub fn generate_from_manifest<W: io::Write>(mut output: &mut W, opt: &Opt) -> Re
             path: package_root.to_owned(),
         });
 
-        gn::write_rule(
-            &mut output,
-            target,
-            &opt.project_root,
-            global_config,
-            target_cfg,
-            binary_name,
-            testonly_targets.contains(target),
-            false,
-            renamed_rules.get(target).copied(),
-            true,
-        )
-        .with_context(|| format!("writing rule for: {} {}", target.name(), target.version()))?;
+        // If there is an existing GN target, we want a group and not a new GN target.
+        if let Some(existing_target) = existing_targets.get(target) {
+            writeln!(
+                output,
+                include_str!("../templates/gn_group.template"),
+                group_name = target.gn_target_name(),
+                dep_name = existing_target,
+            )?;
+        } else {
+            gn::write_rule(
+                &mut output,
+                target,
+                &opt.project_root,
+                global_config,
+                target_cfg,
+                binary_name,
+                testonly_targets.contains(target),
+                false,
+                renamed_rules.get(target).copied(),
+                true,
+            )
+            .with_context(|| format!("writing rule for: {} {}", target.name(), target.version()))?;
+        }
 
         if targets_with_tests.contains(target) {
             gn::write_rule(

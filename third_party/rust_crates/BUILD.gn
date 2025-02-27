@@ -6292,26 +6292,8 @@ rust_library("fsevent-sys-v4_0_0") {
   applicable_licenses = [ ":fsevent-sys-v4_0_0.license" ]
 }
 
-rust_library("fuchsia-cprng-v0_1_1") {
-  crate_name = "fuchsia_cprng"
-  crate_root = "//src/lib/fuchsia-cprng/src/lib.rs"
-  output_name = "fuchsia_cprng-2003c73715c7fc44"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=2003c73715c7fc44",
-    "-Cextra-filename=-2003c73715c7fc44",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ "//build/licenses:fuchsia_license" ]
+group("fuchsia-cprng-v0_1_1") {
+  public_deps = [ "//src/lib/fuchsia-cprng" ]
 }
 
 license("fuse3-v0_6_1.license") {
