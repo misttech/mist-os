@@ -189,6 +189,7 @@ test("amlogic-display-test") {
     "hot-plug-detection-test.cc",
     "panel-config-test.cc",
     "pixel-grid-size2d-test.cc",
+    "pll-regs-test.cc",
     "power-regs-test.cc",
     "video-input-regs-test.cc",
   ]
