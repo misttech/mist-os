@@ -4,6 +4,7 @@
 
 library fuchsia.ui.test.input;
 
+using fuchsia.input;
 using fuchsia.input.report;
 using fuchsia.ui.input3;
 
@@ -34,6 +35,12 @@ closed protocol Keyboard {
     @available(added=16)
     strict SimulateKeyEvent(table {
         1: report fuchsia.input.report.KeyboardInputReport;
+    }) -> ();
+
+    /// Simulate one key press includes down and up event.
+    @available(added=NEXT)
+    strict SimulateKeyPress(table {
+        1: key_code fuchsia.input.Key;
     }) -> ();
 };
 

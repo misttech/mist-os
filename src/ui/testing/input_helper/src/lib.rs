@@ -739,6 +739,33 @@ async fn handle_keyboard_request_stream(
 
                 responder.send().expect("Failed to send SimulateKeyEvent response");
             }
+            Ok(KeyboardRequest::SimulateKeyPress { payload, responder }) => {
+                let key_code = payload.key_code.expect("no key code");
+
+                let down_report = InputReport {
+                    event_time: Some(fasync::MonotonicInstant::now().into_nanos()),
+                    keyboard: Some(KeyboardInputReport {
+                        pressed_keys3: Some(vec![key_code]),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                };
+
+                let up_report = InputReport {
+                    event_time: Some(fasync::MonotonicInstant::now().into_nanos()),
+                    keyboard: Some(KeyboardInputReport {
+                        pressed_keys3: Some(vec![]),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                };
+
+                keyboard_device.send_input_report(down_report).expect("Failed to send key down");
+
+                keyboard_device.send_input_report(up_report).expect("Failed to send key up");
+
+                responder.send().expect("Failed to send SimulateKeyPress response");
+            }
             Err(e) => {
                 error!("Error on keyboard device channel: {}", e);
                 return;
