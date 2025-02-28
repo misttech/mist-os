@@ -59,7 +59,7 @@ zx::result<typename Service::ServiceClient> OpenService(
   if (result.is_error()) {
     return result.take_error();
   }
-  return zx::ok(typename Service::ServiceClient(std::move(local), internal::DirectoryOpenFunc));
+  return zx::ok(typename Service::ServiceClient(std::move(local), internal::ProtocolOpenFunc));
 }
 
 // Opens a connection to the given instance of the provide FIDL service. The
@@ -87,7 +87,7 @@ zx::result<typename Service::ServiceClient> OpenServiceAt(
   if (result.is_error()) {
     return result.take_error();
   }
-  return zx::ok(typename Service::ServiceClient(std::move(local), internal::DirectoryOpenFunc));
+  return zx::ok(typename Service::ServiceClient(std::move(local), internal::ProtocolOpenFunc));
 }
 
 // Gets the relative path to a service member.

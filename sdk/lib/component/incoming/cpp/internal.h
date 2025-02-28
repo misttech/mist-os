@@ -60,15 +60,15 @@ zx::result<> OpenNamedServiceAtRaw(fidl::UnownedClientEnd<fuchsia_io::Directory>
                                    std::string_view service_path, std::string_view instance,
                                    zx::channel remote);
 
-// The internal |DirectoryOpenFunc| needs to take raw Zircon channels because
+// The internal |ProtocolOpenFunc| needs to take raw Zircon channels because
 // the FIDL runtime that interfaces with it cannot depend on the |fuchsia.io|
 // FIDL library.
-zx::result<> DirectoryOpenFunc(zx::unowned_channel dir, fidl::StringView path,
-                               fidl::internal::AnyTransport remote);
+zx::result<> ProtocolOpenFunc(zx::unowned_channel dir, fidl::StringView path,
+                              fidl::internal::AnyTransport remote);
 
 zx::result<fidl::ClientEnd<fuchsia_io::Directory>> GetGlobalServiceDirectory();
 
-// Determines if |Protocol| contains the |fuchsia.unknown/Cloneable.Clone2| method.
+// Determines if |Protocol| contains the |fuchsia.unknown/Cloneable.Clone| method.
 template <typename Protocol, typename = void>
 struct has_fidl_method_fuchsia_unknown_clone : public ::std::false_type {};
 #if FUCHSIA_API_LEVEL_AT_LEAST(26)

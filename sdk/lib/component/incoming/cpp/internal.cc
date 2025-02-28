@@ -9,39 +9,40 @@
 #include <lib/fdio/directory.h>
 #include <zircon/assert.h>
 
+#include <cstring>
+
 namespace component::internal {
 
 namespace {
 
 namespace fio = fuchsia_io;
 
-constexpr uint64_t kMaxFilename = fio::wire::kMaxFilename;
+constexpr size_t kMaxComponentLength = fio::wire::kMaxFilename;
 
-// Max path length will be two path components, separated by a file separator.
-constexpr uint64_t kMaxPath = (2 * kMaxFilename) + 1;
+// Buffer used to hold the maximum possible path of a service instance. A service instance path is
+// made from two path components, each separated by '/', and must be terminated with a null byte.
+using ServiceInstancePathBuffer = char[(2 * kMaxComponentLength) + 1 + 1];
 
-zx::result<fidl::StringView> ValidateAndJoinPath(fidl::Array<char, kMaxPath>& buffer,
-                                                 fidl::StringView service,
-                                                 fidl::StringView instance) {
-  if (service.empty() || service.size() > kMaxFilename) {
+// Combines `service` and `instance` with a '/' separator. Guarantees the result ends with a null
+// byte so it can be safely passed to functions that require C strings.
+zx::result<std::string_view> MakeInstancePath(ServiceInstancePathBuffer& buffer,
+                                              std::string_view service, std::string_view instance) {
+  if (service.empty() || service.size() > kMaxComponentLength) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
-  if (instance.size() > kMaxFilename) {
+  if (instance.size() > kMaxComponentLength) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
   if (service[0] == '/') {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
-
   const uint64_t path_size = service.size() + instance.size() + 1;
-  ZX_ASSERT(path_size <= kMaxPath);
-
-  char* path_cursor = buffer.data();
-  memcpy(path_cursor, service.data(), service.size());
-  path_cursor += service.size();
-  *path_cursor++ = '/';
-  memcpy(path_cursor, instance.data(), instance.size());
-  return zx::ok(fidl::StringView::FromExternal(buffer.data(), path_size));
+  ZX_ASSERT(path_size < sizeof buffer);
+  std::memcpy(buffer, service.data(), service.size());
+  buffer[service.size()] = '/';
+  std::memcpy(buffer + service.size() + 1, instance.data(), instance.size());
+  buffer[path_size] = '\0';
+  return zx::ok(std::string_view(buffer, path_size));
 }
 
 zx::result<fio::wire::Flags> EnsureDirectoryProtocol(fio::wire::Flags flags) {
@@ -134,19 +135,17 @@ zx::result<> OpenNamedServiceRaw(std::string_view service, std::string_view inst
 zx::result<> OpenNamedServiceAtRaw(fidl::UnownedClientEnd<fio::Directory> dir,
                                    std::string_view service, std::string_view instance,
                                    zx::channel remote) {
-  fidl::Array<char, kMaxPath> path_buffer;
-  zx::result<fidl::StringView> path_result =
-      ValidateAndJoinPath(path_buffer, fidl::StringView::FromExternal(service),
-                          fidl::StringView::FromExternal(instance));
-  if (!path_result.is_ok()) {
-    return path_result.take_error();
+  ServiceInstancePathBuffer path_buffer;
+  zx::result<std::string_view> path = MakeInstancePath(path_buffer, service, instance);
+  if (!path.is_ok()) {
+    return path.take_error();
   }
-  return DirectoryOpenFunc(dir.channel(), path_result.value(),
-                           fidl::internal::MakeAnyTransport(std::move(remote)));
+  return zx::make_result(fdio_open3_at(dir.channel()->get(), path->data(),
+                                       uint64_t{kServiceRootFlags}, remote.release()));
 }
 
-zx::result<> DirectoryOpenFunc(zx::unowned_channel dir, fidl::StringView path,
-                               fidl::internal::AnyTransport remote) {
+zx::result<> ProtocolOpenFunc(zx::unowned_channel dir, fidl::StringView path,
+                              fidl::internal::AnyTransport remote) {
   std::string owned_path(path.get());
   return zx::make_result(
       fdio_service_connect_at(dir->get(), owned_path.c_str(),
