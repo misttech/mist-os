@@ -15,6 +15,8 @@ use packet_formats::ipv4::Ipv4Header as _;
 use packet_formats::ipv6::ext_hdrs::{HopByHopOptionData, Ipv6ExtensionHeaderData};
 use packet_formats::ipv6::Ipv6Header as _;
 
+use crate::internal::routing::rules::Marks;
+
 /// Informs the transport layer of parameters for transparent local delivery.
 #[derive(Debug, GenericOverIp, Clone)]
 #[generic_over_ip(I, Ip)]
@@ -46,6 +48,8 @@ pub struct LocalDeliveryPacketInfo<I: IpExt, H: IpHeaderInfo<I>> {
     pub meta: ReceiveIpPacketMeta<I>,
     /// Accessor for extra information in IP header.
     pub header_info: H,
+    /// The marks carried by the incoming packet.
+    pub marks: Marks,
 }
 
 /// Abstracts extracting information from IP headers for upper layers.
@@ -130,7 +134,11 @@ pub(crate) mod testutil {
 
     impl<I: IpExt> Default for LocalDeliveryPacketInfo<I, FakeIpHeaderInfo> {
         fn default() -> Self {
-            Self { meta: Default::default(), header_info: Default::default() }
+            Self {
+                meta: Default::default(),
+                header_info: Default::default(),
+                marks: Default::default(),
+            }
         }
     }
 

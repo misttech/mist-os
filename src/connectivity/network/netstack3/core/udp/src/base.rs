@@ -1388,7 +1388,7 @@ fn receive_ip_packet<
     mut buffer: B,
     info: &LocalDeliveryPacketInfo<I, H>,
 ) -> Result<(), (B, TransportReceiveError)> {
-    let LocalDeliveryPacketInfo { meta, header_info } = info;
+    let LocalDeliveryPacketInfo { meta, header_info, marks: _ } = info;
     let ReceiveIpPacketMeta { broadcast, transparent_override } = meta;
 
     trace_duration!(bindings_ctx, c"udp::receive_ip_packet");

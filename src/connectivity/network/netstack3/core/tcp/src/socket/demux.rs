@@ -24,7 +24,7 @@ use netstack3_base::{
 use netstack3_filter::TransportPacketSerializer;
 use netstack3_ip::socket::{IpSockCreationError, MmsError};
 use netstack3_ip::{
-    IpHeaderInfo, IpTransportContext, LocalDeliveryPacketInfo, ReceiveIpPacketMeta,
+    IpHeaderInfo, IpTransportContext, LocalDeliveryPacketInfo, Marks, ReceiveIpPacketMeta,
     TransportIpContext, TransportReceiveError,
 };
 use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder, Serializer as _};
@@ -117,7 +117,7 @@ where
         mut buffer: B,
         info: &LocalDeliveryPacketInfo<I, H>,
     ) -> Result<(), (B, TransportReceiveError)> {
-        let LocalDeliveryPacketInfo { meta, header_info: _ } = info;
+        let LocalDeliveryPacketInfo { meta, header_info: _, marks } = info;
         let ReceiveIpPacketMeta { broadcast, transparent_override } = meta;
         if let Some(delivery) = transparent_override {
             warn!(
@@ -198,7 +198,14 @@ where
                 core_ctx.increment(|counters: &TcpCounters<I>| &counters.fins_received)
             }
         }
-        handle_incoming_packet::<I, _, _>(core_ctx, bindings_ctx, conn_addr, device, incoming);
+        handle_incoming_packet::<I, _, _>(
+            core_ctx,
+            bindings_ctx,
+            conn_addr,
+            device,
+            incoming,
+            marks,
+        );
         Ok(())
     }
 }
@@ -209,6 +216,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
     conn_addr: ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>,
     incoming_device: &CC::DeviceId,
     incoming: Segment<&[u8]>,
+    marks: &Marks,
 ) where
     WireI: DualStackIpExt,
     BC: TcpBindingsContext
@@ -292,6 +300,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
                                             &mut tw_reuse,
                                             move |conn, addr| converter.convert_back((conn, addr)),
                                             WireI::into_demux_socket_id,
+                                            marks,
                                         )
                                     }
                                     MaybeDualStack::DualStack((core_ctx, converter)) => {
@@ -311,6 +320,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
                                                 )))
                                             },
                                             WireI::into_demux_socket_id,
+                                            marks,
                                         )
                                     }
                                 }
@@ -358,6 +368,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
                                                 )))
                                             },
                                             move |id| other_demux_id_converter.convert(id),
+                                            marks,
                                         )
                                     }
                                 }
@@ -398,10 +409,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
                 None,
                 conn_addr,
                 seg.into_empty(),
-                // We can't find the socket, so just use the default options.
-                // TODO(https://fxbug.dev/369133279): If the incoming packet carries marks, we
-                // should use them instead, otherwise we may send the RST on the wrong network.
-                &TcpIpSockOptions::default(),
+                &TcpIpSockOptions { marks: *marks },
             );
         }
     } else {
@@ -842,6 +850,7 @@ fn try_handle_incoming_for_listener<SockI, WireI, CC, BC, DC>(
     make_demux_id: impl Fn(
         TcpSocketId<SockI, CC::WeakDeviceId, BC>,
     ) -> WireI::DemuxSocketId<CC::WeakDeviceId, BC>,
+    marks: &Marks,
 ) -> ListenerIncomingSegmentDisposition<PrimaryRc<SockI, CC::WeakDeviceId, BC>>
 where
     SockI: DualStackIpExt,
@@ -895,6 +904,9 @@ where
         bound_device.map(EitherDeviceId::Weak)
     };
 
+    let ip_options = TcpIpSockOptions { marks: *marks, ..socket_options.ip_options };
+    let socket_options = SocketOptions { ip_options, ..*socket_options };
+
     let bound_device = bound_device.as_ref().map(|d| d.as_ref());
     let ip_sock = match core_ctx.new_ip_socket(
         bindings_ctx,
@@ -902,7 +914,7 @@ where
         IpDeviceAddr::new_from_socket_ip_addr(local_ip),
         remote_ip,
         IpProto::Tcp.into(),
-        &socket_options.ip_options,
+        &ip_options,
     ) {
         Ok(ip_sock) => ip_sock,
         err @ Err(IpSockCreationError::Route(_)) => {
@@ -965,7 +977,6 @@ where
 
     let result = if matches!(state, State::SynRcvd(_)) {
         let poll_send_at = state.poll_send_at().expect("no retrans timer");
-        let socket_options = socket_options.clone();
         let ListenerSharingState { sharing, listening: _ } = *sharing;
         let bound_device = ip_sock.device().cloned();
 

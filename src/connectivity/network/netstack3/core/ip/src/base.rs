@@ -173,6 +173,8 @@ pub struct IpLayerPacketMetadata<
     /// This may be non-default even in the rx path for looped back packets that
     /// are still forcing tx frame ownership for sockets.
     tx_metadata: BT::TxMetadata,
+    /// Marks attached to the packet that can be acted upon by routing/filtering.
+    marks: Marks,
     #[cfg(debug_assertions)]
     drop_check: IpLayerPacketMetadataDropCheck,
 }
@@ -207,6 +209,13 @@ pub struct DeviceIpLayerMetadata<BT: TxMetadataBindingsTypes> {
     /// This may be non-default even in the rx path for looped back packets that
     /// are still forcing tx frame ownership for sockets.
     tx_metadata: BT::TxMetadata,
+    /// Marks attached to this packet. For all the incoming packets, they are None
+    /// by default but can be changed by a filtering rule.
+    ///
+    /// Note: The marks will be preserved if the packet is being looped back, i.e.,
+    /// the receiver will be able to observe the marks set by the sender. This is
+    /// consistent with Linux behavior.
+    marks: Marks,
 }
 
 impl<BT: TxMetadataBindingsTypes> DeviceIpLayerMetadata<BT> {
@@ -225,7 +234,7 @@ impl<
 {
     fn from_device_ip_layer_metadata<CC>(
         core_ctx: &mut CC,
-        DeviceIpLayerMetadata { conntrack_entry, tx_metadata }: DeviceIpLayerMetadata<BT>,
+        DeviceIpLayerMetadata { conntrack_entry, tx_metadata, marks }: DeviceIpLayerMetadata<BT>,
     ) -> Self
     where
         CC: CounterContext<IpCounters<I>>,
@@ -251,6 +260,7 @@ impl<
         Self {
             conntrack_connection_and_direction,
             tx_metadata,
+            marks,
             #[cfg(debug_assertions)]
             drop_check: Default::default(),
         }
@@ -260,13 +270,28 @@ impl<
 impl<I: IpExt, A, BT: FilterBindingsTypes + TxMetadataBindingsTypes>
     IpLayerPacketMetadata<I, A, BT>
 {
-    pub(crate) fn from_tx_metadata(tx_metadata: BT::TxMetadata) -> Self {
+    pub(crate) fn from_tx_metadata_and_marks(tx_metadata: BT::TxMetadata, marks: Marks) -> Self {
         Self {
             conntrack_connection_and_direction: None,
             tx_metadata,
+            marks,
             #[cfg(debug_assertions)]
             drop_check: Default::default(),
         }
+    }
+
+    pub(crate) fn into_parts(
+        mut self,
+    ) -> (Option<(ConntrackConnection<I, A, BT>, ConnectionDirection)>, BT::TxMetadata, Marks) {
+        self.acknowledge_drop();
+        let Self {
+            tx_metadata,
+            marks,
+            conntrack_connection_and_direction,
+            #[cfg(debug_assertions)]
+                drop_check: _,
+        } = self;
+        (conntrack_connection_and_direction, tx_metadata, marks)
     }
 
     /// Acknowledge that it's okay to drop this packet metadata.
@@ -2386,6 +2411,7 @@ fn dispatch_receive_ipv4_packet<
         }
         filter::Verdict::Accept(()) => {}
     }
+    let marks = packet_metadata.marks;
     packet_metadata.acknowledge_drop();
 
     let src_ip = packet.src_ip();
@@ -2406,7 +2432,7 @@ fn dispatch_receive_ipv4_packet<
     let (prefix, options, body) = packet.parts_with_body_mut();
     let buffer = Buf::new(body, ..);
     let header_info = Ipv4HeaderInfo { prefix, options: options.as_ref() };
-    let receive_info = LocalDeliveryPacketInfo { meta: receive_meta, header_info };
+    let receive_info = LocalDeliveryPacketInfo { meta: receive_meta, header_info, marks };
 
     core_ctx
         .dispatch_receive_ip_packet(
@@ -2514,7 +2540,7 @@ fn dispatch_receive_ipv6_packet<
     let (fixed, extension, body) = packet.parts_with_body_mut();
     let buffer = Buf::new(body, ..);
     let header_info = Ipv6HeaderInfo { fixed, extension };
-    let receive_info = LocalDeliveryPacketInfo { meta, header_info };
+    let receive_info = LocalDeliveryPacketInfo { meta, header_info, marks: packet_metadata.marks };
 
     let result = core_ctx
         .dispatch_receive_ip_packet(
@@ -2882,17 +2908,14 @@ where
     // If the packet is leaving through the loopback device, attempt to extract a
     // weak reference to the packet's conntrack entry to plumb that through the
     // device layer so it can be reused on ingress to the IP layer.
+    let (conntrack_connection_and_direction, tx_metadata, marks) = packet_metadata.into_parts();
     let conntrack_entry = if device.is_loopback() {
-        packet_metadata
-            .conntrack_connection_and_direction
-            .take()
+        conntrack_connection_and_direction
             .and_then(|(conn, dir)| WeakConntrackConnection::new(&conn).map(|conn| (conn, dir)))
     } else {
         None
     };
-    let tx_metadata = core::mem::take(&mut packet_metadata.tx_metadata);
-    let device_ip_layer_metadata = DeviceIpLayerMetadata { conntrack_entry, tx_metadata };
-    packet_metadata.acknowledge_drop();
+    let device_ip_layer_metadata = DeviceIpLayerMetadata { conntrack_entry, tx_metadata, marks };
 
     // The filtering layer may have changed our address. Perform a last moment
     // check to protect against sending loopback addresses on the wire for
@@ -2955,6 +2978,7 @@ where
                 DeviceIpLayerMetadata {
                     conntrack_entry: device_ip_layer_metadata.conntrack_entry.clone(),
                     tx_metadata: Default::default(),
+                    marks: device_ip_layer_metadata.marks,
                 }
             } else {
                 // Unwrap here because the last frame can only happen once.

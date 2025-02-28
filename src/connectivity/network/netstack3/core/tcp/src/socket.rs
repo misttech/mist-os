@@ -2485,6 +2485,9 @@ where
     }
 
     /// Accepts an established socket from the queue of a listener socket.
+    ///
+    /// Note: The accepted socket will have the marks of the incoming SYN
+    /// instead of the listener itself.
     pub fn accept(
         &mut self,
         id: &TcpApiSocketId<I, C>,
@@ -5587,6 +5590,8 @@ mod tests {
     struct TcpCoreCtx<D: FakeStrongDeviceId, BT: TcpBindingsTypes> {
         tcp: FakeDualStackTcpState<D, BT>,
         ip_socket_ctx: InnerCoreCtx<D>,
+        // Marks to attach for incoming packets.
+        recv_packet_marks: netstack3_ip::Marks,
     }
 
     impl<D: FakeStrongDeviceId, BT: TcpBindingsTypes> ContextProvider for TcpCoreCtx<D, BT> {
@@ -5625,7 +5630,10 @@ mod tests {
                         Ipv4::recv_src_addr(*meta.src_ip),
                         meta.dst_ip,
                         buffer,
-                        &LocalDeliveryPacketInfo::default(),
+                        &LocalDeliveryPacketInfo {
+                            marks: core_ctx.recv_packet_marks,
+                            ..Default::default()
+                        },
                     )
                     .expect("failed to deliver bytes");
                 }
@@ -5637,7 +5645,10 @@ mod tests {
                         Ipv6::recv_src_addr(*meta.src_ip),
                         meta.dst_ip,
                         buffer,
-                        &LocalDeliveryPacketInfo::default(),
+                        &LocalDeliveryPacketInfo {
+                            marks: core_ctx.recv_packet_marks,
+                            ..Default::default()
+                        },
                     )
                     .expect("failed to deliver bytes");
                 }
@@ -6147,7 +6158,11 @@ mod tests {
         BT::Instant: Default,
     {
         fn with_ip_socket_ctx_state(state: FakeDualStackIpSocketCtx<D>) -> Self {
-            Self { tcp: Default::default(), ip_socket_ctx: FakeCoreCtx::with_state(state) }
+            Self {
+                tcp: Default::default(),
+                ip_socket_ctx: FakeCoreCtx::with_state(state),
+                recv_packet_marks: Default::default(),
+            }
         }
     }
 
@@ -6155,7 +6170,6 @@ mod tests {
         fn new<I: TcpTestIpExt>(
             addr: SpecifiedAddr<I::Addr>,
             peer: SpecifiedAddr<I::Addr>,
-            _prefix: u8,
         ) -> Self {
             Self::with_ip_socket_ctx_state(FakeDualStackIpSocketCtx::new(core::iter::once(
                 FakeDeviceConfig {
@@ -6224,7 +6238,6 @@ mod tests {
                         core_ctx: TcpCoreCtx::new::<I>(
                             I::TEST_ADDRS.local_ip,
                             I::TEST_ADDRS.remote_ip,
-                            I::TEST_ADDRS.subnet.prefix(),
                         ),
                         bindings_ctx: TcpBindingsCtx::default(),
                     },
@@ -6235,7 +6248,6 @@ mod tests {
                         core_ctx: TcpCoreCtx::new::<I>(
                             I::TEST_ADDRS.remote_ip,
                             I::TEST_ADDRS.local_ip,
-                            I::TEST_ADDRS.subnet.prefix(),
                         ),
                         bindings_ctx: TcpBindingsCtx::default(),
                     },
@@ -6628,7 +6640,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.local_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         let s1 = api.create(Default::default());
@@ -6658,7 +6669,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.local_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         for port in 1..=u16::MAX {
@@ -6702,7 +6712,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         let unbound = api.create(Default::default());
@@ -6721,7 +6730,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(
             Ipv6::TEST_ADDRS.local_ip,
             Ipv6::TEST_ADDRS.remote_ip,
-            Ipv6::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<Ipv6>();
         let unbound = api.create(Default::default());
@@ -6742,7 +6750,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(
             Ipv6::TEST_ADDRS.local_ip,
             Ipv6::TEST_ADDRS.remote_ip,
-            Ipv6::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<Ipv6>();
         let socket = api.create(Default::default());
@@ -6828,8 +6835,8 @@ mod tests {
         let server_ip = SpecifiedAddr::new(net_ip_v6!("1:2:3:4::")).unwrap();
         let mut net = FakeTcpNetworkSpec::new_network(
             [
-                (LOCAL, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(client_ip, server_ip, 0))),
-                (REMOTE, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(server_ip, client_ip, 0))),
+                (LOCAL, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(client_ip, server_ip))),
+                (REMOTE, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(server_ip, client_ip))),
             ],
             |net, meta| {
                 if net == LOCAL {
@@ -6902,8 +6909,8 @@ mod tests {
         let client_ip = SpecifiedAddr::new(net_ip_v6!("1:2:3:4::")).unwrap();
         let mut net = FakeTcpNetworkSpec::new_network(
             [
-                (LOCAL, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(server_ip, client_ip, 0))),
-                (REMOTE, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(client_ip, server_ip, 0))),
+                (LOCAL, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(server_ip, client_ip))),
+                (REMOTE, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(client_ip, server_ip))),
             ],
             |net, meta| {
                 if net == LOCAL {
@@ -7199,7 +7206,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         let socket = api.create(Default::default());
@@ -7230,7 +7236,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         let local = SocketAddr { ip: ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip), port: PORT_1 };
@@ -7259,22 +7264,8 @@ mod tests {
         let server_ip = SpecifiedAddr::new(net_ip_v6!("fe80::2")).unwrap();
         let mut net = FakeTcpNetworkSpec::new_network(
             [
-                (
-                    LOCAL,
-                    TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(
-                        server_ip,
-                        client_ip,
-                        Ipv6::LINK_LOCAL_UNICAST_SUBNET.prefix(),
-                    )),
-                ),
-                (
-                    REMOTE,
-                    TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(
-                        client_ip,
-                        server_ip,
-                        Ipv6::LINK_LOCAL_UNICAST_SUBNET.prefix(),
-                    )),
-                ),
+                (LOCAL, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(server_ip, client_ip))),
+                (REMOTE, TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(client_ip, server_ip))),
             ],
             move |net, meta: DualStackSendIpPacketMeta<_>| {
                 if net == LOCAL {
@@ -7340,11 +7331,7 @@ mod tests {
     fn bound_connection_info_zoned_addrs() {
         let local_ip = LinkLocalAddr::new(net_ip_v6!("fe80::1")).unwrap().into_specified();
         let remote_ip = LinkLocalAddr::new(net_ip_v6!("fe80::2")).unwrap().into_specified();
-        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(
-            local_ip,
-            remote_ip,
-            Ipv6::LINK_LOCAL_UNICAST_SUBNET.prefix(),
-        ));
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<Ipv6>(local_ip, remote_ip));
 
         let local_addr = SocketAddr {
             ip: ZonedAddr::Zoned(AddrAndZone::new(local_ip, FakeDeviceId).unwrap()),
@@ -7596,7 +7583,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         let unbound = api.create(Default::default());
@@ -7614,7 +7600,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         let socket = api.create(Default::default());
@@ -7785,7 +7770,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         let socket = api.create(Default::default());
@@ -7816,7 +7800,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
 
@@ -7851,7 +7834,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
 
@@ -7902,7 +7884,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         let first = api.create(Default::default());
@@ -7994,7 +7975,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
 
@@ -8036,7 +8016,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
 
@@ -8137,7 +8116,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
 
@@ -8822,7 +8800,6 @@ mod tests {
         let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
             I::TEST_ADDRS.local_ip,
             I::TEST_ADDRS.remote_ip,
-            I::TEST_ADDRS.subnet.prefix(),
         ));
         let mut api = ctx.tcp_api::<I>();
         let socket = api.create(Default::default());
@@ -8846,7 +8823,16 @@ mod tests {
             DualStackConverter = I::DualStackConverter,
         >,
     {
+        // We want the accepted socket to be marked 101 for MARK_1 and 102 for MARK_2.
+        let expected_marks = [(MarkDomain::Mark1, 101), (MarkDomain::Mark2, 102)];
+        let marks = netstack3_ip::Marks::new(expected_marks);
         let mut net = new_test_net::<I>();
+
+        for c in [LOCAL, REMOTE] {
+            net.with_context(c, |ctx| {
+                ctx.core_ctx.recv_packet_marks = marks;
+            })
+        }
 
         let backlog = NonZeroUsize::new(1).unwrap();
         let server_port = NonZeroU16::new(1234).unwrap();
@@ -8872,7 +8858,9 @@ mod tests {
         net.with_context(REMOTE, |ctx| {
             let (accepted, _addr, _accepted_ends) =
                 ctx.tcp_api::<I>().accept(&server).expect("failed to accept");
-            assert_eq!(ctx.tcp_api::<I>().get_mark(&accepted, MarkDomain::Mark1), Mark(Some(1)));
+            for (domain, expected) in expected_marks {
+                assert_eq!(ctx.tcp_api::<I>().get_mark(&accepted, domain), Mark(Some(expected)));
+            }
         });
     }
 

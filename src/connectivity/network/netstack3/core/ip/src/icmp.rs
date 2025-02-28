@@ -809,7 +809,7 @@ impl<
         mut buffer: B,
         info: &LocalDeliveryPacketInfo<Ipv4, H>,
     ) -> Result<(), (B, TransportReceiveError)> {
-        let LocalDeliveryPacketInfo { meta, header_info: _ } = info;
+        let LocalDeliveryPacketInfo { meta, header_info: _, marks: _ } = info;
         let ReceiveIpPacketMeta { broadcast: _, transparent_override } = meta;
         if let Some(delivery) = transparent_override {
             unreachable!(
@@ -1646,7 +1646,7 @@ impl<
         mut buffer: B,
         info: &LocalDeliveryPacketInfo<Ipv6, H>,
     ) -> Result<(), (B, TransportReceiveError)> {
-        let LocalDeliveryPacketInfo { meta, header_info: _ } = info;
+        let LocalDeliveryPacketInfo { meta, header_info: _, marks: _ } = info;
         let ReceiveIpPacketMeta { broadcast: _, transparent_override } = meta;
         if let Some(delivery) = transparent_override {
             unreachable!(

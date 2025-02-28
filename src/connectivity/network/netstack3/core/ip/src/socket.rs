@@ -863,7 +863,8 @@ where
 
     let previous_dst = remote_ip.addr();
     let mut packet = filter::TxPacket::new(local_ip.addr(), remote_ip.addr(), *proto, &mut body);
-    let mut packet_metadata = IpLayerPacketMetadata::from_tx_metadata(tx_metadata);
+    let mut packet_metadata =
+        IpLayerPacketMetadata::from_tx_metadata_and_marks(tx_metadata, *options.marks());
 
     match core_ctx.filter_handler().local_egress_hook(
         bindings_ctx,
