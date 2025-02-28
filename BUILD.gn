@@ -1323,6 +1323,7 @@ group("tool_paths.metadata") {
     "$rustc_prefix/bin/rustc",
     "$rustc_prefix/bin/rustdoc",
     "$rustc_prefix/bin/rustfmt",
+    "//src/testing/fidl_coverage",
     "//src/testing/perfcompare",
 
     # reclient is using fairly generic names (bootstrap, dumpstats). We may
