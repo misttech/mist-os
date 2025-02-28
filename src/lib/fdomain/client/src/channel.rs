@@ -27,6 +27,27 @@ pub struct MessageBuf {
 }
 
 impl MessageBuf {
+    /// Create a new [`MessageBuf`]
+    pub fn new() -> Self {
+        MessageBuf { bytes: Vec::new(), handles: Vec::new() }
+    }
+
+    /// Make sure this buffer has room for a certain number of bytes.
+    pub fn ensure_capacity_bytes(&mut self, bytes: usize) {
+        self.bytes.reserve(bytes);
+    }
+
+    /// Clear out the contents of this buffer.
+    pub fn clear(&mut self) {
+        self.bytes.clear();
+        self.handles.clear();
+    }
+
+    /// Get the byte content of this buffer.
+    pub fn bytes(&self) -> &[u8] {
+        self.bytes.as_slice()
+    }
+
     /// Convert a proto ChannelMessage to a MessageBuf.
     fn from_proto(client: &Arc<crate::Client>, message: proto::ChannelMessage) -> MessageBuf {
         let proto::ChannelMessage { data, handles } = message;
