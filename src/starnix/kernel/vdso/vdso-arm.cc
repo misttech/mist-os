@@ -20,7 +20,8 @@ int syscall(intptr_t syscall_number, intptr_t arg1, intptr_t arg2, intptr_t arg3
   return static_cast<int>(x0);
 }
 
-extern "C" __EXPORT __attribute__((naked)) void __kernel_rt_sigreturn() {
+extern "C" __EXPORT __attribute__((naked)) __attribute__((target("arm"))) void
+__kernel_rt_sigreturn() {
   __asm__ volatile("mov r7, %0" ::"I"(__NR_rt_sigreturn));
   __asm__ volatile("svc #0");
 }
