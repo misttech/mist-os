@@ -541,6 +541,16 @@
             availability: "optional",
         },
         {
+            // If set, Timekeeper should serve the FIDL protocol that allows external
+            // time adjustment, `fuchsia.time.external/Adjust`.
+            //
+            // This is a security sensitive protocol, and very few assemblies are
+            // expected to have it turned on.
+            config: "fuchsia.time.config.WritableUTCTime",
+            from: "parent",
+            to: "#timekeeper",
+        },
+        {
             protocol: [
                 "fuchsia.tracing.perfetto.ProducerConnector",
                 "fuchsia.tracing.provider.Registry",

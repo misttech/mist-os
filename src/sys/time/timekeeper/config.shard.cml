@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
+    include: [
+        // The structured configuration properties that are also offered as
+        // config capabilities.
+        "//src/sys/time/timekeeper/config.use.shard.cml",
+    ],
     config: {
         // The primary time source URL represents a component to be installed to receive time
         // updates. There is no maximum URL length defined by RFC 3986, but this length should
@@ -84,12 +89,5 @@
         // If set, the hardware has a counter that is always on and operates even
         // if the rest of the hardware system is in a low power state.
         has_always_on_counter: { type: "bool" },
-
-        /// If set, Timekeeper should serve the FIDL protocol that allows external
-        /// time adjustment, `fuchsia.time.external/Adjust`.
-        ///
-        /// This is a security sensitive protocol, and very few assemblies are
-        /// expected to have it turned on.
-        serve_fuchsia_time_external_adjust: { type: "bool" },
     },
 }

@@ -5,6 +5,7 @@
 use crate::subsystems::prelude::*;
 use anyhow::{anyhow, Context, Result};
 
+use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::timekeeper_config::TimekeeperConfig;
 
 pub(crate) struct TimekeeperSubsystem;
@@ -71,13 +72,18 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
         let has_real_time_clock = context.board_info.provides_feature("fuchsia::real_time_clock")
             || has_always_on_counter;
 
+        // Refer to //src/sys/time/timekeeper/config.shard.cml
+        // for details.
+        builder.set_config_capability(
+            "fuchsia.time.config.WritableUTCTime",
+            Config::new(ConfigValueType::Bool, config.serve_fuchsia_time_external_adjust.into()),
+        )?;
+
         let mut config_builder = builder
             .package("timekeeper")
             .component("meta/timekeeper.cm")
             .context("while finding the timekeeper component")?;
 
-        // Refer to //src/sys/time/timekeeper/config.shard.cml
-        // for details.
         config_builder
             .field("disable_delays", false)?
             .field("oscillator_error_std_dev_ppm", 15)?
@@ -98,6 +104,7 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
             // TODO: b/295537795 - provide this setting somehow.
             .field("power_topology_integration_enabled", false)?
             .field("serve_test_protocols", serve_test_protocols)?
+            // Should this now be removed in favor of WritableUTCTime above?
             .field("serve_fuchsia_time_external_adjust", config.serve_fuchsia_time_external_adjust)?
             .field("has_real_time_clock", has_real_time_clock)?
             .field("has_always_on_counter", has_always_on_counter)?

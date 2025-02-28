@@ -4,6 +4,7 @@
 {
     include: [
         "//sdk/lib/sys/component/realm_builder.shard.cml",
+        "//src/sys/time/timekeeper/config.capabilities.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
@@ -43,6 +44,12 @@
         {
             event_stream: [ "capability_requested" ],
             from: "parent",
+            to: "#realm_builder",
+        },
+        {
+            // For the time being we have no need to route this from "parent".
+            config: "fuchsia.time.config.WritableUTCTime",
+            from: "self",
             to: "#realm_builder",
         },
     ],

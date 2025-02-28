@@ -223,6 +223,16 @@ impl NestedTimekeeper {
             .await
             .unwrap();
 
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::configuration("fuchsia.time.config.WritableUTCTime"))
+                    .from(Ref::parent())
+                    .to(&timekeeper),
+            )
+            .await
+            .unwrap();
+
         let rtc_updates = setup_rtc(rtc_options, &builder, &timekeeper).await;
         let realm_instance = builder.build().await.unwrap();
 
