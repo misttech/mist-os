@@ -67,6 +67,9 @@ exports_files(
     # prebuilt firmware
     glob(["prebuilt/vendor/google_devices/*/prebuilts/firmware/**/*"]) +
 
+    # audio config files
+    glob(["prebuilt/vendor/google_devices/*/prebuilts/audio/**/*"]) +
+
     # build/info
     [
         "integration/.git/HEAD",
