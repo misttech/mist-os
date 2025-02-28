@@ -45,7 +45,7 @@ using namespace fuchsia_driver_framework;
 class OvernetUsb;
 
 class OvernetUsb : public fdf::DriverBase,
-                   public fidl::WireServer<fuchsia_hardware_overnet::Device>,
+                   public fidl::WireServer<fuchsia_hardware_overnet::Usb>,
                    public ddk::UsbFunctionInterfaceProtocol<OvernetUsb> {
  public:
   explicit OvernetUsb(fdf::DriverStartArgs start_args,
@@ -55,7 +55,7 @@ class OvernetUsb : public fdf::DriverBase,
   zx::result<> Start() override;
   void PrepareStop(fdf::PrepareStopCompleter Completer) override;
 
-  void SetCallback(fuchsia_hardware_overnet::wire::DeviceSetCallbackRequest* request,
+  void SetCallback(fuchsia_hardware_overnet::wire::UsbSetCallbackRequest* request,
                    SetCallbackCompleter::Sync& completer) override;
 
   size_t UsbFunctionInterfaceGetDescriptorsSize();
@@ -68,13 +68,13 @@ class OvernetUsb : public fdf::DriverBase,
   zx_status_t UsbFunctionInterfaceSetInterface(uint8_t interface, uint8_t alt_setting);
 
  private:
-  // Configures the device's endpoints and sets the device state to Ready, if it's in the
+  // Configures the device's endpoints and sets the device state to Running, if it's in the
   // Unconfigured state.
-  zx_status_t ConfigureEndpoints();
+  zx_status_t ConfigureEndpoints() __TA_EXCLUDES(lock_);
 
   // Disables the device's endpoints, cancels any outstanding requests, and moves the device
   // into the Unconfigured state if it's not already there.
-  zx_status_t UnconfigureEndpoints();
+  zx_status_t UnconfigureEndpoints() __TA_EXCLUDES(lock_);
 
   // Called whenever the socket from RCS is readable. Reads data out of the socket and places it
   // into bulk IN requests.
@@ -86,33 +86,28 @@ class OvernetUsb : public fdf::DriverBase,
                             const zx_packet_signal_t*);
 
   // Connect a FIDL interface.
-  void FidlConnect(fidl::ServerEnd<fuchsia_hardware_overnet::Device> request);
+  void FidlConnect(fidl::ServerEnd<fuchsia_hardware_overnet::Usb> request);
 
   // Internal state machine for this driver. There are four states:
   //
-  // Unconfigured, Ready, Running, Shutting Down.
+  // Unconfigured, Running, Shutting Down.
   //
-  // We can transition from the Unconfigured to the Ready state if
-  // UsbFunctionInterfaceSetConfigured is called.
+  // We can transition from the Unconfigured to the Running state if
+  // UsbFunctionInterfaceSetConfigured or UsbFunctionSetInterface is called.
   //
-  // We transition from Ready to Running if we receive a magic transaction from the host.
+  // We transition from Running to Unconfigured if any faults happen while handling the connection
   //
-  // We transition from Running to Ready if any faults happen while handling the connection, such as
-  // RCS disconnecting the socket.
-  //
-  // We transition from any state to Shutting Down if DdkUnbind or DdkSuspend are called.
+  // We transition from any state to Shutting Down if Stop is called.
   class Unconfigured;
-  class Ready;
   class Running;
   class ShuttingDown;
-  using State = std::variant<Unconfigured, Ready, Running, ShuttingDown>;
+  using State = std::variant<Unconfigured, Running, ShuttingDown>;
 
   // Common interface for states where no socket is available.
   class BaseNoSocketState {
    public:
     static bool WritesWaiting() { return false; }
     static bool ReadsWaiting() { return false; }
-    static bool NewSocket() { return false; }
   };
 
   // Unconfigured state. We have no transactions queued and cannot receive data.
@@ -129,24 +124,8 @@ class OvernetUsb : public fdf::DriverBase,
     State Writable() && { return *this; }
   };
 
-  // Ready state. We are reading data from the host, but will ignore it until we receive a 16-byte
-  // magic transaction. We will not send data while in this state.
-  class Ready : public BaseNoSocketState {
-   public:
-    // Called when we receive data from the host while in this state. Transitions to Running if the
-    // data is a magic transaction, otherwise warns and discards.
-    State ReceiveData(uint8_t* data, size_t len, std::optional<zx::socket>* peer_socket,
-                      OvernetUsb* owner) &&;
-    // Called when we are asked to send data from this state. Should never be called.
-    State SendData(uint8_t*, size_t, size_t*, zx_status_t* status) && {
-      *status = ZX_ERR_SHOULD_WAIT;
-      return *this;
-    }
-    State Writable() && { return *this; }
-  };
-
-  // Running. We will send a response magic transaction to the host, followed by any data we get
-  // from the RCS socket. Data we receive will be queued on the RCS socket.
+  // Running. We will send any data we get from the RCS socket. Data we receive will be queued
+  // on the RCS socket.
   class Running {
    public:
     Running(zx::socket socket, OvernetUsb* owner)
@@ -179,9 +158,6 @@ class OvernetUsb : public fdf::DriverBase,
     bool WritesWaiting() { return !socket_out_queue_.empty(); }
     // Whether we are waiting to read data from the host.
     static bool ReadsWaiting() { return true; }
-    bool NewSocket() const { return socket_is_new_; }
-    // Whether we've successfully sent a reply magic header.
-    void MagicSent();
 
     // Called when socket_ is writable. Pumps socket_out_queue_ into socket_.
     State Writable() &&;
@@ -252,10 +228,10 @@ class OvernetUsb : public fdf::DriverBase,
            !std::holds_alternative<ShuttingDown>(state_);
   }
 
-  // Transition from Running to Ready, usually due to a connection error.
+  // Transition from Running to Unconfigured, usually due to a connection error.
   void ResetState() __TA_REQUIRES(lock_) {
     if (std::holds_alternative<Running>(state_)) {
-      state_ = Ready();
+      state_ = Unconfigured();
     }
   }
 
@@ -265,8 +241,6 @@ class OvernetUsb : public fdf::DriverBase,
   // Get an IN request ready for use.
   std::optional<usb::FidlRequest> PrepareTx() __TA_REQUIRES(lock_);
 
-  // Send a 16-byte magic packet to the host.
-  void SendMagicReply(usb::FidlRequest request) __TA_REQUIRES(lock_);
   // Handle when RCS connects to us and is ready to receive a socket, or when we have a socket and
   // need to hand it to RCS.
   void HandleSocketAvailable() __TA_REQUIRES(lock_);
@@ -328,11 +302,10 @@ class OvernetUsb : public fdf::DriverBase,
   static constexpr uint16_t kMaxPacketSize = 512;
 
   std::optional<Callback> callback_ __TA_GUARDED(lock_);
-  std::optional<zx::socket> peer_socket_;
+  std::optional<zx::socket> peer_socket_ __TA_GUARDED(lock_);
 
-  fidl::SyncClient<fuchsia_driver_framework::Node> node_;
   fidl::SyncClient<fuchsia_driver_framework::NodeController> node_controller_;
-  fidl::ServerBindingGroup<fuchsia_hardware_overnet::Device> device_binding_group_;
+  fidl::ServerBindingGroup<fuchsia_hardware_overnet::Usb> device_binding_group_;
 
   ddk::UsbFunctionProtocolClient function_;
 

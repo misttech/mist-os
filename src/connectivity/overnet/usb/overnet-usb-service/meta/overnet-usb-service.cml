@@ -1,4 +1,4 @@
-// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
@@ -9,22 +9,21 @@
     ],
     program: {
         runner: "driver",
-        binary: "driver/overnet-usb.so",
-        bind: "meta/bind/overnet-usb.bindbc",
+        binary: "driver/overnet-usb-service.so",
+        bind: "meta/bind/overnet-usb-service.bindbc",
         fallback: "false",
         default_dispatcher_opts: [ "allow_sync_calls" ],
-        colocate: "true",
+        colocate: "false",
     },
     capabilities: [
-        { service: "fuchsia.hardware.overnet.UsbService" },
+        { service: "fuchsia.hardware.overnet.Service" },
     ],
     use: [
-        { service: "fuchsia.hardware.usb.function.UsbFunctionService" },
-        { protocol: "fuchsia.hardware.usb.endpoint.Endpoint" },
+        { service: "fuchsia.hardware.overnet.UsbService" },
     ],
     expose: [
         {
-            service: "fuchsia.hardware.overnet.UsbService",
+            service: "fuchsia.hardware.overnet.Service",
             from: "self",
         },
     ],

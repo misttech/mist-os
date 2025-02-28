@@ -34,9 +34,6 @@
 // NOLINTBEGIN(readability-convert-member-functions-to-static)
 // NOLINTBEGIN(readability-container-data-pointer)
 
-static constexpr uint8_t kOvernetMagic[] = "OVERNET USB\xff\x00\xff\x00\xff";
-static constexpr size_t kOvernetMagicSize = sizeof(kOvernetMagic) - 1;
-
 static constexpr uint8_t kBulkOutEndpoint = 0;
 static constexpr uint8_t kBulkInEndpoint = 1;
 
@@ -256,7 +253,7 @@ class OvernetUsbEnvironment : public fdf_testing::Environment {
     fake_usb_->ExpectConnectToEndpoint(kBulkOutEndpoint);
     fake_usb_->ExpectConnectToEndpoint(kBulkInEndpoint);
 
-    auto endpoints = fidl::Endpoints<fuchsia_hardware_overnet::Device>::Create();
+    auto endpoints = fidl::Endpoints<fuchsia_hardware_overnet::Usb>::Create();
 
     return zx::ok();
   }
@@ -276,26 +273,6 @@ class OvernetUsbTestConfig final {
 
 class OvernetUsbTest : public zxtest::Test {
  public:
-  bool SendMagic() {
-    FDF_LOG(DEBUG, "SendMagic");
-    return SendTx(kOvernetMagic, kOvernetMagicSize);
-  }
-
-  bool GetMagic() {
-    FDF_LOG(DEBUG, "GetMagic");
-    auto got = GetRx();
-
-    if (!got) {
-      return false;
-    }
-
-    if (got->size() != kOvernetMagicSize) {
-      return false;
-    }
-
-    return std::equal(kOvernetMagic, kOvernetMagic + kOvernetMagicSize, got->begin());
-  }
-
   fuchsia_hardware_usb_request::Request WaitForRequestOn(uint8_t endpoint) {
     auto& runtime = driver_test().runtime();
     size_t request_count;
@@ -444,7 +421,7 @@ class OvernetUsbTest : public zxtest::Test {
       env.function_.ExpectGetRequestSize(0);
     });
     ASSERT_OK(driver_test().StartDriver().status_value());
-    auto device = driver_test().Connect<fuchsia_hardware_overnet::Service::Device>();
+    auto device = driver_test().Connect<fuchsia_hardware_overnet::UsbService::Device>();
     EXPECT_OK(device.status_value());
     client_.Bind(std::move(device.value()));
   }
@@ -467,8 +444,6 @@ class OvernetUsbTest : public zxtest::Test {
     driver_test().RunInEnvironmentTypeContext([](OvernetUsbEnvironment& env) {
       env.function_.ExpectConfigEp(ZX_OK, {}, {});
       env.function_.ExpectConfigEp(ZX_OK, {}, {});
-      // for (auto i = 0; i < 8; i++) {
-      // }
     });
 
     driver_test().RunInDriverContext([speed](OvernetUsb& device) {
@@ -494,13 +469,23 @@ class OvernetUsbTest : public zxtest::Test {
     });
   }
 
+  void ResetWithSetInterface() {
+    FDF_LOG(DEBUG, "Resetting device by calling SetInterface on it");
+
+    driver_test().RunInEnvironmentTypeContext([](OvernetUsbEnvironment& env) {
+      env.function_.ExpectConfigEp(ZX_OK, {}, {});
+      env.function_.ExpectConfigEp(ZX_OK, {}, {});
+    });
+
+    driver_test().RunInDriverContext(
+        [](auto& driver) { ASSERT_OK(driver.UsbFunctionInterfaceSetInterface(1, 0)); });
+  }
+
   std::unique_ptr<TestCallback> SetupCallback(size_t expected_calls,
                                               std::function<void(zx::socket)> callback) {
     auto callback_obj = SetTestCallback(expected_calls, std::move(callback));
     EXPECT_TRUE(callback_obj);
-    EXPECT_TRUE(SendMagic());
     driver_test().runtime().RunUntilIdle();
-    EXPECT_TRUE(GetMagic());
     return callback_obj;
   }
 
@@ -521,7 +506,7 @@ class OvernetUsbTest : public zxtest::Test {
 
   fdf_testing::BackgroundDriverTest<OvernetUsbTestConfig>& driver_test() { return driver_test_; }
   fdf_testing::BackgroundDriverTest<OvernetUsbTestConfig> driver_test_;
-  fidl::WireSyncClient<fuchsia_hardware_overnet::Device> client_;
+  fidl::WireSyncClient<fuchsia_hardware_overnet::Usb> client_;
 };
 
 TEST_F(OvernetUsbTest, Startup) { FDF_LOG(DEBUG, "startup"); }
@@ -612,13 +597,11 @@ TEST_F(OvernetUsbTest, Reset) {
                              test_data_b.size()));
   ASSERT_TRUE(
       GetRxConcatExpect(reinterpret_cast<const uint8_t*>(test_data_b.data()), test_data_b.size()));
-
-  ASSERT_TRUE(SendMagic());
+  ResetWithSetInterface();
   // wait for the socket reset to work its way through and produce a new socket
   while (sockets.size() < 2) {
     driver_test().runtime().RunUntilIdle();
   }
-  ASSERT_TRUE(GetMagic());
 
   zx_signals_t pending;
   sockets[0].wait_one(ZX_SOCKET_PEER_CLOSED, zx::time::infinite(), &pending);
@@ -671,13 +654,11 @@ TEST_F(OvernetUsbTest, ResetMoreData) {
     ASSERT_TRUE(GetRxConcatExpect(reinterpret_cast<const uint8_t*>(test_data_d.data()),
                                   test_data_d.size()));
   }
-
-  ASSERT_TRUE(SendMagic());
+  ResetWithSetInterface();
   // wait for the socket reset to work its way through and produce a new socket
   while (sockets.size() < 2) {
     driver_test().runtime().RunUntilIdle();
   }
-  ASSERT_TRUE(GetMagic());
 
   zx_signals_t pending;
   sockets[0].wait_one(ZX_SOCKET_PEER_CLOSED, zx::time::infinite(), &pending);

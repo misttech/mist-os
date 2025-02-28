@@ -1752,7 +1752,10 @@ assembly_input_bundle("core_realm_development_access_rcs_usb") {
   base_driver_packages = [
     {
       package_target = "//src/connectivity/overnet/usb:overnet-usb-package"
-      driver_components = [ "meta/overnet-usb.cm" ]
+      driver_components = [
+        "meta/overnet-usb-service.cm",
+        "meta/overnet-usb.cm",
+      ]
     },
   ]
   compiled_packages = [

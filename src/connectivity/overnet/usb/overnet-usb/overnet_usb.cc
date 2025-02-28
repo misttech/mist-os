@@ -30,9 +30,6 @@
 namespace fendpoint = fuchsia_hardware_usb_endpoint;
 namespace ffunction = fuchsia_hardware_usb_function;
 
-static constexpr uint8_t kOvernetMagic[] = "OVERNET USB\xff\x00\xff\x00\xff";
-static constexpr size_t kOvernetMagicSize = sizeof(kOvernetMagic) - 1;
-
 zx::result<> OvernetUsb::Start() {
   zx::result<ddk::UsbFunctionProtocolClient> function =
       compat::ConnectBanjo<ddk::UsbFunctionProtocolClient>(incoming());
@@ -125,51 +122,31 @@ zx::result<> OvernetUsb::Start() {
 
   function_.SetInterface(this, &usb_function_interface_protocol_ops_);
 
-  fdf::NodeAddArgs args;
-  args.name("overnet-usb");
-
-  auto controller_eps = fidl::CreateEndpoints<fdf::NodeController>();
-  if (controller_eps.is_error()) {
-    FDF_SLOG(ERROR, "Could not create node controller endpoints",
-             KV("error", controller_eps.status_string()));
-    return controller_eps.take_error();
-  }
-  node_controller_.Bind(std::move(controller_eps->client));
-
-  auto node_eps = fidl::CreateEndpoints<fdf::Node>();
-  if (node_eps.is_error()) {
-    FDF_SLOG(ERROR, "Could not create node endpoints", KV("error", node_eps.status_string()));
-    return node_eps.take_error();
-  }
-  node_.Bind(std::move(node_eps->client));
-
-  auto result = fidl::Call(node())->AddChild({{
-      .args = std::move(args),
-      .controller = std::move(controller_eps->server),
-      .node = std::move(node_eps->server),
-  }});
-
-  if (result.is_error()) {
-    FDF_SLOG(ERROR, "Could not add child node",
-             KV("error", result.error_value().FormatDescription()));
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-
-  fuchsia_hardware_overnet::Service::InstanceHandler handler({
+  fuchsia_hardware_overnet::UsbService::InstanceHandler handler({
       .device = fit::bind_member<&OvernetUsb::FidlConnect>(this),
   });
 
   auto service_result =
-      outgoing()->AddService<fuchsia_hardware_overnet::Service>(std::move(handler));
-  if (result.is_error()) {
+      outgoing()->AddService<fuchsia_hardware_overnet::UsbService>(std::move(handler));
+  if (service_result.is_error()) {
     FDF_LOG(ERROR, "Failed to add service: %s", service_result.status_string());
     return service_result.take_error();
   }
 
+  std::vector<fuchsia_driver_framework::NodeProperty2> properties = {};
+  zx::result child_result =
+      AddChild("overnet-usb", properties,
+               std::array{fdf::MakeOffer2<fuchsia_hardware_overnet::UsbService>()});
+  if (child_result.is_error()) {
+    FDF_SLOG(ERROR, "Could not add child node");
+    return child_result.take_error();
+  }
+  node_controller_.Bind(std::move(child_result.value()));
+
   return zx::ok();
 }
 
-void OvernetUsb::FidlConnect(fidl::ServerEnd<fuchsia_hardware_overnet::Device> request) {
+void OvernetUsb::FidlConnect(fidl::ServerEnd<fuchsia_hardware_overnet::Usb> request) {
   device_binding_group_.AddBinding(dispatcher_, std::move(request), this,
                                    fidl::kIgnoreBindingClosure);
 }
@@ -236,8 +213,20 @@ zx_status_t OvernetUsb::ConfigureEndpoints() {
     return status;
   }
 
-  FDF_LOG(TRACE, "Setting state to Ready");
-  state_ = Ready();
+  FDF_LOG(TRACE, "Setting state to Running");
+  zx::socket socket;
+  peer_socket_ = zx::socket();
+
+  status = zx::socket::create(ZX_SOCKET_DATAGRAM, &socket, &peer_socket_.value());
+  if (status != ZX_OK) {
+    FDF_SLOG(ERROR, "Failed to create socket", KV("status", zx_status_get_string(status)));
+    // There are two errors that can happen here: a kernel out of memory condition which the docs
+    // say we shouldn't try to handle, and invalid arguments, which should be impossible.
+    abort();
+  }
+  state_ = Running(std::move(socket), this);
+  HandleSocketAvailable();
+  ProcessReadsFromSocket();
 
   std::vector<fuchsia_hardware_usb_request::Request> requests;
   std::lock_guard ep_lock(bulk_out_ep_.mutex());
@@ -308,6 +297,12 @@ zx_status_t OvernetUsb::UsbFunctionInterfaceSetInterface(uint8_t interface, uint
     return ZX_ERR_INVALID_ARGS;
   }
 
+  fbl::AutoLock lock(&lock_);
+  if (std::holds_alternative<Running>(state_)) {
+    state_ = Unconfigured();
+  }
+
+  lock.release();
   return ConfigureEndpoints();
 }
 
@@ -328,6 +323,7 @@ std::optional<usb::FidlRequest> OvernetUsb::PrepareTx() {
 
 void OvernetUsb::HandleSocketReadable(async_dispatcher_t*, async::WaitBase*, zx_status_t status,
                                       const zx_packet_signal_t*) {
+  FDF_LOG(TRACE, "HandleSocketReadable(..., %d, ...)", status);
   if (status != ZX_OK) {
     if (status != ZX_ERR_CANCELED) {
       FDF_SLOG(WARNING, "Unexpected error waiting on socket",
@@ -403,7 +399,7 @@ OvernetUsb::State OvernetUsb::Running::SendData(uint8_t* data, size_t len, size_
       FDF_SLOG(ERROR, "Failed to read from socket", KV("status", zx_status_get_string(*status)));
     }
     FDF_LOG(INFO, "Client socket closed, returning to ready state");
-    return Ready();
+    return Unconfigured();
   }
 
   return std::move(*this);
@@ -411,6 +407,7 @@ OvernetUsb::State OvernetUsb::Running::SendData(uint8_t* data, size_t len, size_
 
 void OvernetUsb::HandleSocketWritable(async_dispatcher_t*, async::WaitBase*, zx_status_t status,
                                       const zx_packet_signal_t*) {
+  FDF_LOG(TRACE, "HandleSocketWritable(..., %d, ...)", status);
   fbl::AutoLock lock(&lock_);
 
   if (status != ZX_OK) {
@@ -451,13 +448,13 @@ OvernetUsb::State OvernetUsb::Running::Writable() && {
       FDF_SLOG(ERROR, "Failed to read from socket", KV("status", zx_status_get_string(status)));
     }
     FDF_LOG(INFO, "Client socket closed, returning to ready state");
-    return Ready();
+    return Unconfigured();
   }
 
   return std::move(*this);
 }
 
-void OvernetUsb::SetCallback(fuchsia_hardware_overnet::wire::DeviceSetCallbackRequest* request,
+void OvernetUsb::SetCallback(fuchsia_hardware_overnet::wire::UsbSetCallbackRequest* request,
                              SetCallbackCompleter::Sync& completer) {
   FDF_LOG(TRACE, "SetCallback");
   fbl::AutoLock lock(&lock_);
@@ -474,13 +471,16 @@ void OvernetUsb::SetCallback(fuchsia_hardware_overnet::wire::DeviceSetCallbackRe
 
 void OvernetUsb::HandleSocketAvailable() {
   if (!callback_) {
+    FDF_LOG(TRACE, "No callback set, deferring socket callback");
     return;
   }
 
   if (!peer_socket_) {
+    FDF_LOG(TRACE, "No peer socket created yet, deferring socket callback");
     return;
   }
 
+  FDF_LOG(TRACE, "Callback set and peer socket available, sending socket to callback");
   (*callback_)(std::move(*peer_socket_));
   peer_socket_ = std::nullopt;
 }
@@ -513,39 +513,10 @@ OvernetUsb::State OvernetUsb::ShuttingDown::ReceiveData(uint8_t*, size_t len,
   return std::move(*this);
 }
 
-OvernetUsb::State OvernetUsb::Ready::ReceiveData(uint8_t* data, size_t len,
-                                                 std::optional<zx::socket>* peer_socket,
-                                                 OvernetUsb* owner) && {
-  if (len != kOvernetMagicSize ||
-      !std::equal(kOvernetMagic, kOvernetMagic + kOvernetMagicSize, data)) {
-    FDF_SLOG(WARNING, "Dropped incoming data (driver not synchronized)", KV("len", len));
-    return *this;
-  }
-
-  zx::socket socket;
-  *peer_socket = zx::socket();
-
-  zx_status_t status = zx::socket::create(ZX_SOCKET_STREAM, &socket, &peer_socket->value());
-  if (status != ZX_OK) {
-    FDF_SLOG(ERROR, "Failed to create socket", KV("status", zx_status_get_string(status)));
-    // There are two errors that can happen here: a kernel out of memory condition which the docs
-    // say we shouldn't try to handle, and invalid arguments, which should be impossible.
-    abort();
-  }
-
-  return Running(std::move(socket), owner);
-}
-
 OvernetUsb::State OvernetUsb::Running::ReceiveData(uint8_t* data, size_t len,
                                                    std::optional<zx::socket>* peer_socket,
                                                    OvernetUsb* owner) && {
   FDF_LOG(TRACE, "Running::ReceiveData(%zu)", len);
-  if (len == kOvernetMagicSize &&
-      std::equal(kOvernetMagic, kOvernetMagic + kOvernetMagicSize, data)) {
-    FDF_LOG(INFO, "Reset packet received on usb out endpoint, returning to ready state");
-    return Ready().ReceiveData(data, len, peer_socket, owner);
-  }
-
   zx_status_t status;
 
   if (socket_out_queue_.empty()) {
@@ -570,7 +541,7 @@ OvernetUsb::State OvernetUsb::Running::ReceiveData(uint8_t* data, size_t len,
         FDF_SLOG(ERROR, "Failed to write to socket", KV("status", zx_status_get_string(status)));
       }
       FDF_LOG(INFO, "Client socket closed, returning to ready state");
-      return Ready();
+      return Unconfigured();
     }
   }
 
@@ -579,65 +550,6 @@ OvernetUsb::State OvernetUsb::Running::ReceiveData(uint8_t* data, size_t len,
   }
 
   return std::move(*this);
-}
-
-void OvernetUsb::SendMagicReply(usb::FidlRequest request) {
-  FDF_LOG(TRACE, "SendMagicReply");
-  auto actual = request.CopyTo(0, kOvernetMagic, kOvernetMagicSize, bulk_in_ep_.GetMapped());
-
-  for (size_t i = 0; i < actual.size(); i++) {
-    request->data()->at(i).size(actual[i]);
-  }
-
-  auto status = request.CacheFlush(bulk_in_ep_.GetMapped());
-  if (status != ZX_OK) {
-    FDF_SLOG(ERROR, "Cache flush failed", KV("status", zx_status_get_string(status)));
-  }
-
-  std::vector<fuchsia_hardware_usb_request::Request> requests;
-  requests.emplace_back(request.take_request());
-  FDF_LOG(TRACE, "Queueing write request (magic)");
-  auto result = bulk_in_ep_->QueueRequests(std::move(requests));
-  if (result.is_error()) {
-    FDF_SLOG(ERROR, "Failed to QueueRequests",
-             KV("status", result.error_value().FormatDescription()));
-    ResetState();
-    return;
-  }
-
-  auto& state = std::get<Running>(state_);
-
-  state.MagicSent();
-  ProcessReadsFromSocket();
-  HandleSocketAvailable();
-}
-
-void OvernetUsb::Running::MagicSent() {
-  socket_is_new_ = false;
-
-  async::PostTask(owner_->dispatcher_, [this]() {
-    fbl::AutoLock lock(&owner_->lock_);
-
-    if (std::holds_alternative<ShuttingDown>(owner_->state_)) {
-      if (!owner_->HasPendingRequests()) {
-        owner_->ShutdownComplete();
-      }
-      return;
-    }
-
-    if (std::get_if<Running>(&owner_->state_) != this) {
-      return;
-    }
-
-    if (read_waiter_->is_pending()) {
-      read_waiter_->Cancel();
-    }
-    read_waiter_->set_object(socket()->get());
-    if (write_waiter_->is_pending()) {
-      write_waiter_->Cancel();
-    }
-    write_waiter_->set_object(socket()->get());
-  });
 }
 
 void OvernetUsb::ReadComplete(fendpoint::Completion completion) {
@@ -682,20 +594,6 @@ void OvernetUsb::ReadComplete(fendpoint::Completion completion) {
                                                                     &peer_socket_, this);
         },
         std::move(state_));
-    std::visit(
-        [this](auto& state) __TA_REQUIRES(lock_) {
-          if (state.NewSocket()) {
-            auto request = PrepareTx();
-
-            if (request) {
-              SendMagicReply(std::move(*request));
-            }
-          }
-          if (state.WritesWaiting()) {
-            ProcessWritesToSocket();
-          }
-        },
-        state_);
   } else if (*completion.status() != ZX_ERR_CANCELED) {
     FDF_SLOG(ERROR, "Read failed", KV("status", zx_status_get_string(*completion.status())));
   }
@@ -740,13 +638,6 @@ void OvernetUsb::WriteComplete(fendpoint::Completion completion) {
       ShutdownComplete();
     }
     return;
-  }
-
-  if (auto state = std::get_if<Running>(&state_)) {
-    if (state->NewSocket()) {
-      SendMagicReply(std::move(request));
-      return;
-    }
   }
 
   FDF_LOG(DEBUG, "Write completed, returning request to pool");
