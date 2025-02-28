@@ -15,6 +15,7 @@ use extended_pstate::ExtendedPstateState;
 use starnix_logging::{log_trace, log_warn};
 use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::SyscallResult;
+use starnix_types::arch::ArchWidth;
 use starnix_uapi::errors::{Errno, EINTR, ERESTART_RESTARTBLOCK};
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::signals::{
@@ -252,6 +253,7 @@ pub fn dequeue_signal(locked: &mut Locked<'_, Unlocked>, current_task: &mut Curr
         }
         if let Some(status) = deliver_signal(
             &task,
+            current_task.thread_state.arch_width,
             task_state,
             siginfo.clone(),
             &mut current_task.thread_state.registers,
@@ -264,6 +266,7 @@ pub fn dequeue_signal(locked: &mut Locked<'_, Unlocked>, current_task: &mut Curr
 
 pub fn deliver_signal(
     task: &Task,
+    arch_width: ArchWidth,
     mut task_state: TaskWriteGuard<'_>,
     mut siginfo: SignalInfo,
     registers: &mut RegisterState,
@@ -280,6 +283,7 @@ pub fn deliver_signal(
                 let signal = siginfo.signal;
                 match dispatch_signal_handler(
                     task,
+                    arch_width,
                     registers,
                     extended_pstate,
                     task_state.signals_mut(),
@@ -356,6 +360,7 @@ pub fn deliver_signal(
 /// This function stores the state required to restore after the signal handler on the stack.
 fn dispatch_signal_handler(
     task: &Task,
+    arch_width: ArchWidth,
     registers: &mut RegisterState,
     extended_pstate: &ExtendedPstateState,
     signal_state: &mut SignalState,
@@ -405,6 +410,7 @@ fn dispatch_signal_handler(
 
     let signal_stack_frame = SignalStackFrame::new(
         task,
+        arch_width,
         registers,
         extended_pstate,
         signal_state,

@@ -8,6 +8,7 @@ use crate::task::{CurrentTask, Task};
 use extended_pstate::riscv64::{RiscvVectorCsrs, NUM_V_REGISTERS, VLEN};
 use extended_pstate::ExtendedPstateState;
 use starnix_logging::log_debug;
+use starnix_types::arch::ArchWidth;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::user_address::UserAddress;
@@ -50,6 +51,7 @@ struct VState {
 impl SignalStackFrame {
     pub fn new(
         task: &Task,
+        _arch_width: ArchWidth,
         registers: &mut RegisterState,
         extended_pstate: &ExtendedPstateState,
         signal_state: &SignalState,

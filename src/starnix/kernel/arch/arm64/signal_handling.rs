@@ -7,6 +7,7 @@ use crate::signals::{SignalInfo, SignalState};
 use crate::task::{CurrentTask, Task};
 use extended_pstate::ExtendedPstateState;
 use starnix_logging::{log_debug, track_stub};
+use starnix_types::arch::ArchWidth;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::signals::{SIGBUS, SIGSEGV};
@@ -34,6 +35,7 @@ pub struct SignalStackFrame {
 impl SignalStackFrame {
     pub fn new(
         task: &Task,
+        arch_width: ArchWidth,
         registers: &mut RegisterState,
         extended_pstate: &ExtendedPstateState,
         signal_state: &SignalState,
@@ -74,11 +76,18 @@ impl SignalStackFrame {
             ..Default::default()
         };
 
-        let vdso_sigreturn_offset = task.kernel().vdso.sigreturn_offset;
+        let vdso_sigreturn_offset = if arch_width.is_arch32() {
+            task.kernel().vdso_arch32.as_ref().unwrap().sigreturn_offset
+        } else {
+            task.kernel().vdso.sigreturn_offset
+        };
         let sigreturn_addr = task.mm().ok_or_else(|| errno!(EINVAL))?.state.read().vdso_base.ptr()
             as u64
             + vdso_sigreturn_offset;
         registers.lr = sigreturn_addr;
+        if arch_width.is_arch32() {
+            registers.r[14] = registers.lr;
+        }
 
         Ok(SignalStackFrame { context, siginfo_bytes: siginfo.as_siginfo_bytes() })
     }

@@ -7,6 +7,7 @@ use crate::signals::{SignalInfo, SignalState};
 use crate::task::{CurrentTask, Task};
 use extended_pstate::ExtendedPstateState;
 use starnix_logging::log_debug;
+use starnix_types::arch::ArchWidth;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
@@ -75,6 +76,7 @@ pub const SIG_STACK_SIZE: usize = std::mem::size_of::<SignalStackFrame>();
 impl SignalStackFrame {
     pub fn new(
         _task: &Task,
+        _arch_width: ArchWidth,
         registers: &RegisterState,
         extended_pstate: &ExtendedPstateState,
         signal_state: &SignalState,

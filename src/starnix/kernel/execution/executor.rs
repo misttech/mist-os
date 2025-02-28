@@ -648,6 +648,7 @@ fn process_completed_exception(
 
                 if let Some(status) = deliver_signal(
                     current_task,
+                    current_task.thread_state.arch_width,
                     task_state,
                     signal.into(),
                     &mut registers,
