@@ -5,6 +5,7 @@
 use std::collections::BTreeMap;
 
 use anyhow::Result;
+use assembly_constants::FileEntry;
 use assembly_container::{FileType, WalkPaths, WalkPathsFn};
 use assembly_package_utils::{PackageInternalPathBuf, PackageManifestPathBuf};
 use camino::{Utf8Path, Utf8PathBuf};
@@ -47,6 +48,12 @@ pub struct ProductConfig {
 
     /// Components which should run as trusted applications in Fuchsia.
     pub trusted_apps: Vec<TrustedApp>,
+
+    /// The set of files to be placed in BOOTFS in the ZBI.
+    ///
+    /// This is only usable in the empty, embeddable, and bootstrap feature set levels.
+    #[walk_paths]
+    pub bootfs_files: Vec<FileEntry<String>>,
 }
 
 /// Packages provided by the product, to add to the assembled images.
@@ -83,6 +90,13 @@ pub struct ProductPackagesConfig {
     /// to add to the 'cache' package set, which are keyed by package name.
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub cache: BTreeMap<String, ProductPackageDetails>,
+
+    /// Paths to package manifests, or more detailed json entries for packages
+    /// to add to the 'bootfs' package set, which are keyed by package name.
+    ///
+    /// This is only usable in the empty, embeddable, and bootstrap feature set levels.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub bootfs: BTreeMap<String, ProductPackageDetails>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -90,6 +104,7 @@ pub struct ProductPackagesConfig {
 struct ProductPackagesConfigDeserializeHelper {
     pub base: MapOrVecOfPackages,
     pub cache: MapOrVecOfPackages,
+    pub bootfs: MapOrVecOfPackages,
 }
 
 #[derive(Debug, Deserialize)]
@@ -117,7 +132,11 @@ fn convert_to_map(map_or_vec: MapOrVecOfPackages) -> BTreeMap<String, ProductPac
 
 impl From<ProductPackagesConfigDeserializeHelper> for ProductPackagesConfig {
     fn from(helper: ProductPackagesConfigDeserializeHelper) -> Self {
-        Self { base: convert_to_map(helper.base), cache: convert_to_map(helper.cache) }
+        Self {
+            base: convert_to_map(helper.base),
+            cache: convert_to_map(helper.cache),
+            bootfs: convert_to_map(helper.bootfs),
+        }
     }
 }
 
@@ -495,6 +514,7 @@ mod tests {
             )]
             .into(),
             cache: BTreeMap::default(),
+            bootfs: BTreeMap::default(),
         };
 
         let mut cursor = std::io::Cursor::new(from_list);

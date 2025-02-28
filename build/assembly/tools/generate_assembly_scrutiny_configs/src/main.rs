@@ -177,6 +177,7 @@ fn main() {
             // This script only returns assembly-generated files.
             // Files from AIBs are collected and merged in a separate process.
             BootfsDestination::FromAIB(_)
+            | BootfsDestination::FromProduct(_)
             | BootfsDestination::ForTest
             | BootfsDestination::SshAuthorizedKeys => None,
             BootfsDestination::ThreadRoles(_) => {

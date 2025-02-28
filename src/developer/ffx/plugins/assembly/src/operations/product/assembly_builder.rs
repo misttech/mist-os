@@ -410,6 +410,17 @@ impl ImageAssemblyConfigBuilder {
         Ok(())
     }
 
+    /// Add all the product-provided bootfs file entries to the builder.
+    pub fn add_product_bootfs_files(&mut self, files: &Vec<FileEntry<String>>) -> Result<()> {
+        for entry in files {
+            self.bootfs_files.add_entry(FileEntry {
+                source: entry.source.to_owned(),
+                destination: BootfsDestination::FromProduct(entry.destination.to_owned()),
+            })?;
+        }
+        Ok(())
+    }
+
     /// Add kernel args to the builder
     pub fn add_kernel_args(&mut self, args: impl IntoIterator<Item = String>) -> Result<()> {
         self.kernel_args
@@ -576,6 +587,7 @@ impl ImageAssemblyConfigBuilder {
     pub fn add_product_packages(&mut self, packages: ProductPackagesConfig) -> Result<()> {
         self.add_product_packages_to_set(packages.base, PackageSet::Base)?;
         self.add_product_packages_to_set(packages.cache, PackageSet::Cache)?;
+        self.add_product_packages_to_set(packages.bootfs, PackageSet::Bootfs)?;
         Ok(())
     }
 
@@ -2018,6 +2030,7 @@ mod tests {
                 ("cache_b".to_string(), write_empty_pkg(outdir, "cache_b", None).into()),
             ]
             .into(),
+            bootfs: [].into(),
         };
 
         let mut builder = get_minimum_config_builder(

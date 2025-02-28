@@ -10,7 +10,9 @@ rustc_library("constants") {
   version = "0.1.0"
   with_unit_tests = true
   deps = [
+    "//src/lib/assembly/container",
     "//src/lib/assembly/util",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",

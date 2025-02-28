@@ -264,6 +264,21 @@ Resulting product is not supported and may misbehave!
     builder.add_bootfs_files(&configuration.bootfs.files).context("Adding bootfs files")?;
 
     // Add product-specified packages and configuration
+    if !product.bootfs_files.is_empty() || !product.packages.bootfs.is_empty() {
+        match platform.feature_set_level {
+            FeatureSupportLevel::Empty
+            | FeatureSupportLevel::Embeddable
+            | FeatureSupportLevel::Bootstrap => {
+                // these are the only valid feature set levels for adding these files.
+            }
+            _ => {
+                bail!("bootfs packages and files can only be added to the 'empty', 'embeddable', or 'bootstrap' feature set levels");
+            }
+        }
+    }
+    builder
+        .add_product_bootfs_files(&product.bootfs_files)
+        .context("Adding product-specified bootfs files")?;
     builder.add_product_packages(product.packages).context("Adding product-provided packages")?;
 
     // Add product-specified memory buckets.
