@@ -470,7 +470,7 @@ if (!(current_os == "fuchsia")) {
 }
 
 group("iota") {
-  public_deps = [ ":iota-v0_2_2" ]
+  public_deps = [ ":iota-v0_2_3" ]
 }
 
 group("itertools") {
@@ -8115,18 +8115,18 @@ rust_library("instant-v0_1_9") {
   applicable_licenses = [ ":instant-v0_1_9.license" ]
 }
 
-license("iota-v0_2_2.license") {
+license("iota-v0_2_3.license") {
   public_package_name = "iota"
   license_files = [
-    "//third_party/rust_crates/vendor/iota-0.2.2/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/iota-0.2.2/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/iota-0.2.3/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/iota-0.2.3/LICENSE-MIT",
   ]
 }
 
-rust_library("iota-v0_2_2") {
+rust_library("iota-v0_2_3") {
   crate_name = "iota"
-  crate_root = "//third_party/rust_crates/vendor/iota-0.2.2/src/lib.rs"
-  output_name = "iota-e068e14ca4b8dd42"
+  crate_root = "//third_party/rust_crates/vendor/iota-0.2.3/src/lib.rs"
+  output_name = "iota-dc8ada07611e0f0a"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -8136,13 +8136,13 @@ rust_library("iota-v0_2_2") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=e068e14ca4b8dd42",
-    "-Cextra-filename=-e068e14ca4b8dd42",
+    "-Cmetadata=dc8ada07611e0f0a",
+    "-Cextra-filename=-dc8ada07611e0f0a",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":iota-v0_2_2.license" ]
+  applicable_licenses = [ ":iota-v0_2_3.license" ]
 }
 
 license("ipnet-v2_3_1.license") {
