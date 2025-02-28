@@ -121,9 +121,8 @@ pub struct Element {
     id: ElementID,
     name: String,
     valid_levels: Vec<IndexedPowerLevel>,
-    #[allow(dead_code)]
     synthetic: bool,
-    inspect_vertex: Rc<RefCell<IGraphVertex<ElementID>>>,
+    inspect_vertex: Option<Rc<RefCell<IGraphVertex<ElementID>>>>,
     inspect_edges: Rc<RefCell<HashMap<ElementID, IGraphEdge>>>,
 }
 
@@ -133,7 +132,6 @@ impl Element {
         name: String,
         mut valid_levels: Vec<IndexedPowerLevel>,
         synthetic: bool,
-        inspect_vertex: IGraphVertex<ElementID>,
     ) -> Self {
         valid_levels.sort();
         Self {
@@ -141,7 +139,7 @@ impl Element {
             name,
             valid_levels,
             synthetic,
-            inspect_vertex: Rc::new(RefCell::new(inspect_vertex)),
+            inspect_vertex: None,
             inspect_edges: Rc::new(RefCell::new(HashMap::new())),
         }
     }
@@ -219,10 +217,23 @@ impl Topology {
         topology.unsatisfiable_element_id = topology
             .add_element(
                 Self::TOPOLOGY_UNSATISFIABLE_ELEMENT,
-                Self::TOPOLOGY_UNSATISFIABLE_ELEMENT_POWER_LEVELS.to_vec(),
+                &Self::TOPOLOGY_UNSATISFIABLE_ELEMENT_POWER_LEVELS,
             )
             .ok()
             .expect("Failed to add unsatisfiable element");
+        topology.elements.get_mut(&topology.unsatisfiable_element_id).unwrap().inspect_vertex =
+            Some(Rc::new(RefCell::new(topology.inspect_graph.add_vertex(
+                topology.unsatisfiable_element_id.clone(),
+                [
+                    IGraphMeta::new("name", Self::TOPOLOGY_UNSATISFIABLE_ELEMENT),
+                    IGraphMeta::new(
+                        "valid_levels",
+                        Self::TOPOLOGY_UNSATISFIABLE_ELEMENT_POWER_LEVELS.to_vec(),
+                    ),
+                    IGraphMeta::new("current_level", "unset").track_events(),
+                    IGraphMeta::new("required_level", "unset").track_events(),
+                ],
+            ))));
         topology
     }
 
@@ -253,7 +264,7 @@ impl Topology {
     pub fn add_element(
         &mut self,
         name: &str,
-        valid_levels: Vec<fpb::PowerLevel>,
+        valid_levels: &[fpb::PowerLevel],
     ) -> Result<ElementID, AddElementError> {
         self.add_element_internal(name, valid_levels, false)
     }
@@ -261,7 +272,7 @@ impl Topology {
     pub fn add_synthetic_element(
         &mut self,
         name: &str,
-        valid_levels: Vec<fpb::PowerLevel>,
+        valid_levels: &[fpb::PowerLevel],
     ) -> Result<ElementID, AddElementError> {
         self.add_element_internal(name, valid_levels, true)
     }
@@ -269,7 +280,7 @@ impl Topology {
     fn add_element_internal(
         &mut self,
         name: &str,
-        valid_levels: Vec<fpb::PowerLevel>,
+        valid_levels: &[fpb::PowerLevel],
         synthetic: bool,
     ) -> Result<ElementID, AddElementError> {
         let id: ElementID = if ID_DEBUG_MODE {
@@ -286,26 +297,13 @@ impl Topology {
                 }
             }
         };
-        let inspect_graph =
-            if synthetic { &self.synthetic_inspect_graph } else { &self.inspect_graph };
-        let inspect_vertex = inspect_graph.add_vertex(
-            id.clone(),
-            [
-                IGraphMeta::new("name", name),
-                IGraphMeta::new("valid_levels", valid_levels.clone()),
-                IGraphMeta::new("current_level", "unset").track_events(),
-                IGraphMeta::new("required_level", "unset").track_events(),
-            ],
-        );
         let valid_levels = valid_levels
             .iter()
             .enumerate()
             .map(|(index, level)| IndexedPowerLevel { level: *level, index })
             .collect();
-        self.elements.insert(
-            id.clone(),
-            Element::new(id.clone(), name.into(), valid_levels, synthetic, inspect_vertex),
-        );
+        self.elements
+            .insert(id.clone(), Element::new(id.clone(), name.into(), valid_levels, synthetic));
         Ok(id)
     }
 
@@ -667,8 +665,8 @@ impl Topology {
         let mut inspect_edges = dp.inspect_edges.borrow_mut();
         match inspect_edges.get_mut(&rq_id) {
             None => {
-                let mut dp_vertex = dp.inspect_vertex.borrow_mut();
-                let mut rq_vertex = rq.inspect_vertex.borrow_mut();
+                let mut dp_vertex = dp.inspect_vertex.as_ref().unwrap().borrow_mut();
+                let mut rq_vertex = rq.inspect_vertex.as_ref().unwrap().borrow_mut();
                 let edge = dp_vertex.add_edge(
                     &mut rq_vertex,
                     [IGraphMeta::new(
@@ -706,7 +704,39 @@ impl Topology {
         &self,
         element_id: &'a ElementID,
     ) -> Option<Rc<RefCell<IGraphVertex<ElementID>>>> {
-        Some(Rc::clone(&self.elements.get(element_id)?.inspect_vertex))
+        self.elements.get(element_id)?.inspect_vertex.as_ref().map(Rc::clone)
+    }
+
+    pub fn initialize_element_inspect<'a>(
+        &mut self,
+        element_id: &'a ElementID,
+        valid_levels: Vec<fpb::PowerLevel>,
+        current_level: fpb::PowerLevel,
+        required_level: fpb::PowerLevel,
+    ) {
+        let Some(element) = self.elements.get_mut(element_id) else {
+            return;
+        };
+        let inspect_vertex = if element.synthetic {
+            self.synthetic_inspect_graph.add_vertex(
+                element_id.clone(),
+                [
+                    IGraphMeta::new("name", &element.name),
+                    IGraphMeta::new("valid_levels", valid_levels),
+                ],
+            )
+        } else {
+            self.inspect_graph.add_vertex(
+                element_id.clone(),
+                [
+                    IGraphMeta::new("name", &element.name),
+                    IGraphMeta::new("valid_levels", valid_levels),
+                    IGraphMeta::new("current_level", current_level).track_events(),
+                    IGraphMeta::new("required_level", required_level).track_events(),
+                ],
+            )
+        };
+        element.inspect_vertex = Some(Rc::new(RefCell::new(inspect_vertex)));
     }
 }
 
@@ -728,17 +758,62 @@ mod tests {
     const TWO: IndexedPowerLevel = IndexedPowerLevel::from_same_level_and_index(2);
     const THREE: IndexedPowerLevel = IndexedPowerLevel::from_same_level_and_index(3);
 
+    impl Topology {
+        fn add_element_with_inspect(
+            &mut self,
+            name: &str,
+            valid_levels: Vec<fpb::PowerLevel>,
+            current_level: fpb::PowerLevel,
+            required_level: fpb::PowerLevel,
+        ) -> Result<ElementID, AddElementError> {
+            let element_id = self.add_element(name, &valid_levels)?;
+            self.initialize_element_inspect(
+                &element_id,
+                valid_levels,
+                current_level,
+                required_level,
+            );
+            Ok(element_id)
+        }
+    }
+
     #[fuchsia::test]
     fn test_add_remove_elements() {
         let inspect = fuchsia_inspect::component::inspector();
         let inspect_node = inspect.root().create_child("test");
         let mut t = Topology::new(inspect_node, 0);
-        let water =
-            t.add_element("Water", BINARY_POWER_LEVELS.to_vec()).expect("add_element failed");
-        let earth =
-            t.add_element("Earth", BINARY_POWER_LEVELS.to_vec()).expect("add_element failed");
-        let fire = t.add_element("Fire", BINARY_POWER_LEVELS.to_vec()).expect("add_element failed");
-        let air = t.add_element("Air", BINARY_POWER_LEVELS.to_vec()).expect("add_element failed");
+        let water = t
+            .add_element_with_inspect(
+                "Water",
+                BINARY_POWER_LEVELS.to_vec(),
+                fpb::BinaryPowerLevel::On as u8,
+                fpb::BinaryPowerLevel::On as u8,
+            )
+            .expect("add_element failed");
+        let earth = t
+            .add_element_with_inspect(
+                "Earth",
+                BINARY_POWER_LEVELS.to_vec(),
+                fpb::BinaryPowerLevel::Off as u8,
+                fpb::BinaryPowerLevel::On as u8,
+            )
+            .expect("add_element failed");
+        let fire = t
+            .add_element_with_inspect(
+                "Fire",
+                BINARY_POWER_LEVELS.to_vec(),
+                fpb::BinaryPowerLevel::On as u8,
+                fpb::BinaryPowerLevel::Off as u8,
+            )
+            .expect("add_element failed");
+        let air = t
+            .add_element_with_inspect(
+                "Air",
+                BINARY_POWER_LEVELS.to_vec(),
+                fpb::BinaryPowerLevel::Off as u8,
+                fpb::BinaryPowerLevel::Off as u8,
+            )
+            .expect("add_element failed");
         let v01: Vec<u64> = BINARY_POWER_LEVELS.iter().map(|&v| v as u64).collect();
         assert_data_tree!(inspect, root: {
             test: {
@@ -749,16 +824,17 @@ mod tests {
                             meta: {
                                 name: t.get_unsatisfiable_element().name,
                                 valid_levels: t.get_unsatisfiable_element_levels(),
-                                required_level: "unset",
                                 current_level: "unset",
+                                required_level: "unset"
                             },
-                            relationships: {}},
+                            relationships: {},
+                        },
                         water.to_string() => {
                             meta: {
                                 name: "Water",
                                 valid_levels: v01.clone(),
-                                required_level: "unset",
-                                current_level: "unset",
+                                current_level: 1u64,
+                                required_level: 1u64,
                             },
                             relationships: {},
                         },
@@ -766,8 +842,8 @@ mod tests {
                             meta: {
                                 name: "Earth",
                                 valid_levels: v01.clone(),
-                                required_level: "unset",
-                                current_level: "unset",
+                                current_level: 0u64,
+                                required_level: 1u64,
                             },
                             relationships: {},
                         },
@@ -775,8 +851,8 @@ mod tests {
                             meta: {
                                 name: "Fire",
                                 valid_levels: v01.clone(),
-                                required_level: "unset",
-                                current_level: "unset",
+                                current_level: 1u64,
+                                required_level: 0u64,
                             },
                             relationships: {},
                         },
@@ -784,8 +860,8 @@ mod tests {
                             meta: {
                                 name: "Air",
                                 valid_levels: v01.clone(),
-                                required_level: "unset",
-                                current_level: "unset",
+                                current_level: 0u64,
+                                required_level: 0u64,
                             },
                             relationships: {},
                         },
@@ -813,8 +889,8 @@ mod tests {
                             meta: {
                                 name: "Water",
                                 valid_levels: v01.clone(),
-                                required_level: "unset",
-                                current_level: "unset",
+                                current_level: 1u64,
+                                required_level: 1u64,
                             },
                             relationships: {
                                 earth.to_string() => {
@@ -827,8 +903,8 @@ mod tests {
                             meta: {
                                 name: "Earth",
                                 valid_levels: v01.clone(),
-                                required_level: "unset",
-                                current_level: "unset",
+                                current_level: 0u64,
+                                required_level: 1u64,
                             },
                             relationships: {},
                         },
@@ -836,8 +912,8 @@ mod tests {
                             meta: {
                                 name: "Fire",
                                 valid_levels: v01.clone(),
-                                required_level: "unset",
-                                current_level: "unset",
+                                current_level: 1u64,
+                                required_level: 0u64,
                             },
                             relationships: {},
                         },
@@ -845,8 +921,8 @@ mod tests {
                             meta: {
                                 name: "Air",
                                 valid_levels: v01.clone(),
-                                required_level: "unset",
-                                current_level: "unset",
+                                current_level: 0u64,
+                                required_level: 0u64,
                             },
                             relationships: {},
                         },
@@ -880,8 +956,8 @@ mod tests {
                             meta: {
                                 name: "Water",
                                 valid_levels: v01.clone(),
-                                required_level: "unset",
-                                current_level: "unset",
+                                current_level: 1u64,
+                                required_level: 1u64,
                             },
                             relationships: {
                                 earth.to_string() => {
@@ -894,8 +970,8 @@ mod tests {
                             meta: {
                                 name: "Earth",
                                 valid_levels: v01.clone(),
-                                required_level: "unset",
-                                current_level: "unset",
+                                current_level: 0u64,
+                                required_level: 1u64,
                             },
                             relationships: {},
                         },
@@ -903,8 +979,8 @@ mod tests {
                             meta: {
                                 name: "Fire",
                                 valid_levels: v01.clone(),
-                                required_level: "unset",
-                                current_level: "unset",
+                                current_level: 1u64,
+                                required_level: 0u64,
                             },
                             relationships: {},
                         },
@@ -912,8 +988,8 @@ mod tests {
                             meta: {
                                 name: "Air",
                                 valid_levels: v01.clone(),
-                                required_level: "unset",
-                                current_level: "unset",
+                                current_level: 0u64,
+                                required_level: 0u64,
                             },
                             relationships: {},
                         },
@@ -960,8 +1036,8 @@ mod tests {
                             meta: {
                                 name: "Water",
                                 valid_levels: v01.clone(),
-                                required_level: "unset",
-                                current_level: "unset",
+                                current_level: 1u64,
+                                required_level: 1u64,
                             },
                             relationships: {
                                 earth.to_string() => {
@@ -974,8 +1050,8 @@ mod tests {
                             meta: {
                                 name: "Earth",
                                 valid_levels: v01.clone(),
-                                required_level: "unset",
-                                current_level: "unset",
+                                current_level: 0u64,
+                                required_level: 1u64,
                             },
                             relationships: {},
                         },
@@ -1010,8 +1086,8 @@ mod tests {
                             meta: {
                                 name: "Water",
                                 valid_levels: v01.clone(),
-                                required_level: "unset",
-                                current_level: "unset",
+                                current_level: 1u64,
+                                required_level: 1u64,
                             },
                             relationships: {
                                 earth.to_string() => {
@@ -1024,8 +1100,8 @@ mod tests {
                             meta: {
                                 name: "Earth",
                                 valid_levels: v01.clone(),
-                                required_level: "unset",
-                                current_level: "unset",
+                                current_level: 0u64,
+                                required_level: 1u64,
                             },
                             relationships: {},
                         },
@@ -1051,8 +1127,8 @@ mod tests {
                 meta: {
                     name: "Water",
                     valid_levels: v01.clone(),
-                    required_level: "unset",
-                    current_level: "unset",
+                    current_level: 1u64,
+                    required_level: 1u64,
                 },
                 relationships: {
                     earth.to_string() => {
@@ -1065,8 +1141,8 @@ mod tests {
                 meta: {
                     name: "Earth",
                     valid_levels: v01.clone(),
-                    required_level: "unset",
-                    current_level: "unset",
+                    current_level: 0u64,
+                    required_level: 1u64,
                 },
                 relationships: {},
             },
@@ -1088,8 +1164,8 @@ mod tests {
                 meta: {
                     name: "Water",
                     valid_levels: v01.clone(),
-                    required_level: "unset",
-                    current_level: "unset",
+                    current_level: 1u64,
+                    required_level: 1u64,
                 },
                 relationships: {
                     t.get_unsatisfiable_element().id.to_string() => {
@@ -1101,7 +1177,7 @@ mod tests {
         }}}});
 
         let synthetic_element = t
-            .add_synthetic_element("Synthetic", BINARY_POWER_LEVELS.to_vec())
+            .add_synthetic_element("Synthetic", &BINARY_POWER_LEVELS)
             .expect("add_synthetic_element failed");
         assert_eq!(t.element_exists(&synthetic_element), true);
         assert_eq!(t.element_is_synthetic(&synthetic_element), true);
@@ -1116,10 +1192,10 @@ mod tests {
         let v012_u8: Vec<u8> = vec![0, 1, 2];
         let v012: Vec<u64> = v012_u8.iter().map(|&v| v as u64).collect();
 
-        let a = t.add_element("A", v012_u8.clone()).expect("add_element failed");
-        let b = t.add_element("B", v012_u8.clone()).expect("add_element failed");
-        let c = t.add_element("C", v012_u8.clone()).expect("add_element failed");
-        let d = t.add_element("D", v012_u8.clone()).expect("add_element failed");
+        let a = t.add_element_with_inspect("A", v012_u8.clone(), 0, 0).expect("add_element failed");
+        let b = t.add_element_with_inspect("B", v012_u8.clone(), 0, 0).expect("add_element failed");
+        let c = t.add_element_with_inspect("C", v012_u8.clone(), 0, 0).expect("add_element failed");
+        let d = t.add_element_with_inspect("D", v012_u8.clone(), 0, 0).expect("add_element failed");
         // A <- B <- C -> D
         let ba = Dependency {
             dependent: ElementLevel { element_id: b.clone(), level: ONE },
@@ -1158,8 +1234,8 @@ mod tests {
                             meta: {
                                 name: "A",
                                 valid_levels: v012.clone(),
-                                current_level: "unset",
-                                required_level: "unset",
+                                current_level: 0u64,
+                                required_level: 0u64,
                             },
                             relationships: {},
                         },
@@ -1167,8 +1243,8 @@ mod tests {
                             meta: {
                                 name: "B",
                                 valid_levels: v012.clone(),
-                                current_level: "unset",
-                                required_level: "unset",
+                                current_level: 0u64,
+                                required_level: 0u64,
                             },
                             relationships: {
                                 a.to_string() => {
@@ -1181,8 +1257,8 @@ mod tests {
                             meta: {
                                 name: "C",
                                 valid_levels: v012.clone(),
-                                current_level: "unset",
-                                required_level: "unset",
+                                current_level: 0u64,
+                                required_level: 0u64,
                             },
                             relationships: {
                                 b.to_string() => {
@@ -1199,8 +1275,8 @@ mod tests {
                             meta: {
                                 name: "D",
                                 valid_levels: v012.clone(),
-                                current_level: "unset",
-                                required_level: "unset",
+                                current_level: 0u64,
+                                required_level: 0u64,
                             },
                             relationships: {},
                         },
@@ -1239,11 +1315,12 @@ mod tests {
             v013_u8.iter().map(|&v| v as u64).collect(),
         );
 
-        let a = t.add_element("A", vec![0, 1, 2, 3]).expect("add_element failed");
-        let b = t.add_element("B", vec![0, 1, 5]).expect("add_element failed");
-        let c = t.add_element("C", vec![0, 1]).expect("add_element failed");
-        let d = t.add_element("D", vec![0, 1, 3]).expect("add_element failed");
-        let e = t.add_element("E", vec![0, 1]).expect("add_element failed");
+        let a =
+            t.add_element_with_inspect("A", vec![0, 1, 2, 3], 2, 1).expect("add_element failed");
+        let b = t.add_element_with_inspect("B", vec![0, 1, 5], 0, 5).expect("add_element failed");
+        let c = t.add_element_with_inspect("C", vec![0, 1], 1, 1).expect("add_element failed");
+        let d = t.add_element_with_inspect("D", vec![0, 1, 3], 1, 3).expect("add_element failed");
+        let e = t.add_element_with_inspect("E", vec![0, 1], 0, 0).expect("add_element failed");
         assert_data_tree!(inspect, root: {
             test: {
                 "fuchsia.inspect.synthetic.Graph": contains {},
@@ -1261,8 +1338,8 @@ mod tests {
                             meta: {
                                 name: "A",
                                 valid_levels: v0123.clone(),
-                                current_level: "unset",
-                                required_level: "unset",
+                                current_level: 2u64,
+                                required_level: 1u64,
                             },
                             relationships: {},
                         },
@@ -1270,8 +1347,8 @@ mod tests {
                             meta: {
                                 name: "B",
                                 valid_levels: v015.clone(),
-                                current_level: "unset",
-                                required_level: "unset",
+                                current_level: 0u64,
+                                required_level: 5u64,
                             },
                             relationships: {},
                         },
@@ -1279,8 +1356,8 @@ mod tests {
                             meta: {
                                 name: "C",
                                 valid_levels: v01.clone(),
-                                current_level: "unset",
-                                required_level: "unset",
+                                current_level: 1u64,
+                                required_level: 1u64,
                             },
                             relationships: {},
                         },
@@ -1288,8 +1365,8 @@ mod tests {
                             meta: {
                                 name: "D",
                                 valid_levels: v013.clone(),
-                                current_level: "unset",
-                                required_level: "unset",
+                                current_level: 1u64,
+                                required_level: 3u64,
                             },
                             relationships: {},
                         },
@@ -1297,8 +1374,8 @@ mod tests {
                             meta: {
                                 name: "E",
                                 valid_levels: v01.clone(),
-                                current_level: "unset",
-                                required_level: "unset",
+                                current_level: 0u64,
+                                required_level: 0u64,
                             },
                             relationships: {},
                         },
@@ -1372,8 +1449,8 @@ mod tests {
                             meta: {
                                 name: "A",
                                 valid_levels: v0123.clone(),
-                                current_level: "unset",
-                                required_level: "unset",
+                                current_level: 2u64,
+                                required_level: 1u64,
                             },
                             relationships: {},
                         },
@@ -1381,8 +1458,8 @@ mod tests {
                             meta: {
                                 name: "B",
                                 valid_levels: v015.clone(),
-                                current_level: "unset",
-                                required_level: "unset",
+                                current_level: 0u64,
+                                required_level: 5u64,
                             },
                             relationships: {
                                 a.to_string() => {
@@ -1398,8 +1475,8 @@ mod tests {
                             meta: {
                                 name: "C",
                                 valid_levels: v01.clone(),
-                                current_level: "unset",
-                                required_level: "unset",
+                                current_level: 1u64,
+                                required_level: 1u64,
                             },
                             relationships: {
                                 b.to_string() => {
@@ -1416,8 +1493,8 @@ mod tests {
                             meta: {
                                 name: "D",
                                 valid_levels: v013.clone(),
-                                current_level: "unset",
-                                required_level: "unset",
+                                current_level: 1u64,
+                                required_level: 3u64,
                             },
                             relationships: {
                                 a.to_string() => {
@@ -1434,8 +1511,8 @@ mod tests {
                             meta: {
                                 name: "E",
                                 valid_levels: v01.clone(),
-                                current_level: "unset",
-                                required_level: "unset",
+                                current_level: 0u64,
+                                required_level: 0u64,
                             },
                             relationships: {},
                         },
@@ -1499,11 +1576,12 @@ mod tests {
         let inspect_node = inspect.root().create_child("test");
         let mut t = Topology::new(inspect_node, 0);
 
-        let a = t.add_element("A", vec![0, 1, 2, 3]).expect("add_element failed");
-        let b = t.add_element("B", vec![0, 1, 5]).expect("add_element failed");
-        let c = t.add_element("C", vec![0, 1]).expect("add_element failed");
-        let d = t.add_element("D", vec![0, 1, 3]).expect("add_element failed");
-        let e = t.add_element("E", vec![0, 1]).expect("add_element failed");
+        let a =
+            t.add_element_with_inspect("A", vec![0, 1, 2, 3], 0, 0).expect("add_element failed");
+        let b = t.add_element_with_inspect("B", vec![0, 1, 5], 0, 0).expect("add_element failed");
+        let c = t.add_element_with_inspect("C", vec![0, 1], 0, 0).expect("add_element failed");
+        let d = t.add_element_with_inspect("D", vec![0, 1, 3], 0, 0).expect("add_element failed");
+        let e = t.add_element_with_inspect("E", vec![0, 1], 0, 0).expect("add_element failed");
 
         // C has direct assertive dependencies on B and D.
         // B only has opportunistic dependencies on A.

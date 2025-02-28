@@ -1064,15 +1064,22 @@ impl Broker {
         if valid_levels.len() < 1 {
             return Err(AddElementError::Invalid);
         }
-        let id = self.catalog.topology.add_element(name, valid_levels.to_vec())?;
-        let initial_current_level = self
+        let id = self.catalog.topology.add_element(name, &valid_levels)?;
+        let initial_current_level = *self
             .catalog
             .topology
             .get_level_index(&id, &initial_current_level)
             .ok_or(AddElementError::Invalid)?;
-        self.update_current_level_internal(&id, *initial_current_level);
+        let current_level = initial_current_level.level;
+        self.update_current_level_internal(&id, initial_current_level);
         let minimum_level = self.catalog.topology.minimum_level(&id);
         self.update_required_level(&id, minimum_level);
+        self.catalog.topology.initialize_element_inspect(
+            &id,
+            valid_levels,
+            current_level,
+            minimum_level.level,
+        );
         for dependency in level_dependencies {
             let requires_token = dependency.requires_token.into();
             let Some(requires_cred) = self.lookup_credentials(&requires_token) else {
@@ -1416,13 +1423,20 @@ impl Catalog {
         element_id: &ElementID,
         level: IndexedPowerLevel,
     ) -> ElementID {
+        let valid_levels = vec![LeasePowerLevel::Pending as u8, LeasePowerLevel::Satisfied as u8];
         let lease_element_id = self
             .topology
             .add_synthetic_element(
                 format!("{}_{}_LEASE", element_id, Uuid::new_v4().as_simple()).as_str(),
-                vec![LeasePowerLevel::Pending as u8, LeasePowerLevel::Satisfied as u8],
+                &valid_levels,
             )
             .expect("Failed to create lease element");
+        self.topology.initialize_element_inspect(
+            &lease_element_id,
+            valid_levels,
+            0, /* unused */
+            0, /* unused */
+        );
         self.topology
             .add_assertive_dependency(&Dependency {
                 dependent: ElementLevel {
@@ -2290,23 +2304,9 @@ mod tests {
                                 vertex_id: latinum.to_string(),
                                 event: "add_vertex",
                                 meta: {
-                                    current_level: "unset",
-                                    required_level: "unset",
+                                    current_level: 7u64,
+                                    required_level: 5u64,
                                 },
-                            },
-                            "2": {
-                                "@time": AnyProperty,
-                                vertex_id: latinum.to_string(),
-                                event: "update_key",
-                                key: "current_level",
-                                update: 7u64,
-                            },
-                            "3": {
-                                "@time": AnyProperty,
-                                vertex_id: latinum.to_string(),
-                                event: "update_key",
-                                key: "required_level",
-                                update: 5u64,
                             },
                         },
                         stats: contains {},
@@ -2381,8 +2381,8 @@ mod tests {
                                 vertex_id: latinum.to_string(),
                                 event: "add_vertex",
                                 meta: {
-                                    current_level: "unset",
-                                    required_level: "unset",
+                                    current_level: 2u64,
+                                    required_level: 0u64,
                                 },
                             },
                             "2": {
@@ -2390,37 +2390,23 @@ mod tests {
                                 vertex_id: latinum.to_string(),
                                 event: "update_key",
                                 key: "current_level",
-                                update: 2u64,
+                                update: 0u64,
                             },
                             "3": {
                                 "@time": AnyProperty,
                                 vertex_id: latinum.to_string(),
                                 event: "update_key",
                                 key: "required_level",
-                                update: 0u64,
+                                update: 1u64,
                             },
                             "4": {
                                 "@time": AnyProperty,
                                 vertex_id: latinum.to_string(),
                                 event: "update_key",
                                 key: "current_level",
-                                update: 0u64,
+                                update: 1u64,
                             },
                             "5": {
-                                "@time": AnyProperty,
-                                vertex_id: latinum.to_string(),
-                                event: "update_key",
-                                key: "required_level",
-                                update: 1u64,
-                            },
-                            "6": {
-                                "@time": AnyProperty,
-                                vertex_id: latinum.to_string(),
-                                event: "update_key",
-                                key: "current_level",
-                                update: 1u64,
-                            },
-                            "7": {
                                 "@time": AnyProperty,
                                 vertex_id: latinum.to_string(),
                                 event: "update_key",
@@ -2634,23 +2620,9 @@ mod tests {
                                 vertex_id: unobtanium.to_string(),
                                 event: "add_vertex",
                                 meta: {
-                                    current_level: "unset",
-                                    required_level: "unset",
+                                    current_level: OFF.level as u64,
+                                    required_level: OFF.level as u64,
                                 },
-                            },
-                            "2": {
-                                "@time": AnyProperty,
-                                vertex_id: unobtanium.to_string(),
-                                event: "update_key",
-                                key: "current_level",
-                                update: OFF.level as u64,
-                            },
-                            "3": {
-                                "@time": AnyProperty,
-                                vertex_id: unobtanium.to_string(),
-                                event: "update_key",
-                                key: "required_level",
-                                update: OFF.level as u64,
                             },
                         },
                         stats: contains {},
@@ -2691,25 +2663,11 @@ mod tests {
                                 vertex_id: unobtanium.to_string(),
                                 event: "add_vertex",
                                 meta: {
-                                    current_level: "unset",
-                                    required_level: "unset",
+                                    current_level: OFF.level as u64,
+                                    required_level: OFF.level as u64,
                                 },
                             },
                             "2": {
-                                "@time": AnyProperty,
-                                vertex_id: unobtanium.to_string(),
-                                event: "update_key",
-                                key: "current_level",
-                                update: OFF.level as u64,
-                            },
-                            "3": {
-                                "@time": AnyProperty,
-                                vertex_id: unobtanium.to_string(),
-                                event: "update_key",
-                                key: "required_level",
-                                update: OFF.level as u64,
-                            },
-                            "4": {
                                 "@time": AnyProperty,
                                 vertex_id: unobtanium.to_string(),
                                 event: "remove_vertex",
