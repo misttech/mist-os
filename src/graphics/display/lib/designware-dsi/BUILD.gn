@@ -6,6 +6,7 @@ import("//build/test.gni")
 
 source_set("dsi-host-controller") {
   sources = [
+    "dpi-interface-config.h",
     "dpi-video-timing.h",
     "dsi-host-controller.cc",
     "dsi-host-controller.h",
@@ -25,7 +26,10 @@ source_set("dsi-host-controller") {
 
 test("dsi-host-controller-tests-bin") {
   output_name = "dsi-host-controller-tests"
-  sources = [ "dpi-video-timing-test.cc" ]
+  sources = [
+    "dpi-interface-config-test.cc",
+    "dpi-video-timing-test.cc",
+  ]
 
   deps = [
     ":dsi-host-controller",
