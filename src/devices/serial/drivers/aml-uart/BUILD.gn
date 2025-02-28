@@ -43,11 +43,13 @@ source_set("aml-uart-source") {
   ]
   public_deps = [
     ":aml-uart-config",
+    "//sdk/fidl/fuchsia.boot.metadata:fuchsia.boot.metadata_cpp",
     "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
     "//sdk/fidl/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_cpp",
     "//sdk/lib/async:async-cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/metadata/cpp",
     "//sdk/lib/driver/platform-device/cpp",
     "//sdk/lib/driver/power/cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",

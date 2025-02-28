@@ -36,9 +36,11 @@ void AmlUartV2::Start(fdf::StartCompleter completer) {
 
   parent_node_client_.Bind(std::move(node()), dispatcher());
 
-  device_server_.Begin(incoming(), outgoing(), node_name(), kChildName,
-                       fit::bind_member<&AmlUartV2::OnDeviceServerInitialized>(this),
-                       compat::ForwardMetadata::Some({DEVICE_METADATA_MAC_ADDRESS}));
+  device_server_.Begin(
+      incoming(), outgoing(), node_name(), kChildName,
+      fit::bind_member<&AmlUartV2::OnDeviceServerInitialized>(this),
+      // TODO(b/373918767): Don't forward DEVICE_METADATA_MAC_ADDRESS once no longer retrieved.
+      compat::ForwardMetadata::Some({DEVICE_METADATA_MAC_ADDRESS}));
 }
 
 void AmlUartV2::PrepareStop(fdf::PrepareStopCompleter completer) {
@@ -69,6 +71,20 @@ void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result
       return;
     }
     pdev = fdf::PDev{std::move(result.value())};
+  }
+
+  if (zx::result result = mac_address_metadata_server_.SetMetadataFromPDevIfExists(pdev);
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to set mac address metadata from platform device: %s",
+            result.status_string());
+    CompleteStart(result.take_error());
+    return;
+  }
+  if (zx::result result = mac_address_metadata_server_.Serve(*outgoing(), dispatcher());
+      result.is_error()) {
+    FDF_LOG(ERROR, "Failed to serve mac address metadata: %s", result.status_string());
+    CompleteStart(result.take_error());
+    return;
   }
 
   zx::result metadata = pdev.GetFidlMetadata<fuchsia_hardware_serial::SerialPortInfo>(
@@ -143,6 +159,7 @@ void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result
 
   auto offers = device_server_.CreateOffers2();
   offers.push_back(fdf::MakeOffer2<fuchsia_hardware_serialimpl::Service>(kChildName));
+  offers.push_back(mac_address_metadata_server_.MakeOffer());
 
   fuchsia_driver_framework::NodeAddArgs args{
       {
