@@ -1204,7 +1204,7 @@ def main() -> int:
         else:
             return ret.stdout.splitlines()
 
-    configured_args = [shlex.quote(arg) for arg in args.extra_bazel_args]
+    configured_args = args.extra_bazel_args
 
     if any(
         entry.copy_debug_symbols
