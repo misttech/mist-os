@@ -15,7 +15,12 @@
 #include <fbl/auto_lock.h>
 #include <fbl/string_buffer.h>
 
+#include "src/graphics/display/lib/designware-dsi/banjo-conversion.h"
+#include "src/graphics/display/lib/designware-dsi/dphy-interface-config.h"
+#include "src/graphics/display/lib/designware-dsi/dpi-interface-config.h"
 #include "src/graphics/display/lib/designware-dsi/dpi-video-timing.h"
+#include "src/graphics/display/lib/designware-dsi/dsi-host-controller-config.h"
+#include "src/graphics/display/lib/designware-dsi/dsi-packet-handler-config.h"
 #include "src/graphics/display/lib/designware-dsi/dw-mipi-dsi-reg.h"
 
 // Header Creation Macros
@@ -72,52 +77,6 @@ void LogBytes(cpp20::span<const uint8_t> bytes) {
 }  // namespace
 
 DsiHostController::DsiHostController(fdf::MmioBuffer dsi_mmio) : dsi_mmio_(std::move(dsi_mmio)) {}
-
-zx_status_t DsiHostController::GetColorCode(color_code_t c, bool& packed, uint8_t& code) {
-  zx_status_t status = ZX_OK;
-  switch (c) {
-    case COLOR_CODE_PACKED_16BIT_565:
-      packed = true;
-      code = 0;
-      break;
-    case COLOR_CODE_PACKED_18BIT_666:
-      packed = true;
-      code = 3;
-      // Converts the duration of transmitting `pixels` on the DPI interface to
-      // lane byte clock cycles (number of lane byte clock periods),
-      break;
-    case COLOR_CODE_LOOSE_24BIT_666:
-      packed = false;
-      code = 3;
-      break;
-    case COLOR_CODE_PACKED_24BIT_888:
-      packed = true;
-      code = 5;
-      break;
-    default:
-      status = ZX_ERR_INVALID_ARGS;
-      break;
-  }
-  return status;
-}
-
-zx_status_t DsiHostController::GetVideoMode(video_mode_t v, uint8_t& mode) {
-  zx_status_t status = ZX_OK;
-  switch (v) {
-    case VIDEO_MODE_NON_BURST_PULSE:
-      mode = 0;
-      break;
-    case VIDEO_MODE_NON_BURST_EVENT:
-      mode = 1;
-      break;
-    case VIDEO_MODE_BURST:
-      mode = 2;
-      break;
-    default:
-      status = ZX_ERR_INVALID_ARGS;
-  }
-  return status;
-}
 
 void DsiHostController::PowerUp() {
   DsiDwPwrUpReg::Get().ReadFrom(&dsi_mmio_).set_shutdown(kPowerOn).WriteTo(&dsi_mmio_);
@@ -201,26 +160,19 @@ void DsiHostController::SetMode(dsi_mode_t mode) {
 
 zx_status_t DsiHostController::Config(const dsi_config_t* dsi_config,
                                       int64_t dphy_data_lane_bits_per_second) {
-  const display_setting_t disp_setting = dsi_config->display_setting;
-  const designware_config_t dw_cfg =
-      *(reinterpret_cast<designware_config_t*>(dsi_config->vendor_config_buffer));
+  ZX_DEBUG_ASSERT(dsi_config != nullptr);
+  ZX_DEBUG_ASSERT(dsi_config->vendor_config_buffer != nullptr);
+  ZX_DEBUG_ASSERT(dsi_config->vendor_config_size >= sizeof(designware_config_t));
 
-  static constexpr int kBitsPerByte = 8;
-  const int64_t dphy_data_lane_bytes_per_second = dphy_data_lane_bits_per_second / kBitsPerByte;
+  const DsiHostControllerConfig config =
+      ToDsiHostControllerConfig(*dsi_config, dphy_data_lane_bits_per_second);
+  return Config(config).status_value();
+}
 
-  bool packed;
-  uint8_t code;
-  uint8_t video_mode;
-  zx_status_t status = GetColorCode(dsi_config->color_coding, packed, code);
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Refusing config with invalid or unsupported color coding");
-    return status;
-  }
-
-  status = GetVideoMode(dsi_config->video_mode_type, video_mode);
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Refusing config with invalid or unsupported video mode");
-    return status;
+zx::result<> DsiHostController::Config(const DsiHostControllerConfig& config) {
+  if (!config.IsValid()) {
+    FDF_LOG(ERROR, "Invalid DsiHostControllerConfig provided");
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   // Enable LP transmission in CMD Mode
@@ -253,7 +205,7 @@ zx_status_t DsiHostController::Config(const dsi_config_t* dsi_config,
   DsiDwPhyIfCfgReg::Get()
       .ReadFrom(&dsi_mmio_)
       .set_phy_stop_wait_time(kPhyStopWaitTime)
-      .set_n_lanes(disp_setting.lane_num - 1)
+      .set_n_lanes(config.dphy_interface_config.data_lane_count - 1)
       .WriteTo(&dsi_mmio_);
 
   // 2.1 Configure virtual channel
@@ -263,10 +215,13 @@ zx_status_t DsiHostController::Config(const dsi_config_t* dsi_config,
       .WriteTo(&dsi_mmio_);
 
   // 2.2, Configure Color format
+  const bool pixel_stream_packet_format_is_18bit_loosely_packed =
+      config.dsi_packet_handler_config.pixel_stream_packet_format ==
+      mipi_dsi::DsiPixelStreamPacketFormat::k18BitR6G6B6LooselyPacked;
   DsiDwDpiColorCodingReg::Get()
       .ReadFrom(&dsi_mmio_)
-      .set_loosely18_en(!packed)
-      .set_dpi_color_coding(code)
+      .set_loosely18_en(pixel_stream_packet_format_is_18bit_loosely_packed)
+      .SetColorComponentMapping(config.dpi_interface_config.color_component_mapping)
       .WriteTo(&dsi_mmio_);
   // 2.3 Configure Signal polarity - Keep as default
   DsiDwDpiCfgPolReg::Get().FromValue(0).set_reg_value(0).WriteTo(&dsi_mmio_);
@@ -289,20 +244,22 @@ zx_status_t DsiHostController::Config(const dsi_config_t* dsi_config,
       .set_lp_vfp_en(1)
       .set_lp_vbp_en(1)
       .set_lp_vsa_en(1)
-      .set_vid_mode_type(video_mode)
+      .SetVideoModePacketSequencing(config.dsi_packet_handler_config.packet_sequencing)
       .WriteTo(&dsi_mmio_);
 
   // Define the max pkt size during Low Power mode
   DsiDwDpiLpCmdTimReg::Get()
       .ReadFrom(&dsi_mmio_)
-      .set_outvact_lpcmd_time(dw_cfg.lp_cmd_pkt_size)
-      .set_invact_lpcmd_time(dw_cfg.lp_cmd_pkt_size)
+      .set_outvact_lpcmd_time(config.dpi_interface_config.low_power_command_timer_config
+                                  .max_vertical_blank_escape_mode_command_size_bytes)
+      .set_invact_lpcmd_time(config.dpi_interface_config.low_power_command_timer_config
+                                 .max_vertical_active_escape_mode_command_size_bytes)
       .WriteTo(&dsi_mmio_);
 
   // 3.2   Configure video packet size settings
   DsiDwVidPktSizeReg::Get()
       .ReadFrom(&dsi_mmio_)
-      .set_vid_pkt_size(disp_setting.h_active)
+      .set_vid_pkt_size(config.dpi_interface_config.video_timing.horizontal_active_px)
       .WriteTo(&dsi_mmio_);
 
   // Disable sending vid in chunk since they are ignored by DW host IP in burst mode
@@ -310,29 +267,31 @@ zx_status_t DsiHostController::Config(const dsi_config_t* dsi_config,
   DsiDwVidNullSizeReg::Get().FromValue(0).set_reg_value(0).WriteTo(&dsi_mmio_);
 
   // 4 Configure the video relative parameters according to the output type
-  const int64_t pixel_clock_frequency_hz = disp_setting.lcd_clock;
+  const display::DisplayTiming& video_timing = config.dpi_interface_config.video_timing;
+  const int64_t dphy_data_lane_bytes_per_second =
+      config.dphy_interface_config.high_speed_mode_data_lane_bytes_per_second();
 
-  const int32_t horizontal_sync_width_pixels = static_cast<int32_t>(disp_setting.hsync_width);
   const int32_t horizontal_sync_width_duration_lane_byte_clock_cycles =
-      DpiPixelToDphyLaneByteClockCycle(horizontal_sync_width_pixels, pixel_clock_frequency_hz,
+      DpiPixelToDphyLaneByteClockCycle(video_timing.horizontal_sync_width_px,
+                                       video_timing.pixel_clock_frequency_hz,
                                        dphy_data_lane_bytes_per_second);
   DsiDwVidHsaTimeReg::Get()
       .ReadFrom(&dsi_mmio_)
       .set_vid_hsa_time(horizontal_sync_width_duration_lane_byte_clock_cycles)
       .WriteTo(&dsi_mmio_);
 
-  const int32_t horizontal_back_porch_pixels = static_cast<int32_t>(disp_setting.hsync_bp);
   const int32_t horizontal_back_porch_duration_lane_byte_clock_cycles =
-      DpiPixelToDphyLaneByteClockCycle(horizontal_back_porch_pixels, pixel_clock_frequency_hz,
+      DpiPixelToDphyLaneByteClockCycle(video_timing.horizontal_back_porch_px,
+                                       video_timing.pixel_clock_frequency_hz,
                                        dphy_data_lane_bytes_per_second);
   DsiDwVidHbpTimeReg::Get()
       .ReadFrom(&dsi_mmio_)
       .set_vid_hbp_time(horizontal_back_porch_duration_lane_byte_clock_cycles)
       .WriteTo(&dsi_mmio_);
 
-  const int32_t horizontal_total_pixels = static_cast<int32_t>(disp_setting.h_period);
   const int32_t horizontal_total_duration_lane_byte_clock_cycles = DpiPixelToDphyLaneByteClockCycle(
-      horizontal_total_pixels, pixel_clock_frequency_hz, dphy_data_lane_bytes_per_second);
+      video_timing.horizontal_total_px(), video_timing.pixel_clock_frequency_hz,
+      dphy_data_lane_bytes_per_second);
   DsiDwVidHlineTimeReg::Get()
       .ReadFrom(&dsi_mmio_)
       .set_vid_hline_time(horizontal_total_duration_lane_byte_clock_cycles)
@@ -340,51 +299,62 @@ zx_status_t DsiHostController::Config(const dsi_config_t* dsi_config,
 
   DsiDwVidVsaLinesReg::Get()
       .ReadFrom(&dsi_mmio_)
-      .set_vsa_lines(disp_setting.vsync_width)
+      .set_vsa_lines(video_timing.vertical_sync_width_lines)
       .WriteTo(&dsi_mmio_);
 
   DsiDwVidVbpLinesReg::Get()
       .ReadFrom(&dsi_mmio_)
-      .set_vbp_lines(disp_setting.vsync_bp)
+      .set_vbp_lines(video_timing.vertical_back_porch_lines)
       .WriteTo(&dsi_mmio_);
 
   DsiDwVidVactiveLinesReg::Get()
       .ReadFrom(&dsi_mmio_)
-      .set_vactive_lines(disp_setting.v_active)
+      .set_vactive_lines(video_timing.vertical_active_lines)
       .WriteTo(&dsi_mmio_);
 
   DsiDwVidVfpLinesReg::Get()
       .ReadFrom(&dsi_mmio_)
-      .set_vfp_lines(disp_setting.v_period - disp_setting.v_active - disp_setting.vsync_bp -
-                     disp_setting.vsync_width)
+      .set_vfp_lines(video_timing.vertical_front_porch_lines)
       .WriteTo(&dsi_mmio_);
 
   // Internal dividers to divide lanebyteclk for timeout purposes
+
+  // The quotient is guaranteed to be >= 1 and <= 255. Thus it can be cast
+  // to an int32_t.
+  const int32_t escape_clock_divider = static_cast<int32_t>(
+      config.dphy_interface_config.high_speed_mode_data_lane_bytes_per_second() /
+      config.dphy_interface_config.escape_mode_clock_lane_frequency_hz);
   DsiDwClkmgrCfgReg::Get()
       .ReadFrom(&dsi_mmio_)
       .set_to_clk_div(1)
-      .set_tx_esc_clk_div(dw_cfg.lp_escape_time)
+      .set_tx_esc_clk_div(escape_clock_divider)
       .WriteTo(&dsi_mmio_);
 
   // Setup Phy Timers as provided by vendor
   DsiDwPhyTmrLpclkCfgReg::Get()
       .ReadFrom(&dsi_mmio_)
-      .set_phy_clkhs2lp_time(dw_cfg.phy_timer_clkhs_to_lp)
-      .set_phy_clklp2hs_time(dw_cfg.phy_timer_clklp_to_hs)
+      .set_phy_clkhs2lp_time(
+          config.dphy_interface_config
+              .max_clock_lane_hs_to_lp_transition_duration_lane_byte_clock_cycles)
+      .set_phy_clklp2hs_time(
+          config.dphy_interface_config
+              .max_clock_lane_lp_to_hs_transition_duration_lane_byte_clock_cycles)
       .WriteTo(&dsi_mmio_);
   DsiDwPhyTmrCfgReg::Get()
       .ReadFrom(&dsi_mmio_)
-      .set_phy_hs2lp_time(dw_cfg.phy_timer_hs_to_lp)
-      .set_phy_lp2hs_time(dw_cfg.phy_timer_lp_to_hs)
+      .set_phy_hs2lp_time(config.dphy_interface_config
+                              .max_data_lane_hs_to_lp_transition_duration_lane_byte_clock_cycles)
+      .set_phy_lp2hs_time(config.dphy_interface_config
+                              .max_data_lane_lp_to_hs_transition_duration_lane_byte_clock_cycles)
       .WriteTo(&dsi_mmio_);
 
   DsiDwLpclkCtrlReg::Get()
       .ReadFrom(&dsi_mmio_)
-      .set_auto_clklane_ctrl(dw_cfg.auto_clklane)
+      .set_auto_clklane_ctrl(config.dphy_interface_config.clock_lane_mode_automatic_control_enabled)
       .set_phy_txrequestclkhs(1)
       .WriteTo(&dsi_mmio_);
 
-  return ZX_OK;
+  return zx::ok();
 }
 
 inline bool DsiHostController::IsPldREmpty() {

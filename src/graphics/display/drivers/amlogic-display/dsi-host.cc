@@ -281,6 +281,7 @@ zx::result<> DsiHost::ConfigureDsiHostController(int64_t d_phy_data_lane_bitrate
   dw_cfg.phy_timer_lp_to_hs = PHY_TMR_LP_TO_HS;
   dw_cfg.auto_clklane = 1;
   dsi_cfg.vendor_config_buffer = reinterpret_cast<uint8_t*>(&dw_cfg);
+  dsi_cfg.vendor_config_size = sizeof(dw_cfg);
 
   designware_dsi_host_controller_->Config(&dsi_cfg, d_phy_data_lane_bitrate_bits_per_second);
 

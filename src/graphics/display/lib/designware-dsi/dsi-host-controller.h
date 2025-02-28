@@ -13,6 +13,8 @@
 
 #include <fbl/mutex.h>
 
+#include "src/graphics/display/lib/designware-dsi/dsi-host-controller-config.h"
+
 namespace designware_dsi {
 
 // The DesignWare Cores MIPI-DSI host controller IP core (also known as
@@ -22,6 +24,7 @@ class DsiHostController {
   explicit DsiHostController(fdf::MmioBuffer dsi_mmio);
 
   zx_status_t Config(const dsi_config_t* dsi_config, int64_t dphy_data_lane_bits_per_second);
+  zx::result<> Config(const DsiHostControllerConfig& config);
   void PowerUp();
   void PowerDown();
   void SetMode(dsi_mode_t mode);
@@ -57,8 +60,6 @@ class DsiHostController {
   zx_status_t GenWriteLong(const mipi_dsi::DsiCommandAndResponse& command) TA_REQ(command_lock_);
   zx_status_t GenRead(const mipi_dsi::DsiCommandAndResponse& command) TA_REQ(command_lock_);
   zx_status_t IssueCommand(const mipi_dsi::DsiCommandAndResponse& command);
-  zx_status_t GetColorCode(color_code_t c, bool& packed, uint8_t& code);
-  zx_status_t GetVideoMode(video_mode_t v, uint8_t& mode);
 
   fdf::MmioBuffer dsi_mmio_;
 

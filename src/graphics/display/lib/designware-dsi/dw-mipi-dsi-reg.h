@@ -5,7 +5,12 @@
 #ifndef SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_DSI_DW_MIPI_DSI_REG_H_
 #define SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_DSI_DW_MIPI_DSI_REG_H_
 
+#include <lib/driver/logging/cpp/logger.h>
+#include <lib/mipi-dsi/mipi-dsi.h>
+
 #include <hwreg/bitfields.h>
+
+#include "src/graphics/display/lib/designware-dsi/dpi-interface-config.h"
 
 // The register definitions here are from the Synopsis DesignWare Cores MIPI DSI
 // Host Controller Databook version 1.51a, Section 5.1 "DSI Registers".
@@ -91,9 +96,131 @@ class DsiDwDpiVcidReg : public hwreg::RegisterBase<DsiDwDpiVcidReg, uint32_t> {
 
 class DsiDwDpiColorCodingReg : public hwreg::RegisterBase<DsiDwDpiColorCodingReg, uint32_t> {
  public:
+  // Also known as "color coding" in the databook.
+  enum class ColorComponentMapping : uint8_t {
+    // Known as "16-Bit Config 1" in the databook.
+    k16BitR5G6B5Config1 = 0x0,
+
+    // Known as "16-Bit Config 2" in the databook.
+    k16BitR5G6B5Config2 = 0x1,
+
+    // Known as "16-Bit Config 3" in the databook.
+    k16BitR5G6B5Config3 = 0x2,
+
+    // Known as "18-Bit Config 1" in the databook.
+    k18BitR6G6B6Config1 = 0x3,
+
+    // Known as "18-Bit Config 2" in the databook.
+    k18BitR6G6B6Config2 = 0x4,
+
+    // Known as "24-Bits" in the databook.
+    k24BitR8G8B8 = 0x5,
+
+    // Known as "20-Bit YCbCr 4:2:2 Loosely Packed" in the databook.
+    // It requires 2 clock cycles to transmit two contiguous pixels.
+    k20BitYcbcr422 = 0x6,
+
+    // Known as "24-Bit YCbCr 4:2:2" in the databook.
+    // It requires 2 clock cycles to transmit two contiguous pixels.
+    k24BitYcbcr422 = 0x7,
+
+    // Known as "16-Bit YCbCr 4:2:2" in the databook.
+    // It requires 2 clock cycles to transmit two contiguous pixels.
+    k16BitYcbcr422 = 0x8,
+
+    // Known as "30-Bit" in the databook.
+    k30BitR10G10B10 = 0x9,
+
+    // Known as "36-Bit" in the databook.
+    // It requires 2 clock cycles to transmit one pixel.
+    k36BitR12G12B12 = 0xa,
+
+    // Known as "12-Bit YCbCr 4:2:0" in the databook.
+    k12BitYcbcr420 = 0xb,
+
+    // Known as "DSC24 compress data" in the databook.
+    kDsc24Compressed = 0xc,
+
+    kReserved = 0xd,
+    kReserved2 = 0xe,
+    kReserved3 = 0xf,
+  };
+
+  static hwreg::RegisterAddr<DsiDwDpiColorCodingReg> Get() {
+    return hwreg::RegisterAddr<DsiDwDpiColorCodingReg>(DW_DSI_DPI_COLOR_CODING);
+  }
+
   DEF_BIT(8, loosely18_en);
-  DEF_FIELD(3, 0, dpi_color_coding);
-  static auto Get() { return hwreg::RegisterAddr<DsiDwDpiColorCodingReg>(DW_DSI_DPI_COLOR_CODING); }
+  DEF_ENUM_FIELD(ColorComponentMapping, 3, 0, color_component_mapping);
+
+  DpiColorComponentMapping GetColorComponentMapping() const {
+    switch (color_component_mapping()) {
+      case ColorComponentMapping::k16BitR5G6B5Config1:
+        return DpiColorComponentMapping::k16BitR5G6B5Config1;
+      case ColorComponentMapping::k16BitR5G6B5Config2:
+        return DpiColorComponentMapping::k16BitR5G6B5Config2;
+      case ColorComponentMapping::k16BitR5G6B5Config3:
+        return DpiColorComponentMapping::k16BitR5G6B5Config3;
+      case ColorComponentMapping::k18BitR6G6B6Config1:
+        return DpiColorComponentMapping::k18BitR6G6B6Config1;
+      case ColorComponentMapping::k18BitR6G6B6Config2:
+        return DpiColorComponentMapping::k18BitR6G6B6Config2;
+      case ColorComponentMapping::k24BitR8G8B8:
+        return DpiColorComponentMapping::k24BitR8G8B8;
+      case ColorComponentMapping::k20BitYcbcr422:
+        return DpiColorComponentMapping::k20BitYcbcr422;
+      case ColorComponentMapping::k24BitYcbcr422:
+        return DpiColorComponentMapping::k24BitYcbcr422;
+      case ColorComponentMapping::k16BitYcbcr422:
+        return DpiColorComponentMapping::k16BitYcbcr422;
+      case ColorComponentMapping::k30BitR10G10B10:
+        return DpiColorComponentMapping::k30BitR10G10B10;
+      case ColorComponentMapping::k36BitR12G12B12:
+        return DpiColorComponentMapping::k36BitR12G12B12;
+      case ColorComponentMapping::k12BitYcbcr420:
+        return DpiColorComponentMapping::k12BitYcbcr420;
+      case ColorComponentMapping::kDsc24Compressed:
+        return DpiColorComponentMapping::kDsc24Compressed;
+      case ColorComponentMapping::kReserved:
+      case ColorComponentMapping::kReserved2:
+      case ColorComponentMapping::kReserved3:
+        FDF_LOG(ERROR, "Unknown color component mapping: %" PRIu32,
+                static_cast<uint32_t>(color_component_mapping()));
+        return DpiColorComponentMapping::k24BitR8G8B8;
+    }
+  }
+
+  DsiDwDpiColorCodingReg& SetColorComponentMapping(
+      DpiColorComponentMapping color_component_mapping) {
+    switch (color_component_mapping) {
+      case DpiColorComponentMapping::k16BitR5G6B5Config1:
+        return set_color_component_mapping(ColorComponentMapping::k16BitR5G6B5Config1);
+      case DpiColorComponentMapping::k16BitR5G6B5Config2:
+        return set_color_component_mapping(ColorComponentMapping::k16BitR5G6B5Config2);
+      case DpiColorComponentMapping::k16BitR5G6B5Config3:
+        return set_color_component_mapping(ColorComponentMapping::k16BitR5G6B5Config3);
+      case DpiColorComponentMapping::k18BitR6G6B6Config1:
+        return set_color_component_mapping(ColorComponentMapping::k18BitR6G6B6Config1);
+      case DpiColorComponentMapping::k18BitR6G6B6Config2:
+        return set_color_component_mapping(ColorComponentMapping::k18BitR6G6B6Config2);
+      case DpiColorComponentMapping::k24BitR8G8B8:
+        return set_color_component_mapping(ColorComponentMapping::k24BitR8G8B8);
+      case DpiColorComponentMapping::k20BitYcbcr422:
+        return set_color_component_mapping(ColorComponentMapping::k20BitYcbcr422);
+      case DpiColorComponentMapping::k24BitYcbcr422:
+        return set_color_component_mapping(ColorComponentMapping::k24BitYcbcr422);
+      case DpiColorComponentMapping::k16BitYcbcr422:
+        return set_color_component_mapping(ColorComponentMapping::k16BitYcbcr422);
+      case DpiColorComponentMapping::k30BitR10G10B10:
+        return set_color_component_mapping(ColorComponentMapping::k30BitR10G10B10);
+      case DpiColorComponentMapping::k36BitR12G12B12:
+        return set_color_component_mapping(ColorComponentMapping::k36BitR12G12B12);
+      case DpiColorComponentMapping::k12BitYcbcr420:
+        return set_color_component_mapping(ColorComponentMapping::k12BitYcbcr420);
+      case DpiColorComponentMapping::kDsc24Compressed:
+        return set_color_component_mapping(ColorComponentMapping::kDsc24Compressed);
+    }
+  }
 };
 
 class DsiDwDpiCfgPolReg : public hwreg::RegisterBase<DsiDwDpiCfgPolReg, uint32_t> {
@@ -166,6 +293,18 @@ class DsiDwModeCfgReg : public hwreg::RegisterBase<DsiDwModeCfgReg, uint32_t> {
 
 class DsiDwVidModeCfgReg : public hwreg::RegisterBase<DsiDwVidModeCfgReg, uint32_t> {
  public:
+  enum class VideoModeTransmissionTypeSelection : uint8_t {
+    kNonBurstModeWithSyncPulses = 0,
+    kNonBurstModeWithSyncEvents = 1,
+    kBurstMode = 2,
+    // Same as `kBurstMode`.
+    kBurstMode2 = 3,
+  };
+
+  static hwreg::RegisterAddr<DsiDwVidModeCfgReg> Get() {
+    return hwreg::RegisterAddr<DsiDwVidModeCfgReg>(DW_DSI_VID_MODE_CFG);
+  }
+
   DEF_BIT(24, vpg_orientation);
   DEF_BIT(20, vpg_mode);
   DEF_BIT(16, vpg_en);
@@ -177,8 +316,37 @@ class DsiDwVidModeCfgReg : public hwreg::RegisterBase<DsiDwVidModeCfgReg, uint32
   DEF_BIT(10, lp_vfp_en);
   DEF_BIT(9, lp_vbp_en);
   DEF_BIT(8, lp_vsa_en);
-  DEF_FIELD(1, 0, vid_mode_type);
-  static auto Get() { return hwreg::RegisterAddr<DsiDwVidModeCfgReg>(DW_DSI_VID_MODE_CFG); }
+
+  // It's preferred to use the helper methods `GetVideoModePacketSequencing()`
+  // and `SetVideoModePacketSequencing()` instead of directly manipulating the
+  // field.
+  DEF_ENUM_FIELD(VideoModeTransmissionTypeSelection, 1, 0, vid_mode_transmission_type);
+
+  mipi_dsi::DsiVideoModePacketSequencing GetVideoModePacketSequencing() const {
+    switch (vid_mode_transmission_type()) {
+      case VideoModeTransmissionTypeSelection::kNonBurstModeWithSyncPulses:
+        return mipi_dsi::DsiVideoModePacketSequencing::kSyncPulsesNoBurst;
+      case VideoModeTransmissionTypeSelection::kNonBurstModeWithSyncEvents:
+        return mipi_dsi::DsiVideoModePacketSequencing::kSyncEventsNoBurst;
+      case VideoModeTransmissionTypeSelection::kBurstMode:
+      case VideoModeTransmissionTypeSelection::kBurstMode2:
+        return mipi_dsi::DsiVideoModePacketSequencing::kBurst;
+    }
+  }
+
+  DsiDwVidModeCfgReg& SetVideoModePacketSequencing(
+      mipi_dsi::DsiVideoModePacketSequencing video_mode_packet_Sequencing) {
+    switch (video_mode_packet_Sequencing) {
+      case mipi_dsi::DsiVideoModePacketSequencing::kSyncPulsesNoBurst:
+        return set_vid_mode_transmission_type(
+            VideoModeTransmissionTypeSelection::kNonBurstModeWithSyncPulses);
+      case mipi_dsi::DsiVideoModePacketSequencing::kSyncEventsNoBurst:
+        return set_vid_mode_transmission_type(
+            VideoModeTransmissionTypeSelection::kNonBurstModeWithSyncEvents);
+      case mipi_dsi::DsiVideoModePacketSequencing::kBurst:
+        return set_vid_mode_transmission_type(VideoModeTransmissionTypeSelection::kBurstMode);
+    }
+  }
 };
 
 class DsiDwVidPktSizeReg : public hwreg::RegisterBase<DsiDwVidPktSizeReg, uint32_t> {
