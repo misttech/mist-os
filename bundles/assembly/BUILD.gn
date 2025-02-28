@@ -623,7 +623,6 @@ assembly_input_bundle("bootstrap_eng") {
     "//src/devices/thermal/bin/temperature-cli:bootfs",
     "//src/devices/thermal/bin/thermal-cli:bootfs",
     "//src/devices/usb/bin/lsusb:bootfs",
-    "//src/media/audio/tools/audio-driver-ctl:bootfs",
     "//src/security/bin/syscall-check:bootfs",
     "//src/sys/tools/package:bootfs",
     "//src/ui/backlight/bin/backlight:bootfs",
@@ -3797,6 +3796,7 @@ assembly_input_bundle("audio_development_support") {
     "//src/media/audio/services/ffxdaemon:audio_ffx_daemon",
     "//src/media/audio/tools/audio-capture-timestamp-validator",
     "//src/media/audio/tools/audio-codec-ctl",
+    "//src/media/audio/tools/audio-driver-ctl",
     "//src/media/audio/tools/audio-effects-ctl",
     "//src/media/audio/tools/audio_listener",
     "//src/media/audio/tools/dsputil",
@@ -3829,6 +3829,10 @@ assembly_input_bundle("audio_development_support") {
     {
       package = "audio-codec-ctl"
       components = [ "audio-codec-ctl" ]
+    },
+    {
+      package = "audio-driver-ctl"
+      components = [ "audio-driver-ctl" ]
     },
     {
       package = "audio-effects-ctl"
