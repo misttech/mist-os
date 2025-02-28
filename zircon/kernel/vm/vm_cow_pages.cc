@@ -1087,7 +1087,8 @@ zx_status_t VmCowPages::ReplaceWithHiddenNodeLocked(fbl::RefPtr<VmCowPages>* rep
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
-  AssertHeld(hidden_parent->lock_ref());
+  Guard<VmoLockType> child_guard{AssertOrderedLock, hidden_parent->lock(),
+                                 hidden_parent->lock_order(), VmLockAcquireMode::Reentrant};
   hidden_parent->page_list_.InitializeSkew(page_list_.GetSkew(), 0);
   hidden_parent->TransitionToAliveLocked();
 
@@ -1141,7 +1142,10 @@ zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t limit
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
-  AssertHeld(cow_clone->lock_ref());
+  // As this node was just constructed we know the lock is free, use one of the lock order gap
+  // values to acquire without a lockdep violation.
+  Guard<VmoLockType> child_guard{AssertOrderedLock, cow_clone->lock(), lock_order() + 1,
+                                 VmLockAcquireMode::Reentrant};
 
   VmCowPages* parent = this;
 
@@ -1189,7 +1193,10 @@ zx_status_t VmCowPages::CloneUnidirectionalLocked(uint64_t offset, uint64_t limi
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
-  AssertHeld(cow_clone->lock_ref());
+  // As this node was just constructed we know the lock is free, use one of the lock order gap
+  // values to acquire without a lockdep violation.
+  Guard<VmoLockType> child_guard{AssertOrderedLock, cow_clone->lock(), lock_order() + 1,
+                                 VmLockAcquireMode::Reentrant};
 
   // The COW clone's parent must not be hidden because the clone may see future parent writes.
   DEBUG_ASSERT(!is_hidden());
