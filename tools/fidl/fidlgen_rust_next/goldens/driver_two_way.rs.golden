@@ -3,6 +3,7 @@
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct TwoWayAddRequest {
     pub addend1: u16,
 
@@ -10,6 +11,13 @@ pub struct TwoWayAddRequest {
 }
 
 impl ::fidl_next::Encodable for TwoWayAddRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <u16 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <u16 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireTwoWayAddRequest;
 }
 
@@ -110,11 +118,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct TwoWayAddResponse {
     pub sum: u16,
 }
 
 impl ::fidl_next::Encodable for TwoWayAddResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <u16 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireTwoWayAddResponse;
 }
 

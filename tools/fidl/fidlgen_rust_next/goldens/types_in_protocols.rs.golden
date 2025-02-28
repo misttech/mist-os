@@ -389,9 +389,13 @@ impl ::core::convert::From<Enum> for WireEnum {
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct Struct {}
 
 impl ::fidl_next::Encodable for Struct {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     type Encoded = WireStruct;
 }
 
@@ -3761,9 +3765,13 @@ impl ::core::fmt::Debug for WireOptionalProtocolErrorArrayVectorNestedResult {
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct ResourceStruct {}
 
 impl ::fidl_next::Encodable for ResourceStruct {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     type Encoded = WireResourceStruct;
 }
 

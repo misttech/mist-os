@@ -87,11 +87,23 @@ where
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct ParentGetChildResponse {
     pub c: ::fidl_next::bind::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::Child>,
 }
 
 impl ::fidl_next::Encodable for ParentGetChildResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe {
+            ::fidl_next::CopyOptimization::enable_if(
+                true && <::fidl_next::bind::ClientEnd<
+                    ::fidl_next::fuchsia::zx::Handle,
+                    crate::Child,
+                > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                    .is_enabled(),
+            )
+        };
+
     type Encoded = WireParentGetChildResponse;
 }
 
@@ -184,11 +196,23 @@ where
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct ParentGetChildRequestResponse {
     pub r: ::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::zx::Handle, crate::Child>,
 }
 
 impl ::fidl_next::Encodable for ParentGetChildRequestResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe {
+            ::fidl_next::CopyOptimization::enable_if(
+                true && <::fidl_next::bind::ServerEnd<
+                    ::fidl_next::fuchsia::zx::Handle,
+                    crate::Child,
+                > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                    .is_enabled(),
+            )
+        };
+
     type Encoded = WireParentGetChildRequestResponse;
 }
 
@@ -281,11 +305,23 @@ where
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct ParentTakeChildRequest {
     pub c: ::fidl_next::bind::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::Child>,
 }
 
 impl ::fidl_next::Encodable for ParentTakeChildRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe {
+            ::fidl_next::CopyOptimization::enable_if(
+                true && <::fidl_next::bind::ClientEnd<
+                    ::fidl_next::fuchsia::zx::Handle,
+                    crate::Child,
+                > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                    .is_enabled(),
+            )
+        };
+
     type Encoded = WireParentTakeChildRequest;
 }
 
@@ -378,11 +414,23 @@ where
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct ParentTakeChildRequestRequest {
     pub r: ::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::zx::Handle, crate::Child>,
 }
 
 impl ::fidl_next::Encodable for ParentTakeChildRequestRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe {
+            ::fidl_next::CopyOptimization::enable_if(
+                true && <::fidl_next::bind::ServerEnd<
+                    ::fidl_next::fuchsia::zx::Handle,
+                    crate::Child,
+                > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                    .is_enabled(),
+            )
+        };
+
     type Encoded = WireParentTakeChildRequestRequest;
 }
 

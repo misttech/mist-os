@@ -114,6 +114,7 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct Simple {
     pub f1: u8,
 
@@ -121,6 +122,13 @@ pub struct Simple {
 }
 
 impl ::fidl_next::Encodable for Simple {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <u8 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireSimple;
 }
 

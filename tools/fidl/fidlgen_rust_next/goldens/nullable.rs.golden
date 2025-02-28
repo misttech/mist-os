@@ -3,11 +3,18 @@
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct Int32Wrapper {
     pub val: i32,
 }
 
 impl ::fidl_next::Encodable for Int32Wrapper {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireInt32Wrapper;
 }
 
@@ -96,6 +103,7 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct SimpleProtocolAddRequest {
     pub a: i32,
 
@@ -103,6 +111,13 @@ pub struct SimpleProtocolAddRequest {
 }
 
 impl ::fidl_next::Encodable for SimpleProtocolAddRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireSimpleProtocolAddRequest;
 }
 
@@ -203,11 +218,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct SimpleProtocolAddResponse {
     pub sum: i32,
 }
 
 impl ::fidl_next::Encodable for SimpleProtocolAddResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireSimpleProtocolAddResponse;
 }
 
@@ -680,11 +702,23 @@ impl ::core::fmt::Debug for WireOptionalSimpleUnion {
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct StructWithNullableHandle {
     pub val: Option<::fidl_next::fuchsia::zx::Handle>,
 }
 
 impl ::fidl_next::Encodable for StructWithNullableHandle {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true
+
+                && <
+                    Option<::fidl_next::fuchsia::zx::Handle> as ::fidl_next::Encodable
+                >::COPY_OPTIMIZATION.is_enabled()
+
+        )
+    };
+
     type Encoded = WireStructWithNullableHandle;
 }
 
@@ -777,6 +811,7 @@ where
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct StructWithNullableProtocol {
     pub val: ::fidl_next::bind::ClientEnd<
         Option<::fidl_next::fuchsia::zx::Handle>,
@@ -785,6 +820,16 @@ pub struct StructWithNullableProtocol {
 }
 
 impl ::fidl_next::Encodable for StructWithNullableProtocol {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::bind::ClientEnd<
+                Option<::fidl_next::fuchsia::zx::Handle>,
+                crate::SimpleProtocol,
+            > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     type Encoded = WireStructWithNullableProtocol;
 }
 
@@ -880,6 +925,7 @@ where
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct StructWithNullableRequest {
     pub val: ::fidl_next::bind::ServerEnd<
         Option<::fidl_next::fuchsia::zx::Handle>,
@@ -888,6 +934,16 @@ pub struct StructWithNullableRequest {
 }
 
 impl ::fidl_next::Encodable for StructWithNullableRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::bind::ServerEnd<
+                Option<::fidl_next::fuchsia::zx::Handle>,
+                crate::SimpleProtocol,
+            > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     type Encoded = WireStructWithNullableRequest;
 }
 
@@ -1177,11 +1233,19 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct StructWithNullableUnion {
     pub val: Option<Box<crate::SimpleUnion>>,
 }
 
 impl ::fidl_next::Encodable for StructWithNullableUnion {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <Option<Box<crate::SimpleUnion>> as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     type Encoded = WireStructWithNullableUnion;
 }
 

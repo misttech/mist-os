@@ -971,11 +971,18 @@ impl ::core::fmt::Debug for WireOptionalStrictUnion {
 
 #[doc = " struct comment #1\n\n struct comment #3\n"]
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct Struct {
     pub field: i32,
 }
 
 impl ::fidl_next::Encodable for Struct {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireStruct;
 }
 

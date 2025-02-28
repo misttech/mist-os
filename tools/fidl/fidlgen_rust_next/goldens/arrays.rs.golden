@@ -3,11 +3,18 @@
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct StructLargeArray {
     pub a: [u32; 100],
 }
 
 impl ::fidl_next::Encodable for StructLargeArray {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <[u32; 100] as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireStructLargeArray;
 }
 
@@ -96,11 +103,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct StructSmallArray {
     pub a: [u32; 2],
 }
 
 impl ::fidl_next::Encodable for StructSmallArray {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <[u32; 2] as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireStructSmallArray;
 }
 

@@ -318,6 +318,7 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct StructSize16Alignment8 {
     pub f1: u64,
 
@@ -325,6 +326,13 @@ pub struct StructSize16Alignment8 {
 }
 
 impl ::fidl_next::Encodable for StructSize16Alignment8 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <u64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <u64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireStructSize16Alignment8;
 }
 

@@ -177,11 +177,23 @@ impl ::core::convert::From<ExampleEnum> for WireExampleEnum {
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct ExampleProtocolMethodRequest {
     pub arg: ::fidl_next_test_exampleusing::Empty,
 }
 
 impl ::fidl_next::Encodable for ExampleProtocolMethodRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true
+
+                && <
+                    ::fidl_next_test_exampleusing::Empty as ::fidl_next::Encodable
+                >::COPY_OPTIMIZATION.is_enabled()
+
+        )
+    };
+
     type Encoded = WireExampleProtocolMethodRequest;
 }
 
@@ -408,11 +420,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct ExampleStruct {
     pub member: u32,
 }
 
 impl ::fidl_next::Encodable for ExampleStruct {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireExampleStruct;
 }
 

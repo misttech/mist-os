@@ -6,15 +6,60 @@
 
 mod error;
 
-pub use self::error::*;
+use core::marker::PhantomData;
+use core::ptr::copy_nonoverlapping;
+
+pub use self::error::EncodeError;
 
 use crate::{
     f32_le, f64_le, i16_le, i32_le, i64_le, u16_le, u32_le, u64_le, Encoder, EncoderExt as _, Slot,
     WireBox,
 };
 
+/// An optimization hint about whether `T` is trivially copyable.
+pub struct CopyOptimization<T: ?Sized>(bool, PhantomData<T>);
+
+impl<T: ?Sized> CopyOptimization<T> {
+    /// Returns a `CopyOptimization` hint with the optimization enabled for `T`.
+    ///
+    /// # Safety
+    ///
+    /// `T` must not have any uninit bytes (e.g. padding).
+    pub const unsafe fn enable() -> Self {
+        Self(true, PhantomData)
+    }
+
+    /// Returns a `CopyOptimization` hint with the optimization enabled for `T` if `value` is
+    /// `true`.
+    ///
+    /// # Safety
+    ///
+    /// `T` must not have any uninit bytes (e.g. padding) if `value` is `true`.
+    pub const unsafe fn enable_if(value: bool) -> Self {
+        Self(value, PhantomData)
+    }
+
+    /// Returns a `CopyOptimization` hint with the optimization disabled for `T`.
+    pub const fn disable() -> Self {
+        Self(false, PhantomData)
+    }
+
+    /// Returns whether the optimization is enabled for `T`.
+    pub const fn is_enabled(&self) -> bool {
+        self.0
+    }
+}
+
 /// A type which can be encoded as FIDL.
 pub trait Encodable {
+    /// An optimization flag that allows the bytes of this type to be copied directly during
+    /// encoding instead of calling `encode`.
+    ///
+    /// This optimization is disabled by default. To enable this optimization, you must unsafely
+    /// attest that `Self` is trivially copyable using [`CopyOptimization::enable`] or
+    /// [`CopyOptimization::enable_if`].
+    const COPY_OPTIMIZATION: CopyOptimization<Self> = CopyOptimization::disable();
+
     /// The wire type for the value.
     type Encoded;
 }
@@ -45,6 +90,14 @@ pub trait EncodeOption<E: ?Sized>: EncodableOption {
 macro_rules! impl_primitive {
     ($ty:ty, $enc:ty) => {
         impl Encodable for $ty {
+            // Copy optimization for primitives is enabled if their size is <= 1 or the target is
+            // little-endian.
+            const COPY_OPTIMIZATION: CopyOptimization<Self> = unsafe {
+                CopyOptimization::enable_if(
+                    size_of::<Self>() <= 1 || cfg!(target_endian = "little"),
+                )
+            };
+
             type Encoded = $enc;
         }
 
@@ -105,6 +158,9 @@ impl_primitives! {
 }
 
 impl<T: Encodable, const N: usize> Encodable for [T; N] {
+    const COPY_OPTIMIZATION: CopyOptimization<Self> =
+        unsafe { CopyOptimization::enable_if(T::COPY_OPTIMIZATION.is_enabled()) };
+
     type Encoded = [T::Encoded; N];
 }
 
@@ -114,8 +170,15 @@ impl<E: ?Sized, T: Encode<E>, const N: usize> Encode<E> for [T; N] {
         encoder: &mut E,
         mut slot: Slot<'_, Self::Encoded>,
     ) -> Result<(), EncodeError> {
-        for (i, item) in self.iter_mut().enumerate() {
-            item.encode(encoder, slot.index(i))?;
+        if T::COPY_OPTIMIZATION.is_enabled() {
+            // SAFETY: `T` has copy optimization enabled and so is safe to copy to the output.
+            unsafe {
+                copy_nonoverlapping(self.as_ptr().cast(), slot.as_mut_ptr(), 1);
+            }
+        } else {
+            for (i, item) in self.iter_mut().enumerate() {
+                item.encode(encoder, slot.index(i))?;
+            }
         }
         Ok(())
     }

@@ -3,11 +3,23 @@
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct Foo {
     pub field: ::fidl_next_test_dependent::MyEnum,
 }
 
 impl ::fidl_next::Encodable for Foo {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true
+
+                && <
+                    ::fidl_next_test_dependent::MyEnum as ::fidl_next::Encodable
+                >::COPY_OPTIMIZATION.is_enabled()
+
+        )
+    };
+
     type Encoded = WireFoo;
 }
 

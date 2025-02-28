@@ -3,9 +3,13 @@
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct EmptyResourceStruct {}
 
 impl ::fidl_next::Encodable for EmptyResourceStruct {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     type Encoded = WireEmptyResourceStruct;
 }
 

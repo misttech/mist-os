@@ -95,6 +95,7 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct ChannelProtocolMethodARequest {
     pub a: i64,
 
@@ -102,6 +103,13 @@ pub struct ChannelProtocolMethodARequest {
 }
 
 impl ::fidl_next::Encodable for ChannelProtocolMethodARequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireChannelProtocolMethodARequest;
 }
 
@@ -202,6 +210,7 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct ChannelProtocolEventARequest {
     pub a: i64,
 
@@ -209,6 +218,13 @@ pub struct ChannelProtocolEventARequest {
 }
 
 impl ::fidl_next::Encodable for ChannelProtocolEventARequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireChannelProtocolEventARequest;
 }
 
@@ -309,6 +325,7 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct ChannelProtocolMethodBRequest {
     pub a: i64,
 
@@ -316,6 +333,13 @@ pub struct ChannelProtocolMethodBRequest {
 }
 
 impl ::fidl_next::Encodable for ChannelProtocolMethodBRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireChannelProtocolMethodBRequest;
 }
 
@@ -416,11 +440,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct ChannelProtocolMethodBResponse {
     pub result: i64,
 }
 
 impl ::fidl_next::Encodable for ChannelProtocolMethodBResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireChannelProtocolMethodBResponse;
 }
 
@@ -509,11 +540,19 @@ where
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct ChannelProtocolTakeHandleRequest {
     pub h: ::fidl_next::fuchsia::zx::Handle,
 }
 
 impl ::fidl_next::Encodable for ChannelProtocolTakeHandleRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     type Encoded = WireChannelProtocolTakeHandleRequest;
 }
 
@@ -608,11 +647,19 @@ where
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct ChannelProtocolMutateSocketRequest {
     pub a: ::fidl_next::fuchsia::zx::Handle,
 }
 
 impl ::fidl_next::Encodable for ChannelProtocolMutateSocketRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     type Encoded = WireChannelProtocolMutateSocketRequest;
 }
 
@@ -707,11 +754,19 @@ where
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct ChannelProtocolMutateSocketResponse {
     pub b: ::fidl_next::fuchsia::zx::Handle,
 }
 
 impl ::fidl_next::Encodable for ChannelProtocolMutateSocketResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     type Encoded = WireChannelProtocolMutateSocketResponse;
 }
 
@@ -1394,11 +1449,19 @@ impl ::core::convert::From<ErrorEnum> for WireErrorEnum {
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct HandleRightsProtocolNoResponseMethodRequest {
     pub h: ::fidl_next::fuchsia::zx::Handle,
 }
 
 impl ::fidl_next::Encodable for HandleRightsProtocolNoResponseMethodRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     type Encoded = WireHandleRightsProtocolNoResponseMethodRequest;
 }
 
@@ -1493,11 +1556,19 @@ where
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct HandleRightsProtocolResponseMethodRequest {
     pub h: ::fidl_next::fuchsia::zx::Handle,
 }
 
 impl ::fidl_next::Encodable for HandleRightsProtocolResponseMethodRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     type Encoded = WireHandleRightsProtocolResponseMethodRequest;
 }
 
@@ -1592,11 +1663,19 @@ where
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct HandleRightsProtocolResponseMethodResponse {
     pub h: ::fidl_next::fuchsia::zx::Handle,
 }
 
 impl ::fidl_next::Encodable for HandleRightsProtocolResponseMethodResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     type Encoded = WireHandleRightsProtocolResponseMethodResponse;
 }
 
@@ -1691,11 +1770,19 @@ where
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct HandleRightsProtocolAnEventRequest {
     pub h: ::fidl_next::fuchsia::zx::Handle,
 }
 
 impl ::fidl_next::Encodable for HandleRightsProtocolAnEventRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     type Encoded = WireHandleRightsProtocolAnEventRequest;
 }
 
@@ -2042,6 +2129,7 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct ManyParametersFifteenRequest {
     pub p1: bool,
 
@@ -2075,6 +2163,26 @@ pub struct ManyParametersFifteenRequest {
 }
 
 impl ::fidl_next::Encodable for ManyParametersFifteenRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireManyParametersFifteenRequest;
 }
 
@@ -2661,11 +2769,18 @@ impl ::core::fmt::Debug for WireOptionalTheUnion {
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct MethodWithUnionUnionMethodRequest {
     pub u: crate::TheUnion,
 }
 
 impl ::fidl_next::Encodable for MethodWithUnionUnionMethodRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <crate::TheUnion as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireMethodWithUnionUnionMethodRequest;
 }
 
@@ -2756,11 +2871,19 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct MethodWithUnionUnionMethodResponse {
     pub u: Option<Box<crate::TheUnion>>,
 }
 
 impl ::fidl_next::Encodable for MethodWithUnionUnionMethodResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <Option<Box<crate::TheUnion>> as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     type Encoded = WireMethodWithUnionUnionMethodResponse;
 }
 
@@ -3096,6 +3219,7 @@ where
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct ProtocolEnds {
     pub client:
         ::fidl_next::bind::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::DiscoverableProtocol>,
@@ -3115,6 +3239,31 @@ pub struct ProtocolEnds {
 }
 
 impl ::fidl_next::Encodable for ProtocolEnds {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::bind::ClientEnd<
+                ::fidl_next::fuchsia::zx::Handle,
+                crate::DiscoverableProtocol,
+            > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled()
+                && <::fidl_next::bind::ServerEnd<
+                    ::fidl_next::fuchsia::zx::Handle,
+                    crate::DiscoverableProtocol,
+                > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                    .is_enabled()
+                && <::fidl_next::bind::ClientEnd<
+                    Option<::fidl_next::fuchsia::zx::Handle>,
+                    crate::DiscoverableProtocol,
+                > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                    .is_enabled()
+                && <::fidl_next::bind::ServerEnd<
+                    Option<::fidl_next::fuchsia::zx::Handle>,
+                    crate::DiscoverableProtocol,
+                > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                    .is_enabled(),
+        )
+    };
+
     type Encoded = WireProtocolEnds;
 }
 
@@ -3247,6 +3396,7 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct SyscallProtocolMethodCRequest {
     pub a: i64,
 
@@ -3254,6 +3404,13 @@ pub struct SyscallProtocolMethodCRequest {
 }
 
 impl ::fidl_next::Encodable for SyscallProtocolMethodCRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireSyscallProtocolMethodCRequest;
 }
 
@@ -4625,6 +4782,7 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct WithErrorSyntaxResponseAsStructResponse {
     pub a: i64,
 
@@ -4634,6 +4792,14 @@ pub struct WithErrorSyntaxResponseAsStructResponse {
 }
 
 impl ::fidl_next::Encodable for WithErrorSyntaxResponseAsStructResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireWithErrorSyntaxResponseAsStructResponse;
 }
 
@@ -4973,9 +5139,13 @@ impl ::core::fmt::Debug for WireOptionalWithErrorSyntaxResponseAsStructResult {
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct WithErrorSyntaxErrorAsPrimitiveResponse {}
 
 impl ::fidl_next::Encodable for WithErrorSyntaxErrorAsPrimitiveResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     type Encoded = WireWithErrorSyntaxErrorAsPrimitiveResponse;
 }
 
@@ -5321,9 +5491,13 @@ impl ::core::fmt::Debug for WireOptionalWithErrorSyntaxErrorAsPrimitiveResult {
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct WithErrorSyntaxErrorAsEnumResponse {}
 
 impl ::fidl_next::Encodable for WithErrorSyntaxErrorAsEnumResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     type Encoded = WireWithErrorSyntaxErrorAsEnumResponse;
 }
 
@@ -5670,11 +5844,19 @@ impl ::core::fmt::Debug for WireOptionalWithErrorSyntaxErrorAsEnumResult {
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct WithErrorSyntaxHandleInResultResponse {
     pub h: ::fidl_next::fuchsia::zx::Handle,
 }
 
 impl ::fidl_next::Encodable for WithErrorSyntaxHandleInResultResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     type Encoded = WireWithErrorSyntaxHandleInResultResponse;
 }
 
@@ -6272,12 +6454,23 @@ where
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct WithProtocolEndsClientEndsRequest {
     pub in_:
         ::fidl_next::bind::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::DiscoverableProtocol>,
 }
 
 impl ::fidl_next::Encodable for WithProtocolEndsClientEndsRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::bind::ClientEnd<
+                ::fidl_next::fuchsia::zx::Handle,
+                crate::DiscoverableProtocol,
+            > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     type Encoded = WireWithProtocolEndsClientEndsRequest;
 }
 
@@ -6373,6 +6566,7 @@ where
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct WithProtocolEndsClientEndsResponse {
     pub out: ::fidl_next::bind::ClientEnd<
         Option<::fidl_next::fuchsia::zx::Handle>,
@@ -6381,6 +6575,16 @@ pub struct WithProtocolEndsClientEndsResponse {
 }
 
 impl ::fidl_next::Encodable for WithProtocolEndsClientEndsResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::bind::ClientEnd<
+                Option<::fidl_next::fuchsia::zx::Handle>,
+                crate::DiscoverableProtocol,
+            > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     type Encoded = WireWithProtocolEndsClientEndsResponse;
 }
 
@@ -6478,6 +6682,7 @@ where
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct WithProtocolEndsServerEndsRequest {
     pub in_: ::fidl_next::bind::ServerEnd<
         Option<::fidl_next::fuchsia::zx::Handle>,
@@ -6486,6 +6691,16 @@ pub struct WithProtocolEndsServerEndsRequest {
 }
 
 impl ::fidl_next::Encodable for WithProtocolEndsServerEndsRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::bind::ServerEnd<
+                Option<::fidl_next::fuchsia::zx::Handle>,
+                crate::DiscoverableProtocol,
+            > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     type Encoded = WireWithProtocolEndsServerEndsRequest;
 }
 
@@ -6583,12 +6798,23 @@ where
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct WithProtocolEndsServerEndsResponse {
     pub out:
         ::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::zx::Handle, crate::DiscoverableProtocol>,
 }
 
 impl ::fidl_next::Encodable for WithProtocolEndsServerEndsResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::bind::ServerEnd<
+                ::fidl_next::fuchsia::zx::Handle,
+                crate::DiscoverableProtocol,
+            > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     type Encoded = WireWithProtocolEndsServerEndsResponse;
 }
 
@@ -6684,11 +6910,18 @@ where
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct WithProtocolEndsStructContainingEndsRequest {
     pub in_: crate::ProtocolEnds,
 }
 
 impl ::fidl_next::Encodable for WithProtocolEndsStructContainingEndsRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <crate::ProtocolEnds as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireWithProtocolEndsStructContainingEndsRequest;
 }
 
@@ -6783,11 +7016,18 @@ where
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct WithProtocolEndsStructContainingEndsResponse {
     pub out: crate::ProtocolEnds,
 }
 
 impl ::fidl_next::Encodable for WithProtocolEndsStructContainingEndsResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <crate::ProtocolEnds as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireWithProtocolEndsStructContainingEndsResponse;
 }
 

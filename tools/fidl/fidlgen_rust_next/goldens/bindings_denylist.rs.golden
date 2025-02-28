@@ -5,11 +5,18 @@
 pub const ALL_BINDINGS: u32 = 0;
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct ShouldNeverAppearInAnyBinding4 {
     pub a: bool,
 }
 
 impl ::fidl_next::Encodable for ShouldNeverAppearInAnyBinding4 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireShouldNeverAppearInAnyBinding4;
 }
 
@@ -1010,11 +1017,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct ShouldNeverAppearInAnyBinding1 {
     pub a: bool,
 }
 
 impl ::fidl_next::Encodable for ShouldNeverAppearInAnyBinding1 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireShouldNeverAppearInAnyBinding1;
 }
 
@@ -1715,11 +1729,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct ShouldNeverAppearInAnyBinding7 {
     pub a: bool,
 }
 
 impl ::fidl_next::Encodable for ShouldNeverAppearInAnyBinding7 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireShouldNeverAppearInAnyBinding7;
 }
 
@@ -2283,11 +2304,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct DenyEachBindingOnlyDenyCppRequest {
     pub a: bool,
 }
 
 impl ::fidl_next::Encodable for DenyEachBindingOnlyDenyCppRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireDenyEachBindingOnlyDenyCppRequest;
 }
 
@@ -2378,11 +2406,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct DenyEachBindingOnlyDenyCppResponse {
     pub b: i32,
 }
 
 impl ::fidl_next::Encodable for DenyEachBindingOnlyDenyCppResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireDenyEachBindingOnlyDenyCppResponse;
 }
 
@@ -2736,11 +2771,18 @@ impl ::core::fmt::Debug for WireOptionalDenyEachBindingOnlyDenyCppResult {
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct DenyEachBindingOnlyDenyDartRequest {
     pub a: bool,
 }
 
 impl ::fidl_next::Encodable for DenyEachBindingOnlyDenyDartRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireDenyEachBindingOnlyDenyDartRequest;
 }
 
@@ -2831,11 +2873,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct DenyEachBindingOnlyDenyDartResponse {
     pub b: i32,
 }
 
 impl ::fidl_next::Encodable for DenyEachBindingOnlyDenyDartResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireDenyEachBindingOnlyDenyDartResponse;
 }
 
@@ -3189,11 +3238,18 @@ impl ::core::fmt::Debug for WireOptionalDenyEachBindingOnlyDenyDartResult {
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct DenyEachBindingOnlyDenyGoRequest {
     pub a: bool,
 }
 
 impl ::fidl_next::Encodable for DenyEachBindingOnlyDenyGoRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireDenyEachBindingOnlyDenyGoRequest;
 }
 
@@ -3284,11 +3340,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct DenyEachBindingOnlyDenyGoResponse {
     pub b: i32,
 }
 
 impl ::fidl_next::Encodable for DenyEachBindingOnlyDenyGoResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireDenyEachBindingOnlyDenyGoResponse;
 }
 
@@ -3642,11 +3705,18 @@ impl ::core::fmt::Debug for WireOptionalDenyEachBindingOnlyDenyGoResult {
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct DenyEachBindingOnlyDenyLibfuzzerRequest {
     pub a: bool,
 }
 
 impl ::fidl_next::Encodable for DenyEachBindingOnlyDenyLibfuzzerRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireDenyEachBindingOnlyDenyLibfuzzerRequest;
 }
 
@@ -3737,11 +3807,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct DenyEachBindingOnlyDenyLibfuzzerResponse {
     pub b: i32,
 }
 
 impl ::fidl_next::Encodable for DenyEachBindingOnlyDenyLibfuzzerResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireDenyEachBindingOnlyDenyLibfuzzerResponse;
 }
 
@@ -4097,11 +4174,18 @@ impl ::core::fmt::Debug for WireOptionalDenyEachBindingOnlyDenyLibfuzzerResult {
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct DenyEachBindingOnlyDenyRustRequest {
     pub a: bool,
 }
 
 impl ::fidl_next::Encodable for DenyEachBindingOnlyDenyRustRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireDenyEachBindingOnlyDenyRustRequest;
 }
 
@@ -4192,11 +4276,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct DenyEachBindingOnlyDenyRustResponse {
     pub b: i32,
 }
 
 impl ::fidl_next::Encodable for DenyEachBindingOnlyDenyRustResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireDenyEachBindingOnlyDenyRustResponse;
 }
 
@@ -4550,11 +4641,18 @@ impl ::core::fmt::Debug for WireOptionalDenyEachBindingOnlyDenyRustResult {
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct DenyEachBindingOnlyDenySyzkallerRequest {
     pub a: bool,
 }
 
 impl ::fidl_next::Encodable for DenyEachBindingOnlyDenySyzkallerRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireDenyEachBindingOnlyDenySyzkallerRequest;
 }
 
@@ -4645,11 +4743,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct DenyEachBindingOnlyDenySyzkallerResponse {
     pub b: i32,
 }
 
 impl ::fidl_next::Encodable for DenyEachBindingOnlyDenySyzkallerResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireDenyEachBindingOnlyDenySyzkallerResponse;
 }
 
@@ -5679,11 +5784,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct MemberOnlyAppearsInImportingLibrary {
     pub a: bool,
 }
 
 impl ::fidl_next::Encodable for MemberOnlyAppearsInImportingLibrary {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireMemberOnlyAppearsInImportingLibrary;
 }
 
@@ -5774,11 +5886,23 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct OnlyAppearsInImportingLibrary {
     pub member_only_appears_in_importing_library: crate::MemberOnlyAppearsInImportingLibrary,
 }
 
 impl ::fidl_next::Encodable for OnlyAppearsInImportingLibrary {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true
+
+                && <
+                    crate::MemberOnlyAppearsInImportingLibrary as ::fidl_next::Encodable
+                >::COPY_OPTIMIZATION.is_enabled()
+
+        )
+    };
+
     type Encoded = WireOnlyAppearsInImportingLibrary;
 }
 
@@ -6047,9 +6171,13 @@ impl ::core::convert::From<OnlyDart> for WireOnlyDart {
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct OnlyGo {}
 
 impl ::fidl_next::Encodable for OnlyGo {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     type Encoded = WireOnlyGo;
 }
 

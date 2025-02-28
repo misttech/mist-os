@@ -13,9 +13,13 @@ pub const ENUM_MEMBER: ::fidl_next_test_dependent::MyEnum =
 pub const ENUM_MEMBER_PRIMITIVE: u8 = 1;
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct MyStruct {}
 
 impl ::fidl_next::Encodable for MyStruct {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     type Encoded = WireMyStruct;
 }
 

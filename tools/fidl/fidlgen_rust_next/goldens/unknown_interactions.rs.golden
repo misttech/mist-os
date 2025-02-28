@@ -3,11 +3,18 @@
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse {
     pub some_field: i32,
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse;
 }
 
@@ -479,9 +486,13 @@ impl ::core::fmt::Debug for WireUnknownInteractionsAjarDriverProtocolStrictTwoWa
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse {}
 
 impl ::fidl_next::Encodable for UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     type Encoded = WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse;
 }
 
@@ -846,11 +857,18 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsAjarDriverProtocolStr
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse {
     pub some_field: i32,
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse;
 }
 
@@ -2717,11 +2735,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse {
     pub some_field: i32,
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse;
 }
 
@@ -3177,9 +3202,13 @@ impl ::core::fmt::Debug for WireUnknownInteractionsAjarProtocolStrictTwoWayTable
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsAjarProtocolStrictTwoWayErrResponse {}
 
 impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolStrictTwoWayErrResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     type Encoded = WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse;
 }
 
@@ -3534,11 +3563,18 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsAjarProtocolStrictTwo
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse {
     pub some_field: i32,
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse;
 }
 
@@ -4751,11 +4787,18 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsAjarProtocolStrictTwo
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsAjarProtocolStrictEventFieldsRequest {
     pub some_field: i32,
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolStrictEventFieldsRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest;
 }
 
@@ -5207,11 +5250,18 @@ impl ::core::fmt::Debug for WireUnknownInteractionsAjarProtocolStrictEventTableR
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest {
     pub some_field: i32,
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest;
 }
 
@@ -6633,11 +6683,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse {
     pub some_field: i32,
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse;
 }
 
@@ -7110,9 +7167,13 @@ impl ::core::fmt::Debug for WireUnknownInteractionsClosedDriverProtocolStrictTwo
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse {}
 
 impl ::fidl_next::Encodable for UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     type Encoded = WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse;
 }
 
@@ -7482,6 +7543,7 @@ impl ::core::fmt::Debug
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse {
     pub some_field: i32,
 }
@@ -7489,6 +7551,12 @@ pub struct UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse 
 impl ::fidl_next::Encodable
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse;
 }
 
@@ -9339,11 +9407,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse {
     pub some_field: i32,
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse;
 }
 
@@ -9801,9 +9876,13 @@ impl ::core::fmt::Debug for WireUnknownInteractionsClosedProtocolStrictTwoWayTab
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsClosedProtocolStrictTwoWayErrResponse {}
 
 impl ::fidl_next::Encodable for UnknownInteractionsClosedProtocolStrictTwoWayErrResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     type Encoded = WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse;
 }
 
@@ -10162,11 +10241,18 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsClosedProtocolStrictT
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse {
     pub some_field: i32,
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse;
 }
 
@@ -11396,11 +11482,18 @@ impl ::core::fmt::Debug
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsClosedProtocolStrictEventFieldsRequest {
     pub some_field: i32,
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsClosedProtocolStrictEventFieldsRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest;
 }
 
@@ -12599,11 +12692,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse {
     pub some_field: i32,
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse;
 }
 
@@ -13061,9 +13161,13 @@ impl ::core::fmt::Debug for WireUnknownInteractionsDriverProtocolStrictTwoWayTab
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsDriverProtocolStrictTwoWayErrResponse {}
 
 impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolStrictTwoWayErrResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     type Encoded = WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse;
 }
 
@@ -13422,11 +13526,18 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsDriverProtocolStrictT
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse {
     pub some_field: i32,
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse;
 }
 
@@ -14656,9 +14767,13 @@ impl ::core::fmt::Debug
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsDriverProtocolFlexibleTwoWayResponse {}
 
 impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     type Encoded = WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse;
 }
 
@@ -15027,11 +15142,18 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsDriverProtocolFlexibl
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse {
     pub some_field: i32,
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse;
 }
 
@@ -16283,9 +16405,13 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsDriverProtocolFlexibl
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse {}
 
 impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     type Encoded = WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse;
 }
 
@@ -16689,11 +16815,18 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsDriverProtocolFlexibl
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse {
     pub some_field: i32,
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse;
 }
 
@@ -19091,11 +19224,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsProtocolStrictTwoWayFieldsResponse {
     pub some_field: i32,
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolStrictTwoWayFieldsResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireUnknownInteractionsProtocolStrictTwoWayFieldsResponse;
 }
 
@@ -19545,9 +19685,13 @@ impl ::core::fmt::Debug for WireUnknownInteractionsProtocolStrictTwoWayTableResp
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsProtocolStrictTwoWayErrResponse {}
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolStrictTwoWayErrResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     type Encoded = WireUnknownInteractionsProtocolStrictTwoWayErrResponse;
 }
 
@@ -19898,11 +20042,18 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsProtocolStrictTwoWayE
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse {
     pub some_field: i32,
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResponse;
 }
 
@@ -21093,9 +21244,13 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsProtocolStrictTwoWayT
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsProtocolFlexibleTwoWayResponse {}
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     type Encoded = WireUnknownInteractionsProtocolFlexibleTwoWayResponse;
 }
 
@@ -21457,11 +21612,18 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsProtocolFlexibleTwoWa
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse {
     pub some_field: i32,
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResponse;
 }
 
@@ -22682,9 +22844,13 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsProtocolFlexibleTwoWa
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsProtocolFlexibleTwoWayErrResponse {}
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayErrResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     type Encoded = WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse;
 }
 
@@ -23083,11 +23249,18 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsProtocolFlexibleTwoWa
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse {
     pub some_field: i32,
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse;
 }
 
@@ -24391,11 +24564,18 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsProtocolFlexibleTwoWa
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsProtocolStrictEventFieldsRequest {
     pub some_field: i32,
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolStrictEventFieldsRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireUnknownInteractionsProtocolStrictEventFieldsRequest;
 }
 
@@ -24845,11 +25025,18 @@ impl ::core::fmt::Debug for WireUnknownInteractionsProtocolStrictEventTableReque
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UnknownInteractionsProtocolFlexibleEventFieldsRequest {
     pub some_field: i32,
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleEventFieldsRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireUnknownInteractionsProtocolFlexibleEventFieldsRequest;
 }
 

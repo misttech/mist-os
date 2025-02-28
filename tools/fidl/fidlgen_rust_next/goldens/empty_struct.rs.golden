@@ -3,9 +3,13 @@
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct Empty {}
 
 impl ::fidl_next::Encodable for Empty {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     type Encoded = WireEmpty;
 }
 
@@ -86,11 +90,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct EmptyProtocolSendRequest {
     pub e: crate::Empty,
 }
 
 impl ::fidl_next::Encodable for EmptyProtocolSendRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <crate::Empty as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireEmptyProtocolSendRequest;
 }
 
@@ -179,11 +190,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct EmptyProtocolReceiveRequest {
     pub e: crate::Empty,
 }
 
 impl ::fidl_next::Encodable for EmptyProtocolReceiveRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <crate::Empty as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireEmptyProtocolReceiveRequest;
 }
 
@@ -272,11 +290,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct EmptyProtocolSendAndReceiveRequest {
     pub e: crate::Empty,
 }
 
 impl ::fidl_next::Encodable for EmptyProtocolSendAndReceiveRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <crate::Empty as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireEmptyProtocolSendAndReceiveRequest;
 }
 
@@ -367,11 +392,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct EmptyProtocolSendAndReceiveResponse {
     pub e: crate::Empty,
 }
 
 impl ::fidl_next::Encodable for EmptyProtocolSendAndReceiveResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <crate::Empty as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireEmptyProtocolSendAndReceiveResponse;
 }
 

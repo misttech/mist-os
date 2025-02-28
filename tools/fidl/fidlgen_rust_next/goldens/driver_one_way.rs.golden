@@ -3,11 +3,18 @@
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct Payload {
     pub value: u32,
 }
 
 impl ::fidl_next::Encodable for Payload {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WirePayload;
 }
 
@@ -96,11 +103,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct OneWaySendRequest {
     pub payload: crate::Payload,
 }
 
 impl ::fidl_next::Encodable for OneWaySendRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <crate::Payload as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireOneWaySendRequest;
 }
 

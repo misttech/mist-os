@@ -1,4 +1,5 @@
 {% let is_static = strct.shape.max_out_of_line == 0 %}
+{% let has_padding = strct.shape.has_padding %}
 {% let base_name = strct.name.decl_name().camel() %}
 {% let name = filters::ident(base_name)? %}
 {% let wire_name = format!("Wire{base_name}") %}
@@ -12,6 +13,9 @@
         Debug,
     {% endif %}
 )]
+{%- if is_static && !has_padding %}
+    #[repr(C)]
+{% endif -%}
 pub struct {{ name }} {
     {% for member in strct.members %}
         pub {{ member.name.snake()|ident }}: {{ context.natural_type(member.ty) }},
@@ -19,6 +23,19 @@ pub struct {{ name }} {
 }
 
 impl ::fidl_next::Encodable for {{ name }} {
+    {% if is_static && !has_padding %}
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true
+            {% for member in strct.members %}
+                && <
+                    {{ context.natural_type(member.ty) }} as ::fidl_next::Encodable
+                >::COPY_OPTIMIZATION.is_enabled()
+            {% endfor %}
+        )
+    };
+    {% endif %}
+
     type Encoded = {{ wire_name }};
 }
 

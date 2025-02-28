@@ -3,6 +3,7 @@
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct LocalStructPayload {
     pub a: u32,
 
@@ -10,6 +11,13 @@ pub struct LocalStructPayload {
 }
 
 impl ::fidl_next::Encodable for LocalStructPayload {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireLocalStructPayload;
 }
 
@@ -594,6 +602,7 @@ impl ::core::fmt::Debug for WireOptionalMainProtocolTwoWayImportWithErrorResult 
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct MainProtocolOneWayAnonRequest {
     pub a: u32,
 
@@ -601,6 +610,13 @@ pub struct MainProtocolOneWayAnonRequest {
 }
 
 impl ::fidl_next::Encodable for MainProtocolOneWayAnonRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireMainProtocolOneWayAnonRequest;
 }
 
@@ -701,6 +717,7 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct MainProtocolTwoWayAnonRequest {
     pub a: u32,
 
@@ -708,6 +725,13 @@ pub struct MainProtocolTwoWayAnonRequest {
 }
 
 impl ::fidl_next::Encodable for MainProtocolTwoWayAnonRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireMainProtocolTwoWayAnonRequest;
 }
 
@@ -808,6 +832,7 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct MainProtocolTwoWayAnonResponse {
     pub a: u32,
 
@@ -815,6 +840,13 @@ pub struct MainProtocolTwoWayAnonResponse {
 }
 
 impl ::fidl_next::Encodable for MainProtocolTwoWayAnonResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireMainProtocolTwoWayAnonResponse;
 }
 
@@ -915,6 +947,7 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct MainProtocolTwoWayAnonWithErrorRequest {
     pub a: u32,
 
@@ -922,6 +955,13 @@ pub struct MainProtocolTwoWayAnonWithErrorRequest {
 }
 
 impl ::fidl_next::Encodable for MainProtocolTwoWayAnonWithErrorRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireMainProtocolTwoWayAnonWithErrorRequest;
 }
 
@@ -1024,6 +1064,7 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct MainProtocolTwoWayAnonWithErrorResponse {
     pub a: u32,
 
@@ -1031,6 +1072,13 @@ pub struct MainProtocolTwoWayAnonWithErrorResponse {
 }
 
 impl ::fidl_next::Encodable for MainProtocolTwoWayAnonWithErrorResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireMainProtocolTwoWayAnonWithErrorResponse;
 }
 
@@ -1360,6 +1408,7 @@ impl ::core::fmt::Debug for WireOptionalMainProtocolTwoWayAnonWithErrorResult {
 }
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct MainProtocolOnAnonRequest {
     pub a: u32,
 
@@ -1367,6 +1416,13 @@ pub struct MainProtocolOnAnonRequest {
 }
 
 impl ::fidl_next::Encodable for MainProtocolOnAnonRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     type Encoded = WireMainProtocolOnAnonRequest;
 }
 

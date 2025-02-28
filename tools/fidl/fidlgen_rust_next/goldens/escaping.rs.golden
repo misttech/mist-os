@@ -10,9 +10,13 @@ pub const DOLLAR_BRACE: &str = "${";
 
 #[doc = " \"pleaseescapethisdocommentproperly\"\n"]
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct DocCommentWithQuotes {}
 
 impl ::fidl_next::Encodable for DocCommentWithQuotes {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     type Encoded = WireDocCommentWithQuotes;
 }
 

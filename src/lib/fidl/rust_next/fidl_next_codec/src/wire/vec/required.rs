@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use core::fmt;
 use core::mem::needs_drop;
 use core::ops::Deref;
 use core::ptr::NonNull;
+use core::{fmt, slice};
 
 use munge::munge;
 
@@ -126,7 +126,13 @@ impl<E: Encoder + ?Sized, T: Encode<E>> Encode<E> for Vec<T> {
         encoder: &mut E,
         slot: Slot<'_, Self::Encoded>,
     ) -> Result<(), EncodeError> {
-        encoder.encode_next_slice(self.as_mut_slice())?;
+        if T::COPY_OPTIMIZATION.is_enabled() {
+            let bytes =
+                unsafe { slice::from_raw_parts(self.as_ptr().cast(), self.len() * size_of::<T>()) };
+            encoder.write(bytes);
+        } else {
+            encoder.encode_next_slice(self.as_mut_slice())?;
+        }
         WireVector::encode_present(slot, self.len() as u64);
         Ok(())
     }
