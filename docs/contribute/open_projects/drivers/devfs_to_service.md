@@ -1,4 +1,4 @@
-# Driver devfs deprecation
+# Devfs migration guide
 
 ## Goal & motivation
 
@@ -165,6 +165,11 @@ Example CLs:
 
  - [Routing usb-peripheral to a command-line tool][usb-peripheral-routing-cl]{:.external}
  - [Routing cpu.ctrl to command-line tool][cpu-ctl-routing-cl]{:.external}
+
+More information about routing capabilities can be found on the
+[Connect Components][connect-components] page.  If you run into problems, the
+[troubleshooting][troubleshoot-routes] section may be helpful, as well as the
+[debugging](#debugging) section below.
 
 Note: If you followed [step 1](#step1), your service should be routed to `#core` already.
 This also means that tests using `DriverTestRealm` do not need to add routing
@@ -581,6 +586,9 @@ a parent->child relationship, which is useful for understanding the component to
 Note: The `ffx component` tool does not know about the routing between DriverTestRealm
 and the test component.
 
+More information can be found on the [Connect Components][connect-components]
+page, especially under [Troubleshooting][troubleshoot-routes].
+
 ## Sponsors
 
 Reach out for questions or for status updates:
@@ -592,6 +600,8 @@ Reach out for questions or for status updates:
 <!-- Reference links -->
 <!-- Other Docs -->
 [identifying-service-instances]: /docs/contribute/open_projects/drivers/identifying_service_instances.md
+[connect-components]: /docs/development/components/connect.md
+[troubleshoot-routes]: /docs/development/components/connect.md#troubleshooting-troubleshooting
 <!-- Code links -->
 [class-names]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/devices/bin/driver_manager/devfs/class_names.h;l=48
 [servicememberwatcher]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/component/incoming/cpp/service_member_watcher.h

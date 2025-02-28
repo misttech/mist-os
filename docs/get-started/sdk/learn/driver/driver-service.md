@@ -3,9 +3,7 @@
 Driver components offer the features and services they provide to other drivers
 and non-driver components through [capabilities][concepts-capabilities].
 This enables Fuchsia's component framework to route those capabilities to the
-target component when necessary. Drivers can also export their capabilities to
-[devfs][concepts-devfs] to enable other components to discover them as file
-nodes mounted in the component's namespace.
+target component when necessary.
 
 In this section, you'll expose the `qemu_edu` driver's factorial capabilities
 and consume those from a component running elsewhere in the system.
@@ -223,5 +221,4 @@ Congratulations! You've successfully exposed FIDL services from a Fuchsia driver
 <!-- Reference links -->
 
 [concepts-capabilities]: /docs/concepts/components/v2/capabilities/README.md
-[concepts-devfs]: /docs/concepts/drivers/driver_communication.md#service_discovery_using_devfs
 [fidl-cpp-bindings]: /docs/reference/fidl/bindings/cpp-bindings.md

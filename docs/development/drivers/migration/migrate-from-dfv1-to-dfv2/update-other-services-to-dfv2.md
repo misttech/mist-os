@@ -132,7 +132,7 @@ do the following:
 
    fidl::WireSyncClient<fuchsia_driver_framework::Node> node(std::move(node()));
      auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
-                       .name(arena, “example_node”)
+                       .name(arena, "example_node")
                        {{ '<strong>' }}.offers2(offers){{ '</strong>' }}
                        .Build();
 
@@ -310,40 +310,6 @@ Do the following:
      },
      ```
 
-## Expose a devfs node from the DFv2 driver {:#expose-a-devfs-node-from-the-dfv2-driver}
-
-To expose a [`devfs`][devfs] node from a DFv2 driver, you need to add
-the `device_args` member to the [`NodeAddArgs`][nodeaddargs].
-In particular, it requires specifying the class name as well as
-implementing the connector, which can be simplified by making use of
-the [`Connector`][connector] library, for example:
-
-```cpp
-zx::result connector = devfs_connector_.Bind(dispatcher());
-if (connector.is_error()) {
-  return connector.take_error();
-}
-
-auto devfs =
-    fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena).connector(
-        std::move(connector.value()));
-
-auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
-                    .name(arena, name)
-                    .devfs_args(devfs.Build())
-                    .Build();
-```
-
-(Source: [`parent-driver.cc`][v2-parent-driver-cc])
-
-For more information, see
-[Expose the driver capabilities][codelab-driver-service] in the
-DFv2 driver codelab. Also, see this [implementation][export-to-devfs]
-of the `ExportToDevfs` method mentioned in the codelab.
-
-For more details on the `devfs` setup process,
-see the [Set up devfs in a DFv2 driver][set-up-devfs] guide.
-
 ## Use dispatchers {:#use-dispatchers}
 
 [Dispatchers][driver-dispatcher] fetch data from a channel between
@@ -458,30 +424,30 @@ The following libraries are available for unit testing DFv2 drivers:
 
 - [`//sdk/lib/driver/testing/cpp`][driver-testing-cpp]
 
-  - `TestNode` – This class implements the `fuchsia_driver_framework::Node`
+  - `TestNode` - This class implements the `fuchsia_driver_framework::Node`
     protocol, which can be provided to a driver to create child nodes. This
     class is also used by tests to access the child nodes that the driver
     has created.
 
-  - `TestEnvironment` – A wrapper over an `OutgoingDirectory` object that
+  - `TestEnvironment` - A wrapper over an `OutgoingDirectory` object that
     serves as the backing VFS (virtual file system) for the incoming
     namespace of the driver under test.
 
-  - `DriverUnderTest` – This class is a RAII
+  - `DriverUnderTest` - This class is a RAII
     ([Resource Acquisition Is Initialization][raii]{:.external}) wrapper
     for the driver under test.
 
-  - `DriverRuntime` – This class is a RAII wrapper over the managed driver
+  - `DriverRuntime` - This class is a RAII wrapper over the managed driver
     runtime thread pool.
 
 - [`//sdk/lib/driver/testing/cpp/driver_runtime.h`][driver-testing-runtime]
 
-  - `TestSynchronizedDispatcher` – This class is a RAII wrapper over the
+  - `TestSynchronizedDispatcher` - This class is a RAII wrapper over the
     driver dispatcher.
 
 The following library may be helpful for writing driver unit tests:
 
-- [`//src/devices/bus/testing/fake-pdev/fake-pdev.h`][fake-pdev-h] – This
+- [`//src/devices/bus/testing/fake-pdev/fake-pdev.h`][fake-pdev-h] - This
   helper library implements a fake version of the `pdev` FIDL protocol.
 
 Lastly, the following example unit tests cover different configurations and

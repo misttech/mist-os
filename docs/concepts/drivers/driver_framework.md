@@ -37,14 +37,6 @@ existing driver host), which also runs as a component. The driver host starts an
 instance of the driver and begins providing the device’s services to other
 Fuchsia components in the system.
 
-In addition, the driver manager hosts a virtual filesystem named
-[`devfs`][service-discovery] (as in "device filesystem"). All non-driver
-components use this `devfs` to discover services provided by the drivers
-running in the system.
-
-Note: Fuchsia will continue to support `devfs`. However, it will be deprecated
-at some point.
-
 ## Driver host
 
 Every driver lives in a driver host, which runs as a Fuchsia component
