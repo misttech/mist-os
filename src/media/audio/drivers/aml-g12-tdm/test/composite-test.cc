@@ -1167,12 +1167,6 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
     ASSERT_TRUE(delay_result->delay_info().internal_delay().has_value());  // Some delay reported.
   }
 
-  void TestSetActiveChannels(fuchsia_hardware_audio::ElementId id, uint64_t mask) {
-    auto client = GetRingBufferClientReadyForSetActiveChannels(id, 2);
-    auto set_active_channels_result = client->SetActiveChannels(mask);
-    ASSERT_TRUE(set_active_channels_result.is_ok());
-  }
-
   void TestInvalidActiveChannelsFor1Channel(fuchsia_hardware_audio::ElementId id) {
     auto client = GetRingBufferClientReadyForSetActiveChannels(id, 1);
 
@@ -1279,4 +1273,53 @@ TEST_F(AmlG12CompositeRingBufferTest, RingBufferGetDelay) {
   }
 }
 
+TEST_F(AmlG12CompositeRingBufferTest, DefaultPowerState) {
+  auto client0 = GetRingBufferClient(kEngineARingBufferIdOutput);
+  TestPowerState(true);  // Default to on.
+  ASSERT_TRUE(client0->SetActiveChannels(0).is_ok());
+  TestPowerState(false);  // Was set to off.
+
+  auto client1 = GetRingBufferClient(kEngineARingBufferIdOutput);
+  TestPowerState(true);  // Another ring buffer request, then back to on.
+}
+
+TEST_F(AmlG12CompositeRingBufferTest, PowerSuspendResumeOneRingBuffer) {
+  // Clear active channels for one ring buffer.
+  auto client0 = GetRingBufferClientReadyForSetActiveChannels(kAllValidRingBufferIds[0], 2);
+  auto result0 = client0->SetActiveChannels(0);
+  ASSERT_TRUE(result0.is_ok());
+  TestPowerState(false);
+
+  // Set one active channel in one ring buffer.
+  auto client1 = GetRingBufferClientReadyForSetActiveChannels(kAllValidRingBufferIds[0], 2);
+  auto result1 = client1->SetActiveChannels(1);
+  ASSERT_TRUE(result1.is_ok());
+  TestPowerState(true);
+}
+
+TEST_F(AmlG12CompositeRingBufferTest, PowerSuspendResumMultipleRingBuffers) {
+  auto client0 = GetRingBufferClientReadyForSetActiveChannels(kAllValidRingBufferIds[0], 2);
+  auto client1 = GetRingBufferClientReadyForSetActiveChannels(kAllValidRingBufferIds[1], 2);
+  auto client2 = GetRingBufferClientReadyForSetActiveChannels(kAllValidRingBufferIds[2], 2);
+
+  // After disabling one ring buffer, power is still enabled.
+  ASSERT_TRUE(client0->SetActiveChannels(0).is_ok());
+  TestPowerState(true);
+
+  // After all ring buffers created are disabled, power is disabled.
+  ASSERT_TRUE(client1->SetActiveChannels(0).is_ok());
+  ASSERT_TRUE(client2->SetActiveChannels(0).is_ok());
+  TestPowerState(false);
+
+  // After enabling a channel in a different ring buffer, power is enabled.
+  ASSERT_TRUE(client2->SetActiveChannels(1).is_ok());
+  TestPowerState(true);
+}
+
+TEST_F(AmlG12CompositeRingBufferTest, InvalidSetActiveChannels) {
+  for (auto& id : kAllValidRingBufferIds) {
+    TestInvalidActiveChannelsFor1Channel(id);
+    TestInvalidActiveChannelsFor2Channels(id);
+  }
+}
 }  // namespace audio::aml_g12

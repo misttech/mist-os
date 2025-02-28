@@ -191,11 +191,11 @@ zx_status_t AudioCompositeServer::ResetEngine(size_t index) {
   if (dai_format.frame_format().frame_format_standard().has_value()) {
     switch (dai_format.frame_format().frame_format_standard().value()) {
         // clang-format off
-     case StandardFormat::kI2S:        dai_type = DaiType::I2s;                 break;
-     case StandardFormat::kStereoLeft: dai_type = DaiType::StereoLeftJustified; break;
-     case StandardFormat::kTdm1:       dai_type = DaiType::Tdm1;                break;
-     case StandardFormat::kTdm2:       dai_type = DaiType::Tdm2;                break;
-     case StandardFormat::kTdm3:       dai_type = DaiType::Tdm3;                break;
+      case StandardFormat::kI2S:        dai_type = DaiType::I2s;                 break;
+      case StandardFormat::kStereoLeft: dai_type = DaiType::StereoLeftJustified; break;
+      case StandardFormat::kTdm1:       dai_type = DaiType::Tdm1;                break;
+      case StandardFormat::kTdm2:       dai_type = DaiType::Tdm2;                break;
+      case StandardFormat::kTdm3:       dai_type = DaiType::Tdm3;                break;
         // clang-format on
       case StandardFormat::kNone:
         [[fallthrough]];
@@ -253,10 +253,13 @@ zx_status_t AudioCompositeServer::ResetEngine(size_t index) {
     return status;
   }
 
-  status = engines_[index].device->InitHW(
-      engines_[index].config, dai_format.channels_to_use_bitmask(), dai_format.frame_rate());
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to init hardware: %s", zx_status_get_string(status));
+  {
+    auto stop_if_temporarily_started = TemporarilyStartSocPower();
+    status = engines_[index].device->InitHW(
+        engines_[index].config, dai_format.channels_to_use_bitmask(), dai_format.frame_rate());
+    if (status != ZX_OK) {
+      FDF_LOG(ERROR, "Failed to init hardware: %s", zx_status_get_string(status));
+    }
   }
   return status;
 }
@@ -412,17 +415,11 @@ void AudioCompositeServer::CreateRingBuffer(CreateRingBufferRequest& request,
   }
 
   // RingBuffer::SetActiveChannels is optional; we must work well for clients who _never_ call it.
-  // However, ideally we can leave the hardware powered-down by default, until a client connects.
   //
   // The hardware is put into the powered-off state when initially configured, until the first
   // RingBuffer is created. At that point the hardware powers-up automatically, so that clients who
-  // do not use SetActiveChannels get the expected behavior. After that first RingBuffer creation,
-  // the hardware retains its power state across the creation and destruction of RingBuffers -- the
-  // only thing that changes its power level is a SetActiveChannels() call.
-  if (!first_ring_buffer_has_been_created_) {
-    ZX_ASSERT(StartSocPower(/*wait_for_completion*/ true) == ZX_OK);
-    first_ring_buffer_has_been_created_ = true;
-  }
+  // do not use SetActiveChannels get the expected behavior.
+  ZX_ASSERT(StartSocPower(/*wait_for_completion*/ true) == ZX_OK);
 
   // Engine is on by default.
   engines_on_.set(ring_buffer_index, true);
@@ -725,7 +722,10 @@ void RingBufferServer::ResetRingBuffer() {
   notification_period_ = {};
 
   fetched_ = false;
-  engine_.device->Stop();
+  {
+    auto stop_if_temporarily_started = owner_.TemporarilyStartSocPower();
+    engine_.device->Stop();
+  }
   started_ = false;
   pinned_ring_buffer_.Unpin();
 }
@@ -807,7 +807,10 @@ void RingBufferServer::Start(StartCompleter::Sync& completer) {
     return;
   }
 
-  start_time = engine_.device->Start();
+  {
+    auto stop_if_temporarily_started = owner_.TemporarilyStartSocPower();
+    start_time = engine_.device->Start();
+  }
   started_ = true;
 
   uint32_t notifs = expected_notifications_per_ring_.load();
@@ -842,7 +845,10 @@ void RingBufferServer::Stop(StopCompleter::Sync& completer) {
   notify_timer_.Cancel();
   notification_period_ = {};
 
-  engine_.device->Stop();
+  {
+    auto stop_if_temporarily_started = owner_.TemporarilyStartSocPower();
+    engine_.device->Stop();
+  }
   auto stop_time = zx::clock::get_monotonic();
   started_ = false;
 
