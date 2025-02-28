@@ -20,11 +20,6 @@ use zerocopy::{FromBytes, IntoBytes};
 /// The size of the red zone.
 pub const RED_ZONE_SIZE: u64 = 0;
 
-/// The size of the syscall instruction in bytes.
-pub const SYSCALL_INSTRUCTION_SIZE_BYTES: u64 = 4;
-
-// TODO(https://fxbug.dev/380405833): Add in arm and thumb here to enable syscall_restart
-
 /// The size, in bytes, of the signal stack frame.
 pub const SIG_STACK_SIZE: usize = std::mem::size_of::<SignalStackFrame>();
 

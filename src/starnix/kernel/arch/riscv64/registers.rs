@@ -6,6 +6,10 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::uapi::user_regs_struct;
 use starnix_uapi::{__NR_restart_syscall, error};
 
+/// The size of the syscall instruction in bytes. `ECALL` is not compressed, i.e. it always takes 4
+/// bytes.
+const SYSCALL_INSTRUCTION_SIZE_BYTES: u64 = 4;
+
 /// The state of the task's registers when the thread of execution entered the kernel.
 /// This is a thin wrapper around [`zx::sys::zx_thread_state_general_regs_t`].
 ///
@@ -50,6 +54,11 @@ impl RegisterState {
     /// function call.
     pub fn set_instruction_pointer_register(&mut self, new_ip: u64) {
         self.real_registers.pc = new_ip;
+    }
+
+    /// Rewind the the register that indicates the instruction pointer by one syscall instruction.
+    pub fn rewind_syscall_instruction(&mut self) {
+        self.real_registers.pc -= SYSCALL_INSTRUCTION_SIZE_BYTES;
     }
 
     /// Returns the register that indicates the single-machine-word return value from a

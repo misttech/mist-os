@@ -18,10 +18,6 @@ use starnix_uapi::{
 /// The size of the red zone.
 pub const RED_ZONE_SIZE: u64 = 0;
 
-/// The size of the syscall instruction in bytes. `ECALL` is not compressed, i.e. it always takes 4
-/// bytes.
-pub const SYSCALL_INSTRUCTION_SIZE_BYTES: u64 = 4;
-
 /// The size, in bytes, of the signal stack frame.
 pub const SIG_STACK_SIZE: usize = std::mem::size_of::<SignalStackFrame>();
 

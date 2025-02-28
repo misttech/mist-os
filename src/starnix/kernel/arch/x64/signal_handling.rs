@@ -26,9 +26,6 @@ use static_assertions::const_assert_eq;
 ///   > zone.
 pub const RED_ZONE_SIZE: u64 = 128;
 
-/// The size of the syscall instruction in bytes.
-pub const SYSCALL_INSTRUCTION_SIZE_BYTES: u64 = 2;
-
 /// A `SignalStackFrame` contains all the state that is stored on the stack prior
 /// to executing a signal handler.
 ///

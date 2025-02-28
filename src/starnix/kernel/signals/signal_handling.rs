@@ -5,7 +5,6 @@
 use crate::arch::registers::RegisterState;
 use crate::arch::signal_handling::{
     align_stack_pointer, restore_registers, SignalStackFrame, RED_ZONE_SIZE, SIG_STACK_SIZE,
-    SYSCALL_INSTRUCTION_SIZE_BYTES,
 };
 use crate::mm::{MemoryAccessor, MemoryAccessorExt};
 use crate::signals::{KernelSignal, KernelSignalInfo, SignalDetail, SignalInfo, SignalState};
@@ -468,11 +467,6 @@ pub fn prepare_to_restart_syscall(thread_state: &mut ThreadState, sigaction: Opt
     };
 
     if err.should_restart(sigaction) {
-        if thread_state.arch_width.is_arch32() {
-            // TODO(https://fxbug.dev/380405833): Fix pc post syscall for restart.
-            panic!("pc is being changed incorrectly post syscall for restart!");
-        }
-
         // This error code is returned for system calls that need restart_syscall() to adjust time
         // related arguments when the syscall is restarted. Other syscall restarts can be dispatched
         // directly to the original syscall implementation.
@@ -483,9 +477,7 @@ pub fn prepare_to_restart_syscall(thread_state: &mut ThreadState, sigaction: Opt
         }
 
         // TODO(https://fxbug.dev/388051291) figure out whether Linux relies on registers here
-        thread_state.registers.set_instruction_pointer_register(
-            thread_state.registers.instruction_pointer_register() - SYSCALL_INSTRUCTION_SIZE_BYTES,
-        );
+        thread_state.registers.rewind_syscall_instruction();
     } else {
         thread_state.registers.set_return_register(EINTR.return_value());
     }
