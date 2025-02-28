@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/fake/fake-display.h"
 
-#include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/driver/logging/cpp/logger.h>

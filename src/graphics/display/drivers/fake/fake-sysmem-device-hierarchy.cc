@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/fake/fake-sysmem-device-hierarchy.h"
 
-#include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/task.h>
@@ -55,17 +54,6 @@ FakeSysmemDeviceHierarchy::ConnectAllocator2() {
   sysmem_service_->SyncCall([this, request = std::move(server)]() mutable {
     sysmem_service::Allocator::CreateOwnedV2(std::move(request), sysmem_service_.get(),
                                              sysmem_service_->v2_allocators());
-  });
-  return zx::ok(std::move(client));
-}
-
-zx::result<fidl::ClientEnd<fuchsia_hardware_sysmem::Sysmem>>
-FakeSysmemDeviceHierarchy::ConnectHardwareSysmem() {
-  auto [client, server] = fidl::Endpoints<fuchsia_hardware_sysmem::Sysmem>::Create();
-  // The loop_ dispatcher is the "client_dispatcher" in sysmem_service_.
-  async::PostTask(loop_.dispatcher(), [this, server = std::move(server)]() mutable {
-    sysmem_service_->BindingsForTest().AddBinding(
-        loop_.dispatcher(), std::move(server), sysmem_service_.get(), fidl::kIgnoreBindingClosure);
   });
   return zx::ok(std::move(client));
 }

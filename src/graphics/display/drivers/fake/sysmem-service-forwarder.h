@@ -5,7 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_SYSMEM_SERVICE_FORWARDER_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_SYSMEM_SERVICE_FORWARDER_H_
 
-#include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/zx/result.h>
@@ -14,10 +13,7 @@
 
 namespace fake_display {
 
-// Forwards the following sysmem protocols from the component's incoming service
-// directory to the forwarder's outgoing service directory:
-// - [`fuchsia.sysmem2/Allocator`]
-// - [`fucshia.hardware.sysmem/Sysmem`]
+// Provider that uses the component's incoming service directory.
 class SysmemServiceForwarder : public SysmemServiceProvider {
  public:
   // Factory method for production use.
@@ -37,7 +33,6 @@ class SysmemServiceForwarder : public SysmemServiceProvider {
 
   // SysmemServiceProvider:
   zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> ConnectAllocator2() override;
-  zx::result<fidl::ClientEnd<fuchsia_hardware_sysmem::Sysmem>> ConnectHardwareSysmem() override;
 
  private:
   fidl::ClientEnd<fuchsia_io::Directory> component_incoming_root_;

@@ -38,7 +38,6 @@ class FakeSysmemDeviceHierarchy : public SysmemServiceProvider {
 
   // SysmemServiceProvider:
   zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> ConnectAllocator2() override;
-  zx::result<fidl::ClientEnd<fuchsia_hardware_sysmem::Sysmem>> ConnectHardwareSysmem() override;
 
  private:
   async::Loop loop_;
