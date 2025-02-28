@@ -14,9 +14,7 @@ use fho::{
 };
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx_ext::RepositoryError;
-use pkg::{
-    config as pkg_config, PkgServerInfo, PkgServerInstanceInfo as _, PkgServerInstances, ServerMode,
-};
+use pkg::{PkgServerInfo, PkgServerInstanceInfo as _, PkgServerInstances, ServerMode};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use target_holders::daemon_protocol;
@@ -151,10 +149,6 @@ impl RepoStopTool {
                                 Ok(Some("No repository server is running".into()))
                             }
                             err => {
-                                // If we failed to communicate with the daemon, disable the server so it doesn't start
-                                // next time the daemon starts.
-                                let _ = pkg_config::set_repository_server_enabled(false).await;
-
                                 return_bug!(
                                     "Failed to stop the server: {}",
                                     RepositoryError::from(err)
@@ -163,10 +157,6 @@ impl RepoStopTool {
                         }
                     }
                     Err(err) => {
-                        // If we failed to communicate with the daemon, disable the server so it doesn't start
-                        // next time the daemon starts.
-                        let _ = pkg_config::set_repository_server_enabled(false).await;
-
                         return_bug!("Failed to communicate with the daemon: {}", err)
                     }
                 }
@@ -181,7 +171,7 @@ mod tests {
     use camino::Utf8PathBuf;
     use ffx_config::{ConfigLevel, TestEnv};
     use ffx_writer::Format;
-    use fidl_fuchsia_developer_ffx::{RepositoryRegistryMarker, RepositoryRegistryRequest};
+    use fidl_fuchsia_developer_ffx::RepositoryRegistryRequest;
     use fidl_fuchsia_developer_ffx_ext::RepositorySpec;
     use fidl_fuchsia_pkg_ext::{
         RepositoryConfigBuilder, RepositoryRegistrationAliasConflictMode, RepositoryStorageType,
@@ -388,82 +378,6 @@ mod tests {
         assert_eq!(stdout, "Stopped the repository server\n", "stderr: {stderr}");
         assert_eq!(stderr, "");
         assert!(res.is_ok());
-    }
-
-    #[fuchsia::test]
-    async fn test_stop_disables_daemon_server_on_error() {
-        let env = ffx_config::test_init().await.unwrap();
-        env.context
-            .query("repository.process_dir")
-            .level(Some(ConfigLevel::User))
-            .set(env.isolate_root.path().join("repo_servers").to_string_lossy().into())
-            .await
-            .expect("setting isolated process dir");
-        pkg_config::set_repository_server_enabled(true).await.unwrap();
-
-        make_daemon_instance("default".into(), &env.context).expect("test daemon instance");
-
-        let (sender, receiver) = channel();
-        let mut sender = Some(sender);
-        let fake_proxy = fake_proxy(move |req| match req {
-            RepositoryRegistryRequest::ServerStop { responder } => {
-                sender.take().unwrap().send(()).unwrap();
-                responder.send(Err(RepositoryError::InternalError.into())).unwrap()
-            }
-            other => panic!("Unexpected request: {:?}", other),
-        });
-        let repos = Deferred::from_output(Ok(fake_proxy));
-
-        let tool = RepoStopTool {
-            context: env.context.clone(),
-            cmd: StopCommand { all: true, name: None, port: None, product_bundle: None },
-            repos,
-        };
-        let buffers = ffx_writer::TestBuffers::default();
-        let writer = <RepoStopTool as FfxMain>::Writer::new_test(None, &buffers);
-        let res = tool.main(writer).await;
-
-        let (stdout, stderr) = buffers.into_strings();
-        assert_eq!(stdout, "");
-        assert_eq!(stderr, "");
-        assert!(res.is_err());
-        assert!(receiver.await.is_ok());
-
-        assert!(!pkg_config::get_repository_server_enabled().await.unwrap());
-    }
-
-    #[fuchsia::test]
-    async fn test_stop_disables_daemon_server_on_communication_error() {
-        let env = ffx_config::test_init().await.unwrap();
-        env.context
-            .query("repository.process_dir")
-            .level(Some(ConfigLevel::User))
-            .set(env.isolate_root.path().join("repo_servers").to_string_lossy().into())
-            .await
-            .expect("setting isolated process dir");
-        pkg_config::set_repository_server_enabled(true).await.unwrap();
-
-        make_daemon_instance("default".into(), &env.context).expect("test daemon instance");
-
-        let (proxy, stream) =
-            fidl::endpoints::create_proxy_and_stream::<RepositoryRegistryMarker>();
-        drop(stream);
-        let repos = Deferred::from_output(Ok(proxy));
-
-        let tool = RepoStopTool {
-            context: env.context.clone(),
-            cmd: StopCommand { all: true, name: None, port: None, product_bundle: None },
-            repos,
-        };
-        let buffers = ffx_writer::TestBuffers::default();
-        let writer = <RepoStopTool as FfxMain>::Writer::new_test(None, &buffers);
-        let res = tool.main(writer).await;
-
-        let (stdout, stderr) = buffers.into_strings();
-        assert_eq!(stdout, "");
-        assert_eq!(stderr, "");
-        assert!(res.is_err());
-        assert!(!pkg_config::get_repository_server_enabled().await.unwrap());
     }
 
     #[fuchsia::test]

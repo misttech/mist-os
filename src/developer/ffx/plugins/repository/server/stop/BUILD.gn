@@ -32,7 +32,6 @@ ffx_plugin("ffx_repository_server_stop") {
     "//third_party/rust_crates:serde",
   ]
   test_deps = [
-    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/sys/lib/fidl-fuchsia-pkg-ext",
     "//third_party/rust_crates:camino",

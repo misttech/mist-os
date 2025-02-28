@@ -14,7 +14,6 @@ const CONFIG_KEY_REPOSITORIES: &str = "repository.repositories";
 const CONFIG_KEY_REGISTRATIONS: &str = "repository.registrations";
 const CONFIG_KEY_REGISTRATION_MODE: &str = "repository.registration-mode";
 const CONFIG_KEY_DEFAULT_REPOSITORY: &str = "repository.default";
-const CONFIG_KEY_SERVER_ENABLED: &str = "repository.server.enabled";
 const CONFIG_KEY_SERVER_LISTEN: &str = "repository.server.listen";
 const CONFIG_KEY_LAST_USED_ADDRESS: &str = "repository.server.last_used_address";
 const ESCAPE_SET: &AsciiSet = &CONTROLS.add(b'%').add(b'.');
@@ -84,20 +83,10 @@ pub async fn repository_registration_mode() -> Result<String> {
 
 /// Return if the repository server is enabled.
 pub async fn get_repository_server_enabled() -> Result<bool> {
-    if let Some(enabled) = ffx_config::get(CONFIG_KEY_SERVER_ENABLED)? {
-        Ok(enabled)
-    } else {
-        Ok(false)
-    }
-}
+    // TODO(http://fxbug.dev/389735589): Remove daemon based repo server code
 
-/// Sets if the repository server is enabled.
-pub async fn set_repository_server_enabled(enabled: bool) -> Result<()> {
-    ffx_config::invalidate_global_cache().await; // Necessary when the daemon does some writes and the CLI does others
-    ffx_config::query(CONFIG_KEY_SERVER_ENABLED)
-        .level(Some(ConfigLevel::User))
-        .set(enabled.into())
-        .await
+    // Right now, just disable it.
+    Ok(false)
 }
 
 /// Return if the last used repository address used.
