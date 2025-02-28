@@ -24,6 +24,7 @@ if (is_host) {
       "igmpv3.go",
       "ip.go",
       "ipv6.go",
+      "ipv6_autoconfig.go",
       "ipv6_mld.go",
       "ipv6_mldv2.go",
       "ipv6_pmtu.go",

@@ -42,6 +42,7 @@ var expectations map[SuiteIdentifier]map[AnvlCaseNumber]outcome.Outcome = func()
 	addAllExpectations("igmp", platform.NS2, igmpExpectations)
 	addAllExpectations("ip", platform.NS2, ipExpectations)
 	addAllExpectations("ipv6", platform.NS2, ipv6Expectations)
+	addAllExpectations("ipv6-autoconfig", platform.NS2, ipv6AutoconfigExpectations)
 	addAllExpectations("ipv6-mld", platform.NS2, ipv6MldExpectations)
 	addAllExpectations("ipv6-ndp", platform.NS2, ipv6ndpExpectations)
 	addAllExpectations("ipv6-pmtu", platform.NS2, ipv6PmtuExpectations)
@@ -69,6 +70,7 @@ var expectations map[SuiteIdentifier]map[AnvlCaseNumber]outcome.Outcome = func()
 	addAllExpectations("igmpv3", platform.NS3, igmpv3ExpectationsNS3)
 	addAllExpectations("ip", platform.NS3, ipExpectationsNS3)
 	addAllExpectations("ipv6", platform.NS3, ipv6ExpectationsNS3)
+	addAllExpectations("ipv6-autoconfig", platform.NS3, ipv6AutoconfigExpectationsNS3)
 	addAllExpectations("ipv6-mld", platform.NS3, ipv6MldExpectationsNS3)
 	addAllExpectations("ipv6-mldv2", platform.NS3, ipv6Mldv2ExpectationsNS3)
 	addAllExpectations("ipv6-ndp", platform.NS3, ipv6ndpExpectationsNS3)
@@ -103,6 +105,7 @@ func (a AnvlCaseNumber) Cmp(b AnvlCaseNumber) bool {
 var Pass = outcome.Pass
 var Fail = outcome.Fail
 var Inconclusive = outcome.Inconclusive
+var NoResponse = outcome.NoResponse
 var Flaky = outcome.Flaky
 var Skip = outcome.Skip
 var AnvlSkip = outcome.AnvlSkip

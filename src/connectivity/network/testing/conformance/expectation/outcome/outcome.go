@@ -14,6 +14,8 @@ const (
 	_ Outcome = iota
 	Pass
 	Fail
+	// No response should be considered a failure.
+	NoResponse
 	Inconclusive
 	// Flaky is a special value that, when used as a test expectation, indicates
 	// that we should accept any outcome as expected. Any expectation marked
@@ -36,6 +38,8 @@ func (o Outcome) String() string {
 		return "Passed"
 	case Fail:
 		return "!FAILED!"
+	case NoResponse:
+		return "!NO RESPONSE!"
 	case Inconclusive:
 		return "!INCONCLUSIVE!"
 	case Flaky:
