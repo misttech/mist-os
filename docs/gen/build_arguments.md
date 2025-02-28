@@ -722,7 +722,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8721735362045458401"`
+**Current value for `target_cpu = "arm64"`:** `"8721690060494536961"`
 
 From //out/not-default/args.gn:10
 
@@ -730,7 +730,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8721735362045458401"`
+**Current value for `target_cpu = "riscv64"`:** `"8721690060494536961"`
 
 From //out/not-default/args.gn:10
 
@@ -738,7 +738,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8721735362045458401"`
+**Current value for `target_cpu = "x64"`:** `"8721690060494536961"`
 
 From //out/not-default/args.gn:10
 
@@ -1140,7 +1140,7 @@ This should never be set as a build argument.
   clang_rt = "../../../../out/not-default/libclang_rt.hwasan.so"
 }
   static = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.hwasan.a"
   clang_rt_cxx = "../../../../out/not-default/libclang_rt.hwasan_cxx.a"
 }
 }
@@ -1208,7 +1208,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "lib/clang/20/lib/riscv64-unknown-fuchsia/libclang_rt.lsan.a"
-  clang_rt_cxx = ""
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.lsan_cxx.a"
 }
 }
   tsan = {
@@ -5390,7 +5390,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"gLtQ-5ur3yitHZ0td65E1YNv6oD7rohi7anZtDG0KygC"`
+**Current value (from the default):** `"CjlIdo98pmS01_NpIXpOBEUQneRiJoJ6dH451H-Cp8oC"`
 
 From //build/rust/config.gni:42
 
@@ -9768,7 +9768,7 @@ From //third_party/pigweed/src/pw_unit_test/test.gni:117
 
 **Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/src/pw_build:reduced_size"]`
 
-From //.gn:152
+From //.gn:156
 
 **Overridden from the default:** `[]`
 
@@ -9776,7 +9776,7 @@ From //third_party/pigweed/src/pw_build/gn_internal/defaults.gni:36
 
 **Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/src/pw_build:reduced_size"]`
 
-From //.gn:152
+From //.gn:156
 
 **Overridden from the default:** `[]`
 
