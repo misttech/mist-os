@@ -129,6 +129,9 @@
 // when the implementation of [name] differs
 // between 32-bit and 64-bit.
 #include <arm-arch32-syscalls.h>
+
+// Definition of ucontext
+#include <arm-arch32-ucontext.h>
 #endif
 
 #include <fcntl.h>

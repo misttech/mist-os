@@ -65,7 +65,9 @@ where
     pub unsafe fn raw_get_bit(this: *const Self, index: usize) -> bool {
         debug_assert!(index / 8 < core::mem::size_of::<Storage>());
         let byte_index = index / 8;
-        let byte = *(core::ptr::addr_of!((*this).storage) as *const u8).offset(byte_index as isize);
+        let byte = unsafe {
+            *(core::ptr::addr_of!((*this).storage) as *const u8).offset(byte_index as isize)
+        };
         Self::extract_bit(byte, index)
     }
     #[inline]
@@ -89,9 +91,10 @@ where
     pub unsafe fn raw_set_bit(this: *mut Self, index: usize, val: bool) {
         debug_assert!(index / 8 < core::mem::size_of::<Storage>());
         let byte_index = index / 8;
-        let byte =
-            (core::ptr::addr_of_mut!((*this).storage) as *mut u8).offset(byte_index as isize);
-        *byte = Self::change_bit(*byte, index, val);
+        let byte = unsafe {
+            (core::ptr::addr_of_mut!((*this).storage) as *mut u8).offset(byte_index as isize)
+        };
+        unsafe { *byte = Self::change_bit(*byte, index, val) };
     }
     #[inline]
     pub fn get(&self, bit_offset: usize, bit_width: u8) -> u64 {
@@ -115,7 +118,7 @@ where
         debug_assert!((bit_offset + (bit_width as usize)) / 8 <= core::mem::size_of::<Storage>());
         let mut val = 0;
         for i in 0..(bit_width as usize) {
-            if Self::raw_get_bit(this, i + bit_offset) {
+            if unsafe { Self::raw_get_bit(this, i + bit_offset) } {
                 let index =
                     if cfg!(target_endian = "big") { bit_width as usize - 1 - i } else { i };
                 val |= 1 << index;
@@ -144,7 +147,7 @@ where
             let mask = 1 << i;
             let val_bit_is_set = val & mask == mask;
             let index = if cfg!(target_endian = "big") { bit_width as usize - 1 - i } else { i };
-            Self::raw_set_bit(this, index + bit_offset, val_bit_is_set);
+            unsafe { Self::raw_set_bit(this, index + bit_offset, val_bit_is_set) };
         }
     }
 }
@@ -17047,6 +17050,32 @@ pub struct vvar_data {
     pub boot_to_utc_reference_ticks: std::sync::atomic::AtomicU32,
     pub boot_to_utc_synthetic_ticks: std::sync::atomic::AtomicU32,
 }
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct sigset64_t {
+    pub sig: [crate::types::arch32::c_ulong; 1usize],
+}
+pub type mcontext_t = sigcontext;
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct ucontext {
+    pub uc_flags: crate::types::arch32::c_ulong,
+    pub uc_link: crate::uref32<ucontext>,
+    pub uc_stack: stack_t,
+    pub uc_mcontext: mcontext_t,
+    pub uc_sigmask64: sigset64_t,
+    pub __padding: [crate::types::arch32::c_char; 640usize],
+}
+impl Default for ucontext {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+pub type ucontext_t = ucontext;
 pub const SECCOMP_IOCTL_NOTIF_RECV: __u32 = 3226476800;
 pub const SECCOMP_IOCTL_NOTIF_SEND: __u32 = 3222806785;
 pub const SECCOMP_IOCTL_NOTIF_ID_VALID: __u32 = 1074274562;
