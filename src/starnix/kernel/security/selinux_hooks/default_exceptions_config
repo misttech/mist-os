@@ -31,6 +31,11 @@ todo_deny https://fxbug.dev/375381156 logd logd dir
 todo_deny https://fxbug.dev/395085164 init hal_graphics_allocator_default fd
 todo_deny https://fxbug.dev/395085164 gmscore_app hal_bluetooth_default fd
 
+// https://fxbug.dev/399628337 - mislabeled anon_inodes obtained via remote binder
+todo_deny https://fxbug.dev/399628337 netutils_wrapper hal_bluetooth_default fd
+todo_deny https://fxbug.dev/399628337 netutils_wrapper hal_bluetooth_default file
+todo_deny https://fxbug.dev/399628337 netutils_wrapper hal_bluetooth_default anon_inode
+
 //
 // Exceptions required for the SELinux Test Suite container.
 //
