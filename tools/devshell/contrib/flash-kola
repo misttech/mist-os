@@ -30,7 +30,7 @@ readonly FVM_PATH ZBI_PATH DTBO_PATH
 
 if [[ -z $ANDROID_SERIAL ]]; then
   readonly DEVICE_COUNT=$(${FASTBOOT} devices | awk NF | wc -l)
-  if [[ ${DEVICE_COUNT} -ne 1 ]]; then
+  if [[ ${DEVICE_COUNT} -gt 1 ]]; then
     fx-error "Detected ${DEVICE_COUNT} devices in fastboot mode."
     fx-error "Make sure there is only one device or set ANDROID_SERIAL."
     exit 1
