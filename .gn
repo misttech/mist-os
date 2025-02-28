@@ -142,6 +142,10 @@ default_args = {
   pw_unit_test_BACKEND = "//third_party/pigweed/src/pw_unit_test:googletest"
   pw_unit_test_TESTONLY = true
 
+  # pw_unit_test says claims it only depends on googletest, but nevertheless
+  # includes some GMock headers.
+  pw_third_party_googletest_ALIAS = "//third_party/googletest:gmock_no_testonly"
+
   # Point Pigweed's ICU target to Fuchsia's checkout.
   dir_pw_third_party_icu = "//third_party/icu/default"
 
