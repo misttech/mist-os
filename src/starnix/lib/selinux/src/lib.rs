@@ -101,6 +101,8 @@ enumerable_enum! {
         /// The SELinux "security" object class.
         Security,
         /// The SELinux "sock_file" object class.
+        SockFile,
+        /// The SELinux "socket" object class.
         Socket,
         // keep-sorted end
     }
@@ -124,7 +126,8 @@ impl ObjectClass {
             Self::Link => "lnk_file",
             Self::Process => "process",
             Self::Security => "security",
-            Self::Socket => "sock_file",
+            Self::SockFile => "sock_file",
+            Self::Socket => "socket",
             // keep-sorted end
         }
     }
@@ -207,7 +210,7 @@ enumerable_enum! {
         /// The SELinux "lnk_file" object class.
         Link,
         /// The SELinux "sock_file" object class.
-        Socket,
+        SockFile,
         // keep-sorted end
     }
 }
@@ -223,9 +226,60 @@ impl From<FileClass> for ObjectClass {
             FileClass::Fifo => Self::Fifo,
             FileClass::File => Self::File,
             FileClass::Link => Self::Link,
-            FileClass::Socket => Self::Socket,
+            FileClass::SockFile => Self::SockFile,
             // keep-sorted end
         }
+    }
+}
+
+enumerable_enum! {
+    /// Distinguishes socket-like kernel object classes defined in SELinux policy.
+    #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+    SocketClass {
+        // keep-sorted start
+        /// Generic socket class applied to all socket-like objects for which no more specific
+        /// class is defined.
+        Socket,
+        // keep-sorted end
+    }
+}
+
+impl From<SocketClass> for ObjectClass {
+    fn from(sock_class: SocketClass) -> Self {
+        match sock_class {
+            // keep-sorted start
+            SocketClass::Socket => Self::Socket,
+            // keep-sorted end
+        }
+    }
+}
+
+/// Container for a security class that could be associated with a [`crate::vfs::FsNode`], to allow
+/// permissions common to both file-like and socket-like classes to be generated easily by hooks.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub enum FsNodeClass {
+    File(FileClass),
+    Socket(SocketClass),
+}
+
+impl From<FsNodeClass> for ObjectClass {
+    fn from(class: FsNodeClass) -> Self {
+        match class {
+            FsNodeClass::File(file_class) => file_class.into(),
+            FsNodeClass::Socket(sock_class) => sock_class.into(),
+        }
+    }
+}
+
+impl From<FileClass> for FsNodeClass {
+    fn from(file_class: FileClass) -> Self {
+        FsNodeClass::File(file_class)
+    }
+}
+
+impl From<SocketClass> for FsNodeClass {
+    fn from(sock_class: SocketClass) -> Self {
+        FsNodeClass::Socket(sock_class)
     }
 }
 
@@ -327,6 +381,8 @@ permission_enum! {
         /// Permissions for access to parts of the "selinuxfs" used to administer and query SELinux.
         Security(SecurityPermission),
         /// Permissions for the well-known SELinux "sock_file" file-like object class.
+        SockFile(SockFilePermission),
+        /// Permissions for the well-known SELinux "socket" file-like object class.
         Socket(SocketPermission),
         // keep-sorted end
     }
@@ -483,45 +539,99 @@ impl CommonCap2Permission {
 }
 
 common_permission_enum! {
+    /// Permissions meaningful for all [`crate::vfs::FsNode`]s, whether file- or socket-like.
+    ///
+    /// This extra layer of common permissions is not reflected in the hierarchy defined by the
+    /// SELinux Reference Policy. Because even common permissions are mapped per-class, by name, to
+    /// the policy equivalents, the implementation and policy notions of common permissions need not
+    /// be identical.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    CommonFsNodePermission {
+        // keep-sorted start
+        /// Permission to append to a file or socket.
+        Append("append"),
+        /// Permission to create a file or socket.
+        Create("create"),
+        /// Permission to query attributes, including uid, gid and extended attributes.
+        GetAttr("getattr"),
+        /// Permission to execute ioctls on the file or socket.
+        Ioctl("ioctl"),
+        /// Permission to set and unset file or socket locks.
+        Lock("lock"),
+        /// Permission to read content from a file or socket, as well as reading or following links.
+        Read("read"),
+        /// Permission checked against the existing label when updating a node's security label.
+        RelabelFrom("relabelfrom"),
+        /// Permission checked against the new label when updating a node's security label.
+        RelabelTo("relabelto"),
+        /// Permission to modify attributes, including uid, gid and extended attributes.
+        SetAttr("setattr"),
+        /// Permission to write contents to the file or socket.
+        Write("write"),
+        // keep-sorted end
+    }
+}
+
+impl CommonFsNodePermission {
+    /// Returns the `class`-affine `Permission` value corresponding to this common permission.
+    /// This is used to allow hooks to resolve e.g. common "read" permission access based on the
+    /// "allow" rules for the correct target object class.
+    pub fn for_class(&self, class: impl Into<FsNodeClass>) -> Permission {
+        match class.into() {
+            FsNodeClass::File(file_class) => {
+                CommonFilePermission::Common(self.clone()).for_class(file_class)
+            }
+            FsNodeClass::Socket(sock_class) => {
+                CommonSocketPermission::Common(self.clone()).for_class(sock_class)
+            }
+        }
+    }
+}
+common_permission_enum! {
+    /// Permissions common to all socket-like object classes. These are combined with a specific
+    /// `SocketClass` by policy enforcement hooks, to obtain class-affine permission values.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    CommonSocketPermission extends CommonFsNodePermission {
+        // keep-sorted start
+        // keep-sorted end
+    }
+}
+
+impl CommonSocketPermission {
+    pub fn for_class(&self, class: SocketClass) -> Permission {
+        match class {
+            SocketClass::Socket => SocketPermission::Common(self.clone()).into(),
+        }
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "socket" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    SocketPermission extends CommonSocketPermission {
+    }
+}
+
+common_permission_enum! {
     /// Permissions common to all file-like object classes (e.g. "lnk_file", "dir"). These are
     /// combined with a specific `FileClass` by policy enforcement hooks, to obtain class-affine
     /// permission values to check.
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-    CommonFilePermission {
+    CommonFilePermission extends CommonFsNodePermission {
         // keep-sorted start
-        /// Permission to append to a file.
-        Append("append"),
-        /// Permission to create a file.
-        Create("create"),
         /// Permission to execute a file with domain transition.
         Execute("execute"),
-        /// Permission to query attributes, including uid, gid and extended attributes.
-        GetAttr("getattr"),
-        /// Permission to execute ioctls on the file.
-        Ioctl("ioctl"),
         /// Permissions to create hard link.
         Link("link"),
-        /// Permission to set and unset file locks.
-        Lock("lock"),
         /// Permission to use as mount point; only useful for directories and files.
         MountOn("mounton"),
         /// Permission to open a file.
         Open("open"),
-        /// Permission to read file contents. Note this applies to reading more than regular file's
-        /// data.
-        Read("read"),
-        /// Permission checked against the existing label when updating a file's security label.
-        RelabelFrom("relabelfrom"),
-        /// Permission checked against the new label when updating a file's security label.
-        RelabelTo("relabelto"),
         /// Permission to rename a file.
         Rename("rename"),
-        /// Permission to modify attributes, including uid, gid and extended attributes.
-        SetAttr("setattr"),
         /// Permission to delete a file or remove a hard link.
         Unlink("unlink"),
-        /// Permission to write or append file contents.
-        Write("write"),
         // keep-sorted end
     }
 }
@@ -539,7 +649,7 @@ impl CommonFilePermission {
             FileClass::Fifo => FifoFilePermission::Common(self.clone()).into(),
             FileClass::File => FilePermission::Common(self.clone()).into(),
             FileClass::Link => LinkFilePermission::Common(self.clone()).into(),
-            FileClass::Socket => SocketPermission::Common(self.clone()).into(),
+            FileClass::SockFile => SockFilePermission::Common(self.clone()).into(),
         }
     }
 }
@@ -736,7 +846,7 @@ class_permission_enum! {
     /// A well-known "sock_file" class permission in SELinux policy that has a particular meaning in
     /// policy enforcement hooks.
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-    SocketPermission extends CommonFilePermission {
+    SockFilePermission extends CommonFilePermission {
     }
 }
 

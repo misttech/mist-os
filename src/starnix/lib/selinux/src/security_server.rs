@@ -634,7 +634,7 @@ fn sid_from_mount_option(
 mod tests {
     use super::*;
     use crate::permission_check::PermissionCheckResult;
-    use crate::{CommonFilePermission, FilePermission, ProcessPermission};
+    use crate::{CommonFsNodePermission, FilePermission, ProcessPermission};
     use std::num::NonZeroU64;
 
     const TESTSUITE_BINARY_POLICY: &[u8] = include_bytes!("../testdata/policies/selinux_testsuite");
@@ -1228,7 +1228,7 @@ mod tests {
             permission_check.has_permission(
                 sid,
                 sid,
-                CommonFilePermission::GetAttr.for_class(FileClass::Block)
+                CommonFsNodePermission::GetAttr.for_class(FileClass::Block)
             ),
             PermissionCheckResult { permit: true, audit: true, todo_bug: None }
         );
@@ -1263,7 +1263,7 @@ mod tests {
             permission_check.has_permission(
                 sid,
                 sid,
-                CommonFilePermission::GetAttr.for_class(FileClass::Block)
+                CommonFsNodePermission::GetAttr.for_class(FileClass::Block)
             ),
             PermissionCheckResult { permit: false, audit: true, todo_bug: None }
         );
@@ -1329,7 +1329,7 @@ mod tests {
             permission_check.has_permission(
                 permissive_sid,
                 non_permissive_sid,
-                CommonFilePermission::GetAttr.for_class(FileClass::Block)
+                CommonFsNodePermission::GetAttr.for_class(FileClass::Block)
             ),
             PermissionCheckResult { permit: true, audit: true, todo_bug: None }
         );
@@ -1337,7 +1337,7 @@ mod tests {
             permission_check.has_permission(
                 non_permissive_sid,
                 non_permissive_sid,
-                CommonFilePermission::GetAttr.for_class(FileClass::Block)
+                CommonFsNodePermission::GetAttr.for_class(FileClass::Block)
             ),
             PermissionCheckResult { permit: false, audit: true, todo_bug: None }
         );
@@ -1455,7 +1455,7 @@ mod tests {
             permission_check.has_permission(
                 other_sid,
                 target_sid,
-                CommonFilePermission::Read.for_class(FileClass::Character)
+                CommonFsNodePermission::Read.for_class(FileClass::Character)
             ),
             PermissionCheckResult {
                 permit: true,

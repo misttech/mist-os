@@ -21,9 +21,10 @@ use linux_uapi::XATTR_NAME_SELINUX;
 use selinux::permission_check::PermissionCheck;
 use selinux::policy::FsUseType;
 use selinux::{
-    ClassPermission, CommonFilePermission, DirPermission, FdPermission, FileClass, FileSystemLabel,
-    FileSystemLabelingScheme, FileSystemMountOptions, FileSystemPermission, InitialSid,
-    ObjectClass, Permission, ProcessPermission, SecurityId, SecurityPermission, SecurityServer,
+    ClassPermission, CommonFilePermission, CommonFsNodePermission, DirPermission, FdPermission,
+    FileClass, FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions,
+    FileSystemPermission, FsNodeClass, InitialSid, ObjectClass, Permission, ProcessPermission,
+    SecurityId, SecurityPermission, SecurityServer,
 };
 use starnix_logging::{log_debug, log_warn, track_stub, BugRef};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex};
@@ -46,23 +47,27 @@ use syncio::zxio_node_attr_has_t;
 const SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE: usize = 4096;
 
 /// Returns the set of `Permissions` on `class`, corresponding to the specified `flags`.
-fn permissions_from_flags(flags: PermissionFlags, class: FileClass) -> Vec<Permission> {
+fn permissions_from_flags(flags: PermissionFlags, class: FsNodeClass) -> Vec<Permission> {
     let mut result = Vec::new();
     if flags.contains(PermissionFlags::READ) {
-        result.push(CommonFilePermission::Read.for_class(class));
+        result.push(CommonFsNodePermission::Read.for_class(class));
     }
     // SELinux uses the `APPEND` bit to distinguish which of the "append" or the more general
     // "write" permission to check for.
     if flags.contains(PermissionFlags::APPEND) {
-        result.push(CommonFilePermission::Append.for_class(class));
+        result.push(CommonFsNodePermission::Append.for_class(class));
     } else if flags.contains(PermissionFlags::WRITE) {
-        result.push(CommonFilePermission::Write.for_class(class));
+        result.push(CommonFsNodePermission::Write.for_class(class));
     }
-    if flags.contains(PermissionFlags::EXEC) {
-        if class == FileClass::Dir {
-            result.push(DirPermission::Search.into());
-        } else {
-            result.push(CommonFilePermission::Execute.for_class(class));
+
+    #[allow(irrefutable_let_patterns)]
+    if let FsNodeClass::File(class) = class {
+        if flags.contains(PermissionFlags::EXEC) {
+            if class == FileClass::Dir {
+                result.push(DirPermission::Search.into());
+            } else {
+                result.push(CommonFilePermission::Execute.for_class(class));
+            }
         }
     }
     result
@@ -379,7 +384,7 @@ pub(super) fn fs_node_init_with_dentry(
             // filesystem "proc" is mounted in "/proc" and if the actual full path to the
             // fs_node is "/proc/bootconfig" then, get_fs_relative_path will return
             // "/bootconfig". This matches the path definitions in the genfscon statements.
-            let sub_path = if fs_node_class == FileClass::Link {
+            let sub_path = if fs_node_class == FileClass::Link.into() {
                 // Investigation for https://fxbug.dev/378863048 suggests that symlinks' paths are
                 // ignored, so that they use the filesystem's root label.
                 "/".into()
@@ -429,7 +434,7 @@ fn file_class_from_file_mode(mode: FileMode) -> Result<FileClass, Errno> {
         starnix_uapi::S_IFCHR => Ok(FileClass::Character),
         starnix_uapi::S_IFBLK => Ok(FileClass::Block),
         starnix_uapi::S_IFIFO => Ok(FileClass::Fifo),
-        starnix_uapi::S_IFSOCK => Ok(FileClass::Socket),
+        starnix_uapi::S_IFSOCK => Ok(FileClass::SockFile),
         0 => {
             track_stub!(TODO("https://fxbug.dev/378864191"), "File with zero IFMT?");
             Ok(FileClass::File)
@@ -457,7 +462,7 @@ fn compute_new_fs_node_sid(
     current_task: &CurrentTask,
     fs: &FileSystem,
     parent: Option<&FsNode>,
-    new_node_class: FileClass,
+    new_node_class: FsNodeClass,
     name: &FsStr,
 ) -> Result<Option<(SecurityId, FileSystemLabel)>, Errno> {
     let label = match &*fs.security_state.state.0.lock() {
@@ -503,8 +508,11 @@ fn compute_new_fs_node_sid(
                 } else {
                     label.sid
                 };
-                let sid = security_server
-                    .as_permission_check()
+                let permission_check = security_server.as_permission_check();
+                let FsNodeClass::File(new_node_class) = new_node_class else {
+                    panic!("compute_new_fs_node_sid on non-file-like class")
+                };
+                let sid = permission_check
                     .compute_new_file_sid(current_task_sid, parent_sid, new_node_class, name.into())
                     // TODO: https://fxbug.dev/377915452 - is EPERM right here? What does it mean
                     // for compute_new_file_sid to have failed?
@@ -584,7 +592,7 @@ pub(super) fn fs_node_init_anon(
         .compute_new_file_sid(task_sid, task_sid, FileClass::AnonFsNode, node_type.into())
         .expect("Compute label for anon_inode");
     let mut state = new_node.security_state.lock();
-    state.class = FileClass::AnonFsNode;
+    state.class = FileClass::AnonFsNode.into();
     state.label = FsNodeLabel::SecurityId { sid };
 }
 
@@ -622,7 +630,7 @@ fn may_create(
     )?;
 
     // Verify that the caller has permission to create new nodes of the desired type.
-    let new_file_class = file_class_from_file_mode(new_file_mode)?;
+    let new_file_class = file_class_from_file_mode(new_file_mode)?.into();
     let new_file_sid = compute_new_fs_node_sid(
         security_server,
         current_task,
@@ -639,7 +647,7 @@ fn may_create(
         &permission_check,
         current_sid,
         new_file_sid,
-        CommonFilePermission::Create.for_class(new_file_class),
+        CommonFsNodePermission::Create.for_class(new_file_class),
         (&audit_context).into(),
     )?;
 
@@ -681,6 +689,9 @@ fn may_link(
     let FsNodeSidAndClass { sid: file_sid, class: file_class } =
         fs_node_effective_sid_and_class(existing_node);
 
+    let FsNodeClass::File(file_class) = file_class else {
+        panic!("may_link called on non-file-like class")
+    };
     check_permission(
         &permission_check,
         current_sid,
@@ -702,6 +713,7 @@ fn may_link(
         CommonFilePermission::Link.for_class(file_class),
         audit_context,
     )?;
+
     Ok(())
 }
 
@@ -740,22 +752,26 @@ fn may_unlink_or_rmdir(
 
     let FsNodeSidAndClass { sid: file_sid, class: file_class } =
         fs_node_effective_sid_and_class(fs_node);
-    match operation {
-        UnlinkKind::NonDirectory => check_permission(
-            &permission_check,
-            current_sid,
-            file_sid,
-            CommonFilePermission::Unlink.for_class(file_class),
-            audit_context,
-        )?,
-        UnlinkKind::Directory => check_permission(
-            &permission_check,
-            current_sid,
-            file_sid,
-            DirPermission::RemoveDir,
-            audit_context,
-        )?,
+    #[allow(irrefutable_let_patterns)]
+    if let FsNodeClass::File(file_class) = file_class {
+        match operation {
+            UnlinkKind::NonDirectory => check_permission(
+                &permission_check,
+                current_sid,
+                file_sid,
+                CommonFilePermission::Unlink.for_class(file_class),
+                audit_context,
+            )?,
+            UnlinkKind::Directory => check_permission(
+                &permission_check,
+                current_sid,
+                file_sid,
+                DirPermission::RemoveDir,
+                audit_context,
+            )?,
+        }
     }
+
     Ok(())
 }
 
@@ -872,13 +888,16 @@ pub(super) fn check_fs_node_rename_access(
 
     let FsNodeSidAndClass { sid: file_sid, class: file_class } =
         fs_node_effective_sid_and_class(moving_node);
-    check_permission(
-        &permission_check,
-        current_sid,
-        file_sid,
-        CommonFilePermission::Rename.for_class(file_class),
-        current_task.into(),
-    )?;
+    #[allow(irrefutable_let_patterns)]
+    if let FsNodeClass::File(file_class) = file_class {
+        check_permission(
+            &permission_check,
+            current_sid,
+            file_sid,
+            CommonFilePermission::Rename.for_class(file_class),
+            current_task.into(),
+        )?;
+    }
 
     let new_parent_sid = fs_node_effective_sid_and_class(new_parent).sid;
     check_permission(
@@ -898,7 +917,7 @@ pub(super) fn check_fs_node_rename_access(
             current_task,
             new_parent,
             replaced_node,
-            if replaced_node_class == FileClass::Dir {
+            if replaced_node_class == FileClass::Dir.into() {
                 UnlinkKind::Directory
             } else {
                 UnlinkKind::NonDirectory
@@ -920,7 +939,7 @@ pub(super) fn check_fs_node_rename_access(
         // If the file is a directory and its parent directory is being changed by the rename,
         // we additionally check for the reparent permission. Note that the `reparent` permission is
         // only defined for directories.
-        if file_class == FileClass::Dir {
+        if file_class == FileClass::Dir.into() {
             check_permission(
                 &permission_check,
                 current_sid,
@@ -947,7 +966,7 @@ pub(super) fn check_fs_node_read_link_access(
         &security_server.as_permission_check(),
         current_sid,
         file_sid,
-        CommonFilePermission::Read.for_class(file_class),
+        CommonFsNodePermission::Read.for_class(file_class),
         current_task.into(),
     )
 }
@@ -984,7 +1003,7 @@ pub(super) fn check_fs_node_getattr_access(
         &security_server.as_permission_check(),
         current_sid,
         file_sid,
-        CommonFilePermission::GetAttr.for_class(file_class),
+        CommonFsNodePermission::GetAttr.for_class(file_class),
         current_task.into(),
     )
 }
@@ -1006,9 +1025,9 @@ pub fn check_fs_node_setattr_access(
         || attributes.modification_time
         || attributes.change_time
     {
-        [CommonFilePermission::SetAttr.for_class(file_class)]
+        [CommonFsNodePermission::SetAttr.for_class(file_class)]
     } else {
-        [CommonFilePermission::Write.for_class(file_class)]
+        [CommonFsNodePermission::Write.for_class(file_class)]
     };
 
     has_fs_node_permissions(
@@ -1035,7 +1054,7 @@ pub(super) fn check_fs_node_setxattr_access(
         &security_server.as_permission_check(),
         current_sid,
         file_sid,
-        CommonFilePermission::SetAttr.for_class(file_class),
+        CommonFsNodePermission::SetAttr.for_class(file_class),
         current_task.into(),
     )
 }
@@ -1053,7 +1072,7 @@ pub(super) fn check_fs_node_getxattr_access(
         &security_server.as_permission_check(),
         current_sid,
         file_sid,
-        CommonFilePermission::GetAttr.for_class(file_class),
+        CommonFsNodePermission::GetAttr.for_class(file_class),
         current_task.into(),
     )
 }
@@ -1070,7 +1089,7 @@ pub(super) fn check_fs_node_listxattr_access(
         &security_server.as_permission_check(),
         current_sid,
         file_sid,
-        CommonFilePermission::GetAttr.for_class(file_class),
+        CommonFsNodePermission::GetAttr.for_class(file_class),
         current_task.into(),
     )
 }
@@ -1090,7 +1109,7 @@ pub(super) fn check_fs_node_removexattr_access(
         &security_server.as_permission_check(),
         current_sid,
         file_sid,
-        CommonFilePermission::SetAttr.for_class(file_class),
+        CommonFsNodePermission::SetAttr.for_class(file_class),
         current_task.into(),
     )
 }
@@ -1110,13 +1129,13 @@ pub(super) fn check_file_ioctl_access(
     let permissions: &[Permission] = match request {
         // The NSA report also has `FIBMAP` follow this branch.
         FIONREAD | FIGETBSZ | FS_IOC_GETFLAGS | FS_IOC_GETVERSION => {
-            &[CommonFilePermission::GetAttr.for_class(file_class)]
+            &[CommonFsNodePermission::GetAttr.for_class(file_class)]
         }
         FS_IOC_SETFLAGS | FS_IOC_SETVERSION => {
-            &[CommonFilePermission::SetAttr.for_class(file_class)]
+            &[CommonFsNodePermission::SetAttr.for_class(file_class)]
         }
         FIONBIO | FIOASYNC => &[],
-        _ => &[CommonFilePermission::Ioctl.for_class(file_class)],
+        _ => &[CommonFsNodePermission::Ioctl.for_class(file_class)],
     };
 
     let audit_context = [current_task.into(), file.into()];
@@ -1151,7 +1170,7 @@ pub(super) fn check_file_lock_access(
         &permission_check,
         subject_sid,
         file,
-        &[CommonFilePermission::Lock.for_class(fs_node_class)],
+        &[CommonFsNodePermission::Lock.for_class(fs_node_class)],
         current_task.into(),
     )
 }
@@ -1176,7 +1195,7 @@ pub(super) fn check_file_fcntl_access(
                 &permission_check,
                 subject_sid,
                 file,
-                &[CommonFilePermission::Lock.for_class(fs_node_class)],
+                &[CommonFsNodePermission::Lock.for_class(fs_node_class)],
                 current_task.into(),
             )?;
         }
@@ -1340,7 +1359,7 @@ where
                 &permission_check,
                 task_sid,
                 old_sid,
-                CommonFilePermission::RelabelFrom.for_class(file_class),
+                CommonFsNodePermission::RelabelFrom.for_class(file_class),
                 audit_context,
             )?;
         } else {
@@ -1348,7 +1367,7 @@ where
                 &permission_check,
                 task_sid,
                 old_sid,
-                CommonFilePermission::RelabelFrom.for_class(file_class),
+                CommonFsNodePermission::RelabelFrom.for_class(file_class),
                 audit_context,
             )?;
         }
@@ -1356,7 +1375,7 @@ where
             &permission_check,
             task_sid,
             new_sid,
-            CommonFilePermission::RelabelTo.for_class(file_class),
+            CommonFsNodePermission::RelabelTo.for_class(file_class),
             audit_context,
         )?;
         check_permission(
@@ -1413,7 +1432,10 @@ fn fs_node_effective_sid_and_class(fs_node: &FsNode) -> FsNodeSidAndClass {
         track_stub!(TODO("https://fxbug.dev/381210513"), "SID requested for unlabeled FsNode");
     }
 
-    FsNodeSidAndClass { sid: SecurityId::initial(InitialSid::Unlabeled), class: FileClass::File }
+    FsNodeSidAndClass {
+        sid: SecurityId::initial(InitialSid::Unlabeled),
+        class: FileClass::File.into(),
+    }
 }
 
 /// Perform the specified check as would `check_permission()`, but report denials as "todo_deny" in
@@ -1451,7 +1473,7 @@ fn check_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
     permission: P,
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
-    if permission.class() == FileClass::Socket.into() {
+    if permission.class() == FileClass::SockFile.into() {
         return todo_check_permission(
             TODO_DENY!(
                 "https://fxbug.dev/364568517",
@@ -1800,12 +1822,12 @@ impl FileSystemState {
 #[derive(Debug, Clone)]
 pub struct FsNodeState {
     label: FsNodeLabel,
-    class: FileClass,
+    class: FsNodeClass,
 }
 
 impl Default for FsNodeState {
     fn default() -> Self {
-        Self { label: FsNodeLabel::Uninitialized, class: FileClass::File }
+        Self { label: FsNodeLabel::Uninitialized, class: FileClass::File.into() }
     }
 }
 
@@ -1827,7 +1849,7 @@ impl FsNodeLabel {
 #[derive(Debug, PartialEq)]
 struct FsNodeSidAndClass {
     sid: SecurityId,
-    class: FileClass,
+    class: FsNodeClass,
 }
 
 /// Sets the cached security id associated with `fs_node` to `sid`. Storing the security id will
@@ -1848,9 +1870,9 @@ pub(super) fn fs_node_set_label_with_task(fs_node: &FsNode, task: WeakRef<Task>)
 /// As per the NSA report description, the security class is chosen based on the `FileMode`, unless
 /// a security class more specific than "file" has already been set on the node.
 pub(super) fn fs_node_ensure_class(fs_node: &FsNode) -> Result<(), Errno> {
-    if fs_node.security_state.lock().class == FileClass::File {
+    if fs_node.security_state.lock().class == FileClass::File.into() {
         let file_mode = fs_node.info().mode;
-        fs_node.security_state.lock().class = file_class_from_file_mode(file_mode)?;
+        fs_node.security_state.lock().class = file_class_from_file_mode(file_mode)?.into();
     }
     Ok(())
 }

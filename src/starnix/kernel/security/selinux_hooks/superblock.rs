@@ -11,7 +11,8 @@ use crate::vfs::{FileSystem, Mount, NamespaceNode};
 use crate::TODO_DENY;
 use selinux::permission_check::PermissionCheck;
 use selinux::{
-    CommonFilePermission, FileSystemMountOptions, FileSystemPermission, SecurityId, SecurityServer,
+    CommonFilePermission, FileSystemMountOptions, FileSystemPermission, FsNodeClass, SecurityId,
+    SecurityServer,
 };
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
@@ -72,6 +73,9 @@ pub fn sb_mount(
         let node = path.entry.node.as_ref().as_ref();
         let FsNodeSidAndClass { sid: target_sid, class: target_class } =
             fs_node_effective_sid_and_class(node);
+        let FsNodeClass::File(target_class) = target_class else {
+            panic!("sb_mount on non-file-like class")
+        };
         let audit_context = [current_task.into(), node.into()];
         todo_check_permission(
             TODO_DENY!("https://fxbug.dev/380230897", "Check mounton permission."),
