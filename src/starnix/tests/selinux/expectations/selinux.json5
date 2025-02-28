@@ -26,6 +26,7 @@
                 "cgroupfs_label",
                 "checkreqprot",
                 "extended_socket_class",
+                "fdreceive",
                 "file",
                 "filesystem",
                 "fs_filesystem",

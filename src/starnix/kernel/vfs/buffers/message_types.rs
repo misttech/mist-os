@@ -9,7 +9,6 @@ use byteorder::{ByteOrder, NativeEndian};
 use zerocopy::{FromBytes, IntoBytes};
 
 use crate::mm::VmsplicePayload;
-use crate::security;
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, InputBufferExt as _, OutputBuffer};
 use crate::vfs::socket::{SocketAddress, SocketMessageFlags};
@@ -168,38 +167,38 @@ impl AncillaryData {
         self,
         current_task: &CurrentTask,
         flags: SocketMessageFlags,
-    ) -> Result<Option<ControlMsg>, Errno> {
+    ) -> Result<ControlMsg, Errno> {
         match self {
             AncillaryData::Unix(control) => control.into_controlmsg(current_task, flags),
             AncillaryData::Ip(syncio::ControlMessage::IpTos(value)) => {
-                Ok(Some(ControlMsg::new(SOL_IP, IP_TOS, value.as_bytes().to_vec())))
+                Ok(ControlMsg::new(SOL_IP, IP_TOS, value.as_bytes().to_vec()))
             }
             AncillaryData::Ip(syncio::ControlMessage::IpTtl(value)) => {
-                Ok(Some(ControlMsg::new(SOL_IP, IP_TTL, (value as c_int).as_bytes().to_vec())))
+                Ok(ControlMsg::new(SOL_IP, IP_TTL, (value as c_int).as_bytes().to_vec()))
             }
             AncillaryData::Ip(syncio::ControlMessage::IpRecvOrigDstAddr(value)) => {
-                Ok(Some(ControlMsg::new(SOL_IP, IP_RECVORIGDSTADDR, value.as_bytes().to_vec())))
+                Ok(ControlMsg::new(SOL_IP, IP_RECVORIGDSTADDR, value.as_bytes().to_vec()))
             }
-            AncillaryData::Ip(syncio::ControlMessage::Ipv6Tclass(value)) => Ok(Some(
-                ControlMsg::new(SOL_IPV6, IPV6_TCLASS, (value as c_int).as_bytes().to_vec()),
-            )),
-            AncillaryData::Ip(syncio::ControlMessage::Ipv6HopLimit(value)) => Ok(Some(
-                ControlMsg::new(SOL_IPV6, IPV6_HOPLIMIT, (value as c_int).as_bytes().to_vec()),
-            )),
+            AncillaryData::Ip(syncio::ControlMessage::Ipv6Tclass(value)) => {
+                Ok(ControlMsg::new(SOL_IPV6, IPV6_TCLASS, (value as c_int).as_bytes().to_vec()))
+            }
+            AncillaryData::Ip(syncio::ControlMessage::Ipv6HopLimit(value)) => {
+                Ok(ControlMsg::new(SOL_IPV6, IPV6_HOPLIMIT, (value as c_int).as_bytes().to_vec()))
+            }
             AncillaryData::Ip(syncio::ControlMessage::Ipv6PacketInfo { iface, local_addr }) => {
                 let pktinfo = in6_pktinfo {
                     ipi6_addr: in6_addr { in6_u: in6_addr__bindgen_ty_1 { u6_addr8: local_addr } },
                     ipi6_ifindex: iface as i32,
                 };
-                Ok(Some(ControlMsg::new(SOL_IPV6, IPV6_PKTINFO, pktinfo.as_bytes().to_vec())))
+                Ok(ControlMsg::new(SOL_IPV6, IPV6_PKTINFO, pktinfo.as_bytes().to_vec()))
             }
             AncillaryData::Ip(syncio::ControlMessage::Timestamp { sec, usec }) => {
                 let time = timeval { tv_sec: sec, tv_usec: usec };
-                Ok(Some(ControlMsg::new(SOL_SOCKET, SO_TIMESTAMP, time.as_bytes().to_vec())))
+                Ok(ControlMsg::new(SOL_SOCKET, SO_TIMESTAMP, time.as_bytes().to_vec()))
             }
             AncillaryData::Ip(syncio::ControlMessage::TimestampNs { sec, nsec }) => {
                 let time = timespec { tv_sec: sec, tv_nsec: nsec };
-                Ok(Some(ControlMsg::new(SOL_SOCKET, SO_TIMESTAMPNS, time.as_bytes().to_vec())))
+                Ok(ControlMsg::new(SOL_SOCKET, SO_TIMESTAMPNS, time.as_bytes().to_vec()))
             }
         }
     }
@@ -236,16 +235,14 @@ impl AncillaryData {
             return Ok(vec![]);
         }
 
-        let cmsg = self.into_controlmsg(current_task, flags)?;
-        if let Some(mut cmsg) = cmsg {
-            let cmsg_len = std::cmp::min(header_size + cmsg.data.len(), space_available);
-            cmsg.header.cmsg_len = cmsg_len;
-            let mut bytes = cmsg.header.as_bytes().to_owned();
-            bytes.extend_from_slice(&cmsg.data[..cmsg_len - header_size]);
-            return Ok(bytes);
-        } else {
-            return Ok(vec![]);
-        }
+        let mut cmsg = self.into_controlmsg(current_task, flags)?;
+        let cmsg_len = std::cmp::min(header_size + cmsg.data.len(), space_available);
+        cmsg.header.cmsg_len = cmsg_len;
+
+        let mut bytes = cmsg.header.as_bytes().to_owned();
+        bytes.extend_from_slice(&cmsg.data[..cmsg_len - header_size]);
+
+        Ok(bytes)
     }
 }
 
@@ -350,7 +347,7 @@ impl UnixControlData {
         self,
         current_task: &CurrentTask,
         flags: SocketMessageFlags,
-    ) -> Result<Option<ControlMsg>, Errno> {
+    ) -> Result<ControlMsg, Errno> {
         let (msg_type, data) = match self {
             UnixControlData::Rights(files) => {
                 let flags = if flags.contains(SocketMessageFlags::CMSG_CLOEXEC) {
@@ -358,21 +355,10 @@ impl UnixControlData {
                 } else {
                     FdFlags::empty()
                 };
-                let mut fds = Vec::with_capacity(files.len());
-                for file in files {
-                    // Truncate the message as soon as a file descriptor is not allowed to be
-                    // received.
-                    if security::file_receive(current_task, &file).is_err() {
-                        break;
-                    }
-                    let fd = current_task.add_file(file, flags)?;
-                    fds.push(fd);
-                }
-                // If no file descriptors are left, the entirety of the control message should be
-                // dropped.
-                if fds.is_empty() {
-                    return Ok(None);
-                }
+                let fds: Vec<FdNumber> = files
+                    .iter()
+                    .map(|file| current_task.add_file(file.clone(), flags))
+                    .collect::<Result<Vec<FdNumber>, Errno>>()?;
                 (SCM_RIGHTS, fds.as_bytes().to_owned())
             }
             UnixControlData::Credentials(credentials) => {
@@ -380,7 +366,8 @@ impl UnixControlData {
             }
             UnixControlData::Security(string) => (SCM_SECURITY, string.as_bytes().to_owned()),
         };
-        Ok(Some(ControlMsg::new(SOL_SOCKET, msg_type, data)))
+
+        Ok(ControlMsg::new(SOL_SOCKET, msg_type, data))
     }
 
     /// Returns the total size of all data in this message.
