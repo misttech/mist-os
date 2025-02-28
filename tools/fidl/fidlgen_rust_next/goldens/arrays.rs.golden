@@ -68,6 +68,12 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStructLargeArray> for StructLargeArray {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <[u32; 100] as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireStructLargeArray) -> Self {
         Self { a: ::fidl_next::TakeFrom::take_from(&from.a) }
@@ -168,6 +174,12 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStructSmallArray> for StructSmallArray {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <[u32; 2] as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireStructSmallArray) -> Self {
         Self { a: ::fidl_next::TakeFrom::take_from(&from.a) }

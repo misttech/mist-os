@@ -60,6 +60,9 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireEmpty> for Empty {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     #[inline]
     fn take_from(from: &WireEmpty) -> Self {
         Self {}

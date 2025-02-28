@@ -165,6 +165,12 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireSuperFooResponse> for SuperFooResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireSuperFooResponse) -> Self {
         Self { y: ::fidl_next::TakeFrom::take_from(&from.y) }

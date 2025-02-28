@@ -75,6 +75,12 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse>
     for UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(
         from: &WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse,
@@ -550,6 +556,9 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse>
     for UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     #[inline]
     fn take_from(from: &WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse) -> Self {
         Self {}
@@ -930,6 +939,12 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse>
     for UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(
         from: &WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse,
@@ -2806,6 +2821,12 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse>
     for UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
@@ -3263,6 +3284,9 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse>
     for UnknownInteractionsAjarProtocolStrictTwoWayErrResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     #[inline]
     fn take_from(from: &WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse) -> Self {
         Self {}
@@ -3635,6 +3659,12 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse>
     for UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
@@ -4856,6 +4886,12 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest>
     for UnknownInteractionsAjarProtocolStrictEventFieldsRequest
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
@@ -5321,6 +5357,12 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest>
     for UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
@@ -6755,6 +6797,12 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse>
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(
         from: &WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse,
@@ -7231,6 +7279,9 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse>
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     #[inline]
     fn take_from(
         from: &WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse,
@@ -7618,6 +7669,12 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse>
     for UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(
         from: &WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse,
@@ -9478,6 +9535,12 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse>
     for UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
@@ -9939,6 +10002,9 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse>
     for UnknownInteractionsClosedProtocolStrictTwoWayErrResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     #[inline]
     fn take_from(from: &WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse) -> Self {
         Self {}
@@ -10313,6 +10379,12 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse>
     for UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(
         from: &WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse,
@@ -11553,6 +11625,12 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest>
     for UnknownInteractionsClosedProtocolStrictEventFieldsRequest
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
@@ -12763,6 +12841,12 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse>
     for UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
@@ -13224,6 +13308,9 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse>
     for UnknownInteractionsDriverProtocolStrictTwoWayErrResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse) -> Self {
         Self {}
@@ -13598,6 +13685,12 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse>
     for UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(
         from: &WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse,
@@ -14828,6 +14921,9 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse) -> Self {
         Self {}
@@ -15214,6 +15310,12 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
@@ -16468,6 +16570,9 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     #[inline]
     fn take_from(from: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse) -> Self {
         Self {}
@@ -16887,6 +16992,12 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse>
     for UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(
         from: &WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse,
@@ -19293,6 +19404,12 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayFieldsResponse>
     for UnknownInteractionsProtocolStrictTwoWayFieldsResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolStrictTwoWayFieldsResponse) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
@@ -19746,6 +19863,9 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayErrResponse>
     for UnknownInteractionsProtocolStrictTwoWayErrResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolStrictTwoWayErrResponse) -> Self {
         Self {}
@@ -20113,6 +20233,12 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResponse>
     for UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResponse) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
@@ -21305,6 +21431,9 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayResponse>
     for UnknownInteractionsProtocolFlexibleTwoWayResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleTwoWayResponse) -> Self {
         Self {}
@@ -21681,6 +21810,12 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResponse>
     for UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResponse) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
@@ -22905,6 +23040,9 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse>
     for UnknownInteractionsProtocolFlexibleTwoWayErrResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse) -> Self {
         Self {}
@@ -23320,6 +23458,12 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse>
     for UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
@@ -24633,6 +24777,12 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolStrictEventFieldsRequest>
     for UnknownInteractionsProtocolStrictEventFieldsRequest
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolStrictEventFieldsRequest) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }
@@ -25094,6 +25244,12 @@ where
 impl ::fidl_next::TakeFrom<WireUnknownInteractionsProtocolFlexibleEventFieldsRequest>
     for UnknownInteractionsProtocolFlexibleEventFieldsRequest
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireUnknownInteractionsProtocolFlexibleEventFieldsRequest) -> Self {
         Self { some_field: ::fidl_next::TakeFrom::take_from(&from.some_field) }

@@ -68,6 +68,12 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WirePayload> for Payload {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WirePayload) -> Self {
         Self { value: ::fidl_next::TakeFrom::take_from(&from.value) }
@@ -168,6 +174,12 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireOneWaySendRequest> for OneWaySendRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <crate::Payload as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireOneWaySendRequest) -> Self {
         Self { payload: ::fidl_next::TakeFrom::take_from(&from.payload) }

@@ -75,6 +75,16 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireClientEndWrapper> for ClientEndWrapper {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::bind::ClientEnd<
+                ::fidl_next::fuchsia::zx::Handle,
+                crate::DriverProtocol,
+            > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireClientEndWrapper) -> Self {
         Self { value: ::fidl_next::TakeFrom::take_from(&from.value) }
@@ -682,6 +692,16 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireServerEndWrapper> for ServerEndWrapper {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::bind::ServerEnd<
+                ::fidl_next::fuchsia::zx::Handle,
+                crate::DriverProtocol,
+            > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireServerEndWrapper) -> Self {
         Self { value: ::fidl_next::TakeFrom::take_from(&from.value) }

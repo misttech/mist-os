@@ -67,6 +67,9 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireDocCommentWithQuotes> for DocCommentWithQuotes {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     #[inline]
     fn take_from(from: &WireDocCommentWithQuotes) -> Self {
         Self {}

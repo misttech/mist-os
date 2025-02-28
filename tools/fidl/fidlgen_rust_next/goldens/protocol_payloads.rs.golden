@@ -74,6 +74,13 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireLocalStructPayload> for LocalStructPayload {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireLocalStructPayload) -> Self {
         Self {
@@ -673,6 +680,13 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireMainProtocolOneWayAnonRequest> for MainProtocolOneWayAnonRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireMainProtocolOneWayAnonRequest) -> Self {
         Self {
@@ -788,6 +802,13 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireMainProtocolTwoWayAnonRequest> for MainProtocolTwoWayAnonRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireMainProtocolTwoWayAnonRequest) -> Self {
         Self {
@@ -903,6 +924,13 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireMainProtocolTwoWayAnonResponse> for MainProtocolTwoWayAnonResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireMainProtocolTwoWayAnonResponse) -> Self {
         Self {
@@ -1020,6 +1048,13 @@ where
 impl ::fidl_next::TakeFrom<WireMainProtocolTwoWayAnonWithErrorRequest>
     for MainProtocolTwoWayAnonWithErrorRequest
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireMainProtocolTwoWayAnonWithErrorRequest) -> Self {
         Self {
@@ -1137,6 +1172,13 @@ where
 impl ::fidl_next::TakeFrom<WireMainProtocolTwoWayAnonWithErrorResponse>
     for MainProtocolTwoWayAnonWithErrorResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireMainProtocolTwoWayAnonWithErrorResponse) -> Self {
         Self {
@@ -1479,6 +1521,13 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireMainProtocolOnAnonRequest> for MainProtocolOnAnonRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireMainProtocolOnAnonRequest) -> Self {
         Self {

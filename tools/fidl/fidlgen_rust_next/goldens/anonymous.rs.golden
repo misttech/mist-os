@@ -1116,6 +1116,12 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireTableData> for TableData {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <u8 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireTableData) -> Self {
         Self { data: ::fidl_next::TakeFrom::take_from(&from.data) }
@@ -1456,6 +1462,12 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireSomeProtocolSomeMethodResponse> for SomeProtocolSomeMethodResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <crate::BitsMember as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireSomeProtocolSomeMethodResponse) -> Self {
         Self { bits_member: ::fidl_next::TakeFrom::take_from(&from.bits_member) }

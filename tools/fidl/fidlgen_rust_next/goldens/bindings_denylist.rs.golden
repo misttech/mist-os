@@ -70,6 +70,12 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireShouldNeverAppearInAnyBinding4> for ShouldNeverAppearInAnyBinding4 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireShouldNeverAppearInAnyBinding4) -> Self {
         Self { a: ::fidl_next::TakeFrom::take_from(&from.a) }
@@ -1082,6 +1088,12 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireShouldNeverAppearInAnyBinding1> for ShouldNeverAppearInAnyBinding1 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireShouldNeverAppearInAnyBinding1) -> Self {
         Self { a: ::fidl_next::TakeFrom::take_from(&from.a) }
@@ -1794,6 +1806,12 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireShouldNeverAppearInAnyBinding7> for ShouldNeverAppearInAnyBinding7 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireShouldNeverAppearInAnyBinding7) -> Self {
         Self { a: ::fidl_next::TakeFrom::take_from(&from.a) }
@@ -2371,6 +2389,12 @@ where
 impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyCppRequest>
     for DenyEachBindingOnlyDenyCppRequest
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireDenyEachBindingOnlyDenyCppRequest) -> Self {
         Self { a: ::fidl_next::TakeFrom::take_from(&from.a) }
@@ -2473,6 +2497,12 @@ where
 impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyCppResponse>
     for DenyEachBindingOnlyDenyCppResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireDenyEachBindingOnlyDenyCppResponse) -> Self {
         Self { b: ::fidl_next::TakeFrom::take_from(&from.b) }
@@ -2838,6 +2868,12 @@ where
 impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyDartRequest>
     for DenyEachBindingOnlyDenyDartRequest
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireDenyEachBindingOnlyDenyDartRequest) -> Self {
         Self { a: ::fidl_next::TakeFrom::take_from(&from.a) }
@@ -2940,6 +2976,12 @@ where
 impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyDartResponse>
     for DenyEachBindingOnlyDenyDartResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireDenyEachBindingOnlyDenyDartResponse) -> Self {
         Self { b: ::fidl_next::TakeFrom::take_from(&from.b) }
@@ -3305,6 +3347,12 @@ where
 impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyGoRequest>
     for DenyEachBindingOnlyDenyGoRequest
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireDenyEachBindingOnlyDenyGoRequest) -> Self {
         Self { a: ::fidl_next::TakeFrom::take_from(&from.a) }
@@ -3407,6 +3455,12 @@ where
 impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyGoResponse>
     for DenyEachBindingOnlyDenyGoResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireDenyEachBindingOnlyDenyGoResponse) -> Self {
         Self { b: ::fidl_next::TakeFrom::take_from(&from.b) }
@@ -3772,6 +3826,12 @@ where
 impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyLibfuzzerRequest>
     for DenyEachBindingOnlyDenyLibfuzzerRequest
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireDenyEachBindingOnlyDenyLibfuzzerRequest) -> Self {
         Self { a: ::fidl_next::TakeFrom::take_from(&from.a) }
@@ -3874,6 +3934,12 @@ where
 impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyLibfuzzerResponse>
     for DenyEachBindingOnlyDenyLibfuzzerResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireDenyEachBindingOnlyDenyLibfuzzerResponse) -> Self {
         Self { b: ::fidl_next::TakeFrom::take_from(&from.b) }
@@ -4241,6 +4307,12 @@ where
 impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyRustRequest>
     for DenyEachBindingOnlyDenyRustRequest
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireDenyEachBindingOnlyDenyRustRequest) -> Self {
         Self { a: ::fidl_next::TakeFrom::take_from(&from.a) }
@@ -4343,6 +4415,12 @@ where
 impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyRustResponse>
     for DenyEachBindingOnlyDenyRustResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireDenyEachBindingOnlyDenyRustResponse) -> Self {
         Self { b: ::fidl_next::TakeFrom::take_from(&from.b) }
@@ -4708,6 +4786,12 @@ where
 impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenySyzkallerRequest>
     for DenyEachBindingOnlyDenySyzkallerRequest
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireDenyEachBindingOnlyDenySyzkallerRequest) -> Self {
         Self { a: ::fidl_next::TakeFrom::take_from(&from.a) }
@@ -4810,6 +4894,12 @@ where
 impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenySyzkallerResponse>
     for DenyEachBindingOnlyDenySyzkallerResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireDenyEachBindingOnlyDenySyzkallerResponse) -> Self {
         Self { b: ::fidl_next::TakeFrom::take_from(&from.b) }
@@ -5851,6 +5941,12 @@ where
 impl ::fidl_next::TakeFrom<WireMemberOnlyAppearsInImportingLibrary>
     for MemberOnlyAppearsInImportingLibrary
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireMemberOnlyAppearsInImportingLibrary) -> Self {
         Self { a: ::fidl_next::TakeFrom::take_from(&from.a) }
@@ -5960,6 +6056,17 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireOnlyAppearsInImportingLibrary> for OnlyAppearsInImportingLibrary {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true
+
+                && <
+                    crate::MemberOnlyAppearsInImportingLibrary as ::fidl_next::Encodable
+                >::COPY_OPTIMIZATION.is_enabled()
+
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireOnlyAppearsInImportingLibrary) -> Self {
         Self {
@@ -6228,6 +6335,9 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireOnlyGo> for OnlyGo {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     #[inline]
     fn take_from(from: &WireOnlyGo) -> Self {
         Self {}

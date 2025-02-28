@@ -483,6 +483,12 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStruct> for Struct {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireStruct) -> Self {
         Self { x: ::fidl_next::TakeFrom::take_from(&from.x) }

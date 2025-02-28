@@ -98,6 +98,19 @@ where
 }
 
 impl ::fidl_next::TakeFrom<{{ wire_name }}> for {{ name }} {
+    {% if is_static && !has_padding %}
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true
+            {% for member in strct.members %}
+                && <
+                    {{ context.natural_type(member.ty) }} as ::fidl_next::Encodable
+                >::COPY_OPTIMIZATION.is_enabled()
+            {% endfor %}
+        )
+    };
+    {% endif %}
+
     #[inline]
     fn take_from(from: &{{ wire_name }}) -> Self {
         Self {

@@ -166,6 +166,13 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireChannelProtocolMethodARequest> for ChannelProtocolMethodARequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireChannelProtocolMethodARequest) -> Self {
         Self {
@@ -281,6 +288,13 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireChannelProtocolEventARequest> for ChannelProtocolEventARequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireChannelProtocolEventARequest) -> Self {
         Self {
@@ -396,6 +410,13 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireChannelProtocolMethodBRequest> for ChannelProtocolMethodBRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireChannelProtocolMethodBRequest) -> Self {
         Self {
@@ -505,6 +526,12 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireChannelProtocolMethodBResponse> for ChannelProtocolMethodBResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireChannelProtocolMethodBResponse) -> Self {
         Self { result: ::fidl_next::TakeFrom::take_from(&from.result) }
@@ -610,6 +637,13 @@ where
 impl ::fidl_next::TakeFrom<WireChannelProtocolTakeHandleRequest>
     for ChannelProtocolTakeHandleRequest
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireChannelProtocolTakeHandleRequest) -> Self {
         Self { h: ::fidl_next::TakeFrom::take_from(&from.h) }
@@ -717,6 +751,13 @@ where
 impl ::fidl_next::TakeFrom<WireChannelProtocolMutateSocketRequest>
     for ChannelProtocolMutateSocketRequest
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireChannelProtocolMutateSocketRequest) -> Self {
         Self { a: ::fidl_next::TakeFrom::take_from(&from.a) }
@@ -824,6 +865,13 @@ where
 impl ::fidl_next::TakeFrom<WireChannelProtocolMutateSocketResponse>
     for ChannelProtocolMutateSocketResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireChannelProtocolMutateSocketResponse) -> Self {
         Self { b: ::fidl_next::TakeFrom::take_from(&from.b) }
@@ -1519,6 +1567,13 @@ where
 impl ::fidl_next::TakeFrom<WireHandleRightsProtocolNoResponseMethodRequest>
     for HandleRightsProtocolNoResponseMethodRequest
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireHandleRightsProtocolNoResponseMethodRequest) -> Self {
         Self { h: ::fidl_next::TakeFrom::take_from(&from.h) }
@@ -1626,6 +1681,13 @@ where
 impl ::fidl_next::TakeFrom<WireHandleRightsProtocolResponseMethodRequest>
     for HandleRightsProtocolResponseMethodRequest
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireHandleRightsProtocolResponseMethodRequest) -> Self {
         Self { h: ::fidl_next::TakeFrom::take_from(&from.h) }
@@ -1733,6 +1795,13 @@ where
 impl ::fidl_next::TakeFrom<WireHandleRightsProtocolResponseMethodResponse>
     for HandleRightsProtocolResponseMethodResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireHandleRightsProtocolResponseMethodResponse) -> Self {
         Self { h: ::fidl_next::TakeFrom::take_from(&from.h) }
@@ -1840,6 +1909,13 @@ where
 impl ::fidl_next::TakeFrom<WireHandleRightsProtocolAnEventRequest>
     for HandleRightsProtocolAnEventRequest
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireHandleRightsProtocolAnEventRequest) -> Self {
         Self { h: ::fidl_next::TakeFrom::take_from(&from.h) }
@@ -2278,6 +2354,26 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireManyParametersFifteenRequest> for ManyParametersFifteenRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <bool as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireManyParametersFifteenRequest) -> Self {
         Self {
@@ -2836,6 +2932,12 @@ where
 impl ::fidl_next::TakeFrom<WireMethodWithUnionUnionMethodRequest>
     for MethodWithUnionUnionMethodRequest
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <crate::TheUnion as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireMethodWithUnionUnionMethodRequest) -> Self {
         Self { u: ::fidl_next::TakeFrom::take_from(&from.u) }
@@ -2939,6 +3041,13 @@ where
 impl ::fidl_next::TakeFrom<WireMethodWithUnionUnionMethodResponse>
     for MethodWithUnionUnionMethodResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <Option<Box<crate::TheUnion>> as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireMethodWithUnionUnionMethodResponse) -> Self {
         Self { u: ::fidl_next::TakeFrom::take_from(&from.u) }
@@ -3328,6 +3437,31 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireProtocolEnds> for ProtocolEnds {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::bind::ClientEnd<
+                ::fidl_next::fuchsia::zx::Handle,
+                crate::DiscoverableProtocol,
+            > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled()
+                && <::fidl_next::bind::ServerEnd<
+                    ::fidl_next::fuchsia::zx::Handle,
+                    crate::DiscoverableProtocol,
+                > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                    .is_enabled()
+                && <::fidl_next::bind::ClientEnd<
+                    Option<::fidl_next::fuchsia::zx::Handle>,
+                    crate::DiscoverableProtocol,
+                > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                    .is_enabled()
+                && <::fidl_next::bind::ServerEnd<
+                    Option<::fidl_next::fuchsia::zx::Handle>,
+                    crate::DiscoverableProtocol,
+                > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                    .is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireProtocolEnds) -> Self {
         Self {
@@ -3467,6 +3601,13 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireSyscallProtocolMethodCRequest> for SyscallProtocolMethodCRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireSyscallProtocolMethodCRequest) -> Self {
         Self {
@@ -4861,6 +5002,14 @@ where
 impl ::fidl_next::TakeFrom<WireWithErrorSyntaxResponseAsStructResponse>
     for WithErrorSyntaxResponseAsStructResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireWithErrorSyntaxResponseAsStructResponse) -> Self {
         Self {
@@ -5198,6 +5347,9 @@ where
 impl ::fidl_next::TakeFrom<WireWithErrorSyntaxErrorAsPrimitiveResponse>
     for WithErrorSyntaxErrorAsPrimitiveResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     #[inline]
     fn take_from(from: &WireWithErrorSyntaxErrorAsPrimitiveResponse) -> Self {
         Self {}
@@ -5550,6 +5702,9 @@ where
 impl ::fidl_next::TakeFrom<WireWithErrorSyntaxErrorAsEnumResponse>
     for WithErrorSyntaxErrorAsEnumResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     #[inline]
     fn take_from(from: &WireWithErrorSyntaxErrorAsEnumResponse) -> Self {
         Self {}
@@ -5914,6 +6069,13 @@ where
 impl ::fidl_next::TakeFrom<WireWithErrorSyntaxHandleInResultResponse>
     for WithErrorSyntaxHandleInResultResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::fuchsia::zx::Handle as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireWithErrorSyntaxHandleInResultResponse) -> Self {
         Self { h: ::fidl_next::TakeFrom::take_from(&from.h) }
@@ -6528,6 +6690,16 @@ where
 impl ::fidl_next::TakeFrom<WireWithProtocolEndsClientEndsRequest>
     for WithProtocolEndsClientEndsRequest
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::bind::ClientEnd<
+                ::fidl_next::fuchsia::zx::Handle,
+                crate::DiscoverableProtocol,
+            > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireWithProtocolEndsClientEndsRequest) -> Self {
         Self { in_: ::fidl_next::TakeFrom::take_from(&from.in_) }
@@ -6642,6 +6814,16 @@ where
 impl ::fidl_next::TakeFrom<WireWithProtocolEndsClientEndsResponse>
     for WithProtocolEndsClientEndsResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::bind::ClientEnd<
+                Option<::fidl_next::fuchsia::zx::Handle>,
+                crate::DiscoverableProtocol,
+            > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireWithProtocolEndsClientEndsResponse) -> Self {
         Self { out: ::fidl_next::TakeFrom::take_from(&from.out) }
@@ -6758,6 +6940,16 @@ where
 impl ::fidl_next::TakeFrom<WireWithProtocolEndsServerEndsRequest>
     for WithProtocolEndsServerEndsRequest
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::bind::ServerEnd<
+                Option<::fidl_next::fuchsia::zx::Handle>,
+                crate::DiscoverableProtocol,
+            > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireWithProtocolEndsServerEndsRequest) -> Self {
         Self { in_: ::fidl_next::TakeFrom::take_from(&from.in_) }
@@ -6872,6 +7064,16 @@ where
 impl ::fidl_next::TakeFrom<WireWithProtocolEndsServerEndsResponse>
     for WithProtocolEndsServerEndsResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::bind::ServerEnd<
+                ::fidl_next::fuchsia::zx::Handle,
+                crate::DiscoverableProtocol,
+            > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireWithProtocolEndsServerEndsResponse) -> Self {
         Self { out: ::fidl_next::TakeFrom::take_from(&from.out) }
@@ -6979,6 +7181,12 @@ where
 impl ::fidl_next::TakeFrom<WireWithProtocolEndsStructContainingEndsRequest>
     for WithProtocolEndsStructContainingEndsRequest
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <crate::ProtocolEnds as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireWithProtocolEndsStructContainingEndsRequest) -> Self {
         Self { in_: ::fidl_next::TakeFrom::take_from(&from.in_) }
@@ -7085,6 +7293,12 @@ where
 impl ::fidl_next::TakeFrom<WireWithProtocolEndsStructContainingEndsResponse>
     for WithProtocolEndsStructContainingEndsResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <crate::ProtocolEnds as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireWithProtocolEndsStructContainingEndsResponse) -> Self {
         Self { out: ::fidl_next::TakeFrom::take_from(&from.out) }

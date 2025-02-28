@@ -247,6 +247,17 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireExampleProtocolMethodRequest> for ExampleProtocolMethodRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true
+
+                && <
+                    ::fidl_next_test_exampleusing::Empty as ::fidl_next::Encodable
+                >::COPY_OPTIMIZATION.is_enabled()
+
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireExampleProtocolMethodRequest) -> Self {
         Self { arg: ::fidl_next::TakeFrom::take_from(&from.arg) }
@@ -485,6 +496,12 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireExampleStruct> for ExampleStruct {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <u32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireExampleStruct) -> Self {
         Self { member: ::fidl_next::TakeFrom::take_from(&from.member) }

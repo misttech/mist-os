@@ -68,6 +68,12 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireInt32Wrapper> for Int32Wrapper {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireInt32Wrapper) -> Self {
         Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
@@ -174,6 +180,13 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireSimpleProtocolAddRequest> for SimpleProtocolAddRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireSimpleProtocolAddRequest) -> Self {
         Self {
@@ -283,6 +296,12 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireSimpleProtocolAddResponse> for SimpleProtocolAddResponse {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i32 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireSimpleProtocolAddResponse) -> Self {
         Self { sum: ::fidl_next::TakeFrom::take_from(&from.sum) }
@@ -774,6 +793,17 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStructWithNullableHandle> for StructWithNullableHandle {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true
+
+                && <
+                    Option<::fidl_next::fuchsia::zx::Handle> as ::fidl_next::Encodable
+                >::COPY_OPTIMIZATION.is_enabled()
+
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireStructWithNullableHandle) -> Self {
         Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
@@ -885,6 +915,16 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStructWithNullableProtocol> for StructWithNullableProtocol {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::bind::ClientEnd<
+                Option<::fidl_next::fuchsia::zx::Handle>,
+                crate::SimpleProtocol,
+            > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireStructWithNullableProtocol) -> Self {
         Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
@@ -999,6 +1039,16 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStructWithNullableRequest> for StructWithNullableRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <::fidl_next::bind::ServerEnd<
+                Option<::fidl_next::fuchsia::zx::Handle>,
+                crate::SimpleProtocol,
+            > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireStructWithNullableRequest) -> Self {
         Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }
@@ -1299,6 +1349,13 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireStructWithNullableUnion> for StructWithNullableUnion {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <Option<Box<crate::SimpleUnion>> as ::fidl_next::Encodable>::COPY_OPTIMIZATION
+                .is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireStructWithNullableUnion) -> Self {
         Self { val: ::fidl_next::TakeFrom::take_from(&from.val) }

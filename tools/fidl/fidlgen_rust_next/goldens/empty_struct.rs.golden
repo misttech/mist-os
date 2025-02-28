@@ -60,6 +60,9 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireEmpty> for Empty {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
+        unsafe { ::fidl_next::CopyOptimization::enable_if(true) };
+
     #[inline]
     fn take_from(from: &WireEmpty) -> Self {
         Self {}
@@ -155,6 +158,12 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireEmptyProtocolSendRequest> for EmptyProtocolSendRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <crate::Empty as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireEmptyProtocolSendRequest) -> Self {
         Self { e: ::fidl_next::TakeFrom::take_from(&from.e) }
@@ -255,6 +264,12 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireEmptyProtocolReceiveRequest> for EmptyProtocolReceiveRequest {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <crate::Empty as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireEmptyProtocolReceiveRequest) -> Self {
         Self { e: ::fidl_next::TakeFrom::take_from(&from.e) }
@@ -357,6 +372,12 @@ where
 impl ::fidl_next::TakeFrom<WireEmptyProtocolSendAndReceiveRequest>
     for EmptyProtocolSendAndReceiveRequest
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <crate::Empty as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireEmptyProtocolSendAndReceiveRequest) -> Self {
         Self { e: ::fidl_next::TakeFrom::take_from(&from.e) }
@@ -459,6 +480,12 @@ where
 impl ::fidl_next::TakeFrom<WireEmptyProtocolSendAndReceiveResponse>
     for EmptyProtocolSendAndReceiveResponse
 {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <crate::Empty as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireEmptyProtocolSendAndReceiveResponse) -> Self {
         Self { e: ::fidl_next::TakeFrom::take_from(&from.e) }

@@ -86,6 +86,15 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireAllInstants> for AllInstants {
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled()
+                && <i64 as ::fidl_next::Encodable>::COPY_OPTIMIZATION.is_enabled(),
+        )
+    };
+
     #[inline]
     fn take_from(from: &WireAllInstants) -> Self {
         Self {

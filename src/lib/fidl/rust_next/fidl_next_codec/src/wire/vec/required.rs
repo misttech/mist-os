@@ -4,7 +4,7 @@
 
 use core::mem::needs_drop;
 use core::ops::Deref;
-use core::ptr::NonNull;
+use core::ptr::{copy_nonoverlapping, NonNull};
 use core::{fmt, slice};
 
 use munge::munge;
@@ -140,9 +140,18 @@ impl<E: Encoder + ?Sized, T: Encode<E>> Encode<E> for Vec<T> {
 
 impl<T: TakeFrom<WT>, WT> TakeFrom<WireVector<WT>> for Vec<T> {
     fn take_from(from: &WireVector<WT>) -> Self {
-        let mut result = Vec::with_capacity(from.len());
-        for item in from.as_slice() {
-            result.push(T::take_from(item));
+        let mut result = Vec::<T>::with_capacity(from.len());
+        if T::COPY_OPTIMIZATION.is_enabled() {
+            unsafe {
+                copy_nonoverlapping(from.as_ptr().cast(), result.as_mut_ptr(), from.len());
+            }
+            unsafe {
+                result.set_len(from.len());
+            }
+        } else {
+            for item in from.as_slice() {
+                result.push(T::take_from(item));
+            }
         }
         result
     }
