@@ -260,10 +260,28 @@ pub type HmacSha256Key = SimpleSymmetricKey<192, 1024, 8>;
 pub type HmacSha384Key = SimpleSymmetricKey<256, 512, 8>;
 pub type HmacSha512Key = SimpleSymmetricKey<256, 512, 8>;
 
-#[derive(Clone)]
 pub struct RsaKeypair {
-    private: Option<Box<RsaPrivateKey>>,
+    private: Option<Rc<RsaPrivateKey>>,
     max_size: u32,
+}
+
+impl RsaKeypair {
+    pub fn private_key(&self) -> Rc<RsaPrivateKey> {
+        self.private.as_ref().unwrap().clone()
+    }
+}
+
+// A deep clone implementation as we don't want to the lifetimes of copied keys
+// to be tied to their originals.
+impl Clone for RsaKeypair {
+    fn clone(&self) -> Self {
+        let max_size = self.max_size;
+        if let Some(private) = &self.private {
+            Self { private: Some(Rc::new(private.deref().clone())), max_size }
+        } else {
+            Self { private: None, max_size }
+        }
+    }
 }
 
 impl KeyType for RsaKeypair {
@@ -407,7 +425,7 @@ impl KeyType for RsaKeypair {
             }
         }
 
-        self.private = Some(Box::new(private_key));
+        self.private = Some(Rc::new(private_key));
         Ok(())
     }
 
@@ -435,7 +453,7 @@ impl KeyType for RsaKeypair {
         // possibly in subsequent key use.
         private_key.precompute().unwrap();
 
-        self.private = Some(Box::new(private_key));
+        self.private = Some(Rc::new(private_key));
 
         Ok(())
     }

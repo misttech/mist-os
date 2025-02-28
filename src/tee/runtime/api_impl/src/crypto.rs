@@ -17,13 +17,17 @@ use digest::DynDigest as Digest;
 use ecb::{Decryptor as EcbDecryptor, Encryptor as EcbEncryptor};
 use hmac::Hmac;
 use rand_core::{CryptoRng, RngCore};
+use rsa::traits::{PaddingScheme as RsaPaddingScheme, PublicKeyParts as _};
+use rsa::{Oaep, RsaPrivateKey};
 use sha1::Sha1;
 use sha2::{Sha224, Sha256, Sha384, Sha512};
-use tee_internal::{Algorithm, EccCurve, Error, Mode, OperationHandle, Result as TeeResult, Usage};
+use tee_internal::{
+    Algorithm, Attribute, EccCurve, Error, Mode, OperationHandle, Result as TeeResult, Usage,
+};
 
 use crate::storage::{
     AesKey, HmacSha1Key, HmacSha224Key, HmacSha256Key, HmacSha384Key, HmacSha512Key, Key,
-    KeyType as _, NoKey, Object,
+    KeyType as _, NoKey, Object, RsaKeypair,
 };
 use crate::ErrorWithSize;
 
@@ -53,7 +57,8 @@ pub fn is_algorithm_supported(alg: Algorithm, element: EccCurve) -> bool {
         | Algorithm::HmacSha224
         | Algorithm::HmacSha256
         | Algorithm::HmacSha384
-        | Algorithm::HmacSha512 => true,
+        | Algorithm::HmacSha512
+        | Algorithm::RsaesPkcs1OaepMgf1Sha1 => true,
         _ => false,
     }
 }
@@ -392,13 +397,90 @@ enum CipherType {
     AesEcbNopad,
 }
 
+trait AsymmetricEncryptionKey {
+    fn decrypt(
+        &self,
+        params: &[Attribute],
+        input: &[u8],
+        output: &mut [u8],
+    ) -> Result<usize, ErrorWithSize>;
+}
+
+trait RsaPadding<D>: RsaPaddingScheme
+where
+    D: 'static + Digest + digest::Digest + Send + Sync,
+{
+    fn new() -> Self;
+}
+
+impl<D> RsaPadding<D> for Oaep
+where
+    D: 'static + Digest + digest::Digest + Send + Sync,
+{
+    fn new() -> Self {
+        Oaep::new::<D>()
+    }
+}
+
+struct RsaEncryptionKey<D, Padding>
+where
+    D: 'static + Digest + digest::Digest + Send + Sync,
+    Padding: RsaPadding<D>,
+{
+    private: Rc<RsaPrivateKey>,
+    phantom: PhantomData<(D, Padding)>,
+}
+
+impl<D, Padding> RsaEncryptionKey<D, Padding>
+where
+    D: 'static + Digest + digest::Digest + Send + Sync,
+    Padding: RsaPadding<D>,
+{
+    fn new(private: Rc<RsaPrivateKey>) -> Self {
+        Self { private, phantom: PhantomData::default() }
+    }
+}
+
+impl<D, Padding> AsymmetricEncryptionKey for RsaEncryptionKey<D, Padding>
+where
+    D: 'static + Digest + digest::Digest + Send + Sync,
+    Padding: RsaPadding<D>,
+{
+    fn decrypt(
+        &self,
+        params: &[Attribute],
+        input: &[u8],
+        output: &mut [u8],
+    ) -> Result<usize, ErrorWithSize> {
+        if !params.is_empty() {
+            unimplemented!();
+        }
+        let output_size = self.private.size() as usize;
+        if input.len() != output_size {
+            return Err(ErrorWithSize::new(Error::BadParameters));
+        }
+        if output.len() < output_size {
+            return Err(ErrorWithSize::short_buffer(output_size));
+        }
+
+        let decrypted = self.private.decrypt(Padding::new(), input).expect("Failed to decrypt");
+        let written = &mut output[..decrypted.len()];
+        written.copy_from_slice(&decrypted);
+        Ok(written.len())
+    }
+}
+
+enum AsymmetricEncryptionKeyType {
+    RsaOaepSha1,
+}
+
 // Encapsulated an abstracted helper classes particular to supported
 // algorithms.
 enum Helper {
     Digest(Box<dyn Digest>),
     Cipher(Option<Box<dyn Cipher>>, CipherType),
     Mac(Option<Box<dyn Mac>>, MacType),
-    // TODO(https://fxbug.dev/360942581): Add more...
+    AsymmetricEncryptionKey(Option<Box<dyn AsymmetricEncryptionKey>>, AsymmetricEncryptionKeyType),
 }
 
 impl Helper {
@@ -417,6 +499,9 @@ impl Helper {
             Algorithm::HmacSha256 => Ok(Helper::Mac(None, MacType::HmacSha256)),
             Algorithm::HmacSha384 => Ok(Helper::Mac(None, MacType::HmacSha384)),
             Algorithm::HmacSha512 => Ok(Helper::Mac(None, MacType::HmacSha512)),
+            Algorithm::RsaesPkcs1OaepMgf1Sha1 => {
+                Ok(Helper::AsymmetricEncryptionKey(None, AsymmetricEncryptionKeyType::RsaOaepSha1))
+            }
             _ => Err(Error::NotSupported),
         }
     }
@@ -498,6 +583,14 @@ impl Helper {
                     *mac = Some(Box::new(HmacSha512::new_from_slice(&secret).unwrap()))
                 }
             },
+            Helper::AsymmetricEncryptionKey(aenc, aenc_type) => match aenc_type {
+                AsymmetricEncryptionKeyType::RsaOaepSha1 => {
+                    let Key::RsaKeypair(rsa) = key else {
+                        panic!("Wrong key type ({:?}) - expected RSA keypair", key.get_type());
+                    };
+                    *aenc = Some(Box::new(RsaEncryptionKey::<Sha1, Oaep>::new(rsa.private_key())));
+                }
+            },
         }
     }
 
@@ -514,6 +607,7 @@ impl Helper {
                     mac.reset()
                 }
             }
+            Helper::AsymmetricEncryptionKey(_, _) => {}
         }
     }
 }
@@ -558,7 +652,7 @@ impl Operation {
 
     fn as_cipher(&mut self) -> &mut Box<dyn Cipher> {
         if let Helper::Cipher(ref mut cipher, _) = &mut self.helper {
-            cipher.as_mut().expect("TEE_SetKey() has not yet been called")
+            cipher.as_mut().expect("TEE_OperationSetKey() has not yet been called")
         } else {
             panic!("{:?} is not a cipher algorithm", self.algorithm)
         }
@@ -566,9 +660,17 @@ impl Operation {
 
     fn as_mac(&mut self) -> &mut Box<dyn Mac> {
         if let Helper::Mac(ref mut mac, _) = &mut self.helper {
-            mac.as_mut().expect("TEE_SetKey() has not yet been called")
+            mac.as_mut().expect("TEE_OperationSetKey() has not yet been called")
         } else {
             panic!("{:?} is not a MAC algorithm", self.algorithm)
+        }
+    }
+
+    fn as_asymmetric_encryption_key(&mut self) -> &mut Box<dyn AsymmetricEncryptionKey> {
+        if let Helper::AsymmetricEncryptionKey(ref mut aenc, _) = &mut self.helper {
+            aenc.as_mut().expect("TEE_OperationSetKey() has not yet been called")
+        } else {
+            panic!("{:?} is not a asymmetric encryption key algorithm", self.algorithm)
         }
     }
 
@@ -637,6 +739,7 @@ impl Operation {
             | Algorithm::HmacSha256
             | Algorithm::HmacSha384
             | Algorithm::HmacSha512 => {}
+            Algorithm::RsaesPkcs1OaepMgf1Sha1 => {}
             _ => return Err(Error::NotImplemented),
         };
         self.key = key.clone();
@@ -865,6 +968,17 @@ impl Operation {
         self.state = OpState::Initial;
         result
     }
+
+    // See TEE_AsymmetricDecrypt().
+    fn asymmetric_decrypt(
+        &mut self,
+        params: &[Attribute],
+        src: &[u8],
+        dest: &mut [u8],
+    ) -> Result<usize, ErrorWithSize> {
+        assert_eq!(self.mode, Mode::Decrypt);
+        self.as_asymmetric_encryption_key().decrypt(params, src, dest)
+    }
 }
 
 pub struct Operations {
@@ -953,6 +1067,12 @@ impl Operations {
                     return Err(Error::NotSupported);
                 }
                 HmacSha512Key::is_valid_size
+            }
+            Algorithm::RsaesPkcs1OaepMgf1Sha1 => {
+                if mode != Mode::Encrypt && mode != Mode::Decrypt {
+                    return Err(Error::NotSupported);
+                }
+                RsaKeypair::is_valid_size
             }
             _ => {
                 inspect_stubs::track_stub!(
@@ -1076,6 +1196,16 @@ impl Operations {
         mac: &[u8],
     ) -> TeeResult {
         self.get_mut(operation).compare_final_mac(message, mac)
+    }
+
+    pub fn asymmetric_decrypt(
+        &mut self,
+        operation: OperationHandle,
+        params: &[Attribute],
+        src: &[u8],
+        dest: &mut [u8],
+    ) -> Result<usize, ErrorWithSize> {
+        self.get_mut(operation).asymmetric_decrypt(params, src, dest)
     }
 }
 

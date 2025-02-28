@@ -1507,7 +1507,7 @@ extern "C" fn TEE_MACComputeFinal(
         // SAFETY: macLen checked as non-null above.
         let initialMacLen = unsafe { *macLen };
 
-        // This is a precondition to being anble to reinterpret `mac` as a
+        // This is a precondition to being able to reinterpret `mac` as a
         // mutable slice.
         assert!(!buffers_overlap(message, messageLen, mac, initialMacLen));
 
@@ -1620,7 +1620,35 @@ extern "C" fn TEE_AsymmetricDecrypt(
     destData: *mut ::std::os::raw::c_void,
     destLen: *mut usize,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!destLen.is_null());
+
+    to_tee_result(|| -> TeeResult {
+        // SAFETY: destLen checked as non-null above.
+        let initialDestLen = unsafe { *destLen };
+
+        // This is a precondition to being able to reinterpret `destData` as a
+        // mutable slice.
+        assert!(!buffers_overlap(srcData, srcLen, destData, initialDestLen));
+
+        let params = slice_from_raw_parts(params, paramCount as usize);
+        let src = slice_from_raw_parts(srcData, srcLen);
+        let dest = slice_from_raw_parts_mut(destData, initialDestLen);
+        let operation = *OperationHandle::from_binding(&operation);
+
+        context::with_current_mut(|context| {
+            let (output_size, result) =
+                match context.operations.asymmetric_decrypt(operation, params, src, dest) {
+                    Ok(written) => {
+                        debug_assert!(written <= dest.len());
+                        (written, Ok(()))
+                    }
+                    Err(err) => (err.size, Err(err.error)),
+                };
+            // SAFETY: destLen checked as non-null above.
+            unsafe { *destLen = output_size };
+            result
+        })
+    }())
 }
 
 #[no_mangle]
