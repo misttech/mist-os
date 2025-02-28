@@ -184,6 +184,7 @@ test("amlogic-display-test") {
     "clock-test.cc",
     "common-test.cc",
     "display-engine-test.cc",
+    "encoder-regs-test.cc",
     "fixed-point-util-test.cc",
     "hdmi-transmitter-test.cc",
     "hot-plug-detection-test.cc",
