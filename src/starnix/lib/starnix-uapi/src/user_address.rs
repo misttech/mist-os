@@ -352,6 +352,10 @@ impl<T64, T32> MultiArchUserRef<T64, T32> {
             Self::Arch32(addr) => addr.addr(),
         }
     }
+
+    pub fn is_arch32(&self) -> bool {
+        matches!(self, Self::Arch32(_))
+    }
 }
 
 impl<T64, T32> Default for MultiArchUserRef<T64, T32> {

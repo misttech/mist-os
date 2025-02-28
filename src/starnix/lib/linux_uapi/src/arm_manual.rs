@@ -154,3 +154,24 @@ impl TryFrom<crate::__kernel_sigaction> for crate::arch32::__kernel_sigaction {
         })
     }
 }
+
+impl From<crate::arch32::sigset64_t> for crate::sigset_t {
+    fn from(sigset: crate::arch32::sigset64_t) -> Self {
+        Self { sig: [sigset.sig[0].into()] }
+    }
+}
+
+impl From<crate::sigset_t> for crate::arch32::sigset64_t {
+    fn from(sigset: crate::sigset_t) -> Self {
+        Self { sig: [sigset.sig[0] as u32] }
+    }
+}
+
+impl TryFrom<crate::sigval> for crate::arch32::sigval {
+    type Error = ();
+    fn try_from(sigval: crate::sigval) -> Result<Self, ()> {
+        // SAFETY: This is safe because the union has a single field.
+        let bindgen_opaque_blob = unsafe { sigval._bindgen_opaque_blob };
+        Ok(Self { _bindgen_opaque_blob: bindgen_opaque_blob.try_into().map_err(|_| ())? })
+    }
+}

@@ -4,7 +4,7 @@
 
 pub use super::signal_handling::sys_restart_syscall;
 use super::signalfd::SignalFd;
-use crate::mm::{MemoryAccessor, MemoryAccessorExt};
+use crate::mm::MemoryAccessorExt;
 use crate::security;
 use crate::signals::{
     restore_from_signal_handler, send_signal, SignalDetail, SignalInfo, SignalInfoHeader,
@@ -28,7 +28,7 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS};
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::{
-    errno, error, pid_t, rusage, sigaltstack, timespec, MINSIGSTKSZ, P_ALL, P_PGID, P_PID, P_PIDFD,
+    errno, error, pid_t, rusage, sigaltstack, MINSIGSTKSZ, P_ALL, P_PGID, P_PID, P_PIDFD,
     SFD_CLOEXEC, SFD_NONBLOCK, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SI_MAX_SIZE, SI_TKILL, SI_USER,
     SS_AUTODISARM, SS_DISABLE, SS_ONSTACK, WCONTINUED, WEXITED, WNOHANG, WNOWAIT, WSTOPPED,
     WUNTRACED, __WALL, __WCLONE,
@@ -219,8 +219,8 @@ pub fn sys_rt_sigtimedwait(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     set_addr: UserRef<SigSet>,
-    siginfo_addr: UserAddress,
-    timeout_addr: UserRef<timespec>,
+    siginfo_addr: MultiArchUserRef<uapi::siginfo_t, uapi::arch32::siginfo_t>,
+    timeout_addr: MultiArchUserRef<uapi::timespec, uapi::arch32::timespec>,
     sigset_size: usize,
 ) -> Result<Signal, Errno> {
     if sigset_size != std::mem::size_of::<SigSet>() {
@@ -234,7 +234,7 @@ pub fn sys_rt_sigtimedwait(
     let deadline = if timeout_addr.is_null() {
         zx::MonotonicInstant::INFINITE
     } else {
-        let timeout = current_task.read_object(timeout_addr)?;
+        let timeout = current_task.read_multi_arch_object(timeout_addr)?;
         zx::MonotonicInstant::after(duration_from_timespec(timeout)?)
     };
 
@@ -281,7 +281,7 @@ pub fn sys_rt_sigtimedwait(
     };
 
     if !siginfo_addr.is_null() {
-        current_task.write_memory(siginfo_addr, &signal_info.as_siginfo_bytes())?;
+        signal_info.write(current_task, siginfo_addr)?;
     }
 
     Ok(signal_info.signal)
@@ -751,9 +751,9 @@ pub fn sys_waitid(
     current_task: &CurrentTask,
     id_type: u32,
     id: i32,
-    user_info: UserAddress,
+    user_info: MultiArchUserRef<uapi::siginfo_t, uapi::arch32::siginfo_t>,
     options: u32,
-    user_rusage: UserRef<rusage>,
+    user_rusage: UserRef<uapi::rusage>,
 ) -> Result<(), Errno> {
     let mut waiting_options = WaitingOptions::new_for_waitid(options)?;
 
@@ -794,7 +794,7 @@ pub fn sys_waitid(
 
         if !user_info.is_null() {
             let siginfo = waitable_process.as_signal_info();
-            current_task.write_memory(user_info, &siginfo.as_siginfo_bytes())?;
+            siginfo.write(current_task, user_info)?;
         }
     } else if id_type == P_PIDFD {
         // From <https://man7.org/linux/man-pages/man2/pidfd_open.2.html>:
@@ -880,7 +880,7 @@ pub use arch32::*;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mm::PAGE_SIZE;
+    use crate::mm::{MemoryAccessor, PAGE_SIZE};
     use crate::signals::send_standard_signal;
     use crate::signals::testing::dequeue_signal_for_test;
     use crate::task::{ExitStatus, ProcessExitInfo};
@@ -1698,7 +1698,7 @@ mod tests {
                 &current_task,
                 P_PID,
                 id,
-                UserAddress::default(),
+                Default::default(),
                 0,
                 UserRef::default()
             ),
@@ -1710,7 +1710,7 @@ mod tests {
                 &current_task,
                 P_PID,
                 id,
-                UserAddress::default(),
+                Default::default(),
                 0xffff,
                 UserRef::default()
             ),
@@ -1981,14 +1981,15 @@ mod tests {
         child2.thread_group.exit(&mut locked, ExitStatus::Exit(42), None);
         std::mem::drop(child2);
 
-        let address = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let address: UserRef<uapi::siginfo_t> =
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE).into();
         assert_eq!(
             sys_waitid(
                 &mut locked,
                 &current_task,
                 P_PGID,
                 child2_pid,
-                address,
+                address.into(),
                 WEXITED,
                 UserRef::default()
             ),
@@ -1998,7 +1999,15 @@ mod tests {
         assert_eq!(current_task.thread_group.read().zombie_children[0].pid, child1_pid);
 
         assert_eq!(
-            sys_waitid(&mut locked, &current_task, P_PGID, 0, address, WEXITED, UserRef::default()),
+            sys_waitid(
+                &mut locked,
+                &current_task,
+                P_PGID,
+                0,
+                address.into(),
+                WEXITED,
+                UserRef::default()
+            ),
             Ok(())
         );
     }

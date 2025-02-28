@@ -2,17 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::mm::MemoryAccessor;
 use crate::task::{IntervalTimerHandle, ThreadGroupReadGuard, WaitQueue, Waiter, WaiterRef};
 use starnix_sync::{InterruptibleEvent, RwLock};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS};
 use starnix_uapi::union::struct_with_union_into_bytes;
-use starnix_uapi::user_address::UserAddress;
+use starnix_uapi::user_address::{MultiArchUserRef, UserAddress};
 use starnix_uapi::{
-    __sifields__bindgen_ty_1, __sifields__bindgen_ty_2, __sifields__bindgen_ty_4,
-    __sifields__bindgen_ty_7, c_int, c_uint, error, pid_t, sigaction_t, sigaltstack, sigevent,
-    siginfo_t, sigval_t, uapi, uid_t, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGEV_THREAD_ID,
-    SIG_DFL, SIG_IGN, SI_KERNEL, SI_MAX_SIZE,
+    c_int, c_uint, errno, error, pid_t, sigaction_t, sigaltstack, sigevent, sigval_t, uaddr, uapi,
+    uid_t, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGEV_THREAD_ID, SIG_DFL, SIG_IGN, SI_KERNEL,
+    SI_MAX_SIZE,
 };
 use std::cmp::Ordering;
 use std::collections::VecDeque;
@@ -395,6 +395,96 @@ pub struct SignalInfo {
     pub force: bool,
 }
 
+macro_rules! make_siginfo {
+            ($self:ident $(, $( $sifield:ident ).*, $value:expr)?) => {
+                {
+                struct_with_union_into_bytes!(uapi_path::siginfo_t {
+                    __bindgen_anon_1.__bindgen_anon_1.si_signo: $self.signal.number() as i32,
+                    __bindgen_anon_1.__bindgen_anon_1.si_errno: $self.errno,
+                    __bindgen_anon_1.__bindgen_anon_1.si_code: $self.code,
+                    $(
+                        __bindgen_anon_1.__bindgen_anon_1._sifields.$( $sifield ).*: $value,
+                    )?
+                })
+                }
+            };
+        }
+
+macro_rules! signal_info_as_siginfo_bytes {
+    ($ns:path, $self:ident) => {{
+        use $ns as uapi_path;
+        match $self.detail {
+            SignalDetail::None => make_siginfo!($self),
+            SignalDetail::Kill { pid, uid } => {
+                make_siginfo!(
+                    $self,
+                    _kill,
+                    uapi_path::__sifields__bindgen_ty_1 { _pid: pid, _uid: uid }
+                )
+            }
+            SignalDetail::SIGCHLD { pid, uid, status } => make_siginfo!(
+                $self,
+                _sigchld,
+                uapi_path::__sifields__bindgen_ty_4 {
+                    _pid: pid,
+                    _uid: uid,
+                    _status: status,
+                    ..Default::default()
+                }
+            ),
+            SignalDetail::SigFault { addr } => {
+                make_siginfo!(
+                    $self,
+                    _sigfault._addr,
+                    uapi::uaddr { addr }.try_into().map_err(|_| errno!(EINVAL))?
+                )
+            }
+            SignalDetail::SIGSYS { call_addr, syscall, arch } => make_siginfo!(
+                $self,
+                _sigsys,
+                uapi_path::__sifields__bindgen_ty_7 {
+                    _call_addr: uaddr::from(call_addr).try_into().map_err(|_| errno!(EINVAL))?,
+                    _syscall: syscall as c_int,
+                    _arch: arch as c_uint,
+                }
+            ),
+            SignalDetail::Timer { ref timer } => {
+                let sigval: uapi_path::sigval =
+                    if timer.signal_event.notify == SignalEventNotify::None {
+                        Default::default()
+                    } else {
+                        uapi::sigval::from(timer.signal_event.value)
+                            .try_into()
+                            .map_err(|_| errno!(EINVAL))?
+                    };
+
+                make_siginfo!(
+                    $self,
+                    _timer,
+                    uapi_path::__sifields__bindgen_ty_2 {
+                        _tid: timer.timer_id,
+                        _overrun: timer.overrun_cur(),
+                        _sigval: sigval,
+                        ..Default::default()
+                    }
+                )
+            }
+            SignalDetail::Raw { data } => {
+                let header = SignalInfoHeader {
+                    signo: $self.signal.number(),
+                    errno: $self.errno,
+                    code: $self.code,
+                    _pad: 0,
+                };
+                let mut array: [u8; SI_MAX_SIZE as usize] = [0; SI_MAX_SIZE as usize];
+                let _ = header.write_to(&mut array[..SI_HEADER_SIZE]);
+                array[SI_HEADER_SIZE..SI_MAX_SIZE as usize].copy_from_slice(&data);
+                array
+            }
+        }
+    }};
+}
+
 impl SignalInfo {
     pub fn default(signal: Signal) -> Self {
         Self::new(signal, SI_KERNEL as i32, SignalDetail::default())
@@ -406,78 +496,29 @@ impl SignalInfo {
 
     // TODO(tbodt): Add a bound requiring siginfo_t to be FromBytes. This will help ensure the
     // Linux side won't get an invalid siginfo_t.
-    pub fn as_siginfo_bytes(&self) -> [u8; std::mem::size_of::<siginfo_t>()] {
-        macro_rules! make_siginfo {
-            ($self:ident $(, $( $sifield:ident ).*, $value:expr)?) => {
-                struct_with_union_into_bytes!(siginfo_t {
-                    __bindgen_anon_1.__bindgen_anon_1.si_signo: $self.signal.number() as i32,
-                    __bindgen_anon_1.__bindgen_anon_1.si_errno: $self.errno,
-                    __bindgen_anon_1.__bindgen_anon_1.si_code: $self.code,
-                    $(
-                        __bindgen_anon_1.__bindgen_anon_1._sifields.$( $sifield ).*: $value,
-                    )?
-                })
-            };
-        }
+    pub fn as_siginfo64_bytes(
+        &self,
+    ) -> Result<[u8; std::mem::size_of::<uapi::siginfo_t>()], Errno> {
+        Ok(signal_info_as_siginfo_bytes!(uapi, self))
+    }
 
-        match self.detail {
-            SignalDetail::None => make_siginfo!(self),
-            SignalDetail::Kill { pid, uid } => {
-                make_siginfo!(self, _kill, __sifields__bindgen_ty_1 { _pid: pid, _uid: uid })
-            }
-            SignalDetail::SIGCHLD { pid, uid, status } => make_siginfo!(
-                self,
-                _sigchld,
-                __sifields__bindgen_ty_4 {
-                    _pid: pid,
-                    _uid: uid,
-                    _status: status,
-                    ..Default::default()
-                }
-            ),
-            SignalDetail::SigFault { addr } => {
-                make_siginfo!(self, _sigfault._addr, linux_uapi::uaddr { addr })
-            }
-            SignalDetail::SIGSYS { call_addr, syscall, arch } => make_siginfo!(
-                self,
-                _sigsys,
-                __sifields__bindgen_ty_7 {
-                    _call_addr: call_addr.into(),
-                    _syscall: syscall as c_int,
-                    _arch: arch as c_uint,
-                }
-            ),
-            SignalDetail::Timer { ref timer } => {
-                let sigval: uapi::sigval = if timer.signal_event.notify == SignalEventNotify::None {
-                    Default::default()
-                } else {
-                    timer.signal_event.value.into()
-                };
+    pub fn as_siginfo32_bytes(
+        &self,
+    ) -> Result<[u8; std::mem::size_of::<uapi::arch32::siginfo_t>()], Errno> {
+        Ok(signal_info_as_siginfo_bytes!(uapi::arch32, self))
+    }
 
-                make_siginfo!(
-                    self,
-                    _timer,
-                    __sifields__bindgen_ty_2 {
-                        _tid: timer.timer_id,
-                        _overrun: timer.overrun_cur(),
-                        _sigval: sigval,
-                        ..Default::default()
-                    }
-                )
-            }
-            SignalDetail::Raw { data } => {
-                let header = SignalInfoHeader {
-                    signo: self.signal.number(),
-                    errno: self.errno,
-                    code: self.code,
-                    _pad: 0,
-                };
-                let mut array: [u8; SI_MAX_SIZE as usize] = [0; SI_MAX_SIZE as usize];
-                let _ = header.write_to(&mut array[..SI_HEADER_SIZE]);
-                array[SI_HEADER_SIZE..SI_MAX_SIZE as usize].copy_from_slice(&data);
-                array
-            }
+    pub fn write<MA: MemoryAccessor>(
+        &self,
+        ma: &MA,
+        addr: MultiArchUserRef<uapi::siginfo_t, uapi::arch32::siginfo_t>,
+    ) -> Result<(), Errno> {
+        if addr.is_arch32() {
+            ma.write_memory(addr.addr(), &self.as_siginfo32_bytes()?)?;
+        } else {
+            ma.write_memory(addr.addr(), &self.as_siginfo64_bytes()?)?;
         }
+        Ok(())
     }
 }
 
@@ -649,14 +690,15 @@ mod test {
     fn test_siginfo_bytes() {
         let mut sigchld_bytes =
             vec![17, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 123, 0, 0, 0, 200, 1, 0, 0, 2];
-        sigchld_bytes.resize(std::mem::size_of::<siginfo_t>(), 0);
+        sigchld_bytes.resize(std::mem::size_of::<uapi::siginfo_t>(), 0);
         assert_eq!(
             &SignalInfo::new(
                 SIGCHLD,
                 CLD_EXITED as i32,
                 SignalDetail::SIGCHLD { pid: 123, uid: 456, status: 2 }
             )
-            .as_siginfo_bytes(),
+            .as_siginfo64_bytes()
+            .expect("as_siginfo_bytes"),
             sigchld_bytes.as_slice()
         );
     }

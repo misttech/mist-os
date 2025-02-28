@@ -127,7 +127,7 @@ impl SignalStackFrame {
         };
         Ok(SignalStackFrame {
             context,
-            siginfo_bytes: siginfo.as_siginfo_bytes(),
+            siginfo_bytes: siginfo.as_siginfo64_bytes()?,
             restorer_address: action.sa_restorer.addr,
             xstate: get_xstate(extended_pstate),
         })

@@ -89,7 +89,7 @@ impl SignalStackFrame {
             registers.r[14] = registers.lr;
         }
 
-        Ok(SignalStackFrame { context, siginfo_bytes: siginfo.as_siginfo_bytes() })
+        Ok(SignalStackFrame { context, siginfo_bytes: siginfo.as_siginfo64_bytes()? })
     }
 
     pub fn as_bytes(&self) -> &[u8; SIG_STACK_SIZE] {

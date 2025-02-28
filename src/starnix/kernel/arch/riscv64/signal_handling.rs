@@ -104,7 +104,7 @@ impl SignalStackFrame {
         };
 
         let mut sigstack = SignalStackFrame {
-            siginfo_bytes: siginfo.as_siginfo_bytes(),
+            siginfo_bytes: siginfo.as_siginfo64_bytes()?,
             context,
             v_state,
             end_header: uapi::__riscv_ctx_hdr { magic: uapi::END_MAGIC, size: uapi::END_HDR_SIZE },
