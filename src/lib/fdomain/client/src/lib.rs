@@ -118,6 +118,7 @@ pub enum Error {
     ProtocolStreamEventIncompatible,
     Transport(Arc<std::io::Error>),
     ConnectionMismatch,
+    StreamingAborted,
     ClientLost,
 }
 
@@ -160,6 +161,7 @@ impl std::fmt::Display for Error {
             Self::ConnectionMismatch => {
                 write!(f, "Tried to use an FDomain handle from a different connection")
             }
+            Self::StreamingAborted => write!(f, "This channel is no longer streaming"),
             Self::ClientLost => write!(f, "The client associated with this handle was destroyed"),
         }
     }
@@ -178,6 +180,7 @@ impl std::fmt::Debug for Error {
             Self::ProtocolSignalsIncompatible => write!(f, "ProtocolSignalsIncompatible "),
             Self::ProtocolStreamEventIncompatible => write!(f, "ProtocolStreamEventIncompatible"),
             Self::ConnectionMismatch => write!(f, "ConnectionMismatch"),
+            Self::StreamingAborted => write!(f, "StreamingAborted"),
             Self::ClientLost => write!(f, "ClientLost"),
         }
     }
@@ -845,12 +848,10 @@ impl Client {
             read_request_pending: false,
         });
 
-        if for_stream && !state.is_streaming {
-            return Poll::Ready(None);
-        }
-
         if let Some(got) = state.queued.pop_front() {
             return Poll::Ready(Some(got));
+        } else if for_stream && !state.is_streaming {
+            return Poll::Ready(None);
         } else if !state.wakers.iter().any(|x| ctx.waker().will_wake(x)) {
             state.wakers.push(ctx.waker().clone());
         }

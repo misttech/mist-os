@@ -5,6 +5,7 @@
 use crate::{AnyHandle, Client, Error, FDomainTransport};
 use fdomain_container::wire::FDomainCodec;
 use fdomain_container::FDomain;
+use fidl_fuchsia_fdomain::Error as FDomainError;
 use futures::stream::Stream;
 use futures::StreamExt;
 use std::pin::Pin;
@@ -265,6 +266,63 @@ async fn channel_async() {
 
         let TestError(err) = err.get_ref().unwrap().downcast_ref().unwrap();
         assert_eq!("Connection failed", err);
+
+        for pair in msgs.chunks(2) {
+            let a = &pair[0];
+            let b = &pair[1];
+            assert_eq!(test_str_a, a.bytes.as_slice());
+            assert_eq!(test_str_b, b.bytes.as_slice());
+            assert!(a.handles.is_empty());
+            assert!(b.handles.is_empty());
+        }
+    };
+
+    futures::future::join(read_side, write_side).await;
+}
+
+#[fuchsia::test]
+async fn channel_async_shutdown() {
+    let (client, _fault_injector) = TestFDomain::new_client();
+
+    let (a, b) = client.create_channel();
+    let test_str_a = b"Feral Cats Move In Mysterious Ways";
+    let test_str_b = b"Almost all of our feelings were programmed in to us.";
+
+    let (mut b_reader, b_writer) = b.stream().unwrap();
+    b_writer.write(test_str_a, Vec::new()).await.unwrap();
+
+    let write_side = async move {
+        let msg = a.recv_msg().await.unwrap();
+
+        assert_eq!(test_str_a, msg.bytes.as_slice());
+        assert!(msg.handles.is_empty());
+
+        for _ in 0..5 {
+            a.write(test_str_a, Vec::new()).await.unwrap();
+            fuchsia_async::Timer::new(std::time::Duration::from_millis(10)).await;
+            a.write(test_str_b, Vec::new()).await.unwrap();
+            fuchsia_async::Timer::new(std::time::Duration::from_millis(10)).await;
+        }
+
+        println!("Dropping writer");
+        std::mem::drop(a);
+    };
+
+    let read_side = async move {
+        let mut msgs = Vec::new();
+
+        for _ in 0..10 {
+            msgs.push(b_reader.next().await.unwrap().unwrap());
+        }
+
+        println!("Waiting for error");
+        let err = b_reader.next().await.unwrap().unwrap_err();
+        println!("Got error");
+        let Error::FDomain(FDomainError::TargetError(err)) = err else {
+            panic!("Wrong error type!")
+        };
+
+        assert_eq!(fidl::Status::PEER_CLOSED.into_raw(), err);
 
         for pair in msgs.chunks(2) {
             let a = &pair[0];

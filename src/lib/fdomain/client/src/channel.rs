@@ -309,7 +309,7 @@ impl ChannelMessageStream {
 impl Stream for ChannelMessageStream {
     type Item = Result<MessageBuf, Error>;
     fn poll_next(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let Ok(client) = self.0.client() else { return Poll::Ready(None) };
+        let Ok(client) = self.0.client() else { return Poll::Ready(Some(Err(Error::ClientLost))) };
         client
             .poll_channel(self.0 .0.proto(), ctx, true)
             .map(|x| x.map(|x| x.map(|x| MessageBuf::from_proto(&client, x))))
