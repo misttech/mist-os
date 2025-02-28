@@ -315,6 +315,11 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
   fbl::AutoLock lock(mtx());
   auto displays_it = displays_.find(display_id);
   if (!displays_it.IsValid()) {
+    // TODO(https://fxbug.dev/399886375): This logging is racy. It is possible
+    // that DisplayEngineListenerOnDisplayAdded() was called, but the event
+    // wasn't processed on the Coordinator's client dispatcher yet. This means we can
+    // discard the VSync, as it can't possibly report a configuration applied by
+    // Coordinator clients.
     FDF_LOG(ERROR, "Received VSync for unknown display ID: %" PRIu64, display_id.value());
     return;
   }
