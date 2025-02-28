@@ -98,7 +98,7 @@ fn load_files<'a>(
     Ok(())
 }
 
-pub async fn command(cmd: EfiCommand) -> Result<()> {
+async fn command(cmd: EfiCommand) -> Result<()> {
     match &cmd.subcommand {
         EfiSubCommand::Create(create) => {
             let output_path = Path::new(&create.output);
