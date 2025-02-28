@@ -270,11 +270,7 @@ impl ProtocolsExt for fio::Flags {
     fn to_directory_options(&self) -> Result<DirectoryOptions, Status> {
         // Verify protocols.
         if !self.is_dir_allowed() {
-            if self.is_file_allowed() && !self.is_symlink_allowed() {
-                return Err(Status::NOT_FILE);
-            } else {
-                return Err(Status::WRONG_TYPE);
-            }
+            return Err(if self.is_file_allowed() { Status::NOT_FILE } else { Status::WRONG_TYPE });
         }
 
         // Expand the POSIX flags to their respective rights. This is done with the assumption that

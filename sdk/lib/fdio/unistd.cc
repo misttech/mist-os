@@ -83,52 +83,58 @@ constexpr fio::OpenFlags kZxioFsMask = fio::OpenFlags::kNodeReference | fio::Ope
                                        fio::OpenFlags::kCreateIfAbsent | fio::OpenFlags::kTruncate |
                                        fio::OpenFlags::kDirectory | fio::OpenFlags::kAppend;
 
-// Translates legacy `fuchsia.io/OpenFlags` (io1) to an equivalent set of `fuchsia.io/Flags` (io2).
-constexpr fio::Flags Io1FlagsToIo2(fio::OpenFlags legacy_flags) {
+}  // namespace
+
+// Translates deprecated `fuchsia.io/OpenFlags` to an equivalent set of `fuchsia.io/Flags`.
+fio::Flags TranslateDeprecatedFlags(fio::OpenFlags deprecated_flags) {
   fio::Flags flags = fio::Flags::kPermGetAttributes;
 
-  if (legacy_flags & fio::OpenFlags::kNodeReference) {
+  if (deprecated_flags & fio::OpenFlags::kDescribe) {
+    flags |= fio::Flags::kFlagSendRepresentation;
+  }
+
+  if (deprecated_flags & fio::OpenFlags::kNodeReference) {
     flags |= fio::Flags::kProtocolNode;
-    if (legacy_flags & fio::OpenFlags::kDirectory) {
+    if (deprecated_flags & fio::OpenFlags::kDirectory) {
       flags |= fio::Flags::kProtocolDirectory;
-    } else if (legacy_flags & fio::OpenFlags::kNotDirectory) {
+    } else if (deprecated_flags & fio::OpenFlags::kNotDirectory) {
       flags |= fio::Flags::kProtocolFile;
     }
   } else {
     // Permissions
-    if (legacy_flags & fio::OpenFlags::kRightReadable) {
+    if (deprecated_flags & fio::OpenFlags::kRightReadable) {
       flags |= fio::kPermReadable;
     }
-    if (legacy_flags & fio::OpenFlags::kRightWritable) {
+    if (deprecated_flags & fio::OpenFlags::kRightWritable) {
       flags |= fio::kPermWritable;
     }
-    if (legacy_flags & fio::OpenFlags::kRightExecutable) {
+    if (deprecated_flags & fio::OpenFlags::kRightExecutable) {
       flags |= fio::kPermExecutable;
     }
 
     // POSIX flags
-    if (legacy_flags & fio::OpenFlags::kPosixWritable) {
+    if (deprecated_flags & fio::OpenFlags::kPosixWritable) {
       flags |= fio::Flags::kPermInheritWrite;
     }
-    if (legacy_flags & fio::OpenFlags::kPosixExecutable) {
+    if (deprecated_flags & fio::OpenFlags::kPosixExecutable) {
       flags |= fio::Flags::kPermInheritExecute;
     }
 
     // Type flags
-    if (legacy_flags & fio::OpenFlags::kDirectory) {
+    if (deprecated_flags & fio::OpenFlags::kDirectory) {
       flags |= fio::Flags::kProtocolDirectory;
-    } else if (legacy_flags & fio::OpenFlags::kNotDirectory) {
+    } else if (deprecated_flags & fio::OpenFlags::kNotDirectory) {
       flags |= fio::Flags::kProtocolFile;
     }
 
     // Create flags
-    if (legacy_flags & fio::OpenFlags::kCreateIfAbsent) {
+    if (deprecated_flags & fio::OpenFlags::kCreateIfAbsent) {
       flags |= fio::Flags::kFlagMustCreate;
-    } else if (legacy_flags & fio::OpenFlags::kCreate) {
+    } else if (deprecated_flags & fio::OpenFlags::kCreate) {
       flags |= fio::Flags::kFlagMaybeCreate;
     }
 
-    if (legacy_flags & (fio::OpenFlags::kCreateIfAbsent | fio::OpenFlags::kCreate) &&
+    if (deprecated_flags & (fio::OpenFlags::kCreateIfAbsent | fio::OpenFlags::kCreate) &&
         !(flags & fio::wire::kMaskKnownProtocols)) {
       // A protocol must be specified when creating a node. If the DIRECTORY flag wasn't specified,
       // we ensure that we will create a file.
@@ -136,10 +142,10 @@ constexpr fio::Flags Io1FlagsToIo2(fio::OpenFlags legacy_flags) {
     }
 
     // File flags
-    if (legacy_flags & fio::OpenFlags::kTruncate) {
+    if (deprecated_flags & fio::OpenFlags::kTruncate) {
       flags |= fio::Flags::kFileTruncate;
     }
-    if (legacy_flags & fio::OpenFlags::kAppend) {
+    if (deprecated_flags & fio::OpenFlags::kAppend) {
       flags |= fio::Flags::kFileAppend;
     }
   }
@@ -147,8 +153,10 @@ constexpr fio::Flags Io1FlagsToIo2(fio::OpenFlags legacy_flags) {
   return flags;
 }
 
+namespace {
+
 // Map POSIX O_* flags to equivalent fuchsia.io OpenFlags.
-constexpr fio::OpenFlags PosixToOpenFlags(int32_t flags) {
+constexpr fio::OpenFlags PosixToDeprecatedOpenFlags(int32_t flags) {
   fio::OpenFlags rights = {};
   switch (flags & O_ACCMODE) {
     case O_RDONLY:
@@ -224,80 +232,27 @@ int close_impl(int fd, bool should_wait) {
   return 0;
 }
 
-zx::result<fdio_ptr> open_at_impl(int dirfd, const char* path, int flags, uint32_t mode,
-                                  bool enforce_eisdir) {
+zx::result<fdio_ptr> DeprecatedOpenAt(int dirfd, const char* path, int flags, uint32_t mode,
+                                      bool enforce_eisdir) {
   // Emulate EISDIR behavior from
   // http://pubs.opengroup.org/onlinepubs/9699919799/functions/open.html
   const bool flags_incompatible_with_directory =
       ((flags & ~O_PATH & O_ACCMODE) != O_RDONLY) || (flags & O_CREAT);
-  fio::OpenFlags fio_flags = PosixToOpenFlags(flags);
+  fio::OpenFlags flags_deprecated = PosixToDeprecatedOpenFlags(flags);
   if (S_ISDIR(mode)) {
-    fio_flags |= fio::OpenFlags::kDirectory;
+    flags_deprecated |= fio::OpenFlags::kDirectory;
   }
-
-  return fdio_internal::open_at_impl(
-      dirfd, path, fio_flags,
+  return fdio_internal::OpenAt(
+      dirfd, path, TranslateDeprecatedFlags(flags_deprecated),
       {
-          .disallow_directory = enforce_eisdir && flags_incompatible_with_directory,
+          .allow_directory = !(enforce_eisdir && flags_incompatible_with_directory),
           .allow_absolute_path = true,
       });
 }
 
 }  // namespace
 
-zx::result<fdio_ptr> open_at_impl(int dirfd, const char* path, fio::OpenFlags flags,
-                                  OpenAtOptions options) {
-  if (path == nullptr) {
-    return zx::error(ZX_ERR_INVALID_ARGS);
-  }
-  if (path[0] == '\0') {
-    return zx::error(ZX_ERR_NOT_FOUND);
-  }
-
-  fdio_internal::PathBuffer clean_buffer;
-  bool has_ending_slash;
-  const bool cleaned = CleanPath(path, &clean_buffer, &has_ending_slash);
-  if (!cleaned) {
-    return zx::error(ZX_ERR_BAD_PATH);
-  }
-
-  std::string_view clean = clean_buffer;
-
-  // Some callers such as the fdio_open_..._at() family do not permit absolute paths.
-  if (!options.allow_absolute_path && cpp20::starts_with(clean, '/')) {
-    return zx::error(ZX_ERR_INVALID_ARGS);
-  }
-
-  const fdio_ptr iodir = fdio_iodir(dirfd, clean);
-  if (iodir == nullptr) {
-    return zx::error(ZX_ERR_BAD_HANDLE);
-  }
-
-  if (options.disallow_directory && has_ending_slash) {
-    return zx::error(ZX_ERR_NOT_FILE);
-  }
-
-  if (has_ending_slash) {
-    flags |= fio::OpenFlags::kDirectory;
-  }
-
-  if (!(flags & fio::OpenFlags::kDirectory)) {
-    // At this point we're not sure if the path refers to a directory.
-    // To emulate EISDIR behavior, if the flags are not compatible with directory,
-    // use this flag to instruct open to error if the path turns out to be a directory.
-    // Otherwise, opening a directory with O_RDWR will incorrectly succeed.
-    if (options.disallow_directory) {
-      flags |= fio::OpenFlags::kNotDirectory;
-    }
-  }
-  if (flags & fio::OpenFlags::kNodeReference) {
-    flags &= fio::wire::kOpenFlagsAllowedWithNodeReference;
-  }
-  return iodir->open(clean, Io1FlagsToIo2(flags));
-}
-
-zx::result<fdio_ptr> open3_at_impl(int dirfd, const char* path, fio::Flags flags,
-                                   OpenAtOptions options) {
+zx::result<fdio_ptr> OpenAt(int dirfd, const char* path, fio::Flags flags, OpenAtOptions options) {
   if (path == nullptr) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
@@ -326,12 +281,17 @@ zx::result<fdio_ptr> open3_at_impl(int dirfd, const char* path, fio::Flags flags
 
   if (has_ending_slash) {
     // If the path ends in a slash, we must be opening a directory.
-    if (options.disallow_directory) {
+    if (!options.allow_directory) {
       return zx::error(ZX_ERR_NOT_FILE);
     }
     flags |= fio::Flags::kProtocolDirectory;
-  } else if (options.disallow_directory) {
-    // Only allow opening non-directory protocols (files/symlinks).
+  }
+
+  // At this point we're not sure if the path refers to a directory.
+  // To emulate EISDIR behavior, if the flags are not compatible with directory,
+  // use these flag to instruct open to error if the path turns out to be a directory.
+  // Otherwise, opening a directory with O_RDWR will incorrectly succeed.
+  if (!options.allow_directory && !(flags & fio::wire::kMaskKnownProtocols)) {
     flags |= fio::Flags::kProtocolFile | fio::Flags::kProtocolSymlink;
   }
   return iodir->open(clean, flags);
@@ -341,13 +301,13 @@ namespace {
 // Open |path| from the |dirfd| directory, enforcing the POSIX EISDIR error condition. Specifically,
 // ZX_ERR_NOT_FILE will be returned when opening a directory with write access/O_CREAT.
 zx::result<fdio_ptr> open_at(int dirfd, const char* path, int flags, uint32_t mode) {
-  return open_at_impl(dirfd, path, flags, mode, true);
+  return DeprecatedOpenAt(dirfd, path, flags, mode, true);
 }
 
 // Open |path| from the |dirfd| directory, but allow creating directories/opening them with
 // write access. Note that this differs from POSIX behavior.
 zx::result<fdio_ptr> open_at_ignore_eisdir(int dirfd, const char* path, int flags, uint32_t mode) {
-  return open_at_impl(dirfd, path, flags, mode, false);
+  return DeprecatedOpenAt(dirfd, path, flags, mode, false);
 }
 
 // Open |path| from the current working directory, respecting EISDIR.
@@ -475,7 +435,7 @@ zx::result<fdio_ptr> opendir_containing_at(int dirfd, const char* path, NameBuff
   }
 
   constexpr int32_t kPosixFlags = O_RDONLY | O_DIRECTORY;
-  return iodir->open(base, Io1FlagsToIo2(PosixToOpenFlags(kPosixFlags)));
+  return iodir->open(base, TranslateDeprecatedFlags(PosixToDeprecatedOpenFlags(kPosixFlags)));
 }
 
 zx_status_t stat_impl(const fdio_ptr& io, struct stat* s) {
@@ -996,7 +956,8 @@ int fcntl(int fd, int cmd, ...) {
       }
       GET_INT_ARG(fdio_flags);
 
-      const fio::OpenFlags flags = fdio_internal::PosixToOpenFlags(fdio_flags & ~O_NONBLOCK);
+      const fio::OpenFlags flags =
+          fdio_internal::PosixToDeprecatedOpenFlags(fdio_flags & ~O_NONBLOCK);
       // TODO(https://fxbug.dev/376509077): Transition to set_flags when SetFlags2 is
       // supported by all out-of-tree servers.
       zx_status_t status = io->set_flags_deprecated(flags);
