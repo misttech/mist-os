@@ -929,7 +929,7 @@ group("serde_json") {
 }
 
 group("serde_json5") {
-  public_deps = [ ":serde_json5-v0_1_0" ]
+  public_deps = [ ":serde_json5-v0_2_1" ]
 }
 
 group("serde_repr") {
@@ -15013,19 +15013,18 @@ rust_library("serde_json-v1_0_128") {
   applicable_licenses = [ ":serde_json-v1_0_128.license" ]
 }
 
-license("serde_json5-v0_1_0.license") {
+license("serde_json5-v0_2_1.license") {
   public_package_name = "serde_json5"
   license_files = [
-    "//third_party/rust_crates/mirrors/serde_json5/LICENSE",
-    "//third_party/rust_crates/mirrors/serde_json5/third_party/LICENSE",
+    "//third_party/rust_crates/vendor/serde_json5-0.2.1/LICENSE-Apache-2.0",
+    "//third_party/rust_crates/vendor/serde_json5-0.2.1/LICENSE-ISC",
   ]
 }
 
-rust_library("serde_json5-v0_1_0") {
+rust_library("serde_json5-v0_2_1") {
   crate_name = "serde_json5"
-  crate_root =
-      "//third_party/rust_crates/mirrors/serde_json5/third_party/src/lib.rs"
-  output_name = "serde_json5-c6c8351d886fc9d3"
+  crate_root = "//third_party/rust_crates/vendor/serde_json5-0.2.1/src/lib.rs"
+  output_name = "serde_json5-cb19478c92ae0e55"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -15037,14 +15036,14 @@ rust_library("serde_json5-v0_1_0") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=c6c8351d886fc9d3",
-    "-Cextra-filename=-c6c8351d886fc9d3",
+    "--edition=2021",
+    "-Cmetadata=cb19478c92ae0e55",
+    "-Cextra-filename=-cb19478c92ae0e55",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":serde_json5-v0_1_0.license" ]
+  applicable_licenses = [ ":serde_json5-v0_2_1.license" ]
 }
 
 license("serde_repr-v0_1_7.license") {

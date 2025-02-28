@@ -982,7 +982,7 @@ pub(super) mod tests {
         ];
 
         for [policy_path, policy_bytes, expectations_bytes] in policies_and_expectations {
-            let expectations = serde_json5::from_reader::<Expectations, _>(
+            let expectations = serde_json5::from_reader::<_, Expectations>(
                 &mut std::io::Cursor::new(expectations_bytes),
             )
             .expect("deserialize expectations");
