@@ -1459,7 +1459,7 @@ impl Catalog {
         if let Some(elem_inspect) = self.topology.inspect_for_element(&element_id) {
             let elem_readable_name = self.topology.element_name(&element_id);
             elem_inspect.borrow_mut().meta().set_and_track(
-                format!("lease_{}", lease.id),
+                format!("lease_{}@level_{}", lease.id, level), // for example, lease_ffff@level_1
                 format!("level_{level}@{elem_readable_name}"), // for example, level_1@elem_name
             );
         }
@@ -1503,10 +1503,9 @@ impl Catalog {
         self.lease_contingent.remove(lease_id);
         if let Some(elem_inspect) = self.topology.inspect_for_element(&lease.underlying_element_id)
         {
-            elem_inspect
-                .borrow_mut()
-                .meta()
-                .remove_and_track(format!("lease_{}", lease.id).as_str());
+            elem_inspect.borrow_mut().meta().remove_and_track(
+                format!("lease_{}@level_{}", lease.id, lease.underlying_element_level).as_str(),
+            );
             elem_inspect.borrow_mut().meta().remove(
                 format!("lease_status_{}@level_{}", lease.id, lease.underlying_element_level)
                     .as_str(),
@@ -3028,7 +3027,7 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: ON.level as u64,
                                     required_level: ON.level as u64,
-                                    format!("lease_{}", lease.id.clone()) => "level_1@C",
+                                    format!("lease_{}@level_1", lease.id.clone()) => "level_1@C",
                                     format!("lease_status_{}@level_1", lease.id.clone()) => "Satisfied",
                                 },
                                 relationships: {
@@ -3942,7 +3941,7 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: ON.level as u64,
                                     required_level: ON.level as u64,
-                                    format!("lease_{}", lease_b.id) => "level_1@B",
+                                    format!("lease_{}@level_1", lease_b.id) => "level_1@B",
                                     format!("lease_status_{}@level_1", lease_b.id) => "Satisfied",
                                 },
                                 relationships: {
@@ -3958,7 +3957,7 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: ON.level as u64,
                                     required_level: ON.level as u64,
-                                    format!("lease_{}", lease_c.id) => "level_1@C",
+                                    format!("lease_{}@level_1", lease_c.id) => "level_1@C",
                                     format!("lease_status_{}@level_1", lease_c.id) => "Satisfied",
                                 },
                                 relationships: {
