@@ -428,7 +428,7 @@ if (!(current_os == "fuchsia")) {
 }
 
 group("hound") {
-  public_deps = [ ":hound-v3_5_0" ]
+  public_deps = [ ":hound-v3_5_1" ]
 }
 
 group("http") {
@@ -7429,15 +7429,15 @@ rust_library("home-v0_5_9") {
   applicable_licenses = [ ":home-v0_5_9.license" ]
 }
 
-license("hound-v3_5_0.license") {
+license("hound-v3_5_1.license") {
   public_package_name = "hound"
-  license_files = [ "//third_party/rust_crates/forks/hound/license" ]
+  license_files = [ "//third_party/rust_crates/vendor/hound-3.5.1/license" ]
 }
 
-rust_library("hound-v3_5_0") {
+rust_library("hound-v3_5_1") {
   crate_name = "hound"
-  crate_root = "//third_party/rust_crates/forks/hound/src/lib.rs"
-  output_name = "hound-80b4d537af823d33"
+  crate_root = "//third_party/rust_crates/vendor/hound-3.5.1/src/lib.rs"
+  output_name = "hound-8743522af37d9e60"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -7447,13 +7447,13 @@ rust_library("hound-v3_5_0") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2015",
-    "-Cmetadata=80b4d537af823d33",
-    "-Cextra-filename=-80b4d537af823d33",
+    "-Cmetadata=8743522af37d9e60",
+    "-Cextra-filename=-8743522af37d9e60",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":hound-v3_5_0.license" ]
+  applicable_licenses = [ ":hound-v3_5_1.license" ]
 }
 
 license("http-v0_2_4.license") {

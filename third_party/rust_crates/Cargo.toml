@@ -125,7 +125,7 @@ heck = "0.3.1"
 hex = { version = "0.4.3", features = ["serde"] }
 hkdf = "0.12.3"
 hmac = "0.12.1"
-hound = "3.5.0"
+hound = "3.5.1"
 http = "0.2.4"
 humansize = "1.1.1"
 # TODO(https://fxbug.dev/100964): We intentionally did not enable http2, since we're
@@ -408,7 +408,6 @@ windows-targets-0_52_0 = { package = "windows-targets", path = "empty/windows-ta
 askama_derive = { path = "forks/askama_derive" }
 fatfs = { path = "forks/fatfs" }
 fuse3 = { path = "forks/fuse3" }
-hound = { path = "forks/hound" }
 libm = { path = "forks/libm" }
 nix_0_29_0 = { package = "nix", path = "forks/nix-0.29.0" }
 nom-7_1_3 = { package = "nom", path = "forks/nom" }
