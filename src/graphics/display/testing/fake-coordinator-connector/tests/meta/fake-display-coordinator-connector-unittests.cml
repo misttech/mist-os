@@ -6,9 +6,8 @@
         "//src/sys/test_runners/gtest/default.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
-        "vulkan/client.shard.cml",
     ],
     program: {
-        binary: "bin/fake-display-coordinator-connector-unittest",
+        binary: "test/fake-display-coordinator-connector-unittests",
     },
 }

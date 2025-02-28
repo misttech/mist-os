@@ -9,7 +9,7 @@
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "test/fake-display-coordinator-connector-integration-test",
+        binary: "test/fake-display-coordinator-connector-integration-tests",
     },
     children: [
         {
