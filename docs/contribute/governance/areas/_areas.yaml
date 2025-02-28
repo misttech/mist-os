@@ -28,8 +28,8 @@
     - fidl: 'fuchsia.bluetooth.gatt'
 
 - name: 'Component Framework'
-  api_primary: 'geb@google.com'
-  api_secondary: 'dgilhooley@google.com'
+  api_primary: 'cgonyeo@google.com'
+  api_secondary: 'quiche@google.com'
   description: |
     The set of APIs that are used to define components, interact with
     components, and integrate with the Component Framework. These are the low
@@ -40,7 +40,6 @@
     - fidl: 'fuchsia.component'
     - fidl: 'fuchsia.component.internal'
     - fidl: 'fuchsia.sys2'
-    - fidl: 'fuchsia.sys'
 
 - name: 'Developer'
   api_primary: 'wilkinsonclay@google.com'
