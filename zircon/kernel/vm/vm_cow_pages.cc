@@ -481,7 +481,8 @@ zx_status_t VmCowPages::ReplaceReferenceWithPageLocked(VmPageOrMarkerRef page_or
 VmCowPages::VmCowPages(const fbl::RefPtr<VmHierarchyState> hierarchy_state_ptr,
                        VmCowPagesOptions options, uint32_t pmm_alloc_flags, uint64_t size,
                        fbl::RefPtr<PageSource> page_source,
-                       ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker)
+                       ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker,
+                       uint64_t lock_order)
     : VmHierarchyBase(ktl::move(hierarchy_state_ptr)),
       pmm_alloc_flags_(pmm_alloc_flags),
       options_(options),
@@ -491,10 +492,24 @@ VmCowPages::VmCowPages(const fbl::RefPtr<VmHierarchyState> hierarchy_state_ptr,
 #if VMO_USE_LOCAL_LOCK && VMO_USE_SHARED_LOCK
       lock_(hierarchy_state_ptr_->lock()->lock()),
 #endif
+#if (LOCK_DEP_ENABLED_FEATURE_LEVEL > 0)
+      lock_order_(lock_order),
+#endif
       size_(size),
       page_source_(ktl::move(page_source)),
       discardable_tracker_(ktl::move(discardable_tracker)) {
   DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
+  // If we are tracking correct lock orders then add some asserts that nodes are created with lock
+  // orders that at least vaguely make sense.
+#if (LOCK_DEP_ENABLED_FEATURE_LEVEL > 0)
+  // Nodes with a page source must always be the root, and have the respective lock order.
+  DEBUG_ASSERT(!page_source_ || lock_order_ == kLockOrderRoot);
+  // Hidden nodes must always have a lock order above the anonymous numbering area.
+  DEBUG_ASSERT(!is_hidden() || lock_order_ > kLockOrderFirstAnon);
+  // First anonymous nodes (i.e. not hidden and not with a direct page source) should fall into the
+  // anonymous numbering area.
+  DEBUG_ASSERT(page_source_ || is_hidden() || lock_order_ <= kLockOrderFirstAnon);
+#endif
 }
 
 void VmCowPages::TransitionToAliveLocked() {
@@ -838,9 +853,9 @@ zx_status_t VmCowPages::Create(fbl::RefPtr<VmHierarchyState> root_lock, VmCowPag
                                fbl::RefPtr<VmCowPages>* cow_pages) {
   DEBUG_ASSERT(!(options & VmCowPagesOptions::kInternalOnlyMask));
   fbl::AllocChecker ac;
-  auto cow = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(ktl::move(root_lock), options,
-                                                            pmm_alloc_flags, size, nullptr,
-                                                            ktl::move(discardable_tracker)));
+  auto cow = fbl::AdoptRef<VmCowPages>(
+      new (&ac) VmCowPages(ktl::move(root_lock), options, pmm_alloc_flags, size, nullptr,
+                           ktl::move(discardable_tracker), kLockOrderFirstAnon));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -857,8 +872,9 @@ zx_status_t VmCowPages::CreateExternal(fbl::RefPtr<PageSource> src, VmCowPagesOp
                                        fbl::RefPtr<VmCowPages>* cow_pages) {
   DEBUG_ASSERT(!(options & VmCowPagesOptions::kInternalOnlyMask));
   fbl::AllocChecker ac;
-  auto cow = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
-      ktl::move(root_lock), options, PMM_ALLOC_FLAG_CAN_WAIT, size, ktl::move(src), nullptr));
+  auto cow = fbl::AdoptRef<VmCowPages>(
+      new (&ac) VmCowPages(ktl::move(root_lock), options, PMM_ALLOC_FLAG_CAN_WAIT, size,
+                           ktl::move(src), nullptr, kLockOrderRoot));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -1059,9 +1075,15 @@ zx_status_t VmCowPages::ReplaceWithHiddenNodeLocked(fbl::RefPtr<VmCowPages>* rep
 
   VmCowPagesOptions options = inheritable_options();
   fbl::AllocChecker ac;
+  // Lock order for a new hidden parent is either derived from its parent, or if no parent starts at
+  // kLockOrderRoot. Cow creation rules state that our parent is either hidden, or a page root node,
+  // ensuring that our derived lock order will still be in the hidden range.
+  DEBUG_ASSERT(!parent_ || parent_->is_hidden() || parent_->page_source_);
+  const uint64_t hidden_lock_order =
+      parent_ ? parent_->lock_order() - kLockOrderDelta : kLockOrderRoot;
   auto hidden_parent = fbl::AdoptRef<VmCowPages>(
       new (&ac) VmCowPages(ktl::move(state), options | VmCowPagesOptions::kHidden, pmm_alloc_flags_,
-                           size_, nullptr, nullptr));
+                           size_, nullptr, nullptr, hidden_lock_order));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -1114,8 +1136,8 @@ zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t limit
 #if VMO_USE_SHARED_LOCK
   state = hierarchy_state_ptr_;
 #endif
-  auto cow_clone = fbl::AdoptRef<VmCowPages>(
-      new (&ac) VmCowPages(ktl::move(state), options, pmm_alloc_flags_, size, nullptr, nullptr));
+  auto cow_clone = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
+      ktl::move(state), options, pmm_alloc_flags_, size, nullptr, nullptr, kLockOrderFirstAnon));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -1157,8 +1179,13 @@ zx_status_t VmCowPages::CloneUnidirectionalLocked(uint64_t offset, uint64_t limi
 #if VMO_USE_SHARED_LOCK
   state = hierarchy_state_ptr_;
 #endif
-  auto cow_clone = fbl::AdoptRef<VmCowPages>(
-      new (&ac) VmCowPages(ktl::move(state), options, pmm_alloc_flags_, size, nullptr, nullptr));
+  // If we do not have a parent, then we are constructing the first anonymous node (since we must be
+  // pager backed), and so we want to start at kLockOrderFirstAnon. Otherwise if we ourselves have
+  // a parent then this is a long unidirectional chain and we derive the new lock order from
+  // ourselves.
+  const uint64_t clone_order = parent_ ? lock_order() - kLockOrderDelta : kLockOrderFirstAnon;
+  auto cow_clone = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
+      ktl::move(state), options, pmm_alloc_flags_, size, nullptr, nullptr, clone_order));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }

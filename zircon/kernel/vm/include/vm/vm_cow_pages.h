@@ -124,6 +124,15 @@ class VmCowPages final : public VmHierarchyBase,
   }
 #endif
 
+  uint64_t lock_order() const {
+#if (LOCK_DEP_ENABLED_FEATURE_LEVEL > 0)
+    return lock_order_;
+#endif
+    // When the lock order isn't in use just return a garbage value, whatever is calculated using it
+    // will get thrown away regardless.
+    return 0;
+  }
+
   // Creates a copy-on-write clone with the desired parameters. This can fail due to various
   // internal states not being correct.
   zx_status_t CreateCloneLocked(SnapshotType type, bool require_unidirection, VmCowRange range,
@@ -743,7 +752,7 @@ class VmCowPages final : public VmHierarchyBase,
   // private constructor (use Create...())
   VmCowPages(fbl::RefPtr<VmHierarchyState> root_lock, VmCowPagesOptions options,
              uint32_t pmm_alloc_flags, uint64_t size, fbl::RefPtr<PageSource> page_source,
-             ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker);
+             ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker, uint64_t lock_order);
 
   ~VmCowPages() override;
 
@@ -1409,6 +1418,52 @@ class VmCowPages final : public VmHierarchyBase,
 #if VMO_USE_LOCAL_LOCK
   mutable LOCK_DEP_INSTRUMENT(VmCowPages, VmoLockTraits::LocalLockType,
                               VmoLockTraits::LocalLockFlags) lock_;
+#endif
+
+  // When acquiring multiple locks they must be acquired in order from lowest to highest. To support
+  // unidirectional clones, where nodes gain new children, and bidirectional clones, where nodes
+  // gain new parents, lock ordering is determined using the following scheme:
+  //  * A node with a page source, as it will always be the root, is given the highest order of
+  //    kLockOrderRoot.
+  //  * The first anonymous node in a chain is given the a lock order in the middle of
+  //    kLockOrderFirstAnon. This is nodes such as:
+  //    - Direct child of a root page source node.
+  //    - Direct Child of a hidden node.
+  //    - New anonymous root node.
+  //  * Children of visible anonymous nodes, i.e. unidirectional clones of a non-hidden non pager
+  //    backed node, take their parents lock order minus the kLockOrderDelta.
+  //  * Hidden nodes take either kLockOrderRoot, if they are becoming the root node, or their
+  //    parents lock order minus the kLockOrderDelta.
+  // The goal of this scheme is to provide room in the numbering for both unidirectional children
+  // to grow down at the bottom, and hidden nodes to grow down in the middle, without colliding. If
+  // children of hidden nodes did not start at kLockOrderFirstAnon, but instead just took a minimum
+  // lock order, then a collision would occur if:
+  //  1. A pager backed node is created that then has a hidden node below it, with two anonymous
+  //     leaf nodes below it.
+  //  2. A new clone is created from one of those leafs that can hang directly off the hidden node.
+  //  3. Both the original leaf nodes are closed, merging the remaining child with the hidden node.
+  //  4. A unidirectional clone is now created from what is now a unidirectional hierarchy.
+  // Here, space is needed to grow down, as we have effectively found a way to promote a leaf child
+  // of a hidden node to being part of a unidirectional clone chain.
+  //
+  // Having a non-contiguous numbering allows for using an alternate lock ordering scheme during
+  // clone construction and dead transitions. When creating new nodes since there are no other
+  // references the lock cannot be held and so we cannot deadlock. However we still need to provide
+  // a lock order to satisfy lockdep. Here the gaps created by kLockOrderDelta can be used as the
+  // order for these newly created nodes.
+  //
+  // During a dead transition where a hidden node merge needs to happen we need to hold locks of
+  // three nodes: the hidden node and both of its children. Here the order is that the children must
+  // be acquired in list order, and then the parent. When acquiring the second child, since its
+  // lock order would be equal to the first child, the guaranteed gap between the first child and
+  // the parent lock order is used instead.
+  static constexpr uint64_t kLockOrderDelta = 3;
+  static constexpr uint64_t kLockOrderRoot = UINT64_MAX - kLockOrderDelta;
+  static constexpr uint64_t kLockOrderFirstAnon = UINT64_MAX / 2;
+  // As lock orders are only validated when lockdep is enabled, the storage is only defined if
+  // lockdep is enabled.
+#if (LOCK_DEP_ENABLED_FEATURE_LEVEL > 0)
+  const uint64_t lock_order_;
 #endif
 
   uint64_t size_ TA_GUARDED(lock());
