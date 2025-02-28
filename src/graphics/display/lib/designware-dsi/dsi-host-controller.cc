@@ -15,7 +15,6 @@
 #include <fbl/auto_lock.h>
 #include <fbl/string_buffer.h>
 
-#include "src/graphics/display/lib/designware-dsi/banjo-conversion.h"
 #include "src/graphics/display/lib/designware-dsi/dphy-interface-config.h"
 #include "src/graphics/display/lib/designware-dsi/dpi-interface-config.h"
 #include "src/graphics/display/lib/designware-dsi/dpi-video-timing.h"
@@ -156,17 +155,6 @@ zx::result<> DsiHostController::IssueCommands(
 void DsiHostController::SetMode(dsi_mode_t mode) {
   // Configure the operation mode (cmd or vid)
   DsiDwModeCfgReg::Get().ReadFrom(&dsi_mmio_).set_cmd_video_mode(mode).WriteTo(&dsi_mmio_);
-}
-
-zx_status_t DsiHostController::Config(const dsi_config_t* dsi_config,
-                                      int64_t dphy_data_lane_bits_per_second) {
-  ZX_DEBUG_ASSERT(dsi_config != nullptr);
-  ZX_DEBUG_ASSERT(dsi_config->vendor_config_buffer != nullptr);
-  ZX_DEBUG_ASSERT(dsi_config->vendor_config_size >= sizeof(designware_config_t));
-
-  const DsiHostControllerConfig config =
-      ToDsiHostControllerConfig(*dsi_config, dphy_data_lane_bits_per_second);
-  return Config(config).status_value();
 }
 
 zx::result<> DsiHostController::Config(const DsiHostControllerConfig& config) {

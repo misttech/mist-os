@@ -5,7 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_PANEL_CONFIG_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_PANEL_CONFIG_H_
 
-#include <fuchsia/hardware/dsiimpl/c/banjo.h>
 #include <lib/stdcompat/span.h>
 
 #include <cstdint>
@@ -150,8 +149,6 @@ struct PanelConfig {
 // If the `panel_type` is supported, returns the panel configuration.
 // Otherwise returns nullptr.
 const PanelConfig* GetPanelConfig(uint32_t panel_type);
-
-display_setting_t ToDisplaySetting(const PanelConfig& panel_config);
 
 }  // namespace amlogic_display
 

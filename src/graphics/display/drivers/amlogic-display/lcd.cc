@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/amlogic-display/lcd.h"
 
-#include <fuchsia/hardware/dsiimpl/c/banjo.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/mipi-dsi/mipi-dsi.h>

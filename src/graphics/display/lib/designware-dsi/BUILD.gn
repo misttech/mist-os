@@ -6,8 +6,6 @@ import("//build/test.gni")
 
 source_set("dsi-host-controller") {
   sources = [
-    "banjo-conversion.cc",
-    "banjo-conversion.h",
     "dphy-interface-config.h",
     "dpi-interface-config.h",
     "dpi-video-timing.h",
@@ -32,7 +30,6 @@ source_set("dsi-host-controller") {
 test("dsi-host-controller-tests-bin") {
   output_name = "dsi-host-controller-tests"
   sources = [
-    "banjo-conversion-test.cc",
     "dphy-interface-config-test.cc",
     "dpi-interface-config-test.cc",
     "dpi-video-timing-test.cc",

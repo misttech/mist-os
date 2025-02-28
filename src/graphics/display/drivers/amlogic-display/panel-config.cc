@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 
-#include <fuchsia/hardware/dsiimpl/c/banjo.h>
 #include <lib/device-protocol/display-panel.h>
 #include <zircon/types.h>
 
@@ -467,28 +466,6 @@ const PanelConfig* GetPanelConfig(uint32_t panel_type) {
   }
   // LINT.ThenChange(//src/graphics/display/lib/device-protocol-display/include/lib/device-protocol/display-panel.h)
   return nullptr;
-}
-
-display_setting_t ToDisplaySetting(const PanelConfig& config) {
-  const int64_t maximum_per_data_lane_megabit_per_second =
-      (config.maximum_per_data_lane_bit_per_second() + 500'000) / 1'000'000;
-  return display_setting_t{
-      .lane_num = static_cast<uint32_t>(config.dphy_data_lane_count),
-      .bit_rate_max = static_cast<uint32_t>(maximum_per_data_lane_megabit_per_second),
-      .lcd_clock = static_cast<uint32_t>(config.display_timing.pixel_clock_frequency_hz),
-      .h_active = static_cast<uint32_t>(config.display_timing.horizontal_active_px),
-      .v_active = static_cast<uint32_t>(config.display_timing.vertical_active_lines),
-      .h_period = static_cast<uint32_t>(config.display_timing.horizontal_total_px()),
-      .v_period = static_cast<uint32_t>(config.display_timing.vertical_total_lines()),
-      .hsync_width = static_cast<uint32_t>(config.display_timing.horizontal_sync_width_px),
-      .hsync_bp = static_cast<uint32_t>(config.display_timing.horizontal_back_porch_px),
-      .hsync_pol =
-          config.display_timing.hsync_polarity == display::SyncPolarity::kPositive ? 1u : 0u,
-      .vsync_width = static_cast<uint32_t>(config.display_timing.vertical_sync_width_lines),
-      .vsync_bp = static_cast<uint32_t>(config.display_timing.vertical_back_porch_lines),
-      .vsync_pol =
-          config.display_timing.vsync_polarity == display::SyncPolarity::kPositive ? 1u : 0u,
-  };
 }
 
 }  // namespace amlogic_display

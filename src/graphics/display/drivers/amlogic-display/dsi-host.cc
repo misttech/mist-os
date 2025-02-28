@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/fit/function.h>
+#include <lib/mipi-dsi/mipi-dsi.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
@@ -22,6 +23,8 @@
 #include "src/graphics/display/drivers/amlogic-display/lcd.h"
 #include "src/graphics/display/drivers/amlogic-display/mipi-phy.h"
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
+#include "src/graphics/display/lib/designware-dsi/dpi-interface-config.h"
+#include "src/graphics/display/lib/designware-dsi/dsi-host-controller-config.h"
 #include "src/graphics/display/lib/designware-dsi/dsi-host-controller.h"
 
 namespace amlogic_display {
@@ -266,25 +269,53 @@ zx::result<> DsiHost::ConfigureDsiHostController(int64_t d_phy_data_lane_bitrate
                       TOP_CNTL_CHROMA_SUBSAMPLE_BITS, 0),
       MIPI_DSI_TOP_CNTL);
 
-  // setup dsi config
-  dsi_config_t dsi_cfg;
-  dsi_cfg.display_setting = ToDisplaySetting(panel_config_);
-  dsi_cfg.video_mode_type = VIDEO_MODE_BURST;
-  dsi_cfg.color_coding = COLOR_CODE_PACKED_24BIT_888;
+  constexpr int kBitsPerByte = 8;
+  constexpr int kDataLaneBitsPerClockLanePeriod = 2;
+  const int64_t d_phy_data_lane_bytes_per_second =
+      d_phy_data_lane_bitrate_bits_per_second / kBitsPerByte;
+  const designware_dsi::DsiHostControllerConfig config = {
+      .dphy_interface_config =
+          {
+              .data_lane_count = panel_config_.dphy_data_lane_count,
+              .clock_lane_mode_automatic_control_enabled = true,
 
-  designware_config_t dw_cfg;
-  dw_cfg.lp_escape_time = phy_->GetLowPowerEscaseTime();
-  dw_cfg.lp_cmd_pkt_size = LPCMD_PKT_SIZE;
-  dw_cfg.phy_timer_clkhs_to_lp = PHY_TMR_LPCLK_CLKHS_TO_LP;
-  dw_cfg.phy_timer_clklp_to_hs = PHY_TMR_LPCLK_CLKLP_TO_HS;
-  dw_cfg.phy_timer_hs_to_lp = PHY_TMR_HS_TO_LP;
-  dw_cfg.phy_timer_lp_to_hs = PHY_TMR_LP_TO_HS;
-  dw_cfg.auto_clklane = 1;
-  dsi_cfg.vendor_config_buffer = reinterpret_cast<uint8_t*>(&dw_cfg);
-  dsi_cfg.vendor_config_size = sizeof(dw_cfg);
+              .high_speed_mode_clock_lane_frequency_hz =
+                  d_phy_data_lane_bitrate_bits_per_second / kDataLaneBitsPerClockLanePeriod,
+              .escape_mode_clock_lane_frequency_hz =
+                  d_phy_data_lane_bytes_per_second /
+                  phy_->GetDataLaneByteRateToEscapeClockFrequencyRatio(),
 
-  designware_dsi_host_controller_->Config(&dsi_cfg, d_phy_data_lane_bitrate_bits_per_second);
+              .max_data_lane_hs_to_lp_transition_duration_lane_byte_clock_cycles = PHY_TMR_HS_TO_LP,
+              .max_data_lane_lp_to_hs_transition_duration_lane_byte_clock_cycles = PHY_TMR_LP_TO_HS,
+              .max_clock_lane_hs_to_lp_transition_duration_lane_byte_clock_cycles =
+                  PHY_TMR_LPCLK_CLKHS_TO_LP,
+              .max_clock_lane_lp_to_hs_transition_duration_lane_byte_clock_cycles =
+                  PHY_TMR_LPCLK_CLKLP_TO_HS,
+          },
 
+      .dpi_interface_config =
+          {
+              .color_component_mapping = designware_dsi::DpiColorComponentMapping::k24BitR8G8B8,
+              .video_timing = panel_config_.display_timing,
+              .low_power_command_timer_config =
+                  {
+                      .max_vertical_blank_escape_mode_command_size_bytes = LPCMD_PKT_SIZE,
+                      .max_vertical_active_escape_mode_command_size_bytes = LPCMD_PKT_SIZE,
+                  },
+          },
+
+      .dsi_packet_handler_config =
+          {
+              .packet_sequencing = mipi_dsi::DsiVideoModePacketSequencing::kBurst,
+              .pixel_stream_packet_format = mipi_dsi::DsiPixelStreamPacketFormat::k24BitR8G8B8,
+          },
+  };
+  zx::result config_result = designware_dsi_host_controller_->Config(config);
+  if (config_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to configure the DSI Host Controller: %s",
+            config_result.status_string());
+    return config_result.take_error();
+  }
   return zx::ok();
 }
 

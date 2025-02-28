@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_PLL_REGS_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_PLL_REGS_H_
 
-#include <lib/ddk/debug.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <zircon/assert.h>
 
 #include <cstdint>
@@ -192,8 +192,8 @@ class HdmiPllControl0 : public hwreg::RegisterBase<HdmiPllControl0, uint32_t> {
       case OutputDividerSelection::k4:
         return 4;
     }
-    zxlogf(WARNING, "Invalid output divider 3 selection: %" PRIu32,
-           static_cast<uint32_t>(divider_selection));
+    FDF_LOG(WARNING, "Invalid output divider 3 selection: %" PRIu32,
+            static_cast<uint32_t>(divider_selection));
     return 0;
   }
 
@@ -220,8 +220,8 @@ class HdmiPllControl0 : public hwreg::RegisterBase<HdmiPllControl0, uint32_t> {
       case OutputDividerSelection::k4:
         return 4;
     }
-    zxlogf(WARNING, "Invalid output divider 2 selection: %" PRIu32,
-           static_cast<uint32_t>(divider_selection));
+    FDF_LOG(WARNING, "Invalid output divider 2 selection: %" PRIu32,
+            static_cast<uint32_t>(divider_selection));
     return 0;
   }
 
@@ -248,8 +248,8 @@ class HdmiPllControl0 : public hwreg::RegisterBase<HdmiPllControl0, uint32_t> {
       case OutputDividerSelection::k4:
         return 4;
     }
-    zxlogf(WARNING, "Invalid output divider 1 selection: %" PRIu32,
-           static_cast<uint32_t>(divider_selection));
+    FDF_LOG(WARNING, "Invalid output divider 1 selection: %" PRIu32,
+            static_cast<uint32_t>(divider_selection));
     return 0;
   }
 
