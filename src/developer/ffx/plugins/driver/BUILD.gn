@@ -2,19 +2,30 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//src/developer/ffx/build/ffx_plugin.gni")
+import("//build/rust/rustc_library.gni")
 import("//src/developer/ffx/build/ffx_tool.gni")
 
-ffx_plugin("ffx_driver") {
-  sdk_category = "not-yet-specified"
+assert(is_host, "ffx driver subtool is intended for host toolchain use only")
+
+rustc_library("ffx_driver_args") {
   version = "0.1.0"
   edition = "2021"
-  with_unit_tests = true
-  args_deps = [
+  sources = [ "src/args.rs" ]
+  source_root = "src/args.rs"
+
+  deps = [
     "//src/devices/bin/driver_tools:lib",
     "//third_party/rust_crates:argh",
   ]
+}
+
+rustc_library("ffx_driver") {
+  version = "0.1.0"
+  edition = "2021"
+  with_unit_tests = true
+
   deps = [
+    ":ffx_driver_args",
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_rust",
     "//sdk/fidl/fuchsia.driver.playground:fuchsia.driver.playground_rust",
@@ -34,7 +45,6 @@ ffx_plugin("ffx_driver") {
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:rustyline",
   ]
-  args_sources = [ "src/args.rs" ]
   sources = [ "src/lib.rs" ]
 }
 
@@ -65,5 +75,5 @@ group("bin") {
 
 group("tests") {
   testonly = true
-  deps = [ ":ffx_driver_tests($host_toolchain)" ]
+  deps = [ ":ffx_driver_test" ]
 }

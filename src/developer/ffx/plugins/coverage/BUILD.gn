@@ -2,20 +2,29 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//src/developer/ffx/build/ffx_plugin.gni")
+import("//build/rust/rustc_library.gni")
 import("//src/developer/ffx/build/ffx_tool.gni")
 
-ffx_plugin("ffx_coverage") {
-  sdk_category = "not-yet-specified"
-  version = "0.0.1"
+assert(is_host, "ffx coverage subtool is intended for host toolchain use only")
+
+rustc_library("ffx_coverage_args") {
+  version = "0.1.0"
+  edition = "2021"
+  sources = [ "src/args.rs" ]
+  source_root = "src/args.rs"
+
+  deps = [ "//third_party/rust_crates:argh" ]
+}
+
+rustc_library("ffx_coverage") {
+  version = "0.1.0"
   edition = "2021"
   with_unit_tests = true
 
-  args_sources = [ "src/args.rs" ]
-  args_deps = [ "//third_party/rust_crates:argh" ]
   sources = [ "src/lib.rs" ]
 
   deps = [
+    ":ffx_coverage_args",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/symbol-index",
     "//src/developer/ffx/lib/writer:lib",
@@ -58,5 +67,5 @@ group("bin") {
 
 group("tests") {
   testonly = true
-  deps = [ ":ffx_coverage_tests($host_toolchain)" ]
+  deps = [ ":ffx_coverage_test($host_toolchain)" ]
 }
