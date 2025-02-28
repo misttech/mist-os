@@ -75,10 +75,18 @@ fn main() {
     }
     writer.flush().unwrap();
 
-    Command::new(args.rustfmt)
+    Command::new(&args.rustfmt)
         .arg("--config-path")
         .arg(&args.rustfmt_config)
         .arg(&args.output_filename)
         .status()
         .expect("failed to run format output file");
+
+    // Apparently rustfmt may not have idempotent outputs, so just run it again.
+    Command::new(&args.rustfmt)
+        .arg("--config-path")
+        .arg(&args.rustfmt_config)
+        .arg(&args.output_filename)
+        .status()
+        .expect("failed to run format output file a second time");
 }
