@@ -29,39 +29,63 @@ zx::result<std::unique_ptr<FakeSysmemDeviceHierarchy>> FakeSysmemDeviceHierarchy
 }
 
 FakeSysmemDeviceHierarchy::FakeSysmemDeviceHierarchy()
-    : loop_(&kAsyncLoopConfigNeverAttachToThread) {
-  zx_status_t start_status = loop_.StartThread("FakeSysmemDeviceHierarchy");
-  ZX_ASSERT_MSG(start_status == ZX_OK, "loop_.StartThread failed: %s",
+    : sysmem_client_loop_(&kAsyncLoopConfigNeverAttachToThread) {
+  zx_status_t start_status =
+      sysmem_client_loop_.StartThread("FakeSysmemDeviceHierarchy.SysmemClientDispatcher");
+  ZX_ASSERT_MSG(start_status == ZX_OK, "Failed to start the Sysmem client loop: %s",
                 zx_status_get_string(start_status));
 
+  // sysmem_service::Sysmem::Create() must be called on the client loop's dispatcher.
+  //
+  // `sysmem_service` stores the created instance on the client loop dispatcher
+  // thread, and `sysmem_service_mutex` ensures that the created instance is
+  // seen by the constructor thread.
+  //
+  // `sysmem_service_` is written on the constructor thread, as stated in the data
+  // member comment. This results in an unsurprising threading model. For example,
+  // a call to ConnectAllocator2() immediately after the constructor completes is
+  // guaranteed to see the written value.
+  std::mutex sysmem_service_mutex;
+  std::unique_ptr<sysmem_service::Sysmem> sysmem_service;
+
   libsync::Completion done;
-  zx_status_t post_status = async::PostTask(loop_.dispatcher(), [this, &done] {
+  zx_status_t post_status = async::PostTask(sysmem_client_loop_.dispatcher(), [&] {
     sysmem_service::Sysmem::CreateArgs create_args;
     zx::result<std::unique_ptr<sysmem_service::Sysmem>> create_result =
-        sysmem_service::Sysmem::Create(loop_.dispatcher(), create_args);
+        sysmem_service::Sysmem::Create(sysmem_client_loop_.dispatcher(), create_args);
     ZX_ASSERT_MSG(create_result.is_ok(), "sysmem_service::Sysmem::Create() failed: %s",
                   create_result.status_string());
-    sysmem_service_ = std::move(create_result.value());
+
+    {
+      std::lock_guard lock(sysmem_service_mutex);
+      sysmem_service = std::move(create_result.value());
+    }
     done.Signal();
   });
+
   ZX_ASSERT(post_status == ZX_OK);
   done.Wait();
+
+  {
+    std::lock_guard lock(sysmem_service_mutex);
+    sysmem_service_ = std::move(sysmem_service);
+  }
 }
 
 zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>>
 FakeSysmemDeviceHierarchy::ConnectAllocator2() {
-  auto [client, server] = fidl::Endpoints<fuchsia_sysmem2::Allocator>::Create();
-  sysmem_service_->SyncCall([this, request = std::move(server)]() mutable {
-    sysmem_service::Allocator::CreateOwnedV2(std::move(request), sysmem_service_.get(),
+  auto [sysmem_client, sysmem_server] = fidl::Endpoints<fuchsia_sysmem2::Allocator>::Create();
+  sysmem_service_->SyncCall([this, sysmem_server = std::move(sysmem_server)]() mutable {
+    sysmem_service::Allocator::CreateOwnedV2(std::move(sysmem_server), sysmem_service_.get(),
                                              sysmem_service_->v2_allocators());
   });
-  return zx::ok(std::move(client));
+  return zx::ok(std::move(sysmem_client));
 }
 
 FakeSysmemDeviceHierarchy::~FakeSysmemDeviceHierarchy() {
-  // ensure this runs first regardless of field order
+  // The sysmem_service::Sysmem instance must be destroyed on the client loop's dispatcher.
   libsync::Completion done;
-  zx_status_t post_status = async::PostTask(loop_.dispatcher(), [this, &done] {
+  zx_status_t post_status = async::PostTask(sysmem_client_loop_.dispatcher(), [this, &done] {
     sysmem_service_.reset();
     done.Signal();
   });
