@@ -870,4 +870,32 @@ impl Client {
         };
         state.is_streaming
     }
+
+    /// Check that all the given handles are safe to transfer through a channel
+    /// e.g. that there's no chance of in-flight reads getting dropped.
+    pub(crate) fn clear_handles_for_transfer(&self, handles: &proto::Handles) {
+        let inner = self.0.lock().unwrap();
+        match handles {
+            proto::Handles::Handles(handles) => {
+                for handle in handles {
+                    assert!(
+                        !inner.channel_read_states.contains_key(handle),
+                        "Tried to transfer handle after reading"
+                    );
+                }
+            }
+            proto::Handles::Dispositions(dispositions) => {
+                for disposition in dispositions {
+                    match &disposition.handle {
+                        proto::HandleOp::Move_(handle) => assert!(
+                            !inner.channel_read_states.contains_key(handle),
+                            "Tried to transfer handle after reading"
+                        ),
+                        // Pretty sure this should be fine regardless of read state.
+                        proto::HandleOp::Duplicate(_) => (),
+                    }
+                }
+            }
+        }
+    }
 }

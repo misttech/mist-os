@@ -213,6 +213,7 @@ impl Channel {
         let handle = self.0.proto();
 
         let result = client.map(move |client| {
+            client.clear_handles_for_transfer(&handles);
             client.transaction(
                 ordinals::WRITE_CHANNEL,
                 proto::ChannelWriteChannelRequest { handle, data, handles },
