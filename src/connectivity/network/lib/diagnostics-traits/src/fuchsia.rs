@@ -7,10 +7,11 @@ use alloc::string::String;
 use core::fmt::Display;
 use core::marker::PhantomData;
 
+use fuchsia_async as fasync;
 use fuchsia_inspect::Node;
 use log::warn;
 
-use crate::{Inspector, InspectorDeviceExt};
+use crate::{InspectableInstant, Inspector, InspectorDeviceExt, InstantPropertyName};
 
 /// Provides an abstract interface for extracting inspect device identifier.
 pub trait InspectorDeviceIdProvider<DeviceId> {
@@ -85,5 +86,11 @@ impl<'a, D, P: InspectorDeviceIdProvider<D>> InspectorDeviceExt<D> for FuchsiaIn
 
     fn device_identifier_as_address_zone(id: D) -> impl Display {
         P::device_id(&id)
+    }
+}
+
+impl InspectableInstant for fasync::MonotonicInstant {
+    fn record<I: Inspector>(&self, name: InstantPropertyName, inspector: &mut I) {
+        inspector.record_int(name.into(), self.into_nanos());
     }
 }

@@ -104,6 +104,11 @@ pub trait Inspector: Sized {
         value.record(name, self)
     }
 
+    /// Records an implementor of [`InspectableInstant`].
+    fn record_instant<V: InspectableInstant>(&mut self, name: InstantPropertyName, value: &V) {
+        value.record(name, self)
+    }
+
     /// Records an implementor of [`Inspectable`] under `name`.
     fn record_inspectable<V: Inspectable>(&mut self, name: &str, value: &V) {
         self.record_child(name, |inspector| {
@@ -155,4 +160,60 @@ pub trait InspectorDeviceExt<D> {
     /// Returns the `Display` representation of the IPv6 scoped address zone
     /// associated with `D`.
     fn device_identifier_as_address_zone(device: D) -> impl Display;
+}
+
+/// A trait that marks a type as an inspectable representation of an instant in
+/// time.
+pub trait InspectableInstant {
+    /// Records this value into `inspector`.
+    fn record<I: Inspector>(&self, name: InstantPropertyName, inspector: &mut I);
+}
+
+/// A name suitable for use for recording an Instant property representing a
+/// moment in time.
+///
+/// This type exists because Fuchsia Snapshot Viewer has special treatment of
+/// property names ending in the magic string "@time".
+/// [`crate::instant_property_name`] should be used to construct this type and
+/// ensure that the "@time" suffix is added.
+#[derive(Copy, Clone)]
+pub struct InstantPropertyName {
+    inner: &'static str,
+}
+
+impl InstantPropertyName {
+    pub fn get(&self) -> &'static str {
+        self.inner
+    }
+}
+
+impl From<InstantPropertyName> for &'static str {
+    fn from(InstantPropertyName { inner }: InstantPropertyName) -> Self {
+        inner
+    }
+}
+
+/// Implementation details that need to be `pub` in order to be used from macros
+/// but should not be used otherwise.
+#[doc(hidden)]
+pub mod internal {
+    use super::InstantPropertyName;
+
+    /// Constructs an [`InstantPropertyName`].
+    ///
+    /// Use [`crate::instant_property_name`] instead.
+    pub fn construct_instant_property_name_do_not_use(inner: &'static str) -> InstantPropertyName {
+        InstantPropertyName { inner }
+    }
+}
+
+/// Constructs an [`InstantPropertyName`] to use while recording Instants.
+#[macro_export]
+macro_rules! instant_property_name {
+    () => {
+        $crate::internal::construct_instant_property_name_do_not_use("@time")
+    };
+    ($lit:literal) => {
+        $crate::internal::construct_instant_property_name_do_not_use(core::concat!($lit, "@time"))
+    };
 }

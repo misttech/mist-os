@@ -64,6 +64,7 @@ struct AlreadyInUse;
 pub(crate) async fn serve_client_provider(
     stream: ClientProviderRequestStream,
     provider: fpacket::ProviderProxy,
+    inspect_root: &fuchsia_inspect::Node,
 ) -> Result<(), Error> {
     let provider = &provider;
     let interfaces_in_use = &InterfacesInUse::new();
@@ -147,6 +148,7 @@ pub(crate) async fn serve_client_provider(
                         &udp_socket_provider,
                         params,
                         client_requests_stream,
+                        inspect_root,
                     )
                     .await
                     .unwrap_or_else(|error| match error {

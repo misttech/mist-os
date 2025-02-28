@@ -9,6 +9,7 @@
 //! //src/connectivity/network/tests/integration/dhcp-client.
 
 mod client;
+mod inspect;
 mod packetsocket;
 mod provider;
 mod udpsocket;
@@ -28,6 +29,13 @@ enum IncomingService {
 pub async fn main() {
     log::info!("starting");
 
+    let inspector = fuchsia_inspect::component::inspector();
+    let _inspect_server_task =
+        inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default())
+            .expect("publish Inspect task");
+    let clients_inspect_root = inspector.root().create_child("Clients");
+    let clients_inspect_root = &clients_inspect_root;
+
     let mut fs = ServiceFs::new_local();
     let _: &mut ServiceFsDir<'_, _> =
         fs.dir("svc").add_fidl_service(IncomingService::ClientProvider);
@@ -46,6 +54,7 @@ pub async fn main() {
                                     <fpacket::ProviderMarker as fidl::endpoints::ProtocolMarker>
                                     ::DEBUG_NAME)
                             }),
+                        clients_inspect_root,
                     )
                     .await
                     .unwrap_or_else(|e| {

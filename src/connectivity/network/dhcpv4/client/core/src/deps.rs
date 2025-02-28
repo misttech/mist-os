@@ -6,6 +6,7 @@
 //! core, and provides fake implementations of these dependencies for testing
 //! purposes.
 
+use diagnostics_traits::InspectableInstant;
 use fuchsia_async as fasync;
 use rand::Rng;
 
@@ -108,7 +109,9 @@ pub trait UdpSocketProvider {
 }
 
 /// A type representing an instant in time.
-pub trait Instant: Sized + Ord + Copy + Clone + std::fmt::Debug + Send + Sync {
+pub trait Instant:
+    Sized + Ord + Copy + Clone + std::fmt::Debug + Send + Sync + InspectableInstant
+{
     /// Returns the time `self + duration`. Panics if `self + duration` would
     /// overflow the underlying instant storage type.
     fn add(&self, duration: std::time::Duration) -> Self;
@@ -154,6 +157,7 @@ pub trait Clock {
 #[cfg(test)]
 pub(crate) mod testutil {
     use super::*;
+    use diagnostics_traits::InstantPropertyName;
     use futures::channel::{mpsc, oneshot};
     use futures::lock::Mutex;
     use futures::StreamExt as _;
@@ -290,15 +294,28 @@ pub(crate) mod testutil {
         }
     }
 
-    impl Instant for std::time::Duration {
+    #[derive(Copy, Clone, PartialEq, Eq, Debug, PartialOrd, Ord)]
+    pub(crate) struct TestInstant(pub(crate) std::time::Duration);
+
+    impl InspectableInstant for TestInstant {
+        fn record<I: diagnostics_traits::Inspector>(
+            &self,
+            name: InstantPropertyName,
+            inspector: &mut I,
+        ) {
+            inspector.record_debug(name.into(), self);
+        }
+    }
+
+    impl Instant for TestInstant {
         fn add(&self, duration: std::time::Duration) -> Self {
-            self.checked_add(duration).unwrap()
+            Self(self.0.checked_add(duration).unwrap())
         }
 
         fn average(&self, other: Self) -> Self {
-            let lower = *self.min(&other);
-            let higher = *self.max(&other);
-            lower + (higher - lower) / 2
+            let lower = self.0.min(other.0);
+            let higher = self.0.max(other.0);
+            Self(lower + (higher - lower) / 2)
         }
     }
 
@@ -383,15 +400,15 @@ pub(crate) mod testutil {
     }
 
     impl Clock for Rc<RefCell<FakeTimeController>> {
-        type Instant = std::time::Duration;
+        type Instant = TestInstant;
 
         fn now(&self) -> Self::Instant {
             let ctl = self.borrow_mut();
             let FakeTimeController { timer_heap: _, current_time } = ctl.deref();
-            *current_time
+            TestInstant(*current_time)
         }
 
-        async fn wait_until(&self, time: Self::Instant) {
+        async fn wait_until(&self, TestInstant(time): Self::Instant) {
             log::info!("registering timer at {:?}", time);
             let receiver = {
                 let mut ctl = self.borrow_mut();
@@ -560,15 +577,15 @@ mod test {
         let time_ctl = FakeTimeController::new();
         assert!(time_ctl.borrow().timer_heap.is_empty());
         assert_eq!(time_ctl.borrow().current_time, std::time::Duration::from_secs(0));
-        assert_eq!(time_ctl.now(), std::time::Duration::from_secs(0));
+        assert_eq!(time_ctl.now(), TestInstant(std::time::Duration::from_secs(0)));
 
         let mut timer_registered_before_should_fire_1 =
-            pin!(time_ctl.wait_until(std::time::Duration::from_secs(1)));
+            pin!(time_ctl.wait_until(TestInstant(std::time::Duration::from_secs(1))));
         let mut timer_registered_before_should_fire_2 =
-            pin!(time_ctl.wait_until(std::time::Duration::from_secs(1)));
+            pin!(time_ctl.wait_until(TestInstant(std::time::Duration::from_secs(1))));
 
         let mut timer_should_not_fire =
-            pin!(time_ctl.wait_until(std::time::Duration::from_secs(10)));
+            pin!(time_ctl.wait_until(TestInstant(std::time::Duration::from_secs(10))));
 
         // Poll the timer futures once so that they have the chance to
         // register themselves in our timer heap.
@@ -605,7 +622,7 @@ mod test {
 
         advance(&time_ctl, std::time::Duration::from_secs(1));
 
-        assert_eq!(time_ctl.now(), std::time::Duration::from_secs(1));
+        assert_eq!(time_ctl.now(), TestInstant(std::time::Duration::from_secs(1)));
         {
             let time_ctl = time_ctl.borrow_mut();
             let entries = time_ctl.timer_heap.iter().collect::<Vec<_>>();
@@ -619,7 +636,7 @@ mod test {
         assert_eq!(timer_registered_before_should_fire_2.now_or_never(), Some(()));
         assert_eq!(timer_should_not_fire.now_or_never(), None);
 
-        let timer_set_in_past = time_ctl.wait_until(std::time::Duration::from_secs(0));
+        let timer_set_in_past = time_ctl.wait_until(TestInstant(std::time::Duration::from_secs(0)));
         assert_eq!(timer_set_in_past.now_or_never(), Some(()));
 
         let timer_set_for_present = time_ctl.wait_until(time_ctl.now());

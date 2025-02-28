@@ -5,10 +5,13 @@
 //! Parsing and serialization of DHCP messages
 
 use dhcp_protocol::{AtLeast, AtMostBytes};
+use diagnostics_traits::Inspector;
 use packet::{InnerPacketBuilder, ParseBuffer as _, Serializer};
 use packet_formats::ip::IpPacket as _;
 use std::net::Ipv4Addr;
 use std::num::{NonZeroU16, NonZeroU32, TryFromIntError};
+
+use crate::inspect::Counter;
 
 #[derive(thiserror::Error, Debug)]
 pub(crate) enum ParseError {
@@ -154,6 +157,65 @@ impl From<derive_builder::UninitializedFieldError> for CommonIncomingMessageErro
         // `derive_builder::UninitializedFieldError` cannot be destructured
         // because its fields are private.
         Self::BuilderMissingField(value.field_name())
+    }
+}
+
+/// Counters for reasons an incoming message was discarded.
+#[derive(Default, Debug)]
+pub(crate) struct CommonIncomingMessageErrorCounters {
+    /// The incoming message was a BOOTREQUEST rather than a BOOTREPLY.
+    pub(crate) not_boot_reply: Counter,
+    /// The incoming message provided the unspecified address as the server
+    /// identifier.
+    pub(crate) unspecified_server_identifier: Counter,
+    /// The parser was unable to populate a required field while consuming the
+    /// message.
+    pub(crate) parser_missing_field: Counter,
+    /// The incoming message was discarded due to providing duplicate
+    /// definitions of an option.
+    pub(crate) duplicate_option: Counter,
+    /// The incoming message included an option that was illegal to include
+    /// according to spec.
+    pub(crate) illegally_included_option: Counter,
+}
+
+impl CommonIncomingMessageErrorCounters {
+    /// Records the counters.
+    fn record(&self, inspector: &mut impl Inspector) {
+        let Self {
+            not_boot_reply,
+            unspecified_server_identifier,
+            parser_missing_field,
+            duplicate_option,
+            illegally_included_option,
+        } = self;
+        inspector.record_usize("NotBootReply", not_boot_reply.load());
+        inspector.record_usize("UnspecifiedServerIdentifier", unspecified_server_identifier.load());
+        inspector.record_usize("ParserMissingField", parser_missing_field.load());
+        inspector.record_usize("DuplicateOption", duplicate_option.load());
+        inspector.record_usize("IllegallyIncludedOption", illegally_included_option.load());
+    }
+
+    /// Increments the counter corresponding to the error.
+    fn increment(&self, error: &CommonIncomingMessageError) {
+        let Self {
+            not_boot_reply,
+            unspecified_server_identifier,
+            parser_missing_field,
+            duplicate_option,
+            illegally_included_option,
+        } = self;
+        match error {
+            CommonIncomingMessageError::NotBootReply(_) => not_boot_reply.increment(),
+            CommonIncomingMessageError::UnspecifiedServerIdentifier => {
+                unspecified_server_identifier.increment()
+            }
+            CommonIncomingMessageError::BuilderMissingField(_) => parser_missing_field.increment(),
+            CommonIncomingMessageError::DuplicateOption(_) => duplicate_option.increment(),
+            CommonIncomingMessageError::IllegallyIncludedOption(_) => {
+                illegally_included_option.increment()
+            }
+        }
     }
 }
 
@@ -495,6 +557,62 @@ pub(crate) enum SelectingIncomingMessageError {
     MissingRequiredOption(dhcp_protocol::OptionCode),
 }
 
+/// Counters for reasons a message was discarded while receiving in Selecting
+/// state.
+#[derive(Default, Debug)]
+pub(crate) struct SelectingIncomingMessageErrorCounters {
+    /// Common reasons across all states.
+    pub(crate) common: CommonIncomingMessageErrorCounters,
+    /// The message omitted the Server Identifier option.
+    pub(crate) no_server_identifier: Counter,
+    /// The message was not a DHCPOFFER.
+    pub(crate) not_dhcp_offer: Counter,
+    /// The message had yiaddr set to the unspecified address.
+    pub(crate) unspecified_yiaddr: Counter,
+    /// The message was missing a required option.
+    pub(crate) missing_required_option: Counter,
+}
+
+impl SelectingIncomingMessageErrorCounters {
+    /// Records the counters.
+    pub(crate) fn record(&self, inspector: &mut impl Inspector) {
+        let Self {
+            common,
+            no_server_identifier,
+            not_dhcp_offer,
+            unspecified_yiaddr,
+            missing_required_option,
+        } = self;
+        common.record(inspector);
+        inspector.record_usize("NoServerIdentifier", no_server_identifier.load());
+        inspector.record_usize("NotDhcpOffer", not_dhcp_offer.load());
+        inspector.record_usize("UnspecifiedYiaddr", unspecified_yiaddr.load());
+        inspector.record_usize("MissingRequiredOption", missing_required_option.load());
+    }
+
+    /// Increments the counter corresponding to the error.
+    pub(crate) fn increment(&self, error: &SelectingIncomingMessageError) {
+        let Self {
+            common,
+            no_server_identifier,
+            not_dhcp_offer,
+            unspecified_yiaddr,
+            missing_required_option,
+        } = self;
+        match error {
+            SelectingIncomingMessageError::CommonError(common_incoming_message_error) => {
+                common.increment(common_incoming_message_error)
+            }
+            SelectingIncomingMessageError::NoServerIdentifier => no_server_identifier.increment(),
+            SelectingIncomingMessageError::NotDhcpOffer(_) => not_dhcp_offer.increment(),
+            SelectingIncomingMessageError::UnspecifiedYiaddr => unspecified_yiaddr.increment(),
+            SelectingIncomingMessageError::MissingRequiredOption(_) => {
+                missing_required_option.increment()
+            }
+        }
+    }
+}
+
 /// Extracts the fields from a DHCP message incoming during Selecting state that
 /// should be used during Requesting state.
 pub(crate) fn fields_to_retain_from_selecting(
@@ -541,12 +659,23 @@ pub(crate) fn fields_to_retain_from_selecting(
     })
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 /// Fields from a DHCPOFFER that should be used while building a DHCPREQUEST.
 pub(crate) struct FieldsFromOfferToUseInRequest {
     pub(crate) server_identifier: net_types::SpecifiedAddr<net_types::ip::Ipv4Addr>,
     pub(crate) ip_address_lease_time_secs: Option<NonZeroU32>,
     pub(crate) ip_address_to_request: net_types::SpecifiedAddr<net_types::ip::Ipv4Addr>,
+}
+
+impl FieldsFromOfferToUseInRequest {
+    pub(crate) fn record(&self, inspector: &mut impl Inspector) {
+        let Self { server_identifier, ip_address_lease_time_secs, ip_address_to_request } = self;
+        inspector.record_ip_addr("ServerIdentifier", **server_identifier);
+        if let Some(value) = ip_address_lease_time_secs {
+            inspector.record_uint("IpAddressLeaseTimeSecs", value.get());
+        }
+        inspector.record_ip_addr("IpAddressToRequest", **ip_address_to_request);
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -575,6 +704,68 @@ pub(crate) enum IncomingResponseToRequestError {
     NoServerIdentifier,
     #[error("missing required option: {0:?}")]
     MissingRequiredOption(dhcp_protocol::OptionCode),
+}
+
+/// Counters for reasons a message was discarded while receiving in Requesting
+/// state.
+#[derive(Default, Debug)]
+pub(crate) struct IncomingResponseToRequestErrorCounters {
+    /// Common reasons across all states.
+    pub(crate) common: CommonIncomingMessageErrorCounters,
+    /// The message was not a DHCPACK or DHCPNAK.
+    pub(crate) not_dhcp_ack_or_nak: Counter,
+    /// The message had yiaddr set to the unspecified address.
+    pub(crate) unspecified_yiaddr: Counter,
+    /// The message had no IP address lease time.
+    pub(crate) no_lease_time: Counter,
+    /// The message had no server identifier.
+    pub(crate) no_server_identifier: Counter,
+    /// The message was missing a required option.
+    pub(crate) missing_required_option: Counter,
+}
+
+impl IncomingResponseToRequestErrorCounters {
+    /// Records the counters.
+    pub(crate) fn record(&self, inspector: &mut impl Inspector) {
+        let Self {
+            common,
+            not_dhcp_ack_or_nak,
+            unspecified_yiaddr,
+            no_lease_time,
+            no_server_identifier,
+            missing_required_option,
+        } = self;
+        common.record(inspector);
+        inspector.record_usize("NotDhcpAckOrNak", not_dhcp_ack_or_nak.load());
+        inspector.record_usize("UnspecifiedYiaddr", unspecified_yiaddr.load());
+        inspector.record_usize("NoLeaseTime", no_lease_time.load());
+        inspector.record_usize("NoServerIdentifier", no_server_identifier.load());
+        inspector.record_usize("MissingRequiredOption", missing_required_option.load());
+    }
+
+    /// Increments the counter corresponding to the error.
+    pub(crate) fn increment(&self, error: &IncomingResponseToRequestError) {
+        let Self {
+            common,
+            not_dhcp_ack_or_nak,
+            unspecified_yiaddr,
+            no_lease_time,
+            no_server_identifier,
+            missing_required_option,
+        } = self;
+        match error {
+            IncomingResponseToRequestError::CommonError(common_incoming_message_error) => {
+                common.increment(common_incoming_message_error)
+            }
+            IncomingResponseToRequestError::NotDhcpAckOrNak(_) => not_dhcp_ack_or_nak.increment(),
+            IncomingResponseToRequestError::UnspecifiedYiaddr => unspecified_yiaddr.increment(),
+            IncomingResponseToRequestError::NoLeaseTime => no_lease_time.increment(),
+            IncomingResponseToRequestError::NoServerIdentifier => no_server_identifier.increment(),
+            IncomingResponseToRequestError::MissingRequiredOption(_) => {
+                missing_required_option.increment()
+            }
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]

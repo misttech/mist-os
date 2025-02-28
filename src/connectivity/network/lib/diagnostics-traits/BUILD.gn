@@ -16,6 +16,7 @@ rustc_library("diagnostics-traits") {
     sources += [ "src/fuchsia.rs" ]
     deps += [
       "//src/lib/diagnostics/inspect/rust",
+      "//src/lib/fuchsia-async",
       "//third_party/rust_crates:log",
     ]
   }

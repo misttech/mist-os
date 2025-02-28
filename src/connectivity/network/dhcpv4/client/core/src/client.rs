@@ -5,9 +5,15 @@
 //! Implements the DHCP client state machine.
 
 use crate::deps::{self, DatagramInfo, Instant as _, Socket as _};
+use crate::inspect::{
+    record_optional_duration_secs, Counters, MessagingRelatedCounters, RebindingCounters,
+    RenewingCounters, RequestingCounters, SelectingCounters,
+};
 use crate::parse::{OptionCodeMap, OptionRequested};
+
 use anyhow::Context as _;
 use dhcp_protocol::{AtLeast, AtMostBytes, CLIENT_PORT, SERVER_PORT};
+use diagnostics_traits::Inspector;
 use futures::channel::mpsc;
 use futures::{select, select_biased, FutureExt as _, Stream, StreamExt as _, TryStreamExt as _};
 use net_types::ethernet::Mac;
@@ -38,7 +44,7 @@ pub enum ExitReason {
 /// [RFC 2131].
 ///
 /// [RFC 2131]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.4
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum State<I> {
     /// The default initial state of the state machine (no known
     /// currently-assigned IP address or DHCP server).
@@ -128,6 +134,49 @@ impl<I: deps::Instant> State<I> {
         rng: &mut impl deps::RngProvider,
         clock: &C,
         stop_receiver: &mut mpsc::UnboundedReceiver<()>,
+        counters: &Counters,
+    ) -> Result<Step<I>, Error> {
+        let step = self
+            .run_inner(
+                config,
+                packet_socket_provider,
+                udp_socket_provider,
+                rng,
+                clock,
+                stop_receiver,
+                counters,
+            )
+            .await?;
+
+        match &step {
+            Step::NextState(transition) => {
+                let counter_to_increment = match transition {
+                    Transition::Init(_) => &counters.init.entered,
+                    Transition::Selecting(_) => &counters.selecting.entered,
+                    Transition::Requesting(_) => &counters.requesting.entered,
+                    Transition::BoundWithNewLease(_, _) => &counters.bound.entered,
+                    Transition::BoundWithRenewedLease(_, _) => &counters.bound.entered,
+                    Transition::Renewing(_) => &counters.renewing.entered,
+                    Transition::Rebinding(_) => &counters.rebinding.entered,
+                    Transition::WaitingToRestart(_) => &counters.waiting_to_restart.entered,
+                };
+                counter_to_increment.increment();
+            }
+            Step::Exit(_) => (),
+        };
+
+        Ok(step)
+    }
+
+    async fn run_inner<C: deps::Clock<Instant = I>>(
+        &self,
+        config: &ClientConfig,
+        packet_socket_provider: &impl deps::PacketSocketProvider,
+        udp_socket_provider: &impl deps::UdpSocketProvider,
+        rng: &mut impl deps::RngProvider,
+        clock: &C,
+        stop_receiver: &mut mpsc::UnboundedReceiver<()>,
+        counters: &Counters,
     ) -> Result<Step<I>, Error> {
         let debug_log_prefix = &config.debug_log_prefix;
         match self {
@@ -135,7 +184,7 @@ impl<I: deps::Instant> State<I> {
                 Ok(Step::NextState(Transition::Selecting(init.do_init(rng, clock))))
             }
             State::Selecting(selecting) => match selecting
-                .do_selecting(config, packet_socket_provider, rng, clock, stop_receiver)
+                .do_selecting(config, packet_socket_provider, rng, clock, stop_receiver, counters)
                 .await?
             {
                 SelectingOutcome::GracefulShutdown => Ok(Step::Exit(ExitReason::GracefulShutdown)),
@@ -145,7 +194,14 @@ impl<I: deps::Instant> State<I> {
             },
             State::Requesting(requesting) => {
                 match requesting
-                    .do_requesting(config, packet_socket_provider, rng, clock, stop_receiver)
+                    .do_requesting(
+                        config,
+                        packet_socket_provider,
+                        rng,
+                        clock,
+                        stop_receiver,
+                        counters,
+                    )
                     .await?
                 {
                     RequestingOutcome::RanOutOfRetransmits => {
@@ -191,13 +247,17 @@ impl<I: deps::Instant> State<I> {
                     }
                 }
             }
-            State::Bound(bound) => Ok(match bound.do_bound(config, clock, stop_receiver).await {
-                BoundOutcome::GracefulShutdown => Step::Exit(ExitReason::GracefulShutdown),
-                BoundOutcome::Renewing(renewing) => Step::NextState(Transition::Renewing(renewing)),
-            }),
+            State::Bound(bound) => {
+                Ok(match bound.do_bound(config, clock, stop_receiver, counters).await {
+                    BoundOutcome::GracefulShutdown => Step::Exit(ExitReason::GracefulShutdown),
+                    BoundOutcome::Renewing(renewing) => {
+                        Step::NextState(Transition::Renewing(renewing))
+                    }
+                })
+            }
             State::Renewing(renewing) => {
                 match renewing
-                    .do_renewing(config, udp_socket_provider, clock, stop_receiver)
+                    .do_renewing(config, udp_socket_provider, clock, stop_receiver, counters)
                     .await?
                 {
                     RenewingOutcome::GracefulShutdown => {
@@ -270,7 +330,7 @@ impl<I: deps::Instant> State<I> {
             }
             State::Rebinding(rebinding) => {
                 match rebinding
-                    .do_rebinding(config, udp_socket_provider, clock, stop_receiver)
+                    .do_rebinding(config, udp_socket_provider, clock, stop_receiver, counters)
                     .await?
                 {
                     RebindingOutcome::GracefulShutdown => {
@@ -449,7 +509,9 @@ impl<I: deps::Instant> State<I> {
         }
     }
 
-    fn state_name(&self) -> &'static str {
+    /// Provides a human-readable rendition of the state machine state for
+    /// exposure in debugging environments.
+    pub fn state_name(&self) -> &'static str {
         match self {
             State::Init(_) => "Init",
             State::Selecting(_) => "Selecting",
@@ -523,6 +585,38 @@ impl<I> Default for State<I> {
     }
 }
 
+impl<I: deps::Instant> diagnostics_traits::InspectableValue for State<I> {
+    fn record<II: diagnostics_traits::Inspector>(&self, name: &str, inspector: &mut II) {
+        inspector.record_child(name, |inspector| {
+            inspector.record_str("Kind", self.state_name());
+            match self {
+                State::Init(Init) => (),
+                State::Selecting(selecting) => {
+                    selecting.record(inspector);
+                }
+                State::Requesting(requesting) => {
+                    requesting.record(inspector);
+                }
+                State::Bound(bound) => {
+                    bound.record(inspector);
+                }
+                State::Renewing(Renewing { bound }) => {
+                    bound.record(inspector);
+                }
+                State::Rebinding(Rebinding { bound }) => {
+                    bound.record(inspector);
+                }
+                State::WaitingToRestart(WaitingToRestart { waiting_until }) => {
+                    inspector.record_instant(
+                        diagnostics_traits::instant_property_name!("WaitingToRestartUntil"),
+                        waiting_until,
+                    );
+                }
+            }
+        });
+    }
+}
+
 /// Debug information to include in log messages about the client.
 #[derive(Clone, Copy)]
 pub struct DebugLogPrefix {
@@ -557,9 +651,16 @@ pub struct ClientConfig {
     pub debug_log_prefix: DebugLogPrefix,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Copy)]
 struct DiscoverOptions {
     xid: TransactionId,
+}
+
+impl DiscoverOptions {
+    fn record(&self, inspector: &mut impl Inspector) {
+        let Self { xid: TransactionId(xid) } = self;
+        inspector.record_uint("Xid", xid.get());
+    }
 }
 
 /// Transaction ID for an exchange of DHCP messages.
@@ -579,7 +680,7 @@ struct TransactionId(
 
 /// The initial state as depicted in the state-transition diagram in [RFC 2131].
 /// [RFC 2131]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.4
-#[derive(Default, Debug, PartialEq)]
+#[derive(Default, Debug, PartialEq, Clone, Copy)]
 pub struct Init;
 
 impl Init {
@@ -604,7 +705,7 @@ impl Init {
 }
 
 /// The state of waiting to restart the configuration process.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct WaitingToRestart<I> {
     waiting_until: I,
 }
@@ -659,6 +760,7 @@ async fn send_with_retransmits<T: Clone + Send + Debug>(
     socket: &impl deps::Socket<T>,
     dest: T,
     debug_log_prefix: DebugLogPrefix,
+    counters: &MessagingRelatedCounters,
 ) -> Result<(), Error> {
     send_with_retransmits_at_instants(
         time,
@@ -667,6 +769,7 @@ async fn send_with_retransmits<T: Clone + Send + Debug>(
         socket,
         dest,
         debug_log_prefix,
+        counters,
     )
     .await
 }
@@ -678,14 +781,19 @@ async fn send_with_retransmits_at_instants<I: deps::Instant, T: Clone + Send + D
     socket: &impl deps::Socket<T>,
     dest: T,
     debug_log_prefix: DebugLogPrefix,
+    counters: &MessagingRelatedCounters,
 ) -> Result<(), Error> {
+    let MessagingRelatedCounters { send_message, recv_time_out, .. } = counters;
     for wait_until in std::iter::once(None).chain(retransmit_schedule.into_iter().map(Some)) {
         if let Some(wait_until) = wait_until {
             time.wait_until(wait_until).await;
+            recv_time_out.increment();
         }
         let result = socket.send_to(message, dest.clone()).await;
         match result {
-            Ok(()) => (),
+            Ok(()) => {
+                send_message.increment();
+            }
             Err(e) => match e {
                 // We view these errors as non-recoverable, so we bubble them up
                 // to bindings:
@@ -748,18 +856,31 @@ fn recv_stream<'a, T: 'a, U: Send>(
     recv_buf: &'a mut [u8],
     parser: impl Fn(&[u8], U) -> T + 'a,
     debug_log_prefix: DebugLogPrefix,
+    counters: &'a MessagingRelatedCounters,
 ) -> impl Stream<Item = Result<T, Error>> + 'a {
+    let MessagingRelatedCounters {
+        recv_message,
+        recv_message_fatal_socket_error,
+        recv_message_non_fatal_socket_error,
+        ..
+    } = counters;
     futures::stream::try_unfold((recv_buf, parser), move |(recv_buf, parser)| async move {
         let result = socket.recv_from(recv_buf).await;
         let DatagramInfo { length, address } = match result {
-            Ok(datagram_info) => datagram_info,
+            Ok(datagram_info) => {
+                recv_message.increment();
+                datagram_info
+            }
             Err(e) => match e {
                 // We view these errors as non-recoverable, so we bubble them up
                 // to bindings:
                 deps::SocketError::FailedToOpen(_)
                 | deps::SocketError::NoInterface
                 | deps::SocketError::NetworkUnreachable
-                | deps::SocketError::UnsupportedHardwareType => return Err(Error::Socket(e)),
+                | deps::SocketError::UnsupportedHardwareType => {
+                    recv_message_fatal_socket_error.increment();
+                    return Err(Error::Socket(e));
+                }
                 // We view EHOSTUNREACH as a recoverable error, as the server
                 // we're communicating with could only be temporarily offline,
                 // and this does not indicate an issue with our own network
@@ -770,12 +891,14 @@ fn recv_stream<'a, T: 'a, U: Send>(
                 // fails, or as a result of an ICMP message.)
                 deps::SocketError::HostUnreachable => {
                     log::warn!("{debug_log_prefix} EHOSTUNREACH from recv_from");
+                    recv_message_non_fatal_socket_error.increment();
                     return Ok(Some((None, (recv_buf, parser))));
                 }
                 // For errors that we don't recognize, default to logging an
                 // error and continuing to operate.
                 deps::SocketError::Other(_) => {
                     log::error!("{debug_log_prefix} socket error while receiving: {:?}", e);
+                    recv_message_non_fatal_socket_error.increment();
                     return Ok(Some((None, (recv_buf, parser))));
                 }
             },
@@ -921,7 +1044,7 @@ pub(crate) enum SelectingOutcome<I> {
 /// The Selecting state as depicted in the state-transition diagram in [RFC 2131].
 ///
 /// [RFC 2131]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.4
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Selecting<I> {
     discover_options: DiscoverOptions,
     // The time at which the DHCP transaction was initiated (used as the offset
@@ -942,7 +1065,9 @@ impl<I: deps::Instant> Selecting<I> {
         rng: &mut impl deps::RngProvider,
         time: &C,
         stop_receiver: &mut mpsc::UnboundedReceiver<()>,
+        counters: &Counters,
     ) -> Result<SelectingOutcome<I>, Error> {
+        let Counters { selecting: SelectingCounters { messaging, recv_error, .. }, .. } = counters;
         // TODO(https://fxbug.dev/42075580): avoid dropping/recreating the packet
         // socket unnecessarily by taking an `&impl
         // deps::Socket<net_types::ethernet::Mac>` here instead.
@@ -974,6 +1099,7 @@ impl<I: deps::Instant> Selecting<I> {
             &socket,
             /* dest= */ Mac::BROADCAST,
             *debug_log_prefix,
+            messaging
         )
         .fuse());
 
@@ -987,19 +1113,24 @@ impl<I: deps::Instant> Selecting<I> {
                 let _: Mac = src_addr;
 
                 let (src_addr, message) =
-                    match parse_incoming_dhcp_message_from_ip_packet(packet, *debug_log_prefix)? {
+                    match parse_incoming_dhcp_message_from_ip_packet(packet, *debug_log_prefix)
+                        .inspect_err(|_| messaging.recv_failed_dhcp_parse.increment())?
+                    {
                         Some(message) => message,
                         None => return Ok(None),
                     };
                 validate_message(discover_options, client_config, &message)
+                    .inspect_err(|e| e.increment(&messaging))
                     .context("invalid DHCP message")?;
                 crate::parse::fields_to_retain_from_selecting(requested_parameters, message)
+                    .inspect_err(|e| recv_error.increment(&e))
+                    .map(|fields| Some((src_addr, fields)))
                     .context(
                         "error while retrieving fields to use in DHCPREQUEST from DHCP message",
                     )
-                    .map(|fields| Some((src_addr, fields)))
             },
             *debug_log_prefix,
+            messaging
         )
         .try_filter_map(|parse_result| {
             futures::future::ok(match parse_result {
@@ -1042,12 +1173,29 @@ impl<I: deps::Instant> Selecting<I> {
     }
 }
 
+impl<I: deps::Instant> Selecting<I> {
+    fn record(&self, inspector: &mut impl Inspector) {
+        let Self { discover_options, start_time } = self;
+        inspector.record_instant(diagnostics_traits::instant_property_name!("Start"), start_time);
+        discover_options.record(inspector);
+    }
+}
+
 #[derive(thiserror::Error, Debug, PartialEq)]
 enum ValidateMessageError {
     #[error("xid {actual} doesn't match expected xid {expected}")]
     WrongXid { expected: u32, actual: u32 },
     #[error("chaddr {actual} doesn't match expected chaddr {expected}")]
     WrongChaddr { expected: Mac, actual: Mac },
+}
+
+impl ValidateMessageError {
+    fn increment(&self, counters: &MessagingRelatedCounters) {
+        match self {
+            ValidateMessageError::WrongXid { .. } => counters.recv_wrong_xid.increment(),
+            ValidateMessageError::WrongChaddr { .. } => counters.recv_wrong_chaddr.increment(),
+        }
+    }
 }
 
 fn validate_message(
@@ -1099,7 +1247,7 @@ pub(crate) enum RequestingOutcome<I> {
 /// The Requesting state as depicted in the state-transition diagram in [RFC 2131].
 ///
 /// [RFC 2131]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.4
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Requesting<I> {
     discover_options: DiscoverOptions,
     fields_from_offer_to_use_in_request: crate::parse::FieldsFromOfferToUseInRequest,
@@ -1124,7 +1272,11 @@ impl<I: deps::Instant> Requesting<I> {
         rng: &mut impl deps::RngProvider,
         time: &C,
         stop_receiver: &mut mpsc::UnboundedReceiver<()>,
+        counters: &Counters,
     ) -> Result<RequestingOutcome<I>, Error> {
+        let Counters {
+            requesting: RequestingCounters { messaging, recv_error, recv_nak, .. }, ..
+        } = counters;
         let socket = packet_socket_provider.get_packet_socket().await.map_err(Error::Socket)?;
         let Requesting { discover_options, fields_from_offer_to_use_in_request, start_time } = self;
         let message = build_request_during_address_acquisition(
@@ -1157,6 +1309,7 @@ impl<I: deps::Instant> Requesting<I> {
             &socket,
             Mac::BROADCAST,
             *debug_log_prefix,
+            messaging
         )
         .fuse());
 
@@ -1170,21 +1323,27 @@ impl<I: deps::Instant> Requesting<I> {
                 // identify DHCP servers via the Server Identifier option.
                 let _: Mac = src_addr;
                 let (src_addr, message) =
-                    match parse_incoming_dhcp_message_from_ip_packet(packet, *debug_log_prefix)? {
+                    match parse_incoming_dhcp_message_from_ip_packet(packet, *debug_log_prefix)
+                        .inspect_err(|_| {
+                            messaging.recv_failed_dhcp_parse.increment();
+                        })? {
                         Some(message) => message,
                         None => return Ok(None),
                     };
                 validate_message(discover_options, client_config, &message)
+                    .inspect_err(|e| e.increment(&messaging))
                     .context("invalid DHCP message")?;
 
                 crate::parse::fields_to_retain_from_response_to_request(
                     requested_parameters,
                     message,
                 )
+                .inspect_err(|e| recv_error.increment(e))
                 .context("error extracting needed fields from DHCP message during Requesting")
                 .map(|fields| Some((src_addr, fields)))
             },
             *debug_log_prefix,
+            messaging
         )
         .try_filter_map(|parse_result| {
             futures::future::ok(match parse_result {
@@ -1206,6 +1365,7 @@ impl<I: deps::Instant> Requesting<I> {
             },
             send_requests_result = send_fut => {
                 send_requests_result?;
+                messaging.recv_time_out.increment();
                 return Ok(RequestingOutcome::RanOutOfRetransmits)
             }
         };
@@ -1255,8 +1415,18 @@ impl<I: deps::Instant> Requesting<I> {
                     parameters,
                 ))
             }
-            crate::parse::IncomingResponseToRequest::Nak(nak) => Ok(RequestingOutcome::Nak(nak)),
+            crate::parse::IncomingResponseToRequest::Nak(nak) => {
+                recv_nak.increment();
+                Ok(RequestingOutcome::Nak(nak))
+            }
         }
+    }
+
+    fn record(&self, inspector: &mut impl Inspector) {
+        let Self { discover_options, start_time, fields_from_offer_to_use_in_request } = self;
+        inspector.record_instant(diagnostics_traits::instant_property_name!("Start"), start_time);
+        discover_options.record(inspector);
+        fields_from_offer_to_use_in_request.record(inspector);
     }
 }
 
@@ -1324,7 +1494,7 @@ pub(crate) enum BoundOutcome<I> {
 /// The Bound state as depicted in the state-transition diagram in [RFC 2131].
 ///
 /// [RFC 2131]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.4
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Bound<I> {
     discover_options: DiscoverOptions,
     yiaddr: SpecifiedAddr<net_types::ip::Ipv4Addr>,
@@ -1341,6 +1511,9 @@ impl<I: deps::Instant> Bound<I> {
         client_config: &ClientConfig,
         time: &C,
         stop_receiver: &mut mpsc::UnboundedReceiver<()>,
+        // The Bound state currently doesn't need to increment any counters,
+        // because all it does is wait until it's time to start renewing.
+        _counters: &Counters,
     ) -> BoundOutcome<I> {
         let Self {
             discover_options: _,
@@ -1371,6 +1544,25 @@ impl<I: deps::Instant> Bound<I> {
             () = stop_receiver.select_next_some() => BoundOutcome::GracefulShutdown,
         }
     }
+
+    fn record(&self, inspector: &mut impl Inspector) {
+        let Self {
+            discover_options,
+            yiaddr,
+            server_identifier,
+            ip_address_lease_time,
+            start_time,
+            renewal_time,
+            rebinding_time,
+        } = self;
+        inspector.record_instant(diagnostics_traits::instant_property_name!("Start"), start_time);
+        discover_options.record(inspector);
+        inspector.record_ip_addr("Yiaddr", **yiaddr);
+        inspector.record_ip_addr("ServerIdentifier", **server_identifier);
+        inspector.record_uint("IpAddressLeaseTimeSecs", ip_address_lease_time.as_secs());
+        record_optional_duration_secs(inspector, "RenewalTimeSecs", *renewal_time);
+        record_optional_duration_secs(inspector, "RebindingTimeSecs", *rebinding_time);
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -1391,7 +1583,7 @@ pub(crate) enum RenewingOutcome<I> {
 /// The Renewing state as depicted in the state-transition diagram in [RFC 2131].
 ///
 /// [RFC 2131]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.4
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Renewing<I> {
     bound: Bound<I>,
 }
@@ -1414,7 +1606,10 @@ impl<I: deps::Instant> Renewing<I> {
         udp_socket_provider: &impl deps::UdpSocketProvider,
         time: &C,
         stop_receiver: &mut mpsc::UnboundedReceiver<()>,
+        counters: &Counters,
     ) -> Result<RenewingOutcome<I>, Error> {
+        let Counters { renewing: RenewingCounters { messaging, recv_error, recv_nak, .. }, .. } =
+            counters;
         let renewal_start_time = time.now();
         let debug_log_prefix = client_config.debug_log_prefix;
 
@@ -1477,6 +1672,7 @@ impl<I: deps::Instant> Renewing<I> {
             &socket,
             server_sockaddr,
             debug_log_prefix,
+            messaging
         )
         .fuse());
 
@@ -1490,16 +1686,20 @@ impl<I: deps::Instant> Renewing<I> {
                 }
                 let message = dhcp_protocol::Message::from_buffer(packet)
                     .map_err(crate::parse::ParseError::Dhcp)
-                    .context("error while parsing DHCP message from UDP datagram")?;
+                    .context("error while parsing DHCP message from UDP datagram")
+                    .inspect_err(|_| messaging.recv_failed_dhcp_parse.increment())?;
                 validate_message(discover_options, client_config, &message)
+                    .inspect_err(|e| e.increment(&messaging))
                     .context("invalid DHCP message")?;
                 crate::parse::fields_to_retain_from_response_to_request(
                     &client_config.requested_parameters,
                     message,
                 )
+                .inspect_err(|e| recv_error.increment(e))
                 .context("error extracting needed fields from DHCP message during Renewing")
             },
             debug_log_prefix,
+            messaging
         )
         .try_filter_map(|parse_result| {
             futures::future::ok(match parse_result {
@@ -1522,9 +1722,12 @@ impl<I: deps::Instant> Renewing<I> {
             send_result = send_fut => {
                 return Err(send_result.expect_err("send_fut should never complete without error"))
             },
-            () = timeout_fut => return Ok(RenewingOutcome::Rebinding(
+            () = timeout_fut => {
+                messaging.recv_time_out.increment();
+                return Ok(RenewingOutcome::Rebinding(
                     Rebinding { bound: bound.clone() }
                 ))
+            }
         };
 
         match response {
@@ -1569,7 +1772,10 @@ impl<I: deps::Instant> Renewing<I> {
                     parameters,
                 ))
             }
-            crate::parse::IncomingResponseToRequest::Nak(nak) => Ok(RenewingOutcome::Nak(nak)),
+            crate::parse::IncomingResponseToRequest::Nak(nak) => {
+                recv_nak.increment();
+                Ok(RenewingOutcome::Nak(nak))
+            }
         }
     }
 }
@@ -1591,7 +1797,7 @@ pub struct LeaseRenewal<I> {
 /// [RFC 2131].
 ///
 /// [RFC 2131]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.4
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Rebinding<I> {
     bound: Bound<I>,
 }
@@ -1621,7 +1827,11 @@ impl<I: deps::Instant> Rebinding<I> {
         udp_socket_provider: &impl deps::UdpSocketProvider,
         time: &C,
         stop_receiver: &mut mpsc::UnboundedReceiver<()>,
+        counters: &Counters,
     ) -> Result<RebindingOutcome<I>, Error> {
+        let Counters {
+            rebinding: RebindingCounters { messaging, recv_error, recv_nak, .. }, ..
+        } = counters;
         let rebinding_start_time = time.now();
         let debug_log_prefix = client_config.debug_log_prefix;
 
@@ -1683,6 +1893,7 @@ impl<I: deps::Instant> Rebinding<I> {
             &socket,
             server_sockaddr,
             debug_log_prefix,
+            messaging
         )
         .fuse());
 
@@ -1693,8 +1904,10 @@ impl<I: deps::Instant> Rebinding<I> {
             |packet, _addr| {
                 let message = dhcp_protocol::Message::from_buffer(packet)
                     .map_err(crate::parse::ParseError::Dhcp)
-                    .context("error while parsing DHCP message from UDP datagram")?;
+                    .context("error while parsing DHCP message from UDP datagram")
+                    .inspect_err(|_| messaging.recv_failed_dhcp_parse.increment())?;
                 validate_message(discover_options, client_config, &message)
+                    .inspect_err(|e| e.increment(&messaging))
                     .context("invalid DHCP message")?;
                 crate::parse::fields_to_retain_from_response_to_request(
                     &client_config.requested_parameters,
@@ -1717,9 +1930,13 @@ impl<I: deps::Instant> Rebinding<I> {
                         Ok(crate::parse::IncomingResponseToRequest::Nak(nak))
                     }
                 })
+                .inspect_err(|e| {
+                    recv_error.increment(e);
+                })
                 .context("error extracting needed fields from DHCP message during Rebinding")
             },
             debug_log_prefix,
+            messaging
         )
         .try_filter_map(|parse_result| {
             futures::future::ok(match parse_result {
@@ -1742,7 +1959,10 @@ impl<I: deps::Instant> Rebinding<I> {
             send_result = send_fut => {
                 return Err(send_result.expect_err("send_fut should never complete without error"))
             },
-            () = timeout_fut => return Ok(RebindingOutcome::TimedOut)
+            () = timeout_fut => {
+                messaging.recv_time_out.increment();
+                return Ok(RebindingOutcome::TimedOut)
+            }
         };
 
         match response {
@@ -1787,7 +2007,10 @@ impl<I: deps::Instant> Rebinding<I> {
                     parameters,
                 ))
             }
-            crate::parse::IncomingResponseToRequest::Nak(nak) => Ok(RebindingOutcome::Nak(nak)),
+            crate::parse::IncomingResponseToRequest::Nak(nak) => {
+                recv_nak.increment();
+                Ok(RebindingOutcome::Nak(nak))
+            }
         }
     }
 }
@@ -1797,7 +2020,7 @@ mod test {
     use super::*;
     use crate::deps::testutil::{
         advance, run_until_next_timers_fire, FakeRngProvider, FakeSocket, FakeSocketProvider,
-        FakeTimeController,
+        FakeTimeController, TestInstant,
     };
     use crate::deps::Clock as _;
     use assert_matches::assert_matches;
@@ -1878,8 +2101,8 @@ mod test {
             start_time: start_time_b,
         } = Init.do_init(&mut rng, &time);
         assert_ne!(xid_a, xid_b);
-        assert_eq!(start_time_a, arbitrary_start_time);
-        assert_eq!(start_time_b, arbitrary_start_time);
+        assert_eq!(start_time_a, TestInstant(arbitrary_start_time));
+        assert_eq!(start_time_b, TestInstant(arbitrary_start_time));
     }
 
     fn run_with_accelerated_time<F>(
@@ -1898,16 +2121,17 @@ mod test {
         }
     }
 
-    fn build_test_selecting_state() -> Selecting<Duration> {
+    fn build_test_selecting_state() -> Selecting<TestInstant> {
         Selecting {
             discover_options: DiscoverOptions { xid: TransactionId(NonZeroU32::new(1).unwrap()) },
-            start_time: std::time::Duration::from_secs(0),
+            start_time: TestInstant(std::time::Duration::from_secs(0)),
         }
     }
 
     #[test]
     fn do_selecting_obeys_graceful_shutdown() {
         initialize_logging();
+        let counters = Counters::default();
 
         let mut executor = fasync::TestExecutor::new();
         let time = FakeTimeController::new();
@@ -1929,6 +2153,7 @@ mod test {
                 &mut rng,
                 &time,
                 &mut stop_receiver,
+                &counters,
             )
             .fuse());
 
@@ -1937,7 +2162,7 @@ mod test {
         let mut wait_fut = pin!(async {
             // Wait some arbitrary amount of time to ensure `do_selecting` is waiting on a reply.
             // Note that this is fake time, not 30 actual seconds.
-            time.wait_until(std::time::Duration::from_secs(30)).await;
+            time.wait_until(TestInstant(std::time::Duration::from_secs(30))).await;
         }
         .fuse());
 
@@ -1993,13 +2218,14 @@ mod test {
     #[test]
     fn do_selecting_sends_discover() {
         initialize_logging();
+        let counters = Counters::default();
 
         let mut executor = fasync::TestExecutor::new();
         let time = FakeTimeController::new();
 
         let selecting = Selecting {
             discover_options: DiscoverOptions { xid: TransactionId(NonZeroU32::new(1).unwrap()) },
-            start_time: std::time::Duration::from_secs(0),
+            start_time: TestInstant(std::time::Duration::from_secs(0)),
         };
         let mut rng = FakeRngProvider::new(0);
 
@@ -2017,6 +2243,7 @@ mod test {
                 &mut rng,
                 &time,
                 &mut stop_receiver,
+                &counters,
             )
             .fuse());
 
@@ -2065,7 +2292,7 @@ mod test {
                     },
                 );
 
-                let received_time = time.now();
+                let TestInstant(received_time) = time.now();
 
                 let duration_range =
                     std::time::Duration::from_secs(start)..=std::time::Duration::from_secs(end);
@@ -2085,6 +2312,8 @@ mod test {
         let mut main_future = pin!(main_future);
 
         run_with_accelerated_time(&mut executor, time, &mut main_future);
+        assert_eq!(counters.selecting.messaging.send_message.load(), EXPECTED_RANGES.len());
+        assert_eq!(counters.selecting.messaging.recv_time_out.load(), EXPECTED_RANGES.len() - 1);
     }
 
     const XID: NonZeroU32 = NonZeroU32::new(1).unwrap();
@@ -2136,6 +2365,7 @@ mod test {
     #[test_case(true ; "ignoring garbage replies to discover")]
     fn do_selecting_good_offer(reply_to_discover_with_garbage: bool) {
         initialize_logging();
+        let counters = Counters::default();
 
         let mut rng = FakeRngProvider::new(0);
         let time = FakeTimeController::new();
@@ -2160,6 +2390,7 @@ mod test {
                 &mut rng,
                 &time,
                 &mut stop_receiver,
+                &counters,
             )
             .fuse());
 
@@ -2330,18 +2561,33 @@ mod test {
                         .try_into()
                         .expect("should be specified"),
                 },
-                start_time: arbitrary_start_time,
+                start_time: TestInstant(arbitrary_start_time),
             }
         );
+        assert_eq!(
+            counters.selecting.messaging.send_message.load(),
+            if reply_to_discover_with_garbage { 2 } else { 1 }
+        );
+        assert_eq!(
+            counters.selecting.messaging.recv_time_out.load(),
+            if reply_to_discover_with_garbage { 1 } else { 0 }
+        );
+        assert_eq!(
+            counters.selecting.messaging.recv_failed_dhcp_parse.load(),
+            if reply_to_discover_with_garbage { 1 } else { 0 }
+        );
+        assert_eq!(counters.selecting.messaging.recv_wrong_xid.load(), 1);
+        assert_eq!(counters.selecting.messaging.recv_wrong_chaddr.load(), 0);
+        assert_eq!(counters.selecting.recv_error.missing_required_option.load(), 1);
     }
 
     const TEST_XID: TransactionId = TransactionId(NonZeroU32::new(1).unwrap());
     const TEST_DISCOVER_OPTIONS: DiscoverOptions = DiscoverOptions { xid: TEST_XID };
 
-    fn build_test_requesting_state() -> Requesting<std::time::Duration> {
+    fn build_test_requesting_state() -> Requesting<TestInstant> {
         Requesting {
             discover_options: TEST_DISCOVER_OPTIONS,
-            start_time: std::time::Duration::from_secs(0),
+            start_time: TestInstant(std::time::Duration::from_secs(0)),
             fields_from_offer_to_use_in_request: crate::parse::FieldsFromOfferToUseInRequest {
                 server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
                     .try_into()
@@ -2359,6 +2605,7 @@ mod test {
     #[test]
     fn do_requesting_obeys_graceful_shutdown() {
         initialize_logging();
+        let counters = Counters::default();
 
         let time = FakeTimeController::new();
 
@@ -2379,6 +2626,7 @@ mod test {
                 &mut rng,
                 &time,
                 &mut stop_receiver,
+                &counters,
             )
             .fuse();
         let mut requesting_fut = pin!(requesting_fut);
@@ -2398,6 +2646,7 @@ mod test {
     #[test]
     fn do_requesting_sends_requests() {
         initialize_logging();
+        let counters = Counters::default();
 
         let mut executor = fasync::TestExecutor::new();
         let time = FakeTimeController::new();
@@ -2419,6 +2668,7 @@ mod test {
                 &mut rng,
                 &time,
                 &mut stop_receiver,
+                &counters,
             )
             .fuse());
 
@@ -2472,7 +2722,7 @@ mod test {
                     },
                 );
 
-                let received_time = time.now();
+                let TestInstant(received_time) = time.now();
 
                 let duration_range =
                     std::time::Duration::from_secs(start)..=std::time::Duration::from_secs(end);
@@ -2490,6 +2740,8 @@ mod test {
             run_with_accelerated_time(&mut executor, time, &mut main_future);
 
         assert_matches!(requesting_result, Ok(RequestingOutcome::RanOutOfRetransmits));
+        assert_eq!(counters.requesting.messaging.send_message.load(), EXPECTED_RANGES.len());
+        assert_eq!(counters.requesting.messaging.recv_time_out.load(), EXPECTED_RANGES.len());
     }
 
     struct VaryingIncomingMessageFields {
@@ -2521,6 +2773,24 @@ mod test {
 
     const NAK_MESSAGE: &str = "something went wrong";
 
+    #[derive(PartialEq, Debug)]
+    struct RequestingTestResult {
+        outcome: RequestingOutcome<TestInstant>,
+        counters: RequestingTestCounters,
+    }
+
+    #[derive(PartialEq, Eq, Debug, Default)]
+    struct RequestingTestCounters {
+        send_message: usize,
+        recv_time_out: usize,
+        recv_failed_dhcp_parse: usize,
+        recv_wrong_xid: usize,
+        recv_wrong_chaddr: usize,
+        recv_message: usize,
+        recv_nak: usize,
+        recv_missing_option: usize,
+    }
+
     #[test_case(VaryingIncomingMessageFields {
         yiaddr: YIADDR,
         options: [
@@ -2535,19 +2805,26 @@ mod test {
         .into_iter()
         .chain(test_parameter_values())
         .collect(),
-    } => RequestingOutcome::Bound(Bound {
-        discover_options: TEST_DISCOVER_OPTIONS,
-        yiaddr: net_types::ip::Ipv4Addr::from(YIADDR)
-            .try_into()
-            .expect("should be specified"),
-        server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
-            .try_into()
-            .expect("should be specified"),
-        ip_address_lease_time: std::time::Duration::from_secs(DEFAULT_LEASE_LENGTH_SECONDS.into()),
-        renewal_time: None,
-        rebinding_time: None,
-        start_time: std::time::Duration::from_secs(0),
-    }, test_parameter_values().into_iter().collect()) ; "transitions to Bound after receiving DHCPACK")]
+    } => RequestingTestResult {
+        outcome: RequestingOutcome::Bound(Bound {
+            discover_options: TEST_DISCOVER_OPTIONS,
+            yiaddr: net_types::ip::Ipv4Addr::from(YIADDR)
+                .try_into()
+                .expect("should be specified"),
+            server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
+                .try_into()
+                .expect("should be specified"),
+            ip_address_lease_time: std::time::Duration::from_secs(DEFAULT_LEASE_LENGTH_SECONDS.into()),
+            renewal_time: None,
+            rebinding_time: None,
+            start_time: TestInstant(std::time::Duration::from_secs(0)),
+        }, test_parameter_values().into_iter().collect()),
+        counters: RequestingTestCounters {
+            send_message: 1,
+            recv_message: 1,
+            ..Default::default()
+        }
+     } ; "transitions to Bound after receiving DHCPACK")]
     #[test_case(VaryingIncomingMessageFields {
         yiaddr: YIADDR,
         options: [
@@ -2562,7 +2839,16 @@ mod test {
         .into_iter()
         .chain(test_parameter_values_excluding_subnet_mask())
         .collect(),
-    } => RequestingOutcome::RanOutOfRetransmits ; "ignores replies lacking required option SubnetMask")]
+    } => RequestingTestResult {
+        outcome: RequestingOutcome::RanOutOfRetransmits,
+        counters: RequestingTestCounters {
+            send_message: 5,
+            recv_time_out: 5,
+            recv_message: 1,
+            recv_missing_option: 1,
+            ..Default::default()
+        },
+    }; "ignores replies lacking required option SubnetMask")]
     #[test_case(VaryingIncomingMessageFields {
         yiaddr: Ipv4Addr::UNSPECIFIED,
         options: [
@@ -2575,17 +2861,26 @@ mod test {
         .into_iter()
         .chain(test_parameter_values())
         .collect(),
-    } => RequestingOutcome::Nak(crate::parse::FieldsToRetainFromNak {
-        server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
-            .try_into()
-            .expect("should be specified"),
-        message: Some(NAK_MESSAGE.to_owned()),
-        client_identifier: None,
-    }) ; "transitions to Init after receiving DHCPNAK")]
+    } => RequestingTestResult {
+        outcome: RequestingOutcome::Nak(crate::parse::FieldsToRetainFromNak {
+            server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
+                .try_into()
+                .expect("should be specified"),
+            message: Some(NAK_MESSAGE.to_owned()),
+            client_identifier: None,
+        }),
+        counters: RequestingTestCounters {
+            send_message: 1,
+            recv_message: 1,
+            recv_nak: 1,
+            ..Default::default()
+        },
+    }; "transitions to Init after receiving DHCPNAK")]
     fn do_requesting_transitions_on_reply(
         incoming_message: VaryingIncomingMessageFields,
-    ) -> RequestingOutcome<std::time::Duration> {
+    ) -> RequestingTestResult {
         initialize_logging();
+        let counters = Counters::default();
 
         let time = &FakeTimeController::new();
 
@@ -2606,6 +2901,7 @@ mod test {
                 &mut rng,
                 time,
                 &mut stop_receiver,
+                &counters,
             )
             .fuse());
 
@@ -2678,10 +2974,21 @@ mod test {
         let mut executor = fasync::TestExecutor::new();
         let requesting_result = run_with_accelerated_time(&mut executor, time, &mut main_future);
 
-        assert_matches!(requesting_result, Ok(outcome) => outcome)
+        let outcome = assert_matches!(requesting_result, Ok(outcome) => outcome);
+        let counters = RequestingTestCounters {
+            send_message: counters.requesting.messaging.send_message.load(),
+            recv_time_out: counters.requesting.messaging.recv_time_out.load(),
+            recv_failed_dhcp_parse: counters.requesting.messaging.recv_failed_dhcp_parse.load(),
+            recv_wrong_xid: counters.requesting.messaging.recv_wrong_xid.load(),
+            recv_wrong_chaddr: counters.requesting.messaging.recv_wrong_chaddr.load(),
+            recv_message: counters.requesting.messaging.recv_message.load(),
+            recv_nak: counters.requesting.recv_nak.load(),
+            recv_missing_option: counters.requesting.recv_error.missing_required_option.load(),
+        };
+        RequestingTestResult { outcome, counters }
     }
 
-    fn build_test_bound_state() -> Bound<std::time::Duration> {
+    fn build_test_bound_state() -> Bound<TestInstant> {
         build_test_bound_state_with_times(
             Duration::from_secs(DEFAULT_LEASE_LENGTH_SECONDS.into()),
             None,
@@ -2693,7 +3000,7 @@ mod test {
         lease_length: Duration,
         renewal_time: Option<Duration>,
         rebinding_time: Option<Duration>,
-    ) -> Bound<std::time::Duration> {
+    ) -> Bound<TestInstant> {
         Bound {
             discover_options: TEST_DISCOVER_OPTIONS,
             yiaddr: net_types::ip::Ipv4Addr::from(YIADDR).try_into().expect("should be specified"),
@@ -2701,18 +3008,18 @@ mod test {
                 .try_into()
                 .expect("should be specified"),
             ip_address_lease_time: lease_length,
-            start_time: std::time::Duration::from_secs(0),
+            start_time: TestInstant(std::time::Duration::from_secs(0)),
             renewal_time,
             rebinding_time,
         }
     }
 
-    fn build_test_newly_acquired_lease() -> NewlyAcquiredLease<Duration> {
+    fn build_test_newly_acquired_lease() -> NewlyAcquiredLease<TestInstant> {
         NewlyAcquiredLease {
             ip_address: net_types::ip::Ipv4Addr::from(YIADDR)
                 .try_into()
                 .expect("should be specified"),
-            start_time: std::time::Duration::from_secs(0),
+            start_time: TestInstant(std::time::Duration::from_secs(0)),
             lease_time: Duration::from_secs(DEFAULT_LEASE_LENGTH_SECONDS.into()),
             parameters: Vec::new(),
         }
@@ -2733,8 +3040,8 @@ mod test {
         "recognizes loss of lease"
     )]
     fn apply_transition(
-        (state, transition): (State<Duration>, Transition<Duration>),
-    ) -> Option<TransitionEffect<Duration>> {
+        (state, transition): (State<TestInstant>, Transition<TestInstant>),
+    ) -> Option<TransitionEffect<TestInstant>> {
         let (_next_state, effect) = state.apply(&test_client_config(), transition);
         effect
     }
@@ -2760,11 +3067,11 @@ mod test {
         "should decline and restart during Bound"
     )]
     #[test_case(
-        State::WaitingToRestart(WaitingToRestart { waiting_until: WAIT_TIME_BEFORE_RESTARTING_AFTER_ADDRESS_REJECTION }),
+        State::WaitingToRestart(WaitingToRestart { waiting_until: TestInstant(WAIT_TIME_BEFORE_RESTARTING_AFTER_ADDRESS_REJECTION) }),
         false;
         "should not have lease during WaitingToRestart"
     )]
-    fn on_address_rejection(state: State<Duration>, expect_decline: bool) {
+    fn on_address_rejection(state: State<TestInstant>, expect_decline: bool) {
         let config = &test_client_config();
         let time = &FakeTimeController::new();
         let (server_end, client_end) = FakeSocket::new_pair();
@@ -2789,7 +3096,7 @@ mod test {
                     State::WaitingToRestart(waiting)
                 )) => waiting
             );
-            assert_eq!(waiting_until, Duration::from_secs(10));
+            assert_eq!(waiting_until, TestInstant(Duration::from_secs(10)));
 
             let mut buf = [0u8; BUFFER_SIZE];
             let DatagramInfo { length, address } = server_end
@@ -2824,7 +3131,7 @@ mod test {
     fn waiting_to_restart() {
         let time = &FakeTimeController::new();
 
-        const WAITING_UNTIL: Duration = Duration::from_secs(10);
+        const WAITING_UNTIL: TestInstant = TestInstant(Duration::from_secs(10));
 
         // Set the start time to some arbitrary time below WAITING_UNTIL to show
         // that `WaitingToRestart` waits until an absolute time rather than for
@@ -2844,19 +3151,20 @@ mod test {
 
     #[test_case(
         build_test_bound_state() =>
-            Duration::from_secs(u64::from(DEFAULT_LEASE_LENGTH_SECONDS) / 2);
+        TestInstant(Duration::from_secs(u64::from(DEFAULT_LEASE_LENGTH_SECONDS) / 2));
         "waits default renewal time when not specified")]
     #[test_case(
         Bound {
             renewal_time: Some(Duration::from_secs(10)),
             ..build_test_bound_state()
-        } => Duration::from_secs(10);
+        } => TestInstant(Duration::from_secs(10));
         "waits specified renewal time")]
-    fn bound_waits_for_renewal_time(bound: Bound<Duration>) -> Duration {
+    fn bound_waits_for_renewal_time(bound: Bound<TestInstant>) -> TestInstant {
         let time = &FakeTimeController::new();
         let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
         let config = &test_client_config();
-        let main_fut = bound.do_bound(config, time, &mut stop_receiver).fuse();
+        let counters = Counters::default();
+        let main_fut = bound.do_bound(config, time, &mut stop_receiver, &counters).fuse();
         let mut main_fut = pin!(main_fut);
         let mut executor = fasync::TestExecutor::new();
         let outcome = run_with_accelerated_time(&mut executor, time, &mut main_fut);
@@ -2870,7 +3178,8 @@ mod test {
         let (stop_sender, mut stop_receiver) = mpsc::unbounded();
         let bound = build_test_bound_state();
         let config = &test_client_config();
-        let bound_fut = bound.do_bound(&config, time, &mut stop_receiver).fuse();
+        let counters = Counters::default();
+        let bound_fut = bound.do_bound(&config, time, &mut stop_receiver, &counters).fuse();
 
         stop_sender.unbounded_send(()).expect("send should succeed");
         assert_eq!(
@@ -2883,7 +3192,7 @@ mod test {
         lease_length: Duration,
         renewal_time: Option<Duration>,
         rebinding_time: Option<Duration>,
-    ) -> Renewing<Duration> {
+    ) -> Renewing<TestInstant> {
         Renewing {
             bound: build_test_bound_state_with_times(lease_length, renewal_time, rebinding_time),
         }
@@ -2892,6 +3201,7 @@ mod test {
     #[test]
     fn do_renewing_obeys_graceful_shutdown() {
         initialize_logging();
+        let counters = Counters::default();
 
         let renewing = build_test_renewing_state(
             Duration::from_secs(DEFAULT_LEASE_LENGTH_SECONDS.into()),
@@ -2906,7 +3216,7 @@ mod test {
         let time = &FakeTimeController::new();
 
         let renewing_fut = renewing
-            .do_renewing(client_config, test_socket_provider, time, &mut stop_receiver)
+            .do_renewing(client_config, test_socket_provider, time, &mut stop_receiver, &counters)
             .fuse();
         let mut renewing_fut = pin!(renewing_fut);
 
@@ -2965,9 +3275,9 @@ mod test {
         let test_socket_provider = &FakeSocketProvider::new_with_events(client_end, binds_sender);
         let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
         let time = &FakeTimeController::new();
-
+        let counters = Counters::default();
         let renewing_fut = pin!(renewing
-            .do_renewing(client_config, test_socket_provider, time, &mut stop_receiver)
+            .do_renewing(client_config, test_socket_provider, time, &mut stop_receiver, &counters)
             .fuse());
 
         // Observe the "64, 4" instead of "64, 32" due to the 60 second minimum
@@ -2992,7 +3302,7 @@ mod test {
                         SERVER_PORT.get()
                     ))
                 );
-                assert_eq!(time.now(), expected_time);
+                assert_eq!(time.now(), TestInstant(expected_time));
                 let msg = dhcp_protocol::Message::from_buffer(&recv_buf[..length])
                     .expect("received packet should parse as DHCP message");
 
@@ -3037,6 +3347,32 @@ mod test {
             bound_socket_addr,
             std::net::SocketAddr::V4(std::net::SocketAddrV4::new(YIADDR, CLIENT_PORT.into()))
         );
+        assert_eq!(
+            counters.renewing.messaging.send_message.load(),
+            expected_times_requests_are_sent.len()
+        );
+        assert_eq!(
+            counters.renewing.messaging.recv_time_out.load(),
+            expected_times_requests_are_sent.len()
+        );
+    }
+
+    #[derive(PartialEq, Debug)]
+    struct RenewingTestResult {
+        outcome: RenewingOutcome<TestInstant>,
+        counters: RenewingTestCounters,
+    }
+
+    #[derive(PartialEq, Eq, Debug, Default)]
+    struct RenewingTestCounters {
+        send_message: usize,
+        recv_time_out: usize,
+        recv_failed_dhcp_parse: usize,
+        recv_wrong_xid: usize,
+        recv_wrong_chaddr: usize,
+        recv_message: usize,
+        recv_nak: usize,
+        recv_missing_option: usize,
     }
 
     #[test_case(VaryingIncomingMessageFields {
@@ -3053,19 +3389,26 @@ mod test {
         .into_iter()
         .chain(test_parameter_values())
         .collect(),
-    } => RenewingOutcome::Renewed(Bound {
-        discover_options: TEST_DISCOVER_OPTIONS,
-        yiaddr: net_types::ip::Ipv4Addr::from(YIADDR)
-            .try_into()
-            .expect("should be specified"),
-        server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
-            .try_into()
-            .expect("should be specified"),
-        ip_address_lease_time: std::time::Duration::from_secs(DEFAULT_LEASE_LENGTH_SECONDS.into()),
-        renewal_time: None,
-        rebinding_time: None,
-        start_time: std::time::Duration::from_secs(0),
-    }, test_parameter_values().into_iter().collect()) ; "successfully renews after receiving DHCPACK")]
+    } => RenewingTestResult {
+        outcome: RenewingOutcome::Renewed(Bound {
+            discover_options: TEST_DISCOVER_OPTIONS,
+            yiaddr: net_types::ip::Ipv4Addr::from(YIADDR)
+                .try_into()
+                .expect("should be specified"),
+            server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
+                .try_into()
+                .expect("should be specified"),
+            ip_address_lease_time: std::time::Duration::from_secs(DEFAULT_LEASE_LENGTH_SECONDS.into()),
+            renewal_time: None,
+            rebinding_time: None,
+            start_time: TestInstant(std::time::Duration::from_secs(0)),
+        }, test_parameter_values().into_iter().collect()),
+        counters: RenewingTestCounters {
+            send_message: 1,
+            recv_message: 1,
+            ..Default::default()
+        }
+    }; "successfully renews after receiving DHCPACK")]
     #[test_case(VaryingIncomingMessageFields {
         yiaddr: OTHER_ADDR,
         options: [
@@ -3080,19 +3423,26 @@ mod test {
         .into_iter()
         .chain(test_parameter_values())
         .collect(),
-    } => RenewingOutcome::NewAddress(Bound {
-        discover_options: TEST_DISCOVER_OPTIONS,
-        yiaddr: net_types::ip::Ipv4Addr::from(OTHER_ADDR)
-            .try_into()
-            .expect("should be specified"),
-        server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
-            .try_into()
-            .expect("should be specified"),
-        ip_address_lease_time: std::time::Duration::from_secs(DEFAULT_LEASE_LENGTH_SECONDS.into()),
-        renewal_time: None,
-        rebinding_time: None,
-        start_time: std::time::Duration::from_secs(0),
-    }, test_parameter_values().into_iter().collect()) ; "observes new address from DHCPACK")]
+    } => RenewingTestResult {
+        outcome: RenewingOutcome::NewAddress(Bound {
+            discover_options: TEST_DISCOVER_OPTIONS,
+            yiaddr: net_types::ip::Ipv4Addr::from(OTHER_ADDR)
+                .try_into()
+                .expect("should be specified"),
+            server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
+                .try_into()
+                .expect("should be specified"),
+            ip_address_lease_time: std::time::Duration::from_secs(DEFAULT_LEASE_LENGTH_SECONDS.into()),
+            renewal_time: None,
+            rebinding_time: None,
+            start_time: TestInstant(std::time::Duration::from_secs(0)),
+        }, test_parameter_values().into_iter().collect()),
+        counters: RenewingTestCounters {
+            send_message: 1,
+            recv_message: 1,
+            ..Default::default()
+        }
+    }; "observes new address from DHCPACK")]
     #[test_case(VaryingIncomingMessageFields {
         yiaddr: YIADDR,
         options: [
@@ -3107,10 +3457,19 @@ mod test {
         .into_iter()
         .chain(test_parameter_values_excluding_subnet_mask())
         .collect(),
-    } => RenewingOutcome::Rebinding(
-        Rebinding {
-            bound: build_test_bound_state()
-        }) ; "ignores replies lacking required option SubnetMask")]
+    } => RenewingTestResult {
+        outcome: RenewingOutcome::Rebinding(
+            Rebinding {
+                bound: build_test_bound_state()
+        }),
+        counters: RenewingTestCounters {
+            send_message: 2,
+            recv_time_out: 2,
+            recv_message: 1,
+            recv_missing_option: 1,
+            ..Default::default()
+        },
+    }; "ignores replies lacking required option SubnetMask")]
     #[test_case(VaryingIncomingMessageFields {
         yiaddr: Ipv4Addr::UNSPECIFIED,
         options: [
@@ -3123,16 +3482,24 @@ mod test {
         .into_iter()
         .chain(test_parameter_values())
         .collect(),
-    } => RenewingOutcome::Nak(crate::parse::FieldsToRetainFromNak {
-        server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
-            .try_into()
-            .expect("should be specified"),
-        message: Some(NAK_MESSAGE.to_owned()),
-        client_identifier: None,
-    }) ; "transitions to Init after receiving DHCPNAK")]
+    } => RenewingTestResult {
+        outcome: RenewingOutcome::Nak(crate::parse::FieldsToRetainFromNak {
+            server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
+                .try_into()
+                .expect("should be specified"),
+            message: Some(NAK_MESSAGE.to_owned()),
+            client_identifier: None,
+        }),
+        counters: RenewingTestCounters {
+            send_message: 1,
+            recv_message: 1,
+            recv_nak: 1,
+            ..Default::default()
+        },
+    }; "transitions to Init after receiving DHCPNAK")]
     fn do_renewing_transitions_on_reply(
         incoming_message: VaryingIncomingMessageFields,
-    ) -> RenewingOutcome<std::time::Duration> {
+    ) -> RenewingTestResult {
         initialize_logging();
 
         let renewing = build_test_renewing_state(
@@ -3146,9 +3513,9 @@ mod test {
         let test_socket_provider = &FakeSocketProvider::new(client_end);
         let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
         let time = &FakeTimeController::new();
-
+        let counters = Counters::default();
         let mut renewing_fut = pin!(renewing
-            .do_renewing(client_config, test_socket_provider, time, &mut stop_receiver)
+            .do_renewing(client_config, test_socket_provider, time, &mut stop_receiver, &counters)
             .fuse());
         let renewing_fut = pin!(renewing_fut);
 
@@ -3211,14 +3578,25 @@ mod test {
         let mut executor = fasync::TestExecutor::new();
         let renewing_result = run_with_accelerated_time(&mut executor, time, &mut main_future);
 
-        assert_matches!(renewing_result, Ok(outcome) => outcome)
+        let outcome = assert_matches!(renewing_result, Ok(outcome) => outcome);
+        let counters = RenewingTestCounters {
+            send_message: counters.renewing.messaging.send_message.load(),
+            recv_time_out: counters.renewing.messaging.recv_time_out.load(),
+            recv_failed_dhcp_parse: counters.renewing.messaging.recv_failed_dhcp_parse.load(),
+            recv_wrong_xid: counters.renewing.messaging.recv_wrong_xid.load(),
+            recv_wrong_chaddr: counters.renewing.messaging.recv_wrong_chaddr.load(),
+            recv_message: counters.renewing.messaging.recv_message.load(),
+            recv_nak: counters.renewing.recv_nak.load(),
+            recv_missing_option: counters.renewing.recv_error.missing_required_option.load(),
+        };
+        RenewingTestResult { outcome, counters }
     }
 
     fn build_test_rebinding_state(
         lease_length: Duration,
         renewal_time: Option<Duration>,
         rebinding_time: Option<Duration>,
-    ) -> Rebinding<Duration> {
+    ) -> Rebinding<TestInstant> {
         Rebinding {
             bound: build_test_bound_state_with_times(lease_length, renewal_time, rebinding_time),
         }
@@ -3242,9 +3620,9 @@ mod test {
         let test_socket_provider = &FakeSocketProvider::new_with_events(client_end, binds_sender);
         let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
         let time = &FakeTimeController::new();
-
+        let counters = Counters::default();
         let rebinding_fut = pin!(rebinding
-            .do_rebinding(client_config, test_socket_provider, time, &mut stop_receiver)
+            .do_rebinding(client_config, test_socket_provider, time, &mut stop_receiver, &counters)
             .fuse());
 
         // Observe the "64, 4" instead of "64, 32" due to the 60 second minimum
@@ -3269,7 +3647,7 @@ mod test {
                         SERVER_PORT.get()
                     ))
                 );
-                assert_eq!(time.now(), expected_time);
+                assert_eq!(time.now(), TestInstant(expected_time));
                 let msg = dhcp_protocol::Message::from_buffer(&recv_buf[..length])
                     .expect("received packet should parse as DHCP message");
 
@@ -3316,6 +3694,24 @@ mod test {
         );
     }
 
+    #[derive(PartialEq, Debug)]
+    struct RebindingTestResult {
+        outcome: RebindingOutcome<TestInstant>,
+        counters: RebindingTestCounters,
+    }
+
+    #[derive(PartialEq, Eq, Debug, Default)]
+    struct RebindingTestCounters {
+        send_message: usize,
+        recv_time_out: usize,
+        recv_failed_dhcp_parse: usize,
+        recv_wrong_xid: usize,
+        recv_wrong_chaddr: usize,
+        recv_message: usize,
+        recv_nak: usize,
+        recv_missing_option: usize,
+    }
+
     #[test_case(VaryingIncomingMessageFields {
         yiaddr: YIADDR,
         options: [
@@ -3330,20 +3726,26 @@ mod test {
         .into_iter()
         .chain(test_parameter_values())
         .collect(),
-    } => RebindingOutcome::Renewed(Bound {
-        discover_options: TEST_DISCOVER_OPTIONS,
-        yiaddr: net_types::ip::Ipv4Addr::from(YIADDR)
-            .try_into()
-            .expect("should be specified"),
-        server_identifier: net_types::ip::Ipv4Addr::from(OTHER_SERVER_IP)
-            .try_into()
-            .expect("should be specified"),
-        ip_address_lease_time: std::time::Duration::from_secs(DEFAULT_LEASE_LENGTH_SECONDS.into()),
-        renewal_time: None,
-        rebinding_time: None,
-        start_time: std::time::Duration::from_secs(0),
-    }, test_parameter_values().into_iter().collect());
-    "successfully renews after receiving DHCPACK")]
+    } => RebindingTestResult {
+        outcome: RebindingOutcome::Renewed(Bound {
+            discover_options: TEST_DISCOVER_OPTIONS,
+            yiaddr: net_types::ip::Ipv4Addr::from(YIADDR)
+                .try_into()
+                .expect("should be specified"),
+            server_identifier: net_types::ip::Ipv4Addr::from(OTHER_SERVER_IP)
+                .try_into()
+                .expect("should be specified"),
+            ip_address_lease_time: std::time::Duration::from_secs(DEFAULT_LEASE_LENGTH_SECONDS.into()),
+            renewal_time: None,
+            rebinding_time: None,
+            start_time: TestInstant(std::time::Duration::from_secs(0)),
+        }, test_parameter_values().into_iter().collect()),
+        counters: RebindingTestCounters {
+            send_message: 1,
+            recv_message: 1,
+            ..Default::default()
+        }
+    }; "successfully renews after receiving DHCPACK")]
     #[test_case(VaryingIncomingMessageFields {
         yiaddr: OTHER_ADDR,
         options: [
@@ -3358,7 +3760,8 @@ mod test {
         .into_iter()
         .chain(test_parameter_values())
         .collect(),
-    } => RebindingOutcome::NewAddress(Bound {
+    } => RebindingTestResult {
+        outcome: RebindingOutcome::NewAddress(Bound {
         discover_options: TEST_DISCOVER_OPTIONS,
         yiaddr: net_types::ip::Ipv4Addr::from(OTHER_ADDR)
             .try_into()
@@ -3369,8 +3772,14 @@ mod test {
         ip_address_lease_time: std::time::Duration::from_secs(DEFAULT_LEASE_LENGTH_SECONDS.into()),
         renewal_time: None,
         rebinding_time: None,
-        start_time: std::time::Duration::from_secs(0),
-    }, test_parameter_values().into_iter().collect()) ; "observes new address from DHCPACK")]
+        start_time: TestInstant(std::time::Duration::from_secs(0)),
+    }, test_parameter_values().into_iter().collect()),
+    counters: RebindingTestCounters {
+        send_message: 1,
+        recv_message: 1,
+        ..Default::default()
+    }
+ } ; "observes new address from DHCPACK")]
     #[test_case(VaryingIncomingMessageFields {
         yiaddr: YIADDR,
         options: [
@@ -3385,7 +3794,16 @@ mod test {
         .into_iter()
         .chain(test_parameter_values_excluding_subnet_mask())
         .collect(),
-    } => RebindingOutcome::TimedOut ; "ignores replies lacking required option SubnetMask")]
+    } => RebindingTestResult {
+        outcome: RebindingOutcome::TimedOut,
+        counters: RebindingTestCounters {
+            send_message: 2,
+            recv_time_out: 2,
+            recv_message: 1,
+            recv_missing_option: 1,
+            ..Default::default()
+        }
+    } ; "ignores replies lacking required option SubnetMask")]
     #[test_case(VaryingIncomingMessageFields {
         yiaddr: Ipv4Addr::UNSPECIFIED,
         options: [
@@ -3398,16 +3816,24 @@ mod test {
         .into_iter()
         .chain(test_parameter_values())
         .collect(),
-    } => RebindingOutcome::Nak(crate::parse::FieldsToRetainFromNak {
-        server_identifier: net_types::ip::Ipv4Addr::from(OTHER_SERVER_IP)
-            .try_into()
-            .expect("should be specified"),
-        message: Some(NAK_MESSAGE.to_owned()),
-        client_identifier: None,
-    }) ; "transitions to Init after receiving DHCPNAK")]
+    } => RebindingTestResult {
+        outcome: RebindingOutcome::Nak(crate::parse::FieldsToRetainFromNak {
+            server_identifier: net_types::ip::Ipv4Addr::from(OTHER_SERVER_IP)
+                .try_into()
+                .expect("should be specified"),
+            message: Some(NAK_MESSAGE.to_owned()),
+            client_identifier: None,
+        }),
+        counters: RebindingTestCounters {
+            send_message: 1,
+            recv_message: 1,
+            recv_nak: 1,
+            ..Default::default()
+        },
+    } ; "transitions to Init after receiving DHCPNAK")]
     fn do_rebinding_transitions_on_reply(
         incoming_message: VaryingIncomingMessageFields,
-    ) -> RebindingOutcome<std::time::Duration> {
+    ) -> RebindingTestResult {
         initialize_logging();
 
         let rebinding = build_test_rebinding_state(
@@ -3421,9 +3847,9 @@ mod test {
         let test_socket_provider = &FakeSocketProvider::new(client_end);
         let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
         let time = &FakeTimeController::new();
-
+        let counters = Counters::default();
         let rebinding_fut = pin!(rebinding
-            .do_rebinding(client_config, test_socket_provider, time, &mut stop_receiver)
+            .do_rebinding(client_config, test_socket_provider, time, &mut stop_receiver, &counters)
             .fuse());
 
         let server_socket_addr = std::net::SocketAddr::V4(std::net::SocketAddrV4::new(
@@ -3493,6 +3919,17 @@ mod test {
         let mut executor = fasync::TestExecutor::new();
         let rebinding_result = run_with_accelerated_time(&mut executor, time, &mut main_future);
 
-        assert_matches!(rebinding_result, Ok(outcome) => outcome)
+        let outcome = assert_matches!(rebinding_result, Ok(outcome) => outcome);
+        let counters = RebindingTestCounters {
+            send_message: counters.rebinding.messaging.send_message.load(),
+            recv_time_out: counters.rebinding.messaging.recv_time_out.load(),
+            recv_failed_dhcp_parse: counters.rebinding.messaging.recv_failed_dhcp_parse.load(),
+            recv_wrong_xid: counters.rebinding.messaging.recv_wrong_xid.load(),
+            recv_wrong_chaddr: counters.rebinding.messaging.recv_wrong_chaddr.load(),
+            recv_message: counters.rebinding.messaging.recv_message.load(),
+            recv_nak: counters.rebinding.recv_nak.load(),
+            recv_missing_option: counters.rebinding.recv_error.missing_required_option.load(),
+        };
+        RebindingTestResult { outcome, counters }
     }
 }
