@@ -341,7 +341,7 @@ void DsiHost::Disable() {
   }
 
   // Place dsi in command mode first
-  designware_dsi_host_controller_->SetMode(DSI_MODE_COMMAND);
+  designware_dsi_host_controller_->SetMode(mipi_dsi::DsiOperationMode::kCommand);
   fit::callback<zx::result<>()> power_off = [this]() -> zx::result<> {
     zx::result<> result = lcd_->Disable();
     if (!result.is_ok()) {
@@ -403,7 +403,7 @@ zx::result<> DsiHost::Enable(int64_t dphy_data_lane_bits_per_second) {
     zx::nanosleep(zx::deadline_after(zx::msec(10)));
 
     // Initialize host in command mode first
-    designware_dsi_host_controller_->SetMode(DSI_MODE_COMMAND);
+    designware_dsi_host_controller_->SetMode(mipi_dsi::DsiOperationMode::kCommand);
     zx::result<> dsi_host_config_result =
         ConfigureDsiHostController(dphy_data_lane_bits_per_second);
     if (!dsi_host_config_result.is_ok()) {
@@ -426,8 +426,7 @@ zx::result<> DsiHost::Enable(int64_t dphy_data_lane_bits_per_second) {
       FDF_LOG(ERROR, "Failed to enable LCD: %s", lcd_enable_result.status_string());
     }
 
-    // switch to video mode
-    designware_dsi_host_controller_->SetMode(DSI_MODE_VIDEO);
+    designware_dsi_host_controller_->SetMode(mipi_dsi::DsiOperationMode::kVideo);
     return zx::ok();
   };
 

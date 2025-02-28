@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/lib/designware-dsi/dsi-host-controller.h"
 
-#include <fuchsia/hardware/dsiimpl/c/banjo.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/mipi-dsi/mipi-dsi.h>
 #include <lib/mmio/mmio-buffer.h>
@@ -152,9 +151,8 @@ zx::result<> DsiHostController::IssueCommands(
   return zx::ok();
 }
 
-void DsiHostController::SetMode(dsi_mode_t mode) {
-  // Configure the operation mode (cmd or vid)
-  DsiDwModeCfgReg::Get().ReadFrom(&dsi_mmio_).set_cmd_video_mode(mode).WriteTo(&dsi_mmio_);
+void DsiHostController::SetMode(mipi_dsi::DsiOperationMode operation_mode) {
+  DsiDwModeCfgReg::Get().ReadFrom(&dsi_mmio_).SetOperationMode(operation_mode).WriteTo(&dsi_mmio_);
 }
 
 zx::result<> DsiHostController::Config(const DsiHostControllerConfig& config) {

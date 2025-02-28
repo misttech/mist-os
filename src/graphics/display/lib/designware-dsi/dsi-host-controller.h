@@ -5,7 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_DSI_DSI_HOST_CONTROLLER_H_
 #define SRC_GRAPHICS_DISPLAY_LIB_DESIGNWARE_DSI_DSI_HOST_CONTROLLER_H_
 
-#include <fuchsia/hardware/dsiimpl/c/banjo.h>
 #include <lib/mipi-dsi/mipi-dsi.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zircon-internal/thread_annotations.h>
@@ -26,7 +25,7 @@ class DsiHostController {
   zx::result<> Config(const DsiHostControllerConfig& config);
   void PowerUp();
   void PowerDown();
-  void SetMode(dsi_mode_t mode);
+  void SetMode(mipi_dsi::DsiOperationMode operation_mode);
   zx::result<> IssueCommands(cpp20::span<const mipi_dsi::DsiCommandAndResponse> commands);
   void PhyPowerUp();
   void PhyPowerDown();

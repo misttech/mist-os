@@ -16,7 +16,6 @@ source_set("dsi-host-controller") {
     "dw-mipi-dsi-reg.h",
   ]
   public_deps = [
-    "//sdk/banjo/fuchsia.hardware.dsiimpl:fuchsia.hardware.dsiimpl_banjo_cpp",
     "//sdk/lib/driver/logging/cpp",
     "//src/devices/lib/mmio",
     "//src/graphics/display/lib/api-types/cpp",

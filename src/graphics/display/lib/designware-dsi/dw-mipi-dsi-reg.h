@@ -287,8 +287,34 @@ class DsiDwGenVcidReg : public hwreg::RegisterBase<DsiDwGenVcidReg, uint32_t> {
 
 class DsiDwModeCfgReg : public hwreg::RegisterBase<DsiDwModeCfgReg, uint32_t> {
  public:
-  DEF_BIT(0, cmd_video_mode);
-  static auto Get() { return hwreg::RegisterAddr<DsiDwModeCfgReg>(DW_DSI_MODE_CFG); }
+  enum class OperationMode : uint8_t {
+    kVideo = 0x0,
+    kCommand = 0x1,
+  };
+
+  static hwreg::RegisterAddr<DsiDwModeCfgReg> Get() {
+    return hwreg::RegisterAddr<DsiDwModeCfgReg>(DW_DSI_MODE_CFG);
+  }
+
+  DEF_ENUM_FIELD(OperationMode, 0, 0, operation_mode);
+
+  mipi_dsi::DsiOperationMode GetOperationMode() const {
+    switch (operation_mode()) {
+      case OperationMode::kVideo:
+        return mipi_dsi::DsiOperationMode::kVideo;
+      case OperationMode::kCommand:
+        return mipi_dsi::DsiOperationMode::kCommand;
+    }
+  }
+
+  DsiDwModeCfgReg& SetOperationMode(mipi_dsi::DsiOperationMode operation_mode) {
+    switch (operation_mode) {
+      case mipi_dsi::DsiOperationMode::kVideo:
+        return set_operation_mode(OperationMode::kVideo);
+      case mipi_dsi::DsiOperationMode::kCommand:
+        return set_operation_mode(OperationMode::kCommand);
+    }
+  }
 };
 
 class DsiDwVidModeCfgReg : public hwreg::RegisterBase<DsiDwVidModeCfgReg, uint32_t> {
