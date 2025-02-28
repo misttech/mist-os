@@ -65,6 +65,9 @@ enum class DpiColorComponentMapping : uint8_t {
 
   // Known as "12-Bit YCbCr 4:2:0" in the databook.
   k12BitYcbcr420 = 0b1011,
+
+  // Known as "DSC24 compress data" in the databook.
+  kDsc24Compressed = 0b1100,
 };
 
 // Constrained by the `outvact_lpcmd_time` field in the `DPI_LP_CMD_TIM` register.
