@@ -5,7 +5,8 @@
 The perfcompare tool requires Python 3.
 
 There are two ways to run the perfcompare tool with the required
-dependencies (currently just the `scipy` Python library):
+dependencies (currently the `scipy` Python library, which depends
+on the `numpy` Python library):
 
 * Via `vpython3`:
 
@@ -23,6 +24,8 @@ dependencies (currently just the `scipy` Python library):
   ```sh
   sudo apt-get install python3-scipy
   ```
+
+  This command should install numpy as well.
 
 ## Running the unit tests
 
