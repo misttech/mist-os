@@ -208,8 +208,8 @@
     - fidl: 'fuchsia.identity.authentication'
 
 - name: 'Kernel'
-  api_primary: 'cpu@google.com'
-  api_secondary: 'abarth@google.com'
+  api_primary: 'mcgrathr@google.com'
+  api_secondary: 'rashaeqbal@google.com'
   description: |
     <p>The Fuchsia kernel, whose API surface is:</p>
     <ul>
