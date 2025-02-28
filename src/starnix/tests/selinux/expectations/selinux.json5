@@ -14,49 +14,43 @@
             matchers: [
                 // TODO(http://b/385121365): `inherit` tests will pass once the `file_permission`
                 // hook correctly enforces the `write` permission.
-                "*inherit*",
+                "inherit",
 
                 // keep-sorted start
-                "*atsecure*",
-                "*bounds*",
-                "*bpf*",
-                "*capable_file*",
-                "*capable_net*",
-                "*capable_sys*",
-                "*cgroupfs_label*",
-                "*checkreqprot*",
-                "*fdreceive*",
-                "*inet_socket*",
-                "*ioctl*",
-                "*key_socket*",
-                "*keys*",
-                "*mac_admin*",
-                "*mmap*",
-                "*module_load*",
-                "*msg*",
-                "*netlink_socket*",
-                "*nnp_nosuid*",
-                "*notify*",
-                "*open*",
-                "*perf_event*",
-                "*rxdir*",
-                "*sem*",
-                "*shm*",
-                "*stat*",
-                "*sysctl*",
-                "*tun_tap*",
-
-                // keep-sorted end
-
-                // The tests below are all explicitly expected to fail. The ones
-                // containing "*" above sometimes cover more than one test.
-                // keep-sorted start
+                "atsecure",
+                "bounds",
+                "bpf",
+                "capable_file",
+                "capable_net",
+                "capable_sys",
+                "cgroupfs_label",
+                "checkreqprot",
                 "extended_socket_class",
+                "fdreceive",
                 "file",
                 "filesystem",
                 "fs_filesystem",
                 "glblub",
+                "inet_socket/tcp",
+                "ioctl",
+                "key_socket",
+                "keys",
+                "mac_admin",
+                "mmap",
+                "msg",
+                "netlink_socket",
+                "nlmsg",
+                "nnp_nosuid*",
+                "notify",
+                "open",
                 "overlay",
+                "perf_event",
+                "rxdir",
+                "sem",
+                "shm",
+                "stat",
+                "sysctl",
+                "tun_tap",
                 "userfaultfd",
                 "watchkey",
 
@@ -66,8 +60,17 @@
         {
             type: "skip",
             matchers: [
-                // Test sometimes hangs.
-                "*unix_socket*",
+                // TODO: https://fxbug.dev/398663317 - This sub-directory was mistakenly added to the test list.
+                "inet_socket",
+
+                // TODO: https://fxbug.dev/398663317 - Test hangs, possibly because IP_PASSSEC is not implemented yet.
+                "inet_socket/udp",
+
+                // TODO: https://fxbug.dev/398696695 - Test sometimes hangs.
+                "unix_socket",
+
+                // TODO: https://fxbug.dev/319480589 - Starnix does not support dynamic kernel module loading.
+                "module_load",
             ],
         },
     ],
