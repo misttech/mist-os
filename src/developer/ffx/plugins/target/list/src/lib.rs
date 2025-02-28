@@ -388,8 +388,7 @@ mod test {
         match VerifiedMachineWriter::<Vec<JsonTarget>>::verify_schema(&data) {
             Ok(_) => (),
             Err(e) => {
-                println!("Error verifying schema: {e}");
-                println!("{data:?}");
+                panic!("Error verifying schema of {data:?}: {e}");
             }
         };
     }
