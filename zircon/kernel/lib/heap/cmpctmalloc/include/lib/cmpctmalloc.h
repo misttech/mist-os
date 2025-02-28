@@ -16,7 +16,16 @@
 #ifdef _KERNEL
 #include <kernel/mutex.h>
 
-DECLARE_SINGLETON_MUTEX(TheHeapLock);
+// This is a popular lock.  Critical sections protected by this lock are
+// *usually* short-lived, so we'd like to minimize lock thrash by disabling
+// preemption while holding the lock.  However, in degenerate cases (e.g. with
+// excessive PMM fragmentation), the lock can be held for long periods of time.
+// In those case, we don't want to overly delay the scheduling of a higher
+// priority task.  To strike a balance between these competing concerns, we use
+// |CriticalMutex| which employs "time-limited preemption deferral".
+//
+// For more information, see https://fxbug.dev/399694236.
+DECLARE_SINGLETON_CRITICAL_MUTEX(TheHeapLock);
 #else
 #include <mutex>
 
