@@ -291,6 +291,7 @@ fidl_library://fidl/fuchsia.hardware.serial (unstable)
 fidl_library://fidl/fuchsia.hardware.serialimpl (unstable)
 fidl_library://fidl/fuchsia.hardware.sharedmemory (unstable)
 fidl_library://fidl/fuchsia.hardware.spi (unstable)
+fidl_library://fidl/fuchsia.hardware.spi.businfo (unstable)
 fidl_library://fidl/fuchsia.hardware.spiimpl (unstable)
 fidl_library://fidl/fuchsia.hardware.spmi (unstable)
 fidl_library://fidl/fuchsia.hardware.temperature

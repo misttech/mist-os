@@ -105,6 +105,7 @@ _partner_idk_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl",
   "//sdk/fidl/fuchsia.hardware.sharedmemory:fuchsia.hardware.sharedmemory",
   "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi",
+  "//sdk/fidl/fuchsia.hardware.spi.businfo:fuchsia.hardware.spi.businfo",
   "//sdk/fidl/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl",
   "//sdk/fidl/fuchsia.hardware.spmi:fuchsia.hardware.spmi",
   "//sdk/fidl/fuchsia.hardware.temperature:fuchsia.hardware.temperature",
