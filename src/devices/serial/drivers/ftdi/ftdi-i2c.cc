@@ -81,13 +81,14 @@ zx_status_t FtdiI2c::Bind() {
   }
 
   std::array<const char*, 1> fidl_service_offers{fuchsia_hardware_i2cimpl::Service::Name};
-  return DdkAdd(ddk::DeviceAddArgs("ftdi-i2c")
-                    .set_outgoing_dir(directory_client.TakeChannel())
-                    .set_runtime_service_offers(fidl_service_offers)
-                    .forward_metadata(parent(), DEVICE_METADATA_I2C_CHANNELS));
-}
+  zx_status_t status = DdkAdd(ddk::DeviceAddArgs("ftdi-i2c")
+                                  .set_outgoing_dir(directory_client.TakeChannel())
+                                  .set_runtime_service_offers(fidl_service_offers));
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to add device: %s", zx_status_get_string(status));
+    return status;
+  }
 
-void FtdiI2c::DdkInit(ddk::InitTxn txn) {
   fidl::Arena allocator;
   fidl::VectorView<fuchsia_hardware_i2c_businfo::wire::I2CChannel> i2c_channels(
       allocator, i2c_devices_.size());
@@ -107,16 +108,19 @@ void FtdiI2c::DdkInit(ddk::InitTxn txn) {
   if (!persisted.is_ok()) {
     zxlogf(ERROR, "encoding device metadata failed: %s\n",
            persisted.error_value().FormatDescription().c_str());
-    txn.Reply(ZX_ERR_INTERNAL);
-    return;
+    return ZX_ERR_INTERNAL;
   }
   std::vector<uint8_t>& bytes = persisted.value();
-  zx_status_t status = DdkAddMetadata(DEVICE_METADATA_I2C_CHANNELS, bytes.data(), bytes.size());
+  status = DdkAddMetadata(DEVICE_METADATA_I2C_CHANNELS, bytes.data(), bytes.size());
   if (status != ZX_OK) {
-    txn.Reply(status);
-    return;
+    zxlogf(ERROR, "Failed to add metadata: %s", zx_status_get_string(status));
+    return status;
   }
 
+  return ZX_OK;
+}
+
+void FtdiI2c::DdkInit(ddk::InitTxn txn) {
   // We will reply to the init txn once the device is ready to become visible
   // and able to be unbound.
   init_txn_ = std::move(txn);
