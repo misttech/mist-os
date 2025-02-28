@@ -456,7 +456,7 @@ pub fn restore_from_signal_handler(current_task: &mut CurrentTask) -> Result<(),
     restore_registers(current_task, &signal_stack_frame, signal_frame_address)?;
 
     // Restore the stored signal mask.
-    current_task.write().set_signal_mask(SigSet::from(signal_stack_frame.context.uc_sigmask));
+    current_task.write().set_signal_mask(signal_stack_frame.get_signal_mask());
 
     Ok(())
 }

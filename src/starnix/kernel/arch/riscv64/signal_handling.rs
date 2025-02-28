@@ -11,6 +11,7 @@ use starnix_logging::log_debug;
 use starnix_types::arch::ArchWidth;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::math::round_up_to_increment;
+use starnix_uapi::signals::SigSet;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
     self as uapi, errno, error, sigaction_t, sigaltstack, sigcontext, siginfo_t, ucontext,
@@ -127,6 +128,10 @@ impl SignalStackFrame {
 
     pub fn from_bytes(bytes: [u8; SIG_STACK_SIZE]) -> SignalStackFrame {
         unsafe { std::mem::transmute(bytes) }
+    }
+
+    pub fn get_signal_mask(&self) -> SigSet {
+        self.context.uc_sigmask.into()
     }
 }
 

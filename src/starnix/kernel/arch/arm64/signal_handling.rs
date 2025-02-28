@@ -10,7 +10,7 @@ use starnix_logging::{log_debug, track_stub};
 use starnix_types::arch::ArchWidth;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::math::round_up_to_increment;
-use starnix_uapi::signals::{SIGBUS, SIGSEGV};
+use starnix_uapi::signals::{SigSet, SIGBUS, SIGSEGV};
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
     _aarch64_ctx, errno, error, esr_context, fpsimd_context, sigaction_t, sigaltstack, sigcontext,
@@ -98,6 +98,10 @@ impl SignalStackFrame {
 
     pub fn from_bytes(bytes: [u8; SIG_STACK_SIZE]) -> SignalStackFrame {
         unsafe { std::mem::transmute(bytes) }
+    }
+
+    pub fn get_signal_mask(&self) -> SigSet {
+        self.context.uc_sigmask.into()
     }
 }
 
