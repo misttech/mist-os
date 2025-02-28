@@ -27,7 +27,7 @@
 /// all zeroes.
 #[macro_export]
 macro_rules! struct_with_union_into_bytes {
-    ($ty:ident { $($($field:ident).*: $value:expr,)* }) => {{
+    ($ty:ty { $($($field:ident).*: $value:expr,)* }) => {{
         use std::mem::MaybeUninit;
 
         const BYTES: usize = std::mem::size_of::<$ty>();
