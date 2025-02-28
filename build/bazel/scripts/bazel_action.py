@@ -247,6 +247,10 @@ _BAZEL_NO_CONTENT_HASH_REPOSITORIES = (
 # due to the stdout/stderr logs being too large.
 _DEBUG = False
 
+# Set this to True to debug .build-id copies from the Bazel output base
+# to the Ninja build directory.
+_DEBUG_BUILD_ID_COPIES = _DEBUG
+
 # Set this to True to assert when non-symlink repository files are found.
 # This is useful to find them when performing expensive builds on CQ
 _ASSERT_ON_IGNORED_FILES = True
@@ -470,6 +474,8 @@ def copy_build_id_dir(build_id_dir: str, bazel_output_base_dir: str) -> None:
             for obj in os.listdir(bid_path):
                 src_path = os.path.join(bid_path, obj)
                 dst_path = os.path.join(_BUILD_ID_PREFIX, path, obj)
+                if _DEBUG_BUILD_ID_COPIES:
+                    print(f"BUILD_ID {src_path} --> {dst_path}")
                 copy_file_if_changed(src_path, dst_path, bazel_output_base_dir)
 
 
@@ -1200,8 +1206,15 @@ def main() -> int:
 
     configured_args = [shlex.quote(arg) for arg in args.extra_bazel_args]
 
+    if any(
+        entry.copy_debug_symbols
+        for entry in args.package_outputs + args.directory_outputs
+    ):
+        # Ensure the build_id directories are produced.
+        configured_args += ["--output_groups=+build_id_dirs"]
+
     def run_starlark_cquery(
-        query_target: str, starlark_filename: str
+        query_targets: List[str], starlark_filename: str
     ) -> List[str]:
         result = get_bazel_query_output(
             "cquery",
@@ -1210,9 +1223,9 @@ def main() -> int:
                 "--output=starlark",
                 "--starlark:file",
                 get_input_starlark_file_path(starlark_filename),
-                query_target,
             ]
-            + configured_args,
+            + configured_args
+            + ["set(%s)" % " ".join(query_targets)],
         )
         assert result is not None
         return result
@@ -1266,13 +1279,6 @@ def main() -> int:
     # in the environment.
     if os.environ.get(_ENV_DEBUG_SANDBOX, "0") == "1":
         cmd.append("--sandbox_debug")
-
-    if any(
-        entry.copy_debug_symbols
-        for entry in args.package_outputs + args.directory_outputs
-    ):
-        # Ensure the build_id directories are produced.
-        cmd += ["--output_groups=+build_id_dirs"]
 
     if jobs:
         cmd += [f"--jobs={jobs}"]
@@ -1376,7 +1382,7 @@ def main() -> int:
             # Run a cquery to extract the FuchsiaPackageInfo and
             # FuchsiaDebugSymbolInfo provider values.
             query_result = run_starlark_cquery(
-                entry.package_label,
+                [entry.package_label],
                 "package_archive_manifest_and_debug_symbol_dirs.cquery",
             )
             assert (
@@ -1404,6 +1410,13 @@ def main() -> int:
                 )
 
             if entry.copy_debug_symbols:
+                if _DEBUG_BUILD_ID_COPIES:
+                    print(
+                        f"PACKAGE DEBUG SYMBOLS gn={args.gn_target_label} bazel={args.bazel_targets}"
+                    )
+                    for debug_symbol_dir in bazel_debug_symbol_dirs:
+                        print(f"  DIR: {debug_symbol_dir}")
+
                 for debug_symbol_dir in bazel_debug_symbol_dirs:
                     copy_build_id_dir(
                         os.path.join(bazel_execroot, debug_symbol_dir),
@@ -1437,9 +1450,14 @@ def main() -> int:
         dir_copies.append((src_path, dst_path, dir_output.tracked_files))
 
         if dir_output.copy_debug_symbols:
+            if _DEBUG_BUILD_ID_COPIES:
+                print(
+                    f"DIRECTORY DEBUG SYMBOLS gn={args.gn_target_label} bazel={args.bazel_targets} {src_path} -> {dst_path}"
+                )
+
             bazel_execroot = find_bazel_execroot(args.workspace_dir)
             debug_symbol_dirs = run_starlark_cquery(
-                args.bazel_targets[0],
+                args.bazel_targets,
                 "FuchsiaDebugSymbolInfo_debug_symbol_dirs.cquery",
             )
             for debug_symbol_dir in debug_symbol_dirs:
