@@ -28,6 +28,7 @@ class FfxTest(ffxtestcase.FfxTestCase):
 
     def test_get_ssh_address_includes_port(self) -> None:
         """Test `ffx target get-ssh-address` output returns as expected."""
+        # NOTE: This test fails if the device under test is an user-mode networking emulator.
         output = self.dut.ffx.run(["target", "get-ssh-address", "-t", "5"])
         asserts.assert_true(
             ":22" in output, f"expected stdout to contain ':22',got {output}"
@@ -202,15 +203,20 @@ class FfxTest(ffxtestcase.FfxTestCase):
             "server",
             "start",
             "--background",
-            "--daemon",
+            "--foreground",
         ]
         (code, stdout, stderr) = self.run_ffx_unchecked(cmd)
-        output_json = json.loads(stdout)
-        asserts.assert_equal(stderr, "")
+        try:
+            output_json = json.loads(stdout)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"could not parse string as JSON: {e}.  {stdout}")
+
+        # This is an expected message on stderr. The log file is changed for package servers.
+        asserts.assert_in("Switching log file to", stderr)
         asserts.assert_equal(output_json["type"], "user")
         asserts.assert_equal(
             output_json["message"],
-            "--daemon and --background are mutually exclusive",
+            "--background and --foreground are mutually exclusive",
         )
         asserts.assert_equal(output_json["code"], 1)
 

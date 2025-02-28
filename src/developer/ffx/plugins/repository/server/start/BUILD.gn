@@ -46,7 +46,6 @@ ffx_plugin("ffx_repository_server_start") {
     "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-url",
-    "//src/lib/network/fidl_fuchsia_net_ext",
     "//src/sys/lib/fidl-fuchsia-pkg-ext",
     "//src/sys/pkg/lib/fuchsia-repo",
     "//src/sys/pkg/lib/package-tool",
@@ -77,7 +76,6 @@ ffx_plugin("ffx_repository_server_start") {
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tempfile",
     "//third_party/rust_crates:url",
   ]

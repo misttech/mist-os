@@ -88,7 +88,6 @@ pub(crate) async fn package_server_task(
 
         // These are defaults, nothing special needed.
         background: false,
-        daemon: false,
         disconnected: false,
         trusted_root: None,
         repo_path: None,
