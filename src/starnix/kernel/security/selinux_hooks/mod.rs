@@ -1157,6 +1157,25 @@ pub(super) fn fs_node_copy_up<'a>(
     scoped_fs_create(current_task, file_sid)
 }
 
+/// Returns whether the `current_task` can receive `file` via a socket IPC.
+pub(super) fn file_receive(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    file: &FileObject,
+) -> Result<(), Errno> {
+    let permission_check = security_server.as_permission_check();
+    let subject_sid = current_task.security_state.lock().current_sid;
+    let fs_node_class = file.node().security_state.lock().class;
+    let permission_flags = file.flags().into();
+    has_file_permissions(
+        &permission_check,
+        subject_sid,
+        file,
+        &permissions_from_flags(permission_flags, fs_node_class),
+        current_task.into(),
+    )
+}
+
 /// Returns whether `current_task` can perform a lock operation on the given `file`.
 pub(super) fn check_file_lock_access(
     security_server: &SecurityServer,

@@ -21,6 +21,7 @@ use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{Access, FileMode};
 use starnix_uapi::mount_flags::MountFlags;
+use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::signals::Signal;
 use starnix_uapi::unmount_flags::UnmountFlags;
 use starnix_uapi::{errno, error};
@@ -58,6 +59,22 @@ impl From<Access> for PermissionFlags {
         }
         if access.contains(Access::EXEC) {
             permissions |= PermissionFlags::EXEC;
+        }
+        permissions
+    }
+}
+
+impl From<OpenFlags> for PermissionFlags {
+    fn from(flags: OpenFlags) -> Self {
+        let mut permissions = PermissionFlags::empty();
+        if flags.can_read() {
+            permissions |= PermissionFlags::READ;
+        }
+        if flags.can_write() {
+            permissions |= PermissionFlags::WRITE;
+        }
+        if flags.contains(OpenFlags::APPEND) {
+            permissions |= PermissionFlags::APPEND;
         }
         permissions
     }
@@ -493,6 +510,15 @@ pub fn fs_node_permission(
     track_hook_duration!(c"security.hooks.fs_node_permission");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::fs_node_permission(security_server, current_task, fs_node, permission_flags)
+    })
+}
+
+/// Returns whether the `current_task` can receive `file` via a socket IPC.
+/// Corresponds to the `file_receive()` LSM hook.
+pub fn file_receive(current_task: &CurrentTask, file: &FileObject) -> Result<(), Errno> {
+    profile_duration!("security.hooks.file_receive");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::file_receive(security_server, current_task, file)
     })
 }
 
