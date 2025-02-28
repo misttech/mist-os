@@ -7,6 +7,7 @@ import("//build/config/fuchsia/target_api_level.gni")
 import("//build/rust/rustc_dylib.gni")
 
 common_vfs_args = {
+  output_name = "vfs_rust"
   version = "0.1.0"
   edition = "2021"
   deps = [

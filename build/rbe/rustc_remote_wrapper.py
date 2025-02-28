@@ -39,7 +39,7 @@ _EXEC_PERMS = (
 )
 
 # This is a list of known dylibs built in Fuchsia.
-_KNOWN_FUCHSIA_DYLIBS = ("libvfs",)
+_KNOWN_FUCHSIA_DYLIBS = ("libvfs_rust",)
 
 
 def msg(text: str) -> None:

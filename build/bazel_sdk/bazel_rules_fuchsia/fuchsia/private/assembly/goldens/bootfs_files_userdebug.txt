@@ -63,5 +63,5 @@ lib/libsvc.so
 lib/libtrace-engine.so
 lib/libunwind.so.1
 lib/libusb-peripheral-utils.so
-lib/libvfs.so
 lib/libvfs_internal.so
+lib/libvfs_rust.so

@@ -23,4 +23,4 @@ lib/libfdio.so
 lib/libstd-*
 lib/libtrace-engine.so
 lib/libunwind.so.1
-lib/libvfs.so
+lib/libvfs_rust.so
