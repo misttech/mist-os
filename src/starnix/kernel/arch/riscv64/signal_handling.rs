@@ -51,7 +51,7 @@ struct VState {
 impl SignalStackFrame {
     pub fn new(
         task: &Task,
-        _arch_width: ArchWidth,
+        arch_width: ArchWidth,
         registers: &mut RegisterState,
         extended_pstate: &ExtendedPstateState,
         signal_state: &SignalState,
@@ -104,7 +104,7 @@ impl SignalStackFrame {
         };
 
         let mut sigstack = SignalStackFrame {
-            siginfo_bytes: siginfo.as_siginfo64_bytes()?,
+            siginfo_bytes: siginfo.as_siginfo_bytes(arch_width)?,
             context,
             v_state,
             end_header: uapi::__riscv_ctx_hdr { magic: uapi::END_MAGIC, size: uapi::END_HDR_SIZE },

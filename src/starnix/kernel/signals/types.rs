@@ -5,6 +5,7 @@
 use crate::mm::MemoryAccessor;
 use crate::task::{IntervalTimerHandle, ThreadGroupReadGuard, WaitQueue, Waiter, WaiterRef};
 use starnix_sync::{InterruptibleEvent, RwLock};
+use starnix_types::arch::ArchWidth;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS};
 use starnix_uapi::union::struct_with_union_into_bytes;
@@ -14,6 +15,7 @@ use starnix_uapi::{
     uid_t, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGEV_THREAD_ID, SIG_DFL, SIG_IGN, SI_KERNEL,
     SI_MAX_SIZE,
 };
+use static_assertions::const_assert;
 use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -494,20 +496,6 @@ impl SignalInfo {
         Self { signal, errno: 0, code, detail, force: false }
     }
 
-    // TODO(tbodt): Add a bound requiring siginfo_t to be FromBytes. This will help ensure the
-    // Linux side won't get an invalid siginfo_t.
-    pub fn as_siginfo64_bytes(
-        &self,
-    ) -> Result<[u8; std::mem::size_of::<uapi::siginfo_t>()], Errno> {
-        Ok(signal_info_as_siginfo_bytes!(uapi, self))
-    }
-
-    pub fn as_siginfo32_bytes(
-        &self,
-    ) -> Result<[u8; std::mem::size_of::<uapi::arch32::siginfo_t>()], Errno> {
-        Ok(signal_info_as_siginfo_bytes!(uapi::arch32, self))
-    }
-
     pub fn write<MA: MemoryAccessor>(
         &self,
         ma: &MA,
@@ -519,6 +507,36 @@ impl SignalInfo {
             ma.write_memory(addr.addr(), &self.as_siginfo64_bytes()?)?;
         }
         Ok(())
+    }
+
+    pub fn as_siginfo_bytes(
+        &self,
+        arch_width: ArchWidth,
+    ) -> Result<[u8; std::mem::size_of::<uapi::siginfo_t>()], Errno> {
+        const_assert!(
+            std::mem::size_of::<uapi::siginfo_t>()
+                >= std::mem::size_of::<uapi::arch32::siginfo_t>()
+        );
+        if arch_width.is_arch32() {
+            let mut result = [0_u8; std::mem::size_of::<uapi::siginfo_t>()];
+            result[..std::mem::size_of::<uapi::arch32::siginfo_t>()]
+                .copy_from_slice(&self.as_siginfo32_bytes()?);
+            Ok(result)
+        } else {
+            self.as_siginfo64_bytes()
+        }
+    }
+
+    // TODO(tbodt): Add a bound requiring siginfo_t to be FromBytes. This will help ensure the
+    // Linux side won't get an invalid siginfo_t.
+    fn as_siginfo64_bytes(&self) -> Result<[u8; std::mem::size_of::<uapi::siginfo_t>()], Errno> {
+        Ok(signal_info_as_siginfo_bytes!(uapi, self))
+    }
+
+    fn as_siginfo32_bytes(
+        &self,
+    ) -> Result<[u8; std::mem::size_of::<uapi::arch32::siginfo_t>()], Errno> {
+        Ok(signal_info_as_siginfo_bytes!(uapi::arch32, self))
     }
 }
 

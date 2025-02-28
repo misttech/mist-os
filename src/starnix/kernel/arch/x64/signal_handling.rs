@@ -76,7 +76,7 @@ pub const SIG_STACK_SIZE: usize = std::mem::size_of::<SignalStackFrame>();
 impl SignalStackFrame {
     pub fn new(
         _task: &Task,
-        _arch_width: ArchWidth,
+        arch_width: ArchWidth,
         registers: &RegisterState,
         extended_pstate: &ExtendedPstateState,
         signal_state: &SignalState,
@@ -127,7 +127,7 @@ impl SignalStackFrame {
         };
         Ok(SignalStackFrame {
             context,
-            siginfo_bytes: siginfo.as_siginfo64_bytes()?,
+            siginfo_bytes: siginfo.as_siginfo_bytes(arch_width)?,
             restorer_address: action.sa_restorer.addr,
             xstate: get_xstate(extended_pstate),
         })
