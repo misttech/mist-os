@@ -1,0 +1,196 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/rust/rustc_library.gni")
+import("//build/rust/rustc_macro.gni")
+
+rustc_library("libkmr_crypto_boring") {
+  name = "kmr_crypto_boring"
+  edition = "2021"
+  source_root = "src/boringssl/src/lib.rs"
+  sources = [
+    "src/boringssl/src/aes.rs",
+    "src/boringssl/src/aes_cmac.rs",
+    "src/boringssl/src/des.rs",
+    "src/boringssl/src/ec.rs",
+    "src/boringssl/src/eq.rs",
+    "src/boringssl/src/err.rs",
+    "src/boringssl/src/hmac.rs",
+    "src/boringssl/src/lib.rs",
+    "src/boringssl/src/rng.rs",
+    "src/boringssl/src/rsa.rs",
+    "src/boringssl/src/sha256.rs",
+    "src/boringssl/src/types.rs",
+  ]
+  deps = [
+    ":libkmr_common",
+    ":libkmr_wire_v4",
+    "//third_party/boringssl/rust:bssl-sys",
+    "//third_party/rust_crates:foreign-types",
+    "//third_party/rust_crates:libc",
+    "//third_party/rust_crates:log",
+    "//third_party/rust_crates:openssl",
+  ]
+  configs += [ ":with_boringssl_config" ]
+  configs += [ "//src/lib/android:android_rust_config" ]
+}
+
+config("with_boringssl_config") {
+  # Android called it soong by opposition to cargo, but
+  # it was really more about boringssl vs. openssl.
+  rustflags = [ "--cfg=soong" ]
+}
+
+rustc_library("libkmr_common") {
+  name = "kmr_common"
+  edition = "2021"
+  source_root = "src/common/src/lib.rs"
+  sources = [
+    "src/common/src/crypto.rs",
+    "src/common/src/crypto/aes.rs",
+    "src/common/src/crypto/des.rs",
+    "src/common/src/crypto/ec.rs",
+    "src/common/src/crypto/hmac.rs",
+    "src/common/src/crypto/rsa.rs",
+    "src/common/src/crypto/traits.rs",
+    "src/common/src/keyblob.rs",
+    "src/common/src/keyblob/legacy.rs",
+    "src/common/src/keyblob/sdd_mem.rs",
+    "src/common/src/lib.rs",
+    "src/common/src/tag.rs",
+    "src/common/src/tag/info.rs",
+    "src/common/src/tag/legacy.rs",
+  ]
+  deps = [
+    ":libkmr_derive",
+    ":libkmr_wire_v4",
+    "//third_party/rust_crates:ciborium",
+    "//third_party/rust_crates:coset",
+    "//third_party/rust_crates:der",
+    "//third_party/rust_crates:enumn",
+    "//third_party/rust_crates:log",
+    "//third_party/rust_crates:pkcs1",
+    "//third_party/rust_crates:pkcs8",
+    "//third_party/rust_crates:sec1",
+    "//third_party/rust_crates:spki",
+    "//third_party/rust_crates:zeroize",
+  ]
+  configs += [ "//src/lib/android:android_rust_config" ]
+}
+
+rustc_macro("libkmr_derive") {
+  name = "kmr_derive"
+  edition = "2021"
+  source_root = "src/derive/src/lib.rs"
+  sources = [ "src/derive/src/lib.rs" ]
+  deps = [
+    "//third_party/rust_crates:proc-macro2",
+    "//third_party/rust_crates:quote",
+    "//third_party/rust_crates:syn",
+  ]
+}
+
+rustc_library("libkmr_hal") {
+  name = "kmr_hal"
+  edition = "2021"
+  source_root = "src/hal/src/lib.rs"
+  sources = [
+    "src/hal/src/env.rs",
+    "src/hal/src/hal.rs",
+    "src/hal/src/keymint.rs",
+    "src/hal/src/lib.rs",
+    "src/hal/src/rpc.rs",
+    "src/hal/src/secureclock.rs",
+    "src/hal/src/sharedsecret.rs",
+  ]
+  deps = [
+    ":libkmr_wire_v2",
+    "//src/android/api/android/hardware/security/keymint/2:2_rust",
+    "//src/android/api/android/hardware/security/rkp/3:3_rust",
+    "//src/android/api/android/hardware/security/secureclock/1:1_rust",
+    "//src/android/api/android/hardware/security/sharedsecret/1:1_rust",
+    "//src/lib/android/binder/rust:binder",
+    "//third_party/android/platform/system/keymint/librustutils",
+    "//third_party/rust_crates:log",
+    "//third_party/rust_crates:regex",
+  ]
+  features = [ "hal_v2" ]
+  configs += [ "//src/lib/android:android_rust_config" ]
+}
+
+rustc_library("libkmr_ta") {
+  name = "kmr_ta"
+  edition = "2021"
+  source_root = "src/ta/src/lib.rs"
+  sources = [
+    "src/ta/src/cert.rs",
+    "src/ta/src/clock.rs",
+    "src/ta/src/device.rs",
+    "src/ta/src/keys.rs",
+    "src/ta/src/lib.rs",
+    "src/ta/src/operation.rs",
+    "src/ta/src/rkp.rs",
+    "src/ta/src/secret.rs",
+  ]
+  deps = [
+    ":libkmr_common",
+    ":libkmr_wire_v4",
+    "//third_party/rust_crates:der",
+    "//third_party/rust_crates:flagset",
+    "//third_party/rust_crates:log",
+    "//third_party/rust_crates:spki",
+    "//third_party/rust_crates:x509-cert",
+  ]
+  configs += [ "//src/lib/android:android_rust_config" ]
+}
+
+rustc_library("libkmr_wire_v2") {
+  name = "kmr_wire"
+  edition = "2021"
+  source_root = "src/wire/src/lib.rs"
+  sources = [
+    "src/wire/src/keymint.rs",
+    "src/wire/src/legacy.rs",
+    "src/wire/src/lib.rs",
+    "src/wire/src/rpc.rs",
+    "src/wire/src/secureclock.rs",
+    "src/wire/src/sharedsecret.rs",
+    "src/wire/src/types.rs",
+  ]
+  deps = [
+    ":libkmr_derive",
+    "//third_party/rust_crates:ciborium",
+    "//third_party/rust_crates:coset",
+    "//third_party/rust_crates:enumn",
+    "//third_party/rust_crates:zeroize",
+  ]
+  features = [ "hal_v2" ]
+}
+
+rustc_library("libkmr_wire_v4") {
+  name = "kmr_wire"
+  edition = "2021"
+  source_root = "src/wire/src/lib.rs"
+  sources = [
+    "src/wire/src/keymint.rs",
+    "src/wire/src/legacy.rs",
+    "src/wire/src/lib.rs",
+    "src/wire/src/rpc.rs",
+    "src/wire/src/secureclock.rs",
+    "src/wire/src/sharedsecret.rs",
+    "src/wire/src/types.rs",
+  ]
+  deps = [
+    ":libkmr_derive",
+    "//third_party/rust_crates:ciborium",
+    "//third_party/rust_crates:coset",
+    "//third_party/rust_crates:enumn",
+    "//third_party/rust_crates:zeroize",
+  ]
+  features = [
+    "hal_v2",
+    "hal_v3",
+    "hal_v4",
+  ]
+}

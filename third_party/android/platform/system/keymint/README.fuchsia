@@ -1,0 +1,7 @@
+Name: Android KeyMint Rust Reference implementation
+URL: https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/system/keymint/
+Upstream Git: https://android.googlesource.com/platform/system/keymint/
+Version: git
+License: Apache 2.0
+License File: src/NOTICE
+Security Critical: yes
