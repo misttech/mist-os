@@ -36,13 +36,10 @@ impl SocketDisposition {
 impl Socket {
     /// Read up to the given buffer's length from the socket.
     pub fn read<'a>(&self, buf: &'a mut [u8]) -> impl Future<Output = Result<usize, Error>> + 'a {
-        let client = self.0.client.clone();
+        let client = self.0.client();
         let handle = self.0.proto();
 
-        futures::future::poll_fn(move |ctx| {
-            let client = client.upgrade().ok_or(Error::ClientLost)?;
-            client.poll_socket(handle, ctx, buf)
-        })
+        futures::future::poll_fn(move |ctx| client.poll_socket(handle, ctx, buf))
     }
 
     /// Write all of the given data to the socket.
@@ -52,16 +49,13 @@ impl Socket {
         let hid = self.0.proto();
 
         let client = self.0.client();
-        let result = client.map(|client| {
-            client
-                .transaction(
-                    ordinals::WRITE_SOCKET,
-                    proto::SocketWriteSocketRequest { handle: hid, data },
-                    move |x| Responder::WriteSocket(x, hid),
-                )
-                .map(move |x| x.map(|y| assert!(y.wrote as usize == len)))
-        });
-        async move { result?.await }
+        client
+            .transaction(
+                ordinals::WRITE_SOCKET,
+                proto::SocketWriteSocketRequest { handle: hid, data },
+                move |x| Responder::WriteSocket(x, hid),
+            )
+            .map(move |x| x.map(|y| assert!(y.wrote as usize == len)))
     }
 
     /// Set the disposition of this socket and/or its peer.
@@ -77,14 +71,11 @@ impl Socket {
             .unwrap_or(proto::SocketDisposition::NoChange);
         let client = self.0.client();
         let handle = self.0.proto();
-        let result = client.map(|client| {
-            client.transaction(
-                ordinals::SET_SOCKET_DISPOSITION,
-                proto::SocketSetSocketDispositionRequest { handle, disposition, disposition_peer },
-                Responder::SetSocketDisposition,
-            )
-        });
-        async move { result?.await }
+        client.transaction(
+            ordinals::SET_SOCKET_DISPOSITION,
+            proto::SocketSetSocketDispositionRequest { handle, disposition, disposition_peer },
+            Responder::SetSocketDisposition,
+        )
     }
 
     /// Split this socket into a streaming reader and a writer. This is more
@@ -94,7 +85,7 @@ impl Socket {
     /// lead to memory issues if you don't intend to use the data from the
     /// socket as fast as it comes.
     pub fn stream(self) -> Result<(SocketReadStream, SocketWriter), Error> {
-        self.0.client()?.start_socket_streaming(self.0.proto())?;
+        self.0.client().start_socket_streaming(self.0.proto())?;
 
         let a = Arc::new(self);
         let b = Arc::clone(&a);
@@ -125,7 +116,7 @@ impl SocketReadStream {
 
 impl Drop for SocketReadStream {
     fn drop(&mut self) {
-        if let Ok(client) = self.0 .0.client() {
+        if let Some(client) = self.0 .0.client.upgrade() {
             client.stop_socket_streaming(self.0 .0.proto());
         }
     }

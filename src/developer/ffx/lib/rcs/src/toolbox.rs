@@ -15,7 +15,7 @@ use {
 
 #[cfg(not(feature = "fdomain"))]
 use {
-    fidl::endpoints::{DiscoverableProtocolMarker, ProxyHasClient},
+    fidl::endpoints::{DiscoverableProtocolMarker, ProxyHasDomain},
     fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as sys2,
     fidl_fuchsia_sys2::OpenDirType,
@@ -79,7 +79,7 @@ pub async fn open_toolbox(rcs: &RemoteControlProxy) -> Result<fio::DirectoryProx
 /// Open the service directory of the toolbox.
 #[cfg(feature = "fdomain")]
 pub async fn open_toolbox(rcs: &RemoteControlProxy) -> Result<fio::DirectoryProxy> {
-    rcs.client()?.namespace().await.map_err(Into::into).map(fio::DirectoryProxy::from_channel)
+    rcs.domain().namespace().await.map_err(Into::into).map(fio::DirectoryProxy::from_channel)
 }
 
 /// Connects to a protocol available in the namespace of the `toolbox` component.
@@ -95,7 +95,7 @@ where
     P: DiscoverableProtocolMarker,
 {
     let protocol_name = P::PROTOCOL_NAME;
-    let (proxy, server_end) = rcs_proxy.client()?.create_proxy::<P>();
+    let (proxy, server_end) = rcs_proxy.domain().create_proxy::<P>();
     // time this so that we can use an appropriately shorter timeout for the attempt
     // to connect by the backup (if there is one)
     let start_time = Instant::now();
@@ -113,7 +113,7 @@ where
     let (toolbox_res, proxy) = if toolbox_res.is_ok() {
         (toolbox_res, proxy)
     } else {
-        let (proxy, server_end) = rcs_proxy.client()?.create_proxy::<P>();
+        let (proxy, server_end) = rcs_proxy.domain().create_proxy::<P>();
         let toolbox_took = Instant::now() - start_time;
         let timeout = dur.saturating_sub(toolbox_took);
         (
@@ -147,7 +147,7 @@ where
     // try to connect to the moniker given instead, but don't double
     // up the timeout.
     let timeout = dur.saturating_sub(toolbox_took);
-    let (proxy, server_end) = rcs_proxy.client()?.create_proxy::<P>();
+    let (proxy, server_end) = rcs_proxy.domain().create_proxy::<P>();
     let moniker_res = crate::open_with_timeout::<P>(
         timeout,
         &backup,

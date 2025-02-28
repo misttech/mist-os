@@ -25,7 +25,7 @@ use {
 
 #[cfg(not(feature = "fdomain"))]
 use {
-    fidl::endpoints::{DiscoverableProtocolMarker, ProxyHasClient},
+    fidl::endpoints::{DiscoverableProtocolMarker, ProxyHasDomain},
     fidl_fuchsia_developer_remotecontrol::{
         ConnectCapabilityError, IdentifyHostError, IdentifyHostResponse, RemoteControlMarker,
         RemoteControlProxy,
@@ -245,7 +245,7 @@ async fn connect_to_rcs(
     capability_set: OpenDirType,
     capability_name: &str,
 ) -> Result<KnockClientType, KnockRcsError> {
-    let rcs_client = rcs_proxy.client()?;
+    let rcs_client = rcs_proxy.domain();
     // Try to connect via fuchsia.developer.remotecontrol/RemoteControl.ConnectCapability.
     let (client, server) = rcs_client.create_channel();
     #[cfg(not(feature = "fdomain"))]
@@ -258,7 +258,7 @@ async fn connect_to_rcs(
     }
     // Fallback to fuchsia.developer.remotecontrol/RemoteControl.DeprecatedOpenCapability.
     // This can be removed once we drop support for API level 27.
-    let (client, server) = rcs_proxy.client()?.create_channel();
+    let (client, server) = rcs_proxy.domain().create_channel();
     #[cfg(not(feature = "fdomain"))]
     let client = fuchsia_async::Channel::from_channel(client);
     rcs_proxy
@@ -407,7 +407,7 @@ pub async fn connect_to_protocol<P: DiscoverableProtocolMarker>(
     moniker: &str,
     rcs_proxy: &RemoteControlProxy,
 ) -> Result<P::Proxy> {
-    let (proxy, server_end) = rcs_proxy.client()?.create_proxy::<P>();
+    let (proxy, server_end) = rcs_proxy.domain().create_proxy::<P>();
     connect_with_timeout::<P>(dur, moniker, rcs_proxy, server_end.into_channel()).await?;
     Ok(proxy)
 }
@@ -428,7 +428,7 @@ async fn get_cf_root_from_namespace<M: DiscoverableProtocolMarker>(
     rcs_proxy: &RemoteControlProxy,
     timeout: Duration,
 ) -> Result<M::Proxy> {
-    let (proxy, server_end) = rcs_proxy.client()?.create_proxy::<M>();
+    let (proxy, server_end) = rcs_proxy.domain().create_proxy::<M>();
     let start_time = Instant::now();
     let res = open_with_timeout_at(
         timeout,
@@ -444,7 +444,7 @@ async fn get_cf_root_from_namespace<M: DiscoverableProtocolMarker>(
         proxy
     } else {
         // Fallback to the legacy remote control moniker if toolbox doesn't contain the capability.
-        let (proxy, server_end) = rcs_proxy.client()?.create_proxy::<M>();
+        let (proxy, server_end) = rcs_proxy.domain().create_proxy::<M>();
         let timeout = timeout.saturating_sub(Instant::now() - start_time);
         open_with_timeout_at(
             timeout,
@@ -465,7 +465,7 @@ pub async fn kernel_stats(
     timeout: Duration,
 ) -> Result<proto_fuchsia_kernel::StatsProxy> {
     let (proxy, server_end) =
-        rcs_proxy.client()?.create_proxy::<proto_fuchsia_kernel::StatsMarker>();
+        rcs_proxy.domain().create_proxy::<proto_fuchsia_kernel::StatsMarker>();
     let start_time = Instant::now();
     let res = open_with_timeout_at(
         timeout,
@@ -482,7 +482,7 @@ pub async fn kernel_stats(
     } else {
         // Fallback to the legacy remote control moniker if toolbox doesn't contain the capability.
         let (proxy, server_end) =
-            rcs_proxy.client()?.create_proxy::<proto_fuchsia_kernel::StatsMarker>();
+            rcs_proxy.domain().create_proxy::<proto_fuchsia_kernel::StatsMarker>();
         let timeout = timeout.saturating_sub(Instant::now() - start_time);
         open_with_timeout_at(
             timeout,

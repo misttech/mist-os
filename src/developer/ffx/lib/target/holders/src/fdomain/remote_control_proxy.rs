@@ -9,7 +9,7 @@ use fdomain_client::fidl::{
     DiscoverableProtocolMarker as FDiscoverableProtocolMarker, Proxy as FProxy,
 };
 use fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy;
-use ffx_command_error::{Error, FfxContext as _, Result};
+use ffx_command_error::{FfxContext as _, Result};
 use fho::{bug, FhoConnectionBehavior, FhoEnvironment, TryFromEnv};
 use std::ops::Deref;
 use std::sync::Arc;
@@ -81,8 +81,7 @@ where
     P: FProxy + 'static,
     P::Protocol: FDiscoverableProtocolMarker,
 {
-    let (proxy, server_end) =
-        rcs.client().map_err(|e| Error::Unexpected(e.into()))?.create_proxy::<P::Protocol>();
+    let (proxy, server_end) = rcs.domain().create_proxy::<P::Protocol>();
     rcs_fdomain::open_with_timeout::<P::Protocol>(
         timeout,
         moniker,

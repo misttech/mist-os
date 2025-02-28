@@ -4,7 +4,7 @@
 
 use crate::handle::handle_type;
 use crate::responder::Responder;
-use crate::{ordinals, AsHandleRef, Error, Event, EventPair, Handle, OnFDomainSignals, Socket};
+use crate::{ordinals, Error, Event, EventPair, Handle, OnFDomainSignals, Socket};
 use fidl_fuchsia_fdomain as proto;
 use futures::future::Either;
 use futures::stream::Stream;
@@ -135,11 +135,10 @@ pub enum HandleOp<'h> {
 impl Channel {
     /// Reads a message from the channel.
     pub fn recv_msg(&self) -> impl Future<Output = Result<MessageBuf, Error>> {
-        let client = self.0.client.clone();
+        let client = self.0.client();
         let handle = self.0.proto();
 
         futures::future::poll_fn(move |ctx| {
-            let client = client.upgrade().ok_or(Error::ClientLost)?;
             client.poll_channel(handle, ctx, false).map(|x| {
                 x.expect("Got stream termination indication from non-streaming read!")
                     .map(|x| MessageBuf::from_proto(&client, x))
@@ -149,7 +148,7 @@ impl Channel {
 
     /// Poll a channel for a message to read.
     pub fn recv_from(&self, cx: &mut Context<'_>, buf: &mut MessageBuf) -> Poll<Result<(), Error>> {
-        let client = self.0.client()?;
+        let client = self.0.client();
         match ready!(client.poll_channel(self.0.proto(), cx, false))
             .expect("Got stream termination indication from non-streaming read!")
         {
@@ -233,16 +232,12 @@ impl Channel {
         let client = self.0.client();
         let handle = self.0.proto();
 
-        let result = client.map(move |client| {
-            client.clear_handles_for_transfer(&handles);
-            client.transaction(
-                ordinals::WRITE_CHANNEL,
-                proto::ChannelWriteChannelRequest { handle, data, handles },
-                move |x| Responder::WriteChannel(x, handle),
-            )
-        });
-
-        async move { result?.await }
+        client.clear_handles_for_transfer(&handles);
+        client.transaction(
+            ordinals::WRITE_CHANNEL,
+            proto::ChannelWriteChannelRequest { handle, data, handles },
+            move |x| Responder::WriteChannel(x, handle),
+        )
     }
 
     /// Split this channel into a streaming reader and a writer. This is more
@@ -252,8 +247,7 @@ impl Channel {
     /// buffer, so it may lead to memory issues if you don't intend to use the
     /// messages from the channel as fast as they come.
     pub fn stream(self) -> Result<(ChannelMessageStream, ChannelWriter), Error> {
-        let client = self.client()?;
-        client.start_channel_streaming(self.0.proto())?;
+        self.0.client().start_channel_streaming(self.0.proto())?;
 
         let a = Arc::new(self);
         let b = Arc::clone(&a);
@@ -304,7 +298,7 @@ impl ChannelMessageStream {
     /// `Channel::stream`.
     pub fn rejoin(mut self, writer: ChannelWriter) -> Channel {
         assert!(Arc::ptr_eq(&self.0, &writer.0), "Tried to join stream with wrong writer!");
-        if let Ok(client) = self.0 .0.client() {
+        if let Some(client) = self.0 .0.client.upgrade() {
             client.stop_channel_streaming(self.0 .0.proto())
         }
         std::mem::drop(writer);
@@ -314,9 +308,7 @@ impl ChannelMessageStream {
 
     /// Whether this stream is closed.
     pub fn is_closed(&self) -> bool {
-        let Ok(client) = self.0.client() else {
-            return true;
-        };
+        let client = self.0 .0.client();
 
         !client.channel_is_streaming(self.0 .0.proto())
     }
@@ -330,7 +322,7 @@ impl ChannelMessageStream {
 impl Stream for ChannelMessageStream {
     type Item = Result<MessageBuf, Error>;
     fn poll_next(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let Ok(client) = self.0.client() else { return Poll::Ready(Some(Err(Error::ClientLost))) };
+        let client = self.0 .0.client();
         client
             .poll_channel(self.0 .0.proto(), ctx, true)
             .map(|x| x.map(|x| x.map(|x| MessageBuf::from_proto(&client, x))))
@@ -339,7 +331,7 @@ impl Stream for ChannelMessageStream {
 
 impl Drop for ChannelMessageStream {
     fn drop(&mut self) {
-        if let Ok(client) = self.0.client() {
+        if let Some(client) = self.0 .0.client.upgrade() {
             client.stop_channel_streaming(self.0 .0.proto());
         }
     }

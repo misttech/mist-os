@@ -11,7 +11,6 @@ use crate::{
 };
 use futures::{Future, FutureExt, Stream, TryFutureExt, TryStream, TryStreamExt};
 use log::error;
-use std::convert::Infallible;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use {fuchsia_async as fasync, zx_status};
@@ -103,20 +102,20 @@ pub trait Proxy: Sized + Send + Sync {
     }
 }
 
-/// This gives native Zircon proxies a client method like FDomain proxies have.
+/// This gives native Zircon proxies a domain method like FDomain proxies have.
 /// This makes it easier in some cases to build the same code for both FDomain
 /// and regular FIDL.
-pub trait ProxyHasClient {
+pub trait ProxyHasDomain {
     /// Get a "client" for this proxy. This is just an object which has methods
     /// for a few common handle creation operations.
-    fn client(&self) -> Result<ZirconClient, Infallible> {
-        Ok(ZirconClient)
+    fn domain(&self) -> ZirconClient {
+        ZirconClient
     }
 }
 
-impl<T: Proxy> ProxyHasClient for T {}
+impl<T: Proxy> ProxyHasDomain for T {}
 
-/// The fake "client" produced by `ProxyHasClient`. Analogous to an FDomain client.
+/// The fake "client" produced by `ProxyHasDomain`. Analogous to an FDomain client.
 pub struct ZirconClient;
 
 impl ZirconClient {

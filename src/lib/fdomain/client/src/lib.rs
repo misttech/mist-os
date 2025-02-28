@@ -11,7 +11,7 @@ use std::convert::Infallible;
 use std::future::Future;
 use std::num::NonZeroU32;
 use std::pin::Pin;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::task::{ready, Context, Poll, Waker};
 use {fidl_fuchsia_fdomain as proto, fuchsia_async as _};
 
@@ -117,7 +117,6 @@ pub enum Error {
     Transport(Arc<std::io::Error>),
     ConnectionMismatch,
     StreamingAborted,
-    ClientLost,
 }
 
 impl std::fmt::Display for Error {
@@ -160,7 +159,6 @@ impl std::fmt::Display for Error {
                 write!(f, "Tried to use an FDomain handle from a different connection")
             }
             Self::StreamingAborted => write!(f, "This channel is no longer streaming"),
-            Self::ClientLost => write!(f, "The client associated with this handle was destroyed"),
         }
     }
 }
@@ -179,7 +177,6 @@ impl std::fmt::Debug for Error {
             Self::ProtocolStreamEventIncompatible => write!(f, "ProtocolStreamEventIncompatible"),
             Self::ConnectionMismatch => write!(f, "ConnectionMismatch"),
             Self::StreamingAborted => write!(f, "StreamingAborted"),
-            Self::ClientLost => write!(f, "ClientLost"),
         }
     }
 }
@@ -592,6 +589,23 @@ impl std::fmt::Debug for Client {
     }
 }
 
+/// A client which is always disconnected. Handles that lose their clients
+/// connect to this client instead, which always returns a "Client Lost"
+/// transport failure.
+pub(crate) static DEAD_CLIENT: LazyLock<Arc<Client>> = LazyLock::new(|| {
+    Arc::new(Client(Mutex::new(ClientInner {
+        transport: Transport::Error(InnerError::Transport(Arc::new(std::io::Error::other(
+            "Client Lost",
+        )))),
+        transactions: HashMap::new(),
+        channel_read_states: HashMap::new(),
+        socket_read_states: HashMap::new(),
+        next_tx_id: 1,
+        waiting_to_close: Vec::new(),
+        waiting_to_close_waker: futures::task::noop_waker(),
+    })))
+});
+
 impl Client {
     /// Create a new FDomain client. The `transport` argument should contain the
     /// established connection to the target, ready to communicate the FDomain
@@ -791,6 +805,9 @@ impl Client {
     /// Start getting streaming events for socket reads.
     pub(crate) fn start_socket_streaming(&self, id: proto::HandleId) -> Result<(), Error> {
         let mut inner = self.0.lock().unwrap();
+        if let Some(e) = inner.transport.error() {
+            return Err(e.into());
+        }
 
         let state = inner.socket_read_states.entry(id).or_insert_with(|| SocketReadState {
             wakers: Vec::new(),
@@ -831,6 +848,9 @@ impl Client {
     /// Start getting streaming events for socket reads.
     pub(crate) fn start_channel_streaming(&self, id: proto::HandleId) -> Result<(), Error> {
         let mut inner = self.0.lock().unwrap();
+        if let Some(e) = inner.transport.error() {
+            return Err(e.into());
+        }
         let state = inner.channel_read_states.entry(id).or_insert_with(|| ChannelReadState {
             wakers: Vec::new(),
             queued: VecDeque::new(),

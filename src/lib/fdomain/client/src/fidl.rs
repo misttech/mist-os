@@ -374,9 +374,12 @@ pub trait Proxy: Sized + Send + Sync {
     /// exclusive control over these operations.
     fn as_channel(&self) -> &Channel;
 
-    /// Get the client supporting this proxy.
-    fn client(&self) -> Result<Arc<crate::Client>, Error> {
-        self.as_channel().client()
+    /// Get the client supporting this proxy. We call this a "domain" here because:
+    /// * Client is especially overloaded in contexts where this is useful.
+    /// * We simulate this call for target-side FIDL proxies, so it isn't always
+    ///   really a client.
+    fn domain(&self) -> Arc<crate::Client> {
+        self.as_channel().domain()
     }
 }
 
