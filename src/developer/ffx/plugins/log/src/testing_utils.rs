@@ -166,6 +166,10 @@ impl TestEnvironment {
         self.disconnect_target();
     }
 
+    pub fn set_boot_timestamp(&mut self, new_boot_timestamp: u64) {
+        self.state.mutable.borrow_mut().boot_timestamp = new_boot_timestamp;
+    }
+
     pub fn disconnect_target(&mut self) {
         let mut mutable_state = self.state.mutable.borrow_mut();
         // This must have already been taken and is been awaited on.

@@ -29,6 +29,7 @@ ffx_plugin("ffx_log") {
     "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/lib/writer:lib",
     "//src/diagnostics/lib/log-command",
+    "//src/lib/diagnostics/data/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
@@ -56,7 +57,6 @@ ffx_plugin("ffx_log") {
   test_deps = [
     "//src/developer/ffx/lib/writer:lib",
     "//src/diagnostics/lib/log-command",
-    "//src/lib/diagnostics/data/rust",
     "//src/lib/diagnostics/selectors",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-sync",

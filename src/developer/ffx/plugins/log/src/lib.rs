@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
+use diagnostics_data::{BuilderArgs, LogsDataBuilder, LogsProperty, Severity};
 use error::LogError;
 use ffx_log_args::LogCommand;
 use ffx_writer::{MachineWriter, ToolIO};
@@ -12,8 +13,8 @@ use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
 use fidl_fuchsia_sys2::RealmQueryProxy;
 use futures::{select, FutureExt};
 use log_command::{
-    dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, LogEntry, LogProcessingResult,
-    LogSubCommand, Symbolize, Timestamp, WatchCommand, WriterContainer,
+    dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, LogData, LogEntry,
+    LogProcessingResult, LogSubCommand, Symbolize, Timestamp, WatchCommand, WriterContainer,
 };
 use std::io::Write;
 use target_connector::Connector;
@@ -112,6 +113,7 @@ struct DeviceConnection {
     log_settings_client: LogSettingsProxy,
     boot_id: Option<u64>,
     realm_query: RealmQueryProxy,
+    was_reboot: bool,
 }
 
 async fn connect_to_rcs(
@@ -134,21 +136,22 @@ async fn connect_to_target(
     let boot_timestamp = host_id.boot_timestamp_nanos.ok_or(LogError::NoBootTimestamp)?;
     let boot_id = host_id.boot_id;
     let realm_query = rcs::root_realm_query(&rcs_client, TIMEOUT).await?;
-
     // If we detect a reboot we want to SnapshotThenSubscribe so
     // we get all of the logs from the reboot. If not, we use Snapshot
     // to avoid getting duplicate logs.
-    match prev_boot_id {
+    let was_reboot = match prev_boot_id {
         Some(id) if Some(id) == boot_id => {
             // Reconnect detected, subscribe.
             *stream_mode = fidl_fuchsia_diagnostics::StreamMode::Subscribe;
+            false
         }
         Some(_) => {
             // Device rebooted
             *stream_mode = fidl_fuchsia_diagnostics::StreamMode::SnapshotThenSubscribe;
+            true
         }
-        _ => {}
-    }
+        _ => false,
+    };
     // Connect to ArchiveAccessor
     let diagnostics_client = rcs::toolbox::connect_with_timeout::<ArchiveAccessorMarker>(
         &rcs_client,
@@ -185,6 +188,7 @@ async fn connect_to_target(
         log_settings_client,
         boot_id,
         realm_query,
+        was_reboot,
     })
 }
 
@@ -243,6 +247,7 @@ where
             }
             fuchsia_async::Timer::new(std::time::Duration::from_secs(backoff)).await;
         }
+        let prev_boot_id_for_logging = prev_boot_id;
         prev_boot_id = connection.boot_id;
 
         formatter.expand_monikers(&connection.realm_query).await?;
@@ -264,6 +269,27 @@ where
         formatter.set_boot_timestamp(Timestamp::from_nanos(
             connection.boot_timestamp.try_into().unwrap(),
         ));
+        if connection.was_reboot {
+            // Generate synthetic reboot message
+            let mut builder = LogsDataBuilder::new(BuilderArgs {
+                component_url: Some("ffx".into()),
+                moniker: "ffx".try_into().unwrap(),
+                severity: Severity::Info,
+                timestamp: Timestamp::from_nanos(formatter.get_boot_timestamp().into_nanos()),
+            })
+            .set_message("Target device rebooted");
+            if let Some(prev_boot_id) = prev_boot_id_for_logging {
+                builder =
+                    builder.add_key(LogsProperty::Uint("previous_boot_id".into(), prev_boot_id));
+            }
+            if let Some(current_boot_id) = connection.boot_id {
+                builder =
+                    builder.add_key(LogsProperty::Uint("current_boot_id".into(), current_boot_id));
+            }
+            formatter
+                .push_unfiltered_log(LogEntry { data: LogData::TargetLog(builder.build()) })
+                .await?;
+        }
         let result = dump_logs_from_socket(
             connection.log_socket,
             &mut formatter,
@@ -328,11 +354,19 @@ mod tests {
     use selectors::parse_log_interest_selector;
 
     const TEST_STR: &str = "[1980-01-01 00:00:03.000][ffx] INFO: Hello world!\u{1b}[m\n";
+    const RECONNECT_STR: &str = "[1970-01-01 00:00:00.000][ffx] INFO: Target device rebooted current_boot_id=42 previous_boot_id=1\u{1b}[m\n[1980-01-01 00:00:03.000][ffx] INFO: Hello world!\u{1b}[m\n";
+    const RECONNECT_STR_WITH_42_SECONDS: &str = "[1970-01-01 00:00:42.000][ffx] INFO: Target device rebooted current_boot_id=42 previous_boot_id=1\u{1b}[m\n[1980-01-01 00:00:45.000][ffx] INFO: Hello world!\u{1b}[m\n";
     const BOOT_TIMESTAMP: u64 = 57575757;
 
     async fn check_for_message(buffers: &TestBuffers, msg: &str) {
-        while buffers.stdout.clone().into_string() != msg {
-            buffers.stdout.wait_ready().await;
+        loop {
+            let actual = buffers.stdout.clone().into_string();
+            let expected = msg;
+            if actual != expected {
+                buffers.stdout.wait_ready().await;
+            } else {
+                break;
+            }
         }
     }
 
@@ -665,7 +699,7 @@ ffx log --force-set-severity.
         // polling the future.
         assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
 
-        check_for_message(&buffers, TEST_STR).await;
+        check_for_message(&buffers, RECONNECT_STR).await;
 
         // Second connection has a different timestamp so should be treated
         // as a reboot.
@@ -788,11 +822,12 @@ ffx log --force-set-severity.
         // For the third connection, we should get a
         // SnapshotThenSubscribe request because the timestamp
         // changed and it's clear it's actually a separate boot not a disconnect/reconnect
+        environment.set_boot_timestamp(std::time::Duration::from_secs(42).as_nanos() as u64);
         environment.reboot_target(Some(42));
 
         assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
 
-        check_for_message(&buffers, TEST_STR).await;
+        check_for_message(&buffers, RECONNECT_STR_WITH_42_SECONDS).await;
 
         assert_matches!(
             event_stream.next().await,

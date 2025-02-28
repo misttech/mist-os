@@ -260,29 +260,7 @@ where
     W: Write + ToolIO<OutputItem = LogEntry>,
 {
     async fn push_log(&mut self, log_entry: LogEntry) -> Result<LogProcessingResult, LogError> {
-        if self.filter_by_timestamp(&log_entry, self.options.since.as_ref(), |a, b| a <= b) {
-            return Ok(LogProcessingResult::Continue);
-        }
-
-        if self.filter_by_timestamp(&log_entry, self.options.until.as_ref(), |a, b| a >= b) {
-            return Ok(LogProcessingResult::Exit);
-        }
-
-        if !self.filters.matches(&log_entry) {
-            return Ok(LogProcessingResult::Continue);
-        }
-        match self.options.display {
-            Some(text_options) => {
-                let mut options_for_this_line_only = self.options.clone();
-                options_for_this_line_only.display = Some(text_options);
-                self.format_text_log(options_for_this_line_only, log_entry)?;
-            }
-            None => {
-                self.writer.item(&log_entry).map_err(|err| LogError::UnknownError(err.into()))?;
-            }
-        };
-
-        Ok(LogProcessingResult::Continue)
+        self.push_log_internal(log_entry, true).await
     }
 
     fn is_utc_time_format(&self) -> bool {
@@ -341,6 +319,58 @@ where
 
     pub async fn expand_monikers(&mut self, getter: &impl InstanceGetter) -> Result<(), LogError> {
         self.filters.expand_monikers(getter).await
+    }
+
+    pub async fn push_unfiltered_log(
+        &mut self,
+        log_entry: LogEntry,
+    ) -> Result<LogProcessingResult, LogError> {
+        self.push_log_internal(log_entry, false).await
+    }
+
+    async fn push_log_internal(
+        &mut self,
+        log_entry: LogEntry,
+        enable_filters: bool,
+    ) -> Result<LogProcessingResult, LogError> {
+        if enable_filters {
+            if self.filter_by_timestamp(&log_entry, self.options.since.as_ref(), |a, b| a <= b) {
+                return Ok(LogProcessingResult::Continue);
+            }
+
+            if self.filter_by_timestamp(&log_entry, self.options.until.as_ref(), |a, b| a >= b) {
+                return Ok(LogProcessingResult::Exit);
+            }
+
+            if !self.filters.matches(&log_entry) {
+                return Ok(LogProcessingResult::Continue);
+            }
+        }
+        match self.options.display {
+            Some(text_options) => {
+                let mut options_for_this_line_only = self.options.clone();
+                options_for_this_line_only.display = Some(text_options);
+                if !enable_filters {
+                    // For host logs, don't apply the boot time offset
+                    // as this is with reference to the UTC timeline
+                    if let LogTimeDisplayFormat::WallTime { ref mut offset, .. } =
+                        options_for_this_line_only.display.as_mut().unwrap().time_format
+                    {
+                        // 1 nanosecond so that LogTimeDisplayFormat in diagnostics_data
+                        // knows that we have a valid UTC offset. It normally falls back if
+                        // the UTC offset is 0. It prints at millisecond precision so being
+                        // off by +1 nanosecond isn't an issue.
+                        *offset = 1;
+                    };
+                }
+                self.format_text_log(options_for_this_line_only, log_entry)?;
+            }
+            None => {
+                self.writer.item(&log_entry).map_err(|err| LogError::UnknownError(err.into()))?;
+            }
+        };
+
+        Ok(LogProcessingResult::Continue)
     }
 
     /// Creates a new DefaultLogFormatter from command-line arguments.
