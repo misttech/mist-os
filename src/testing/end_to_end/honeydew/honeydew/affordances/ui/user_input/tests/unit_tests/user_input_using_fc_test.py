@@ -169,3 +169,40 @@ class UserInputFCTests(unittest.TestCase):
                 ),
             ]
         )
+
+    @mock.patch.object(
+        f_test_input.Registry.Client,
+        "register_keyboard",
+    )
+    def test_create_keyboard_device(self, register_keyboard) -> None:  # type: ignore[no-untyped-def]
+        """Test for UserInput.create_keyboard_device() method."""
+
+        keyboard_device = self.user_input().create_keyboard_device()
+
+        self.fc_transport_obj.connect_device_proxy.assert_called_once_with(
+            custom_types.FidlEndpoint(
+                "/core/ui", "fuchsia.ui.test.input.Registry"
+            )
+        )
+
+        register_keyboard.assert_called_once()
+
+        self.assertIsNotNone(keyboard_device._keyboard_proxy)  # type: ignore[attr-defined]
+
+    def test_key_press(self) -> None:
+        """Test for UserInput.key_press() method."""
+
+        keyboard_device = self.user_input().create_keyboard_device()
+        keyboard_device._keyboard_proxy = mock.MagicMock()  # type: ignore[attr-defined]
+
+        keyboard_device.key_press(
+            key_code=0xFFFF0002,  # Power
+        )
+
+        keyboard_device._keyboard_proxy.simulate_key_press.assert_has_calls(  # type: ignore[attr-defined]
+            [
+                mock.call(
+                    key_code=0xFFFF0002,
+                ),
+            ]
+        )

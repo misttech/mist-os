@@ -74,6 +74,25 @@ class UserInputAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         # after = self.device.screenshot.take()
         # asserts.assert_not_equal(before.data[0:4], after.data[0:4])
 
+    def test_user_input_press_key(self) -> None:
+        self.device.session.add_component(TOUCH_APP)
+
+        # The app will change the color when a key is received.
+        # Ensure the top left pixel changes after
+        #
+        # TODO(b/320543407): Re-enable the assertion once we get the example app
+        # to properly render into scenic. See b/320543407 for details.
+        # before = self.device.screenshot.take()
+
+        keyboard_device = self.device.user_input.create_keyboard_device()
+
+        keyboard_device.key_press(key_code=0x00070004)  # Key A
+
+        # TODO(b/320543407): Re-enable the assertion once we get the example app
+        # to properly render into scenic. See b/320543407 for details.
+        # after = self.device.screenshot.take()
+        # asserts.assert_not_equal(before.data[0:4], after.data[0:4])
+
 
 if __name__ == "__main__":
     test_runner.main()

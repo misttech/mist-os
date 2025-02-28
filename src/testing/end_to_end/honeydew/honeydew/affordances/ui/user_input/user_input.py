@@ -69,6 +69,24 @@ class TouchDevice(abc.ABC):
         """
 
 
+class KeyboardDevice(abc.ABC):
+    """Abstract base class for UserInput Keyboard or Button."""
+
+    @abc.abstractmethod
+    def key_press(
+        self,
+        key_code: int,
+    ) -> None:
+        """Instantiates key press includes down and up.
+
+        Args:
+            key_code: key code you can find in fuchsia.input.Key
+
+        Raises:
+            UserInputError: if failed key press operation.
+        """
+
+
 class UserInput(abc.ABC):
     """Abstract base class for UserInput affordance."""
 
@@ -85,4 +103,12 @@ class UserInput(abc.ABC):
 
         Raises:
             UserInputError: if failed to create virtual touch device.
+        """
+
+    @abc.abstractmethod
+    def create_keyboard_device(self) -> KeyboardDevice:
+        """Create a virtual keyboard device for testing keyboard input.
+
+        Raises:
+            UserInputError: if failed to create virtual keyboard device.
         """

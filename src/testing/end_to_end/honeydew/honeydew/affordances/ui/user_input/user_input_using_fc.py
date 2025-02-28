@@ -141,6 +141,61 @@ class TouchDevice(user_input.TouchDevice):
             ) from status
 
 
+class KeyboardDevice(user_input.KeyboardDevice):
+    """Virtual KeyboardDevice for testing using FuchsiaController.
+
+    Args:
+        device_name: name of testing device.
+        fuchsia_controller: FuchsiaController transport.
+
+    Raises:
+        UserInputError: if failed to create virtual keyboard device.
+    """
+
+    def __init__(
+        self,
+        device_name: str,
+        fuchsia_controller: fc_transport.FuchsiaController,
+    ) -> None:
+        self._device_name = device_name
+        channel_server, channel_client = fcp.Channel.create()
+
+        try:
+            input_registry_proxy = f_test_input.Registry.Client(
+                fuchsia_controller.connect_device_proxy(
+                    _FcProxies.INPUT_REGISTRY
+                )
+            )
+            input_registry_proxy.register_keyboard(
+                device=channel_server.take(),
+            )
+        except fcp.ZxStatus as status:
+            raise user_input_errors.UserInputError(
+                f"Failed to initialize keyboard device on {self._device_name}"
+            ) from status
+
+        self._keyboard_proxy = f_test_input.Keyboard.Client(channel_client)
+
+    def key_press(
+        self,
+        key_code: int,
+    ) -> None:
+        """Instantiates key press includes down and up.
+
+        Args:
+            key_code: key code you can find in fuchsia.input.Key
+
+        Raises:
+            UserInputError: if failed key press operation.
+        """
+        try:
+            self._keyboard_proxy.simulate_key_press(key_code=key_code)
+        except fcp.ZxStatus as status:
+            raise user_input_errors.UserInputError(
+                f"key press operation failed on {self._device_name}"
+            ) from status
+
+
 class UserInputUsingFc(user_input.UserInput):
     """UserInput affordance implementation using FuchsiaController.
 
@@ -183,5 +238,10 @@ class UserInputUsingFc(user_input.UserInput):
             UserInputError: if failed to create virtual touch device.
         """
         return TouchDevice(
+            device_name=self._device_name, fuchsia_controller=self._fc_transport
+        )
+
+    def create_keyboard_device(self) -> user_input.KeyboardDevice:
+        return KeyboardDevice(
             device_name=self._device_name, fuchsia_controller=self._fc_transport
         )
