@@ -309,7 +309,11 @@ impl Handle {
 impl Drop for Handle {
     fn drop(&mut self) {
         if let Ok(client) = self.client() {
-            client.0.lock().unwrap().waiting_to_close.push(self.proto());
+            let mut client = client.0.lock().unwrap();
+            if client.waiting_to_close.is_empty() {
+                client.waiting_to_close_waker.wake_by_ref();
+            }
+            client.waiting_to_close.push(self.proto());
         }
     }
 }

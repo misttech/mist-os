@@ -363,6 +363,7 @@ struct ClientInner {
     channel_read_states: HashMap<proto::HandleId, ChannelReadState>,
     next_tx_id: u32,
     waiting_to_close: Vec<proto::HandleId>,
+    waiting_to_close_waker: Waker,
 }
 
 impl ClientInner {
@@ -394,6 +395,8 @@ impl ClientInner {
                 Responder::Ignore,
             );
         }
+
+        self.waiting_to_close_waker = ctx.waker().clone();
 
         loop {
             if let Poll::Ready(e) = self.transport.poll_send_messages(ctx) {
@@ -573,6 +576,7 @@ impl Client {
             channel_read_states: HashMap::new(),
             next_tx_id: 1,
             waiting_to_close: Vec::new(),
+            waiting_to_close_waker: futures::task::noop_waker(),
         })));
 
         let client_weak = Arc::downgrade(&ret);
