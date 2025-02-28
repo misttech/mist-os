@@ -14,7 +14,7 @@ use errors::{ffx_bail, ffx_bail_with_code, ffx_error, ffx_error_with_code, FfxEr
 use ffx_test_args::{
     EarlyBootProfileCommand, ListCommand, RunCommand, TestCommand, TestSubCommand,
 };
-use ffx_writer::SimpleWriter;
+use ffx_writer::VerifiedMachineWriter;
 use fho::{FfxMain, FfxTool};
 use fidl::endpoints::create_proxy;
 use futures::FutureExt;
@@ -59,7 +59,7 @@ fho::embedded_plugin!(TestTool);
 
 #[async_trait(?Send)]
 impl FfxMain for TestTool {
-    type Writer = SimpleWriter;
+    type Writer = VerifiedMachineWriter<()>;
 
     // TODO(https://fxbug.dev/42078544): use Writer when it becomes possible.
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
