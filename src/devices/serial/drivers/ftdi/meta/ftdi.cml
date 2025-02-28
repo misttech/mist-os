@@ -18,6 +18,7 @@
     capabilities: [
         { service: "fuchsia.hardware.i2cimpl.Service" },
         { service: "fuchsia.hardware.serialimpl.Service" },
+        { service: "fuchsia.hardware.i2c.businfo.I2CBusMetadata" },
     ],
     use: [],
     expose: [
@@ -27,6 +28,10 @@
         },
         {
             service: "fuchsia.hardware.serialimpl.Service",
+            from: "self",
+        },
+        {
+            service: "fuchsia.hardware.i2c.businfo.I2CBusMetadata",
             from: "self",
         },
     ],

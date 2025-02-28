@@ -6,6 +6,7 @@
 #define SRC_DEVICES_SERIAL_DRIVERS_FTDI_FTDI_I2C_H_
 
 #include <fidl/fuchsia.hardware.ftdi/cpp/wire.h>
+#include <fidl/fuchsia.hardware.i2c.businfo/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.i2cimpl/cpp/driver/wire.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <threads.h>
@@ -13,6 +14,7 @@
 #include <vector>
 
 #include <ddktl/device.h>
+#include <ddktl/metadata_server.h>
 
 #include "ftdi-mpsse.h"
 #include "ftdi.h"
@@ -118,6 +120,8 @@ class FtdiI2c : public DeviceType, public fdf::WireServer<fuchsia_hardware_i2cim
 
   fdf::ServerBindingGroup<fuchsia_hardware_i2cimpl::Device> bindings_;
   fdf::OutgoingDirectory outgoing_;
+
+  ddk::MetadataServer<fuchsia_hardware_i2c_businfo::I2CBusMetadata> metadata_server_;
 };
 
 }  // namespace ftdi_mpsse
