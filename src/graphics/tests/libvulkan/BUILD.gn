@@ -36,17 +36,17 @@ executable("fake_vulkan_loader_bin") {
   sources = [ "fake_vulkan_loader.cc" ]
 
   deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_hlcpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/sys/cpp",
+    "//sdk/lib/vfs/cpp",
     "//src/lib/fxl:fxl_cli",
+    "//src/testing/fidl:placeholders_cpp",
   ]
 
-  deps += [
-    ":icd-json",
-    ":libvulkan_fake",
-  ]
+  deps += [ ":libvulkan_fake" ]
 
   # IMPORTANT: The fake_vulkan_loader_bin program
   # expects the library to be in /pkg/lib/ at
@@ -64,8 +64,8 @@ resource("icd-json") {
 shared_library("libvulkan_fake") {
   sources = [ "libvulkan_fake.cc" ]
   deps = [
-    "//sdk/lib/fdio",
     "//src/lib/vulkan",
+    "//src/testing/fidl:placeholders_cpp",
     "//zircon/system/ulib/zx",
   ]
 }
@@ -86,6 +86,7 @@ fuchsia_component("libvulkan_test_hermetic_cmp") {
   testonly = true
   component_name = "libvulkan_test_hermetic"
   deps = [
+    ":icd-json",
     ":libvulkan_test_bin",
     "//src/lib/vulkan/validation_layers",
   ]

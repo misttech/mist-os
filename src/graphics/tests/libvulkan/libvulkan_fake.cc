@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/fdio/fdio.h>
+#include <fidl/test.placeholders/cpp/wire.h>
 #include <lib/zx/channel.h>
 
 #include <cstdio>
@@ -150,27 +150,28 @@ vk_icdInitializeOpenInNamespaceCallback(PFN_vkOpenInNamespaceAddr open_in_namesp
   static_assert(std::is_same_v<decltype(&vk_icdInitializeOpenInNamespaceCallback),
                                PFN_vkInitializeOpenInNamespaceCallbackAddr>,
                 "Function type must match callback");
-  zx::channel server_end, client_end;
-  zx::channel::create(0, &server_end, &client_end);
+  auto [client, server] = fidl::Endpoints<test_placeholders::Echo>::Create();
 
   // A hermetic ICD shouldn't try to access to anything from the loader service.
   if (!getenv("HERMETIC_ICD")) {
-    // ConnectToDeviceFs in the service provider should connect the device fs to /pkg/data.
+    // ConnectToDeviceFs in the fake Vulkan loader should provide an echo service at "echo".
     VkResult result =
-        open_in_namespace_addr("/loader-gpu-devices/libvulkan_fake.json", server_end.release());
+        open_in_namespace_addr("/loader-gpu-devices/echo", server.TakeChannel().release());
     if (result != VK_SUCCESS) {
-      fprintf(stderr, "Opening libvulkan_fake.json failed with error %d\n", result);
+      fprintf(stderr, "Opening /loader-gpu-devices/echo failed with error %d\n", result);
+      return;
     }
-
-    fdio_t* fdio;
-    zx_status_t status = fdio_create(client_end.release(), &fdio);
-    if (status != ZX_OK) {
-      fprintf(stderr, "fdio create failed with status %d\n", status);
+    // Make sure the service is being served from the DeviceFs.
+    constexpr std::string_view kExpected = "Hello, world!";
+    auto response = fidl::WireCall(client)->EchoString(fidl::StringView::FromExternal(kExpected));
+    if (!response.ok()) {
+      fprintf(stderr, "Failed to call method on service from DeviceFs: %s\n",
+              response.status_string());
+      return;
     }
-
-    int fd = fdio_bind_to_fd(fdio, -1, 0);
-    if (fd < 0) {
-      fprintf(stderr, "fdio_bind_to_fd failed\n");
+    if (response->response.get() != kExpected) {
+      fprintf(stderr, "Service from DeviceFs returned incorrect response!\n");
+      return;
     }
   }
 
