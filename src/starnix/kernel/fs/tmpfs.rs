@@ -326,14 +326,24 @@ impl FsNodeOps for TmpfsDirectory {
         node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
-        child: &FsNodeHandle,
+        child_to_unlink: &FsNodeHandle,
     ) -> Result<(), Errno> {
-        if child.is_dir() {
+        if child_to_unlink.is_dir() {
+            // The following cast is safe, unless something is seriously wrong:
+            // - The filesystem should not be asked to unlink a node that it doesn't handle.
+            // - The child has already been determined to be a directory.
+            // - TmpfsDirectory is the ops for directories in this filesystem.
+            let child_count =
+                &child_to_unlink.downcast_ops::<TmpfsDirectory>().unwrap().child_count;
+            if child_count.load(Ordering::Relaxed) != 0 {
+                return error!(ENOTEMPTY);
+            }
+
             node.update_info(|info| {
                 info.link_count -= 1;
             });
         }
-        child.update_info(|info| {
+        child_to_unlink.update_info(|info| {
             info.link_count -= 1;
         });
         self.child_count.fetch_sub(1, Ordering::Release);
