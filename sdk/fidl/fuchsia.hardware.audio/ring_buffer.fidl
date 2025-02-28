@@ -427,6 +427,8 @@ closed(removed=24) open(added=24) protocol RingBuffer {
     /// Sets which channels are active via a bitmask.
     /// The least significant bit corresponds to channel index 0.
     /// Channels not set (bits are 0) in the bitmask are inactive.
+    /// By default all channels are active. Hence creating a RingBuffer turns on the
+    /// hardware associated for all channels.
     /// Inactive channels indicate to the driver that it may turn off hardware associated with the
     /// inactive channels. A subsequent `SetActiveChannels` setting an inactive channel to active
     /// may incur in a `turn_on_delay` to actually restart playback/capture of the channels.
@@ -438,7 +440,6 @@ closed(removed=24) open(added=24) protocol RingBuffer {
     /// advances (and position notifications sent as needed) regardless of the number of active
     /// channels, including if no channels are active. This means that the format in the
     /// ring buffer is not changed.
-    /// By default all channels are active.
     /// If the driver does not support deactivating channels it must return `ZX_ERR_NOT_SUPPORTED`.
     /// If the mask is incorrect, i.e. enables channels outside the number of bits
     /// to use for a given `number_of_channels`, then the driver must return `ZX_ERR_INVALID_ARGS`.
