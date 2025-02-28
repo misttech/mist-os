@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/fake/image-info.h"
 
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/zx/vmo.h>
 
 #include <cstddef>
