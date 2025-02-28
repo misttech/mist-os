@@ -204,7 +204,7 @@ pub fn dispatch_syscall(
     let args = (syscall.arg0, syscall.arg1, syscall.arg2, syscall.arg3, syscall.arg4, syscall.arg5);
 
     #[cfg(all(target_arch = "aarch64", feature = "arch32"))]
-    if current_task.thread_state.arch_width.is_arch32() {
+    if current_task.is_arch32() {
         return arch32_syscall_match! {
             locked; current_task; syscall.decl.number; args;
             ARM_set_tls[1],

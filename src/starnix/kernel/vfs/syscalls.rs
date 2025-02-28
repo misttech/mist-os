@@ -449,7 +449,7 @@ fn do_writev(
 
     let file = current_task.files.get(fd)?;
     // Try to minimize how far arch32 impacts the system
-    let iovec = if current_task.thread_state.arch_width.is_arch32() {
+    let iovec = if current_task.is_arch32() {
         current_task.read_iovec32(iovec_addr, iovec_count)?
     } else {
         current_task.read_iovec(iovec_addr, iovec_count)?

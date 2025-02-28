@@ -753,7 +753,7 @@ impl Default for CpuSet {
 }
 
 fn check_cpu_set_alignment(current_task: &CurrentTask, cpusetsize: u32) -> Result<(), Errno> {
-    let alignment = if current_task.thread_state.arch_width.is_arch32() { 4 } else { 8 };
+    let alignment = if current_task.is_arch32() { 4 } else { 8 };
     if cpusetsize < alignment || cpusetsize % alignment != 0 {
         return error!(EINVAL);
     }

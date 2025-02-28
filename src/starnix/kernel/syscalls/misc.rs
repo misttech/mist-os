@@ -68,7 +68,7 @@ pub fn do_uname(
 
     init_array(&mut result.version, version.as_bytes());
     // TODO(https://fxbug.dev/380431743) rename property or use personality?
-    if cfg!(feature = "arch32") && current_task.thread_state.arch_width.is_arch32() {
+    if current_task.is_arch32() {
         init_array(&mut result.machine, ARCH_NAME_COMPAT);
     } else {
         init_array(&mut result.machine, ARCH_NAME);
@@ -411,7 +411,7 @@ pub fn sys_unknown(
     syscall_number: u64,
 ) -> Result<SyscallResult, Errno> {
     #[cfg(feature = "arch32")]
-    if current_task.thread_state.arch_width.is_arch32() {
+    if current_task.is_arch32() {
         let name = for_each_arch32_syscall! { syscall_arch32_number_to_name_literal_callback, syscall_number };
         track_stub!(TODO("https://fxbug.dev/322874143"), name, syscall_number,);
         return error!(ENOSYS);

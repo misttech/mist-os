@@ -231,6 +231,10 @@ impl CurrentTask {
         Self { task, thread_state, _local_marker: Default::default() }
     }
 
+    pub fn is_arch32(&self) -> bool {
+        self.thread_state.arch_width.is_arch32()
+    }
+
     pub fn trigger_delayed_releaser<L>(&self, locked: &mut Locked<'_, L>)
     where
         L: LockEqualOrBefore<FileOpsCore>,

@@ -120,7 +120,7 @@ pub fn restore_registers(
         tpidr: current_task.thread_state.registers.tpidr,
     };
     // TODO(https://fxbug.dev/380405833) This feels very clunky
-    if current_task.thread_state.arch_width.is_arch32() {
+    if current_task.is_arch32() {
         restored_regs.r[13] = restored_regs.sp;
         restored_regs.r[14] = restored_regs.lr;
     }
