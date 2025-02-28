@@ -11,6 +11,7 @@ source_set("dsi-host-controller") {
     "dpi-video-timing.h",
     "dsi-host-controller.cc",
     "dsi-host-controller.h",
+    "dsi-packet-handler-config.h",
     "dw-mipi-dsi-reg.h",
   ]
   public_deps = [
@@ -31,6 +32,7 @@ test("dsi-host-controller-tests-bin") {
     "dphy-interface-config-test.cc",
     "dpi-interface-config-test.cc",
     "dpi-video-timing-test.cc",
+    "dsi-packet-handler-config-test.cc",
   ]
 
   deps = [
