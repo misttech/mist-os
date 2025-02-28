@@ -3,11 +3,9 @@
 // found in the LICENSE file.
 
 use fidl_message::TransactionHeader;
-use futures::channel::mpsc::UnboundedSender;
 use futures::channel::oneshot::Sender as OneshotSender;
 use futures::stream::Stream as StreamTrait;
 use futures::FutureExt;
-use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
 use std::convert::Infallible;
 use std::future::Future;
@@ -342,6 +340,23 @@ impl Transport {
 }
 
 /// State of a channel that is or has been read from.
+struct SocketReadState {
+    wakers: Vec<Waker>,
+    queued: VecDeque<Result<Vec<u8>, Error>>,
+    read_request_pending: bool,
+    is_streaming: bool,
+}
+
+impl SocketReadState {
+    /// Handle an incoming message, which is either a channel streaming event or
+    /// response to a `ChannelRead` request.
+    fn handle_incoming_message(&mut self, msg: Result<Vec<u8>, Error>) {
+        self.queued.push_back(msg);
+        self.wakers.drain(..).for_each(Waker::wake);
+    }
+}
+
+/// State of a channel that is or has been read from.
 struct ChannelReadState {
     wakers: Vec<Waker>,
     queued: VecDeque<Result<proto::ChannelMessage, Error>>,
@@ -362,8 +377,8 @@ impl ChannelReadState {
 struct ClientInner {
     transport: Transport,
     transactions: HashMap<NonZeroU32, responder::Responder>,
-    socket_read_subscriptions: HashMap<proto::HandleId, UnboundedSender<Result<Vec<u8>, Error>>>,
     channel_read_states: HashMap<proto::HandleId, ChannelReadState>,
+    socket_read_states: HashMap<proto::HandleId, SocketReadState>,
     next_tx_id: u32,
     waiting_to_close: Vec<proto::HandleId>,
     waiting_to_close_waker: Waker,
@@ -403,13 +418,12 @@ impl ClientInner {
 
         loop {
             if let Poll::Ready(e) = self.transport.poll_send_messages(ctx) {
-                for sender in self.socket_read_subscriptions.values_mut() {
-                    let _ = sender.unbounded_send(Err(e.clone().into()));
+                for state in std::mem::take(&mut self.socket_read_states).into_values() {
+                    state.wakers.into_iter().for_each(Waker::wake);
                 }
                 for (_, state) in self.channel_read_states.drain() {
                     state.wakers.into_iter().for_each(Waker::wake);
                 }
-                self.socket_read_subscriptions.clear();
                 return Poll::Ready(Err(e));
             }
             let Poll::Ready(Some(result)) = self.transport.poll_next(ctx) else {
@@ -456,32 +470,26 @@ impl ClientInner {
                 let msg = fidl_message::decode_message::<proto::SocketOnSocketStreamingDataRequest>(
                     header, data,
                 )?;
-                if let Entry::Occupied(mut o) = self.socket_read_subscriptions.entry(msg.handle) {
-                    match msg.socket_message {
-                        proto::SocketMessage::Data(data) => {
-                            if o.get_mut().unbounded_send(Ok(data)).is_err() {
-                                let _ = o.remove();
-                                self.request(
-                                    ordinals::READ_SOCKET_STREAMING_STOP,
-                                    proto::SocketReadSocketStreamingStopRequest {
-                                        handle: msg.handle,
-                                    },
-                                    Responder::Ignore,
-                                );
-                            }
-                            Ok(())
-                        }
-                        proto::SocketMessage::Stopped(proto::AioStopped { error }) => {
-                            let o = o.remove();
-                            if let Some(error) = error {
-                                let _ = o.unbounded_send(Err(Error::FDomain(*error)));
-                            }
-                            Ok(())
-                        }
-                        _ => Err(InnerError::ProtocolStreamEventIncompatible),
+                let o =
+                    self.socket_read_states.entry(msg.handle).or_insert_with(|| SocketReadState {
+                        wakers: Vec::new(),
+                        queued: VecDeque::new(),
+                        is_streaming: false,
+                        read_request_pending: false,
+                    });
+                match msg.socket_message {
+                    proto::SocketMessage::Data(data) => {
+                        o.handle_incoming_message(Ok(data));
+                        Ok(())
                     }
-                } else {
-                    Ok(())
+                    proto::SocketMessage::Stopped(proto::AioStopped { error }) => {
+                        if let Some(error) = error {
+                            o.handle_incoming_message(Err(Error::FDomain(*error)));
+                        }
+                        o.is_streaming = false;
+                        Ok(())
+                    }
+                    _ => Err(InnerError::ProtocolStreamEventIncompatible),
                 }
             }
             ordinals::ON_CHANNEL_STREAMING_DATA => {
@@ -531,6 +539,22 @@ impl ClientInner {
         }
     }
 
+    /// Handles the response to a `SocketRead` protocol message.
+    pub(crate) fn handle_socket_read_response(
+        &mut self,
+        msg: Result<Vec<u8>, Error>,
+        id: proto::HandleId,
+    ) {
+        let state = self.socket_read_states.entry(id).or_insert_with(|| SocketReadState {
+            wakers: Vec::new(),
+            queued: VecDeque::new(),
+            is_streaming: false,
+            read_request_pending: false,
+        });
+        state.handle_incoming_message(msg);
+        state.read_request_pending = false;
+    }
+
     /// Handles the response to a `ChannelRead` protocol message.
     pub(crate) fn handle_channel_read_response(
         &mut self,
@@ -575,7 +599,7 @@ impl Client {
         let ret = Arc::new(Client(Mutex::new(ClientInner {
             transport: Transport::Transport(Box::pin(transport), VecDeque::new(), Vec::new()),
             transactions: HashMap::new(),
-            socket_read_subscriptions: HashMap::new(),
+            socket_read_states: HashMap::new(),
             channel_read_states: HashMap::new(),
             next_tx_id: 1,
             waiting_to_close: Vec::new(),
@@ -759,13 +783,19 @@ impl Client {
     }
 
     /// Start getting streaming events for socket reads.
-    pub(crate) fn start_socket_streaming(
-        &self,
-        id: proto::HandleId,
-        output: UnboundedSender<Result<Vec<u8>, Error>>,
-    ) -> Result<(), Error> {
+    pub(crate) fn start_socket_streaming(&self, id: proto::HandleId) -> Result<(), Error> {
         let mut inner = self.0.lock().unwrap();
-        inner.socket_read_subscriptions.insert(id, output);
+
+        let state = inner.socket_read_states.entry(id).or_insert_with(|| SocketReadState {
+            wakers: Vec::new(),
+            queued: VecDeque::new(),
+            is_streaming: false,
+            read_request_pending: false,
+        });
+
+        assert!(!state.is_streaming, "Initiated streaming twice!");
+        state.is_streaming = true;
+
         inner.request(
             ordinals::READ_SOCKET_STREAMING_START,
             proto::SocketReadSocketStreamingStartRequest { handle: id },
@@ -779,13 +809,16 @@ impl Client {
     /// do with them.
     pub(crate) fn stop_socket_streaming(&self, id: proto::HandleId) {
         let mut inner = self.0.lock().unwrap();
-        if inner.socket_read_subscriptions.remove(&id).is_some() {
-            // TODO: Log?
-            let _ = inner.request(
-                ordinals::READ_SOCKET_STREAMING_STOP,
-                proto::SocketReadSocketStreamingStopRequest { handle: id },
-                Responder::Ignore,
-            );
+        if let Some(state) = inner.socket_read_states.get_mut(&id) {
+            if state.is_streaming {
+                state.is_streaming = false;
+                // TODO: Log?
+                let _ = inner.request(
+                    ordinals::READ_SOCKET_STREAMING_STOP,
+                    proto::ChannelReadChannelStreamingStopRequest { handle: id },
+                    Responder::Ignore,
+                );
+            }
         }
     }
 
@@ -827,6 +860,59 @@ impl Client {
                 );
             }
         }
+    }
+
+    /// Execute a read from a channel.
+    pub(crate) fn poll_socket(
+        &self,
+        id: proto::HandleId,
+        ctx: &mut Context<'_>,
+        out: &mut [u8],
+    ) -> Poll<Result<usize, Error>> {
+        let mut inner = self.0.lock().unwrap();
+        if let Some(error) = inner.transport.error() {
+            return Poll::Ready(Err(error.into()));
+        }
+
+        let state = inner.socket_read_states.entry(id).or_insert_with(|| SocketReadState {
+            wakers: Vec::new(),
+            queued: VecDeque::new(),
+            is_streaming: false,
+            read_request_pending: false,
+        });
+
+        if let Some(got) = state.queued.front_mut() {
+            match got.as_mut() {
+                Ok(data) => {
+                    let read_size = std::cmp::min(data.len(), out.len());
+                    out[..read_size].copy_from_slice(&data[..read_size]);
+
+                    if data.len() > read_size {
+                        let _ = data.drain(..read_size);
+                    } else {
+                        let _ = state.queued.pop_front();
+                    }
+
+                    return Poll::Ready(Ok(read_size));
+                }
+                Err(_) => {
+                    let err = state.queued.pop_front().unwrap().unwrap_err();
+                    return Poll::Ready(Err(err));
+                }
+            }
+        } else if !state.wakers.iter().any(|x| ctx.waker().will_wake(x)) {
+            state.wakers.push(ctx.waker().clone());
+        }
+
+        if !state.read_request_pending && !state.is_streaming {
+            inner.request(
+                ordinals::READ_SOCKET,
+                proto::SocketReadSocketRequest { handle: id, max_bytes: out.len() as u64 },
+                Responder::ReadSocket(id),
+            );
+        }
+
+        Poll::Pending
     }
 
     /// Execute a read from a channel.
@@ -884,7 +970,8 @@ impl Client {
             proto::Handles::Handles(handles) => {
                 for handle in handles {
                     assert!(
-                        !inner.channel_read_states.contains_key(handle),
+                        !(inner.channel_read_states.contains_key(handle)
+                            || inner.socket_read_states.contains_key(handle)),
                         "Tried to transfer handle after reading"
                     );
                 }
@@ -893,7 +980,8 @@ impl Client {
                 for disposition in dispositions {
                     match &disposition.handle {
                         proto::HandleOp::Move_(handle) => assert!(
-                            !inner.channel_read_states.contains_key(handle),
+                            !(inner.channel_read_states.contains_key(handle)
+                                || inner.socket_read_states.contains_key(handle)),
                             "Tried to transfer handle after reading"
                         ),
                         // Pretty sure this should be fine regardless of read state.

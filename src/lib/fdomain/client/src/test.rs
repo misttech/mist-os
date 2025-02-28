@@ -7,7 +7,7 @@ use fdomain_container::wire::FDomainCodec;
 use fdomain_container::FDomain;
 use fidl_fuchsia_fdomain::Error as FDomainError;
 use futures::stream::Stream;
-use futures::StreamExt;
+use futures::{FutureExt, StreamExt};
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
@@ -97,17 +97,19 @@ async fn socket() {
     let (client, _) = TestFDomain::new_client();
 
     let (a, b) = client.create_stream_socket();
-    let test_str = b"Feral Cats Move In Mysterious Ways";
+    const TEST_STR: &[u8] = b"Feral Cats Move In Mysterious Ways";
 
-    a.write_all(test_str).await.unwrap();
+    a.write_all(TEST_STR).await.unwrap();
 
-    let mut got = Vec::with_capacity(test_str.len());
+    let mut got = Vec::with_capacity(TEST_STR.len());
+    let mut buf = [0u8; TEST_STR.len()];
 
-    while got.len() < test_str.len() {
-        got.append(&mut b.read(test_str.len() - got.len()).await.unwrap());
+    while got.len() < TEST_STR.len() {
+        let new_bytes = b.read(&mut buf).await.unwrap();
+        got.extend_from_slice(&buf[..new_bytes]);
     }
 
-    assert_eq!(test_str, got.as_slice());
+    assert_eq!(TEST_STR, got.as_slice());
 }
 
 #[fuchsia::test]
@@ -116,15 +118,15 @@ async fn channel() {
 
     let (a, b) = client.create_channel();
     let (c, d) = client.create_stream_socket();
-    let test_str_1 = b"Feral Cats Move In Mysterious Ways";
-    let test_str_2 = b"Joyous Throbbing! Jubilant Pulsing!";
+    const TEST_STR_1: &[u8] = b"Feral Cats Move In Mysterious Ways";
+    const TEST_STR_2: &[u8] = b"Joyous Throbbing! Jubilant Pulsing!";
 
-    a.write(test_str_1, vec![c.into()]).await.unwrap();
-    d.write_all(test_str_2).await.unwrap();
+    a.write(TEST_STR_1, vec![c.into()]).await.unwrap();
+    d.write_all(TEST_STR_2).await.unwrap();
 
     let mut msg = b.recv_msg().await.unwrap();
 
-    assert_eq!(test_str_1, msg.bytes.as_slice());
+    assert_eq!(TEST_STR_1, msg.bytes.as_slice());
 
     let handle = msg.handles.pop().unwrap();
     assert!(msg.handles.is_empty());
@@ -144,13 +146,15 @@ async fn channel() {
 
     let AnyHandle::Socket(e) = handle.handle else { panic!() };
 
-    let mut got = Vec::with_capacity(test_str_2.len());
+    let mut got = Vec::with_capacity(TEST_STR_2.len());
+    let mut buf = [0u8; TEST_STR_2.len()];
 
-    while got.len() < test_str_2.len() {
-        got.append(&mut e.read(test_str_2.len() - got.len()).await.unwrap());
+    while got.len() < TEST_STR_2.len() {
+        let new_bytes = e.read(&mut buf).await.unwrap();
+        got.extend_from_slice(&buf[..new_bytes]);
     }
 
-    assert_eq!(test_str_2, got.as_slice());
+    assert_eq!(TEST_STR_2, got.as_slice());
 }
 
 #[fuchsia::test]
@@ -158,31 +162,33 @@ async fn socket_async() {
     let (client, fault_injector) = TestFDomain::new_client();
 
     let (a, b) = client.create_stream_socket();
-    let test_str_a = b"Feral Cats Move In Mysterious Ways";
-    let test_str_b = b"Almost all of our feelings were programmed in to us.";
+    const TEST_STR_A: &[u8] = b"Feral Cats Move In Mysterious Ways";
+    const TEST_STR_B: &[u8] = b"Almost all of our feelings were programmed in to us.";
 
     let (mut b_reader, b_writer) = b.stream().unwrap();
-    b_writer.write_all(test_str_a).await.unwrap();
+    b_writer.write_all(TEST_STR_A).await.unwrap();
 
     let write_side = async move {
-        let mut got = Vec::with_capacity(test_str_a.len());
+        let mut got = Vec::with_capacity(TEST_STR_A.len());
+        let mut buf = [0u8; TEST_STR_A.len()];
 
-        while got.len() < test_str_a.len() {
-            got.append(&mut a.read(test_str_a.len() - got.len()).await.unwrap());
+        while got.len() < TEST_STR_A.len() {
+            let new_bytes = a.read(&mut buf).await.unwrap();
+            got.extend_from_slice(&buf[..new_bytes]);
         }
 
-        assert_eq!(test_str_a, got.as_slice());
+        assert_eq!(TEST_STR_A, got.as_slice());
 
         for _ in 0..5 {
-            a.write_all(test_str_a).await.unwrap();
+            a.write_all(TEST_STR_A).await.unwrap();
             fuchsia_async::Timer::new(std::time::Duration::from_millis(10)).await;
-            a.write_all(test_str_b).await.unwrap();
+            a.write_all(TEST_STR_B).await.unwrap();
             fuchsia_async::Timer::new(std::time::Duration::from_millis(10)).await;
         }
 
         fault_injector.inject(TestError("Connection failed".to_owned()));
 
-        let err = a.write_all(test_str_a).await.unwrap_err();
+        let err = a.write_all(TEST_STR_A).await.unwrap_err();
         let Error::Transport(err) = err else { panic!("Wrong error type!") };
 
         let TestError(err) = err.get_ref().unwrap().downcast_ref().unwrap();
@@ -191,7 +197,7 @@ async fn socket_async() {
 
     let read_side = async move {
         let mut buf = Vec::new();
-        buf.resize((test_str_a.len() + test_str_b.len()) * 5, 0);
+        buf.resize((TEST_STR_A.len() + TEST_STR_B.len()) * 5, 0);
 
         for mut buf in buf.chunks_mut(20) {
             while !buf.is_empty() {
@@ -209,16 +215,44 @@ async fn socket_async() {
         let mut buf = buf.as_mut_slice();
 
         for _ in 0..5 {
-            assert!(buf.starts_with(test_str_a));
-            buf = &mut buf[test_str_a.len()..];
-            assert!(buf.starts_with(test_str_b));
-            buf = &mut buf[test_str_b.len()..];
+            assert!(buf.starts_with(TEST_STR_A));
+            buf = &mut buf[TEST_STR_A.len()..];
+            assert!(buf.starts_with(TEST_STR_B));
+            buf = &mut buf[TEST_STR_B.len()..];
         }
 
         assert!(buf.is_empty());
     };
 
     futures::future::join(read_side, write_side).await;
+}
+
+#[fuchsia::test]
+async fn socket_drop_read_fut() {
+    let (client, _fault_injector) = TestFDomain::new_client();
+
+    let mut buf1 = [0u8; 2];
+    let mut buf2 = [0u8; 2];
+    let mut buf3 = [0u8; 2];
+
+    let (a, b) = client.create_stream_socket();
+    let mut fut1 = b.read(&mut buf1);
+    let mut fut2 = b.read(&mut buf2);
+    let mut fut3 = b.read(&mut buf3);
+
+    let mut null_cx = std::task::Context::from_waker(futures::task::noop_waker_ref());
+    assert!(fut1.poll_unpin(&mut null_cx).is_pending());
+    assert!(fut2.poll_unpin(&mut null_cx).is_pending());
+    assert!(fut3.poll_unpin(&mut null_cx).is_pending());
+
+    a.write_all(b"abcd").await.unwrap();
+
+    assert_eq!(2, fut1.await.unwrap());
+    std::mem::drop(fut2);
+    assert_eq!(2, fut3.await.unwrap());
+
+    assert_eq!(b"ab", &buf1);
+    assert_eq!(b"cd", &buf3);
 }
 
 #[fuchsia::test]

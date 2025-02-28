@@ -19,7 +19,6 @@ pub(crate) enum Responder {
     CreateEventPair(Sender<Result<(), Error>>),
     CreateEvent(Sender<Result<(), Error>>),
     SetSocketDisposition(Sender<Result<(), Error>>),
-    ReadSocket(Sender<Result<proto::SocketReadSocketResponse, Error>>),
     WriteSocket(Sender<Result<proto::SocketWriteSocketResponse, Error>>, proto::HandleId),
     WriteChannel(Sender<Result<(), Error>>, proto::HandleId),
     Close(Sender<Result<(), Error>>),
@@ -29,9 +28,10 @@ pub(crate) enum Responder {
     SignalPeer(Sender<Result<(), Error>>),
     WaitForSignals(Sender<Result<proto::FDomainWaitForSignalsResponse, Error>>),
 
-    // Read channel is a little different. We just need the handle ID as we're
+    // Read channel/socket is a little different. We just need the handle ID as we're
     // going to ask the client to handle the transaction for us.
     ReadChannel(proto::HandleId),
+    ReadSocket(proto::HandleId),
 
     // We always use the Ignore variant for these, but implementation is here
     // for posterity.
@@ -86,8 +86,16 @@ impl Responder {
                 sender,
                 result,
             ),
-            Responder::ReadSocket(sender) => {
-                Responder::dispatch_handle("read_socket", ordinals::READ_SOCKET, sender, result)
+            Responder::ReadSocket(id) => {
+                Responder::dispatch_handle_etc::<proto::SocketReadSocketResponse, proto::Error>(
+                    "read_channel",
+                    ordinals::READ_SOCKET,
+                    move |msg| {
+                        client_inner.handle_socket_read_response(msg.map(|x| x.data), id);
+                    },
+                    result,
+                    None,
+                )
             }
             Responder::ReadChannel(id) => Responder::dispatch_handle_etc::<_, proto::Error>(
                 "read_channel",
