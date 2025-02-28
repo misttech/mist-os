@@ -31,6 +31,9 @@ class PmemDevice final : public virtio::Device {
   // VMO representing the shared buffer.
   zx::vmo phys_vmo_;
 
+  // Virtio event queue. 5.19.2
+  Ring request_virtio_queue_;
+
   zx::resource mmio_resource_;
 };
 

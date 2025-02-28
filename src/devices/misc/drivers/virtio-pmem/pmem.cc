@@ -21,6 +21,7 @@ namespace virtio {
 
 PmemDevice::PmemDevice(zx::bti bti, std::unique_ptr<Backend> backend, zx::resource mmio_resource)
     : virtio::Device(std::move(bti), std::move(backend)),
+      request_virtio_queue_(this),
       mmio_resource_(std::move(mmio_resource)) {}
 
 PmemDevice::~PmemDevice() {}
@@ -52,6 +53,13 @@ zx_status_t PmemDevice::Init() {
       zx::vmo::create_physical(mmio_resource_, config.start, config.size, &phys_vmo_);
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "failed to create VMO: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  // Initialize request virtqueue.
+  status = request_virtio_queue_.Init(0);
+  if (status != ZX_OK) {
+    FDF_LOG(ERROR, "failed to initialize req_vq : %s", zx_status_get_string(status));
     return status;
   }
 
