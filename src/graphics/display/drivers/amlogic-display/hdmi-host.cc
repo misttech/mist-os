@@ -522,35 +522,71 @@ void HdmiHost::ConfigEncoder(const display::DisplayTiming& timing) {
   // progressive fields.
   ZX_DEBUG_ASSERT(timing.fields_per_frame == display::FieldsPerFrame::kProgressive);
 
-  vpu_mmio_.Write32(timing.horizontal_total_px() - 1, VPU_ENCP_VIDEO_MAX_PXCNT);
-  vpu_mmio_.Write32(timing.vertical_total_lines() - 1, VPU_ENCP_VIDEO_MAX_LNCNT);
+  HdmiEncoderHorizontalTotal::Get()
+      .FromValue(0)
+      .set_pixels(timing.horizontal_total_px())
+      .WriteTo(&vpu_mmio_);
+  HdmiEncoderVerticalTotal::Get()
+      .FromValue(0)
+      .set_lines(timing.vertical_total_lines())
+      .WriteTo(&vpu_mmio_);
 
-  vpu_mmio_.Write32(0, VPU_ENCI_VIDEO_EN);
-  vpu_mmio_.Write32(1, VPU_ENCP_VIDEO_EN);
+  InterlacedHdmiEncoderEnabled::Get().FromValue(0).set_enabled(false).WriteTo(&vpu_mmio_);
+  HdmiEncoderEnabled::Get().FromValue(0).set_enabled(true).WriteTo(&vpu_mmio_);
 
-  vpu_mmio_.Write32(0x4040, VPU_ENCP_VIDEO_MODE);
-  vpu_mmio_.Write32(0x18, VPU_ENCP_VIDEO_MODE_ADV);
+  HdmiEncoderModeConfig::Get()
+      .FromValue(0)
+      .set_debug_counter_enabled(false)
+      .set_display_enabled_signal_polarity(
+          HdmiEncoderModeConfig::DisplayEnabledSignalPolarity::kActiveHigh)
+      .set_horizontal_period_increases_by_one(false)
+      .ConfigureForHighDefinitionProgressive()
+      .WriteTo(&vpu_mmio_);
 
-  vpu_mmio_.Write32(SetFieldValue32(vpu_mmio_.Read32(VPU_ENCP_VIDEO_MODE), /*field_begin_bit=*/14,
-                                    /*field_size_bits=*/1, /*field_value=*/1),
-                    VPU_ENCP_VIDEO_MODE);  // DE Signal polarity
+  HdmiEncoderAdvancedModeConfig::Get()
+      .FromValue(0)
+      .set_sp_timing_control(0)
+      .set_cr_bypasses_limiter(false)
+      .set_cb_bypasses_limiter(false)
+      .set_y_bypasses_limiter(false)
+      .set_gamma_rgb_input_selection(false)
+      .set_hue_matrix_enabled(false)
+      .set_pb_pr_swapped(false)
+      .set_pb_pr_hsync_enabled(false)
+      .set_ypbpr_gain_as_hdtv_type(true)
+      .set_viu_fifo_enabled(true)
+      .set_viu_fifo_downsampling_multiplier(1)
+      .WriteTo(&vpu_mmio_);
 
-  const int video_horizontal_sync_begin_px = 0;
+  const int video_horizontal_sync_start_px = 0;
   const int video_horizontal_sync_end_px =
-      video_horizontal_sync_begin_px + timing.horizontal_sync_width_px - 1;
-  const int video_horizontal_active_begin_px =
+      video_horizontal_sync_start_px + timing.horizontal_sync_width_px - 1;
+  const int video_horizontal_active_start_px =
       video_horizontal_sync_end_px + 1 + timing.horizontal_back_porch_px;
   const int video_horizontal_active_end_px =
-      video_horizontal_active_begin_px + timing.horizontal_active_px - 1;
+      video_horizontal_active_start_px + timing.horizontal_active_px - 1;
   const int video_horizontal_period_px = timing.horizontal_total_px();
 
-  // Experiments on Khadas VIM3 (using Amlogic A311D) show that HAVON_*
-  // registers must be set before HSO_* registers, otherwise the encoder
-  // won't work.
-  vpu_mmio_.Write32(video_horizontal_active_begin_px, VPU_ENCP_VIDEO_HAVON_BEGIN);
-  vpu_mmio_.Write32(video_horizontal_active_end_px, VPU_ENCP_VIDEO_HAVON_END);
-  vpu_mmio_.Write32(video_horizontal_sync_begin_px, VPU_ENCP_VIDEO_HSO_BEGIN);
-  vpu_mmio_.Write32(video_horizontal_sync_end_px + 1, VPU_ENCP_VIDEO_HSO_END);
+  // Experiments on Khadas VIM3 (using Amlogic A311D) show that the
+  // `HdmiEncoderVideoHorizontalActive*` registers must be set before the
+  // `HdmiEncoderVideoHorizontalSync*` registers, otherwise the encoder won't
+  // work.
+  HdmiEncoderVideoHorizontalActiveStart::Get()
+      .FromValue(0)
+      .set_pixels(video_horizontal_active_start_px)
+      .WriteTo(&vpu_mmio_);
+  HdmiEncoderVideoHorizontalActiveEnd::Get()
+      .FromValue(0)
+      .set_pixels(video_horizontal_active_end_px)
+      .WriteTo(&vpu_mmio_);
+  HdmiEncoderVideoHorizontalSyncStart::Get()
+      .FromValue(0)
+      .set_pixels(video_horizontal_sync_start_px)
+      .WriteTo(&vpu_mmio_);
+  HdmiEncoderVideoHorizontalSyncEnd::Get()
+      .FromValue(0)
+      .set_pixels(video_horizontal_sync_end_px)
+      .WriteTo(&vpu_mmio_);
 
   const int video_vertical_sync_begin_line = 0;
   const int video_vertical_sync_end_line =
@@ -560,60 +596,103 @@ void HdmiHost::ConfigEncoder(const display::DisplayTiming& timing) {
   const int video_vertical_active_end_line =
       video_vertical_active_begin_line + timing.vertical_active_lines - 1;
 
-  // Experiments on Khadas VIM3 (using Amlogic A311D) show that VAVON_*
-  // registers must be set before VSO_* registers, otherwise the encoder
-  // won't work.
-  vpu_mmio_.Write32(video_vertical_active_begin_line, VPU_ENCP_VIDEO_VAVON_BLINE);
-  vpu_mmio_.Write32(video_vertical_active_end_line, VPU_ENCP_VIDEO_VAVON_ELINE);
-  vpu_mmio_.Write32(video_vertical_sync_begin_line, VPU_ENCP_VIDEO_VSO_BLINE);
-  vpu_mmio_.Write32(video_vertical_sync_end_line + 1, VPU_ENCP_VIDEO_VSO_ELINE);
-  vpu_mmio_.Write32(16, VPU_ENCP_VIDEO_VSO_BEGIN);
-  vpu_mmio_.Write32(32, VPU_ENCP_VIDEO_VSO_END);
+  // Experiments on Khadas VIM3 (using Amlogic A311D) show that the
+  // `HdmiEncoderVideoVerticalActive*` registers must be set before the
+  // `HdmiEncoderVideoVerticalSync*` registers, otherwise the encoder won't
+  // work.
+  HdmiEncoderVideoVerticalActiveStart::Get()
+      .FromValue(0)
+      .set_lines(video_vertical_active_begin_line)
+      .WriteTo(&vpu_mmio_);
+  HdmiEncoderVideoVerticalActiveEnd::Get()
+      .FromValue(0)
+      .set_lines(video_vertical_active_end_line)
+      .WriteTo(&vpu_mmio_);
+  HdmiEncoderVideoVerticalSyncStart::Get()
+      .FromValue(0)
+      .set_lines(video_vertical_sync_begin_line)
+      .WriteTo(&vpu_mmio_);
+  HdmiEncoderVideoVerticalSyncEnd::Get()
+      .FromValue(0)
+      .set_lines(video_vertical_sync_end_line)
+      .WriteTo(&vpu_mmio_);
+  HdmiEncoderVideoVerticalSyncHorizontalStart::Get().FromValue(0).set_pixels(16).WriteTo(
+      &vpu_mmio_);
+  HdmiEncoderVideoVerticalSyncHorizontalEnd::Get().FromValue(0).set_pixels(32).WriteTo(&vpu_mmio_);
 
   // The latency between HDMI timing signals (DE, VSYNC, HSYNC) and the video
   // signal (from VFIFO).
   static constexpr int hdmi_signal_horizontal_offset = 2;
 
-  const int hdmi_horizontal_sync_begin_px =
-      (video_horizontal_sync_begin_px + hdmi_signal_horizontal_offset) % video_horizontal_period_px;
+  const int hdmi_horizontal_sync_start_px =
+      (video_horizontal_sync_start_px + hdmi_signal_horizontal_offset) % video_horizontal_period_px;
   const int hdmi_horizontal_sync_end_px =
       (video_horizontal_sync_end_px + hdmi_signal_horizontal_offset) % video_horizontal_period_px;
-  const int hdmi_horizontal_active_begin_px =
-      (video_horizontal_active_begin_px + hdmi_signal_horizontal_offset) %
+  const int hdmi_horizontal_active_start_px =
+      (video_horizontal_active_start_px + hdmi_signal_horizontal_offset) %
       video_horizontal_period_px;
   const int hdmi_horizontal_active_end_px =
       (video_horizontal_active_end_px + hdmi_signal_horizontal_offset) % video_horizontal_period_px;
 
-  vpu_mmio_.Write32(hdmi_horizontal_active_begin_px, VPU_ENCP_DE_H_BEGIN);
-  vpu_mmio_.Write32(hdmi_horizontal_active_end_px + 1, VPU_ENCP_DE_H_END);
-  vpu_mmio_.Write32(hdmi_horizontal_sync_begin_px, VPU_ENCP_DVI_HSO_BEGIN);
-  vpu_mmio_.Write32(hdmi_horizontal_sync_end_px + 1, VPU_ENCP_DVI_HSO_END);
+  HdmiEncoderDataEnableHorizontalActiveStart::Get()
+      .FromValue(0)
+      .set_pixels(hdmi_horizontal_active_start_px)
+      .WriteTo(&vpu_mmio_);
+  HdmiEncoderDataEnableHorizontalActiveEnd::Get()
+      .FromValue(0)
+      .set_pixels(hdmi_horizontal_active_end_px)
+      .WriteTo(&vpu_mmio_);
+  HdmiEncoderHorizontalSyncStart::Get()
+      .FromValue(0)
+      .set_pixels(hdmi_horizontal_sync_start_px)
+      .WriteTo(&vpu_mmio_);
+  HdmiEncoderHorizontalSyncEnd::Get()
+      .FromValue(0)
+      .set_pixels(hdmi_horizontal_sync_end_px)
+      .WriteTo(&vpu_mmio_);
 
   const int hdmi_vertical_sync_begin_line = video_vertical_sync_begin_line;
   const int hdmi_vertical_sync_end_line = video_vertical_sync_end_line;
   const int hdmi_vertical_active_begin_line = video_vertical_active_begin_line;
   const int hdmi_vertical_active_end_line = video_vertical_active_end_line;
 
-  vpu_mmio_.Write32(hdmi_vertical_active_begin_line, VPU_ENCP_DE_V_BEGIN_EVEN);
-  vpu_mmio_.Write32(hdmi_vertical_active_end_line + 1, VPU_ENCP_DE_V_END_EVEN);
-  vpu_mmio_.Write32(hdmi_vertical_sync_begin_line, VPU_ENCP_DVI_VSO_BLINE_EVN);
-  vpu_mmio_.Write32(hdmi_vertical_sync_end_line + 1, VPU_ENCP_DVI_VSO_ELINE_EVN);
-  vpu_mmio_.Write32(hdmi_horizontal_sync_begin_px, VPU_ENCP_DVI_VSO_BEGIN_EVN);
-  vpu_mmio_.Write32(hdmi_horizontal_sync_begin_px, VPU_ENCP_DVI_VSO_END_EVN);
+  HdmiEncoderDataEnableVerticalActiveStart::Get()
+      .FromValue(0)
+      .set_lines(hdmi_vertical_active_begin_line)
+      .WriteTo(&vpu_mmio_);
+  HdmiEncoderDataEnableVerticalActiveEnd::Get()
+      .FromValue(0)
+      .set_lines(hdmi_vertical_active_end_line)
+      .WriteTo(&vpu_mmio_);
+  HdmiEncoderVerticalSyncStart::Get()
+      .FromValue(0)
+      .set_lines(hdmi_vertical_sync_begin_line)
+      .WriteTo(&vpu_mmio_);
+  HdmiEncoderVerticalSyncEnd::Get()
+      .FromValue(0)
+      .set_lines(hdmi_vertical_sync_end_line)
+      .WriteTo(&vpu_mmio_);
+  HdmiEncoderVerticalSyncHorizontalStart::Get()
+      .FromValue(0)
+      .set_pixels(hdmi_horizontal_sync_start_px)
+      .WriteTo(&vpu_mmio_);
+  HdmiEncoderVerticalSyncHorizontalEnd::Get()
+      .FromValue(0)
+      .set_pixels(hdmi_horizontal_sync_start_px)
+      .WriteTo(&vpu_mmio_);
 
-  // hsync, vsync active high. output CbYCr (GRB)
-  // TODO: output desired format is hardcoded here to CbYCr (GRB)
-  uint32_t vpu_hdmi_setting = 0b100 << 5;
-  if (timing.hsync_polarity == display::SyncPolarity::kPositive) {
-    vpu_hdmi_setting |= (1 << 2);
-  }
-  if (timing.vsync_polarity == display::SyncPolarity::kPositive) {
-    vpu_hdmi_setting |= (1 << 3);
-  }
-  vpu_mmio_.Write32(vpu_hdmi_setting, VPU_HDMI_SETTING);
-
-  // Select ENCP data to HDMI
-  VpuHdmiSettingReg::Get().ReadFrom(&vpu_mmio_).set_src_sel(2).WriteTo(&vpu_mmio_);
+  HdmiEncoderTransmitterBridgeSetting::Get()
+      .FromValue(0)
+      .set_fifo_read_downsampling_multiplier(1)
+      .set_fifo_write_downsampling_multiplier(1)
+      .set_color_component_mapping(
+          HdmiEncoderTransmitterBridgeSetting::ColorComponentMappingFrom012::kTo210)
+      .set_dvi_clock_polarity(display::SyncPolarity::kNegative)
+      .set_vsync_polarity(timing.vsync_polarity)
+      .set_hsync_polarity(timing.hsync_polarity)
+      .set_source_encoder_selection(
+          HdmiEncoderTransmitterBridgeSetting::SourceEncoderSelection::kProgressive)
+      .WriteTo(&vpu_mmio_);
 
   FDF_LOG(INFO, "done");
 }
