@@ -140,17 +140,15 @@ impl GptPartition {
 
     pub async fn trim(
         &self,
-        mut device_block_offset: u64,
+        device_block_offset: u64,
         block_count: u32,
         trace_flow_id: Option<NonZero<u64>>,
     ) -> Result<(), zx::Status> {
-        device_block_offset = self.absolute_offset(device_block_offset, block_count)?;
-        self.block_client
-            .trim_traced(
-                device_block_offset..device_block_offset + block_count as u64,
-                trace_id(trace_flow_id),
-            )
-            .await
+        let dev_offset = self
+            .absolute_offset(device_block_offset, block_count)
+            .map(|offset| offset * self.block_size() as u64)?;
+        let len = block_count as u64 * self.block_size() as u64;
+        self.block_client.trim_traced(dev_offset..dev_offset + len, trace_id(trace_flow_id)).await
     }
 
     // Converts a relative range specified by [offset, offset+len) into an absolute offset in the
@@ -632,7 +630,7 @@ mod tests {
                 type_guid: Guid::from_bytes(PART_TYPE_GUID),
                 instance_guid: Guid::from_bytes(PART_INSTANCE_GUID),
                 start_block: 4,
-                num_blocks: 1,
+                num_blocks: 2,
                 flags: 0,
             }],
         )
@@ -662,22 +660,25 @@ mod tests {
                 .expect("Failed to open block service");
         let client = RemoteBlockClient::new(block).await.expect("Failed to create block client");
 
-        assert_eq!(client.block_count(), 1);
+        assert_eq!(client.block_count(), 2);
         assert_eq!(client.block_size(), 512);
 
         let buf = vec![0xabu8; 512];
         client.write_at(BufferSlice::Memory(&buf[..]), 0).await.expect("write_at failed");
         client
-            .write_at(BufferSlice::Memory(&buf[..]), 512)
+            .write_at(BufferSlice::Memory(&buf[..]), 1024)
             .await
             .expect_err("write_at should fail when writing past partition end");
         let mut buf2 = vec![0u8; 512];
         client.read_at(MutableBufferSlice::Memory(&mut buf2[..]), 0).await.expect("read_at failed");
         assert_eq!(buf, buf2);
         client
-            .read_at(MutableBufferSlice::Memory(&mut buf2[..]), 512)
+            .read_at(MutableBufferSlice::Memory(&mut buf2[..]), 1024)
             .await
             .expect_err("read_at should fail when reading past partition end");
+        client.trim(512..1024).await.expect("trim failed");
+        client.trim(1..512).await.expect_err("trim with invalid range should fail");
+        client.trim(1024..1536).await.expect_err("trim past end of partition should fail");
         runner.shutdown().await;
 
         // Ensure writes persisted to the partition.
