@@ -13,6 +13,7 @@ package(default_visibility = ["//visibility:public"])
 fuchsia_board_input_bundle(
     name = "x64_bib",
     bootfs_driver_packages = [
+        "//src/devices/misc/drivers/virtio-pmem:package",
         "//src/devices/misc/drivers/virtio-socket:package",
         "//src/devices/board/drivers/x86:package",
     ],
@@ -40,6 +41,7 @@ fuchsia_board_configuration(
 fuchsia_board_input_bundle(
     name = "arm64_bib",
     bootfs_driver_packages = [
+        "//src/devices/misc/drivers/virtio-pmem:package",
         "//src/devices/misc/drivers/virtio-socket:package",
         "//src/devices/board/drivers/crosvm:package",
     ],
