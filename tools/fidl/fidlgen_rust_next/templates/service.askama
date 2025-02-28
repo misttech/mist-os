@@ -16,18 +16,18 @@ pub trait {{ instance_trait_name }} {
     type Error: ::core::error::Error + Send + Sync + 'static;
 
     /// The transport type created by connecting to a member.
-    type Transport: ::fidl_next::protocol::Transport;
+    type Transport: ::fidl_next::Transport;
 
     {% for member in service.members %}
         /// Attempts to connect to the `{{ member.name.non_canonical() }}` member.
         fn {{ member.name.snake()|ident }}(&mut self) -> Result<
-            ::fidl_next::bind::ClientEnd<Self::Transport, {{ context.natural_type(member.ty) }}>,
+            ::fidl_next::ClientEnd<Self::Transport, {{ context.natural_type(member.ty) }}>,
             Self::Error,
         >;
     {% endfor %}
 }
 
-impl<___I> {{ instance_trait_name }} for ::fidl_next::bind::ServiceInstance<___I, {{ service_name }}>
+impl<___I> {{ instance_trait_name }} for ::fidl_next::ServiceInstance<___I, {{ service_name }}>
 where
     ___I: ::fidl_next::protocol::ServiceInstance,
 {
@@ -36,10 +36,10 @@ where
 
     {% for member in service.members %}
         fn {{ member.name.snake()|ident }}(&mut self) -> Result<
-            ::fidl_next::bind::ClientEnd<Self::Transport, {{ context.natural_type(member.ty) }}>,
+            ::fidl_next::ClientEnd<Self::Transport, {{ context.natural_type(member.ty) }}>,
             Self::Error,
         > {
-            self.as_untyped_mut().connect("{{ member.name.snake() }}").map(::fidl_next::bind::ClientEnd::from_untyped)
+            self.as_untyped_mut().connect("{{ member.name.snake() }}").map(::fidl_next::ClientEnd::from_untyped)
         }
     {% endfor %}
 }

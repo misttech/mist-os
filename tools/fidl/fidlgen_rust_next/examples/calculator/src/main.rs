@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_next::bind::{
+use fidl_next::{
     Client, ClientEnd, ClientSender, RequestBuffer, Responder, ResponseBuffer, Server, ServerEnd,
-    ServerSender,
+    ServerSender, Transport,
 };
-use fidl_next::protocol::Transport;
 use fidl_next_examples_calculator::{
     calculator, Calculator, CalculatorClientHandler, CalculatorServerHandler,
 };

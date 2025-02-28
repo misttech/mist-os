@@ -23,11 +23,11 @@ pub type AliasOfBytes = Vec<u8>;
 pub type WireAliasOfBytes = ::fidl_next::WireVector<u8>;
 
 pub type AliasOfRequest =
-    ::fidl_next::bind::ServerEnd<Option<::fidl_next::fuchsia::zx::Handle>, crate::MyProtocol>;
+    ::fidl_next::ServerEnd<Option<::fidl_next::fuchsia::zx::Handle>, crate::MyProtocol>;
 
 /// The wire type corresponding to [`AliasOfRequest`].
 pub type WireAliasOfRequest =
-    ::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::MyProtocol>;
+    ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::MyProtocol>;
 
 pub type AliasOfString = String;
 
@@ -46,26 +46,26 @@ pub struct MyProtocol;
 pub mod my_protocol {}
 
 /// A helper trait for the `MyProtocol` client sender.
-pub trait MyProtocolClientSender<___T: ::fidl_next::protocol::Transport> {}
+pub trait MyProtocolClientSender<___T: ::fidl_next::Transport> {}
 
-impl<___T> MyProtocolClientSender<___T> for ::fidl_next::bind::ClientSender<___T, MyProtocol> where
-    ___T: ::fidl_next::protocol::Transport
+impl<___T> MyProtocolClientSender<___T> for ::fidl_next::ClientSender<___T, MyProtocol> where
+    ___T: ::fidl_next::Transport
 {
 }
 
 /// A client handler for the MyProtocol protocol.
 ///
 /// See [`MyProtocol`] for more details.
-pub trait MyProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {}
+pub trait MyProtocolClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for MyProtocol
+impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for MyProtocol
 where
-    ___T: ::fidl_next::protocol::Transport,
+    ___T: ::fidl_next::Transport,
     ___H: MyProtocolClientHandler<___T>,
 {
     fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::bind::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -78,26 +78,26 @@ where
 }
 
 /// A helper trait for the `MyProtocol` server sender.
-pub trait MyProtocolServerSender<___T: ::fidl_next::protocol::Transport> {}
+pub trait MyProtocolServerSender<___T: ::fidl_next::Transport> {}
 
-impl<___T> MyProtocolServerSender<___T> for ::fidl_next::bind::ServerSender<___T, MyProtocol> where
-    ___T: ::fidl_next::protocol::Transport
+impl<___T> MyProtocolServerSender<___T> for ::fidl_next::ServerSender<___T, MyProtocol> where
+    ___T: ::fidl_next::Transport
 {
 }
 
 /// A server handler for the MyProtocol protocol.
 ///
 /// See [`MyProtocol`] for more details.
-pub trait MyProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {}
+pub trait MyProtocolServerHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::bind::ServerProtocol<___T, ___H> for MyProtocol
+impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for MyProtocol
 where
-    ___T: ::fidl_next::protocol::Transport,
+    ___T: ::fidl_next::Transport,
     ___H: MyProtocolServerHandler<___T>,
 {
     fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::bind::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -110,7 +110,7 @@ where
 
     fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::bind::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -156,16 +156,13 @@ pub struct Testing {
 
     pub a3: [[u64; 1]; 4],
 
-    pub r1:
-        ::fidl_next::bind::ServerEnd<Option<::fidl_next::fuchsia::zx::Handle>, crate::MyProtocol>,
+    pub r1: ::fidl_next::ServerEnd<Option<::fidl_next::fuchsia::zx::Handle>, crate::MyProtocol>,
 
-    pub r2: Vec<
-        ::fidl_next::bind::ServerEnd<Option<::fidl_next::fuchsia::zx::Handle>, crate::MyProtocol>,
-    >,
+    pub r2:
+        Vec<::fidl_next::ServerEnd<Option<::fidl_next::fuchsia::zx::Handle>, crate::MyProtocol>>,
 
     pub r3:
-        [::fidl_next::bind::ServerEnd<Option<::fidl_next::fuchsia::zx::Handle>, crate::MyProtocol>;
-            4],
+        [::fidl_next::ServerEnd<Option<::fidl_next::fuchsia::zx::Handle>, crate::MyProtocol>; 4],
 
     pub b1: Vec<u8>,
 
@@ -423,16 +420,14 @@ pub struct WireTesting {
 
     pub a3: [[::fidl_next::u64_le; 1]; 4],
 
-    pub r1:
-        ::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::MyProtocol>,
+    pub r1: ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::MyProtocol>,
 
     pub r2: ::fidl_next::WireVector<
-        ::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::MyProtocol>,
+        ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::MyProtocol>,
     >,
 
     pub r3:
-        [::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::MyProtocol>;
-            4],
+        [::fidl_next::ServerEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::MyProtocol>; 4],
 
     pub b1: ::fidl_next::WireVector<u8>,
 

@@ -22,9 +22,9 @@
     {%- when TypeKind::Endpoint with { nullable, role, protocol, protocol_transport: _ } -%}
         {%- match role -%}
             {%- when EndpointRole::Client -%}
-                ::fidl_next::bind::ClientEnd
+                ::fidl_next::ClientEnd
             {%- when EndpointRole::Server -%}
-                ::fidl_next::bind::ServerEnd
+                ::fidl_next::ServerEnd
         {%- endmatch -%}
         <
             {%- if nullable -%}

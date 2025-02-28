@@ -445,7 +445,7 @@ pub mod example_use_of_error_syntax {
 
     pub struct ComposedCallWhichMayFail;
 
-    impl ::fidl_next::bind::Method for ComposedCallWhichMayFail {
+    impl ::fidl_next::Method for ComposedCallWhichMayFail {
         const ORDINAL: u64 = 3565108794310607393;
 
         type Protocol = crate::ExampleUseOfErrorSyntax;
@@ -457,7 +457,7 @@ pub mod example_use_of_error_syntax {
 
     pub struct CallWhichMayFail;
 
-    impl ::fidl_next::bind::Method for CallWhichMayFail {
+    impl ::fidl_next::Method for CallWhichMayFail {
         const ORDINAL: u64 = 3757408930698888354;
 
         type Protocol = crate::ExampleUseOfErrorSyntax;
@@ -469,12 +469,12 @@ pub mod example_use_of_error_syntax {
 }
 
 /// A helper trait for the `ExampleUseOfErrorSyntax` client sender.
-pub trait ExampleUseOfErrorSyntaxClientSender<___T: ::fidl_next::protocol::Transport> {
+pub trait ExampleUseOfErrorSyntaxClientSender<___T: ::fidl_next::Transport> {
     fn composed_call_which_may_fail<___R>(
                         &self,
                         request: &mut ___R,
                     ) -> Result<
-                        ::fidl_next::bind::ResponseFuture<
+                        ::fidl_next::ResponseFuture<
                             '_,
                             ___T,
                             example_use_of_error_syntax::ComposedCallWhichMayFail,
@@ -491,7 +491,7 @@ pub trait ExampleUseOfErrorSyntaxClientSender<___T: ::fidl_next::protocol::Trans
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::ResponseFuture<'_, ___T, example_use_of_error_syntax::CallWhichMayFail>,
+        ::fidl_next::ResponseFuture<'_, ___T, example_use_of_error_syntax::CallWhichMayFail>,
         ::fidl_next::EncodeError,
     >
     where
@@ -502,15 +502,15 @@ pub trait ExampleUseOfErrorSyntaxClientSender<___T: ::fidl_next::protocol::Trans
 }
 
 impl<___T> ExampleUseOfErrorSyntaxClientSender<___T>
-    for ::fidl_next::bind::ClientSender<___T, ExampleUseOfErrorSyntax>
+    for ::fidl_next::ClientSender<___T, ExampleUseOfErrorSyntax>
 where
-    ___T: ::fidl_next::protocol::Transport,
+    ___T: ::fidl_next::Transport,
 {
     fn composed_call_which_may_fail<___R>(
                         &self,
                         request: &mut ___R,
                     ) -> Result<
-                        ::fidl_next::bind::ResponseFuture<'_, ___T, example_use_of_error_syntax::ComposedCallWhichMayFail>,
+                        ::fidl_next::ResponseFuture<'_, ___T, example_use_of_error_syntax::ComposedCallWhichMayFail>,
                         ::fidl_next::EncodeError,
                     >
                     where
@@ -521,14 +521,14 @@ where
                     {
         self.as_untyped()
             .send_two_way(3565108794310607393, request)
-            .map(::fidl_next::bind::ResponseFuture::from_untyped)
+            .map(::fidl_next::ResponseFuture::from_untyped)
     }
 
     fn call_which_may_fail<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::ResponseFuture<'_, ___T, example_use_of_error_syntax::CallWhichMayFail>,
+        ::fidl_next::ResponseFuture<'_, ___T, example_use_of_error_syntax::CallWhichMayFail>,
         ::fidl_next::EncodeError,
     >
     where
@@ -539,29 +539,29 @@ where
     {
         self.as_untyped()
             .send_two_way(3757408930698888354, request)
-            .map(::fidl_next::bind::ResponseFuture::from_untyped)
+            .map(::fidl_next::ResponseFuture::from_untyped)
     }
 }
 
 /// A client handler for the ExampleUseOfErrorSyntax protocol.
 ///
 /// See [`ExampleUseOfErrorSyntax`] for more details.
-pub trait ExampleUseOfErrorSyntaxClientHandler<___T: ::fidl_next::protocol::Transport> {}
+pub trait ExampleUseOfErrorSyntaxClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for ExampleUseOfErrorSyntax
+impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for ExampleUseOfErrorSyntax
 where
-    ___T: ::fidl_next::protocol::Transport,
+    ___T: ::fidl_next::Transport,
     ___H: ExampleUseOfErrorSyntaxClientHandler<___T>,
 
     ::fidl_next_test_errorsyntax_parent::WireParentUsesErrorSyntaxComposedCallWhichMayFailResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
+        ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 
     crate::WireExampleUseOfErrorSyntaxCallWhichMayFailResult:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
+        ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::bind::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -574,60 +574,55 @@ where
 }
 
 /// A helper trait for the `ExampleUseOfErrorSyntax` server sender.
-pub trait ExampleUseOfErrorSyntaxServerSender<___T: ::fidl_next::protocol::Transport> {}
+pub trait ExampleUseOfErrorSyntaxServerSender<___T: ::fidl_next::Transport> {}
 
 impl<___T> ExampleUseOfErrorSyntaxServerSender<___T>
-    for ::fidl_next::bind::ServerSender<___T, ExampleUseOfErrorSyntax>
+    for ::fidl_next::ServerSender<___T, ExampleUseOfErrorSyntax>
 where
-    ___T: ::fidl_next::protocol::Transport,
+    ___T: ::fidl_next::Transport,
 {
 }
 
 /// A server handler for the ExampleUseOfErrorSyntax protocol.
 ///
 /// See [`ExampleUseOfErrorSyntax`] for more details.
-pub trait ExampleUseOfErrorSyntaxServerHandler<___T: ::fidl_next::protocol::Transport> {
+pub trait ExampleUseOfErrorSyntaxServerHandler<___T: ::fidl_next::Transport> {
     fn composed_call_which_may_fail(
         &mut self,
-        sender: &::fidl_next::bind::ServerSender<___T, ExampleUseOfErrorSyntax>,
+        sender: &::fidl_next::ServerSender<___T, ExampleUseOfErrorSyntax>,
 
-        request: ::fidl_next::bind::RequestBuffer<
+        request: ::fidl_next::RequestBuffer<
             ___T,
             example_use_of_error_syntax::ComposedCallWhichMayFail,
         >,
 
-        responder: ::fidl_next::bind::Responder<
-            example_use_of_error_syntax::ComposedCallWhichMayFail,
-        >,
+        responder: ::fidl_next::Responder<example_use_of_error_syntax::ComposedCallWhichMayFail>,
     );
 
     fn call_which_may_fail(
         &mut self,
-        sender: &::fidl_next::bind::ServerSender<___T, ExampleUseOfErrorSyntax>,
+        sender: &::fidl_next::ServerSender<___T, ExampleUseOfErrorSyntax>,
 
-        request: ::fidl_next::bind::RequestBuffer<
-            ___T,
-            example_use_of_error_syntax::CallWhichMayFail,
-        >,
+        request: ::fidl_next::RequestBuffer<___T, example_use_of_error_syntax::CallWhichMayFail>,
 
-        responder: ::fidl_next::bind::Responder<example_use_of_error_syntax::CallWhichMayFail>,
+        responder: ::fidl_next::Responder<example_use_of_error_syntax::CallWhichMayFail>,
     );
 }
 
-impl<___T, ___H> ::fidl_next::bind::ServerProtocol<___T, ___H> for ExampleUseOfErrorSyntax
+impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for ExampleUseOfErrorSyntax
 where
-    ___T: ::fidl_next::protocol::Transport,
+    ___T: ::fidl_next::Transport,
     ___H: ExampleUseOfErrorSyntaxServerHandler<___T>,
 
     ::fidl_next_test_errorsyntax_parent::WireParentUsesErrorSyntaxComposedCallWhichMayFailRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
+        ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 
     crate::WireExampleUseOfErrorSyntaxCallWhichMayFailRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
+        ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::bind::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -640,23 +635,23 @@ where
 
     fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::bind::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
     ) {
         match ordinal {
             3565108794310607393 => {
-                let responder = ::fidl_next::bind::Responder::from_untyped(responder);
+                let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
+                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
                 handler.composed_call_which_may_fail(sender, buffer, responder);
             }
 
             3757408930698888354 => {
-                let responder = ::fidl_next::bind::Responder::from_untyped(responder);
+                let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
+                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
                 handler.call_which_may_fail(sender, buffer, responder);
             }
 

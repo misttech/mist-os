@@ -12,10 +12,10 @@ pub trait EmptyServiceInstance {
     type Error: ::core::error::Error + Send + Sync + 'static;
 
     /// The transport type created by connecting to a member.
-    type Transport: ::fidl_next::protocol::Transport;
+    type Transport: ::fidl_next::Transport;
 }
 
-impl<___I> EmptyServiceInstance for ::fidl_next::bind::ServiceInstance<___I, EmptyService>
+impl<___I> EmptyServiceInstance for ::fidl_next::ServiceInstance<___I, EmptyService>
 where
     ___I: ::fidl_next::protocol::ServiceInstance,
 {
@@ -31,25 +31,25 @@ pub mod first_protocol {
 
     pub struct MethodOnFirst;
 
-    impl ::fidl_next::bind::Method for MethodOnFirst {
+    impl ::fidl_next::Method for MethodOnFirst {
         const ORDINAL: u64 = 6352548393671797041;
 
         type Protocol = crate::FirstProtocol;
 
         type Request = ();
 
-        type Response = ::fidl_next::bind::Never;
+        type Response = ::fidl_next::Never;
     }
 }
 
 /// A helper trait for the `FirstProtocol` client sender.
-pub trait FirstProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
+pub trait FirstProtocolClientSender<___T: ::fidl_next::Transport> {
     fn method_on_first(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
 }
 
-impl<___T> FirstProtocolClientSender<___T> for ::fidl_next::bind::ClientSender<___T, FirstProtocol>
+impl<___T> FirstProtocolClientSender<___T> for ::fidl_next::ClientSender<___T, FirstProtocol>
 where
-    ___T: ::fidl_next::protocol::Transport,
+    ___T: ::fidl_next::Transport,
 {
     fn method_on_first(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
         self.as_untyped().send_one_way(6352548393671797041, &mut ())
@@ -59,16 +59,16 @@ where
 /// A client handler for the FirstProtocol protocol.
 ///
 /// See [`FirstProtocol`] for more details.
-pub trait FirstProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {}
+pub trait FirstProtocolClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for FirstProtocol
+impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for FirstProtocol
 where
-    ___T: ::fidl_next::protocol::Transport,
+    ___T: ::fidl_next::Transport,
     ___H: FirstProtocolClientHandler<___T>,
 {
     fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::bind::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -81,28 +81,28 @@ where
 }
 
 /// A helper trait for the `FirstProtocol` server sender.
-pub trait FirstProtocolServerSender<___T: ::fidl_next::protocol::Transport> {}
+pub trait FirstProtocolServerSender<___T: ::fidl_next::Transport> {}
 
-impl<___T> FirstProtocolServerSender<___T> for ::fidl_next::bind::ServerSender<___T, FirstProtocol> where
-    ___T: ::fidl_next::protocol::Transport
+impl<___T> FirstProtocolServerSender<___T> for ::fidl_next::ServerSender<___T, FirstProtocol> where
+    ___T: ::fidl_next::Transport
 {
 }
 
 /// A server handler for the FirstProtocol protocol.
 ///
 /// See [`FirstProtocol`] for more details.
-pub trait FirstProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
-    fn method_on_first(&mut self, sender: &::fidl_next::bind::ServerSender<___T, FirstProtocol>);
+pub trait FirstProtocolServerHandler<___T: ::fidl_next::Transport> {
+    fn method_on_first(&mut self, sender: &::fidl_next::ServerSender<___T, FirstProtocol>);
 }
 
-impl<___T, ___H> ::fidl_next::bind::ServerProtocol<___T, ___H> for FirstProtocol
+impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for FirstProtocol
 where
-    ___T: ::fidl_next::protocol::Transport,
+    ___T: ::fidl_next::Transport,
     ___H: FirstProtocolServerHandler<___T>,
 {
     fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::bind::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -119,7 +119,7 @@ where
 
     fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::bind::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -142,15 +142,15 @@ pub trait MultiHeterogeneousMemberServiceInstance {
     type Error: ::core::error::Error + Send + Sync + 'static;
 
     /// The transport type created by connecting to a member.
-    type Transport: ::fidl_next::protocol::Transport;
+    type Transport: ::fidl_next::Transport;
 
     /// Attempts to connect to the `first_member` member.
     fn first_member(
         &mut self,
     ) -> Result<
-        ::fidl_next::bind::ClientEnd<
+        ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::bind::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::FirstProtocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::FirstProtocol>,
         >,
         Self::Error,
     >;
@@ -159,16 +159,16 @@ pub trait MultiHeterogeneousMemberServiceInstance {
     fn second_member(
         &mut self,
     ) -> Result<
-        ::fidl_next::bind::ClientEnd<
+        ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::bind::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::SecondProtocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::SecondProtocol>,
         >,
         Self::Error,
     >;
 }
 
 impl<___I> MultiHeterogeneousMemberServiceInstance
-    for ::fidl_next::bind::ServiceInstance<___I, MultiHeterogeneousMemberService>
+    for ::fidl_next::ServiceInstance<___I, MultiHeterogeneousMemberService>
 where
     ___I: ::fidl_next::protocol::ServiceInstance,
 {
@@ -178,29 +178,25 @@ where
     fn first_member(
         &mut self,
     ) -> Result<
-        ::fidl_next::bind::ClientEnd<
+        ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::bind::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::FirstProtocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::FirstProtocol>,
         >,
         Self::Error,
     > {
-        self.as_untyped_mut()
-            .connect("first_member")
-            .map(::fidl_next::bind::ClientEnd::from_untyped)
+        self.as_untyped_mut().connect("first_member").map(::fidl_next::ClientEnd::from_untyped)
     }
 
     fn second_member(
         &mut self,
     ) -> Result<
-        ::fidl_next::bind::ClientEnd<
+        ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::bind::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::SecondProtocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::SecondProtocol>,
         >,
         Self::Error,
     > {
-        self.as_untyped_mut()
-            .connect("second_member")
-            .map(::fidl_next::bind::ClientEnd::from_untyped)
+        self.as_untyped_mut().connect("second_member").map(::fidl_next::ClientEnd::from_untyped)
     }
 }
 
@@ -214,15 +210,15 @@ pub trait MultiHomogeneousMemberServiceInstance {
     type Error: ::core::error::Error + Send + Sync + 'static;
 
     /// The transport type created by connecting to a member.
-    type Transport: ::fidl_next::protocol::Transport;
+    type Transport: ::fidl_next::Transport;
 
     /// Attempts to connect to the `first_member` member.
     fn first_member(
         &mut self,
     ) -> Result<
-        ::fidl_next::bind::ClientEnd<
+        ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::bind::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::FirstProtocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::FirstProtocol>,
         >,
         Self::Error,
     >;
@@ -231,16 +227,16 @@ pub trait MultiHomogeneousMemberServiceInstance {
     fn second_member(
         &mut self,
     ) -> Result<
-        ::fidl_next::bind::ClientEnd<
+        ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::bind::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::FirstProtocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::FirstProtocol>,
         >,
         Self::Error,
     >;
 }
 
 impl<___I> MultiHomogeneousMemberServiceInstance
-    for ::fidl_next::bind::ServiceInstance<___I, MultiHomogeneousMemberService>
+    for ::fidl_next::ServiceInstance<___I, MultiHomogeneousMemberService>
 where
     ___I: ::fidl_next::protocol::ServiceInstance,
 {
@@ -250,29 +246,25 @@ where
     fn first_member(
         &mut self,
     ) -> Result<
-        ::fidl_next::bind::ClientEnd<
+        ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::bind::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::FirstProtocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::FirstProtocol>,
         >,
         Self::Error,
     > {
-        self.as_untyped_mut()
-            .connect("first_member")
-            .map(::fidl_next::bind::ClientEnd::from_untyped)
+        self.as_untyped_mut().connect("first_member").map(::fidl_next::ClientEnd::from_untyped)
     }
 
     fn second_member(
         &mut self,
     ) -> Result<
-        ::fidl_next::bind::ClientEnd<
+        ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::bind::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::FirstProtocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::FirstProtocol>,
         >,
         Self::Error,
     > {
-        self.as_untyped_mut()
-            .connect("second_member")
-            .map(::fidl_next::bind::ClientEnd::from_untyped)
+        self.as_untyped_mut().connect("second_member").map(::fidl_next::ClientEnd::from_untyped)
     }
 }
 
@@ -284,26 +276,25 @@ pub mod second_protocol {
 
     pub struct MethodOnSecond;
 
-    impl ::fidl_next::bind::Method for MethodOnSecond {
+    impl ::fidl_next::Method for MethodOnSecond {
         const ORDINAL: u64 = 8121179205110225988;
 
         type Protocol = crate::SecondProtocol;
 
         type Request = ();
 
-        type Response = ::fidl_next::bind::Never;
+        type Response = ::fidl_next::Never;
     }
 }
 
 /// A helper trait for the `SecondProtocol` client sender.
-pub trait SecondProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
+pub trait SecondProtocolClientSender<___T: ::fidl_next::Transport> {
     fn method_on_second(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
 }
 
-impl<___T> SecondProtocolClientSender<___T>
-    for ::fidl_next::bind::ClientSender<___T, SecondProtocol>
+impl<___T> SecondProtocolClientSender<___T> for ::fidl_next::ClientSender<___T, SecondProtocol>
 where
-    ___T: ::fidl_next::protocol::Transport,
+    ___T: ::fidl_next::Transport,
 {
     fn method_on_second(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
         self.as_untyped().send_one_way(8121179205110225988, &mut ())
@@ -313,16 +304,16 @@ where
 /// A client handler for the SecondProtocol protocol.
 ///
 /// See [`SecondProtocol`] for more details.
-pub trait SecondProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {}
+pub trait SecondProtocolClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for SecondProtocol
+impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for SecondProtocol
 where
-    ___T: ::fidl_next::protocol::Transport,
+    ___T: ::fidl_next::Transport,
     ___H: SecondProtocolClientHandler<___T>,
 {
     fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::bind::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -335,30 +326,28 @@ where
 }
 
 /// A helper trait for the `SecondProtocol` server sender.
-pub trait SecondProtocolServerSender<___T: ::fidl_next::protocol::Transport> {}
+pub trait SecondProtocolServerSender<___T: ::fidl_next::Transport> {}
 
-impl<___T> SecondProtocolServerSender<___T>
-    for ::fidl_next::bind::ServerSender<___T, SecondProtocol>
-where
-    ___T: ::fidl_next::protocol::Transport,
+impl<___T> SecondProtocolServerSender<___T> for ::fidl_next::ServerSender<___T, SecondProtocol> where
+    ___T: ::fidl_next::Transport
 {
 }
 
 /// A server handler for the SecondProtocol protocol.
 ///
 /// See [`SecondProtocol`] for more details.
-pub trait SecondProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
-    fn method_on_second(&mut self, sender: &::fidl_next::bind::ServerSender<___T, SecondProtocol>);
+pub trait SecondProtocolServerHandler<___T: ::fidl_next::Transport> {
+    fn method_on_second(&mut self, sender: &::fidl_next::ServerSender<___T, SecondProtocol>);
 }
 
-impl<___T, ___H> ::fidl_next::bind::ServerProtocol<___T, ___H> for SecondProtocol
+impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for SecondProtocol
 where
-    ___T: ::fidl_next::protocol::Transport,
+    ___T: ::fidl_next::Transport,
     ___H: SecondProtocolServerHandler<___T>,
 {
     fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::bind::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -375,7 +364,7 @@ where
 
     fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::bind::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -398,22 +387,21 @@ pub trait SingleMemberServiceInstance {
     type Error: ::core::error::Error + Send + Sync + 'static;
 
     /// The transport type created by connecting to a member.
-    type Transport: ::fidl_next::protocol::Transport;
+    type Transport: ::fidl_next::Transport;
 
     /// Attempts to connect to the `single_member` member.
     fn single_member(
         &mut self,
     ) -> Result<
-        ::fidl_next::bind::ClientEnd<
+        ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::bind::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::FirstProtocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::FirstProtocol>,
         >,
         Self::Error,
     >;
 }
 
-impl<___I> SingleMemberServiceInstance
-    for ::fidl_next::bind::ServiceInstance<___I, SingleMemberService>
+impl<___I> SingleMemberServiceInstance for ::fidl_next::ServiceInstance<___I, SingleMemberService>
 where
     ___I: ::fidl_next::protocol::ServiceInstance,
 {
@@ -423,14 +411,12 @@ where
     fn single_member(
         &mut self,
     ) -> Result<
-        ::fidl_next::bind::ClientEnd<
+        ::fidl_next::ClientEnd<
             Self::Transport,
-            ::fidl_next::bind::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::FirstProtocol>,
+            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Handle, crate::FirstProtocol>,
         >,
         Self::Error,
     > {
-        self.as_untyped_mut()
-            .connect("single_member")
-            .map(::fidl_next::bind::ClientEnd::from_untyped)
+        self.as_untyped_mut().connect("single_member").map(::fidl_next::ClientEnd::from_untyped)
     }
 }

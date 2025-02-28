@@ -5,20 +5,21 @@
 #[derive(Debug)]
 #[repr(C)]
 pub struct ParentFirstRequest {
-    pub request: ::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::zx::Handle, crate::Parent>,
+    pub request: ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Handle, crate::Parent>,
 }
 
 impl ::fidl_next::Encodable for ParentFirstRequest {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe {
-            ::fidl_next::CopyOptimization::enable_if(
-                true && <::fidl_next::bind::ServerEnd<
-                    ::fidl_next::fuchsia::zx::Handle,
-                    crate::Parent,
-                > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
-                    .is_enabled(),
-            )
-        };
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true
+
+                && <
+                    ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Handle,crate::Parent,
+        > as ::fidl_next::Encodable
+                >::COPY_OPTIMIZATION.is_enabled()
+
+        )
+    };
 
     type Encoded = WireParentFirstRequest;
 }
@@ -75,16 +76,17 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireParentFirstRequest> for ParentFirstRequest {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe {
-            ::fidl_next::CopyOptimization::enable_if(
-                true && <::fidl_next::bind::ServerEnd<
-                    ::fidl_next::fuchsia::zx::Handle,
-                    crate::Parent,
-                > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
-                    .is_enabled(),
-            )
-        };
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true
+
+                && <
+                    ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Handle,crate::Parent,
+        > as ::fidl_next::Encodable
+                >::COPY_OPTIMIZATION.is_enabled()
+
+        )
+    };
 
     #[inline]
     fn take_from(from: &WireParentFirstRequest) -> Self {
@@ -96,7 +98,7 @@ impl ::fidl_next::TakeFrom<WireParentFirstRequest> for ParentFirstRequest {
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireParentFirstRequest {
-    pub request: ::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::WireHandle, crate::Parent>,
+    pub request: ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireHandle, crate::Parent>,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireParentFirstRequest
@@ -130,19 +132,19 @@ pub mod parent {
 
     pub struct First;
 
-    impl ::fidl_next::bind::Method for First {
+    impl ::fidl_next::Method for First {
         const ORDINAL: u64 = 3973163707930985819;
 
         type Protocol = crate::Parent;
 
         type Request = crate::WireParentFirstRequest;
 
-        type Response = ::fidl_next::bind::Never;
+        type Response = ::fidl_next::Never;
     }
 }
 
 /// A helper trait for the `Parent` client sender.
-pub trait ParentClientSender<___T: ::fidl_next::protocol::Transport> {
+pub trait ParentClientSender<___T: ::fidl_next::Transport> {
     fn first<___R>(
         &self,
         request: &mut ___R,
@@ -151,9 +153,9 @@ pub trait ParentClientSender<___T: ::fidl_next::protocol::Transport> {
         ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireParentFirstRequest>;
 }
 
-impl<___T> ParentClientSender<___T> for ::fidl_next::bind::ClientSender<___T, Parent>
+impl<___T> ParentClientSender<___T> for ::fidl_next::ClientSender<___T, Parent>
 where
-    ___T: ::fidl_next::protocol::Transport,
+    ___T: ::fidl_next::Transport,
 {
     fn first<___R>(
         &self,
@@ -169,16 +171,16 @@ where
 /// A client handler for the Parent protocol.
 ///
 /// See [`Parent`] for more details.
-pub trait ParentClientHandler<___T: ::fidl_next::protocol::Transport> {}
+pub trait ParentClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for Parent
+impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for Parent
 where
-    ___T: ::fidl_next::protocol::Transport,
+    ___T: ::fidl_next::Transport,
     ___H: ParentClientHandler<___T>,
 {
     fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::bind::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -191,42 +193,42 @@ where
 }
 
 /// A helper trait for the `Parent` server sender.
-pub trait ParentServerSender<___T: ::fidl_next::protocol::Transport> {}
+pub trait ParentServerSender<___T: ::fidl_next::Transport> {}
 
-impl<___T> ParentServerSender<___T> for ::fidl_next::bind::ServerSender<___T, Parent> where
-    ___T: ::fidl_next::protocol::Transport
+impl<___T> ParentServerSender<___T> for ::fidl_next::ServerSender<___T, Parent> where
+    ___T: ::fidl_next::Transport
 {
 }
 
 /// A server handler for the Parent protocol.
 ///
 /// See [`Parent`] for more details.
-pub trait ParentServerHandler<___T: ::fidl_next::protocol::Transport> {
+pub trait ParentServerHandler<___T: ::fidl_next::Transport> {
     fn first(
         &mut self,
-        sender: &::fidl_next::bind::ServerSender<___T, Parent>,
+        sender: &::fidl_next::ServerSender<___T, Parent>,
 
-        request: ::fidl_next::bind::RequestBuffer<___T, parent::First>,
+        request: ::fidl_next::RequestBuffer<___T, parent::First>,
     );
 }
 
-impl<___T, ___H> ::fidl_next::bind::ServerProtocol<___T, ___H> for Parent
+impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for Parent
 where
-    ___T: ::fidl_next::protocol::Transport,
+    ___T: ::fidl_next::Transport,
     ___H: ParentServerHandler<___T>,
 
     crate::WireParentFirstRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
+        ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::bind::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
             3973163707930985819 => {
-                let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
+                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
                 handler.first(sender, buffer);
             }
 
@@ -238,7 +240,7 @@ where
 
     fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::bind::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -254,20 +256,21 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct ChildSecondRequest {
-    pub request: ::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::zx::Handle, crate::Parent>,
+    pub request: ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Handle, crate::Parent>,
 }
 
 impl ::fidl_next::Encodable for ChildSecondRequest {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe {
-            ::fidl_next::CopyOptimization::enable_if(
-                true && <::fidl_next::bind::ServerEnd<
-                    ::fidl_next::fuchsia::zx::Handle,
-                    crate::Parent,
-                > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
-                    .is_enabled(),
-            )
-        };
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true
+
+                && <
+                    ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Handle,crate::Parent,
+        > as ::fidl_next::Encodable
+                >::COPY_OPTIMIZATION.is_enabled()
+
+        )
+    };
 
     type Encoded = WireChildSecondRequest;
 }
@@ -324,16 +327,17 @@ where
 }
 
 impl ::fidl_next::TakeFrom<WireChildSecondRequest> for ChildSecondRequest {
-    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> =
-        unsafe {
-            ::fidl_next::CopyOptimization::enable_if(
-                true && <::fidl_next::bind::ServerEnd<
-                    ::fidl_next::fuchsia::zx::Handle,
-                    crate::Parent,
-                > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
-                    .is_enabled(),
-            )
-        };
+    const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
+        ::fidl_next::CopyOptimization::enable_if(
+            true
+
+                && <
+                    ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Handle,crate::Parent,
+        > as ::fidl_next::Encodable
+                >::COPY_OPTIMIZATION.is_enabled()
+
+        )
+    };
 
     #[inline]
     fn take_from(from: &WireChildSecondRequest) -> Self {
@@ -345,7 +349,7 @@ impl ::fidl_next::TakeFrom<WireChildSecondRequest> for ChildSecondRequest {
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireChildSecondRequest {
-    pub request: ::fidl_next::bind::ServerEnd<::fidl_next::fuchsia::WireHandle, crate::Parent>,
+    pub request: ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireHandle, crate::Parent>,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireChildSecondRequest
@@ -379,31 +383,31 @@ pub mod child {
 
     pub struct First;
 
-    impl ::fidl_next::bind::Method for First {
+    impl ::fidl_next::Method for First {
         const ORDINAL: u64 = 3973163707930985819;
 
         type Protocol = crate::Child;
 
         type Request = crate::WireParentFirstRequest;
 
-        type Response = ::fidl_next::bind::Never;
+        type Response = ::fidl_next::Never;
     }
 
     pub struct Second;
 
-    impl ::fidl_next::bind::Method for Second {
+    impl ::fidl_next::Method for Second {
         const ORDINAL: u64 = 2545123272820824165;
 
         type Protocol = crate::Child;
 
         type Request = crate::WireChildSecondRequest;
 
-        type Response = ::fidl_next::bind::Never;
+        type Response = ::fidl_next::Never;
     }
 }
 
 /// A helper trait for the `Child` client sender.
-pub trait ChildClientSender<___T: ::fidl_next::protocol::Transport> {
+pub trait ChildClientSender<___T: ::fidl_next::Transport> {
     fn first<___R>(
         &self,
         request: &mut ___R,
@@ -419,9 +423,9 @@ pub trait ChildClientSender<___T: ::fidl_next::protocol::Transport> {
         ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireChildSecondRequest>;
 }
 
-impl<___T> ChildClientSender<___T> for ::fidl_next::bind::ClientSender<___T, Child>
+impl<___T> ChildClientSender<___T> for ::fidl_next::ClientSender<___T, Child>
 where
-    ___T: ::fidl_next::protocol::Transport,
+    ___T: ::fidl_next::Transport,
 {
     fn first<___R>(
         &self,
@@ -447,16 +451,16 @@ where
 /// A client handler for the Child protocol.
 ///
 /// See [`Child`] for more details.
-pub trait ChildClientHandler<___T: ::fidl_next::protocol::Transport> {}
+pub trait ChildClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for Child
+impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for Child
 where
-    ___T: ::fidl_next::protocol::Transport,
+    ___T: ::fidl_next::Transport,
     ___H: ChildClientHandler<___T>,
 {
     fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::bind::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -469,57 +473,57 @@ where
 }
 
 /// A helper trait for the `Child` server sender.
-pub trait ChildServerSender<___T: ::fidl_next::protocol::Transport> {}
+pub trait ChildServerSender<___T: ::fidl_next::Transport> {}
 
-impl<___T> ChildServerSender<___T> for ::fidl_next::bind::ServerSender<___T, Child> where
-    ___T: ::fidl_next::protocol::Transport
+impl<___T> ChildServerSender<___T> for ::fidl_next::ServerSender<___T, Child> where
+    ___T: ::fidl_next::Transport
 {
 }
 
 /// A server handler for the Child protocol.
 ///
 /// See [`Child`] for more details.
-pub trait ChildServerHandler<___T: ::fidl_next::protocol::Transport> {
+pub trait ChildServerHandler<___T: ::fidl_next::Transport> {
     fn first(
         &mut self,
-        sender: &::fidl_next::bind::ServerSender<___T, Child>,
+        sender: &::fidl_next::ServerSender<___T, Child>,
 
-        request: ::fidl_next::bind::RequestBuffer<___T, child::First>,
+        request: ::fidl_next::RequestBuffer<___T, child::First>,
     );
 
     fn second(
         &mut self,
-        sender: &::fidl_next::bind::ServerSender<___T, Child>,
+        sender: &::fidl_next::ServerSender<___T, Child>,
 
-        request: ::fidl_next::bind::RequestBuffer<___T, child::Second>,
+        request: ::fidl_next::RequestBuffer<___T, child::Second>,
     );
 }
 
-impl<___T, ___H> ::fidl_next::bind::ServerProtocol<___T, ___H> for Child
+impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for Child
 where
-    ___T: ::fidl_next::protocol::Transport,
+    ___T: ::fidl_next::Transport,
     ___H: ChildServerHandler<___T>,
 
     crate::WireParentFirstRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
+        ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 
     crate::WireChildSecondRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
+        ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::bind::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
             3973163707930985819 => {
-                let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
+                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
                 handler.first(sender, buffer);
             }
 
             2545123272820824165 => {
-                let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
+                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
                 handler.second(sender, buffer);
             }
 
@@ -531,7 +535,7 @@ where
 
     fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::bind::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,

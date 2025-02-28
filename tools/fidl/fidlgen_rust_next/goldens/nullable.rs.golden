@@ -344,7 +344,7 @@ pub mod simple_protocol {
 
     pub struct Add;
 
-    impl ::fidl_next::bind::Method for Add {
+    impl ::fidl_next::Method for Add {
         const ORDINAL: u64 = 9142761280038437494;
 
         type Protocol = crate::SimpleProtocol;
@@ -356,55 +356,48 @@ pub mod simple_protocol {
 }
 
 /// A helper trait for the `SimpleProtocol` client sender.
-pub trait SimpleProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
+pub trait SimpleProtocolClientSender<___T: ::fidl_next::Transport> {
     fn add<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<
-        ::fidl_next::bind::ResponseFuture<'_, ___T, simple_protocol::Add>,
-        ::fidl_next::EncodeError,
-    >
+    ) -> Result<::fidl_next::ResponseFuture<'_, ___T, simple_protocol::Add>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireSimpleProtocolAddRequest>;
 }
 
-impl<___T> SimpleProtocolClientSender<___T>
-    for ::fidl_next::bind::ClientSender<___T, SimpleProtocol>
+impl<___T> SimpleProtocolClientSender<___T> for ::fidl_next::ClientSender<___T, SimpleProtocol>
 where
-    ___T: ::fidl_next::protocol::Transport,
+    ___T: ::fidl_next::Transport,
 {
     fn add<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<
-        ::fidl_next::bind::ResponseFuture<'_, ___T, simple_protocol::Add>,
-        ::fidl_next::EncodeError,
-    >
+    ) -> Result<::fidl_next::ResponseFuture<'_, ___T, simple_protocol::Add>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireSimpleProtocolAddRequest>,
     {
         self.as_untyped()
             .send_two_way(9142761280038437494, request)
-            .map(::fidl_next::bind::ResponseFuture::from_untyped)
+            .map(::fidl_next::ResponseFuture::from_untyped)
     }
 }
 
 /// A client handler for the SimpleProtocol protocol.
 ///
 /// See [`SimpleProtocol`] for more details.
-pub trait SimpleProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {}
+pub trait SimpleProtocolClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for SimpleProtocol
+impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for SimpleProtocol
 where
-    ___T: ::fidl_next::protocol::Transport,
+    ___T: ::fidl_next::Transport,
     ___H: SimpleProtocolClientHandler<___T>,
 
     crate::WireSimpleProtocolAddResponse:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
+        ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::bind::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -417,40 +410,38 @@ where
 }
 
 /// A helper trait for the `SimpleProtocol` server sender.
-pub trait SimpleProtocolServerSender<___T: ::fidl_next::protocol::Transport> {}
+pub trait SimpleProtocolServerSender<___T: ::fidl_next::Transport> {}
 
-impl<___T> SimpleProtocolServerSender<___T>
-    for ::fidl_next::bind::ServerSender<___T, SimpleProtocol>
-where
-    ___T: ::fidl_next::protocol::Transport,
+impl<___T> SimpleProtocolServerSender<___T> for ::fidl_next::ServerSender<___T, SimpleProtocol> where
+    ___T: ::fidl_next::Transport
 {
 }
 
 /// A server handler for the SimpleProtocol protocol.
 ///
 /// See [`SimpleProtocol`] for more details.
-pub trait SimpleProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
+pub trait SimpleProtocolServerHandler<___T: ::fidl_next::Transport> {
     fn add(
         &mut self,
-        sender: &::fidl_next::bind::ServerSender<___T, SimpleProtocol>,
+        sender: &::fidl_next::ServerSender<___T, SimpleProtocol>,
 
-        request: ::fidl_next::bind::RequestBuffer<___T, simple_protocol::Add>,
+        request: ::fidl_next::RequestBuffer<___T, simple_protocol::Add>,
 
-        responder: ::fidl_next::bind::Responder<simple_protocol::Add>,
+        responder: ::fidl_next::Responder<simple_protocol::Add>,
     );
 }
 
-impl<___T, ___H> ::fidl_next::bind::ServerProtocol<___T, ___H> for SimpleProtocol
+impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for SimpleProtocol
 where
-    ___T: ::fidl_next::protocol::Transport,
+    ___T: ::fidl_next::Transport,
     ___H: SimpleProtocolServerHandler<___T>,
 
     crate::WireSimpleProtocolAddRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
+        ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::bind::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -463,16 +454,16 @@ where
 
     fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::bind::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
     ) {
         match ordinal {
             9142761280038437494 => {
-                let responder = ::fidl_next::bind::Responder::from_untyped(responder);
+                let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
+                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
                 handler.add(sender, buffer, responder);
             }
 
@@ -843,16 +834,14 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct StructWithNullableProtocol {
-    pub val: ::fidl_next::bind::ClientEnd<
-        Option<::fidl_next::fuchsia::zx::Handle>,
-        crate::SimpleProtocol,
-    >,
+    pub val:
+        ::fidl_next::ClientEnd<Option<::fidl_next::fuchsia::zx::Handle>, crate::SimpleProtocol>,
 }
 
 impl ::fidl_next::Encodable for StructWithNullableProtocol {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::bind::ClientEnd<
+            true && <::fidl_next::ClientEnd<
                 Option<::fidl_next::fuchsia::zx::Handle>,
                 crate::SimpleProtocol,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
@@ -917,7 +906,7 @@ where
 impl ::fidl_next::TakeFrom<WireStructWithNullableProtocol> for StructWithNullableProtocol {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::bind::ClientEnd<
+            true && <::fidl_next::ClientEnd<
                 Option<::fidl_next::fuchsia::zx::Handle>,
                 crate::SimpleProtocol,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
@@ -935,10 +924,8 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableProtocol> for StructWithNullabl
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireStructWithNullableProtocol {
-    pub val: ::fidl_next::bind::ClientEnd<
-        ::fidl_next::fuchsia::WireOptionalHandle,
-        crate::SimpleProtocol,
-    >,
+    pub val:
+        ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::SimpleProtocol>,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableProtocol
@@ -967,16 +954,14 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct StructWithNullableRequest {
-    pub val: ::fidl_next::bind::ServerEnd<
-        Option<::fidl_next::fuchsia::zx::Handle>,
-        crate::SimpleProtocol,
-    >,
+    pub val:
+        ::fidl_next::ServerEnd<Option<::fidl_next::fuchsia::zx::Handle>, crate::SimpleProtocol>,
 }
 
 impl ::fidl_next::Encodable for StructWithNullableRequest {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::bind::ServerEnd<
+            true && <::fidl_next::ServerEnd<
                 Option<::fidl_next::fuchsia::zx::Handle>,
                 crate::SimpleProtocol,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
@@ -1041,7 +1026,7 @@ where
 impl ::fidl_next::TakeFrom<WireStructWithNullableRequest> for StructWithNullableRequest {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::bind::ServerEnd<
+            true && <::fidl_next::ServerEnd<
                 Option<::fidl_next::fuchsia::zx::Handle>,
                 crate::SimpleProtocol,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
@@ -1059,10 +1044,8 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableRequest> for StructWithNullable
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireStructWithNullableRequest {
-    pub val: ::fidl_next::bind::ServerEnd<
-        ::fidl_next::fuchsia::WireOptionalHandle,
-        crate::SimpleProtocol,
-    >,
+    pub val:
+        ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::SimpleProtocol>,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableRequest

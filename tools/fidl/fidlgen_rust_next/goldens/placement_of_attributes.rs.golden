@@ -300,19 +300,19 @@ pub mod example_protocol {
 
     pub struct Method;
 
-    impl ::fidl_next::bind::Method for Method {
+    impl ::fidl_next::Method for Method {
         const ORDINAL: u64 = 6023439637367187273;
 
         type Protocol = crate::ExampleProtocol;
 
         type Request = crate::WireExampleProtocolMethodRequest;
 
-        type Response = ::fidl_next::bind::Never;
+        type Response = ::fidl_next::Never;
     }
 }
 
 /// A helper trait for the `ExampleProtocol` client sender.
-pub trait ExampleProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
+pub trait ExampleProtocolClientSender<___T: ::fidl_next::Transport> {
     fn method<___R>(
         &self,
         request: &mut ___R,
@@ -324,10 +324,9 @@ pub trait ExampleProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
         >;
 }
 
-impl<___T> ExampleProtocolClientSender<___T>
-    for ::fidl_next::bind::ClientSender<___T, ExampleProtocol>
+impl<___T> ExampleProtocolClientSender<___T> for ::fidl_next::ClientSender<___T, ExampleProtocol>
 where
-    ___T: ::fidl_next::protocol::Transport,
+    ___T: ::fidl_next::Transport,
 {
     fn method<___R>(
         &self,
@@ -346,16 +345,16 @@ where
 /// A client handler for the ExampleProtocol protocol.
 ///
 /// See [`ExampleProtocol`] for more details.
-pub trait ExampleProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {}
+pub trait ExampleProtocolClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for ExampleProtocol
+impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for ExampleProtocol
 where
-    ___T: ::fidl_next::protocol::Transport,
+    ___T: ::fidl_next::Transport,
     ___H: ExampleProtocolClientHandler<___T>,
 {
     fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::bind::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -368,44 +367,42 @@ where
 }
 
 /// A helper trait for the `ExampleProtocol` server sender.
-pub trait ExampleProtocolServerSender<___T: ::fidl_next::protocol::Transport> {}
+pub trait ExampleProtocolServerSender<___T: ::fidl_next::Transport> {}
 
-impl<___T> ExampleProtocolServerSender<___T>
-    for ::fidl_next::bind::ServerSender<___T, ExampleProtocol>
-where
-    ___T: ::fidl_next::protocol::Transport,
+impl<___T> ExampleProtocolServerSender<___T> for ::fidl_next::ServerSender<___T, ExampleProtocol> where
+    ___T: ::fidl_next::Transport
 {
 }
 
 /// A server handler for the ExampleProtocol protocol.
 ///
 /// See [`ExampleProtocol`] for more details.
-pub trait ExampleProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
+pub trait ExampleProtocolServerHandler<___T: ::fidl_next::Transport> {
     fn method(
         &mut self,
-        sender: &::fidl_next::bind::ServerSender<___T, ExampleProtocol>,
+        sender: &::fidl_next::ServerSender<___T, ExampleProtocol>,
 
-        request: ::fidl_next::bind::RequestBuffer<___T, example_protocol::Method>,
+        request: ::fidl_next::RequestBuffer<___T, example_protocol::Method>,
     );
 }
 
-impl<___T, ___H> ::fidl_next::bind::ServerProtocol<___T, ___H> for ExampleProtocol
+impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for ExampleProtocol
 where
-    ___T: ::fidl_next::protocol::Transport,
+    ___T: ::fidl_next::Transport,
     ___H: ExampleProtocolServerHandler<___T>,
 
     crate::WireExampleProtocolMethodRequest:
-        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::RecvBuffer>,
+        ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::bind::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
             6023439637367187273 => {
-                let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
+                let buffer = ::fidl_next::RequestBuffer::from_untyped(buffer);
                 handler.method(sender, buffer);
             }
 
@@ -417,7 +414,7 @@ where
 
     fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::bind::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
