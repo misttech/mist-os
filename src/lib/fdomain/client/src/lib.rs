@@ -407,6 +407,12 @@ impl ClientInner {
     ) -> Poll<Result<Infallible, InnerError>> {
         if !self.waiting_to_close.is_empty() {
             let handles = std::mem::replace(&mut self.waiting_to_close, Vec::new());
+            // We've dropped the handle object. Nobody is going to wait to read
+            // the buffers anymore. This is a safe time to drop the read state.
+            for handle in &handles {
+                let _ = self.channel_read_states.remove(handle);
+                let _ = self.socket_read_states.remove(handle);
+            }
             self.request(
                 ordinals::CLOSE,
                 proto::FDomainCloseRequest { handles },

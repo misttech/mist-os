@@ -281,6 +281,11 @@ impl Handle {
         let params = (move || {
             let client = self.client()?;
             let handle = self.take_proto();
+            {
+                let mut client = client.0.lock().unwrap();
+                let _ = client.channel_read_states.remove(&handle);
+                let _ = client.socket_read_states.remove(&handle);
+            }
             let new_handle = client.new_hid();
             Ok((new_handle, handle, client))
         })();
