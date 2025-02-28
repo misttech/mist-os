@@ -8,6 +8,7 @@ group("tests") {
     "api-protocols:tests",
     "api-types:tests",
     "coordinator-getter:tests",
+    "designware-dsi:tests",
     "designware-hdmi:tests",
     "driver-framework-migration-utils:tests",
     "driver-utils:tests",

@@ -15,6 +15,7 @@
 #include <fbl/auto_lock.h>
 #include <fbl/string_buffer.h>
 
+#include "src/graphics/display/lib/designware-dsi/dpi-video-timing.h"
 #include "src/graphics/display/lib/designware-dsi/dw-mipi-dsi-reg.h"
 
 // Header Creation Macros
@@ -46,35 +47,6 @@ constexpr uint32_t kBitPldWFull = 3;
 constexpr uint32_t kBitPldWEmpty = 2;
 constexpr uint32_t kBitCmdFull = 1;
 constexpr uint32_t kBitCmdEmpty = 0;
-
-// Computes the amount of time it takes to transmit a number of pixels across
-// the DPI interface between the display engine frontend and the DesignWare DSI
-// host controller.
-//
-// The result is expressed in D-PHY lane byte clock cycles, which is the
-// number of bytes that can be transmitted on a D-PHY data lane in High Speed
-// mode.
-//
-// `pixels` must be >= 0 and <= 2^23 - 1.
-//
-// The DPI pixel rate (Hz) must be divisble by the D-PHY data lane byte
-// transmission rate (bytes per second), and the quotient must be >= 1 and
-// <= 256.
-constexpr int32_t DpiPixelToDphyLaneByteClockCycle(int32_t pixels, int64_t dpi_pixel_rate_hz,
-                                                   int64_t dphy_data_lane_bytes_per_second) {
-  ZX_DEBUG_ASSERT(pixels >= 0);
-  ZX_DEBUG_ASSERT(pixels <= (1 << 23) - 1);
-
-  ZX_DEBUG_ASSERT(dphy_data_lane_bytes_per_second % dpi_pixel_rate_hz == 0);
-  int64_t dphy_data_lane_byte_rate_to_dpi_pixel_rate_ratio_i64 =
-      dphy_data_lane_bytes_per_second / dpi_pixel_rate_hz;
-  ZX_DEBUG_ASSERT(dphy_data_lane_byte_rate_to_dpi_pixel_rate_ratio_i64 >= 1);
-  ZX_DEBUG_ASSERT(dphy_data_lane_byte_rate_to_dpi_pixel_rate_ratio_i64 <= 256);
-
-  int32_t dphy_data_lane_byte_rate_to_dpi_pixel_rate_ratio =
-      static_cast<int32_t>(dphy_data_lane_byte_rate_to_dpi_pixel_rate_ratio_i64);
-  return pixels * dphy_data_lane_byte_rate_to_dpi_pixel_rate_ratio;
-}
 
 void LogBytes(cpp20::span<const uint8_t> bytes) {
   if (bytes.empty()) {
