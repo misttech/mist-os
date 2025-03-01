@@ -102,7 +102,7 @@ where
 ///
 /// This is basically the same thing as `ffx_plugin` used to generate for
 /// each proxy argument, but uses a generic instead of text replacement.
-pub async fn fake_proxy_f<T: fdomain_client::fidl::Proxy>(
+pub async fn fake_proxy<T: fdomain_client::fidl::Proxy>(
     client: Arc<fdomain_client::Client>,
     mut handle_request: impl FnMut(fdomain_client::fidl::Request<T::Protocol>) + 'static,
 ) -> T {
