@@ -148,9 +148,6 @@ void vm_init() {
   //
   physmap_protect_non_arena_regions();
 
-  // Mark the physmap no-execute.
-  physmap_protect_arena_regions_noexecute();
-
   cmpct_set_fill_on_alloc_threshold(gBootOptions->alloc_fill_threshold);
 }
 

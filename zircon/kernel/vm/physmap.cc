@@ -22,10 +22,6 @@
 
 namespace {
 
-// Permissions & flags for regions of the physmap backed by memory. Execute permissions
-// are not included - we do not ever execute from physmap addresses.
-constexpr uint kPhysmapMmuFlags = ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE;
-
 // Permissions & flags for regions of the physmap that are not backed by memory; they
 // may represent MMIOs or non-allocatable (ACPI NVS) memory. The kernel may access
 // some peripherals in these addresses (such as MMIO-based UARTs) in early boot.
@@ -145,20 +141,4 @@ void physmap_protect_non_arena_regions() {
   ASSERT(status == ZX_OK);
 
   physmap_for_each_gap(physmap_protect_gap, arenas.get(), num_arenas, gPhysHandoff->nvram);
-}
-
-void physmap_protect_arena_regions_noexecute() {
-  const size_t num_arenas = pmm_num_arenas();
-  fbl::AllocChecker ac;
-  auto arenas = ktl::unique_ptr<pmm_arena_info_t[]>(new (&ac) pmm_arena_info_t[num_arenas]);
-  ASSERT(ac.check());
-  const size_t size = num_arenas * sizeof(pmm_arena_info_t);
-
-  zx_status_t status = pmm_get_arena_info(num_arenas, 0, arenas.get(), size);
-  ASSERT(status == ZX_OK);
-
-  for (uint i = 0; i < num_arenas; i++) {
-    physmap_modify_region(reinterpret_cast<vaddr_t>(paddr_to_physmap(arenas[i].base)),
-                          /*size=*/arenas[i].size, /*mmu_flags=*/kPhysmapMmuFlags);
-  }
 }

@@ -345,14 +345,12 @@ void HandoffPrep::ConstructKernelAddressSpace(const ElfImage& kernel) {
   // (e.g., for VM init).
 
   // Construct the physmap.
-  //
-  // TODO(https://fxbug.dev/42164859): Don't map as executable.
-  constexpr AddressSpace::MapSettings kRwxRam{
-      .access = {.readable = true, .writable = true, .executable = true},
+  constexpr AddressSpace::MapSettings kRwRam{
+      .access = {.readable = true, .writable = true},
       .memory = kArchNormalMemoryType,
   };
   AddressSpace::PanicIfError(
-      gAddressSpace->Map(kArchPhysmapVirtualBase, kArchPhysmapSize, 0, kRwxRam));
+      gAddressSpace->Map(kArchPhysmapVirtualBase, kArchPhysmapSize, 0, kRwRam));
 
   // Construct the kernel's mapping.
   AddressSpace::PanicIfError(kernel.MapInto(*gAddressSpace));
