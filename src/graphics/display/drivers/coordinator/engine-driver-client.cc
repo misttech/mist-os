@@ -139,7 +139,7 @@ EngineDriverClient::~EngineDriverClient() {
 void EngineDriverClient::ReleaseImage(display::DriverImageId driver_image_id) {
   if (use_engine_) {
     fdf::Arena arena(kArenaTag);
-    fdf::WireUnownedResult result =
+    fidl::OneWayStatus result =
         fidl_engine_.buffer(arena)->ReleaseImage(ToFidlDriverImageId(driver_image_id));
     if (!result.ok()) {
       FDF_LOG(ERROR, "ReleaseImage failed: %s", result.status_string());

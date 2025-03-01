@@ -126,53 +126,25 @@ type RawDisplayInfo = resource struct {
 @transport("Banjo")
 @banjo_layout("ddk-interface")
 closed protocol DisplayEngineListener {
-    /// Called when a display is connected.
-    ///
-    /// Display Engine drivers must emit this event for all displays connected
-    /// prior to initialization.
+    /// See [`fuchsia.hardware.display.engine/EngineListener.OnDisplayAdded`].
     strict OnDisplayAdded(resource struct {
         display_info RawDisplayInfo;
     });
 
-    /// Called when a display is removed.
-    ///
-    /// `display_id` must be a valid display ID that occurred in a previous
-    /// `OnDisplayAdded()` event.
-    ///
-    /// Display Engine drivers must have finished accessing all images which
-    /// were on the removed display before emitting the `OnDisplayRemoved()`
-    /// event.
+    /// See [`fuchsia.hardware.display.engine/EngineListener.OnDisplayRemoved`].
     strict OnDisplayRemoved(struct {
         display_id uint64;
     });
 
-    /// Called at the start of each display device's vertical synchronization
-    /// (Vsync) period, regardless of whether the display has applied any
-    /// configuration.
-    ///
-    /// Arguments
-    /// - |timestamp|
-    ///      The ZX_CLOCK_MONOTONIC timestamp at which the vsync occurred.
-    /// - |config_stamp|
-    ///      The config stamp of the latest configuration that is currently
-    ///      fully applied to all the layers of the display with `display_id`.
-    ///        If none of the configurations are currently fully applied to
-    ///      this display, a null value will be passed to the driver.
-    ///        Note that an `ApplyConfiguration()` call may contain multiple
-    ///      configurations with a certain `config_stamp`; Only the application
-    ///      status of the configuration with ID `display_id` is related.
+    /// See [`fuchsia.hardware.display.engine/EngineListener.OnDisplayVsync`].
     strict OnDisplayVsync(struct {
         display_id uint64;
         timestamp zx.Time;
         config_stamp box<ConfigStamp>;
-    }) -> ();
+    });
 
-    /// Called when the previous display capture triggered by
-    /// [`DisplayEngine.StartCapture`] is completed.
-    ///
-    /// Each `OnCaptureComplete` call must be paired with a previous successful
-    /// call to [`DisplayEngine.StartCapture`].
-    strict OnCaptureComplete() -> ();
+    /// See [`fuchsia.hardware.display.engine/EngineListener.OnCaptureComplete`].
+    strict OnCaptureComplete();
 };
 
 type Alpha = strict enum : uint8 {
@@ -338,7 +310,7 @@ closed protocol DisplayEngine {
 
     /// Clears the `DisplayEngineListener` connection established by
     /// [`DisplayEngine.CompleteCoordinatorConnection`].
-    strict UnsetListener() -> ();
+    strict UnsetListener();
 
     /// See [`fuchsia.hardware.display.engine/Engine.ImportBufferCollection2`].
     strict ImportBufferCollection(resource struct {
@@ -385,7 +357,7 @@ closed protocol DisplayEngine {
     /// See [`fuchsia.hardware.display.engine/Engine.ReleaseImage`].
     strict ReleaseImage(struct {
         image_handle uint64;
-    }) -> ();
+    });
 
     /// See [`fuchsia.hardware.display.engine/Engine.CheckConfiguration`].
     strict CheckConfiguration(struct {

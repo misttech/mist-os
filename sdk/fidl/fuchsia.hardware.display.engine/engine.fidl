@@ -456,7 +456,7 @@ open protocol Engine {
         /// imported image. The ID may be reused by a future call to
         /// [`Engine.ImportImage`].
         image_id ImageId;
-    }) -> ();
+    });
 
     /// Verifies that a configuration can be presented on a display.
     ///
