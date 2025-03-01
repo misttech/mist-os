@@ -98,6 +98,10 @@ conditions apply:
 
 ## Debugging non-inlined calls {:#debugging-non-inlined-calls}
 
+Note: This approach only works for developers who are able to modify a Fuchsia
+checkout as part of their workflow. See https://fxbug.dev/42053164 for a tool
+that will work for OOT workflows.
+
 The `fdf_env_dispatcher_dump` function can help driver authors debug why some
 calls are not made inline. This function logs the count and reasons for
 non-inline calls, for example:
@@ -116,6 +120,9 @@ INFO: [my_driver.cc(212)] * Another thread was already dispatching a request: 1 
 INFO: [my_driver.cc(212)] No queued tasks
 ```
 
+To call this function during development you will need to modify the restricted
+symbols [allowlist][restricted-symbols] and OTA/flash with that change.
+
 <!-- Reference links -->
 
 [driver-dispatchers]: /docs/concepts/drivers/driver-dispatcher-and-threads.md
@@ -124,4 +131,4 @@ INFO: [my_driver.cc(212)] No queued tasks
 [synchronized-dispatchers]: /docs/concepts/drivers/driver-dispatcher-and-threads.md#synchronized-and-unsynchronized
 [reentrant]: /docs/concepts/drivers/driver-dispatcher-and-threads.md#reentrancy-guarantees
 [driver-transport]: /docs/development/languages/fidl/tutorials/cpp/topics/driver-transport.md
-
+[restricted-symbols]: /src/lib/driver_symbols/restricted_symbols.h
