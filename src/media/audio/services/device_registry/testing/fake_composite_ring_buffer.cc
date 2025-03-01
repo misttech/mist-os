@@ -45,6 +45,8 @@ FakeCompositeRingBuffer::~FakeCompositeRingBuffer() {
   ADR_LOG_METHOD(kLogFakeCompositeRingBuffer) << "There are now " << count_ << " instances";
 }
 
+bool FakeCompositeRingBuffer::responsive() { return parent()->responsive(); }
+
 void FakeCompositeRingBuffer::AllocateRingBuffer(ElementId element_id, size_t size) {
   ADR_LOG_METHOD(kLogFakeCompositeRingBuffer);
   FX_CHECK(!vmo_.is_valid()) << "Calling AllocateRingBuffer multiple times is not supported";
@@ -62,6 +64,13 @@ void FakeCompositeRingBuffer::NotImplemented_(const std::string& name,
 
 void FakeCompositeRingBuffer::GetProperties(GetPropertiesCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogFakeCompositeRingBuffer);
+
+  // If we've been instructed to be unresponsive, pend the completer - indefinitely.
+  if (!responsive()) {
+    get_properties_completers_.emplace_back(completer.ToAsync());
+    return;
+  }
+
   fha::RingBufferProperties props;
   if (needs_cache_flush_or_invalidate_.has_value()) {
     props.needs_cache_flush_or_invalidate(*needs_cache_flush_or_invalidate_);
@@ -77,6 +86,13 @@ void FakeCompositeRingBuffer::GetProperties(GetPropertiesCompleter::Sync& comple
 
 void FakeCompositeRingBuffer::GetVmo(GetVmoRequest& request, GetVmoCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogFakeCompositeRingBuffer);
+
+  // If we've been instructed to be unresponsive, pend the completer - indefinitely.
+  if (!responsive()) {
+    get_vmo_completers_.emplace_back(completer.ToAsync());
+    return;
+  }
+
   auto total_requested_size =
       driver_transfer_bytes_.value_or(0) + request.min_frames() * bytes_per_frame_;
   if (total_requested_size > allocated_size_) {
@@ -100,6 +116,13 @@ void FakeCompositeRingBuffer::GetVmo(GetVmoRequest& request, GetVmoCompleter::Sy
 
 void FakeCompositeRingBuffer::Start(StartCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogFakeCompositeRingBuffer);
+
+  // If we've been instructed to be unresponsive, pend the completer - indefinitely.
+  if (!responsive()) {
+    start_completers_.emplace_back(completer.ToAsync());
+    return;
+  }
+
   if (!vmo_.is_valid() || started_) {
     completer.Close(ZX_ERR_BAD_STATE);
     return;
@@ -111,6 +134,13 @@ void FakeCompositeRingBuffer::Start(StartCompleter::Sync& completer) {
 
 void FakeCompositeRingBuffer::Stop(StopCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogFakeCompositeRingBuffer);
+
+  // If we've been instructed to be unresponsive, pend the completer - indefinitely.
+  if (!responsive()) {
+    stop_completers_.emplace_back(completer.ToAsync());
+    return;
+  }
+
   if (!vmo_.is_valid() || !started_) {
     completer.Close(ZX_ERR_BAD_STATE);
     return;
@@ -123,6 +153,13 @@ void FakeCompositeRingBuffer::Stop(StopCompleter::Sync& completer) {
 void FakeCompositeRingBuffer::SetActiveChannels(SetActiveChannelsRequest& request,
                                                 SetActiveChannelsCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogFakeCompositeRingBuffer);
+
+  // If we've been instructed to be unresponsive, pend the completer - indefinitely.
+  if (!responsive()) {
+    set_active_channels_completers_.emplace_back(completer.ToAsync());
+    return;
+  }
+
   if (!supports_active_channels_) {
     completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
     return;
@@ -140,12 +177,19 @@ void FakeCompositeRingBuffer::SetActiveChannels(SetActiveChannelsRequest& reques
 
 void FakeCompositeRingBuffer::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogFakeCompositeRingBuffer);
-  if (watch_delay_info_completer_.has_value()) {
+
+  // If we've been instructed to be unresponsive, pend the completer - indefinitely.
+  if (!responsive()) {
+    watch_delay_info_completers_.emplace_back(completer.ToAsync());
+    return;
+  }
+
+  if (!watch_delay_info_completers_.empty()) {
     completer.Close(ZX_ERR_BAD_STATE);
     return;
   }
 
-  watch_delay_info_completer_ = completer.ToAsync();
+  watch_delay_info_completers_.emplace_back(completer.ToAsync());
   MaybeCompleteWatchDelayInfo();
 }
 
@@ -164,25 +208,33 @@ void FakeCompositeRingBuffer::InjectDelayUpdate(std::optional<zx::duration> inte
 
 void FakeCompositeRingBuffer::MaybeCompleteWatchDelayInfo() {
   ADR_LOG_METHOD(kLogFakeCompositeRingBuffer);
-  if (delays_have_changed_ && watch_delay_info_completer_.has_value()) {
-    delays_have_changed_ = false;
-
-    auto completer = std::move(*watch_delay_info_completer_);
-    watch_delay_info_completer_.reset();
-
-    fha::DelayInfo info;
-    if (internal_delay_.has_value()) {
-      info.internal_delay(internal_delay_->get());
-    }
-    if (external_delay_.has_value()) {
-      info.external_delay(external_delay_->get());
-    }
-    completer.Reply(std::move(info));
+  if (!delays_have_changed_ || watch_delay_info_completers_.empty()) {
+    return;
   }
+
+  delays_have_changed_ = false;
+
+  auto completer = std::move(watch_delay_info_completers_.front());
+  watch_delay_info_completers_.erase(watch_delay_info_completers_.begin());
+
+  fha::DelayInfo info;
+  if (internal_delay_.has_value()) {
+    info.internal_delay(internal_delay_->get());
+  }
+  if (external_delay_.has_value()) {
+    info.external_delay(external_delay_->get());
+  }
+  completer.Reply(std::move(info));
 }
 
 void FakeCompositeRingBuffer::WatchClockRecoveryPositionInfo(
     WatchClockRecoveryPositionInfoCompleter::Sync& completer) {
+  // If we've been instructed to be unresponsive, pend the completer - indefinitely.
+  if (!responsive()) {
+    watch_clock_recovery_position_info_completers_.emplace_back(completer.ToAsync());
+    return;
+  }
+
   NotImplemented_("WatchClockRecoveryPositionInfo", completer);
 }
 
@@ -191,6 +243,10 @@ void FakeCompositeRingBuffer::handle_unknown_method(
     fidl::UnknownMethodCompleter::Sync& completer) {
   ADR_WARN_METHOD() << "FakeCompositeRingBuffer: unknown method (RingBuffer) ordinal "
                     << metadata.method_ordinal;
+  if (!responsive()) {
+    unknown_method_completers_.emplace_back(completer.ToAsync());
+    return;
+  }
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 

@@ -23,6 +23,44 @@ namespace fha = fuchsia_hardware_audio;
 class CodecWarningTest : public CodecTest {};
 class CompositeWarningTest : public CompositeTest {
  protected:
+  bool CreateRingBufferForTest(const std::shared_ptr<FakeComposite>& fake_driver,
+                               const std::shared_ptr<Device>& device, ElementId rb_element_id) {
+    if (!device->is_operational()) {
+      return false;
+    }
+    if (!SetControl(device)) {
+      return false;
+    }
+
+    auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
+    if (ring_buffer_format_sets_by_element.empty()) {
+      return false;
+    }
+    if (device->ring_buffer_ids().size() != ring_buffer_format_sets_by_element.size()) {
+      return false;
+    }
+    constexpr uint32_t reserved_ring_buffer_bytes = 8192;
+    constexpr uint32_t requested_ring_buffer_bytes = 4000;
+
+    fake_driver->ReserveRingBufferSize(rb_element_id, reserved_ring_buffer_bytes);
+    auto safe_format = SafeDriverRingBufferFormatFromElementDriverRingBufferFormatSets(
+        rb_element_id, ring_buffer_format_sets_by_element);
+
+    bool callback_received = false;
+    if (!device->CreateRingBuffer(
+            rb_element_id, safe_format, requested_ring_buffer_bytes,
+            [&callback_received](const fit::result<fad::ControlCreateRingBufferError,
+                                                   Device::RingBufferInfo>& result) {
+              ASSERT_TRUE(result.is_ok());
+              callback_received = true;
+            })) {
+      return false;
+    }
+
+    RunLoopUntilIdle();
+    return callback_received;
+  }
+
   // Creating a RingBuffer should fail with `expected_error`.
   void ExpectCreateRingBufferError(const std::shared_ptr<Device>& device, ElementId element_id,
                                    fad::ControlCreateRingBufferError expected_error,
@@ -492,6 +530,302 @@ TEST_F(CompositeWarningTest, DropControlTwice) {
 
   EXPECT_EQ(device_presence_watcher()->on_ready_count(), 1u);
   EXPECT_EQ(device_presence_watcher()->on_error_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
+}
+
+TEST_F(CompositeWarningTest, UnresponsiveInitializeBecomesError) {
+  auto fake_driver = MakeFakeComposite();
+  ASSERT_EQ(device_presence_watcher()->on_ready_count(), 0u);
+  ASSERT_EQ(device_presence_watcher()->on_error_count(), 0u);
+  ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 0u);
+  ASSERT_EQ(device_presence_watcher()->error_devices().size(), 0u);
+
+  fake_driver->set_unresponsive();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  EXPECT_TRUE(device->has_error());
+
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 1u);
+
+  EXPECT_EQ(device_presence_watcher()->on_ready_count(), 0u);
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
+}
+
+TEST_F(CompositeWarningTest, UnresponsiveGetHealthStateBecomesError) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(device->is_operational());
+  ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  ASSERT_EQ(device_presence_watcher()->on_error_count(), 0u);
+
+  fake_driver->set_unresponsive();
+  RetrieveHealthState(device);
+
+  RunLoopFor(ShortCmdTimeout());
+  RunLoopUntilIdle();
+
+  // This FIDL call, after the previous one timed out, triggers the device to be marked "in error".
+  RetrieveHealthState(device);
+  RunLoopUntilIdle();
+
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 1u);
+
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
+}
+
+TEST_F(CompositeWarningTest, UnresponsiveSetDaiFormatBecomesError) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(device->is_operational());
+  ASSERT_TRUE(SetControl(device));
+
+  auto dai_format_sets_by_element = device->dai_format_sets();
+  ASSERT_FALSE(dai_format_sets_by_element.empty());
+  auto dai_id = *device->dai_ids().begin();
+  auto safe_format = SafeDaiFormatFromElementDaiFormatSets(dai_id, dai_format_sets_by_element);
+  ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  ASSERT_EQ(device_presence_watcher()->on_error_count(), 0u);
+
+  fake_driver->set_unresponsive();
+  device->SetDaiFormat(dai_id, safe_format);
+
+  RunLoopFor(ShortCmdTimeout());
+  RunLoopUntilIdle();
+
+  // This FIDL call, after the previous one timed out, triggers the device to be marked "in error".
+  RetrieveHealthState(device);
+  RunLoopUntilIdle();
+
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 1u);
+
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
+}
+
+TEST_F(CompositeWarningTest, UnresponsiveResetBecomesError) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(device->is_operational());
+  ASSERT_TRUE(SetControl(device));
+  ASSERT_EQ(device_presence_watcher()->on_ready_count(), 1u);
+  ASSERT_FALSE(notify()->device_is_reset());
+  ASSERT_EQ(device_presence_watcher()->on_error_count(), 0u);
+
+  fake_driver->set_unresponsive();
+  EXPECT_TRUE(device->Reset());
+
+  RunLoopFor(ShortCmdTimeout());
+  RunLoopUntilIdle();
+
+  // This FIDL call, after the previous one timed out, triggers the device to be marked "in error".
+  RetrieveHealthState(device);
+  RunLoopUntilIdle();
+
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 1u);
+
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
+}
+
+TEST_F(CompositeWarningTest, UnresponsiveCreateRingBufferBecomesError) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(device->is_operational());
+  ASSERT_TRUE(SetControl(device));
+
+  auto ring_buffer_format_sets_by_element = ElementDriverRingBufferFormatSets(device);
+  ASSERT_FALSE(ring_buffer_format_sets_by_element.empty());
+  ASSERT_EQ(device->ring_buffer_ids().size(), ring_buffer_format_sets_by_element.size());
+  constexpr uint32_t reserved_ring_buffer_bytes = 8192;
+  constexpr uint32_t requested_ring_buffer_bytes = 4000;
+
+  auto element_id = *device->ring_buffer_ids().begin();
+
+  fake_driver->ReserveRingBufferSize(element_id, reserved_ring_buffer_bytes);
+  auto safe_format = SafeDriverRingBufferFormatFromElementDriverRingBufferFormatSets(
+      element_id, ring_buffer_format_sets_by_element);
+
+  fake_driver->set_unresponsive();
+  bool callback_received = false;
+  ASSERT_TRUE(device->CreateRingBuffer(
+      element_id, safe_format, requested_ring_buffer_bytes,
+      [&callback_received](
+          const fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>& result) {
+        FAIL() << "Unexpected CreateRingBuffer callback when unresponsive";
+        callback_received = true;
+      }));
+
+  RunLoopFor(LongCmdTimeout());
+  RunLoopUntilIdle();
+
+  // This FIDL call, after the previous one timed out, triggers the device to be marked "in error".
+  RetrieveHealthState(device);
+  RunLoopUntilIdle();
+
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 1u);
+
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
+}
+
+TEST_F(CompositeWarningTest, UnresponsiveSetElementStateBecomesError) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(device->is_operational());
+  ASSERT_TRUE(SetControl(device));
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(notify()->element_states().find(FakeComposite::kMuteElementId) !=
+              notify()->element_states().end());
+  notify()->clear_element_states();
+  fuchsia_hardware_audio_signalprocessing::SettableElementState state{
+      {.started = true, .bypassed = false}};
+
+  fake_driver->set_unresponsive();
+  EXPECT_EQ(device->SetElementState(FakeComposite::kMuteElementId, state), ZX_OK);
+
+  RunLoopFor(ShortCmdTimeout());
+  RunLoopUntilIdle();
+
+  // This FIDL call, after the previous one timed out, triggers the device to be marked "in error".
+  RetrieveHealthState(device);
+  RunLoopUntilIdle();
+
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 1u);
+
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
+}
+
+TEST_F(CompositeWarningTest, UnresponsiveSetTopologyBecomesError) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(device->is_operational());
+  ASSERT_TRUE(SetControl(device));
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(notify()->topology_id().has_value());
+  TopologyId current_topology_id = *notify()->topology_id();
+
+  TopologyId topology_id_to_set = 0;
+  if (device->topology_ids().size() < 2) {
+    GTEST_SKIP() << "Not enough topologies to run this test case";
+  }
+  for (auto t : device->topology_ids()) {
+    if (t != current_topology_id) {
+      topology_id_to_set = t;
+      break;
+    }
+  }
+
+  fake_driver->set_unresponsive();
+  EXPECT_EQ(device->SetTopology(topology_id_to_set), ZX_OK);
+
+  RunLoopFor(ShortCmdTimeout());
+  RunLoopUntilIdle();
+
+  // This FIDL call, after the previous one timed out, triggers the device to be marked "in error".
+  RetrieveHealthState(device);
+  RunLoopUntilIdle();
+
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 1u);
+
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
+}
+
+TEST_F(CompositeWarningTest, UnresponsiveSetActiveChannelsBecomesError) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  auto rb_element_id = *device->ring_buffer_ids().begin();
+  ASSERT_TRUE(CreateRingBufferForTest(fake_driver, device, rb_element_id));
+
+  bool callback_received = false;
+  fake_driver->set_unresponsive();
+  device->SetActiveChannels(rb_element_id, 0x0, [&callback_received](zx::result<zx::time> result) {
+    callback_received = true;
+    EXPECT_TRUE(result.is_error());
+  });
+
+  RunLoopFor(ShortCmdTimeout());
+  RunLoopUntilIdle();
+
+  // This FIDL call, after the previous one timed out, triggers the device to be marked "in error".
+  RetrieveHealthState(device);
+  RunLoopUntilIdle();
+
+  EXPECT_FALSE(callback_received);
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 1u);
+
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
+}
+
+TEST_F(CompositeWarningTest, UnresponsiveStartBecomesError) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  auto rb_element_id = *device->ring_buffer_ids().begin();
+  ASSERT_TRUE(CreateRingBufferForTest(fake_driver, device, rb_element_id));
+
+  bool callback_received = false;
+  fake_driver->set_unresponsive();
+  device->StartRingBuffer(rb_element_id, [&callback_received](zx::result<zx::time> result) {
+    callback_received = true;
+    EXPECT_TRUE(result.is_error());
+  });
+
+  RunLoopFor(ShortCmdTimeout());
+  RunLoopUntilIdle();
+
+  // This FIDL call, after the previous one timed out, triggers the device to be marked "in error".
+  RetrieveHealthState(device);
+  RunLoopUntilIdle();
+
+  EXPECT_FALSE(callback_received);
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 1u);
+
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 1u);
+  EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
+}
+
+TEST_F(CompositeWarningTest, UnresponsiveStopBecomesError) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  auto rb_element_id = *device->ring_buffer_ids().begin();
+  ASSERT_TRUE(CreateRingBufferForTest(fake_driver, device, rb_element_id));
+
+  ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  ASSERT_EQ(device_presence_watcher()->error_devices().size(), 0u);
+
+  bool callback_received = false;
+  fake_driver->set_unresponsive();
+  device->StopRingBuffer(rb_element_id, [&callback_received](zx_status_t status) {
+    callback_received = true;
+    EXPECT_NE(status, ZX_OK);
+  });
+
+  RunLoopFor(ShortCmdTimeout());
+  RunLoopUntilIdle();
+
+  // This FIDL call, after the previous one timed out, triggers the device to be marked "in error".
+  RetrieveHealthState(device);
+  RunLoopUntilIdle();
+
+  EXPECT_FALSE(callback_received);
+  EXPECT_EQ(device_presence_watcher()->ready_devices().size(), 0u);
+  EXPECT_EQ(device_presence_watcher()->error_devices().size(), 1u);
+
+  EXPECT_EQ(device_presence_watcher()->on_error_count(), 1u);
   EXPECT_EQ(device_presence_watcher()->on_removal_count(), 0u);
 }
 

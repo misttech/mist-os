@@ -220,7 +220,6 @@ class Device : public std::enable_shared_from_this<Device> {
   friend class DeviceTest;
   friend class CodecTest;
   friend class CompositeTest;
-  friend class DeviceWarningTest;
   friend class AudioDeviceRegistryServerTestBase;
 
   static inline const std::string_view kClassName = "Device";
@@ -345,6 +344,42 @@ class Device : public std::enable_shared_from_this<Device> {
   void SetError(zx_status_t error);
   void SetRingBufferState(ElementId element_id, RingBufferState new_ring_buffer_state);
 
+  /////////////////////////////////////////////////////////////////////////////////////////////////
+  // Timeout values are generous while still providing guard-rails against hardware errors.
+  // Correctly functioning hardware and drivers should never result in any timeouts.
+  //
+  // We use this value for individual driver FIDL calls, by default.
+  static constexpr zx::duration kDefaultShortCmdTimeout = zx::sec(2);
+  // We use this value only for 2 "meta-commands" of multiple FIDL calls issued as a set.
+  static constexpr zx::duration kDefaultLongCmdTimeout = zx::sec(4);
+
+  enum class DriverCommandState : uint8_t { Idle, Waiting, Overdue, Unresponsive };
+  void SetDriverCommandState(DriverCommandState state) { driver_cmd_state_ = state; }
+  bool driver_cmd_idle() const { return (driver_cmd_state_ == DriverCommandState::Idle); }
+  bool driver_cmd_waiting() const { return (driver_cmd_state_ == DriverCommandState::Waiting); }
+  bool driver_cmd_overdue() const { return (driver_cmd_state_ == DriverCommandState::Overdue); }
+  bool driver_cmd_unresponsive() const {
+    return (driver_cmd_state_ == DriverCommandState::Unresponsive);
+  }
+
+  void SetCommandTimeout(const zx::duration& budget, std::string cmd_tag);
+  void ClearCommandTimeout();
+  void DriverCommandTimedOut();
+  void LogCommandTimeout(const std::string& cmd_tag, zx::duration expected,
+                         std::optional<zx::duration> actual);
+  async::TaskClosureMethod<Device, &Device::DriverCommandTimedOut> timeout_task_{this};
+
+  struct CommandCountdown {
+    std::string tag;
+    zx::time deadline;
+    zx::duration budget;  // for logging/diagnostic purposes only
+  };
+
+  std::optional<CommandCountdown> pending_driver_cmd_;
+  DriverCommandState driver_cmd_state_ = DriverCommandState::Idle;
+  bool recovering_from_late_response_ = false;  // for logging/diagnostic purposes only
+
+  /////////////////////////////////////////////////////////////////////////////////////////////////
   // Start the ongoing process of device clock recovery from position notifications. Before this
   // call, and after StopDeviceClockRecovery(), the device clock should run at the MONOTONIC rate.
   void RecoverDeviceClockFromPositionInfo();

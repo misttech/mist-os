@@ -646,7 +646,7 @@ TEST_F(InspectorTest, ProviderAddedDevice) {
 
   auto first_device = added_devices_node->children().cbegin();
   EXPECT_EQ(first_device->name(), "Test codec");
-  EXPECT_EQ(first_device->node().properties().size(), 2u);
+  EXPECT_EQ(first_device->node().properties().size(), 4u);
   EXPECT_GT(first_device->node().get_property<IntPropertyValue>(std::string(kAddedAt))->value(),
             before_add_codec.get());
   EXPECT_EQ(
@@ -656,7 +656,7 @@ TEST_F(InspectorTest, ProviderAddedDevice) {
 
   auto last_device = added_devices_node->children().crbegin();
   EXPECT_EQ(last_device->name(), "Test composite");
-  EXPECT_EQ(last_device->node().properties().size(), 2u);
+  EXPECT_EQ(last_device->node().properties().size(), 4u);
   EXPECT_EQ(
       last_device->node().get_property<StringPropertyValue>(std::string(kDeviceType))->value(),
       "COMPOSITE");

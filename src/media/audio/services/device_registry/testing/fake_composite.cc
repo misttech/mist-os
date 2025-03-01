@@ -23,6 +23,54 @@ namespace media_audio {
 namespace fha = fuchsia_hardware_audio;
 namespace fhasp = fuchsia_hardware_audio_signalprocessing;
 
+namespace {
+
+bool ElementStateMatchesSettableElementState(
+    fuchsia_hardware_audio_signalprocessing::ElementState state,
+    fuchsia_hardware_audio_signalprocessing::SettableElementState settable_state) {
+  return
+      // started must match
+      (state.started() == settable_state.started()) &&
+      // bypassed must match
+      (state.bypassed() == settable_state.bypassed()) &&
+      // type_specific must match ...
+      (
+          // ... whether it is dynamics ...
+          (state.type_specific()->Which() ==
+               fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kDynamics &&
+           settable_state.type_specific()->Which() ==
+               fuchsia_hardware_audio_signalprocessing::SettableTypeSpecificElementState::Tag::
+                   kDynamics &&
+           state.type_specific()->dynamics().value() ==
+               settable_state.type_specific()->dynamics().value()) ||
+          // ... or equalizer ...
+          (state.type_specific()->Which() ==
+               fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEqualizer &&
+           settable_state.type_specific()->Which() ==
+               fuchsia_hardware_audio_signalprocessing::SettableTypeSpecificElementState::Tag::
+                   kEqualizer &&
+           state.type_specific()->equalizer().value() ==
+               settable_state.type_specific()->equalizer().value()) ||
+          // ... or gain ...
+          (state.type_specific()->Which() ==
+               fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kGain &&
+           settable_state.type_specific()->Which() ==
+               fuchsia_hardware_audio_signalprocessing::SettableTypeSpecificElementState::Tag::
+                   kGain &&
+           state.type_specific()->gain().value() ==
+               settable_state.type_specific()->gain().value()) ||
+          // ... or vendor_specific.
+          (state.type_specific()->Which() == fuchsia_hardware_audio_signalprocessing::
+                                                 TypeSpecificElementState::Tag::kVendorSpecific &&
+           settable_state.type_specific()->Which() ==
+               fuchsia_hardware_audio_signalprocessing::SettableTypeSpecificElementState::Tag::
+                   kVendorSpecific &&
+           state.type_specific()->vendor_specific().value() ==
+               settable_state.type_specific()->vendor_specific().value())) &&
+      // vendor_specific_data must match
+      (state.vendor_specific_data() == settable_state.vendor_specific_data());
+}
+
 bool FormatIsSupported(const fha::Format& format,
                        const std::vector<fha::SupportedFormats>& ring_buffer_format_sets) {
   if (!format.pcm_format().has_value()) {
@@ -90,6 +138,14 @@ bool FormatIsSupported(const fha::Format& format,
   return false;
 }
 
+void on_unbind(FakeComposite* fake_composite, fidl::UnbindInfo info,
+               fidl::ServerEnd<fha::Composite> server_end) {
+  ADR_LOG(kLogFakeComposite) << "for FakeComposite";
+  fake_composite->DropChildren();
+}
+
+}  // namespace
+
 FakeComposite::FakeComposite(zx::channel server_end, zx::channel client_end,
                              async_dispatcher_t* dispatcher)
     : dispatcher_(dispatcher),
@@ -108,17 +164,25 @@ void FakeComposite::DropComposite() {
   binding_.reset();
 }
 
-void on_unbind(FakeComposite* fake_composite, fidl::UnbindInfo info,
-               fidl::ServerEnd<fha::Composite> server_end) {
-  ADR_LOG(kLogFakeComposite) << "for FakeComposite";
-  fake_composite->DropChildren();
-}
-
 void FakeComposite::DropChildren() {
   ADR_LOG_METHOD(kLogFakeComposite);
 
-  health_completer_.reset();
-  watch_topology_completer_.reset();
+  get_health_state_completers_.clear();
+  get_properties_completers_.clear();
+  get_ring_buffer_formats_completers_.clear();
+  create_ring_buffer_completers_.clear();
+  get_dai_formats_completers_.clear();
+  reset_completers_.clear();
+  set_dai_format_completers_.clear();
+
+  get_elements_completers_.clear();
+  watch_element_state_completers_.clear();
+  set_element_state_completers_.clear();
+  get_topologies_completers_.clear();
+  watch_topology_completers_.clear();
+  set_topology_completers_.clear();
+
+  unknown_method_completers_.clear();
 
   DropRingBuffers();
 
@@ -211,20 +275,27 @@ void FakeComposite::SetupElementsMap() {
 }
 
 void FakeComposite::GetHealthState(GetHealthStateCompleter::Sync& completer) {
-  if (responsive_) {
-    if (healthy_.has_value()) {
-      completer.Reply(fha::HealthState{{healthy_.value()}});
-    } else {
-      completer.Reply({});
-    }
+  if (!responsive()) {
+    get_health_state_completers_.emplace_back(completer.ToAsync());  // Just pend it; never respond.
+    return;
+  }
+
+  if (healthy_.has_value()) {
+    completer.Reply(fha::HealthState{{healthy_}});
   } else {
-    health_completer_.emplace(completer.ToAsync());  // Just pend it; never respond.
+    completer.Reply({});
   }
 }
 
 void FakeComposite::SignalProcessingConnect(SignalProcessingConnectRequest& request,
                                             SignalProcessingConnectCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogFakeComposite);
+
+  // If we've been instructed to be unresponsive, do nothing (no need to pend the completer).
+  if (!responsive()) {
+    return;
+  }
+
   if (!supports_signalprocessing_) {
     request.protocol().Close(ZX_ERR_NOT_SUPPORTED);
     return;
@@ -237,6 +308,12 @@ void FakeComposite::SignalProcessingConnect(SignalProcessingConnectRequest& requ
 
 void FakeComposite::Reset(ResetCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogFakeComposite);
+
+  // If we've been instructed to be unresponsive, pend the completer - indefinitely.
+  if (!responsive()) {
+    reset_completers_.emplace_back(completer.ToAsync());
+    return;
+  }
 
   // Reset any RingBuffers (start, format)
   DropRingBuffers();
@@ -253,19 +330,25 @@ void FakeComposite::Reset(ResetCompleter::Sync& completer) {
 void FakeComposite::GetProperties(GetPropertiesCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogFakeComposite);
 
+  // If we've been instructed to be unresponsive, pend the completer - indefinitely.
+  if (!responsive()) {
+    get_properties_completers_.emplace_back(completer.ToAsync());
+    return;
+  }
+
   // Gather the properties and return them.
   fha::CompositeProperties composite_properties{};
   if (manufacturer_.has_value()) {
-    composite_properties.manufacturer(*manufacturer_);
+    composite_properties.manufacturer(manufacturer_);
   }
   if (product_.has_value()) {
-    composite_properties.product(*product_);
+    composite_properties.product(product_);
   }
   if (uid_.has_value()) {
-    composite_properties.unique_id(*uid_);
+    composite_properties.unique_id(uid_);
   }
   if (clock_domain_.has_value()) {
-    composite_properties.clock_domain(*clock_domain_);
+    composite_properties.clock_domain(clock_domain_);
   }
 
   completer.Reply(composite_properties);
@@ -275,6 +358,12 @@ void FakeComposite::GetRingBufferFormats(GetRingBufferFormatsRequest& request,
                                          GetRingBufferFormatsCompleter::Sync& completer) {
   auto element_id = request.processing_element_id();
   ADR_LOG_METHOD(kLogFakeComposite) << "(" << element_id << ")";
+
+  // If we've been instructed to be unresponsive, pend the completer - indefinitely.
+  if (!responsive()) {
+    get_ring_buffer_formats_completers_.emplace_back(completer.ToAsync());
+    return;
+  }
 
   auto element_pair_iter = elements_.find(element_id);
   if (element_pair_iter == elements_.end()) {
@@ -322,6 +411,12 @@ void FakeComposite::CreateRingBuffer(CreateRingBufferRequest& request,
                                      CreateRingBufferCompleter::Sync& completer) {
   auto element_id = request.processing_element_id();
   ADR_LOG_METHOD(kLogFakeComposite) << "(" << element_id << ")";
+
+  // If we've been instructed to be unresponsive, pend the completer - indefinitely.
+  if (!responsive()) {
+    create_ring_buffer_completers_.emplace_back(completer.ToAsync());
+    return;
+  }
 
   auto element_pair_iter = elements_.find(element_id);
   if (element_pair_iter == elements_.end()) {
@@ -405,6 +500,12 @@ void FakeComposite::GetDaiFormats(GetDaiFormatsRequest& request,
                                   GetDaiFormatsCompleter::Sync& completer) {
   auto element_id = request.processing_element_id();
   ADR_LOG_METHOD(kLogFakeComposite) << "(" << element_id << ")";
+
+  // If we've been instructed to be unresponsive, pend the completer - indefinitely.
+  if (!responsive()) {
+    get_dai_formats_completers_.emplace_back(completer.ToAsync());
+    return;
+  }
 
   if (element_id < kMinDaiElementId || element_id > kMaxDaiElementId) {
     ADR_WARN_METHOD() << "Element " << element_id << " is out of range";
@@ -512,6 +613,12 @@ void FakeComposite::SetDaiFormat(SetDaiFormatRequest& request,
   auto element_id = request.processing_element_id();
   ADR_LOG_METHOD(kLogFakeComposite) << "(" << element_id << ")";
 
+  // If we've been instructed to be unresponsive, pend the completer - indefinitely.
+  if (!responsive()) {
+    set_dai_format_completers_.emplace_back(completer.ToAsync());
+    return;
+  }
+
   if (element_id < kMinDaiElementId || element_id > kMaxDaiElementId) {
     ADR_WARN_METHOD() << "Element " << element_id << " is out of range";
     completer.Reply(fit::error(fha::DriverError::kInvalidArgs));
@@ -531,12 +638,24 @@ void FakeComposite::SetDaiFormat(SetDaiFormatRequest& request,
 void FakeComposite::GetElements(GetElementsCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogFakeComposite);
 
+  // If we've been instructed to be unresponsive, pend the completer - indefinitely.
+  if (!responsive()) {
+    get_elements_completers_.emplace_back(completer.ToAsync());
+    return;
+  }
+
   completer.Reply(fit::success(kElements));
 }
 
 // Return our static topology list.
 void FakeComposite::GetTopologies(GetTopologiesCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogFakeComposite);
+
+  // If we've been instructed to be unresponsive, pend the completer - indefinitely.
+  if (!responsive()) {
+    get_topologies_completers_.emplace_back(completer.ToAsync());
+    return;
+  }
 
   completer.Reply(fit::success(kTopologies));
 }
@@ -545,6 +664,12 @@ void FakeComposite::WatchElementState(WatchElementStateRequest& request,
                                       WatchElementStateCompleter::Sync& completer) {
   auto element_id = request.processing_element_id();
   ADR_LOG_METHOD(kLogFakeComposite) << "(" << element_id << ")";
+
+  // If we've been instructed to be unresponsive, pend the completer - indefinitely.
+  if (!responsive()) {
+    watch_element_state_completers_.emplace_back(completer.ToAsync());
+    return;
+  }
 
   auto match = elements_.find(element_id);
   if (match == elements_.end()) {
@@ -556,7 +681,6 @@ void FakeComposite::WatchElementState(WatchElementStateRequest& request,
 
   if (element.watch_completer.has_value()) {
     ADR_WARN_METHOD() << "previous completer was still pending";
-    element.watch_completer.reset();
     completer.Close(ZX_ERR_BAD_STATE);
     return;
   }
@@ -566,56 +690,16 @@ void FakeComposite::WatchElementState(WatchElementStateRequest& request,
   MaybeCompleteWatchElementState(element);
 }
 
-bool ElementStateMatchesSettableElementState(
-    fuchsia_hardware_audio_signalprocessing::ElementState state,
-    fuchsia_hardware_audio_signalprocessing::SettableElementState settable_state) {
-  return
-      // started must match
-      (state.started() == settable_state.started()) &&
-      // bypassed must match
-      (state.bypassed() == settable_state.bypassed()) &&
-      // type_specific must match ...
-      (
-          // ... whether it is dynamics ...
-          (state.type_specific()->Which() ==
-               fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kDynamics &&
-           settable_state.type_specific()->Which() ==
-               fuchsia_hardware_audio_signalprocessing::SettableTypeSpecificElementState::Tag::
-                   kDynamics &&
-           state.type_specific()->dynamics().value() ==
-               settable_state.type_specific()->dynamics().value()) ||
-          // ... or equalizer ...
-          (state.type_specific()->Which() ==
-               fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kEqualizer &&
-           settable_state.type_specific()->Which() ==
-               fuchsia_hardware_audio_signalprocessing::SettableTypeSpecificElementState::Tag::
-                   kEqualizer &&
-           state.type_specific()->equalizer().value() ==
-               settable_state.type_specific()->equalizer().value()) ||
-          // ... or gain ...
-          (state.type_specific()->Which() ==
-               fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::Tag::kGain &&
-           settable_state.type_specific()->Which() ==
-               fuchsia_hardware_audio_signalprocessing::SettableTypeSpecificElementState::Tag::
-                   kGain &&
-           state.type_specific()->gain().value() ==
-               settable_state.type_specific()->gain().value()) ||
-          // ... or vendor_specific.
-          (state.type_specific()->Which() == fuchsia_hardware_audio_signalprocessing::
-                                                 TypeSpecificElementState::Tag::kVendorSpecific &&
-           settable_state.type_specific()->Which() ==
-               fuchsia_hardware_audio_signalprocessing::SettableTypeSpecificElementState::Tag::
-                   kVendorSpecific &&
-           state.type_specific()->vendor_specific().value() ==
-               settable_state.type_specific()->vendor_specific().value())) &&
-      // vendor_specific_data must match
-      (state.vendor_specific_data() == settable_state.vendor_specific_data());
-}
-
 void FakeComposite::SetElementState(SetElementStateRequest& request,
                                     SetElementStateCompleter::Sync& completer) {
   auto element_id = request.processing_element_id();
   ADR_LOG_METHOD(kLogFakeComposite) << "(" << element_id << ")";
+
+  // If we've been instructed to be unresponsive, pend the completer - indefinitely.
+  if (!responsive()) {
+    set_element_state_completers_.emplace_back(completer.ToAsync());
+    return;
+  }
 
   auto match = elements_.find(element_id);
   if (match == elements_.end()) {
@@ -669,7 +753,9 @@ void FakeComposite::InjectElementStateChange(ElementId element_id, fhasp::Elemen
   element.state = std::move(new_state);
   element.state_has_changed = true;
 
-  MaybeCompleteWatchElementState(element);
+  if (responsive()) {
+    MaybeCompleteWatchElementState(element);
+  }
 }
 
 // static
@@ -691,21 +777,33 @@ void FakeComposite::MaybeCompleteWatchElementState(FakeElementRecord& element_re
 
 void FakeComposite::WatchTopology(WatchTopologyCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogFakeComposite);
-  if (watch_topology_completer_.has_value()) {
+
+  // If we've been instructed to be unresponsive, pend the completer - indefinitely.
+  if (!responsive()) {
+    watch_topology_completers_.emplace_back(completer.ToAsync());
+    return;
+  }
+
+  if (!watch_topology_completers_.empty()) {
     ADR_WARN_METHOD() << "previous completer was still pending";
-    watch_topology_completer_.reset();
     completer.Close(ZX_ERR_BAD_STATE);
     return;
   }
 
-  watch_topology_completer_ = completer.ToAsync();
+  watch_topology_completers_.emplace_back(completer.ToAsync());
 
   MaybeCompleteWatchTopology();
 }
 
 void FakeComposite::SetTopology(SetTopologyRequest& request,
                                 SetTopologyCompleter::Sync& completer) {
-  ADR_LOG_METHOD(kLogFakeComposite);
+  ADR_LOG_METHOD(kLogFakeComposite) << "(id: " << request.topology_id() << ")";
+
+  // If we've been instructed to be unresponsive, pend the completer - indefinitely.
+  if (!responsive()) {
+    set_topology_completers_.emplace_back(completer.ToAsync());
+    return;
+  }
 
   bool topology_id_is_valid = false;
   for (const auto& topology : kTopologies) {
@@ -736,6 +834,11 @@ void FakeComposite::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
   ADR_WARN_METHOD() << "(SignalProcessing) ordinal " << metadata.method_ordinal;
+  // If we've been instructed to be unresponsive, pend the completer - indefinitely.
+  if (!responsive()) {
+    unknown_method_completers_.emplace_back(completer.ToAsync());
+    return;
+  }
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
@@ -744,18 +847,20 @@ void FakeComposite::InjectTopologyChange(std::optional<TopologyId> topology_id) 
   topology_has_changed_ = topology_id.has_value();
 
   if (topology_has_changed_) {
-    topology_id_ = *topology_id;
+    topology_id_ = topology_id;
 
-    MaybeCompleteWatchTopology();
+    if (responsive()) {
+      MaybeCompleteWatchTopology();
+    }
   } else {
     topology_id_.reset();  // A new `SetTopology` call must be made
   }
 }
 
 void FakeComposite::MaybeCompleteWatchTopology() {
-  if (topology_id_.has_value() && topology_has_changed_ && watch_topology_completer_.has_value()) {
-    auto completer = std::move(*watch_topology_completer_);
-    watch_topology_completer_.reset();
+  if (topology_id_.has_value() && topology_has_changed_ && !watch_topology_completers_.empty()) {
+    auto completer = std::move(watch_topology_completers_.front());
+    watch_topology_completers_.clear();
 
     topology_has_changed_ = false;
 

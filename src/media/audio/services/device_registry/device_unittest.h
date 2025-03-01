@@ -97,6 +97,9 @@ class DeviceTestBase : public gtest::TestLoopFixture {
           dai_format_sets_callback) {
     device->GetDaiFormatSets(element_id, std::move(dai_format_sets_callback));
   }
+  static void RetrieveHealthState(const std::shared_ptr<Device>& device) {
+    device->RetrieveHealthState();
+  }
 
   // Accessor for a Device private member.
   static const std::optional<fuchsia_hardware_audio::DelayInfo>& DeviceDelayInfo(
@@ -360,6 +363,9 @@ class DeviceTestBase : public gtest::TestLoopFixture {
   static ElementId ring_buffer_id() { return kRingBufferElementId; }
   static ElementId dai_id() { return kDaiElementId; }
 
+  static zx::duration ShortCmdTimeout() { return Device::kDefaultShortCmdTimeout; }
+  static zx::duration LongCmdTimeout() { return Device::kDefaultLongCmdTimeout; }
+
  private:
   static constexpr ElementId kRingBufferElementId = 0;
   static constexpr ElementId kDaiElementId = fuchsia_audio_device::kDefaultDaiInterconnectElementId;
@@ -435,7 +441,9 @@ class CompositeTest : public DeviceTestBase {
         "Composite device name", fuchsia_audio_device::DeviceType::kComposite,
         fuchsia_audio_device::DriverClient::WithComposite(std::move(composite_client_end)));
 
-    RunLoopUntilIdle();
+    while (!device->is_operational() && !device->has_error()) {
+      RunLoopFor(zx::msec(10));
+    }
     EXPECT_TRUE(device->is_operational() || device->has_error()) << "device still initializing";
 
     return device;

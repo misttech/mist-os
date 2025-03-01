@@ -229,7 +229,8 @@ class FakeComposite final
   bool is_bound() const { return binding_.has_value(); }
 
   bool responsive() const { return responsive_; }
-  void set_responsive(bool responsive) { responsive_ = responsive; }
+  // Once we mark a device unresponsive, it cannot correctly transition back to responsive state.
+  void set_unresponsive() { responsive_ = false; }
   std::optional<bool> health_state() const { return healthy_; }
   void set_health_state(std::optional<bool> healthy) { healthy_ = healthy; }
 
@@ -340,7 +341,14 @@ class FakeComposite final
 
   bool responsive_ = true;
   std::optional<bool> healthy_ = true;
-  std::optional<GetHealthStateCompleter::Async> health_completer_;
+  std::vector<GetPropertiesCompleter::Async> get_properties_completers_;
+  std::vector<GetRingBufferFormatsCompleter::Async> get_ring_buffer_formats_completers_;
+  std::vector<CreateRingBufferCompleter::Async> create_ring_buffer_completers_;
+  std::vector<GetDaiFormatsCompleter::Async> get_dai_formats_completers_;
+  std::vector<SetDaiFormatCompleter::Async> set_dai_format_completers_;
+  std::vector<GetHealthStateCompleter::Async> get_health_state_completers_;
+  std::vector<ResetCompleter::Async> reset_completers_;
+  std::vector<fidl::UnknownMethodCompleter::Async> unknown_method_completers_;
 
   std::optional<std::string> manufacturer_ = kDefaultManufacturer;
   std::optional<std::string> product_ = kDefaultProduct;
@@ -351,9 +359,14 @@ class FakeComposite final
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_audio_signalprocessing::SignalProcessing>>
       signal_processing_binding_;
 
+  std::vector<GetElementsCompleter::Async> get_elements_completers_;
+  std::vector<WatchElementStateCompleter::Async> watch_element_state_completers_;
+  std::vector<SetElementStateCompleter::Async> set_element_state_completers_;
   std::unordered_map<ElementId, FakeElementRecord> elements_;
 
-  std::optional<WatchTopologyCompleter::Async> watch_topology_completer_;
+  std::vector<GetTopologiesCompleter::Async> get_topologies_completers_;
+  std::vector<WatchTopologyCompleter::Async> watch_topology_completers_;
+  std::vector<SetTopologyCompleter::Async> set_topology_completers_;
   std::optional<TopologyId> topology_id_ = kFullDuplexTopologyId;
   bool topology_has_changed_ = true;
 
