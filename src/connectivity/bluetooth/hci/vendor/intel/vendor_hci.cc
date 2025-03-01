@@ -223,8 +223,7 @@ pw::bluetooth::emboss::StatusCode VendorHci::SendHciReset() const {
   std::vector<uint8_t> cmd_packet(pw::bluetooth::emboss::CommandHeader::IntrinsicSizeInBytes(),
                                   0x00);
   auto view = pw::bluetooth::emboss::MakeCommandHeaderView(&cmd_packet);
-  view.opcode_bits().BackingStorage().WriteUInt(
-      static_cast<uint16_t>(pw::bluetooth::emboss::OpCode::RESET));
+  view.opcode().Write(pw::bluetooth::emboss::OpCode::RESET);
   view.parameter_total_size().Write(0);
   SendCommand(std::move(cmd_packet));
 
@@ -289,8 +288,7 @@ bool VendorHci::SendSecureSend(uint8_t type, cpp20::span<const uint8_t> bytes) c
       return false;
     }
     auto event_view = pw::bluetooth::emboss::MakeEventHeaderView(&event);
-    if (event_view.event_code_uint().Read() ==
-        static_cast<uint8_t>(pw::bluetooth::emboss::EventCode::COMMAND_COMPLETE)) {
+    if (event_view.event_code().Read() == pw::bluetooth::emboss::EventCode::COMMAND_COMPLETE) {
       auto view = MakeSecureSendCommandCompleteEventView(&event);
       if (!view.IsComplete()) {
         errorf("VendorHci: SecureSend command complete event is too small (%zu, expected: %" PRIu64
@@ -307,8 +305,7 @@ bool VendorHci::SendSecureSend(uint8_t type, cpp20::span<const uint8_t> bytes) c
                view.param().Read());
         return false;
       }
-    } else if (event_view.event_code_uint().Read() ==
-               static_cast<uint8_t>(pw::bluetooth::emboss::EventCode::VENDOR_DEBUG)) {
+    } else if (event_view.event_code().Read() == pw::bluetooth::emboss::EventCode::VENDOR_DEBUG) {
       auto view = MakeSecureSendEventView(&event);
       infof("VendorHci: SecureSend result 0x%x, opcode: 0x%x, status: 0x%x", view.result().Read(),
             view.opcode().Read(), view.status().Read());
@@ -359,8 +356,7 @@ void VendorHci::EnterManufacturerMode() {
   std::vector<uint8_t> evt_packet = WaitForEventBuffer();
   auto event = pw::bluetooth::emboss::EventHeaderView(&evt_packet);
   if (!event.IsComplete() ||
-      event.event_code_uint().Read() !=
-          static_cast<uint8_t>(pw::bluetooth::emboss::EventCode::COMMAND_COMPLETE)) {
+      event.event_code().Read() != pw::bluetooth::emboss::EventCode::COMMAND_COMPLETE) {
     errorf("VendorHci: EnterManufacturerMode failed");
     return;
   }
@@ -386,8 +382,7 @@ bool VendorHci::ExitManufacturerMode(MfgDisableMode mode) {
   std::vector<uint8_t> evt_packet = WaitForEventBuffer();
   auto event = pw::bluetooth::emboss::EventHeaderView(&evt_packet);
   if (!event.IsComplete() ||
-      event.event_code_uint().Read() !=
-          static_cast<uint8_t>(pw::bluetooth::emboss::EventCode::COMMAND_COMPLETE)) {
+      event.event_code().Read() != pw::bluetooth::emboss::EventCode::COMMAND_COMPLETE) {
     errorf("VendorHci: ExitManufacturerMode failed");
     return false;
   }
@@ -448,10 +443,9 @@ std::vector<uint8_t> VendorHci::WaitForEventBuffer(
     return {};
   }
 
-  if (expected_event && static_cast<uint8_t>(*expected_event) != view.event_code_uint().Read()) {
+  if (expected_event && *expected_event != view.event_code().Read()) {
     tracef("VendorHci: keep waiting (expected: 0x%02x, got: 0x%02x)",
-           static_cast<uint8_t>(*expected_event),
-           static_cast<uint8_t>(view.event_code_uint().Read()));
+           static_cast<uint8_t>(*expected_event), static_cast<uint8_t>(view.event_code().Read()));
     return {};
   }
 
