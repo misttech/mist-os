@@ -8,8 +8,6 @@
 namespace dwc3 {
 
 void Dwc3::CmdStartNewConfig(const Endpoint& ep, uint32_t rsrc_id) {
-  std::lock_guard<std::mutex> lock(lock_);
-
   auto* mmio = get_mmio();
   const uint8_t ep_num = ep.ep_num;
 
@@ -25,8 +23,6 @@ void Dwc3::CmdStartNewConfig(const Endpoint& ep, uint32_t rsrc_id) {
 }
 
 void Dwc3::CmdEpSetConfig(const Endpoint& ep, bool modify) {
-  std::lock_guard<std::mutex> lock(lock_);
-
   auto* mmio = get_mmio();
   const uint8_t ep_num = ep.ep_num;
 
@@ -55,7 +51,6 @@ void Dwc3::CmdEpSetConfig(const Endpoint& ep, bool modify) {
 }
 
 void Dwc3::CmdEpTransferConfig(const Endpoint& ep) {
-  std::lock_guard<std::mutex> lock(lock_);
   auto* mmio = get_mmio();
   const uint8_t ep_num = ep.ep_num;
 
@@ -66,7 +61,6 @@ void Dwc3::CmdEpTransferConfig(const Endpoint& ep) {
 }
 
 void Dwc3::CmdEpStartTransfer(const Endpoint& ep, zx_paddr_t trb_phys) {
-  std::lock_guard<std::mutex> lock(lock_);
   auto* mmio = get_mmio();
   const uint8_t ep_num = ep.ep_num;
 
@@ -89,7 +83,6 @@ void Dwc3::CmdEpStartTransfer(const Endpoint& ep, zx_paddr_t trb_phys) {
 }
 
 void Dwc3::CmdEpEndTransfer(const Endpoint& ep) {
-  std::lock_guard<std::mutex> lock(lock_);
   auto* mmio = get_mmio();
 
   const uint32_t ep_num = ep.ep_num;
@@ -113,7 +106,6 @@ void Dwc3::CmdEpEndTransfer(const Endpoint& ep) {
 }
 
 void Dwc3::CmdEpSetStall(const Endpoint& ep) {
-  std::lock_guard<std::mutex> lock(lock_);
   auto* mmio = get_mmio();
 
   const uint32_t ep_num = ep.ep_num;
@@ -134,7 +126,6 @@ void Dwc3::CmdEpSetStall(const Endpoint& ep) {
 }
 
 void Dwc3::CmdEpClearStall(const Endpoint& ep) {
-  std::lock_guard<std::mutex> lock(lock_);
   auto* mmio = get_mmio();
 
   const uint32_t ep_num = ep.ep_num;
