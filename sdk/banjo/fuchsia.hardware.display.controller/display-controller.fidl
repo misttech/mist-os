@@ -340,122 +340,68 @@ closed protocol DisplayEngine {
     /// [`DisplayEngine.CompleteCoordinatorConnection`].
     strict UnsetListener() -> ();
 
-    /// Import a sysmem buffer collection token.
-    ///
-    /// Returns ZX_ERR_ALREADY_EXISTS if `collection_id` is in use.
+    /// See [`fuchsia.hardware.display.engine/Engine.ImportBufferCollection2`].
     strict ImportBufferCollection(resource struct {
         collection_id uint64;
-        // TODO(https://fxbug.dev/42171012): This is a client end channel of FIDL protocol
-        // fuchsia.sysmem2.BufferCollectionToken. The raw channel needs to be
-        // replaced with FIDL client end once banjo to FIDL migration finishes.
+
+        /// The client end of a channel speaking [`fuchsia.sysmem2/BufferCollectionToken`].
+        ///
+        /// The FIDL version of this call uses a typed client end here.
         collection_token zx.Handle:CHANNEL;
     }) -> (struct {
         s zx.Status;
     });
 
-    /// Release an imported buffer collection.
-    ///
-    /// Returns ZX_ERR_NOT_FOUND if `collection_id` isn't successfully imported.
+    /// See [`fuchsia.hardware.display.engine/Engine.ReleaseBufferCollection`].
     strict ReleaseBufferCollection(struct {
         collection_id uint64;
     }) -> (struct {
         s zx.Status;
     });
 
-    /// Imports an image from a imported BufferCollection into the driver.
-    ///
-    /// Returns ZX_OK and the imported image's handle, if the image is imported
-    /// succesfully.
-    /// Returns ZX_ERR_NOT_FOUND if `collection_id` is not imported yet.
-    /// Returns ZX_ERR_SHOULD_WAIT if the buffer collection is not already
-    /// allocated.
+    /// See [`fuchsia.hardware.display.engine/Engine.ImportImage`].
     strict ImportImage(struct {
-        // TODO(https://fxbug.dev/329163718): Some of the information in
-        // `image_metadata` was negotiated by sysmem. The display coordinator or
-        // engine drivers should read that information directly from sysmem.
         image_metadata ImageMetadata;
         collection_id uint64;
         index uint32;
     }) -> (struct {
         s zx.Status;
+
+        /// Undefined if the call does not succeed.
         image_handle uint64;
     });
 
-    /// Import BufferCollection backed VMO pointed to by `index`.
-    /// Importing the VMO usually involves pinning the VMO and updating display
-    /// controller hardware registers with the physical address of the VMO to be
-    /// used for capture. Returns out_capture_handle which maps to the allocated
-    /// resource.
-    ///
-    /// If display capture is not supported, returns ZX_ERR_NOT_SUPPORTED and
-    /// the value of `capture_handle` will be undefined.
-    ///
-    /// Returns ZX_ERR_NOT_FOUND if `collection_id` is not imported yet.
-    /// Returns ZX_ERR_SHOULD_WAIT if the buffer collection is not already
-    /// allocated.
+    /// See [`fuchsia.hardware.display.engine/Engine.ImportImageForCapture`].
     strict ImportImageForCapture(struct {
         collection_id uint64;
         index uint32;
     }) -> (struct {
         s zx.Status;
+
+        /// Undefined if the call does not succeed.
         capture_handle uint64;
     });
 
-    /// Releases any driver state associated with the given image. The client guarantees that
-    /// any images passed to apply_config will not be released until a vsync occurs with a
-    /// more recent image.
+    /// See [`fuchsia.hardware.display.engine/Engine.ReleaseImage`].
     strict ReleaseImage(struct {
         image_handle uint64;
     }) -> ();
 
-    /// Verifies that a configuration can be presented on a display.
+    /// See [`fuchsia.hardware.display.engine/Engine.CheckConfiguration`].
     strict CheckConfiguration(struct {
-        /// The display configuration to be validated.
-        ///
-        /// The verification result must not depend on the image handles in the
-        /// configuration. In other words, drivers must accept replacing an
-        /// existing configuration with a new configuration that matches it in
-        /// every respect except for the use of different image handles.
         display_config DisplayConfig;
     }) -> (struct {
-        /// Indicates if the display mode and composited layers are supported.
         config_check_result ConfigCheckResult;
-
-        /// Compositing operations that yield a supported configuration.
-        ///
-        /// If `config_check_result` is
-        /// `CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG`, the compositing operations
-        /// are specified as a vector with one element for each layer in the
-        /// display configuration. Otherwise, the vector must be empty.
         layer_composition_operations vector<LayerCompositionOperations>:MAX;
     });
 
-    /// Submits a configuration for future presentation on a display.
-    ///
-    /// `display_config` must be derived from a configuration that was validated
-    /// via [`DisplayEngine.CheckConfiguration`].
+    /// See [`fuchsia.hardware.display.engine/Engine.ApplyConfiguration`].
     strict ApplyConfiguration(struct {
-        /// The display configuration to be submitted for presentation.
-        ///
-        /// While the configuration is transmitted to the display, the driver
-        /// will hold references to the image whose handles are included in the
-        /// configuration.
         display_config DisplayConfig;
-
-        /// Identifies the configuration to be applied. Must be a valid value.
-        /// Must be strictly increasing across calls.
         config_stamp ConfigStamp;
     }) -> ();
 
-    /// Conveys the display hardware's limitations on image buffers to sysmem.
-    ///
-    /// The sysmem BufferCollection imported with `collection_id` will receive
-    /// constraints representing the display hardware's limitations for image
-    /// buffers that will be used according to `usage`. Once this succeeds,
-    /// calls to ImportImage() or ImportImageForCapture() that are consistent
-    /// with `usage` will not fail.
-    ///
-    /// Returns ZX_ERR_NOT_FOUND if `collection_id` is not imported yet.
+    /// See [`fuchsia.hardware.display.engine/Engine.SetBufferCollectionConstraints`].
     strict SetBufferCollectionConstraints(struct {
         usage ImageBufferUsage;
         collection_id uint64;
@@ -463,11 +409,7 @@ closed protocol DisplayEngine {
         s zx.Status;
     });
 
-    /// Power off/on the display panel. Newly added displays are turned on by default.
-    ///
-    /// Displays that are turned off will not deliver VSync events.
-    /// This may include the vsync event for the most recently applied
-    /// config.
+    /// See [`fuchsia.hardware.display.engine/Engine.SetDisplayPower`].
     strict SetDisplayPower(struct {
         display_id uint64;
         power_on bool;
@@ -475,42 +417,21 @@ closed protocol DisplayEngine {
         s zx.Status;
     });
 
-    /// Starts capture into the resource mapped by capture_handle (non-blocking)
-    /// Only one active capture is allowed at a time.
-    /// A valid image must be displayed during capture. Otherwise unexpected hardware
-    /// behavior might occur.
-    /// Drivers should not leave display hardware in this unexpected state.
-    /// Drivers are expected to stop and/or abort capture if no valid
-    /// image is being displayed.
-    ///
-    /// Returns ZX_ERR_NOT_SUPPORTED if display capture feature is not
-    /// supported.
+    /// See [`fuchsia.hardware.display.engine/Engine.StartCapture`].
     strict StartCapture(struct {
         capture_handle uint64;
     }) -> (struct {
         s zx.Status;
     });
 
-    /// Releases resources allocated by capture_handle.
-    /// Releasing resources from an active capture is not allowed and will cause
-    /// unexpected behavior.
-    ///
-    /// Returns ZX_ERR_NOT_SUPPORTED if display capture feature is not
-    /// supported.
+    /// See [`fuchsia.hardware.display.engine/Engine.ReleaseCapture`].
     strict ReleaseCapture(struct {
         capture_handle uint64;
     }) -> (struct {
         s zx.Status;
     });
 
-    /// Set the minimum value of RGB channels.
-    ///
-    /// Returns ZX_ERR_NOT_SUPPORTED if RGB clamping is not supported.
-    //
-    // TODO(https://fxbug.dev/328903017): This is a provisional method meant
-    // to address a hardware issue where RGB channels need to get clamped in
-    // order to reduce backlight bleeding. Revise this API when migrating this
-    // protocol to FIDL.
+    /// See [`fuchsia.hardware.display.engine/Engine.SetMinimumRgb`].
     strict SetMinimumRgb(struct {
         /// Must be >= 0 and <= 255.
         minimum_rgb uint8;

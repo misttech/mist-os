@@ -287,8 +287,10 @@ open protocol EngineListener {
     /// Called when a previous display capture triggered by
     /// [`Engine.StartCapture`] is completed.
     ///
-    /// The display Engine emits an [`OnCaptureComplete`] event only if
-    /// [`IsCaptureSupported`] returns `true`.
+    /// The display engine only emits [`OnCaptureComplete`] events if capture is
+    /// supported. Capture support is reported in
+    /// [`EngineInfo.is_capture_supported`] returned by
+    /// [`Engine.CompleteCoordinatorConnection`].
     flexible OnCaptureComplete();
 };
 
@@ -355,73 +357,130 @@ open protocol Engine {
         engine_info EngineInfo;
     });
 
-    /// Import a sysmem buffer collection token.
+    /// Sets up this driver to use a Sysmem BufferCollection.
     ///
-    /// Returns ZX_ERR_ALREADY_EXISTS if `collection_id` is in use.
+    /// Fails with ZX_ERR_INTERNAL if any error occurs during the setup process,
+    /// which mainly consists of communicating with the Sysmem service.
     flexible ImportBufferCollection2(resource struct {
+        /// Identifies the imported BufferCollection.
+        ///
+        /// The ID must not be invalid, and must not be already assigned.
+        ///
+        /// The ID is assigned to the imported collection from the moment this
+        /// call is issued until the moment this call fails, or until the moment
+        /// a call to [`Engine.ReleaseBufferCollection`] with the same ID
+        /// completes.
         buffer_collection_id BufferCollectionId;
 
+        /// Identifies the BufferCollection to the Sysmem service.
         collection_token client_end:fuchsia.sysmem2.BufferCollectionToken;
     }) -> () error zx.Status;
 
-    /// Release an imported buffer collection.
+    /// Releases the resources needed to use a Sysmem BufferCollection.
     ///
-    /// Returns ZX_ERR_NOT_FOUND if `collection_id` isn't successfully imported.
+    /// TODO(https://fxbug.dev/394954078): Make this method infallible.
     flexible ReleaseBufferCollection(struct {
+        /// Identifies a previously imported BufferCollection.
+        ///
+        /// The ID must be assigned to an imported BufferCollection, via a
+        /// successful call to [`Enigne.ImportBufferCollection2`].
+        ///
+        /// When the call completes, the ID is no longer assigned to the
+        /// BufferCollection, and can be used in a future call to
+        /// [`Engine.ImportBufferCollection2`].
         collection_id uint64;
     }) -> () error zx.Status;
 
-    /// Imports an image from a imported BufferCollection into the driver and
-    /// returns its unique ID.
+    /// Sets up the hardware to use a buffer as a display image data source.
     ///
-    /// Returns ZX_OK if the image is imported succesfully.
-    /// Returns ZX_ERR_NOT_FOUND if `collection_id` is not imported yet.
-    /// Returns ZX_ERR_SHOULD_WAIT if the buffer collection is not already
-    /// allocated.
+    /// Fails with ZX_ERR_SHOULD_WAIT if Sysmem reports that the
+    /// BufferCollection's buffers are not yet allocated. Fails with
+    /// ZX_ERR_INTERNAL if any other error occurs while obtaining the buffer
+    /// from the Sysmem service.
     flexible ImportImage(struct {
         // TODO(https://fxbug.dev/329163718): Some of the information in
         // `image_metadata` was negotiated by sysmem. The display coordinator or
         // engine drivers should read that information directly from sysmem.
         image_metadata fuchsia.hardware.display.types.ImageMetadata;
+
+        /// Identifies a previously imported BufferCollection.
+        ///
+        /// The ID must be assigned to an imported BufferCollection, via a
+        /// successful [`DisplayEnigne.ImportBufferCollection`] call.
         buffer_id BufferId;
     }) -> (struct {
+        /// Assigned to the imported image buffer.
+        ///
+        /// The ID is assigned to the imported image from the moment the call
+        /// succeeds until the moment a call to [`Engine.ReleaseImage`] with the
+        /// same ID completes.
         image_id ImageId;
     }) error zx.Status;
 
-    /// Import BufferCollection backed VMO pointed to by `index`.
-    /// Importing the VMO usually involves pinning the VMO and updating display
-    /// controller hardware registers with the physical address of the VMO to be
-    /// used for capture.
+    /// Sets up the hardware to use a buffer for display capture output.
     ///
-    /// If display capture is not supported, returns ZX_ERR_NOT_SUPPORTED.
+    /// This call must only be issued when the engine driver supports capture.
+    /// Capture support is reported in [`EngineInfo.is_capture_supported`]
+    /// returned by [`Engine.CompleteCoordinatorConnection`].
     ///
-    /// Returns ZX_ERR_NOT_FOUND if `collection_id` is not imported yet.
-    /// Returns ZX_ERR_SHOULD_WAIT if the buffer collection is not already
-    /// allocated.
+    /// Fails with ZX_ERR_SHOULD_WAIT if Sysmem reports that the
+    /// BufferCollection's buffers are not yet allocated. Fails with
+    /// ZX_ERR_INTERNAL if any other error occurs while obtaining the buffer
+    /// from the Sysmem service.
     flexible ImportImageForCapture(struct {
+        /// Identifies a previously imported BufferCollection.
+        ///
+        /// The ID must be assigned to an imported BufferCollection, via a
+        /// successful [`DisplayEnigne.ImportBufferCollection`] call.
         buffer_id BufferId;
     }) -> (struct {
+        /// Assigned to the imported capture image buffer.
+        ///
+        /// The ID is assigned to the imported capture image from the moment the
+        /// call succeeds until the moment a call to
+        /// [`DisplayEngine.ReleaseImageCapture`] with the same ID completes.
         capture_image_id ImageId;
     }) error zx.Status;
 
-    /// Releases any driver state associated with the given image. The client
-    /// is expected to not release any images passed to `apply_config`
-    /// until a vsync occurs with a more recent image.
+    /// Releases resources for using a buffer as a display image data source.
     flexible ReleaseImage(struct {
+        /// Identifies a previously imported display image data source buffer.
+        ///
+        /// The ID must be assigned to an imported image buffer, via a
+        /// successful [`DisplayEngine.ImportImage`] call.
+        ///
+        /// The buffer must not be used by a display configuration that is
+        /// applied or waiting to be applied.
+        ///
+        /// When the call completes, the ID is no longer assigned to the
+        /// imported image. The ID may be reused by a future call to
+        /// [`Engine.ImportImage`].
         image_id ImageId;
     }) -> ();
 
     /// Verifies that a configuration can be presented on a display.
+    ///
+    /// The verification result must be valid for any configuration derived from
+    /// the given configuration.
+    ///
+    /// A derived configuration can be obtained from another configuration by
+    /// applying one or more of the following operations. The list of operations
+    /// is expected to slowly grow over time.
+    ///
+    /// * Replace an image ID with another image ID. The two IDs must identify
+    ///   images that were imported with the same metadata.
     flexible CheckConfiguration(struct {
         /// The display configuration to be validated.
         ///
-        /// The verification result must not depend on the image handles in the
-        /// configuration. In other words, drivers must accept replacing an
-        /// existing configuration with a new configuration that matches it in
-        /// every respect except for the use of different image handles.
+        /// TODO(https://fxbug.dev/399954526): Update the contract to cover
+        /// configurations that reference an unassigned DisplayId.
         display_config DisplayConfig;
     }) -> (struct {
         /// Indicates if the display mode and composited layers are supported.
+        ///
+        /// The verification result must not depend on details that can change
+        /// among derived configurations. For example, the verification result
+        /// moust not depend on the image IDs in the configuration.
         config_check_result fuchsia.hardware.display.types.ConfigResult;
 
         /// Compositing operations that yield a supported configuration.
@@ -434,81 +493,133 @@ open protocol Engine {
     });
 
     /// Submits a configuration for future presentation on a display.
-    ///
-    /// `display_config` must be derived from a configuration that was validated
-    /// via [`Engine.CheckConfiguration`].
     flexible ApplyConfiguration(struct {
         /// The display configuration to be submitted for presentation.
+        ///
+        /// Must be derived from a configuration that was validated via
+        /// [`Engine.CheckConfiguration`]. That call's documentation includes
+        /// the definition of a derived configuration.
         ///
         /// While the configuration is transmitted to the display, the driver
         /// will hold references to the image whose handles are included in the
         /// configuration.
-        display_config vector<DisplayConfig>:MAX;
+        ///
+        /// TODO(https://fxbug.dev/399954526): Update the contract to cover
+        /// configurations that reference an unassigned DisplayId.
+        display_config DisplayConfig;
 
         /// Identifies the configuration to be applied. Must be a valid value.
         /// Must be strictly increasing across calls.
         config_stamp ConfigStamp;
     }) -> ();
 
-    /// Set sysmem buffer collection contraints needed to ensure an image can be
-    /// imported with `config` on the imported BufferCollecition with
-    /// `collection_id`.
+    /// Conveys the display hardware's limitations on image buffers to sysmem.
     ///
-    /// Returns ZX_ERR_NOT_FOUND if `collection_id` is not imported yet.
+    /// Fails with ZX_ERR_INTERNAL if any error occurs while communicating with
+    /// the the Sysmem service.
     flexible SetBufferCollectionConstraints(struct {
+        /// Describes how the image buffers will be used.
+        ///
+        /// After this call succeeds, calls to [`Engine.ImportImage`] or
+        /// [`Engine.ImportImageForCapture`] that are consistent with the
+        /// usage declared here are expected to succeed.
         usage fuchsia.hardware.display.types.ImageBufferUsage;
+
+        /// Identifies a previously imported BufferCollection.
+        ///
+        /// The ID must be assigned to an imported BufferCollection, via a
+        /// successful [`DisplayEnigne.ImportBufferCollection`] call.
         buffer_collection_id BufferCollectionId;
     }) -> () error zx.Status;
 
-    /// Power off/on the display panel. Newly added displays are turned on by
-    /// default.
-    ///
-    /// Displays that are turned off will not deliver VSync events.
-    /// This may include the vsync event for the most recently applied
-    /// config.
+    /// Sets a display's power state.
     flexible SetDisplayPower(struct {
+        /// Identifies the display whose power state is changed.
+        ///
+        /// Must be a valid ID assigned to a display connected to the system.
+        ///
+        /// TODO(https://fxbug.dev/399954526): Update the contract to cover
+        /// configurations that reference an unassigned DisplayId.
         display_id uint64;
+
+        /// The display's new power state.
+        ///
+        /// Displays are powered on when they are connected to the system.
+        ///
+        /// When a display is powered off, it does not deliver VSync events.
         power_on bool;
     }) -> () error zx.Status;
 
     /// Set the minimum value of RGB channels.
     ///
-    /// Returns ZX_ERR_NOT_SUPPORTED if RGB clamping is not supported.
-    ///
-    /// This method is provisional and is only for some display engines.
-    /// Most display drivers willreturn ZX_ERR_NOT_SUPPORTED.
+    /// Fails with ZX_ERR_NOT_SUPPORTED if RGB clamping is not supported. Most
+    /// engine drivers are expected to fail in this manner.
     //
-    // TODO(https://fxbug.dev/328903017): This is a provisional method meant
-    // to address a hardware issue where RGB channels need to get clamped in
-    // order to reduce backlight bleeding. Revise this method when stabilizing
-    // the Engine protocol API.
+    // TODO(https://fxbug.dev/328903017): This is a provisional method meant to
+    // address a hardware issue where RGB channels need to get clamped in order
+    // to reduce backlight bleeding. Revise this method when stabilizing the
+    // Engine protocol API.
     flexible SetMinimumRgb(struct {
         /// Must be >= 0 and <= 255.
         minimum_rgb uint8;
     }) -> () error zx.Status;
 
-    /// Starts capture into the resource mapped by `capture_image_id `(non-blocking)
-    /// Only one active capture is allowed at a time.
-    /// A valid image must be displayed during capture. Otherwise unexpected
-    /// hardware behavior might occur.
+    /// Starts a display capture operation.
     ///
-    /// Drivers should not leave display hardware in this unexpected state.
-    /// Drivers are expected to stop and/or abort capture if no valid image is
-    /// being displayed.
+    /// The engine driver must not be performing another capture operation. The
+    /// capture operation is considered to be in-progress from the moment when a
+    /// successful call to [`DisplayEngine.StartCapture`] is issued, until the
+    /// moment when the engine driver issues a call to
+    /// [`DisplayEngineListener.OnCaptureComplete`].
     ///
-    /// Returns ZX_ERR_NOT_SUPPORTED if display capture feature is not
-    /// supported.
+    /// This call must only be issued when the engine driver supports capture.
+    /// Capture support is reported in [`EngineInfo.is_capture_supported`]
+    /// returned by [`Engine.CompleteCoordinatorConnection`].
+    ///
+    /// This call must only be issued after a configuration has been applied to
+    /// the display.
+    ///
+    /// Fails with ZX_ERR_IO_REFUSED if the display engine hardware failed to
+    /// start the capture. This error could point to a systemic issue, such as
+    /// the system having insufficient DRAM bandwidth to capture the currently
+    /// applied display configuration. This error could also be caused by a
+    /// temporary hardware failure.
     flexible StartCapture(struct {
+        /// Identifies a previously imported display capture output buffer.
+        ///
+        /// The ID must be assigned to an imported capture output buffer, via a
+        /// successful [`Engine.ImportImageForCapture`] call.
+        ///
+        /// If the call succeeds, the display capture output buffer is used by
+        /// the in-progress display capture operation. While this operation is
+        /// in-progress, the buffer must not be passed in calls to
+        /// [`Engine.StartCapture`] or [`Engine.ReleaseCapture`].
+        ///
+        /// Once the capture operation completes, the buffer will store the
+        /// image data captured from the display.
         capture_image_id ImageId;
     }) -> () error zx.Status;
 
-    /// Releases resources allocated by `capture_image_id`.
-    /// Releasing resources from an active capture is not allowed and will cause
-    /// unexpected behavior.
+    /// Releases resources for using a buffer for display capture output.
     ///
-    /// Returns ZX_ERR_NOT_SUPPORTED if display capture feature is not
-    /// supported.
+    /// This call must only be issued when the engine driver supports capture.
+    /// Capture support is reported in [`EngineInfo.is_capture_supported`]
+    /// returned by [`Engine.CompleteCoordinatorConnection`].
+    ///
+    /// TODO(https://fxbug.dev/394954078): Make this method infallible.
     flexible ReleaseCapture(struct {
+        /// Identifies a previously imported display capture output buffer.
+        ///
+        /// The ID must be assigned to an imported display capture output
+        /// buffer, via a successful [`Engine.ImportImageForCapture`] call.
+        ///
+        /// The display capture output buffer must not be used by an in-progress
+        /// display capture operation. See [`DisplayEngine.StartCapture`] for
+        /// the definition of an in-progress display capture operation.
+        ///
+        /// When the call completes, the ID is no longer assigned to the display
+        /// capture output buffer. The ID may be reused by a future call to
+        /// [`Engine.ImportImageForCapture`].
         capture_image_id ImageId;
     }) -> () error zx.Status;
 
