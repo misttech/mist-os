@@ -1956,6 +1956,9 @@ test_loadable_module("tls-get-addr-global-dynamic-reloc") {
   configs = [ "//build/config/lto:no-lto" ]
 
   configs += [ "//build/config:no-tlsdesc" ]
+
+  # workaround for b/349448459 to remote-link successfully
+  configs += [ "//build/config:remote_link_scandeps_workaround" ]
 }
 
 test_executable("llvm-profdata") {
