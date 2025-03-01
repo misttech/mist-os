@@ -294,9 +294,6 @@
 
                 // TODO(https://fxbug.dev/395053835): Re-enable once flake is resolved.
                 "setrlimit01",
-
-                // TODO(https://fxbug.dev/398932523): Re-enable once we roll.
-                "setpgid01",
             ],
         },
     ],
