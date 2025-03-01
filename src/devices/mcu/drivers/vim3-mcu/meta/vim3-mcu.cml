@@ -13,7 +13,16 @@
         compat: "driver/vim3-mcu.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
     },
+    capabilities: [
+        { service: "fuchsia.hardware.fan.Service" },
+    ],
     use: [
         { service: "fuchsia.hardware.i2c.Service" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.fan.Service",
+            from: "self",
+        },
     ],
 }

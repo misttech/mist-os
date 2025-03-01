@@ -12,9 +12,8 @@
     },
     use: [
         {
-            directory: "dev-fan",
-            rights: [ "r*" ],
-            path: "/dev/class/fan",
+            service: "fuchsia.hardware.fan.Service",
+            from: "parent",
         },
         {
             protocol: "fuchsia.thermal.ClientStateConnector",

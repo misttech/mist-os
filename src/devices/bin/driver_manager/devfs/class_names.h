@@ -85,7 +85,6 @@ const std::unordered_map<std::string_view, ServiceEntry> kClassNameToService = {
      {ServiceEntry::kDevfsAndService, "fuchsia.services.test.Device", "control"}},
     {"display-coordinator",
      {ServiceEntry::kDevfsAndService, "fuchsia.hardware.display.service", "provider"}},
-    {"fan", {ServiceEntry::kDevfsAndService, "fuchsia.hardware.fan.Service", "device"}},
     {"fastboot", {ServiceEntry::kDevfsAndService, "fuchsia.hardware.fastboot.Service", "fastboot"}},
     {"goldfish-address-space",
      {ServiceEntry::kDevfsAndService, "fuchsia.hardware.goldfish.AddressSpaceService", "device"}},

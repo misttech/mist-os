@@ -10,12 +10,12 @@ source_set("common") {
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.fan:fuchsia.hardware.fan_cpp",
     "//sdk/fidl/fuchsia.thermal:fuchsia.thermal_cpp",
+    "//sdk/lib/async-default",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp:cpp",
     "//sdk/lib/sys/cpp:cpp",
     "//sdk/lib/syslog/cpp",
-    "//src/lib/fsl",
   ]
 }
 

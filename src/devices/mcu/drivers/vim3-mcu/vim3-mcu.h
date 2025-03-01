@@ -70,10 +70,9 @@ enum FanLevel {
   MAX,
 };
 class StmMcu;
-using DeviceType =
-    ddk::Device<StmMcu, ddk::Unbindable, ddk::Messageable<fuchsia_hardware_fan::Device>::Mixin>;
+using DeviceType = ddk::Device<StmMcu, ddk::Unbindable>;
 
-class StmMcu : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_FAN> {
+class StmMcu : public DeviceType, public fidl::WireServer<fuchsia_hardware_fan::Device> {
  public:
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(StmMcu);
   StmMcu(zx_device_t* parent, ddk::I2cChannel i2c) : DeviceType(parent), i2c_(std::move(i2c)) {}
@@ -111,6 +110,8 @@ class StmMcu : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_FAN> {
   void ShutDown();
   fbl::Mutex i2c_lock_;
   inspect::Inspector inspect_;
+
+  fidl::ServerBindingGroup<fuchsia_hardware_fan::Device> bindings_;
 
   FanLevel fan_level_ = FanLevel::MAX;
 };

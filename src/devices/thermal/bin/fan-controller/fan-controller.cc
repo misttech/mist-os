@@ -26,15 +26,8 @@ zx::result<fidl::ClientEnd<fuchsia_thermal::ClientStateWatcher>> FanController::
   return zx::ok(std::move(endpoints->client));
 }
 
-void FanController::ExistsCallback(const fidl::ClientEnd<fuchsia_io::Directory>& dir,
-                                   const std::string& filename) {
-  zx::result client_end = component::ConnectAt<fuchsia_hardware_fan::Device>(dir, filename);
-  if (client_end.is_error()) {
-    FX_LOGS(ERROR) << "Could not connect to " << filename << ": " << client_end.status_string();
-    return;
-  }
-
-  auto fan = fidl::SyncClient(std::move(*client_end));
+void FanController::NewFan(fidl::ClientEnd<fuchsia_hardware_fan::Device> client_end) {
+  auto fan = fidl::SyncClient(std::move(client_end));
   auto client_type = fan->GetClientType();
   if (client_type.is_error()) {
     FX_LOGS(ERROR) << "Could not get client type " << client_type.error_value();
