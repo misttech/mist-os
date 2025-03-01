@@ -7,9 +7,9 @@
 
 namespace component {
 
-zx_status_t ServiceWatcher::Begin(fidl::ClientEnd<fuchsia_io::Directory> dir,
-                                  ServiceWatcher::Callback callback,
-                                  async_dispatcher_t* dispatcher) {
+zx_status_t DirectoryWatcher::Begin(fidl::UnownedClientEnd<fuchsia_io::Directory> dir,
+                                    DirectoryWatcher::Callback callback,
+                                    async_dispatcher_t* dispatcher) {
   if (callback_ != nullptr) {
     return ZX_ERR_UNAVAILABLE;
   }
@@ -35,22 +35,10 @@ zx_status_t ServiceWatcher::Begin(fidl::ClientEnd<fuchsia_io::Directory> dir,
   return wait_.Begin(dispatcher);
 }
 
-zx_status_t ServiceWatcher::Begin(std::string_view service_name, ServiceWatcher::Callback callback,
-                                  async_dispatcher_t* dispatcher) {
-  std::string path = service_path_ + "/" + std::string(service_name);
-  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  zx_status_t status = fdio_open3(path.c_str(), uint64_t{fuchsia_io::wire::kPermReadable},
-                                  server.TakeChannel().release());
-  if (status != ZX_OK) {
-    return status;
-  }
-  return Begin(std::move(client), std::move(callback), dispatcher);
-}
+zx_status_t DirectoryWatcher::Cancel() { return wait_.Cancel(); }
 
-zx_status_t ServiceWatcher::Cancel() { return wait_.Cancel(); }
-
-void ServiceWatcher::OnWatchedEvent(async_dispatcher_t* dispatcher, async::WaitBase* wait,
-                                    zx_status_t status, const zx_packet_signal_t* signal) {
+void DirectoryWatcher::OnWatchedEvent(async_dispatcher_t* dispatcher, async::WaitBase* wait,
+                                      zx_status_t status, const zx_packet_signal_t* signal) {
   if (status != ZX_OK || !(signal->observed & ZX_CHANNEL_READABLE)) {
     return;
   }
@@ -91,6 +79,78 @@ void ServiceWatcher::OnWatchedEvent(async_dispatcher_t* dispatcher, async::WaitB
   }
 
   wait_.Begin(dispatcher);
+}
+
+zx::result<> SyncDirectoryWatcher::Begin() {
+  auto callback = fit::bind_member<&SyncDirectoryWatcher::OnWatchedEvent>(this);
+  // Get the actual directory client depending on how this was initialized:
+  if (path_ && dir_) {
+    auto result = OpenDirectoryAt(*dir_, *path_);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+    return zx::make_result(
+        directory_watcher_.Begin(result.value().borrow(), std::move(callback), loop_.dispatcher()));
+  }
+  // full path case:
+  if (path_) {
+    auto result = OpenDirectory(*path_);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+    return zx::make_result(
+        directory_watcher_.Begin(result.value().borrow(), std::move(callback), loop_.dispatcher()));
+  }
+  // just directory case
+  return zx::make_result(directory_watcher_.Begin(*dir_, std::move(callback), loop_.dispatcher()));
+}
+
+zx::result<std::string> SyncDirectoryWatcher::GetNextEntry(bool stop_at_idle, zx::time deadline) {
+  if (!has_begun_iterating_) {
+    auto result = Begin();
+    if (result.is_error()) {
+      return result.take_error();
+    }
+    has_begun_iterating_ = true;
+  }
+  // Run the loop to get the file events
+  // Due to the nature of the fuchsia_io::Watcher protocol, one event for the service watcher may
+  // correspond to multiple file events.  For this reason, we just run the loop until idle and
+  // then process all the file events that we have received.
+  zx_status_t run_status;
+  do {
+    run_status = loop_.RunUntilIdle();
+    if (run_status != ZX_OK) {  // loop was cancelled or shutdown
+      return zx::error(run_status);
+    }
+    // First get all the entries that were existing/added:
+    if (!entries_.empty()) {
+      std::string ret_instance = entries_.front();
+      entries_.pop_front();
+      return zx::ok(ret_instance);
+    }
+    // Once the queue is emptied, we can let the user know that the idle callback was invoked.
+    if (stop_at_idle && idle_called_) {
+      return zx::error(ZX_ERR_STOP);
+    }
+    // At this point, we are either in a race for the idle signal, or stop_at_idle == false,
+    // and we are just waiting for any future file events.
+    run_status = loop_.Run(deadline, true);
+  } while (run_status == ZX_OK);
+  // loop_.Run exited with a timeout or because it was canceled.
+  return zx::error(run_status);
+}
+
+void SyncDirectoryWatcher::OnWatchedEvent(fuchsia_io::wire::WatchEvent event,
+                                          const std::string& instance) {
+  if (event == fuchsia_io::wire::WatchEvent::kIdle) {
+    idle_called_ = true;
+    return;
+  }
+  if (event == fuchsia_io::wire::WatchEvent::kRemoved || instance.size() < 2) {
+    return;
+  }
+  entries_.push_back(instance);
 }
 
 }  // namespace component

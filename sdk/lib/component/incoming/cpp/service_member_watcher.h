@@ -17,8 +17,6 @@
 #include <lib/zx/clock.h>
 #include <lib/zx/result.h>
 
-#include <deque>
-#include <type_traits>
 #include <utility>
 
 namespace component {
@@ -68,7 +66,7 @@ class ServiceMemberWatcher {
   // Cancels watching for service instances.
   zx::result<> Cancel() {
     client_callback_ = nullptr;
-    return zx::make_result(service_watcher_.Cancel());
+    return zx::make_result(directory_watcher_.Cancel());
   }
 
   // For tests, the service root can be set manually
@@ -101,7 +99,7 @@ class ServiceMemberWatcher {
     if (service_directory_result.is_error()) {
       return service_directory_result.take_error();
     }
-    return zx::make_result(service_watcher_.Begin(
+    return zx::make_result(directory_watcher_.Begin(
         std::move(service_directory_result.value()),
         fit::bind_member<&ServiceMemberWatcher::OnWatchedEvent>(this), dispatcher));
   }
@@ -112,7 +110,7 @@ class ServiceMemberWatcher {
       idle_callback_();
       return;
     }
-    if (event == fuchsia_io::wire::WatchEvent::kRemoved || instance.size() < 2) {
+    if (event == fuchsia_io::wire::WatchEvent::kRemoved || instance == "." || instance.empty()) {
       return;
     }
 
@@ -128,7 +126,7 @@ class ServiceMemberWatcher {
   // for default initialization we hold ownership of the client_end.
   fidl::ClientEnd<fuchsia_io::Directory> default_svc_dir_;
   fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir_;
-  component::ServiceWatcher service_watcher_;
+  component::DirectoryWatcher directory_watcher_;
 };
 
 // SyncServiceMemberWatcher allows services to be waited for synchronously.
@@ -143,8 +141,11 @@ class SyncServiceMemberWatcher final : public ServiceMemberWatcher<ServiceMember
  public:
   using Protocol = typename ServiceMember::ProtocolType;
   explicit SyncServiceMemberWatcher(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root)
-      : ServiceMemberWatcher<ServiceMember>(svc_root) {}
-  SyncServiceMemberWatcher() : ServiceMemberWatcher<ServiceMember>() {}
+      : svc_dir_(svc_root), sync_dir_watcher_(svc_dir_, ServiceMember::ServiceName) {}
+  SyncServiceMemberWatcher()
+      : default_svc_dir_(OpenServiceRoot().value()),
+        svc_dir_(default_svc_dir_.borrow()),
+        sync_dir_watcher_(svc_dir_, ServiceMember::ServiceName) {}
 
   // Sequentially query for service instances at /svc/ServiceMember::ServiceName
   //
@@ -159,53 +160,17 @@ class SyncServiceMemberWatcher final : public ServiceMemberWatcher<ServiceMember
   // Otherwise, GetNextInstance will wait until |deadline| for a new instance to appear.
   zx::result<fidl::ClientEnd<Protocol>> GetNextInstance(bool stop_at_idle,
                                                         zx::time deadline = zx::time::infinite()) {
-    if (!has_begun_iterating_) {
-      zx::result result = this->Begin(
-          loop_.dispatcher(),
-          [this](fidl::ClientEnd<Protocol> client_in) {
-            clients_.emplace_back(std::move(client_in));
-          },
-          [this]() { idle_called_ = true; });
-      if (result.is_error()) {
-        return result.take_error();
-      }
-      has_begun_iterating_ = true;
+    zx::result result = sync_dir_watcher_.GetNextEntry(stop_at_idle, deadline);
+    if (result.is_error()) {
+      return result.take_error();
     }
-    // Run the loop to get the file events
-    // Due to the nature of the fuchsia_io::Watcher protocol, one event for the service watcher may
-    // correspond to multiple file events.  For this reason, we just run the loop until idle and
-    // then process all the file events that we have received.
-    zx_status_t run_status;
-    do {
-      run_status = loop_.RunUntilIdle();
-      if (run_status != ZX_OK) {  // loop was cancelled or shutdown
-        return zx::error(run_status);
-      }
-      // First get all the entries that were existing/added:
-      if (!clients_.empty()) {
-        fidl::ClientEnd<Protocol> client = std::move(clients_.front());
-        clients_.pop_front();
-        return zx::ok(std::move(client));
-      }
-      // Once the queue is emptied, we can let the user know that the idle callback was invoked.
-      if (stop_at_idle && idle_called_) {
-        return zx::error(ZX_ERR_STOP);
-      }
-      // At this point, we are either in a race for the idle signal, or stop_at_idle == false,
-      // and we are just waiting for any future file events.
-      run_status = loop_.Run(deadline, true);
-    } while (run_status == ZX_OK);
-    // loop_.Run exited with a timeout or because it was canceled.
-    return zx::error(run_status);
+    return ConnectAtMember<ServiceMember>(svc_dir_, result.value());
   }
 
- private:
-  bool has_begun_iterating_ = false;
-  bool idle_called_ = false;
-
-  // For doing blocking waits:
-  std::deque<fidl::ClientEnd<Protocol>> clients_;
-  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
+  // for default initialization we hold ownership of the client_end.
+  fidl::ClientEnd<fuchsia_io::Directory> default_svc_dir_;
+  fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir_;
+  SyncDirectoryWatcher sync_dir_watcher_;
 };
 
 }  // namespace component

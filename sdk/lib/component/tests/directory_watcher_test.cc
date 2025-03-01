@@ -59,7 +59,7 @@ class TestBase : public ::testing::Test {
 
 }  // namespace testing
 
-class ServiceWatcherTest : public testing::TestBase {
+class DirectoryWatcherTest : public testing::TestBase {
  protected:
   async::TestLoop& loop() { return loop_; }
 
@@ -67,14 +67,16 @@ class ServiceWatcherTest : public testing::TestBase {
   async::TestLoop loop_;
 };
 
-TEST_F(ServiceWatcherTest, Begin) {
+TEST_F(DirectoryWatcherTest, Begin) {
   std::vector<std::pair<fuchsia_io::wire::WatchEvent, std::string>> instances;
-  ServiceWatcher watcher;
-  watcher.set_service_path(kFakeServicePath);
+  DirectoryWatcher watcher;
   auto callback = ([&instances](fuchsia_io::wire::WatchEvent event, std::string instance) {
     instances.emplace_back(std::make_pair(event, std::move(instance)));
   });
-  zx_status_t status = watcher.Begin("fuchsia.examples.EchoService", callback, loop().dispatcher());
+  std::string service_dir = std::string(kFakeServicePath) + "/fuchsia.examples.EchoService";
+  zx::result dir_result = OpenDirectory(service_dir);
+  ASSERT_TRUE(dir_result.is_ok());
+  zx_status_t status = watcher.Begin(dir_result.value(), callback, loop().dispatcher());
   ASSERT_EQ(ZX_OK, status);
 
   ASSERT_TRUE(loop().RunUntilIdle());
@@ -99,6 +101,23 @@ TEST_F(ServiceWatcherTest, Begin) {
   ASSERT_EQ(0, ret);
   ASSERT_FALSE(loop().RunUntilIdle());
   ASSERT_TRUE(instances.empty());
+}
+
+TEST_F(DirectoryWatcherTest, SyncDirectoryWatcher) {
+  std::vector<std::string> instances;
+  std::string service_dir = std::string(kFakeServicePath) + "/fuchsia.examples.EchoService";
+  SyncDirectoryWatcher watcher(service_dir);
+
+  zx::result watch_result = watcher.GetNextEntry(true);
+  ASSERT_TRUE(watch_result.is_ok());
+  instances.push_back(watch_result.value());
+  watch_result = watcher.GetNextEntry(true);
+  ASSERT_TRUE(watch_result.is_ok());
+  instances.push_back(watch_result.value());
+  watch_result = watcher.GetNextEntry(true);
+  ASSERT_EQ(watch_result.status_value(), ZX_ERR_STOP);
+  // These instances are added by TestBase:
+  EXPECT_THAT(instances, ::testing::UnorderedElementsAre("default", "my_instance"));
 }
 
 }  // namespace
