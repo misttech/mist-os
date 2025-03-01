@@ -57,7 +57,7 @@ _types_not_requiring_compatibility = [
 #     Describes the availability of the element.
 #     Possible values, from most restrictive to least restrictive:
 #       - internal         : the atom is exposed in-tree to the Bazel SDK build via `@internal_sdk`.
-#       - cts              : Currently unsupported - See https://fxbug.dev/367760026.
+#       - compat_test      : May be used in CTF realm proxies to enable tests to configure the target.
 #       - partner_internal : The atom may be used internally by other atoms in SDKs for partners.
 #       - partner          : The atom may be included in SDKs for partners.
 #
@@ -178,7 +178,7 @@ template("sdk_atom") {
 
   _allowed_categories = [
     # "internal" is deprecated; only specific legacy cases below are allowed.
-    "cts",
+    "compat_test",
     "partner_internal",
     "partner",
   ]
@@ -190,12 +190,6 @@ template("sdk_atom") {
           # assert below have been removed.
           category == "internal",
       "'${target_name}' has unsupported SDK category '${category}'. Must be one of ${_allowed_categories}.")
-
-  # "cts" is not properly implemented and should not be used. See
-  # https://fxbug.dev/367760026.
-  assert(
-      category != "cts",
-      "'${target_name}' has SDK category '${category}', which is not yet supported.")
 
   if (category == "internal" &&
       # `sdk_source_set()` enforces an allowlist.

@@ -44,7 +44,7 @@ single package.
 
 If a RealmFactory FIDL protocol will be used by CTF tests, it should have
 [FIDL availability] annotations. The protocol must also be added to the
-`partner_internal` [SDK category] to indicate that the API can be used by CTF
+`compat_test` [SDK category] to indicate that the API can be used by CTF
 tests and must maintain backward compatibility but is not be exposed to SDK
 users or the `partner` category if it should be available to SDK users.
 
@@ -72,7 +72,7 @@ emits logs and [Inspect data] to Archivist, and is controlled by
 test puppet to inject arbitrary logs and Inspect data into test realms.
 
 Note: If the puppet's FIDL protocol will be used by CTF tests, remember to
-add the protocol to the `partner_internal` [SDK category] to indicate that the
+add the protocol to the `compat_test` [SDK category] to indicate that the
 API can be used to CTF tests and must maintain backward compatibility, but is
 not be exposed to SDK users.
 

@@ -33,11 +33,11 @@ idk_category_marker_template("not-in-idk") {
   visibility += [ "*" ]
 }
 
-idk_category_marker_template("cts") {
-  # "cts" should not be used until implemented. See https://fxbug.dev/367760026.
-  # TODO(https://fxbug.dev/367760026): Add an appropriate pattern when the
-  # category is implemented.
-  visibility = []
+idk_category_marker_template("compat_test") {
+  visibility = [
+    "//sdk/fidl/*",
+    "//src/*",
+  ]
 }
 
 idk_category_marker_template("partner_internal") {
@@ -117,7 +117,7 @@ group("test_all_marker_lists") {
 
   assert(markers_partner_idk_prebuilts_must_not_depend_on == [
                "//sdk/categories:marker-not-in-idk",
-               "//sdk/categories:marker-cts",
+               "//sdk/categories:marker-compat_test",
              ],
          "${markers_partner_idk_prebuilts_must_not_depend_on}")
 }

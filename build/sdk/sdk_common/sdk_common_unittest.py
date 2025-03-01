@@ -32,47 +32,61 @@ class SdkCommonTests(unittest.TestCase):
     def test_categories(self) -> None:
         atoms = [_atom("hello", "internal"), _atom("world", "partner")]
         self.assertEqual([*detect_category_violations("internal", atoms)], [])
-        atoms = [_atom("hello", "partner"), _atom("world", "partner_internal")]
+        atoms = [
+            _atom("hello", "compat_test"),
+            _atom("world", "partner_internal"),
+            _atom("universe", "partner"),
+        ]
+        self.assertEqual(
+            [*detect_category_violations("compat_test", atoms)], []
+        )
+
+        atoms = [_atom("hello", "partner_internal"), _atom("world", "partner")]
+        self.assertEqual(
+            [*detect_category_violations("compat_test", atoms)], []
+        )
         self.assertEqual(
             [*detect_category_violations("partner_internal", atoms)], []
         )
 
+        atoms = [_atom("hello", "partner")]
+        self.assertEqual(
+            [*detect_category_violations("compat_test", atoms)], []
+        )
+        self.assertEqual(
+            [*detect_category_violations("partner_internal", atoms)], []
+        )
+        self.assertEqual([*detect_category_violations("partner", atoms)], [])
+
     def test_categories_failure(self) -> None:
-        atoms = [_atom("hello", "internal"), _atom("world", "partner")]
+        atoms = [_atom("hello", "compat_test"), _atom("world", "partner")]
         self.assertEqual(
             [*detect_category_violations("partner_internal", atoms)],
             [
-                '"hello" has publication level "internal", which is incompatible with "partner_internal".'
+                '"hello" has publication level "compat_test", which is incompatible with "partner_internal".'
             ],
         )
-        atoms = [_atom("hello", "internal"), _atom("world", "partner")]
         self.assertEqual(
             [*detect_category_violations("partner", atoms)],
             [
-                '"hello" has publication level "internal", which is incompatible with "partner".'
+                '"hello" has publication level "compat_test", which is incompatible with "partner".'
             ],
         )
 
-    def test_unsupported_categories(self) -> None:
+        atoms = [_atom("hello", "partner_internal"), _atom("world", "partner")]
+        self.assertEqual(
+            [*detect_category_violations("partner", atoms)],
+            [
+                '"hello" has publication level "partner_internal", which is incompatible with "partner".'
+            ],
+        )
+
+    def test_category_name_unrecognized(self) -> None:
         atoms = [_atom("hello", "internal"), _atom("world", "public")]
         self.assertRaisesRegex(
             Exception,
             'Unknown SDK category "public"',
             lambda: [*detect_category_violations("internal", atoms)],
-        )
-        atoms = [_atom("hello", "partner"), _atom("world", "cts")]
-        self.assertRaisesRegex(
-            Exception,
-            '"world" has SDK category "cts", which is not yet supported.',
-            lambda: [*detect_category_violations("internal", atoms)],
-        )
-
-    def test_category_name_bogus(self) -> None:
-        atoms = [_atom("hello", "foobarnotgood"), _atom("world", "partner")]
-        self.assertRaisesRegex(
-            Exception,
-            'Unknown SDK category "foobarnotgood"',
-            lambda: [*detect_category_violations("partner", atoms)],
         )
 
     def test_area_name(self) -> None:

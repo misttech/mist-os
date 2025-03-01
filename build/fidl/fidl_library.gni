@@ -94,8 +94,7 @@ template("fidl_library") {
           invoker.sdk_category == "partner",
       "In vendor repos, only libraries in the vendor SDK should have `sdk_category` set.")
 
-  # All libraries in an SDK category (supported by this template) require
-  # compatibility tests.
+  # All libraries in an SDK category require compatibility tests.
   requires_compatibility_tests = defined(invoker.sdk_category)
 
   is_unversioned_vendor_sdk = false
@@ -125,12 +124,11 @@ template("fidl_library") {
       requires_compatibility_tests = false
       category_allowlist_deps =
           [ "//sdk/fidl:internal_only_idk_libs_allowlist" ]
-    } else if (category == "cts") {
-      # The cts category is not currently implemented (i.e., no compatibility
-      # checks). See https://fxbug.dev/367760026.
-      # When implementing this category, add it to the error message in the
-      # `else` case below and see the comment at the top of this `if` block.
-      assert(false, "SDK category '$category' is not currently supported.")
+    } else if (category == "compat_test") {
+      # Ensures that all libraries in the "compat_test" category are in the
+      # "sdk_compat_test_libs_allowlist" target, which is used to ensure
+      # that the API compatibility tests actually run on these libraries.
+      category_allowlist_deps = [ "//sdk/fidl:sdk_compat_test_libs_allowlist" ]
     } else if (category == "partner_internal") {
       # Ensures that all libraries in the "partner_internal" category are in the
       # "sdk_partner_internal_libs_allowlist" target, which is used to ensure
@@ -146,12 +144,12 @@ template("fidl_library") {
         category_allowlist_deps = []
         is_unversioned_vendor_sdk = true
       } else {
-        category_allowlist_deps = [ "//sdk/fidl:sdk_fidl_partner_allowlist" ]
+        category_allowlist_deps = [ "//sdk/fidl:sdk_partner_libs_allowlist" ]
       }
     } else {
       assert(
           false,
-          "Unrecognized SDK category '$category'. Currently supported categories are: 'partner' and 'partner_internal'. For libraries not in the IDK, do not specify `sdk_category`.")
+          "Unrecognized SDK category '$category'. Currently supported categories are: 'partner', 'partner_internal', and 'compat_test'. For libraries not in the IDK, do not specify `sdk_category`.")
     }
   } else {
     category_allowlist_deps = []
@@ -172,10 +170,9 @@ template("fidl_library") {
   }
 
   assert(
-      (requires_compatibility_tests ||
-           (is_sdk_included_publishable && !is_vendor_library) ||
-           is_in_internal_only_idk) == (category_allowlist_deps != []),
-      "Libraries that require compatibility tests or are publishable in an IDK must be in an allowlist to ensure they are compatibility tested and included in the IDK.")
+      category_allowlist_deps != [] || is_unversioned_vendor_sdk ||
+          !defined(invoker.sdk_category),
+      "Libraries with an SDK category must be in an allowlist to ensure they are compatibility tested and included in the IDK as appropriate.")
 
   assert(
       requires_compatibility_tests == defined(invoker.stable) ||
@@ -216,6 +213,10 @@ template("fidl_library") {
   # on unstable libraries.
   # Treat such libraries as unversioned until each is resolved.
   _unversioned_libraries_used_by_sdk_prebuilts_or_ctf = [
+    # Do not add to this list without discussing with the FIDL team.
+    # It is likely that only instances of the scenarios described in
+    # https://fxbug.dev/369892217 should be added.
+
     # TODO(https://fxbug.dev/364294648): Resolve heapdump instrumentation dependency on library.
     "fuchsia.memory.heapdump.process",
 
@@ -331,6 +332,7 @@ template("fidl_library") {
       (fidlc_versioned_arg == "fuchsia" && is_stable &&
            requires_compatibility_tests &&
            (is_sdk_included_publishable ||
+                invoker.sdk_category == "compat_test" ||
                 invoker.sdk_category == "partner_internal")) ||
           (fidlc_versioned_arg == "fuchsia" && _is_banjo_sysmem && !is_stable &&
                !requires_compatibility_tests && !is_sdk_included_publishable) ||

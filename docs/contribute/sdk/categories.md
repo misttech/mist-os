@@ -88,14 +88,14 @@ SDK categories have been implemented in the [`sdk_atom`](/docs/glossary#sdk-atom
 Each SDK Atom has an `category` parameter with one of the following values:
 
 - `internal`: deprecated (no new uses allowed)
-- `cts`: supported for use in the Compatibility Tests for Fuchsia (not yet supported)
+- `compat_test`: supported for use in the Compatibility Tests for Fuchsia
 - `partner_internal`: supported for use in non-source SDK atoms in the
   `partner` category but not exposed to the SDK users
 - `partner`: supported for use by select partners
 
 These categories form an ordered list with a monotonically increasing audience.
 For example, an SDK Atom in the `partner` category is necessarily available to
-Compatibility Tests `partner` comes after `cts` in this list.
+Compatibility Tests `partner` comes after `compat_test` in this list.
 
 ## Commitments
 

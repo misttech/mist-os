@@ -8,7 +8,7 @@ _all_idk_categories = [
   "not-in-idk",
 
   # The categories supported by `sdk_atom()`.
-  "cts",
+  "compat_test",
   "partner_internal",
   "partner",
 ]

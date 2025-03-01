@@ -40,8 +40,8 @@ def main():
     )
     parser.add_argument("--keep-documentation", help="Keep API documentation.")
     parser.add_argument(
-        "--include-internal",
-        help="Include libraries from the partner_internal as well as partner category.",
+        "--include-all",
+        help="Include libraries from all categories. By default only libraries in the 'partner' category are included.",
     )
     parser.add_argument("--depfile", type=argparse.FileType("w"))
 
@@ -56,8 +56,11 @@ def main():
         for fidl_library in json.load(args.sdk_fidl_json)
         if (
             fidl_library["category"] == "partner"
-            or (args.include_internal)
-            and fidl_library["category"] == "partner_internal"
+            or (args.include_all)
+            and (
+                fidl_library["category"] == "partner_internal"
+                or fidl_library["category"] == "compat_test"
+            )
         )
     ]
 

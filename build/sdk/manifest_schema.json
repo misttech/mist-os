@@ -54,7 +54,7 @@
                     "type": "string",
                     "enum": [
                         "internal",
-                        "cts",
+                        "compat_test",
                         "partner_internal",
                         "partner"
                     ]

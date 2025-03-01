@@ -246,23 +246,25 @@ sdk_molecule("fidl") {
   category = "partner"
 
   deps = []
-  non_sdk_deps = []
   foreach(fidl_library_path, _partner_idk_fidl_libraries_targets_list) {
     deps += [ "${fidl_library_path}_sdk($fidl_toolchain)" ]
   }
 
-  # Ensure that the API compatibility tests run on libraries that require
+  # Ensure that the API compatibility tests run on all libraries that require
   # compatibility but are not in the IDK.
-  non_sdk_deps += [ ":partner_internal_fidl_libraries_non_sdk_molecule" ]
+  non_sdk_deps = [
+    ":compat_test_fidl_libraries_non_sdk_molecule",
+    ":partner_internal_fidl_libraries_non_sdk_molecule",
+  ]
 }
 
-group("sdk_fidl_partner_allowlist") {
+group("sdk_partner_libs_allowlist") {
   visibility = _partner_idk_fidl_libraries_targets_list
 }
 
 # The list of FIDL libraries in the "partner_internal" SDK category.
-# These libraries are NOT included in the IDK and is only used by the targets
-# below to ensure that we run the FIDL API compatibility tests on these
+# These libraries are NOT included in the IDK; this list is only used by the
+# targets below to ensure that we run the FIDL API compatibility tests on these
 # libraries and allowlist additions.
 # Targets must be included if and only if the `fidl()` target specifies:
 # `sdk_category = "partner_internal"`.
@@ -291,23 +293,25 @@ _partner_internal_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container",
   "//sdk/fidl/fuchsia.sys2:fuchsia.sys2",
   "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager",
-  "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness",
   "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader",
 
   # keep-sorted: end
 ]
 
-# Do NOT depend on this molecule from another SDK atom's `deps`. If is only
+# Do NOT depend on this molecule from another SDK atom's `deps`. It is only
 # to be used in `non_sdk_deps` of the "fidl" target to ensure a) there are no
 # category violations and b) that compatibility tests are run.
 # It must be an `sdk_molecule()` and not a `group()` because category checking
 # is not performed on `non_sdk_deps`.
 sdk_molecule("partner_internal_fidl_libraries_non_sdk_molecule") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":fidl.manifest",
+    ":partner_internal_fidl_libraries_non_sdk_molecule",
+    ":partner_internal_fidl_libraries_non_sdk_molecule.validate",
+  ]
   category = "partner_internal"
 
   deps = []
-  non_sdk_deps = []
   foreach(fidl_library_path, _partner_internal_fidl_libraries_targets_list) {
     deps += [ "${fidl_library_path}_sdk($fidl_toolchain)" ]
   }
@@ -317,11 +321,50 @@ group("sdk_partner_internal_libs_allowlist") {
   visibility = _partner_internal_fidl_libraries_targets_list
 }
 
+# The list of FIDL libraries in the "compat_test" SDK category.
+# These libraries are NOT included in the IDK; this list is only used by the
+# targets below to ensure that we run the FIDL API compatibility tests on these
+# libraries and allowlist additions.
+# Targets must be included if and only if the `fidl()` target specifies:
+# `sdk_category = "compat_test"`.
+# When removing a library from all such lists, delete all of its history files:
+#   git rm sdk/history/*/<library_name>.api_summary.json
+_compat_test_fidl_libraries_targets_list = [
+  # keep-sorted: begin
+  "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness",
+  # keep-sorted: end
+]
+
+# Do NOT depend on this molecule from another SDK atom's `deps`. It is only
+# to be used in `non_sdk_deps` of the "fidl" target to ensure a) there are no
+# category violations and b) that compatibility tests are run.
+# It must be an `sdk_molecule()` and not a `group()` because category checking
+# is not performed on `non_sdk_deps`.
+sdk_molecule("compat_test_fidl_libraries_non_sdk_molecule") {
+  visibility = [
+    ":compat_test_fidl_libraries_non_sdk_molecule",
+    ":compat_test_fidl_libraries_non_sdk_molecule.validate",
+    ":fidl.manifest",
+  ]
+  category = "compat_test"
+
+  deps = []
+  foreach(fidl_library_path, _compat_test_fidl_libraries_targets_list) {
+    deps += [ "${fidl_library_path}_sdk($fidl_toolchain)" ]
+  }
+}
+
+group("sdk_compat_test_libs_allowlist") {
+  visibility = _compat_test_fidl_libraries_targets_list
+}
+
 # Ensure the lists are mutually exclusive.
 assert(
     _partner_idk_fidl_libraries_targets_list +
+        _partner_internal_fidl_libraries_targets_list +
+        _compat_test_fidl_libraries_targets_list -
         _partner_internal_fidl_libraries_targets_list -
-        _partner_internal_fidl_libraries_targets_list ==
+        _compat_test_fidl_libraries_targets_list ==
         _partner_idk_fidl_libraries_targets_list,
     "A FIDL library appears in more than one SDK category list. If adding a library to a category, remove it from the other.")
 
