@@ -113,6 +113,7 @@ unified_only = [
   "bti",
   "default-exception-handler",  # needs job tree w/o exception handler.
   "debuglog:unified-only",
+  "hotplug",
   "interrupt",
   "next-vdso",
   "pager-writeback",
