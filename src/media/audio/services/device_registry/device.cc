@@ -1399,6 +1399,10 @@ void Device::RetrieveDaiFormatSets() {
       }
     });
   }
+  if (remaining_dai_ids->empty()) {
+    dai_format_sets_retrieved_ = true;
+    OnInitializationResponse();
+  }
 }
 
 void Device::GetDaiFormatSets(

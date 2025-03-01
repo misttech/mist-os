@@ -387,7 +387,7 @@ impl Device {
                 .abs() as u64
                 > bytes_in_rb - (consumer_bytes + bytes_per_wakeup_interval)
             {
-                println!(
+                log::info!(
                     "Woke up {} ns late",
                     duration_since_last_wakeup.into_nanos() as f64 - nanos_per_wakeup_interval
                 );
@@ -570,6 +570,9 @@ impl Device {
                     break;
                 }
             }
+
+            ring_buffer.stop().await?;
+
             Ok(fac::RecorderRecordResponse {
                 bytes_processed: None,
                 packets_processed: None,

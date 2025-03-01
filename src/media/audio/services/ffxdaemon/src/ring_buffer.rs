@@ -67,6 +67,8 @@ impl HardwareRingBuffer {
             .ok_or_else(|| anyhow::anyhow!("driver transfer bytes unavailable"))?
             as u64;
 
+        log::debug!("driver transfer bytes: {} num_frames: {}", driver_transfer_bytes, num_frames);
+
         Ok(Self { proxy, vmo_buffer, driver_transfer_bytes })
     }
 }
