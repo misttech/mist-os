@@ -11,13 +11,9 @@ _all_idk_categories = [
   "cts",
   "partner_internal",
   "partner",
-  "public",
 ]
 
-_categories_partner_sources_may_depend_on = [
-  "partner",
-  "public",
-]
+_categories_partner_sources_may_depend_on = [ "partner" ]
 
 _categories_partner_prebuilts_may_depend_on =
     _categories_partner_sources_may_depend_on + [ "partner_internal" ]

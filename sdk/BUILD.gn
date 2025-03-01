@@ -70,7 +70,7 @@ if (current_build_target_api_level != "PLATFORM") {
 }
 
 # A list of sdk_collection() targets that correspond to all
-# IDK targets in the "public" and "partner" category. For now
+# IDK targets in the "partner" category. For now
 # this is only the Fuchsia Core IDK, with the exceptional addition
 # of //sdk:zircon_sysroot. See the documentation comment for the
 # latter to understand why this is needed.
@@ -86,7 +86,7 @@ _sdk_public_deps = [
   ":zircon_sysroot",
 ]
 
-# This default target should depend on all public or partner IDKs.
+# This default target should depend on all IDKs.
 group("sdk") {
   visibility += [ "//:*" ]
 

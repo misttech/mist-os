@@ -60,7 +60,6 @@ _types_not_requiring_compatibility = [
 #       - cts              : Currently unsupported - See https://fxbug.dev/367760026.
 #       - partner_internal : The atom may be used internally by other atoms in SDKs for partners.
 #       - partner          : The atom may be included in SDKs for partners.
-#       - public           : The atom may be included in SDKs for all Fuchsia developers.
 #
 #   sdk_area (optional)
 #     The API area responsible for maintaining this SDK atom. See
@@ -182,7 +181,6 @@ template("sdk_atom") {
     "cts",
     "partner_internal",
     "partner",
-    "public",
   ]
 
   assert(
@@ -195,9 +193,8 @@ template("sdk_atom") {
 
   # "cts" is not properly implemented and should not be used. See
   # https://fxbug.dev/367760026.
-  # The public IDK does not yet exist, so "public" should not be used.
   assert(
-      category != "cts" && category != "public",
+      category != "cts",
       "'${target_name}' has SDK category '${category}', which is not yet supported.")
 
   if (category == "internal" &&

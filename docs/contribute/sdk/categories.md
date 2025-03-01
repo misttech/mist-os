@@ -51,11 +51,6 @@ project and by SDK consumers who have partnered[^1] with the Fuchsia project.
 When someone changes `fuchsia.bar`, they run a larger risk of breaking
 consumers because they might break the partners that depend upon `fuchsia.bar`.
 
-Finally, consider a `fuchsia.qux` FIDL library with an SDK category of
-`public`, which means `fuchsia.qux` can be used by the general public. Changing
-`fuchsia.qux` is very risky because the set of software developed by the
-general public is potentially unbounded and unknowable.
-
 Along with defining concentrically increasing sets of API consumers, SDK
 categories also define increasing stability windows. For example, `fuchsia.foo`
 can change dramatically from one day to the next because the `internal`
@@ -65,29 +60,17 @@ means the stability window needed for the API is either very small or zero. By
 way of contrast, the agreement that Fuchsia has with partner projects includes
 an expectation for compatibility windows.
 
-Currently, Fuchsia do not have any SDK Atoms with an SDK category of `public`,
-which means Fuchsia has not made any commitments to supporting the general
-public using its APIs. However, at some point, the Fuchsia project will begin
-supporting the general public using its APIs. At that time, the Fuchsia project
-will need to define the compatibility window for those APIs, which will likely
-be longer than the compatibility window for `partner` APIs.
-
 An additional type of SDK category is required for the APIs used in the prebuilt
-`partner` or `public` SDK atoms when it's undesirable to expose these APIs to
-SDK users. These `partner_internal` and `public_internal` categories will enforce
-the same API compatibility windows as the `partner` and `public` categories
-without requiring adding those APIs to the SDK API surface area. Only the
-`partner_internal` category will be introduced for now as there's no `public`
-SDK atoms.
+`partner` SDK atoms when it's undesirable to expose these APIs to
+SDK users. This `partner_internal` category will enforce
+the same API compatibility windows as the `partner` category
+without requiring adding those APIs to the SDK API surface area.
 
-A typical SDK Atom begins its lifecycle in the `internal` SDK category. At some
-point, the API Council might graduate the SDK Atom might to the `partner` SDK
-category, often when a partner needs access to an API contained in the Atom.
-Sometime in the future, when Fuchsia has a non-empty `public` SDK category, SDK
-Atoms will be able to graduate from the `partner` category to the `public`
-category as well. Some SDK Atoms might remain in the `internal` SDK category
-indefinitely. Others might graduate to `partner` but never graduate to
-`public`.
+A typical SDK Atom begins its lifecycle outside the SDK with no SDK category. It
+may first be added to the SDK in the `partner_internal` category when a host
+tool or precompiled library in the SDK need to use it. At some point, the API
+Council will promote the SDK Atom right to the `partner` SDK category, often
+when a partner needs access to an API contained in the Atom.
 
 Please note that this mechanism is complementary to `@available` mechanism for
 [platform versioning][fidl-versioning]. The `@available` mechanism *records*
@@ -109,11 +92,10 @@ Each SDK Atom has an `category` parameter with one of the following values:
 - `partner_internal`: supported for use in non-source SDK atoms in the
   `partner` category but not exposed to the SDK users
 - `partner`: supported for use by select partners
-- `public`: supported for use by the general public (not yet supported)
 
 These categories form an ordered list with a monotonically increasing audience.
-For example, an SDK Atom in the `public` category is necessarily available to
-select partners because `public` comes after `partner` in this list.
+For example, an SDK Atom in the `partner` category is necessarily available to
+Compatibility Tests `partner` comes after `cts` in this list.
 
 ## Commitments
 

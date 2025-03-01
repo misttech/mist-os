@@ -91,7 +91,6 @@ template("sdk_source_set") {
     # "cts" is only for ABI compatibility and thus not applicable.
     # "partner_internal" is only for ABI compatibility and thus not applicable.
     "partner",
-    # "public" is not yet implemented.
   ]
 
   # TODO(https://fxbug.dev/372986936): Remove once all uses have been removed.

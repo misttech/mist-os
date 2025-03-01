@@ -55,9 +55,8 @@
                     "enum": [
                         "internal",
                         "cts",
-                        "partner",
                         "partner_internal",
-                        "public"
+                        "partner"
                     ]
                 },
                 "area": {

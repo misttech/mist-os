@@ -44,7 +44,7 @@ import("//tools/cmc/build/expect_includes.gni")
 #     Type: string.
 #
 #   category
-#     The SDK category for the package. Must be either "public" or "partner".
+#     The SDK category for the package. Must be "partner".
 #     See //build/sdk/sdk_atom.gni for more.
 #     Type: string.
 #
@@ -104,7 +104,6 @@ template("sdk_fuchsia_package") {
     # "cts" is only for ABI compatibility and thus not applicable.
     # "partner_internal" is only for ABI compatibility and thus not applicable.
     "partner",
-    # "public" is not yet implemented.
   ]
   assert(
       valid_categories + [ invoker.category ] - [ invoker.category ] !=

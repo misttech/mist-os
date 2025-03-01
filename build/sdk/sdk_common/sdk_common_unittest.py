@@ -54,11 +54,10 @@ class SdkCommonTests(unittest.TestCase):
         )
 
     def test_unsupported_categories(self) -> None:
-        # Documented categories that are temporarily disabled.
         atoms = [_atom("hello", "internal"), _atom("world", "public")]
         self.assertRaisesRegex(
             Exception,
-            '"world" has SDK category "public", which is not yet supported.',
+            'Unknown SDK category "public"',
             lambda: [*detect_category_violations("internal", atoms)],
         )
         atoms = [_atom("hello", "partner"), _atom("world", "cts")]
@@ -68,22 +67,8 @@ class SdkCommonTests(unittest.TestCase):
             lambda: [*detect_category_violations("internal", atoms)],
         )
 
-        # Documented categories that are no longer supported.
-        atoms = [_atom("hello", "partner"), _atom("world", "experimental")]
-        self.assertRaisesRegex(
-            Exception,
-            'Unknown SDK category "experimental"',
-            lambda: [*detect_category_violations("internal", atoms)],
-        )
-        atoms = [_atom("hello", "partner"), _atom("world", "excluded")]
-        self.assertRaisesRegex(
-            Exception,
-            'Unknown SDK category "excluded"',
-            lambda: [*detect_category_violations("internal", atoms)],
-        )
-
     def test_category_name_bogus(self) -> None:
-        atoms = [_atom("hello", "foobarnotgood"), _atom("world", "public")]
+        atoms = [_atom("hello", "foobarnotgood"), _atom("world", "partner")]
         self.assertRaisesRegex(
             Exception,
             'Unknown SDK category "foobarnotgood"',
@@ -94,13 +79,13 @@ class SdkCommonTests(unittest.TestCase):
         v = Validator(valid_areas=["Kernel", "Unknown"])
         atoms = [
             _atom("hello", "internal", "Unknown"),
-            _atom("world", "public", "Kernel"),
+            _atom("world", "partner", "Kernel"),
         ]
         self.assertEqual([*v.detect_area_violations(atoms)], [])
 
         atoms = [
             _atom("hello", "internal", "So Not A Real Area"),
-            _atom("world", "public", "Kernel"),
+            _atom("world", "partner", "Kernel"),
         ]
         self.assertEqual(
             [*v.detect_area_violations(atoms)],
@@ -113,7 +98,7 @@ class SdkCommonTests(unittest.TestCase):
         v = Validator(valid_areas=["Kernel", "Unknown"])
         atoms = [
             _atom("hello", "internal"),
-            _atom("world", "public", "Kernel"),
+            _atom("world", "partner", "Kernel"),
         ]
         self.assertEqual(
             [*v.detect_area_violations(atoms)],
@@ -124,7 +109,7 @@ class SdkCommonTests(unittest.TestCase):
 
         atoms = [
             _atom("hello", "internal"),
-            _atom("world", "public"),
+            _atom("world", "partner"),
         ]
         self.assertEqual(
             [*v.detect_area_violations(atoms)],

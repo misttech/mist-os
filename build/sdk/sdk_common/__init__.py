@@ -99,7 +99,6 @@ CATEGORIES = [
     "cts",
     "partner_internal",
     "partner",
-    "public",
 ]
 
 
@@ -117,8 +116,7 @@ def detect_category_violations(
     for atom in atoms:
         # "cts" is not properly implemented and should not be used. See
         # https://fxbug.dev/367760026.
-        # The public IDK does not yet exist, so "public" should not be used.
-        if atom.category == "cts" or atom.category == "public":
+        if atom.category == "cts":
             raise Exception(
                 '"%s" has SDK category "%s", which is not yet supported.'
                 % (atom, atom.category)

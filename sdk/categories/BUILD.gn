@@ -48,11 +48,6 @@ idk_category_marker_template("partner") {
   visibility = [ "*" ]
 }
 
-idk_category_marker_template("public") {
-  # The public IDK does not yet exist, so "public" should not be used.
-  visibility = []
-}
-
 if (is_host || is_fidl_toolchain) {
   # Currently, depending on these markers just has the effect of not depending
   # on one of the SDK category markers above. Nothing asserts on them.

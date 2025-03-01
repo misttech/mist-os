@@ -78,7 +78,6 @@ template("sdk_static_library") {
     # "cts" is only for ABI compatibility and thus not applicable.
     # "partner_internal" is only for ABI compatibility and thus not applicable.
     "partner",
-    # "public" is not yet implemented.
   ]
 
   # TODO(https://fxbug.dev/333907192): Remove "internal" support once the

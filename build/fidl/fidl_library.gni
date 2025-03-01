@@ -148,12 +148,6 @@ template("fidl_library") {
       } else {
         category_allowlist_deps = [ "//sdk/fidl:sdk_fidl_partner_allowlist" ]
       }
-    } else if (category == "public") {
-      # The public IDK does not yet exist. A similar allowlist will need to be
-      # added when implementing it.
-      # When implementing this category, add it to the error message in the
-      # `else` case below and see the comment at the top of this `if` block.
-      assert(false, "SDK category '$category' is not currently supported.")
     } else {
       assert(
           false,
@@ -166,11 +160,9 @@ template("fidl_library") {
   }
 
   # All publishable libraries must have compatibility tests.
-  # All such libraries are publishable except for those in "cts" and
-  # "partner_internal".
+  # Only "partner" libraries are publishable.
   is_sdk_included_publishable =
-      requires_compatibility_tests && invoker.sdk_category != "cts" &&
-      invoker.sdk_category != "partner_internal"
+      requires_compatibility_tests && invoker.sdk_category == "partner"
 
   if (is_unversioned_vendor_sdk) {
     # Override the values set above to account for this special case as
