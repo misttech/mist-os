@@ -14,10 +14,6 @@ _types_supporting_unstable_atoms = [
   "fidl_library",
   "cc_source_library",
 ]
-_categories_supporting_unstable_atoms = [
-  "internal",  # TODO(https://fxbug.dev/372986936): Remove when no more uses.
-  "partner",
-]
 _types_not_requiring_compatibility = [
   "bind_library",
   "companion_host_tool",
@@ -237,13 +233,14 @@ template("sdk_atom") {
       # For types that specify stable, ensure the `api` file was specified for stable atoms.
       assert(defined(invoker.api))
     } else {
-      is_category_supporting_unstable =
-          _categories_supporting_unstable_atoms + [ category ] - [ category ] !=
-          _categories_supporting_unstable_atoms
-
+      # Categories other than "partner" exist only to ensure stability and thus
+      # should not have unstable atoms. If you have a use case for unstable
+      # atoms in another category, contact the Platform Versioning team.
       assert(
-          is_category_supporting_unstable,
-          "`meta.stable` must be true unless the SDK category ('${category}') is one of ${_categories_supporting_unstable_atoms}.")
+          category == "partner" ||
+              # TODO(https://fxbug.dev/372986936): Remove when no more uses.
+              category == "internal",
+          "`meta.stable` must be true unless the SDK category ('${category}') is 'partner'.")
       add_stable_property = false
     }
   } else {

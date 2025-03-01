@@ -142,12 +142,11 @@ import("//build/testing/host_test_data.gni")
 #     Set to true to enable Zither bindings for this library.
 #     See //zircon/tools/zither/README.md for details.
 #
-#   stable (optional flag)
-#     Whether this library is stabilized.
-#     When true, `versioned` defaults to "fuchsia" and an .api file is
-#     generated. When false, the atom is marked as unstable in the final IDK.
-#     Must be specified when `sdk_category` is defined and not "internal";
-#     otherwise, must not be specified.
+#   stable (optional flag) Whether this library is stabilized. When true,
+#     `versioned` defaults to "fuchsia" for "fuchsia.*" library names and an
+#     .api file is generated. When false, the atom is marked as unstable in the
+#     final IDK. Must be specified if and only if `sdk_category` is specified.
+#     May only be false when `sdk_category` is "partner".
 #
 #   applicable_licenses
 #   public_deps
@@ -164,6 +163,14 @@ template("fidl") {
   assert(!defined(invoker.deps),
          "All FIDL dependencies are inherently " +
              "public, use 'public_deps' instead of 'deps'.")
+  assert(defined(invoker.sdk_category) == defined(invoker.stable),
+         "`stable` must be specified when specifying `sdk_category`.")
+  assert(!defined(invoker.sdk_category) || invoker.stable == true ||
+             invoker.sdk_category == "partner" ||
+             # TODO(https://fxbug.dev/333907192): Remove the "internal_only_idk"
+             # exception when fuchsia.boot is promoted.
+             target_name == "fuchsia.boot",
+         "`stable` must be true unless the category is 'partner'.")
 
   # Define values that will be used to generate other variables here so that
   # such use does not count as having used the member of `common_parameters.

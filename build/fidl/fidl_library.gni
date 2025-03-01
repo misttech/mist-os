@@ -175,8 +175,7 @@ template("fidl_library") {
       "Libraries with an SDK category must be in an allowlist to ensure they are compatibility tested and included in the IDK as appropriate.")
 
   assert(
-      requires_compatibility_tests == defined(invoker.stable) ||
-          is_unversioned_vendor_sdk,
+      defined(invoker.sdk_category) == defined(invoker.stable),
       "`stable` must be specified if and only if `sdk_category` is specified.")
 
   assert(
@@ -193,8 +192,8 @@ template("fidl_library") {
   assert(!is_stable || requires_compatibility_tests)
 
   assert(
-      is_stable || !defined(invoker.sdk_category) || is_in_internal_only_idk ||
-          invoker.sdk_category == "partner",
+      is_stable || !defined(invoker.sdk_category) ||
+          invoker.sdk_category == "partner" || is_in_internal_only_idk,
       "Libraries in category '${sdk_category_string_for_assert}' must specify `stable=true`.")
 
   # Make sure  the same variables are forwarded to both fidl_ir() instances.
