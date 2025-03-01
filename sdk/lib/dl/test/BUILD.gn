@@ -51,6 +51,7 @@ test("dl-unittests") {
     ]
     deps += [
       ":dl-unittest.deps",
+      ":tlsdesc-runtime-dynamic-tests",
       "..:runtime",
       "//sdk/lib/fit",
       "//sdk/lib/ld/testing",
@@ -70,6 +71,24 @@ test("dl-unittests") {
     }
     data_deps = [ ":test-data" ]
   }
+}
+
+source_set("tlsdesc-runtime-dynamic-tests") {
+  visibility = [ ":*" ]
+  testonly = true
+
+  sources = [
+    "call-tlsdesc.S",
+    "call-tlsdesc.h",
+    "tlsdesc-runtime-dynamic-tests.cc",
+  ]
+  deps = [
+    "..:tlsdesc-runtime-dynamic",
+    "//sdk/lib/ld:headers",
+    "//third_party/googletest:gmock",
+    "//third_party/googletest:gtest",
+    "//zircon/kernel/lib/arch",
+  ]
 }
 
 # These are the shared_library() targets to be included as startup modules for

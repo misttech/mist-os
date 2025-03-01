@@ -57,6 +57,12 @@ source_set("concat-view") {
   public = [ "concat-view.h" ]
 }
 
+source_set("tlsdesc-runtime-dynamic") {
+  public = [ "tlsdesc-runtime-dynamic.h" ]
+  public_deps = [ "//sdk/lib/ld:headers" ]
+  sources = [ "tlsdesc-runtime-dynamic.S" ]
+}
+
 group("tests") {
   testonly = true
   deps = [ "test:tests" ]

@@ -118,11 +118,15 @@
 # ifdef _LP64
 tlsdesc_r0 .req x0
 tlsdesc_r1 .req x1
+tlsdesc_r2 .req x2
 tlsdesc.value_offset = 8
+#define tlsdesc_uxtw(reg, shift) reg, lsl shift  // For second register in ldr.
 # else
 tlsdesc_r0 .req w0
 tlsdesc_r1 .req w1
+tlsdesc_r2 .req w2
 tlsdesc.value_offset = 4
+#define tlsdesc_uxtw(reg, shift) reg, uxtw shift
 # endif
 
 #elif defined(__arm__)
@@ -150,6 +154,9 @@ tlsdesc.value_offset = 4
 .macro tlsdesc.load reg, mem
   ld \reg, \mem
 .endm
+.macro tlsdesc.add rd, r1, r2
+  add \rd, \r1, \r2
+.endm
 .macro tlsdesc.sub rd, r1, r2
   sub \rd, \r1, \r2
 .endm
@@ -157,6 +164,9 @@ tlsdesc.value_offset = 8
 # else
 .macro tlsdesc.load reg, mem
   lw \reg, \mem
+.endm
+.macro tlsdesc.add rd, r1, r2
+  addw \rd, \r1, \r2
 .endm
 .macro tlsdesc.sub rd, r1, r2
   subw \rd, \r1, \r2
@@ -175,11 +185,14 @@ tlsdesc.value_offset = 4
 
 # ifdef _LP64
 #define tlsdesc_ax rax
-tlsdesc.value_offset = 4
+#define tlsdesc_cx rcx
+#define tlsdesc_dx rdx
 # else
 #define tlsdesc_ax eax
-tlsdesc.value_offset = 8
+#define tlsdesc_cx ecx
+#define tlsdesc_dx edx
 # endif
+tlsdesc.value_offset = 8  // x86-64 GOT slots are 64 bits even in ILP32.
 
 #else
 
@@ -207,6 +220,7 @@ namespace [[gnu::visibility("hidden")]] ld {
 // called from C++.  These symbol names are not visible anywhere outside
 // the dynamic linking implementation itself and these functions are only
 // ever called by compiler-generated TLSDESC references.
+using TlsdescCallback = ptrdiff_t(const elfldltl::Elf<>::TlsDescGot<>& got);
 
 extern "C" {
 
@@ -216,14 +230,14 @@ extern "C" {
 // The implementation returns the addend minus the thread pointer, such that
 // adding the thread pointer back to this offset produces zero with a zero
 // addend, and thus nullptr.
-ptrdiff_t _ld_tlsdesc_runtime_undefined_weak(const elfldltl::Elf<>::TlsDescGot<>& got);
-ptrdiff_t _ld_tlsdesc_runtime_undefined_weak_addend(const elfldltl::Elf<>::TlsDescGot<>& got);
+extern TlsdescCallback _ld_tlsdesc_runtime_undefined_weak;
+extern TlsdescCallback _ld_tlsdesc_runtime_undefined_weak_addend;
 
 // In this minimal implementation used for PT_TLS segments in the static TLS
 // set, desc.valueu is always simply a fixed offset from the thread pointer.
 // Note this offset might be negative, but it's always handled as uintptr_t to
 // ensure well-defined overflow arithmetic.
-ptrdiff_t _ld_tlsdesc_runtime_static(const elfldltl::Elf<>::TlsDescGot<>& got);
+extern TlsdescCallback _ld_tlsdesc_runtime_static;
 
 }  // extern "C"
 

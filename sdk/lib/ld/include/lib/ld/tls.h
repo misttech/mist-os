@@ -91,7 +91,7 @@ inline T* TpRelative(ptrdiff_t offset = 0, void* tp = __builtin_thread_pointer()
 template <typename T>
 inline ptrdiff_t TpRelativeToOffset(T* ptr) {
   std::byte* tp = TpRelative<std::byte>();
-  return reinterpret_cast<std::byte*>(ptr) - tp;
+  return reinterpret_cast<const std::byte*>(ptr) - tp;
 }
 
 // Interrogate the passive ABI (e.g. ld::abi::_ld_abi) for the thread-pointer

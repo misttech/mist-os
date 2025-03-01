@@ -15,6 +15,9 @@
 // If the compiler uses -mthumb, then tell the assembler to use Thumb too.
 #ifdef __thumb__
 .thumb
+pcrel.bias = 4
+#else
+pcrel.bias = 8
 #endif
 
 .macro assert.fail
