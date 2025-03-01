@@ -5,7 +5,7 @@
 #include <fcntl.h>
 #include <fidl/fuchsia.examples/cpp/wire.h>
 #include <lib/async-testing/test_loop.h>
-#include <lib/component/incoming/cpp/service_watcher.h>
+#include <lib/component/incoming/cpp/directory_watcher.h>
 #include <lib/fdio/namespace.h>
 #include <stdlib.h>
 #include <zircon/types.h>

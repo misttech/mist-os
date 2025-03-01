@@ -10,9 +10,9 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/incoming/cpp/constants.h>
 #include <lib/component/incoming/cpp/directory.h>
+#include <lib/component/incoming/cpp/directory_watcher.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/incoming/cpp/service.h>
-#include <lib/component/incoming/cpp/service_watcher.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/result.h>

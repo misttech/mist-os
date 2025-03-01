@@ -7,7 +7,7 @@
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "bin/service_watcher_unittests",
+        binary: "bin/directory_watcher_unittests",
     },
     use: [
         { service: "fidl.service.test.EchoService" },

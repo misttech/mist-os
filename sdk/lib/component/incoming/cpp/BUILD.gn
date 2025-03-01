@@ -14,14 +14,14 @@ sdk_source_set("cpp") {
     "clone.h",
     "constants.h",
     "directory.h",
+    "directory_watcher.cc",
+    "directory_watcher.h",
     "internal.cc",
     "internal.h",
     "protocol.cc",
     "protocol.h",
     "service.h",
     "service_member_watcher.h",
-    "service_watcher.cc",
-    "service_watcher.h",
   ]
 
   public_deps = [

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_COMPONENT_INCOMING_CPP_SERVICE_WATCHER_H_
-#define LIB_COMPONENT_INCOMING_CPP_SERVICE_WATCHER_H_
+#ifndef LIB_COMPONENT_INCOMING_CPP_DIRECTORY_WATCHER_H_
+#define LIB_COMPONENT_INCOMING_CPP_DIRECTORY_WATCHER_H_
 
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async/cpp/wait.h>
@@ -57,4 +57,4 @@ class ServiceWatcher final {
 
 }  // namespace component
 
-#endif  // LIB_COMPONENT_INCOMING_CPP_SERVICE_WATCHER_H_
+#endif  // LIB_COMPONENT_INCOMING_CPP_DIRECTORY_WATCHER_H_
