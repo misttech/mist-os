@@ -125,6 +125,23 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
             builder.kernel_arg(KernelArg::Arm64DebugDap(soc.clone()));
         }
 
+        if config.tools.audio.driver_tools {
+            context.ensure_build_type_and_feature_set_level(
+                &[BuildType::Eng],
+                &[FeatureSupportLevel::Standard],
+                "Audio driver development tools",
+            )?;
+            builder.platform_bundle("audio_driver_development_tools");
+        }
+        if config.tools.audio.full_stack_tools {
+            context.ensure_build_type_and_feature_set_level(
+                &[BuildType::Eng],
+                &[FeatureSupportLevel::Standard],
+                "Audio full-stack development tools",
+            )?;
+            builder.platform_bundle("audio_full_stack_development_tools");
+        }
+
         if config.tools.connectivity.enable_networking {
             context.ensure_build_type_and_feature_set_level(
                 &[BuildType::Eng, BuildType::UserDebug],

@@ -382,7 +382,7 @@ eng_only_platform_aib_names =
       "core_realm_development_access_eng",
 
       # This isn't in all eng builds, but is in some,
-      #and not in any non-eng builds.
+      # and not in any non-eng builds.
       "component_manager_with_tracing",
 
       # The minimal additions for eng build-type assemblies
@@ -416,7 +416,11 @@ eng_only_platform_aib_names =
 
       # Audio development/debugging
       "audio_development_support",
+      "audio_driver_development_tools",
+      "audio_full_stack_development_tools",
       "intel_hda",
+
+      # Video development/debugging
       "video_development_support",
 
       # Fake power sensor

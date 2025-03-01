@@ -24,6 +24,10 @@ _platform_configuration_base = {
     include_sl4f = true
 
     tools = {
+      audio = {
+        driver_tools = true
+        full_stack_tools = true
+      }
       connectivity = {
         enable_networking = true
         enable_wlan = true

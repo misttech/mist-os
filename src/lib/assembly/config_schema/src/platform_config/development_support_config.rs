@@ -60,11 +60,31 @@ pub struct DevelopmentSupportConfig {
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct ToolsConfig {
+    /// Tools for audio.
+    pub audio: AudioToolsConfig,
+
     /// Tools for connectivity.
     pub connectivity: ConnectivityToolsConfig,
 
     /// Tools for storage.
     pub storage: StorageToolsConfig,
+}
+
+/// Platform-provided tools for development and debugging of audio.
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(default, deny_unknown_fields)]
+pub struct AudioToolsConfig {
+    /// Include tools for audio driver development, such as:
+    ///   - 'audio-codec-ctl'
+    ///   - 'audio-driver-ctl'
+    ///   - 'virtual_audio_util'
+    pub driver_tools: bool,
+
+    /// Include tools for debugging the audio_core service, such as:
+    ///   - 'audio_listener'
+    ///   - 'signal_generator'
+    ///   - 'wav_recorder'
+    pub full_stack_tools: bool,
 }
 
 /// Platform-provided tools for development and debugging connectivity.

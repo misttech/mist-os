@@ -3779,96 +3779,11 @@ assembly_input_bundle("location_emergency") {
   ]
 }
 
-# Support for interactive debugging/development of platform audio
+# Intel High-Definition Audio class driver
 #
-# feature_set_levels: minimal
+# feature_set_levels: standard
 # build-types: eng
 #
-assembly_input_bundle("audio_development_support") {
-  base_driver_packages = [
-    {
-      package_target = "//src/media/audio/drivers/virtual-audio-legacy"
-      driver_components = [ "meta/virtual-audio-legacy-driver.cm" ]
-    },
-  ]
-
-  cache_packages = [
-    "//src/media/audio/services/ffxdaemon:audio_ffx_daemon",
-    "//src/media/audio/tools/audio-capture-timestamp-validator",
-    "//src/media/audio/tools/audio-codec-ctl",
-    "//src/media/audio/tools/audio-driver-ctl",
-    "//src/media/audio/tools/audio-effects-ctl",
-    "//src/media/audio/tools/audio_listener",
-    "//src/media/audio/tools/dsputil",
-    "//src/media/audio/tools/signal_generator",
-    "//src/media/audio/tools/virtual_audio_util",
-    "//src/media/audio/tools/vol",
-    "//src/media/audio/tools/wav_player",
-    "//src/media/audio/tools/wav_recorder",
-  ]
-
-  compiled_packages = [
-    {
-      name = "core"
-      components = [
-        {
-          component_name = "core"
-          shards = [ "//src/media/audio/services/ffxdaemon/meta/audio_ffx_daemon.core_shard.cml" ]
-        },
-      ]
-    },
-  ]
-
-  # From //src/media/audio/tools.
-  # audio-driver-ctl is included in bootfs, not here.
-  shell_commands = [
-    {
-      package = "audio-capture-timestamp-validator"
-      components = [ "audio-capture-timestamp-validator" ]
-    },
-    {
-      package = "audio-codec-ctl"
-      components = [ "audio-codec-ctl" ]
-    },
-    {
-      package = "audio-driver-ctl"
-      components = [ "audio-driver-ctl" ]
-    },
-    {
-      package = "audio-effects-ctl"
-      components = [ "audio-effects-ctl" ]
-    },
-    {
-      package = "audio_listener"
-      components = [ "audio_listener" ]
-    },
-    {
-      package = "dsputil"
-      components = [ "dsputil" ]
-    },
-    {
-      package = "signal_generator"
-      components = [ "signal_generator" ]
-    },
-    {
-      package = "virtual_audio_util"
-      components = [ "virtual_audio" ]
-    },
-    {
-      package = "vol"
-      components = [ "vol" ]
-    },
-    {
-      package = "wav_player"
-      components = [ "wav_player" ]
-    },
-    {
-      package = "wav_recorder"
-      components = [ "wav_recorder" ]
-    },
-  ]
-}
-
 assembly_input_bundle("intel_hda") {
   boot_driver_packages = [
     {
@@ -3896,20 +3811,140 @@ assembly_input_bundle("intel_hda") {
   bootfs_files_labels = [ "//src/media/audio/bin/ihda:bootfs" ]
 }
 
-assembly_input_bundle("video_development_support") {
-  testonly = true
-  cache_packages = [ "//src/media/codec/examples:encode-file" ]
+# Support for interactive debugging/development of platform audio
+#
+# feature_set_levels: standard
+# build-types: eng
+#
+assembly_input_bundle("audio_development_support") {
+  base_driver_packages = [
+    {
+      package_target = "//src/media/audio/drivers/virtual-audio-legacy"
+      driver_components = [ "meta/virtual-audio-legacy-driver.cm" ]
+    },
+  ]
+
+  cache_packages = [ "//src/media/audio/services/ffxdaemon:audio_ffx_daemon" ]
+
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/media/audio/services/ffxdaemon/meta/audio_ffx_daemon.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
+# Tools for interactive debugging/development of audio drivers
+#
+# feature_set_levels: standard (requires AIB "audio_development_support")
+# build-types: eng
+#
+assembly_input_bundle("audio_driver_development_tools") {
+  cache_packages = [
+    "//src/media/audio/tools/audio-codec-ctl",
+    "//src/media/audio/tools/audio-driver-ctl",
+    "//src/media/audio/tools/dsputil",
+    "//src/media/audio/tools/virtual_audio_util",
+  ]
+
+  # From //src/media/audio/tools.
   shell_commands = [
     {
-      package = "encode-file"
-      components = [ "encode-file" ]
+      package = "audio-codec-ctl"
+      components = [ "audio-codec-ctl" ]
+    },
+    {
+      package = "audio-driver-ctl"
+      components = [ "audio-driver-ctl" ]
+    },
+    {
+      package = "dsputil"
+      components = [ "dsputil" ]
+    },
+    {
+      package = "virtual_audio_util"
+      components = [ "virtual_audio" ]
+    },
+  ]
+}
+
+# Tools for interactive debugging/development of platform full-stack audio
+#
+# feature_set_levels: standard (requires AIB "audio_core")
+# build-types: eng
+#
+assembly_input_bundle("audio_full_stack_development_tools") {
+  cache_packages = [
+    "//src/media/audio/tools/audio-capture-timestamp-validator",
+    "//src/media/audio/tools/audio-effects-ctl",
+    "//src/media/audio/tools/audio_listener",
+    "//src/media/audio/tools/signal_generator",
+    "//src/media/audio/tools/vol",
+    "//src/media/audio/tools/wav_player",
+    "//src/media/audio/tools/wav_recorder",
+  ]
+
+  # From //src/media/audio/tools.
+  shell_commands = [
+    {
+      package = "audio-capture-timestamp-validator"
+      components = [ "audio-capture-timestamp-validator" ]
+    },
+    {
+      package = "audio-effects-ctl"
+      components = [ "audio-effects-ctl" ]
+    },
+    {
+      package = "audio_listener"
+      components = [ "audio_listener" ]
+    },
+    {
+      package = "signal_generator"
+      components = [ "signal_generator" ]
+    },
+    {
+      package = "vol"
+      components = [ "vol" ]
+    },
+    {
+      package = "wav_player"
+      components = [ "wav_player" ]
+    },
+    {
+      package = "wav_recorder"
+      components = [ "wav_recorder" ]
+    },
+  ]
+}
+
+# Component that manages platform audio devices
+#
+# feature_set_levels: standard
+# build-types: all
+#
+assembly_input_bundle("audio_device_registry") {
+  flexible_packages = [ "//src/media/audio/services/device_registry" ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/media/audio/services/device_registry/meta/audio_device_registry.core_shard.cml" ]
+        },
+      ]
     },
   ]
 }
 
 # Component that routes audio on Smart Displays
 #
-# feature_set_levels: minimal
+# feature_set_levels: standard
 # build-types: all
 #
 assembly_input_bundle("audio_core") {
@@ -3945,29 +3980,9 @@ assembly_input_bundle("audio_core_use_adc_device") {
   ]
 }
 
-# Component that manages platform audio devices
-#
-# feature_set_levels: minimal
-# build-types: all
-#
-assembly_input_bundle("audio_device_registry") {
-  flexible_packages = [ "//src/media/audio/services/device_registry" ]
-  compiled_packages = [
-    {
-      name = "core"
-      components = [
-        {
-          component_name = "core"
-          shards = [ "//src/media/audio/services/device_registry/meta/audio_device_registry.core_shard.cml" ]
-        },
-      ]
-    },
-  ]
-}
-
 # Component that plays audio files using audio_core protocols.
 #
-# feature_set_levels: minimal
+# feature_set_levels: standard (requires AIB "audio_core")
 # build-types: all
 #
 assembly_input_bundle("soundplayer") {
@@ -4006,6 +4021,17 @@ assembly_input_bundle("media_codecs") {
               [ "//src/media/codec/factory/meta/codec_factory.core_shard.cml" ]
         },
       ]
+    },
+  ]
+}
+
+assembly_input_bundle("video_development_support") {
+  testonly = true
+  cache_packages = [ "//src/media/codec/examples:encode-file" ]
+  shell_commands = [
+    {
+      package = "encode-file"
+      components = [ "encode-file" ]
     },
   ]
 }
