@@ -332,6 +332,8 @@ group("sdk_partner_internal_libs_allowlist") {
 _compat_test_fidl_libraries_targets_list = [
   # keep-sorted: begin
   "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness",
+  "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus",
+
   # keep-sorted: end
 ]
 

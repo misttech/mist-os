@@ -223,7 +223,6 @@ template("fidl_library") {
     # TODO(https://fxbug.dev/365602422): For each of these UI-related libraries,
     # either remove the dependency from the CTF tests or make the library stable
     # then remove the library from the list below.
-    "fuchsia.ui.focus",
     "fuchsia.ui.observation.scope",
     "fuchsia.ui.observation.test",
     "fuchsia.ui.pointer.augment",
