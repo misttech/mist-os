@@ -130,6 +130,9 @@ struct vm_page {
   // logically private, use loaned getters and setters below.
   static constexpr uint8_t kLoanedStateIsLoaned = 1;
   static constexpr uint8_t kLoanedStateIsLoanCancelled = 2;
+  // The loaned state is packed into a single byte here to reduce memory usage, but due to the
+  // allowable access patterns this means the getters and setters must perform atomic loads and
+  // stores to prevent UB.
   uint8_t loaned_state_priv;
 
   // helper routines
@@ -151,6 +154,8 @@ struct vm_page {
   // which causes the data in the loaned page to be moved into a different physical page (which
   // itself can be non-loaned or loaned).  A loaned page cannot be used to allocate a new contiguous
   // VMO.
+  // Maybe queried by anyone who either owns the page, or has sufficient knowledge that the loaned
+  // state cannot be being altered in parallel.
   bool is_loaned() const {
     // TODO(https://fxbug.dev/355287217): Remove const_cast when libcxx `atomic_ref<T>` is fixed.
     return !!(ktl::atomic_ref<uint8_t>(*const_cast<uint8_t*>(&loaned_state_priv))
@@ -161,28 +166,32 @@ struct vm_page {
   // the page is no longer loaned, either via commit of the page back into the contiguous VMO that
   // loaned the page, or via deletion of the contiguous VMO that loaned the page.  Such pages are
   // not in the free_loaned_list_ in pmm, which is how re-use is prevented.
+  // Should only be called by the PmmNode under its lock.
   bool is_loan_cancelled() const {
-    return !!(ktl::atomic_ref<uint8_t>(*const_cast<uint8_t*>(&loaned_state_priv)) &
+    return !!(ktl::atomic_ref<uint8_t>(*const_cast<uint8_t*>(&loaned_state_priv))
+                  .load(ktl::memory_order_relaxed) &
               kLoanedStateIsLoanCancelled);
   }
   // Manipulation of 'loaned' should only be done by the PmmNode under the loaned pages lock whilst
   // it is the owner of the page.
   void set_is_loaned() {
-    ktl::atomic_ref<uint8_t>(loaned_state_priv).fetch_or(kLoanedStateIsLoaned);
+    ktl::atomic_ref<uint8_t>(loaned_state_priv)
+        .fetch_or(kLoanedStateIsLoaned, ktl::memory_order_relaxed);
   }
   void clear_is_loaned() {
     ktl::atomic_ref<uint8_t>(loaned_state_priv)
-        .fetch_and(static_cast<uint8_t>(~kLoanedStateIsLoaned));
+        .fetch_and(~kLoanedStateIsLoaned, ktl::memory_order_relaxed);
   }
 
   // Manipulation of 'loan_cancelled' should only be done by the PmmNode under its lock, but may be
   // done when the PmmNode is not the owner of the page.
   void set_is_loan_cancelled() {
-    ktl::atomic_ref<uint8_t>(loaned_state_priv).fetch_or(kLoanedStateIsLoanCancelled);
+    ktl::atomic_ref<uint8_t>(loaned_state_priv)
+        .fetch_or(kLoanedStateIsLoanCancelled, ktl::memory_order_relaxed);
   }
   void clear_is_loan_cancelled() {
     ktl::atomic_ref<uint8_t>(loaned_state_priv)
-        .fetch_and(static_cast<uint8_t>(~kLoanedStateIsLoanCancelled));
+        .fetch_and(~kLoanedStateIsLoanCancelled, ktl::memory_order_relaxed);
   }
 
   void dump() const;
