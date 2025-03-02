@@ -142,27 +142,6 @@ zx_status_t pmm_alloc_contiguous(size_t count, uint alloc_flags, uint8_t alignme
 
 void pmm_unwire_page(vm_page_t* page) { Pmm::Node().UnwirePage(page); }
 
-void pmm_begin_loan(list_node* page_list) {
-  VM_KTRACE_DURATION(3, "pmm_begin_loan");
-  Pmm::Node().BeginLoan(page_list);
-}
-
-void pmm_cancel_loan(paddr_t address, size_t count) {
-  VM_KTRACE_DURATION(3, "pmm_cancel_loan", ("address", ktrace::Pointer{address}), ("count", count));
-  Pmm::Node().CancelLoan(address, count);
-}
-
-void pmm_end_loan(paddr_t address, size_t count, list_node* page_list) {
-  VM_KTRACE_DURATION(3, "pmm_end_loan", ("address", ktrace::Pointer{address}), ("count", count));
-  Pmm::Node().EndLoan(address, count, page_list);
-}
-
-void pmm_delete_lender(paddr_t address, size_t count) {
-  VM_KTRACE_DURATION(3, "pmm_delete_lender", ("address", ktrace::Pointer{address}),
-                     ("count", count));
-  Pmm::Node().DeleteLender(address, count);
-}
-
 void pmm_free(list_node* list) {
   VM_KTRACE_DURATION(3, "pmm_free");
   Pmm::Node().FreeList(list);

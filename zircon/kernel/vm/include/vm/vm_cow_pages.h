@@ -196,6 +196,58 @@ class VmCowPages final : public VmHierarchyBase,
     return result;
   }
 
+  // can_borrow_locked() returns true if the VmCowPages is capable of borrowing pages, but whether
+  // the VmCowPages should actually borrow pages also depends on a borrowing-site-specific flag that
+  // the caller is responsible for checking (in addition to checking can_borrow_locked()).  Only if
+  // both are true should the caller actually borrow at the caller's specific potential borrowing
+  // site.  For example, see is_borrowing_in_supplypages_enabled() and
+  // is_borrowing_on_mru_enabled().
+  bool can_borrow_locked() const TA_REQ(lock()) {
+    // TODO(dustingreen): Or rashaeqbal@.  We can only borrow while the page is not dirty.
+    // Currently we enforce this by checking ShouldTrapDirtyTransitions() below and leaning on the
+    // fact that !ShouldTrapDirtyTransitions() dirtying isn't implemented yet.  We currently evict
+    // to reclaim instead of replacing the page, and we can't evict a dirty page since the contents
+    // would be lost.  Option 1: When a loaned page is about to become dirty, we could replace it
+    // with a non-loaned page.  Option 2: When reclaiming a loaned page we could replace instead of
+    // evicting (this may be simpler).
+
+    // Currently there needs to be a page source for any borrowing to be possible, due to
+    // requirements of a backlink and other assumptions in the VMO code. Returning early here in the
+    // absence of a page source simplifies the rest of the logic.
+    if (!page_source_) {
+      return false;
+    }
+
+    bool source_is_suitable = page_source_->properties().is_preserving_page_content;
+
+    // This ensures that if borrowing is globally disabled (no borrowing sites enabled), that we'll
+    // return false.  We could delete this bool without damaging correctness, but we want to
+    // mitigate a call site that maybe fails to check its call-site-specific settings such as
+    // is_borrowing_in_supplypages_enabled().
+    //
+    // We also don't technically need to check is_any_borrowing_enabled() here since pmm will check
+    // also, but by checking here, we minimize the amount of code that will run when
+    // !is_any_borrowing_enabled() (in case we have it disabled due to late discovery of a problem
+    // with borrowing).
+    bool borrowing_is_generally_acceptable =
+        pmm_physical_page_borrowing_config()->is_any_borrowing_enabled();
+    // Exclude is_latency_sensitive_ to avoid adding latency due to reclaim.
+    //
+    // Currently we evict instead of replacing a page when reclaiming, so we want to avoid evicting
+    // pages that are latency sensitive or are fairly likely to be pinned at some point.
+    //
+    // We also don't want to borrow a page that might get pinned again since we want to mitigate the
+    // possibility of an invalid DMA-after-free.
+    bool excluded_from_borrowing_for_latency_reasons = high_priority_count_ != 0 || ever_pinned_;
+    // Avoid borrowing and trapping dirty transitions overlapping for now; nothing really stops
+    // these from being compatible AFAICT - we're just avoiding overlap of these two things until
+    // later.
+    bool overlapping_with_other_features = page_source_->ShouldTrapDirtyTransitions();
+
+    return source_is_suitable && borrowing_is_generally_acceptable &&
+           !excluded_from_borrowing_for_latency_reasons && !overlapping_with_other_features;
+  }
+
   // Returns whether this cow pages node is dirty tracked.
   bool is_dirty_tracked() const {
     canary_.Assert();
@@ -775,58 +827,6 @@ class VmCowPages final : public VmHierarchyBase,
   bool is_hidden() const { return !!(options_ & VmCowPagesOptions::kHidden); }
   bool can_decommit_zero_pages() const {
     return !(options_ & VmCowPagesOptions::kCannotDecommitZeroPages);
-  }
-
-  // can_borrow_locked() returns true if the VmCowPages is capable of borrowing pages, but whether
-  // the VmCowPages should actually borrow pages also depends on a borrowing-site-specific flag that
-  // the caller is responsible for checking (in addition to checking can_borrow_locked()).  Only if
-  // both are true should the caller actually borrow at the caller's specific potential borrowing
-  // site.  For example, see is_borrowing_in_supplypages_enabled() and
-  // is_borrowing_on_mru_enabled().
-  bool can_borrow_locked() const TA_REQ(lock()) {
-    // TODO(dustingreen): Or rashaeqbal@.  We can only borrow while the page is not dirty.
-    // Currently we enforce this by checking ShouldTrapDirtyTransitions() below and leaning on the
-    // fact that !ShouldTrapDirtyTransitions() dirtying isn't implemented yet.  We currently evict
-    // to reclaim instead of replacing the page, and we can't evict a dirty page since the contents
-    // would be lost.  Option 1: When a loaned page is about to become dirty, we could replace it
-    // with a non-loaned page.  Option 2: When reclaiming a loaned page we could replace instead of
-    // evicting (this may be simpler).
-
-    // Currently there needs to be a page source for any borrowing to be possible, due to
-    // requirements of a backlink and other assumptions in the VMO code. Returning early here in the
-    // absence of a page source simplifies the rest of the logic.
-    if (!page_source_) {
-      return false;
-    }
-
-    bool source_is_suitable = page_source_->properties().is_preserving_page_content;
-
-    // This ensures that if borrowing is globally disabled (no borrowing sites enabled), that we'll
-    // return false.  We could delete this bool without damaging correctness, but we want to
-    // mitigate a call site that maybe fails to check its call-site-specific settings such as
-    // is_borrowing_in_supplypages_enabled().
-    //
-    // We also don't technically need to check is_any_borrowing_enabled() here since pmm will check
-    // also, but by checking here, we minimize the amount of code that will run when
-    // !is_any_borrowing_enabled() (in case we have it disabled due to late discovery of a problem
-    // with borrowing).
-    bool borrowing_is_generally_acceptable =
-        pmm_physical_page_borrowing_config()->is_any_borrowing_enabled();
-    // Exclude is_latency_sensitive_ to avoid adding latency due to reclaim.
-    //
-    // Currently we evict instead of replacing a page when reclaiming, so we want to avoid evicting
-    // pages that are latency sensitive or are fairly likely to be pinned at some point.
-    //
-    // We also don't want to borrow a page that might get pinned again since we want to mitigate the
-    // possibility of an invalid DMA-after-free.
-    bool excluded_from_borrowing_for_latency_reasons = high_priority_count_ != 0 || ever_pinned_;
-    // Avoid borrowing and trapping dirty transitions overlapping for now; nothing really stops
-    // these from being compatible AFAICT - we're just avoiding overlap of these two things until
-    // later.
-    bool overlapping_with_other_features = page_source_->ShouldTrapDirtyTransitions();
-
-    return source_is_suitable && borrowing_is_generally_acceptable &&
-           !excluded_from_borrowing_for_latency_reasons && !overlapping_with_other_features;
   }
 
   bool direct_source_supplies_zero_pages() const {

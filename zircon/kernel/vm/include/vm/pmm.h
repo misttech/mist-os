@@ -82,33 +82,6 @@ zx_status_t pmm_alloc_contiguous(size_t count, uint alloc_flags, uint8_t align_l
 // Unwires a page and sets it in the ALLOC state.
 void pmm_unwire_page(vm_page_t* page);
 
-// Mark contiguous pages as "loaned", and free the pages so they can be borrowed by page
-// allocations that specify PMM_ALLOC_FLAG_CAN_BORROW.  The caller must eventually call
-// pmm_cancel_loan() + pmm_end_loan(), or pmm_delete_lender(), on ranges that cover exactly all
-// the loaned pages.
-void pmm_begin_loan(list_node* page_list);
-
-// All pages in the range must be currently loaned.  This call must be made before pmm_end_loan().
-// This call has no restrictions on whether the pages are presently in use or presently FREE.
-//
-// This call prevents the pages from being re-used for any new purpose until pmm_end_loan().  For
-// presently-FREE pages, this removes the pages from free_loaned_list_.  For presently-used pages,
-// this specifies that the page will not be added to free_loaned_list_ when later freed.  Once these
-// pages are all FREE (to be ensured by the caller via PhysicalPageProvider reclaim of the pages),
-// the loan can be ended with pmm_end_loan().
-void pmm_cancel_loan(paddr_t address, size_t count);
-
-// All the pages in the range must be currently loaned, and must be currently loan_cancelled, and
-// must be FREE.  End loaning of these contiguous pages, and return the pages via page_list as
-// non-loaned pages allocated by/for the caller.
-void pmm_end_loan(paddr_t address, size_t count, list_node* page_list);
-
-// All the pages in the range must be currently loaned.  Make the pages no longer loaned without
-// allocating them to the caller or changing the pages' current state().  This is used when deleting
-// a contiguous VMO which may have previously loaned pages.  After this, the pages are normal
-// (non-loaned) pages.
-void pmm_delete_lender(paddr_t address, size_t count);
-
 // Free a list of physical pages. This list must not contained loaned pages returned from
 // PmmNode::AllocLoanedPage.
 void pmm_free(list_node* list) __NONNULL((1));

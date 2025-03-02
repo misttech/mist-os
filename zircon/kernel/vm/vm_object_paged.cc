@@ -1071,40 +1071,6 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
       return commit_status;
     }
 
-    // Handle the contiguous case separately because most of the following code (replacing with
-    // non-loaned pages and dirtying pages) does not apply to contiguous VMOs anyway. More
-    // importantly that code will cancel page requests if required. Contiguous VMOs are backed by a
-    // physical page provider which does not handle page request cancelation well, more specifically
-    // a page request regeneration after cancelation breaks the assumption of all processed page
-    // requests being unique. So avoid cancelation altogether, which is not needed for contiguous
-    // VMOs anyway, as the only page request type we can encounter here are read page requests. More
-    // details can be found in https://fxbug.dev/42080926.
-    if (is_contiguous()) {
-      // Pages owned by contiguous VMOs are by definition non-loaned, so we can directly pin any
-      // committed pages.
-      if (pin && committed_len > 0) {
-        // Verify that we are starting the pin after the previously pinned range, as we do not want
-        // to repeatedly pin the same pages.
-        ASSERT(pinned_end_offset == offset);
-        zx_status_t pin_status =
-            cow_pages_locked()->PinRangeLocked(*GetCowRange(offset, committed_len));
-        if (pin_status != ZX_OK) {
-          return pin_status;
-        }
-        pinned_end_offset = offset + committed_len;
-      }
-      // Update how much was committed, and then wait on the page request (if any).
-      zx_status_t wait_status = advance_processed_range(
-          committed_len, /*wait_on_page_request=*/commit_status == ZX_ERR_SHOULD_WAIT);
-      if (wait_status != ZX_OK) {
-        return wait_status;
-      }
-      // Continue to the top of the while loop.
-      continue;
-    }
-
-    // We've already handled the contiguous case above.
-    DEBUG_ASSERT(!is_contiguous());
     // If we're required to pin, try to pin the committed range before waiting on the page_request,
     // which has been populated to request pages beyond the committed range.
     // Even though the page_request has already been initialized, we choose to first completely
@@ -1113,24 +1079,33 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
     // pages before trying to fault in further pages, thereby preventing the already committed (and
     // pinned) pages from being evicted while we wait with the lock dropped.
     if (pin && committed_len > 0) {
-      // We need to replace any loaned pages in the committed range with non-loaned pages first,
-      // since pinning expects all pages to be non-loaned. Replacing loaned pages requires a page
-      // request too. At any time we'll only be able to wait on a single page request, and after the
-      // wait the conditions that resulted in the previous request might have changed, so we can
-      // just cancel and reuse the existing page_request.
-      // TODO: consider not canceling this and the other request below. The issue with not
-      // canceling is that without early wake support, i.e. being able to reinitialize an existing
-      // initialized request, I think this code will not work without canceling.
-      page_request.CancelRequests();
-
       uint64_t non_loaned_len = 0;
-      zx_status_t replace_status = cow_pages_locked()->ReplacePagesWithNonLoanedLocked(
-          *GetCowRange(offset, committed_len), page_request.GetAnonymous(), &non_loaned_len);
-      DEBUG_ASSERT(non_loaned_len <= committed_len);
-      if (replace_status == ZX_OK) {
-        DEBUG_ASSERT(non_loaned_len == committed_len);
-      } else if (replace_status != ZX_ERR_SHOULD_WAIT) {
-        return replace_status;
+      zx_status_t replace_status = ZX_OK;
+      if (cow_pages_locked()->can_borrow_locked()) {
+        // We need to replace any loaned pages in the committed range with non-loaned pages first,
+        // since pinning expects all pages to be non-loaned. Replacing loaned pages requires a page
+        // request too. At any time we'll only be able to wait on a single page request, and after
+        // the wait the conditions that resulted in the previous request might have changed, so we
+        // can just cancel and reuse the existing page_request.
+        // TODO: consider not canceling this and the other request below. The issue with not
+        // canceling is that without early wake support, i.e. being able to reinitialize an existing
+        // initialized request, I think this code will not work without canceling.
+        page_request.CancelRequests();
+        replace_status = cow_pages_locked()->ReplacePagesWithNonLoanedLocked(
+            *GetCowRange(offset, committed_len), page_request.GetAnonymous(), &non_loaned_len);
+        DEBUG_ASSERT(non_loaned_len <= committed_len);
+        if (replace_status == ZX_OK) {
+          DEBUG_ASSERT(non_loaned_len == committed_len);
+        } else if (replace_status != ZX_ERR_SHOULD_WAIT) {
+          return replace_status;
+        }
+      } else {
+        // Borrowing not available so we know there are no loaned pages.
+        non_loaned_len = committed_len;
+        // As we have not canceled the page_request in this branch, duplicate the commit_status into
+        // the replace_status so that later code knows whether there is still a page_request to wait
+        // on or not.
+        replace_status = commit_status;
       }
 
       // We can safely pin the non-loaned range before waiting on the page request.

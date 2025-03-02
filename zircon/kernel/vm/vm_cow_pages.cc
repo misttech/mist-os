@@ -536,6 +536,13 @@ fbl::RefPtr<VmCowPages> VmCowPages::DeadTransitionLocked(Guard<VmoLockType>& gua
   // are made at performing a DeadTransition.
   life_cycle_ = LifeCycle::Dying;
 
+  // Close any PageSource. It does not matter if we do this before or after removing the pages, as
+  // we hold the lock continuously, but it makes more sense (and is slightly more efficient for the
+  // PhysicalPageProvider) to notify the close before.
+  if (page_source_) {
+    page_source_->Close();
+  }
+
   // To prevent races with a hidden parent creation or merging, it is necessary to hold the lock
   // over the is_hidden and parent_ check and into the subsequent removal call.
 
@@ -604,11 +611,6 @@ fbl::RefPtr<VmCowPages> VmCowPages::DeadTransitionLocked(Guard<VmoLockType>& gua
   }
 
   DEBUG_ASSERT(page_list_.IsEmpty());
-  // We must Close() after removing pages, so that all pages will be loaned by the time
-  // PhysicalPageProvider::OnClose() calls pmm_delete_lender() on the whole physical range.
-  if (page_source_) {
-    page_source_->Close();
-  }
 
   // Due to the potential lock dropping earlier double check our life_cycle_ is what we expect.
   DEBUG_ASSERT(life_cycle_ == LifeCycle::Dying);
