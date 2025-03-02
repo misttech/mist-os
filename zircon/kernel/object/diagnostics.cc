@@ -663,7 +663,7 @@ void DumpAllVmObjects(bool hidden_only, pretty::SizeUnit format_unit) {
 class AspaceVmoDumper final : public VmEnumerator {
  public:
   explicit AspaceVmoDumper(pretty::SizeUnit format_unit) : format_unit_(format_unit) {}
-  zx_status_t OnVmMapping(const VmMapping* map, const VmAddressRegion* vmar, uint depth,
+  zx_status_t OnVmMapping(VmMapping* map, VmAddressRegion* vmar, uint depth,
                           Guard<CriticalMutex>&) final TA_REQ(map->lock()) TA_REQ(vmar->lock()) {
     auto vmo = map->vmo_locked();
     DumpVmObject(*vmo, format_unit_, ZX_HANDLE_INVALID,
@@ -775,8 +775,8 @@ void KillProcess(zx_koid_t id) {
 // Counts memory usage under a VmAspace.
 class VmCounter final : public VmEnumerator {
  public:
-  zx_status_t OnVmMapping(const VmMapping* map, const VmAddressRegion* vmar, uint depth,
-                          Guard<CriticalMutex>&) TA_REQ(map->lock()) TA_REQ(vmar->lock()) override {
+  zx_status_t OnVmMapping(VmMapping* map, VmAddressRegion* vmar, uint depth, Guard<CriticalMutex>&)
+      TA_REQ(map->lock()) TA_REQ(vmar->lock()) override {
     usage.mapped_bytes += map->size_locked();
 
     auto vmo = map->vmo_locked();
@@ -913,7 +913,7 @@ class RestartableVmEnumerator {
    public:
     Enumerator(RestartableVmEnumerator* parent) : parent_(parent) {}
 
-    zx_status_t OnVmAddressRegion([[maybe_unused]] const VmAddressRegion* vmar,
+    zx_status_t OnVmAddressRegion([[maybe_unused]] VmAddressRegion* vmar,
                                   [[maybe_unused]] uint depth, Guard<CriticalMutex>&) override {
       if constexpr (EnumerateVmar) {
         return parent_->DoEntry(
@@ -925,8 +925,7 @@ class RestartableVmEnumerator {
       return ZX_ERR_NEXT;
     }
 
-    zx_status_t OnVmMapping([[maybe_unused]] const VmMapping* map,
-                            [[maybe_unused]] const VmAddressRegion* vmar,
+    zx_status_t OnVmMapping([[maybe_unused]] VmMapping* map, [[maybe_unused]] VmAddressRegion* vmar,
                             [[maybe_unused]] uint depth, Guard<CriticalMutex>&) TA_REQ(map->lock())
         TA_REQ(vmar->lock()) override {
       if constexpr (EnumerateMapping == MappingEnumeration::Mapping) {

@@ -1300,13 +1300,13 @@ class VmMapping final : public VmAddressRegionOrMapping {
 class VmEnumerator {
  public:
   // |depth| will be 0 for the root VmAddressRegion.
-  virtual zx_status_t OnVmAddressRegion(const VmAddressRegion* vmar, uint depth,
+  virtual zx_status_t OnVmAddressRegion(VmAddressRegion* vmar, uint depth,
                                         Guard<CriticalMutex>& guard) TA_REQ(vmar->lock()) {
     return ZX_ERR_NEXT;
   }
 
   // |vmar| is the parent of |map|.
-  virtual zx_status_t OnVmMapping(const VmMapping* map, const VmAddressRegion* vmar, uint depth,
+  virtual zx_status_t OnVmMapping(VmMapping* map, VmAddressRegion* vmar, uint depth,
                                   Guard<CriticalMutex>& guard) TA_REQ(map->lock())
       TA_REQ(vmar->lock()) {
     return ZX_ERR_NEXT;
