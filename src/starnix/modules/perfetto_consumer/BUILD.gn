@@ -5,8 +5,8 @@
 import("//build/rust/rustc_library.gni")
 import("//tools/protobuf/rust_proto_library.gni")
 
-rustc_library("perfetto-consumer") {
-  name = "starnix-modules-perfetto-consumer"
+rustc_library("perfetto_consumer") {
+  name = "starnix-modules-perfetto_consumer"
   edition = "2021"
   version = "0.1.0"
   source_root = "lib.rs"

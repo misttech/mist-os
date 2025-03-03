@@ -556,7 +556,7 @@ rustc_library("starnix_kernel_runner") {
     "//src/starnix/modules/magma",
     "//src/starnix/modules/nanohub",
     "//src/starnix/modules/overlayfs",
-    "//src/starnix/modules/perfetto-consumer",
+    "//src/starnix/modules/perfetto_consumer",
     "//src/starnix/modules/touch_power_policy",
     "//src/sys/lib/runner",
     "//third_party/rust_crates:anyhow",
