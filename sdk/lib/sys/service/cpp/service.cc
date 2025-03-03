@@ -37,8 +37,9 @@ std::unique_ptr<fidl::ServiceConnector> OpenNamedServiceAt(
   std::string path = service_path + '/' + instance;
 
   fidl::InterfaceHandle<fuchsia::io::Directory> dir;
-  zx_status_t status = fdio_service_connect_at(handle.channel().get(), path.data(),
-                                               dir.NewRequest().TakeChannel().release());
+  zx_status_t status =
+      fdio_open3_at(handle.channel().get(), path.data(), uint64_t{fuchsia::io::PERM_READABLE},
+                    dir.NewRequest().TakeChannel().release());
   if (status != ZX_OK) {
     return nullptr;
   }
