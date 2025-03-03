@@ -546,13 +546,13 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
                                             .used_from_child
                                             .insert((Capability::Protocol(name), c.name));
                                     }
-                                    // TODO(fxbug.dev/347290357): Handle different types of refs
+                                    // TODO(https://fxbug.dev/347290357): Handle different types of refs
                                     e => {
                                         debug!("Unknown use from ref: {:?}", e);
                                     }
                                 }
                             }
-                            // TODO(fxbug.dev/347290357): Handle different types of entries
+                            // TODO(https://fxbug.dev/347290357): Handle different types of entries
                             e => {
                                 debug!("Unknown use entry: {:?}", e)
                                 // Skip all else for now
@@ -578,12 +578,12 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
                                             .insert((Capability::Protocol(name), c.name));
                                     }
                                     e => {
-                                        // TODO(fxbug.dev/347290357): Handle different types of refs
+                                        // TODO(https://fxbug.dev/347290357): Handle different types of refs
                                         debug!("Unknown expose from ref: {:?}", e);
                                     }
                                 }
                             }
-                            // TODO(fxbug.dev/347290357): Handle different types of entries
+                            // TODO(https://fxbug.dev/347290357): Handle different types of entries
                             e => {
                                 debug!("Unknown exposes entry: {:?}", e)
                                 // Skip all else for now
