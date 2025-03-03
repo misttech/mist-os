@@ -13,8 +13,8 @@
     },
     children: [
         {
-            name: "psi-provider",
-            url: "#meta/psi-provider.cm",
+            name: "psi_provider",
+            url: "#meta/psi_provider.cm",
         },
     ],
     collections: [
@@ -148,12 +148,12 @@
         {
             protocol: [ "fuchsia.kernel.StallResource" ],
             from: "parent",
-            to: "#psi-provider",
+            to: "#psi_provider",
             availability: "optional",
         },
         {
             protocol: [ "fuchsia.starnix.psi.PsiProvider" ],
-            from: "#psi-provider",
+            from: "#psi_provider",
             to: "#kernels",
         },
     ],
