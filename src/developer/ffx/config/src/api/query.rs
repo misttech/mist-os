@@ -11,7 +11,6 @@ use crate::{
 use anyhow::{anyhow, bail, Context, Result};
 use serde_json::Value;
 use std::default::Default;
-use tracing::debug;
 
 use super::value::TryConvert;
 use super::ConfigValue;
@@ -79,7 +78,6 @@ impl<'a> ConfigQuery<'a> {
     }
 
     fn get_config(&self, env: Environment) -> ConfigResult {
-        debug!("{self}");
         let config = env.config_from_cache()?;
         let read_guard = config.read().map_err(|_| anyhow!("config read guard"))?;
         let result = match self {
@@ -90,9 +88,15 @@ impl<'a> ConfigQuery<'a> {
             Self { name: None, level: Some(level), .. } => {
                 read_guard.get_level(*level).cloned().map(Value::Object)
             }
-            _ => bail!("Invalid query: {self:?}"),
-        };
-        Ok(result.into())
+            _ => {
+                let err_string = format!("Invalid query: {self}");
+                tracing::debug!("{err_string}");
+                bail!("{err_string}");
+            }
+        }
+        .into();
+        tracing::debug!("`{self}` => `{result:?}`");
+        Ok(result)
     }
 
     /// Get a value with as little processing as possible
