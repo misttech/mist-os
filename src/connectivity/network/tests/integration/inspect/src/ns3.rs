@@ -836,6 +836,32 @@ async fn inspect_devices(name: &str) {
                             UnsupportedEthertype: 0u64,
                         },
                     },
+                    IGMP: {
+                        Rx: {
+                            IGMPv1Query: 0u64,
+                            IGMPv2Query: 0u64,
+                            IGMPv3Query: 0u64,
+                            IGMPv1Report: 0u64,
+                            IGMPv2Report: 0u64,
+                            IGMPv3Report: 0u64,
+                            LeaveGroup: 0u64,
+                            Errors: {
+                                ParseFailed: 0u64,
+                                MissingRouterAlertInQuery: 0u64,
+                                RejectedGeneralQuery: 0u64,
+                                BadTTL: 0u64,
+                            },
+                        },
+                        Tx: {
+                            IGMPv1Report: 0u64,
+                            IGMPv2Report: 0u64,
+                            IGMPv3Report: 0u64,
+                            LeaveGroup: 0u64,
+                            Errors: {
+                                SendFailed: 0u64,
+                            },
+                        },
+                    },
                 }
             },
             "2": {
@@ -922,6 +948,32 @@ async fn inspect_devices(name: &str) {
                         Rx: {
                             NoEthertype: 0u64,
                             UnsupportedEthertype: 0u64,
+                        },
+                    },
+                    IGMP: {
+                        Rx: {
+                            IGMPv1Query: 0u64,
+                            IGMPv2Query: 0u64,
+                            IGMPv3Query: 0u64,
+                            IGMPv1Report: 0u64,
+                            IGMPv2Report: 0u64,
+                            IGMPv3Report: 0u64,
+                            LeaveGroup: 0u64,
+                            Errors: {
+                                ParseFailed: 0u64,
+                                MissingRouterAlertInQuery: 0u64,
+                                RejectedGeneralQuery: 0u64,
+                                BadTTL: 0u64,
+                            },
+                        },
+                        Tx: {
+                            IGMPv1Report: 0u64,
+                            IGMPv2Report: 0u64,
+                            IGMPv3Report: 0u64,
+                            LeaveGroup: 0u64,
+                            Errors: {
+                                SendFailed: 0u64,
+                            },
                         },
                     },
                 }
@@ -1088,6 +1140,32 @@ async fn inspect_counters(name: &str) {
                             NeighborAdvertisement: 0u64,
                             NeighborSolicitation: 0u64,
                         },
+                    },
+                },
+            },
+            "IGMP": {
+                Rx: {
+                    IGMPv1Query: 0u64,
+                    IGMPv2Query: 0u64,
+                    IGMPv3Query: 0u64,
+                    IGMPv1Report: 0u64,
+                    IGMPv2Report: 0u64,
+                    IGMPv3Report: 0u64,
+                    LeaveGroup: 0u64,
+                    Errors: {
+                        ParseFailed: 0u64,
+                        MissingRouterAlertInQuery: 0u64,
+                        RejectedGeneralQuery: 0u64,
+                        BadTTL: 0u64,
+                    },
+                },
+                Tx: {
+                    IGMPv1Report: 0u64,
+                    IGMPv2Report: 0u64,
+                    IGMPv3Report: 0u64,
+                    LeaveGroup: 0u64,
+                    Errors: {
+                        SendFailed: 0u64,
                     },
                 },
             },

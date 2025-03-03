@@ -9,6 +9,7 @@ use netstack3_base::{ContextPair, CounterContext, Inspector, InspectorExt as _};
 use netstack3_device::ethernet::EthernetDeviceCounters;
 use netstack3_device::socket::DeviceSocketCounters;
 use netstack3_device::{ArpCounters, DeviceCounters};
+use netstack3_ip::gmp::IgmpCounters;
 use netstack3_ip::icmp::{
     IcmpRxCounters, IcmpRxCountersInner, IcmpTxCounters, IcmpTxCountersInner, NdpCounters,
     NdpRxCounters, NdpTxCounters,
@@ -47,6 +48,7 @@ where
         + CounterContext<IcmpTxCounters<Ipv4>>
         + CounterContext<IcmpTxCounters<Ipv4>>
         + CounterContext<IcmpTxCounters<Ipv6>>
+        + CounterContext<IgmpCounters>
         + CounterContext<NudCounters<Ipv4>>
         + CounterContext<NudCounters<Ipv6>>
         + CounterContext<NdpCounters>
@@ -112,6 +114,10 @@ where
                     })
                 });
             });
+        });
+        inspector.record_child("IGMP", |inspector| {
+            self.core_ctx()
+                .with_counters(|counters: &IgmpCounters| inspector.delegate_inspectable(counters));
         });
         inspector.record_child("IPv4", |inspector| {
             self.core_ctx().with_counters(|ip| inspect_ip_counters::<Ipv4>(inspector, ip))

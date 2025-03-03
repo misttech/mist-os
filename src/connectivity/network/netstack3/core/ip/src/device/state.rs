@@ -35,7 +35,7 @@ use crate::internal::device::{
     IpAddressIdSpec, IpDeviceAddr, IpDeviceTimerId, Ipv4DeviceAddr, Ipv4DeviceTimerId,
     Ipv6DeviceAddr, Ipv6DeviceTimerId, WeakIpAddressId,
 };
-use crate::internal::gmp::igmp::{IgmpConfig, IgmpTimerId, IgmpTypeLayout};
+use crate::internal::gmp::igmp::{IgmpConfig, IgmpCounters, IgmpTimerId, IgmpTypeLayout};
 use crate::internal::gmp::mld::{MldConfig, MldTimerId, MldTypeLayout};
 use crate::internal::gmp::{GmpGroupState, GmpState, GmpTimerId, GmpTypeLayout, MulticastGroupSet};
 use crate::internal::types::RawMetric;
@@ -487,6 +487,7 @@ impl<'a, I: Ip + IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> Iterator
 pub struct Ipv4DeviceState<BT: IpDeviceStateBindingsTypes> {
     ip_state: IpDeviceState<Ipv4, BT>,
     config: RwLock<Ipv4DeviceConfiguration>,
+    igmp_counters: IgmpCounters,
 }
 
 impl<BT: IpDeviceStateBindingsTypes> OrderedLockAccess<Ipv4DeviceConfiguration>
@@ -509,7 +510,14 @@ impl<BC: IpDeviceStateBindingsTypes + TimerContext> Ipv4DeviceState<BC> {
                 device_id,
             ),
             config: Default::default(),
+            igmp_counters: Default::default(),
         }
+    }
+}
+
+impl<BT: IpDeviceStateBindingsTypes> Ipv4DeviceState<BT> {
+    pub(crate) fn igmp_counters(&self) -> &IgmpCounters {
+        &self.igmp_counters
     }
 }
 
@@ -794,6 +802,13 @@ impl<BC: IpDeviceStateBindingsTypes + TimerContext> DualStackIpDeviceState<BC> {
             >(bindings_ctx, device_id),
             metric,
         }
+    }
+}
+
+impl<BT: IpDeviceStateBindingsTypes> DualStackIpDeviceState<BT> {
+    /// Access the IGMP counters associated with this specific device state.
+    pub fn igmp_counters(&self) -> &IgmpCounters {
+        self.ipv4.igmp_counters()
     }
 }
 

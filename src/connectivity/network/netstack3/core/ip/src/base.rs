@@ -66,6 +66,7 @@ use crate::internal::device::{
 use crate::internal::fragmentation::{
     FragmentableIpSerializer, FragmentationCounters, FragmentationIpExt, IpFragmenter,
 };
+use crate::internal::gmp::igmp::IgmpCounters;
 use crate::internal::gmp::GmpQueryHandler;
 use crate::internal::icmp::{
     IcmpBindingsTypes, IcmpErrorHandler, IcmpHandlerIpExt, Icmpv4Error, Icmpv4ErrorKind,
@@ -2140,6 +2141,7 @@ pub struct IpStateInner<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateB
     // that the main table cannot be removed and Bindings must never attempt to remove the main
     // routing table.
     tables: Mutex<HashMap<RoutingTableId<I, D>, PrimaryRc<RwLock<RoutingTable<I, D>>>>>,
+    igmp_counters: IgmpCounters,
 }
 
 impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateBindingsTypes> IpStateInner<I, D, BT> {
@@ -2174,6 +2176,11 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateBindingsTypes> IpSta
     pub fn filter(&self) -> &RwLock<filter::State<I, I::Weak<BT>, BT>> {
         &self.filter
     }
+
+    /// Gets the stack-wide IGMP counters.
+    pub fn igmp_counters(&self) -> &IgmpCounters {
+        &self.igmp_counters
+    }
 }
 
 impl<
@@ -2203,6 +2210,7 @@ impl<
             raw_sockets: Default::default(),
             raw_socket_counters: Default::default(),
             filter: RwLock::new(filter::State::new::<NestedIntoCoreTimerCtx<CC, _>>(bindings_ctx)),
+            igmp_counters: Default::default(),
         }
     }
 }

@@ -19,7 +19,7 @@ use net_types::{LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr,
 use netstack3_base::{
     AnyDevice, CoreEventContext, CoreTimerContext, CounterContext, DeviceIdContext, ExistsError,
     IpDeviceAddr, IpDeviceAddressIdContext, Ipv4DeviceAddr, Ipv6DeviceAddr, NotFoundError,
-    RemoveResourceResultWithContext,
+    RemoveResourceResultWithContext, ResourceCounterContext,
 };
 use netstack3_device::{DeviceId, WeakDeviceId};
 use netstack3_filter::FilterImpl;
@@ -531,6 +531,16 @@ where
 {
     fn with_counters<O, F: FnOnce(&T) -> O>(&self, cb: F) -> O {
         self.core_ctx.with_counters(cb)
+    }
+}
+
+impl<'a, Config, L, BC: BindingsContext, R, T> ResourceCounterContext<R, T>
+    for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
+where
+    CoreCtx<'a, BC, L>: ResourceCounterContext<R, T>,
+{
+    fn with_per_resource_counters<O, F: FnOnce(&T) -> O>(&mut self, resource: &R, cb: F) -> O {
+        self.core_ctx.with_per_resource_counters(resource, cb)
     }
 }
 

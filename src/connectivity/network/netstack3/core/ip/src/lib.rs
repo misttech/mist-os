@@ -102,8 +102,8 @@ pub mod device {
 /// Group management protocols.
 pub mod gmp {
     pub use crate::internal::gmp::igmp::{
-        IgmpConfigMode, IgmpContext, IgmpContextMarker, IgmpSendContext, IgmpStateContext,
-        IgmpTimerId, IgmpTypeLayout, IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
+        IgmpConfigMode, IgmpContext, IgmpContextMarker, IgmpCounters, IgmpSendContext,
+        IgmpStateContext, IgmpTimerId, IgmpTypeLayout, IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
     };
     pub use crate::internal::gmp::mld::{
         MldConfigMode, MldContext, MldContextMarker, MldSendContext, MldStateContext, MldTimerId,

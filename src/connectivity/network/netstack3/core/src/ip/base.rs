@@ -13,16 +13,18 @@ use net_types::ip::{Ip, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr
 use net_types::{MulticastAddr, SpecifiedAddr};
 use netstack3_base::socket::SocketIpAddr;
 use netstack3_base::{
-    CounterContext, Icmpv4ErrorCode, Icmpv6ErrorCode, TokenBucket, WeakDeviceIdentifier,
+    CounterContext, Icmpv4ErrorCode, Icmpv6ErrorCode, ResourceCounterContext, TokenBucket,
+    WeakDeviceIdentifier,
 };
 use netstack3_datagram as datagram;
-use netstack3_device::{DeviceId, WeakDeviceId};
+use netstack3_device::{for_any_device_id, BaseDeviceId, DeviceId, DeviceStateSpec, WeakDeviceId};
 use netstack3_icmp_echo::{
     self as icmp_echo, IcmpEchoBoundStateContext, IcmpEchoContextMarker,
     IcmpEchoIpTransportContext, IcmpEchoStateContext, IcmpSocketId, IcmpSocketSet, IcmpSocketState,
     IcmpSockets,
 };
 use netstack3_ip::device::{self, IpDeviceBindingsContext, IpDeviceIpExt};
+use netstack3_ip::gmp::IgmpCounters;
 use netstack3_ip::icmp::{
     self, IcmpIpTransportContext, IcmpRxCounters, IcmpState, IcmpTxCounters, InnerIcmpContext,
     InnerIcmpv4Context, NdpCounters,
@@ -144,6 +146,48 @@ impl<BT: BindingsTypes, I: datagram::DualStackIpExt, L> CounterContext<IcmpRxCou
             .unlocked_access::<crate::lock_ordering::UnlockedState>()
             .inner_icmp_state::<I>()
             .rx_counters)
+    }
+}
+
+impl<BT: BindingsTypes, L> CounterContext<IgmpCounters> for CoreCtx<'_, BT, L> {
+    fn with_counters<O, F: FnOnce(&IgmpCounters) -> O>(&self, cb: F) -> O {
+        cb(&self
+            .unlocked_access::<crate::lock_ordering::UnlockedState>()
+            .inner_ip_state::<Ipv4>()
+            .igmp_counters())
+    }
+}
+
+impl<BT: BindingsTypes, L> ResourceCounterContext<DeviceId<BT>, IgmpCounters>
+    for CoreCtx<'_, BT, L>
+{
+    fn with_per_resource_counters<O, F: FnOnce(&IgmpCounters) -> O>(
+        &mut self,
+        device_id: &DeviceId<BT>,
+        cb: F,
+    ) -> O {
+        for_any_device_id!(
+            DeviceId,
+            device_id,
+            id => self.with_per_resource_counters(id, cb)
+        )
+    }
+}
+
+impl<BT: BindingsTypes, D: DeviceStateSpec, L>
+    ResourceCounterContext<BaseDeviceId<D, BT>, IgmpCounters> for CoreCtx<'_, BT, L>
+{
+    fn with_per_resource_counters<O, F: FnOnce(&IgmpCounters) -> O>(
+        &mut self,
+        device_id: &BaseDeviceId<D, BT>,
+        cb: F,
+    ) -> O {
+        cb(device_id
+            .device_state(
+                &self.unlocked_access::<crate::lock_ordering::UnlockedState>().device.origin,
+            )
+            .as_ref()
+            .igmp_counters())
     }
 }
 
@@ -441,7 +485,9 @@ impl<
         original_body: &[u8],
         err: Icmpv4ErrorCode,
     ) {
-        self.increment(|counters: &IpCounters<Ipv4>| &counters.receive_icmp_error);
+        CounterContext::<IpCounters<Ipv4>>::increment(self, |counters: &IpCounters<Ipv4>| {
+            &counters.receive_icmp_error
+        });
         trace!("InnerIcmpContext<Ipv4>::receive_icmp_error({:?})", err);
 
         match original_proto {
@@ -519,7 +565,9 @@ impl<
         original_body: &[u8],
         err: Icmpv6ErrorCode,
     ) {
-        self.increment(|counters: &IpCounters<Ipv6>| &counters.receive_icmp_error);
+        CounterContext::<IpCounters<Ipv6>>::increment(self, |counters: &IpCounters<Ipv6>| {
+            &counters.receive_icmp_error
+        });
         trace!("InnerIcmpContext<Ipv6>::receive_icmp_error({:?})", err);
 
         match original_next_header {
