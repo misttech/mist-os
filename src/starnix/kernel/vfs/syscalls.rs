@@ -2310,7 +2310,7 @@ pub fn sys_epoll_ctl(
             // capability, then the EPOLLWAKEUP flag is silently ignored.
             // See https://man7.org/linux/man-pages/man2/epoll_ctl.2.html
             if epoll_event.events().contains(FdEvents::EPOLLWAKEUP) {
-                if security::check_task_capable(current_task, CAP_BLOCK_SUSPEND).is_err() {
+                if !security::is_task_capable_noaudit(current_task, CAP_BLOCK_SUSPEND) {
                     epoll_event.ignore(FdEvents::EPOLLWAKEUP);
                 }
             }
@@ -3070,15 +3070,10 @@ pub fn sys_io_uring_setup(
     match limits.io_uring_disabled.load(atomic::Ordering::Relaxed) {
         0 => (),
         1 => {
-            if security::check_task_capable(current_task, CAP_SYS_ADMIN).is_err() {
-                let io_uring_group = limits
-                    .io_uring_group
-                    .load(atomic::Ordering::Relaxed)
-                    .try_into()
-                    .map_err(|_| errno!(EPERM))?;
-                if !current_task.creds().is_in_group(io_uring_group) {
-                    return error!(EPERM);
-                }
+            let io_uring_group = limits.io_uring_group.load(atomic::Ordering::Relaxed).try_into();
+            if io_uring_group.is_err() || !current_task.creds().is_in_group(io_uring_group.unwrap())
+            {
+                security::check_task_capable(current_task, CAP_SYS_ADMIN)?;
             }
         }
         _ => {

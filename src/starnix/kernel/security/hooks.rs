@@ -650,18 +650,18 @@ pub fn task_get_context(current_task: &CurrentTask, target: &Task) -> Result<Vec
     )
 }
 
-/// Checks if a task has all of the given capabilities.
+/// Assesses if a task has all of the given capabilities.
 /// Corresponds to the `capable()` LSM hook.
-pub fn check_task_capable_noaudit(
+pub fn is_task_capable_noaudit(
     task: &Task,
     capabilities: starnix_uapi::auth::Capabilities,
 ) -> bool {
-    track_hook_duration!(c"security.hooks.check_task_capable_noaudit");
+    track_hook_duration!(c"security.hooks.is_task_capable_noaudit");
     return task.creds().has_capability(capabilities)
         && if_selinux_else(
             task,
             |security_server| {
-                selinux_hooks::task::is_task_capable(
+                selinux_hooks::task::is_task_capable_noaudit(
                     &security_server.as_permission_check(),
                     &task,
                     capabilities,

@@ -325,13 +325,10 @@ fn create_socket_ops(
         SocketDomain::Inet | SocketDomain::Inet6 => {
             // Follow Linux, and require CAP_NET_RAW to create raw sockets.
             // See https://man7.org/linux/man-pages/man7/raw.7.html.
-            if socket_type == SocketType::Raw
-                && security::check_task_capable(current_task, CAP_NET_RAW).is_err()
-            {
-                error!(EPERM)
-            } else {
-                Ok(Box::new(ZxioBackedSocket::new(domain, socket_type, protocol)?))
+            if socket_type == SocketType::Raw {
+                security::check_task_capable(current_task, CAP_NET_RAW)?;
             }
+            Ok(Box::new(ZxioBackedSocket::new(domain, socket_type, protocol)?))
         }
         SocketDomain::Netlink => {
             let netlink_family = NetlinkFamily::from_raw(protocol.as_raw());

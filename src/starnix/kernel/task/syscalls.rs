@@ -415,14 +415,14 @@ fn new_uid_allowed(current_task: &CurrentTask, uid: uid_t) -> bool {
     uid == current_task.creds().uid
         || uid == current_task.creds().euid
         || uid == current_task.creds().saved_uid
-        || security::check_task_capable_noaudit(current_task, CAP_SETUID)
+        || security::is_task_capable_noaudit(current_task, CAP_SETUID)
 }
 
 fn new_gid_allowed(current_task: &CurrentTask, gid: gid_t) -> bool {
     gid == current_task.creds().gid
         || gid == current_task.creds().egid
         || gid == current_task.creds().saved_gid
-        || security::check_task_capable_noaudit(current_task, CAP_SETGID)
+        || security::is_task_capable_noaudit(current_task, CAP_SETGID)
 }
 
 pub fn sys_getuid(
@@ -454,7 +454,7 @@ pub fn sys_setuid(
     let prev = creds.copy_user_credentials();
     creds.euid = uid;
     creds.fsuid = uid;
-    if security::check_task_capable(current_task, CAP_SETUID).is_ok() {
+    if security::is_task_capable_noaudit(current_task, CAP_SETUID) {
         creds.uid = uid;
         creds.saved_uid = uid;
     }
@@ -478,7 +478,7 @@ pub fn sys_setgid(
     }
     creds.egid = gid;
     creds.fsgid = gid;
-    if security::check_task_capable(current_task, CAP_SETGID).is_ok() {
+    if security::is_task_capable_noaudit(current_task, CAP_SETGID) {
         creds.gid = gid;
         creds.saved_gid = gid;
     }
@@ -1259,21 +1259,19 @@ where
     let target_task = Task::from_weak(&weak)?;
 
     // To get or set the resource of a process other than itself, the caller must have either:
-    // * the CAP_SYS_RESOURCE
     // * the same `uid`, `euid`, `saved_uid`, `gid`, `egid`, `saved_gid` as the target.
+    // * the CAP_SYS_RESOURCE
     if current_task.get_pid() != target_task.get_pid() {
         let current_creds = current_task.creds();
-        if security::check_task_capable(current_task, CAP_SYS_RESOURCE).is_err() {
-            let target_creds = target_task.creds();
-            let creds_match = current_creds.uid == target_creds.uid
-                && current_creds.euid == target_creds.euid
-                && current_creds.saved_uid == target_creds.saved_uid
-                && current_creds.gid == target_creds.gid
-                && current_creds.egid == target_creds.egid
-                && current_creds.saved_gid == target_creds.saved_gid;
-            if !creds_match {
-                return error!(EPERM);
-            }
+        let target_creds = target_task.creds();
+        if current_creds.uid != target_creds.uid
+            || current_creds.euid != target_creds.euid
+            || current_creds.saved_uid != target_creds.saved_uid
+            || current_creds.gid != target_creds.gid
+            || current_creds.egid != target_creds.egid
+            || current_creds.saved_gid != target_creds.saved_gid
+        {
+            security::check_task_capable(current_task, CAP_SYS_RESOURCE)?;
         }
         security::task_prlimit(
             current_task,

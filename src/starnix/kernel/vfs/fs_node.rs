@@ -1223,7 +1223,7 @@ impl FsNode {
             let current_task = current_task
                 .expect("expected that a CurrentTask would be available when creating a fifo");
             let mut default_pipe_capacity = (*PAGE_SIZE * 16) as usize;
-            if !security::check_task_capable_noaudit(current_task, CAP_SYS_RESOURCE) {
+            if !security::is_task_capable_noaudit(current_task, CAP_SYS_RESOURCE) {
                 let kernel = kernel.upgrade().expect("Invalid kernel when creating fs node");
                 let max_size = kernel.system_limits.pipe_max_size.load(Ordering::Relaxed);
                 default_pipe_capacity = std::cmp::min(default_pipe_capacity, max_size);
@@ -1677,8 +1677,7 @@ impl FsNode {
         // Check that the the filesystem UID of the calling process (`current_task`) is the same as
         // the UID of the existing file. The check can be bypassed if the calling process has
         // `CAP_FOWNER` capability.
-        if child_uid != creds.fsuid
-            && security::check_task_capable(current_task, CAP_FOWNER).is_err()
+        if child_uid != creds.fsuid && !security::is_task_capable_noaudit(current_task, CAP_FOWNER)
         {
             // If current_task is not the user of the existing file, it needs to have read and write
             // access to the existing file.
@@ -1940,7 +1939,7 @@ impl FsNode {
             let creds = current_task.creds();
             if owner.gid != creds.fsgid
                 && !creds.is_in_group(owner.gid)
-                && security::check_task_capable(current_task, CAP_FOWNER).is_err()
+                && !security::is_task_capable_noaudit(current_task, CAP_FOWNER)
             {
                 *mode &= !FileMode::ISGID;
             }
@@ -1986,13 +1985,16 @@ impl FsNode {
             // To set the timestamps to other values the caller must either be the file owner or hold
             // the CAP_FOWNER capability.
             let creds = current_task.creds();
-            let has_owner_priviledge = creds.fsuid == node_uid
-                || security::check_task_capable(current_task, CAP_FOWNER).is_ok();
-            if has_owner_priviledge {
+            if creds.fsuid == node_uid {
                 return Ok(());
             }
-            if !now {
-                return error!(EPERM);
+            if now {
+                if security::is_task_capable_noaudit(current_task, CAP_FOWNER) {
+                    return Ok(());
+                }
+            } else {
+                security::check_task_capable(current_task, CAP_FOWNER)?;
+                return Ok(());
             }
         }
         current_task.creds().check_access(access, node_uid, node_gid, mode)
@@ -2125,7 +2127,7 @@ impl FsNode {
             } else if info.gid != creds.egid
                 && !creds.is_in_group(info.gid)
                 && mode.intersects(FileMode::ISGID)
-                && security::check_task_capable(current_task, CAP_FOWNER).is_err()
+                && !security::is_task_capable_noaudit(current_task, CAP_FOWNER)
             {
                 mode &= !FileMode::ISGID;
             }
@@ -2148,7 +2150,7 @@ impl FsNode {
     {
         mount.check_readonly_filesystem()?;
         self.update_attributes(locked, current_task, |info| {
-            if security::check_task_capable(current_task, CAP_CHOWN).is_ok() {
+            if security::is_task_capable_noaudit(current_task, CAP_CHOWN) {
                 info.chown(owner, group);
                 return Ok(());
             }
@@ -2358,7 +2360,7 @@ impl FsNode {
             if !info.mode.is_reg() && !info.mode.is_dir() {
                 return Err(error());
             }
-        } else if security::check_task_capable(current_task, CAP_SYS_ADMIN).is_err() {
+        } else if !security::is_task_capable_noaudit(current_task, CAP_SYS_ADMIN) {
             // Non-privileged callers only have access to the user namespace.
             return Err(error());
         }
@@ -2522,7 +2524,7 @@ impl FsNode {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        if !security::check_task_capable_noaudit(current_task, CAP_FSETID) {
+        if !security::is_task_capable_noaudit(current_task, CAP_FSETID) {
             self.update_attributes(locked, current_task, |info| {
                 info.clear_suid_and_sgid_bits();
                 Ok(())

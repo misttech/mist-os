@@ -42,8 +42,10 @@ impl Syslog {
     }
 
     pub fn validate_access(current_task: &CurrentTask) -> Result<(), Errno> {
-        security::check_task_capable(current_task, CAP_SYSLOG)
-            .or_else(|_| security::check_task_capable(current_task, CAP_SYS_ADMIN))
+        if !security::is_task_capable_noaudit(current_task, CAP_SYS_ADMIN) {
+            security::check_task_capable(current_task, CAP_SYSLOG)?;
+        }
+        Ok(())
     }
 
     pub fn snapshot_then_subscribe(current_task: &CurrentTask) -> Result<LogSubscription, Errno> {

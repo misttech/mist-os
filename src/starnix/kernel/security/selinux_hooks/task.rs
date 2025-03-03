@@ -493,7 +493,7 @@ fn permission_from_capability(capabilities: starnix_uapi::auth::Capabilities) ->
     }
 }
 
-pub fn is_task_capable(
+pub fn is_task_capable_noaudit(
     permission_check: &PermissionCheck<'_>,
     task: &Task,
     capabilities: starnix_uapi::auth::Capabilities,

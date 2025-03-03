@@ -1752,11 +1752,11 @@ mod test {
     #[::fuchsia::test]
     async fn test_root_capabilities() {
         let (_kernel, current_task) = create_kernel_and_task();
-        assert!(security::check_task_capable(&current_task, CAP_SYS_ADMIN).is_ok());
+        assert!(security::is_task_capable_noaudit(&current_task, CAP_SYS_ADMIN));
         assert_eq!(current_task.creds().cap_inheritable, Capabilities::empty());
 
         current_task.set_creds(Credentials::with_ids(1, 1));
-        assert!(security::check_task_capable(&current_task, CAP_SYS_ADMIN).is_err());
+        assert!(!security::is_task_capable_noaudit(&current_task, CAP_SYS_ADMIN));
     }
 
     #[::fuchsia::test]

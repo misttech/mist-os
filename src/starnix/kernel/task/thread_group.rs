@@ -1168,8 +1168,7 @@ impl ThreadGroup {
         resource: Resource,
         maybe_new_limit: Option<rlimit>,
     ) -> Result<rlimit, Errno> {
-        let can_increase_rlimit =
-            security::check_task_capable(current_task, CAP_SYS_RESOURCE).is_ok();
+        let can_increase_rlimit = security::is_task_capable_noaudit(current_task, CAP_SYS_RESOURCE);
         let mut limit_state = self.limits.lock();
         limit_state.get_and_set(resource, maybe_new_limit, can_increase_rlimit)
     }

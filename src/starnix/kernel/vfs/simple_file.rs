@@ -67,7 +67,7 @@ where
         reason: CheckAccessReason,
     ) -> Result<(), Errno> {
         if self.capabilities != Capabilities::empty()
-            && security::check_task_capable(current_task, self.capabilities).is_ok()
+            && security::is_task_capable_noaudit(current_task, self.capabilities)
         {
             Ok(())
         } else {
