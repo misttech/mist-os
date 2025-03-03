@@ -5,7 +5,7 @@
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 
-rustc_library("starnix-lifecycle") {
+rustc_library("starnix_lifecycle") {
   name = "starnix_lifecycle"
   edition = "2021"
   version = "0.1.0"
@@ -35,11 +35,11 @@ rustc_library("starnix-lifecycle") {
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 
-fuchsia_unittest_package("starnix-lifecycle-tests") {
-  deps = [ ":starnix-lifecycle_test" ]
+fuchsia_unittest_package("starnix_lifecycle-tests") {
+  deps = [ ":starnix_lifecycle_test" ]
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":starnix-lifecycle-tests" ]
+  deps = [ ":starnix_lifecycle-tests" ]
 }
