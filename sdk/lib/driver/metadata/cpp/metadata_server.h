@@ -136,7 +136,7 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
   // changes will not be reflected in the metadata to be served.
   //
   // Make sure that the component manifest specifies that is uses the `FidlType::kSerializableName`
-  // FIDL service
+  // FIDL service.
   zx::result<> ForwardMetadata(
       const std::shared_ptr<fdf::Namespace>& incoming,
       std::string_view instance_name = component::OutgoingDirectory::kDefaultServiceInstance) {
@@ -170,6 +170,56 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
     persisted_metadata_.emplace(std::move(copy));
 
     return zx::ok();
+  }
+
+  // Similar to `ForwardMetadata()` except that it will return false if it fails to connect to the
+  // incoming metadata server or if the incoming metadata server does not have metadata to provide.
+  // Returns true otherwise.
+  zx::result<bool> ForwardMetadataIfExists(
+      const std::shared_ptr<fdf::Namespace>& incoming,
+      std::string_view instance_name = component::OutgoingDirectory::kDefaultServiceInstance) {
+    fidl::WireSyncClient<fuchsia_driver_metadata::Metadata> client{};
+    {
+      zx::result result =
+          ConnectToMetadataProtocol(incoming, FidlType::kSerializableName, instance_name);
+      if (result.is_error()) {
+        FDF_SLOG(DEBUG, "Failed to connect to metadata server.",
+                 KV("status", result.status_string()));
+        return zx::ok(false);
+      }
+      client.Bind(std::move(result.value()));
+    }
+
+    fidl::WireResult<fuchsia_driver_metadata::Metadata::GetPersistedMetadata> result =
+        client->GetPersistedMetadata();
+    if (!result.ok()) {
+      if (result.status() == ZX_ERR_PEER_CLOSED) {
+        // We assume that the metadata does not exist because we assume that the FIDL server does
+        // not exist because we received a peer closed status.
+        FDF_SLOG(DEBUG, "Failed to send GetPersistedMetadata request.",
+                 KV("status", result.status_string()));
+        return zx::ok(false);
+      }
+      FDF_SLOG(ERROR, "Failed to send GetPersistedMetadata request.",
+               KV("status", result.status_string()));
+      return zx::error(result.status());
+    }
+    if (result->is_error()) {
+      if (result->error_value() == ZX_ERR_NOT_FOUND) {
+        FDF_SLOG(DEBUG, "Failed to get persisted metadata.",
+                 KV("status", zx_status_get_string(result->error_value())));
+        return zx::ok(false);
+      }
+      FDF_SLOG(ERROR, "Failed to get persisted metadata.",
+               KV("status", zx_status_get_string(result->error_value())));
+      return result->take_error();
+    }
+    cpp20::span<uint8_t> persisted_metadata = result.value()->persisted_metadata.get();
+    std::vector<uint8_t> copy;
+    copy.insert(copy.begin(), persisted_metadata.begin(), persisted_metadata.end());
+    persisted_metadata_.emplace(std::move(copy));
+
+    return zx::ok(true);
   }
 
   zx::result<> Serve(fdf::OutgoingDirectory& outgoing, async_dispatcher_t* dispatcher) {
@@ -207,7 +257,7 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
   void GetPersistedMetadata(GetPersistedMetadataCompleter::Sync& completer) override {
     if (!persisted_metadata_.has_value()) {
       FDF_LOG(WARNING, "Metadata not set");
-      completer.ReplyError(ZX_ERR_BAD_STATE);
+      completer.ReplyError(ZX_ERR_NOT_FOUND);
       return;
     }
     completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(persisted_metadata_.value()));

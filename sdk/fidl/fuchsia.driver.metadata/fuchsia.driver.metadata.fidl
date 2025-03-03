@@ -7,7 +7,8 @@ library fuchsia.driver.metadata;
 using zx;
 
 closed protocol Metadata {
-    /// Retrieve the persisted metadata provided by the server.
+    /// Retrieve the persisted metadata provided by the server. Returns ZX_ERR_NOT_FOUND if the
+    /// server does not have metadata to provide.
     strict GetPersistedMetadata() -> (struct {
         /// The persisted metadata. Assumed to be a persisted FIDL object. The actual type of the
         /// FIDL object is decided outside of this function.

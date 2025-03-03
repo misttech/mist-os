@@ -273,7 +273,7 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
   void GetPersistedMetadata(GetPersistedMetadataCompleter::Sync& completer) override {
     if (!persisted_metadata_.has_value()) {
       zxlogf(ERROR, "Metadata not set. Set metadata with SetMetadata() or ForwardMetadata().");
-      completer.ReplyError(ZX_ERR_BAD_STATE);
+      completer.ReplyError(ZX_ERR_NOT_FOUND);
       return;
     }
     completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(persisted_metadata_.value()));
