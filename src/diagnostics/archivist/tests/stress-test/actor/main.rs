@@ -27,10 +27,10 @@ async fn main() -> Result<()> {
     // Create a WorkerData singleton
     let accessor_proxy = connect_to_protocol::<ArchiveAccessorMarker>()
         .context("Could not connect to ArchiveAccessor protocol")?;
-    let mut archive_reader = ArchiveReader::new();
+    let mut archive_reader = ArchiveReader::logs();
     archive_reader.with_archive(accessor_proxy);
     let subscription =
-        archive_reader.snapshot_then_subscribe::<Logs>().context("Could not subscribe to logs")?;
+        archive_reader.snapshot_then_subscribe().context("Could not subscribe to logs")?;
     let data = WorkerData { subscription };
 
     actor_loop(
