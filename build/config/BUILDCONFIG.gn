@@ -1757,6 +1757,7 @@ declare_args() {
 
     {
       configs = [ "//build/config/profile:profile-use" ]
+      tags = [ "instrumented" ]
     },
 
     {
