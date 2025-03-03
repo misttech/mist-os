@@ -20,7 +20,7 @@ rustc_library("starnix-syscalls") {
   ]
 
   deps = [
-    "//src/starnix/lib/starnix-types",
+    "//src/starnix/lib/starnix_types",
     "//src/starnix/lib/starnix_uapi",
     "//third_party/rust_crates:paste",
   ]

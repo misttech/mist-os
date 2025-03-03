@@ -23,7 +23,7 @@ rustc_library("starnix_lifecycle") {
     "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
-    "//src/starnix/lib/starnix-types",
+    "//src/starnix/lib/starnix_types",
     "//third_party/rust_crates:paste",
   ]
 

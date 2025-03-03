@@ -35,8 +35,8 @@ rustc_library("cgroupfs") {
 
   deps = [
     "//src/starnix/kernel:starnix_core",
-    "//src/starnix/lib/starnix-types",
     "//src/starnix/lib/starnix_sync",
+    "//src/starnix/lib/starnix_types",
     "//src/starnix/lib/starnix_uapi",
   ]
 
