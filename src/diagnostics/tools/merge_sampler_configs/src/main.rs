@@ -61,7 +61,7 @@ fn read_file<T: DeserializeOwned>(path: PathBuf) -> anyhow::Result<T> {
 fn write_file<T: Serialize>(path: PathBuf, value: T) -> anyhow::Result<()> {
     let file = File::create(path)?;
     let mut writer = BufWriter::new(file);
-    serde_json::to_writer(&mut writer, &value)?;
+    serde_json5::to_writer(&mut writer, &value)?;
     writer.flush()?;
     Ok(())
 }
