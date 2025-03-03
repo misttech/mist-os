@@ -208,10 +208,17 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 	testDurations := testsharder.NewTestDurationsMap(m.TestDurations())
 	shards = testsharder.AddExpectedDurationTags(shards, testDurations)
 
+	hasAffectedModifiers := false
 	if flags.modifiersPath != "" {
 		modifiers, err := testsharder.LoadTestModifiers(ctx, m.TestSpecs(), flags.modifiersPath)
 		if err != nil {
 			return err
+		}
+		for _, mod := range modifiers {
+			if mod.Modifier.Affected {
+				hasAffectedModifiers = true
+				break
+			}
 		}
 		// Apply user-defined modifiers.
 		shards, err = testsharder.ApplyModifiers(shards, modifiers)
@@ -257,7 +264,7 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 		if err != nil {
 			return err
 		}
-	} else {
+	} else if !hasAffectedModifiers {
 		// If no affected-tests file was provided, we don't know which tests
 		// were affected, so run all tests.
 		flags.skipUnaffected = false
@@ -275,12 +282,9 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 		affected := func(t testsharder.Test) bool {
 			return t.Affected
 		}
-		affectedShards, unaffectedShards := testsharder.PartitionShards(nonMultipliedShards, affected, testsharder.AffectedShardPrefix)
+		// Since we're only running affected shards, we don't need to add a prefix to the shard name.
+		affectedShards, _ := testsharder.PartitionShards(nonMultipliedShards, affected, "")
 		shards = affectedShards
-		skippedShards, err = testsharder.MarkShardsSkipped(unaffectedShards)
-		if err != nil {
-			return err
-		}
 	} else {
 		// Filter out the affected, hermetic shards from the non-multiplied shards.
 		hermeticAndAffected := func(t testsharder.Test) bool {
