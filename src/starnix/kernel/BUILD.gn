@@ -316,7 +316,7 @@ rustc_library("starnix_core") {
   deps = [
     ":restricted_trampoline",
     ":starnix_logging",
-    ":vdso-data($bionic_linux_toolchain)",
+    ":vdso_data($bionic_linux_toolchain)",
     "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_rust",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
@@ -446,7 +446,7 @@ rustc_library("starnix_core") {
   ]
 
   if (starnix_enable_arch32) {
-    deps += [ ":vdso-data($bionic_linux_arch32_toolchain)" ]
+    deps += [ ":vdso_data($bionic_linux_arch32_toolchain)" ]
   }
 
   test_deps = [
@@ -659,7 +659,7 @@ config("vdso_config") {
 
   # Use a custom linker script to ensure only one PT_LOAD header.
   vdso_linker_script = "vdso/vdso.ld"
-  vdso_version_script = "vdso/vdso-${current_cpu}.map"
+  vdso_version_script = "vdso/vdso_${current_cpu}.map"
   ldflags += [
     "-Wl,--hash-style=both",
     "-Wl,-T," + rebase_path(vdso_linker_script, root_build_dir),
@@ -667,8 +667,8 @@ config("vdso_config") {
   ]
 }
 
-source_set("vdso-calculate-utc") {
-  sources = [ "vdso/vdso-calculate-utc.cc" ]
+source_set("vdso_calculate_utc") {
+  sources = [ "vdso/vdso_calculate_utc.cc" ]
   deps = [
     "//zircon/kernel/lib/fasttime:headers",
     "//zircon/system/public",
@@ -679,18 +679,18 @@ source_set("vdso-calculate-utc") {
 
 loadable_module("vdso") {
   sources = [
-    "vdso/vdso-${current_cpu}.cc",
-    "vdso/vdso-common.cc",
+    "vdso/vdso_${current_cpu}.cc",
+    "vdso/vdso_common.cc",
   ]
   if (current_cpu == "arm") {
-    sources += [ "vdso/vdso-arm-eabi.cc" ]
+    sources += [ "vdso/vdso_arm_eabi.cc" ]
   }
 
   deps = [ "//zircon/system/public" ]
 
   if (current_cpu != "arm") {
     deps += [
-      ":vdso-calculate-utc",
+      ":vdso_calculate_utc",
       "//zircon/kernel/lib/fasttime:headers",
       "//zircon/system/ulib/affine",
     ]
@@ -707,12 +707,12 @@ loadable_module("vdso") {
   exclude_toolchain_tags = [ "instrumented" ]
 }
 
-resource("vdso-data") {
+resource("vdso_data") {
   sources = [ "$root_out_dir/libvdso.so" ]
   if (current_cpu != "arm") {
     outputs = [ "data/libvdso.so" ]
   } else {
-    outputs = [ "data/libvdso-arch32.so" ]
+    outputs = [ "data/libvdso_arch32.so" ]
   }
   deps = [ ":vdso" ]
 }
@@ -757,7 +757,7 @@ fuchsia_package("starnix_kernel_package") {
 }
 
 fuchsia_unittest_package("starnix-tests") {
-  manifest = "meta/starnix-tests.cml"
+  manifest = "meta/starnix_tests.cml"
   deps = [
     ":starnix-test-files",
     ":starnix_core_test",
@@ -774,12 +774,12 @@ fuchsia_unittest_package("starnix-tests") {
 
 fuchsia_unittest_package("starnix_kernel_bin-tests") {
   deps = [ ":starnix_kernel_bin_test" ]
-  manifest = "meta/starnix_kernel_bin-tests.cml"
+  manifest = "meta/starnix_kernel_bin_tests.cml"
 }
 
 fuchsia_unittest_package("starnix_kernel_runner-tests") {
   deps = [ ":starnix_kernel_runner_test" ]
-  manifest = "meta/starnix_kernel_runner-tests.cml"
+  manifest = "meta/starnix_kernel_runner_tests.cml"
   test_specs = {
     log_settings = {
       # Tests exercise failure cases, so ERROR logs are expected.

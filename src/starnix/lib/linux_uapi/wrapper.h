@@ -117,7 +117,7 @@
 #endif  // #ifndef __arm__
 
 // Data shared between Starnix and a vDSO implementation.
-#include "src/starnix/kernel/vdso/vvar-data.h"
+#include "src/starnix/kernel/vdso/vvar_data.h"
 
 #ifdef __x86_64__
 #include <asm/prctl.h>
@@ -128,10 +128,10 @@
 //   __NR_arch32_[name]
 // when the implementation of [name] differs
 // between 32-bit and 64-bit.
-#include <arm-arch32-syscalls.h>
+#include <arm_arch32_syscalls.h>
 
 // Definition of ucontext
-#include <arm-arch32-ucontext.h>
+#include <arm_arch32_ucontext.h>
 #endif
 
 #include <fcntl.h>

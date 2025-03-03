@@ -50,7 +50,7 @@ rustc_library("tracefs") {
 }
 
 fuchsia_unittest_package("starnix-tracefs-tests") {
-  manifest = "meta/starnix-tracefs-tests.cml"
+  manifest = "meta/starnix_tracefs_tests.cml"
   deps = [ ":tracefs_test" ]
   test_specs = {
     log_settings = {

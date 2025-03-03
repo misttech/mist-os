@@ -199,7 +199,7 @@ fn load_vdso_from_file() -> Result<Arc<MemoryObject>, Errno> {
 
 /// Reads the vDSO file and returns the backing VMO.
 fn load_vdso_arch32_from_file() -> Result<Arc<MemoryObject>, Errno> {
-    const VDSO_FILENAME: &str = "libvdso-arch32.so";
+    const VDSO_FILENAME: &str = "libvdso_arch32.so";
     const VDSO_LOCATION: &str = "/pkg/data";
 
     let dir_proxy = sync_open_in_namespace(VDSO_LOCATION, fio::PERM_READABLE)?;

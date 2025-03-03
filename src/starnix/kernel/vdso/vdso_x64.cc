@@ -6,8 +6,8 @@
 #include <sys/time.h>
 #include <zircon/compiler.h>
 
-#include "src/starnix/kernel/vdso/vdso-common.h"
-#include "src/starnix/kernel/vdso/vdso-platform.h"
+#include "src/starnix/kernel/vdso/vdso_common.h"
+#include "src/starnix/kernel/vdso/vdso_platform.h"
 
 int syscall(intptr_t syscall_number, intptr_t arg1, intptr_t arg2, intptr_t arg3) {
   int ret;

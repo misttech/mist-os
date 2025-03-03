@@ -40,6 +40,6 @@ rustc_library("syncio") {
 }
 
 fuchsia_unittest_package("starnix_syncio-tests") {
-  manifest = "meta/syncio-tests.cml"
+  manifest = "meta/syncio_tests.cml"
   deps = [ ":syncio_test" ]
 }

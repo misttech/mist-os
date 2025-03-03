@@ -49,5 +49,5 @@ rustc_library("kernel_manager") {
 
 fuchsia_unittest_package("starnix_kernel_manager-tests") {
   deps = [ ":kernel_manager_test" ]
-  manifest = "meta/kernel_manager-tests.cml"
+  manifest = "meta/kernel_manager_tests.cml"
 }

@@ -8,7 +8,7 @@
         "//src/starnix/tests/starnix_test.shard.cml",
     ],
     program: {
-        binary: "data/tests/vdso-calculate-utc-test-bin",
+        binary: "data/tests/vdso_calculate_utc_test-bin",
         uid: "0",
         test_type: "gtest",
     },

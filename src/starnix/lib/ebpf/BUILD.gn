@@ -49,18 +49,18 @@ rustc_library("ebpf") {
 
   inputs = [
     "src/test_grammar.pest",
-    "src/tests/err-offset-overflow.data",
-    "src/tests/err-read-only-helper.data",
-    "src/tests/err-write-r10.data",
-    "src/tests/exponential-verification.data",
-    "src/tests/forget-release.data",
-    "src/tests/malloc-double-free.data",
-    "src/tests/malloc-use-free.data",
-    "src/tests/null-checks-propagated.data",
-    "src/tests/packet-access.data",
-    "src/tests/read-only-helper.data",
-    "src/tests/stack-access.data",
-    "src/tests/write-only-helper.data",
+    "src/tests/err_offset_overflow.data",
+    "src/tests/err_read_only_helper.data",
+    "src/tests/err_write_r10.data",
+    "src/tests/exponential_verification.data",
+    "src/tests/forget_release.data",
+    "src/tests/malloc_double_free.data",
+    "src/tests/malloc_use_free.data",
+    "src/tests/null_checks_propagated.data",
+    "src/tests/packet_access.data",
+    "src/tests/read_only_helper.data",
+    "src/tests/stack_access.data",
+    "src/tests/write_only_helper.data",
     "//third_party/ubpf/src/tests/add64.data",
     "//third_party/ubpf/src/tests/add.data",
     "//third_party/ubpf/src/tests/alu64-arith.data",
@@ -197,6 +197,6 @@ rustc_library("ebpf") {
 }
 
 fuchsia_unittest_package("starnix-ebpf-tests") {
-  manifest = "meta/ebpf-tests.cml"
+  manifest = "meta/ebpf_tests.cml"
   deps = [ ":ebpf_test" ]
 }

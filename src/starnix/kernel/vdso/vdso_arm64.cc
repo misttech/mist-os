@@ -6,8 +6,8 @@
 #include <sys/time.h>
 #include <zircon/compiler.h>
 
-#include "vdso-common.h"
-#include "vdso-platform.h"
+#include "vdso_common.h"
+#include "vdso_platform.h"
 
 int syscall(intptr_t syscall_number, intptr_t arg1, intptr_t arg2, intptr_t arg3) {
   register intptr_t x0 asm("x0") = arg1;

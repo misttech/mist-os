@@ -72,7 +72,7 @@ rustc_library("input") {
 }
 
 fuchsia_unittest_package("starnix-input-tests") {
-  manifest = "meta/starnix-input-tests.cml"
+  manifest = "meta/starnix_input_tests.cml"
   deps = [ ":input_test" ]
   test_specs = {
     log_settings = {

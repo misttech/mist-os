@@ -49,7 +49,7 @@ rustc_library("ext4") {
 }
 
 fuchsia_unittest_package("starnix-ext4-tests") {
-  manifest = "meta/starnix-ext4-tests.cml"
+  manifest = "meta/starnix_ext4_tests.cml"
   deps = [ ":ext4_test" ]
   test_specs = {
     log_settings = {

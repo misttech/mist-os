@@ -7,7 +7,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "src/starnix/kernel/vdso/vdso-calculate-time.h"
+#include "src/starnix/kernel/vdso/vdso_calculate_time.h"
 
 vvar_data vvar;
 

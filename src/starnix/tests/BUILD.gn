@@ -66,13 +66,14 @@ expect_includes("starnix_benchmark") {
 }
 
 if (host_os == "linux" && host_cpu == "x64") {
-  starnix_host_test_component("fdio-test") {
+  starnix_host_test_component("fdio_test") {
     test_label = "//sdk/lib/fdio/tests:fdio-test"
     test_type = "starnix"
+    test_binary = "fdio-test"
   }
 
   fuchsia_test_package("starnix_user_tests") {
-    test_components = [ ":fdio-test" ]
+    test_components = [ ":fdio_test" ]
 
     subpackages = starnix_test_subpackages +
                   [ "//src/starnix/containers/debian:debian_package" ]

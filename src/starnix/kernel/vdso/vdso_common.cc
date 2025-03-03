@@ -2,18 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "vdso-common.h"
+#include "vdso_common.h"
 
 #include <errno.h>
 #include <sys/syscall.h>
 #include <zircon/time.h>
 
-#include "vdso-platform.h"
+#include "vdso_platform.h"
 
 #if !defined(__arm__)
 #include <lib/fasttime/time.h>
 
-#include "vdso-calculate-time.h"
+#include "vdso_calculate_time.h"
 #endif
 
 #if !defined(__arm__)

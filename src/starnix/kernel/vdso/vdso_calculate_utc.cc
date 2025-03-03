@@ -4,8 +4,8 @@
 
 #include <lib/affine/ratio.h>
 
-#include "src/starnix/kernel/vdso/vdso-calculate-time.h"
-#include "src/starnix/kernel/vdso/vdso-platform.h"
+#include "src/starnix/kernel/vdso/vdso_calculate_time.h"
+#include "src/starnix/kernel/vdso/vdso_platform.h"
 
 // This is in its own source file so it can be unit tested.
 int64_t calculate_utc_time_nsec() {

@@ -7,7 +7,7 @@
 
 #include <stdint.h>
 
-#include "vvar-data.h"
+#include "vvar_data.h"
 
 constexpr uint32_t kNanosecondsPerSecond = 1'000'000'000;
 constexpr int64_t kUtcInvalid = 0;
