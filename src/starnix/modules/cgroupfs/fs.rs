@@ -72,13 +72,14 @@ impl CgroupV2Fs {
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
-        let weak_kernel = Arc::downgrade(current_task.kernel());
-        let root = CgroupRoot::new(weak_kernel);
-        let hierarchy = Hierarchy::new(Arc::downgrade(&root));
+        let kernel = current_task.kernel();
+        let weak_kernel = Arc::downgrade(kernel);
+        let root = kernel.cgroup2_root.get_or_init(|| CgroupRoot::new(weak_kernel));
+        let hierarchy = Hierarchy::new(Arc::downgrade(root));
         let fs = FileSystem::new(
             current_task.kernel(),
             CacheMode::Uncached,
-            CgroupV2Fs { hierarchy: hierarchy.clone(), root: root },
+            CgroupV2Fs { hierarchy: hierarchy.clone(), root: root.clone() },
             options,
         )?;
         hierarchy.root.create_root_interface_files(current_task, &fs);

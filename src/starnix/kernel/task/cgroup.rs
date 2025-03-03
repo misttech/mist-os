@@ -140,6 +140,10 @@ impl CgroupRoot {
     fn kernel(&self) -> Arc<Kernel> {
         self.kernel.upgrade().expect("kernel is available for cgroup operations")
     }
+
+    pub fn get_cgroup(&self, pid: pid_t) -> Option<Weak<Cgroup>> {
+        self.pid_table.lock().get(&pid).cloned()
+    }
 }
 
 impl CgroupOps for CgroupRoot {
@@ -436,8 +440,11 @@ pub struct Cgroup {
 pub type CgroupHandle = Arc<Cgroup>;
 
 /// Returns the path from the root to this `cgroup`.
-#[allow(dead_code)]
-pub fn path_from_root(cgroup: CgroupHandle) -> Result<FsString, Errno> {
+pub fn path_from_root(weak_cgroup: Option<Weak<Cgroup>>) -> Result<FsString, Errno> {
+    let cgroup = match weak_cgroup {
+        Some(weak_cgroup) => Weak::upgrade(&weak_cgroup).ok_or_else(|| errno!(ENODEV))?,
+        None => return Ok("/".into()),
+    };
     let mut path = PathBuilder::new();
     let mut current = Some(cgroup);
     while let Some(cgroup) = current {
@@ -610,7 +617,7 @@ mod test {
         let test_cgroup = root.new_child("test".into()).expect("");
         let child_cgroup = test_cgroup.new_child("child".into()).expect("");
 
-        assert_eq!(path_from_root(test_cgroup), Ok("/test".into()));
-        assert_eq!(path_from_root(child_cgroup), Ok("/test/child".into()));
+        assert_eq!(path_from_root(Some(Arc::downgrade(&test_cgroup))), Ok("/test".into()));
+        assert_eq!(path_from_root(Some(Arc::downgrade(&child_cgroup))), Ok("/test/child".into()));
     }
 }

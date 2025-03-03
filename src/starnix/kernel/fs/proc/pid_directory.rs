@@ -4,7 +4,9 @@
 
 use crate::mm::{MemoryAccessor, MemoryAccessorExt, ProcMapsFile, ProcSmapsFile, PAGE_SIZE};
 use crate::security;
-use crate::task::{CurrentTask, Task, TaskPersistentInfo, TaskStateCode, ThreadGroup};
+use crate::task::{
+    path_from_root, CurrentTask, Task, TaskPersistentInfo, TaskStateCode, ThreadGroup,
+};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
     default_seek, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
@@ -197,12 +199,7 @@ fn static_directory_builder_with_common_task_entries<'a>(
     // proc(5): "The files inside each /proc/pid directory are normally owned by
     // the effective user and effective group ID of the process."
     dir.entry_creds(task.creds().euid_as_fscred());
-    dir.entry(
-        current_task,
-        "cgroup",
-        StubEmptyFile::new_node("/proc/pid/cgroup", bug_ref!("https://fxbug.dev/322893771")),
-        mode!(IFREG, 0o444),
-    );
+    dir.entry(current_task, "cgroup", CgroupFile::new_node(task.into()), mode!(IFREG, 0o444));
     dir.entry(
         current_task,
         "cwd",
@@ -667,6 +664,27 @@ impl FsNodeOps for TaskListDirectory {
         std::mem::drop(pid_state);
 
         Ok(tid_directory(current_task, &node.fs(), &task))
+    }
+}
+
+#[derive(Clone)]
+struct CgroupFile(WeakRef<Task>);
+impl CgroupFile {
+    pub fn new_node(task: WeakRef<Task>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self(task))
+    }
+}
+impl DynamicFileSource for CgroupFile {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+        let task = Task::from_weak(&self.0)?;
+        let cgroup = task
+            .kernel()
+            .cgroup2_root
+            .get()
+            .and_then(|cgroup_root| cgroup_root.get_cgroup(task.get_pid()));
+        let path = path_from_root(cgroup)?;
+        sink.write(format!("0::{}\n", path).as_bytes());
+        Ok(())
     }
 }
 

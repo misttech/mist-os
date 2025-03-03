@@ -471,3 +471,43 @@ TEST_F(CgroupTest, KillCgroupWithDescendant) {
   EXPECT_TRUE(fork_helper.WaitForChildren());
   CheckFileHasLine(grandchild_events_path, EVENTS_NOT_POPULATED);
 }
+
+TEST_F(CgroupTest, ProcfsCgroup) {
+  std::string root_procs_path = root_path() + "/" + PROCS_FILE;
+  std::string child_path_from_root = "/child";
+  std::string child_path = root_path() + child_path_from_root;
+  std::string child_procs_path = child_path + "/" + PROCS_FILE;
+  std::string grandchild_path_from_root = child_path_from_root + "/grandchild";
+  std::string grandchild_path = root_path() + grandchild_path_from_root;
+  std::string grandchild_procs_path = grandchild_path + "/" + PROCS_FILE;
+  std::string procfs_cgroup_path = "/proc/self/cgroup";
+  std::string pid_string = std::to_string(getpid());
+
+  CheckFileHasLine(procfs_cgroup_path, "0::/");
+
+  CreateCgroup(child_path);
+  CreateCgroup(grandchild_path);
+
+  {
+    fbl::unique_fd child_procs_fd(open(child_procs_path.c_str(), O_WRONLY));
+    ASSERT_TRUE(child_procs_fd.is_valid());
+    EXPECT_THAT(write(child_procs_fd.get(), pid_string.c_str(), pid_string.length()),
+                SyscallSucceeds());
+  }
+
+  CheckFileHasLine(procfs_cgroup_path, "0::" + child_path_from_root);
+
+  {
+    fbl::unique_fd grandchild_procs_fd(open(grandchild_procs_path.c_str(), O_WRONLY));
+    ASSERT_TRUE(grandchild_procs_fd.is_valid());
+    EXPECT_THAT(write(grandchild_procs_fd.get(), pid_string.c_str(), pid_string.length()),
+                SyscallSucceeds());
+  }
+
+  CheckFileHasLine(procfs_cgroup_path, "0::" + grandchild_path_from_root);
+  {
+    fbl::unique_fd procs_fd(open(root_procs_path.c_str(), O_WRONLY));
+    ASSERT_TRUE(procs_fd.is_valid());
+    EXPECT_THAT(write(procs_fd.get(), pid_string.c_str(), pid_string.length()), SyscallSucceeds());
+  }
+}
