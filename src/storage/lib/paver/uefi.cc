@@ -110,7 +110,10 @@ zx::result<std::unique_ptr<PartitionClient>> EfiDevicePartitioner::FindPartition
     case Partition::kBootloaderA: {
       const auto filter = [](const GptPartitionMetadata& part) {
         return FilterByTypeAndName(part, GUID_BOOTLOADER_VALUE, GUID_BOOTLOADER_NAME) ||
-               FilterByTypeAndName(part, GUID_EFI_VALUE, GUID_EFI_NAME) ||
+               // TODO(b/400314846) ARM emulator can be run using UEFI. But it uses
+               // a mix of names and types for bootloader partition
+               // FilterByTypeAndName(part, GUID_EFI_VALUE, GUID_EFI_NAME) ||
+               FilterByName(part, GUID_EFI_NAME) ||
                // TODO: Remove support after July 9th 2021.
                FilterByTypeAndName(part, GUID_EFI_VALUE, kOldEfiName);
       };
