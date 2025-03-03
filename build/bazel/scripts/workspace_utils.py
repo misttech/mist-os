@@ -453,7 +453,6 @@ def record_fuchsia_workspace(
     fuchsia_dir: Path,
     gn_output_dir: Path,
     git_bin_path: Path,
-    target_cpu: str,
     log: T.Optional[T.Callable[[str], None]] = None,
     enable_bzlmod: bool = False,
 ) -> None:
@@ -473,8 +472,6 @@ def record_fuchsia_workspace(
         fuchsia_dir: Path to the Fuchsia source checkout.
         gn_output_dir: Path to the GN/Ninja output directory.
         git_bin_path: Path to the host git binary to use during the build.
-        target_cpu: The current build configuration's target cpu values,
-            following Fuchsia conventions.
         log: Optional logging callback. If not None, must take a single
             string as argument.
         enable_bzlmod: Optional flag. Set to True to enable Bzlmod.
@@ -619,8 +616,6 @@ def record_fuchsia_workspace(
     logs_dir_from_workspace = os.path.relpath(logs_dir, top_dir / "workspace")
     bazelrc_content = expand_template_file(
         "template.bazelrc",
-        default_platform=f"fuchsia_{target_cpu}",
-        host_platform=host_tag.replace("-", "_"),
         workspace_log_file=f"{logs_dir_from_workspace}/workspace_events.log",
         execution_log_file=f"{logs_dir_from_workspace}/exec_log.pb.zstd",
     )
@@ -743,15 +738,15 @@ def generate_fuchsia_workspace(
     git_bin_path = find_host_binary_path("git")
     assert git_bin_path, f"Could not find 'git' in current PATH!"
 
-    # Extract target_cpu from args.json. This file is GN-generated
-    # and doesn't need to be added to input_files.
-    args_json_path = build_dir / "args.json"
-    assert args_json_path.exists(), f"Missing GN output file: {args_json_path}"
-    with args_json_path.open("rb") as f:
-        args_json = json.load(f)
-
-    target_cpu = args_json.get("target_cpu")
-    assert target_cpu, f"Missing target_cpu key in {args_json_path}"
+    # # Extract target_cpu from args.json. This file is GN-generated
+    # # and doesn't need to be added to input_files.
+    # args_json_path = build_dir / "args.json"
+    # assert args_json_path.exists(), f"Missing GN output file: {args_json_path}"
+    # with args_json_path.open("rb") as f:
+    #     args_json = json.load(f)
+    #
+    # target_cpu = args_json.get("target_cpu")
+    # assert target_cpu, f"Missing target_cpu key in {args_json_path}"
 
     # Find the location of the Bazel top-dir relative to the Ninja
     # build directory.
@@ -768,7 +763,6 @@ def generate_fuchsia_workspace(
         fuchsia_dir=fuchsia_dir,
         gn_output_dir=build_dir,
         git_bin_path=Path(git_bin_path),
-        target_cpu=target_cpu,
         log=log,
         enable_bzlmod=False,
     )

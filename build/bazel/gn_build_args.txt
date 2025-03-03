@@ -21,6 +21,9 @@
 #        to a Starlark string (false will be mapped to the empty string).
 #
 
+# From args.gn
+target_cpu: string
+
 # LINT.IfChange
 use_vbmeta: bool
 # LINT.ThenChange(//build/images/vbmeta.gni)
