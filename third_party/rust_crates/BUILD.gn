@@ -474,7 +474,7 @@ group("itertools") {
 }
 
 group("itoa") {
-  public_deps = [ ":itoa-v0_4_3" ]
+  public_deps = [ ":itoa-v0_4_8" ]
 }
 
 group("json5format") {
@@ -7473,7 +7473,7 @@ rust_library("http-v0_2_4") {
   deps = []
   deps += [ ":bytes-v1_10_0" ]
   deps += [ ":fnv-v1_0_7" ]
-  deps += [ ":itoa-v0_4_3" ]
+  deps += [ ":itoa-v0_4_8" ]
 
   rustenv = []
 
@@ -8238,18 +8238,18 @@ rust_library("itertools-v0_8_0") {
   applicable_licenses = [ ":itertools-v0_8_0.license" ]
 }
 
-license("itoa-v0_4_3.license") {
+license("itoa-v0_4_8.license") {
   public_package_name = "itoa"
   license_files = [
-    "//third_party/rust_crates/vendor/itoa-0.4.3/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/itoa-0.4.3/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/itoa-0.4.8/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/itoa-0.4.8/LICENSE-MIT",
   ]
 }
 
-rust_library("itoa-v0_4_3") {
+rust_library("itoa-v0_4_8") {
   crate_name = "itoa"
-  crate_root = "//third_party/rust_crates/vendor/itoa-0.4.3/src/lib.rs"
-  output_name = "itoa-f3a32c9a05744438"
+  crate_root = "//third_party/rust_crates/vendor/itoa-0.4.8/src/lib.rs"
+  output_name = "itoa-9e27afdde10ba0b5"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -8259,15 +8259,15 @@ rust_library("itoa-v0_4_3") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2015",
-    "-Cmetadata=f3a32c9a05744438",
-    "-Cextra-filename=-f3a32c9a05744438",
+    "-Cmetadata=9e27afdde10ba0b5",
+    "-Cextra-filename=-9e27afdde10ba0b5",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":itoa-v0_4_3.license" ]
+  applicable_licenses = [ ":itoa-v0_4_8.license" ]
 }
 
 license("itoa-v1_0_5.license") {
