@@ -19,8 +19,8 @@ rustc_library("ashmem") {
     "//src/starnix/lib/range_map",
     "//src/starnix/lib/starnix-lifecycle",
     "//src/starnix/lib/starnix-syscalls",
-    "//src/starnix/lib/starnix-uapi",
     "//src/starnix/lib/starnix_sync",
+    "//src/starnix/lib/starnix_uapi",
     "//third_party/rust_crates:once_cell",
   ]
 }

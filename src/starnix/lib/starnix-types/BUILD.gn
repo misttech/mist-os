@@ -31,7 +31,7 @@ rustc_library("starnix-types") {
     "//sdk/fidl/fuchsia.starnix.binder:fuchsia.starnix.binder_rust",
     "//sdk/rust/zx",
     "//src/starnix/lib/linux_uapi",
-    "//src/starnix/lib/starnix-uapi",
+    "//src/starnix/lib/starnix_uapi",
     "//src/starnix/lib/syncio",
     "//third_party/rust_crates:cfg-if",
     "//third_party/rust_crates:memoffset",

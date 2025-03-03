@@ -20,8 +20,8 @@ rustc_library("perfetto-consumer") {
     "//src/starnix/kernel:starnix_logging",
     "//src/starnix/lib/perfetto",
     "//src/starnix/lib/perfetto:perfetto_consumer_proto",
-    "//src/starnix/lib/starnix-uapi",
     "//src/starnix/lib/starnix_sync",
+    "//src/starnix/lib/starnix_uapi",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:prost",
   ]

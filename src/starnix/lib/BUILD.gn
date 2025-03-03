@@ -9,7 +9,7 @@ group("lib") {
     "magma",
     "starnix-lifecycle",
     "starnix-types",
-    "starnix-uapi",
+    "starnix_uapi",
     "syncio",
     "third_party",
   ]
@@ -28,8 +28,8 @@ group("tests") {
     "selinux:tests",
     "starnix-lifecycle:tests",
     "starnix-types:tests",
-    "starnix-uapi:tests",
     "starnix_sync:tests",
+    "starnix_uapi:tests",
     "syncio:tests",
     "third_party:tests",
     "usercopy:tests",
