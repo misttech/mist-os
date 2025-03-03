@@ -593,7 +593,6 @@ class RustRemoteAction(object):
             libname = p.name.removesuffix(".rmeta")
             if libname in _KNOWN_FUCHSIA_DYLIBS:
                 remote_depfile_inputs += [p.parent.joinpath(f"{libname}.so")]
-                break
 
         # Expand some .rmeta deps for .rlib compilation.
         expanded_remote_inputs = list(

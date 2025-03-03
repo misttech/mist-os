@@ -93,6 +93,9 @@ import("//build/rust/rustc_test.gni")
 #     The name of the target as it appears in the BUILD file. Enables tooling
 #     to find the template invocation in a BUILD file where this target was defined.
 #
+#   applicable_licenses
+#   rustflags
+#
 # See //examples/rust/dylib/rust-shared/BUILD.gn for an example of using this template.
 #
 template("rustc_dylib") {
@@ -127,6 +130,7 @@ template("rustc_dylib") {
   rustc_artifact(target_name) {
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "deps",
                              "disable_clippy",
                              "disable_rbe",
@@ -136,6 +140,7 @@ template("rustc_dylib") {
                              "inputs",
                              "output_name",
                              "public_deps",
+                             "rustflags",
                              "sources",
                              "testonly",
                              "visibility",
@@ -145,11 +150,11 @@ template("rustc_dylib") {
     rust_crate_type = "dylib"
     crate_root = "src/lib.rs"
     if (defined(invoker.source_root)) {
-      crate_root = source_root
+      crate_root = invoker.source_root
     }
     crate_name = target_name
     if (defined(invoker.name)) {
-      crate_name = name
+      crate_name = invoker.name
     }
     original_target_name = _original_target_name
 
