@@ -469,7 +469,7 @@ impl AnonymizedAggregateServiceDir {
 
             let result = self_clone.wait_for_service_directory(&instance, &source).await;
             if let Err(err) = result {
-                error!(
+                warn!(
                     component:% = instance,
                     service_name:% = service_name,
                     error:% = err;
@@ -609,7 +609,7 @@ impl AnonymizedAggregateServiceDir {
                             continue;
                         }
                         Err(StreamErrorType::StreamError(err)) => {
-                            error!(
+                            warn!(
                                 component:% = instance,
                                 service_name:% = self.route.service_name,
                                 error:% = err;
