@@ -7,11 +7,12 @@ use async_trait::async_trait;
 use blackout_target::static_tree::{DirectoryEntry, EntryDistribution};
 use blackout_target::{find_partition, set_up_partition, Test, TestServer};
 use fidl::endpoints::{ClientEnd, Proxy as _};
-use fidl_fuchsia_device::ControllerProxy;
 use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
 use fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose};
 use fidl_fuchsia_io as fio;
-use fs_management::filesystem::{ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem};
+use fs_management::filesystem::{
+    BlockConnector, Filesystem, ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem,
+};
 use fs_management::{Fxfs, Minfs};
 use fuchsia_component::client::connect_to_protocol;
 use rand::rngs::StdRng;
@@ -32,7 +33,9 @@ const METADATA_KEY: [u8; 32] = [
 ];
 
 #[derive(Copy, Clone)]
-struct FsTree;
+struct FsTree {
+    storage_host: bool,
+}
 
 impl FsTree {
     fn connect_to_crypt_service(&self) -> Result<ClientEnd<CryptMarker>> {
@@ -68,8 +71,8 @@ impl FsTree {
         self.connect_to_crypt_service()
     }
 
-    async fn setup_fxfs(&self, controller: ControllerProxy) -> Result<()> {
-        let mut fxfs = Fxfs::new(controller);
+    async fn setup_fxfs(&self, block_connector: Box<dyn BlockConnector>) -> Result<()> {
+        let mut fxfs = Filesystem::from_boxed_config(block_connector, Box::new(Fxfs::default()));
         fxfs.format().await?;
         let mut fs = fxfs.serve_multi_volume().await?;
         let crypt = Some(self.setup_crypt_service().await?);
@@ -82,14 +85,14 @@ impl FsTree {
         Ok(())
     }
 
-    async fn setup_minfs(&self, controller: ControllerProxy) -> Result<()> {
-        let mut minfs = Minfs::new(controller);
+    async fn setup_minfs(&self, block_connector: Box<dyn BlockConnector>) -> Result<()> {
+        let mut minfs = Filesystem::from_boxed_config(block_connector, Box::new(Minfs::default()));
         minfs.format().await.context("failed to format minfs")?;
         Ok(())
     }
 
-    async fn serve_fxfs(&self, controller: ControllerProxy) -> Result<FsInstance> {
-        let mut fxfs = Fxfs::new(controller);
+    async fn serve_fxfs(&self, block_connector: Box<dyn BlockConnector>) -> Result<FsInstance> {
+        let mut fxfs = Filesystem::from_boxed_config(block_connector, Box::new(Fxfs::default()));
         let mut fs = fxfs.serve_multi_volume().await?;
         let crypt = Some(self.setup_crypt_service().await?);
         let _ =
@@ -97,14 +100,14 @@ impl FsTree {
         Ok(FsInstance::Fxfs(fs))
     }
 
-    async fn serve_minfs(&self, controller: ControllerProxy) -> Result<FsInstance> {
-        let mut minfs = Minfs::new(controller);
+    async fn serve_minfs(&self, block_connector: Box<dyn BlockConnector>) -> Result<FsInstance> {
+        let mut minfs = Filesystem::from_boxed_config(block_connector, Box::new(Minfs::default()));
         let fs = minfs.serve().await?;
         Ok(FsInstance::Minfs(fs))
     }
 
-    async fn verify_fxfs(&self, controller: ControllerProxy) -> Result<()> {
-        let mut fxfs = Fxfs::new(controller);
+    async fn verify_fxfs(&self, block_connector: Box<dyn BlockConnector>) -> Result<()> {
+        let mut fxfs = Filesystem::from_boxed_config(block_connector, Box::new(Fxfs::default()));
         fxfs.fsck().await.context("overall fsck")?;
 
         // Also check the volume we created.
@@ -114,8 +117,8 @@ impl FsTree {
         Ok(())
     }
 
-    async fn verify_minfs(&self, controller: ControllerProxy) -> Result<()> {
-        let mut minfs = Minfs::new(controller);
+    async fn verify_minfs(&self, block_connector: Box<dyn BlockConnector>) -> Result<()> {
+        let mut minfs = Filesystem::from_boxed_config(block_connector, Box::new(Minfs::default()));
         minfs.fsck().await?;
         Ok(())
     }
@@ -143,15 +146,15 @@ impl Test for FsTree {
     async fn setup(
         self: Arc<Self>,
         device_label: String,
-        device_path: Option<String>,
+        _device_path: Option<String>,
         _seed: u64,
     ) -> Result<()> {
-        log::info!(device_label:%, device_path:?; "setting up");
-        let partition_controller = set_up_partition(device_label, device_path).await?;
+        log::info!(device_label:%; "setting up");
+        let block_connector = set_up_partition(device_label, self.storage_host).await?;
 
         match DATA_FILESYSTEM_FORMAT {
-            "fxfs" => self.setup_fxfs(partition_controller).await?,
-            "minfs" => self.setup_minfs(partition_controller).await?,
+            "fxfs" => self.setup_fxfs(block_connector).await?,
+            "minfs" => self.setup_minfs(block_connector).await?,
             _ => panic!("Unsupported filesystem"),
         }
 
@@ -162,16 +165,16 @@ impl Test for FsTree {
     async fn test(
         self: Arc<Self>,
         device_label: String,
-        device_path: Option<String>,
+        _device_path: Option<String>,
         seed: u64,
     ) -> Result<()> {
-        log::info!(device_label:%, device_path:?; "running load gen");
-        let partition_controller = find_partition(device_label, device_path)
+        log::info!(device_label:%; "running load gen");
+        let block_connector = find_partition(device_label, self.storage_host)
             .await
             .context("test failed to find partition")?;
         let fs = match DATA_FILESYSTEM_FORMAT {
-            "fxfs" => self.serve_fxfs(partition_controller).await?,
-            "minfs" => self.serve_minfs(partition_controller).await?,
+            "fxfs" => self.serve_fxfs(block_connector).await?,
+            "minfs" => self.serve_minfs(block_connector).await?,
             _ => panic!("Unsupported filesystem"),
         };
 
@@ -202,17 +205,17 @@ impl Test for FsTree {
     async fn verify(
         self: Arc<Self>,
         device_label: String,
-        device_path: Option<String>,
+        _device_path: Option<String>,
         _seed: u64,
     ) -> Result<()> {
-        log::info!(device_label:%, device_path:?; "verifying disk consistency");
-        let partition_controller = find_partition(device_label, device_path)
+        log::info!(device_label:%; "verifying disk consistency");
+        let block_connector = find_partition(device_label, self.storage_host)
             .await
             .context("verify failed to find partition")?;
 
         match DATA_FILESYSTEM_FORMAT {
-            "fxfs" => self.verify_fxfs(partition_controller).await?,
-            "minfs" => self.verify_minfs(partition_controller).await?,
+            "fxfs" => self.verify_fxfs(block_connector).await?,
+            "minfs" => self.verify_minfs(block_connector).await?,
             _ => panic!("Unsupported filesystem"),
         }
 
@@ -223,7 +226,8 @@ impl Test for FsTree {
 
 #[fuchsia::main(logging_tags = ["blackout", "fs-tree"])]
 async fn main() -> Result<()> {
-    let server = TestServer::new(FsTree)?;
+    let config = blackout_config::Config::take_from_startup_handle();
+    let server = TestServer::new(FsTree { storage_host: config.storage_host })?;
     server.serve().await;
 
     Ok(())

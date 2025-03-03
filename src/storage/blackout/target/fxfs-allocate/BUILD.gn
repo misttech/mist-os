@@ -21,6 +21,7 @@ rustc_binary("blackout-fxfs-allocate-bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
+    "//src/storage/blackout/target/lib:blackout-config",
     "//src/storage/blackout/target/lib:blackout-target",
     "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
