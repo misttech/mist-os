@@ -187,6 +187,16 @@ template("sdk_atom") {
           category == "internal",
       "'${target_name}' has unsupported SDK category '${category}'. Must be one of ${_allowed_categories}.")
 
+  # Atom types other than FIDL must be in the "partner" SDK category because
+  # they are exposed directly to developers. If you have a use case for another
+  # type in a different category, contact the Platform Versioning team.
+  assert(
+      category == "partner" || type == "fidl_library" ||
+          # TODO(https://fxbug.dev/372986936): Remove once all exceptions in the
+          # assert below have been removed.
+          category == "internal",
+      "Atoms of type '${type}' must be in the 'partner' SDK category ('${category}').")
+
   if (category == "internal" &&
       # `sdk_source_set()` enforces an allowlist.
       type != "cc_source_library") {
