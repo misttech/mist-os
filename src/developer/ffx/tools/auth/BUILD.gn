@@ -28,8 +28,6 @@ rustc_library("lib") {
 ffx_tool("ffx_auth") {
   edition = "2021"
   output_name = "ffx-auth"
-  sdk_target_name = "sdk"
-  sdk_category = "partner"
 
   deps = [
     ":lib",

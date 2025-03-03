@@ -1154,7 +1154,6 @@ if (current_toolchain == default_toolchain) {
         "//src/developer/ffx/plugins/component/run/tests/structured_config:verify_ffx_component_run_parent_overrides_emulator_data",
         "//src/developer/ffx/plugins/profile/heapdump:verify_ffx_profile_heapdump_emulator_data",
         "//src/developer/ffx/plugins/target/ssh:ffx_target_ssh_e2e_tests_emulator_data",
-        "//src/developer/ffx/tests/cli-goldens:sdk_exported_for_ffx",
         "//src/developer/ffx/tests/mw-goldens:sdk_exported_for_ffx",
         "//src/developer/ffx/tools/power/system-activity/application-activity:ffx_power_system_activity_application_activity_e2e_tests_emulator_data",
         "//src/developer/ffx/tools/target-package/tests:verify_ffx_target_package_explore_emulator_data",

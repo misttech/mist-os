@@ -27,5 +27,6 @@ starnix
 target
 test
 trace
+triage
 version
 wlan

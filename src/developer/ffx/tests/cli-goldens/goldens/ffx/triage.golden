@@ -5,7 +5,7 @@
   "flags": [
     {
       "kind": "Switch",
-      "optionality": "Optional",
+      "optionality": "optional",
       "long": "--help",
       "short": null,
       "description": "display usage information",
@@ -17,7 +17,7 @@
           "arg_name": "config"
         }
       },
-      "optionality": "Repeating",
+      "optionality": "repeating",
       "long": "--config",
       "short": null,
       "description": "path to config file or dir",
@@ -29,7 +29,7 @@
           "arg_name": "data"
         }
       },
-      "optionality": "Optional",
+      "optionality": "optional",
       "long": "--data",
       "short": null,
       "description": "path to snapshot.zip or uncompressed dir",
@@ -41,7 +41,7 @@
           "arg_name": "tag"
         }
       },
-      "optionality": "Repeating",
+      "optionality": "repeating",
       "long": "--tag",
       "short": null,
       "description": "adds an action tags to include",
@@ -53,7 +53,7 @@
           "arg_name": "exclude-tag"
         }
       },
-      "optionality": "Repeating",
+      "optionality": "repeating",
       "long": "--exclude-tag",
       "short": null,
       "description": "adds an action tags to exclude",

@@ -5,14 +5,12 @@
 use anyhow::Result;
 use argh::FromArgs;
 use ffx_command::CliArgsInfo;
-use ffx_config::environment::ExecutableKind;
-use ffx_config::{EnvironmentContext, SdkRoot};
-use ffx_isolate::{Isolate, SearchContext};
 use serde::Serialize;
-use serde_json::Value;
+use serde_json::{Map, Value};
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
+use std::process::Command;
 
 #[derive(FromArgs)]
 /// CLI tool for generating golden JSON files for
@@ -35,8 +33,11 @@ struct Args {
     /// generate the comparisons file for the goldens
     pub gen_comparisons: Option<PathBuf>,
     #[argh(option)]
-    /// path to SDK root
-    pub sdk_root: PathBuf,
+    /// path to ffx manifest
+    pub ffx_path: PathBuf,
+    #[argh(option)]
+    /// path to ffx-tools manifest
+    pub tool_list: PathBuf,
     #[argh(option)]
     /// path to write out the list of golden files.
     pub golden_file_list: Option<PathBuf>,
@@ -57,64 +58,59 @@ struct Comparison {
     pub golden: String,
 }
 
-/// Creates a new Isolate for ffx and a temp directory for holding
-/// test artifacts, such as ssh keys.
-/// These objects need to exist for the duration of the test,
-/// since the underlying data is cleaned up when they are dropped.
-pub(crate) async fn new_ffx_isolate(name: &str, sdk_root_dir: PathBuf) -> Result<Isolate> {
-    let context =
-        EnvironmentContext::no_context(ExecutableKind::Test, Default::default(), None, false);
-
-    let subtool_search_paths = Vec::<PathBuf>::new();
-
-    let sdk_root = SdkRoot::Full { root: sdk_root_dir.into(), manifest: None };
-    let sdk = sdk_root.clone().get_sdk()?;
-    let ffx_path = sdk.get_host_tool("ffx")?;
-
-    if !ffx_path.exists() {
-        anyhow::bail!("ffx not found at {ffx_path:?}")
-    }
-
-    let ffx_isolate = Isolate::new_with_search(
-        name,
-        SearchContext::Runtime {
-            ffx_path: ffx_path,
-            sdk_root: Some(sdk_root.clone()),
-            subtool_search_paths,
-        },
-        PathBuf::from("."),
-        &context,
-    )
-    .await?;
-
-    Ok(ffx_isolate)
-}
-
 // Note: setting logging to "info" will print superfluous information to stdout.
 #[fuchsia::main(logging_minimum_severity = "warn")]
 async fn main() -> Result<()> {
     let args = argh::from_env::<Args>();
 
-    let ffx_isolate = new_ffx_isolate("cli-goldens", args.sdk_root).await?;
+    // Run ffx and get the JSON encoded help data.
+    let mut cmd = Command::new(args.ffx_path);
+    cmd.args([
+        "--no-environment",
+        "--config",
+        &format!("ffx.subtool-manifest={}", args.tool_list.to_string_lossy()),
+        "--machine",
+        "json-pretty",
+        "--help",
+    ]);
 
-    let output = ffx_isolate.ffx(&["--machine", "json-pretty", "--help"]).await?;
+    let out = cmd.output()?;
+    let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&out.stderr).to_string();
 
-    let value: CliArgsInfo = serde_json::from_str(&output.stdout)
+    let value: CliArgsInfo = serde_json::from_str(&stdout)
         .or_else(|e| -> Result<CliArgsInfo> {
-            panic!(
-                "{e}\n<start>{}\n<end>\n<starterr>\n{}\n<enderr>\n",
-                output.stdout, output.stderr
-            )
+            panic!("{e}\n<start>{}\n<end>\n<starterr>\n{}\n<enderr>\n", stdout, stderr)
         })
         .expect("json");
 
+    // Parse the ffx_tools.json file which lists the external subtools.
+    // This is used to filter which commands are listed, and to
+    // complete the depfile contents, which is deps of the inputs. In
+    // this case, it is the contents of the ffx_tools.json file.
+    let data = serde_json::from_str::<Value>(&fs::read_to_string(&args.tool_list)?)?;
+    let tools: Vec<&Map<String, Value>> =
+        data.as_array().unwrap().iter().filter_map(|t| t.as_object().clone()).collect();
+
     if let Some(depfile) = args.depfile {
-        write_depfile(depfile, ffx_isolate.env_context())?;
+        write_depfile(depfile, args.tool_list.display().to_string(), &tools)?;
     }
 
     if args.commandlist_only {
+        // Get the internal subtools, and make sure
+        // not of the tools listed are internal.
+        let tool_list: Vec<_> = tools
+            .iter()
+            .filter(|t| t["category"].as_str() == Some("internal"))
+            .filter_map(|t| t["name"].as_str())
+            .collect();
         let mut out = fs::File::create(args.command_list.expect("command list path"))?;
-        let mut commands: Vec<String> = value.commands.iter().map(|c| c.name.clone()).collect();
+        let mut commands: Vec<String> = value
+            .commands
+            .iter()
+            .filter(|c| tool_list.iter().all(|t| t != &format!("ffx-{}", c.name)))
+            .map(|c| c.name.clone())
+            .collect();
         commands.sort();
         writeln!(&mut out, "{}", commands.join("\n"))?;
         return Ok(());
@@ -163,40 +159,20 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn write_depfile(depfile: PathBuf, context: &EnvironmentContext) -> Result<()> {
+/// Writes a GN dep file for the manifest and its dependencies.
+fn write_depfile(
+    depfile: PathBuf,
+    manifest_filename: String,
+    subtools: &Vec<&Map<String, Value>>,
+) -> Result<()> {
     let mut f = File::create(depfile)?;
 
-    if let Some(path) = context.get_sdk_root()?.manifest_path() {
-        // Read the SDK manifest. This probably should be part of the SDK interface, but
-        // for now it is a one-off.
-        let manifest: Value = serde_json::from_str(&fs::read_to_string(&path)?)?;
-        let cwd = std::env::current_dir()?;
-
-        let manifest_filename = if path.is_relative() {
-            path.display().to_string()
-        } else {
-            path.strip_prefix(cwd)?.display().to_string()
-        };
-        if let Some(atoms) = manifest.get("atoms") {
-            // Parse in-tree atom list
-            let tool_files_atoms: Vec<&Value> = atoms
-                .as_array()
-                .unwrap()
-                .iter()
-                .filter(|a| {
-                    a["type"].as_str() == Some("host_tool")
-                        || a["type"].as_str() == Some("companion_host_tool")
-                })
-                .filter_map(|t| t["files"].as_array())
-                .flatten()
-                .collect();
-            for tool in tool_files_atoms {
-                writeln!(f, "{manifest_filename} : {}", tool["source"])?;
-            }
-        } else {
-            // sdk manifest
-            panic!("cli-goldens only supports in-tree sdk manifests at this time.")
-        }
+    for tool in subtools {
+        writeln!(
+            f,
+            "{manifest_filename} : {} {}",
+            tool["executable"], tool["executable_metadata"]
+        )?;
     }
 
     Ok(())
