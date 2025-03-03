@@ -29,6 +29,10 @@ build:fuchsia_riscv64 --copt=--debug --strip=never
 build --host_platform=@fuchsia_build_config//:host
 build --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
 
+# Ensure local build actions never inherit the user's LD_LIBRARY_PATH
+# to improve hermeticity and caching.
+build --incompatible_strict_action_env=true
+
 # Bzlmod is not supported yet.
 common --enable_bzlmod=false
 

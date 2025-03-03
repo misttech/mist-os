@@ -896,9 +896,6 @@ def main() -> int:
         # which prevent removing output directories with `rm -rf`.
         # See https://fxbug.dev/42072059
         "--experimental_writable_outputs",
-        # TODO(http://b/319377689#comment5): Remove this flag when the linked issue is
-        # fixed upstream.
-        "--sandbox_add_mount_pair=/tmp",
     ]
 
     # Forward additional --config's, intended for `bazel test`.
