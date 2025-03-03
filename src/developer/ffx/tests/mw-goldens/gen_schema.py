@@ -45,16 +45,28 @@ def main():
         help="output directory for schema information.",
     )
     parser.add_argument(
-        "--sdk-root",
+        "--ffx-path",
         type=str,
         required=False,
-        help="sdk root to find ffx.",
+        help="path to ffx.",
+    )
+    parser.add_argument(
+        "--tool-list",
+        type=str,
+        required=False,
+        help="path to ffx subtool manifest file.",
     )
     parser.add_argument(
         "--comparisons",
         type=str,
         required=False,
         help="golden file test comparison file..",
+    )
+    parser.add_argument(
+        "--depfile",
+        type=str,
+        required=False,
+        help="output file containing the dependencies of the input. Used by GN.",
     )
     args = parser.parse_args()
 
@@ -63,21 +75,26 @@ def main():
     else:
         if not args.comparisons:
             raise ValueError("--comparisons option is missing")
-        if not args.sdk_root:
-            raise ValueError("--sdk-root option is missing")
+        if not args.ffx_path:
+            raise ValueError("--ffx-path option is missing")
+        if not args.tool_list:
+            raise ValueError("--tool-list option is missing")
         if not args.out_dir:
             raise ValueError("--outdir option is missing")
         if not args.goldens_dir:
             raise ValueError("--goldens-dir option is missing")
-        ffx_path = os.path.join(args.sdk_root, "tools/x64/ffx")
+        if not args.depfile:
+            raise ValueError("--depfile option is missing")
+
         build_command_list(
             args.command_list,
             args.out_dir,
-            ffx_path,
+            args.ffx_path,
             args.comparisons,
             args.goldens_dir,
-            args.sdk_root,
+            args.tool_list,
         )
+        build_depfile(args.depfile, args.tool_list)
 
 
 def build_schemalist(src_cmds, schemalist_path):
@@ -91,7 +108,7 @@ def build_schemalist(src_cmds, schemalist_path):
 
 
 def build_command_list(
-    src_cmds, out_dir, ffx_path, comparison_path, goldens_dir, sdk_root
+    src_cmds, out_dir, ffx_path, comparison_path, goldens_dir, tool_list
 ):
     comparisons = []
     cmd_diagnostics = None
@@ -111,10 +128,8 @@ def build_command_list(
             schema_cmd = [
                 ffx_path,
                 "--no-environment",
-                "-c",
-                "sdk.module=host_tools_used_by_ffx_action_during_build",
-                "-c",
-                f"sdk.root={sdk_root}",
+                "--config",
+                f"ffx.subtool-manifest={tool_list}",
                 "--schema",
                 "--machine",
                 "json-pretty",
@@ -127,10 +142,9 @@ def build_command_list(
                     if not cmd_diagnostics:
                         cmds_cmd = [
                             ffx_path,
-                            "-c",
-                            "sdk.module=host_tools_used_by_ffx_action_during_build",
-                            "-c",
-                            f"sdk.root={sdk_root}",
+                            "--no-environment",
+                            "--config",
+                            f"ffx.subtool-manifest={tool_list}",
                             "commands",
                         ]
                         cmd_diagnostics = subprocess.check_output(cmds_cmd)
@@ -140,6 +154,17 @@ def build_command_list(
 
     with open(comparison_path, mode="w") as cmp_file:
         json.dump(comparisons, cmp_file)
+
+
+def build_depfile(depfile, tools_manifest):
+    with open(tools_manifest, "r") as manifest:
+        data = json.load(manifest)
+    with open(depfile, "w") as f:
+        for tool in data:
+            print(
+                f"{tools_manifest}: {tool['executable']} {tool['executable_metadata']}",
+                file=f,
+            )
 
 
 if __name__ == "__main__":

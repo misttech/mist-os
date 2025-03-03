@@ -10,19 +10,14 @@ import("//src/developer/ffx/config.gni")
 assert(is_host, "ffx mw-golden tests are only valid with the host toolchain.")
 
 if (has_board) {
-  # Exported SDK with ffx binary.
-  _sdk_label = "//sdk:exported_idk_for_ffx_tests($default_toolchain)"
-  _sdk_outdir = get_label_info(_sdk_label, "root_out_dir")
-  _sdk_path = _sdk_outdir + "/sdk/exported/core"
-
-  host_test_data("sdk_exported_for_ffx") {
-    sources = [ _sdk_path ]
-    deps = [ _sdk_label ]
-  }
-
   _golden_dir = "${target_out_dir}/goldens"
   _comparison_file = "${target_out_dir}/schema_comparisons.json"
   _schemalist_file = "${target_out_dir}/schemalist.txt"
+
+  # manifest of ffx subtools including sdk-category information.
+  _tool_list_label = "//src/developer/ffx:tool_manifest"
+  _tool_list = "${root_build_dir}/ffx_tools.json"
+  _ffx_path = "${host_tools_dir}/ffx"
 
   action("gen_schema_list") {
     testonly = true
@@ -55,9 +50,12 @@ if (has_board) {
     script = "gen_schema.py"
     inputs = [
       "commandlist.txt",
-      "${root_build_dir}/host_${host_cpu}/ffx",
+      "$root_build_dir/ffx-config.json",
+      _tool_list,
+      _ffx_path,
     ]
     outputs = [ _comparison_file ]
+    depfile = "${target_out_dir}/$target_name.d"
     _golden_filename_list = read_file("goldens/schemalist.txt", "list lines")
     foreach(f, _golden_filename_list) {
       outputs += [ "${_golden_dir}/${f}" ]
@@ -69,15 +67,20 @@ if (has_board) {
       rebase_path("goldens", "//"),
       "--out-dir",
       rebase_path(_golden_dir, root_build_dir),
-      "--sdk-root",
-      rebase_path(_sdk_path, root_build_dir),
+      "--ffx-path",
+      rebase_path(_ffx_path, root_build_dir),
+      "--tool-list",
+      rebase_path(_tool_list, root_build_dir),
       "--comparisons",
       rebase_path(_comparison_file, root_build_dir),
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
     ]
     deps = [
       ":ffx-golden-schemafile-list",
-      ":sdk_exported_for_ffx",
-      "//src/developer/ffx:ffx_bin",
+      "//src/developer/ffx:ffx_build_dir_config_file($default_toolchain)",
+      "//src/developer/ffx:host(//build/toolchain:host_x64)",
+      _tool_list_label,
     ]
   }
 
@@ -97,12 +100,7 @@ if (has_board) {
     # TODO(b/287779902) Also check that dual mode as subtools aren't enabled,
     # because that produces an incomplete SDK.
     if (is_linux) {
-      if (!ffx_build_dual_mode_plugins_as_subtools) {
-        deps = [ ":ffx-golden-mw-list" ]
-      } else {
-        print(
-            "Warning! ffx machine schema golden file tests are disabled because this build has ffx_build_dual_mode_plugins_as_subtools = true.")
-      }
+      deps = [ ":ffx-golden-mw-list" ]
     }
   }
 } else {

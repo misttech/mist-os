@@ -278,13 +278,13 @@ impl EnvironmentContext {
         self.exe_kind
     }
 
-    pub async fn analytics_enabled(&self) -> bool {
+    pub fn analytics_enabled(&self) -> bool {
         use EnvironmentKind::*;
         if let Isolated { .. } = self.kind {
             false
         } else {
             // note: double negative to turn this into an affirmative
-            !is_analytics_disabled(self).await
+            !is_analytics_disabled(self)
         }
     }
 
