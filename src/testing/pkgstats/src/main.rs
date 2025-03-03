@@ -2,17 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![allow(dead_code)]
-
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::env::current_exe;
-use std::fs::File;
-use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
-use std::time::Instant;
-
 use anyhow::{bail, Context, Result};
 use argh::FromArgs;
 use fidl_fuchsia_component_decl as fdecl;
@@ -27,6 +16,14 @@ use log::debug;
 use rayon::prelude::*;
 use rayon::ThreadPoolBuilder;
 use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::env::current_exe;
+use std::fs::File;
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 #[derive(FromArgs)]
 /// collect and generate stats on Fuchsia packages
