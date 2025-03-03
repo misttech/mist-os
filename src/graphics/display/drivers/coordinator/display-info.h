@@ -38,7 +38,7 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, display::Display
                     public fbl::RefCounted<DisplayInfo> {
  public:
   // Consumes `added_display_info`.
-  static zx::result<fbl::RefPtr<DisplayInfo>> Create(AddedDisplayInfo&& added_display_info);
+  static zx::result<fbl::RefPtr<DisplayInfo>> Create(AddedDisplayInfo added_display_info);
 
   DisplayInfo(const DisplayInfo&) = delete;
   DisplayInfo(DisplayInfo&&) = delete;

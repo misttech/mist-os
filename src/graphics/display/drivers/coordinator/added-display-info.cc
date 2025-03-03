@@ -63,9 +63,12 @@ zx::result<std::unique_ptr<AddedDisplayInfo>> AddedDisplayInfo::Create(
     }
     display::PixelFormat pixel_format(banjo_pixel_format);
 
-    ZX_DEBUG_ASSERT(pixel_formats.size() < banjo_display_info.pixel_formats_count);
+    ZX_DEBUG_ASSERT_MSG(pixel_formats.size() < banjo_display_info.pixel_formats_count,
+                        "The push_back() below was not supposed to allocate memory, but it might");
     pixel_formats.push_back(pixel_format, &alloc_checker);
-    ZX_DEBUG_ASSERT(alloc_checker.check());
+    ZX_DEBUG_ASSERT_MSG(alloc_checker.check(),
+                        "The push_back() above failed to allocate memory; "
+                        "it was not supposed to allocate at all");
   }
 
   fbl::Vector<display_mode_t> banjo_display_modes;
@@ -76,9 +79,13 @@ zx::result<std::unique_ptr<AddedDisplayInfo>> AddedDisplayInfo::Create(
       return zx::error(ZX_ERR_NO_MEMORY);
     }
     for (size_t i = 0; i < banjo_display_info.preferred_modes_count; ++i) {
-      ZX_DEBUG_ASSERT(banjo_display_modes.size() < banjo_display_info.preferred_modes_count);
+      ZX_DEBUG_ASSERT_MSG(
+          banjo_display_modes.size() < banjo_display_info.preferred_modes_count,
+          "The push_back() below was not supposed to allocate memory, but it might");
       banjo_display_modes.push_back(banjo_display_info.preferred_modes_list[i], &alloc_checker);
-      ZX_DEBUG_ASSERT(alloc_checker.check());
+      ZX_DEBUG_ASSERT_MSG(alloc_checker.check(),
+                          "The push_back() above failed to allocate memory; "
+                          "it was not supposed to allocate at all");
     }
   }
 

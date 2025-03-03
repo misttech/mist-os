@@ -93,7 +93,7 @@ void DisplayInfo::InitializeInspect(inspect::Node* parent_node) {
 }
 
 // static
-zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(AddedDisplayInfo&& added_display_info) {
+zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(AddedDisplayInfo added_display_info) {
   ZX_DEBUG_ASSERT(added_display_info.display_id != display::kInvalidDisplayId);
   display::DisplayId display_id = added_display_info.display_id;
 
