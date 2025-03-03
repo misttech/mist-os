@@ -5,6 +5,7 @@
 _all_idk_categories = [
   # A fake category used only for markers to represent targets that do not have
   # a category and thus are not included in the IDK.
+  # Also used for unstable APIs in other categories.
   "not-in-idk",
 
   # The categories supported by `sdk_atom()`.

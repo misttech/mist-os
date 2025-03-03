@@ -97,10 +97,9 @@ python_library("fuchsia_controller_py") {
     "wrappers.py",
   ]
 
-  # Ensure all FIDL dependencies are available and stable. Use the
-  # "partner_internal" SDK category and greater as an approximation of this.
-  # However, note that not everything in those categories is stable.
-  # TODO(https://fxbug.dev/314822328): Reframe the markers in terms of stability.
+  # Ensure all FIDL dependencies meet the compatibility and stability
+  # requirements.
+  # There are currently exceptions - see https://fxbug.dev/42081073.
   assert_no_deps = markers_partner_idk_prebuilts_must_not_depend_on
 }
 

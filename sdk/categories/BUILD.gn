@@ -9,10 +9,8 @@ visibility = []
 
 # These markers are used to ensure all FIDL dependencies of host tools in the
 # SDK are available and stable. FIDL-related targets and ffx tools and plugins
-# take dependencies on the marker targets, and the host tools `assert_no_deps`
-# on the markers for incompatible categories.
-# However, note that not everything in those categories is stable.
-# TODO(https://fxbug.dev/314822328): Reframe the markers in terms of stability.
+# take dependencies on the marker targets, and the host tools and host tests
+# `assert_no_deps` on the markers for incompatible categories.
 #
 # Assign the incompatible category lists from `compatibility.gni` to
 # `assert_no_deps`, and never specify a toolchain for markers in
@@ -68,6 +66,19 @@ if (is_host || is_fidl_toolchain) {
         "${target}_lint",
         "${target}_rust.actual",
       ]
+    }
+
+    # FIDL libraries in an SDK category are compiled for each frozen API level,
+    # so those targets must be allowed too.
+    import("//build/config/fuchsia/platform_version.gni")
+    foreach(target, ffx_subtool_fidl_partner_unstable_allowlist) {
+      foreach(level,
+              platform_version.frozen_api_levels + [
+                    "NEXT",
+                    "HEAD",
+                  ]) {
+        visibility += [ "${target}_compile_${level}_fidlc" ]
+      }
     }
   }
 

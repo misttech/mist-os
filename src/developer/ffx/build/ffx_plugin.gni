@@ -118,12 +118,10 @@ template("ffx_plugin") {
       "args_with_unit_tests",
     ]
 
-    # Ensure FIDL libraries with more restrictive visibility are not used.
+    # Ensure all FIDL dependencies meet the compatibility and stability
+    # requirements.
     # Each target below must use these two variables for this to work.
-    # Note that not everything in categories with greater visibility is stable.
-    # TODO(https://fxbug.dev/314822328): Reframe the markers in terms of stability.
-    # Also, there are exceptions - see https://fxbug.dev/42081073 and
-    # https://fxbug.dev/326090508.
+    # There are currently exceptions - see https://fxbug.dev/42081073.
     #
     # Plugins may specify an IDK category in which to be included. Otherwise,
     # they are only used within the platform environment.

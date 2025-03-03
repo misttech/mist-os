@@ -246,8 +246,14 @@ template("fidl") {
   _not_in_sdk_category = "not-in-idk"
   if (defined(invoker.sdk_category) &&
       invoker.sdk_category != "internal_only_idk") {
-    marker_category = invoker.sdk_category
-    not_needed([ "_not_in_sdk_category" ])
+    if (invoker.stable) {
+      marker_category = invoker.sdk_category
+      not_needed([ "_not_in_sdk_category" ])
+    } else {
+      # Unstable libraries in the SDK provide no more compatibility guarantee
+      # than libraries not in the SDK. Use the same marker for simplicity.
+      marker_category = _not_in_sdk_category
+    }
   } else {
     marker_category = _not_in_sdk_category
   }
