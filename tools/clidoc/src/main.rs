@@ -66,14 +66,6 @@ struct Opt {
     #[argh(option)]
     depfile: Option<PathBuf>,
 
-    /// path to sdk manifest used to add files read by ffx to the depfile.
-    #[argh(option)]
-    sdk_manifest: Option<PathBuf>,
-
-    /// root of the sdk for ffx
-    #[argh(option)]
-    sdk_root: Option<PathBuf>,
-
     /// isolate-dir to use with ffx
     #[argh(option)]
     isolate_dir: Option<PathBuf>,
@@ -223,8 +215,6 @@ fn run(opt: Opt) -> Result<()> {
             ffx_doc::write_formatted_output_for_ffx(
                 &cmd_path,
                 output_path,
-                &opt.sdk_root,
-                &opt.sdk_manifest,
                 &opt.isolate_dir,
                 &opt.subtool_manifest,
             )

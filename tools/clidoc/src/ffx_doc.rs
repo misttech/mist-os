@@ -26,8 +26,6 @@ pub(crate) struct SubToolManifestEntry {
 pub(crate) fn write_formatted_output_for_ffx(
     cmd_path: &PathBuf,
     output_path: &PathBuf,
-    sdk_root_path: &Option<PathBuf>,
-    sdk_manifest_path: &Option<PathBuf>,
     isolate_dir_path: &Option<PathBuf>,
     subtool_manifest_path: &Option<PathBuf>,
 ) -> Result<(String, String, PathBuf)> {
@@ -38,17 +36,7 @@ pub(crate) fn write_formatted_output_for_ffx(
 
     let mut cmd = Command::new(&cmd_path);
     cmd.args(["--no-environment"]);
-    // ffx can't really run standalone in a hermetic environment, so we need to impute some
-    // configuration.
-    if let Some(sdk_root) = sdk_root_path {
-        cmd.args(["--config", &format!("sdk.root={}", sdk_root.to_string_lossy())]);
-    }
-    if let Some(sdk_manifest) = sdk_manifest_path {
-        cmd.args([
-            "--config",
-            &format!("sdk.module={}", sdk_manifest.file_name().unwrap().to_string_lossy()),
-        ]);
-    }
+
     if let Some(subtool_manifest) = subtool_manifest_path {
         cmd.args([
             "--config",

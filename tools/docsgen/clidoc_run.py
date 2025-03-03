@@ -43,16 +43,6 @@ def main() -> int:
         help="Depfile location.",
     )
     parser.add_argument(
-        "--sdk-root",
-        type=str,
-        required=True,
-    )
-    parser.add_argument(
-        "--sdk-manifest",
-        type=str,
-        required=True,
-    )
-    parser.add_argument(
         "--isolate-dir",
         type=str,
         required=True,
@@ -93,8 +83,6 @@ def run_clidoc(args, cmd_list):
         args.output,
         "--depfile",
         args.depfile,
-        "--sdk-manifest",
-        args.sdk_manifest,
         "--subtool-manifest",
         args.subtool_manifest,
     ] + cmds
