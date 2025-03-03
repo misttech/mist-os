@@ -27,8 +27,8 @@ rustc_library("modules") {
 
   deps = [
     "//src/starnix/kernel:starnix_core",
-    "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-uapi",
+    "//src/starnix/lib/starnix_sync",
     "//src/starnix/modules/cgroupfs",
     "//src/starnix/modules/device-mapper",
     "//src/starnix/modules/ext4",

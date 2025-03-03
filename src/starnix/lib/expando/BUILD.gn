@@ -13,7 +13,7 @@ group("tests") {
 rustc_library("expando") {
   edition = "2021"
   sources = [ "src/lib.rs" ]
-  deps = [ "//src/starnix/lib/starnix-sync" ]
+  deps = [ "//src/starnix/lib/starnix_sync" ]
 
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
   with_unit_tests = true

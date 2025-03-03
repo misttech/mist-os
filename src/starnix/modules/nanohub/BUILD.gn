@@ -32,8 +32,8 @@ rustc_library("nanohub") {
     "//sdk/rust/zx",
     "//src/lib/fuchsia-component",
     "//src/starnix/kernel:starnix_core",
-    "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-syscalls",
     "//src/starnix/lib/starnix-uapi",
+    "//src/starnix/lib/starnix_sync",
   ]
 }

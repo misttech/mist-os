@@ -58,7 +58,10 @@ mod example {
 
     impl<T> LockFor<LockLevel> for Mutex<T> {
         type Data = T;
-        type Guard<'l> = MutexGuard<'l, T> where Self: 'l;
+        type Guard<'l>
+            = MutexGuard<'l, T>
+        where
+            Self: 'l;
 
         fn lock(&self) -> Self::Guard<'_> {
             self.lock().unwrap()

@@ -7,7 +7,7 @@ import("//build/rust/rustc_library.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":starnix-syncio-tests" ]
+  deps = [ ":starnix_syncio-tests" ]
 }
 
 rustc_library("syncio") {
@@ -39,7 +39,7 @@ rustc_library("syncio") {
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 
-fuchsia_unittest_package("starnix-syncio-tests") {
+fuchsia_unittest_package("starnix_syncio-tests") {
   manifest = "meta/syncio-tests.cml"
   deps = [ ":syncio_test" ]
 }

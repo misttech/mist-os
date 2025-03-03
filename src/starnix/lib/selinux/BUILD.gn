@@ -88,8 +88,8 @@ rustc_library("selinux") {
     # Fuchsia/starnix builds use `fuchsia-inspect-contrib` for self-profiling.
     deps += [ "//src/lib/diagnostics/inspect/contrib/rust" ]
 
-    # Fuchsia/starnix builds use `starnix-sync` for lock primitives.
-    deps += [ "//src/starnix/lib/starnix-sync" ]
+    # Fuchsia/starnix builds use `starnix_sync` for lock primitives.
+    deps += [ "//src/starnix/lib/starnix_sync" ]
 
     # Fuchsia/starnix async tests rely on additional dependencies.
     test_deps += [
