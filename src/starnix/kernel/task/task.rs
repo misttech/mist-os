@@ -34,8 +34,8 @@ use starnix_uapi::signals::{
 use starnix_uapi::user_address::{MultiArchUserRef, UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    errno, error, from_status_like_fdio, pid_t, sigaction_t, sigaltstack, uapi, ucred,
-    CLD_CONTINUED, CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED, FUTEX_BITSET_MATCH_ANY,
+    errno, from_status_like_fdio, pid_t, sigaction_t, sigaltstack, uapi, ucred, CLD_CONTINUED,
+    CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED, FUTEX_BITSET_MATCH_ANY,
 };
 use std::collections::VecDeque;
 use std::ffi::CString;
@@ -1489,9 +1489,7 @@ impl Task {
             }
         }
 
-        security::check_task_capable(self, CAP_KILL)?;
-
-        error!(EPERM)
+        security::check_task_capable(self, CAP_KILL)
     }
 
     /// Interrupts the current task.
