@@ -4,8 +4,8 @@
 
 import("//build/rust/rustc_library.gni")
 
-rustc_library("device-mapper") {
-  name = "starnix-modules-device-mapper"
+rustc_library("device_mapper") {
+  name = "starnix-modules-device_mapper"
   edition = "2021"
 
   source_root = "lib.rs"
