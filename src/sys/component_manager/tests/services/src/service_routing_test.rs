@@ -13,10 +13,12 @@ use fuchsia_component_test::{
 };
 use fuchsia_fs::directory::{WatchEvent, WatchMessage, Watcher};
 use futures::channel::mpsc;
+use futures::lock::Mutex;
 use futures::{FutureExt, SinkExt, StreamExt, TryFutureExt, TryStreamExt};
 use log::*;
 use moniker::ChildName;
 use std::collections::HashSet;
+use std::sync::Arc;
 use test_case::test_case;
 use vfs::directory::entry::DirectoryEntry;
 use vfs::directory::helper::DirectlyMutable;
@@ -420,12 +422,19 @@ fn verify_instances(instances: Vec<String>, expected_len: usize) {
 async fn use_from_collection() {
     let builder = RealmBuilder::new().await.unwrap();
     let (service_directory_sender, mut service_directory_receiver) = mpsc::unbounded();
+    let (service_access_blocker_sender, service_access_blocker_receiver) = mpsc::unbounded();
+    let service_access_blocker_receiver =
+        Arc::new(Mutex::new(Some(service_access_blocker_receiver)));
     let service_accessing_child = builder
         .add_local_child(
             "service_accessing_child",
             move |h| {
                 let service_directory_sender = service_directory_sender.clone();
+                let service_access_blocker_receiver = service_access_blocker_receiver.clone();
                 async move {
+                    let mut service_access_blocker_receiver =
+                        service_access_blocker_receiver.lock().await.take().unwrap();
+                    let () = service_access_blocker_receiver.next().await.unwrap();
                     let service_directory = h.open_service::<fecho::EchoServiceMarker>().unwrap();
                     service_directory_sender.unbounded_send(service_directory).unwrap();
                     futures::future::pending().await
@@ -507,6 +516,7 @@ async fn use_from_collection() {
         .await
         .unwrap()
         .unwrap();
+    service_access_blocker_sender.unbounded_send(()).unwrap();
 
     let service_directory = service_directory_receiver.next().await.unwrap();
     let dir_entries = fuchsia_fs::directory::readdir(&service_directory).await.unwrap();
