@@ -7,12 +7,15 @@
 
 #include <cstddef>
 
+constexpr size_t kTlsDepAlign = 32;
 constexpr int kTlsLdDepDataValue = 23;
-constexpr ptrdiff_t kTlsLdDepBss1Offset = sizeof(int) + 1;
+constexpr ptrdiff_t kTlsLdDepBss1Offset = kTlsDepAlign + 1;
 
 extern "C" {
 
 int* get_tls_ld_dep_data();
+
+char* get_tls_ld_dep_bss0();
 
 char* get_tls_ld_dep_bss1();
 

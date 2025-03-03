@@ -84,6 +84,7 @@ constexpr const char* kGdWeakSymbolName = "get_tls_dep_weak";
 
 constexpr const char* kLdDataSymbolName = "get_tls_ld_dep_data";
 constexpr const char* kLdBss1SymbolName = "get_tls_ld_dep_bss1";
+constexpr const char* kLdBss0SymbolName = "get_tls_ld_dep_bss0";
 
 constexpr const char* kEarlyLoadedModuleSymbolName = "get_tls_initial_dep_data";
 
@@ -689,6 +690,38 @@ TYPED_TEST(DlTests, TlsGetAddrGlobalDynamicReloc) {
   // The offset of this uninitialized variable will always follow the
   // initialized int variable.
   EXPECT_EQ(tls_bss_got->offset + elfldltl::TlsTraits<>::kTlsRelativeBias, kExpectedBssOffset);
+}
+
+// TODO(https://fxbug.dev/342480690): Fold this test into a function shared with
+// the GD Reloc test case.
+TYPED_TEST(DlTests, TlsGetAddrLocalDynamicReloc) {
+  const std::string kTlsLdRelocFile = "tls-get-addr-local-dynamic-reloc.so";
+  constexpr size_type kExpectedDataOffset = 0u;
+  constexpr size_type kExpectedBssOffset = 32u;
+
+  if constexpr (!TestFixture::kSupportsDynamicTls) {
+    GTEST_SKIP() << "test requires dynamic TLS support";
+  }
+
+  OpenModule open(*this);
+  ASSERT_NO_FATAL_FAILURE(open.InitModule(kTlsLdRelocFile.c_str(), RTLD_NOW | RTLD_LOCAL,
+                                          {kLdDataSymbolName, kLdBss0SymbolName},
+                                          kLdDataSymbolName));
+  if (open.Skip()) {
+    // Skip if __tls_get_addr is not emitted on this machine.
+    GTEST_SKIP() << "test requires __tls_get_addr to resolve symbols";
+  }
+
+  // The TLS modid will be compared with what is shown by dl_iterate_phdr.
+  auto info = GetPhdrInfoForModule(this, kTlsLdRelocFile);
+
+  auto data_got = RunFunction<elfldltl::Elf<>::TlsGetAddrGot<>*>(open[kLdDataSymbolName]);
+  EXPECT_EQ(data_got->tls_modid, info.tls_modid());
+  EXPECT_EQ(data_got->offset + elfldltl::TlsTraits<>::kTlsRelativeBias, kExpectedDataOffset);
+
+  auto bss_got = RunFunction<elfldltl::Elf<>::TlsGetAddrGot<>*>(open[kLdBss0SymbolName]);
+  EXPECT_EQ(bss_got->tls_modid, info.tls_modid());
+  EXPECT_EQ(bss_got->offset + elfldltl::TlsTraits<>::kTlsRelativeBias, kExpectedBssOffset);
 }
 
 }  // namespace

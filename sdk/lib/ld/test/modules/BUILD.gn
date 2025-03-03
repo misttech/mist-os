@@ -97,6 +97,7 @@ group("dl-test-data.deps") {
     ":tls-desc-initial-dep-module",
     ":tls-desc-ld-dep-module",
     ":tls-get-addr-global-dynamic-reloc",
+    ":tls-get-addr-local-dynamic-reloc",
     ":tls-initial-dep-module",
     ":tls-ld-dep-module",
   ]
@@ -842,6 +843,8 @@ test_executable("tls-shlib-only") {
   ]
 }
 
+# TODO(https://fxbug.dev/396520084): Put tls-dep sources into a souce_set that
+# can be shared by targets.
 test_shared_library("tls-dep") {
   public = [ "tls-dep.h" ]
   sources = [ "tls-dep.cc" ]
@@ -932,17 +935,20 @@ test_loadable_module("tls-desc-initial-dep-module") {
 }
 
 test_loadable_module("tls-ld-dep-module") {
-  public = [ "tls-ld-dep.h" ]
-  sources = [ "tls-ld-dep.cc" ]
-  configs = [ "//build/config:no-tlsdesc" ]
+  sources = [
+    "tls-ld-dep-symbol.cc",
+    "tls-ld-dep.cc",
+    "tls-ld-dep.h",
+  ]
   deps = [ "//zircon/system/public" ]
+
+  configs = [ "//build/config:no-tlsdesc" ]
 
   # We need to allow undefined symbols, since __tls_get_addr will not be
   # defined by this module or any link-time dependency, but will be supplied by libc.
   remove_configs = [ "//build/config:symbol_no_undefined" ]
 
-  # TODO(https://fxbug.dev/42085421): LTO insists on using IE accesses here. Remove this
-  # when the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
+  # Don't build this module with LTO, so that the TLS access stays unoptimized.
   remove_configs += [ "//build/config/lto" ]
   configs += [ "//build/config/lto:no-lto" ]
 }
@@ -950,12 +956,14 @@ test_loadable_module("tls-ld-dep-module") {
 # This is the same as tls-dep-ld-module but using TLSDESC, with no __tls_get_addr.
 test_loadable_module("tls-desc-ld-dep-module") {
   public = [ "tls-ld-dep.h" ]
-  sources = [ "tls-ld-dep.cc" ]
+  sources = [
+    "tls-ld-dep-symbol.cc",
+    "tls-ld-dep.cc",
+  ]
   configs = [ "//build/config:tlsdesc" ]
   deps = [ "//zircon/system/public" ]
 
-  # TODO(https://fxbug.dev/42085421): LTO insists on using IE accesses here. Remove this
-  # when the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
+  # Don't build this module with LTO, so that the TLS access stays unoptimized.
   remove_configs = [ "//build/config/lto" ]
   configs += [ "//build/config/lto:no-lto" ]
 }
@@ -1049,15 +1057,17 @@ test_executable("tls-ld") {
 
 test_shared_library("tls-ld-dep") {
   public = [ "tls-ld-dep.h" ]
-  sources = [ "tls-ld-dep.cc" ]
+  sources = [
+    "tls-ld-dep-symbol.cc",
+    "tls-ld-dep.cc",
+  ]
   configs = [ "//build/config:no-tlsdesc" ]
   deps = [
     "//sdk/lib/ld:static-tls-get-addr",
     "//zircon/system/public",
   ]
 
-  # TODO(https://fxbug.dev/42085421): LTO insists on using IE accesses here. Remove this
-  # when the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
+  # Don't build this module with LTO, so that the TLS access stays unoptimized.
   remove_configs = [ "//build/config/lto" ]
   configs += [ "//build/config/lto:no-lto" ]
 }
@@ -1939,9 +1949,6 @@ source_set("mock-tls-get-addr") {
   ]
 }
 
-# TODO(https://fxbug.dev/342480690): use tls-dep-module and make it a
-# symbol-suffixed module. Put tls-dep sources into a souce_set that can be
-# shared by targets.
 test_loadable_module("tls-get-addr-global-dynamic-reloc") {
   public = [ "tls-dep.h" ]
   sources = [ "tls-dep.cc" ]
@@ -1959,6 +1966,24 @@ test_loadable_module("tls-get-addr-global-dynamic-reloc") {
 
   # workaround for b/349448459 to remote-link successfully
   configs += [ "//build/config:remote_link_scandeps_workaround" ]
+}
+
+test_loadable_module("tls-get-addr-local-dynamic-reloc") {
+  public = [ "tls-ld-dep.h" ]
+  sources = [
+    "tls-ld-dep-symbol.cc",
+    "tls-ld-dep.cc",
+  ]
+  deps = [
+    ":mock-tls-get-addr",
+    "//zircon/system/public",
+  ]
+
+  configs = [ "//build/config:no-tlsdesc" ]
+
+  # Don't build this module with LTO, so that the TLS access stays unoptimized.
+  remove_configs = [ "//build/config/lto" ]
+  configs += [ "//build/config/lto:no-lto" ]
 }
 
 test_executable("llvm-profdata") {
