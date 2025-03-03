@@ -474,7 +474,7 @@ group("itertools") {
 }
 
 group("itoa") {
-  public_deps = [ ":itoa-v1_0_5" ]
+  public_deps = [ ":itoa-v1_0_14" ]
 }
 
 group("json5format") {
@@ -4448,7 +4448,7 @@ rust_library("csv-v1_3_1") {
 
   deps = []
   deps += [ ":csv-core-v0_1_12" ]
-  deps += [ ":itoa-v1_0_5" ]
+  deps += [ ":itoa-v1_0_14" ]
   deps += [ ":ryu-v1_0_3" ]
   deps += [ ":serde-v1_0_204" ]
 
@@ -7633,7 +7633,7 @@ rust_library("hyper-v0_14_19") {
   deps += [ ":http-v0_2_4" ]
   deps += [ ":httparse-v1_9_4" ]
   deps += [ ":httpdate-v1_0_2" ]
-  deps += [ ":itoa-v1_0_5" ]
+  deps += [ ":itoa-v1_0_14" ]
   deps += [ ":pin-project-lite-v0_2_13" ]
   deps += [ ":tokio-v1_38_1" ]
   deps += [ ":tower-service-v0_3_0" ]
@@ -8270,18 +8270,18 @@ rust_library("itoa-v0_4_8") {
   applicable_licenses = [ ":itoa-v0_4_8.license" ]
 }
 
-license("itoa-v1_0_5.license") {
+license("itoa-v1_0_14.license") {
   public_package_name = "itoa"
   license_files = [
-    "//third_party/rust_crates/vendor/itoa-1.0.5/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/itoa-1.0.5/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/itoa-1.0.14/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/itoa-1.0.14/LICENSE-MIT",
   ]
 }
 
-rust_library("itoa-v1_0_5") {
+rust_library("itoa-v1_0_14") {
   crate_name = "itoa"
-  crate_root = "//third_party/rust_crates/vendor/itoa-1.0.5/src/lib.rs"
-  output_name = "itoa-d5820561044d3a6e"
+  crate_root = "//third_party/rust_crates/vendor/itoa-1.0.14/src/lib.rs"
+  output_name = "itoa-f5836dac1151d209"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -8291,13 +8291,13 @@ rust_library("itoa-v1_0_5") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=d5820561044d3a6e",
-    "-Cextra-filename=-d5820561044d3a6e",
+    "-Cmetadata=f5836dac1151d209",
+    "-Cextra-filename=-f5836dac1151d209",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":itoa-v1_0_5.license" ]
+  applicable_licenses = [ ":itoa-v1_0_14.license" ]
 }
 
 rust_library("js-sys-v0_3_68") {
@@ -14991,7 +14991,7 @@ rust_library("serde_json-v1_0_128") {
 
   deps = []
   deps += [ ":memchr-v2_7_4" ]
-  deps += [ ":itoa-v1_0_5" ]
+  deps += [ ":itoa-v1_0_14" ]
   deps += [ ":ryu-v1_0_3" ]
   deps += [ ":serde-v1_0_204" ]
 
@@ -15095,7 +15095,7 @@ rust_library("serde_yaml-v0_9_14") {
 
   deps = []
   deps += [ ":indexmap-v1_9_2" ]
-  deps += [ ":itoa-v1_0_5" ]
+  deps += [ ":itoa-v1_0_14" ]
   deps += [ ":ryu-v1_0_3" ]
   deps += [ ":serde-v1_0_204" ]
   deps += [ ":unsafe-libyaml-v0_2_4" ]
@@ -17754,7 +17754,7 @@ rust_library("tuf-v0_3_0-beta13") {
   deps += [ ":futures-util-v0_3_30" ]
   deps += [ ":http-v0_2_4" ]
   deps += [ ":hyper-v0_14_19" ]
-  deps += [ ":itoa-v1_0_5" ]
+  deps += [ ":itoa-v1_0_14" ]
   deps += [ ":log-v0_4_22" ]
   deps += [ ":percent-encoding-v2_2_0" ]
   deps += [ ":serde-v1_0_204" ]

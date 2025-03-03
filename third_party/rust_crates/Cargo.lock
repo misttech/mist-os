@@ -906,7 +906,7 @@ name = "csv"
 version = "1.3.1"
 dependencies = [
  "csv-core",
- "itoa 1.0.5",
+ "itoa 1.0.14",
  "ryu",
  "serde",
 ]
@@ -1543,7 +1543,7 @@ dependencies = [
  "indoc",
  "iota",
  "itertools 0.10.1",
- "itoa 1.0.5",
+ "itoa 1.0.14",
  "json5format",
  "lazy_static",
  "libc",
@@ -2087,7 +2087,7 @@ dependencies = [
  "http-body",
  "httparse",
  "httpdate",
- "itoa 1.0.5",
+ "itoa 1.0.14",
  "pin-project-lite",
  "tokio",
  "tower-service",
@@ -2272,9 +2272,9 @@ checksum = "b71991ff56294aa922b450139ee08b3bfc70982c6b2c7562771375cf73542dd4"
 
 [[package]]
 name = "itoa"
-version = "1.0.5"
+version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fad582f4b9e86b6caa621cabeb0963332d92eea04729ab12892c2533951e6440"
+checksum = "d75a2a4b1b190afb6f5425f10f6a8f959d2ea0b9c2b1d79553551850539e4674"
 
 [[package]]
 name = "js-sys"
@@ -4296,7 +4296,7 @@ version = "1.0.128"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ff5456707a1de34e7e37f2a6fd3d3f808c318259cbd01ab6377795054b483d8"
 dependencies = [
- "itoa 1.0.5",
+ "itoa 1.0.14",
  "memchr",
  "ryu",
  "serde",
@@ -4331,7 +4331,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6d232d893b10de3eb7258ff01974d6ee20663d8e833263c99409d4b13a0209da"
 dependencies = [
  "indexmap",
- "itoa 1.0.5",
+ "itoa 1.0.14",
  "ryu",
  "serde",
  "unsafe-libyaml",
@@ -5069,7 +5069,7 @@ dependencies = [
  "futures-util",
  "http",
  "hyper",
- "itoa 1.0.5",
+ "itoa 1.0.14",
  "log",
  "percent-encoding 2.2.0",
  "ring",
