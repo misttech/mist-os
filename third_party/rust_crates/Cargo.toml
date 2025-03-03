@@ -1081,11 +1081,8 @@ group_visibility = { import = "//third_party/rust_crates/visibility.gni", variab
 [gn.package.trust-dns-resolver."0.22.0"]
 env_vars = [ "CARGO_PKG_VERSION=\\\"0.22.0\\\"" ]
 
-[gn.package.typenum."1.15.0"]
-env_vars = [
-  "TYPENUM_BUILD_CONSTS=../../../compat/typenum/consts.rs",
-  "TYPENUM_BUILD_OP=../../../compat/typenum/op.rs",
-]
+[gn.package.typenum."1.18.0"]
+license_files = ["LICENSE-APACHE"]
 
 [gn.package.unic-common."0.9.0"]
 env_vars = [ "CARGO_PKG_VERSION=\\\"0.9.0\\\"", "CARGO_PKG_NAME=\\\"unic-common\\\"",  "CARGO_PKG_DESCRIPTION=\\\"\\\"", ]

@@ -4387,7 +4387,7 @@ rust_library("crypto-common-v0_1_6") {
   deps = []
   deps += [ ":generic-array-v0_14_7" ]
   deps += [ ":rand_core-v0_6_4" ]
-  deps += [ ":typenum-v1_15_0" ]
+  deps += [ ":typenum-v1_18_0" ]
 
   rustenv = []
 
@@ -6863,7 +6863,7 @@ rust_library("generic-array-v0_14_7") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":typenum-v1_15_0" ]
+  deps += [ ":typenum-v1_18_0" ]
 
   rustenv = []
 
@@ -17844,38 +17844,32 @@ rust_proc_macro("typed-builder-v0_10_0") {
   applicable_licenses = [ ":typed-builder-v0_10_0.license" ]
 }
 
-license("typenum-v1_15_0.license") {
+license("typenum-v1_18_0.license") {
   public_package_name = "typenum"
-  license_files = [
-    "//third_party/rust_crates/vendor/typenum-1.15.0/LICENSE",
-    "//third_party/rust_crates/vendor/typenum-1.15.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/typenum-1.15.0/LICENSE-MIT",
-  ]
+  license_files =
+      [ "//third_party/rust_crates/vendor/typenum-1.18.0/LICENSE-APACHE" ]
 }
 
-rust_library("typenum-v1_15_0") {
+rust_library("typenum-v1_18_0") {
   crate_name = "typenum"
-  crate_root = "//third_party/rust_crates/vendor/typenum-1.15.0/src/lib.rs"
-  output_name = "typenum-c61aa3b105deff60"
+  crate_root = "//third_party/rust_crates/vendor/typenum-1.18.0/src/lib.rs"
+  output_name = "typenum-9a2354a9589ed275"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
 
-  rustenv = [
-    "TYPENUM_BUILD_CONSTS=../../../compat/typenum/consts.rs",
-    "TYPENUM_BUILD_OP=../../../compat/typenum/op.rs",
-  ]
+  rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=c61aa3b105deff60",
-    "-Cextra-filename=-c61aa3b105deff60",
+    "-Cmetadata=9a2354a9589ed275",
+    "-Cextra-filename=-9a2354a9589ed275",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":typenum-v1_15_0.license" ]
+  applicable_licenses = [ ":typenum-v1_18_0.license" ]
 }
 
 license("ucd-trie-v0_1_6.license") {

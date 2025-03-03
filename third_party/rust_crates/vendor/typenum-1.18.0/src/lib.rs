@@ -47,19 +47,8 @@
 #![warn(missing_docs)]
 #![cfg_attr(feature = "strict", deny(missing_docs))]
 #![cfg_attr(feature = "strict", deny(warnings))]
-#![cfg_attr(
-    feature = "cargo-clippy",
-    allow(
-        clippy::len_without_is_empty,
-        clippy::many_single_char_names,
-        clippy::new_without_default,
-        clippy::suspicious_arithmetic_impl,
-        clippy::type_complexity,
-        clippy::wrong_self_convention,
-    )
-)]
-#![cfg_attr(feature = "cargo-clippy", deny(clippy::missing_inline_in_public_items))]
-#![doc(html_root_url = "https://docs.rs/typenum/1.15.0")]
+#![doc(html_root_url = "https://docs.rs/typenum/1.18.0")]
+#![cfg_attr(docsrs, feature(doc_auto_cfg, doc_cfg))]
 
 // For debugging macros:
 // #![feature(trace_macros)]
@@ -67,19 +56,8 @@
 
 use core::cmp::Ordering;
 
-#[cfg(feature = "force_unix_path_separator")]
-mod generated {
-    include!(concat!(env!("OUT_DIR"), "/op.rs"));
-    include!(concat!(env!("OUT_DIR"), "/consts.rs"));
-}
-
-#[cfg(not(feature = "force_unix_path_separator"))]
-mod generated {
-    include!(env!("TYPENUM_BUILD_OP"));
-    include!(env!("TYPENUM_BUILD_CONSTS"));
-}
-
 pub mod bit;
+mod gen;
 pub mod int;
 pub mod marker_traits;
 pub mod operator_aliases;
@@ -91,14 +69,24 @@ pub mod array;
 
 pub use crate::{
     array::{ATerm, TArr},
-    consts::*,
-    generated::consts,
+    gen::consts,
     int::{NInt, PInt},
     marker_traits::*,
     operator_aliases::*,
     type_operators::*,
     uint::{UInt, UTerm},
 };
+
+#[doc(no_inline)]
+#[rustfmt::skip]
+pub use consts::*;
+
+#[cfg(feature = "const-generics")]
+pub use crate::gen::generic_const_mappings;
+
+#[cfg(feature = "const-generics")]
+#[doc(no_inline)]
+pub use generic_const_mappings::{Const, ToUInt, U};
 
 /// A potential output from `Cmp`, this is the type equivalent to the enum variant
 /// `core::cmp::Ordering::Greater`.
