@@ -6,7 +6,7 @@ import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 import("//src/starnix/kernel/args.gni")
 
-rustc_library("starnix-syscalls") {
+rustc_library("starnix_syscalls") {
   name = "starnix_syscalls"
   edition = "2021"
   version = "0.1.0"
