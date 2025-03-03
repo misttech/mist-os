@@ -10,6 +10,7 @@
 #include <cinttypes>
 #include <cstdint>
 #include <cstdio>
+#include <format>
 #include <map>
 #include <string>
 
@@ -22,8 +23,10 @@ namespace unwinder {
 
 namespace {
 
-// The CIE ID that distinguishes a CIE from an FDE. They are only used in version 4.
-// In version 1, the CIE ID is 0.
+// The CIE ID that distinguishes a CIE from an FDE. In the eh_frame section (version 1), the CIE ID
+// is always zero. In the debug_frame section (version 4), the value is either a 4 byte or 8 byte
+// value, depending on whether the section is encoded as 32 bit or 64 bit DWARF. Regardless of the
+// size of the value, the value shall always be filled with 0xFF.
 const constexpr uint32_t kDwarf32CieId = std::numeric_limits<uint32_t>::max();
 const constexpr uint64_t kDwarf64CieId = std::numeric_limits<uint64_t>::max();
 
@@ -59,8 +62,8 @@ const constexpr uint64_t kDwarf64CieId = std::numeric_limits<uint64_t>::max();
 //
 // When returned, |ptr| will point to the beginning of the body, and |end| will point to the end
 // of the entry.
-[[nodiscard]] Error DecodeCieFdeHdrAndAdvance(Memory* elf, uint8_t version, uint64_t& ptr,
-                                              uint64_t& end, uint64_t& cie_id) {
+[[nodiscard]] Error DecodeCieFdeHdrAndAdvance(Memory* elf, UnwindTableSectionType section_type,
+                                              uint64_t& ptr, uint64_t& end, uint64_t& cie_id) {
   uint32_t short_length;
   if (auto err = elf->ReadAndAdvance(ptr, short_length); err.has_err()) {
     return err;
@@ -68,6 +71,9 @@ const constexpr uint64_t kDwarf64CieId = std::numeric_limits<uint64_t>::max();
   if (short_length == 0) {
     return Error("not a valid CIE/FDE");
   }
+
+  // The first 4 bytes of the length set to 0xFFFFFFFF indicates that this is 64 bit DWARF format
+  // and we can read the cie_id directly below after reading the full 8 byte length.
   if (short_length != 0xFFFFFFFF) {
     end = ptr + short_length;
   } else {
@@ -77,8 +83,8 @@ const constexpr uint64_t kDwarf64CieId = std::numeric_limits<uint64_t>::max();
     }
     end = ptr + length;
   }
-  // The cie_id is 8-bytes only when the version is 4 and it's a 64-bit DWARF format.
-  if (version == 4 && short_length == 0xFFFFFFFF) {
+  // The cie_id is 8-bytes only in debug_frame and it's a 64-bit DWARF format.
+  if (section_type == UnwindTableSectionType::kDebugFrame && short_length == 0xFFFFFFFF) {
     if (auto err = elf->ReadAndAdvance(ptr, cie_id); err.has_err()) {
       return err;
     }
@@ -87,15 +93,20 @@ const constexpr uint64_t kDwarf64CieId = std::numeric_limits<uint64_t>::max();
     if (auto err = elf->ReadAndAdvance(ptr, short_cie_id); err.has_err()) {
       return err;
     }
-    // Special handling for cie_id in .debug_frame so that the callers don't need to distinguish
-    // 32/64-bit DWARF to know whether an entry is CIE or FDE.
-    if (version == 4 && short_cie_id == kDwarf32CieId) {
-      cie_id = kDwarf64CieId;
-    } else {
-      cie_id = short_cie_id;
-    }
+
+    cie_id = short_cie_id;
   }
   return Success();
+}
+
+// Returns true if the given |cie_id| value is correct for |section_type|.
+[[nodiscard]] bool CheckCieId(UnwindTableSectionType section_type, uint64_t cie_id) {
+  switch (section_type) {
+    case UnwindTableSectionType::kEhFrame:
+      return cie_id == 0;
+    case UnwindTableSectionType::kDebugFrame:
+      return cie_id == kDwarf32CieId || cie_id == kDwarf64CieId;
+  }
 }
 
 }  // namespace
@@ -356,7 +367,7 @@ Error CfiModule::SearchEhFrame(uint64_t pc, DwarfCie& cie, DwarfFde& fde) {
     return err;
   }
 
-  if (auto err = DecodeFde(1, fde_ptr, cie, fde); err.has_err()) {
+  if (auto err = DecodeFde(UnwindTableSectionType::kEhFrame, fde_ptr, cie, fde); err.has_err()) {
     return err;
   }
   if (pc < fde.pc_begin || pc >= fde.pc_end) {
@@ -382,7 +393,7 @@ Error CfiModule::SearchDebugFrame(uint64_t pc, DwarfCie& cie, DwarfFde& fde) {
   debug_frame_map_it--;
   uint64_t fde_ptr = debug_frame_map_it->second;
 
-  if (auto err = DecodeFde(4, fde_ptr, cie, fde); err.has_err()) {
+  if (auto err = DecodeFde(UnwindTableSectionType::kDebugFrame, fde_ptr, cie, fde); err.has_err()) {
     return err;
   }
   if (pc < fde.pc_begin || pc >= fde.pc_end) {
@@ -399,17 +410,19 @@ Error CfiModule::BuildDebugFrameMap() {
   for (uint64_t p = debug_frame_ptr_, next_p; p < debug_frame_end_; p = next_p) {
     uint64_t hdr_p = p;
     uint64_t cie_id;
-    if (auto err = DecodeCieFdeHdrAndAdvance(elf_, 4, p, next_p, cie_id); err.has_err()) {
+    if (auto err =
+            DecodeCieFdeHdrAndAdvance(elf_, UnwindTableSectionType::kDebugFrame, p, next_p, cie_id);
+        err.has_err()) {
       return err;
     }
-    if (cie_id == kDwarf64CieId) {
+    if (CheckCieId(UnwindTableSectionType::kDebugFrame, cie_id)) {
       if (fde_address_encoding) {
         // Assume address encoding is the same for all CIEs. Skip all other CIEs to accelerate.
         continue;
       }
       DwarfCie cie;
       // This will only be called once, so it's fine that |DecodeCie| decodes the header again.
-      if (auto err = DecodeCie(4, hdr_p, cie); err.has_err()) {
+      if (auto err = DecodeCie(UnwindTableSectionType::kDebugFrame, hdr_p, cie); err.has_err()) {
         return err;
       }
       fde_address_encoding = cie.fde_address_encoding;
@@ -423,23 +436,22 @@ Error CfiModule::BuildDebugFrameMap() {
       debug_frame_map_.emplace(pc_begin, hdr_p);
     }
   }
+
   if (debug_frame_map_.empty()) {
     return Error("empty .debug_frame");
   }
   return Success();
 }
 
-// When version == 1, check the spec at
-// https://refspecs.linuxfoundation.org/LSB_5.0.0/LSB-Core-generic/LSB-Core-generic/ehframechpt.html
-// When version == 4, check the spec at http://www.dwarfstd.org/doc/DWARF5.pdf
-Error CfiModule::DecodeCie(uint8_t version, uint64_t cie_ptr, DwarfCie& cie) {
+Error CfiModule::DecodeCie(UnwindTableSectionType type, uint64_t cie_ptr, DwarfCie& cie) {
   uint64_t cie_id;
-  if (auto err = DecodeCieFdeHdrAndAdvance(elf_, version, cie_ptr, cie.instructions_end, cie_id);
+  if (auto err = DecodeCieFdeHdrAndAdvance(elf_, type, cie_ptr, cie.instructions_end, cie_id);
       err.has_err()) {
     return err;
   }
-  if ((version == 1 && cie_id != 0) || (version == 4 && cie_id != kDwarf64CieId)) {
-    return Error("not a valid CIE");
+
+  if (!CheckCieId(type, cie_id)) {
+    return Error("CIE_ID invalid for this version = %d, cie_id = %" PRIx64, type, cie_id);
   }
 
   // Versions should match.
@@ -447,7 +459,7 @@ Error CfiModule::DecodeCie(uint8_t version, uint64_t cie_ptr, DwarfCie& cie) {
   if (auto err = elf_->ReadAndAdvance(cie_ptr, this_version); err.has_err()) {
     return err;
   }
-  if (this_version != version) {
+  if (this_version != type) {
     return Error("unexpected CIE version: %d", this_version);
   }
 
@@ -464,7 +476,7 @@ Error CfiModule::DecodeCie(uint8_t version, uint64_t cie_ptr, DwarfCie& cie) {
     }
   }
 
-  if (version == 4) {
+  if (type == UnwindTableSectionType::kDebugFrame) {
     // Read the address_size.
     uint8_t address_size;
     if (auto err = elf_->ReadAndAdvance(cie_ptr, address_size); err.has_err()) {
@@ -494,7 +506,7 @@ Error CfiModule::DecodeCie(uint8_t version, uint64_t cie_ptr, DwarfCie& cie) {
   if (auto err = elf_->ReadSLEB128AndAdvance(cie_ptr, cie.data_alignment_factor); err.has_err()) {
     return err;
   }
-  if (version == 4) {
+  if (type == UnwindTableSectionType::kDebugFrame) {
     uint64_t return_address_register;
     if (auto err = elf_->ReadULEB128AndAdvance(cie_ptr, return_address_register); err.has_err()) {
       return err;
@@ -514,7 +526,7 @@ Error CfiModule::DecodeCie(uint8_t version, uint64_t cie_ptr, DwarfCie& cie) {
     // we have never seen a use case of augmentation string in .debug_frame, which is understandable
     // because the augmentation string is mainly useful for unwinding during an exception.
     // For now, we don't support it.
-    if (version == 4) {
+    if (type == UnwindTableSectionType::kDebugFrame) {
       return Error("unsupported augmentation string in .debug_frame: %s",
                    augmentation_string.c_str());
     }
@@ -562,21 +574,22 @@ Error CfiModule::DecodeCie(uint8_t version, uint64_t cie_ptr, DwarfCie& cie) {
   return Success();
 }
 
-Error CfiModule::DecodeFde(uint8_t version, uint64_t fde_ptr, DwarfCie& cie, DwarfFde& fde) {
+Error CfiModule::DecodeFde(UnwindTableSectionType section_type, uint64_t fde_ptr, DwarfCie& cie,
+                           DwarfFde& fde) {
   uint64_t cie_offset;
   if (auto err =
-          DecodeCieFdeHdrAndAdvance(elf_, version, fde_ptr, fde.instructions_end, cie_offset);
+          DecodeCieFdeHdrAndAdvance(elf_, section_type, fde_ptr, fde.instructions_end, cie_offset);
       err.has_err()) {
     return err;
   }
 
   uint64_t cie_ptr;
-  if (version == 4) {
+  if (section_type == UnwindTableSectionType::kDebugFrame) {
     cie_ptr = debug_frame_ptr_ + cie_offset;
   } else {
     cie_ptr = fde_ptr - 4 - cie_offset;
   }
-  if (auto err = DecodeCie(version, cie_ptr, cie); err.has_err()) {
+  if (auto err = DecodeCie(section_type, cie_ptr, cie); err.has_err()) {
     return err;
   }
 
