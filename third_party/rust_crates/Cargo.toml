@@ -135,7 +135,7 @@ hyper = { version = "0.14.19", default-features = false, features = ["stream", "
 indexmap = "1.9.2"
 iota = "0.2.3"
 itertools = "0.10"
-itoa = "0.4"
+itoa = "1.0"
 json5format = "0.2.6"
 lazy_static = "1.4"
 libc = { version = "0.2.169", features = ["extra_traits"] }

@@ -474,7 +474,7 @@ group("itertools") {
 }
 
 group("itoa") {
-  public_deps = [ ":itoa-v0_4_8" ]
+  public_deps = [ ":itoa-v1_0_5" ]
 }
 
 group("json5format") {

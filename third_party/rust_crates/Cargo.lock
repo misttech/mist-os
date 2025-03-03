@@ -1543,7 +1543,7 @@ dependencies = [
  "indoc",
  "iota",
  "itertools 0.10.1",
- "itoa 0.4.8",
+ "itoa 1.0.5",
  "json5format",
  "lazy_static",
  "libc",
