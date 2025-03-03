@@ -99,8 +99,8 @@ conditions apply:
 ## Debugging non-inlined calls {:#debugging-non-inlined-calls}
 
 Note: This approach only works for developers who are able to modify a Fuchsia
-checkout as part of their workflow. See https://fxbug.dev/42053164 for a tool
-that will work for OOT workflows.
+checkout as part of their workflow. If you need a tool for working OOT
+(out of tree), see [fxbug.dev/42053164](https://fxbug.dev/42053164).
 
 The `fdf_env_dispatcher_dump` function can help driver authors debug why some
 calls are not made inline. This function logs the count and reasons for
@@ -121,7 +121,8 @@ INFO: [my_driver.cc(212)] No queued tasks
 ```
 
 To call this function during development you will need to modify the restricted
-symbols [allowlist][restricted-symbols] and OTA/flash with that change.
+symbols [allowlist][restricted-symbols] and OTA/flash your Fuchsia device with
+that change.
 
 <!-- Reference links -->
 
