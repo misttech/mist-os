@@ -77,10 +77,8 @@ void Dwc3::CmdEpStartTransfer(const Endpoint& ep, zx_paddr_t trb_phys) {
       .set_CMDIOC(1)
       .WriteTo(mmio);
 
-  while (true) {
-    if (DEPCMD::Get(ep_num).ReadFrom(mmio).CMDACT()) {
-      break;
-    }
+  while (DEPCMD::Get(ep_num).ReadFrom(mmio).CMDACT()) {
+    usleep(1000);
   }
 }
 
@@ -102,10 +100,8 @@ void Dwc3::CmdEpEndTransfer(const Endpoint& ep) {
       .set_HIPRI_FORCERM(1)
       .WriteTo(mmio);
 
-  while (true) {
-    if (DEPCMD::Get(ep_num).ReadFrom(mmio).CMDACT()) {
-      break;
-    }
+  while (DEPCMD::Get(ep_num).ReadFrom(mmio).CMDACT()) {
+    usleep(1000);
   }
 }
 
@@ -124,10 +120,8 @@ void Dwc3::CmdEpSetStall(const Endpoint& ep) {
       .set_CMDIOC(1)
       .WriteTo(mmio);
 
-  while (true) {
-    if (DEPCMD::Get(ep_num).ReadFrom(mmio).CMDACT()) {
-      break;
-    }
+  while (DEPCMD::Get(ep_num).ReadFrom(mmio).CMDACT()) {
+    usleep(1000);
   }
 }
 
@@ -146,10 +140,8 @@ void Dwc3::CmdEpClearStall(const Endpoint& ep) {
       .set_CMDIOC(1)
       .WriteTo(mmio);
 
-  while (true) {
-    if (DEPCMD::Get(ep_num).ReadFrom(mmio).CMDACT()) {
-      break;
-    }
+  while (DEPCMD::Get(ep_num).ReadFrom(mmio).CMDACT()) {
+    usleep(1000);
   }
 }
 

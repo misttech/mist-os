@@ -367,6 +367,7 @@ zx_status_t Dwc3::ResetHw() {
     if ((zx::clock::get_monotonic() - start) >= kHwResetTimeout) {
       return ZX_ERR_TIMED_OUT;
     }
+    usleep(1000);
   }
 
   return ZX_OK;
