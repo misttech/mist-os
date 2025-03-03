@@ -81,7 +81,11 @@ fuchsia_component_perf_test("archivist-logging-benchmark") {
 }
 
 group("build-only") {
-  deps = [ ":archivist-benchmarks" ]
+  testonly = true
+  deps = [
+    ":formatter-benchmarks-component",
+    ":logging-benchmarks-component",
+  ]
 }
 
 group("bench") {

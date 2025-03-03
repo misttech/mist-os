@@ -12,6 +12,11 @@ group("tests") {
   ]
 }
 
+group("build-only") {
+  testonly = true
+  deps = [ "stress-test:build-only" ]
+}
+
 group("ctf-tests") {
   testonly = true
   deps = [ "integration:ctf-tests" ]

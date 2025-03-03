@@ -305,7 +305,7 @@ group("archivist") {
 
 group("tests") {
   testonly = true
-  public_deps = [
+  deps = [
     ":archivist-fuzzers",
     ":archivist-tests",
     "build/scripts:tests",
@@ -313,7 +313,15 @@ group("tests") {
   ]
 }
 
+group("build-only") {
+  testonly = true
+  deps = [
+    "bench:build-only",
+    "tests:build-only",
+  ]
+}
+
 group("benchmarks") {
   testonly = true
-  public_deps = [ "bench" ]
+  deps = [ "bench" ]
 }
