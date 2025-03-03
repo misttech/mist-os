@@ -67,12 +67,6 @@
             availability: "optional",
         },
         {
-            directory: "dev-hrtimer",
-            from: "void",
-            to: "#kernel",
-            availability: "optional",
-        },
-        {
             protocol: [ "fuchsia.tracing.provider.Registry" ],
             from: "parent",
             to: "#kernel",
