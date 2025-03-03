@@ -35,7 +35,7 @@ local_repository(
 )
 
 load(
-    "@fuchsia_sdk//fuchsia:deps.bzl",
+    "@rules_fuchsia//fuchsia:deps.bzl",
     "rules_fuchsia_deps",
 )
 
@@ -45,7 +45,7 @@ rules_fuchsia_deps()
 register_toolchains("@fuchsia_sdk//:fuchsia_toolchain_sdk")
 
 load(
-    "@fuchsia_sdk//fuchsia:clang.bzl",
+    "@rules_fuchsia//fuchsia:clang.bzl",
     "fuchsia_clang_repository",
 )
 

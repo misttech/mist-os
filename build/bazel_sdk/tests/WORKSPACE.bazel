@@ -70,7 +70,7 @@ fuchsia_build_config_repository(
 
 load("@fuchsia_build_config//:defs.bzl", "build_config")
 load(
-    "@fuchsia_sdk//fuchsia:clang.bzl",
+    "@rules_fuchsia//fuchsia:clang.bzl",
     "fuchsia_clang_repository",
 )
 
