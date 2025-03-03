@@ -4,7 +4,7 @@
 
 """Rule for defining a Fuchsia toolchain."""
 
-load("//fuchsia/private:providers.bzl", "FuchsiaComponentManifestShardCollectionInfo")
+load("@rules_fuchsia//fuchsia/private:providers.bzl", "FuchsiaComponentManifestShardCollectionInfo")
 
 def _fuchsia_toolchain_info_impl(ctx):
     return [platform_common.ToolchainInfo(

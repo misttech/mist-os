@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_package", "get_fuchsia_api_levels")
+load("@rules_fuchsia//fuchsia:defs.bzl", "fuchsia_package", "get_fuchsia_api_levels")
 load("//fuchsia/packaging:common_utils.bzl", "failure_test", "no_repo_default_api_level_failure_test", "unknown_override_api_level_failure_test", "unknown_repo_default_api_level_failure_test")
 load("//test_utils:api_levels.bzl", "some_valid_numerical_api_level_as_string")
 load(":fuchsia_package_checker_test.bzl", "fuchsia_package_checker_test", "no_repo_default_api_level_fuchsia_package_checker_test", "repo_default_api_level_next_fuchsia_package_checker_test", "repo_default_unknown_and_override_next_api_level_fuchsia_package_checker_test", "repo_default_unknown_api_level_fuchsia_package_checker_test")

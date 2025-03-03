@@ -4,7 +4,7 @@
 
 load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
 load(
-    "@fuchsia_sdk//fuchsia:licenses.bzl",
+    "@rules_fuchsia//fuchsia:licenses.bzl",
     "fuchsia_licenses_preprocess",
     "fuchsia_licenses_spdx",
 )

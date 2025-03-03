@@ -5,7 +5,7 @@
 # buildifier: disable=module-docstring
 load("@bazel_skylib//lib:paths.bzl", "paths")
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
-load("@fuchsia_sdk//fuchsia:private_defs.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "FuchsiaPackageInfo", "get_fuchsia_api_level", "get_fuchsia_sdk_toolchain")
+load("@rules_fuchsia//fuchsia:private_defs.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "FuchsiaPackageInfo", "get_fuchsia_api_level", "get_fuchsia_sdk_toolchain")
 load("//test_utils:py_test_utils.bzl", "PY_TOOLCHAIN_DEPS", "create_python3_shell_wrapper_provider")
 
 _PACKAGE_RESOURCE_ATTRS = {

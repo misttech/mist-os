@@ -50,6 +50,7 @@ rules_fuchsia_deps()
 
 fuchsia_sdk_repository(
     name = "fuchsia_sdk",
+    use_rules_fuchsia = True,
 )
 
 # Register the fuchsia_sdk toolchain

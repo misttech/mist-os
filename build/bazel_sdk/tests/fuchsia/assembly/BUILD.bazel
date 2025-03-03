@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 load(
-    "@fuchsia_sdk//fuchsia:assembly.bzl",
+    "@rules_fuchsia//fuchsia:assembly.bzl",
     "PARTITION_TYPE",
     "SLOT",
     "fuchsia_board_configuration",
@@ -29,7 +29,7 @@ load(
     "tuf_repo_root",
 )
 load(
-    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "@rules_fuchsia//fuchsia:defs.bzl",
     "fuchsia_component",
     "fuchsia_component_manifest",
     "fuchsia_package",
