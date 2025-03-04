@@ -766,6 +766,7 @@ function track-build-event {
   local is_clean_build="$9"
 
   local args_gn=""
+  local args_json=""
 
   metrics-read-config
   if [[ "${METRICS_LEVEL}" -eq 0 ]]; then
@@ -779,11 +780,14 @@ function track-build-event {
 
     args_gn="$(grep -E 'build_info_board|build_info_product|rbe_mode|is_debug|optimize|select_variant|compilation_mode' "${build_dir}"/args.gn | paste -sd ';' -)"
     args_gn="${args_gn//[[:blank:]]/}" # remove blanks
+
+    args_json=$(fx-command-run jq -c '{ b: .build_info_board, p: .build_info_product, r: .rbe_mode, c: .compilation_mode, o:.optimize, sv: .select_variant }' "${build_dir}"/args.json)
   else
     switches=""
     ninja_switches=""
     fuchsia_targets=""
     args_gn=""
+    args_json=""
   fi
 
   switches="${switches:0:100}"
@@ -792,10 +796,14 @@ function track-build-event {
 
   local args_gn1="${args_gn:0:100}"
   local args_gn2="${args_gn:100:100}"
+  local args_json1="${args_json:0:100}"
+  local args_json2="${args_json:100:100}"
 
   event_params=$(fx-command-run jq -c -n \
     --arg args_gn1 "${args_gn1}" \
     --arg args_gn2 "${args_gn2}" \
+    --arg args_json1 "${args_json1}" \
+    --arg args_json2 "${args_json2}" \
     --arg switches "${switches}" \
     --arg ninja_switches "${ninja_switches}" \
     --arg fuchsia_targets "${fuchsia_targets}" \
