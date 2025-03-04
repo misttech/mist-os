@@ -10,14 +10,10 @@ group("common") {
     "//sdk/fidl/fuchsia.component:fuchsia.component_cpp",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
     "//sdk/fidl/fuchsia.hardware.adb:fuchsia.hardware.adb_cpp",
-    "//sdk/lib/async-loop:async-loop-cpp",
-    "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/fdio",
     "//sdk/lib/sys/cpp",
     "//src/developer/adb/third_party/adb",
-    "//src/lib/fsl",
     "//zircon/system/ulib/sync:sync-cpp",
   ]
 }

@@ -88,8 +88,7 @@ class UsbAdbDevice : public fdf::DriverBase,
   explicit UsbAdbDevice(fdf::DriverStartArgs start_args,
                         fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : fdf::DriverBase("usb_adb", std::move(start_args), std::move(driver_dispatcher)),
-        checker_(dispatcher()),
-        devfs_connector_(fit::bind_member<&UsbAdbDevice::Serve>(this)) {
+        checker_(dispatcher()) {
     // TODO(https://fxrev.dev/333883656): Use SynchronizedDispatcher with
     // FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS instead.
     usb_loop_.StartThread("usb-adb-loop");
@@ -128,16 +127,7 @@ class UsbAdbDevice : public fdf::DriverBase,
   void ResetOrStopUsb() __TA_REQUIRES(checker_);
   void CheckUsbStopComplete() __TA_REQUIRES(checker_);
 
-  // Helpers and fields for exposing the service via devfs.
-  void Serve(fidl::ServerEnd<fadb::Device> server) {
-    device_bindings_.AddBinding(dispatcher(), std::move(server), this, fidl::kIgnoreBindingClosure);
-  }
-  zx::result<> CreateDevfsNode();
-
   fidl::ServerBindingGroup<fadb::Device> device_bindings_;
-  fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
-  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
-  driver_devfs::Connector<fadb::Device> devfs_connector_;
 
   // Structure to store pending transfer requests when there are not enough USB request buffers.
   struct txn_req_t {

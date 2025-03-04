@@ -54,10 +54,8 @@
             availability: "optional",
         },
         {
-            directory: "dev-adb",
-            rights: [ "r*" ],
-            path: "/dev/class/adb",
-            availability: "optional",
+            service: "fuchsia.hardware.adb.Service",
+            from: "parent",
         },
         {
             directory: "container_config",

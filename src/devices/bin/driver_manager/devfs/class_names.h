@@ -48,7 +48,6 @@ struct ServiceEntry {
 //                        "fidl.examples.echo.DriverEchoService", "echo_device"}},
 const std::unordered_map<std::string_view, ServiceEntry> kClassNameToService = {
     {"acpi", {ServiceEntry::kDevfs, "", ""}},
-    {"adb", {ServiceEntry::kDevfsAndService, "fuchsia.hardware.adb.Service", "adb"}},
     {"adc", {ServiceEntry::kDevfsAndService, "fuchsia.hardware.adc.Service", "device"}},
     {"aml-ram", {ServiceEntry::kDevfsAndService, "fuchsia.hardware.ram.metrics.Service", "device"}},
     {"audio-composite",

@@ -22,11 +22,9 @@
     ],
     offer: [
         {
-            directory: "dev-class",
+            service: "fuchsia.hardware.adb.Service",
             from: "parent",
-            as: "dev-adb",
             to: [ "#adb" ],
-            subdir: "adb",
         },
         {
             dictionary: "diagnostics",

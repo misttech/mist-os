@@ -52,7 +52,7 @@ const INPUT_ENDPOINT_NODE_ID: ino_t = 4;
 // Set to the same value as Linux.
 const FUNCTIONFS_MAGIC: u32 = 0xa647361;
 
-const ADB_DIRECTORY: &str = "/dev/class/adb";
+const ADB_DIRECTORY: &str = "/svc/fuchsia.hardware.adb.Service";
 
 /// Clear our wake proxy signal based on the number of outstanding reads we have.
 pub fn clear_wake_proxy_signal(event: &zx::EventPair, outstanding_reads: i32) {
@@ -306,7 +306,8 @@ fn connect_to_device(
     let Some(Ok(entry)) = dir.next() else {
         return error!(EBUSY);
     };
-    let path = entry.path().into_os_string().into_string().map_err(|_| errno!(EINVAL))?;
+    let path =
+        entry.path().join("adb").into_os_string().into_string().map_err(|_| errno!(EINVAL))?;
 
     let (client_channel, server_channel) = zx::Channel::create();
     fdio::service_connect(&path, server_channel).map_err(|_| errno!(EINVAL))?;

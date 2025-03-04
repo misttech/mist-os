@@ -136,7 +136,7 @@
             to: [ "#kernels" ],
         },
         {
-            directory: "dev-adb",
+            service: "fuchsia.hardware.adb.Service",
             from: "parent",
             to: [ "#kernels" ],
         },

@@ -141,11 +141,9 @@
             subdir: "gpu",
         },
         {
-            directory: "dev-class",
+            service: "fuchsia.hardware.adb.Service",
             from: "parent",
-            as: "dev-adb",
             to: [ "#starnix_runner" ],
-            subdir: "adb",
         },
         {
             protocol: [

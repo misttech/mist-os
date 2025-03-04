@@ -202,7 +202,7 @@ class UsbAdbTest : public zxtest::Test {
     });
 
     ASSERT_OK(driver_test_.StartDriver().status_value());
-    auto device = driver_test_.ConnectThroughDevfs<fadb::Device>(kDeviceName);
+    auto device = driver_test_.Connect<fadb::Service::Adb>();
     EXPECT_OK(device.status_value());
     client_.Bind(std::move(device.value()));
   }

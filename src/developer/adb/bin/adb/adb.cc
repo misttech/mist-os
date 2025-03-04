@@ -4,19 +4,11 @@
 
 #include "adb.h"
 
-#include <lib/async-loop/cpp/loop.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fdio/directory.h>
+#include <lib/component/incoming/cpp/service_member_watcher.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include <filesystem>
-
-#include "src/lib/fsl/io/device_watcher.h"
-
 namespace adb {
-
-// Discover the first ADB capable device. We only support one ADB connection as of now.
-constexpr char kAdbDirectory[] = "/dev/class/adb";
 
 void Adb::ReceiveCallback(
     fidl::WireUnownedResult<fuchsia_hardware_adb::UsbAdbImpl::Receive>& result) {
@@ -171,12 +163,12 @@ zx::result<zx::socket> Adb::GetServiceSocket(std::string_view service_name, std:
 }
 
 zx_status_t Adb::Init(DeviceConnector* connector) {
-  FX_LOGS(DEBUG) << "Only supports 1 adb device. Waiting for device to show up at "
-                 << kAdbDirectory;
+  FX_LOGS(DEBUG) << "Only supports 1 adb device. Waiting for device to show up at /svc/"
+                 << fuchsia_hardware_adb::Service::Name;
   auto dev = connector->ConnectToFirstDevice();
   if (dev.is_error() || !dev->is_valid()) {
-    FX_LOGS(ERROR) << "Could not connect to device at " << kAdbDirectory << ": "
-                   << dev.error_value();
+    FX_LOGS(ERROR) << "Could not connect to device at /svc/" << fuchsia_hardware_adb::Service::Name
+                   << ": " << dev.error_value();
     return dev.is_error() ? dev.error_value() : ZX_ERR_NOT_CONNECTED;
   }
 
@@ -216,33 +208,15 @@ zx::result<std::unique_ptr<Adb>> Adb::Create(async_dispatcher_t* dispatcher) {
   }
 
   // The default device connector that tries to connect to fuchsia_hardware_adb::Device
-  // implementations by looking for the first device that appears on /dev/class/adb
+  // implementations by looking for the first device that appears in
+  // /svc/fuchsia.hardware.adb.Service
   class DefaultConnector : public DeviceConnector {
    public:
     explicit DefaultConnector() = default;
 
     zx::result<fidl::ClientEnd<fuchsia_hardware_adb::Device>> ConnectToFirstDevice() override {
-      async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-      fidl::ClientEnd<fuchsia_hardware_adb::Device> client;
-      auto watcher = fsl::DeviceWatcher::Create(
-          kAdbDirectory,
-          [&](const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename) {
-            zx::result client_end =
-                component::ConnectAt<fuchsia_hardware_adb::Device>(dir, filename);
-            if (client_end.is_ok() && !client.is_valid()) {
-              client = std::move(client_end.value());
-              loop.Quit();
-            }
-          },
-          loop.dispatcher());
-      if (!watcher) {
-        FX_LOGS(ERROR) << "Could not create device watcher";
-        return zx::error(ZX_ERR_NOT_FOUND);
-      }
-
-      loop.Run();
-
-      return zx::ok(std::move(client));
+      return component::SyncServiceMemberWatcher<fuchsia_hardware_adb::Service::Adb>()
+          .GetNextInstance(false);
     }
   } default_connector;
 
