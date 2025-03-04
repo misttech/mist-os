@@ -133,6 +133,47 @@ class VmCowPages final : public VmHierarchyBase,
     return 0;
   }
 
+  // Similar to LockedPtr, but holds a RefPtr instead of a raw pointer.
+  class LockedRefPtr {
+   public:
+    LockedRefPtr() = default;
+    ~LockedRefPtr() { release(); }
+    LockedRefPtr(LockedRefPtr&& l) = default;
+    LockedRefPtr(const fbl::RefPtr<VmCowPages>& object, VmLockAcquireMode mode)
+        : LockedRefPtr(object, object->lock_order(), mode) {}
+    LockedRefPtr(fbl::RefPtr<VmCowPages> object, uint64_t lock_order, VmLockAcquireMode mode)
+        : ptr_(ktl::move(object)),
+          lock_(Guard<VmoLockType>(AssertOrderedLock, ptr_->lock(), lock_order, mode).take()) {}
+    ktl::pair<fbl::RefPtr<VmCowPages>, Guard<VmoLockType>::Adoptable> take() {
+      return {ktl::move(ptr_), ktl::move(lock_)};
+    }
+
+    VmCowPages& locked() const TA_ASSERT(locked().lock()) { return *ptr_; }
+
+    fbl::RefPtr<VmCowPages>&& release() {
+      if (ptr_) {
+        Guard<VmoLockType> guard{AdoptLock, ptr_->lock(), ktl::move(lock_)};
+      }
+      return ktl::move(ptr_);
+    }
+
+    VmCowPages* get() const { return ptr_.get(); }
+    VmCowPages& operator*() const { return *ptr_; }
+    VmCowPages* operator->() const { return get(); }
+
+    explicit operator bool() const { return !!ptr_; }
+    LockedRefPtr& operator=(LockedRefPtr&& other) {
+      release();
+      ptr_ = ktl::move(other.ptr_);
+      lock_ = ktl::move(other.lock_);
+      return *this;
+    }
+
+   private:
+    fbl::RefPtr<VmCowPages> ptr_;
+    Guard<VmoLockType>::Adoptable lock_;
+  };
+
   // Creates a copy-on-write clone with the desired parameters. This can fail due to various
   // internal states not being correct.
   zx_status_t CreateCloneLocked(SnapshotType type, bool require_unidirection, VmCowRange range,
@@ -822,6 +863,81 @@ class VmCowPages final : public VmHierarchyBase,
   friend class fbl::RefPtr<VmCowPages>;
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(VmCowPages);
+
+  // Helper class for managing a locked VmCowPages referenced by a raw pointer. This helper makes it
+  // easy pass around references to locked objects while retaining as much static analysis support
+  // as possible.
+  // This class needs to be declared fully inline here so that VmCowPages methods can reference it
+  // and so that this can reference the |lock()| member of VmCowPages.
+  class LockedPtr {
+   public:
+    LockedPtr() = default;
+    ~LockedPtr() { release(); }
+    LockedPtr(LockedPtr&& other) : ptr_(other.ptr_), lock_(other.take_lock()) {}
+    LockedPtr(VmCowPages* ptr, VmLockAcquireMode mode) : LockedPtr(ptr, ptr->lock_order(), mode) {}
+    LockedPtr(VmCowPages* ptr, uint64_t lock_order, VmLockAcquireMode mode) TA_EXCL(ptr->lock())
+        : ptr_(ptr),
+          lock_(Guard<VmoLockType>{AssertOrderedLock, ptr->lock(), lock_order, mode}.take()) {}
+    // Take both the pointer and the lock, leaving the LockedPtr empty. Caller must take ownership
+    // of the returned lock and release it.
+    ktl::pair<VmCowPages*, Guard<VmoLockType>::Adoptable> take() {
+      VmCowPages* ret = ptr_;
+      return {ret, take_lock()};
+    }
+    // Provide locked access to the underlying pointer. Must not be null.
+    VmCowPages& locked() const TA_ASSERT(locked().lock()) { return *ptr_; }
+    // Provide locked access toe the underlying pointer, or if the pointer is null locked access to
+    // the passed in object.
+    VmCowPages& locked_or(VmCowPages* self) const TA_REQ(self->lock())
+        TA_ASSERT(locked_or(self).lock()) {
+      if (ptr_) {
+        return *ptr_;
+      }
+      return *self;
+    }
+    const VmCowPages& locked_or(const VmCowPages* self) const TA_REQ(self->lock())
+        TA_ASSERT(locked_or(self).lock()) {
+      if (ptr_) {
+        return *ptr_;
+      }
+      return *self;
+    }
+    // Release the lock, returning the underlying pointer.
+    VmCowPages* release() {
+      auto [ret, lock] = take();
+      if (ret) {
+        Guard<VmoLockType> guard{AdoptLock, ret->lock(), ktl::move(lock)};
+      }
+      return ret;
+    }
+
+    explicit operator bool() const { return !!ptr_; }
+    VmCowPages* get() const { return ptr_; }
+    VmCowPages& operator*() const { return *ptr_; }
+    VmCowPages* operator->() const { return ptr_; }
+
+    LockedPtr& operator=(LockedPtr&& other) {
+      release();
+      auto [ptr, lock] = other.take();
+      // Whatever ptr and lock are they come from a LockedPtr that is assumed to be valid, and so
+      // assigning them into ourselves is assumed to valid and maintain our lock invariant.
+      ptr_ = ptr;
+      lock_ = ktl::move(lock);
+      return *this;
+    }
+
+   private:
+    // Helper for moving out the lock_ and clearing the ptr_ at the same time.
+    Guard<VmoLockType>::Adoptable&& take_lock() {
+      ptr_ = nullptr;
+      return ktl::move(lock_);
+    }
+    // Underlying object pointer and lock. The invariant that this class maintains is that if ptr_
+    // is null, then lock_ is invalid, otherwise if ptr_ is non-null then lock_ holds the adoptable
+    // lock acquisition of that object.
+    VmCowPages* ptr_ = nullptr;
+    Guard<VmoLockType>::Adoptable lock_;
+  };
 
   // Transitions from Alive->Dead, freeing pages and cleaning up state. Responsibility of the caller
   // to validate that it is correct to be doing this transition. May drop the lock during its
