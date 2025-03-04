@@ -675,6 +675,12 @@ class VmCowPages final : public VmHierarchyBase,
       TA_REQ(lock());
   // Applies the specific operation to all mappings in the given range for against descendants/cow
   // children. The operation is not applied for this object.
+  // Takes ownership, and will drop, the lock for this object as children are iterated.
+  void RangeChangeUpdateCowChildren(VmCowRange range, RangeChangeOp op,
+                                    Guard<VmoLockType>::Adoptable adopt) TA_EXCL(lock());
+  // TODO(https://fxbug.dev/338300943): Under fine grained locking children cannot be iterated while
+  // this VMOs lock is held. This method exists while call sites transition to the above method that
+  // takes ownership of the lock.
   void RangeChangeUpdateCowChildrenLocked(VmCowRange range, RangeChangeOp op) TA_REQ(lock());
 
   // Promote pages in the specified range for reclamation under memory pressure. |offset| will be

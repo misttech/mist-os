@@ -5856,6 +5856,15 @@ void VmCowPages::RangeChangeUpdateCowChildrenLocked(VmCowRange range, RangeChang
   DEBUG_ASSERT(cumulative_parent_offset == 0);
 }
 
+void VmCowPages::RangeChangeUpdateCowChildren(VmCowRange range, RangeChangeOp op,
+                                              Guard<VmoLockType>::Adoptable adopt) {
+  Guard<VmoLockType> guard{AdoptLock, lock(), ktl::move(adopt)};
+  // TODO(https://fxbug.dev/338300943): Once all other usages of RangeChangeUpdateCowChildrenLocked
+  // have been removed this call can be replaced with an implementation that correctly walks the
+  // tree without relying on a hierarchy lock.
+  RangeChangeUpdateCowChildrenLocked(range, op);
+}
+
 void VmCowPages::ReclaimPageForEviction(vm_page_t* page, uint64_t offset) {
   canary_.Assert();
 
