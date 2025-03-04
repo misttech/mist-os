@@ -215,6 +215,8 @@ template("esp") {
       }
 
       args += [
+        "--arch",
+        target_cpu,
         "--efi-bootloader",
         rebase_path(gigaboot_bin, root_build_dir),
       ]
