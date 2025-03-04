@@ -33,7 +33,7 @@ pub use store_object_handle::{
 
 use crate::errors::FxfsError;
 use crate::filesystem::{
-    ApplyContext, ApplyMode, FxFilesystem, JournalingObject, SyncOptions, MAX_FILE_SIZE,
+    ApplyContext, ApplyMode, FxFilesystem, JournalingObject, SyncOptions, TxnGuard, MAX_FILE_SIZE,
 };
 use crate::log::*;
 use crate::lsm_tree::cache::{NullCache, ObjectCache};
@@ -57,7 +57,10 @@ use fidl_fuchsia_io as fio;
 use fprint::TypeFingerprint;
 use fuchsia_inspect::ArrayProperty;
 use fxfs_crypto::ff1::Ff1;
-use fxfs_crypto::{Crypt, KeyPurpose, StreamCipher, WrappedKeyV32, WrappedKeyV40, WrappedKeys};
+use fxfs_crypto::{
+    Crypt, KeyPurpose, StreamCipher, UnwrappedKey, WrappedKey, WrappedKeyV32, WrappedKeyV40,
+    WrappedKeys,
+};
 use once_cell::sync::OnceCell;
 use scopeguard::ScopeGuard;
 use serde::{Deserialize, Serialize};
@@ -214,6 +217,18 @@ pub struct HandleOptions {
     /// If true, data written to any attribute of this handle will not have per-block checksums
     /// computed.
     pub skip_checksums: bool,
+}
+
+/// Parameters for encrypting a newly created object.
+struct ObjectEncryptionOptions {
+    /// If set, the keys are treated as permanent and never evicted from the KeyManager cache.
+    /// This is necessary when keys are managed by another store; for example, the layer files
+    /// of a child store are objects in the root store, but they are encrypted with keys from the
+    /// child store.  Generally, most objects should have this set to `false`.
+    permanent: bool,
+    key_id: u64,
+    key: WrappedKey,
+    unwrapped_key: UnwrappedKey,
 }
 
 #[derive(Default)]
@@ -538,18 +553,18 @@ impl ObjectStore {
         object_cache: Box<dyn ObjectCache<ObjectKey, ObjectValue>>,
     ) -> Result<Arc<Self>, Error> {
         let handle = if options.object_id != INVALID_OBJECT_ID {
-            ObjectStore::create_object_with_id(
+            let handle = ObjectStore::create_object_with_id(
                 self,
                 transaction,
                 options.object_id,
                 HandleOptions::default(),
                 None,
-                None,
             )
-            .await?
+            .await?;
+            self.update_last_object_id(options.object_id);
+            handle
         } else {
-            ObjectStore::create_object(self, transaction, HandleOptions::default(), None, None)
-                .await?
+            ObjectStore::create_object(self, transaction, HandleOptions::default(), None).await?
         };
         let filesystem = self.filesystem();
         let store = if let Some(crypt) = options.crypt {
@@ -939,29 +954,17 @@ impl ObjectStore {
         Ok(data_object_handle)
     }
 
-    // See the comment on create_object for the semantics of the `crypt` argument.  If object_id ==
-    // INVALID_OBJECT_ID (which should usually be the case), an object ID will be chosen.
     async fn create_object_with_id<S: HandleOwner>(
         owner: &Arc<S>,
         transaction: &mut Transaction<'_>,
-        mut object_id: u64,
+        object_id: u64,
         options: HandleOptions,
-        mut crypt: Option<&dyn Crypt>,
-        wrapping_key_id: Option<u128>,
+        encryption_options: Option<ObjectEncryptionOptions>,
     ) -> Result<DataObjectHandle<S>, Error> {
+        debug_assert!(object_id != INVALID_OBJECT_ID);
         let store = owner.as_ref().as_ref();
-        if object_id == INVALID_OBJECT_ID {
-            object_id = store.get_next_object_id(transaction).await?;
-        } else {
-            store.update_last_object_id(object_id);
-        }
-        let store_crypt;
-        // See comment for equivalent in open_object.
-        let permanent = crypt.is_some();
-        if crypt.is_none() {
-            store_crypt = store.crypt();
-            crypt = store_crypt.as_deref();
-        }
+        // Don't permit creating unencrypted objects in an encrypted store.  The converse is OK.
+        debug_assert!(store.crypt().is_none() || encryption_options.is_some());
         let now = Timestamp::now();
         transaction.add(
             store.store_object_id(),
@@ -970,13 +973,11 @@ impl ObjectStore {
                 ObjectValue::file(1, 0, now.clone(), now.clone(), now.clone(), now, 0, None),
             ),
         );
-        let key_id = if wrapping_key_id.is_some() { FSCRYPT_KEY_ID } else { VOLUME_DATA_KEY_ID };
-        if let Some(crypt) = crypt {
-            let (key, unwrapped_key) = if let Some(wrapping_key_id) = wrapping_key_id {
-                crypt.create_key_with_id(object_id, wrapping_key_id).await?
-            } else {
-                crypt.create_key(object_id, KeyPurpose::Data).await?
-            };
+        let mut permanent_keys = false;
+        if let Some(ObjectEncryptionOptions { permanent, key_id, key, unwrapped_key }) =
+            encryption_options
+        {
+            permanent_keys = permanent;
             transaction.add(
                 store.store_object_id(),
                 Mutation::insert_object(
@@ -999,7 +1000,7 @@ impl ObjectStore {
         Ok(DataObjectHandle::new(
             owner.clone(),
             object_id,
-            permanent,
+            permanent_keys,
             DEFAULT_DATA_ATTRIBUTE_ID,
             0,
             FsverityState::None,
@@ -1009,27 +1010,66 @@ impl ObjectStore {
         ))
     }
 
-    /// There are instances where a store might not be an encrypted store, but the object should
-    /// still be encrypted.  For example, the layer files for child stores should be encrypted using
-    /// the crypt service of the child store even though the root store doesn't have encryption.  If
-    /// `crypt` is None, the default for the store is used (and prefer to pass None over passing the
-    /// store's crypt service directly because the latter will end up using a permanent key that
-    /// isn't purged when inactive).
-    /// TODO(https://fxbug.dev/364428824): Condense all optional arguments into a separate struct.
+    /// Creates an object in the store.
+    ///
+    /// If the store is encrypted, the object will be automatically encrypted as well.
+    /// If `wrapping_key_id` is set, the new keys will be wrapped with that specific key, and
+    /// otherwise the default data key is used.
     pub async fn create_object<S: HandleOwner>(
         owner: &Arc<S>,
         mut transaction: &mut Transaction<'_>,
         options: HandleOptions,
-        crypt: Option<&dyn Crypt>,
         wrapping_key_id: Option<u128>,
+    ) -> Result<DataObjectHandle<S>, Error> {
+        let store = owner.as_ref().as_ref();
+        let object_id = store.get_next_object_id(transaction.txn_guard()).await?;
+        let crypt = store.crypt();
+        let encryption_options = if let Some(crypt) = crypt {
+            let key_id =
+                if wrapping_key_id.is_some() { FSCRYPT_KEY_ID } else { VOLUME_DATA_KEY_ID };
+            let (key, unwrapped_key) = if let Some(wrapping_key_id) = wrapping_key_id {
+                crypt.create_key_with_id(object_id, wrapping_key_id).await?
+            } else {
+                crypt.create_key(object_id, KeyPurpose::Data).await?
+            };
+            Some(ObjectEncryptionOptions { permanent: false, key_id, key, unwrapped_key })
+        } else {
+            None
+        };
+        ObjectStore::create_object_with_id(
+            owner,
+            &mut transaction,
+            object_id,
+            options,
+            encryption_options,
+        )
+        .await
+    }
+
+    /// Creates an object using explicitly provided keys.
+    ///
+    /// There are some cases where an encrypted object needs to be created in an unencrypted store.
+    /// For example, when layer files for a child store are created in the root store, but they must
+    /// be encrypted using the child store's keys.  This method exists for that purpose.
+    pub(crate) async fn create_object_with_key<S: HandleOwner>(
+        owner: &Arc<S>,
+        mut transaction: &mut Transaction<'_>,
+        object_id: u64,
+        options: HandleOptions,
+        key: WrappedKey,
+        unwrapped_key: UnwrappedKey,
     ) -> Result<DataObjectHandle<S>, Error> {
         ObjectStore::create_object_with_id(
             owner,
             &mut transaction,
-            INVALID_OBJECT_ID,
+            object_id,
             options,
-            crypt,
-            wrapping_key_id,
+            Some(ObjectEncryptionOptions {
+                permanent: true,
+                key_id: VOLUME_DATA_KEY_ID,
+                key,
+                unwrapped_key,
+            }),
         )
         .await
     }
@@ -1769,10 +1809,11 @@ impl ObjectStore {
         }
     }
 
-    // Returns a new object ID that can be used.  This will create an object ID cipher if necessary.
-    // We require a transaction to guarantee that a guard is held because if we create a transaction
-    // to roll the object ID key, we skip taking the filesystem lock.
-    pub async fn get_next_object_id(&self, transaction: &Transaction<'_>) -> Result<u64, Error> {
+    /// Returns a new object ID that can be used.  This will create an object ID cipher if needed.
+    ///
+    /// If the object ID key needs to be rolled, a new transaction will be created and committed.
+    /// This transaction does not take the filesystem lock, hence `txn_guard`.
+    pub async fn get_next_object_id(&self, txn_guard: &TxnGuard<'_>) -> Result<u64, Error> {
         let object_id = self.maybe_get_next_object_id();
         if object_id != INVALID_OBJECT_ID {
             return Ok(object_id);
@@ -1791,7 +1832,7 @@ impl ObjectStore {
                     // compact.
                     skip_journal_checks: true,
                     borrow_metadata_space: true,
-                    txn_guard: Some(transaction.txn_guard()),
+                    txn_guard: Some(txn_guard),
                     ..Default::default()
                 },
             )
@@ -2335,15 +2376,9 @@ mod tests {
             .expect("new_transaction failed");
         let store = fs.root_store();
         object1 = Arc::new(
-            ObjectStore::create_object(
-                &store,
-                &mut transaction,
-                HandleOptions::default(),
-                None,
-                None,
-            )
-            .await
-            .expect("create_object failed"),
+            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
+                .await
+                .expect("create_object failed"),
         );
         transaction.commit().await.expect("commit failed");
         let mut transaction = fs
@@ -2352,15 +2387,9 @@ mod tests {
             .await
             .expect("new_transaction failed");
         object2 = Arc::new(
-            ObjectStore::create_object(
-                &store,
-                &mut transaction,
-                HandleOptions::default(),
-                None,
-                None,
-            )
-            .await
-            .expect("create_object failed"),
+            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
+                .await
+                .expect("create_object failed"),
         );
         transaction.commit().await.expect("commit failed");
 
@@ -2372,15 +2401,9 @@ mod tests {
             .await
             .expect("new_transaction failed");
         object3 = Arc::new(
-            ObjectStore::create_object(
-                &store,
-                &mut transaction,
-                HandleOptions::default(),
-                None,
-                None,
-            )
-            .await
-            .expect("create_object failed"),
+            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
+                .await
+                .expect("create_object failed"),
         );
         transaction.commit().await.expect("commit failed");
 
@@ -2415,15 +2438,9 @@ mod tests {
             .expect("new_transaction failed");
         let store = fs.root_store();
         let object = Arc::new(
-            ObjectStore::create_object(
-                &store,
-                &mut transaction,
-                HandleOptions::default(),
-                None,
-                None,
-            )
-            .await
-            .expect("create_object failed"),
+            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
+                .await
+                .expect("create_object failed"),
         );
 
         transaction.add(
@@ -2475,15 +2492,9 @@ mod tests {
             .expect("new_transaction failed");
         let store = fs.root_store();
         let object = Arc::new(
-            ObjectStore::create_object(
-                &store,
-                &mut transaction,
-                HandleOptions::default(),
-                None,
-                None,
-            )
-            .await
-            .expect("create_object failed"),
+            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
+                .await
+                .expect("create_object failed"),
         );
 
         transaction.commit().await.unwrap();
@@ -2613,15 +2624,9 @@ mod tests {
             .await
             .expect("new_transaction failed");
         let object = Arc::new(
-            ObjectStore::create_object(
-                &store,
-                &mut transaction,
-                HandleOptions::default(),
-                None,
-                None,
-            )
-            .await
-            .expect("create_object failed"),
+            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
+                .await
+                .expect("create_object failed"),
         );
         transaction.commit().await.expect("commit failed");
 
@@ -2680,7 +2685,6 @@ mod tests {
                 &mut transaction,
                 HandleOptions::default(),
                 None,
-                None,
             )
             .await
             .expect("create_object failed");
@@ -2713,15 +2717,10 @@ mod tests {
             .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
-        let child = ObjectStore::create_object(
-            &store,
-            &mut transaction,
-            HandleOptions::default(),
-            None,
-            None,
-        )
-        .await
-        .expect("create_object failed");
+        let child =
+            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
+                .await
+                .expect("create_object failed");
         transaction.commit().await.expect("commit failed");
         assert!(store.key_manager.get(child.object_id()).await.unwrap().is_some());
         store
@@ -2746,7 +2745,6 @@ mod tests {
                 &root_store,
                 &mut transaction,
                 HandleOptions::default(),
-                None,
                 None,
             )
             .await

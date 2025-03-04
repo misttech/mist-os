@@ -1117,10 +1117,10 @@ impl Journal {
             SuperBlockInstance::A.object_id(),
             HandleOptions::default(),
             None,
-            None,
         )
         .await
         .context("create super block")?;
+        root_store.update_last_object_id(SuperBlockInstance::A.object_id());
         super_block_a_handle
             .extend(&mut transaction, SuperBlockInstance::A.first_extent())
             .await
@@ -1131,10 +1131,10 @@ impl Journal {
             SuperBlockInstance::B.object_id(),
             HandleOptions::default(),
             None,
-            None,
         )
         .await
         .context("create super block")?;
+        root_store.update_last_object_id(SuperBlockInstance::B.object_id());
         super_block_b_handle
             .extend(&mut transaction, SuperBlockInstance::B.first_extent())
             .await
@@ -1145,7 +1145,6 @@ impl Journal {
             &root_parent,
             &mut transaction,
             journal_handle_options(),
-            None,
             None,
         )
         .await

@@ -1129,7 +1129,6 @@ mod tests {
                 &mut transaction,
                 HandleOptions::default(),
                 None,
-                None,
             )
             .await
             .expect("create_object failed")
@@ -1220,7 +1219,6 @@ mod tests {
                 &volume,
                 &mut transaction,
                 HandleOptions::default(),
-                None,
                 None,
             )
             .await
@@ -1333,7 +1331,6 @@ mod tests {
                 &volume,
                 &mut transaction,
                 HandleOptions::default(),
-                None,
                 None,
             )
             .await

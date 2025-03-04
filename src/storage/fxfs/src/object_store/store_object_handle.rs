@@ -1945,7 +1945,6 @@ mod tests {
     use bit_vec::BitVec;
     use fuchsia_async as fasync;
     use futures::join;
-    use fxfs_insecure_crypto::InsecureCrypt;
     use std::sync::Arc;
     use storage_device::fake_device::FakeDevice;
     use storage_device::DeviceHolder;
@@ -1979,15 +1978,10 @@ mod tests {
             .await
             .expect("new_transaction failed");
 
-        let object = ObjectStore::create_object(
-            &store,
-            &mut transaction,
-            HandleOptions::default(),
-            Some(&InsecureCrypt::new()),
-            None,
-        )
-        .await
-        .expect("create_object failed");
+        let object =
+            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
+                .await
+                .expect("create_object failed");
 
         let root_directory =
             Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");

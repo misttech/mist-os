@@ -20,6 +20,7 @@ use crate::object_store::{
 };
 use crate::serialized_types::{Version, VersionedLatest, LATEST_VERSION};
 use anyhow::{Context, Error};
+use fxfs_crypto::KeyPurpose;
 use once_cell::sync::OnceCell;
 use std::sync::atomic::Ordering;
 
@@ -196,14 +197,22 @@ impl ObjectStore {
 
         // Create and write a new layer, compacting existing layers.
         let parent_store = self.parent_store.as_ref().unwrap();
-        let new_object_tree_layer = ObjectStore::create_object(
-            parent_store,
-            &mut transaction,
-            HandleOptions { skip_journal_checks: true, ..Default::default() },
-            self.crypt().as_deref(),
-            None,
-        )
-        .await?;
+        let handle_options = HandleOptions { skip_journal_checks: true, ..Default::default() };
+        let new_object_tree_layer = if let Some(crypt) = self.crypt().as_deref() {
+            let object_id = parent_store.get_next_object_id(transaction.txn_guard()).await?;
+            let (key, unwrapped_key) = crypt.create_key(object_id, KeyPurpose::Data).await?;
+            ObjectStore::create_object_with_key(
+                parent_store,
+                &mut transaction,
+                object_id,
+                handle_options,
+                key,
+                unwrapped_key,
+            )
+            .await?
+        } else {
+            ObjectStore::create_object(parent_store, &mut transaction, handle_options, None).await?
+        };
         let writer = DirectWriter::new(&new_object_tree_layer, txn_options).await;
         let new_object_tree_layer_object_id = new_object_tree_layer.object_id();
         parent_store.add_to_graveyard(&mut transaction, new_object_tree_layer_object_id);
@@ -328,7 +337,6 @@ impl ObjectStore {
                 parent_store,
                 &mut transaction,
                 HandleOptions { skip_journal_checks: true, ..Default::default() },
-                None,
                 None,
             )
             .await?;

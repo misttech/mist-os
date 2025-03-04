@@ -28,7 +28,7 @@ use anyhow::{Context, Error};
 use assert_matches::assert_matches;
 use fidl_fuchsia_io as fio;
 use futures::join;
-use fxfs_crypto::{Crypt, WrappedKeys};
+use fxfs_crypto::{Crypt, KeyPurpose, WrappedKeys};
 use fxfs_insecure_crypto::InsecureCrypt;
 use mundane::hash::{Digest, Hasher, Sha256};
 use std::ops::Deref;
@@ -132,15 +132,24 @@ async fn install_items_in_store<K: Key, V: Value>(
         .new_transaction(lock_keys![], Options::default())
         .await
         .expect("new_transaction failed");
-    let layer_handle = ObjectStore::create_object(
-        &root_store,
-        &mut transaction,
-        HandleOptions::default(),
-        store.crypt().as_deref(),
-        None,
-    )
-    .await
-    .expect("create_object failed");
+    let layer_handle = if let Some(crypt) = store.crypt().as_deref() {
+        let object_id = store.get_next_object_id(transaction.txn_guard()).await.unwrap();
+        let (key, unwrapped_key) = crypt.create_key(object_id, KeyPurpose::Data).await.unwrap();
+        ObjectStore::create_object_with_key(
+            &root_store,
+            &mut transaction,
+            object_id,
+            HandleOptions::default(),
+            key,
+            unwrapped_key,
+        )
+        .await
+        .expect("create_object failed")
+    } else {
+        ObjectStore::create_object(&root_store, &mut transaction, HandleOptions::default(), None)
+            .await
+            .expect("create_object failed")
+    };
     transaction.commit().await.expect("commit failed");
 
     {
@@ -335,7 +344,6 @@ async fn test_malformed_allocation() {
             &root_store,
             &mut transaction,
             HandleOptions::default(),
-            None,
             None,
         )
         .await
@@ -694,15 +702,9 @@ async fn test_too_few_object_refs() {
             .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
-        ObjectStore::create_object(
-            &root_store,
-            &mut transaction,
-            HandleOptions::default(),
-            None,
-            None,
-        )
-        .await
-        .expect("create_object failed");
+        ObjectStore::create_object(&root_store, &mut transaction, HandleOptions::default(), None)
+            .await
+            .expect("create_object failed");
         transaction.commit().await.expect("commit failed");
     }
 
@@ -724,7 +726,7 @@ async fn test_missing_object_tree_layer_file() {
             .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
-        ObjectStore::create_object(&volume, &mut transaction, HandleOptions::default(), None, None)
+        ObjectStore::create_object(&volume, &mut transaction, HandleOptions::default(), None)
             .await
             .expect("create_object failed");
         transaction.commit().await.expect("commit failed");
@@ -1795,15 +1797,10 @@ async fn test_file_length_mismatch() {
             .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
-        let handle = ObjectStore::create_object(
-            &store,
-            &mut transaction,
-            HandleOptions::default(),
-            None,
-            None,
-        )
-        .await
-        .expect("create object failed");
+        let handle =
+            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
+                .await
+                .expect("create object failed");
         transaction.commit().await.expect("commit transaction failed");
 
         let mut transaction = fs
@@ -3111,7 +3108,6 @@ async fn test_full_disk() {
             &root_store,
             &mut transaction,
             HandleOptions::default(),
-            None,
             None,
         )
         .await

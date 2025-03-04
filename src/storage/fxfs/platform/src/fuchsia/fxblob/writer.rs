@@ -126,7 +126,6 @@ impl DeliveryBlobWriter {
             // Checksums are redundant for blobs, which are already content-verified.
             HandleOptions { skip_checksums: true, ..Default::default() },
             None,
-            None,
         )
         .await
         .context("Failed to create object.")?;

@@ -291,7 +291,7 @@ impl<S: HandleOwner> Directory<S> {
         casefold: bool,
     ) -> Result<Directory<S>, Error> {
         let store = owner.as_ref().as_ref();
-        let object_id = store.get_next_object_id(transaction).await?;
+        let object_id = store.get_next_object_id(transaction.txn_guard()).await?;
         let now = Timestamp::now();
         transaction.add(
             store.store_object_id(),
@@ -847,8 +847,7 @@ impl<S: HandleOwner> Directory<S> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
         let wrapping_key_id = self.wrapping_key_id.lock().unwrap().clone();
         let handle =
-            ObjectStore::create_object(self.owner(), transaction, options, None, wrapping_key_id)
-                .await?;
+            ObjectStore::create_object(self.owner(), transaction, options, wrapping_key_id).await?;
         self.add_child_file(transaction, name, &handle).await?;
         self.copy_project_id_to_object_in_txn(transaction, handle.object_id())?;
         Ok(handle)
@@ -864,7 +863,6 @@ impl<S: HandleOwner> Directory<S> {
             self.owner(),
             transaction,
             HandleOptions::default(),
-            None,
             wrapping_key_id,
         )
         .await?;
@@ -919,7 +917,7 @@ impl<S: HandleOwner> Directory<S> {
         // https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/limits.h.html.
         // See _POSIX_SYMLINK_MAX.
         ensure!(link.len() <= 256, FxfsError::BadPath);
-        let symlink_id = self.store().get_next_object_id(transaction).await?;
+        let symlink_id = self.store().get_next_object_id(transaction.txn_guard()).await?;
         transaction.add(
             self.store().store_object_id(),
             Mutation::insert_object(

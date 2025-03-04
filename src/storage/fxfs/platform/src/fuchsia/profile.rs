@@ -315,7 +315,7 @@ async fn record<T: RecordedVolume>(
     let fs = store.filesystem();
     let mut transaction = fs.clone().new_transaction(lock_keys![], Options::default()).await?;
     let handle =
-        ObjectStore::create_object(&volume, &mut transaction, HandleOptions::default(), None, None)
+        ObjectStore::create_object(&volume, &mut transaction, HandleOptions::default(), None)
             .await?;
     store.add_to_graveyard(&mut transaction, handle.object_id());
     transaction.commit().await?;
