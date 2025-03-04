@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_METADATA_CPP_TESTS_TEST_ROOT_TEST_ROOT_H_
-#define LIB_DRIVER_METADATA_CPP_TESTS_TEST_ROOT_TEST_ROOT_H_
+#ifndef LIB_DRIVER_METADATA_CPP_TESTS_METADATA_INTEGRATION_TEST_TEST_ROOT_TEST_ROOT_H_
+#define LIB_DRIVER_METADATA_CPP_TESTS_METADATA_INTEGRATION_TEST_TEST_ROOT_TEST_ROOT_H_
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.test/cpp/fidl.h>
@@ -46,4 +46,4 @@ class TestRootDriver : public fdf::DriverBase, public fidl::Server<fuchsia_hardw
 
 }  // namespace fdf_metadata::test
 
-#endif  // LIB_DRIVER_METADATA_CPP_TESTS_TEST_ROOT_TEST_ROOT_H_
+#endif  // LIB_DRIVER_METADATA_CPP_TESTS_METADATA_INTEGRATION_TEST_TEST_ROOT_TEST_ROOT_H_

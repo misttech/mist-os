@@ -1,6 +1,6 @@
-# Metadata Test
-The goal of `:metadata-test` is to make sure that drivers can send and
-receive metadata to each other using the `//sdk/lib/driver/metadata/cpp`
+# Metadata Integration Test
+The goal of `:metadata_integration_test` is to make sure that drivers can send
+and receive metadata to each other using the `//sdk/lib/driver/metadata/cpp`
 library. The test will spawn a driver test realm and include the following four
 drivers: `test_root`, `metadata_sender`, `metadata_forwarder`, and
 `metadata_retriever`.

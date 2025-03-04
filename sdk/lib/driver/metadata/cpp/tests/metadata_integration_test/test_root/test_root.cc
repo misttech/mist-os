@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "sdk/lib/driver/metadata/cpp/tests/test_root/test_root.h"
+#include "sdk/lib/driver/metadata/cpp/tests/metadata_integration_test/test_root/test_root.h"
 
 #include <fidl/fuchsia.driver.framework/cpp/natural_types.h>
 #include <lib/driver/component/cpp/driver_export.h>

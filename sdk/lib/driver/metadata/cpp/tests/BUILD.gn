@@ -11,46 +11,7 @@ group("tests") {
   testonly = true
   deps = [
     ":metadata_server_test",
-    ":metadata_test",
-  ]
-}
-
-bind_library("fuchsia_driver_metadata_test_bind_library") {
-  testonly = true
-  source = "fuchsia.driver.metadata.test.bind"
-  public_deps = [ "//src/devices/bind/fuchsia.test" ]
-}
-
-test("metadata_test_bin") {
-  testonly = true
-  output_name = "metadata_test"
-  sources = [ "metadata_test.cc" ]
-
-  deps = [
-    "fuchsia.hardware.test:fuchsia.hardware.test_cpp",
-    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
-    "//sdk/lib/device-watcher/cpp",
-    "//sdk/lib/driver/metadata/cpp",
-    "//sdk/lib/driver_test_realm/realm_builder/cpp",
-    "//src/lib/fxl/test:gtest_main",
-    "//src/lib/testing/loop_fixture",
-  ]
-}
-
-fuchsia_unittest_package("metadata_test") {
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-  deps = [
-    ":metadata_test_bin",
-    "metadata_forwarder_test_driver:component",
-    "metadata_retriever_test_driver:no_use_component",
-    "metadata_retriever_test_driver:use_component",
-    "metadata_sender_test_driver:expose_component",
-    "metadata_sender_test_driver:no_expose_component",
-    "test_root:component",
+    "metadata_integration_test:tests",
   ]
 }
 

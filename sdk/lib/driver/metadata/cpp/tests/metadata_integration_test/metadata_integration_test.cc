@@ -5,10 +5,10 @@
 #include <fidl/fuchsia.driver.test/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.test/cpp/fidl.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
-#include <lib/driver/metadata/cpp/tests/metadata_forwarder_test_driver/metadata_forwarder_test_driver.h>
-#include <lib/driver/metadata/cpp/tests/metadata_retriever_test_driver/metadata_retriever_test_driver.h>
-#include <lib/driver/metadata/cpp/tests/metadata_sender_test_driver/metadata_sender_test_driver.h>
-#include <lib/driver/metadata/cpp/tests/test_root/test_root.h>
+#include <lib/driver/metadata/cpp/tests/metadata_integration_test/metadata_forwarder_test_driver/metadata_forwarder_test_driver.h>
+#include <lib/driver/metadata/cpp/tests/metadata_integration_test/metadata_retriever_test_driver/metadata_retriever_test_driver.h>
+#include <lib/driver/metadata/cpp/tests/metadata_integration_test/metadata_sender_test_driver/metadata_sender_test_driver.h>
+#include <lib/driver/metadata/cpp/tests/metadata_integration_test/test_root/test_root.h>
 #include <lib/driver_test_realm/realm_builder/cpp/lib.h>
 #include <lib/fdio/fd.h>
 

@@ -16,12 +16,12 @@ group("tests") {
 group("drivers") {
   testonly = true
   deps = [
-    "tests/metadata_forwarder_test_driver:component",
-    "tests/metadata_retriever_test_driver:no_use_component",
-    "tests/metadata_retriever_test_driver:use_component",
-    "tests/metadata_sender_test_driver:expose_component",
-    "tests/metadata_sender_test_driver:no_expose_component",
-    "tests/test_root:component",
+    "tests/metadata_integration_test/metadata_forwarder_test_driver:component",
+    "tests/metadata_integration_test/metadata_retriever_test_driver:no_use_component",
+    "tests/metadata_integration_test/metadata_retriever_test_driver:use_component",
+    "tests/metadata_integration_test/metadata_sender_test_driver:expose_component",
+    "tests/metadata_integration_test/metadata_sender_test_driver:no_expose_component",
+    "tests/metadata_integration_test/test_root:component",
   ]
 }
 

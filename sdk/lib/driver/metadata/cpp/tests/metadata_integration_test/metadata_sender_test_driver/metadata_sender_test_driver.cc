@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "sdk/lib/driver/metadata/cpp/tests/metadata_sender_test_driver/metadata_sender_test_driver.h"
+#include "sdk/lib/driver/metadata/cpp/tests/metadata_integration_test/metadata_sender_test_driver/metadata_sender_test_driver.h"
 
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
