@@ -39,7 +39,7 @@ BT_SET_UP() {
 TEST_ssh_ipv4_port() {
   addr="127.0.0.1:8022"
   cat >> "${ffx}.mock_side_effects" << EOF
-  if [ "\$3" == "target" ]; then
+  if [ "\$3" == "target" ] || [ "\$1" == "target" ]; then
      echo $addr
   else
      echo "/path/to/ssh.priv"
@@ -53,7 +53,7 @@ EOF
 TEST_ssh_ipv6_port() {
     addr="[fe80::7:8%eth0]:222"
     cat >> "${ffx}.mock_side_effects" << EOF
-  if [ "\$3" == "target" ]; then
+  if [ "\$3" == "target" ] || [ "\$1" == "target" ]; then
      echo $addr
   else
      echo "/path/to/ssh.priv"
@@ -82,7 +82,7 @@ TEST_ssh_invalid_ipv6_port() {
 TEST_ssh_addr() {
   addr="127.0.0.1"
     cat >> "${ffx}.mock_side_effects" << EOF
-  if [ "\$3" == "target" ]; then
+  if [ "\$3" == "target" ] || [ "\$1" == "target" ]; then
      echo $addr
   else
      echo "/path/to/ssh.priv"

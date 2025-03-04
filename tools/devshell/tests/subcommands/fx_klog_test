@@ -31,16 +31,19 @@ BT_SET_UP() {
 }
 
 TEST_klog_raw() {
+  echo "testing" > "${ffx}.mock_stdout"
   BT_EXPECT ${fx} -d "testing" klog --raw
-   btf::expect-mock-args "${ffx}.mock_state.1" --config fuchsia.analytics.ffx_invoker=fx target default get
+  btf::expect-mock-args "${ffx}.mock_state.1" "target" "default" "get"
+  btf::expect-mock-args "${ffx}.mock_state.2" --config fuchsia.analytics.ffx_invoker=fx target default get
 
-  BT_EXPECT_FILE_DOES_NOT_EXIST "${ffx}.mock_state.3" \
+  BT_EXPECT_FILE_DOES_NOT_EXIST "${ffx}.mock_state.4" \
     "ffx should not have been called 3 times fx klog --raw"
 }
 
 TEST_klog() {
+  echo "testing" > "${ffx}.mock_stdout"
   BT_EXPECT ${fx} -d "testing" klog
-  btf::expect-mock-args "${ffx}.mock_state.2" debug symbolize
+  btf::expect-mock-args "${ffx}.mock_state.3" debug symbolize
 }
 
 BT_RUN_TESTS "$@"
