@@ -2522,8 +2522,7 @@ VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, Dirt
   // cache operation is pointless.
   // The paged_ref_ could be null if the VmObjectPaged has been destroyed.
   if (target_->paged_ref_) {
-    AssertHeld(target_->paged_ref_->lock_ref());
-    if (target_->paged_ref_->GetMappingCachePolicyLocked() != ARCH_MMU_FLAG_CACHED) {
+    if (paged_backlink_locked(target_)->GetMappingCachePolicyLocked() != ARCH_MMU_FLAG_CACHED) {
       arch_clean_invalidate_cache_range((vaddr_t)paddr_to_physmap(out_page->paddr()), PAGE_SIZE);
     }
   }
