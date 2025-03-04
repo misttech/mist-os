@@ -391,6 +391,7 @@ func buildConfigs(absOutputDir string, absFFXPath string, absSshKeyPath string, 
 		"log.dir":                      filepath.Join(absOutputDir, "ffx_logs"),
 		"ffx.subtool-search-paths":     filepath.Dir(absFFXPath),
 		"test.experimental_json_input": true,
+		"emu.instance_dir":             filepath.Join(absOutputDir, "emu/instances"),
 	}
 	if absSshKeyPath != "" {
 		userConfigSettings["ssh.priv"] = absSshKeyPath
@@ -514,6 +515,10 @@ func (f *ffxInvoker) cmd() *exec.Cmd {
 	args := f.args
 	if f.target != "" {
 		args = append([]string{"--target", f.target}, args...)
+	}
+	// Add command-specific configs
+	for k, v := range f.configs {
+		args = append([]string{"-c", fmt.Sprintf("%s=%v", k, v)}, args...)
 	}
 	ffx_cmd := f.ffx.cmdBuilder.command(f.ffx.ffxPath, f.supportsStrict, args)
 	if f.noMachine {
@@ -717,6 +722,13 @@ func (f *FFXInstance) TargetWait(ctx context.Context, args ...string) error {
 		return fmt.Errorf("no target is set")
 	}
 	return f.invoker(append([]string{"target", "wait"}, args...)).setTarget(f.target).setStrict().run(ctx)
+}
+
+// EmuStart returns an invoker to start the emulator with the specified
+// commands.
+func (f *FFXInstance) EmuStart(pubPath string, args ...string) *ffxInvoker {
+	configs := map[string]string{"ssh.pub": pubPath}
+	return f.invoker(append([]string{"emu", "start"}, args...)).setStrict().setConfigs(configs)
 }
 
 // Test runs a test suite.
