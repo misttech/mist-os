@@ -4,6 +4,7 @@ ffx/repository/default.golden
 ffx/repository/default/get.golden
 ffx/repository/default/set.golden
 ffx/repository/default/unset.golden
+ffx/repository/list.golden
 ffx/repository/package.golden
 ffx/repository/package/extract-archive.golden
 ffx/repository/package/list.golden

@@ -119,9 +119,8 @@ async fn get_remote_proxy_impl(
 ) -> Result<RemoteControlProxy> {
     // See if we need to do local resolution. (Do it here not in
     // open_target_with_fut because o_t_w_f is not async)
-    let mut target_spec = resolve::maybe_locally_resolve_target_spec(target_spec.clone(), context)
-        .await
-        .with_context(|| "could not maybe locally resolve target: {target_spec:?}")?;
+    let mut target_spec =
+        resolve::maybe_locally_resolve_target_spec(target_spec.clone(), context).await?;
     let (target_proxy, target_proxy_fut) =
         open_target_with_fut(target_spec.clone(), daemon_proxy.clone(), *proxy_timeout, context)?;
     let mut target_proxy_fut = target_proxy_fut.boxed_local().fuse();

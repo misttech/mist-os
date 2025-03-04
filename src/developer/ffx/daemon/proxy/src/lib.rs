@@ -162,7 +162,6 @@ impl Injection {
             &self.env_context,
         )
         .await
-        .with_context(|| "for target {target_spec:?}")
     }
 
     #[tracing::instrument]

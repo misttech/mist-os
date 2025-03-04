@@ -143,7 +143,6 @@ impl FhoEnvironment {
 
     pub async fn behavior(&self) -> Option<FhoConnectionBehavior> {
         if let Some(ref b) = *self.behavior.read().await {
-            tracing::debug!("Using {b:?} behavior");
             Some(b.clone())
         } else {
             None
