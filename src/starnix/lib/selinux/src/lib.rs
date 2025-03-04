@@ -78,6 +78,8 @@ enumerable_enum! {
         AnonFsNode,
         /// The SELinux "blk_file" object class.
         Block,
+        /// The SELinux "bpf" object class.
+        Bpf,
         /// The SELinux "capability" object class.
         Capability,
         /// The SELinux "capability2" object class.
@@ -115,6 +117,7 @@ impl ObjectClass {
             // keep-sorted start
             Self::AnonFsNode => "anon_inode",
             Self::Block => "blk_file",
+            Self::Bpf => "bpf",
             Self::Capability => "capability",
             Self::Capability2 => "capability2",
             Self::Character => "chr_file",
@@ -358,6 +361,8 @@ permission_enum! {
         AnonFsNode(AnonFsNodePermission),
         /// Permissions for the well-known SELinux "blk_file" file-like object class.
         Block(BlockFilePermission),
+        /// Permissions for the well-known SELinux "bpf" file-like object class.
+        Bpf(BpfPermission),
         /// Permissions for the well-known SELinux "capability" object class.
         Capability(CapabilityPermission),
         /// Permissions for the well-known SELinux "capability2" object class.
@@ -708,6 +713,26 @@ class_permission_enum! {
         /// context. This permission is generally used to control whether an `exec*()` call from a
         /// cloned process that retained a copy of the file descriptor table should succeed.
         Use("use"),
+        // keep-sorted end
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "bpf" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    BpfPermission {
+        // keep-sorted start
+        /// Permission to create a map.
+        MapCreate("map_create"),
+        /// Permission to read from a map.
+        MapRead("map_read"),
+        /// Permission to write on a map.
+        MapWrite("map_write"),
+        /// Permission to load a program.
+        ProgLoad("prog_load"),
+        /// Permission to run a program.
+        ProgRun("prog_run"),
         // keep-sorted end
     }
 }

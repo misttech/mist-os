@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// TODO(https://github.com/rust-lang/rust/issues/39371): remove
+#![allow(non_upper_case_globals)]
+
 mod audit;
 pub(super) mod superblock;
 pub(super) mod task;
@@ -17,12 +20,11 @@ use crate::vfs::{
 use crate::TODO_DENY;
 use audit::{audit_decision, audit_todo_decision, Auditable};
 use bstr::BStr;
-use linux_uapi::XATTR_NAME_SELINUX;
 use selinux::permission_check::PermissionCheck;
 use selinux::policy::FsUseType;
 use selinux::{
-    ClassPermission, CommonFilePermission, CommonFsNodePermission, DirPermission, FdPermission,
-    FileClass, FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions,
+    BpfPermission, ClassPermission, CommonFilePermission, CommonFsNodePermission, DirPermission,
+    FdPermission, FileClass, FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions,
     FileSystemPermission, FsNodeClass, InitialSid, ObjectClass, Permission, ProcessPermission,
     SecurityId, SecurityPermission, SecurityServer,
 };
@@ -35,12 +37,14 @@ use starnix_uapi::errors::{Errno, ENODATA};
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{
-    errno, error, FIGETBSZ, FIOASYNC, FIONBIO, FIONREAD, FS_IOC_GETFLAGS, FS_IOC_GETVERSION,
-    FS_IOC_SETFLAGS, FS_IOC_SETVERSION, F_GETLK, F_SETFL, F_SETLK, F_SETLKW,
+    bpf_cmd, bpf_cmd_BPF_MAP_CREATE, bpf_cmd_BPF_PROG_LOAD, bpf_cmd_BPF_PROG_RUN, errno, error,
+    FIGETBSZ, FIOASYNC, FIONBIO, FIONREAD, FS_IOC_GETFLAGS, FS_IOC_GETVERSION, FS_IOC_SETFLAGS,
+    FS_IOC_SETVERSION, F_GETLK, F_SETFL, F_SETLK, F_SETLKW, XATTR_NAME_SELINUX,
 };
 use std::collections::HashSet;
 use std::sync::{Arc, OnceLock};
 use syncio::zxio_node_attr_has_t;
+use zerocopy::FromBytes;
 
 /// Maximum supported size for the extended attribute value used to store SELinux security
 /// contexts in a filesystem node extended attributes.
@@ -1404,6 +1408,26 @@ where
     }
 
     result
+}
+
+/// Returns whether `current_task` can perform the bpf `cmd`.
+pub(super) fn check_bpf_access<Attr: FromBytes>(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    cmd: bpf_cmd,
+    _attr: &Attr,
+    _attr_size: u32,
+) -> Result<(), Errno> {
+    let audit_context = current_task.into();
+
+    let sid: SecurityId = current_task.security_state.lock().current_sid;
+    let permission = match cmd {
+        bpf_cmd_BPF_MAP_CREATE => BpfPermission::MapCreate,
+        bpf_cmd_BPF_PROG_LOAD => BpfPermission::ProgLoad,
+        bpf_cmd_BPF_PROG_RUN => BpfPermission::ProgRun,
+        _ => return Ok(()),
+    };
+    check_self_permission(&security_server.as_permission_check(), sid, permission, audit_context)
 }
 
 /// Returns the `SecurityId` that should be used for SELinux access control checks against `fs_node`.

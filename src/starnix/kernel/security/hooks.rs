@@ -23,9 +23,10 @@ use starnix_uapi::file_mode::{Access, FileMode};
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::signals::Signal;
 use starnix_uapi::unmount_flags::UnmountFlags;
-use starnix_uapi::{errno, error};
+use starnix_uapi::{bpf_cmd, errno, error};
 use std::sync::Arc;
 use syncio::zxio_node_attr_has_t;
+use zerocopy::FromBytes;
 
 macro_rules! track_hook_duration {
     ($cname:literal) => {{
@@ -1132,6 +1133,21 @@ where
             }
         },
     )
+}
+
+/// Checks whether `current_task` can perform the given bpf `cmd`. This hook is called from the
+/// `sys_bpf()` syscall after the attribute is copied into the kernel.
+/// Corresponds to the `bpf()` LSM hook.
+pub fn check_bpf_access<Attr: FromBytes>(
+    current_task: &CurrentTask,
+    cmd: bpf_cmd,
+    attr: &Attr,
+    attr_size: u32,
+) -> Result<(), Errno> {
+    profile_duration!("security.hooks.check_bpf_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_bpf_access(security_server, current_task, cmd, attr, attr_size)
+    })
 }
 
 /// Identifies one of the Security Context attributes associated with a task.
