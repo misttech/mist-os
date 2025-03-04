@@ -143,8 +143,8 @@ pub fn dispatch_syscall(
             sys_mprotect as sys_arch32_mprotect,
         };
         pub use crate::signals::syscalls::{
-            sys_arch32_rt_sigaction, sys_arch32_sigaltstack, sys_kill as sys_arch32_kill,
-            sys_rt_sigprocmask as sys_arch32_rt_sigprocmask,
+            sys_arch32_rt_sigaction, sys_arch32_rt_sigtimedwait, sys_arch32_sigaltstack,
+            sys_kill as sys_arch32_kill, sys_rt_sigprocmask as sys_arch32_rt_sigprocmask,
             sys_rt_sigreturn as sys_arch32_rt_sigreturn,
             sys_rt_tgsigqueueinfo as sys_arch32_rt_tgsigqueueinfo, sys_tgkill as sys_arch32_tgkill,
             sys_wait4 as sys_arch32_wait4,
@@ -264,6 +264,7 @@ pub fn dispatch_syscall(
             rt_sigaction[4],
             rt_sigprocmask[4],
             rt_sigreturn[0],
+            rt_sigtimedwait[4],
             rt_tgsigqueueinfo[4],
             sched_getaffinity[3],
             sched_getscheduler[1],

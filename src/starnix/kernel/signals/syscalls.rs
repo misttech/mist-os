@@ -891,7 +891,9 @@ fn negate_pid(pid: pid_t) -> Result<pid_t, Errno> {
 #[cfg(feature = "arch32")]
 mod arch32 {
     pub use super::{
-        sys_rt_sigaction as sys_arch32_rt_sigaction, sys_sigaltstack as sys_arch32_sigaltstack,
+        sys_rt_sigaction as sys_arch32_rt_sigaction,
+        sys_rt_sigtimedwait as sys_arch32_rt_sigtimedwait,
+        sys_sigaltstack as sys_arch32_sigaltstack,
     };
 }
 
