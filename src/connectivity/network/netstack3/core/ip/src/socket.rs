@@ -897,7 +897,7 @@ where
             next_hop: new_next_hop,
             local_delivery_device: new_local_delivery_device,
             internal_forwarding: new_internal_forwarding,
-        } = resolve(
+        } = match resolve(
             core_ctx,
             bindings_ctx,
             socket_device,
@@ -905,10 +905,13 @@ where
             remote_ip,
             options.transparent(),
             options.marks(),
-        )
-        .inspect_err(|_| {
-            packet_metadata.acknowledge_drop();
-        })?;
+        ) {
+            Ok(r) => r,
+            Err(err) => {
+                packet_metadata.acknowledge_drop();
+                return Err(err);
+            }
+        };
         local_ip = new_local_ip;
         egress_device = new_device;
         next_hop = new_next_hop;

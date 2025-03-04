@@ -282,16 +282,19 @@ impl<I: IpExt, A, BT: FilterBindingsTypes + TxMetadataBindingsTypes>
     }
 
     pub(crate) fn into_parts(
-        mut self,
+        self,
     ) -> (Option<(ConntrackConnection<I, A, BT>, ConnectionDirection)>, BT::TxMetadata, Marks) {
-        self.acknowledge_drop();
         let Self {
             tx_metadata,
             marks,
             conntrack_connection_and_direction,
             #[cfg(debug_assertions)]
-                drop_check: _,
+            mut drop_check,
         } = self;
+        #[cfg(debug_assertions)]
+        {
+            drop_check.okay_to_drop = true;
+        }
         (conntrack_connection_and_direction, tx_metadata, marks)
     }
 
@@ -299,10 +302,11 @@ impl<I: IpExt, A, BT: FilterBindingsTypes + TxMetadataBindingsTypes>
     ///
     /// When compiled with debug assertions, dropping [`IplayerPacketMetadata`]
     /// will panic if this method has not previously been called.
-    pub(crate) fn acknowledge_drop(&mut self) {
+    pub(crate) fn acknowledge_drop(self) {
         #[cfg(debug_assertions)]
         {
-            self.drop_check.okay_to_drop = true;
+            let mut this = self;
+            this.drop_check.okay_to_drop = true;
         }
     }
 }
