@@ -35,6 +35,8 @@
 #include <zxtest/zxtest.h>
 
 #include "helpers.h"
+#include "test_thread.h"
+#include "userpager.h"
 
 namespace {
 
@@ -2849,5 +2851,92 @@ TEST(VmoTestCase, Prefetch) {
     check_vmo((*res).vmo, (*res).size);
   }
 }
+
+#if !LIMIT_CONTIGUOUS_ALLOCATIONS
+TEST(VmoTestCase, UnmapLoanedcontiguousWhileFaulting) {
+  using pager_tests::TestThread;
+  using pager_tests::UserPager;
+  using pager_tests::Vmo;
+
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
+    return;
+  }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
+
+  zx::iommu iommu;
+  zx::bti bti;
+  zx_iommu_desc_dummy_t desc;
+  auto final_bti_check = vmo_test::CreateDeferredBtiCheck(bti);
+
+  ASSERT_OK(zx::iommu::create(iommu_resource, ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
+  bti = vmo_test::CreateNamedBti(iommu, 0, 0xdeadbeef,
+                                 "VmoTestCase::UnmapLoanedcontiguousWhileFaulting");
+
+  constexpr uint64_t kNumPages = 4096;
+
+  // Try a bunch of times.
+  for (size_t i = 0; i < 100; i++) {
+    // Create the contiguous VMO for this iteration, decommitting its pages to make them loaned.
+    zx::vmo contig_vmo;
+    ASSERT_OK(
+        zx::vmo::create_contiguous(bti, kNumPages * zx_system_get_page_size(), 0, &contig_vmo));
+    zx_status_t status = contig_vmo.op_range(ZX_VMO_OP_DECOMMIT, 0,
+                                             kNumPages * zx_system_get_page_size(), nullptr, 0);
+    if (status == ZX_ERR_NOT_SUPPORTED) {
+      // Contiguous decommit may not be supported by the current kernel cmdline, so cannot consider
+      // this a hard error.
+      printf("Contiguous decommit not supported, skipping\n");
+      return;
+    }
+    ASSERT_OK(status);
+
+    // Create a pager backed VMO and supply it full of pages to attempt to soak the newly loaned
+    // pages.
+    UserPager pager;
+    ASSERT_TRUE(pager.Init());
+    Vmo *vmo;
+    ASSERT_TRUE(pager.CreateVmo(kNumPages, &vmo));
+    ASSERT_TRUE(pager.SupplyPages(vmo, 0, kNumPages));
+
+    // Map in the contiguous VMO.
+    zx_vaddr_t vaddr = 0;
+    ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, contig_vmo, 0,
+                                         kNumPages * zx_system_get_page_size(), &vaddr));
+    // Drop the contig_vmo reference, just leaving the mapping.
+    contig_vmo.reset();
+
+    // Spawn a test thread to touch the mapping. Using an atomic to ensure that the test thread has
+    // started taking its faults before we unmap to increase the chance of a successful race.
+    std::atomic<bool> running = false;
+    TestThread t([vaddr, &running]() -> bool {
+      for (size_t i = 0; i < kNumPages; i++) {
+        *(volatile char *)(vaddr + i * zx_system_get_page_size()) = 42;
+        running = true;
+      }
+      // Ensure we always crash for consistency.
+      __builtin_abort();
+      return false;
+    });
+
+    // Start the thread and then remove the mapping.
+    ASSERT_TRUE(t.Start());
+    while (!running)
+      ;
+    zx::vmar::root_self()->unmap(vaddr, kNumPages * zx_system_get_page_size());
+
+    // Wait for the test thread to complete. In correct execution it will either crash due to the
+    // mapping going away, or because it calls __builtin_abort, so we just wait for any crash.
+    ASSERT_TRUE(t.WaitForAnyCrash());
+    // Successfully getting here indicates that the kernel didn't crash when closing the internal
+    // physical page provider.
+  }
+}
+#endif
 
 }  // namespace
