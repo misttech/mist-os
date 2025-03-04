@@ -19,6 +19,7 @@ use rayon::ThreadPoolBuilder;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::env::current_exe;
+use std::fmt::Debug;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
@@ -405,68 +406,36 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
         File::open(get_content_file_path(relative_path, source_file_path)?)
     };
 
+    let errors = Errors::default();
     let manifest_count = AtomicUsize::new(0);
-    let manifest_errors = AtomicUsize::new(0);
-    let manifest_file_errors = AtomicUsize::new(0);
     let names = Mutex::new(HashMap::new());
     let content_hash_to_path = Mutex::new(HashMap::new());
     let start = Instant::now();
 
-    manifests.par_iter().for_each(|manifest_path| {
+    manifests.par_iter().for_each(|pkg_manifest_path| {
         debug!("Starting");
         manifest_count.fetch_add(1, Ordering::Relaxed);
-        macro_rules! do_on_error {
-            ($val:expr, $step:expr, $error_counter:expr, $do:expr) => {
-                match $val {
-                    Ok(v) => v,
-                    Err(e) => {
-                        $error_counter.fetch_add(1, Ordering::Relaxed);
-                        debug!(status = "Failed", step = $step;"");
-                        eprintln!(
-                            "[{}] Failed {}: {:?}",
-                            manifest_path,
-                            $step,
-                            e
-                        );
-                        $do;
-                    }
-                }
-            };
-            ($val:expr, $step:expr, $context:expr, $error_counter:expr, $do:expr) => {
-                match $val {
-                    Ok(v) => v,
-                    Err(e) => {
-                        $error_counter.fetch_add(1, Ordering::Relaxed);
-                        debug!(status = "Failed", step = $step;"");
-                        eprintln!(
-                            "[{}] Failed {} for {}: {:?}",
-                            manifest_path,
-                            $step,
-                            $context,
-                            e
-                        );
-                        $do;
-                    }
-                }
-            };
-        }
 
-        let manifest = do_on_error!(
-            PackageManifest::try_load_from(manifest_path),
-            "loading manifest",
-            manifest_errors,
-            return
-        );
+        let manifest = match PackageManifest::try_load_from(pkg_manifest_path) {
+            Ok(m) => m,
+            Err(err) => {
+                errors.log_manifest_error(err, pkg_manifest_path, "loading manifest");
+                return;
+            }
+        };
 
-        let url =
-            match do_on_error!(manifest.package_url(), "formatting URL", manifest_errors, return) {
-                Some(url) => url,
-                None => {
-                    // Package does not have a URL, skip.
-                    manifest_errors.fetch_add(1, Ordering::Relaxed);
-                    return;
-                }
-            };
+        let url = match manifest.package_url() {
+            Err(err) => {
+                errors.log_manifest_error(err, pkg_manifest_path, "formatting URL");
+                return;
+            }
+            Ok(None) => {
+                // Package does not have a URL, skip.
+                errors.manifest_errors.fetch_add(1, Ordering::Relaxed);
+                return;
+            }
+            Ok(Some(url)) => url,
+        };
 
         debug!("Loaded");
 
@@ -477,20 +446,30 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
         for blob in manifest.blobs() {
             if blob.path == "meta/" {
                 // Handle meta
-                let meta_file = do_on_error!(
-                    get_content_file(&blob.source_path, manifest_path),
-                    "opening file",
-                    blob.path,
-                    manifest_file_errors,
-                    continue
-                );
-                let mut reader = do_on_error!(
-                    FARReader::new(meta_file),
-                    "opening as FAR file",
-                    blob.path,
-                    manifest_file_errors,
-                    continue
-                );
+                let meta_file = match get_content_file(&blob.source_path, pkg_manifest_path) {
+                    Ok(meta_file) => meta_file,
+                    Err(err) => {
+                        errors.log_manifest_file_error(
+                            err,
+                            pkg_manifest_path,
+                            "opening file",
+                            &blob.path,
+                        );
+                        continue;
+                    }
+                };
+                let mut reader = match FARReader::new(meta_file) {
+                    Ok(r) => r,
+                    Err(err) => {
+                        errors.log_manifest_file_error(
+                            err,
+                            pkg_manifest_path,
+                            "opening as FAR file",
+                            &blob.path,
+                        );
+                        continue;
+                    }
+                };
 
                 let mut manifest_paths = vec![];
                 debug!("Loaded manifest, have {} entries", reader.list().len());
@@ -504,20 +483,30 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
 
                 for manifest_path in manifest_paths {
                     debug!("Starting");
-                    let data = do_on_error!(
-                        reader.read_file(&manifest_path),
-                        "reading component manifest",
-                        String::from_utf8_lossy(&manifest_path),
-                        manifest_file_errors,
-                        break
-                    );
-                    let manifest: fdecl::Component = do_on_error!(
-                        fidl::unpersist(&data),
-                        "parsing component manifest",
-                        String::from_utf8_lossy(&manifest_path),
-                        manifest_file_errors,
-                        break
-                    );
+                    let data = match reader.read_file(&manifest_path) {
+                        Ok(d) => d,
+                        Err(err) => {
+                            errors.log_manifest_file_error(
+                                err,
+                                pkg_manifest_path,
+                                "reading component manifest",
+                                String::from_utf8_lossy(&manifest_path),
+                            );
+                            break;
+                        }
+                    };
+                    let manifest: fdecl::Component = match fidl::unpersist(&data) {
+                        Ok(m) => m,
+                        Err(err) => {
+                            errors.log_manifest_file_error(
+                                err,
+                                pkg_manifest_path,
+                                "parsing component manifest",
+                                String::from_utf8_lossy(&manifest_path),
+                            );
+                            break;
+                        }
+                    };
 
                     let mut component = ComponentContents::default();
                     for cap in manifest.uses.into_iter().flatten() {
@@ -617,7 +606,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
 
                 contents.blobs.push(blob.merkle.to_string());
             } else {
-                let source_path = get_content_file_path(&blob.source_path, manifest_path)
+                let source_path = get_content_file_path(&blob.source_path, pkg_manifest_path)
                     .map(|v| v.to_string())
                     .unwrap_or_default();
                 content_hash_to_path.lock().unwrap().insert(blob.merkle.to_string(), source_path);
@@ -719,8 +708,8 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
         duration,
         manifest_count.load(Ordering::Relaxed),
         names.lock().unwrap().len(),
-        manifest_errors.load(Ordering::Relaxed),
-        manifest_file_errors.load(Ordering::Relaxed),
+        errors.manifest_errors.load(Ordering::Relaxed),
+        errors.manifest_file_errors.load(Ordering::Relaxed),
         elf_count.load(Ordering::Relaxed),
         other_count.load(Ordering::Relaxed),
         content_hash_to_path.lock().unwrap().len(),
@@ -764,6 +753,37 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[derive(Default)]
+struct Errors {
+    manifest_errors: AtomicUsize,
+    manifest_file_errors: AtomicUsize,
+}
+
+impl Errors {
+    fn log_manifest_error<E>(&self, err: E, manifest_path: &Utf8PathBuf, step: &str)
+    where
+        E: Debug,
+    {
+        self.manifest_errors.fetch_add(1, Ordering::Relaxed);
+        debug!(status = "Failed", step; "");
+        eprintln!("[{}] Failed {}: {:?}", manifest_path, step, err);
+    }
+
+    fn log_manifest_file_error<E>(
+        &self,
+        err: E,
+        manifest_path: &Utf8PathBuf,
+        step: &str,
+        context: impl AsRef<str>,
+    ) where
+        E: Debug,
+    {
+        self.manifest_file_errors.fetch_add(1, Ordering::Relaxed);
+        debug!(status = "Failed", step; "");
+        eprintln!("[{}] Failed {} for {}: {:?}", manifest_path, step, context.as_ref(), err);
+    }
 }
 
 fn do_print_command(args: PrintArgs) -> Result<()> {
