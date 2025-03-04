@@ -16,7 +16,6 @@ use core::time::Duration;
 use assert_matches::assert_matches;
 use derivative::Derivative;
 use explicit::ResultExt as _;
-use log::error;
 use netstack3_base::{
     Control, IcmpErrorCode, Instant, Mss, Options, Payload, PayloadLen as _, Segment,
     SegmentHeader, SeqNum, UnscaledWindowSize, WindowScale, WindowSize,
@@ -882,14 +881,15 @@ impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
             }
         };
 
+        // Because the buffer can be updated by bindings without immediately
+        // acquiring core locks, it is possible that RCV.NXT has moved forward
+        // before we've had a chance to recalculate the window here and update
+        // the peer. In this case, simply saturate the subtraction, we should be
+        // able to open the window now that the unused window is 0.
+        let unused_window = u32::try_from(*rcv_wup + *last_wnd - rcv_nxt).unwrap_or(0);
         // `unused_window` is RCV.WND as described above.
-        let unused_window = WindowSize::from_u32(u32::try_from(*rcv_wup + *last_wnd - rcv_nxt).unwrap_or_else(|_: TryFromIntError| {
-            error!(
-                "we received more bytes than we advertised, rcv_nxt: {:?}, rcv_wup: {:?}, last_wnd: {:?}",
-                rcv_nxt, rcv_wup, last_wnd
-            );
-            0
-        })).unwrap_or(WindowSize::MAX);
+        let unused_window = WindowSize::from_u32(unused_window).unwrap_or(WindowSize::MAX);
+
         // Note: between the last window update and now, it's possible that we
         // have reduced our receive buffer's capacity, so we need to use
         // saturating arithmetic below.
@@ -1892,6 +1892,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
         counters: &TcpCountersInner,
         new_state: State<I, R, S, ActiveOpen>,
     ) -> NewlyClosed {
+        log::debug!("transition to state {} => {}", self, new_state);
         let newly_closed = if let State::Closed(Closed { reason }) = &new_state {
             let (was_established, was_closed) = match self {
                 State::Closed(_) => (false, true),
