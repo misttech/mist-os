@@ -157,7 +157,7 @@ impl TryFrom<ffx::TargetInfo> for TargetHandle {
         // Sorting them this way put ipv6 above ipv4
         addrs.sort_by(|a, b| b.cmp(a));
 
-        fn assert_non_empty_addrs(addrs: &Vec<TargetAddr>) -> Result<(), anyhow::Error>{
+        fn assert_non_empty_addrs(addrs: &Vec<TargetAddr>) -> Result<(), anyhow::Error> {
             if addrs.is_empty() {
                 bail!("There must be at least one target address")
             }

@@ -79,6 +79,7 @@ impl TryFromEnv for TargetInfoHolder {
                     Err(bug!("TryFromEnv for TargetInfoHolder was not passed a TargetInfoHolder"))
                 }
             },
+            [] => Err(user_error!("Matched no targets.")),
             _ => Err(user_error!("Ambiguous target query. Matched multiple targets.")),
         }
     }
