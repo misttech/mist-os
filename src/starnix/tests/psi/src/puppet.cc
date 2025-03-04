@@ -115,33 +115,6 @@ int main(int argc, const char** argv) {
       int fd = fxl::StringToNumber<int>(command[1]);
       fxl::WriteFileDescriptor(fd, command[2].data(), static_cast<ssize_t>(command[2].length()));
       ctl_socket.WriteMessage({});
-    } else if (command[0] == "SELECT_EXCEPT" && command.size() == 3) {
-      int fd = fxl::StringToNumber<int>(command[1]);
-      int timeout_ms = fxl::StringToNumber<int>(command[2]);
-
-      fd_set xfds;
-      FD_ZERO(&xfds);
-      FD_CLR(fd, &xfds);
-
-      timeval timeout{
-          .tv_sec = timeout_ms / 1000,
-          .tv_usec = (timeout_ms % 1000) * 1000,
-      };
-
-      switch (select(fd + 1, nullptr, nullptr, &xfds, &timeout)) {
-        case 0:
-          ctl_socket.WriteMessage({"TIMEOUT"});
-          break;
-        case 1:
-          if (!FD_ISSET(fd, &xfds)) {
-            errx(EXIT_FAILURE, "select returned no exceptional condition event");
-          }
-          ctl_socket.WriteMessage({"EVENT"});
-          break;
-        default:
-          err(EXIT_FAILURE, "select failed");
-          break;
-      }
     } else if (command[0] == "POLL_POLLPRI" && command.size() == 3) {
       int fd = fxl::StringToNumber<int>(command[1]);
       int timeout_ms = fxl::StringToNumber<int>(command[2]);

@@ -133,15 +133,6 @@ impl PuppetInstance {
         let _ = self.read_message().await;
     }
 
-    /// Calls select() with the file descriptor in the exceptfds set, returning
-    /// true if it delivered an exceptional condition event or false if it timed
-    /// out.
-    pub async fn select_except(&mut self, fd: PuppetFileDescriptor, timeout_ms: usize) -> bool {
-        self.write_message(&["SELECT_EXCEPT", &fd.0.to_string(), &timeout_ms.to_string()]).await;
-        let reply = self.read_message().await;
-        reply[0] == "EVENT"
-    }
-
     /// Calls poll() with events=POLLPRI on the file descriptor, returning true
     /// if it delivered a POLLPRI event or false if it timed out.
     pub async fn poll_pollpri(&mut self, fd: PuppetFileDescriptor, timeout_ms: usize) -> bool {

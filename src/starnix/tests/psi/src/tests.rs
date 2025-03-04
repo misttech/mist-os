@@ -11,7 +11,7 @@ use test_case::test_case;
 use zx::{AsHandleRef, HandleBased};
 
 mod event_waiter;
-use event_waiter::{make_epoll_waiter, make_poll_waiter, make_select_waiter, EventWaiter};
+use event_waiter::{make_epoll_waiter, make_poll_waiter, EventWaiter};
 mod fake_psi_provider;
 use fake_psi_provider::*;
 mod puppet;
@@ -131,7 +131,6 @@ async fn test_psi_unavailable() {
 /// Given a function that builds an EventWaiter from a PuppetInstance and an
 /// open PSI file descriptor in it, tests that said EventWaiter delivers the
 /// expected PSI events.
-#[test_case(make_select_waiter => ignore; "select")]
 #[test_case(make_poll_waiter => ignore; "poll")]
 #[test_case(make_epoll_waiter => ignore; "epoll")]
 #[fuchsia::test]
