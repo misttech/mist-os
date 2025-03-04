@@ -5,20 +5,17 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_DISPLAY_INFO_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_DISPLAY_INFO_H_
 
-#include <fidl/fuchsia.hardware.display/cpp/wire.h>
-#include <fuchsia/hardware/audiotypes/c/banjo.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <lib/zx/result.h>
 
 #include <cstdint>
 #include <memory>
 #include <optional>
 #include <queue>
+#include <string>
 #include <string_view>
 #include <vector>
 
-#include <fbl/array.h>
-#include <fbl/string_printf.h>
 #include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/coordinator/added-display-info.h"
@@ -49,7 +46,10 @@ class DisplayInfo : public IdMappable<std::unique_ptr<DisplayInfo>, display::Dis
 
   ~DisplayInfo();
 
-  // Should be called after init_done is set to true.
+  // Populates an inspect tree for this display.
+  //
+  // Must be called after display timing processing is complete. In particular, EDID modes
+  // must be parsed and filtered.
   void InitializeInspect(inspect::Node* parent_node);
 
   // Guaranteed to be >= 0 and < 2^16.
@@ -81,18 +81,16 @@ class DisplayInfo : public IdMappable<std::unique_ptr<DisplayInfo>, display::Dis
 
   fbl::Vector<display::PixelFormat> pixel_formats;
 
-  // Flag indicating that the display is ready to be published to clients.
-  bool init_done = false;
-
   // A list of all images which have been sent to display driver.
   Image::DoublyLinkedList images;
 
   // The number of layers in the applied configuration.
-  uint32_t layer_count;
+  uint32_t layer_count = 0;
 
   // Set when a layer change occurs on this display and cleared in vsync
   // when the new layers are all active.
-  bool pending_layer_change;
+  bool pending_layer_change = false;
+
   // If a configuration applied by Controller has layer change to occur on the
   // display (i.e. |pending_layer_change| is true), this stores the Controller's
   // config stamp for that configuration; otherwise it stores an invalid stamp.

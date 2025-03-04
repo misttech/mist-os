@@ -17,22 +17,17 @@
 #include <zircon/time.h>
 
 #include <cinttypes>
-#include <cstdint>
+#include <cstddef>
 #include <cstring>
-#include <iterator>
-#include <limits>
 #include <span>
 #include <utility>
 
 #include <fbl/alloc_checker.h>
-#include <fbl/ref_ptr.h>
 #include <fbl/string_printf.h>
-#include <pretty/hexdump.h>
 
 #include "src/graphics/display/drivers/coordinator/added-display-info.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
-#include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 #include "src/graphics/display/lib/edid/edid.h"
 
 namespace display_coordinator {
@@ -44,7 +39,6 @@ DisplayInfo::DisplayInfo(display::DisplayId display_id) : IdMappable(display_id)
 DisplayInfo::~DisplayInfo() = default;
 
 void DisplayInfo::InitializeInspect(inspect::Node* parent_node) {
-  ZX_DEBUG_ASSERT(init_done);
   node = parent_node->CreateChild(fbl::StringPrintf("display-%" PRIu64, id().value()).c_str());
 
   if (mode.has_value()) {
@@ -89,9 +83,6 @@ zx::result<std::unique_ptr<DisplayInfo>> DisplayInfo::Create(AddedDisplayInfo ad
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  display_info->pending_layer_change = false;
-  display_info->layer_count = 0;
-
   display_info->pixel_formats = std::move(added_display_info.pixel_formats);
 
   if (!added_display_info.banjo_preferred_modes.is_empty()) {
@@ -117,7 +108,7 @@ zx::result<std::unique_ptr<DisplayInfo>> DisplayInfo::Create(AddedDisplayInfo ad
     FDF_LOG(ERROR, "Failed to initialize EDID: %s", edid_result.error_value());
     return zx::error(ZX_ERR_INTERNAL);
   }
-  display_info->edid = {
+  display_info->edid = DisplayInfo::Edid{
       .base = std::move(edid_result).value(),
   };
 

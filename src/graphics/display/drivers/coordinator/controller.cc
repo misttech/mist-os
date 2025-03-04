@@ -168,7 +168,6 @@ void Controller::AddDisplay(std::unique_ptr<AddedDisplayInfo> added_display_info
   // Dropping some add events can result in spurious removes, but
   // those are filtered out in the clients.
   if (!display_info->edid.has_value() || !display_info->edid->timings.is_empty()) {
-    display_info->init_done = true;
     display_info->InitializeInspect(&root_);
   } else {
     FDF_LOG(WARNING, "Ignoring display with no compatible edid timings");
@@ -797,10 +796,8 @@ zx_status_t Controller::CreateClient(
           display::DisplayId current_displays[displays_.size()];
           int initialized_display_count = 0;
           for (const DisplayInfo& display : displays_) {
-            if (display.init_done) {
-              current_displays[initialized_display_count] = display.id();
-              ++initialized_display_count;
-            }
+            current_displays[initialized_display_count] = display.id();
+            ++initialized_display_count;
           }
           std::span<display::DisplayId> removed_display_ids = {};
           client_proxy->OnDisplaysChanged(

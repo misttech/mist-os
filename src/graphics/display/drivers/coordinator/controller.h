@@ -28,7 +28,6 @@
 #include <span>
 
 #include <fbl/mutex.h>
-#include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/coordinator/added-display-info.h"
