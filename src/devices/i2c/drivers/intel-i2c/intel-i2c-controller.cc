@@ -8,7 +8,6 @@
 #include <errno.h>
 #include <fidl/fuchsia.hardware.acpi/cpp/wire.h>
 #include <fidl/fuchsia.hardware.acpi/cpp/wire_types.h>
-#include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
 #include <fidl/fuchsia.hardware.pci/cpp/wire_types.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
@@ -179,6 +178,17 @@ zx_status_t IntelI2cController::Init() {
     }
   }
 
+  status = metadata_server_.ForwardMetadata(parent());
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to forward metadata: %s", zx_status_get_string(status));
+    return status;
+  }
+  status = metadata_server_.Serve(outgoing_, fdf::Dispatcher::GetCurrent()->async_dispatcher());
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to serve metadata: %s", zx_status_get_string(status));
+    return status;
+  }
+
   auto [directory_client, directory_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   {
@@ -196,11 +206,17 @@ zx_status_t IntelI2cController::Init() {
   char name[ZX_DEVICE_NAME_MAX];
   snprintf(name, sizeof(name), "i2c-bus-%04x", device_id);
 
-  std::array<const char*, 1> fidl_service_offers{fuchsia_hardware_i2cimpl::Service::Name};
-  status = DdkAdd(ddk::DeviceAddArgs(name)
-                      .set_outgoing_dir(directory_client.TakeChannel())
-                      .set_runtime_service_offers(fidl_service_offers)
-                      .forward_metadata(parent(), DEVICE_METADATA_I2C_CHANNELS));
+  std::array fidl_service_offers = {
+      ddk::MetadataServer<fuchsia_hardware_i2c_businfo::I2CBusMetadata>::kFidlServiceName,
+  };
+  std::array<const char*, 1> runtime_service_offers{fuchsia_hardware_i2cimpl::Service::Name};
+  status = DdkAdd(
+      ddk::DeviceAddArgs(name)
+          .set_outgoing_dir(directory_client.TakeChannel())
+          .set_fidl_service_offers(fidl_service_offers)
+          .set_runtime_service_offers(runtime_service_offers)
+          // TODO(b/373918767): Don't forward DEVICE_METADATA_I2C_CHANNELS once no longer retrieved.
+          .forward_metadata(parent(), DEVICE_METADATA_I2C_CHANNELS));
   if (status < 0) {
     zxlogf(ERROR, "device add failed: %s", zx_status_get_string(status));
     return status;
