@@ -198,6 +198,12 @@ impl WindowSize {
         usize::from(self).checked_sub(diff).and_then(Self::new)
     }
 
+    /// Subtract `diff` from `self` returning [`WindowSize::ZERO`] if the result
+    /// would be negative.
+    pub fn saturating_sub(self, diff: usize) -> Self {
+        self.checked_sub(diff).unwrap_or(WindowSize::ZERO)
+    }
+
     /// The window scale that needs to be advertised during the handshake.
     pub fn scale(self) -> WindowScale {
         let WindowSize(size) = self;
