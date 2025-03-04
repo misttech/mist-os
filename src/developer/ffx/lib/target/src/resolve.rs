@@ -205,8 +205,6 @@ pub async fn resolve_target_query(
     resolve_target_query_with_sources(
         query,
         ctx,
-        // TODO(colnnelson): Add DiscoverySources::FASTBOOT_FILE once feature
-        // is announced.
         DiscoverySources::MDNS
             | DiscoverySources::USB
             | DiscoverySources::MANUAL
@@ -308,12 +306,12 @@ async fn get_handle_info(
         TargetState::Product(target_addrs) => (ffx::TargetState::Product, None, Some(target_addrs)),
         TargetState::Fastboot(state) => {
             serial_number.replace(state.serial_number);
-            let fastboot_connection = match state.connection_state {
-                FastbootConnectionState::Usb => ffx::FastbootInterface::Usb,
-                FastbootConnectionState::Tcp(_) => ffx::FastbootInterface::Tcp,
-                FastbootConnectionState::Udp(_) => ffx::FastbootInterface::Udp,
+            let (fastboot_connection, addresses) = match state.connection_state {
+                FastbootConnectionState::Usb => (ffx::FastbootInterface::Usb, None),
+                FastbootConnectionState::Tcp(addrs) => (ffx::FastbootInterface::Tcp, Some(addrs)),
+                FastbootConnectionState::Udp(addrs) => (ffx::FastbootInterface::Udp, Some(addrs)),
             };
-            (ffx::TargetState::Fastboot, Some(fastboot_connection), None)
+            (ffx::TargetState::Fastboot, Some(fastboot_connection), addresses)
         }
         TargetState::Zedboot => (ffx::TargetState::Zedboot, None, None),
     };
@@ -371,6 +369,7 @@ async fn resolve_target_query_with_sources(
     ctx: &EnvironmentContext,
     sources: DiscoverySources,
 ) -> Result<Vec<TargetHandle>> {
+    tracing::debug!("Resolving query: {:#?} with sources: {:#?}", query, sources);
     // Get nodename, in case we're trying to find an exact match
     QueryResolver::new(sources).resolve_target_query(query, ctx).await
 }
@@ -483,6 +482,9 @@ impl QueryResolver {
                                 None
                             } else {
                                 if query_matches_handle(&q_clone, h) {
+                                    tracing::debug!(
+                                        "Signaling early as discovered target matches query"
+                                    );
                                     found_ev.signal();
                                 }
                                 seen.borrow_mut().insert(h.clone());
@@ -521,9 +523,20 @@ fn query_matches_handle(query: &TargetInfoQuery, h: &TargetHandle) -> bool {
             }
         }
         TargetInfoQuery::Addr(ref sa) => {
+            fn addr_matches(addrs: &Vec<TargetAddr>, sa: &SocketAddr) -> bool {
+                addrs.iter().any(|a| a.ip() == sa.ip())
+            }
             if let TargetState::Product(addrs) = &h.state {
-                if addrs.iter().any(|a| a.ip() == sa.ip()) {
-                    return true;
+                return addr_matches(addrs, sa);
+            } else if let TargetState::Fastboot(fts) = &h.state {
+                match &fts.connection_state {
+                    FastbootConnectionState::Tcp(addrs) => {
+                        return addr_matches(addrs, sa);
+                    }
+                    FastbootConnectionState::Udp(addrs) => {
+                        return addr_matches(addrs, sa);
+                    }
+                    FastbootConnectionState::Usb => {}
                 }
             }
         }
