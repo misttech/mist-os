@@ -176,8 +176,8 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Creates a copy-on-write clone with the desired parameters. This can fail due to various
   // internal states not being correct.
-  zx_status_t CreateCloneLocked(SnapshotType type, bool require_unidirection, VmCowRange range,
-                                fbl::RefPtr<VmCowPages>* cow_child) TA_REQ(lock());
+  zx::result<LockedRefPtr> CreateCloneLocked(SnapshotType type, bool require_unidirection,
+                                             VmCowRange range) TA_REQ(lock());
 
   // VmCowPages are initially created in the Init state and need to be transitioned to Alive prior
   // to being used. This is exposed for VmObjectPaged to call after ensuring that creation is
@@ -1356,8 +1356,8 @@ class VmCowPages final : public VmHierarchyBase,
   // Unlike a unidirectional clone, the snapshot taken by the child is guaranteed to never contain
   // any writes or newly committed pages made by ancestor nodes after the clone operation is
   // performed.
-  zx_status_t CloneBidirectionalLocked(uint64_t offset, uint64_t limit, uint64_t size,
-                                       fbl::RefPtr<VmCowPages>* cow_child) TA_REQ(lock());
+  zx::result<LockedRefPtr> CloneBidirectionalLocked(uint64_t offset, uint64_t limit, uint64_t size)
+      TA_REQ(lock());
 
   // Helper function for |CreateCloneLocked|.
   //
@@ -1372,8 +1372,8 @@ class VmCowPages final : public VmHierarchyBase,
   // clone operation is performed, but this is not guaranteed. This includes pages which ancestors
   // have newly committed since this clone operation was performed - the clone may see these pages
   // to snapshot them but it is not guaranteed.
-  zx_status_t CloneUnidirectionalLocked(uint64_t offset, uint64_t limit, uint64_t size,
-                                        fbl::RefPtr<VmCowPages>* cow_child) TA_REQ(lock());
+  zx::result<LockedRefPtr> CloneUnidirectionalLocked(uint64_t offset, uint64_t limit, uint64_t size)
+      TA_REQ(lock());
 
   // Release any pages this VMO can reference from the provided start offset till the end of the
   // VMO. This releases both directly owned pages, as well as pages in hidden parents that may be

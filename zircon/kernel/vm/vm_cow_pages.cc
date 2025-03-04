@@ -1128,8 +1128,9 @@ zx_status_t VmCowPages::ReplaceWithHiddenNodeLocked(fbl::RefPtr<VmCowPages>* rep
   return ZX_OK;
 }
 
-zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t limit, uint64_t size,
-                                                 fbl::RefPtr<VmCowPages>* cow_child) {
+zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneBidirectionalLocked(uint64_t offset,
+                                                                          uint64_t limit,
+                                                                          uint64_t size) {
   canary_.Assert();
 
   VmCowPagesOptions options = inheritable_options();
@@ -1139,15 +1140,19 @@ zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t limit
 #if VMO_USE_SHARED_LOCK
   state = hierarchy_state_ptr_;
 #endif
-  auto cow_clone = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
-      ktl::move(state), options, pmm_alloc_flags_, size, nullptr, nullptr, kLockOrderFirstAnon));
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+  LockedRefPtr cow_clone;
+  // Use a sub-scope to limit visibility of cow_clone_ref as it's just a temporary.
+  {
+    auto cow_clone_ref = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
+        ktl::move(state), options, pmm_alloc_flags_, size, nullptr, nullptr, kLockOrderFirstAnon));
+    if (!ac.check()) {
+      return zx::error(ZX_ERR_NO_MEMORY);
+    }
+    // As this node was just constructed we know the lock is free, use one of the lock order gap
+    // values to acquire without a lockdep violation.
+    cow_clone =
+        LockedRefPtr(ktl::move(cow_clone_ref), lock_order() + 1, VmLockAcquireMode::Reentrant);
   }
-  // As this node was just constructed we know the lock is free, use one of the lock order gap
-  // values to acquire without a lockdep violation.
-  Guard<VmoLockType> child_guard{AssertOrderedLock, cow_clone->lock(), lock_order() + 1,
-                                 VmLockAcquireMode::Reentrant};
 
   VmCowPages* parent = this;
 
@@ -1157,7 +1162,7 @@ zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t limit
     fbl::RefPtr<VmCowPages> replacement_node;
     zx_status_t status = ReplaceWithHiddenNodeLocked(&replacement_node);
     if (status != ZX_OK) {
-      return status;
+      return zx::error(status);
     }
     parent = replacement_node.get();
   }
@@ -1165,59 +1170,62 @@ zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t limit
 
   // The COW clone's parent must be hidden because the clone must not see any future parent writes.
   DEBUG_ASSERT(parent->is_hidden());
-  parent->AddBidirectionallyClonedChildLocked(offset, limit, cow_clone.get());
+  parent->AddBidirectionallyClonedChildLocked(offset, limit, &cow_clone.locked());
 
   // Checking this node's hierarchy will also check the parent's hierarchy.
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
 
-  *cow_child = ktl::move(cow_clone);
-  return ZX_OK;
+  return zx::ok(ktl::move(cow_clone));
 }
 
-zx_status_t VmCowPages::CloneUnidirectionalLocked(uint64_t offset, uint64_t limit, uint64_t size,
-                                                  fbl::RefPtr<VmCowPages>* cow_child) {
+zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneUnidirectionalLocked(uint64_t offset,
+                                                                           uint64_t limit,
+                                                                           uint64_t size) {
   canary_.Assert();
 
   VmCowPagesOptions options = inheritable_options();
 
-  fbl::AllocChecker ac;
-  fbl::RefPtr<VmHierarchyState> state;
+  LockedRefPtr cow_clone;
+  // Use a sub-scope to limit visibility of cow_clone_ref as it's just a temporary.
+  {
+    fbl::AllocChecker ac;
+    fbl::RefPtr<VmHierarchyState> state;
 #if VMO_USE_SHARED_LOCK
-  state = hierarchy_state_ptr_;
+    state = hierarchy_state_ptr_;
 #endif
-  // If we do not have a parent, then we are constructing the first anonymous node (since we must be
-  // pager backed), and so we want to start at kLockOrderFirstAnon. Otherwise if we ourselves have
-  // a parent then this is a long unidirectional chain and we derive the new lock order from
-  // ourselves.
-  const uint64_t clone_order = parent_ ? lock_order() - kLockOrderDelta : kLockOrderFirstAnon;
-  auto cow_clone = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
-      ktl::move(state), options, pmm_alloc_flags_, size, nullptr, nullptr, clone_order));
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+    // If we do not have a parent, then we are constructing the first anonymous node (since we must
+    // be pager backed), and so we want to start at kLockOrderFirstAnon. Otherwise if we ourselves
+    // have a parent then this is a long unidirectional chain and we derive the new lock order from
+    // ourselves.
+    const uint64_t clone_order = parent_ ? lock_order() - kLockOrderDelta : kLockOrderFirstAnon;
+    auto cow_clone_ref = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
+        ktl::move(state), options, pmm_alloc_flags_, size, nullptr, nullptr, clone_order));
+    if (!ac.check()) {
+      return zx::error(ZX_ERR_NO_MEMORY);
+    }
+    // As this node was just constructed we know the lock is free, use one of the lock order gap
+    // values to acquire without a lockdep violation.
+    cow_clone =
+        LockedRefPtr(ktl::move(cow_clone_ref), lock_order() + 1, VmLockAcquireMode::Reentrant);
   }
-  // As this node was just constructed we know the lock is free, use one of the lock order gap
-  // values to acquire without a lockdep violation.
-  Guard<VmoLockType> child_guard{AssertOrderedLock, cow_clone->lock(), lock_order() + 1,
-                                 VmLockAcquireMode::Reentrant};
 
   // The COW clone's parent must not be hidden because the clone may see future parent writes.
   DEBUG_ASSERT(!is_hidden());
-  AddChildLocked(cow_clone.get(), offset, limit);
+  AddChildLocked(&cow_clone.locked(), offset, limit);
 
   // Checking this node's hierarchy will also check the parent's hierarchy.
   // It will not check the child's page sharing however, so check that independently.
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
-  VMO_VALIDATION_ASSERT(cow_clone->DebugValidatePageSharingLocked());
-  VMO_FRUGAL_VALIDATION_ASSERT(cow_clone->DebugValidateVmoPageBorrowingLocked());
+  VMO_VALIDATION_ASSERT(cow_clone.locked().DebugValidatePageSharingLocked());
+  VMO_FRUGAL_VALIDATION_ASSERT(cow_clone.locked().DebugValidateVmoPageBorrowingLocked());
 
-  *cow_child = ktl::move(cow_clone);
-
-  return ZX_OK;
+  return zx::ok(ktl::move(cow_clone));
 }
 
-zx_status_t VmCowPages::CreateCloneLocked(SnapshotType type, bool require_unidirectional,
-                                          VmCowRange range, fbl::RefPtr<VmCowPages>* cow_child) {
+zx::result<VmCowPages::LockedRefPtr> VmCowPages::CreateCloneLocked(SnapshotType type,
+                                                                   bool require_unidirectional,
+                                                                   VmCowRange range) {
   canary_.Assert();
 
   LTRACEF("vmo %p offset %#" PRIx64 " size %#" PRIx64 "\n", this, range.offset, range.len);
@@ -1233,7 +1241,7 @@ zx_status_t VmCowPages::CreateCloneLocked(SnapshotType type, bool require_unidir
   // source. Any unidirectional clones in the tree would be able to introduce / modify content,
   // which is not compatible with the notion of a full snapshot.
   if (type == SnapshotType::Full && can_root_source_evict()) {
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   // Determine whether the snapshot type is requiring a bidirectional clone or not.
@@ -1261,31 +1269,31 @@ zx_status_t VmCowPages::CreateCloneLocked(SnapshotType type, bool require_unidir
     bool overflow;
     overflow = add_overflow(root_parent_offset_, range.offset, &child_root_parent_offset);
     if (overflow) {
-      return ZX_ERR_INVALID_ARGS;
+      return zx::error(ZX_ERR_INVALID_ARGS);
     }
     uint64_t child_root_parent_end;
     overflow = add_overflow(child_root_parent_offset, range.len, &child_root_parent_end);
     if (overflow) {
-      return ZX_ERR_INVALID_ARGS;
+      return zx::error(ZX_ERR_INVALID_ARGS);
     }
   }
 
   if (require_bidirectional && require_unidirectional) {
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
   const bool unidirectional = !require_bidirectional && can_unidirectional_clone_locked();
   if (!unidirectional) {
     if (require_unidirectional) {
-      return ZX_ERR_NOT_SUPPORTED;
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
     }
     if (!can_bidirectional_clone_locked()) {
-      return ZX_ERR_NOT_SUPPORTED;
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
     }
     // If this is non-zero, that means that there are pages which hardware can
     // touch, so the vmo can't be safely cloned.
     // TODO: consider immediately forking these pages.
     if (pinned_page_count_locked()) {
-      return ZX_ERR_BAD_STATE;
+      return zx::error(ZX_ERR_BAD_STATE);
     }
   }
 
@@ -1295,10 +1303,10 @@ zx_status_t VmCowPages::CreateCloneLocked(SnapshotType type, bool require_unidir
 
   if (unidirectional) {
     return child_range.parent->CloneUnidirectionalLocked(
-        child_range.parent_offset, child_range.parent_limit, child_range.size, cow_child);
+        child_range.parent_offset, child_range.parent_limit, child_range.size);
   }
-  return child_range.parent->CloneBidirectionalLocked(
-      child_range.parent_offset, child_range.parent_limit, child_range.size, cow_child);
+  return child_range.parent->CloneBidirectionalLocked(child_range.parent_offset,
+                                                      child_range.parent_limit, child_range.size);
 }
 
 void VmCowPages::RemoveChildLocked(VmCowPages* removed) {

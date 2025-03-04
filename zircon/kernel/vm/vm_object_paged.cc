@@ -799,9 +799,6 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, SnapshotType type
   fbl::RefPtr<VmObjectPaged> vmo;
 
   {
-    // Declare these prior to the guard so that any failure paths destroy these without holding
-    // the lock.
-    fbl::RefPtr<VmCowPages> clone_cow_pages;
     Guard<VmoLockType> guard{lock()};
     // check that we're not uncached in some way
     if (cache_policy_ != ARCH_MMU_FLAG_CACHED) {
@@ -810,11 +807,10 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, SnapshotType type
 
     // If we are a slice we require a unidirection clone, as performing a bi-directional clone
     // through a slice does not yet have defined semantics.
-    bool require_unidirection = is_slice();
-    zx_status_t status = cow_pages_locked()->CreateCloneLocked(type, require_unidirection,
-                                                               *cow_range, &clone_cow_pages);
-    if (status != ZX_OK) {
-      return status;
+    const bool require_unidirection = is_slice();
+    auto result = cow_pages_locked()->CreateCloneLocked(type, require_unidirection, *cow_range);
+    if (result.is_error()) {
+      return result.error_value();
     }
 
     uint32_t options = 0;
@@ -829,13 +825,13 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, SnapshotType type
 #if VMO_USE_SHARED_LOCK
     state = hierarchy_state_ptr_;
 #endif
+    auto [child, child_lock] = (*result).take();
     vmo = fbl::AdoptRef<VmObjectPaged>(
-        new (&ac) VmObjectPaged(options, ktl::move(state), ktl::move(clone_cow_pages)));
+        new (&ac) VmObjectPaged(options, ktl::move(state), ktl::move(child)));
     if (!ac.check()) {
       return ZX_ERR_NO_MEMORY;
     }
-
-    AssertHeld(vmo->lock_ref());
+    Guard<VmoLockType> child_guard{AdoptLock, vmo->lock(), ktl::move(child_lock)};
     DEBUG_ASSERT(vmo->cache_policy_ == ARCH_MMU_FLAG_CACHED);
 
     // Now that everything has succeeded we can wire up cow pages references. VMO will be placed in
@@ -845,7 +841,7 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, SnapshotType type
 
     // Install the parent.
     {
-      Guard<CriticalMutex> child_guard{ChildListLock::Get()};
+      Guard<CriticalMutex> list_guard{ChildListLock::Get()};
       vmo->parent_ = this;
 
       // add the new vmo as a child before we do anything, since its
