@@ -69,22 +69,16 @@ if (current_build_target_api_level != "PLATFORM") {
   }
 }
 
-# A list of sdk_collection() targets that correspond to all
-# IDK targets in the "partner" category. For now
-# this is only the Fuchsia Core IDK, with the exceptional addition
-# of //sdk:zircon_sysroot. See the documentation comment for the
-# latter to understand why this is needed.
-#
-# Note that //sdk:zircon_sysroot simply depends on
-# //zircon/public/sysroot/sdk:sysroot_sdk which is already
-# a transitive dependency of //sdk:core, so technically adding
-# this target here only ensures that `fx build sdk` will
-# also create $OUTPUT_DIR/sdk/exported/zircon_sysroot/ by
-# default, and should not affect other uses of _sdk_public_deps.
-_sdk_public_deps = [
-  ":core",
-  ":zircon_sysroot",
-]
+# Include in the deps of targets that need to ensure that all atoms in the IDK
+# that affect API or ABI compatibility are built. This includes FIDL libraries,
+# sysroot, and source and prebuilt libraries.
+# Note: This will not include code that is excluded from being built in the main
+# platform build. Most code built in sub-builds is also built in the main build
+# as part of the sub-builds dependency. However, some targets are explicitly
+# excluded or different. ":core_packages" is an example.
+# Note: The current value is broader than needed to satisfy the description. It
+# could be narrowed if we find a way to ensure it does not rot.
+_all_idk_atoms_affecting_compatibility = [ ":core" ]
 
 # This default target should depend on all IDKs.
 group("sdk") {
@@ -92,8 +86,13 @@ group("sdk") {
 
   testonly = true
 
-  public_deps = _sdk_public_deps
+  public_deps = [ ":core" ]
   data_deps = [ ":sdk_source_set_list" ]
+
+  # Ensure that the following target is available to build and that a default
+  # build, which includes `//sdk` will also create
+  # $OUTPUT_DIR/sdk/exported/zircon_sysroot/. See the target for details.
+  deps = [ ":zircon_sysroot" ]
 }
 
 # This file contains the list of all source files used in sdk_source_set()
@@ -105,7 +104,7 @@ build_api_module("sdk_source_set_list") {
   visibility += [ "//:*" ]
   testonly = true
   data_keys = [ "sdk_source_set_sources" ]
-  deps = _sdk_public_deps
+  deps = _all_idk_atoms_affecting_compatibility
 }
 
 if (current_toolchain == default_toolchain) {
@@ -115,7 +114,7 @@ if (current_toolchain == default_toolchain) {
   group("generate_compatibility_goldens") {
     visibility += [ "//scripts/versioning:*" ]
     testonly = true
-    deps = [ "//sdk" ]
+    deps = _all_idk_atoms_affecting_compatibility
   }
 }
 
@@ -127,7 +126,7 @@ generated_file("plasa_manifest") {
   data_keys = [ "plasa" ]
   outputs = [ "$root_build_dir/manifest.plasa.json" ]
   output_conversion = "json"
-  deps = _sdk_public_deps
+  deps = _all_idk_atoms_affecting_compatibility
 }
 
 # Generates, validates, and archive the "final" IDK, including prebuilt binaries
@@ -376,6 +375,7 @@ if (!is_host) {
           ":bazel_in_tree_idk",
           ":exported_idk_for_ffx_tests",
           ":final_fuchsia_idk.exported",
+          ":generate_compatibility_goldens",
           ":plasa_manifest",
           ":sdk",
           ":sdk_source_set_list",
@@ -649,7 +649,8 @@ sdk_documentation("sdk_notice") {
 # A tiny SDK collection used to export the content of the Zircon sysroot
 # This is only needed because several other parts of the Fuchsia build
 # depend on $OUTPUT_DIR/sdk/exported/zircon_sysroot/ to be available
-# and properly populated, see [1] for all details.
+# and properly populated, see [1] for all details. Also, some third-party repos
+# build or reference building this rule [2].
 #
 # Note that //zircon/public/sysroot/sdk:sysroot_sdk is already
 # a transitive dependency of //sdk:core, so using the content of
@@ -657,6 +658,7 @@ sdk_documentation("sdk_notice") {
 # this directory is much longer to build (since it contains host tools).
 #
 # [1] https://cs.opensource.google/search?q=zircon_sysroot&ss=fuchsia%2Ffuchsia
+# [2] https://cs.opensource.google/search?q=%22sdk:zircon_sysroot%22&ss=fuchsia%2Ffuchsia
 sdk_collection("zircon_sysroot") {
   # This collection is not included in any SDK and could be a standard `group()`
   # except that there are shell scripts that expect
