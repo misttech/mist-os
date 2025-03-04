@@ -19,7 +19,7 @@ closed protocol Iob {
     ///
     /// zx_status_t zx_iob_create(uint64_t options,
     ///                           const zx_iob_region_t* regions,
-    ///                           uint32_t region_count,
+    ///                           size_t region_count,
     ///                           zx_handle_t* ep0_out,
     ///                           zx_handle_t* ep1_out);
     /// ```
@@ -53,7 +53,7 @@ closed protocol Iob {
     ///   zx_iob_discipline_t discipline;
     ///   union {
     ///     zx_iob_region_private_t private_region;
-    ///     uint8_t max_extension[4 * 8];
+    ///     uint8_t max_extension[32];
     ///   };
     /// };
     /// ```
@@ -68,8 +68,12 @@ closed protocol Iob {
     ///
     ///  - `ZX_IOB_ACCESS_EP0_CAN_MAP_READ` to grant endpoint 0 to ability to map the region as readable
     ///  - `ZX_IOB_ACCESS_EP0_CAN_MAP_WRITE` to grant endpoint 0 to ability to map the region as writable
+    ///  - `ZX_IOB_ACCESS_EP0_CAN_MEDIATED_READ` to grant endpoint 0 ability to perform mediated reads
+    ///  - `ZX_IOB_ACCESS_EP0_CAN_MEDIATED_WRITE` to grant endpoint 0 ability to perform mediated writes
     ///  - `ZX_IOB_ACCESS_EP1_CAN_MAP_READ` to grant endpoint 1 to ability to map the region as readable
     ///  - `ZX_IOB_ACCESS_EP1_CAN_MAP_WRITE` to grant endpoint 1 to ability to map the region as writable
+    ///  - `ZX_IOB_ACCESS_EP1_CAN_MEDIATED_READ` to grant endpoint 1 ability to perform mediated reads
+    ///  - `ZX_IOB_ACCESS_EP1_CAN_MEDIATED_WRITE` to grant endpoint 1 ability to perform mediated writes
     ///
     /// *size* is the requested size of the region in bytes. The size will be
     ///   rounded up to the next system page size boundary, as reported by
@@ -89,7 +93,9 @@ closed protocol Iob {
     ///
     /// ```c
     /// struct zx_iob_region_private_t {
-    ///   uint64_t options;
+    ///   uint32_t options;
+    ///   uint32_t padding1;
+    ///   uint64_t padding2[3];
     /// };
     /// ```
     ///
@@ -114,6 +120,8 @@ closed protocol Iob {
     ///
     /// `ZX_ERR_NO_MEMORY`  Failure due to lack of memory to allocated the
     /// requested buffers.
+    ///
+    /// `ZX_ERR_OUT_OF_RANGE`  The number of regions exceeds the maximum (64).
     strict Create(struct {
         options uint64;
         @voidptr
