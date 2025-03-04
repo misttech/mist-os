@@ -6,11 +6,10 @@ use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::ops::Range;
 
+pub mod btree;
+
 #[cfg(not(feature = "use_cowmap"))]
 use std::collections::BTreeMap;
-
-#[cfg(feature = "use_cowmap")]
-use cowmap::CowMap;
 
 /// Keys for the map inside RangeMap.
 ///
@@ -82,9 +81,6 @@ impl<T: Ord> Ord for RangeStart<T> {
 pub struct RangeMap<K: Ord + Clone, V: Clone + Eq> {
     #[cfg(not(feature = "use_cowmap"))]
     map: BTreeMap<RangeStart<K>, V>,
-
-    #[cfg(feature = "use_cowmap")]
-    map: CowMap<RangeStart<K>, V, 8>,
 }
 
 impl<K, V> Default for RangeMap<K, V>

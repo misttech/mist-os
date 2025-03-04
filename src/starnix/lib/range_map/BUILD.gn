@@ -12,21 +12,32 @@ import("//build/rust/rustc_library.gni")
 
 rustc_library("range_map") {
   edition = "2021"
-  sources = [ "src/lib.rs" ]
+  sources = [
+    "src/btree.rs",
+    "src/lib.rs",
+  ]
+  deps = [ "//third_party/rust_crates:arrayvec" ]
+
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 
   if (starnix_use_cowmap) {
     features = [ "use_cowmap" ]
 
-    deps = [ "//src/starnix/lib/cowmap" ]
+    deps += [ "//src/starnix/lib/cowmap" ]
   }
 }
 
 # Include starnix in the name for easier dashboarding of flakes.
 rustc_test("starnix_range_map_test") {
   edition = "2021"
-  sources = [ "src/lib.rs" ]
-  deps = [ "//src/lib/fuchsia" ]
+  sources = [
+    "src/btree.rs",
+    "src/lib.rs",
+  ]
+  deps = [
+    "//src/lib/fuchsia",
+    "//third_party/rust_crates:arrayvec",
+  ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 

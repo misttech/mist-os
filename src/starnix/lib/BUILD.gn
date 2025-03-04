@@ -19,7 +19,6 @@ group("tests") {
   testonly = true
 
   deps = [
-    "cowmap:tests",
     "ebpf:tests",
     "expando:tests",
     "extended_pstate:tests",

@@ -8,28 +8,32 @@ use std::fmt::{Debug, Formatter};
 use std::ops::{Bound, RangeBounds};
 use std::sync::Arc;
 
+const B: usize = 6;
+const NODE_CAPACITY: usize = 2 * B;
+
+type Key = u64;
+
 /// A leaf node in the btree.
 ///
 /// Stores a flat map of keys to values, with the `i`th entry in the keys array corresponding to
 /// the `i`th entry in the values array. The balancing rules of the btree ensure that every
 /// non-root leaf has between N and N/2 entries populated.
 #[derive(Clone)]
-struct NodeLeaf<K: Ord + Clone, V: Clone, const N: usize> {
+struct NodeLeaf<V: Clone> {
     /// The keys stored in this leaf node.
     ///
     /// We store the key in a dense array to improve cache performance during lookups. We often
     /// need to binary-search the keys in a given leaf node, which means having those keys close
     /// together improves cache performance.
-    keys: ArrayVec<K, N>,
+    keys: ArrayVec<Key, NODE_CAPACITY>,
 
     /// The value stored in this leaf node.
-    values: ArrayVec<V, N>,
+    values: ArrayVec<V, NODE_CAPACITY>,
 }
 
 /// Shows the map structure of the leaf node.
-impl<K, V, const N: usize> Debug for NodeLeaf<K, V, N>
+impl<V> Debug for NodeLeaf<V>
 where
-    K: Debug + Ord + Clone,
     V: Debug + Clone,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -38,7 +42,7 @@ where
 }
 
 /// The result of performing an insertion into a btree node.
-enum InsertResult<K: Ord + Clone, V: Clone, const N: usize> {
+enum InsertResult<V: Clone> {
     /// The value was successfully inserted into an empty slot.
     Inserted,
 
@@ -50,13 +54,13 @@ enum InsertResult<K: Ord + Clone, V: Clone, const N: usize> {
     /// leaf node to exceed its capacity and split into two leaf nodes. The existing leaf node
     /// now holds the entries to the left of the split and the entries to the right of the split
     /// are returned. The split occurred at the returned key.
-    SplitLeaf(K, Arc<NodeLeaf<K, V, N>>),
+    SplitLeaf(Key, Arc<NodeLeaf<V>>),
 
     /// The value was inserted into an empty slot in a subtree but that insertion caused the
     /// internal node to exceed its capacity and split into two internal nodes. The internal node
     /// now holds the entries to the left of the split and the entries to the right of the split
     /// are returned. The split occurred at the returned key.
-    SplitInternal(K, Arc<NodeInternal<K, V, N>>),
+    SplitInternal(Key, Arc<NodeInternal<V>>),
 }
 
 /// The intermediate result of a remove operation.
@@ -99,9 +103,8 @@ enum CursorPosition {
     After,
 }
 
-impl<K, V, const N: usize> NodeLeaf<K, V, N>
+impl<V> NodeLeaf<V>
 where
-    K: Ord + Clone,
     V: Clone,
 {
     /// Create an empty leaf node.
@@ -112,12 +115,12 @@ where
     }
 
     /// Search this leaf node for the given key.
-    fn get(&self, key: &K) -> Option<&V> {
+    fn get(&self, key: &Key) -> Option<&V> {
         self.get_key_value(key).map(|(_, v)| v)
     }
 
     /// Search this leaf for the given key and return both the key and the value found.
-    fn get_key_value(&self, key: &K) -> Option<(&K, &V)> {
+    fn get_key_value(&self, key: &Key) -> Option<(&Key, &V)> {
         match self.keys.binary_search(key) {
             Ok(i) => Some((&self.keys[i], &self.values[i])),
             Err(_) => None,
@@ -125,7 +128,7 @@ where
     }
 
     /// The last key/value pair stored in this leaf.
-    fn last_key_value(&self) -> Option<(&K, &V)> {
+    fn last_key_value(&self) -> Option<(&Key, &V)> {
         let key = self.keys.last()?;
         let value = self.values.last()?;
         Some((key, value))
@@ -134,9 +137,9 @@ where
     /// Find the given key in this leaf and record its position in the given stack.
     fn find_key<'a>(
         self: &'a Arc<Self>,
-        key: &K,
+        key: &Key,
         position: CursorPosition,
-        stack: &mut Vec<Cursor<'a, K, V, N>>,
+        stack: &mut Vec<Cursor<'a, V>>,
     ) {
         match self.keys.binary_search(key) {
             Ok(i) => {
@@ -155,7 +158,7 @@ where
     /// Insert the given value at the given key into this leaf node.
     ///
     /// Inserting a value into a leaf node might cause this node to split into two leaf nodes.
-    fn insert(&mut self, key: K, value: V) -> InsertResult<K, V, N> {
+    fn insert(&mut self, key: Key, value: V) -> InsertResult<V> {
         match self.keys.binary_search(&key) {
             Ok(i) => {
                 let old_value = self.values[i].clone();
@@ -163,15 +166,15 @@ where
                 InsertResult::Replaced(old_value)
             }
             Err(i) => {
-                if self.keys.len() == N {
-                    if i == N {
+                if self.keys.len() == NODE_CAPACITY {
+                    if i == NODE_CAPACITY {
                         let mut keys = ArrayVec::new();
                         let mut values = ArrayVec::new();
                         keys.push(key.clone());
                         values.push(value);
                         return InsertResult::SplitLeaf(key, Arc::new(Self { keys, values }));
                     }
-                    let middle = N / 2;
+                    let middle = NODE_CAPACITY / 2;
                     assert!(middle > 0);
                     let mut right = Self {
                         keys: self.keys.drain(middle..).collect(),
@@ -195,12 +198,12 @@ where
     }
 
     /// From the entry with the given key from this leaf node.
-    fn remove(&mut self, key: &K) -> RemoveResult<V> {
+    fn remove(&mut self, key: &Key) -> RemoveResult<V> {
         match self.keys.binary_search(key) {
             Ok(i) => {
                 self.keys.remove(i);
                 let value = self.values.remove(i);
-                if self.keys.len() < N / 2 {
+                if self.keys.len() < NODE_CAPACITY / 2 {
                     RemoveResult::Underflow(value)
                 } else {
                     RemoveResult::Removed(value)
@@ -213,17 +216,16 @@ where
 
 /// The children of an internal node in the btree.
 #[derive(Clone, Debug)]
-enum ChildList<K: Ord + Clone, V: Clone, const N: usize> {
+enum ChildList<V: Clone> {
     /// Used when an internal node has leaf nodes as children.
-    Leaf(ArrayVec<Arc<NodeLeaf<K, V, N>>, N>),
+    Leaf(ArrayVec<Arc<NodeLeaf<V>>, NODE_CAPACITY>),
 
     /// Used when an internal node has other internal nodes as children.
-    Internal(ArrayVec<Arc<NodeInternal<K, V, N>>, N>),
+    Internal(ArrayVec<Arc<NodeInternal<V>>, NODE_CAPACITY>),
 }
 
-impl<K, V, const N: usize> ChildList<K, V, N>
+impl<V> ChildList<V>
 where
-    K: Ord + Clone,
     V: Clone,
 {
     /// Create a child list that has no children.
@@ -251,7 +253,7 @@ where
     }
 
     /// Obtain the child located at the given index.
-    fn get(&self, i: usize) -> Node<K, V, N> {
+    fn get(&self, i: usize) -> Node<V> {
         match self {
             ChildList::Leaf(children) => Node::Leaf(children[i].clone()),
             ChildList::Internal(children) => Node::Internal(children[i].clone()),
@@ -259,7 +261,7 @@ where
     }
 
     /// Get a reference to the child located at the given index.
-    fn get_ref(&self, i: usize) -> NodeRef<'_, K, V, N> {
+    fn get_ref(&self, i: usize) -> NodeRef<'_, V> {
         match self {
             ChildList::Leaf(children) => NodeRef::Leaf(&children[i]),
             ChildList::Internal(children) => NodeRef::Internal(&children[i]),
@@ -289,7 +291,7 @@ where
     /// Insert a child into the child list.
     ///
     /// The type of child node must match the type of the child list.
-    fn insert(&mut self, index: usize, child: Node<K, V, N>) {
+    fn insert(&mut self, index: usize, child: Node<V>) {
         match self {
             ChildList::Leaf(children) => {
                 let Node::Leaf(leaf) = child else {
@@ -336,16 +338,16 @@ where
 
 /// An internal node in the btree.
 #[derive(Clone, Debug)]
-struct NodeInternal<K: Ord + Clone, V: Clone, const N: usize> {
+struct NodeInternal<V: Clone> {
     /// A cache of the keys that partition the keys in the children.
     /// The key at index `i` is the smallest key stored in the subtree
     /// of the `i`+1 child.
     ///
-    /// We only ever store N-1 keys in this array.
-    keys: ArrayVec<K, N>,
+    /// We only ever store CAPACITY - 1 keys in this array.
+    keys: ArrayVec<Key, NODE_CAPACITY>,
 
     /// The children of this node.
-    children: ChildList<K, V, N>,
+    children: ChildList<V>,
 }
 
 /// Get mutable references to two entries in a slice.
@@ -367,16 +369,15 @@ fn get_two_mut<T>(slice: &mut [T], i: usize, j: usize) -> (&mut T, &mut T) {
     }
 }
 
-impl<K, V, const N: usize> NodeInternal<K, V, N>
+impl<V> NodeInternal<V>
 where
-    K: Ord + Clone,
     V: Clone,
 {
     /// The index of the child that might contain the given key.
     ///
     /// Searches the cached keys at this node to determine which child node might contain the given
     /// key.
-    fn get_child_index(&self, key: &K) -> usize {
+    fn get_child_index(&self, key: &Key) -> usize {
         let p = self.keys.partition_point(|k| k < key);
         if self.keys.get(p) == Some(key) {
             // If the query key exactly matches the split key, then we need to look for this key to
@@ -389,7 +390,7 @@ where
     }
 
     /// Search this subtree for the given key.
-    fn get(&self, key: &K) -> Option<&V> {
+    fn get(&self, key: &Key) -> Option<&V> {
         let i = self.get_child_index(&key);
         match &self.children {
             ChildList::Leaf(children) => children[i].get(key),
@@ -398,7 +399,7 @@ where
     }
 
     /// Search this subtree for the given key and return both the key and the value found.
-    fn get_key_value(&self, key: &K) -> Option<(&K, &V)> {
+    fn get_key_value(&self, key: &Key) -> Option<(&Key, &V)> {
         match &self.children {
             ChildList::Leaf(children) => {
                 children.last().expect("child lists are always non-empty").get_key_value(key)
@@ -410,7 +411,7 @@ where
     }
 
     /// The last key/value pair stored in this subtree.
-    fn last_key_value(&self) -> Option<(&K, &V)> {
+    fn last_key_value(&self) -> Option<(&Key, &V)> {
         match &self.children {
             ChildList::Leaf(children) => {
                 children.last().expect("child lists are always non-empty").last_key_value()
@@ -424,9 +425,9 @@ where
     /// Find the given key in this subtree and record its position in the given stack.
     fn find_key<'a>(
         self: &'a Arc<Self>,
-        key: &K,
+        key: &Key,
         position: CursorPosition,
-        stack: &mut Vec<Cursor<'a, K, V, N>>,
+        stack: &mut Vec<Cursor<'a, V>>,
     ) {
         let i = self.get_child_index(&key);
         stack.push(Cursor { node: NodeRef::Internal(self), index: i });
@@ -441,16 +442,16 @@ where
     /// `key` must be the smallest key that occurs in the `child` subtree.
     ///
     /// The caller must ensure that the child is inserted in the correct location.
-    fn insert_child(&mut self, i: usize, key: K, child: Node<K, V, N>) -> InsertResult<K, V, N> {
+    fn insert_child(&mut self, i: usize, key: Key, child: Node<V>) -> InsertResult<V> {
         let n = self.children.len();
-        if n == N {
-            if i == N {
+        if n == NODE_CAPACITY {
+            if i == NODE_CAPACITY {
                 let mut children = self.children.new_empty();
                 children.insert(0, child);
                 let right = Self { keys: ArrayVec::new(), children };
                 return InsertResult::SplitInternal(key, Arc::new(right));
             }
-            let middle = N / 2;
+            let middle = NODE_CAPACITY / 2;
             assert!(middle > 0);
             let mut internal = Self {
                 keys: self.keys.drain(middle..).collect(),
@@ -479,7 +480,7 @@ where
     ///
     /// Inserting a value into an internal node might cause this node to split into two internal
     /// nodes.
-    fn insert(&mut self, key: K, value: V) -> InsertResult<K, V, N> {
+    fn insert(&mut self, key: Key, value: V) -> InsertResult<V> {
         let i = self.get_child_index(&key);
         let result = match &mut self.children {
             ChildList::Leaf(children) => Arc::make_mut(&mut children[i]).insert(key, value),
@@ -534,7 +535,7 @@ where
             ChildList::Leaf(children) => {
                 let (left_shard_node, right_shared_node) = get_two_mut(children, left, right);
                 let left_node = Arc::make_mut(left_shard_node);
-                if n <= N {
+                if n <= NODE_CAPACITY {
                     // Merge the right node into the left node.
                     left_node.keys.extend(right_shared_node.keys.iter().cloned());
                     left_node.values.extend(right_shared_node.values.iter().cloned());
@@ -569,7 +570,7 @@ where
                 let (left_shard_node, right_shared_node) = get_two_mut(children, left, right);
                 let left_node = Arc::make_mut(left_shard_node);
                 let old_split_key = &self.keys[left];
-                if n <= N {
+                if n <= NODE_CAPACITY {
                     // Merge the right node into the left node.
                     left_node.keys.push(old_split_key.clone());
                     left_node.keys.extend(right_shared_node.keys.iter().cloned());
@@ -617,7 +618,7 @@ where
     }
 
     /// Remove the child with the given key from this subtree.
-    fn remove(&mut self, key: &K) -> RemoveResult<V> {
+    fn remove(&mut self, key: &Key) -> RemoveResult<V> {
         let i = self.get_child_index(&key);
         let result = match &mut self.children {
             ChildList::Leaf(children) => Arc::make_mut(&mut children[i]).remove(key),
@@ -628,7 +629,7 @@ where
             RemoveResult::Removed(value) => RemoveResult::Removed(value),
             RemoveResult::Underflow(value) => {
                 self.rebalance_child(i);
-                if self.children.len() < N / 2 {
+                if self.children.len() < NODE_CAPACITY / 2 {
                     RemoveResult::Underflow(value)
                 } else {
                     RemoveResult::Removed(value)
@@ -640,21 +641,20 @@ where
 
 /// A node in the btree.
 #[derive(Clone, Debug)]
-enum Node<K: Ord + Clone, V: Clone, const N: usize> {
+enum Node<V: Clone> {
     /// An internal node.
-    Internal(Arc<NodeInternal<K, V, N>>),
+    Internal(Arc<NodeInternal<V>>),
 
     /// A leaf node.
-    Leaf(Arc<NodeLeaf<K, V, N>>),
+    Leaf(Arc<NodeLeaf<V>>),
 }
 
-impl<K, V, const N: usize> Node<K, V, N>
+impl<V> Node<V>
 where
-    K: Ord + Clone,
     V: Clone,
 {
     /// Search this node for the given key.
-    fn get(&self, key: &K) -> Option<&V> {
+    fn get(&self, key: &Key) -> Option<&V> {
         match self {
             Node::Internal(node) => node.get(key),
             Node::Leaf(node) => node.get(key),
@@ -670,7 +670,7 @@ where
     }
 
     /// Search this node for the given key and return both the key and the value found.
-    fn get_key_value(&self, key: &K) -> Option<(&K, &V)> {
+    fn get_key_value(&self, key: &Key) -> Option<(&Key, &V)> {
         match self {
             Node::Leaf(node) => node.get_key_value(key),
             Node::Internal(node) => node.get_key_value(key),
@@ -678,7 +678,7 @@ where
     }
 
     /// The last key/value pair stored in this node.
-    fn last_key_value(&self) -> Option<(&K, &V)> {
+    fn last_key_value(&self) -> Option<(&Key, &V)> {
         match self {
             Node::Leaf(node) => node.last_key_value(),
             Node::Internal(node) => node.last_key_value(),
@@ -686,7 +686,7 @@ where
     }
 
     /// Converts a reference into a Node into a NodeRef.
-    fn as_ref(&self) -> NodeRef<'_, K, V, N> {
+    fn as_ref(&self) -> NodeRef<'_, V> {
         match self {
             Node::Internal(node) => NodeRef::Internal(node),
             Node::Leaf(node) => NodeRef::Leaf(node),
@@ -697,14 +697,14 @@ where
     ///
     /// If the insertion causes this node to split, the node will always split into two instances
     /// of the same type of node.
-    fn insert(&mut self, key: K, value: V) -> InsertResult<K, V, N> {
+    fn insert(&mut self, key: Key, value: V) -> InsertResult<V> {
         match self {
             Node::Internal(node) => Arc::make_mut(node).insert(key, value),
             Node::Leaf(node) => Arc::make_mut(node).insert(key, value),
         }
     }
 
-    fn remove(&mut self, key: &K) -> RemoveResult<V> {
+    fn remove(&mut self, key: &Key) -> RemoveResult<V> {
         match self {
             Node::Internal(node) => Arc::make_mut(node).remove(key),
             Node::Leaf(node) => Arc::make_mut(node).remove(key),
@@ -712,12 +712,7 @@ where
     }
 
     /// Find the given key in this node and record its position in the given stack.
-    fn find_key<'a>(
-        &'a self,
-        key: &K,
-        position: CursorPosition,
-        stack: &mut Vec<Cursor<'a, K, V, N>>,
-    ) {
+    fn find_key<'a>(&'a self, key: &Key, position: CursorPosition, stack: &mut Vec<Cursor<'a, V>>) {
         match self {
             Node::Internal(node) => node.find_key(key, position, stack),
             Node::Leaf(node) => node.find_key(key, position, stack),
@@ -727,17 +722,16 @@ where
 
 /// A node in the btree.
 #[derive(Clone, Debug)]
-enum NodeRef<'a, K: Ord + Clone, V: Clone, const N: usize> {
+enum NodeRef<'a, V: Clone> {
     /// An internal node.
-    Internal(&'a Arc<NodeInternal<K, V, N>>),
+    Internal(&'a Arc<NodeInternal<V>>),
 
     /// A leaf node.
-    Leaf(&'a Arc<NodeLeaf<K, V, N>>),
+    Leaf(&'a Arc<NodeLeaf<V>>),
 }
 
-impl<'a, K, V, const N: usize> NodeRef<'a, K, V, N>
+impl<'a, V> NodeRef<'a, V>
 where
-    K: Ord + Clone,
     V: Clone,
 {
     /// The number of children stored at this node.
@@ -749,9 +743,8 @@ where
     }
 }
 
-impl<'a, K, V, const N: usize> PartialEq for NodeRef<'a, K, V, N>
+impl<'a, V> PartialEq for NodeRef<'a, V>
 where
-    K: Ord + Clone,
     V: Clone,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -765,9 +758,9 @@ where
 
 /// A cursor into a tree node.
 #[derive(Debug)]
-struct Cursor<'a, K: Ord + Clone, V: Clone, const N: usize> {
+struct Cursor<'a, V: Clone> {
     /// The node pointed to by the cursor.
-    node: NodeRef<'a, K, V, N>,
+    node: NodeRef<'a, V>,
 
     /// The index of the child within `node` pointed to by the cursor.
     index: usize,
@@ -775,13 +768,13 @@ struct Cursor<'a, K: Ord + Clone, V: Clone, const N: usize> {
 
 /// An iterator over the key-value pairs stored in a CowMap.
 #[derive(Debug)]
-pub struct Iter<'a, K: Ord + Clone, V: Clone, const N: usize> {
+pub struct Iter<'a, V: Clone> {
     /// The state of the forward iteration.
     ///
     /// Represents a stack of cursors into the tree. For internal nodes, the cursor points to the
     /// child currently being iterated. For leaf nodes, the cursor points to the next entry to
     /// enumerate.
-    forward: Vec<Cursor<'a, K, V, N>>,
+    forward: Vec<Cursor<'a, V>>,
 
     /// The state of the backward iteration.
     ///
@@ -789,12 +782,11 @@ pub struct Iter<'a, K: Ord + Clone, V: Clone, const N: usize> {
     /// child currently being iterated. For leaf nodes, the cursor points to the child that was
     /// most recently iterated or just past the end of the entry list if no entries have been
     /// enumerated from this leaf yet.
-    backward: Vec<Cursor<'a, K, V, N>>,
+    backward: Vec<Cursor<'a, V>>,
 }
 
-impl<'a, K, V, const N: usize> Iter<'a, K, V, N>
+impl<'a, V> Iter<'a, V>
 where
-    K: Ord + Clone,
     V: Clone,
 {
     /// Whether the iterator is complete.
@@ -809,7 +801,7 @@ where
     }
 
     /// The cursor at the top of the forward stack.
-    fn forward_cursor(&mut self) -> Option<&mut Cursor<'a, K, V, N>> {
+    fn forward_cursor(&mut self) -> Option<&mut Cursor<'a, V>> {
         if self.is_done() {
             None
         } else {
@@ -818,7 +810,7 @@ where
     }
 
     /// The cursor at the top of the backward stack.
-    fn backward_cursor(&mut self) -> Option<&mut Cursor<'a, K, V, N>> {
+    fn backward_cursor(&mut self) -> Option<&mut Cursor<'a, V>> {
         if self.is_done() {
             None
         } else {
@@ -838,12 +830,11 @@ where
     }
 }
 
-impl<'a, K, V, const N: usize> Iterator for Iter<'a, K, V, N>
+impl<'a, V> Iterator for Iter<'a, V>
 where
-    K: Ord + Clone,
     V: Clone,
 {
-    type Item = (&'a K, &'a V);
+    type Item = (&'a Key, &'a V);
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(cursor) = self.forward_cursor() {
@@ -872,9 +863,8 @@ where
     }
 }
 
-impl<'a, K, V, const N: usize> DoubleEndedIterator for Iter<'a, K, V, N>
+impl<'a, V> DoubleEndedIterator for Iter<'a, V>
 where
-    K: Ord + Clone,
     V: Clone,
 {
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -914,17 +904,16 @@ where
 /// `N` is the number of entries to store at each leaf of the map's underlying tree. `N` must be at
 /// least 2 for the map to function properly.
 #[derive(Clone, Debug)]
-pub struct CowMap<K: Ord + Clone, V: Clone, const N: usize> {
+pub struct CowMap<V: Clone> {
     /// The root node of the tree.
     ///
     /// The root node is either a leaf of an internal node, depending on the number of entries in
     /// the map.
-    node: Node<K, V, N>,
+    node: Node<V>,
 }
 
-impl<K, V, const N: usize> Default for CowMap<K, V, N>
+impl<V> Default for CowMap<V>
 where
-    K: Ord + Clone,
     V: Clone,
 {
     fn default() -> Self {
@@ -932,9 +921,8 @@ where
     }
 }
 
-impl<K, V, const N: usize> CowMap<K, V, N>
+impl<V> CowMap<V>
 where
-    K: Ord + Clone,
     V: Clone,
 {
     /// Whether this map contains any entries.
@@ -946,14 +934,14 @@ where
     }
 
     /// Get the value corresponding to the given key from the map.
-    pub fn get(&self, key: &K) -> Option<&V> {
+    pub fn get(&self, key: &Key) -> Option<&V> {
         self.node.get(key)
     }
 
     /// Insert the given value with the given key into this map.
     ///
     /// If the map already contained a value with the given key, that value is returned.
-    pub fn insert(&mut self, key: K, value: V) -> Option<V> {
+    pub fn insert(&mut self, key: Key, value: V) -> Option<V> {
         match self.node.insert(key, value) {
             InsertResult::Inserted => None,
             InsertResult::Replaced(old_value) => Some(old_value),
@@ -993,7 +981,7 @@ where
     /// Remove the entry with the given key from the map.
     ///
     /// If the key was present in the map, returns the value previously stored at the given key.
-    pub fn remove(&mut self, key: &K) -> Option<V> {
+    pub fn remove(&mut self, key: &Key) -> Option<V> {
         match self.node.remove(key) {
             RemoveResult::NotFound => None,
             RemoveResult::Removed(value) => Some(value),
@@ -1015,7 +1003,7 @@ where
     }
 
     /// Iterate through the keys and values stored in the map.
-    pub fn iter(&self) -> Iter<'_, K, V, N> {
+    pub fn iter(&self) -> Iter<'_, V> {
         Iter {
             forward: vec![Cursor { node: self.node.as_ref(), index: 0 }],
             backward: vec![Cursor { node: self.node.as_ref(), index: self.node.len() }],
@@ -1023,7 +1011,7 @@ where
     }
 
     /// Create the cursor stack for the start bound of the given range.
-    fn find_start_bound(&self, bounds: &impl RangeBounds<K>) -> Vec<Cursor<'_, K, V, N>> {
+    fn find_start_bound(&self, bounds: &impl RangeBounds<Key>) -> Vec<Cursor<'_, V>> {
         let mut stack = vec![];
         let (key, position) = match bounds.start_bound() {
             Bound::Included(key) => (key, CursorPosition::At),
@@ -1038,7 +1026,7 @@ where
     }
 
     /// Create teh cursor stack for the end bound of the given range.
-    fn find_end_bound(&self, bounds: &impl RangeBounds<K>) -> Vec<Cursor<'_, K, V, N>> {
+    fn find_end_bound(&self, bounds: &impl RangeBounds<Key>) -> Vec<Cursor<'_, V>> {
         let mut stack = vec![];
         let (key, position) = match bounds.end_bound() {
             Bound::Included(key) => (key, CursorPosition::After),
@@ -1053,7 +1041,7 @@ where
     }
 
     /// Iterate through the keys and values stored in the given range in the map.
-    pub fn range(&self, bounds: impl RangeBounds<K>) -> Iter<'_, K, V, N> {
+    pub fn range(&self, bounds: impl RangeBounds<Key>) -> Iter<'_, V> {
         let forward = self.find_start_bound(&bounds);
         let backward = self.find_end_bound(&bounds);
         Iter { forward, backward }
@@ -1062,12 +1050,12 @@ where
     /// The key and value stored in the map at the given key.
     ///
     /// Useful if not all key objects that are equal in the total ordering are actually identical.
-    pub fn get_key_value(&self, key: &K) -> Option<(&K, &V)> {
+    pub fn get_key_value(&self, key: &Key) -> Option<(&Key, &V)> {
         self.node.get_key_value(key)
     }
 
     /// The key and value for the largest key value stored in the map.
-    pub fn last_key_value(&self) -> Option<(&K, &V)> {
+    pub fn last_key_value(&self) -> Option<(&Key, &V)> {
         self.node.last_key_value()
     }
 }
@@ -1078,14 +1066,14 @@ mod test {
 
     #[test]
     fn test_empty() {
-        let map = CowMap::<u32, i64, 4>::default();
+        let map = CowMap::<i64>::default();
         assert!(map.is_empty());
         assert!(map.get(&12).is_none());
     }
 
     #[test]
     fn test_insert() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         assert!(map.is_empty());
         assert!(map.insert(12, 42).is_none());
         assert!(!map.is_empty());
@@ -1097,7 +1085,7 @@ mod test {
 
     #[test]
     fn test_split_leaf() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
 
         // Fill leaf node.
         for i in 0..4 {
@@ -1120,7 +1108,7 @@ mod test {
 
     #[test]
     fn test_split_internal() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
 
         // Create four leaf nodes that are half full.
         for i in 0..8 {
@@ -1151,7 +1139,7 @@ mod test {
 
     #[test]
     fn test_insert_many() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         for i in 0..100 {
             map.insert(i, i as i64 * 2);
         }
@@ -1162,7 +1150,7 @@ mod test {
 
     #[test]
     fn test_remove() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         assert!(map.is_empty());
         assert!(map.insert(12, 42).is_none());
         assert!(!map.is_empty());
@@ -1173,7 +1161,7 @@ mod test {
 
     #[test]
     fn test_remove_many() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         for i in 0..100 {
             map.insert(i, i as i64 * 2);
         }
@@ -1193,7 +1181,7 @@ mod test {
 
     #[test]
     fn test_split_merge_rebalance() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         for i in 0..100 {
             map.insert(i * 2, i as i64);
         }
@@ -1211,7 +1199,7 @@ mod test {
 
     #[test]
     fn test_clone() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         for i in 0..100 {
             map.insert(i, i as i64);
         }
@@ -1225,7 +1213,7 @@ mod test {
 
     #[test]
     fn test_clone_modify() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         for i in 0..100 {
             map.insert(i, i as i64);
         }
@@ -1248,7 +1236,7 @@ mod test {
 
     #[test]
     fn test_remove_root_single_child() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         map.insert(1, 1);
         map.insert(2, 2);
         map.insert(3, 3);
@@ -1267,7 +1255,7 @@ mod test {
 
     #[test]
     fn test_remove_internal_rebalance_left_heavy() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
 
         for i in 0..10 {
             map.insert(i, i as i64);
@@ -1288,7 +1276,7 @@ mod test {
 
     #[test]
     fn test_remove_internal_rebalance_right_heavy() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         for i in 0..10 {
             map.insert(i, i as i64);
         }
@@ -1307,7 +1295,7 @@ mod test {
 
     #[test]
     fn test_remove_all_from_full_map() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         for i in 0..100 {
             map.insert(i, i as i64);
         }
@@ -1321,7 +1309,7 @@ mod test {
 
     #[test]
     fn test_interleaved_insert_remove() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
 
         for i in 0..50 {
             map.insert(i, i as i64);
@@ -1342,7 +1330,7 @@ mod test {
 
     #[test]
     fn test_remove_from_cloned_map() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         for i in 0..10 {
             map.insert(i, i as i64);
         }
@@ -1358,7 +1346,7 @@ mod test {
 
     #[test]
     fn test_iter() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         map.insert(1, 1);
         map.insert(2, 2);
         map.insert(3, 3);
@@ -1376,7 +1364,7 @@ mod test {
 
     #[test]
     fn test_iter_order() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         map.insert(1, 1);
         map.insert(5, 5);
         map.insert(2, 2);
@@ -1390,7 +1378,7 @@ mod test {
 
     #[test]
     fn test_iter_large() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
 
         for i in 0..100 {
             map.insert(i, i as i64 * 2);
@@ -1406,14 +1394,14 @@ mod test {
 
     #[test]
     fn test_iter_empty() {
-        let map = CowMap::<u32, i64, 4>::default();
+        let map = CowMap::<i64>::default();
         let mut iter = map.iter();
         assert_eq!(iter.next(), None);
     }
 
     #[test]
     fn test_iter_after_remove_all() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         for i in 0..100 {
             map.insert(i, i as i64 * 2);
         }
@@ -1428,7 +1416,7 @@ mod test {
 
     #[test]
     fn test_iter_after_split_and_remove() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         for i in 0..10 {
             map.insert(i, i as i64);
         }
@@ -1443,7 +1431,7 @@ mod test {
 
     #[test]
     fn test_iter_after_clone_and_remove() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         for i in 0..10 {
             map.insert(i, i as i64);
         }
@@ -1466,7 +1454,7 @@ mod test {
 
     #[test]
     fn test_range_basic() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         for i in 0..10 {
             map.insert(i, i as i64);
         }
@@ -1480,20 +1468,20 @@ mod test {
         let range = map.range(..).map(|(&k, &v)| (k, v)).collect::<Vec<_>>();
         assert_eq!(range.len(), 10);
         for i in 0..10 {
-            assert_eq!(range[i], (i as u32, i as i64));
+            assert_eq!(range[i], (i as u64, i as i64));
         }
     }
 
     #[test]
     fn test_range_empty() {
-        let map = CowMap::<u32, i64, 4>::default();
+        let map = CowMap::<i64>::default();
         let range: Vec<_> = map.range(3..7).map(|(&k, &v)| (k, v)).collect();
         assert!(range.is_empty());
     }
 
     #[test]
     fn test_range_out_of_bounds() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         for i in 0..10 {
             map.insert(i, i as i64);
         }
@@ -1507,7 +1495,7 @@ mod test {
 
     #[test]
     fn test_range_exclusive_start_inclusive_end() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         for i in 0..10 {
             map.insert(i, i as i64);
         }
@@ -1518,7 +1506,7 @@ mod test {
 
     #[test]
     fn test_get_key_value_basic() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         map.insert(1, 1);
         assert_eq!(map.get_key_value(&1), Some((&1, &1)));
         assert_eq!(map.get_key_value(&2), None);
@@ -1532,13 +1520,13 @@ mod test {
 
     #[test]
     fn test_get_key_value_empty() {
-        let map = CowMap::<u32, i64, 4>::default();
+        let map = CowMap::<i64>::default();
         assert_eq!(map.get_key_value(&1), None);
     }
 
     #[test]
     fn test_last_key_value_basic() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         assert_eq!(map.last_key_value(), None);
 
         map.insert(1, 1);
@@ -1554,7 +1542,7 @@ mod test {
 
     #[test]
     fn test_last_key_value_after_remove() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         map.insert(1, 1);
         map.insert(2, 2);
         map.insert(3, 3);
@@ -1571,13 +1559,13 @@ mod test {
 
     #[test]
     fn test_last_key_value_empty() {
-        let map = CowMap::<u32, i64, 4>::default();
+        let map = CowMap::<i64>::default();
         assert_eq!(map.last_key_value(), None);
     }
 
     #[test]
     fn test_range_complex_large() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
 
         let keys = (0..200).collect::<Vec<_>>();
 
@@ -1606,7 +1594,7 @@ mod test {
 
     #[test]
     fn test_iter_backward() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         map.insert(1, 1);
         map.insert(2, 2);
         map.insert(3, 3);
@@ -1624,7 +1612,7 @@ mod test {
 
     #[test]
     fn test_iter_backward_large() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
 
         for i in 0..100 {
             map.insert(i, i as i64 * 2);
@@ -1640,7 +1628,7 @@ mod test {
 
     #[test]
     fn test_iter_forward_and_backward_interleaved() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         for i in 0..10 {
             map.insert(i, i as i64);
         }
@@ -1660,7 +1648,7 @@ mod test {
         assert_eq!(iter.next_back(), None);
 
         // Test with odd number of elements
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         for i in 0..9 {
             map.insert(i, i as i64);
         }
@@ -1682,7 +1670,7 @@ mod test {
 
     #[test]
     fn test_range_backward() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         for i in 0..10 {
             map.insert(i, i as i64);
         }
@@ -1696,7 +1684,7 @@ mod test {
 
     #[test]
     fn test_range_backward_edge_cases() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         for i in 0..10 {
             map.insert(i, i as i64);
         }
@@ -1713,7 +1701,7 @@ mod test {
 
     #[test]
     fn test_range_backward_complex_tree() {
-        let mut map = CowMap::<u32, i64, 4>::default();
+        let mut map = CowMap::<i64>::default();
         // Create a more complex tree structure by interleaving insertions and removals.
         for i in 0..100 {
             map.insert(i, i as i64);
