@@ -38,6 +38,7 @@ pub async fn init_connection_behavior(
     context: &EnvironmentContext,
 ) -> Result<FhoConnectionBehavior> {
     if context.is_strict() {
+        tracing::info!("Initializing FhoConnectionBehavior::DirectConnector");
         let connector =
             NetworkConnector::<ffx_target::ssh_connector::SshConnector>::new(context).await?;
         Ok(FhoConnectionBehavior::DirectConnector(Arc::new(connector)))
@@ -49,6 +50,7 @@ pub async fn init_connection_behavior(
             DaemonVersionCheck::SameVersionInfo(build_info),
         )
         .await?;
+        tracing::info!("Initializing FhoConnectionBehavior::DaemonConnector");
         Ok(FhoConnectionBehavior::DaemonConnector(Arc::new(overnet_injector)))
     }
 }

@@ -43,9 +43,14 @@ pub async fn maybe_locally_resolve_target_spec(
     target_spec: Option<String>,
     env_context: &EnvironmentContext,
 ) -> Result<Option<String>> {
+    // This should be read as "is discovery enabled on the daemon".
     if crate::is_discovery_enabled(env_context).await {
         Ok(target_spec)
     } else {
+        tracing::warn!("crate::is_discovery_enabled is false - using local target resolution. is_usb_discovery_disabled is {}, is_mdns_discovery_disabled is {}",
+        ffx_config::is_usb_discovery_disabled(env_context).await,
+        ffx_config::is_mdns_discovery_disabled(env_context).await);
+
         locally_resolve_target_spec(target_spec, &QueryResolver::default(), env_context).await
     }
 }
