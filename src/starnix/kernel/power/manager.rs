@@ -241,6 +241,7 @@ impl SuspendResumeManager {
                         (wake_time - suspend_start_time).into();
                     suspend_stats.last_time_in_sleep =
                         zx::BootDuration::from_nanos(res.suspend_time.unwrap_or(0));
+                    suspend_stats.last_resume_reason = res.resume_reason;
                 });
                 self.lock().inspect_node.add_entry(|node| {
                     node.record_int(fobs::SUSPEND_RESUMED_AT, wake_time.into_nanos());

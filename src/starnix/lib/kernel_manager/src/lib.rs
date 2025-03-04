@@ -329,11 +329,13 @@ async fn suspend_container(
     }
     log::info!("Finished waiting on container wake proxies.");
 
+    let mut resume_reason: Option<String> = None;
     for wait_item in &wait_items {
         if wait_item.pending.contains(RUNNER_SIGNAL) {
             let koid = wait_item.handle.get_koid().unwrap();
             if let Some(event) = resume_events.events.get(&koid) {
                 log::info!("Woke container from sleep for: {}", event.name);
+                resume_reason = Some(event.name.clone());
             }
         }
     }
@@ -350,6 +352,7 @@ async fn suspend_container(
     log::info!("Returning successfully from suspend container");
     Ok(Ok(fstarnixrunner::ManagerSuspendContainerResponse {
         suspend_time: Some((zx::BootInstant::get() - suspend_start).into_nanos()),
+        resume_reason,
         ..Default::default()
     }))
 }
