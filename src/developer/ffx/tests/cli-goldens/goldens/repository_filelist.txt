@@ -13,5 +13,4 @@ ffx/repository/remove.golden
 ffx/repository/server.golden
 ffx/repository/server/list.golden
 ffx/repository/server/start.golden
-ffx/repository/server/status.golden
 ffx/repository/server/stop.golden
