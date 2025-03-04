@@ -279,7 +279,6 @@ async fn run_session(
         std::path::PathBuf::from(&opts.output)
     };
     symbolize(&unsymbolized_path, &symbolized_path).await?;
-
     if !opts.pprof_conversion {
         return Ok(());
     }
