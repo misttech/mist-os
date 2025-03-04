@@ -303,18 +303,10 @@ template("assembly_input_bundle") {
     compiled_packages = "${assembly_input_bundle_dir}.compiled_packages"
   }
 
-  # See if the fuchsia-pkg and archive for the AIB are to be created.
-  forward_variables_from(invoker,
-                         [
-                           "create_aib_package",
-                           "create_aib_archive",
-                         ])
-  if (!defined(create_aib_package)) {
-    create_aib_package = true
-  }
-  if (!defined(create_aib_archive)) {
-    create_aib_archive = true
-  }
+  # Disable creation of the package/archive of the AIBs.
+  # After this soaks for a bit, we can delete all the logic.
+  create_aib_package = false
+  create_aib_archive = false
 
   creation_args = []
   creation_inputs = []
