@@ -621,15 +621,8 @@ where
     //   (2) returns to TIME-WAIT state if the SYN turns out to be an old
     //       duplicate.
     if *defunct && incoming.header.control == Some(Control::SYN) && incoming.header.ack.is_none() {
-        if let State::TimeWait(TimeWait {
-            last_seq: _,
-            last_ack,
-            last_wnd: _,
-            last_wnd_scale: _,
-            expiry: _,
-        }) = state
-        {
-            if !incoming.header.seq.before(*last_ack) {
+        if let State::TimeWait(TimeWait { last_seq: _, closed_rcv, expiry: _ }) = state {
+            if !incoming.header.seq.before(closed_rcv.ack) {
                 return ConnectionIncomingSegmentDisposition::ReuseCandidateForListener;
             }
         }

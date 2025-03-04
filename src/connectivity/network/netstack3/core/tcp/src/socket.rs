@@ -8412,11 +8412,11 @@ mod tests {
                         Connection {
                         state: State::TimeWait(TimeWait {
                             last_seq,
-                            last_ack,
+                            closed_rcv,
                             expiry,
                             ..
                         }), ..
-                        } => (*last_seq, *last_ack, *expiry)
+                        } => (*last_seq, closed_rcv.ack, *expiry)
                     )
                 }
             )

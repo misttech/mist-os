@@ -855,18 +855,6 @@ impl<I> Recv<I, ()> {
 }
 
 impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
-    /// Returns the next window size and updates [`Recv::last_window_update`].
-    ///
-    /// NOTE: Since it updates [`Recv::last_window_update`], this method should
-    /// only be called when a segment is definitely going to be sent. If not,
-    /// prefer to call [`Recv::calculate_window_size`] instead.
-    fn select_window(&mut self) -> WindowSize {
-        let (rcv_nxt, last_wnd) = self.calculate_window_size();
-        self.last_window_update = (rcv_nxt, last_wnd);
-
-        last_wnd
-    }
-
     /// Calculates the next window size to advertise to the peer.
     ///
     /// Returns the next window size and the sequence number of the next octet
@@ -963,10 +951,115 @@ impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
         match self.timer {
             Some(ReceiveTimer::DelayedAck { at, received_bytes: _ }) => (at <= now).then(|| {
                 self.timer = None;
-                Segment::ack(snd_max, self.nxt(), self.select_window() >> self.wnd_scale)
+                self.make_ack(snd_max)
             }),
             None => None,
         }
+    }
+
+    /// Handles a FIN, returning the [`RecvParams`]` to use from now on.
+    fn handle_fin(&self) -> RecvParams {
+        let (ack, wnd) = self.calculate_window_size();
+        RecvParams {
+            ack: ack + 1,
+            wnd: wnd.checked_sub(1).unwrap_or(WindowSize::ZERO),
+            wnd_scale: self.wnd_scale,
+        }
+    }
+}
+
+impl<'a, I: Instant, R: ReceiveBuffer> RecvSegmentArgumentsProvider for &'a mut Recv<I, R> {
+    fn take_rcv_segment_args(self) -> (SeqNum, UnscaledWindowSize) {
+        let (ack, wnd) = self.calculate_window_size();
+        self.last_window_update = (ack, wnd);
+        (ack, wnd >> self.wnd_scale)
+    }
+}
+
+/// Cached parameters for states that no longer have a full receive state
+/// machine.
+#[derive(Debug, Clone)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+pub(super) struct RecvParams {
+    pub(super) ack: SeqNum,
+    pub(super) wnd_scale: WindowScale,
+    pub(super) wnd: WindowSize,
+}
+
+impl<'a> RecvSegmentArgumentsProvider for &'a RecvParams {
+    fn take_rcv_segment_args(self) -> (SeqNum, UnscaledWindowSize) {
+        (self.ack, self.wnd >> self.wnd_scale)
+    }
+}
+
+/// Equivalent to an enum of [`Recv`] and [`RecvParams`] but with a cached
+/// window calculation.
+struct CalculatedRecvParams<'a, I, R> {
+    params: RecvParams,
+    recv: Option<&'a mut Recv<I, R>>,
+}
+
+impl<'a, I, R> CalculatedRecvParams<'a, I, R> {
+    /// Constructs a [`CalculatedRecvParams`] from a [`RecvParams`].
+    ///
+    /// Note: do not use [`Recv::to_params`] to instantiate this, prefer
+    /// [`CalculatedRecvParams::from_recv`] instead.
+    fn from_params(params: RecvParams) -> Self {
+        Self { params, recv: None }
+    }
+
+    fn nxt(&self) -> SeqNum {
+        self.params.ack
+    }
+
+    fn wnd(&self) -> WindowSize {
+        self.params.wnd
+    }
+}
+
+impl<'a, I, R> RecvSegmentArgumentsProvider for CalculatedRecvParams<'a, I, R> {
+    fn take_rcv_segment_args(self) -> (SeqNum, UnscaledWindowSize) {
+        let Self { params, recv } = self;
+        let RecvParams { ack, wnd_scale, wnd } = params;
+        if let Some(recv) = recv {
+            // A segment was produced, update the receiver with last info.
+            recv.last_window_update = (ack, wnd);
+        }
+        (ack, wnd >> wnd_scale)
+    }
+}
+
+impl<'a, I: Instant, R: ReceiveBuffer> CalculatedRecvParams<'a, I, R> {
+    fn from_recv(recv: &'a mut Recv<I, R>) -> Self {
+        let (ack, wnd) = recv.calculate_window_size();
+        let wnd_scale = recv.wnd_scale;
+        Self { params: RecvParams { ack, wnd_scale, wnd }, recv: Some(recv) }
+    }
+}
+
+trait RecvSegmentArgumentsProvider: Sized {
+    /// Consumes this provider returning the ACK and WND to be placed in a
+    /// segment.
+    ///
+    /// The implementer assumes that the parameters *will be sent to a peer* and
+    /// may cache the yielded values as the last sent receiver information.
+    fn take_rcv_segment_args(self) -> (SeqNum, UnscaledWindowSize);
+
+    /// Consumes this provider and calls `f` with the ACK and window size
+    /// arguments that should be put in the segment to be returned by `f`.
+    fn make_segment<P, F: FnOnce(SeqNum, UnscaledWindowSize) -> Segment<P>>(
+        self,
+        f: F,
+    ) -> Segment<P> {
+        let (ack, wnd) = self.take_rcv_segment_args();
+        f(ack, wnd)
+    }
+
+    /// Makes an ACK segment with the provided `seq` and `self`'s receiver
+    /// state.
+    fn make_ack<P: Payload>(self, seq: SeqNum) -> Segment<P> {
+        let (ack, wnd) = self.take_rcv_segment_args();
+        Segment::ack(seq, ack, wnd)
     }
 }
 
@@ -1021,8 +1114,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
     fn poll_send(
         &mut self,
         counters: &TcpCountersInner,
-        rcv_nxt: SeqNum,
-        rcv_wnd: UnscaledWindowSize,
+        rcv: impl RecvSegmentArgumentsProvider,
         limit: u32,
         now: I,
         SocketOptions {
@@ -1108,7 +1200,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                         *already_sent = already_sent.saturating_add(1);
                         // Per RFC 9293 Section 3.8.4:
                         //   Such a segment generally contains SEG.SEQ = SND.NXT-1
-                        return Some(Segment::ack(*snd_max - 1, rcv_nxt, rcv_wnd));
+                        return Some(rcv.make_ack(*snd_max - 1));
                     }
                 } else {
                     *timer = None;
@@ -1246,14 +1338,18 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                     return None;
                 }
             }
-            let (seg, discarded) = Segment::with_data(
-                next_seg,
-                Some(rcv_nxt),
-                has_fin.then_some(Control::FIN),
-                rcv_wnd,
-                readable.slice(0..bytes_to_send),
-            );
-            debug_assert_eq!(discarded, 0);
+
+            let seg = rcv.make_segment(|ack, wnd| {
+                let (seg, discarded) = Segment::with_data(
+                    next_seg,
+                    Some(ack),
+                    has_fin.then_some(Control::FIN),
+                    wnd,
+                    readable.slice(0..bytes_to_send),
+                );
+                debug_assert_eq!(discarded, 0);
+                seg
+            });
             Some(seg)
         })?;
         let seq_max = next_seg + seg.len();
@@ -1298,15 +1394,14 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
 
     /// Processes an incoming ACK and returns a segment if one needs to be sent,
     /// along with whether at least one byte of data was ACKed.
-    fn process_ack(
+    fn process_ack<R: RecvSegmentArgumentsProvider>(
         &mut self,
         counters: &TcpCountersInner,
         seg_seq: SeqNum,
         seg_ack: SeqNum,
         seg_wnd: UnscaledWindowSize,
         pure_ack: bool,
-        rcv_nxt: SeqNum,
-        rcv_wnd: WindowSize,
+        rcv: R,
         now: I,
         keep_alive: &KeepAlive,
     ) -> (Option<Segment<()>>, DataAcked) {
@@ -1356,7 +1451,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             //   If the ACK acks something not yet sent (SEG.ACK >
             //   SND.NXT) then send an ACK, drop the segment, and
             //   return.
-            (Some(Segment::ack(*snd_max, rcv_nxt, rcv_wnd >> *wnd_scale)), DataAcked::No)
+            (Some(rcv.make_ack(*snd_max)), DataAcked::No)
         } else {
             let res = if seg_ack.after(*snd_una) {
                 // The unwrap is safe because the result must be positive.
@@ -1513,9 +1608,7 @@ impl<I: Instant, S: SendBuffer> Send<I, S, { FinQueued::NO }> {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct CloseWait<I, S> {
     snd: Takeable<Send<I, S, { FinQueued::NO }>>,
-    last_ack: SeqNum,
-    last_wnd: WindowSize,
-    last_wnd_scale: WindowScale,
+    closed_rcv: RecvParams,
 }
 
 /// Per RFC 793 (https://tools.ietf.org/html/rfc793#page-21):
@@ -1537,9 +1630,7 @@ pub struct CloseWait<I, S> {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct LastAck<I, S> {
     snd: Send<I, S, { FinQueued::YES }>,
-    last_ack: SeqNum,
-    last_wnd: WindowSize,
-    last_wnd_scale: WindowScale,
+    closed_rcv: RecvParams,
 }
 
 /// Per RFC 793 (https://tools.ietf.org/html/rfc793#page-21):
@@ -1601,9 +1692,7 @@ pub struct FinWait2<I, R> {
 ///   - connect
 pub struct Closing<I, S> {
     snd: Send<I, S, { FinQueued::YES }>,
-    last_ack: SeqNum,
-    last_wnd: WindowSize,
-    last_wnd_scale: WindowScale,
+    closed_rcv: RecvParams,
 }
 
 /// Per RFC 793 (https://tools.ietf.org/html/rfc793#page-22):
@@ -1624,10 +1713,8 @@ pub struct Closing<I, S> {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct TimeWait<I> {
     pub(super) last_seq: SeqNum,
-    pub(super) last_ack: SeqNum,
-    pub(super) last_wnd: WindowSize,
-    pub(super) last_wnd_scale: WindowScale,
     pub(super) expiry: I,
+    pub(super) closed_rcv: RecvParams,
 }
 
 fn new_time_wait_expiry<I: Instant>(now: I) -> I {
@@ -1853,7 +1940,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
         let mut passive_open = None;
         let mut data_acked = DataAcked::No;
         let (seg, newly_closed) = (|| {
-            let (mut rcv_nxt, rcv_wnd, rcv_wnd_scale, snd_max, rst_on_new_data) = match self {
+            let (rcv, snd_max, rst_on_new_data) = match self {
                 State::Closed(closed) => return (closed.on_segment(&incoming), NewlyClosed::No),
                 State::Listen(listen) => {
                     return (
@@ -1908,7 +1995,6 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                                 assert_matches!(this, State::SynSent(SynSent {
                                     active_open,
                                     buffer_sizes,
-                                    rcv_wnd_scale,
                                     ..
                                 }) => {
                                     let Established {snd, rcv} = established;
@@ -1918,11 +2004,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                                         snd: snd.map(|s| s.with_buffer(snd_buffer)),
                                         rcv: rcv.map(|s| s.with_buffer(rcv_buffer)),
                                     };
-                                    let ack = Some(Segment::ack(
-                                        established.snd.max,
-                                        established.rcv.nxt(),
-                                        established.rcv.select_window() >> rcv_wnd_scale,
-                                    ));
+                                    let ack = Some(established.rcv.make_ack(established.snd.max));
                                     (State::Established(established), ack)
                                 })
                             }),
@@ -1970,45 +2052,41 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                     //  (i.e., a <SYN> or <SYN,ACK>) MUST NOT be scaled.
                     let advertised = buffer_sizes.rwnd_unscaled();
                     (
-                        *irs + 1,
-                        advertised << WindowScale::default(),
-                        WindowScale::default(),
+                        CalculatedRecvParams::from_params(RecvParams {
+                            ack: *irs + 1,
+                            wnd: advertised << WindowScale::default(),
+                            wnd_scale: WindowScale::default(),
+                        }),
                         *iss + 1,
                         false,
                     )
                 }
                 State::Established(Established { rcv, snd }) => {
-                    (rcv.nxt(), rcv.select_window(), rcv.wnd_scale, snd.max, false)
+                    (CalculatedRecvParams::from_recv(rcv.get_mut()), snd.max, false)
                 }
-                State::CloseWait(CloseWait { snd, last_ack, last_wnd, last_wnd_scale }) => {
-                    (*last_ack, *last_wnd, *last_wnd_scale, snd.max, true)
+                State::CloseWait(CloseWait { snd, closed_rcv }) => {
+                    (CalculatedRecvParams::from_params(closed_rcv.clone()), snd.max, true)
                 }
-                State::LastAck(LastAck { snd, last_ack, last_wnd, last_wnd_scale })
-                | State::Closing(Closing { snd, last_ack, last_wnd, last_wnd_scale }) => {
-                    (*last_ack, *last_wnd, *last_wnd_scale, snd.max, true)
+                State::LastAck(LastAck { snd, closed_rcv })
+                | State::Closing(Closing { snd, closed_rcv }) => {
+                    (CalculatedRecvParams::from_params(closed_rcv.clone()), snd.max, true)
                 }
                 State::FinWait1(FinWait1 { rcv, snd }) => {
-                    (rcv.nxt(), rcv.select_window(), rcv.wnd_scale, snd.max, rcv.buffer.is_closed())
+                    let closed = rcv.buffer.is_closed();
+                    (CalculatedRecvParams::from_recv(rcv.get_mut()), snd.max, closed)
                 }
-                State::FinWait2(FinWait2 { last_seq, rcv, timeout_at: _ }) => (
-                    rcv.nxt(),
-                    rcv.select_window(),
-                    rcv.wnd_scale,
-                    *last_seq,
-                    rcv.buffer.is_closed(),
-                ),
-                State::TimeWait(TimeWait {
-                    last_seq,
-                    last_ack,
-                    last_wnd,
-                    expiry: _,
-                    last_wnd_scale,
-                }) => (*last_ack, *last_wnd, *last_wnd_scale, *last_seq, true),
+                State::FinWait2(FinWait2 { last_seq, rcv, timeout_at: _ }) => {
+                    let closed = rcv.buffer.is_closed();
+                    (CalculatedRecvParams::from_recv(rcv), *last_seq, closed)
+                }
+                State::TimeWait(TimeWait { last_seq, expiry: _, closed_rcv }) => {
+                    (CalculatedRecvParams::from_params(closed_rcv.clone()), *last_seq, true)
+                }
             };
 
             // Reset the connection if we receive new data while the socket is being closed
             // and the receiver has been shut down.
-            if rst_on_new_data && (incoming.header.seq + incoming.data.len()).after(rcv_nxt) {
+            if rst_on_new_data && (incoming.header.seq + incoming.data.len()).after(rcv.nxt()) {
                 return (
                     Some(Segment::rst(snd_max)),
                     self.transition_to_state(
@@ -2031,7 +2109,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                 header:
                     SegmentHeader { seq: seg_seq, ack: seg_ack, wnd: seg_wnd, control, options: _ },
                 data,
-            } = match incoming.overlap(rcv_nxt, rcv_wnd) {
+            } = match incoming.overlap(rcv.nxt(), rcv.wnd()) {
                 Some(incoming) => incoming,
                 None => {
                     // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-69):
@@ -2042,11 +2120,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                     //   After sending the acknowledgment, drop the unacceptable segment
                     //   and return.
                     return (
-                        if is_rst {
-                            None
-                        } else {
-                            Some(Segment::ack(snd_max, rcv_nxt, rcv_wnd >> rcv_wnd_scale))
-                        },
+                        if is_rst { None } else { Some(rcv.make_ack(snd_max)) },
                         NewlyClosed::No,
                     );
                 }
@@ -2174,15 +2248,15 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                         // transition to Established for the ack processing, it is
                         // impossible for SYN_RCVD to appear past this line.
                     }
-                    State::Established(Established { snd, rcv: _ })
-                    | State::CloseWait(CloseWait {
-                        snd,
-                        last_ack: _,
-                        last_wnd: _,
-                        last_wnd_scale: _,
-                    }) => {
+                    State::Established(Established { snd, rcv }) => {
                         let (ack, segment_acked_data) = snd.process_ack(
-                            counters, seg_seq, seg_ack, seg_wnd, pure_ack, rcv_nxt, rcv_wnd, now,
+                            counters,
+                            seg_seq,
+                            seg_ack,
+                            seg_wnd,
+                            pure_ack,
+                            rcv.get_mut(),
+                            now,
                             keep_alive,
                         );
                         data_acked = segment_acked_data;
@@ -2190,16 +2264,33 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             return (Some(ack), NewlyClosed::No);
                         }
                     }
-                    State::LastAck(LastAck {
-                        snd,
-                        last_ack: _,
-                        last_wnd: _,
-                        last_wnd_scale: _,
-                    }) => {
+                    State::CloseWait(CloseWait { snd, closed_rcv }) => {
+                        let (ack, segment_acked_data) = snd.process_ack(
+                            counters,
+                            seg_seq,
+                            seg_ack,
+                            seg_wnd,
+                            pure_ack,
+                            &*closed_rcv,
+                            now,
+                            keep_alive,
+                        );
+                        data_acked = segment_acked_data;
+                        if let Some(ack) = ack {
+                            return (Some(ack), NewlyClosed::No);
+                        }
+                    }
+                    State::LastAck(LastAck { snd, closed_rcv }) => {
                         let BufferLimits { len, capacity: _ } = snd.buffer.limits();
                         let fin_seq = snd.una + len + 1;
                         let (ack, segment_acked_data) = snd.process_ack(
-                            counters, seg_seq, seg_ack, seg_wnd, pure_ack, rcv_nxt, rcv_wnd, now,
+                            counters,
+                            seg_seq,
+                            seg_ack,
+                            seg_wnd,
+                            pure_ack,
+                            &*closed_rcv,
+                            now,
                             keep_alive,
                         );
                         data_acked = segment_acked_data;
@@ -2219,7 +2310,13 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                         let BufferLimits { len, capacity: _ } = snd.buffer.limits();
                         let fin_seq = snd.una + len + 1;
                         let (ack, segment_acked_data) = snd.process_ack(
-                            counters, seg_seq, seg_ack, seg_wnd, pure_ack, rcv_nxt, rcv_wnd, now,
+                            counters,
+                            seg_seq,
+                            seg_ack,
+                            seg_wnd,
+                            pure_ack,
+                            rcv.get_mut(),
+                            now,
                             keep_alive,
                         );
                         data_acked = segment_acked_data;
@@ -2248,11 +2345,17 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             );
                         }
                     }
-                    State::Closing(Closing { snd, last_ack, last_wnd, last_wnd_scale }) => {
+                    State::Closing(Closing { snd, closed_rcv }) => {
                         let BufferLimits { len, capacity: _ } = snd.buffer.limits();
                         let fin_seq = snd.una + len + 1;
                         let (ack, segment_acked_data) = snd.process_ack(
-                            counters, seg_seq, seg_ack, seg_wnd, pure_ack, rcv_nxt, rcv_wnd, now,
+                            counters,
+                            seg_seq,
+                            seg_ack,
+                            seg_wnd,
+                            pure_ack,
+                            &*closed_rcv,
+                            now,
                             keep_alive,
                         );
                         data_acked = segment_acked_data;
@@ -2266,10 +2369,8 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                             //   otherwise ignore the segment.
                             let timewait = TimeWait {
                                 last_seq: snd.nxt,
-                                last_ack: *last_ack,
-                                last_wnd: *last_wnd,
                                 expiry: new_time_wait_expiry(now),
-                                last_wnd_scale: *last_wnd_scale,
+                                closed_rcv: closed_rcv.clone(),
                             };
                             assert_eq!(
                                 self.transition_to_state(counters, State::TimeWait(timewait)),
@@ -2304,88 +2405,86 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             //     <SEQ=SND.NXT><ACK=RCV.NXT><CTL=ACK>
             //   This acknowledgment should be piggybacked on a segment being
             //   transmitted if possible without incurring undue delay.
-            let ack_to_text = if needs_ack {
-                let mut maybe_ack_to_text = |rcv: &mut Recv<I, R>| {
-                    // Write the segment data in the buffer and keep track if it fills
-                    // any hole in the assembler.
-                    let had_out_of_order = rcv.buffer.has_out_of_order();
-                    if data.len() > 0 {
-                        let offset = usize::try_from(seg_seq - rcv.nxt()).unwrap_or_else(|TryFromIntError {..}| {
+            let maybe_ack_to_text = |rcv: &mut Recv<I, R>| {
+                if !needs_ack {
+                    return (None, rcv.nxt());
+                }
+                // Write the segment data in the buffer and keep track if it fills
+                // any hole in the assembler.
+                let had_out_of_order = rcv.buffer.has_out_of_order();
+                if data.len() > 0 {
+                    let offset = usize::try_from(seg_seq - rcv.nxt()).unwrap_or_else(|TryFromIntError {..}| {
                                 panic!("The segment was trimmed to fit the window, thus seg.seq({:?}) must not come before rcv.nxt({:?})", seg_seq, rcv.nxt());
                             });
-                        match &mut rcv.buffer {
-                            RecvBufferState::Open { buffer, assembler } => {
-                                let nwritten = buffer.write_at(offset, &data);
-                                let readable = assembler.insert(seg_seq..seg_seq + nwritten);
-                                buffer.make_readable(readable, assembler.has_outstanding());
-                            }
-                            RecvBufferState::Closed { nxt, .. } => *nxt = seg_seq + data.len(),
+                    match &mut rcv.buffer {
+                        RecvBufferState::Open { buffer, assembler } => {
+                            let nwritten = buffer.write_at(offset, &data);
+                            let readable = assembler.insert(seg_seq..seg_seq + nwritten);
+                            buffer.make_readable(readable, assembler.has_outstanding());
                         }
-                        rcv_nxt = rcv.nxt();
-                    }
-                    // Per RFC 5681 Section 4.2:
-                    //  Out-of-order data segments SHOULD be acknowledged
-                    //  immediately, ...  the receiver SHOULD send an
-                    //  immediate ACK when it receives a data segment that
-                    //  fills in all or part of a gap in the sequence space.
-                    let immediate_ack =
-                        !*delayed_ack || had_out_of_order || rcv.buffer.has_out_of_order();
-                    if immediate_ack {
-                        rcv.timer = None;
-                    } else {
-                        match &mut rcv.timer {
-                            Some(ReceiveTimer::DelayedAck { at: _, received_bytes }) => {
-                                *received_bytes = received_bytes
-                                    .saturating_add(u32::try_from(data.len()).unwrap_or(u32::MAX));
-                                // Per RFC 5681 Section 4.2:
-                                //  An implementation is deemed to comply
-                                //  with this requirement if it sends at
-                                //  least one acknowledgment every time it
-                                //  receives 2*RMSS bytes of new data from
-                                //  the sender
-                                if received_bytes.get() >= 2 * u32::from(rcv.mss) {
-                                    rcv.timer = None;
-                                }
-                            }
-                            None => {
-                                if let Some(received_bytes) =
-                                    NonZeroU32::new(u32::try_from(data.len()).unwrap_or(u32::MAX))
-                                {
-                                    rcv.timer = Some(ReceiveTimer::DelayedAck {
-                                        at: now.panicking_add(ACK_DELAY_THRESHOLD),
-                                        received_bytes,
-                                    })
-                                }
-                            }
-                        }
-                    }
-                    (!matches!(rcv.timer, Some(ReceiveTimer::DelayedAck { .. }))).then_some(
-                        Segment::ack(snd_max, rcv.nxt(), rcv.select_window() >> rcv.wnd_scale),
-                    )
-                };
-
-                match self {
-                    State::Closed(_) | State::Listen(_) | State::SynRcvd(_) | State::SynSent(_) => {
-                        // This unreachable assert is justified by note (1) and (2).
-                        unreachable!("encountered an already-handled state: {:?}", self)
-                    }
-                    State::Established(Established { snd: _, rcv })
-                    | State::FinWait1(FinWait1 { snd: _, rcv }) => maybe_ack_to_text(rcv.get_mut()),
-                    State::FinWait2(FinWait2 { last_seq: _, rcv, timeout_at: _ }) => {
-                        maybe_ack_to_text(rcv)
-                    }
-                    State::CloseWait(_)
-                    | State::LastAck(_)
-                    | State::Closing(_)
-                    | State::TimeWait(_) => {
-                        // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-75):
-                        //   This should not occur, since a FIN has been received from the
-                        //   remote side.  Ignore the segment text.
-                        None
+                        RecvBufferState::Closed { nxt, .. } => *nxt = seg_seq + data.len(),
                     }
                 }
-            } else {
-                None
+                // Per RFC 5681 Section 4.2:
+                //  Out-of-order data segments SHOULD be acknowledged
+                //  immediately, ...  the receiver SHOULD send an
+                //  immediate ACK when it receives a data segment that
+                //  fills in all or part of a gap in the sequence space.
+                let immediate_ack =
+                    !*delayed_ack || had_out_of_order || rcv.buffer.has_out_of_order();
+                if immediate_ack {
+                    rcv.timer = None;
+                } else {
+                    match &mut rcv.timer {
+                        Some(ReceiveTimer::DelayedAck { at: _, received_bytes }) => {
+                            *received_bytes = received_bytes
+                                .saturating_add(u32::try_from(data.len()).unwrap_or(u32::MAX));
+                            // Per RFC 5681 Section 4.2:
+                            //  An implementation is deemed to comply
+                            //  with this requirement if it sends at
+                            //  least one acknowledgment every time it
+                            //  receives 2*RMSS bytes of new data from
+                            //  the sender
+                            if received_bytes.get() >= 2 * u32::from(rcv.mss) {
+                                rcv.timer = None;
+                            }
+                        }
+                        None => {
+                            if let Some(received_bytes) =
+                                NonZeroU32::new(u32::try_from(data.len()).unwrap_or(u32::MAX))
+                            {
+                                rcv.timer = Some(ReceiveTimer::DelayedAck {
+                                    at: now.panicking_add(ACK_DELAY_THRESHOLD),
+                                    received_bytes,
+                                })
+                            }
+                        }
+                    }
+                }
+                let segment = (!matches!(rcv.timer, Some(ReceiveTimer::DelayedAck { .. })))
+                    .then(|| rcv.make_ack(snd_max));
+                (segment, rcv.nxt())
+            };
+
+            let (ack_to_text, rcv_nxt) = match self {
+                State::Closed(_) | State::Listen(_) | State::SynRcvd(_) | State::SynSent(_) => {
+                    // This unreachable assert is justified by note (1) and (2).
+                    unreachable!("encountered an already-handled state: {:?}", self)
+                }
+                State::Established(Established { snd: _, rcv })
+                | State::FinWait1(FinWait1 { snd: _, rcv }) => maybe_ack_to_text(rcv.get_mut()),
+                State::FinWait2(FinWait2 { last_seq: _, rcv, timeout_at: _ }) => {
+                    maybe_ack_to_text(rcv)
+                }
+                State::CloseWait(CloseWait { closed_rcv, .. })
+                | State::LastAck(LastAck { closed_rcv, .. })
+                | State::Closing(Closing { closed_rcv, .. })
+                | State::TimeWait(TimeWait { closed_rcv, .. }) => {
+                    // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-75):
+                    //   This should not occur, since a FIN has been received from the
+                    //   remote side.  Ignore the segment text.
+                    (None, closed_rcv.ack)
+                }
             };
             // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-75):
             //   eighth, check the FIN bit
@@ -2402,21 +2501,15 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                     State::Established(Established { snd, rcv }) => {
                         // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-75):
                         //   Enter the CLOSE-WAIT state.
-                        let last_ack = rcv.nxt() + 1;
-                        let last_wnd =
-                            rcv.select_window().checked_sub(1).unwrap_or(WindowSize::ZERO);
-                        let scaled_wnd = last_wnd >> rcv.wnd_scale;
-                        let closewait = CloseWait {
-                            snd: snd.to_ref().to_takeable(),
-                            last_ack,
-                            last_wnd,
-                            last_wnd_scale: rcv.wnd_scale,
-                        };
+                        let params = rcv.handle_fin();
+                        let segment = params.make_ack(snd_max);
+                        let closewait =
+                            CloseWait { snd: snd.to_ref().to_takeable(), closed_rcv: params };
                         assert_eq!(
                             self.transition_to_state(counters, State::CloseWait(closewait)),
                             NewlyClosed::No
                         );
-                        Some(Segment::ack(snd_max, last_ack, scaled_wnd))
+                        Some(segment)
                     }
                     State::CloseWait(_) | State::LastAck(_) | State::Closing(_) => {
                         // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-75):
@@ -2429,53 +2522,36 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                         None
                     }
                     State::FinWait1(FinWait1 { snd, rcv }) => {
-                        let last_ack = rcv.nxt() + 1;
-                        let last_wnd =
-                            rcv.select_window().checked_sub(1).unwrap_or(WindowSize::ZERO);
-                        let scaled_wnd = last_wnd >> rcv.wnd_scale;
-                        let closing = Closing {
-                            snd: snd.to_ref().take(),
-                            last_ack,
-                            last_wnd,
-                            last_wnd_scale: rcv.wnd_scale,
-                        };
+                        let params = rcv.handle_fin();
+                        let segment = params.make_ack(snd_max);
+                        let closing = Closing { snd: snd.to_ref().take(), closed_rcv: params };
                         assert_eq!(
                             self.transition_to_state(counters, State::Closing(closing)),
                             NewlyClosed::No
                         );
-                        Some(Segment::ack(snd_max, last_ack, scaled_wnd))
+                        Some(segment)
                     }
                     State::FinWait2(FinWait2 { last_seq, rcv, timeout_at: _ }) => {
-                        let last_ack = rcv.nxt() + 1;
-                        let last_wnd =
-                            rcv.select_window().checked_sub(1).unwrap_or(WindowSize::ZERO);
-                        let scaled_window = last_wnd >> rcv.wnd_scale;
+                        let params = rcv.handle_fin();
+                        let segment = params.make_ack(snd_max);
                         let timewait = TimeWait {
                             last_seq: *last_seq,
-                            last_ack,
-                            last_wnd,
                             expiry: new_time_wait_expiry(now),
-                            last_wnd_scale: rcv.wnd_scale,
+                            closed_rcv: params,
                         };
                         assert_eq!(
                             self.transition_to_state(counters, State::TimeWait(timewait)),
                             NewlyClosed::No,
                         );
-                        Some(Segment::ack(snd_max, last_ack, scaled_window))
+                        Some(segment)
                     }
-                    State::TimeWait(TimeWait {
-                        last_seq,
-                        last_ack,
-                        last_wnd,
-                        expiry,
-                        last_wnd_scale,
-                    }) => {
+                    State::TimeWait(TimeWait { last_seq, expiry, closed_rcv }) => {
                         // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-76):
                         //   TIME-WAIT STATE
                         //     Remain in the TIME-WAIT state.  Restart the 2 MSL time-wait
                         //     timeout.
                         *expiry = new_time_wait_expiry(now);
-                        Some(Segment::ack(*last_seq, *last_ack, *last_wnd >> *last_wnd_scale))
+                        Some(closed_rcv.make_ack(*last_seq))
                     }
                 }
             } else {
@@ -2546,18 +2622,10 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             // sending the delayed ACK) but we need special treatment for
             // FIN_WAIT_1 if we choose the alternative, because otherwise we
             // will have a spurious retransmitted FIN.
-            let rcv_nxt = rcv.nxt();
-            let rcv_wnd = rcv.select_window();
-            let seg = rcv.poll_send(snd.max, now).map(|seg| seg.into_empty()).or_else(|| {
-                snd.poll_send(
-                    counters,
-                    rcv_nxt,
-                    rcv_wnd >> rcv.wnd_scale,
-                    limit,
-                    now,
-                    socket_options,
-                )
-            });
+            let seg = rcv
+                .poll_send(snd.max, now)
+                .map(|seg| seg.into_empty())
+                .or_else(|| snd.poll_send(counters, &mut *rcv, limit, now, socket_options));
             // We must have piggybacked an ACK so we can cancel the timer now.
             if seg.is_some() && matches!(rcv.timer, Some(ReceiveTimer::DelayedAck { .. })) {
                 rcv.timer = None;
@@ -2609,24 +2677,13 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             State::Established(Established { snd, rcv }) => {
                 poll_rcv_then_snd(counters, snd, rcv, limit, now, socket_options)
             }
-            State::CloseWait(CloseWait { snd, last_ack, last_wnd, last_wnd_scale }) => snd
-                .poll_send(
-                    counters,
-                    *last_ack,
-                    *last_wnd >> *last_wnd_scale,
-                    limit,
-                    now,
-                    socket_options,
-                ),
-            State::LastAck(LastAck { snd, last_ack, last_wnd, last_wnd_scale })
-            | State::Closing(Closing { snd, last_ack, last_wnd, last_wnd_scale }) => snd.poll_send(
-                counters,
-                *last_ack,
-                *last_wnd >> *last_wnd_scale,
-                limit,
-                now,
-                socket_options,
-            ),
+            State::CloseWait(CloseWait { snd, closed_rcv }) => {
+                snd.poll_send(counters, &*closed_rcv, limit, now, socket_options)
+            }
+            State::LastAck(LastAck { snd, closed_rcv })
+            | State::Closing(Closing { snd, closed_rcv }) => {
+                snd.poll_send(counters, &*closed_rcv, limit, now, socket_options)
+            }
             State::FinWait1(FinWait1 { snd, rcv }) => {
                 poll_rcv_then_snd(counters, snd, rcv, limit, now, socket_options)
             }
@@ -2657,13 +2714,9 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
     ) -> NewlyClosed {
         let timed_out = match self {
             State::Established(Established { snd, rcv: _ }) => snd.timed_out(now, keep_alive),
-            State::CloseWait(CloseWait { snd, last_ack: _, last_wnd: _, last_wnd_scale: _ }) => {
-                snd.timed_out(now, keep_alive)
-            }
-            State::LastAck(LastAck { snd, last_ack: _, last_wnd: _, last_wnd_scale: _ })
-            | State::Closing(Closing { snd, last_ack: _, last_wnd: _, last_wnd_scale: _ }) => {
-                snd.timed_out(now, keep_alive)
-            }
+            State::CloseWait(CloseWait { snd, closed_rcv: _ }) => snd.timed_out(now, keep_alive),
+            State::LastAck(LastAck { snd, closed_rcv: _ })
+            | State::Closing(Closing { snd, closed_rcv: _ }) => snd.timed_out(now, keep_alive),
             State::FinWait1(FinWait1 { snd, rcv: _ }) => snd.timed_out(now, keep_alive),
             State::SynSent(SynSent {
                 iss: _,
@@ -2735,13 +2788,9 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                 snd.timer.as_ref().map(SendTimer::expiry),
                 rcv.timer.as_ref().map(ReceiveTimer::expiry),
             ),
-            State::CloseWait(CloseWait { snd, last_ack: _, last_wnd: _, last_wnd_scale: _ }) => {
-                Some(snd.timer?.expiry())
-            }
-            State::LastAck(LastAck { snd, last_ack: _, last_wnd: _, last_wnd_scale: _ })
-            | State::Closing(Closing { snd, last_ack: _, last_wnd: _, last_wnd_scale: _ }) => {
-                Some(snd.timer?.expiry())
-            }
+            State::CloseWait(CloseWait { snd, closed_rcv: _ }) => Some(snd.timer?.expiry()),
+            State::LastAck(LastAck { snd, closed_rcv: _ })
+            | State::Closing(Closing { snd, closed_rcv: _ }) => Some(snd.timer?.expiry()),
             State::FinWait1(FinWait1 { snd, rcv }) => combine_expiry(
                 snd.timer.as_ref().map(SendTimer::expiry),
                 rcv.timer.as_ref().map(ReceiveTimer::expiry),
@@ -2752,13 +2801,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             State::SynRcvd(syn_rcvd) => Some(syn_rcvd.retrans_timer.at),
             State::SynSent(syn_sent) => Some(syn_sent.retrans_timer.at),
             State::Closed(_) | State::Listen(_) => None,
-            State::TimeWait(TimeWait {
-                last_seq: _,
-                last_ack: _,
-                last_wnd: _,
-                expiry,
-                last_wnd_scale: _,
-            }) => Some(*expiry),
+            State::TimeWait(TimeWait { last_seq: _, expiry, closed_rcv: _ }) => Some(*expiry),
         }
     }
 
@@ -2868,12 +2911,10 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                 };
                 Ok(self.transition_to_state(counters, State::FinWait1(finwait1)))
             }
-            State::CloseWait(CloseWait { snd, last_ack, last_wnd, last_wnd_scale }) => {
+            State::CloseWait(CloseWait { snd, closed_rcv }) => {
                 let lastack = LastAck {
                     snd: snd.to_ref().take().queue_fin(),
-                    last_ack: *last_ack,
-                    last_wnd: *last_wnd,
-                    last_wnd_scale: *last_wnd_scale,
+                    closed_rcv: closed_rcv.clone(),
                 };
                 Ok(self.transition_to_state(counters, State::LastAck(lastack)))
             }
@@ -2973,8 +3014,8 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             State::FinWait2(FinWait2 { rcv, last_seq, timeout_at: _ }) => {
                 Some(Segment::rst_ack(*last_seq, rcv.nxt()))
             }
-            State::CloseWait(CloseWait { snd, last_ack, last_wnd: _, last_wnd_scale: _ }) => {
-                Some(Segment::rst_ack(snd.nxt, *last_ack))
+            State::CloseWait(CloseWait { snd, closed_rcv }) => {
+                Some(Segment::rst_ack(snd.nxt, closed_rcv.ack))
             }
         };
         (
@@ -3090,11 +3131,11 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                 None
             }
             State::Established(Established { snd, rcv: _ })
-            | State::CloseWait(CloseWait { snd, last_ack: _, last_wnd: _, last_wnd_scale: _ }) => {
+            | State::CloseWait(CloseWait { snd, closed_rcv: _ }) => {
                 (!snd.una.after(seq) && seq.before(snd.nxt)).then_some(err)
             }
-            State::LastAck(LastAck { snd, last_ack: _, last_wnd: _, last_wnd_scale: _ })
-            | State::Closing(Closing { snd, last_ack: _, last_wnd: _, last_wnd_scale: _ }) => {
+            State::LastAck(LastAck { snd, closed_rcv: _ })
+            | State::Closing(Closing { snd, closed_rcv: _ }) => {
                 (!snd.una.after(seq) && seq.before(snd.nxt)).then_some(err)
             }
             State::FinWait1(FinWait1 { snd, rcv: _ }) => {
@@ -3246,6 +3287,22 @@ mod test {
                 false, /* defunct */
             );
             (segment, passive_open)
+        }
+
+        fn recv_mut(&mut self) -> Option<&mut Recv<FakeInstant, R>> {
+            match self {
+                State::Closed(_)
+                | State::Listen(_)
+                | State::SynRcvd(_)
+                | State::SynSent(_)
+                | State::CloseWait(_)
+                | State::LastAck(_)
+                | State::Closing(_)
+                | State::TimeWait(_) => None,
+                State::Established(Established { rcv, .. })
+                | State::FinWait1(FinWait1 { rcv, .. }) => Some(rcv.get_mut()),
+                State::FinWait2(FinWait2 { rcv, .. }) => Some(rcv),
+            }
         }
     }
 
@@ -3518,9 +3575,11 @@ mod test {
                 congestion_control: CongestionControl::cubic_with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
                     wnd_scale: WindowScale::default(),
             }.into(),
-            last_ack: ISS_1 + 2,
-            last_wnd: WindowSize::from_u32(u32::from(u16::MAX - 1)).unwrap(),
-            last_wnd_scale: WindowScale::ZERO,
+            closed_rcv: RecvParams {
+                ack: ISS_1 + 2,
+                wnd: WindowSize::from_u32(u32::from(u16::MAX - 1)).unwrap(),
+                wnd_scale: WindowScale::ZERO,
+            }
         }))
     => Some(
         Segment::ack(ISS_2 + 1, ISS_1 + 2, UnscaledWindowSize::from(u16::MAX - 1))
@@ -3600,9 +3659,11 @@ mod test {
                 congestion_control: CongestionControl::cubic_with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
                     wnd_scale: WindowScale::default(),
             }.into(),
-            last_ack: ISS_2 + 2,
-            last_wnd: WindowSize::new(1).unwrap(),
-            last_wnd_scale: WindowScale::ZERO,
+            closed_rcv: RecvParams {
+                ack: ISS_2 + 2,
+                wnd: WindowSize::new(1).unwrap(),
+                wnd_scale: WindowScale::ZERO,
+            }
         }))
     => Some(
         Segment::ack(ISS_1 + 1, ISS_2 + 2, UnscaledWindowSize::from(1))
@@ -3625,9 +3686,11 @@ mod test {
                 congestion_control: CongestionControl::cubic_with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
                     wnd_scale: WindowScale::default(),
             }.into(),
-            last_ack: ISS_2 + 3,
-            last_wnd: WindowSize::ZERO,
-            last_wnd_scale: WindowScale::ZERO,
+            closed_rcv: RecvParams {
+                ack: ISS_2 + 3,
+                wnd: WindowSize::ZERO,
+                wnd_scale: WindowScale::ZERO,
+            }
         }))
     => Some(
         Segment::ack(ISS_1 + 1, ISS_2 + 3, UnscaledWindowSize::from(0))
@@ -3792,21 +3855,27 @@ mod test {
             State::FinWait1(FinWait1 { snd: new_snd().queue_fin().into(), rcv: new_rcv().into() }),
             State::Closing(Closing {
                 snd: new_snd().queue_fin(),
-                last_ack: ISS_2 + 1,
-                last_wnd: WindowSize::ZERO,
-                last_wnd_scale: WindowScale::default(),
+                closed_rcv: RecvParams {
+                    ack: ISS_2 + 1,
+                    wnd: WindowSize::ZERO,
+                    wnd_scale: WindowScale::default(),
+                },
             }),
             State::CloseWait(CloseWait {
                 snd: new_snd().into(),
-                last_ack: ISS_2 + 1,
-                last_wnd: WindowSize::ZERO,
-                last_wnd_scale: WindowScale::default(),
+                closed_rcv: RecvParams {
+                    ack: ISS_2 + 1,
+                    wnd: WindowSize::ZERO,
+                    wnd_scale: WindowScale::default(),
+                },
             }),
             State::LastAck(LastAck {
                 snd: new_snd().queue_fin(),
-                last_ack: ISS_2 + 1,
-                last_wnd: WindowSize::ZERO,
-                last_wnd_scale: WindowScale::default(),
+                closed_rcv: RecvParams {
+                    ack: ISS_2 + 1,
+                    wnd: WindowSize::ZERO,
+                    wnd_scale: WindowScale::default(),
+                },
             }),
         ] {
             assert_eq!(
@@ -3906,9 +3975,11 @@ mod test {
                 wnd_scale: WindowScale::default(),
             }
             .into(),
-            last_ack: ISS_2 + 2,
-            last_wnd: WindowSize::DEFAULT,
-            last_wnd_scale: WindowScale::ZERO,
+            closed_rcv: RecvParams {
+                ack: ISS_2 + 2,
+                wnd: WindowSize::DEFAULT,
+                wnd_scale: WindowScale::ZERO,
+            },
         });
         let (seg, _passive_open) = state
             .on_segment_with_default_options::<_, ClientlessBufferProvider>(
@@ -4585,12 +4656,7 @@ mod test {
                 panic!("expected that we have entered established state, but got {:?}", state)
             }
             State::Established(Established { ref mut snd, rcv: _ })
-            | State::CloseWait(CloseWait {
-                ref mut snd,
-                last_ack: _,
-                last_wnd: _,
-                last_wnd_scale: _,
-            }) => {
+            | State::CloseWait(CloseWait { ref mut snd, closed_rcv: _ }) => {
                 assert_eq!(snd.buffer.enqueue_data(TEST_BYTES), TEST_BYTES.len());
             }
         }
@@ -4763,9 +4829,7 @@ mod test {
                     ),
                     wnd_scale: WindowScale::default(),
                 },
-                last_ack: ISS_2 + 2,
-                last_wnd,
-                last_wnd_scale,
+                closed_rcv: RecvParams { ack: ISS_2 + 2, wnd: last_wnd, wnd_scale: last_wnd_scale }
             })
         );
         // When the send window is not big enough, there should be no FIN.
@@ -5238,9 +5302,11 @@ mod test {
         let counters = TcpCountersInner::default();
         let mut time_wait = State::<_, NullBuffer, NullBuffer, ()>::TimeWait(TimeWait {
             last_seq: ISS_1 + 2,
-            last_ack: ISS_2 + 2,
-            last_wnd: WindowSize::DEFAULT,
-            last_wnd_scale: WindowScale::default(),
+            closed_rcv: RecvParams {
+                ack: ISS_2 + 2,
+                wnd: WindowSize::DEFAULT,
+                wnd_scale: WindowScale::default(),
+            },
             expiry: new_time_wait_expiry(clock.now()),
         });
 
@@ -5644,8 +5710,11 @@ mod test {
             f(snd
                 .poll_send(
                     &counters,
-                    ISS_1,
-                    WindowSize::DEFAULT >> WindowScale::ZERO,
+                    &RecvParams {
+                        ack: ISS_1,
+                        wnd: WindowSize::DEFAULT,
+                        wnd_scale: WindowScale::ZERO,
+                    },
                     u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
                     FakeInstant::default(),
                     &SocketOptions::default(),
@@ -5892,12 +5961,7 @@ mod test {
                 panic!("expected that we have entered established state, but got {:?}", state)
             }
             State::Established(Established { ref mut snd, rcv: _ })
-            | State::CloseWait(CloseWait {
-                ref mut snd,
-                last_ack: _,
-                last_wnd: _,
-                last_wnd_scale: _,
-            }) => {
+            | State::CloseWait(CloseWait { ref mut snd, closed_rcv: _ }) => {
                 assert_eq!(snd.buffer.enqueue_data(TEST_BYTES), TEST_BYTES.len());
             }
         }
@@ -6171,6 +6235,12 @@ mod test {
         );
         let full_segment_sized_payload =
             vec![b'0'; u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE) as usize];
+
+        let expect_last_window_update = (
+            ISS_2 + 1 + TEST_BYTES.len(),
+            WindowSize::from_u32(2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE)).unwrap(),
+        );
+        assert_eq!(state.recv_mut().unwrap().last_window_update, expect_last_window_update);
         // The first full sized segment should not trigger an immediate ACK,
         assert_eq!(
             state.on_segment::<_, ClientlessBufferProvider>(
@@ -6189,6 +6259,10 @@ mod test {
         );
         // ... but just a timer.
         assert_eq!(state.poll_send_at(), Some(clock.now().panicking_add(ACK_DELAY_THRESHOLD)));
+        // The last reported window should not have been updated since we
+        // didn't send an ACK:
+        assert_eq!(state.recv_mut().unwrap().last_window_update, expect_last_window_update);
+
         // Now the second full sized segment arrives, an ACK should be sent
         // immediately.
         assert_eq!(
@@ -6213,6 +6287,14 @@ mod test {
                 None,
                 DataAcked::No,
                 NewlyClosed::No,
+            )
+        );
+        // Last window update moves forward now.
+        assert_eq!(
+            state.recv_mut().unwrap().last_window_update,
+            (
+                ISS_2 + 1 + TEST_BYTES.len() + 2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE),
+                WindowSize::ZERO,
             )
         );
         assert_eq!(state.poll_send_at(), None);
@@ -6620,8 +6702,11 @@ mod test {
         assert_eq!(
             snd.poll_send(
                 &counters,
-                ISS_2 + 1,
-                WindowSize::DEFAULT >> WindowScale::ZERO,
+                &RecvParams {
+                    ack: ISS_2 + 1,
+                    wnd: WindowSize::DEFAULT,
+                    wnd_scale: WindowScale::ZERO,
+                },
                 u32::MAX,
                 FakeInstant::default(),
                 &SocketOptions::default(),
@@ -6660,7 +6745,7 @@ mod test {
         }
 
         // Initially the entire buffer is advertised.
-        assert_eq!(rcv.select_window(), WindowSize::new(CAP).unwrap());
+        assert_eq!(rcv.calculate_window_size().1, WindowSize::new(CAP).unwrap());
 
         for _ in 0..MULTIPLE {
             assert_eq!(get_buffer(&mut rcv).enqueue_data(TEST_BYTES), TEST_BYTES.len());
@@ -6669,17 +6754,17 @@ mod test {
             RecvBufferState::Open { ref mut assembler, .. } => assembler);
         assert_eq!(assembler.insert(ISS_1..ISS_1 + CAP), CAP);
         // Since the buffer is full, we now get a zero window.
-        assert_eq!(rcv.select_window(), WindowSize::ZERO);
+        assert_eq!(rcv.calculate_window_size().1, WindowSize::ZERO);
 
         // The user reads 1 byte, but our implementation should not advertise
         // a new window because it is too small;
         assert_eq!(get_buffer(&mut rcv).read_with(|_| 1), 1);
-        assert_eq!(rcv.select_window(), WindowSize::ZERO);
+        assert_eq!(rcv.calculate_window_size().1, WindowSize::ZERO);
 
         // Now at least there is at least 1 MSS worth of free space in the
         // buffer, advertise it.
         assert_eq!(get_buffer(&mut rcv).read_with(|_| TEST_BYTES.len()), TEST_BYTES.len());
-        assert_eq!(rcv.select_window(), WindowSize::new(TEST_BYTES.len() + 1).unwrap());
+        assert_eq!(rcv.calculate_window_size().1, WindowSize::new(TEST_BYTES.len() + 1).unwrap());
     }
 
     #[test]
@@ -6724,21 +6809,15 @@ mod test {
             State::FinWait1(FinWait1 { snd: new_snd().queue_fin().into(), rcv: new_rcv().into() }),
             State::Closing(Closing {
                 snd: new_snd().queue_fin(),
-                last_ack: ISS_2 + 1,
-                last_wnd: wnd_size,
-                last_wnd_scale: rcv_wnd_scale,
+                closed_rcv: RecvParams { ack: ISS_2 + 1, wnd: wnd_size, wnd_scale: rcv_wnd_scale },
             }),
             State::CloseWait(CloseWait {
                 snd: new_snd().into(),
-                last_ack: ISS_2 + 1,
-                last_wnd: wnd_size,
-                last_wnd_scale: rcv_wnd_scale,
+                closed_rcv: RecvParams { ack: ISS_2 + 1, wnd: wnd_size, wnd_scale: rcv_wnd_scale },
             }),
             State::LastAck(LastAck {
                 snd: new_snd().queue_fin(),
-                last_ack: ISS_2 + 1,
-                last_wnd: wnd_size,
-                last_wnd_scale: rcv_wnd_scale,
+                closed_rcv: RecvParams { ack: ISS_2 + 1, wnd: wnd_size, wnd_scale: rcv_wnd_scale },
             }),
         ] {
             assert_eq!(
@@ -6793,8 +6872,11 @@ mod test {
         assert_eq!(
             snd.poll_send(
                 &counters,
-                ISS_2 + 1,
-                WindowSize::DEFAULT >> WindowScale::ZERO,
+                &RecvParams {
+                    ack: ISS_2 + 1,
+                    wnd: WindowSize::DEFAULT,
+                    wnd_scale: WindowScale::ZERO,
+                },
                 u32::MAX,
                 clock.now(),
                 &SocketOptions::default(),
@@ -6814,8 +6896,11 @@ mod test {
                 ISS_1 + 1 + TEST_BYTES.len(),
                 UnscaledWindowSize::from(0),
                 true,
-                ISS_2 + 1,
-                WindowSize::DEFAULT,
+                &RecvParams {
+                    ack: ISS_2 + 1,
+                    wnd_scale: WindowScale::default(),
+                    wnd: WindowSize::DEFAULT,
+                },
                 clock.now(),
                 &KeepAlive::default(),
             ),
@@ -6827,8 +6912,11 @@ mod test {
         assert_eq!(
             snd.poll_send(
                 &counters,
-                ISS_2 + 1,
-                WindowSize::DEFAULT >> WindowScale::ZERO,
+                &RecvParams {
+                    ack: ISS_2 + 1,
+                    wnd: WindowSize::DEFAULT,
+                    wnd_scale: WindowScale::ZERO,
+                },
                 u32::MAX,
                 clock.now(),
                 &SocketOptions::default(),
@@ -6851,8 +6939,11 @@ mod test {
         assert_eq!(
             snd.poll_send(
                 &counters,
-                ISS_2 + 1,
-                WindowSize::DEFAULT >> WindowScale::ZERO,
+                &RecvParams {
+                    ack: ISS_2 + 1,
+                    wnd: WindowSize::DEFAULT,
+                    wnd_scale: WindowScale::ZERO,
+                },
                 u32::MAX,
                 clock.now(),
                 &SocketOptions::default(),
@@ -6875,8 +6966,11 @@ mod test {
                     ISS_1 + 1 + TEST_BYTES.len() + 1,
                     UnscaledWindowSize::from(3),
                     true,
-                    ISS_2 + 1,
-                    WindowSize::DEFAULT,
+                    &RecvParams {
+                        ack: ISS_2 + 1,
+                        wnd_scale: WindowScale::default(),
+                        wnd: WindowSize::DEFAULT,
+                    },
                     clock.now(),
                     &KeepAlive::default(),
                 ),
@@ -6891,8 +6985,11 @@ mod test {
                     ISS_1 + 1 + TEST_BYTES.len(),
                     UnscaledWindowSize::from(0),
                     true,
-                    ISS_2 + 1,
-                    WindowSize::DEFAULT,
+                    &RecvParams {
+                        ack: ISS_2 + 1,
+                        wnd_scale: WindowScale::default(),
+                        wnd: WindowSize::DEFAULT,
+                    },
                     clock.now(),
                     &KeepAlive::default(),
                 ),
@@ -6908,8 +7005,11 @@ mod test {
                     ISS_1 + 1 + TEST_BYTES.len(),
                     UnscaledWindowSize::from(3),
                     true,
-                    ISS_2 + 1,
-                    WindowSize::DEFAULT,
+                    &RecvParams {
+                        ack: ISS_2 + 1,
+                        wnd_scale: WindowScale::default(),
+                        wnd: WindowSize::DEFAULT,
+                    },
                     clock.now(),
                     &KeepAlive::default(),
                 ),
@@ -6921,8 +7021,11 @@ mod test {
         assert_eq!(
             snd.poll_send(
                 &counters,
-                ISS_2 + 1,
-                WindowSize::DEFAULT >> WindowScale::ZERO,
+                &RecvParams {
+                    ack: ISS_2 + 1,
+                    wnd: WindowSize::DEFAULT,
+                    wnd_scale: WindowScale::ZERO,
+                },
                 u32::MAX,
                 clock.now(),
                 &SocketOptions::default(),
@@ -6941,8 +7044,11 @@ mod test {
         assert_eq!(
             snd.poll_send(
                 &counters,
-                ISS_2 + 1,
-                WindowSize::DEFAULT >> WindowScale::ZERO,
+                &RecvParams {
+                    ack: ISS_2 + 1,
+                    wnd: WindowSize::DEFAULT,
+                    wnd_scale: WindowScale::ZERO,
+                },
                 u32::MAX,
                 clock.now(),
                 &SocketOptions::default(),
@@ -6989,8 +7095,11 @@ mod test {
         assert_eq!(
             snd.poll_send(
                 &counters,
-                ISS_2 + 1,
-                WindowSize::DEFAULT >> WindowScale::ZERO,
+                &RecvParams {
+                    ack: ISS_2 + 1,
+                    wnd: WindowSize::DEFAULT,
+                    wnd_scale: WindowScale::ZERO,
+                },
                 u32::MAX,
                 clock.now(),
                 &SocketOptions::default(),
@@ -7021,8 +7130,11 @@ mod test {
                 ISS_1 + 1 + TEST_BYTES.len(),
                 UnscaledWindowSize::from(0),
                 true,
-                ISS_2 + 1,
-                WindowSize::DEFAULT,
+                &RecvParams {
+                    ack: ISS_2 + 1,
+                    wnd_scale: WindowScale::default(),
+                    wnd: WindowSize::DEFAULT,
+                },
                 clock.now(),
                 &KeepAlive::default(),
             ),
@@ -7034,8 +7146,11 @@ mod test {
         assert_eq!(
             snd.poll_send(
                 &counters,
-                ISS_2 + 1,
-                WindowSize::DEFAULT >> WindowScale::ZERO,
+                &RecvParams {
+                    ack: ISS_2 + 1,
+                    wnd: WindowSize::DEFAULT,
+                    wnd_scale: WindowScale::ZERO,
+                },
                 u32::MAX,
                 clock.now(),
                 &SocketOptions::default(),
