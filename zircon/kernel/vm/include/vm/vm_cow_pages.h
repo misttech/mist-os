@@ -1383,10 +1383,10 @@ class VmCowPages final : public VmHierarchyBase,
   // the page is owned by this VMO at the specified offset.
   // Assumes that the provided |compressor| is not-null.
   //
-  // Borrows the guard for |lock_| and may drop the lock temporarily during execution.
+  // Takes ownership of the lock and releases it before returning.
   ReclaimCounts ReclaimPageForCompressionLocked(vm_page_t* page, uint64_t offset,
-                                                VmCompressor* compressor, Guard<VmoLockType>& guard)
-      TA_REQ(lock());
+                                                VmCompressor* compressor,
+                                                Guard<VmoLockType>::Adoptable adopt);
 
   // Internal helper for performing reclamation against a discardable VMO. Assumes that the page is
   // owned by this VMO at the specified offset. If any discarding happens the number of pages is

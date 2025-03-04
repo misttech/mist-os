@@ -5948,54 +5948,63 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEvictionLocked(vm_page_t* pa
   };
 }
 
-VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompressionLocked(vm_page_t* page,
-                                                                      uint64_t offset,
-                                                                      VmCompressor* compressor,
-                                                                      Guard<VmoLockType>& guard) {
+VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompressionLocked(
+    vm_page_t* page, uint64_t offset, VmCompressor* compressor,
+    Guard<VmoLockType>::Adoptable adopt) {
   DEBUG_ASSERT(compressor);
   DEBUG_ASSERT(!page_source_);
   ASSERT(page->object.pin_count == 0);
   DEBUG_ASSERT(!page->is_loaned());
   DEBUG_ASSERT(!discardable_tracker_);
   DEBUG_ASSERT(can_decommit_zero_pages());
-  if (paged_ref_) {
-    if ((paged_backlink_locked(this)->GetMappingCachePolicyLocked() & ZX_CACHE_POLICY_MASK) !=
-        ZX_CACHE_POLICY_CACHED) {
-      // Cannot compress uncached mappings. To avoid this page remaining in the reclamation list we
-      // simulate an access.
-      pmm_page_queues()->MarkAccessed(page);
-      return ReclaimCounts{};
-    }
-  }
 
   // Track whether we should tell the caller we reclaimed a page or not.
   bool reclaimed = false;
 
-  // Use a sub-scope as the page_or_marker will become invalid as we will drop the lock later.
   {
-    VmPageOrMarkerRef page_or_marker = page_list_.LookupMutable(offset);
-    DEBUG_ASSERT(page_or_marker);
-    DEBUG_ASSERT(page_or_marker->IsPage());
-    DEBUG_ASSERT(page_or_marker->Page() == page);
+    Guard<VmoLockType> guard{AdoptLock, lock(), ktl::move(adopt)};
+    if (paged_ref_) {
+      if ((paged_backlink_locked(this)->GetMappingCachePolicyLocked() & ZX_CACHE_POLICY_MASK) !=
+          ZX_CACHE_POLICY_CACHED) {
+        // Cannot compress uncached mappings. To avoid this page remaining in the reclamation list
+        // we simulate an access.
+        pmm_page_queues()->MarkAccessed(page);
+        return ReclaimCounts{};
+      }
+    }
 
-    RangeChangeUpdateSelfLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap,
-                                RangeChangeChildren::Deferred);
-    RangeChangeUpdateCowChildrenLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap);
+    // Use a sub-scope as the page_or_marker will become invalid as we will drop the lock later.
+    {
+      VmPageOrMarkerRef page_or_marker = page_list_.LookupMutable(offset);
+      DEBUG_ASSERT(page_or_marker);
+      DEBUG_ASSERT(page_or_marker->IsPage());
+      DEBUG_ASSERT(page_or_marker->Page() == page);
 
-    // Start compression of the page by swapping the page list to contain the temporary reference.
-    // Ensure the compression system is aware of the page's current share_count so it can track any
-    // changes we make to that value while compression is running.
-    VmPageOrMarker::ReferenceValue temp_ref = compressor->Start(
-        VmCompressor::PageAndMetadata{.page = page, .metadata = page->object.share_count});
-    [[maybe_unused]] vm_page_t* compress_page = page_or_marker.SwapPageForReference(temp_ref);
-    DEBUG_ASSERT(compress_page == page);
+      // Perform the unmap of the page on our mappings while we hold the lock. This removes all
+      // possible writable mappings, although our children could still have read-only mappings.
+      // These read-only mappings will be dealt with later, for now the page will at least be
+      // immutable.
+      RangeChangeUpdateSelfLocked(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap,
+                                  RangeChangeChildren::Deferred);
+
+      // Start compression of the page by swapping the page list to contain the temporary reference.
+      // Ensure the compression system is aware of the page's current share_count so it can track
+      // any changes we make to that value while compression is running.
+      VmPageOrMarker::ReferenceValue temp_ref = compressor->Start(
+          VmCompressor::PageAndMetadata{.page = page, .metadata = page->object.share_count});
+      [[maybe_unused]] vm_page_t* compress_page = page_or_marker.SwapPageForReference(temp_ref);
+      DEBUG_ASSERT(compress_page == page);
+    }
+    pmm_page_queues()->Remove(page);
+
+    // We now stack own the page (and guarantee to the compressor that it will not be modified) and
+    // the VMO owns the temporary reference. We can safely drop the VMO lock and perform the
+    // remaining range updates and the compression step.
+    RangeChangeUpdateCowChildren(VmCowRange(offset, PAGE_SIZE), RangeChangeOp::Unmap, guard.take());
   }
-  pmm_page_queues()->Remove(page);
+  compressor->Compress();
 
-  // We now stack own the page (and guarantee to the compressor that it will not be modified) and
-  // the VMO owns the temporary reference. We can safely drop the VMO lock and perform the
-  // compression step.
-  guard.CallUnlocked([compressor] { compressor->Compress(); });
+  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
 
   // Retrieve the result of compression now that we hold the VMO lock again.
   VmCompressor::CompressResult compression_result = compressor->TakeCompressionResult();
@@ -6114,7 +6123,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offs
   if (can_evict()) {
     return ReclaimPageForEvictionLocked(page, offset, hint_action);
   } else if (compressor && !page_source_ && !discardable_tracker_) {
-    return ReclaimPageForCompressionLocked(page, offset, compressor, guard);
+    return ReclaimPageForCompressionLocked(page, offset, compressor, guard.take());
   } else if (discardable_tracker_) {
     // On any errors touch the page so we stop trying to reclaim it. In particular for discardable
     // reclamation attempts, if the page we are passing is not the first page in the discardable
