@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::access_vector_cache::{FifoCache, Locked, Query};
-use crate::policy::{AccessVectorComputer, SELINUX_AVD_FLAGS_PERMISSIVE};
+use crate::policy::{AccessVector, AccessVectorComputer, SELINUX_AVD_FLAGS_PERMISSIVE};
 use crate::security_server::SecurityServer;
 use crate::{ClassPermission, FileClass, NullessByteStr, Permission, SecurityId};
 
@@ -114,10 +114,11 @@ fn has_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
         access_vector_computer.access_vector_from_permissions(&[permission])
     {
         let permit = permission_access_vector & decision.allow == permission_access_vector;
+
         let audit = if permit {
-            permission_access_vector & decision.auditallow == permission_access_vector
+            permission_access_vector & decision.auditallow != AccessVector::NONE
         } else {
-            permission_access_vector & decision.auditdeny == permission_access_vector
+            permission_access_vector & decision.auditdeny != AccessVector::NONE
         };
         PermissionCheckResult { permit, audit, todo_bug: None }
     } else {

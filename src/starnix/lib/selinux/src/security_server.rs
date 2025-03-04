@@ -634,7 +634,7 @@ fn sid_from_mount_option(
 mod tests {
     use super::*;
     use crate::permission_check::PermissionCheckResult;
-    use crate::{CommonFsNodePermission, FilePermission, ProcessPermission};
+    use crate::{CommonFsNodePermission, DirPermission, FilePermission, ProcessPermission};
     use std::num::NonZeroU64;
 
     const TESTSUITE_BINARY_POLICY: &[u8] = include_bytes!("../testdata/policies/selinux_testsuite");
@@ -1502,28 +1502,56 @@ mod tests {
         security_server.set_enforcing(true);
 
         // Load a policy that is missing some elements, and marked handle_unknown=deny.
-        // Then check for a missing permission.
         const DENY_POLICY: &[u8] =
             include_bytes!("../testdata/composite_policies/compiled/handle_unknown_policy-deny.pp");
         assert!(security_server.load_policy(DENY_POLICY.to_vec()).is_ok());
-
         let permission_check = security_server.as_permission_check();
+
+        // Check against undefined classes or permissions should deny access and audit.
         assert_eq!(
             permission_check.has_permission(sid, sid, ProcessPermission::GetSched),
             PermissionCheckResult { permit: false, audit: true, todo_bug: None }
         );
+        assert_eq!(
+            permission_check.has_permission(sid, sid, DirPermission::AddName),
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
+        );
+
+        // Check that permissions that are defined are unaffected by handle-unknown.
+        assert_eq!(
+            permission_check.has_permission(sid, sid, DirPermission::Search),
+            PermissionCheckResult { permit: true, audit: false, todo_bug: None }
+        );
+        assert_eq!(
+            permission_check.has_permission(sid, sid, DirPermission::Reparent),
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
+        );
 
         // Load a policy that is missing some elements, and marked handle_unknown=allow.
-        // Then check for a missing permission.
         const ALLOW_POLICY: &[u8] = include_bytes!(
             "../testdata/composite_policies/compiled/handle_unknown_policy-allow.pp"
         );
         assert!(security_server.load_policy(ALLOW_POLICY.to_vec()).is_ok());
-
         let permission_check = security_server.as_permission_check();
+
+        // Check against undefined classes or permissions should grant access without audit.
         assert_eq!(
             permission_check.has_permission(sid, sid, ProcessPermission::GetSched),
-            PermissionCheckResult { permit: true, audit: true, todo_bug: None }
+            PermissionCheckResult { permit: true, audit: false, todo_bug: None }
+        );
+        assert_eq!(
+            permission_check.has_permission(sid, sid, DirPermission::AddName),
+            PermissionCheckResult { permit: true, audit: false, todo_bug: None }
+        );
+
+        // Check that permissions that are defined are unaffected by handle-unknown.
+        assert_eq!(
+            permission_check.has_permission(sid, sid, DirPermission::Search),
+            PermissionCheckResult { permit: true, audit: false, todo_bug: None }
+        );
+        assert_eq!(
+            permission_check.has_permission(sid, sid, DirPermission::Reparent),
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
         );
     }
 }
