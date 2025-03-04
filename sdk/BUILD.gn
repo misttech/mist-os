@@ -672,46 +672,87 @@ if (is_host) {
   # Tools and data used on a host development machine (usually Linux or macOS).
   sdk_molecule("host_tools_for_single_toolchain") {
     visibility += [ "//tools/docsgen:invoke_clidoc" ]
-
     category = "partner"
-
     deps = [
-      "//build/assembly/tools/generate_config:generate_config_sdk",
+      ":build_host_tools",
+      ":non_build_host_tools",
+      ":non_build_host_tools_required_by_bazel_sdk",
+    ]
+  }
+
+  # Tools and data used on a host development machine to interact with a
+  # target device running Fuchsia. These are not needed to build the IDK or SDK.
+  # Some tools may depend on tools in peer molecules.
+  sdk_molecule("non_build_host_tools") {
+    category = "partner"
+    deps = [
       "//src/developer/debug/zxdb:zxdb_sdk",
-      "//src/developer/ffx:bin_sdk",
       "//src/developer/ffx/plugins/agis:sdk",
-      "//src/developer/ffx/plugins/assembly:sdk",
       "//src/developer/ffx/plugins/audio:sdk",
       "//src/developer/ffx/plugins/component:sdk",
       "//src/developer/ffx/plugins/coverage:sdk",
       "//src/developer/ffx/plugins/debug:sdk",
-      "//src/developer/ffx/plugins/driver:sdk",
       "//src/developer/ffx/plugins/emulator:sdk",
       "//src/developer/ffx/plugins/fuzz:sdk",
       "//src/developer/ffx/plugins/inspect:sdk",
       "//src/developer/ffx/plugins/log:sdk",
-      "//src/developer/ffx/plugins/package:sdk",
       "//src/developer/ffx/plugins/process:sdk",
-      "//src/developer/ffx/plugins/product:sdk",
       "//src/developer/ffx/plugins/profile:sdk",
       "//src/developer/ffx/plugins/repository:sdk",
-      "//src/developer/ffx/plugins/scrutiny:sdk",
       "//src/developer/ffx/plugins/session:sdk",
       "//src/developer/ffx/plugins/setui:sdk",
-      "//src/developer/ffx/plugins/test:sdk",
       "//src/developer/ffx/plugins/trace:sdk",
       "//src/developer/ffx/plugins/wlan:sdk",
       "//src/developer/ffx/tools/starnix:sdk",
       "//src/performance/trace2json:bin_sdk",
+      "//src/sys/pkg/bin/far:bin_sdk",
+      "//src/sys/pkg/testing/fake-omaha-client:bin_sdk",
+      "//tools/fidlcat:fidlcat_sdk",
+      "//tools/fuchsia-sdk-run:fuchsia-sdk-run_sdk",
+      "//tools/net/device-finder:device-finder_sdk",
+
+      # TODO(https://fxbug.dev/42177692): Remove these once the emulators are available independently.
+      "//src/developer/ffx/plugins/emulator:crosvm_internal",
+      "//src/developer/ffx/plugins/emulator:qemu_internal",
+      "//src/developer/ffx/plugins/emulator:uefi_internal_arm64",
+      "//src/developer/ffx/plugins/emulator:uefi_internal_x64",
+    ]
+  }
+
+  # Tools on which the Bazel SDK's `fuchsia_toolchain_info` explicitly depends.
+  # At least some of these should not be needed by the in-tree SDK build and
+  # should be moved to "non_build_host_tools". See https://fxbug.dev/395968221.
+  sdk_molecule("non_build_host_tools_required_by_bazel_sdk") {
+    category = "partner"
+    deps = [
+      "//build/assembly/tools/generate_config:generate_config_sdk",
+      "//src/developer/ffx:bin_sdk",
+      "//src/developer/ffx/plugins/driver:sdk",
+      "//src/developer/ffx/plugins/emulator:aemu_internal",
+      "//src/developer/ffx/plugins/product:sdk",
+      "//src/developer/ffx/plugins/test:sdk",
+      "//tools/bootserver_old:bootserver_sdk",
+      "//tools/funnel:funnel_sdk",
+      "//tools/sdk-tools/fssh:fssh_sdk",
+      "//tools/symbolizer:sdk",
+      "//zircon/tools/merkleroot:merkleroot_sdk",
+    ]
+  }
+
+  # Tools and data used on a host development machine to build software to run
+  # on Fuchsia.
+  sdk_molecule("build_host_tools") {
+    category = "partner"
+    deps = [
+      "//src/developer/ffx/plugins/assembly:sdk",
+      "//src/developer/ffx/plugins/package:sdk",
+      "//src/developer/ffx/plugins/scrutiny:sdk",
       "//src/starnix/tools/gen_android_starnix_container:gen_android_starnix_container_sdk",
       "//src/storage/bin/fvm:fvm_sdk",
       "//src/storage/blobfs/tools:blobfs_sdk",
       "//src/storage/minfs/tools:minfs_sdk",
       "//src/storage/tools/blobfs-compression:blobfs-compression_sdk",
-      "//src/sys/pkg/bin/far:bin_sdk",
-      "//src/sys/pkg/testing/fake-omaha-client:bin_sdk",
       "//tools/bindc:bindc_sdk",
-      "//tools/bootserver_old:bootserver_sdk",
       "//tools/cmc:cmc_sdk",
       "//tools/configc:configc_sdk",
       "//tools/fidl/fidlc:fidl-format_sdk",
@@ -719,21 +760,7 @@ if (is_host) {
       "//tools/fidl/fidlgen_cpp:fidlgen_cpp_sdk",
       "//tools/fidl/fidlgen_hlcpp:fidlgen_hlcpp_sdk",
       "//tools/fidl/fidlgen_rust:fidlgen_rust_sdk",
-      "//tools/fidlcat:fidlcat_sdk",
-      "//tools/fuchsia-sdk-run:fuchsia-sdk-run_sdk",
-      "//tools/funnel:funnel_sdk",
-      "//tools/net/device-finder:device-finder_sdk",
-      "//tools/sdk-tools/fssh:fssh_sdk",
-      "//tools/symbolizer:sdk",
-      "//zircon/tools/merkleroot:merkleroot_sdk",
       "//zircon/tools/zbi:zbi_sdk",
-
-      # TODO(https://fxbug.dev/42177692): Remove these once the emulators are available independently.
-      "//src/developer/ffx/plugins/emulator:aemu_internal",
-      "//src/developer/ffx/plugins/emulator:crosvm_internal",
-      "//src/developer/ffx/plugins/emulator:qemu_internal",
-      "//src/developer/ffx/plugins/emulator:uefi_internal_arm64",
-      "//src/developer/ffx/plugins/emulator:uefi_internal_x64",
     ]
   }
 } else {
