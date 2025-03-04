@@ -67,7 +67,7 @@ TYPED_TEST(DlTests, DlIteratePhdrBasic) {
   EXPECT_TRUE(open_ret17.value());
 
   // Check that a struct `dl_pdhr_info` is produced for the dlopen-ed module.
-  ModulePhdrInfo ret17_phdr_info = GetPhdrInfoForModule(this, kRet17File);
+  ModulePhdrInfo ret17_phdr_info = GetPhdrInfoForModule(*this, kRet17File);
 
   // Check that the `.dlpi_adds` counter is adjusted.
   const size_t loaded_after_open = GetGlobalCounters(this).loaded;

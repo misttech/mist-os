@@ -9,7 +9,6 @@
 
 #include <algorithm>
 #include <filesystem>
-#include <format>
 #include <span>
 #include <vector>
 
@@ -76,13 +75,11 @@ inline int CollectModulePhdrInfo(dl_phdr_info* phdr_info, size_t size, void* dat
 }
 
 // Locate the dl_phdr_info for a specific module by its file basename.
-template <class Test>
-static ModulePhdrInfo GetPhdrInfoForModule(Test* test, std::string_view module_name) {
+static ModulePhdrInfo GetPhdrInfoForModule(auto& test, std::string_view module_name) {
   ModuleInfoList list;
-  EXPECT_EQ(test->DlIteratePhdr(CollectModulePhdrInfo, &list), 0);
-  auto info = std::find_if(list.begin(), list.end(), [&](const ModulePhdrInfo& info) {
-    return info.basename() == module_name;
-  });
+  EXPECT_EQ(test.DlIteratePhdr(CollectModulePhdrInfo, &list), 0);
+  auto info = std::ranges::find_if(
+      list, [&](const ModulePhdrInfo& info) { return info.basename() == module_name; });
   EXPECT_NE(info, list.end());
   return *info;
 }
