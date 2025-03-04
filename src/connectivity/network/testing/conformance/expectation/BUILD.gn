@@ -18,6 +18,7 @@ if (is_host) {
       "dhcpv6_client.go",
       "dhcpv6_client_pd.go",
       "icmp.go",
+      "icmp_router.go",
       "icmpv6.go",
       "icmpv6_router.go",
       "igmp.go",
