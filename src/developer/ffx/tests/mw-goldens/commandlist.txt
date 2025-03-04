@@ -1,5 +1,6 @@
 ffx component show
 ffx daemon stop
+ffx emu list
 ffx emu show
 ffx emu start
 ffx emu stop
