@@ -6,6 +6,7 @@
 
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/driver/logging/cpp/logger.h>
+#include <lib/fit/result.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
 #include <zircon/assert.h>
@@ -35,23 +36,6 @@
 #include "src/graphics/display/lib/edid/edid.h"
 
 namespace display_coordinator {
-
-namespace {
-
-fit::result<const char*, DisplayInfo::Edid> InitEdidFromBytes(std::span<const uint8_t> bytes) {
-  ZX_DEBUG_ASSERT(bytes.size() <= std::numeric_limits<uint16_t>::max());
-
-  fit::result<const char*, edid::Edid> result = edid::Edid::Create(bytes);
-  if (result.is_ok()) {
-    DisplayInfo::Edid edid = {
-        .base = std::move(result).value(),
-    };
-    return fit::ok(std::move(edid));
-  }
-  return result.take_error();
-}
-
-}  // namespace
 
 DisplayInfo::DisplayInfo(display::DisplayId display_id) : IdMappable(display_id) {
   ZX_DEBUG_ASSERT(display_id != display::kInvalidDisplayId);
@@ -121,21 +105,24 @@ zx::result<std::unique_ptr<DisplayInfo>> DisplayInfo::Create(AddedDisplayInfo ad
     return zx::ok(std::move(display_info));
   }
 
-  auto edid_result = [&]() -> fit::result<const char*, Edid> {
-    if (!added_display_info.edid_bytes.is_empty()) {
-      // TODO(https://fxbug.dev/348695412): Merge and de-duplicate the modes in
-      // `preferred_modes` from the logic above.
-      return InitEdidFromBytes(added_display_info.edid_bytes);
-    }
+  if (added_display_info.edid_bytes.is_empty()) {
+    FDF_LOG(ERROR, "Missing display timing information for display ID: %" PRIu64,
+            display_id.value());
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
 
-    return fit::error("Missing display hardware support information");
-  }();
-
-  if (!edid_result.is_ok()) {
+  fit::result<const char*, edid::Edid> edid_result =
+      edid::Edid::Create(added_display_info.edid_bytes);
+  if (edid_result.is_error()) {
     FDF_LOG(ERROR, "Failed to initialize EDID: %s", edid_result.error_value());
     return zx::error(ZX_ERR_INTERNAL);
   }
-  display_info->edid = std::move(edid_result).value();
+  display_info->edid = {
+      .base = std::move(edid_result).value(),
+  };
+
+  // TODO(https://fxbug.dev/348695412): Merge and de-duplicate the modes in
+  // `preferred_modes` from the logic above.
 
   // TODO(https://fxbug.dev/343872853): Parse audio information from EDID.
 
