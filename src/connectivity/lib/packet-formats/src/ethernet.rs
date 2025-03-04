@@ -236,7 +236,7 @@ impl<B: SplitByteSlice> EthernetFrame<B> {
 ///
 /// A [`PacketBuilder`] that serializes into an Ethernet frame. The padding
 /// parameter `P` can be used to choose how the body of the frame is padded.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct EthernetFrameBuilder {
     src_mac: Mac,
     dst_mac: Mac,
@@ -260,6 +260,16 @@ impl EthernetFrameBuilder {
         min_body_len: usize,
     ) -> EthernetFrameBuilder {
         EthernetFrameBuilder { src_mac, dst_mac, ethertype: ethertype.into(), min_body_len }
+    }
+
+    /// Returns the source MAC address for the builder.
+    pub fn src_mac(&self) -> Mac {
+        self.src_mac
+    }
+
+    /// Returns the destination MAC address for the builder.
+    pub fn dst_mac(&self) -> Mac {
+        self.dst_mac
     }
 }
 

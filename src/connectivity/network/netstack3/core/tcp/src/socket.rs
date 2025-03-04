@@ -5495,7 +5495,10 @@ mod tests {
         BaseTransportIpContext, HopLimits, IpTransportContext, LocalDeliveryPacketInfo,
     };
     use packet::{Buf, BufferMut, ParseBuffer as _};
-    use packet_formats::icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode};
+    use packet_formats::icmp::{
+        Icmpv4DestUnreachableCode, Icmpv4ParameterProblemCode, Icmpv4TimeExceededCode,
+        Icmpv6DestUnreachableCode, Icmpv6ParameterProblemCode, Icmpv6TimeExceededCode,
+    };
     use packet_formats::tcp::{TcpParseArgs, TcpSegment};
     use rand::Rng as _;
     use test_case::test_case;
@@ -8072,38 +8075,44 @@ mod tests {
         );
     }
 
-    #[test_case(Icmpv4DestUnreachableCode::DestNetworkUnreachable => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::DestHostUnreachable => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::DestProtocolUnreachable => ConnectionError::ProtocolUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::DestPortUnreachable => ConnectionError::PortUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::SourceRouteFailed => ConnectionError::SourceRouteFailed)]
-    #[test_case(Icmpv4DestUnreachableCode::DestNetworkUnknown => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::DestHostUnknown => ConnectionError::DestinationHostDown)]
-    #[test_case(Icmpv4DestUnreachableCode::SourceHostIsolated => ConnectionError::SourceHostIsolated)]
-    #[test_case(Icmpv4DestUnreachableCode::NetworkAdministrativelyProhibited => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::HostAdministrativelyProhibited => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::NetworkUnreachableForToS => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::HostUnreachableForToS => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::CommAdministrativelyProhibited => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::HostPrecedenceViolation => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::PrecedenceCutoffInEffect => ConnectionError::HostUnreachable)]
-    fn icmp_destination_unreachable_connect_v4(
-        error: Icmpv4DestUnreachableCode,
-    ) -> ConnectionError {
-        icmp_destination_unreachable_connect_inner::<Ipv4>(Icmpv4ErrorCode::DestUnreachable(error))
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestNetworkUnreachable) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestHostUnreachable) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestProtocolUnreachable) => ConnectionError::ProtocolUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestPortUnreachable) => ConnectionError::PortUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::SourceRouteFailed) => ConnectionError::SourceRouteFailed)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestNetworkUnknown) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestHostUnknown) => ConnectionError::DestinationHostDown)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::SourceHostIsolated) => ConnectionError::SourceHostIsolated)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::NetworkAdministrativelyProhibited) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::HostAdministrativelyProhibited) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::NetworkUnreachableForToS) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::HostUnreachableForToS) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::CommAdministrativelyProhibited) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::HostPrecedenceViolation) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::PrecedenceCutoffInEffect) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::ParameterProblem(Icmpv4ParameterProblemCode::PointerIndicatesError) => ConnectionError::ProtocolError)]
+    #[test_case(Icmpv4ErrorCode::ParameterProblem(Icmpv4ParameterProblemCode::MissingRequiredOption) => ConnectionError::ProtocolError)]
+    #[test_case(Icmpv4ErrorCode::ParameterProblem(Icmpv4ParameterProblemCode::BadLength) => ConnectionError::ProtocolError)]
+    #[test_case(Icmpv4ErrorCode::TimeExceeded(Icmpv4TimeExceededCode::TtlExpired) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::TimeExceeded(Icmpv4TimeExceededCode::FragmentReassemblyTimeExceeded) => ConnectionError::TimedOut)]
+    fn icmp_destination_unreachable_connect_v4(error: Icmpv4ErrorCode) -> ConnectionError {
+        icmp_destination_unreachable_connect_inner::<Ipv4>(error)
     }
 
-    #[test_case(Icmpv6DestUnreachableCode::NoRoute => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv6DestUnreachableCode::CommAdministrativelyProhibited => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv6DestUnreachableCode::BeyondScope => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv6DestUnreachableCode::AddrUnreachable => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv6DestUnreachableCode::PortUnreachable => ConnectionError::PortUnreachable)]
-    #[test_case(Icmpv6DestUnreachableCode::SrcAddrFailedPolicy => ConnectionError::SourceRouteFailed)]
-    #[test_case(Icmpv6DestUnreachableCode::RejectRoute => ConnectionError::NetworkUnreachable)]
-    fn icmp_destination_unreachable_connect_v6(
-        error: Icmpv6DestUnreachableCode,
-    ) -> ConnectionError {
-        icmp_destination_unreachable_connect_inner::<Ipv6>(Icmpv6ErrorCode::DestUnreachable(error))
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::NoRoute) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::CommAdministrativelyProhibited) => ConnectionError::PermissionDenied)]
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::BeyondScope) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::AddrUnreachable) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::PortUnreachable) => ConnectionError::PortUnreachable)]
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::SrcAddrFailedPolicy) => ConnectionError::PermissionDenied)]
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::RejectRoute) => ConnectionError::PermissionDenied)]
+    #[test_case(Icmpv6ErrorCode::ParameterProblem(Icmpv6ParameterProblemCode::ErroneousHeaderField) => ConnectionError::ProtocolError)]
+    #[test_case(Icmpv6ErrorCode::ParameterProblem(Icmpv6ParameterProblemCode::UnrecognizedNextHeaderType) => ConnectionError::ProtocolError)]
+    #[test_case(Icmpv6ErrorCode::ParameterProblem(Icmpv6ParameterProblemCode::UnrecognizedIpv6Option) => ConnectionError::ProtocolError)]
+    #[test_case(Icmpv6ErrorCode::TimeExceeded(Icmpv6TimeExceededCode::HopLimitExceeded) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv6ErrorCode::TimeExceeded(Icmpv6TimeExceededCode::FragmentReassemblyTimeExceeded) => ConnectionError::HostUnreachable)]
+    fn icmp_destination_unreachable_connect_v6(error: Icmpv6ErrorCode) -> ConnectionError {
+        icmp_destination_unreachable_connect_inner::<Ipv6>(error)
     }
 
     fn icmp_destination_unreachable_connect_inner<I: TcpTestIpExt + IcmpIpExt>(
@@ -8143,42 +8152,44 @@ mod tests {
         api.get_socket_error(&connection).unwrap()
     }
 
-    #[test_case(Icmpv4DestUnreachableCode::DestNetworkUnreachable => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::DestHostUnreachable => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::DestProtocolUnreachable => ConnectionError::ProtocolUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::DestPortUnreachable => ConnectionError::PortUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::SourceRouteFailed => ConnectionError::SourceRouteFailed)]
-    #[test_case(Icmpv4DestUnreachableCode::DestNetworkUnknown => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::DestHostUnknown => ConnectionError::DestinationHostDown)]
-    #[test_case(Icmpv4DestUnreachableCode::SourceHostIsolated => ConnectionError::SourceHostIsolated)]
-    #[test_case(Icmpv4DestUnreachableCode::NetworkAdministrativelyProhibited => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::HostAdministrativelyProhibited => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::NetworkUnreachableForToS => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::HostUnreachableForToS => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::CommAdministrativelyProhibited => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::HostPrecedenceViolation => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv4DestUnreachableCode::PrecedenceCutoffInEffect => ConnectionError::HostUnreachable)]
-    fn icmp_destination_unreachable_established_v4(
-        error: Icmpv4DestUnreachableCode,
-    ) -> ConnectionError {
-        icmp_destination_unreachable_established_inner::<Ipv4>(Icmpv4ErrorCode::DestUnreachable(
-            error,
-        ))
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestNetworkUnreachable) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestHostUnreachable) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestProtocolUnreachable) => ConnectionError::ProtocolUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestPortUnreachable) => ConnectionError::PortUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::SourceRouteFailed) => ConnectionError::SourceRouteFailed)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestNetworkUnknown) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestHostUnknown) => ConnectionError::DestinationHostDown)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::SourceHostIsolated) => ConnectionError::SourceHostIsolated)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::NetworkAdministrativelyProhibited) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::HostAdministrativelyProhibited) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::NetworkUnreachableForToS) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::HostUnreachableForToS) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::CommAdministrativelyProhibited) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::HostPrecedenceViolation) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::PrecedenceCutoffInEffect) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::ParameterProblem(Icmpv4ParameterProblemCode::PointerIndicatesError) => ConnectionError::ProtocolError)]
+    #[test_case(Icmpv4ErrorCode::ParameterProblem(Icmpv4ParameterProblemCode::MissingRequiredOption) => ConnectionError::ProtocolError)]
+    #[test_case(Icmpv4ErrorCode::ParameterProblem(Icmpv4ParameterProblemCode::BadLength) => ConnectionError::ProtocolError)]
+    #[test_case(Icmpv4ErrorCode::TimeExceeded(Icmpv4TimeExceededCode::TtlExpired) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv4ErrorCode::TimeExceeded(Icmpv4TimeExceededCode::FragmentReassemblyTimeExceeded) => ConnectionError::TimedOut)]
+    fn icmp_destination_unreachable_established_v4(error: Icmpv4ErrorCode) -> ConnectionError {
+        icmp_destination_unreachable_established_inner::<Ipv4>(error)
     }
 
-    #[test_case(Icmpv6DestUnreachableCode::NoRoute => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv6DestUnreachableCode::CommAdministrativelyProhibited => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv6DestUnreachableCode::BeyondScope => ConnectionError::NetworkUnreachable)]
-    #[test_case(Icmpv6DestUnreachableCode::AddrUnreachable => ConnectionError::HostUnreachable)]
-    #[test_case(Icmpv6DestUnreachableCode::PortUnreachable => ConnectionError::PortUnreachable)]
-    #[test_case(Icmpv6DestUnreachableCode::SrcAddrFailedPolicy => ConnectionError::SourceRouteFailed)]
-    #[test_case(Icmpv6DestUnreachableCode::RejectRoute => ConnectionError::NetworkUnreachable)]
-    fn icmp_destination_unreachable_established_v6(
-        error: Icmpv6DestUnreachableCode,
-    ) -> ConnectionError {
-        icmp_destination_unreachable_established_inner::<Ipv6>(Icmpv6ErrorCode::DestUnreachable(
-            error,
-        ))
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::NoRoute) => ConnectionError::NetworkUnreachable)]
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::CommAdministrativelyProhibited) => ConnectionError::PermissionDenied)]
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::BeyondScope) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::AddrUnreachable) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::PortUnreachable) => ConnectionError::PortUnreachable)]
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::SrcAddrFailedPolicy) => ConnectionError::PermissionDenied)]
+    #[test_case(Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::RejectRoute) => ConnectionError::PermissionDenied)]
+    #[test_case(Icmpv6ErrorCode::ParameterProblem(Icmpv6ParameterProblemCode::ErroneousHeaderField) => ConnectionError::ProtocolError)]
+    #[test_case(Icmpv6ErrorCode::ParameterProblem(Icmpv6ParameterProblemCode::UnrecognizedNextHeaderType) => ConnectionError::ProtocolError)]
+    #[test_case(Icmpv6ErrorCode::ParameterProblem(Icmpv6ParameterProblemCode::UnrecognizedIpv6Option) => ConnectionError::ProtocolError)]
+    #[test_case(Icmpv6ErrorCode::TimeExceeded(Icmpv6TimeExceededCode::HopLimitExceeded) => ConnectionError::HostUnreachable)]
+    #[test_case(Icmpv6ErrorCode::TimeExceeded(Icmpv6TimeExceededCode::FragmentReassemblyTimeExceeded) => ConnectionError::HostUnreachable)]
+    fn icmp_destination_unreachable_established_v6(error: Icmpv6ErrorCode) -> ConnectionError {
+        icmp_destination_unreachable_established_inner::<Ipv6>(error)
     }
 
     fn icmp_destination_unreachable_established_inner<I: TcpTestIpExt + IcmpIpExt>(

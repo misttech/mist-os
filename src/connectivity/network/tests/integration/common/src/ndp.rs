@@ -12,6 +12,7 @@ use futures::{future, FutureExt as _, Stream, StreamExt as _, TryStreamExt as _}
 use net_types::ip::Ip as _;
 use net_types::Witness as _;
 use packet::serialize::{InnerPacketBuilder, Serializer};
+use packet::Buf;
 use packet_formats::ethernet::{
     EtherType, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
 };
@@ -25,31 +26,23 @@ use packet_formats::ip::Ipv6Proto;
 use packet_formats::ipv6::Ipv6PacketBuilder;
 use packet_formats::testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame;
 use std::fmt::Debug;
-use zerocopy::SplitByteSlice;
 
 /// As per [RFC 4861] sections 4.1-4.5, NDP packets MUST have a hop limit of 255.
 ///
 /// [RFC 4861]: https://tools.ietf.org/html/rfc4861
 pub const MESSAGE_TTL: u8 = 255;
 
-/// Write an NDP message to the provided fake endpoint.
-///
-/// Given the source and destination MAC and IP addresses, NDP message and
-/// options, the full NDP packet (including IPv6 and Ethernet headers) will be
-/// transmitted to the fake endpoint's network.
-pub async fn write_message<
-    B: SplitByteSlice + Debug,
-    M: IcmpMessage<net_types::ip::Ipv6, Code = IcmpZeroCode> + Debug,
->(
+/// Create an NDP message with the provided parameters, including IPv6 and
+/// Ethernet headers.
+pub fn create_message<M: IcmpMessage<net_types::ip::Ipv6, Code = IcmpZeroCode> + Debug>(
     src_mac: net_types::ethernet::Mac,
     dst_mac: net_types::ethernet::Mac,
     src_ip: net_types::ip::Ipv6Addr,
     dst_ip: net_types::ip::Ipv6Addr,
     message: M,
     options: &[NdpOptionBuilder<'_>],
-    ep: &netemul::TestFakeEndpoint<'_>,
-) -> crate::Result {
-    let ser = OptionSequenceBuilder::new(options.iter())
+) -> crate::Result<Buf<Vec<u8>>> {
+    Ok(OptionSequenceBuilder::new(options.iter())
         .into_serializer()
         .encapsulate(IcmpPacketBuilder::<_, _>::new(src_ip, dst_ip, IcmpZeroCode, message))
         .encapsulate(Ipv6PacketBuilder::new(src_ip, dst_ip, MESSAGE_TTL, Ipv6Proto::Icmpv6))
@@ -61,7 +54,24 @@ pub async fn write_message<
         ))
         .serialize_vec_outer()
         .map_err(|e| anyhow::anyhow!("failed to serialize NDP packet: {:?}", e))?
-        .unwrap_b();
+        .unwrap_b())
+}
+
+/// Write an NDP message to the provided fake endpoint.
+///
+/// Given the source and destination MAC and IP addresses, NDP message and
+/// options, the full NDP packet (including IPv6 and Ethernet headers) will be
+/// transmitted to the fake endpoint's network.
+pub async fn write_message<M: IcmpMessage<net_types::ip::Ipv6, Code = IcmpZeroCode> + Debug>(
+    src_mac: net_types::ethernet::Mac,
+    dst_mac: net_types::ethernet::Mac,
+    src_ip: net_types::ip::Ipv6Addr,
+    dst_ip: net_types::ip::Ipv6Addr,
+    message: M,
+    options: &[NdpOptionBuilder<'_>],
+    ep: &netemul::TestFakeEndpoint<'_>,
+) -> crate::Result {
+    let ser = create_message(src_mac, dst_mac, src_ip, dst_ip, message, options)?;
     ep.write(ser.as_ref()).await.context("failed to write to fake endpoint")
 }
 
@@ -72,7 +82,7 @@ pub async fn send_ra<'a>(
     options: &[NdpOptionBuilder<'_>],
     src_ip: net_types::ip::Ipv6Addr,
 ) -> crate::Result {
-    write_message::<&[u8], _>(
+    write_message(
         constants::eth::MAC_ADDR,
         net_types::ethernet::Mac::from(
             &net_types::ip::Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS,
@@ -170,7 +180,7 @@ pub async fn expect_dad_neighbor_solicitation(fake_ep: &netemul::TestFakeEndpoin
 /// performing DAD for `constants::ipv6::LINK_LOCAL_ADDR`.
 pub async fn fail_dad_with_ns(fake_ep: &netemul::TestFakeEndpoint<'_>) {
     let snmc = constants::ipv6::LINK_LOCAL_ADDR.to_solicited_node_address();
-    let () = write_message::<&[u8], _>(
+    write_message(
         constants::eth::MAC_ADDR,
         net_types::ethernet::Mac::from(&snmc),
         net_types::ip::Ipv6::UNSPECIFIED_ADDRESS,
@@ -186,7 +196,7 @@ pub async fn fail_dad_with_ns(fake_ep: &netemul::TestFakeEndpoint<'_>) {
 /// Transmit a Neighbor Advertisement message simulating that a node owns
 /// `constants::ipv6::LINK_LOCAL_ADDR`.
 pub async fn fail_dad_with_na(fake_ep: &netemul::TestFakeEndpoint<'_>) {
-    let () = write_message::<&[u8], _>(
+    write_message(
         constants::eth::MAC_ADDR,
         net_types::ethernet::Mac::from(
             &net_types::ip::Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS,

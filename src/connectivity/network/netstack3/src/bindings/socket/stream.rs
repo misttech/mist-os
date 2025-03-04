@@ -413,6 +413,8 @@ impl IntoErrno for ConnectionError {
             ConnectionError::SourceRouteFailed => fposix::Errno::Eopnotsupp,
             ConnectionError::SourceHostIsolated => fposix::Errno::Enonet,
             ConnectionError::TimedOut => fposix::Errno::Etimedout,
+            ConnectionError::PermissionDenied => fposix::Errno::Eacces,
+            ConnectionError::ProtocolError => fposix::Errno::Eproto,
         }
     }
 }

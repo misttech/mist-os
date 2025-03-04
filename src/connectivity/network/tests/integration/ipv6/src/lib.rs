@@ -929,7 +929,7 @@ async fn slaac_regeneration_after_dad_failure<N: Netstack>(name: &str) {
                     );
                     // Pretend that there is a duplicate address situation.
                     let snmc = addr.to_solicited_node_address();
-                    ndp::write_message::<&[u8], _>(
+                    ndp::write_message(
                         eth_consts::MAC_ADDR,
                         Mac::from(&snmc),
                         net_types_ip::Ipv6::UNSPECIFIED_ADDRESS,

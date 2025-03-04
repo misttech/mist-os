@@ -15,7 +15,9 @@ use netstack3_base::{
 };
 use netstack3_ip::socket::{RouteResolutionOptions, SendOptions};
 use netstack3_ip::Marks;
-use packet_formats::icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode};
+use packet_formats::icmp::{
+    Icmpv4DestUnreachableCode, Icmpv4TimeExceededCode, Icmpv6DestUnreachableCode,
+};
 use packet_formats::ip::DscpAndEcn;
 use packet_formats::utils::NonZeroDuration;
 use rand::Rng;
@@ -50,6 +52,10 @@ pub enum ConnectionError {
     SourceHostIsolated,
     /// The connection was closed because of a time out.
     TimedOut,
+    /// The connection was closed because of a lack of required permissions.
+    PermissionDenied,
+    /// The connection was closed because there was a protocol error.
+    ProtocolError,
 }
 
 impl ConnectionError {
@@ -70,6 +76,7 @@ impl ConnectionError {
                 Icmpv4DestUnreachableCode::DestPortUnreachable => {
                     Some(ConnectionError::PortUnreachable)
                 }
+                // TODO(https://fxbug.dev/42052672): update PMTU/MSS.
                 Icmpv4DestUnreachableCode::FragmentationRequired => None,
                 Icmpv4DestUnreachableCode::SourceRouteFailed => {
                     Some(ConnectionError::SourceRouteFailed)
@@ -105,18 +112,22 @@ impl ConnectionError {
                     Some(ConnectionError::HostUnreachable)
                 }
             },
-            // TODO(https://fxbug.dev/42052672): Map the following ICMP messages.
-            IcmpErrorCode::V4(
-                Icmpv4ErrorCode::ParameterProblem(_)
-                | Icmpv4ErrorCode::Redirect(_)
-                | Icmpv4ErrorCode::TimeExceeded(_),
-            ) => None,
+            IcmpErrorCode::V4(Icmpv4ErrorCode::ParameterProblem(_)) => {
+                Some(ConnectionError::ProtocolError)
+            }
+            IcmpErrorCode::V4(Icmpv4ErrorCode::TimeExceeded(
+                Icmpv4TimeExceededCode::TtlExpired,
+            )) => Some(ConnectionError::HostUnreachable),
+            IcmpErrorCode::V4(Icmpv4ErrorCode::TimeExceeded(
+                Icmpv4TimeExceededCode::FragmentReassemblyTimeExceeded,
+            )) => Some(ConnectionError::TimedOut),
+            IcmpErrorCode::V4(Icmpv4ErrorCode::Redirect(_)) => None,
             IcmpErrorCode::V6(Icmpv6ErrorCode::DestUnreachable(code)) => match code {
                 Icmpv6DestUnreachableCode::NoRoute => Some(ConnectionError::NetworkUnreachable),
                 Icmpv6DestUnreachableCode::CommAdministrativelyProhibited => {
-                    Some(ConnectionError::HostUnreachable)
+                    Some(ConnectionError::PermissionDenied)
                 }
-                Icmpv6DestUnreachableCode::BeyondScope => Some(ConnectionError::NetworkUnreachable),
+                Icmpv6DestUnreachableCode::BeyondScope => Some(ConnectionError::HostUnreachable),
                 Icmpv6DestUnreachableCode::AddrUnreachable => {
                     Some(ConnectionError::HostUnreachable)
                 }
@@ -124,16 +135,18 @@ impl ConnectionError {
                     Some(ConnectionError::PortUnreachable)
                 }
                 Icmpv6DestUnreachableCode::SrcAddrFailedPolicy => {
-                    Some(ConnectionError::SourceRouteFailed)
+                    Some(ConnectionError::PermissionDenied)
                 }
-                Icmpv6DestUnreachableCode::RejectRoute => Some(ConnectionError::NetworkUnreachable),
+                Icmpv6DestUnreachableCode::RejectRoute => Some(ConnectionError::PermissionDenied),
             },
-            // TODO(https://fxbug.dev/42052672): Map the following ICMP messages.
-            IcmpErrorCode::V6(
-                Icmpv6ErrorCode::PacketTooBig
-                | Icmpv6ErrorCode::ParameterProblem(_)
-                | Icmpv6ErrorCode::TimeExceeded(_),
-            ) => None,
+            IcmpErrorCode::V6(Icmpv6ErrorCode::ParameterProblem(_)) => {
+                Some(ConnectionError::ProtocolError)
+            }
+            IcmpErrorCode::V6(Icmpv6ErrorCode::TimeExceeded(_)) => {
+                Some(ConnectionError::HostUnreachable)
+            }
+            // TODO(https://fxbug.dev/42052672): update PMTU/MSS.
+            IcmpErrorCode::V6(Icmpv6ErrorCode::PacketTooBig) => None,
         }
     }
 }
