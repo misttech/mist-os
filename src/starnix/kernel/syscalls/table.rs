@@ -160,10 +160,11 @@ pub fn dispatch_syscall(
         pub use crate::task::syscalls::{
             sys_arch32_sched_getaffinity, sys_arch32_sched_setaffinity, sys_arch32_setpriority,
             sys_arch32_setrlimit, sys_arch32_ugetrlimit, sys_capget as sys_arch32_capget,
-            sys_capset as sys_arch32_capset, sys_exit as sys_arch32_exit,
-            sys_exit_group as sys_arch32_exit_group, sys_getpid as sys_arch32_getpid,
-            sys_gettid as sys_arch32_gettid, sys_getuid as sys_arch32_getuid32,
-            sys_prctl as sys_arch32_prctl, sys_prlimit64 as sys_arch32_prlimit64,
+            sys_capset as sys_arch32_capset, sys_clone3 as sys_arch32_clone3,
+            sys_exit as sys_arch32_exit, sys_exit_group as sys_arch32_exit_group,
+            sys_getpid as sys_arch32_getpid, sys_gettid as sys_arch32_gettid,
+            sys_getuid as sys_arch32_getuid32, sys_prctl as sys_arch32_prctl,
+            sys_prlimit64 as sys_arch32_prlimit64,
             sys_sched_getscheduler as sys_arch32_sched_getscheduler,
             sys_set_tid_address as sys_arch32_set_tid_address, sys_setuid as sys_arch32_setuid,
         };
@@ -216,6 +217,7 @@ pub fn dispatch_syscall(
             clock_getres[2],
             clock_gettime[2],
             clock_gettime64[2],
+            clone3[2],
             clone[5],
             close[1],
             connect[3],
