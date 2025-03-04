@@ -23,6 +23,7 @@ if (is_host) {
       "//src/sys/pkg/lib/fuchsia-pkg",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:argh",
+      "//third_party/rust_crates:camino",
       "//third_party/rust_crates:handlebars",
       "//third_party/rust_crates:lazy_static",
       "//third_party/rust_crates:log",

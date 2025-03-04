@@ -4,6 +4,7 @@
 
 use anyhow::{bail, Context, Result};
 use argh::FromArgs;
+use camino::{Utf8Path, Utf8PathBuf};
 use fidl_fuchsia_component_decl as fdecl;
 use fuchsia_archive::Reader as FARReader;
 use fuchsia_pkg::PackageManifest;
@@ -20,7 +21,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::env::current_exe;
 use std::fs::File;
 use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
@@ -46,11 +47,11 @@ enum CommandArgs {
 struct ProcessArgs {
     /// the path under which to look for packages
     #[argh(positional)]
-    path: PathBuf,
+    path: Utf8PathBuf,
 
     /// the path to save the output json file
     #[argh(option)]
-    out: Option<PathBuf>,
+    out: Option<Utf8PathBuf>,
 
     /// if set, process manifests one at a time, for debugging.
     #[argh(switch)]
@@ -71,11 +72,11 @@ struct ProcessArgs {
 struct HtmlArgs {
     /// input file generated using "process" command
     #[argh(option)]
-    input: PathBuf,
+    input: Utf8PathBuf,
 
     /// output directory for HTML, must not exist
     #[argh(option)]
-    output: PathBuf,
+    output: Utf8PathBuf,
 }
 
 #[derive(FromArgs)]
@@ -84,11 +85,11 @@ struct HtmlArgs {
 struct PrintArgs {
     /// input file generated using "process" command
     #[argh(option)]
-    input: PathBuf,
+    input: Utf8PathBuf,
 
     /// output file name, if absent print to stdout
     #[argh(option)]
-    output: Option<PathBuf>,
+    output: Option<Utf8PathBuf>,
 }
 
 #[fuchsia::main]
@@ -329,14 +330,10 @@ struct DebugDumpOutput {
 }
 
 fn do_process_command(args: ProcessArgs) -> Result<()> {
-    let path = match args.path {
-        ref p if p.is_dir() => p,
-        ref p if p.exists() => {
-            bail!("'{}' is not a directory", p.to_string_lossy())
-        }
-        ref p => {
-            bail!("Directory '{}' does not exist", p.to_string_lossy())
-        }
+    let path = match &args.path {
+        p if p.is_dir() => p,
+        p if p.exists() => bail!("'{p}' is not a directory"),
+        p => bail!("Directory '{p}' does not exist"),
     };
 
     let mut manifests = vec![];
@@ -351,7 +348,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
             let entry = val?;
             if &entry.file_name() == "package_manifest.json" {
                 file_count += 1;
-                manifests.push(entry.path());
+                manifests.push(Utf8PathBuf::try_from(entry.path())?);
             } else if entry.file_type()?.is_dir() {
                 dirs.push(entry.path().read_dir()?);
             } else {
@@ -372,7 +369,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
     let mut debug_mode = false;
     if let Some(search) = args.debug_manifest_filter {
         debug_mode = true;
-        manifests.retain(|v| v.to_string_lossy().contains(&search));
+        manifests.retain(|v| v.to_string().contains(&search));
     }
     if let Some(limit) = args.debug_manifest_limit {
         debug_mode = true;
@@ -385,7 +382,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
         println!("Filtered down to {} manifests", manifests.len());
     }
 
-    let get_content_file_path = |relative_path: &str, source_file_path: &Path| {
+    let get_content_file_path = |relative_path: &str, source_file_path: &Utf8Path| {
         let filepath = path.join(relative_path);
         if filepath.exists() {
             return Ok(filepath);
@@ -404,7 +401,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
         }
     };
 
-    let get_content_file = |relative_path: &str, source_file_path: &Path| {
+    let get_content_file = |relative_path: &str, source_file_path: &Utf8Path| {
         File::open(get_content_file_path(relative_path, source_file_path)?)
     };
 
@@ -427,7 +424,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
                         debug!(status = "Failed", step = $step;"");
                         eprintln!(
                             "[{}] Failed {}: {:?}",
-                            manifest_path.to_string_lossy(),
+                            manifest_path,
                             $step,
                             e
                         );
@@ -443,7 +440,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
                         debug!(status = "Failed", step = $step;"");
                         eprintln!(
                             "[{}] Failed {} for {}: {:?}",
-                            manifest_path.to_string_lossy(),
+                            manifest_path,
                             $step,
                             $context,
                             e
@@ -455,9 +452,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
         }
 
         let manifest = do_on_error!(
-            PackageManifest::try_load_from(
-                manifest_path.to_string_lossy().to_owned().to_string().as_str()
-            ),
+            PackageManifest::try_load_from(manifest_path),
             "loading manifest",
             manifest_errors,
             return
@@ -623,7 +618,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
                 contents.blobs.push(blob.merkle.to_string());
             } else {
                 let source_path = get_content_file_path(&blob.source_path, manifest_path)
-                    .map(|v| v.to_string_lossy().to_string())
+                    .map(|v| v.to_string())
                     .unwrap_or_default();
                 content_hash_to_path.lock().unwrap().insert(blob.merkle.to_string(), source_path);
                 contents.files.push(PackageFile {
@@ -650,7 +645,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
             return;
         }
 
-        let path = PathBuf::from(path);
+        let path = Utf8PathBuf::from(path);
         let alt_path = path
             .parent()
             .map(|v| v.join("exe.unstripped").join(path.file_name().unwrap_or_default()));
@@ -664,12 +659,12 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
             path
         };
 
-        debug!("Found canonical path at {}", path.to_string_lossy().to_string());
+        debug!("Found canonical path at {path}");
 
         let f = File::open(&path);
         if f.is_err() {
             debug!("Path found");
-            eprintln!("Failed to open {}, skipping: {:?}", path.to_string_lossy(), f.unwrap_err());
+            eprintln!("Failed to open {}, skipping: {:?}", path, f.unwrap_err());
             return;
         }
         let mut f = f.unwrap();
@@ -680,7 +675,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
             elf_count.fetch_add(1, Ordering::Relaxed);
             debug!("Looks like ELF, dumping headers");
 
-            let mut elf_contents = ElfContents::new(path.to_string_lossy().to_string());
+            let mut elf_contents = ElfContents::new(path.to_string());
             let proc = std::process::Command::new(&debugdump_path)
                 .arg(path.as_os_str())
                 .output()
@@ -709,10 +704,10 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
             file_infos.lock().unwrap().insert(hash.clone(), FileInfo::Elf(elf_contents));
         } else {
             debug!("Looks like some other kind of file");
-            file_infos.lock().unwrap().insert(
-                hash.clone(),
-                FileInfo::Other(OtherContents { source_path: path.to_string_lossy().to_string() }),
-            );
+            file_infos
+                .lock()
+                .unwrap()
+                .insert(hash.clone(), FileInfo::Other(OtherContents { source_path: path }));
             other_count.fetch_add(1, Ordering::Relaxed);
         }
     });
@@ -893,7 +888,7 @@ impl ElfContents {
 
 #[derive(Serialize, Deserialize)]
 struct OtherContents {
-    source_path: String,
+    source_path: Utf8PathBuf,
 }
 
 #[derive(Clone)]
