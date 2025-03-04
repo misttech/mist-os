@@ -597,6 +597,8 @@ TEST_F(SigaltstackDeathTest, NestedSignalsWork) {
   test_helper::ForkHelper helper;
 
   helper.RunInForkedProcess([&] {
+    static bool sigusr2_called = false;
+
     ASSERT_EQ(0, setup_sigaltstack_at(sigaltstack_base_, sigaltstack_size_));
     struct sigaction sa = {};
     sa.sa_handler = [](int) { raise(SIGUSR2); };
@@ -605,11 +607,12 @@ TEST_F(SigaltstackDeathTest, NestedSignalsWork) {
     ASSERT_EQ(0, sigaction(SIGUSR1, &sa, NULL));
 
     sa = {};
-    sa.sa_sigaction = [](int, siginfo_t *, void *) {};  // empty handler.
+    sa.sa_sigaction = [](int, siginfo_t *, void *) { sigusr2_called = true; };
     sa.sa_flags = SA_ONSTACK | SA_SIGINFO;
 
     ASSERT_EQ(0, sigaction(SIGUSR2, &sa, NULL));
     raise(SIGUSR1);
+    ASSERT_TRUE(sigusr2_called);
   });
   EXPECT_TRUE(helper.WaitForChildren());
 }
@@ -1189,29 +1192,32 @@ TEST(SignalHandling, Repro347756382) {
 #endif
 
 TEST(SignalHandling, SetContextInSignal) {
-  static ucontext_t context = {};
-  static volatile bool after_setcontext = false;
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([]() {
+    static ucontext_t context = {};
+    static volatile bool after_setcontext = false;
 
-  pid_t self_tid = gettid();
-  struct sigaction sigusr1_action = {};
-  sigusr1_action.sa_flags = SA_SIGINFO;
-  sigusr1_action.sa_sigaction = [](int sig, siginfo_t *info, void *ucontext_ptr) {
-    memcpy(&context, ucontext_ptr, sizeof(context));
-  };
-  SAFE_SYSCALL(sigaction(SIGUSR1, &sigusr1_action, nullptr));
-  INLINE_RAISE_SIGUSR1(self_tid);
-  if (after_setcontext) {
-    // This is the expected exit of the test. The signal should change the
-    // context so that it returns here.
-    return;
-  }
-  after_setcontext = true;
-  sigusr1_action.sa_sigaction = [](int sig, siginfo_t *info, void *ucontext_ptr) {
-    memcpy(ucontext_ptr, &context, sizeof(context));
-  };
-  SAFE_SYSCALL(sigaction(SIGUSR1, &sigusr1_action, nullptr));
-  INLINE_RAISE_SIGUSR1(self_tid);
-  FAIL() << "Test should not return here.";
+    pid_t self_tid = gettid();
+    struct sigaction sigusr1_action = {};
+    sigusr1_action.sa_flags = SA_SIGINFO;
+    sigusr1_action.sa_sigaction = [](int sig, siginfo_t *info, void *ucontext_ptr) {
+      memcpy(&context, ucontext_ptr, sizeof(context));
+    };
+    SAFE_SYSCALL(sigaction(SIGUSR1, &sigusr1_action, nullptr));
+    INLINE_RAISE_SIGUSR1(self_tid);
+    if (after_setcontext) {
+      // This is the expected exit of the test. The signal should change the
+      // context so that it returns here.
+      return;
+    }
+    after_setcontext = true;
+    sigusr1_action.sa_sigaction = [](int sig, siginfo_t *info, void *ucontext_ptr) {
+      memcpy(ucontext_ptr, &context, sizeof(context));
+    };
+    SAFE_SYSCALL(sigaction(SIGUSR1, &sigusr1_action, nullptr));
+    INLINE_RAISE_SIGUSR1(self_tid);
+    FAIL() << "Test should not return here.";
+  });
 }
 
 }  // namespace
