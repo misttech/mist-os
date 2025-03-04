@@ -28,8 +28,8 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS};
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::{
-    errno, error, pid_t, rusage, sigaltstack, MINSIGSTKSZ, P_ALL, P_PGID, P_PID, P_PIDFD,
-    SFD_CLOEXEC, SFD_NONBLOCK, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SI_MAX_SIZE, SI_TKILL, SI_USER,
+    errno, error, pid_t, rusage, sigaltstack, P_ALL, P_PGID, P_PID, P_PIDFD, SFD_CLOEXEC,
+    SFD_NONBLOCK, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SI_MAX_SIZE, SI_TKILL, SI_USER,
     SS_AUTODISARM, SS_DISABLE, SS_ONSTACK, WCONTINUED, WEXITED, WNOHANG, WNOWAIT, WSTOPPED,
     WUNTRACED, __WALL, __WCLONE,
 };
@@ -185,7 +185,9 @@ pub fn sys_sigaltstack(
         if (ss.ss_flags & !((SS_AUTODISARM | SS_DISABLE) as i32)) != 0 {
             return error!(EINVAL);
         }
-        if ss.ss_flags & (SS_DISABLE as i32) == 0 && ss.ss_size < MINSIGSTKSZ as u64 {
+        let min_stack_size =
+            if current_task.is_arch32() { uapi::arch32::MINSIGSTKSZ } else { uapi::MINSIGSTKSZ };
+        if ss.ss_flags & (SS_DISABLE as i32) == 0 && ss.ss_size < min_stack_size as u64 {
             return error!(ENOMEM);
         }
     }
@@ -974,7 +976,7 @@ mod tests {
 
         // Try to install a sigaltstack with an invalid size.
         let sigaltstack_addr_size =
-            round_up_to_system_page_size(MINSIGSTKSZ as usize).expect("failed to round up");
+            round_up_to_system_page_size(uapi::MINSIGSTKSZ as usize).expect("failed to round up");
         let sigaltstack_addr = map_memory(
             &mut locked,
             &current_task,
@@ -983,7 +985,7 @@ mod tests {
         );
         ss.ss_sp = sigaltstack_addr.into();
         ss.ss_flags = 0;
-        ss.ss_size = MINSIGSTKSZ as u64 - 1;
+        ss.ss_size = uapi::MINSIGSTKSZ as u64 - 1;
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
         assert_eq!(
             sys_sigaltstack(&mut locked, &current_task, user_ss.into(), nullptr.into()),
@@ -1008,7 +1010,7 @@ mod tests {
 
         // Try to install a sigaltstack.
         let sigaltstack_addr_size =
-            round_up_to_system_page_size(MINSIGSTKSZ as usize).expect("failed to round up");
+            round_up_to_system_page_size(uapi::MINSIGSTKSZ as usize).expect("failed to round up");
         let sigaltstack_addr = map_memory(
             &mut locked,
             &current_task,
@@ -1059,7 +1061,7 @@ mod tests {
 
         // Try to install a sigaltstack that takes the whole memory.
         let sigaltstack_addr_size =
-            round_up_to_system_page_size(MINSIGSTKSZ as usize).expect("failed to round up");
+            round_up_to_system_page_size(uapi::MINSIGSTKSZ as usize).expect("failed to round up");
         let sigaltstack_addr = map_memory(
             &mut locked,
             &current_task,
