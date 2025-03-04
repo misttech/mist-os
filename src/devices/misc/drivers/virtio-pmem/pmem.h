@@ -4,6 +4,7 @@
 #ifndef SRC_DEVICES_MISC_DRIVERS_VIRTIO_PMEM_PMEM_H_
 #define SRC_DEVICES_MISC_DRIVERS_VIRTIO_PMEM_PMEM_H_
 
+#include <fidl/fuchsia.hardware.virtio.pmem/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/virtio/backends/backend.h>
 #include <lib/virtio/device.h>
@@ -27,6 +28,9 @@ class PmemDevice final : public virtio::Device {
   void IrqConfigChange() final;
   const char* tag() const final { return "virtio-pmem"; }
 
+  // Produce a clone of the shared buffer VMO suitable for clients to access.
+  zx::result<zx::vmo> clone_vmo();
+
  private:
   // VMO representing the shared buffer.
   zx::vmo phys_vmo_;
@@ -37,19 +41,29 @@ class PmemDevice final : public virtio::Device {
   zx::resource mmio_resource_;
 };
 
-class PmemDriver final : public fdf::DriverBase {
+class PmemDriver : public fdf::DriverBase,
+                   public fidl::Server<fuchsia_hardware_virtio_pmem::Device> {
  public:
   static constexpr char kDriverName[] = "virtio-pmem";
 
   PmemDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher);
-  ~PmemDriver() final = default;
+  ~PmemDriver() override = default;
 
+  // fdf::DriverBase implementation.
   zx::result<> Start() final;
 
  private:
-  zx::result<std::unique_ptr<PmemDevice>> CreatePmemDevice();
+  // fidl::Server<fuchsia_hardware_virtiopmem::VirtioPmem> implementation.
+  void Get(GetCompleter::Sync& completer) final;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_virtio_pmem::Device>,
+                             fidl::UnknownMethodCompleter::Sync& completer) final;
+
+  // Overridden in tests.
+  virtual zx::result<std::unique_ptr<PmemDevice>> CreatePmemDevice();
 
   std::unique_ptr<PmemDevice> device_;
+
+  fidl::ServerBindingGroup<fuchsia_hardware_virtio_pmem::Device> bindings_;
 };
 
 }  // namespace virtio

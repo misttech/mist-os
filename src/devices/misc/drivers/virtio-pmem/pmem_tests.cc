@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/testing/cpp/driver_test.h>
+#include <lib/driver/testing/cpp/minimal_compat_environment.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fake-resource/resource.h>
@@ -57,24 +60,97 @@ class FakeBackendForPmem final : public virtio::FakeBackend {
   zx::unowned_bti fake_bti_;
 };
 
+zx::result<zx::resource> CreateFakeMmioResource() {
+  zx::resource fake_root_resource;
+  zx_status_t status = fake_root_resource_create(fake_root_resource.reset_and_get_address());
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  zx::resource fake_mmio_resource;
+  status = zx::resource::create(fake_root_resource, 0 /* options */, FakeBackendForPmem::kFakeStart,
+                                FakeBackendForPmem::kFakeSize, "", 0, &fake_mmio_resource);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(std::move(fake_mmio_resource));
+}
+
 TEST(PmemDevice, Init) {
   fdf_testing::ScopedGlobalLogger logger;
 
   zx::bti fake_bti;
   ASSERT_OK(fake_bti_create(fake_bti.reset_and_get_address()));
-  zx::resource fake_root_resource;
-  ASSERT_OK(fake_root_resource_create(fake_root_resource.reset_and_get_address()));
-  zx::resource fake_mmio_resource;
-  ASSERT_OK(zx::resource::create(fake_root_resource, 0 /* options */,
-                                 FakeBackendForPmem::kFakeStart, FakeBackendForPmem::kFakeSize, "",
-                                 0, &fake_mmio_resource));
+  zx::result fake_mmio_resource = CreateFakeMmioResource();
+  ASSERT_OK(fake_mmio_resource.status_value());
 
   auto backend = std::make_unique<FakeBackendForPmem>(fake_bti.borrow());
   auto* backend_ptr = backend.get();
-  virtio::PmemDevice device(std::move(fake_bti), std::move(backend), std::move(fake_mmio_resource));
+  virtio::PmemDevice device(std::move(fake_bti), std::move(backend),
+                            std::move(*fake_mmio_resource));
 
   ASSERT_OK(device.Init());
   EXPECT_EQ(backend_ptr->DeviceState(), virtio::FakeBackend::State::DRIVER_OK);
 }
+
+class TestPmemDriver : public virtio::PmemDriver {
+ public:
+  TestPmemDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
+      : virtio::PmemDriver(std::move(start_args), std::move(dispatcher)) {}
+
+ private:
+  zx::result<std::unique_ptr<virtio::PmemDevice>> CreatePmemDevice() final {
+    zx::bti fake_bti;
+    zx_status_t status = fake_bti_create(fake_bti.reset_and_get_address());
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+    auto backend = std::make_unique<FakeBackendForPmem>(fake_bti.borrow());
+    zx::result fake_mmio_resource = CreateFakeMmioResource();
+    if (fake_mmio_resource.is_error()) {
+      return fake_mmio_resource.take_error();
+    }
+    return zx::ok(std::make_unique<virtio::PmemDevice>(std::move(fake_bti), std::move(backend),
+                                                       std::move(*fake_mmio_resource)));
+  }
+};
+
+struct TestConfig final {
+  using DriverType = TestPmemDriver;
+  using EnvironmentType = fdf_testing::MinimalCompatEnvironment;
+};
+
+class PmemTestDriver : public ::testing::Test {
+ public:
+  void SetUp() override {
+    zx::result<> result = driver_test().StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+  void TearDown() override {
+    zx::result<> result = driver_test().StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+
+  fdf_testing::ForegroundDriverTest<TestConfig>& driver_test() { return driver_test_; }
+
+ private:
+  fdf_testing::ForegroundDriverTest<TestConfig> driver_test_;
+};
+
+TEST_F(PmemTestDriver, Lifecycle) {}
+
+TEST_F(PmemTestDriver, ServiceTest) {
+  zx::result service = driver_test().Connect<fuchsia_hardware_virtio_pmem::Service::Device>();
+  ASSERT_OK(service.status_value());
+  zx::result run_result = driver_test().RunOnBackgroundDispatcherSync([&service]() {
+    fidl::Result vmo = fidl::Call(*service)->Get();
+    uint64_t vmo_size{};
+    ASSERT_OK(vmo->vmo().get_size(&vmo_size));
+    // Size should match value reported by the fake backend.
+    EXPECT_EQ(vmo_size, FakeBackendForPmem::kFakeSize);
+  });
+  ASSERT_OK(run_result.status_value());
+}
+
+FUCHSIA_DRIVER_EXPORT(TestPmemDriver);
 
 }  // namespace

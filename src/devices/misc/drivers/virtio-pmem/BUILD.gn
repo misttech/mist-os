@@ -34,6 +34,7 @@ source_set("pmem_lib") {
     "virtio/pmem.h",
   ]
   public_deps = [
+    "//sdk/fidl/fuchsia.hardware.virtio.pmem:fuchsia.hardware.virtio.pmem_cpp",
     "//sdk/lib/driver/component/cpp",
     "//src/devices/bin/driver_runtime",
     "//src/devices/bus/lib/virtio:virtio-dfv2",
@@ -79,6 +80,8 @@ test("pmem_tests_bin") {
     ":pmem_lib",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/driver/testing/cpp",
+    "//sdk/lib/driver/testing/cpp:minimal_compat_environment",
     "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//src/devices/bus/lib/virtio:virtio-dfv2",
     "//src/devices/testing/fake-bti",

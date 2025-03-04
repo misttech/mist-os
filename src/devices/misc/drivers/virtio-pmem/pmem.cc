@@ -75,6 +75,15 @@ void PmemDevice::IrqRingUpdate() { FDF_LOG(DEBUG, "%s: Got irq ring update, igno
 
 void PmemDevice::IrqConfigChange() { FDF_LOG(DEBUG, "%s: Got irq config change, ignoring", tag()); }
 
+zx::result<zx::vmo> PmemDevice::clone_vmo() {
+  zx::vmo vmo;
+  zx_status_t status = phys_vmo_.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(std::move(vmo));
+}
+
 PmemDriver::PmemDriver(fdf::DriverStartArgs start_args,
                        fdf::UnownedSynchronizedDispatcher dispatcher)
     : fdf::DriverBase(kDriverName, std::move(start_args), std::move(dispatcher)) {}
@@ -93,7 +102,37 @@ zx::result<> PmemDriver::Start() {
     return zx::error(status);
   }
 
+  // Advertise service.
+  fuchsia_hardware_virtio_pmem::Service::InstanceHandler handler({
+      .device = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                        fidl::kIgnoreBindingClosure),
+  });
+  zx::result add_result =
+      outgoing()->AddService<fuchsia_hardware_virtio_pmem::Service>(std::move(handler));
+  if (add_result.is_error()) {
+    FDF_LOG(ERROR, "Unable to add service: %s", add_result.status_string());
+    return add_result.take_error();
+  }
+
   return zx::ok();
+}
+
+void PmemDriver::Get(GetCompleter::Sync& completer) {
+  if (device_) {
+    zx::result cloned_vmo = device_->clone_vmo();
+    completer.Reply({std::move(cloned_vmo)});
+  } else {
+    FDF_LOG(WARNING, "Get called with uninitialized device.");
+    completer.Close(ZX_ERR_BAD_STATE);
+  }
+}
+
+void PmemDriver::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_virtio_pmem::Device> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  FDF_LOG(WARNING, "Unknown FIDL method received ordinal %lu, closing channel",
+          metadata.method_ordinal);
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
 zx::result<std::unique_ptr<PmemDevice>> PmemDriver::CreatePmemDevice() {
