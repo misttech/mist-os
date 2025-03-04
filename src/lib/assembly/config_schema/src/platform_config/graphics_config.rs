@@ -9,23 +9,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct GraphicsConfig {
-    /// Whether the virtual console should be included.  This has a different
-    /// default value depending on the BuildType.  It's 'true' for Eng and
-    /// UserDebug, false for User.
-    ///
-    /// This is deprecated, use virtual_console.enable_virtual_console instead.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub enable_virtual_console: Option<bool>,
-
     /// Configuration for the virtual console
     pub virtual_console: VirtconConfig,
-
-    /// Specify the keymap for the virtual console. "qwerty" and "dvorak" are
-    /// supported.
-    ///
-    /// This is deprecated, use virtual_console.keymap instead.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub keymap: Option<String>,
 }
 
 /// Platform configuration options for the virtual console

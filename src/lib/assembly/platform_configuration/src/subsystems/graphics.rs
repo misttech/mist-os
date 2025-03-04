@@ -15,13 +15,8 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
     ) -> anyhow::Result<()> {
         let virtcon_config = &graphics_config.virtual_console;
 
-        // During the transition, use the value provided in virtual_console.enable
-        // if provided, otherwise use the value from enable_virtual_console
         let enable_virtual_console =
-            virtcon_config.enable.or(graphics_config.enable_virtual_console);
-
-        let enable_virtual_console =
-            match (context.build_type, context.feature_set_level, enable_virtual_console) {
+            match (context.build_type, context.feature_set_level, virtcon_config.enable) {
                 // Use the value if one was specified.
                 (_, _, Some(enable_virtual_console)) => enable_virtual_console,
                 // If unspecified, virtcon is disabled if it's a user build-type
@@ -80,7 +75,7 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
         builder.set_config_capability("fuchsia.virtcon.FontSize", Config::new_void())?;
         builder.set_config_capability("fuchsia.virtcon.KeepLogVisible", Config::new_void())?;
 
-        if let Some(keymap) = virtcon_config.keymap.as_ref().or(graphics_config.keymap.as_ref()) {
+        if let Some(keymap) = &virtcon_config.keymap {
             builder.set_config_capability(
                 "fuchsia.virtcon.KeyMap",
                 Config::new(ConfigValueType::String { max_size: 10 }, keymap.as_str().into()),
@@ -107,6 +102,7 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
 mod tests {
     use super::*;
     use crate::common::ConfigurationBuilderImpl;
+    use assembly_config_schema::platform_config::graphics_config::VirtconConfig;
 
     #[test]
     fn test_user_default() {
@@ -115,7 +111,7 @@ mod tests {
             build_type: &BuildType::User,
             ..ConfigurationContext::default_for_tests()
         };
-        let config = GraphicsConfig { enable_virtual_console: None, ..Default::default() };
+        let config = GraphicsConfig { ..Default::default() };
         let mut builder = ConfigurationBuilderImpl::default();
         GraphicsSubsystemConfig::define_configuration(&context, &config, &mut builder).unwrap();
         let config = builder.build();
@@ -129,7 +125,9 @@ mod tests {
             build_type: &BuildType::User,
             ..ConfigurationContext::default_for_tests()
         };
-        let config = GraphicsConfig { enable_virtual_console: Some(false), ..Default::default() };
+        let config = GraphicsConfig {
+            virtual_console: VirtconConfig { enable: Some(false), ..Default::default() },
+        };
         let mut builder = ConfigurationBuilderImpl::default();
         GraphicsSubsystemConfig::define_configuration(&context, &config, &mut builder).unwrap();
         let config = builder.build();
@@ -143,7 +141,9 @@ mod tests {
             build_type: &BuildType::User,
             ..ConfigurationContext::default_for_tests()
         };
-        let config = GraphicsConfig { enable_virtual_console: Some(true), ..Default::default() };
+        let config = GraphicsConfig {
+            virtual_console: VirtconConfig { enable: Some(true), ..Default::default() },
+        };
         let mut builder = ConfigurationBuilderImpl::default();
         GraphicsSubsystemConfig::define_configuration(&context, &config, &mut builder).unwrap();
         let config = builder.build();
