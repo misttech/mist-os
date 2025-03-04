@@ -3,9 +3,10 @@
 // found in the LICENSE file.
 
 use crate::args::{EfiCommand, EfiSubCommand};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use errors::ffx_bail;
+use sdk_metadata::CpuArchitecture;
 use std::cmp::max;
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
@@ -25,6 +26,17 @@ impl fho::FfxMain for Efi {
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
         command(self.cmd).await.map_err(|e| e.into())
     }
+}
+
+fn boot_path_from_arch(arch: CpuArchitecture) -> Result<String> {
+    Ok(format!(
+        "EFI/BOOT/{}",
+        match arch {
+            CpuArchitecture::X64 => "BOOTX64.EFI",
+            CpuArchitecture::Arm64 => "BOOTAA64.EFI",
+            a @ _ => return Err(anyhow!("arch {:?} EFI boot loader is not supported yet", a)),
+        }
+    ))
 }
 
 fn format(volume: &File, size: u64) -> Result<()> {
@@ -102,14 +114,14 @@ async fn command(cmd: EfiCommand) -> Result<()> {
     match &cmd.subcommand {
         EfiSubCommand::Create(create) => {
             let output_path = Path::new(&create.output);
-
             let mut names = HashMap::new();
             let mut maybe_insert = |dest_path: &str, value: &Option<String>| {
                 value.as_ref().map(|v| names.insert(String::from(dest_path), String::from(v)));
             };
+            let efi_path = boot_path_from_arch(create.arch)?;
             maybe_insert("zircon.bin", &create.zircon);
             maybe_insert("bootdata.bin", &create.bootdata);
-            maybe_insert("EFI/BOOT/BOOTX64.EFI", &create.efi_bootloader);
+            maybe_insert(&efi_path, &create.efi_bootloader);
             maybe_insert("zedboot.bin", &create.zedboot);
             maybe_insert("cmdline", &create.cmdline);
 
@@ -118,8 +130,10 @@ async fn command(cmd: EfiCommand) -> Result<()> {
 
             // Some arguments require special handling: cmdline, efi_bootloader
             if create.efi_bootloader.is_some() {
-                files
-                    .insert("EFI/Google/GSetup/Boot", "efi\\boot\\bootx64.efi".as_bytes().to_vec());
+                files.insert(
+                    "EFI/Google/GSetup/Boot",
+                    efi_path.replace("/", "\\").as_bytes().to_vec(),
+                );
             }
 
             let size = compute_size(&files);
@@ -169,6 +183,7 @@ mod test {
                 output: output.clone(),
                 cmdline: None,
                 bootdata: None,
+                arch: CpuArchitecture::X64,
                 efi_bootloader: None,
                 zircon: None,
                 zedboot: None,
@@ -180,7 +195,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_create() -> Result<()> {
+    async fn test_create_arm64() -> Result<()> {
         let tmpdir = tempdir()?;
         let tmppath = |name| tmpdir.path().join(name).to_str().unwrap().to_string();
 
@@ -207,6 +222,60 @@ mod test {
                 output: output.clone(),
                 cmdline: Some(cmdline),
                 bootdata: Some(bootdata),
+                arch: CpuArchitecture::Arm64,
+                efi_bootloader: Some(bootloader),
+                zircon: Some(zircon),
+                zedboot: Some(zedboot),
+            }),
+        })
+        .await;
+        assert!(result.is_ok());
+
+        check_file_content(&output, "EFI/BOOT/BOOTAA64.EFI", &bootloader_content)?;
+        check_file_content(&output, "cmdline", cmdline_content)?;
+        check_file_content(&output, "bootdata.bin", bootdata_content)?;
+        check_file_content(&output, "zircon.bin", zircon_content)?;
+        check_file_content(&output, "zedboot.bin", zedboot_content)?;
+        let output_size = metadata(output)?.len();
+
+        // Check that produced image is at least 1MiB
+        assert!(output_size >= 1024 * 1024, "size = {}", output_size);
+
+        // Check that the image is aligned to legacy track size.
+        assert_eq!(output_size % 63 * 512, 0);
+
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_create_x64() -> Result<()> {
+        let tmpdir = tempdir()?;
+        let tmppath = |name| tmpdir.path().join(name).to_str().unwrap().to_string();
+
+        let cmdline = tmppath("test_cmdline");
+        let cmdline_content = "cmdline content";
+        let output = tmppath("test_output");
+        let bootloader = tmppath("test_bootloader");
+        let bootloader_content = "bootloader content".repeat(100);
+        let bootdata = tmppath("test_bootdata");
+        let bootdata_content = "bootdata content";
+        let zircon = tmppath("test_zircon");
+        let zircon_content = "zircon content";
+        let zedboot = tmppath("test_zedboot");
+        let zedboot_content = "zedboot content";
+
+        set_file_content(&cmdline, cmdline_content)?;
+        set_file_content(&bootloader, &bootloader_content)?;
+        set_file_content(&bootdata, bootdata_content)?;
+        set_file_content(&zircon, zircon_content)?;
+        set_file_content(&zedboot, zedboot_content)?;
+
+        let result = command(EfiCommand {
+            subcommand: EfiSubCommand::Create(CreateCommand {
+                output: output.clone(),
+                cmdline: Some(cmdline),
+                bootdata: Some(bootdata),
+                arch: CpuArchitecture::X64,
                 efi_bootloader: Some(bootloader),
                 zircon: Some(zircon),
                 zedboot: Some(zedboot),
@@ -249,6 +318,7 @@ mod test {
                 output: output.clone(),
                 cmdline: None,
                 bootdata: None,
+                arch: CpuArchitecture::X64,
                 efi_bootloader: Some(bootloader),
                 zircon: None,
                 zedboot: None,
@@ -285,6 +355,7 @@ mod test {
                 output: output.clone(),
                 cmdline: None,
                 bootdata: None,
+                arch: CpuArchitecture::X64,
                 efi_bootloader: Some(bootloader),
                 zircon: None,
                 zedboot: None,

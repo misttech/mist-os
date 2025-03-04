@@ -9,6 +9,7 @@ ffx_tool("ffx_efi_tool") {
   output_name = "ffx-efi"
   with_unit_tests = true
   deps = [
+    "//build/sdk/meta:rust",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/writer:lib",
