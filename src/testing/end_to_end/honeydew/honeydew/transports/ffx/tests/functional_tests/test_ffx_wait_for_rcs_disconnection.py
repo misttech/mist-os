@@ -8,7 +8,7 @@ import logging
 from fuchsia_base_test import fuchsia_base_test
 from mobly import test_runner
 
-from honeydew.interfaces.device_classes import fuchsia_device
+from honeydew.fuchsia_device import fuchsia_device
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

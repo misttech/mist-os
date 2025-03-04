@@ -8,10 +8,9 @@ import logging
 import fidl.fuchsia_location_namedplace as f_location_namedplace
 from fuchsia_controller_py import ZxStatus
 
-from honeydew import errors
+from honeydew import affordances_capable, errors
 from honeydew.affordances.location import location
 from honeydew.affordances.location.errors import HoneydewLocationError
-from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports.ffx import ffx as ffx_transport
 from honeydew.transports.fuchsia_controller import (
     fuchsia_controller as fc_transport,

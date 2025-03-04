@@ -10,7 +10,7 @@ import random
 from typing import Any, Literal
 
 from fuchsia_base_test import fuchsia_base_test
-from honeydew.interfaces.device_classes import fuchsia_device
+from honeydew.fuchsia_device import fuchsia_device
 from mobly import asserts, test_runner
 
 LOGGER: logging.Logger = logging.getLogger(__name__)

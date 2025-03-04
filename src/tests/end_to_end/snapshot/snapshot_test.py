@@ -16,7 +16,7 @@ import zipfile
 from typing import Any, Dict, List
 
 from fuchsia_base_test import fuchsia_base_test
-from honeydew.interfaces.device_classes.fuchsia_device import FuchsiaDevice
+from honeydew.fuchsia_device.fuchsia_device import FuchsiaDevice
 from mobly import asserts, test_runner
 from perf_utils.utils import FuchsiaPerfResults
 

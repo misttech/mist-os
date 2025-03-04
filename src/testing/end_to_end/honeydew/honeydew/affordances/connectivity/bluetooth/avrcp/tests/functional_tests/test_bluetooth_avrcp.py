@@ -12,7 +12,7 @@ from honeydew.affordances.connectivity.bluetooth.utils import (
     types as bluetooth_types,
 )
 from honeydew.errors import Sl4fError
-from honeydew.interfaces.device_classes import fuchsia_device
+from honeydew.fuchsia_device import fuchsia_device
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

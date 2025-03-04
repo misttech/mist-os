@@ -7,7 +7,7 @@ import os
 
 import test_data
 from fuchsia_base_test import fuchsia_base_test
-from honeydew.interfaces.device_classes import fuchsia_device
+from honeydew.fuchsia_device import fuchsia_device
 from mobly import asserts, test_runner
 from perf_publish import publish
 from perf_test_utils import utils

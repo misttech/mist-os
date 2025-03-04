@@ -7,10 +7,8 @@ import logging
 from typing import Any
 
 from honeydew import errors
-from honeydew.fuchsia_device import fuchsia_device
-from honeydew.interfaces.device_classes import (
-    fuchsia_device as fuchsia_device_interface,
-)
+from honeydew.fuchsia_device import fuchsia_device as fuchsia_device_interface
+from honeydew.fuchsia_device import fuchsia_device_impl
 from honeydew.transports.ffx.config import FfxConfigData
 from honeydew.typing import custom_types
 
@@ -93,8 +91,7 @@ def create_device(
         ] | None = get_custom_fuchsia_device()
 
         if device_class is None:
-            device_class = fuchsia_device.FuchsiaDevice
-
+            device_class = fuchsia_device_impl.FuchsiaDeviceImpl
         return device_class(  # type: ignore[call-arg]
             device_info,
             ffx_config_data,

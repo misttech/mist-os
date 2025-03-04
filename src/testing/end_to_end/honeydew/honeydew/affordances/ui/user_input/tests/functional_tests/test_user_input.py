@@ -7,7 +7,7 @@ from fuchsia_base_test import fuchsia_base_test
 from mobly import test_runner
 
 from honeydew.affordances.ui.user_input import types as ui_custom_types
-from honeydew.interfaces.device_classes import fuchsia_device
+from honeydew.fuchsia_device import fuchsia_device
 
 TOUCH_APP = (
     "fuchsia-pkg://fuchsia.com/flatland-examples#meta/"

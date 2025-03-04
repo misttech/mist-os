@@ -23,7 +23,7 @@ from honeydew.affordances.connectivity.wlan.utils.types import (
     OperatingState,
     SecurityType,
 )
-from honeydew.interfaces.device_classes import fuchsia_device
+from honeydew.fuchsia_device import fuchsia_device
 
 # Time to wait for a WLAN interface to become available.
 WLAN_INTERFACE_TIMEOUT = 30

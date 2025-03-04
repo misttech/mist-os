@@ -21,7 +21,7 @@ from honeydew.affordances.connectivity.wlan.utils.types import (
     SecurityProtocol,
     WlanMacRole,
 )
-from honeydew.interfaces.device_classes import fuchsia_device
+from honeydew.fuchsia_device import fuchsia_device
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

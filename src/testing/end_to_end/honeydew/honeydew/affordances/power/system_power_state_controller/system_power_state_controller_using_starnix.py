@@ -16,11 +16,10 @@ from typing import Any
 
 import fuchsia_inspect
 
-from honeydew import errors
+from honeydew import affordances_capable, errors
 from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller as system_power_state_controller_interface,
 )
-from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports.ffx import ffx as ffx_transport
 from honeydew.typing import custom_types
 from honeydew.utils import decorators
@@ -117,9 +116,8 @@ class SystemPowerStateControllerUsingStarnix(
     Args:
         device_name: Device name returned by `ffx target list`.
         ffx: interfaces.transports.FFX implementation.
-        device_logger: interfaces.device_classes.affordances_capable.FuchsiaDeviceLogger
-            implementation.
-        inspect: interfaces.device_classes.affordances_capable.InspectCapableDevice implementation.
+        device_logger: FuchsiaDeviceLogger implementation.
+        inspect: InspectCapableDevice implementation.
 
     Raises:
         errors.NotSupportedError: If Fuchsia device does not support Starnix.

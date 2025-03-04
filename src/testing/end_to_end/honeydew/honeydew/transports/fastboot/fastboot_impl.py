@@ -13,11 +13,10 @@ import time
 from importlib import resources
 from typing import Any
 
-from honeydew import errors
+from honeydew import affordances_capable, errors
 from honeydew.auxiliary_devices.power_switch import (
     power_switch as power_switch_interface,
 )
-from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports.fastboot import errors as fastboot_errors
 from honeydew.transports.fastboot import fastboot as fastboot_interface
 from honeydew.transports.ffx import errors as ffx_errors

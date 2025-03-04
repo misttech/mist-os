@@ -6,6 +6,7 @@
 from enum import StrEnum
 from typing import Any
 
+from honeydew import affordances_capable
 from honeydew.affordances.connectivity.bluetooth.bluetooth_common import (
     bluetooth_common,
 )
@@ -15,7 +16,6 @@ from honeydew.affordances.connectivity.bluetooth.utils import (
 from honeydew.affordances.connectivity.bluetooth.utils import (
     types as bluetooth_types,
 )
-from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports.sl4f import errors as sl4f_errors
 from honeydew.transports.sl4f import sl4f as sl4f_transport
 

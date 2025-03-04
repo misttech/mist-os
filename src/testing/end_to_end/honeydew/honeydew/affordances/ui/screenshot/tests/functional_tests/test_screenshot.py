@@ -10,7 +10,7 @@ import time
 from fuchsia_base_test import fuchsia_base_test
 from mobly import asserts, test_runner
 
-from honeydew.interfaces.device_classes import fuchsia_device
+from honeydew.fuchsia_device import fuchsia_device
 from honeydew.typing import custom_types
 
 _LOGGER = logging.getLogger(__name__)

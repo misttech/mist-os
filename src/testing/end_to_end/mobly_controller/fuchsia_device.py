@@ -8,9 +8,7 @@ from copy import deepcopy
 from typing import Any
 
 import honeydew
-from honeydew.interfaces.device_classes import (
-    fuchsia_device as fuchsia_device_interface,
-)
+from honeydew.fuchsia_device import fuchsia_device as fuchsia_device_interface
 from honeydew.transports.ffx import config as ffx_config
 from honeydew.typing import custom_types
 from honeydew.utils import properties

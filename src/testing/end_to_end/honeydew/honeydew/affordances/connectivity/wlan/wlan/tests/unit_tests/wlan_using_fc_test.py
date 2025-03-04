@@ -18,6 +18,7 @@ import fidl.fuchsia_wlan_ieee80211 as f_wlan_ieee80211
 import fidl.fuchsia_wlan_sme as f_wlan_sme
 from fuchsia_controller_py import Channel, ZxStatus
 
+from honeydew import affordances_capable
 from honeydew.affordances.connectivity.wlan.utils.errors import (
     HoneydewWlanError,
 )
@@ -42,7 +43,6 @@ from honeydew.affordances.connectivity.wlan.utils.types import (
 )
 from honeydew.affordances.connectivity.wlan.wlan import wlan_using_fc
 from honeydew.errors import NotSupportedError
-from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports.ffx import ffx as ffx_transport
 from honeydew.transports.fuchsia_controller import (
     fuchsia_controller as fc_transport,

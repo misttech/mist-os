@@ -10,10 +10,10 @@ from unittest import mock
 import fidl.fuchsia_location_namedplace as f_location_namedplace
 from fuchsia_controller_py import ZxStatus
 
+from honeydew import affordances_capable
 from honeydew.affordances.location import location_using_fc
 from honeydew.affordances.location.errors import HoneydewLocationError
 from honeydew.errors import NotSupportedError
-from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports.ffx import ffx as ffx_transport
 from honeydew.transports.fuchsia_controller import (
     fuchsia_controller as fc_transport,

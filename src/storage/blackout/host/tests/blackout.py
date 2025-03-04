@@ -17,7 +17,7 @@ import random
 
 import fidl.fuchsia_blackout_test as blackout
 import honeydew.utils.common
-from honeydew.interfaces.device_classes import fuchsia_device
+from honeydew.fuchsia_device import fuchsia_device
 from honeydew.transports.ffx.errors import FfxCommandError
 from honeydew.typing.custom_types import FidlEndpoint
 from mobly import asserts, test_runner

@@ -13,9 +13,9 @@ import fidl.fuchsia_tracing_controller as f_tracingcontroller
 import fuchsia_controller_py as fc
 from fidl import AsyncSocket
 
+from honeydew import affordances_capable
 from honeydew.affordances.tracing import tracing
 from honeydew.affordances.tracing.errors import TracingError, TracingStateError
-from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports.fuchsia_controller import (
     fuchsia_controller as fc_transport,
 )

@@ -3,6 +3,8 @@
 # found in the LICENSE file.
 """Abstract base class for Fuchsia device."""
 
+# TODO(b/398066508): This file will be deleted after impacted files have been updated to honeydew.fuchsia_device.fuchsia_device
+
 import abc
 from collections.abc import Callable
 

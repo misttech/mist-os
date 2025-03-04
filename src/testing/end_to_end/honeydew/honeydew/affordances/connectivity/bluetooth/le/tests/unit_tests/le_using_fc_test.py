@@ -15,12 +15,12 @@ import fidl.fuchsia_bluetooth_gatt2 as f_gatt_controller
 import fidl.fuchsia_bluetooth_le as f_ble_controller
 from parameterized import param, parameterized
 
+from honeydew import affordances_capable
 from honeydew.affordances.connectivity.bluetooth.le import le_using_fc
 from honeydew.affordances.connectivity.bluetooth.utils import (
     errors as bluetooth_errors,
 )
 from honeydew.affordances.connectivity.bluetooth.utils import types as bt_types
-from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports.fuchsia_controller import (
     fuchsia_controller as fc_transport,
 )

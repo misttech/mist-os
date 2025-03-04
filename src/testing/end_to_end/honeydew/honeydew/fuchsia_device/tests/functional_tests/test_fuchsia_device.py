@@ -12,9 +12,7 @@ import fuchsia_inspect
 from fuchsia_base_test import fuchsia_base_test
 from mobly import asserts, test_runner
 
-from honeydew.interfaces.device_classes import (
-    fuchsia_device as fuchsia_device_interface,
-)
+from honeydew.fuchsia_device import fuchsia_device as fuchsia_device_interface
 from honeydew.typing import custom_types
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)

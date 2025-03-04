@@ -14,6 +14,7 @@ import fidl.fuchsia_net_interfaces as f_net_interfaces
 import fidl.fuchsia_net_root as f_net_root
 from fuchsia_controller_py import Channel, ZxStatus
 
+from honeydew import affordances_capable
 from honeydew.affordances.connectivity.netstack import netstack_using_fc
 from honeydew.affordances.connectivity.netstack.types import (
     InterfaceProperties,
@@ -21,7 +22,6 @@ from honeydew.affordances.connectivity.netstack.types import (
 )
 from honeydew.affordances.connectivity.wlan.utils.types import MacAddress
 from honeydew.errors import NotSupportedError
-from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports.ffx import ffx as ffx_transport
 from honeydew.transports.fuchsia_controller import (
     fuchsia_controller as fc_transport,

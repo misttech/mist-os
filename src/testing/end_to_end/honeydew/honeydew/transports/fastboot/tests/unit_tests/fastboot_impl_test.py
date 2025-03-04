@@ -13,11 +13,10 @@ from unittest import mock
 
 from parameterized import param, parameterized
 
-from honeydew import errors
+from honeydew import affordances_capable, errors
 from honeydew.auxiliary_devices.power_switch import (
     power_switch as power_switch_interface,
 )
-from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports.fastboot import errors as fastboot_errors
 from honeydew.transports.fastboot import fastboot_impl
 from honeydew.transports.ffx import errors as ffx_errors

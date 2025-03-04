@@ -12,7 +12,7 @@ from honeydew.auxiliary_devices.power_switch import (
     power_switch,
     power_switch_using_dmc,
 )
-from honeydew.interfaces.device_classes import fuchsia_device
+from honeydew.fuchsia_device import fuchsia_device
 from honeydew.typing import custom_types
 from mobly import base_test, signals, test_runner
 from mobly_controller import fuchsia_device as fuchsia_device_mobly_controller

@@ -70,8 +70,7 @@ to Honeydew:
   * follow
     [how to add a new test to run in infra][how to add a new test to run in infra].
 * If contribution involves adding a new host target interaction method or class,
-  you would need to update the [interfaces][interfaces] definitions.
-* If CL introduces a new affordance, then add yourself as [Affordance OWNER].
+  you would need to update the corresponding interface.
 
 ### Honeydew code guidelines
 
@@ -98,15 +97,11 @@ INFO: Honeydew code has passed all of the conformance steps
 If you like to use Honeydew in an interactive Python terminal refer to
 [interactive usage](markdowns/interactive_usage.md).
 
-[Affordance OWNER]: honeydew/interfaces/OWNERS
-
 [Best Practices]: #Best-Practices
 
 [conformance.sh]: #honeydew-code-guidelines
 
 [Honeydew code guidelines]: #honeydew-code-guidelines
-
-[interfaces]: honeydew/interfaces/
 
 [unit tests]: tests/unit_tests/
 

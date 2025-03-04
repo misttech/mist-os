@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 
 from fuchsia_base_test import fuchsia_base_test
-from honeydew.interfaces.device_classes import fuchsia_device
+from honeydew.fuchsia_device import fuchsia_device
 from mobly import asserts, test_runner
 from trace_processing import trace_importing, trace_model, trace_utils
 

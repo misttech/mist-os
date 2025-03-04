@@ -1,7 +1,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Unit tests for honeydew.fuchsia_device.fuchsia_device.py."""
+"""Unit tests for honeydew.fuchsia_device.fuchsia_device_impl.py."""
 
 import base64
 import os
@@ -21,7 +21,7 @@ import fuchsia_inspect
 from fuchsia_controller_py import ZxStatus
 from parameterized import param, parameterized
 
-from honeydew import errors
+from honeydew import affordances_capable, errors
 from honeydew.affordances.connectivity.bluetooth.avrcp import avrcp_using_sl4f
 from honeydew.affordances.connectivity.bluetooth.bluetooth_common import (
     bluetooth_common_using_sl4f,
@@ -42,11 +42,8 @@ from honeydew.affordances.ui.user_input import user_input_using_fc
 from honeydew.auxiliary_devices.power_switch import (
     power_switch as power_switch_interface,
 )
-from honeydew.fuchsia_device import fuchsia_device
-from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.interfaces.device_classes import (
-    fuchsia_device as fuchsia_device_interface,
-)
+from honeydew.fuchsia_device import fuchsia_device as fuchsia_device_interface
+from honeydew.fuchsia_device import fuchsia_device_impl
 from honeydew.transports.fastboot import fastboot_impl
 from honeydew.transports.ffx import config as ffx_config
 from honeydew.transports.ffx import errors as ffx_errors
@@ -206,11 +203,11 @@ def _file_attr_resp(status: ZxStatus, size: int) -> f_io.NodeGetAttrResponse:
     )
 
 
-class FuchsiaDeviceFCTests(unittest.TestCase):
-    """Unit tests for honeydew.fuchsia_device.fuchsia_device.py."""
+class FuchsiaDeviceImplTests(unittest.TestCase):
+    """Unit tests for honeydew.fuchsia_device.fuchsia_device_impl.py."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self.fd_fc_obj: fuchsia_device.FuchsiaDevice
+        self.fd_fc_obj: fuchsia_device_impl.FuchsiaDeviceImpl
         super().__init__(*args, **kwargs)
 
     def setUp(self) -> None:
@@ -241,7 +238,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
                 autospec=True,
             ) as mock_sl4f_check_connection,
         ):
-            self.fd_fc_obj = fuchsia_device.FuchsiaDevice(
+            self.fd_fc_obj = fuchsia_device_impl.FuchsiaDeviceImpl(
                 device_info=custom_types.DeviceInfo(
                     name=_INPUT_ARGS["device_name"],
                     ip_port=None,
@@ -295,7 +292,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
                 autospec=True,
             ) as mock_sl4f_check_connection,
         ):
-            self.fd_sl4f_obj = fuchsia_device.FuchsiaDevice(
+            self.fd_sl4f_obj = fuchsia_device_impl.FuchsiaDeviceImpl(
                 device_info=custom_types.DeviceInfo(
                     name=_INPUT_ARGS["device_name"],
                     ip_port=None,
@@ -610,7 +607,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         mock_ffx_get_target_board.assert_called()
 
     @mock.patch.object(
-        fuchsia_device.FuchsiaDevice,
+        fuchsia_device_impl.FuchsiaDeviceImpl,
         "_product_info",
         return_value={
             "manufacturer": "default-manufacturer",
@@ -624,7 +621,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         self.assertEqual(self.fd_fc_obj.manufacturer, "default-manufacturer")
 
     @mock.patch.object(
-        fuchsia_device.FuchsiaDevice,
+        fuchsia_device_impl.FuchsiaDeviceImpl,
         "_product_info",
         return_value={
             "manufacturer": "default-manufacturer",
@@ -649,7 +646,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         mock_ffx_get_target_product.assert_called()
 
     @mock.patch.object(
-        fuchsia_device.FuchsiaDevice,
+        fuchsia_device_impl.FuchsiaDeviceImpl,
         "_product_info",
         return_value={
             "manufacturer": "default-manufacturer",
@@ -663,7 +660,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         self.assertEqual(self.fd_fc_obj.product_name, "default-product-name")
 
     @mock.patch.object(
-        fuchsia_device.FuchsiaDevice,
+        fuchsia_device_impl.FuchsiaDeviceImpl,
         "_device_info_from_fidl",
         return_value={
             "serial_number": "default-serial-number",
@@ -676,7 +673,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
 
     # List all the tests related to dynamic properties
     @mock.patch.object(
-        fuchsia_device.FuchsiaDevice,
+        fuchsia_device_impl.FuchsiaDeviceImpl,
         "_build_info",
         return_value={
             "version": "1.2.3",
@@ -1009,7 +1006,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        fuchsia_device.FuchsiaDevice,
+        fuchsia_device_impl.FuchsiaDeviceImpl,
         "_send_log_command",
         autospec=True,
     )
@@ -1058,7 +1055,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        fuchsia_device.FuchsiaDevice, "health_check", autospec=True
+        fuchsia_device_impl.FuchsiaDeviceImpl, "health_check", autospec=True
     )
     @mock.patch.object(
         fuchsia_controller_impl.FuchsiaControllerImpl,
@@ -1100,7 +1097,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         mock_sl4f_start_server.assert_not_called()
 
     @mock.patch.object(
-        fuchsia_device.FuchsiaDevice, "health_check", autospec=True
+        fuchsia_device_impl.FuchsiaDeviceImpl, "health_check", autospec=True
     )
     @mock.patch.object(
         fuchsia_controller_impl.FuchsiaControllerImpl,
@@ -1129,20 +1126,20 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         mock_sl4f_health_check.assert_called_once_with(self.fd_sl4f_obj)
 
     @mock.patch.object(
-        fuchsia_device.FuchsiaDevice, "on_device_boot", autospec=True
+        fuchsia_device_impl.FuchsiaDeviceImpl, "on_device_boot", autospec=True
     )
     @mock.patch.object(
-        fuchsia_device.FuchsiaDevice,
+        fuchsia_device_impl.FuchsiaDeviceImpl,
         "wait_for_online",
         autospec=True,
     )
     @mock.patch.object(
-        fuchsia_device.FuchsiaDevice,
+        fuchsia_device_impl.FuchsiaDeviceImpl,
         "wait_for_offline",
         autospec=True,
     )
     @mock.patch.object(
-        fuchsia_device.FuchsiaDevice,
+        fuchsia_device_impl.FuchsiaDeviceImpl,
         "log_message_to_device",
         autospec=True,
     )
@@ -1163,25 +1160,25 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         mock_on_device_boot.assert_called()
 
     @mock.patch.object(
-        fuchsia_device.FuchsiaDevice, "on_device_boot", autospec=True
+        fuchsia_device_impl.FuchsiaDeviceImpl, "on_device_boot", autospec=True
     )
     @mock.patch.object(
-        fuchsia_device.FuchsiaDevice,
+        fuchsia_device_impl.FuchsiaDeviceImpl,
         "wait_for_online",
         autospec=True,
     )
     @mock.patch.object(
-        fuchsia_device.FuchsiaDevice,
+        fuchsia_device_impl.FuchsiaDeviceImpl,
         "wait_for_offline",
         autospec=True,
     )
     @mock.patch.object(
-        fuchsia_device.FuchsiaDevice,
+        fuchsia_device_impl.FuchsiaDeviceImpl,
         "_send_reboot_command",
         autospec=True,
     )
     @mock.patch.object(
-        fuchsia_device.FuchsiaDevice,
+        fuchsia_device_impl.FuchsiaDeviceImpl,
         "log_message_to_device",
         autospec=True,
     )
@@ -1233,7 +1230,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        fuchsia_device.FuchsiaDevice,
+        fuchsia_device_impl.FuchsiaDeviceImpl,
         "_send_snapshot_command",
         return_value=_BASE64_ENCODED_BYTES,
         autospec=True,
@@ -1673,7 +1670,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch.object(
-        fuchsia_device.FuchsiaDevice,
+        fuchsia_device_impl.FuchsiaDeviceImpl,
         "health_check",
         autospec=True,
     )
@@ -1711,7 +1708,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch.object(
-        fuchsia_device.FuchsiaDevice,
+        fuchsia_device_impl.FuchsiaDeviceImpl,
         "health_check",
         autospec=True,
     )
@@ -1756,7 +1753,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch.object(
-        fuchsia_device.FuchsiaDevice,
+        fuchsia_device_impl.FuchsiaDeviceImpl,
         "health_check",
         autospec=True,
     )
@@ -1800,7 +1797,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch.object(
-        fuchsia_device.FuchsiaDevice,
+        fuchsia_device_impl.FuchsiaDeviceImpl,
         "health_check",
         autospec=True,
     )
@@ -1850,7 +1847,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch.object(
-        fuchsia_device.FuchsiaDevice,
+        fuchsia_device_impl.FuchsiaDeviceImpl,
         "health_check",
         autospec=True,
     )
@@ -1905,7 +1902,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch.object(
-        fuchsia_device.FuchsiaDevice,
+        fuchsia_device_impl.FuchsiaDeviceImpl,
         "health_check",
         autospec=True,
     )

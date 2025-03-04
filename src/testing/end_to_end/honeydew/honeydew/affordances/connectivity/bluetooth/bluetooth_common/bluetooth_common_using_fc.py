@@ -13,6 +13,7 @@ import fidl.fuchsia_bluetooth_sys as f_btsys_controller
 import fuchsia_controller_py as fc
 from fuchsia_controller_py import Channel
 
+from honeydew import affordances_capable
 from honeydew.affordances.connectivity.bluetooth.bluetooth_common import (
     bluetooth_common,
 )
@@ -23,7 +24,6 @@ from honeydew.affordances.connectivity.bluetooth.utils import types as bt_types
 from honeydew.affordances.connectivity.bluetooth.utils.fidl_servers import (
     bt_fidl_servers,
 )
-from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports.fuchsia_controller import (
     fuchsia_controller as fc_transport,
 )

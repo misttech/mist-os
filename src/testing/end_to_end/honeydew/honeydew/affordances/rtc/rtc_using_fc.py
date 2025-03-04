@@ -9,9 +9,9 @@ import datetime
 import fidl.fuchsia_hardware_rtc as frtc
 import fuchsia_controller_py
 
+from honeydew import affordances_capable
 from honeydew.affordances.rtc import rtc
 from honeydew.affordances.rtc.errors import HoneydewRtcError
-from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports.fuchsia_controller import (
     fuchsia_controller as fuchsia_controller_lib,
 )

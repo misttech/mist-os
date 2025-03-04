@@ -12,14 +12,13 @@ import fidl.fuchsia_net_root as f_net_root
 from fuchsia_controller_py import Channel, ZxStatus
 from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
 
-from honeydew import errors
+from honeydew import affordances_capable, errors
 from honeydew.affordances.connectivity.netstack import netstack
 from honeydew.affordances.connectivity.netstack.errors import (
     HoneydewNetstackError,
 )
 from honeydew.affordances.connectivity.netstack.types import InterfaceProperties
 from honeydew.affordances.connectivity.wlan.utils.types import MacAddress
-from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports.ffx import ffx as ffx_transport
 from honeydew.transports.fuchsia_controller import (
     fuchsia_controller as fc_transport,
