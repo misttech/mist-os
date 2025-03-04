@@ -24,7 +24,7 @@ ffx_tool("ffx_efi_tool") {
     "src/main.rs",
   ]
   test_deps = [
-    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia",
     "//third_party/rust_crates:tempfile",
   ]
 }

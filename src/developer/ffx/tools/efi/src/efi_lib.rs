@@ -159,7 +159,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_create_empty() -> Result<()> {
         let tmpdir = tempdir()?;
         let output = tmpdir.path().join("test_output").to_str().unwrap().to_string();
@@ -179,7 +179,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_create() -> Result<()> {
         let tmpdir = tempdir()?;
         let tmppath = |name| tmpdir.path().join(name).to_str().unwrap().to_string();
@@ -231,7 +231,7 @@ mod test {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_create_worst_case_reservation() -> Result<()> {
         let tmpdir = tempdir()?;
         let tmppath = |name| tmpdir.path().join(name).to_str().unwrap().to_string();
@@ -301,28 +301,28 @@ mod test {
         Ok((fat_type, output_size))
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_create_16mib() {
         let (fat_type, size) = create_image_with_payload(16 * 1024 * 1024).await.unwrap();
         assert_eq!(fat_type, fatfs::FatType::Fat16);
         assert!(size >= 16 * 1024 * 1024);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_create_20mib() {
         let (fat_type, size) = create_image_with_payload(20 * 1024 * 1024).await.unwrap();
         assert_eq!(fat_type, fatfs::FatType::Fat16);
         assert!(size >= 20 * 1024 * 1024);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_create_24mib() {
         let (fat_type, size) = create_image_with_payload(24 * 1024 * 1024).await.unwrap();
         assert_eq!(fat_type, fatfs::FatType::Fat16);
         assert!(size >= 24 * 1024 * 1024);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_create_28mib() {
         let (fat_type, size) = create_image_with_payload(28 * 1024 * 1024).await.unwrap();
         assert_eq!(fat_type, fatfs::FatType::Fat16);
@@ -331,14 +331,14 @@ mod test {
 
     // Empirically this is roughly where images switch over to FAT32.  By the spec, FAT32 images
     // must have at least 65525 clusters, which at 512 bytes per cluster is 33,548,800 bytes.
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_create_30mib() {
         let (fat_type, size) = create_image_with_payload(30 * 1024 * 1024).await.unwrap();
         assert_eq!(fat_type, fatfs::FatType::Fat32);
         assert!(size >= 30 * 1024 * 1024);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_create_32mib() {
         let (fat_type, size) = create_image_with_payload(32 * 1024 * 1024).await.unwrap();
         assert_eq!(fat_type, fatfs::FatType::Fat32);
