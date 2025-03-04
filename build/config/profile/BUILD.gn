@@ -246,7 +246,7 @@ variant("profile-rust") {
   }
 }
 
-# PGO-optimized build that uses collected profiles.
+# Enable PGO-optimized build that uses a profile.
 variant("profile-use") {
   configs = [ ":variant-libprefix" ]
   if (pgo_profile_path != "") {
@@ -256,7 +256,13 @@ variant("profile-use") {
     # TODO(https://fxbug.dev/336358027): Suppress the following warning in PGO
     # optimized build: "Function control flow change detected (hash mismatch)"
     cflags += [ "-Wno-backend-plugin" ]
+  }
+}
 
+# Enable PGO-optimized build that uses a profile collected for Rust.
+variant("profile-use-rust") {
+  configs = [ ":variant-libprefix" ]
+  if (pgo_profile_path != "") {
     rustflags =
         [ "-Cprofile-use=" + rebase_path(pgo_profile_path, root_build_dir) ]
   }

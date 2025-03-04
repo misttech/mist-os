@@ -1761,6 +1761,11 @@ declare_args() {
     },
 
     {
+      configs = [ "//build/config/profile:profile-use-rust" ]
+      tags = [ "instrumented" ]
+    },
+
+    {
       configs = [ "//build/config/sanitizers:tsan" ]
       tags = [
         "tsan",
