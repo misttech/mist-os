@@ -134,6 +134,12 @@ pub enum UsageError {
     #[error("Expected viable parameter names for option '{option}', got {got}")]
     InvalidParameterName { option: Name, got: Name },
 
+    #[error("Unterminated pattern in argument {0}")]
+    UnterminatedArgPattern(String),
+
+    #[error("Unknown parameter {unknown_parameter} referenced in argument pattern {pattern}")]
+    UnknownArgPattern { unknown_parameter: String, pattern: String },
+
     #[error("Parameter {0} was assigned more than one value in strict mode")]
     ParamAlreadyStrictlyAssigned(Name),
 

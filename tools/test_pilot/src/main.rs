@@ -15,6 +15,7 @@ mod parsers;
 mod run_tests;
 mod schema;
 mod test_config;
+mod test_config_;
 
 const INVALID_ARGS_CONFIG_EXIT_CODE: i32 = 222;
 

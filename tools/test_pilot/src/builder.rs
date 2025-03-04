@@ -660,11 +660,10 @@ mod tests {
         Name::from_str("test_option_name")
     }
 
-    /// Asserts that a Result<T, BuilderError> wraps $usage_error
-    macro_rules! assert_usage_error {
-        ($result:expr, $usage_error:expr) => {
-            assert_matches!($result, Err(BuildError::IncorrectUsage(e)) if e == $usage_error)
-        }
+    /// Asserts that a `Result<TestConfigBuilder, BuilderError>` wraps `usage_error`
+    #[track_caller]
+    fn assert_usage_error(result: Result<TestConfigBuilder, BuildError>, usage_error: UsageError) {
+        assert_matches!(result, Err(BuildError::IncorrectUsage(e)) if e == usage_error)
     }
 
     #[test]
@@ -816,9 +815,9 @@ mod tests {
 
         let under_test =
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {});
-        assert_usage_error!(
+        assert_usage_error(
             under_test,
-            UsageError::UnexpectedPositionalArgument(String::from("foo"))
+            UsageError::UnexpectedPositionalArgument(String::from("foo")),
         );
     }
 
@@ -869,37 +868,37 @@ mod tests {
         let fake_env = FakeEnv::new("--include", "");
         let under_test =
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {});
-        assert_usage_error!(under_test, UsageError::MissingValue(Name::Include));
+        assert_usage_error(under_test, UsageError::MissingValue(Name::Include));
 
         let fake_env = FakeEnv::new("--require", "");
         let under_test =
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {});
-        assert_usage_error!(under_test, UsageError::MissingValue(Name::Require));
+        assert_usage_error(under_test, UsageError::MissingValue(Name::Require));
 
         let fake_env = FakeEnv::new("--prohibit", "");
         let under_test =
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {});
-        assert_usage_error!(under_test, UsageError::MissingValue(Name::Prohibit));
+        assert_usage_error(under_test, UsageError::MissingValue(Name::Prohibit));
 
         let fake_env = FakeEnv::new("--host-test-binary", "");
         let under_test =
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {});
-        assert_usage_error!(
+        assert_usage_error(
             under_test,
-            UsageError::MissingValue(Name::from_str("host_test_binary"))
+            UsageError::MissingValue(Name::from_str("host_test_binary")),
         );
 
         let fake_env = FakeEnv::new("--host-test-args", "");
         let under_test =
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {});
-        assert_usage_error!(under_test, UsageError::MissingValue(Name::from_str("host_test_args")));
+        assert_usage_error(under_test, UsageError::MissingValue(Name::from_str("host_test_args")));
 
         let fake_env = FakeEnv::new("--output-directory", "");
         let under_test =
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {});
-        assert_usage_error!(
+        assert_usage_error(
             under_test,
-            UsageError::MissingValue(Name::from_str("output_directory"))
+            UsageError::MissingValue(Name::from_str("output_directory")),
         );
     }
 
@@ -909,49 +908,49 @@ mod tests {
         let fake_env = FakeEnv::new("--require=include", "");
         let under_test =
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {});
-        assert_usage_error!(
+        assert_usage_error(
             under_test,
-            UsageError::InvalidParameterName { option: Name::Require, got: Name::Include }
+            UsageError::InvalidParameterName { option: Name::Require, got: Name::Include },
         );
 
         let fake_env = FakeEnv::new("--require=require", "");
         let under_test =
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {});
-        assert_usage_error!(
+        assert_usage_error(
             under_test,
-            UsageError::InvalidParameterName { option: Name::Require, got: Name::Require }
+            UsageError::InvalidParameterName { option: Name::Require, got: Name::Require },
         );
 
         let fake_env = FakeEnv::new("--require=prohibit", "");
         let under_test =
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {});
-        assert_usage_error!(
+        assert_usage_error(
             under_test,
-            UsageError::InvalidParameterName { option: Name::Require, got: Name::Prohibit }
+            UsageError::InvalidParameterName { option: Name::Require, got: Name::Prohibit },
         );
 
         let fake_env = FakeEnv::new("--prohibit=include", "");
         let under_test =
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {});
-        assert_usage_error!(
+        assert_usage_error(
             under_test,
-            UsageError::InvalidParameterName { option: Name::Prohibit, got: Name::Include }
+            UsageError::InvalidParameterName { option: Name::Prohibit, got: Name::Include },
         );
 
         let fake_env = FakeEnv::new("--prohibit=require", "");
         let under_test =
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {});
-        assert_usage_error!(
+        assert_usage_error(
             under_test,
-            UsageError::InvalidParameterName { option: Name::Prohibit, got: Name::Require }
+            UsageError::InvalidParameterName { option: Name::Prohibit, got: Name::Require },
         );
 
         let fake_env = FakeEnv::new("--prohibit=prohibit", "");
         let under_test =
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {});
-        assert_usage_error!(
+        assert_usage_error(
             under_test,
-            UsageError::InvalidParameterName { option: Name::Prohibit, got: Name::Prohibit }
+            UsageError::InvalidParameterName { option: Name::Prohibit, got: Name::Prohibit },
         );
     }
 
@@ -961,65 +960,65 @@ mod tests {
         let fake_env = FakeEnv::new("--include=1", "");
         let under_test =
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {});
-        assert_usage_error!(under_test, UsageError::IncludedPathDoesNotExist(PathBuf::from("1")));
+        assert_usage_error(under_test, UsageError::IncludedPathDoesNotExist(PathBuf::from("1")));
 
         let fake_env = FakeEnv::new("--include=1,something", "");
         let under_test =
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {});
-        assert_usage_error!(under_test, UsageError::IncludedPathDoesNotExist(PathBuf::from("1")));
+        assert_usage_error(under_test, UsageError::IncludedPathDoesNotExist(PathBuf::from("1")));
 
         let fake_env = FakeEnv::new("--require=1", "");
         let under_test =
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {});
-        assert_usage_error!(
+        assert_usage_error(
             under_test,
-            UsageError::InvalidParameterName { option: Name::Require, got: Name::from_str("1") }
+            UsageError::InvalidParameterName { option: Name::Require, got: Name::from_str("1") },
         );
 
         let fake_env = FakeEnv::new("--require=1,something", "");
         let under_test =
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {});
-        assert_usage_error!(
+        assert_usage_error(
             under_test,
-            UsageError::InvalidParameterName { option: Name::Require, got: Name::from_str("1") }
+            UsageError::InvalidParameterName { option: Name::Require, got: Name::from_str("1") },
         );
 
         let fake_env = FakeEnv::new("--prohibit=1", "");
         let under_test =
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {});
-        assert_usage_error!(
+        assert_usage_error(
             under_test,
-            UsageError::InvalidParameterName { option: Name::Prohibit, got: Name::from_str("1") }
+            UsageError::InvalidParameterName { option: Name::Prohibit, got: Name::from_str("1") },
         );
 
         let fake_env = FakeEnv::new("--prohibit=1,something", "");
         let under_test =
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {});
-        assert_usage_error!(
+        assert_usage_error(
             under_test,
-            UsageError::InvalidParameterName { option: Name::Prohibit, got: Name::from_str("1") }
+            UsageError::InvalidParameterName { option: Name::Prohibit, got: Name::from_str("1") },
         );
 
         let fake_env = FakeEnv::new("--output-directory=1,true", "");
         let under_test =
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {});
-        assert_usage_error!(
+        assert_usage_error(
             under_test,
             UsageError::CommasNotAllowed {
                 parameter: Name::from_str("output_directory"),
                 got: String::from("1,true"),
-            }
+            },
         );
 
         let fake_env = FakeEnv::new("--output-directory=true,1", "");
         let under_test =
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {});
-        assert_usage_error!(
+        assert_usage_error(
             under_test,
             UsageError::CommasNotAllowed {
                 parameter: Name::from_str("output_directory"),
                 got: String::from("true,1"),
-            }
+            },
         );
     }
 
@@ -1083,15 +1082,15 @@ mod tests {
         );
 
         let fake_env = FakeEnv::new("--squeak", "");
-        assert_usage_error!(
+        assert_usage_error(
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {}),
-            UsageError::UnrecognizedParameter(Name::from_str("squeak"))
+            UsageError::UnrecognizedParameter(Name::from_str("squeak")),
         );
 
         let fake_env = FakeEnv::new("--zero", "");
-        assert_usage_error!(
+        assert_usage_error(
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {}),
-            UsageError::MissingValue(Name::from_str("zero"))
+            UsageError::MissingValue(Name::from_str("zero")),
         );
     }
 
@@ -1179,9 +1178,9 @@ mod tests {
 
         // Non-existent file.
         let fake_env = FakeEnv::new("--include=/non_existent_file", "");
-        assert_usage_error!(
+        assert_usage_error(
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {}),
-            UsageError::IncludedPathDoesNotExist(PathBuf::from("/non_existent_file"))
+            UsageError::IncludedPathDoesNotExist(PathBuf::from("/non_existent_file")),
         );
 
         // File containing non-JSON.
@@ -1364,16 +1363,16 @@ mod tests {
 
         // Multiple strict assignments are not allowed.
         let fake_env = FakeEnv::new("--strict --foo=a --foo=b", "");
-        assert_usage_error!(
+        assert_usage_error(
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {}),
-            UsageError::ParamAlreadyStrictlyAssigned(Name::from_str("foo"))
+            UsageError::ParamAlreadyStrictlyAssigned(Name::from_str("foo")),
         );
 
         // Multiple strict assignments are not allowed, even for overridden parameters.
         let fake_env = FakeEnv::new("--foo=a --strict --foo=b --foo=c", "");
-        assert_usage_error!(
+        assert_usage_error(
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {}),
-            UsageError::ParamAlreadyStrictlyAssigned(Name::from_str("foo"))
+            UsageError::ParamAlreadyStrictlyAssigned(Name::from_str("foo")),
         );
 
         // Multiple stricts are ok.
@@ -1383,9 +1382,9 @@ mod tests {
 
         // Can't set strict to false.
         let fake_env = FakeEnv::new("--no-strict", "");
-        assert_usage_error!(
+        assert_usage_error(
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {}),
-            UsageError::InvalidStrictValue(String::from("false"))
+            UsageError::InvalidStrictValue(String::from("false")),
         );
     }
 
@@ -1398,9 +1397,9 @@ mod tests {
         fs::write(temp_file_path, r#"{tunnels: 4}"#).expect("Failed to write to temporary file");
 
         let fake_env = FakeEnv::new(format!("--include={}", temp_file_path).as_str(), "");
-        assert_usage_error!(
+        assert_usage_error(
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {}),
-            UsageError::UnrecognizedParameter(Name::from_str("tunnels"))
+            UsageError::UnrecognizedParameter(Name::from_str("tunnels")),
         );
 
         temp_file.close().expect("Failed to close temporary file");
@@ -1430,27 +1429,27 @@ mod tests {
     // Tests final builder validation.
     fn test_final_validation() {
         let fake_env = FakeEnv::new("--require=chunky", "");
-        assert_usage_error!(
+        assert_usage_error(
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {}),
-            UsageError::UnknownRequiredParameter(Name::from_str("chunky"))
+            UsageError::UnknownRequiredParameter(Name::from_str("chunky")),
         );
 
         let fake_env = FakeEnv::new("--require=foo", "");
-        assert_usage_error!(
+        assert_usage_error(
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {}),
-            UsageError::MissingRequiredParameter(Name::from_str("foo"))
+            UsageError::MissingRequiredParameter(Name::from_str("foo")),
         );
 
         let fake_env = FakeEnv::new("--prohibit=chunky", "");
-        assert_usage_error!(
+        assert_usage_error(
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {}),
-            UsageError::UnknownProhibitedParameter(Name::from_str("chunky"))
+            UsageError::UnknownProhibitedParameter(Name::from_str("chunky")),
         );
 
         let fake_env = FakeEnv::new("--prohibit=foo --foo=bar", "");
-        assert_usage_error!(
+        assert_usage_error(
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {}),
-            UsageError::DefinedProhibitedParameter(Name::from_str("foo"))
+            UsageError::DefinedProhibitedParameter(Name::from_str("foo")),
         );
 
         // In order to test final validation against the schema, we need to assign the wrong
@@ -1463,12 +1462,12 @@ mod tests {
         fs::write(temp_file_path, r#"{true: "horse"}"#).expect("Failed to write to temporary file");
 
         let fake_env = FakeEnv::new(format!("--include={}", temp_file_path).as_str(), "");
-        assert_usage_error!(
+        assert_usage_error(
             TestConfigBuilder::from_env_like(&fake_env, fake_schema(), &mut NullLogger {}),
             UsageError::SchemaTypeMismatch {
                 parameter: String::from("true"),
-                detail: String::from("The value must be boolean")
-            }
+                detail: String::from("The value must be boolean"),
+            },
         );
 
         temp_file.close().expect("Failed to close temporary file");
