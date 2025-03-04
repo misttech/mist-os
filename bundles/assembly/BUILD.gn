@@ -4725,7 +4725,7 @@ assembly_resources_directory("resources") {
     "${root_gen_dir}/src/lib/icu/tzdata/revision.txt",
 
     # Diagnostics sampler resources.
-    "${root_gen_dir}/src/diagnostics/config/sampler/default_sampler_config.json",
+    "${root_gen_dir}/src/diagnostics/config/sampler/default_sampler_config.json5",
 
     # Core shard templates.
     "//src/connectivity/weave/meta/weavestack.core_shard.cml.template",

@@ -126,12 +126,12 @@ resource("netstack-specified-procs-netemul-config") {
 }
 
 resource("ns2-sampler-config") {
-  sources = [ "//src/diagnostics/config/sampler/netstack.json" ]
+  sources = [ "//src/diagnostics/config/sampler/netstack.json5" ]
   outputs = [ "data/sampler-config/netstack.json" ]
 }
 
 resource("ns3-sampler-config") {
-  sources = [ "//src/diagnostics/config/sampler/netstack3.json" ]
+  sources = [ "//src/diagnostics/config/sampler/netstack3.json5" ]
   outputs = [ "data/sampler-config/netstack.json" ]
 }
 

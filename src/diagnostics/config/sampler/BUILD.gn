@@ -16,26 +16,26 @@ merged_sampler_config("default-config") {
       [ "//src/diagnostics/config/sampler/fire/components.json5" ]
 
   project_configs = [
-    "//src/diagnostics/config/sampler/archivist.json",
-    "//src/diagnostics/config/sampler/bt_host.json",
-    "//src/diagnostics/config/sampler/driver_manager_all.json",
-    "//src/diagnostics/config/sampler/fshost.json",
-    "//src/diagnostics/config/sampler/netstack.json",
-    "//src/diagnostics/config/sampler/netstack3.json",
-    "//src/diagnostics/config/sampler/power_metrics_recorder.json",
-    "//src/diagnostics/config/sampler/setui.json",
-    "//src/diagnostics/config/sampler/system-update-committer.json",
+    "//src/diagnostics/config/sampler/archivist.json5",
+    "//src/diagnostics/config/sampler/bt_host.json5",
+    "//src/diagnostics/config/sampler/driver_manager_all.json5",
+    "//src/diagnostics/config/sampler/fshost.json5",
+    "//src/diagnostics/config/sampler/netstack.json5",
+    "//src/diagnostics/config/sampler/netstack3.json5",
+    "//src/diagnostics/config/sampler/power_metrics_recorder.json5",
+    "//src/diagnostics/config/sampler/setui.json5",
+    "//src/diagnostics/config/sampler/system-update-committer.json5",
 
     # TODO(https://fxbug.dev/300170322): remove driver_manager_all.json and bring back these
-    #"audio-drivers.json",
-    #"connectivity-wlan.json",
-    #"display.json",
-    #"ftl.json",
-    #"fvm.json",
-    #"radar.json",
-    #"sdmmc.json",
-    #"sysmem.json",
+    #"audio-drivers.json5",
+    #"connectivity-wlan.json5",
+    #"display.json5",
+    #"ftl.json5",
+    #"fvm.json5",
+    #"radar.json5",
+    #"sdmmc.json5",
+    #"sysmem.json5",
   ]
 
-  output = "${target_gen_dir}/default_sampler_config.json"
+  output = "${target_gen_dir}/default_sampler_config.json5"
 }

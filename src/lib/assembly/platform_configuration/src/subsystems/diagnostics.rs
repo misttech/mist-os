@@ -237,7 +237,7 @@ impl<'a> DefineSubsystemConfiguration<DiagnosticsSubsystemConfig<'a>> for Diagno
             .with_context(|| format!("Adding bootfs file {}", &index_path))?;
 
         let default_sampler_config: MergedSamplerConfig =
-            read_config(context.get_resource("default_sampler_config.json"))?;
+            read_config(context.get_resource("default_sampler_config.json5"))?;
 
         let project_configs =
             load_project_configs(sampler, default_sampler_config, &instance_id_index)?
@@ -429,7 +429,7 @@ mod tests {
                 }),
             );
             this.write(
-                "default_sampler_config.json",
+                "default_sampler_config.json5",
                 json!({
                     "fire_project_templates": [
                         {

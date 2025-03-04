@@ -1,0 +1,431 @@
+{
+    metrics: [
+        // TODO(https://fxbug.dev/42071858): move to connectivity-wlan.json
+        {
+            event_codes: [],
+            metric_id: 339,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=factory-broadcom]root/brcmfmac-phy:fw_recovery_triggered",
+            project_id: 3708719327,
+        },
+
+        // TODO(https://fxbug.dev/42071858): move to connectivity-wlan.json
+        {
+            event_codes: [],
+            metric_id: 340,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=factory-broadcom]root/brcmfmac-phy:fw_recovered",
+            project_id: 3708719327,
+        },
+
+        // TODO(https://fxbug.dev/42071858): move to ftl.json
+        {
+            event_codes: [
+                1,
+            ],
+            metric_id: 2012,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:block.read.count",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [
+                2,
+            ],
+            metric_id: 2012,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:block.write.count",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [
+                3,
+            ],
+            metric_id: 2012,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:block.flush.count",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [
+                4,
+            ],
+            metric_id: 2012,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:block.trim.count",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [
+                1,
+                1,
+            ],
+            metric_id: 2013,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:block.read.issued_page_read.count",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [
+                2,
+                1,
+            ],
+            metric_id: 2013,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:block.read.issued_page_write.count",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [
+                3,
+                1,
+            ],
+            metric_id: 2013,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:block.read.issued_block_erase.count",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [
+                1,
+                2,
+            ],
+            metric_id: 2013,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:block.write.issued_page_read.count",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [
+                2,
+                2,
+            ],
+            metric_id: 2013,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:block.write.issued_page_write.count",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [
+                3,
+                2,
+            ],
+            metric_id: 2013,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:block.write.issued_block_erase.count",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [
+                1,
+                3,
+            ],
+            metric_id: 2013,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:block.flush.issued_page_read.count",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [
+                2,
+                3,
+            ],
+            metric_id: 2013,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:block.flush.issued_page_write.count",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [
+                3,
+                3,
+            ],
+            metric_id: 2013,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:block.flush.issued_block_erase.count",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [
+                1,
+                4,
+            ],
+            metric_id: 2013,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:block.trim.issued_page_read.count",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [
+                2,
+                4,
+            ],
+            metric_id: 2013,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:block.trim.issued_page_write.count",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [
+                3,
+                4,
+            ],
+            metric_id: 2013,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:block.trim.issued_block_erase.count",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [],
+            metric_id: 2003,
+            metric_type: "Integer",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:nand.erase_block.max_wear",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [],
+            metric_id: 2006,
+            metric_type: "IntHistogram",
+            selector: "bootstrap/*-drivers\\:*:[name=nand]root/nand:read_ecc_bit_flips",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [],
+            metric_id: 2007,
+            metric_type: "IntHistogram",
+            selector: "bootstrap/*-drivers\\:*:[name=nand]root/nand:read_attempts",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [],
+            metric_id: 2008,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=nand]root/nand:read_internal_failure",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [],
+            metric_id: 2009,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=nand]root/nand:read_failure",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [
+                1,
+            ],
+            metric_id: 2010,
+            metric_type: "Integer",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:nand.initial_bad_blocks",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [
+                2,
+            ],
+            metric_id: 2010,
+            metric_type: "Integer",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:nand.running_bad_blocks",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [
+                0,
+            ],
+            metric_id: 2011,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:nand.map_block_end_page_failure_reason.0",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [
+                1,
+            ],
+            metric_id: 2011,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:nand.map_block_end_page_failure_reason.1",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [
+                2,
+            ],
+            metric_id: 2011,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:nand.map_block_end_page_failure_reason.2",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [
+                3,
+            ],
+            metric_id: 2011,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:nand.map_block_end_page_failure_reason.3",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [
+                4,
+            ],
+            metric_id: 2011,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:nand.map_block_end_page_failure_reason.4",
+            project_id: 3676913920,
+        },
+
+        // TODO(https://fxbug.dev/42071858): move to fvm.json
+        {
+            event_codes: [
+                0,
+            ],
+            metric_id: 3001,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=fvm]root/fvm/partitions/blobfs:total_slices_reserved",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [
+                1,
+            ],
+            metric_id: 3001,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=fvm]root/fvm/partitions/minfs:total_slices_reserved",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [
+                1,
+            ],
+            metric_id: 61,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=fvm]root/fvm/mount_time/version_combo",
+            project_id: 3676913920,
+        },
+
+        // TODO(https://fxbug.dev/42071858): move to radar.json
+        {
+            event_codes: [],
+            metric_id: 1,
+            metric_type: "Integer",
+            selector: "bootstrap/*-drivers\\:*:[name=selina]root/selina:timeout_error_rate",
+            project_id: 12,
+        },
+        {
+            event_codes: [],
+            metric_id: 2,
+            metric_type: "Integer",
+            selector: "bootstrap/*-drivers\\:*:[name=selina]root/selina:fifo_overflow_error_rate",
+            project_id: 12,
+        },
+        {
+            event_codes: [],
+            metric_id: 3,
+            metric_type: "Integer",
+            selector: "bootstrap/*-drivers\\:*:[name=selina]root/selina:other_error_rate",
+            project_id: 12,
+        },
+
+        // TODO(https://fxbug.dev/42071858): move to sdmmc.json
+        {
+            event_codes: [],
+            metric_id: 3,
+            metric_type: "Integer",
+            selector: "bootstrap/*-drivers\\:*:[name=sdmmc-sdio]root/sdio_core:tx_errors",
+            project_id: 9,
+        },
+        {
+            event_codes: [],
+            metric_id: 4,
+            metric_type: "Integer",
+            selector: "bootstrap/*-drivers\\:*:[name=sdmmc-sdio]root/sdio_core:rx_errors",
+            project_id: 9,
+        },
+        {
+            event_codes: [],
+            metric_id: 5,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=sdmmc-sd, name=sdmmc-mmc]root/sdmmc_core:io_errors",
+            project_id: 9,
+        },
+        {
+            event_codes: [],
+            metric_id: 6,
+            metric_type: "Occurrence",
+            selector: "bootstrap/*-drivers\\:*:[name=sdmmc-sd, name=sdmmc-mmc]root/sdmmc_core:io_retries",
+            project_id: 9,
+        },
+        {
+            event_codes: [],
+            metric_id: 7,
+            metric_type: "Integer",
+            selector: "bootstrap/*-drivers\\:*:[name=sdmmc-sd, name=sdmmc-mmc]root/sdmmc_core:type_a_lifetime_used",
+            project_id: 9,
+        },
+        {
+            event_codes: [],
+            metric_id: 8,
+            metric_type: "Integer",
+            selector: "bootstrap/*-drivers\\:*:[name=sdmmc-sd, name=sdmmc-mmc]root/sdmmc_core:type_b_lifetime_used",
+            project_id: 9,
+        },
+
+        // TODO(https://fxbug.dev/42071858): move to sysmem.json
+        {
+            event_codes: [
+                1,
+            ],
+            metric_id: 104,
+            metric_type: "Integer",
+            selector: "bootstrap/sysmem:root/sysmem/heaps/SysmemContiguousPool:free_at_high_water_mark",
+            project_id: 3509424520,
+        },
+        {
+            event_codes: [
+                1,
+            ],
+            metric_id: 105,
+            metric_type: "Integer",
+            selector: "bootstrap/sysmem:root/sysmem/heaps/SysmemContiguousPool:used_size",
+            project_id: 3509424520,
+        },
+        {
+            event_codes: [
+                2,
+            ],
+            metric_id: 104,
+            metric_type: "Integer",
+            selector: "bootstrap/sysmem:root/sysmem/heaps/SysmemAmlogicProtectedPool:free_at_high_water_mark",
+            project_id: 3509424520,
+        },
+        {
+            event_codes: [
+                2,
+            ],
+            metric_id: 105,
+            metric_type: "Integer",
+            selector: "bootstrap/sysmem:root/sysmem/heaps/SysmemAmlogicProtectedPool:used_size",
+            project_id: 3509424520,
+        },
+        {
+            event_codes: [
+                3,
+            ],
+            metric_id: 104,
+            metric_type: "Integer",
+            selector: "bootstrap/sysmem:root/sysmem/heaps/tee_secure:free_at_high_water_mark",
+            project_id: 3509424520,
+        },
+        {
+            event_codes: [
+                3,
+            ],
+            metric_id: 105,
+            metric_type: "Integer",
+            selector: "bootstrap/sysmem:root/sysmem/heaps/tee_secure:used_size",
+            project_id: 3509424520,
+        },
+    ],
+    poll_rate_sec: 1800,
+    project_id: 0,
+}
