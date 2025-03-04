@@ -16,17 +16,22 @@ use crate::arch::{ARCH_NAME, ARCH_NAME_COMPAT};
 use crate::device::android::bootloader_message_store::BootloaderMessage;
 use crate::mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
 use crate::task::{CurrentTask, Kernel};
-use crate::vfs::{FdNumber, FsString};
+use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::{
+    fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FdFlags, FdNumber, FileObject, FileOps,
+    FsString,
+};
 use starnix_logging::{log_debug, log_error, log_info, log_warn, track_stub};
-use starnix_sync::InterruptibleEvent;
+use starnix_sync::{FileOpsCore, InterruptibleEvent};
 #[cfg(feature = "arch32")]
 use starnix_syscalls::{for_each_arch32_syscall, syscall_arch32_number_to_name_literal_callback};
 use starnix_syscalls::{
-    for_each_syscall, syscall_number_to_name_literal_callback, SyscallResult, SUCCESS,
+    for_each_syscall, syscall_number_to_name_literal_callback, SyscallArg, SyscallResult, SUCCESS,
 };
 use starnix_types::user_buffer::MAX_RW_COUNT;
 use starnix_uapi::auth::{CAP_SYS_ADMIN, CAP_SYS_BOOT, CAP_SYS_MODULE};
 use starnix_uapi::errors::Errno;
+use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::personality::PersonalityFlags;
 use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
 use starnix_uapi::version::KERNEL_RELEASE;
@@ -450,17 +455,76 @@ pub fn sys_delete_module(
     error!(ENOENT)
 }
 
+pub struct PerfEventFile {
+    _pid: pid_t,
+    _cpu: i32,
+}
+
+// PerfEventFile object that implements FileOps.
+// See https://man7.org/linux/man-pages/man2/perf_event_open.2.html for
+// implementation details.
+// This object can be saved as a FileDescriptor.
+impl FileOps for PerfEventFile {
+    // Don't need to implement seek or sync for PerfEventFile.
+    fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
+
+    fn read(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _offset: usize,
+        _data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
+        track_stub!(TODO("https://fxbug.dev/394960158"), "implement perf event functions");
+        error!(ENOSYS)
+    }
+
+    fn ioctl(
+        &self,
+        _locked: &mut Locked<'_, Unlocked>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _request: u32,
+        _arg: SyscallArg,
+    ) -> Result<SyscallResult, Errno> {
+        track_stub!(TODO("https://fxbug.dev/394960158"), "implement perf event functions");
+        error!(ENOSYS)
+    }
+
+    fn write(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _offset: usize,
+        _data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        track_stub!(TODO("https://fxbug.dev/394960158"), "implement perf event functions");
+        error!(ENOSYS)
+    }
+}
+
 pub fn sys_perf_event_open(
     _locked: &mut Locked<'_, Unlocked>,
-    _current_task: &CurrentTask,
+    current_task: &CurrentTask,
     _attr: UserRef<perf_event_attr>,
-    __pid: pid_t,
-    _cpu: i32,
+    pid: pid_t,
+    cpu: i32,
     _group_fd: FdNumber,
     _flags: u64,
 ) -> Result<SyscallResult, Errno> {
-    track_stub!(TODO("https://fxbug.dev/287120583"), "perf_event_open()");
-    error!(ENOSYS)
+    if pid == -1 && cpu == -1 {
+        return error!(EINVAL);
+    }
+
+    let file = Box::new(PerfEventFile { _pid: pid, _cpu: cpu });
+    let file_handle =
+        Anon::new_file(current_task, file, OpenFlags::RDWR, "[fuchsia:perf_event_open]");
+    let file_descriptor = current_task.add_file(file_handle, FdFlags::empty());
+
+    Ok(file_descriptor?.into())
 }
 
 // Syscalls for arch32 usage

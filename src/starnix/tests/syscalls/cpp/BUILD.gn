@@ -63,6 +63,7 @@ arch64_syscall_tests = [
   "mount_test",
   "nmfs_test",
   "overlayfs_test",
+  "perf_event_open_test",
   "pidfd_test",
   "pipe_test",
   "poll_test",
