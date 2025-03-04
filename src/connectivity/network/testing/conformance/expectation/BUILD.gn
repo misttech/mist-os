@@ -23,6 +23,7 @@ if (is_host) {
       "igmp.go",
       "igmpv3.go",
       "ip.go",
+      "ip_router.go",
       "ipv6.go",
       "ipv6_autoconfig.go",
       "ipv6_mld.go",
