@@ -46,6 +46,13 @@ impl SchedulerManager {
         Self { role_manager: None, role_overrides: RoleOverrides::new().build().unwrap() }
     }
 
+    /// Return the currently active role name for this task. Requires read access to `task`'s state,
+    /// should only be called by code which is not already modifying the provided `task`.
+    pub fn role_name(&self, task: &Task) -> Result<&str, Errno> {
+        let policy = task.read().scheduler_policy;
+        self.role_name_inner(task, policy)
+    }
+
     fn role_name_inner(&self, task: &Task, policy: SchedulerPolicy) -> Result<&str, Errno> {
         Ok(if policy.kind.is_realtime() {
             let process_name = task

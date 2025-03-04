@@ -55,6 +55,7 @@ use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::from_status_like_fdio;
 use starnix_uapi::open_flags::OpenFlags;
+use std::borrow::Cow;
 use std::collections::{BTreeMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU8, Ordering};
@@ -694,19 +695,29 @@ impl Kernel {
         let thread_groups = inspector.root();
         let mut mm_summary = MappingSummary::default();
         let mut mms_summarized = HashSet::new();
-        for thread_group in self.pids.read().get_thread_groups() {
-            let tg = thread_group.read();
+
+        // Avoid holding locks for the entire iteration.
+        let all_thread_groups = {
+            let pid_table = self.pids.read();
+            pid_table.get_thread_groups().map(TempRef::into_static).collect::<Vec<_>>()
+        };
+        for thread_group in all_thread_groups {
+            // Avoid holding the state lock while summarizing.
+            let (ppid, tasks) = {
+                let tg = thread_group.read();
+                (tg.get_ppid() as i64, tg.tasks().map(TempRef::into_static).collect::<Vec<_>>())
+            };
 
             let tg_node = thread_groups.create_child(format!("{}", thread_group.leader));
             if let Ok(koid) = &thread_group.process.get_koid() {
                 tg_node.record_int("koid", koid.raw_koid() as i64);
             }
             tg_node.record_int("pid", thread_group.leader as i64);
-            tg_node.record_int("ppid", tg.get_ppid() as i64);
+            tg_node.record_int("ppid", ppid);
             tg_node.record_bool("stopped", thread_group.load_stopped() == StopState::GroupStopped);
 
             let tasks_node = tg_node.create_child("tasks");
-            for task in tg.tasks() {
+            for task in tasks {
                 if let Some(mm) = task.mm() {
                     if mms_summarized.insert(Arc::as_ptr(mm) as usize) {
                         mm.summarize(&mut mm_summary);
@@ -717,7 +728,16 @@ impl Kernel {
 
                     let sched_policy = task.read().scheduler_policy;
                     if !sched_policy.is_default() {
-                        node.record_string("sched_policy", format!("{sched_policy:?}"));
+                        node.record_child("sched", |node| {
+                            node.record_string(
+                                "role_name",
+                                self.scheduler
+                                    .role_name(&task)
+                                    .map(|n| Cow::Borrowed(n))
+                                    .unwrap_or_else(|e| Cow::Owned(e.to_string())),
+                            );
+                            node.record_string("policy", format!("{sched_policy:?}"));
+                        });
                     }
                 };
                 if task.id == thread_group.leader {
