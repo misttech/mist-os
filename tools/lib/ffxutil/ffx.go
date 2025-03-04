@@ -60,7 +60,7 @@ const (
 
 type ffxCmdBuilder interface {
 	// Build an ffx command with appropriate additional arguments
-	command(ffxPath string, args []string) []string
+	command(ffxPath string, supportsStrict bool, args []string) []string
 	// Store the configuration for future ffx invocations
 	setConfigMap(user, global map[string]any) error
 	// Get the config map
@@ -91,7 +91,7 @@ func newLegacyFfxCmdBuilder(
 	}
 }
 
-func (b *legacyFfxCmdBuilder) command(ffxPath string, args []string) []string {
+func (b *legacyFfxCmdBuilder) command(ffxPath string, _supportsStrict bool, args []string) []string {
 	return append([]string{ffxPath, "--isolate-dir", b.isolateDir}, args...)
 }
 
@@ -163,10 +163,16 @@ func (b *strictFfxCmdBuilder) tempSetIsolateDir(dir string) {
 
 // Build the required command for a strict invocation. Note that the command
 // may require the target, but the caller should have set that if so.
-func (b *strictFfxCmdBuilder) command(ffxPath string, args []string) []string {
-	// TODO(slgrady): Add "--strict" once all required commands actually
-	// support it
-	cmd := []string{ffxPath, "--isolate-dir", b.tmpIsolateDir, "-o", b.outputFile}
+func (b *strictFfxCmdBuilder) command(ffxPath string, supportsStrict bool, args []string) []string {
+	cmd := []string{ffxPath, "-o", b.outputFile}
+
+	if supportsStrict {
+		// The command does in fact support --strict, so let's use it!
+		cmd = append(cmd, "--strict")
+	} else {
+		// We don't support strict, so we'd better keep using the isolate dir
+		cmd = append(cmd, "--isolate-dir", b.tmpIsolateDir)
+	}
 
 	// The caller may have already provided the "--machine" argument
 	if !slices.Contains(args, "--machine") {
@@ -312,6 +318,7 @@ func NewFFXInstance(
 	invokeMode FFXInvokeMode,
 	extraConfigSettings ...ConfigSettings,
 ) (*FFXInstance, error) {
+	logger.Debugf(ctx, "NewFFXInstance: ffx=%s dir=%s target=%s sshKey=%s oDir=%s", ffxPath, processDir, target, sshKey, outputDir)
 	if ffxPath == "" {
 		return nil, nil
 	}
@@ -354,11 +361,16 @@ func NewFFXInstance(
 		target:     target,
 		env:        env,
 	}
-	if sshKey != "" {
-		sshKey, err = filepath.Abs(sshKey)
+	// Always make sure we have a private key
+	if sshKey == "" {
+		sshKey, err = ffx.GetSshPrivateKey(ctx)
 		if err != nil {
 			return nil, err
 		}
+	}
+	sshKey, err = filepath.Abs(sshKey)
+	if err != nil {
+		return nil, err
 	}
 	userConfig, globalConfig := buildConfigs(absOutputDir, absFFXPath, sshKey, extraConfigSettings)
 	if err := cmdBuilder.setConfigMap(userConfig, globalConfig); err != nil {
@@ -381,7 +393,7 @@ func buildConfigs(absOutputDir string, absFFXPath string, absSshKeyPath string, 
 		"test.experimental_json_input": true,
 	}
 	if absSshKeyPath != "" {
-		userConfigSettings["ssh.priv"] = []string{absSshKeyPath}
+		userConfigSettings["ssh.priv"] = absSshKeyPath
 	}
 	for _, settings := range extraConfigSettings {
 		if settings.Level == "global" {
@@ -485,16 +497,17 @@ func (f *FFXInstance) invoker(args []string) *ffxInvoker {
 }
 
 type ffxInvoker struct {
-	ffx           *FFXInstance
-	args          []string
-	target        string
-	configs       map[string]string
-	timeout       *time.Duration
-	captureOutput bool
-	output        *bytes.Buffer
-	stdout        io.Writer
-	stderr        io.Writer
-	noMachine     bool
+	ffx            *FFXInstance
+	args           []string
+	target         string
+	configs        map[string]string
+	timeout        *time.Duration
+	captureOutput  bool
+	output         *bytes.Buffer
+	stdout         io.Writer
+	stderr         io.Writer
+	noMachine      bool
+	supportsStrict bool // TODO(slgrady) Remove once all required commands support --strict
 }
 
 func (f *ffxInvoker) cmd() *exec.Cmd {
@@ -502,7 +515,7 @@ func (f *ffxInvoker) cmd() *exec.Cmd {
 	if f.target != "" {
 		args = append([]string{"--target", f.target}, args...)
 	}
-	ffx_cmd := f.ffx.cmdBuilder.command(f.ffx.ffxPath, args)
+	ffx_cmd := f.ffx.cmdBuilder.command(f.ffx.ffxPath, f.supportsStrict, args)
 	if f.noMachine {
 		// Strip out the "--machine", "json" flags if they exist
 		for i, arg := range ffx_cmd {
@@ -575,6 +588,11 @@ func (i *ffxInvoker) setStdout(stdout io.Writer) *ffxInvoker {
 
 func (i *ffxInvoker) setStderr(stderr io.Writer) *ffxInvoker {
 	i.stderr = stderr
+	return i
+}
+
+func (i *ffxInvoker) setStrict() *ffxInvoker {
+	i.supportsStrict = true
 	return i
 }
 
@@ -694,8 +712,11 @@ func (f *FFXInstance) List(ctx context.Context, args ...string) error {
 }
 
 // TargetWait waits until the target becomes available.
-func (f *FFXInstance) TargetWait(ctx context.Context) error {
-	return f.RunWithTarget(ctx, "target", "wait")
+func (f *FFXInstance) TargetWait(ctx context.Context, args ...string) error {
+	if f.target == "" {
+		return fmt.Errorf("no target is set")
+	}
+	return f.invoker(append([]string{"target", "wait"}, args...)).setTarget(f.target).setStrict().run(ctx)
 }
 
 // Test runs a test suite.

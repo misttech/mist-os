@@ -525,6 +525,7 @@ type FFXInstance interface {
 	Test(ctx context.Context, tests build.TestList, outDir string, args ...string) (*ffxutil.TestRunResult, error)
 	Snapshot(ctx context.Context, outDir string, snapshotFilename string) error
 	Stop() error
+	TargetWait(ctx context.Context, args ...string) error
 }
 
 // FFXTester uses ffx to run tests and other enabled features.
@@ -560,7 +561,7 @@ type ffxTestRun struct {
 // NewFFXTester returns an FFXTester.
 func NewFFXTester(ctx context.Context, ffx FFXInstance, localOutputDir string, experiments botanist.Experiments, llvmProfdata string) (*FFXTester, error) {
 	err := retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), maxReconnectAttempts), func() error {
-		return ffx.RunWithTarget(ctx, "target", "wait", "-t", "10")
+		return ffx.TargetWait(ctx, "-t", "10")
 	}, nil)
 	if err != nil {
 		return nil, err
@@ -602,7 +603,7 @@ func (t *FFXTester) Test(ctx context.Context, test testsharder.Test, stdout, std
 
 func (t *FFXTester) Reconnect(ctx context.Context) error {
 	return retry.Retry(ctx, retry.WithMaxDuration(retry.NewConstantBackoff(time.Second), 30*time.Second), func() error {
-		return t.ffx.RunWithTarget(ctx, "target", "wait", "-t", "10")
+		return t.ffx.TargetWait(ctx, "-t", "10")
 	}, nil)
 }
 
