@@ -197,6 +197,7 @@ macro_rules! for_each_arch_arch32_syscall {
             ugetrlimit,
             unlink,
             ustat,
+            vfork,
             wait4,
             waitid,
         }

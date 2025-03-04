@@ -136,7 +136,9 @@ pub fn dispatch_syscall(
 
     #[cfg(all(target_arch = "aarch64", feature = "arch32"))]
     mod aarch64_arch32 {
-        pub use crate::arch::syscalls::{sys_arch32_ARM_set_tls, sys_clone as sys_arch32_clone};
+        pub use crate::arch::syscalls::{
+            sys_arch32_ARM_set_tls, sys_arch32_vfork, sys_clone as sys_arch32_clone,
+        };
         pub use crate::mm::syscalls::{
             sys_arch32_futex, sys_arch32_madvise, sys_arch32_mmap2, sys_arch32_mremap,
             sys_arch32_munmap, sys_arch32_set_robust_list, sys_brk as sys_arch32_brk,
@@ -285,6 +287,7 @@ pub fn dispatch_syscall(
             umount2[2],
             uname[1],
             unlink[1],
+            vfork[0],
             wait4[4],
             write[3],
             writev[3],
