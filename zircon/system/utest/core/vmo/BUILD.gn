@@ -28,17 +28,7 @@ source_set("vmo") {
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
-    "//zircon/system/utest/core/pager:userpager",
   ]
-
-  defines = []
-  if (is_asan) {
-    # Due to how the kernel manages the PMM under ASAN memory can become more fragmented resulting
-    # in less chance of succeeding large contiguous allocation requests.
-    defines += [ "LIMIT_CONTIGUOUS_ALLOCATIONS=1" ]
-  } else {
-    defines += [ "LIMIT_CONTIGUOUS_ALLOCATIONS=0" ]
-  }
 }
 
 library_headers("helpers_headers") {
