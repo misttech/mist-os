@@ -19,7 +19,8 @@ use crate::security;
 use crate::task::{
     AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CgroupRoot, CurrentTask,
     HrTimerManager, HrTimerManagerHandle, IpTables, KernelStats, KernelThreads, NetstackDevices,
-    PidTable, PsiProvider, StopState, Syslog, ThreadGroup, UtsNamespace, UtsNamespaceHandle,
+    PidTable, PsiProvider, SchedulerManager, StopState, Syslog, ThreadGroup, UtsNamespace,
+    UtsNamespaceHandle,
 };
 use crate::vdso::vdso_loader::Vdso;
 use crate::vfs::crypt_service::CryptService;
@@ -38,7 +39,6 @@ use fidl::endpoints::{
 };
 use fidl_fuchsia_component_runner::{ComponentControllerControlHandle, ComponentStopInfo};
 use fidl_fuchsia_feedback::CrashReporterProxy;
-use fidl_fuchsia_scheduler::RoleManagerSynchronousProxy;
 use futures::FutureExt;
 use linux_uapi::FSCRYPT_KEY_IDENTIFIER_SIZE;
 use netlink::interfaces::InterfacesHandler;
@@ -273,8 +273,8 @@ pub struct Kernel {
     // as well as `CurrentTask`).
     pub delayed_releaser: DelayedReleaser,
 
-    /// Proxy to the scheduler role manager for adjusting task priorities.
-    pub role_manager: Option<RoleManagerSynchronousProxy>,
+    /// Manages task priorities.
+    pub scheduler: SchedulerManager,
 
     /// The syslog manager.
     pub syslog: Syslog,
@@ -369,7 +369,7 @@ impl Kernel {
         cmdline: BString,
         features: KernelFeatures,
         container_namespace: ContainerNamespace,
-        role_manager: Option<RoleManagerSynchronousProxy>,
+        scheduler: SchedulerManager,
         crash_reporter_proxy: Option<CrashReporterProxy>,
         inspect_node: fuchsia_inspect::Node,
         framebuffer_aspect_ratio: Option<&AspectRatio>,
@@ -428,7 +428,7 @@ impl Kernel {
             stats: Arc::new(KernelStats::default()),
             psi_provider: PsiProvider::default(),
             delayed_releaser: Default::default(),
-            role_manager,
+            scheduler,
             syslog: Default::default(),
             mounts: Mounts::new(),
             hrtimer_manager,
