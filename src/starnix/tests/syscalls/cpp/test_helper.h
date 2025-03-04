@@ -157,6 +157,12 @@ class ScopedTempDir {
   ScopedTempDir();
   ~ScopedTempDir();
 
+  ScopedTempDir(const ScopedTempDir &) = delete;
+  ScopedTempDir &operator=(const ScopedTempDir &) = delete;
+
+  ScopedTempDir(ScopedTempDir &&) = default;
+  ScopedTempDir &operator=(ScopedTempDir &&) = default;
+
   const std::string &path() const { return path_; }
 
  private:

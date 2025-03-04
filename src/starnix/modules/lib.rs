@@ -17,7 +17,7 @@ use starnix_core::fs::tmpfs::tmp_fs;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::fs_registry::FsRegistry;
 use starnix_core::vfs::pipe::register_pipe_fs;
-use starnix_modules_cgroupfs::{CgroupV1Fs, CgroupV2Fs};
+use starnix_modules_cgroupfs::{cgroup2_fs, CgroupV1Fs};
 use starnix_modules_device_mapper::{create_device_mapper, device_mapper_init};
 use starnix_modules_ext4::ExtFilesystem;
 use starnix_modules_functionfs::FunctionFs;
@@ -103,7 +103,7 @@ pub fn register_common_file_systems(_locked: &mut Locked<'_, Unlocked>, kernel: 
     registry.register(b"binder".into(), BinderFs::new_fs);
     registry.register(b"bpf".into(), BpfFs::new_fs);
     registry.register(b"cgroup".into(), CgroupV1Fs::new_fs);
-    registry.register(b"cgroup2".into(), CgroupV2Fs::new_fs);
+    registry.register(b"cgroup2".into(), cgroup2_fs);
     // Cpusets use the generic cgroup (v1) subsystem.
     // From https://docs.kernel.org/admin-guide/cgroup-v1/cpusets.html
     registry.register(b"cpuset".into(), CgroupV1Fs::new_fs);

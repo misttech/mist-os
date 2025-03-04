@@ -26,7 +26,7 @@ constexpr char EVENTS_POPULATED[] = "populated 1";
 constexpr char EVENTS_NOT_POPULATED[] = "populated 0";
 
 // Mounts cgroup2 in a temporary directory for each test case, and deletes all cgroups created by
-// `CreateCgroup` at the end of each test.
+// `CreateCgroup` at the end of each test, and all mountpoints of the cgroup.
 class CgroupTest : public ::testing::Test {
  public:
   void SetUp() override {
@@ -35,8 +35,7 @@ class CgroupTest : public ::testing::Test {
       // mounting cgroup requires CAP_SYS_ADMIN.
       GTEST_SKIP() << "requires CAP_SYS_ADMIN to mount cgroup";
     }
-    ASSERT_THAT(mkdir(root_path().c_str(), 0777), SyscallSucceeds());
-    ASSERT_THAT(mount(nullptr, root_path().c_str(), "cgroup2", 0, nullptr), SyscallSucceeds());
+    MountCgroup2();
   }
 
   void TearDown() override {
@@ -51,13 +50,25 @@ class CgroupTest : public ::testing::Test {
     for (auto path = cgroup_paths_.rbegin(); path != cgroup_paths_.rend(); path++) {
       ASSERT_THAT(rmdir(path->c_str()), SyscallSucceeds()) << "Could not delete " << *path << "";
     }
-    ASSERT_THAT(umount(root_path().c_str()), SyscallSucceeds());
+
+    for (auto mountpoint = cgroup_mountpoints_.rbegin(); mountpoint != cgroup_mountpoints_.rend();
+         mountpoint++) {
+      ASSERT_THAT(umount((mountpoint->path()).c_str()), SyscallSucceeds());
+    }
   }
 
-  std::string root_path() { return temp_dir_.path() + "/cgroup"; }
+  // Returns the path of the first mountpoint.
+  std::string root_path() { return cgroup_mountpoints_[0].path(); }
 
-  void CheckInterfaceFilesExist(const std::string& path) {
-    bool is_root = path == root_path();
+  // Creates a temp directory and mount cgroup2 on it. Returns the mountpoint path.
+  std::string MountCgroup2() {
+    auto& mountpoint = cgroup_mountpoints_.emplace_back();
+    EXPECT_THAT(mount(nullptr, mountpoint.path().c_str(), "cgroup2", 0, nullptr),
+                SyscallSucceeds());
+    return mountpoint.path();
+  }
+
+  static void CheckInterfaceFilesExist(const std::string& path, bool is_root) {
     std::string controllers_path = path + "/" + CONTROLLERS_FILE;
     std::string procs_path = path + "/" + PROCS_FILE;
     std::string freeze_path = path + "/" + FREEZE_FILE;
@@ -126,14 +137,14 @@ class CgroupTest : public ::testing::Test {
   }
 
   void CreateCgroup(std::string path) {
-    ASSERT_THAT(mkdir(path.c_str(), 0777), SyscallSucceeds());
+    ASSERT_THAT(mkdir(path.c_str(), 0777), SyscallSucceeds()) << "Could not create " << path;
     cgroup_paths_.push_back(std::move(path));
   }
 
   void DeleteCgroup(const std::string& path) {
     auto it = std::ranges::find(cgroup_paths_, path);
-    ASSERT_NE(it, cgroup_paths_.end());
-    ASSERT_THAT(rmdir(path.c_str()), SyscallSucceeds());
+    ASSERT_NE(it, cgroup_paths_.end()) << path << " not found";
+    ASSERT_THAT(rmdir(path.c_str()), SyscallSucceeds()) << "Could not delete " << path;
     cgroup_paths_.erase(it);
   }
 
@@ -141,10 +152,11 @@ class CgroupTest : public ::testing::Test {
   // Paths to be removed after a test has completed.
   std::vector<std::string> cgroup_paths_;
 
-  test_helper::ScopedTempDir temp_dir_;
+  // Mountpoints to be unmounted after a test has completed.
+  std::vector<test_helper::ScopedTempDir> cgroup_mountpoints_;
 };
 
-TEST_F(CgroupTest, InterfaceFilesForRoot) { CheckInterfaceFilesExist(root_path()); }
+TEST_F(CgroupTest, InterfaceFilesForRoot) { CheckInterfaceFilesExist(root_path(), true); }
 
 // This test checks that nodes created as part of cgroups have the same inode each time it is
 // accessed, which is seen on Linux.
@@ -183,15 +195,15 @@ TEST_F(CgroupTest, ReadDir) {
 TEST_F(CgroupTest, CreateSubgroups) {
   std::string child1_path = root_path() + "/child1";
   CreateCgroup(child1_path);
-  CheckInterfaceFilesExist(child1_path);
+  CheckInterfaceFilesExist(child1_path, false);
 
   std::string child2_path = root_path() + "/child2";
   CreateCgroup(child2_path);
-  CheckInterfaceFilesExist(child2_path);
+  CheckInterfaceFilesExist(child2_path, false);
 
   std::string grandchild_path = root_path() + "/child2/grandchild";
   CreateCgroup(grandchild_path);
-  CheckInterfaceFilesExist(grandchild_path);
+  CheckInterfaceFilesExist(grandchild_path, false);
 }
 
 TEST_F(CgroupTest, CreateSubgroupAlreadyExists) {
@@ -510,4 +522,30 @@ TEST_F(CgroupTest, ProcfsCgroup) {
     ASSERT_TRUE(procs_fd.is_valid());
     EXPECT_THAT(write(procs_fd.get(), pid_string.c_str(), pid_string.length()), SyscallSucceeds());
   }
+}
+
+// `CgroupTest` mounts a cgroup2 during `SetUp()`. This test case mounts cgroup2 filesystem again at
+// another mountpoint, and expects that operations are reflected in both mounts.
+TEST_F(CgroupTest, MountCgroup2Twice) {
+  const std::string mountpoint = MountCgroup2();
+
+  CheckInterfaceFilesExist(mountpoint, true);
+
+  // Create /child in the first mount and observe from second mount.
+  const std::string child = "child";
+  const std::string child_path = root_path() + "/" + child;
+  const std::string child_path_mirrored = mountpoint + "/" + child;
+
+  CreateCgroup(child_path);
+  CheckDirectoryIncludes(mountpoint, {{.name = child, .type = DT_DIR}});
+  CheckInterfaceFilesExist(child_path_mirrored, false);
+
+  // Create /child/grandchild in the second mount and observe from first mount.
+  const std::string grandchild = "grandchild";
+  const std::string grandchild_path = child_path + "/" + grandchild;
+  const std::string grandchild_path_mirrored = child_path_mirrored + "/" + grandchild;
+
+  CreateCgroup(grandchild_path_mirrored);
+  CheckDirectoryIncludes(child_path, {{.name = grandchild, .type = DT_DIR}});
+  CheckInterfaceFilesExist(grandchild_path, false);
 }

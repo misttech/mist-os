@@ -60,26 +60,35 @@ impl FileSystemOps for CgroupV1Fs {
 }
 
 pub struct CgroupV2Fs {
-    pub root: Arc<CgroupRoot>,
-
     /// All directory nodes of the cgroup hierarchy.
     pub hierarchy: Arc<Hierarchy>,
 }
 
+struct CgroupV2FsHandle(FileSystemHandle);
+pub fn cgroup2_fs(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    options: FileSystemOptions,
+) -> Result<FileSystemHandle, Errno> {
+    Ok(current_task
+        .kernel()
+        .expando
+        .get_or_try_init(|| Ok(CgroupV2FsHandle(CgroupV2Fs::new_fs(current_task, options)?)))?
+        .0
+        .clone())
+}
+
 impl CgroupV2Fs {
-    pub fn new_fs(
-        _locked: &mut Locked<'_, Unlocked>,
+    fn new_fs(
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let kernel = current_task.kernel();
-        let weak_kernel = Arc::downgrade(kernel);
-        let root = kernel.cgroup2_root.get_or_init(|| CgroupRoot::new(weak_kernel));
-        let hierarchy = Hierarchy::new(Arc::downgrade(root));
+        let hierarchy = Hierarchy::new(Arc::downgrade(&kernel.cgroups.cgroup2));
         let fs = FileSystem::new(
             current_task.kernel(),
             CacheMode::Uncached,
-            CgroupV2Fs { hierarchy: hierarchy.clone(), root: root.clone() },
+            CgroupV2Fs { hierarchy: hierarchy.clone() },
             options,
         )?;
         hierarchy.root.create_root_interface_files(current_task, &fs);
@@ -159,7 +168,7 @@ impl Hierarchy {
 
 #[cfg(test)]
 mod test {
-    use crate::CgroupV2Fs;
+    use super::*;
 
     use starnix_core::testing::create_kernel_task_and_unlocked;
     use starnix_core::vfs::fs_registry::FsRegistry;
@@ -168,7 +177,7 @@ mod test {
     async fn test_filesystem_creates_nodes() {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let registry = kernel.expando.get::<FsRegistry>();
-        registry.register(b"cgroup2".into(), CgroupV2Fs::new_fs);
+        registry.register(b"cgroup2".into(), cgroup2_fs);
 
         let fs = current_task
             .create_filesystem(&mut locked, b"cgroup2".into(), Default::default())

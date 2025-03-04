@@ -21,6 +21,19 @@ use std::ops::Deref;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 
+/// All cgroups of the kernel. There is a single cgroup v2 hierarchy, and one-or-more cgroup v1
+/// hierarchies.
+/// TODO(https://fxbug.dev/389748287): Add cgroup v1 hierarchies on the kernel.
+pub struct Cgroups {
+    pub cgroup2: Arc<CgroupRoot>,
+}
+
+impl Cgroups {
+    pub fn new(kernel: Weak<Kernel>) -> Self {
+        Self { cgroup2: CgroupRoot::new(kernel) }
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum FreezerState {
     Thawed,

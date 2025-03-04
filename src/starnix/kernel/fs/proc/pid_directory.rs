@@ -677,11 +677,7 @@ impl CgroupFile {
 impl DynamicFileSource for CgroupFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let task = Task::from_weak(&self.0)?;
-        let cgroup = task
-            .kernel()
-            .cgroup2_root
-            .get()
-            .and_then(|cgroup_root| cgroup_root.get_cgroup(task.get_pid()));
+        let cgroup = task.kernel().cgroups.cgroup2.get_cgroup(task.get_pid());
         let path = path_from_root(cgroup)?;
         sink.write(format!("0::{}\n", path).as_bytes());
         Ok(())
