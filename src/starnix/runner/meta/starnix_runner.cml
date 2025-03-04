@@ -106,6 +106,7 @@
                 "fuchsia.power.broker.Topology",
                 "fuchsia.power.suspend.Stats",
                 "fuchsia.power.system.ActivityGovernor",
+                "fuchsia.time.external.Adjust",
                 "fuchsia.tracing.provider.Registry",
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",

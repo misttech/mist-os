@@ -43,6 +43,11 @@
     use: [
         { protocol: "fuchsia.kernel.VmexResource" },
         {
+            // Requires AIB starnix_runner_settable_utc_time.
+            protocol: "fuchsia.time.external.Adjust",
+            availability: "optional",
+        },
+        {
             directory: "boot-kernel",
             rights: [ "r*" ],
             path: "/boot/kernel",

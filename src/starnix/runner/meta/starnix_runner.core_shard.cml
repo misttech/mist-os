@@ -185,6 +185,12 @@
             to: "#starnix_runner",
             availability: "transitional",
         },
+        {
+            protocol: [ "fuchsia.time.external.Adjust" ],
+            from: "#timekeeper",
+            to: "#starnix_runner",
+            availability: "optional",
+        },
     ],
     expose: [
         {
