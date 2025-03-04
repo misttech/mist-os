@@ -1984,6 +1984,9 @@ test_loadable_module("tls-get-addr-local-dynamic-reloc") {
   # Don't build this module with LTO, so that the TLS access stays unoptimized.
   remove_configs = [ "//build/config/lto" ]
   configs += [ "//build/config/lto:no-lto" ]
+
+  # workaround for b/349448459 to remote-link successfully
+  configs += [ "//build/config:remote_link_scandeps_workaround" ]
 }
 
 test_executable("llvm-profdata") {
