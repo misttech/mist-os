@@ -378,11 +378,6 @@
 	url = https://fuchsia.googlesource.com/third_party/re2
 	name = third_party/re2
 	ignore = all
-[submodule "third_party/rust_crates/mirrors/serde_json5"]
-	path = third_party/rust_crates/mirrors/serde_json5
-	url = https://fuchsia.googlesource.com/third_party/github.com/google/serde_json5
-	name = third_party/github.com/google/serde_json5
-	ignore = all
 [submodule "third_party/sbase"]
 	path = third_party/sbase
 	url = https://fuchsia.googlesource.com/third_party/sbase
