@@ -42,7 +42,6 @@ template("ta_manager_config_test") {
     }
     configs -= [ "//build/config/rust/lints:allow_unused_results" ]
     deps = [
-      "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
       "//src/lib/fuchsia",
       "//src/lib/fuchsia-component",
       "//src/lib/fuchsia-fs",

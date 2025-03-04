@@ -7,7 +7,7 @@
 use anyhow::Error;
 use fuchsia_component::client::connect_to_protocol_at;
 use tee_internal::binding::TEE_SUCCESS;
-use {fidl_fuchsia_io as _, fidl_fuchsia_tee, fuchsia_fs as _};
+use {fidl_fuchsia_tee, fuchsia_fs as _};
 
 // TODO: single source of truth for TA CMD IDs, which should be defined by the TA.
 const CMD_TEST_PROPS_EXIST: u32 = 0;
