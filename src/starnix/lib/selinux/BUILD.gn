@@ -31,6 +31,9 @@ rustc_library("selinux") {
   inputs = [
     "testdata/composite_policies/compiled/allow_fork.pp",
     "testdata/composite_policies/compiled/class_defaults_policy.pp",
+    "testdata/composite_policies/compiled/handle_unknown_policy-allow.pp",
+    "testdata/composite_policies/compiled/handle_unknown_policy-deny.pp",
+    "testdata/composite_policies/compiled/handle_unknown_policy-reject.pp",
     "testdata/composite_policies/compiled/minimal_policy.pp",
     "testdata/composite_policies/compiled/range_transition_policy.pp",
     "testdata/composite_policies/compiled/role_transition_not_allowed_policy.pp",

@@ -115,24 +115,45 @@ _COMPOSITE_POLICY_PATHS = (
     ),
 )
 
+_HANDLE_UNKNOWN_POLICY_INPUTS = ("new_file/handle_unknown_policy.conf",)
+_HANDLE_UNKNOWN_POLICY_OUTPUT = "handle_unknown_policy-%s.pp"
 
-def compile_composite_policies(checkpolicy_executable):
+
+def _compile_composite_policy(
+    checkpolicy_executable: str,
+    inputs: list[str],
+    output: str,
+    handle_unknown: str,
+) -> None:
+    with tempfile.TemporaryDirectory() as temporary_directory_name:
+        input_paths = tuple(
+            f"{_INPUT_POLICY_DIRECTORY}/{input_path}" for input_path in inputs
+        )
+        output_path = f"{_OUTPUT_POLICY_DIRECTORY}/{output}"
+        merged_path = f"{temporary_directory_name}/policy.conf"
+        merge_policies.merge_text_policies(
+            _INITIAL_SIDS_PATH, input_paths, merged_path
+        )
+        merge_policies.compile_text_policy_to_binary_policy(
+            checkpolicy_executable,
+            merged_path,
+            output_path,
+            handle_unknown,
+        )
+
+
+def compile_composite_policies(checkpolicy_executable: str) -> None:
     for inputs, output in _COMPOSITE_POLICY_PATHS:
-        with tempfile.TemporaryDirectory() as temporary_directory_name:
-            input_paths = tuple(
-                f"{_INPUT_POLICY_DIRECTORY}/{input_path}"
-                for input_path in inputs
-            )
-            output_path = f"{_OUTPUT_POLICY_DIRECTORY}/{output}"
-            merged_path = f"{temporary_directory_name}/policy.conf"
-            merge_policies.merge_text_policies(
-                _INITIAL_SIDS_PATH, input_paths, merged_path
-            )
-            merge_policies.compile_text_policy_to_binary_policy(
-                checkpolicy_executable,
-                merged_path,
-                output_path,
-            )
+        _compile_composite_policy(
+            checkpolicy_executable, inputs, output, "deny"
+        )
+    for handle_unknown in ("allow", "deny", "reject"):
+        _compile_composite_policy(
+            checkpolicy_executable,
+            _HANDLE_UNKNOWN_POLICY_INPUTS,
+            _HANDLE_UNKNOWN_POLICY_OUTPUT % handle_unknown,
+            handle_unknown,
+        )
 
 
 if __name__ == "__main__":

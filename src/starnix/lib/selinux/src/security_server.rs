@@ -1482,4 +1482,48 @@ mod tests {
             PermissionCheckResult { permit: true, audit: true, todo_bug: None }
         );
     }
+
+    #[test]
+    fn handle_unknown() {
+        let security_server = security_server_with_tests_policy();
+
+        let sid = security_server
+            .security_context_to_sid("user0:object_r:type0:s0".into())
+            .expect("Resolve Context to SID");
+
+        // Load a policy that is missing some elements, and marked handle_unknown=reject.
+        // The policy should be rejected, since not all classes/permissions are defined.
+        // Rejecting policy is not controlled by permissive vs enforcing.
+        const REJECT_POLICY: &[u8] = include_bytes!(
+            "../testdata/composite_policies/compiled/handle_unknown_policy-reject.pp"
+        );
+        assert!(security_server.load_policy(REJECT_POLICY.to_vec()).is_err());
+
+        security_server.set_enforcing(true);
+
+        // Load a policy that is missing some elements, and marked handle_unknown=deny.
+        // Then check for a missing permission.
+        const DENY_POLICY: &[u8] =
+            include_bytes!("../testdata/composite_policies/compiled/handle_unknown_policy-deny.pp");
+        assert!(security_server.load_policy(DENY_POLICY.to_vec()).is_ok());
+
+        let permission_check = security_server.as_permission_check();
+        assert_eq!(
+            permission_check.has_permission(sid, sid, ProcessPermission::GetSched),
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
+        );
+
+        // Load a policy that is missing some elements, and marked handle_unknown=allow.
+        // Then check for a missing permission.
+        const ALLOW_POLICY: &[u8] = include_bytes!(
+            "../testdata/composite_policies/compiled/handle_unknown_policy-allow.pp"
+        );
+        assert!(security_server.load_policy(ALLOW_POLICY.to_vec()).is_ok());
+
+        let permission_check = security_server.as_permission_check();
+        assert_eq!(
+            permission_check.has_permission(sid, sid, ProcessPermission::GetSched),
+            PermissionCheckResult { permit: true, audit: true, todo_bug: None }
+        );
+    }
 }
