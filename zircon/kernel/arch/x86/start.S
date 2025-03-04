@@ -18,6 +18,7 @@
 #include <lib/code-patching/asm.h>
 #include <lib/instrumentation/asan.h>
 #include <zircon/tls.h>
+#include <phys/handoff.h>
 
 // We assume `KERNEL_ASPACE_SIZE` <= 512GB.
 .if KERNEL_ASPACE_SIZE > 0x0000008000000000
@@ -37,13 +38,25 @@
   // As early as possible collect the time stamp.
   sample_ticks %r15
 
-  // Set up a temporary stack pointer
+  // Set up the stack.
   lea _kstack_end(%rip), %rsp
 
   // Save off the handoff pointer in a register that won't get clobbered.
   mov %rdi, %r14
 
   mov %r15, kernel_entry_ticks(%rip)
+
+  // Load our new GDT before touching the segment registers, as the latter
+  // will cause the CPU to verify the GDTR points to valid memory for the
+  // GDT.
+  lgdt _temp_gdtr(%rip)
+
+  // Load our new CS from the newly-loaded GDT with a long return.
+  pushq $CODE_64_SELECTOR
+  lea .Lreload_cs(%rip), %rax
+  pushq %rax
+  lretq
+.Lreload_cs:
 
   // We modify the currently live address space below.
   mov $X86_CR3_BASE_MASK, %rax
@@ -60,6 +73,11 @@
   mov %rcx, upper_512gib_page_table_phys(%rip)
 
 #if __has_feature(address_sanitizer)
+  // After these instructions, virtual addresses may be translated to physical
+  // ones by subtracting %rbx.
+  lea __executable_start(%rip), %rbx
+  sub PHYS_HANDOFF_KERNEL_PHYSICAL_LOAD_ADDRESS(%r14), %rbx
+
   // kASAN tracks memory validity with a 'shadow map' starting at a fixed offset. The shadow map
   // tracks the validity of accesses within an eight-byte region with one byte - zero means that
   // all bytes are valid, non-zero tracks either fine-grained validity or various invalid states.
@@ -76,6 +94,7 @@
   movl $NO_OF_PT_ENTRIES, %ecx
   lea kasan_shadow_pt(%rip), %rdi
   lea kasan_zero_page(%rip), %rax
+  sub %rbx, %rax  // Translate to physical address
   or $X86_KERNEL_KASAN_INITIAL_PT_FLAGS, %rax
   rep stosq
 
@@ -83,6 +102,7 @@
   movl $NO_OF_PT_ENTRIES, %ecx
   lea kasan_shadow_pd(%rip), %rdi
   lea kasan_shadow_pt(%rip), %rax
+  sub %rbx, %rax  // Translate to physical address
   or $X86_KERNEL_KASAN_INITIAL_PD_FLAGS, %rax
   rep stosq
 
@@ -94,43 +114,10 @@
   add $PDP_HIGH_SHADOW_OFFSET * 8, %rdi
   movl $X86_KERNEL_KASAN_PDP_ENTRIES, %ecx
   lea kasan_shadow_pd(%rip), %rax
+  sub %rbx, %rax  // Translate to physical address
   or $X86_KERNEL_KASAN_INITIAL_PD_FLAGS, %rax
   rep stosq
 #endif  // __has_feature(address_sanitizer)
-
-  // Long jump to our code selector and the high address relocated.
-  jmp *.Lhigh_entry_addr(%rip)
-
-.pushsection .data.rel.ro, "aw", %progbits
-.Lhigh_entry_addr:
-  .quad .Lhigh_entry
-.popsection
-
-// This code runs at the final virtual address, so it should be pure PIC.
-.Lhigh_entry:
-  // load the high kernel stack
-  lea _kstack_end(%rip), %rsp
-
-  // Load our new GDT before touching the segment registers, as the latter
-  // will cause the CPU to verify the GDTR points to valid memory for the
-  // GDT.
-  lgdt _temp_gdtr(%rip)
-
-  // Now zero the non-CS segment registers: DS, ES, and SS are vestigial; FS
-  // is unused in the kernel; GS will be reset below.
-  xor %eax, %eax
-  mov %eax, %ds
-  mov %eax, %es
-  mov %eax, %fs
-  mov %eax, %gs
-  mov %eax, %ss
-
-  // Load our new CS from the newly-loaded GDT with a long return.
-  pushq $CODE_64_SELECTOR
-  lea .Lreload_cs(%rip), %rax
-  pushq %rax
-  lretq
-.Lreload_cs:
 
   // Set %gs.base to &bp_percpu.  It's statically initialized
   // with kernel_unsafe_sp set, so after this it's safe to call

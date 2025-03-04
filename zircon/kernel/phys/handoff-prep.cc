@@ -356,7 +356,7 @@ void HandoffPrep::ConstructKernelAddressSpace(const ElfImage& kernel) {
   AddressSpace::PanicIfError(kernel.MapInto(*gAddressSpace));
 }
 
-[[noreturn]] void HandoffPrep::DoHandoff(ElfImage& kernel, UartDriver& uart,
+[[noreturn]] void HandoffPrep::DoHandoff(const ElfImage& kernel, UartDriver& uart,
                                          ktl::span<ktl::byte> zbi,
                                          const KernelStorage::Bootfs& kernel_package,
                                          const ArchPatchInfo& patch_info) {
@@ -399,18 +399,8 @@ void HandoffPrep::ConstructKernelAddressSpace(const ElfImage& kernel) {
   // Hand-off the serial driver. There may be no more logging beyond this point.
   handoff()->uart = ktl::move(uart).TakeUart();
 
-  // TODO(https://fxbug.dev/42164859): For now we're loading an ELF kernel in
-  // physical address mode at an arbitrary load address, even though it's been
-  // relocated for its final virtual address.  The kernel's entry point is
-  // expected to be purely position independent long enough to switch to
-  // virtual addressing.
-  //
-  // NOTE: For real handoff with virtual addresses, this will need some inline
-  // asm to switch stacks and such. For interim hack kernels doing physical
-  // address mode handoff, they can either use the phys stack momentarily
-  // or have asm entry code that sets up its own stack.
-  kernel.set_load_address(kernel.physical_load_address());
-
+  debugf("%s: Handing off at physical load address %#" PRIxPTR ", entry %#" PRIx64 "...\n",
+         gSymbolize->name(), kernel.physical_load_address(), kernel.entry());
 #ifdef __aarch64__
   // Make sure all prior stores have been written back to main memory so that
   // secondary CPUs booting with MMU/caches off will see a coherent view.

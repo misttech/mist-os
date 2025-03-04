@@ -30,8 +30,7 @@ tmp3                    .req x11
 tmp4                    .req x12
 tmp5                    .req x13
 
-kernel_vaddr            .req x21
-handoff_paddr           .req x22
+handoff_paddr           .req x21
 
 // Collect timestamp in tmp, tmp2.  Also clobbers tmp3-5.
 .macro sample_ticks
@@ -75,26 +74,6 @@ handoff_paddr           .req x22
   // Save the x0 argument in a register that won't be clobbered.
   mov handoff_paddr, x0
 
-  // This can be any arbitrary (page-aligned) address >= KERNEL_ASPACE_BASE.
-  // TODO(https://fxbug.dev/42098994): Choose it randomly.
-  ldr_global kernel_vaddr, kernel_relocated_base
-
-  // Set up a functional stack pointer
-  adr_global tmp, .Lboot_cpu_kstack_end
-  mov sp, tmp
-
-.Lmmu_on_pc:
-  isb
-
-  // Map our current physical PC to the virtual PC and jump there.
-  // PC = next_PC - __executable_start + kernel_vaddr
-  adr tmp, .Lmmu_on_vaddr
-  adr_global tmp2, __executable_start
-  sub tmp, tmp, tmp2
-  add tmp, tmp, kernel_vaddr
-  br tmp
-
-.Lmmu_on_vaddr:
   // Disable trampoline page-table in ttbr0
   movlit tmp, MMU_TCR_FLAGS_KERNEL
   msr tcr_el1, tmp

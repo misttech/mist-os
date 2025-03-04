@@ -108,8 +108,6 @@ void RelocateElfKernel(ElfImage& elf_kernel) {
   HandoffPrep prep;
   prep.Init();
 
-  debugf("%s: Ready to hand off at physical load address %#" PRIxPTR ", entry %#" PRIx64 "...\n",
-         gSymbolize->name(), elf_kernel.load_address(), elf_kernel.entry());
   if (gBootOptions->phys_verbose) {
     Allocation::GetPool().PrintMemoryRanges(gSymbolize->name());
   }

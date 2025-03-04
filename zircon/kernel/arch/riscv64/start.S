@@ -13,10 +13,12 @@
 #include <lib/code-patching/asm.h>
 #include <lib/arch/asm.h>
 
-// This code is entered at its physical address.  However, relocatable data
-// (including RELRO "constants") have already been relocated by physboot to
-// their final virtual addresses.  This code takes care to manage the
-// transition of physical to virtual precisely.
+// We avoid the `la` pseudoinstruction while doing something equivalent
+// so that we can avoid generating a .got relocation and thus can assert
+// that there should never be any use of .got and ensure compiler-generated
+// and other unintended uses don't creep in.  (`lla` computes the address
+// of the symbol using PC-relative relocations, while `la` under __PIC__
+// does a PC-relative load from the symbol's GOT slot.)
 
 .function _start, global
 .label PhysbootHandoff, global
@@ -32,48 +34,13 @@
   lla     t0, kernel_entry_ticks
   sd      a2, (t0)
 
-  // Materialize the the physical base address in s2 (call-saved).
-  // It will be used again after calls below.
-  lla     s2, __executable_start
-
-  // Load the relocated virtual address corresponding in s3 (call-saved).
-  // This avoids the `la` pseudoinstruction while doing something equivalent
-  // so that we can avoid generating a .got relocation and thus can assert
-  // that there should never be any use of .got and ensure compiler-generated
-  // and other unintended uses don't creep in.  (`lla` computes the address
-  // of the symbol using PC-relative relocations, while `la` under __PIC__
-  // does a PC-relative load from the symbol's GOT slot.)
-  lla     t0, .Lvirtual_executable_start
-  ld      s3, (t0)
-.pushsection .data.rel.ro, "aw", %progbits
-.Lvirtual_executable_start:
-  .quad __executable_start
-.popsection
-
   // set the default stack
-  lla     sp, boot_cpu_kstack_end
+  lla     sp, .Lboot_cpu_kstack_end
 
 #if __has_feature(shadow_call_stack)
   lla     shadow_call_sp, boot_shadow_call_stack
 #endif
 
-  // compute the delta between the old physical and newer high addresses
-  sub     t0, s3, s2
-
-  // fix up the stack pointer
-  add     sp, sp, t0
-
-  // fix up the shadow call pointer
-#if __has_feature(shadow_call_stack)
-  add     shadow_call_sp, shadow_call_sp, t0
-#endif
-
-  // jump to high memory
-  lla     t1, .Lmmu_on_vaddr
-  add     t1, t1, t0
-  jr      t1
-
-.Lmmu_on_vaddr:
   // Run the boot cpu init routine with the boot hart id.
   // This will do basic initialization of the cpu such as initializing
   // the main control registers and loading the exception vector table.
@@ -99,6 +66,11 @@
 .end_function
 
 // Entry point for secondary cpus when started from SBI
+//
+// This code is entered at its physical address.  However, relocatable data
+// (including RELRO "constants") have already been relocated by physboot to
+// their final virtual addresses.  This code takes care to manage the
+// transition of physical to virtual precisely.
 .function riscv64_secondary_start, global
   // Enable the MMU with the ASID 0, prefilled by _start
   ld      t0, riscv64_kernel_bootstrap_translation_table_phys
@@ -111,7 +83,7 @@
   sfence.vma  zero, zero
 
   // Compute the relocation offset
-  lla     t1, .Lvirtual_executable_start
+  lla     t1, virtual_executable_start
   lla     t0, __executable_start
   ld      t1, (t1)
   sub     t0, t1, t0
@@ -144,10 +116,14 @@
   j       0b
 .end_function
 
+.object virtual_executable_start, relro, local
+  .quad __executable_start
+.end_object
+
 .object boot_cpu_kstack, bss, local
   .skip ARCH_DEFAULT_STACK_SIZE
   .balign 16
-boot_cpu_kstack_end:
+.Lboot_cpu_kstack_end:
 .end_object
 
 .object boot_shadow_call_stack, bss, local
