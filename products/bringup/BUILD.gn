@@ -39,15 +39,8 @@ product_assembly_configuration("bringup_with_tests") {
     }
   }
 
-  # These packages will be added to the bootfs package set since the image_mode is no_image.
-  base_packages = [
-    {
-      package_target =
-          "//src/power/testing/system-integration/example:bootstrap_pkg"
-    },
-    {
-      package_target =
-          "//src/power/testing/system-integration/storage:bootstrap_pkg"
-    },
+  bootfs_packages = [
+    "//src/power/testing/system-integration/example:bootstrap_pkg",
+    "//src/power/testing/system-integration/storage:bootstrap_pkg",
   ]
 }

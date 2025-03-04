@@ -56,6 +56,26 @@ import("//build/group_with_inputs.gni")
 #     product-provided package to place into the cache set. The scope must have a
 #     'package_target' field pointing to the GN target of the fuchsia_package.
 #
+#   bootfs_packages [optional]
+#     [list, GN labels] A list of GN labels for product-provided package to
+#     place into bootfs. Each label must be for a GN target defined with
+#     fuchsia_package.
+#
+#     Note: This is only usable on empty, embeddable, or bootstrap feature set
+#     levels.
+#
+#   bootfs_files_labels [optional]
+#     [list, GN labels] A list of GN labels of bootfs_files_for_assembly()
+#     targets to include in bootfs_files provided by this AIB.
+#
+#     Note: These are direct labels for specific targets, not deps to walk for
+#     metadata. If the target isn't a bootfs_files_for_assembly target, it will
+#     cause an error like:
+#       "no dependency provides the input <package_name>/bootfs_files.json"
+#
+#     Note: This is only usable on empty, embeddable, or bootstrap feature set
+#     levels.
+#
 #   font_asset_provider_packages [optional]
 #     [list, GN labels] A list of GN labels pointing at product-provided
 #     packages containing font assets.  These fonts end up as base packages,
@@ -93,6 +113,7 @@ template("product_assembly_configuration") {
     cache_package_set = "${target_name}.cache_packages"
     cache_package_config_data = "${target_name}.cache_packages.config_data"
     board_driver_package_set = "${target_name}.board_driver_packages"
+    bootfs_package_set = "${target_name}.bootfs_packages"
 
     # Base packages specified by the invoker, used to create the list of
     # manifests and as the deps for the package set targets.
@@ -149,6 +170,12 @@ template("product_assembly_configuration") {
       foreach(package, invoker.base_driver_packages) {
         base_driver_package_labels += [ package.package_target ]
       }
+    }
+
+    # Packages for bootfs
+    bootfs_package_labels = []
+    if (defined(invoker.bootfs_packages)) {
+      bootfs_package_labels = invoker.bootfs_packages
     }
   }
 
@@ -288,6 +315,26 @@ template("product_assembly_configuration") {
         ]
       }
     }
+
+    # bootfs_packages are just labels, not scopes, so the handling is slightly simpler.
+    bootfs_packages = []
+    bootfs_package_manifests = []
+    if (defined(invoker.bootfs_packages)) {
+      foreach(bootfs_package, invoker.bootfs_packages) {
+        _package_out_dir = get_label_info(bootfs_package, "target_out_dir")
+        _package_name = get_label_info(bootfs_package, "name")
+        _manifest_path =
+            "${_package_out_dir}/${_package_name}/package_manifest.json"
+        _manifest_path_rebased = rebase_path(_manifest_path, root_build_dir)
+
+        bootfs_package_manifests += [ _manifest_path ]
+        bootfs_packages += [
+          {
+            manifest = _manifest_path_rebased
+          },
+        ]
+      }
+    }
   }
 
   _assembly_config = {
@@ -307,6 +354,9 @@ template("product_assembly_configuration") {
       packages = {
         base = files.base_packages
         cache = files.cache_packages
+        if (files.bootfs_packages != []) {
+          bootfs = files.bootfs_packages
+        }
       }
 
       base_drivers = files.base_driver_packages
@@ -390,6 +440,15 @@ template("product_assembly_configuration") {
     deps = labels.cache_package_config_data_deps
   }
 
+  if (labels.bootfs_package_labels != []) {
+    group_with_inputs(labels.bootfs_package_set) {
+      forward_variables_from(invoker, [ "testonly" ])
+      visibility = [ ":${labels.target_name}" ]
+      inputs = files.bootfs_package_manifests
+      deps = labels.bootfs_package_labels
+    }
+  }
+
   compiled_action(labels.target_name) {
     forward_variables_from(invoker,
                            [
@@ -435,6 +494,9 @@ template("product_assembly_configuration") {
       ":${labels.cache_package_config_data}",
       ":${labels.cache_package_set}",
     ]
+    if (labels.bootfs_package_labels != []) {
+      deps += [ ":${labels.bootfs_package_set}" ]
+    }
 
     # Block all metadata walks for packages, distribution entries, etc.  These
     # inputs should not exist in metadata walks, as they are added via the paths
