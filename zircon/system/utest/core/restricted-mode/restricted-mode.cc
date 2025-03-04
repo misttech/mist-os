@@ -267,9 +267,6 @@ class RestrictedMode : public zxtest::TestWithParam<RestrictedBlobInfo> {
   // This function tests if machine-specific restricted mode is not supported
   // based on if it fails on what should be a valid state configuration.
   void ArchUnsupportedCheck() {
-    NEEDS_NEXT_SKIP(zx_restricted_bind_state);
-    NEEDS_NEXT_SKIP(zx_restricted_enter);
-
     // If there is no matching blob, it has been removed for lack of support.
     auto blob_entry = restricted_blobs_->find(restricted_blob_info_.machine);
     if (blob_entry == restricted_blobs_->end()) {
@@ -282,37 +279,10 @@ class RestrictedMode : public zxtest::TestWithParam<RestrictedBlobInfo> {
       return;
     }
 
-    zx::vmo vmo;
-    // Failures here will fail the test.
-    ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
-    auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
-
-    // Configure the initial register state.
     auto state = ArchRegisterStateFactory::Create(restricted_blob_info_.machine);
-    state->InitializeRegisters(GetTlsAddress(0));
-
-    // Use a known-good pc with a minimal code path before returning.
-    state->set_pc(restricted_symbols().addr_of("exception_bounce_exception_address"));
-
-    // Write the state to the state VMO.
-    ASSERT_OK(vmo.write(&state->restricted_state(), 0, sizeof(state->restricted_state())));
-
-    zx_restricted_reason_t reason_code = 99;
-    // Enter restricted mode with reasonable args that should return with a
-    // reason_code.
-    //
-    // If the machine register state is unsupported, it will return ZX_ERR_BAD_STATE.
-    if (restricted_enter_wrapper(0, reinterpret_cast<uintptr_t>(&restricted_exit), &reason_code) ==
-        ZX_ERR_BAD_STATE) {
-      auto blob = std::move(blob_entry->second);
-      // Only test once, then remove the blob so we skip all other tests.
-      restricted_blobs_->erase(blob_entry);
-      blob.reset();
+    if (!state->ArchSupported()) {
       ZXTEST_SKIP() << "hardware does not support blob:" << restricted_blob_info_.name;
     }
-    // Ensure the reason code was changed.  If we failed with a different error,
-    // there's still a problem.
-    ASSERT_NE(reason_code, 99);
   }
 
   void SetUp() override {
