@@ -4,10 +4,7 @@
 
 """Creates a fuchsia_package_resource for devicetree visitor."""
 
-load(
-    "//fuchsia/private:fuchsia_package_resource.bzl",
-    "fuchsia_package_resource",
-)
+load(":fuchsia_cc.bzl", "fuchsia_cc")
 
 def fuchsia_devicetree_visitor(name, output_name = None, additional_linker_inputs = [], user_link_flags = [], **kwargs):
     """Creates a fuchsia_package_resource for devicetree visitor.
@@ -55,10 +52,11 @@ def fuchsia_devicetree_visitor(name, output_name = None, additional_linker_input
     )
 
     resource_name = name
-    dest = "lib/visitors/{}.so".format(output_name or name)
-    fuchsia_package_resource(
+    bin_name = "{}.so".format(output_name or name)
+    fuchsia_cc(
         name = resource_name,
-        src = ":" + shared_lib_name,
-        dest = dest,
+        bin_name = bin_name,
+        install_root = "lib/visitors/",
+        native_target = shared_lib_name,
         visibility = visibility,
     )
