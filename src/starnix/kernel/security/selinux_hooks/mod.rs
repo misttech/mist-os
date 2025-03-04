@@ -60,7 +60,6 @@ fn permissions_from_flags(flags: PermissionFlags, class: FsNodeClass) -> Vec<Per
         result.push(CommonFsNodePermission::Write.for_class(class));
     }
 
-    #[allow(irrefutable_let_patterns)]
     if let FsNodeClass::File(class) = class {
         if flags.contains(PermissionFlags::EXEC) {
             if class == FileClass::Dir {
@@ -752,27 +751,26 @@ fn may_unlink_or_rmdir(
 
     let FsNodeSidAndClass { sid: file_sid, class: file_class } =
         fs_node_effective_sid_and_class(fs_node);
-    #[allow(irrefutable_let_patterns)]
-    if let FsNodeClass::File(file_class) = file_class {
-        match operation {
-            UnlinkKind::NonDirectory => check_permission(
-                &permission_check,
-                current_sid,
-                file_sid,
-                CommonFilePermission::Unlink.for_class(file_class),
-                audit_context,
-            )?,
-            UnlinkKind::Directory => check_permission(
-                &permission_check,
-                current_sid,
-                file_sid,
-                DirPermission::RemoveDir,
-                audit_context,
-            )?,
-        }
-    }
+    let FsNodeClass::File(file_class) = file_class else {
+        panic!("may_unlink_or_rmdir called on non-file-like class")
+    };
 
-    Ok(())
+    match operation {
+        UnlinkKind::NonDirectory => check_permission(
+            &permission_check,
+            current_sid,
+            file_sid,
+            CommonFilePermission::Unlink.for_class(file_class),
+            audit_context,
+        ),
+        UnlinkKind::Directory => check_permission(
+            &permission_check,
+            current_sid,
+            file_sid,
+            DirPermission::RemoveDir,
+            audit_context,
+        ),
+    }
 }
 
 /// Validate that `current_task` has permission to create a regular file in the `parent` directory,
@@ -888,16 +886,17 @@ pub(super) fn check_fs_node_rename_access(
 
     let FsNodeSidAndClass { sid: file_sid, class: file_class } =
         fs_node_effective_sid_and_class(moving_node);
-    #[allow(irrefutable_let_patterns)]
-    if let FsNodeClass::File(file_class) = file_class {
-        check_permission(
-            &permission_check,
-            current_sid,
-            file_sid,
-            CommonFilePermission::Rename.for_class(file_class),
-            current_task.into(),
-        )?;
-    }
+    let FsNodeClass::File(file_class) = file_class else {
+        panic!("fs_node_rename called on non-file-like class")
+    };
+
+    check_permission(
+        &permission_check,
+        current_sid,
+        file_sid,
+        CommonFilePermission::Rename.for_class(file_class),
+        current_task.into(),
+    )?;
 
     let new_parent_sid = fs_node_effective_sid_and_class(new_parent).sid;
     check_permission(
