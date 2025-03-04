@@ -14,7 +14,6 @@ ffx_plugin("ffx_repository") {
   config_data = [ "data/config.json" ]
 
   plugin_deps = [
-    "add-from-pm:ffx_repository_add_from_pm",
     "create:ffx_repository_create",
     "default:ffx_repository_default",
     "list:ffx_repository_list",

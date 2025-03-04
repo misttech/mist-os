@@ -1,5 +1,4 @@
 ffx/repository.golden
-ffx/repository/add-from-pm.golden
 ffx/repository/create.golden
 ffx/repository/default.golden
 ffx/repository/default/get.golden
