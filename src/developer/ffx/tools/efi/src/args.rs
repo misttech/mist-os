@@ -31,7 +31,6 @@ pub struct CreateCommand {
     /// optional path to source file for bootdata.bin
     #[argh(option)]
     pub bootdata: Option<String>,
-    // TODO(vol): name doesn't match make-efi command argument
     /// optional path to source file for EFI/BOOT/BOOTX64.EFI
     #[argh(option)]
     pub efi_bootloader: Option<String>,
