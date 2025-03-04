@@ -104,29 +104,6 @@ magma::Status MagmaSystemContext::ExecuteCommandBuffers(
   return MAGMA_DRET_MSG(status, "ExecuteCommandBuffers failed: %d", status);
 }
 
-magma::Status MagmaSystemContext::ExecuteImmediateCommands(uint64_t commands_size, void* commands,
-                                                           uint64_t semaphore_count,
-                                                           uint64_t* semaphore_ids) {
-  TRACE_DURATION("magma", "MagmaSystemContext::ExecuteImmediateCommands");
-  std::vector<msd::Semaphore*> msd_semaphores(semaphore_count);
-  for (uint32_t i = 0; i < semaphore_count; i++) {
-    auto semaphore = owner_->LookupSemaphoreForContext(semaphore_ids[i]);
-    if (!semaphore)
-      return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "semaphore id not found 0x%" PRIx64,
-                            semaphore_ids[i]);
-    msd_semaphores[i] = semaphore->msd_semaphore();
-    // This is used to connect with command submission in
-    // src/ui/scenic/lib/flatland/renderer/vk_renderer.cc, so it uses the koid.
-    TRACE_FLOW_END("gfx", "semaphore", semaphore->global_id());
-  }
-  magma_status_t result = msd_ctx()->ExecuteImmediateCommands(
-      cpp20::span(reinterpret_cast<uint8_t*>(commands), commands_size), msd_semaphores);
-
-  return MAGMA_DRET_MSG(
-      result, "ExecuteImmediateCommands: msd_context_execute_immediate_commands failed: %d",
-      result);
-}
-
 magma::Status MagmaSystemContext::ExecuteInlineCommands(
     std::vector<magma_inline_command_buffer> commands) {
   TRACE_DURATION("magma", "MagmaSystemContext::ExecuteInlineCommands");

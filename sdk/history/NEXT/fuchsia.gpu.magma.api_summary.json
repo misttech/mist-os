@@ -324,12 +324,6 @@
     },
     {
         "kind": "const",
-        "name": "fuchsia.gpu.magma/MAX_IMMEDIATE_COMMANDS_DATA_SIZE",
-        "type": "uint32",
-        "value": "2048"
-    },
-    {
-        "kind": "const",
         "name": "fuchsia.gpu.magma/MAX_INLINE_COMMANDS_DATA_SIZE",
         "type": "uint32",
         "value": "2048"
@@ -570,14 +564,6 @@
         "ordinal": "1092010090420875483",
         "direction": "one_way",
         "request": "fuchsia.gpu.magma/PrimaryExecuteCommandRequest"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.gpu.magma/Primary.ExecuteImmediateCommands",
-        "strictness": "strict",
-        "ordinal": "4430994260716992031",
-        "direction": "one_way",
-        "request": "fuchsia.gpu.magma/PrimaryExecuteImmediateCommandsRequest"
     },
     {
         "kind": "protocol/member",
@@ -827,28 +813,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.gpu.magma/PrimaryExecuteCommandRequest"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.gpu.magma/PrimaryExecuteImmediateCommandsRequest.command_data",
-        "ordinal": "2",
-        "type": "vector<uint8>:2048"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.gpu.magma/PrimaryExecuteImmediateCommandsRequest.context_id",
-        "ordinal": "1",
-        "type": "uint32"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.gpu.magma/PrimaryExecuteImmediateCommandsRequest.semaphores",
-        "ordinal": "3",
-        "type": "vector<uint64>"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.gpu.magma/PrimaryExecuteImmediateCommandsRequest"
     },
     {
         "kind": "struct/member",

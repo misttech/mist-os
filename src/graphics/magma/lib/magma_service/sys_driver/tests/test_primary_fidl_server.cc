@@ -614,12 +614,6 @@ class TestDelegate : public msd::internal::PrimaryFidlServer::Delegate {
     shared_data_->notification_handler_initialization_complete.Signal();
   }
 
-  magma::Status ExecuteImmediateCommands(uint32_t context_id, uint64_t commands_size,
-                                         void* commands, uint64_t semaphore_count,
-                                         uint64_t* semaphores) override {
-    return MAGMA_STATUS_UNIMPLEMENTED;
-  }
-
   magma::Status ExecuteInlineCommands(
       uint32_t context_id, std::vector<magma_inline_command_buffer_t> commands) override {
     std::unique_lock<std::mutex> lock(shared_data_->mutex);

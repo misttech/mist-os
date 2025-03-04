@@ -16,6 +16,7 @@
 #include <src/lib/fsl/handles/object_info.h>
 #include <src/lib/testing/loop_fixture/real_loop_fixture.h>
 
+#include "fidl/fuchsia.gpu.magma/cpp/wire_types.h"
 #include "test_magma.h"
 
 namespace {
@@ -506,7 +507,7 @@ TEST_F(TestMagmaFidl, ExecuteCommand) {
 }
 
 // Sends a bunch of zero command bytes
-TEST_F(TestMagmaFidl, ExecuteImmediateCommands) {
+TEST_F(TestMagmaFidl, ExecuteInlineCommands) {
   uint32_t context_id = 10;
 
   {
@@ -516,12 +517,10 @@ TEST_F(TestMagmaFidl, ExecuteImmediateCommands) {
   }
 
   {
-    std::array<uint8_t, fuchsia_gpu_magma::wire::kMaxImmediateCommandsDataSize>
-        command_bytes{};  // zero init
-    std::vector<uint64_t> signal_semaphores;
-    auto wire_result = primary_->ExecuteImmediateCommands(
-        context_id, fidl::VectorView<uint8_t>::FromExternal(command_bytes),
-        fidl::VectorView<uint64_t>::FromExternal(signal_semaphores));
+    std::array<fuchsia_gpu_magma::wire::InlineCommand, 1> inline_commands;
+    auto wire_result = primary_->ExecuteInlineCommands(
+        context_id,
+        fidl::VectorView<fuchsia_gpu_magma::wire::InlineCommand>::FromExternal(inline_commands));
     EXPECT_TRUE(wire_result.ok());
 
     // Fails checking, does not execute on GPU

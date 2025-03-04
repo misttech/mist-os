@@ -20,9 +20,6 @@ class MsdArmContext : public msd::Context {
     }
   }
 
-  magma_status_t ExecuteImmediateCommands(cpp20::span<uint8_t> commands,
-                                          cpp20::span<msd::Semaphore*> semaphores) override;
-
   magma_status_t ExecuteInlineCommand(magma_inline_command_buffer* command,
                                       msd::Semaphore** semaphores) override;
 

@@ -55,9 +55,6 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
   magma::Status UnmapBuffer(uint64_t buffer_id, uint64_t hw_va) override;
   magma::Status BufferRangeOp(uint64_t buffer_id, uint32_t op, uint64_t start,
                               uint64_t length) override;
-  magma::Status ExecuteImmediateCommands(uint32_t context_id, uint64_t commands_size,
-                                         void* commands, uint64_t semaphore_count,
-                                         uint64_t* semaphore_ids) override;
   magma::Status ExecuteInlineCommands(uint32_t context_id,
                                       std::vector<magma_inline_command_buffer> commands) override;
   MagmaSystemContext* LookupContext(uint32_t context_id);
