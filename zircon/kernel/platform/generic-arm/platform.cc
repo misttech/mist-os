@@ -351,6 +351,8 @@ void platform_early_init(void) {
   // Initialize the PmmChecker now that the cmdline has been parsed.
   pmm_checker_init_from_cmdline();
 
+  arm64_boot_map_init(reinterpret_cast<uintptr_t>(__executable_start) -
+                      reinterpret_cast<uintptr_t>(KernelPhysicalLoadAddress()));
   for (const memalloc::Range& range : gPhysHandoff->memory.get()) {
     if (range.type == memalloc::Type::kPeripheral) {
       dprintf(INFO, "ZBI: peripheral range [%#" PRIx64 ", %#" PRIx64 ")\n", range.addr,

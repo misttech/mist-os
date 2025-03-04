@@ -83,11 +83,6 @@ handoff_paddr           .req x22
   adr_global tmp, .Lboot_cpu_kstack_end
   mov sp, tmp
 
-  // Call into the arm64 boot mapping code to give it a chance to initialize its page tables
-  adr_global x0, __executable_start
-  sub x0, kernel_vaddr, x0 // compute the delta between virtual and physical addresses
-  bl arm64_boot_map_init
-
 .Lmmu_on_pc:
   isb
 
