@@ -33,7 +33,6 @@ DDK_PROTOCOL_DEF(DISPLAY_ENGINE,          12,   "display-engine", PF_NOPUB)
 // 13 was dotmatrix-display
 DDK_PROTOCOL_DEF(ETHERNET,                14,   "ethernet", 0)
 DDK_PROTOCOL_DEF(ETHERNET_IMPL,           15,   "ethernet-impl", 0)
-// FASTBOOT defined as 167 below.
 DDK_PROTOCOL_DEF(FRAMEBUFFER,             16,   "framebuffer", 0)
 DDK_PROTOCOL_DEF(GOLDFISH_ADDRESS_SPACE,  17,   "goldfish-address-space", 0)
 DDK_PROTOCOL_DEF(GOLDFISH_CONTROL,        18,   "goldfish-control", 0)
@@ -181,7 +180,7 @@ DDK_PROTOCOL_DEF(AML_MAILBOX,             163, "aml-mailbox", 0)
 // 165 was adb
 // Out-of-order (or added later).
 DDK_PROTOCOL_DEF(USB_INTERFACE_ASSOCIATION, 166, "usb-interface-association", PF_NOPUB)
-DDK_PROTOCOL_DEF(FASTBOOT, 167, "fastboot", 0)
+// 167 was fastboot
 DDK_PROTOCOL_DEF(WLAN_FACTORY,            168,   "wlan-factory", 0)
 // 170 was fan
 DDK_PROTOCOL_DEF(AUDIO_COMPOSITE,         171, "audio-composite", 0)

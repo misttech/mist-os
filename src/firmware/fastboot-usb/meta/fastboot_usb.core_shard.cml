@@ -25,16 +25,14 @@
             to: "#fastboot-usb",
         },
         {
+            service: "fuchsia.hardware.fastboot.Service",
+            from: "parent",
+            to: "#fastboot-usb",
+        },
+        {
             dictionary: "diagnostics",
             from: "parent",
             to: [ "#bt-map-mce" ],
-        },
-        {
-            directory: "dev-class",
-            from: "parent",
-            as: "dev-class-fastboot",
-            to: "#fastboot-usb",
-            subdir: "fastboot",
         },
     ],
 }
