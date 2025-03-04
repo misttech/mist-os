@@ -158,13 +158,24 @@ bool PhysicalPageProvider::DebugIsPageOk(vm_page_t* page, uint64_t offset) {
 }
 
 void PhysicalPageProvider::OnDetach() {
-  // The current synchronization strategy relies on OnDetach being called with the VMO lock being
-  // held. This allows us to assume that the detached_ flag only transitions under the VmCowPages
-  // lock.
-  AssertHeld(cow_pages_->lock_ref());
+  // Its possible for destruction to happen prior to initialization completing, and this can lead
+  // to OnDetach being called from what would be the cow_pages_, but prior to |Init| being called
+  // and the cow_pages_ pointer being setup. In this case we can safely ignore locking requirements
+  // and just set detached.
   Guard<Mutex> guard{&mtx_};
   ASSERT(!closed_);
-  detached_ = true;
+  if (phys_base_ == kInvalidPhysBase) {
+    ASSERT(!cow_pages_);
+    // As we cannot assert the cow_pages_ lock, due to it being a nullptr, we must temporarily
+    // disable analysis.
+    [&]() TA_NO_THREAD_SAFETY_ANALYSIS { detached_ = true; }();
+  } else {
+    // The current synchronization strategy relies on OnDetach being called with the VMO lock being
+    // held. This allows us to assume that the detached_ flag only transitions under the VmCowPages
+    // lock.
+    AssertHeld(cow_pages_->lock_ref());
+    detached_ = true;
+  }
 }
 
 void PhysicalPageProvider::OnClose() {
