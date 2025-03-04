@@ -34,25 +34,44 @@ use starnix_uapi::{
     WUNTRACED, __WALL, __WCLONE,
 };
 use static_assertions::const_assert_eq;
-use zerocopy::FromBytes;
+use zerocopy::{FromBytes, Immutable, IntoBytes};
 
 // Rust will let us do this cast in a const assignment but not in a const generic constraint.
 const SI_MAX_SIZE_AS_USIZE: usize = SI_MAX_SIZE as usize;
 
+type SigAction64Ptr = MultiArchUserRef<uapi::sigaction_t, uapi::arch32::sigaction64_t>;
 type SigActionPtr = MultiArchUserRef<uapi::sigaction_t, uapi::arch32::sigaction_t>;
 
 pub fn sys_rt_sigaction(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     signum: UncheckedSignal,
-    user_action: SigActionPtr,
-    user_old_action: SigActionPtr,
+    user_action: SigAction64Ptr,
+    user_old_action: SigAction64Ptr,
     sigset_size: usize,
 ) -> Result<(), Errno> {
-    if sigset_size != std::mem::size_of::<SigSet>() {
-        return error!(EINVAL);
+    if user_action.is_arch32() && sigset_size == std::mem::size_of::<uapi::arch32::sigset_t>() {
+        let user_action = SigActionPtr::from_32(user_action.addr().into());
+        let user_old_action = SigActionPtr::from_32(user_old_action.addr().into());
+        return rt_sigaction(current_task, signum, user_action, user_old_action);
     }
 
+    if sigset_size != std::mem::size_of::<uapi::sigset_t>() {
+        return error!(EINVAL);
+    }
+    rt_sigaction(current_task, signum, user_action, user_old_action)
+}
+
+fn rt_sigaction<Arch32SigAction>(
+    current_task: &CurrentTask,
+    signum: UncheckedSignal,
+    user_action: MultiArchUserRef<uapi::sigaction_t, Arch32SigAction>,
+    user_old_action: MultiArchUserRef<uapi::sigaction_t, Arch32SigAction>,
+) -> Result<(), Errno>
+where
+    Arch32SigAction:
+        IntoBytes + FromBytes + Immutable + TryFrom<uapi::sigaction_t> + Into<uapi::sigaction_t>,
+{
     let signal = Signal::try_from(signum)?;
 
     let new_signal_action = if !user_action.is_null() {

@@ -17076,6 +17076,24 @@ impl Default for ucontext {
     }
 }
 pub type ucontext_t = ucontext;
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct sigaction64 {
+    pub sa_handler: __sighandler_t,
+    pub sa_flags: crate::types::arch32::c_ulong,
+    pub sa_restorer: crate::uaddr32,
+    pub sa_mask: sigset64_t,
+}
+impl Default for sigaction64 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+pub type sigaction64_t = sigaction64;
 pub const SECCOMP_IOCTL_NOTIF_RECV: __u32 = 3226476800;
 pub const SECCOMP_IOCTL_NOTIF_SEND: __u32 = 3222806785;
 pub const SECCOMP_IOCTL_NOTIF_ID_VALID: __u32 = 1074274562;

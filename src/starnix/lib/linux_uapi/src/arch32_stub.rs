@@ -5,6 +5,7 @@
 pub use crate::*;
 
 pub type stat64 = crate::stat;
+pub type sigaction64_t = crate::sigaction_t;
 
 impl From<crate::statfs> for crate::statfs64 {
     fn from(_statfs: crate::statfs) -> Self {

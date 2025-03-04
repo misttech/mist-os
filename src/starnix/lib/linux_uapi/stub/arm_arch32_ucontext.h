@@ -23,4 +23,15 @@ typedef struct ucontext {
   char __padding[640];
 } ucontext_t;
 
+#if defined(sa_handler)
+#undef sa_handler
+#endif
+
+typedef struct sigaction64 {
+  __sighandler_t sa_handler;
+  unsigned long sa_flags;
+  void* sa_restorer;
+  sigset64_t sa_mask;
+} sigaction64_t;
+
 #endif  // SRC_STARNIX_LIB_LINUX_UAPI_STUB_ARM_ARCH32_UCONTEXT_H_

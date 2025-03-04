@@ -143,12 +143,35 @@ impl From<crate::arch32::__kernel_sigaction> for crate::__kernel_sigaction {
     }
 }
 
+impl From<crate::arch32::sigaction64> for crate::__kernel_sigaction {
+    fn from(sigaction: crate::arch32::sigaction64) -> Self {
+        Self {
+            sa_handler: sigaction.sa_handler.into(),
+            sa_mask: sigaction.sa_mask.into(),
+            sa_flags: sigaction.sa_flags.into(),
+            sa_restorer: sigaction.sa_restorer.into(),
+        }
+    }
+}
+
 impl TryFrom<crate::__kernel_sigaction> for crate::arch32::__kernel_sigaction {
     type Error = ();
     fn try_from(sigaction: crate::__kernel_sigaction) -> Result<Self, ()> {
         Ok(Self {
             sa_handler: sigaction.sa_handler.try_into().map_err(|_| ())?,
             sa_mask: sigaction.sa_mask.sig[0].try_into().map_err(|_| ())?,
+            sa_flags: sigaction.sa_flags.try_into().map_err(|_| ())?,
+            sa_restorer: sigaction.sa_restorer.try_into().map_err(|_| ())?,
+        })
+    }
+}
+
+impl TryFrom<crate::__kernel_sigaction> for crate::arch32::sigaction64 {
+    type Error = ();
+    fn try_from(sigaction: crate::__kernel_sigaction) -> Result<Self, ()> {
+        Ok(Self {
+            sa_handler: sigaction.sa_handler.try_into().map_err(|_| ())?,
+            sa_mask: sigaction.sa_mask.try_into().map_err(|_| ())?,
             sa_flags: sigaction.sa_flags.try_into().map_err(|_| ())?,
             sa_restorer: sigaction.sa_restorer.try_into().map_err(|_| ())?,
         })
