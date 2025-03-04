@@ -63,8 +63,8 @@ namespace fidl_display = fuchsia_hardware_display;
 
 namespace display_coordinator {
 
-void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
-  if (!info->edid.has_value()) {
+void Controller::PopulateDisplayTimings(DisplayInfo& display_info) {
+  if (!display_info.edid.has_value()) {
     return;
   }
 
@@ -89,18 +89,18 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
       },
   };
   display_config_t test_config = {
-      .display_id = display::ToBanjoDisplayId(info->id()),
+      .display_id = display::ToBanjoDisplayId(display_info.id()),
       .layer_list = test_layers,
       .layer_count = 1,
   };
 
-  for (auto edid_timing = edid::timing_iterator(&info->edid->base); edid_timing.is_valid();
+  for (auto edid_timing = edid::timing_iterator(&display_info.edid->base); edid_timing.is_valid();
        ++edid_timing) {
     const display::DisplayTiming& timing = *edid_timing;
     int32_t width = timing.horizontal_active_px;
     int32_t height = timing.vertical_active_lines;
     bool duplicate = false;
-    for (const display::DisplayTiming& existing_timing : info->edid->timings) {
+    for (const display::DisplayTiming& existing_timing : display_info.edid->timings) {
       if (existing_timing.vertical_field_refresh_rate_millihertz() ==
               timing.vertical_field_refresh_rate_millihertz() &&
           existing_timing.horizontal_active_px == width &&
@@ -134,7 +134,7 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
         /*layer_composition_operations_count=*/1, &display_layer_results_count);
     if (display_cfg_result == CONFIG_CHECK_RESULT_OK) {
       fbl::AllocChecker ac;
-      info->edid->timings.push_back(timing, &ac);
+      display_info.edid->timings.push_back(timing, &ac);
       if (!ac.check()) {
         FDF_LOG(WARNING, "Edid skip allocation failed");
         break;
@@ -146,36 +146,20 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
 void Controller::AddDisplay(std::unique_ptr<AddedDisplayInfo> added_display_info) {
   ZX_DEBUG_ASSERT(IsRunningOnClientDispatcher());
 
-  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result =
+  zx::result<std::unique_ptr<DisplayInfo>> display_info_result =
       DisplayInfo::Create(std::move(*added_display_info));
   if (display_info_result.is_error()) {
     // DisplayInfo::Create() has already logged the error.
     return;
   }
-
-  fbl::RefPtr<DisplayInfo> display_info = std::move(display_info_result).value();
-  display::DisplayId display_id = display_info->id();
-
-  {
-    fbl::AutoLock lock(mtx());
-    auto display_it = displays_.find(display_id);
-    if (display_it != displays_.end()) {
-      FDF_LOG(WARNING, "Display %" PRIu64 " is already created; add display request ignored",
-              display_id.value());
-      return;
-    }
-    displays_.insert(display_info);
-  }
+  std::unique_ptr<DisplayInfo> display_info = std::move(display_info_result).value();
 
   if (display_info->edid.has_value()) {
-    PopulateDisplayTimings(display_info);
+    PopulateDisplayTimings(*display_info);
   }
 
-  fbl::AutoLock lock(mtx());
-
-  // TODO(https://fxbug.dev/317914671): Pass parsed display metadata to driver.
-
-  const std::array<display::DisplayId, 1> added_id_candidates = {display_info->id()};
+  display::DisplayId display_id = display_info->id();
+  const std::array<display::DisplayId, 1> added_id_candidates = {display_id};
   std::span<const display::DisplayId> added_ids(added_id_candidates);
 
   // TODO(https://fxbug.dev/339311596): Do not trigger the client's
@@ -191,6 +175,17 @@ void Controller::AddDisplay(std::unique_ptr<AddedDisplayInfo> added_display_info
     added_ids = {};
   }
 
+  fbl::AutoLock<fbl::Mutex> lock(mtx());
+  auto display_it = displays_.find(display_id);
+  if (display_it != displays_.end()) {
+    FDF_LOG(WARNING, "Display %" PRIu64 " is already created; add display request ignored",
+            display_id.value());
+    return;
+  }
+  displays_.insert(std::move(display_info));
+
+  // TODO(https://fxbug.dev/317914671): Pass parsed display metadata to driver.
+
   if (virtcon_client_ready_) {
     ZX_DEBUG_ASSERT(virtcon_client_ != nullptr);
     virtcon_client_->OnDisplaysChanged(added_ids, /*removed_display_ids=*/{});
@@ -205,7 +200,7 @@ void Controller::RemoveDisplay(display::DisplayId removed_display_id) {
   ZX_DEBUG_ASSERT(IsRunningOnClientDispatcher());
 
   fbl::AutoLock lock(mtx());
-  fbl::RefPtr<DisplayInfo> removed_display = displays_.erase(removed_display_id);
+  std::unique_ptr<DisplayInfo> removed_display = displays_.erase(removed_display_id);
   if (!removed_display) {
     FDF_LOG(WARNING, "Display removal references unknown display ID: %" PRIu64,
             removed_display_id.value());

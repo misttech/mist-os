@@ -10,6 +10,7 @@
 #include <zircon/errors.h>
 #include <zircon/status.h>
 
+#include <memory>
 #include <utility>
 
 #include <gtest/gtest.h>
@@ -48,11 +49,11 @@ TEST_F(DisplayInfoTest, InitializeWithEdidValueSingleBlock) {
   std::unique_ptr<AddedDisplayInfo> added_display_info =
       std::move(added_display_info_result).value();
 
-  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result =
+  zx::result<std::unique_ptr<DisplayInfo>> display_info_result =
       DisplayInfo::Create(std::move(*added_display_info));
   ASSERT_OK(display_info_result);
 
-  fbl::RefPtr<DisplayInfo> display_info = std::move(display_info_result).value();
+  std::unique_ptr<DisplayInfo> display_info = std::move(display_info_result).value();
   ASSERT_TRUE(display_info->edid.has_value());
 
   const edid::Edid& edid_base = display_info->edid->base;
@@ -82,11 +83,11 @@ TEST_F(DisplayInfoTest, InitializeWithEdidValueMultipleBlocks) {
   std::unique_ptr<AddedDisplayInfo> added_display_info =
       std::move(added_display_info_result).value();
 
-  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result =
+  zx::result<std::unique_ptr<DisplayInfo>> display_info_result =
       DisplayInfo::Create(std::move(*added_display_info));
   ASSERT_OK(display_info_result);
 
-  fbl::RefPtr<DisplayInfo> display_info = std::move(display_info_result).value();
+  std::unique_ptr<DisplayInfo> display_info = std::move(display_info_result).value();
   ASSERT_TRUE(display_info->edid.has_value());
 
   const edid::Edid& edid_base = display_info->edid->base;
@@ -120,7 +121,7 @@ TEST_F(DisplayInfoTest, InitializeWithEdidValueOfInvalidLength) {
   std::unique_ptr<AddedDisplayInfo> added_display_info =
       std::move(added_display_info_result).value();
 
-  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result =
+  zx::result<std::unique_ptr<DisplayInfo>> display_info_result =
       DisplayInfo::Create(std::move(*added_display_info));
   ASSERT_FALSE(display_info_result.is_ok());
   EXPECT_STATUS(display_info_result.error_value(), ZX_ERR_INTERNAL);
@@ -150,7 +151,7 @@ TEST_F(DisplayInfoTest, InitializeWithEdidValueIncomplete) {
   std::unique_ptr<AddedDisplayInfo> added_display_info =
       std::move(added_display_info_result).value();
 
-  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result =
+  zx::result<std::unique_ptr<DisplayInfo>> display_info_result =
       DisplayInfo::Create(std::move(*added_display_info));
   ASSERT_FALSE(display_info_result.is_ok());
   EXPECT_STATUS(display_info_result.error_value(), ZX_ERR_INTERNAL);
@@ -189,7 +190,7 @@ TEST_F(DisplayInfoTest, InitializeWithEdidValueNonDigitalDisplay) {
   std::unique_ptr<AddedDisplayInfo> added_display_info =
       std::move(added_display_info_result).value();
 
-  zx::result<fbl::RefPtr<DisplayInfo>> display_info_result =
+  zx::result<std::unique_ptr<DisplayInfo>> display_info_result =
       DisplayInfo::Create(std::move(*added_display_info));
   ASSERT_FALSE(display_info_result.is_ok());
   EXPECT_STATUS(display_info_result.error_value(), ZX_ERR_INTERNAL);

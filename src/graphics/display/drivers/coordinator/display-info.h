@@ -11,13 +11,13 @@
 #include <lib/inspect/cpp/inspect.h>
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <queue>
 #include <string_view>
 #include <vector>
 
 #include <fbl/array.h>
-#include <fbl/ref_counted.h>
 #include <fbl/string_printf.h>
 #include <fbl/vector.h>
 
@@ -34,11 +34,13 @@
 
 namespace display_coordinator {
 
-class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, display::DisplayId>,
-                    public fbl::RefCounted<DisplayInfo> {
+class DisplayInfo : public IdMappable<std::unique_ptr<DisplayInfo>, display::DisplayId> {
  public:
   // Consumes `added_display_info`.
-  static zx::result<fbl::RefPtr<DisplayInfo>> Create(AddedDisplayInfo added_display_info);
+  static zx::result<std::unique_ptr<DisplayInfo>> Create(AddedDisplayInfo added_display_info);
+
+  // Exposed for testing. Prefer obtaining instances from the `Create()` factory method.
+  explicit DisplayInfo(display::DisplayId display_id);
 
   DisplayInfo(const DisplayInfo&) = delete;
   DisplayInfo(DisplayInfo&&) = delete;
@@ -126,8 +128,6 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, display::Display
   std::queue<ConfigImages> config_image_queue;
 
  private:
-  explicit DisplayInfo(display::DisplayId display_id);
-
   inspect::Node node;
   inspect::ValueList properties;
 };

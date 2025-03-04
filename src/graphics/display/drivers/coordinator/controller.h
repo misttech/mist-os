@@ -208,7 +208,7 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   void RemoveDisplay(display::DisplayId removed_display_id);
 
   // Must be called on the client dispatcher.
-  void PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) __TA_EXCLUDES(mtx());
+  void PopulateDisplayTimings(DisplayInfo& info) __TA_EXCLUDES(mtx());
 
   inspect::Inspector inspector_;
   // Currently located at bootstrap/driver_manager:root/display.

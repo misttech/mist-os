@@ -11,6 +11,7 @@
 #include <zircon/assert.h>
 #include <zircon/device/audio.h>
 #include <zircon/errors.h>
+#include <zircon/status.h>
 #include <zircon/syscalls.h>
 #include <zircon/time.h>
 
@@ -93,13 +94,12 @@ void DisplayInfo::InitializeInspect(inspect::Node* parent_node) {
 }
 
 // static
-zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(AddedDisplayInfo added_display_info) {
+zx::result<std::unique_ptr<DisplayInfo>> DisplayInfo::Create(AddedDisplayInfo added_display_info) {
   ZX_DEBUG_ASSERT(added_display_info.display_id != display::kInvalidDisplayId);
   display::DisplayId display_id = added_display_info.display_id;
 
   fbl::AllocChecker alloc_checker;
-  fbl::RefPtr<DisplayInfo> display_info =
-      fbl::AdoptRef(new (&alloc_checker) DisplayInfo(display_id));
+  auto display_info = fbl::make_unique_checked<DisplayInfo>(&alloc_checker, display_id);
   if (!alloc_checker.check()) {
     FDF_LOG(ERROR, "Failed to allocate DisplayInfo for display ID: %" PRIu64, display_id.value());
     return zx::error(ZX_ERR_NO_MEMORY);
