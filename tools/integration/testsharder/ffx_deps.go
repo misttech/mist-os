@@ -19,9 +19,9 @@ func AddFFXDeps(s *Shard, buildDir string, tools build.Tools, flash bool) error 
 	if len(s.Tests) == 0 {
 		return fmt.Errorf("shard %s has no tests", s.Name)
 	}
-	subtools := []string{"test", "log"}
+	subtools := []string{"package", "product", "test", "log"}
 	if s.Env.TargetsEmulator() {
-		subtools = append(subtools, "emu", "product")
+		subtools = append(subtools, "emu")
 		deps, err := ffxutil.GetEmuDeps(buildDir, s.TargetCPU(), []string{})
 		if err != nil {
 			return err
