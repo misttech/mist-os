@@ -205,9 +205,9 @@ struct HdmiPllConfigForMipiDsi {
 
   int64_t pll_voltage_controlled_oscillator_output_frequency_hz;
 
-  uint32_t output_divider1_selection;
-  uint32_t output_divider2_selection;
-  uint32_t output_divider3_selection;
+  int32_t output_divider1;
+  int32_t output_divider2;
+  int32_t output_divider3;
 
   // divisor parameters
   uint32_t clock_factor;

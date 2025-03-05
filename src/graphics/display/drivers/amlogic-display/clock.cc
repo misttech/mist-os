@@ -171,12 +171,12 @@ zx::result<HdmiPllConfigForMipiDsi> Clock::GenerateHPLL(
               (voltage_controlled_oscillator_output_frequency_hz <=
                kMaxVoltageControlledOscillatorFrequencyHz)) {
             // within range!
-            pll_cfg.output_divider1_selection = output_divider1 >> 1;
-            pll_cfg.output_divider2_selection = output_divider2 >> 1;
-            pll_cfg.output_divider3_selection = output_divider3 >> 1;
+            pll_cfg.output_divider1 = output_divider1;
+            pll_cfg.output_divider2 = output_divider2;
+            pll_cfg.output_divider3 = output_divider3;
             pll_cfg.pll_frequency_hz = requested_pll_frequency_hz;
-            FDF_LOG(TRACE, "od1=%d, od2=%d, od3=%d", (output_divider1 >> 1), (output_divider2 >> 1),
-                    (output_divider3 >> 1));
+            FDF_LOG(TRACE, "od1=%" PRId32 ", od2=%" PRId32 ", od3=%" PRId32, output_divider1,
+                    output_divider2, output_divider3);
             FDF_LOG(TRACE, "pll_fvco=%" PRId64, voltage_controlled_oscillator_output_frequency_hz);
             pll_cfg.pll_voltage_controlled_oscillator_output_frequency_hz =
                 voltage_controlled_oscillator_output_frequency_hz;
@@ -264,9 +264,9 @@ zx::result<> Clock::Enable(const PanelConfig& panel_config) {
       .set_hdmi_clock_out2_enabled(true)
       .SetDenominator(pll_cfg_.pll_divider)
       .SetNumeratorInteger(pll_cfg_.pll_multiplier_integer)
-      .SetOutputDivider1(pll_cfg_.output_divider1_selection)
-      .SetOutputDivider2(pll_cfg_.output_divider2_selection)
-      .SetOutputDivider3(pll_cfg_.output_divider3_selection)
+      .SetOutputDivider1(pll_cfg_.output_divider1)
+      .SetOutputDivider2(pll_cfg_.output_divider2)
+      .SetOutputDivider3(pll_cfg_.output_divider3)
       .set_numerator_fraction_enabled(use_fraction)
       .WriteTo(&hhi_mmio_);
 
