@@ -585,7 +585,7 @@ class KernelDriver {
       while (!ready) {
         // Block or just unlock and spin or whatever "wait" means to Sync.
         // If that means blocking for interrupt wakeup, enable tx interrupts.
-        waiter_.template Wait(
+        waiter_.Wait(
             lock,
             [this]() {
               SyncPolicy::AssertHeld(lock_);

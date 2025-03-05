@@ -85,7 +85,7 @@ class Writer {
       Writer& writer;
     };
 
-    Literal("\033["sv).template DecimalDigits(static_cast<unsigned int>(color)).Literal('m');
+    Literal("\033["sv).DecimalDigits(static_cast<unsigned int>(color)).Literal('m');
     if (bold) {
       Literal("\033[1m"sv);
     }
