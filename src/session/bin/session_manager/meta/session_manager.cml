@@ -526,15 +526,6 @@
             to: "#session",
         },
         {
-            directory: [
-                "dev-block",
-                "dev-skip-block",
-            ],
-            from: "parent",
-            to: "#session",
-            availability: "same_as_target",
-        },
-        {
             directory: [ "dev-bt-hci" ],
             from: "parent",
             to: "#session",

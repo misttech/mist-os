@@ -241,20 +241,6 @@
         {
             directory: "dev-class",
             from: "parent",
-            as: "dev-block",
-            to: "#session-manager",
-            subdir: "block",
-        },
-        {
-            directory: "dev-class",
-            from: "parent",
-            as: "dev-skip-block",
-            to: "#session-manager",
-            subdir: "skip-block",
-        },
-        {
-            directory: "dev-class",
-            from: "parent",
             as: "dev-hrtimer",
             to: [ "#session-manager" ],
             subdir: "hrtimer",
