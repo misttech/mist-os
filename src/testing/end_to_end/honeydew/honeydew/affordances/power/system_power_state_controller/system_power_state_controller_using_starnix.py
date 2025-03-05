@@ -608,7 +608,9 @@ class SystemPowerStateControllerUsingStarnix(
             raise system_power_state_controller_interface.SystemPowerStateControllerError(
                 f"Based on SAG inspect data, '{suspend_state}' followed "
                 f"by '{resume_mode}' operation didn't succeed on "
-                f"'{self._device_name}'. "
+                f"'{self._device_name}', expected "
+                f"{suspend_resume_stats_before['success_count'] + 1}, "
+                f"but found {suspend_resume_stats_after['success_count']}."
             )
 
         suspend_resume_duration_nano_sec: float = suspend_resume_stats_after[
