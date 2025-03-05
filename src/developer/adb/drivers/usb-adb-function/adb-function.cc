@@ -206,6 +206,10 @@ bool UsbAdbDevice::ReceiveQueuedOnce() {
       zxlogf(ERROR, "Failed to get mapped");
       rx_requests_.front().Reply(fit::error(ZX_ERR_INTERNAL));
     } else {
+      auto status = req.CacheFlushInvalidate(bulk_out_ep_.GetMapped());
+      if (status != ZX_OK) {
+        zxlogf(ERROR, "Cache flush and invalidate failed %d", status);
+      }
       rx_requests_.front().Reply(fit::ok(
           std::vector<uint8_t>(reinterpret_cast<uint8_t*>(*addr),
                                reinterpret_cast<uint8_t*>(*addr) + *completion.transfer_size())));
@@ -214,10 +218,6 @@ bool UsbAdbDevice::ReceiveQueuedOnce() {
   rx_requests_.pop();
 
   req.reset_buffers(bulk_out_ep_.GetMapped());
-  auto status = req.CacheFlushInvalidate(bulk_out_ep_.GetMapped());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Cache flush and invalidate failed %d", status);
-  }
 
   std::vector<fuchsia_hardware_usb_request::Request> requests;
   requests.emplace_back(req.take_request());
