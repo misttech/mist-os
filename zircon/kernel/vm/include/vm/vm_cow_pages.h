@@ -243,6 +243,8 @@ class VmCowPages final : public VmHierarchyBase,
   // both are true should the caller actually borrow at the caller's specific potential borrowing
   // site.  For example, see is_borrowing_in_supplypages_enabled() and
   // is_borrowing_on_mru_enabled().
+  // Aside from the general borrowing in the pmm_physical_page_borrow_config being turned on and
+  // off, the ability to borrow is constant over the lifetime of the VmCowPages.
   bool can_borrow_locked() const TA_REQ(lock()) {
     // TODO(dustingreen): Or rashaeqbal@.  We can only borrow while the page is not dirty.
     // Currently we enforce this by checking ShouldTrapDirtyTransitions() below and leaning on the
@@ -272,6 +274,25 @@ class VmCowPages final : public VmHierarchyBase,
     // with borrowing).
     bool borrowing_is_generally_acceptable =
         pmm_physical_page_borrowing_config()->is_any_borrowing_enabled();
+
+    // Avoid borrowing and trapping dirty transitions overlapping for now; nothing really stops
+    // these from being compatible AFAICT - we're just avoiding overlap of these two things until
+    // later.
+    bool overlapping_with_other_features = page_source_->ShouldTrapDirtyTransitions();
+
+    return source_is_suitable && borrowing_is_generally_acceptable &&
+           !overlapping_with_other_features;
+  }
+
+  // In addition to whether a VmCowPages is allowed, for correctness reasons, to borrow pages there
+  // are other, potentially variable, factors that influence whether it's considered a good idea for
+  // this VmCowPages to borrow pages. In particular it's possible for this to change over the
+  // lifetime of the VmCowPages.
+  bool should_borrow_locked() const TA_REQ(lock()) {
+    const bool can_borrow = can_borrow_locked();
+    if (!can_borrow) {
+      return false;
+    }
     // Exclude is_latency_sensitive_ to avoid adding latency due to reclaim.
     //
     // Currently we evict instead of replacing a page when reclaiming, so we want to avoid evicting
@@ -279,14 +300,9 @@ class VmCowPages final : public VmHierarchyBase,
     //
     // We also don't want to borrow a page that might get pinned again since we want to mitigate the
     // possibility of an invalid DMA-after-free.
-    bool excluded_from_borrowing_for_latency_reasons = high_priority_count_ != 0 || ever_pinned_;
-    // Avoid borrowing and trapping dirty transitions overlapping for now; nothing really stops
-    // these from being compatible AFAICT - we're just avoiding overlap of these two things until
-    // later.
-    bool overlapping_with_other_features = page_source_->ShouldTrapDirtyTransitions();
-
-    return source_is_suitable && borrowing_is_generally_acceptable &&
-           !excluded_from_borrowing_for_latency_reasons && !overlapping_with_other_features;
+    const bool excluded_from_borrowing_for_latency_reasons =
+        high_priority_count_ != 0 || ever_pinned_;
+    return !excluded_from_borrowing_for_latency_reasons;
   }
 
   // Returns whether this cow pages node is dirty tracked.

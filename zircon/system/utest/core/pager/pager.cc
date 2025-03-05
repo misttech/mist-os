@@ -4259,4 +4259,91 @@ TEST(Pager, SuspendInKernelCaptureFaultsTest) {
   ASSERT_FALSE(pager.GetPageDirtyRequest(vmo, 0, &offset, &length));
 }
 
+// Regression test for ensuring that pinning a pager backed VMO with loaned pages correctly replaces
+// the loaned pages.
+TEST(Pager, PinPagerVmoWithLoanedPages) {
+  zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
+  if (!system_resource->is_valid()) {
+    printf("System resource not available, skipping\n");
+    return;
+  }
+
+  zx::result<zx::resource> result =
+      maybe_standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_IOMMU_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource iommu_resource = std::move(result.value());
+
+  zx::iommu iommu;
+  zx::bti bti;
+  zx_iommu_desc_dummy_t desc;
+  auto final_bti_check = vmo_test::CreateDeferredBtiCheck(bti);
+
+  EXPECT_OK(zx::iommu::create(iommu_resource, ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu));
+  bti = vmo_test::CreateNamedBti(iommu, 0, 0xdeadbeef, "VmoTestCase::CompressedContiguous");
+
+  zx_info_bti_t bti_info;
+  EXPECT_OK(bti.get_info(ZX_INFO_BTI, &bti_info, sizeof(bti_info), nullptr, nullptr));
+
+  constexpr size_t kNumPages = 2048;
+
+  // Create single page contiguous VMOs to give us pages to decommit, but avoiding needing to
+  // actually find a contiguous run of pages that could fail.
+  zx::vmo contig_vmos[kNumPages];
+  for (size_t i = 0; i < kNumPages; i++) {
+    ASSERT_OK(zx::vmo::create_contiguous(bti, zx_system_get_page_size(), 0, &contig_vmos[i]));
+  }
+
+  // Now create the pager ready for the loaned pages.
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  Vmo* pager_vmo;
+  ASSERT_TRUE(pager.CreateVmoWithOptions(kNumPages, 0, &pager_vmo));
+
+  // Decommit all the pages from the contiguous VMOs, being tolerant of borrowing potentially not
+  // being enabled.
+  for (size_t i = 0; i < kNumPages; i++) {
+    zx_status_t status =
+        contig_vmos[i].op_range(ZX_VMO_OP_DECOMMIT, 0, zx_system_get_page_size(), nullptr, 0);
+    if (status == ZX_ERR_NOT_SUPPORTED) {
+      printf("Page borrowing not enabled, skipping\n");
+      return;
+    }
+    EXPECT_OK(status);
+  }
+
+  // Now supply the pager, hopefully causing some of the recently loaned pages to be used in the
+  // supply step.
+  EXPECT_TRUE(pager.SupplyPages(pager_vmo, 0, kNumPages));
+  // Make sure any evictions just get a re-supply.
+  EXPECT_TRUE(pager.StartTaggedPageFaultHandler());
+  pager_vmo->SetPageFaultSupplyLimit(kNumPages);
+
+  // Pin a single page from the pager vmo. This will mark the VMO overall as being pinned, and not
+  // a candidate for receiving loaned pages.
+  zx::pmt pmt;
+  uint64_t addr;
+  EXPECT_OK(
+      bti.pin(ZX_BTI_PERM_READ, pager_vmo->vmo(), 0, zx_system_get_page_size(), &addr, 1, &pmt));
+
+  // Pin the remaining portion of the VMO. Although the VMO is not presently eligible for receiving
+  // loaned pages, it might still have loaned pages from the original supply, and these still need
+  // to be replaced.
+  // Failure mode on regression is a kernel panic finding that a page is still loaned when it
+  // attempts to increment the pin count.
+  zx::pmt pmt2;
+  uint64_t addrs[kNumPages - 1];
+  EXPECT_OK(bti.pin(ZX_BTI_PERM_READ, pager_vmo->vmo(), zx_system_get_page_size(),
+                    (kNumPages - 1) * zx_system_get_page_size(), addrs, kNumPages - 1, &pmt2));
+
+  // Recommit the contiguous VMOs. These pages should be available, and not pinned.
+  for (size_t i = 0; i < kNumPages; i++) {
+    EXPECT_OK(contig_vmos[i].op_range(ZX_VMO_OP_COMMIT, 0, zx_system_get_page_size(), nullptr, 0));
+  }
+
+  // Must explicitly unpin.
+  EXPECT_OK(pmt2.unpin());
+  EXPECT_OK(pmt.unpin());
+}
+
 }  // namespace pager_tests

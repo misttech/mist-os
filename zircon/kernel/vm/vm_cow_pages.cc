@@ -4915,7 +4915,7 @@ zx_status_t VmCowPages::SupplyPagesLocked(VmCowRange range, VmPageSpliceList* pa
       }
     }
     VmPageOrMarker old_page;
-    if (options != SupplyOptions::PhysicalPageProvider && can_borrow_locked() &&
+    if (options != SupplyOptions::PhysicalPageProvider && should_borrow_locked() &&
         src_page.IsPage() &&
         pmm_physical_page_borrowing_config()->is_borrowing_in_supplypages_enabled()) {
       // Assert some things we implicitly know are true (currently).  We can avoid explicitly
@@ -6281,7 +6281,7 @@ zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offse
   vm_page_t* new_page = nullptr;
   zx_status_t status = ZX_OK;
   if (with_loaned) {
-    if (!can_borrow_locked()) {
+    if (!should_borrow_locked()) {
       return ZX_ERR_NOT_SUPPORTED;
     }
     if (is_page_dirty_tracked(old_page) && !is_page_clean(old_page)) {
