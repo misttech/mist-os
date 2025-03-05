@@ -157,6 +157,28 @@ impl CgroupRoot {
     pub fn get_cgroup(&self, pid: pid_t) -> Option<Weak<Cgroup>> {
         self.pid_table.lock().get(&pid).cloned()
     }
+
+    pub fn inherit_cgroup(
+        &self,
+        parent_pid: pid_t,
+        child_pid: pid_t,
+        thread_group: &TempRef<'_, ThreadGroup>,
+    ) {
+        let mut pid_table = self.pid_table.lock();
+        if let Some(cgroup) = pid_table.get(&parent_pid).cloned() {
+            assert!(
+                pid_table.insert(child_pid, cgroup.clone()).is_none(),
+                "child pid should not exist when inheriting"
+            );
+            cgroup
+                .upgrade()
+                .expect("parent cgroup should not be deprecated")
+                .state
+                .lock()
+                .add_process(child_pid, thread_group)
+                .expect("cgroup should not be deleted");
+        }
+    }
 }
 
 impl CgroupOps for CgroupRoot {

@@ -24,6 +24,7 @@ constexpr char EVENTS_FILE[] = "cgroup.events";
 constexpr char KILL_FILE[] = "cgroup.kill";
 constexpr char EVENTS_POPULATED[] = "populated 1";
 constexpr char EVENTS_NOT_POPULATED[] = "populated 0";
+constexpr char PROC_CGROUP_PREFIX[] = "0::";
 
 // Mounts cgroup2 in a temporary directory for each test case, and deletes all cgroups created by
 // `CreateCgroup` at the end of each test, and all mountpoints of the cgroup.
@@ -495,7 +496,7 @@ TEST_F(CgroupTest, ProcfsCgroup) {
   std::string procfs_cgroup_path = "/proc/self/cgroup";
   std::string pid_string = std::to_string(getpid());
 
-  CheckFileHasLine(procfs_cgroup_path, "0::/");
+  CheckFileHasLine(procfs_cgroup_path, PROC_CGROUP_PREFIX + std::string("/"));
 
   CreateCgroup(child_path);
   CreateCgroup(grandchild_path);
@@ -507,7 +508,7 @@ TEST_F(CgroupTest, ProcfsCgroup) {
                 SyscallSucceeds());
   }
 
-  CheckFileHasLine(procfs_cgroup_path, "0::" + child_path_from_root);
+  CheckFileHasLine(procfs_cgroup_path, PROC_CGROUP_PREFIX + child_path_from_root);
 
   {
     fbl::unique_fd grandchild_procs_fd(open(grandchild_procs_path.c_str(), O_WRONLY));
@@ -516,7 +517,7 @@ TEST_F(CgroupTest, ProcfsCgroup) {
                 SyscallSucceeds());
   }
 
-  CheckFileHasLine(procfs_cgroup_path, "0::" + grandchild_path_from_root);
+  CheckFileHasLine(procfs_cgroup_path, PROC_CGROUP_PREFIX + grandchild_path_from_root);
   {
     fbl::unique_fd procs_fd(open(root_procs_path.c_str(), O_WRONLY));
     ASSERT_TRUE(procs_fd.is_valid());
@@ -548,4 +549,43 @@ TEST_F(CgroupTest, MountCgroup2Twice) {
   CreateCgroup(grandchild_path_mirrored);
   CheckDirectoryIncludes(child_path, {{.name = grandchild, .type = DT_DIR}});
   CheckInterfaceFilesExist(grandchild_path, false);
+}
+
+TEST_F(CgroupTest, ForkedProcessInheritsCgroup) {
+  // Create child cgroup and put the current pid into it. Fork a new process which should be
+  // automatically added the cgroup
+  std::string child_str = "/child";
+  std::string child_path = root_path() + child_str;
+  std::string child_procs_path = child_path + "/" + PROCS_FILE;
+  std::string procfs_cgroup_path = "/proc/self/cgroup";
+  std::string procfs_cgroup_str = PROC_CGROUP_PREFIX + child_str;
+  std::string pid_string = std::to_string(getpid());
+
+  CreateCgroup(child_path);
+
+  // Move current process to the child cgroup.
+  {
+    fbl::unique_fd child_procs_fd(open(child_procs_path.c_str(), O_WRONLY));
+    ASSERT_TRUE(child_procs_fd.is_valid());
+    EXPECT_THAT(write(child_procs_fd.get(), pid_string.c_str(), pid_string.length()),
+                SyscallSucceeds());
+  }
+  CheckFileHasLine(procfs_cgroup_path, procfs_cgroup_str);
+
+  test_helper::ForkHelper fork_helper;
+  fork_helper.OnlyWaitForForkedChildren();
+
+  fork_helper.RunInForkedProcess([&]() {
+    // Child process should be in same cgroup as parent.
+    CheckFileHasLine(procfs_cgroup_path, procfs_cgroup_str);
+    return 0;
+  });
+  EXPECT_TRUE(fork_helper.WaitForChildren());
+
+  {
+    // Move current process back to the root cgroup.
+    fbl::unique_fd procs_fd(open((root_path() + "/" + PROCS_FILE).c_str(), O_WRONLY));
+    ASSERT_TRUE(procs_fd.is_valid());
+    EXPECT_THAT(write(procs_fd.get(), pid_string.c_str(), pid_string.length()), SyscallSucceeds());
+  }
 }

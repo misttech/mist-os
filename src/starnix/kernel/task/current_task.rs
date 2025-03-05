@@ -1825,6 +1825,12 @@ impl CurrentTask {
 
                 task_info.thread_group.write().is_sharing = is_sharing;
 
+                kernel.cgroups.cgroup2.inherit_cgroup(
+                    self.get_pid(),
+                    pid,
+                    &OwnedRef::temp(&task_info.thread_group),
+                );
+
                 task_info
             }
         };
