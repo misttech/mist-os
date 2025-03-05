@@ -17,9 +17,10 @@ pub async fn create_client(
 ) -> Option<(netdevice_client::Client, netdevice_client::Port)> {
     let (directory, directory_server) = create_proxy::<fidl_fuchsia_io::DirectoryMarker>();
 
-    fdio::service_connect_at(
+    fdio::open_at(
         devfs.as_channel().as_ref(),
         "class/network",
+        fidl_fuchsia_io::PERM_READABLE,
         directory_server.into_channel(),
     )
     .expect("connect to /dev/class/network");

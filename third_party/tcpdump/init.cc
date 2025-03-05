@@ -130,8 +130,9 @@ __attribute__((constructor)) void init_packet_socket_provider() {
         {
           auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
           {
-            zx_status_t status = fdio_service_connect(root.c_str(), server.TakeChannel().release());
-            ZX_ASSERT_MSG(status == ZX_OK, "fdio_service_connect(%s, _): %s", root.c_str(),
+            zx_status_t status =
+                fdio_open3(root.c_str(), uint64_t{kServeFlags}, server.TakeChannel().release());
+            ZX_ASSERT_MSG(status == ZX_OK, "fdio_open3(%s, ...): %s", root.c_str(),
                           zx_status_get_string(status));
           }
           composed_root_dir.SetFallback(std::move(client));
