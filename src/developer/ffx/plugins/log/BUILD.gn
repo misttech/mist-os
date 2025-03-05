@@ -49,7 +49,6 @@ ffx_plugin("ffx_log") {
     "src/error.rs",
     "src/lib.rs",
     "src/mutex.rs",
-    "src/symbolizer.rs",
     "src/testing_utils.rs",
     "src/transactional_symbolizer.rs",
   ]
@@ -83,6 +82,7 @@ ffx_tool("ffx_log_tool") {
     "//src/developer/ffx/lib/fho:lib",
     "//src/lib/fuchsia-async",
   ]
+
   sources = [ "src/main.rs" ]
 
   sdk_target_name = "sdk"
