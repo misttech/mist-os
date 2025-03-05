@@ -454,6 +454,9 @@ foreach(version, header_test_stdcxx) {
         # libc++ headers are not warning-clean.
         "//build/config:Wno-conversion",
       ]
+
+      # TODO(https://fxbug.dev/400986232): Remove when this is resolved upstream
+      configs += [ "//build/config:Wno-nullability-completeness" ]
     }
 
     config("test.$prefix++$version") {

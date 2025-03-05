@@ -939,6 +939,10 @@ config("Wno-gnu-folding-constant") {
   cflags = [ "-Wno-gnu-folding-constant" ]
 }
 
+config("Wno-nullability-completeness") {
+  cflags = [ "-Wno-nullability-completeness" ]
+}
+
 # TODO(https://fxbug.dev/42136089): clean up instances of this outside of third party code.
 #
 # NOTE: Do not add this to public_configs under any circumstances. Public
