@@ -2133,12 +2133,14 @@ is_coverage = select_variant + [
                 "coverage-rust",
                 "coverage-cts",
                 "profile",
+                "profile-rust",
               ] -
               [
                 "coverage",
                 "coverage-rust",
                 "coverage-cts",
                 "profile",
+                "profile-rust",
               ] != select_variant
 is_clang_coverage =
     select_variant + [ "coverage" ] - [ "coverage" ] != select_variant
