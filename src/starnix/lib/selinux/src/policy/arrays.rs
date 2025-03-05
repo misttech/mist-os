@@ -19,28 +19,35 @@ use std::fmt::Debug;
 use std::num::NonZeroU32;
 use zerocopy::{little_endian as le, FromBytes, Immutable, KnownLayout, Unaligned};
 
-pub(super) const EXTENDED_PERMISSIONS_IS_SPECIFIED_DRIVER_PERMISSIONS_MASK: u16 = 0x0700;
 pub(super) const MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY: u32 = 31;
 
+/// Mask for [`AccessVectorRuleMetadata`]'s `access_vector_rule_type` that
+/// indicates that the access vector rule contains extended permissions.
+pub(super) const EXTENDED_PERMISSIONS_IS_SPECIFIED_DRIVER_PERMISSIONS_MASK: u16 = 0x0700;
+
+/// ** Access vector rule types ***
+///
+/// Although these values each have a single bit set, they appear to be
+/// used as enum values rather than as bit masks: i.e., the policy compiler
+/// does not produce access vector rule structures that have more than
+/// one of these types.
+///
 /// Value for [`AccessVectorRuleMetadata`] `access_vector_rule_type` that
 /// indicates that the access vector rule comes from an `allow [source]
 /// [target]:[class] { [permissions] };` policy statement.
-pub(super) const ACCESS_VECTOR_RULE_TYPE_ALLOW: u16 = 1;
-
+pub(super) const ACCESS_VECTOR_RULE_TYPE_ALLOW: u16 = 0x1;
 /// Value for [`AccessVectorRuleMetadata`] `access_vector_rule_type` that
 /// indicates that the access vector rule comes from an `auditallow [source]
 /// [target]:[class] { [permissions] };` policy statement.
-pub(super) const ACCESS_VECTOR_RULE_TYPE_AUDITALLOW: u16 = 2;
-
+pub(super) const ACCESS_VECTOR_RULE_TYPE_AUDITALLOW: u16 = 0x2;
 /// Value for [`AccessVectorRuleMetadata`] `access_vector_rule_type` that
 /// indicates that the access vector rule comes from a `dontaudit [source]
 /// [target]:[class] { [permissions] };` policy statement.
-pub(super) const ACCESS_VECTOR_RULE_TYPE_DONTAUDIT: u16 = 4;
-
+pub(super) const ACCESS_VECTOR_RULE_TYPE_DONTAUDIT: u16 = 0x4;
 /// Value for [`AccessVectorRuleMetadata`] `access_vector_rule_type` that
 /// indicates that the access vector rule comes from a `type_transition
 /// [source] [target]:[class] [new_type];` policy statement.
-pub(super) const ACCESS_VECTOR_RULE_TYPE_TYPE_TRANSITION: u16 = 16;
+pub(super) const ACCESS_VECTOR_RULE_TYPE_TYPE_TRANSITION: u16 = 0x10;
 
 #[allow(type_alias_bounds)]
 pub(super) type SimpleArray<PS: ParseStrategy, T> = Array<PS, PS::Output<le::U32>, T>;

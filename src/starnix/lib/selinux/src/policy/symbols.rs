@@ -22,23 +22,21 @@ use std::num::NonZeroU32;
 use std::ops::Deref;
 use zerocopy::{little_endian as le, FromBytes, Immutable, KnownLayout, Unaligned};
 
+/// ** Constraint term types ***
+///
 /// The `constraint_term_type` metadata field value for a [`ConstraintTerm`]
 /// that represents the "not" operator.
 pub(super) const CONSTRAINT_TERM_TYPE_NOT_OPERATOR: u32 = 1;
-
 /// The `constraint_term_type` metadata field value for a [`ConstraintTerm`]
 /// that represents the "and" operator.
 pub(super) const CONSTRAINT_TERM_TYPE_AND_OPERATOR: u32 = 2;
-
 /// The `constraint_term_type` metadata field value for a [`ConstraintTerm`]
 /// that represents the "or" operator.
 pub(super) const CONSTRAINT_TERM_TYPE_OR_OPERATOR: u32 = 3;
-
 /// The `constraint_term_type` metadata field value for a [`ConstraintTerm`]
 /// that represents a boolean expression where both arguments are fields of
 /// a source and/or target security context.
 pub(super) const CONSTRAINT_TERM_TYPE_EXPR: u32 = 4;
-
 /// The `constraint_term_type` metadata field value for a [`ConstraintTerm`]
 /// that represents a boolean expression where:
 ///
@@ -53,6 +51,8 @@ pub(super) const CONSTRAINT_TERM_TYPE_EXPR: u32 = 4;
 /// [`TypeSet`] encoding the corresponding set of types.
 pub(super) const CONSTRAINT_TERM_TYPE_EXPR_WITH_NAMES: u32 = 5;
 
+/// ** Constraint expression operator types ***
+///
 /// Valid `expr_operator_type` metadata field values for a [`ConstraintTerm`]
 /// with `type` equal to `CONSTRAINT_TERM_TYPE_EXPR` or
 /// `CONSTRAINT_TERM_TYPE_EXPR_WITH_NAMES`.
@@ -79,6 +79,13 @@ pub(super) const CONSTRAINT_EXPR_OPERATOR_TYPE_DOMBY: u32 = 4;
 /// Valid for constraints on security levels.
 pub(super) const CONSTRAINT_EXPR_OPERATOR_TYPE_INCOMP: u32 = 5;
 
+/// ** Constraint expression types ***
+///
+/// Although these values each have a single bit set, they appear to be
+/// used as enum values rather than as bit masks: i.e., the policy compiler
+/// does not produce access vector rule structures that have more than
+/// one of these types.
+///
 /// Valid `expr_operand_type` metadata field values for a [`ConstraintTerm`]
 /// with `constraint_term_type` equal to `CONSTRAINT_TERM_TYPE_EXPR` or
 /// `CONSTRAINT_TERM_TYPE_EXPR_WITH_NAMES`.
@@ -97,29 +104,29 @@ pub(super) const CONSTRAINT_EXPR_OPERATOR_TYPE_INCOMP: u32 = 5;
 /// the `expr_operand_type` field is set (--> target) or not (--> source).
 ///
 /// The `expr_operand_type` value for an expression comparing user IDs.
-pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_USER: u32 = 1;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_USER: u32 = 0x1;
 /// The `expr_operand_type` value for an expression comparing role IDs.
-pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_ROLE: u32 = 2;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_ROLE: u32 = 0x2;
 /// The `expr_operand_type` value for an expression comparing type IDs.
-pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_TYPE: u32 = 4;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_TYPE: u32 = 0x4;
 /// The `expr_operand_type` value for an expression comparing the source
 /// context's low security level to the target context's low security level.
-pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_L1_L2: u32 = 32;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_L1_L2: u32 = 0x20;
 /// The `expr_operand_type` value for an expression comparing the source
 /// context's low security level to the target context's high security level.
-pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_L1_H2: u32 = 64;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_L1_H2: u32 = 0x40;
 /// The `expr_operand_type` value for an expression comparing the source
 /// context's high security level to the target context's low security level.
-pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_H1_L2: u32 = 128;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_H1_L2: u32 = 0x80;
 /// The `expr_operand_type` value for an expression comparing the source
 /// context's high security level to the target context's high security level.
-pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_H1_H2: u32 = 256;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_H1_H2: u32 = 0x100;
 /// The `expr_operand_type` value for an expression comparing the source
 /// context's low security level to the source context's high security level.
-pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_L1_H1: u32 = 512;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_L1_H1: u32 = 0x200;
 /// The `expr_operand_type` value for an expression comparing the target
 /// context's low security level to the target context's high security level.
-pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_L2_H2: u32 = 1024;
+pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_L2_H2: u32 = 0x400;
 
 /// For a [`ConstraintTerm`] with `constraint_term_type` equal to
 /// `CONSTRAINT_TERM_TYPE_EXPR_WITH_NAMES` the `expr_operand_type` may have the
@@ -133,7 +140,7 @@ pub(super) const CONSTRAINT_EXPR_OPERAND_TYPE_L2_H2: u32 = 1024;
 /// If the bit is not set, then the expression compares the source's
 /// {user,role,type} ID to the set of IDs listed in the [`ConstraintTerm`]'s
 /// `names` field.
-pub(super) const CONSTRAINT_EXPR_WITH_NAMES_OPERAND_TYPE_TARGET_MASK: u32 = 8;
+pub(super) const CONSTRAINT_EXPR_WITH_NAMES_OPERAND_TYPE_TARGET_MASK: u32 = 0x8;
 
 /// Exact value of [`Type`] `properties` when the underlying data refers to an SELinux type.
 ///
