@@ -38,21 +38,20 @@ impl<'a> SuiteFilter<'a> {
         let group_data_cipher =
             rsne.group_data_cipher_suite.as_ref().unwrap_or(&DEFAULT_GROUP_DATA_CIPHER);
         let group_data_satisfied = group_data_cipher.has_known_usage()
-            && self.known_group_data_ciphers.iter().any(|s| group_data_cipher.suite_type == *s);
+            && self.known_group_data_ciphers.contains(&group_data_cipher.suite_type);
 
         let akms = if rsne.akm_suites.is_empty() { &DEFAULT_AKM[..] } else { &rsne.akm_suites[..] };
-        let akm_satisfied = akms
-            .iter()
-            .any(|a| a.has_known_algorithm() && self.known_akms.iter().any(|s| a.suite_type == *s));
+        let akm_satisfied =
+            akms.iter().any(|a| a.has_known_algorithm() && self.known_akms.contains(&a.suite_type));
 
         let pairwise_ciphers = if rsne.pairwise_cipher_suites.is_empty() {
             &DEFAULT_PAIRWISE_CIPHER[..]
         } else {
             &rsne.pairwise_cipher_suites[..]
         };
-        let pairwise_satisfied = pairwise_ciphers.iter().any(|c| {
-            c.has_known_usage() && self.known_pairwise_ciphers.iter().any(|s| c.suite_type == *s)
-        });
+        let pairwise_satisfied = pairwise_ciphers
+            .iter()
+            .any(|c| c.has_known_usage() && self.known_pairwise_ciphers.contains(&c.suite_type));
 
         let group_mgmt_cipher =
             rsne.group_mgmt_cipher_suite.as_ref().unwrap_or(&DEFAULT_GROUP_MGMT_CIPHER);
