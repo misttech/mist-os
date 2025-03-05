@@ -14,6 +14,12 @@ use thiserror::Error;
 pub struct ModuleDetails(String);
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct ModuleWithMmapDetails {
+    module: ModuleDetails,
+    mmaps: Vec<MappingDetails>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct BacktraceDetails(u64);
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
@@ -22,30 +28,27 @@ pub struct Pid(u64);
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub struct Tid(u64);
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct ProfilingRecordHandler {
-    mmap_records: Vec<MappingDetails>,
-    module_records: Vec<ModuleDetails>,
+    module_with_mmap_records: Vec<ModuleWithMmapDetails>,
     backtrace_records: HashMap<Tid, Vec<BacktraceDetails>>,
 }
 
 impl ProfilingRecordHandler {
-    pub fn default() -> Self {
-        let mmap_records = Vec::new();
-        let module_records = Vec::new();
-        let backtrace_records = HashMap::new();
-        Self { mmap_records, module_records, backtrace_records }
-    }
-
     pub fn parse_markup_line(
         &mut self,
         line: &str,
         tid: Option<Tid>,
     ) -> Result<(), SymbolizeError> {
         if line.starts_with("{{{mmap") {
-            self.mmap_records.push(parse_mmap_record(line)?);
+            if let Some(module_with_mmap_details) = self.module_with_mmap_records.last_mut() {
+                module_with_mmap_details.mmaps.push(parse_mmap_record(line)?);
+            } else {
+                return Err(SymbolizeError::NoModuleRecord(line.to_string()));
+            }
         } else if line.starts_with("{{{module") {
-            self.module_records.push(parse_module_record(line)?);
+            self.module_with_mmap_records
+                .push(ModuleWithMmapDetails { module: parse_module_record(line)?, mmaps: vec![] });
         } else if line.starts_with("{{{bt") {
             if let Some(tid) = tid {
                 let bt_record = parse_backtrace_record(line)?;
@@ -58,6 +61,7 @@ impl ProfilingRecordHandler {
     }
 }
 
+//TODO: convert to use regex
 fn parse_mmap_record(record: &str) -> Result<MappingDetails, SymbolizeError> {
     // example input: {{{mmap:0x30db523d000:0x10000:load:0:r:0x0}}}
     let naked_record = record
@@ -199,7 +203,6 @@ impl UnsymbolizedSamples {
                     }
                 }
                 ParseStateMachine::SetBacktrace { ref pid, ref tid } => {
-                    //expect another bt or pid
                     if line.starts_with("{{{") {
                         if let Some(profiling_record_handler) = profiling_map.get_mut(pid) {
                             profiling_record_handler.parse_markup_line(&line, Some(tid.clone()))?;
@@ -242,6 +245,9 @@ pub enum SymbolizeError {
 
     #[error("Pid is not set yet for the current backtrace")]
     NoPid,
+
+    #[error("No module record associate with the mmap record: {}.", .0)]
+    NoModuleRecord(String),
 }
 
 #[cfg(test)]
@@ -257,7 +263,6 @@ mod tests {
 {{{module:0:libtrace-engine.so:elf:333e89f0c175000cee9b7e201fedcd6f9b4ba8ae}}}
 {{{mmap:0xc936396000:0x6000:load:0:r:0x0}}}
 {{{mmap:0xc93639c000:0xd000:load:0:rx:0x6000}}}
-{{{module:1:<VMO#1113=bin/component_manager>:elf:a6e1cb8e54b1985312f44bbcb14575a14e25f0ef}}}
 1104
 2616
 {{{bt:0:0x43dc387f8e10:pc}}}
@@ -287,24 +292,23 @@ mod tests {
         let handlers = UnsymbolizedSamples::new(&profiler_record_path).unwrap();
         let mut expected_handlers = HashMap::new();
         let first_handler = ProfilingRecordHandler {
-            mmap_records: vec![
-                MappingDetails {
-                    start_addr: 0xc936396000,
-                    size: 0x6000,
-                    vaddr: 0x0,
-                    flags: MappingFlags::READ,
-                },
-                MappingDetails {
-                    start_addr: 0xc93639c000,
-                    size: 0xd000,
-                    vaddr: 0x6000,
-                    flags: MappingFlags::READ | MappingFlags::EXECUTE,
-                },
-            ],
-            module_records: vec![
-                ModuleDetails(String::from("333e89f0c175000cee9b7e201fedcd6f9b4ba8ae")),
-                ModuleDetails(String::from("a6e1cb8e54b1985312f44bbcb14575a14e25f0ef")),
-            ],
+            module_with_mmap_records: vec![ModuleWithMmapDetails {
+                module: ModuleDetails(String::from("333e89f0c175000cee9b7e201fedcd6f9b4ba8ae")),
+                mmaps: vec![
+                    MappingDetails {
+                        start_addr: 0xc936396000,
+                        size: 0x6000,
+                        vaddr: 0x0,
+                        flags: MappingFlags::READ,
+                    },
+                    MappingDetails {
+                        start_addr: 0xc93639c000,
+                        size: 0xd000,
+                        vaddr: 0x6000,
+                        flags: MappingFlags::READ | MappingFlags::EXECUTE,
+                    },
+                ],
+            }],
             backtrace_records: HashMap::from([
                 (
                     Tid(0x2616),
@@ -318,23 +322,25 @@ mod tests {
         };
 
         let second_handler = ProfilingRecordHandler {
-            mmap_records: vec![
-                MappingDetails {
-                    start_addr: 0x30db523d000,
-                    size: 0x10000,
-                    vaddr: 0x0,
-                    flags: MappingFlags::READ,
+            module_with_mmap_records: vec![
+                ModuleWithMmapDetails {
+                    module: ModuleDetails(String::from("867c18818584f5823f35472b70fc8714b2518ba0")),
+                    mmaps: vec![MappingDetails {
+                        start_addr: 0x30db523d000,
+                        size: 0x10000,
+                        vaddr: 0x0,
+                        flags: MappingFlags::READ,
+                    }],
                 },
-                MappingDetails {
-                    start_addr: 0x3bfd82b3000,
-                    size: 0x62000,
-                    vaddr: 0x0,
-                    flags: MappingFlags::READ,
+                ModuleWithMmapDetails {
+                    module: ModuleDetails(String::from("3e1c4eb82f79af6a4fd142db11f83979772f9867")),
+                    mmaps: vec![MappingDetails {
+                        start_addr: 0x3bfd82b3000,
+                        size: 0x62000,
+                        vaddr: 0x0,
+                        flags: MappingFlags::READ,
+                    }],
                 },
-            ],
-            module_records: vec![
-                ModuleDetails(String::from("867c18818584f5823f35472b70fc8714b2518ba0")),
-                ModuleDetails(String::from("3e1c4eb82f79af6a4fd142db11f83979772f9867")),
             ],
             backtrace_records: HashMap::from([(
                 Tid(0x4209),
