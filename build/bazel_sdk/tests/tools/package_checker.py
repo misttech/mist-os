@@ -8,8 +8,15 @@ import json
 import struct
 import subprocess
 import sys
-import tempfile
 from typing import Iterable, Optional, TypeVar
+
+DEFAULT_CONFIGS = [
+    "--no-environment",
+    "--config",
+    "daemon.autostart=false",
+    "--config",
+    "log.enabled=false",
+]
 
 
 def parse_args() -> argparse.Namespace:
@@ -104,13 +111,15 @@ def dest_merkle_pair_for_blobs(blobs: list[str], ffx: str) -> list[str]:
     if len(blobs) == 0:
         return []
 
-    temp_dir = tempfile.TemporaryDirectory()
-
     srcs = [blob.split("=")[1] for blob in blobs]
     merkles = [
         v.split(" ")[0].strip()
         for v in run(
-            ffx, "--isolate-dir", temp_dir.name, "package", "file-hash", *srcs
+            ffx,
+            *DEFAULT_CONFIGS,
+            "package",
+            "file-hash",
+            *srcs,
         ).split("\n")
     ]
 
@@ -126,7 +135,7 @@ def list_contents(args: argparse.Namespace) -> list[str]:
     """Lists the contents of the meta.far file"""
     return run(
         args.ffx,
-        "--no-environment",
+        *DEFAULT_CONFIGS,
         "package",
         "archive",
         "list",
@@ -144,7 +153,7 @@ def list_subpackage_names(args: argparse.Namespace) -> list[str]:
         json.loads(
             run(
                 args.ffx,
-                "--no-environment",
+                *DEFAULT_CONFIGS,
                 "package",
                 "archive",
                 "cat",
@@ -202,7 +211,7 @@ def check_for_abi_revision(args: argparse.Namespace) -> None:
     abi_stamp_contents = subprocess.check_output(
         [
             args.ffx,
-            "--no-environment",
+            *DEFAULT_CONFIGS,
             "package",
             "archive",
             "cat",
@@ -220,7 +229,7 @@ def check_package_name(args: argparse.Namespace) -> None:
     contents = json.loads(
         run(
             args.ffx,
-            "--no-environment",
+            *DEFAULT_CONFIGS,
             "package",
             "archive",
             "cat",
@@ -239,7 +248,7 @@ def check_package_has_all_blobs(args: argparse.Namespace) -> None:
 
     contents_str = run(
         args.ffx,
-        "--no-environment",
+        *DEFAULT_CONFIGS,
         "package",
         "archive",
         "cat",
