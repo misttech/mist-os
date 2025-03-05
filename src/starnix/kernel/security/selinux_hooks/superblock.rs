@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::fs_node::fs_node_init_with_dentry;
 use super::{
-    check_permission, fs_node_effective_sid_and_class, fs_node_init_with_dentry,
-    todo_check_permission, FileSystemLabel, FileSystemLabelState, FileSystemState,
-    FsNodeSidAndClass,
+    check_permission, fs_node_effective_sid_and_class, todo_check_permission, FileSystemLabel,
+    FileSystemLabelState, FileSystemState, FsNodeSidAndClass,
 };
 
 use crate::task::CurrentTask;
