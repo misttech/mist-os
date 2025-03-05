@@ -90,5 +90,5 @@ fuchsia_devicetree_toolchain_info(
 toolchain(
     name = "fuchsia_sdk_devicetree_toolchain",
     toolchain = ":fuchsia_devicetree_toolchain_info",
-    toolchain_type = "@fuchsia_sdk//fuchsia:devicetree_toolchain_type",
+    toolchain_type = "@rules_fuchsia//fuchsia:devicetree_toolchain_type",
 )

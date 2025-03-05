@@ -58,7 +58,7 @@ def _fuchsia_devicetree_impl(ctx):
     pp_args.add("-O", "dtb")
     pp_args.add_all(ctx.attr.dtcflags)
 
-    dtc = ctx.toolchains["@fuchsia_sdk//fuchsia:devicetree_toolchain_type"].dtc
+    dtc = ctx.toolchains["@rules_fuchsia//fuchsia:devicetree_toolchain_type"].dtc
     ctx.actions.run(
         executable = dtc,
         arguments = [pp_args],
@@ -75,7 +75,7 @@ def _fuchsia_devicetree_impl(ctx):
 fuchsia_devicetree = rule(
     doc = """Defines a devicetree to be built into a devicetree blob.""",
     implementation = _fuchsia_devicetree_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:devicetree_toolchain_type"],
+    toolchains = ["@rules_fuchsia//fuchsia:devicetree_toolchain_type"],
     attrs = {
         "deps": attr.label_list(
             doc = "Other Devicetree fragment targets referenced by this fragment",
@@ -114,7 +114,7 @@ def _fuchsia_devicetree_source_impl(ctx):
     pp_args.add("-o", output_file)
     pp_args.add_all(ctx.attr.dtcflags)
 
-    dtc = ctx.toolchains["@fuchsia_sdk//fuchsia:devicetree_toolchain_type"].dtc
+    dtc = ctx.toolchains["@rules_fuchsia//fuchsia:devicetree_toolchain_type"].dtc
     ctx.actions.run(
         executable = dtc,
         arguments = [pp_args],
@@ -132,7 +132,7 @@ fuchsia_devicetree_source = rule(
     doc = """Defines a devicetree blob decompiler. This is mostly used for
     devicetree binary validation.""",
     implementation = _fuchsia_devicetree_source_impl,
-    toolchains = ["@fuchsia_sdk//fuchsia:devicetree_toolchain_type"],
+    toolchains = ["@rules_fuchsia//fuchsia:devicetree_toolchain_type"],
     attrs = {
         "source": attr.label(
             doc = """Device tree blob file to be decompiled.""",
