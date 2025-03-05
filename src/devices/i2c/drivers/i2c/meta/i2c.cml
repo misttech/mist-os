@@ -13,14 +13,12 @@
         bind: 'meta/bind/i2c.bindbc',
         colocate: 'true',
         default_dispatcher_opts: [ "allow_sync_calls" ],
+        default_dispatcher_scheduler_role: "fuchsia.devices.i2c.drivers.i2c.bus",
     },
     capabilities: [
         { service: 'fuchsia.hardware.i2c.Service' },
     ],
     use: [
-        {
-            protocol: [ "fuchsia.scheduler.RoleManager" ],
-        },
         { service: "fuchsia.hardware.i2cimpl.Service" },
     ],
     expose: [

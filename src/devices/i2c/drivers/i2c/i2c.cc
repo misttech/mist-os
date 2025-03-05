@@ -6,18 +6,12 @@
 
 #include <fidl/fuchsia.hardware.i2c/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.i2cimpl/cpp/fidl.h>
-#include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/trace/event.h>
-#include <lib/zx/profile.h>
 
 namespace i2c {
-
-namespace {
-const std::string_view kScheduleProfileRole = "fuchsia.devices.i2c.drivers.i2c.bus";
-}
 
 zx::result<> I2cDriver::Start() {
   auto i2cimpl_result = incoming()->Connect<fuchsia_hardware_i2cimpl::Service::Device>();
@@ -102,8 +96,6 @@ void I2cDriver::Transact(uint16_t address, TransferRequestView request,
                          TransferCompleter::Sync& completer) {
   TRACE_DURATION("i2c", "I2cDevice Process Queued Transacts");
 
-  SetSchedulerRole();
-
   const auto& transactions = request->transactions;
   if (zx_status_t status = GrowContainersIfNeeded(transactions); status != ZX_OK) {
     completer.ReplyError(status);
@@ -165,44 +157,6 @@ void I2cDriver::Transact(uint16_t address, TransferRequestView request,
     read_buffer_offset += len;
   }
   completer.ReplySuccess(fidl::VectorView<fidl::VectorView<uint8_t>>::FromExternal(read_vectors_));
-}
-
-void I2cDriver::SetSchedulerRole() {
-  static std::once_flag profile_flag;
-  std::call_once(profile_flag, [&] {
-    zx::unowned_thread thread{zx::thread::self()->get()};
-    zx::thread duplicate_thread;
-    zx_status_t status =
-        thread->duplicate(ZX_RIGHT_TRANSFER | ZX_RIGHT_MANAGE_THREAD, &duplicate_thread);
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to duplicate thread: %s", zx_status_get_string(status));
-      return;
-    }
-
-    auto role_client = incoming()->Connect<fuchsia_scheduler::RoleManager>();
-    if (role_client.is_error()) {
-      FDF_LOG(ERROR, "Failed to connect to RoleManager: %s", role_client.status_string());
-      return;
-    }
-
-    fidl::Arena arena;
-    auto request =
-        fuchsia_scheduler::wire::RoleManagerSetRoleRequest::Builder(arena)
-            .target(fuchsia_scheduler::wire::RoleTarget::WithThread(std::move(duplicate_thread)))
-            .role(fuchsia_scheduler::wire::RoleName{
-                fidl::StringView::FromExternal(kScheduleProfileRole)})
-            .Build();
-
-    fidl::WireResult result = fidl::WireCall(*role_client)->SetRole(request);
-    if (!result.ok()) {
-      FDF_LOG(WARNING, "Failed to apply role to dispatch thread: %s", result.status_string());
-      return;
-    }
-    if (!result->is_ok()) {
-      FDF_LOG(WARNING, "Failed to apply role to dispatch thread: %s",
-              zx_status_get_string(result->error_value()));
-    }
-  });
 }
 
 zx_status_t I2cDriver::GrowContainersIfNeeded(
