@@ -6,14 +6,13 @@
 #![allow(non_upper_case_globals)]
 
 use super::{
-    has_file_permissions, permissions_from_flags, todo_has_fs_node_permissions, FileObjectState,
-    PermissionFlags,
+    fs_node_effective_sid_and_class, has_file_permissions, permissions_from_flags,
+    todo_has_fs_node_permissions, FileObjectState, FsNodeSidAndClass, PermissionFlags,
 };
 use crate::task::CurrentTask;
 use crate::vfs::FileObject;
 use crate::TODO_DENY;
 use selinux::{CommonFsNodePermission, Permission, SecurityServer};
-use starnix_logging::track_stub;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{
@@ -34,6 +33,8 @@ pub fn file_permission(
     mut permission_flags: PermissionFlags,
 ) -> Result<(), Errno> {
     let current_sid = current_task.security_state.lock().current_sid;
+    let FsNodeSidAndClass { class: file_class, .. } =
+        fs_node_effective_sid_and_class(&file.name.entry.node);
 
     if file.flags().contains(OpenFlags::APPEND) {
         permission_flags |= PermissionFlags::APPEND;
@@ -47,11 +48,14 @@ pub fn file_permission(
         current_task.into(),
     )?;
 
-    track_stub!(
-        TODO("https://fxbug.dev/385121365"),
-        "Implement & enforce file_permission() checks"
-    );
-    Ok(())
+    todo_has_fs_node_permissions(
+        TODO_DENY!("https://fxbug.dev/385121365", "Enforce file_permission checks"),
+        &security_server.as_permission_check(),
+        current_sid,
+        &file.name.entry.node,
+        &permissions_from_flags(permission_flags, file_class),
+        current_task.into(),
+    )
 }
 
 /// Returns whether `current_task` can issue an ioctl to `file`.
