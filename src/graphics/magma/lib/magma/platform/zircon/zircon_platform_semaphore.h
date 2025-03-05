@@ -41,7 +41,10 @@ class ZirconPlatformSemaphore : public PlatformSemaphore {
   }
 
   void Signal() override {
+    // The connects with clients waiting on this semaphore.
+    // For more info see https://fuchsia.dev/fuchsia-src/development/graphics/magma/concepts/tracing
     TRACE_FLOW_BEGIN("gfx", "event_signal", koid_);
+
     TRACE_DURATION("magma:sync", "semaphore signal", "id", koid_);
     TRACE_FLOW_BEGIN("magma:sync", "semaphore signal", koid_);
     zx_status_t status = event_.signal(0u, zx_signal());

@@ -117,9 +117,9 @@ magma::Status MagmaSystemContext::ExecuteInlineCommands(
         return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "semaphore id not found 0x%" PRIx64,
                               command.semaphore_ids[i]);
       msd_semaphores[i] = semaphore->msd_semaphore();
-      // This is used to connect with command submission in
-      // src/ui/scenic/lib/gfx/engine/engine.cc and
-      // src/ui/scenic/lib/flatland/renderer/vk_renderer.cc, so it uses the koid.
+      // The connects with command submissions.
+      // For more info see
+      // https://fuchsia.dev/fuchsia-src/development/graphics/magma/concepts/tracing
       TRACE_FLOW_END("gfx", "semaphore", semaphore->global_id());
     }
 

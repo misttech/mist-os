@@ -68,7 +68,10 @@ bool ZirconVmoSemaphore::WaitAsync(PlatformPort* port, uint64_t key) {
 }
 
 void ZirconVmoSemaphore::Signal() {
+  // The connects with clients waiting on this semaphore.
+  // For more info see https://fuchsia.dev/fuchsia-src/development/graphics/magma/concepts/tracing
   TRACE_FLOW_BEGIN("gfx", "event_signal", koid_);
+
   TRACE_DURATION("magma:sync", "semaphore signal", "id", koid_);
   TRACE_FLOW_BEGIN("magma:sync", "semaphore signal", koid_);
   {

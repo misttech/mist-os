@@ -16,5 +16,7 @@ toc:
   path: /docs/development/graphics/magma/concepts/vulkan.md
 - title: "Porting"
   path: /docs/development/graphics/magma/concepts/porting.md
+- title: "Tracing"
+  path: /docs/development/graphics/magma/concepts/tracing.md
 - title: "Contributing"
   path: /docs/development/graphics/magma/concepts/contributing.md
