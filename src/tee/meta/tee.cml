@@ -4,6 +4,7 @@
 
 // This is the root of the Trusted Execution Environment for microfuchsia.
 {
+    include: [ "//src/tee/manager/meta/ta-manager-realm.shard.cml" ],
     children: [
         {
             name: "binder-proxy",
@@ -26,9 +27,14 @@
             from: "parent",
             to: [
                 "#binder-proxy",
-                "#ta-manager",
                 "#ta-manager-config",
             ],
+        },
+        {
+            // This allows the ta-manager component to manage the "ta" collection
+            protocol: "fuchsia.component.Realm",
+            from: "framework",
+            to: "#ta-manager",
         },
         {
             directory: "ta",
@@ -41,13 +47,18 @@
             to: [ "#binder-proxy" ],
         },
         {
-            directory: "config",
-            from: "#ta-manager-config",
-            to: [ "#ta-manager" ],
-            rights: [ "r*" ],
+            service: [ "fuchsia.hardware.virtiopmem.Service" ],
+            from: "parent",
+            to: "#binder-proxy",
         },
         {
             config: "fuchsia.binder.BindToLoopback",
+            from: "void",
+            to: "#binder-proxy",
+            availability: "optional",
+        },
+        {
+            config: "fuchsia.binder.UseVirtioPmem",
             from: "void",
             to: "#binder-proxy",
             availability: "optional",

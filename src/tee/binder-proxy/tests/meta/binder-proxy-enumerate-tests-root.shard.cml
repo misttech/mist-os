@@ -4,6 +4,7 @@
 {
     include: [
         "//src/paravirtualization/testing/vsock.test_shard.cml",
+        "//src/tee/manager/meta/ta-manager-realm.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
@@ -22,12 +23,6 @@
             protocol: "fuchsia.vsock.Connector",
             from: "#vsock",
             to: "#binder-proxy-tests",
-        },
-        {
-            directory: "config",
-            from: "#ta-manager-config",
-            to: "#ta-manager",
-            rights: [ "rx*" ],
         },
         {
             directory: "ta",

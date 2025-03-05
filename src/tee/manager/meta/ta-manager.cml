@@ -4,28 +4,44 @@
 
 // This is the production TA Manager component manifest.
 {
-    include: [ "//src/tee/manager/meta/ta-manager-base.shard.cml" ],
-
-    // The TA collection is managed by us directly in the production configuration.
-    collections: [
+    include: [ "//sdk/lib/syslog/client.shard.cml" ],
+    program: {
+        runner: "elf",
+        binary: "bin/ta_manager",
+    },
+    capabilities: [
         {
-            name: "ta",
-            durability: "single_run",
+            directory: "ta",
+            from: "self",
+            rights: [ "rx*" ],
+            path: "/svc/ta",
+        },
+        {
+            directory: "props",
+            from: "self",
+            rights: [ "r*" ],
+            path: "/data/properties",
         },
     ],
     use: [
         {
+            directory: "config",
+            rights: [ "r*" ],
+            path: "/config",
+        },
+        {
             protocol: "fuchsia.component.Realm",
-
-            // The fuchsia.component.Realm instance provided by the framework is scoped to this component's collection(s).
-            from: "framework",
+            from: "parent",
         },
     ],
-    offer: [
+    expose: [
+        {
+            directory: "ta",
+            from: "self",
+        },
         {
             directory: "props",
             from: "self",
-            to: "#ta",
         },
     ],
 }
