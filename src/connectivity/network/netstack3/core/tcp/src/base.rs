@@ -312,17 +312,7 @@ impl Default for SocketOptions {
             //   coalesce short segments
             nagle_enabled: true,
             user_timeout: None,
-            // RFC 9293 Section 4.2:
-            //   The delayed ACK algorithm specified in [RFC1122] SHOULD be used
-            //   by a TCP receiver.
-            // Delayed acks have *bad* performance for connections that are not
-            // interactive, especially when combined with the Nagle algorithm.
-            // We disable it by default here because:
-            //   1. RFC does not say MUST;
-            //   2. Common implementations like Linux has it turned off by
-            //   default.
-            // More context: https://news.ycombinator.com/item?id=10607422
-            delayed_ack: false,
+            delayed_ack: true,
             fin_wait2_timeout: Some(DEFAULT_FIN_WAIT2_TIMEOUT),
             max_syn_retries: DEFAULT_MAX_SYN_RETRIES,
             ip_options: TcpIpSockOptions::default(),

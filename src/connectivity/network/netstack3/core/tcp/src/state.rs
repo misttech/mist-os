@@ -46,9 +46,14 @@ const DEFAULT_USER_TIMEOUT: Duration = Duration::from_secs(900);
 pub(super) const DEFAULT_MAX_SYN_RETRIES: NonZeroU8 = NonZeroU8::new(6).unwrap();
 const DEFAULT_MAX_SYNACK_RETRIES: NonZeroU8 = NonZeroU8::new(5).unwrap();
 
-/// Per RFC 9293 (https://tools.ietf.org/html/rfc9293#section-3.8.6.3):
-///  ... in particular, the delay MUST be less than 0.5 seconds.
-const ACK_DELAY_THRESHOLD: Duration = Duration::from_millis(500);
+/// Time duration by which an ACK is delayed.
+///
+/// We pick a value that matches the minimum value used by linux and the fixed
+/// value used by FreeBSD.
+///
+/// Per [RFC 9293](https://tools.ietf.org/html/rfc9293#section-3.8.6.3), the
+/// delay MUST be less than 0.5 seconds.
+const ACK_DELAY_THRESHOLD: Duration = Duration::from_millis(40);
 /// Per RFC 9293 Section 3.8.6.2.1:
 ///  ... The override timeout should be in the range 0.1 - 1.0 seconds.
 /// Note that we pick the lower end of the range because this case should be
@@ -3323,6 +3328,13 @@ mod test {
         )
     }
 
+    impl SocketOptions {
+        fn default_for_state_tests() -> Self {
+            // In testing, it is convenient to disable delayed ack by default.
+            Self { delayed_ack: false, ..Default::default() }
+        }
+    }
+
     /// A buffer provider that doesn't need extra information to construct
     /// buffers as this is only used in unit tests for the state machine only.
     enum ClientlessBufferProvider {}
@@ -3402,7 +3414,7 @@ mod test {
             now: FakeInstant,
             counters: &TcpCountersInner,
         ) -> Option<Segment<S::Payload<'_>>> {
-            self.poll_send(counters, mss, now, &SocketOptions::default()).ok()
+            self.poll_send(counters, mss, now, &SocketOptions::default_for_state_tests()).ok()
         }
 
         fn on_segment_with_default_options<P: Payload, BP: BufferProvider<R, S, ActiveOpen = ()>>(
@@ -3416,12 +3428,11 @@ mod test {
             R: Default,
             S: Default,
         {
-            // In testing, it is convenient to disable delayed ack by default.
             self.on_segment_with_options::<_, BP>(
                 incoming,
                 now,
                 counters,
-                &SocketOptions::default(),
+                &SocketOptions::default_for_state_tests(),
             )
         }
 
@@ -4169,7 +4180,7 @@ mod test {
             Default::default(),
             DEVICE_MAXIMUM_SEGMENT_SIZE,
             DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-            &SocketOptions::default(),
+            &SocketOptions::default_for_state_tests(),
         );
         assert_eq!(
             syn_seg,
@@ -4352,7 +4363,7 @@ mod test {
             Default::default(),
             DEVICE_MAXIMUM_SEGMENT_SIZE,
             DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-            &SocketOptions::default(),
+            &SocketOptions::default_for_state_tests(),
         );
         let (syn_sent2, syn2) = Closed::<Initial>::connect(
             ISS_2,
@@ -4361,7 +4372,7 @@ mod test {
             Default::default(),
             DEVICE_MAXIMUM_SEGMENT_SIZE,
             DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-            &SocketOptions::default(),
+            &SocketOptions::default_for_state_tests(),
         );
 
         assert_eq!(
@@ -4774,7 +4785,7 @@ mod test {
                 &counters,
                 1,
                 clock.now(),
-                &SocketOptions { nagle_enabled: false, ..SocketOptions::default() }
+                &SocketOptions { nagle_enabled: false, ..SocketOptions::default_for_state_tests() }
             ),
             Ok(Segment::data(
                 ISS_1 + 4,
@@ -4799,7 +4810,7 @@ mod test {
             Default::default(),
             DEVICE_MAXIMUM_SEGMENT_SIZE,
             DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-            &SocketOptions::default(),
+            &SocketOptions::default_for_state_tests(),
         );
         let mut state = State::<_, RingBuffer, RingBuffer, ()>::SynSent(syn_sent);
         // Retransmission timer should be installed.
@@ -5003,7 +5014,11 @@ mod test {
         );
         // Then call CLOSE to transition the state machine to LastAck.
         assert_eq!(
-            state.close(&counters, CloseReason::Shutdown, &SocketOptions::default()),
+            state.close(
+                &counters,
+                CloseReason::Shutdown,
+                &SocketOptions::default_for_state_tests()
+            ),
             Ok(NewlyClosed::No)
         );
         assert_eq!(
@@ -5115,7 +5130,11 @@ mod test {
             snd_wnd_scale: Some(WindowScale::default()),
         });
         assert_eq!(
-            state.close(&counters, CloseReason::Shutdown, &SocketOptions::default()),
+            state.close(
+                &counters,
+                CloseReason::Shutdown,
+                &SocketOptions::default_for_state_tests()
+            ),
             Ok(NewlyClosed::No)
         );
         assert_matches!(state, State::FinWait1(_));
@@ -5166,12 +5185,20 @@ mod test {
             .into(),
         });
         assert_eq!(
-            state.close(&counters, CloseReason::Shutdown, &SocketOptions::default()),
+            state.close(
+                &counters,
+                CloseReason::Shutdown,
+                &SocketOptions::default_for_state_tests()
+            ),
             Ok(NewlyClosed::No)
         );
         assert_matches!(state, State::FinWait1(_));
         assert_eq!(
-            state.close(&counters, CloseReason::Shutdown, &SocketOptions::default()),
+            state.close(
+                &counters,
+                CloseReason::Shutdown,
+                &SocketOptions::default_for_state_tests()
+            ),
             Err(CloseError::Closing)
         );
 
@@ -5424,12 +5451,20 @@ mod test {
             .into(),
         });
         assert_eq!(
-            state.close(&counters, CloseReason::Shutdown, &SocketOptions::default()),
+            state.close(
+                &counters,
+                CloseReason::Shutdown,
+                &SocketOptions::default_for_state_tests()
+            ),
             Ok(NewlyClosed::No)
         );
         assert_matches!(state, State::FinWait1(_));
         assert_eq!(
-            state.close(&counters, CloseReason::Shutdown, &SocketOptions::default()),
+            state.close(
+                &counters,
+                CloseReason::Shutdown,
+                &SocketOptions::default_for_state_tests()
+            ),
             Err(CloseError::Closing)
         );
 
@@ -5763,7 +5798,7 @@ mod test {
         });
 
         let socket_options = {
-            let mut socket_options = SocketOptions::default();
+            let mut socket_options = SocketOptions::default_for_state_tests();
             socket_options.keep_alive.enabled = true;
             socket_options
         };
@@ -5926,7 +5961,7 @@ mod test {
                     },
                     u32::from(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
                     FakeInstant::default(),
-                    &SocketOptions::default(),
+                    &SocketOptions::default_for_state_tests(),
                 )
                 .expect("has data"))
         }
@@ -6101,7 +6136,7 @@ mod test {
             }
             .into(),
         });
-        let mut socket_options = SocketOptions::default();
+        let mut socket_options = SocketOptions::default_for_state_tests();
         assert_eq!(
             state.poll_send(&counters, 3, clock.now(), &socket_options),
             Ok(Segment::data(
@@ -6138,7 +6173,7 @@ mod test {
             Default::default(),
             Mss(NonZeroU16::new(1).unwrap()),
             DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-            &SocketOptions::default(),
+            &SocketOptions::default_for_state_tests(),
         );
         let mut state = State::<_, RingBuffer, RingBuffer, ()>::SynSent(syn_sent);
 
@@ -6244,7 +6279,10 @@ mod test {
             &counters,
             u32::MAX,
             clock.now(),
-            &SocketOptions { user_timeout: Some(TEST_USER_TIMEOUT), ..SocketOptions::default() },
+            &SocketOptions {
+                user_timeout: Some(TEST_USER_TIMEOUT),
+                ..SocketOptions::default_for_state_tests()
+            },
         ) {
             if zero_window_probe {
                 let zero_window_ack = Segment::ack(
@@ -6259,7 +6297,7 @@ mod test {
                         clock.now(),
                         &SocketOptions {
                             user_timeout: Some(TEST_USER_TIMEOUT),
-                            ..SocketOptions::default()
+                            ..SocketOptions::default_for_state_tests()
                         },
                         false,
                     ),
@@ -6277,7 +6315,7 @@ mod test {
                         clock.now(),
                         &SocketOptions {
                             user_timeout: Some(TEST_USER_TIMEOUT),
-                            ..SocketOptions::default()
+                            ..SocketOptions::default_for_state_tests()
                         },
                     ),
                     Err(NewlyClosed::No)
@@ -6428,7 +6466,8 @@ mod test {
     fn delayed_ack(mut state: State<FakeInstant, RingBuffer, RingBuffer, ()>) {
         let mut clock = FakeInstantCtx::default();
         let counters = TcpCountersInner::default();
-        let socket_options = SocketOptions { delayed_ack: true, ..SocketOptions::default() };
+        let socket_options =
+            SocketOptions { delayed_ack: true, ..SocketOptions::default_for_state_tests() };
         assert_eq!(
             state.on_segment::<_, ClientlessBufferProvider>(
                 &counters,
@@ -6525,7 +6564,8 @@ mod test {
     fn immediate_ack_if_out_of_order_or_fin() {
         let clock = FakeInstantCtx::default();
         let counters = TcpCountersInner::default();
-        let socket_options = SocketOptions { delayed_ack: true, ..SocketOptions::default() };
+        let socket_options =
+            SocketOptions { delayed_ack: true, ..SocketOptions::default_for_state_tests() };
         let mut state: State<_, _, _, ()> = State::Established(Established {
             snd: Send {
                 nxt: ISS_1 + 1,
@@ -6667,7 +6707,7 @@ mod test {
             state.close(
                 &counters,
                 CloseReason::Close { now: clock.now() },
-                &SocketOptions::default()
+                &SocketOptions::default_for_state_tests()
             ),
             Err(CloseError::Closing)
         );
@@ -6791,7 +6831,7 @@ mod test {
             BufferSizes { receive: buffer_size, ..Default::default() },
             DEVICE_MAXIMUM_SEGMENT_SIZE,
             DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
-            &SocketOptions::default(),
+            &SocketOptions::default_for_state_tests(),
         );
         assert_eq!(
             syn_seg,
@@ -6934,7 +6974,7 @@ mod test {
                 },
                 u32::MAX,
                 FakeInstant::default(),
-                &SocketOptions::default(),
+                &SocketOptions::default_for_state_tests(),
             ),
             Some(Segment::data(
                 ISS_1 + 1,
@@ -7111,7 +7151,7 @@ mod test {
                 },
                 u32::MAX,
                 clock.now(),
-                &SocketOptions::default(),
+                &SocketOptions::default_for_state_tests(),
             ),
             Some(Segment::data(
                 ISS_1 + 1,
@@ -7151,7 +7191,7 @@ mod test {
                 },
                 u32::MAX,
                 clock.now(),
-                &SocketOptions::default(),
+                &SocketOptions::default_for_state_tests(),
             ),
             None
         );
@@ -7178,7 +7218,7 @@ mod test {
                 },
                 u32::MAX,
                 clock.now(),
-                &SocketOptions::default(),
+                &SocketOptions::default_for_state_tests(),
             ),
             Some(Segment::data(
                 ISS_1 + 1 + TEST_BYTES.len(),
@@ -7260,7 +7300,7 @@ mod test {
                 },
                 u32::MAX,
                 clock.now(),
-                &SocketOptions::default(),
+                &SocketOptions::default_for_state_tests(),
             ),
             None,
         );
@@ -7283,7 +7323,7 @@ mod test {
                 },
                 u32::MAX,
                 clock.now(),
-                &SocketOptions::default(),
+                &SocketOptions::default_for_state_tests(),
             ),
             Some(Segment::data(
                 ISS_1 + 1 + TEST_BYTES.len() + seq_index,
@@ -7334,7 +7374,7 @@ mod test {
                 },
                 u32::MAX,
                 clock.now(),
-                &SocketOptions::default(),
+                &SocketOptions::default_for_state_tests(),
             ),
             Some(Segment::data(
                 ISS_1 + 1,
@@ -7385,7 +7425,7 @@ mod test {
                 },
                 u32::MAX,
                 clock.now(),
-                &SocketOptions::default(),
+                &SocketOptions::default_for_state_tests(),
             ),
             None,
         );
@@ -7613,7 +7653,7 @@ mod test {
                 Segment::data(ISS_2 + 1, ISS_1 + 1, UnscaledWindowSize::from(0), TEST_BYTES),
                 clock.now(),
                 &counters,
-                &SocketOptions { delayed_ack, ..Default::default() },
+                &SocketOptions { delayed_ack, ..SocketOptions::default_for_state_tests() },
             );
 
             let expect_ack = (!delayed_ack).then_some(Segment::ack(
