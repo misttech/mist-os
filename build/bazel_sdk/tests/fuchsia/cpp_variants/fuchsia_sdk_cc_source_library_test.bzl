@@ -36,7 +36,7 @@ def _cc_std_version_transition_impl(settings, attr):
 
     if not output_cpu:
         fail("Unrecognized cpu %s." % input_cpu)
-    fuchsia_platform = "@fuchsia_sdk//fuchsia/constraints/platforms:" + FUCHSIA_PLATFORMS_MAP[output_cpu]
+    fuchsia_platform = "@rules_fuchsia//fuchsia/constraints/platforms:" + FUCHSIA_PLATFORMS_MAP[output_cpu]
 
     cxxopts = settings["//command_line_option:cxxopt"] + [
         "-std={}".format(attr.cc_version),

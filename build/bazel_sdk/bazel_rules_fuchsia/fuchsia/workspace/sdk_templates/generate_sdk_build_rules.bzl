@@ -1740,7 +1740,6 @@ def _merge_rules_fuchsia(runtime, use_rules_fuchsia):
         # these files simply re-exports symbols loaded from other source
         # packages.
         child_directories = [
-            "fuchsia/constraints/platforms",
             "fuchsia/constraints",
             "fuchsia/toolchains",
             "fuchsia",
