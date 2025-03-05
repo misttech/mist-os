@@ -2094,13 +2094,14 @@ fn select(
         }
     };
 
-    if nfds as usize >= BITS_PER_BYTE * std::mem::size_of::<__kernel_fd_set>() {
+    if nfds as usize > BITS_PER_BYTE * std::mem::size_of::<__kernel_fd_set>() {
         return error!(EINVAL);
     }
 
-    let read_events = POLLRDNORM | POLLRDBAND | POLLIN | POLLHUP | POLLERR;
-    let write_events = POLLWRBAND | POLLWRNORM | POLLOUT | POLLERR;
-    let except_events = POLLPRI;
+    let read_events =
+        FdEvents::from_bits_truncate(POLLRDNORM | POLLRDBAND | POLLIN | POLLHUP | POLLERR);
+    let write_events = FdEvents::from_bits_truncate(POLLWRBAND | POLLWRNORM | POLLOUT | POLLERR);
+    let except_events = FdEvents::from_bits_truncate(POLLPRI);
 
     let readfds = read_fd_set(readfds_addr)?;
     let writefds = read_fd_set(writefds_addr)?;
@@ -2110,22 +2111,16 @@ fn select(
     let waiter = FileWaiter::<FdNumber>::default();
 
     for fd in 0..nfds {
-        let mut aggregated_events = 0;
+        let mut aggregated_events = FdEvents::empty();
         for (events, fds) in sets.iter() {
             if is_fd_set(fds, fd as usize) {
-                aggregated_events |= events;
+                aggregated_events |= *events;
             }
         }
-        if aggregated_events != 0 {
+        if !aggregated_events.is_empty() {
             let fd = FdNumber::from_raw(fd as i32);
             let file = current_task.files.get(fd)?;
-            waiter.add(
-                locked,
-                current_task,
-                fd,
-                Some(&file),
-                FdEvents::from_bits_truncate(aggregated_events),
-            )?;
+            waiter.add(locked, current_task, fd, Some(&file), aggregated_events)?;
         }
     }
 
@@ -2147,15 +2142,14 @@ fn select(
     waiter.wait(locked, current_task, mask, deadline)?;
 
     let mut num_fds = 0;
-    let mut readfds: __kernel_fd_set = Default::default();
-    let mut writefds: __kernel_fd_set = Default::default();
-    let mut exceptfds: __kernel_fd_set = Default::default();
+    let mut readfds_out: __kernel_fd_set = Default::default();
+    let mut writefds_out: __kernel_fd_set = Default::default();
+    let mut exceptfds_out: __kernel_fd_set = Default::default();
     let mut sets = [
-        (read_events, &mut readfds),
-        (write_events, &mut writefds),
-        (except_events, &mut exceptfds),
+        (read_events, &readfds, &mut readfds_out),
+        (write_events, &writefds, &mut writefds_out),
+        (except_events, &exceptfds, &mut exceptfds_out),
     ];
-
     let mut ready_items = waiter.ready_items.lock();
     for ReadyItem { key: ready_key, events: ready_events } in ready_items.drain(..) {
         let ready_key = assert_matches::assert_matches!(
@@ -2163,11 +2157,10 @@ fn select(
             ReadyItemKey::FdNumber(v) => v
         );
 
-        sets.iter_mut().for_each(|entry| {
-            let events = FdEvents::from_bits_truncate(entry.0);
-            let fds: &mut __kernel_fd_set = entry.1;
-            if events.intersects(ready_events) {
-                add_fd_to_set(fds, ready_key.raw() as usize);
+        sets.iter_mut().for_each(|(events, fds, fds_out)| {
+            let fd = ready_key.raw() as usize;
+            if events.intersects(ready_events) && is_fd_set(fds, fd) {
+                add_fd_to_set(fds_out, fd);
                 num_fds += 1;
             }
         });
@@ -2180,9 +2173,9 @@ fn select(
             }
             Ok(())
         };
-    write_fd_set(readfds_addr, readfds)?;
-    write_fd_set(writefds_addr, writefds)?;
-    write_fd_set(exceptfds_addr, exceptfds)?;
+    write_fd_set(readfds_addr, readfds_out)?;
+    write_fd_set(writefds_addr, writefds_out)?;
+    write_fd_set(exceptfds_addr, exceptfds_out)?;
     Ok(num_fds)
 }
 

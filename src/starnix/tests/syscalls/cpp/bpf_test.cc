@@ -411,6 +411,27 @@ TEST_F(BpfMapTest, ArrayEpoll) {
   ASSERT_EQ(ev.events, EPOLLERR);
 }
 
+TEST_F(BpfMapTest, ArraySelect) {
+  {
+    fd_set readfds = {};
+    fd_set writefds = {};
+    FD_SET(array_fd(), &readfds);
+    ASSERT_EQ(select(FD_SETSIZE, &readfds, &writefds, nullptr, nullptr), 1);
+    ASSERT_TRUE(FD_ISSET(array_fd(), &readfds));
+    ASSERT_FALSE(FD_ISSET(array_fd(), &writefds));
+  }
+
+  {
+    fd_set readfds = {};
+    fd_set writefds = {};
+    FD_SET(array_fd(), &readfds);
+    FD_SET(array_fd(), &writefds);
+    ASSERT_EQ(select(FD_SETSIZE, &readfds, &writefds, nullptr, nullptr), 2);
+    ASSERT_TRUE(FD_ISSET(array_fd(), &readfds));
+    ASSERT_TRUE(FD_ISSET(array_fd(), &writefds));
+  }
+}
+
 TEST_F(BpfMapTest, HashMapEpoll) {
   fbl::unique_fd epollfd(SAFE_SYSCALL(epoll_create(1)));
 
