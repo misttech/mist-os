@@ -1696,7 +1696,12 @@ mod tests {
         let mut ctx = new_mldv1_context();
         let FakeCtxImpl { core_ctx, bindings_ctx } = &mut ctx;
 
-        let buffer = new_v1_query(Duration::from_secs(1), GROUP_ADDR).into_inner();
+        assert_eq!(
+            core_ctx.gmp_join_group(bindings_ctx, &FakeDeviceId, GROUP_ADDR),
+            GroupJoinResult::Joined(())
+        );
+
+        let buffer = new_v1_report(GROUP_ADDR).into_inner();
         let addr = Ipv6SourceAddr::new(net_ip_v6!("2001::1")).unwrap();
         let mut buffer = &buffer[..];
         let packet = parse_mld_packet(&mut buffer);
@@ -1706,14 +1711,11 @@ mod tests {
         );
 
         // Unspecified is okay however.
-        let buffer = new_v1_query(Duration::from_secs(1), GROUP_ADDR).into_inner();
+        let buffer = new_v1_report(GROUP_ADDR).into_inner();
         let addr = Ipv6SourceAddr::Unspecified;
         let mut buffer = &buffer[..];
         let packet = parse_mld_packet(&mut buffer);
-        assert_eq!(
-            receive_mld_packet(core_ctx, bindings_ctx, &FakeDeviceId, addr, packet),
-            Err(MldError::BadSourceAddress { addr: addr.into_addr() })
-        );
+        assert_eq!(receive_mld_packet(core_ctx, bindings_ctx, &FakeDeviceId, addr, packet), Ok(()));
     }
 
     #[test]
