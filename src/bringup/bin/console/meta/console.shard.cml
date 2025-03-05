@@ -275,6 +275,11 @@
             to: "#console-launcher",
         },
         {
+            service: "fuchsia.hardware.pty.Service",
+            from: "#boot-drivers",
+            to: "#console-launcher",
+        },
+        {
             protocol: "fuchsia.paver.Paver",
             from: "#paver",
             to: "#console-launcher",

@@ -28,9 +28,9 @@ struct Arguments {
   std::string autorun_boot;
   std::string autorun_system;
 
-  // If this has a value, search for a PTY device with the given topological suffix.
+  // If true, search for a PTY device in /svc/fuchsia.hardware.pty.Service
   // Otherwise, connect to /svc/console.
-  std::optional<std::string> device_topological_suffix;
+  bool use_virtio_console = false;
   std::string term = "TERM=";
   bool virtual_console_need_debuglog = false;
 };

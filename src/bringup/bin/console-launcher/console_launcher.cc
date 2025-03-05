@@ -55,20 +55,22 @@ zx::result<Arguments> GetArguments(const fidl::ClientEnd<fuchsia_boot::Arguments
   Arguments ret;
 
   {
-    fuchsia_boot::wire::BoolPair bool_keys[]{
-        {
-            .key = "console.shell",
-            .defaultval = false,
-        },
-        {
-            .key = "netsvc.disable",
-            .defaultval = true,
-        },
-        {
-            .key = "netsvc.netboot",
-            .defaultval = false,
-        },
-    };
+    fuchsia_boot::wire::BoolPair bool_keys[]{{
+                                                 .key = "console.shell",
+                                                 .defaultval = false,
+                                             },
+                                             {
+                                                 .key = "netsvc.disable",
+                                                 .defaultval = true,
+                                             },
+                                             {
+                                                 .key = "netsvc.netboot",
+                                                 .defaultval = false,
+                                             },
+                                             {
+                                                 .key = "console.use_virtio_console",
+                                                 .defaultval = false,
+                                             }};
     const fidl::WireResult result = fidl::WireCall(client)->GetBools(
         fidl::VectorView<fuchsia_boot::wire::BoolPair>::FromExternal(bool_keys));
     if (!result.ok()) {
@@ -83,11 +85,11 @@ zx::result<Arguments> GetArguments(const fidl::ClientEnd<fuchsia_boot::Arguments
     const bool netsvc_netboot = response.values[2];
     const bool netboot = !netsvc_disable && netsvc_netboot;
     ret.virtual_console_need_debuglog = netboot;
+    ret.use_virtio_console = response.values[3];
   }
 
   fidl::StringView vars[]{
       "TERM",
-      "console.device_topological_suffix",
       "zircon.autorun.boot",
       "zircon.autorun.system",
   };
@@ -104,13 +106,10 @@ zx::result<Arguments> GetArguments(const fidl::ClientEnd<fuchsia_boot::Arguments
     ret.term += resp->values[0].get();
   }
   if (!resp->values[1].is_null()) {
-    ret.device_topological_suffix.emplace(resp->values[1].get());
+    ret.autorun_boot = resp->values[1].get();
   }
   if (!resp->values[2].is_null()) {
-    ret.autorun_boot = resp->values[2].get();
-  }
-  if (!resp->values[3].is_null()) {
-    ret.autorun_system = resp->values[3].get();
+    ret.autorun_system = resp->values[2].get();
   }
 
   return zx::ok(ret);
