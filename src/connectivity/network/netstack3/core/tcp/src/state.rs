@@ -751,7 +751,7 @@ enum SendTimer<I> {
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 enum ReceiveTimer<I> {
-    DelayedAck { at: I, received_bytes: NonZeroU32 },
+    DelayedAck { at: I },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -792,7 +792,7 @@ impl<I: Instant> SendTimer<I> {
 impl<I: Instant> ReceiveTimer<I> {
     fn expiry(&self) -> I {
         match self {
-            ReceiveTimer::DelayedAck { at, received_bytes: _ } => *at,
+            ReceiveTimer::DelayedAck { at } => *at,
         }
     }
 }
@@ -1014,7 +1014,7 @@ impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
 
     fn poll_send(&mut self, snd_max: SeqNum, now: I) -> Option<Segment<()>> {
         match self.timer {
-            Some(ReceiveTimer::DelayedAck { at, received_bytes: _ }) => (at <= now).then(|| {
+            Some(ReceiveTimer::DelayedAck { at }) => (at <= now).then(|| {
                 self.timer = None;
                 self.make_ack(snd_max)
             }),
@@ -2537,35 +2537,40 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                 let immediate_ack = !*delayed_ack
                     || had_out_of_order
                     || rcv.buffer.has_out_of_order()
-                    || rcv.remaining_quickacks != 0;
+                    // Always send immediate ACKS if we're in a quickack period.
+                    || rcv.remaining_quickacks != 0
+                    // Per RFC 5681 Section 4.2:
+                    //  An implementation is deemed to comply with this
+                    //  requirement if it sends at least one acknowledgment
+                    //  every time it receives 2*RMSS bytes of new data from the
+                    //  sender. [...]
+                    //  The sender may be forced to use a segment size less than
+                    //  RMSS due to the maximum transmission unit (MTU), the
+                    //  path MTU discovery algorithm or other factors.  For
+                    //  instance, consider the case when the receiver announces
+                    //  an RMSS of X bytes but the sender ends up using a
+                    //  segment size of Y bytes (Y < X) due to path MTU
+                    //  discovery (or the sender's MTU size).  The receiver will
+                    //  generate stretch ACKs if it waits for 2*X bytes to
+                    //  arrive before an ACK is sent.  Clearly this will take
+                    //  more than 2 segments of size Y bytes. Therefore, while a
+                    //  specific algorithm is not defined, it is desirable for
+                    //  receivers to attempt to prevent this situation, for
+                    //  example, by acknowledging at least every second segment,
+                    //  regardless of size.
+                    //
+                    // To avoid having to keep track of an estimated rmss from
+                    // the sender's perspective, we follow the simplified
+                    // guidance from the RFC and always acknowledge every other
+                    // segment, giving up on the timer if it is set.
+                    || rcv.timer.is_some();
+
                 if immediate_ack {
                     rcv.timer = None;
                 } else {
-                    match &mut rcv.timer {
-                        Some(ReceiveTimer::DelayedAck { at: _, received_bytes }) => {
-                            *received_bytes = received_bytes
-                                .saturating_add(u32::try_from(data.len()).unwrap_or(u32::MAX));
-                            // Per RFC 5681 Section 4.2:
-                            //  An implementation is deemed to comply
-                            //  with this requirement if it sends at
-                            //  least one acknowledgment every time it
-                            //  receives 2*RMSS bytes of new data from
-                            //  the sender
-                            if received_bytes.get() >= 2 * u32::from(rcv.mss) {
-                                rcv.timer = None;
-                            }
-                        }
-                        None => {
-                            if let Some(received_bytes) =
-                                NonZeroU32::new(u32::try_from(data.len()).unwrap_or(u32::MAX))
-                            {
-                                rcv.timer = Some(ReceiveTimer::DelayedAck {
-                                    at: now.panicking_add(ACK_DELAY_THRESHOLD),
-                                    received_bytes,
-                                })
-                            }
-                        }
-                    }
+                    rcv.timer = Some(ReceiveTimer::DelayedAck {
+                        at: now.panicking_add(ACK_DELAY_THRESHOLD),
+                    });
                 }
                 let segment =
                     (!matches!(rcv.timer, Some(ReceiveTimer::DelayedAck { .. }))).then(|| {
