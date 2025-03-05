@@ -206,6 +206,7 @@ rustc_library("starnix_core") {
     "security/hooks.rs",
     "security/mod.rs",
     "security/selinux_hooks/audit.rs",
+    "security/selinux_hooks/file.rs",
     "security/selinux_hooks/mod.rs",
     "security/selinux_hooks/superblock.rs",
     "security/selinux_hooks/task.rs",

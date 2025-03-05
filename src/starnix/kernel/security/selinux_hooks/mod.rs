@@ -6,16 +6,16 @@
 #![allow(non_upper_case_globals)]
 
 mod audit;
+pub(super) mod file;
 pub(super) mod superblock;
 pub(super) mod task;
 pub(super) mod testing;
 
 use super::{FsNodeSecurityXattr, PermissionFlags};
 use crate::task::{CurrentTask, Task};
-use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
-    DirEntry, DirEntryHandle, FileHandle, FileObject, FileSystem, FileSystemHandle, FsNode, FsStr,
-    FsString, PathBuilder, UnlinkKind, ValueOrSize, XattrOp,
+    DirEntry, DirEntryHandle, FileHandle, FileObject, FileSystem, FsNode, FsStr, FsString,
+    PathBuilder, UnlinkKind, ValueOrSize, XattrOp,
 };
 use crate::TODO_DENY;
 use audit::{audit_decision, audit_todo_decision, Auditable};
@@ -35,11 +35,9 @@ use starnix_uapi::arc_key::WeakKey;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, ENODATA};
 use starnix_uapi::file_mode::FileMode;
-use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{
     bpf_cmd, bpf_cmd_BPF_MAP_CREATE, bpf_cmd_BPF_PROG_LOAD, bpf_cmd_BPF_PROG_RUN, errno, error,
-    FIGETBSZ, FIOASYNC, FIONBIO, FIONREAD, FS_IOC_GETFLAGS, FS_IOC_GETVERSION, FS_IOC_SETFLAGS,
-    FS_IOC_SETVERSION, F_GETLK, F_SETFL, F_SETLK, F_SETLKW, XATTR_NAME_SELINUX,
+    XATTR_NAME_SELINUX,
 };
 use std::collections::HashSet;
 use std::sync::{Arc, OnceLock};
@@ -172,34 +170,6 @@ fn todo_has_fs_node_permissions(
         }
     }
 
-    Ok(())
-}
-
-/// Checks whether the `current_task`` has the permissions specified by `mask` to the `file`.
-pub fn file_permission(
-    security_server: &SecurityServer,
-    current_task: &CurrentTask,
-    file: &FileObject,
-    mut permission_flags: PermissionFlags,
-) -> Result<(), Errno> {
-    let current_sid = current_task.security_state.lock().current_sid;
-
-    if file.flags().contains(OpenFlags::APPEND) {
-        permission_flags |= PermissionFlags::APPEND;
-    }
-
-    has_file_permissions(
-        &security_server.as_permission_check(),
-        current_sid,
-        file,
-        &[],
-        current_task.into(),
-    )?;
-
-    track_stub!(
-        TODO("https://fxbug.dev/385121365"),
-        "Implement & enforce file_permission() checks"
-    );
     Ok(())
 }
 
@@ -1117,136 +1087,12 @@ pub(super) fn check_fs_node_removexattr_access(
     )
 }
 
-/// Returns whether `current_task` can issue an ioctl to `file`.
-pub(super) fn check_file_ioctl_access(
-    security_server: &SecurityServer,
-    current_task: &CurrentTask,
-    file: &FileObject,
-    request: u32,
-) -> Result<(), Errno> {
-    let permission_check = security_server.as_permission_check();
-    let subject_sid = current_task.security_state.lock().current_sid;
-    has_file_permissions(&permission_check, subject_sid, file, &[], current_task.into())?;
-
-    let file_class = file.node().security_state.lock().class;
-    let permissions: &[Permission] = match request {
-        // The NSA report also has `FIBMAP` follow this branch.
-        FIONREAD | FIGETBSZ | FS_IOC_GETFLAGS | FS_IOC_GETVERSION => {
-            &[CommonFsNodePermission::GetAttr.for_class(file_class)]
-        }
-        FS_IOC_SETFLAGS | FS_IOC_SETVERSION => {
-            &[CommonFsNodePermission::SetAttr.for_class(file_class)]
-        }
-        FIONBIO | FIOASYNC => &[],
-        _ => &[CommonFsNodePermission::Ioctl.for_class(file_class)],
-    };
-
-    let audit_context = [current_task.into(), file.into()];
-    todo_has_fs_node_permissions(
-        TODO_DENY!("https://fxbug.dev/385077129", "Enforce file_ioctl() fs-node checks"),
-        &permission_check,
-        subject_sid,
-        file.node(),
-        permissions,
-        (&audit_context).into(),
-    )
-}
-
 pub(super) fn fs_node_copy_up<'a>(
     current_task: &'a CurrentTask,
     fs_node: &FsNode,
 ) -> ScopedFsCreate<'a> {
     let file_sid = fs_node_effective_sid_and_class(fs_node).sid;
     scoped_fs_create(current_task, file_sid)
-}
-
-/// Returns whether `current_task` can perform a lock operation on the given `file`.
-pub(super) fn check_file_lock_access(
-    security_server: &SecurityServer,
-    current_task: &CurrentTask,
-    file: &FileObject,
-) -> Result<(), Errno> {
-    let permission_check = security_server.as_permission_check();
-    let subject_sid = current_task.security_state.lock().current_sid;
-    let fs_node_class = file.node().security_state.lock().class;
-    has_file_permissions(
-        &permission_check,
-        subject_sid,
-        file,
-        &[CommonFsNodePermission::Lock.for_class(fs_node_class)],
-        current_task.into(),
-    )
-}
-
-/// This hook is called by the `fcntl` syscall. Returns whether `current_task` can perform
-/// `fcntl_cmd` on the given file.
-pub(super) fn check_file_fcntl_access(
-    security_server: &SecurityServer,
-    current_task: &CurrentTask,
-    file: &FileObject,
-    fcntl_cmd: u32,
-    fcntl_arg: u64,
-) -> Result<(), Errno> {
-    let permission_check = security_server.as_permission_check();
-    let subject_sid = current_task.security_state.lock().current_sid;
-    let fs_node_class = file.node().security_state.lock().class;
-
-    match fcntl_cmd {
-        F_GETLK | F_SETLK | F_SETLKW => {
-            // Checks both the Lock and Use permissions.
-            has_file_permissions(
-                &permission_check,
-                subject_sid,
-                file,
-                &[CommonFsNodePermission::Lock.for_class(fs_node_class)],
-                current_task.into(),
-            )?;
-        }
-        _ => {
-            // Only checks the Use permission.
-            has_file_permissions(&permission_check, subject_sid, file, &[], current_task.into())?;
-        }
-    }
-
-    if fcntl_cmd != F_SETFL {
-        return Ok(());
-    }
-
-    // Based on documentation additional checks are necessary for F_SETFL, since it updates the file
-    // permissions.
-    let new_flags = OpenFlags::from_bits_truncate(fcntl_arg as u32);
-    let old_flags = file.flags();
-    let changed_flags = old_flags.symmetric_difference(new_flags);
-    if !changed_flags.contains(OpenFlags::APPEND) {
-        // The append value wasn't updated: no further checks are necessary.
-        return Ok(());
-    }
-    if new_flags.contains(OpenFlags::APPEND) {
-        if !old_flags.can_write() {
-            // The file was previously opened with read-only access. Since append is now requested,
-            // we need to check for permission.
-            todo_has_fs_node_permissions(
-                TODO_DENY!("https://fxbug.dev/385121365", "Enforce file_permission() checks"),
-                &security_server.as_permission_check(),
-                subject_sid,
-                file.node(),
-                &permissions_from_flags(PermissionFlags::APPEND, fs_node_class),
-                current_task.into(),
-            )?;
-        }
-    } else if old_flags.can_write() {
-        // If a file is opened with the WRITE and APPEND permissions, only the APPEND permission is
-        // checked. Now that the append flag was cleared we need to check the WRITE permission.
-        todo_has_fs_node_permissions(
-            TODO_DENY!("https://fxbug.dev/385121365", "Enforce file_permission() checks"),
-            &security_server.as_permission_check(),
-            subject_sid,
-            file.node(),
-            &permissions_from_flags(PermissionFlags::WRITE, fs_node_class),
-            current_task.into(),
-        )?;
-    }
-    Ok(())
 }
 
 /// If `fs_node` is in a filesystem without xattr support, returns the xattr name for the security
@@ -1545,124 +1391,6 @@ pub(super) fn kernel_init_security(exceptions_config: String) -> KernelState {
     }
 }
 
-/// Consumes the SELinux mount options from the supplied `MountParams` and returns the security
-/// mount options for the given `MountParams`.
-pub(super) fn sb_eat_lsm_opts(
-    mount_params: &mut MountParams,
-) -> Result<FileSystemMountOptions, Errno> {
-    let context = mount_params.remove(FsStr::new(b"context"));
-    let def_context = mount_params.remove(FsStr::new(b"defcontext"));
-    let fs_context = mount_params.remove(FsStr::new(b"fscontext"));
-    let root_context = mount_params.remove(FsStr::new(b"rootcontext"));
-
-    // If a "context" is specified then it is used for all nodes in the filesystem, so the other
-    // security context options would not be meaningful to combine with it, except "fscontext".
-    if context.is_some() && (def_context.is_some() || root_context.is_some()) {
-        return error!(EINVAL);
-    }
-    Ok(FileSystemMountOptions {
-        context: context.map(Into::into),
-        def_context: def_context.map(Into::into),
-        fs_context: fs_context.map(Into::into),
-        root_context: root_context.map(Into::into),
-    })
-}
-
-/// Returns security state to associate with a filesystem based on the supplied mount options.
-pub(super) fn file_system_init_security(
-    name: &'static FsStr,
-    mount_options: &FileSystemMountOptions,
-) -> Result<FileSystemState, Errno> {
-    Ok(FileSystemState::new(name, mount_options.clone()))
-}
-
-/// Returns the security label to be applied to a file system with the name `fs_name`
-/// that is to be mounted with `mount_options`.
-fn label_from_mount_options_and_name(
-    security_server: &SecurityServer,
-    mount_options: &FileSystemMountOptions,
-    fs_name: &'static FsStr,
-) -> FileSystemLabel {
-    // TODO: https://fxbug.dev/361297862 - Replace this workaround with more
-    // general handling of these special Fuchsia filesystems.
-    let effective_name: &FsStr =
-        if *fs_name == "remotefs" || *fs_name == "remote_bundle" || *fs_name == "remotevol" {
-            track_stub!(
-                TODO("https://fxbug.dev/361297862"),
-                "Applying ext4 labeling configuration to remote filesystems"
-            );
-            "ext4".into()
-        } else {
-            fs_name
-        };
-    security_server.resolve_fs_label(effective_name.into(), mount_options)
-}
-
-/// Resolves the labeling scheme and arguments for the `file_system`, based on the loaded policy.
-pub(super) fn file_system_resolve_security<L>(
-    locked: &mut Locked<'_, L>,
-    security_server: &SecurityServer,
-    current_task: &CurrentTask,
-    file_system: &FileSystemHandle,
-) -> Result<(), Errno>
-where
-    L: LockEqualOrBefore<FileOpsCore>,
-{
-    // TODO: https://fxbug.dev/334094811 - Determine how failures, e.g. mount options containing
-    // Security Context values that are not valid in the loaded policy.
-    let pending_entries = {
-        let mut label_state = file_system.security_state.state.0.lock();
-        let (resolved_label_state, pending_entries) = match &mut *label_state {
-            FileSystemLabelState::Labeled { .. } => return Ok(()),
-            FileSystemLabelState::Unlabeled { name, mount_options, pending_entries } => (
-                {
-                    FileSystemLabelState::Labeled {
-                        label: label_from_mount_options_and_name(
-                            security_server,
-                            mount_options,
-                            name,
-                        ),
-                    }
-                },
-                std::mem::take(pending_entries),
-            ),
-        };
-        *label_state = resolved_label_state;
-        pending_entries
-    };
-
-    if let Some(root_dir_entry) = file_system.maybe_root() {
-        fs_node_init_with_dentry(
-            Some(&mut locked.cast_locked()),
-            security_server,
-            current_task,
-            root_dir_entry,
-        )?;
-    }
-
-    // Label the `FsNode`s for any `pending_entries`.
-    let labeled_entries = pending_entries.len();
-    for dir_entry in pending_entries {
-        if let Some(dir_entry) = dir_entry.0.upgrade() {
-            fs_node_init_with_dentry(
-                Some(&mut locked.cast_locked()),
-                security_server,
-                current_task,
-                &dir_entry,
-            )
-            .unwrap_or_else(|_| panic!("Failed to resolve FsNode label"));
-        }
-    }
-    log_debug!("Labeled {} entries in {} FileSystem", labeled_entries, file_system.name());
-
-    Ok(())
-}
-
-/// Returns the security state for a new file object created by `current_task`.
-pub fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
-    FileObjectState { sid: current_task.security_state.lock().current_sid }
-}
-
 pub(super) fn selinuxfs_init_null(current_task: &CurrentTask, null_file_handle: &FileHandle) {
     let kernel_state = current_task
         .kernel()
@@ -1693,10 +1421,15 @@ pub(super) fn selinuxfs_policy_loaded<L>(
     let pending_file_systems = std::mem::take(&mut *kernel_state.pending_file_systems.lock());
     for file_system in pending_file_systems {
         if let Some(file_system) = file_system.0.upgrade() {
-            file_system_resolve_security(locked, security_server, current_task, &file_system)
-                .unwrap_or_else(|_| {
-                    panic!("Failed to resolve {} FileSystem label", file_system.name())
-                });
+            superblock::file_system_resolve_security(
+                locked,
+                security_server,
+                current_task,
+                &file_system,
+            )
+            .unwrap_or_else(|_| {
+                panic!("Failed to resolve {} FileSystem label", file_system.name())
+            });
         }
     }
 }
@@ -1831,7 +1564,7 @@ impl FileSystemState {
                 return *other_mount_options == *mount_options
             }
             FileSystemLabelState::Labeled { label } => {
-                return label_from_mount_options_and_name(
+                return superblock::label_from_mount_options_and_name(
                     security_server,
                     other_mount_options,
                     fs_name.into(),

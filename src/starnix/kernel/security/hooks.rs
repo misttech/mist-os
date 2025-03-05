@@ -142,7 +142,7 @@ pub fn sb_eat_lsm_opts(
     track_hook_duration!(c"security.hooks.sb_eat_lsm_opts");
     if let Some(state) = &kernel.security_state.state {
         if state.server.has_policy() {
-            return selinux_hooks::sb_eat_lsm_opts(mount_params);
+            return selinux_hooks::superblock::sb_eat_lsm_opts(mount_params);
         }
     }
     Ok(FileSystemMountOptions::default())
@@ -155,7 +155,9 @@ pub fn file_system_init_security(
     mount_options: &FileSystemMountOptions,
 ) -> Result<FileSystemState, Errno> {
     track_hook_duration!(c"security.hooks.file_system_init_security");
-    Ok(FileSystemState { state: selinux_hooks::file_system_init_security(name, mount_options)? })
+    Ok(FileSystemState {
+        state: selinux_hooks::superblock::file_system_init_security(name, mount_options)?,
+    })
 }
 
 /// Gives the hooks subsystem an opportunity to note that the new `file_system` needs labeling, if
@@ -188,7 +190,7 @@ where
 {
     track_hook_duration!(c"security.hooks.file_system_resolve_security");
     if_selinux_else_default_ok_with_context(locked, current_task, |locked, security_server| {
-        selinux_hooks::file_system_resolve_security(
+        selinux_hooks::superblock::file_system_resolve_security(
             locked,
             security_server,
             current_task,
@@ -212,7 +214,7 @@ pub fn file_permission(
 ) -> Result<(), Errno> {
     track_hook_duration!(c"security.hooks.file_permission");
     if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::file_permission(security_server, current_task, file, permission_flags)
+        selinux_hooks::file::file_permission(security_server, current_task, file, permission_flags)
     })
 }
 
@@ -501,7 +503,7 @@ pub fn fs_node_permission(
 /// Corresponds to the `file_alloc_security()` LSM hook.
 pub fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
     track_hook_duration!(c"security.hooks.file_alloc_security");
-    FileObjectState { state: selinux_hooks::file_alloc_security(current_task) }
+    FileObjectState { state: selinux_hooks::file::file_alloc_security(current_task) }
 }
 
 /// Returns whether `current_task` can issue an ioctl to `file`.
@@ -513,7 +515,7 @@ pub fn check_file_ioctl_access(
 ) -> Result<(), Errno> {
     track_hook_duration!(c"security.hooks.check_file_ioctl_access");
     if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::check_file_ioctl_access(security_server, current_task, file, request)
+        selinux_hooks::file::check_file_ioctl_access(security_server, current_task, file, request)
     })
 }
 
@@ -545,7 +547,7 @@ pub fn fs_node_copy_up<'a>(
 pub fn check_file_lock_access(current_task: &CurrentTask, file: &FileObject) -> Result<(), Errno> {
     track_hook_duration!(c"security.hooks.check_file_lock_access");
     if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::check_file_lock_access(security_server, current_task, file)
+        selinux_hooks::file::check_file_lock_access(security_server, current_task, file)
     })
 }
 
@@ -559,7 +561,7 @@ pub fn check_file_fcntl_access(
 ) -> Result<(), Errno> {
     track_hook_duration!(c"security.hooks.check_file_fcntl_access");
     if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::check_file_fcntl_access(
+        selinux_hooks::file::check_file_fcntl_access(
             security_server,
             current_task,
             file,
