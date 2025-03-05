@@ -4,8 +4,9 @@
 #ifndef SRC_DEVICES_BUS_LIB_VIRTIO_INCLUDE_LIB_VIRTIO_RING_H_
 #define SRC_DEVICES_BUS_LIB_VIRTIO_INCLUDE_LIB_VIRTIO_RING_H_
 
-#include <lib/ddk/hw/arch_ops.h>
 #include <lib/dma-buffer/buffer.h>
+#include <lib/mmio/mmio-internal.h>
+#include <lib/virtio/internal/barriers.h>
 #include <zircon/types.h>
 
 #include <memory>

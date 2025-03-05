@@ -13,6 +13,7 @@
 
 #include <ddktl/device.h>
 #include <ddktl/protocol/empty-protocol.h>
+#include <fbl/mutex.h>
 #include <virtio/input.h>
 
 #include "src/ui/input/drivers/virtio/input_device.h"

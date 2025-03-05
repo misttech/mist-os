@@ -21,7 +21,7 @@ class ConnectionTest : public zxtest::Test {
  public:
   fuchsia_hardware_vsock::wire::Addr addr_;
   virtio::SocketDevice::ConnectionKey key_{addr_};
-  fbl::Mutex lock_;
+  std::mutex lock_;
   zx::socket tx_;
   std::optional<virtio::SocketDevice::Connection> connection_;
 };

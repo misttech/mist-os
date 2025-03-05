@@ -224,7 +224,7 @@ class SocketDevice : public Device, public DeviceType, public fidl::WireServer<v
     using SignalHandler =
         fit::function<void(zx_status_t, const zx_packet_signal_t*, fbl::RefPtr<Connection>)>;
     Connection(const ConnectionKey& key, zx::socket data, SignalHandler wait_handler, uint32_t cid,
-               fbl::Mutex& lock);
+               std::mutex& lock);
     ~Connection() = default;
 
     bool PendingTx();
@@ -324,7 +324,7 @@ class SocketDevice : public Device, public DeviceType, public fidl::WireServer<v
     void SetSocketTxThreshold(uint32_t threshold);
 
     // Reference to the lock that we will hold when performing BeginWait.
-    fbl::Mutex& lock_;
+    std::mutex& lock_;
 
     ConnectionKey key_;
 
