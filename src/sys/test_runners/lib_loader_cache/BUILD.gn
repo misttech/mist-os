@@ -68,5 +68,10 @@ fuchsia_unittest_package("lib_loader_runner_cache_unit_tests") {
 
 group("tests") {
   testonly = true
-  deps = [ ":lib_loader_runner_cache_unit_tests" ]
+
+  # TODO: https://fxbug.dev/400833576: Re-enable it in the profile variant
+  # after the issue is fixed.
+  if (!is_profile) {
+    deps = [ ":lib_loader_runner_cache_unit_tests" ]
+  }
 }
