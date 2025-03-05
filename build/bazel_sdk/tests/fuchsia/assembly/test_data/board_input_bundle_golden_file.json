@@ -15,15 +15,7 @@
             "set": "base"
         }
     ],
-    "kernel_boot_args": [],
     "configuration": {
-        "cpu_manager": "configuration/cpu_manager/config_data.json",
-        "energy_model": null,
-        "power_manager": null,
-        "power_metrics_recorder": null,
-        "system_power_mode": null,
-        "thermal": null,
-        "thread_roles": [],
-        "sysmem_format_costs": []
+        "cpu_manager": "configuration/cpu_manager/config_data.json"
     }
 }

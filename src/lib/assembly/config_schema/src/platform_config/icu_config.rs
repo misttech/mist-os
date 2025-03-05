@@ -57,10 +57,12 @@ pub struct ICUConfig {
     /// The revision (corresponding to either one of the labels, or a git commit ID) of the ICU
     /// library to use in system assembly. This revision is constrained to the commit IDs available
     /// in the repos at `//third_party/icu/{default,latest}`,
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub revision: Revision,
 
     /// A list of packages that should receive ICU tzdata in their config directory.
     /// TODO(b/297214394): Remove this option once all components use tzdata_provider.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub legacy_tzdata_packages: Vec<String>,
 }
 

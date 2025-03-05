@@ -46,6 +46,7 @@ pub struct PlatformSysmemConfig {
     /// timers by default. When true, on detection of an improperly written
     /// page, sysmem will attempt to log debug info re. allocations that
     /// previously used the page.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub contiguous_guard_pages_unused: bool,
 
     /// Optional ordered list of files, each of which contains a persistent fidl
@@ -98,5 +99,6 @@ pub struct BoardSysmemConfig {
     /// timers by default. When true, on detection of an improperly written
     /// page, sysmem will attempt to log debug info re. allocations that
     /// previously used the page.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub contiguous_guard_pages_unused: bool,
 }

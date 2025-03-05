@@ -26,6 +26,7 @@ pub enum MemoryMonitorVersion {
 #[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct PlatformMemoryMonitorConfig {
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub memory_monitor_versions: Vec<MemoryMonitorVersion>,
 }
 

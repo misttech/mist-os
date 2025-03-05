@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 #[serde(default, deny_unknown_fields)]
 pub struct GraphicsConfig {
     /// Configuration for the virtual console
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub virtual_console: VirtconConfig,
 }
 

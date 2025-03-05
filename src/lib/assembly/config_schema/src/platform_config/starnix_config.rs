@@ -9,6 +9,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct PlatformStarnixConfig {
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub enabled: bool,
+
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub enable_android_support: bool,
 }

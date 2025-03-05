@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct PlatformSessionConfig {
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub enabled: bool,
 
     /// If `autolaunch` is true (the default) and the `session.url` is set in
@@ -16,11 +17,22 @@ pub struct PlatformSessionConfig {
     /// boots up.
     pub autolaunch: bool,
 
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub include_element_manager: bool,
 }
 
 impl Default for PlatformSessionConfig {
     fn default() -> Self {
         Self { enabled: false, autolaunch: true, include_element_manager: false }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_serialization() {
+        crate::common::tests::default_serialization_helper::<PlatformSessionConfig>();
     }
 }

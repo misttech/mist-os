@@ -15,25 +15,31 @@ use crate::common::option_path_schema;
 pub struct FactoryStoreProvidersConfig {
     #[schemars(schema_with = "option_path_schema")]
     #[walk_paths]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub alpha: Option<Utf8PathBuf>,
 
     #[schemars(schema_with = "option_path_schema")]
     #[walk_paths]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub cast_credentials: Option<Utf8PathBuf>,
 
     #[schemars(schema_with = "option_path_schema")]
     #[walk_paths]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub misc: Option<Utf8PathBuf>,
 
     #[schemars(schema_with = "option_path_schema")]
     #[walk_paths]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub play_ready: Option<Utf8PathBuf>,
 
     #[schemars(schema_with = "option_path_schema")]
     #[walk_paths]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub weave: Option<Utf8PathBuf>,
 
     #[schemars(schema_with = "option_path_schema")]
     #[walk_paths]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub widevine: Option<Utf8PathBuf>,
 }

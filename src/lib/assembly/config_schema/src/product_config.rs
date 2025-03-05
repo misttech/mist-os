@@ -15,44 +15,53 @@ use serde::{Deserialize, Serialize};
 use crate::common::{path_schema, vec_path_schema, DriverDetails};
 
 /// The Product-provided configuration details.
-#[derive(Debug, Default, Deserialize, Serialize, JsonSchema, WalkPaths)]
+#[derive(Debug, Default, Deserialize, Serialize, JsonSchema, WalkPaths, PartialEq)]
 #[serde(default, deny_unknown_fields)]
 pub struct ProductConfig {
     #[walk_paths]
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub packages: ProductPackagesConfig,
 
     /// List of base drivers to include in the product.
     #[walk_paths]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub base_drivers: Vec<DriverDetails>,
 
     /// Product-specific session information.
     ///
     /// Default to None which creates a "paused" config that launches nothing to start.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub session: Option<ProductSessionConfig>,
 
     /// Generic product information.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub info: Option<ProductInfoConfig>,
 
     /// The file paths to various build information.
     #[walk_paths]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub build_info: Option<BuildInfoConfig>,
 
     /// The policy given to component_manager that restricts where sensitive capabilities can be
     /// routed.
     #[walk_paths]
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub component_policy: ComponentPolicyConfig,
 
     /// Components which depend on trusted applications running in the TEE.
     #[walk_paths]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tee_clients: Vec<TeeClient>,
 
     /// Components which should run as trusted applications in Fuchsia.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub trusted_apps: Vec<TrustedApp>,
 
     /// The set of files to be placed in BOOTFS in the ZBI.
     ///
     /// This is only usable in the empty, embeddable, and bootstrap feature set levels.
     #[walk_paths]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub bootfs_files: Vec<FileEntry<String>>,
 }
 
@@ -248,52 +257,61 @@ pub struct BuildInfoConfig {
 }
 
 /// Configuration options for the component policy.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, JsonSchema, WalkPaths)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(default, deny_unknown_fields)]
 pub struct ComponentPolicyConfig {
     /// The file paths to a product-provided component policies.
     #[walk_paths]
     #[schemars(schema_with = "vec_path_schema")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub product_policies: Vec<Utf8PathBuf>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize, JsonSchema)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default)]
 pub struct TeeClientFeatures {
     /// Whether this component needs /dev-class/securemem routed to it. If true, the securemem
     //// directory will be routed as dev-securemem.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub securemem: bool,
     /// Whether this component requires persistent storage, routed as /data.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub persistent_storage: bool,
     /// Whether this component requires tmp storage, routed as /tmp.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub tmp_storage: bool,
 }
 
 /// A configuration for a component which depends on TEE-based protocols.
 /// Examples include components which implement DRM, or authentication services.
-#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema, WalkPaths)]
+#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema, WalkPaths, PartialEq)]
 pub struct TeeClient {
     /// The URL of the component.
     pub component_url: String,
     /// GUIDs which of the form fuchsia.tee.Application.{GUID} will match a
     /// protocol provided by the TEE.
     #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub guids: Vec<String>,
     /// Capabilities provided by this component which should be routed to the
     /// rest of the system.
     #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub capabilities: Vec<String>,
     /// Additional protocols which are required for this component to work, and
     /// which will be routed from 'parent'
     #[serde(default)]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub additional_required_protocols: Vec<String>,
     /// Config data files required for this component to work, and which will be inserted into
     /// config data for this package (with a package name based on the component URL)
     #[serde(default)]
     #[walk_paths]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub config_data: Option<TeeClientConfigData>,
     /// Additional features required for the component to function.
     #[serde(default)]
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub additional_required_features: TeeClientFeatures,
 }
 
@@ -301,7 +319,7 @@ pub struct TeeClient {
 ///
 /// We have to wrap the BTreeMap in order to be able to implement JsonSchema
 /// for a Utf8PathBuf.
-#[derive(Clone, Debug, Deserialize, Serialize, WalkPaths)]
+#[derive(Clone, Debug, Deserialize, Serialize, WalkPaths, PartialEq)]
 pub struct TeeClientConfigData {
     /// The inner map of config data files.
     #[serde(flatten)]
@@ -323,7 +341,7 @@ impl JsonSchema for TeeClientConfigData {
 }
 
 /// Configuration for how to run a trusted application in Fuchsia.
-#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
+#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema, PartialEq)]
 pub struct TrustedApp {
     /// The URL of the component.
     pub component_url: String,
@@ -352,6 +370,7 @@ pub struct ProductSessionConfig {
 
     /// Specifies initial element properties for the window manager.
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub initial_element: Option<InitialElement>,
 }
 
@@ -382,6 +401,11 @@ fn collection_default() -> String {
 mod tests {
     use super::*;
     use assembly_util as util;
+
+    #[test]
+    fn test_default_serialization() {
+        crate::common::tests::default_serialization_helper::<ProductConfig>();
+    }
 
     #[test]
     fn test_product_provided_config_data() {

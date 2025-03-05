@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct HealthCheckConfig {
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub verify_components: Vec<VerifyComponent>,
 }
 

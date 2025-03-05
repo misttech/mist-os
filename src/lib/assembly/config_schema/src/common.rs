@@ -26,6 +26,10 @@ pub fn option_path_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars:
     schema.into()
 }
 
+pub fn is_default<T: Default + PartialEq>(t: &T) -> bool {
+    t == &T::default()
+}
+
 /// These are the package sets that a package can belong to.
 ///
 /// See RFC-0212 "Package Sets" for more information on these:
@@ -188,5 +192,30 @@ pub enum FeatureControl {
 impl PartialEq<FeatureControl> for &FeatureControl {
     fn eq(&self, other: &FeatureControl) -> bool {
         self.eq(&other)
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use serde::{Deserialize, Serialize};
+
+    /// Validate that the default value for a type serializes and then
+    /// deserializes back to the default value.
+    pub fn default_serialization_helper<T>()
+    where
+        for<'de> T: Default + std::fmt::Debug + Deserialize<'de> + Serialize + PartialEq,
+    {
+        value_serialization_helper(T::default());
+    }
+
+    /// Validate that a given value for a type serializes and then
+    /// deserializes back into the same value.
+    pub fn value_serialization_helper<T>(value: T)
+    where
+        for<'de> T: std::fmt::Debug + Deserialize<'de> + Serialize + PartialEq,
+    {
+        let serialized = serde_json::to_string(&value).unwrap();
+        let deserialized: T = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(value, deserialized);
     }
 }

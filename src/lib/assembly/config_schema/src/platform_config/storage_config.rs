@@ -13,21 +13,28 @@ use serde::{Deserialize, Serialize};
 #[serde(default, deny_unknown_fields)]
 pub struct StorageConfig {
     #[walk_paths]
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub component_id_index: ComponentIdIndexConfig,
 
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub factory_data: FactoryDataConfig,
 
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub filesystems: ProductFilesystemConfig,
 
     /// Prevents fshost from binding to detected block devices.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub disable_automount: bool,
 
     /// Enables storage-host.  See RFC (https://fxrev.dev/1077832) for details.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub storage_host_enabled: bool,
 
     /// Enable the automatic garbage collection of mutable storage.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub mutable_storage_garbage_collection: bool,
 
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub starnix_volume: StarnixVolumeConfig,
 }
 
@@ -43,6 +50,7 @@ pub struct ComponentIdIndexConfig {
     /// An optional index to use for product-provided components.
     #[walk_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub product_index: Option<Utf8PathBuf>,
 }
 
@@ -50,6 +58,7 @@ pub struct ComponentIdIndexConfig {
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default)]
 pub struct FactoryDataConfig {
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub enabled: bool,
 }
 
@@ -60,5 +69,6 @@ pub struct FactoryDataConfig {
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default)]
 pub struct StarnixVolumeConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
 }

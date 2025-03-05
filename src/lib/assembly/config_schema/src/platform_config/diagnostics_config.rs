@@ -18,16 +18,27 @@ pub use diagnostics_log_types::Severity;
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, WalkPaths)]
 #[serde(default, deny_unknown_fields)]
 pub struct DiagnosticsConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub archivist: Option<ArchivistConfig>,
+
     /// The set of pipeline config files to supply to archivist.
     #[walk_paths]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub archivist_pipelines: Vec<ArchivistPipeline>,
+
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub additional_serial_log_components: Vec<String>,
+
     #[walk_paths]
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub sampler: SamplerConfig,
+
     #[walk_paths]
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub memory_monitor: MemoryMonitorConfig,
+
     /// The set of log levels components will receive as their initial interest.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub component_log_initial_interests: Vec<ComponentInitialInterest>,
 }
 
@@ -117,18 +128,23 @@ pub struct SamplerConfig {
     /// The metrics configs to pass to sampler.
     #[schemars(schema_with = "crate::vec_path_schema")]
     #[walk_paths]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub project_configs: Vec<Utf8PathBuf>,
 
     /// The FIRE config to pass to sampler.
     #[walk_paths]
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub fire: FireConfig,
 
     // TODO(https://fxbug.dev/395159893): these are obsolete and unused. Remove.
     #[schemars(schema_with = "crate::vec_path_schema")]
     #[walk_paths]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub metrics_configs: Vec<Utf8PathBuf>,
+
     #[schemars(schema_with = "crate::vec_path_schema")]
     #[walk_paths]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub fire_configs: Vec<Utf8PathBuf>,
 }
 
@@ -140,11 +156,13 @@ pub struct FireConfig {
     /// to Cobalt metric ID.
     #[schemars(schema_with = "crate::vec_path_schema")]
     #[walk_paths]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub component_configs: Vec<Utf8PathBuf>,
 
     /// FIRE project templates.
     #[schemars(schema_with = "crate::vec_path_schema")]
     #[walk_paths]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub project_templates: Vec<Utf8PathBuf>,
 }
 
@@ -155,20 +173,31 @@ pub struct MemoryMonitorConfig {
     /// The memory buckets config file to provide to memory monitor.
     #[schemars(schema_with = "crate::option_path_schema")]
     #[walk_paths]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub buckets: Option<Utf8PathBuf>,
+
     /// Control whether a pressure change should trigger a capture.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub capture_on_pressure_change: bool,
+
     /// Expected delay between scheduled captures upon imminent OOM, in
     /// seconds.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub imminent_oom_capture_delay_s: Option<u32>,
+
     /// Expected delay between scheduled captures when the memory
     /// pressure is critical, in seconds.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub critical_capture_delay_s: Option<u32>,
+
     /// Expected delay between scheduled captures when the memory
     /// pressure is abnormal, in seconds.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub warning_capture_delay_s: Option<u32>,
+
     /// Expected delay between scheduled captures when the memory
     /// pressure is normal, in seconds.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub normal_capture_delay_s: Option<u32>,
 }
 
@@ -179,6 +208,7 @@ pub struct MemoryMonitorConfig {
 pub struct ComponentInitialInterest {
     /// The URL or moniker for the component which should receive the initial interest.
     pub component: UrlOrMoniker,
+
     /// The log severity the initial interest should specify.
     pub log_severity: Severity,
 }

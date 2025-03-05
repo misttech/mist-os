@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 pub struct SystemSoundsConfig {
     /// earcon configuration
     #[walk_paths]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub earcons: Option<Earcons>,
 }
 
@@ -23,25 +24,30 @@ pub struct Earcons {
     /// Sound to play on bluetooth connection
     #[schemars(schema_with = "crate::option_path_schema")]
     #[walk_paths]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bluetooth_connected: Option<Utf8PathBuf>,
 
     /// Sound to play on bluetooth disconnect
     #[schemars(schema_with = "crate::option_path_schema")]
     #[walk_paths]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub bluetooth_disconnected: Option<Utf8PathBuf>,
 
     /// Sound to play when changing volume
     #[schemars(schema_with = "crate::option_path_schema")]
     #[walk_paths]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub volume_changed: Option<Utf8PathBuf>,
 
     /// Sound to play when reaching max volume
     #[schemars(schema_with = "crate::option_path_schema")]
     #[walk_paths]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub volume_max_reached: Option<Utf8PathBuf>,
 
     /// Sound to play on system start
     #[schemars(schema_with = "crate::option_path_schema")]
     #[walk_paths]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub system_start: Option<Utf8PathBuf>,
 }

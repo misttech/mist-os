@@ -14,14 +14,25 @@ use serde::{Deserialize, Serialize};
 #[serde(rename(serialize = "software_delivery"))]
 #[serde(rename(deserialize = "software_delivery"))]
 pub struct SwdConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub policy: Option<PolicyLabels>,
+
     #[walk_paths]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub update_checker: Option<UpdateChecker>,
+
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub on_verification_failure: VerificationFailureAction,
+
     #[walk_paths]
     #[schemars(schema_with = "crate::vec_path_schema")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tuf_config_paths: Vec<Utf8PathBuf>,
+
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub include_configurator: bool,
+
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub enable_upgradable_packages: bool,
 }
 
@@ -48,9 +59,8 @@ pub enum UpdateChecker {
 
 /// Defines the behavior of the system-update-committer package when update
 /// verification fails
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[derive(Clone, Default, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
-#[derive(Default)]
 pub enum VerificationFailureAction {
     #[default]
     Reboot,
@@ -65,14 +75,18 @@ pub struct OtaConfigs {
     /// //src/sys/pkg/lib/channel-config
     #[walk_paths]
     #[schemars(schema_with = "crate::option_path_schema")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub channels_path: Option<Utf8PathBuf>,
 
     /// If not specified, the hard-coded value in omaha-client-bin will be
     /// used
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub server_url: Option<ServerUrl>,
 
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub policy_config: PolicyConfig,
 
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub include_empty_eager_config: bool,
 }
 
@@ -109,6 +123,11 @@ mod tests {
 
     use anyhow::Result;
     use assembly_util as util;
+
+    #[test]
+    fn test_default_serialization() {
+        crate::common::tests::default_serialization_helper::<PolicyConfig>();
+    }
 
     #[test]
     fn test_empty_deserialization() {

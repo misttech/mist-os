@@ -67,4 +67,9 @@ mod tests {
         let v: TimekeeperConfig = serde_json::from_str("{}").unwrap();
         assert_eq!(v, Default::default());
     }
+
+    #[test]
+    fn test_default_serialization() {
+        crate::common::tests::default_serialization_helper::<TimekeeperConfig>();
+    }
 }

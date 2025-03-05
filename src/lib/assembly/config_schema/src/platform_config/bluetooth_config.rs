@@ -23,6 +23,7 @@ pub enum Snoop {
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default)]
 pub struct A2dpConfig {
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub enabled: bool,
 }
 
@@ -31,6 +32,7 @@ pub struct A2dpConfig {
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default)]
 pub struct AvrcpConfig {
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub enabled: bool,
 }
 
@@ -39,21 +41,27 @@ pub struct AvrcpConfig {
 #[serde(default)]
 pub struct DeviceIdConfig {
     /// Enable the device identification profile (`bt-device-id`).
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub enabled: bool,
     /// Uniquely identifies the Vendor of the device.
     /// Mandatory if `enabled` is true.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub vendor_id: u16,
     /// Uniquely identifies the product - typically a value assigned by the Vendor.
     /// Mandatory if `enabled` is true.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub product_id: u16,
     /// Device release number.
     /// Mandatory if `enabled` is true.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub version: u16,
     /// If `true`, designates this identification as the primary service record for this device.
     /// Mandatory if `enabled` is true.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub primary: bool,
     /// A human-readable description of the service.
     /// Optional if `enabled` is true.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub service_description: Option<String>,
 }
 
@@ -110,6 +118,7 @@ pub enum HfpCodecId {
 #[serde(default)]
 pub struct HfpConfig {
     /// Enable hands free calling audio gateway (`bt-hfp-audio-gateway`).
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub enabled: bool,
 
     /// The set of AudioGateway features that are enabled.
@@ -120,16 +129,20 @@ pub struct HfpConfig {
     ///  - Codec Negotiation
     ///  - HF Indicators
     ///  - eSCO S4
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub audio_gateway: Vec<HfpAudioGatewayFeature>,
 
     /// The set of codecs that are enabled to use.
     /// If MSBC is enabled, Wide Band Speech will be enabled
     /// If LC3 is enabled, Super Wide Band will be enabled
     /// By default, all codecs supported (either by the controller as specified below) will be enabled.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub codecs_supported: Vec<HfpCodecId>,
+
     /// Set of codec ids that the Bluetooth controller can encode.
     /// Codecs not supported will be ignored.
     /// Codecs not in this list but in codecs_supported will be encoded locally and sent inband.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub controller_encodes: Vec<HfpCodecId>,
 }
 
@@ -147,18 +160,23 @@ pub struct MapConfig {
 #[serde(default)]
 pub struct BluetoothProfilesConfig {
     /// Specifies the configuration for `bt-a2dp`.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub a2dp: A2dpConfig,
 
     /// Specifies the configuration for `bt-avrcp`.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub avrcp: AvrcpConfig,
 
     /// Specifies the configuration for `bt-device-id`.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub did: DeviceIdConfig,
 
     /// Specifies the configuration for `bt-hfp`.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub hfp: HfpConfig,
 
     /// Specifies the configuration for `bt-map`.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub map: MapConfig,
 }
 
@@ -167,6 +185,7 @@ pub struct BluetoothProfilesConfig {
 #[serde(default)]
 pub struct BluetoothCoreConfig {
     /// Enable BR/EDR legacy pairing.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
     pub legacy_pairing_enabled: bool,
 }
 
@@ -181,14 +200,17 @@ pub enum BluetoothConfig {
     Standard {
         /// Configuration for Bluetooth profiles. The default includes no profiles.
         #[serde(default)]
+        #[serde(skip_serializing_if = "crate::common::is_default")]
         profiles: BluetoothProfilesConfig,
 
         /// Configuration for Bluetooth core.
         #[serde(default)]
+        #[serde(skip_serializing_if = "crate::common::is_default")]
         core: BluetoothCoreConfig,
 
         /// Configuration for `bt-snoop`.
         #[serde(default)]
+        #[serde(skip_serializing_if = "crate::common::is_default")]
         snoop: Snoop,
     },
     /// The coreless Bluetooth configuration omits the "core" set of Bluetooth components and only
@@ -198,6 +220,7 @@ pub enum BluetoothConfig {
     Coreless {
         /// Configuration for `bt-snoop`.
         #[serde(default)]
+        #[serde(skip_serializing_if = "crate::common::is_default")]
         snoop: Snoop,
     },
 }
@@ -221,6 +244,11 @@ impl BluetoothConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_default_serialization() {
+        crate::common::tests::default_serialization_helper::<BluetoothConfig>();
+    }
 
     #[test]
     fn deserialize_standard_config_no_profiles() {
