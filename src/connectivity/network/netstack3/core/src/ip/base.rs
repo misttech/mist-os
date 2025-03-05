@@ -24,7 +24,7 @@ use netstack3_icmp_echo::{
     IcmpSockets,
 };
 use netstack3_ip::device::{self, IpDeviceBindingsContext, IpDeviceIpExt};
-use netstack3_ip::gmp::IgmpCounters;
+use netstack3_ip::gmp::{IgmpCounters, MldCounters};
 use netstack3_ip::icmp::{
     self, IcmpIpTransportContext, IcmpRxCounters, IcmpState, IcmpTxCounters, InnerIcmpContext,
     InnerIcmpv4Context, NdpCounters,
@@ -188,6 +188,48 @@ impl<BT: BindingsTypes, D: DeviceStateSpec, L>
             )
             .as_ref()
             .igmp_counters())
+    }
+}
+
+impl<BT: BindingsTypes, L> CounterContext<MldCounters> for CoreCtx<'_, BT, L> {
+    fn with_counters<O, F: FnOnce(&MldCounters) -> O>(&self, cb: F) -> O {
+        cb(&self
+            .unlocked_access::<crate::lock_ordering::UnlockedState>()
+            .inner_ip_state::<Ipv4>()
+            .mld_counters())
+    }
+}
+
+impl<BT: BindingsTypes, L> ResourceCounterContext<DeviceId<BT>, MldCounters>
+    for CoreCtx<'_, BT, L>
+{
+    fn with_per_resource_counters<O, F: FnOnce(&MldCounters) -> O>(
+        &mut self,
+        device_id: &DeviceId<BT>,
+        cb: F,
+    ) -> O {
+        for_any_device_id!(
+            DeviceId,
+            device_id,
+            id => self.with_per_resource_counters(id, cb)
+        )
+    }
+}
+
+impl<BT: BindingsTypes, D: DeviceStateSpec, L>
+    ResourceCounterContext<BaseDeviceId<D, BT>, MldCounters> for CoreCtx<'_, BT, L>
+{
+    fn with_per_resource_counters<O, F: FnOnce(&MldCounters) -> O>(
+        &mut self,
+        device_id: &BaseDeviceId<D, BT>,
+        cb: F,
+    ) -> O {
+        cb(device_id
+            .device_state(
+                &self.unlocked_access::<crate::lock_ordering::UnlockedState>().device.origin,
+            )
+            .as_ref()
+            .mld_counters())
     }
 }
 

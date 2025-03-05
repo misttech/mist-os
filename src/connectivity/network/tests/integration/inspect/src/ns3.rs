@@ -862,6 +862,28 @@ async fn inspect_devices(name: &str) {
                             },
                         },
                     },
+                    MLD: {
+                        Rx: {
+                            MLDv1Query: 0u64,
+                            MLDv2Query: 0u64,
+                            MLDv1Report: 0u64,
+                            MLDv2Report: 0u64,
+                            LeaveGroup: 0u64,
+                            Errors: {
+                                MissingRouterAlert: 0u64,
+                                BadSourceAddress: 0u64,
+                                BadHopLimit: 0u64,
+                            },
+                        },
+                        Tx: {
+                            MLDv1Report: 0u64,
+                            MLDv2Report: 0u64,
+                            LeaveGroup: 0u64,
+                            Errors: {
+                                SendFailed: 0u64,
+                            },
+                        },
+                    },
                 }
             },
             "2": {
@@ -970,6 +992,33 @@ async fn inspect_devices(name: &str) {
                             IGMPv1Report: 0u64,
                             IGMPv2Report: 0u64,
                             IGMPv3Report: 0u64,
+                            LeaveGroup: 0u64,
+                            Errors: {
+                                SendFailed: 0u64,
+                            },
+                        },
+                    },
+                    MLD: {
+                        Rx: {
+                            MLDv1Query: 0u64,
+                            MLDv2Query: 0u64,
+                            MLDv1Report: 0u64,
+                            MLDv2Report: 0u64,
+                            LeaveGroup: 0u64,
+                            Errors: {
+                                MissingRouterAlert: 0u64,
+                                BadSourceAddress: 0u64,
+                                BadHopLimit: 0u64,
+                            },
+                        },
+                        Tx: {
+                            MLDv1Report: 0u64,
+                            // Note: Duplicate address detection (DAD) joins the
+                            // solicited-node multicast group for the interface.
+                            // This may or may not cause a report to have been
+                            // sent by the netstack (depending on if the join
+                            // finishes before inspect counters are fetched).
+                            MLDv2Report: diagnostics_assertions::AnyUintProperty,
                             LeaveGroup: 0u64,
                             Errors: {
                                 SendFailed: 0u64,
@@ -1163,6 +1212,28 @@ async fn inspect_counters(name: &str) {
                     IGMPv1Report: 0u64,
                     IGMPv2Report: 0u64,
                     IGMPv3Report: 0u64,
+                    LeaveGroup: 0u64,
+                    Errors: {
+                        SendFailed: 0u64,
+                    },
+                },
+            },
+            "MLD": {
+                Rx: {
+                    MLDv1Query: 0u64,
+                    MLDv2Query: 0u64,
+                    MLDv1Report: 0u64,
+                    MLDv2Report: 0u64,
+                    LeaveGroup: 0u64,
+                    Errors: {
+                        MissingRouterAlert: 0u64,
+                        BadSourceAddress: 0u64,
+                        BadHopLimit: 0u64,
+                    },
+                },
+                Tx: {
+                    MLDv1Report: 0u64,
+                    MLDv2Report: 0u64,
                     LeaveGroup: 0u64,
                     Errors: {
                         SendFailed: 0u64,

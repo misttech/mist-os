@@ -67,6 +67,7 @@ use crate::internal::fragmentation::{
     FragmentableIpSerializer, FragmentationCounters, FragmentationIpExt, IpFragmenter,
 };
 use crate::internal::gmp::igmp::IgmpCounters;
+use crate::internal::gmp::mld::MldCounters;
 use crate::internal::gmp::GmpQueryHandler;
 use crate::internal::icmp::{
     IcmpBindingsTypes, IcmpErrorHandler, IcmpHandlerIpExt, Icmpv4Error, Icmpv4ErrorKind,
@@ -2151,6 +2152,7 @@ pub struct IpStateInner<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateB
     // routing table.
     tables: Mutex<HashMap<RoutingTableId<I, D>, PrimaryRc<RwLock<RoutingTable<I, D>>>>>,
     igmp_counters: IgmpCounters,
+    mld_counters: MldCounters,
 }
 
 impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateBindingsTypes> IpStateInner<I, D, BT> {
@@ -2190,6 +2192,11 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateBindingsTypes> IpSta
     pub fn igmp_counters(&self) -> &IgmpCounters {
         &self.igmp_counters
     }
+
+    /// Gets the stack-wide MLD counters.
+    pub fn mld_counters(&self) -> &MldCounters {
+        &self.mld_counters
+    }
 }
 
 impl<
@@ -2220,6 +2227,7 @@ impl<
             raw_socket_counters: Default::default(),
             filter: RwLock::new(filter::State::new::<NestedIntoCoreTimerCtx<CC, _>>(bindings_ctx)),
             igmp_counters: Default::default(),
+            mld_counters: Default::default(),
         }
     }
 }

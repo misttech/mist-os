@@ -36,7 +36,7 @@ use crate::internal::device::{
     Ipv6DeviceAddr, Ipv6DeviceTimerId, WeakIpAddressId,
 };
 use crate::internal::gmp::igmp::{IgmpConfig, IgmpCounters, IgmpTimerId, IgmpTypeLayout};
-use crate::internal::gmp::mld::{MldConfig, MldTimerId, MldTypeLayout};
+use crate::internal::gmp::mld::{MldConfig, MldCounters, MldTimerId, MldTypeLayout};
 use crate::internal::gmp::{GmpGroupState, GmpState, GmpTimerId, GmpTypeLayout, MulticastGroupSet};
 use crate::internal::types::RawMetric;
 
@@ -516,7 +516,7 @@ impl<BC: IpDeviceStateBindingsTypes + TimerContext> Ipv4DeviceState<BC> {
 }
 
 impl<BT: IpDeviceStateBindingsTypes> Ipv4DeviceState<BT> {
-    pub(crate) fn igmp_counters(&self) -> &IgmpCounters {
+    fn igmp_counters(&self) -> &IgmpCounters {
         &self.igmp_counters
     }
 }
@@ -711,6 +711,7 @@ pub struct Ipv6DeviceState<BT: IpDeviceStateBindingsTypes> {
     ip_state: IpDeviceState<Ipv6, BT>,
     config: RwLock<Ipv6DeviceConfiguration>,
     slaac_state: Mutex<SlaacState<BT>>,
+    mld_counters: MldCounters,
 }
 
 impl<BC: IpDeviceStateBindingsTypes + TimerContext> Ipv6DeviceState<BC> {
@@ -738,7 +739,14 @@ impl<BC: IpDeviceStateBindingsTypes + TimerContext> Ipv6DeviceState<BC> {
                 bindings_ctx,
                 device_id,
             )),
+            mld_counters: Default::default(),
         }
+    }
+}
+
+impl<BT: IpDeviceStateBindingsTypes> Ipv6DeviceState<BT> {
+    fn mld_counters(&self) -> &MldCounters {
+        &self.mld_counters
     }
 }
 
@@ -806,13 +814,6 @@ impl<BC: IpDeviceStateBindingsTypes + TimerContext> DualStackIpDeviceState<BC> {
 }
 
 impl<BT: IpDeviceStateBindingsTypes> DualStackIpDeviceState<BT> {
-    /// Access the IGMP counters associated with this specific device state.
-    pub fn igmp_counters(&self) -> &IgmpCounters {
-        self.ipv4.igmp_counters()
-    }
-}
-
-impl<BT: IpDeviceStateBindingsTypes> DualStackIpDeviceState<BT> {
     /// Returns the [`RawMetric`] for this device.
     pub fn metric(&self) -> &RawMetric {
         &self.metric
@@ -825,6 +826,16 @@ impl<BT: IpDeviceStateBindingsTypes> DualStackIpDeviceState<BT> {
             |dual_stack| &dual_stack.ipv4.ip_state,
             |dual_stack| &dual_stack.ipv6.ip_state,
         )
+    }
+
+    /// Access the IGMP counters associated with this specific device state.
+    pub fn igmp_counters(&self) -> &IgmpCounters {
+        self.ipv4.igmp_counters()
+    }
+
+    /// Access the MLD counters associated with this specific device state.
+    pub fn mld_counters(&self) -> &MldCounters {
+        self.ipv6.mld_counters()
     }
 }
 

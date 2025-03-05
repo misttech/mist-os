@@ -18,7 +18,7 @@ use netstack3_ip::device::{
     IpAddressIdSpecContext, IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceTimerId,
     Ipv6DeviceConfigurationContext,
 };
-use netstack3_ip::gmp::IgmpCounters;
+use netstack3_ip::gmp::{IgmpCounters, MldCounters};
 use netstack3_ip::{self as ip, RawMetric};
 use packet::BufferMut;
 
@@ -293,7 +293,10 @@ where
             });
             self.core_ctx().with_per_resource_counters(device, |counters: &IgmpCounters| {
                 inspector.record_child("IGMP", |inspector| inspector.delegate_inspectable(counters))
-            })
+            });
+            self.core_ctx().with_per_resource_counters(device, |counters: &MldCounters| {
+                inspector.record_child("MLD", |inspector| inspector.delegate_inspectable(counters))
+            });
         });
     }
 }
@@ -390,6 +393,7 @@ pub trait DeviceApiCoreContext<
     + ResourceCounterContext<Self::DeviceId, DeviceCounters>
     + ResourceCounterContext<Self::DeviceId, D::Counters>
     + ResourceCounterContext<Self::DeviceId, IgmpCounters>
+    + ResourceCounterContext<Self::DeviceId, MldCounters>
     + CoreTimerContext<D::TimerId<Self::WeakDeviceId>, BC>
 {
 }
@@ -406,6 +410,7 @@ where
         + ResourceCounterContext<Self::DeviceId, DeviceCounters>
         + ResourceCounterContext<Self::DeviceId, D::Counters>
         + ResourceCounterContext<Self::DeviceId, IgmpCounters>
+        + ResourceCounterContext<Self::DeviceId, MldCounters>
         + CoreTimerContext<D::TimerId<Self::WeakDeviceId>, BC>,
 {
 }

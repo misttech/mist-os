@@ -106,8 +106,8 @@ pub mod gmp {
         IgmpStateContext, IgmpTimerId, IgmpTypeLayout, IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
     };
     pub use crate::internal::gmp::mld::{
-        MldConfigMode, MldContext, MldContextMarker, MldSendContext, MldStateContext, MldTimerId,
-        MldTypeLayout, MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
+        MldConfigMode, MldContext, MldContextMarker, MldCounters, MldSendContext, MldStateContext,
+        MldTimerId, MldTypeLayout, MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
     };
     pub use crate::internal::gmp::{
         GmpGroupState, GmpHandler, GmpQueryHandler, GmpState, GmpStateRef, GmpTimerId, IpExt,
