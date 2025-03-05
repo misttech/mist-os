@@ -155,7 +155,7 @@ DDK_PROTOCOL_DEF(VIRTUALBUS_TEST,         137, "virtual-bus-test", 0)
 DDK_PROTOCOL_DEF(TEST_ASIX_FUNCTION,      138, "test-asix-function", 0)
 DDK_PROTOCOL_DEF(AUDIO_INPUT,             140, "audio-input", 0)
 DDK_PROTOCOL_DEF(AUDIO_OUTPUT,            141, "audio-output", 0)
-DDK_PROTOCOL_DEF(AMLOGIC_RAM,             142, "aml-ram", 0)
+// 142 was aml-ram
 DDK_PROTOCOL_DEF(GPU_PERFORMANCE_COUNTERS, 143, "gpu-performance-counters", 0)
 // 144 was display-clamprgb-impl
 DDK_PROTOCOL_DEF(TEMPERATURE,             145, "temperature", 0)

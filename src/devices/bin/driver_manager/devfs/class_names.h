@@ -49,7 +49,6 @@ struct ServiceEntry {
 const std::unordered_map<std::string_view, ServiceEntry> kClassNameToService = {
     {"acpi", {ServiceEntry::kDevfs, "", ""}},
     {"adc", {ServiceEntry::kDevfsAndService, "fuchsia.hardware.adc.Service", "device"}},
-    {"aml-ram", {ServiceEntry::kDevfsAndService, "fuchsia.hardware.ram.metrics.Service", "device"}},
     {"audio-composite",
      {ServiceEntry::kDevfsAndService, "fuchsia.hardware.audio.CompositeConnectorService",
       "composite_connector"}},
@@ -155,9 +154,6 @@ const std::unordered_map<std::string_view, ServiceEntry> kClassNameToService = {
 std::unordered_map<std::string_view, uint8_t> classes_that_assume_ordering({
     // TODO(https://fxbug.dev/42065012): Remove.
     {"adc", 0},
-
-    // TODO(https://fxbug.dev/42065013): Remove.
-    {"aml-ram", 0},
 
     // TODO(https://fxbug.dev/42065014): Remove.
     // TODO(https://fxbug.dev/42065080): Remove.

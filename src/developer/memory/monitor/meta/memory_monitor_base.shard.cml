@@ -34,11 +34,7 @@
             // product and non-eng builds of any product.
             availability: "optional",
         },
-        {
-            directory: "dev-aml-ram",
-            rights: [ "r*" ],
-            path: "/dev/class/aml-ram",
-        },
+        { service: "fuchsia.hardware.ram.metrics.Service" },
         {
             storage: "cache",
             path: "/cache",

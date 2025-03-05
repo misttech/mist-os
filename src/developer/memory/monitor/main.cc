@@ -4,36 +4,31 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/component/incoming/cpp/protocol.h>
+#include <lib/component/incoming/cpp/service_member_watcher.h>
 #include <lib/fdio/directory.h>
 #include <lib/scheduler/role.h>
 #include <lib/trace-provider/provider.h>
 
-#include <filesystem>
 #include <memory>
-#include <system_error>
 
-#include "lib/component/incoming/cpp/protocol.h"
 #include "src/developer/memory/metrics/capture.h"
 #include "src/developer/memory/monitor/monitor.h"
 
 namespace {
-const char kRamDeviceClassPath[] = "/dev/class/aml-ram";
 std::optional<fidl::Client<fuchsia_hardware_ram_metrics::Device>> GetRamDevice(
     async_dispatcher_t* dispatcher) {
   // Look for optional RAM device that provides bandwidth measurement interface.
-  std::error_code ec;
-  // Use the noexcept version of std::filesystem::exists.
-  if (std::filesystem::exists(kRamDeviceClassPath, ec)) {
-    for (const auto& entry : std::filesystem::directory_iterator(kRamDeviceClassPath)) {
-      auto device = component::Connect<fuchsia_hardware_ram_metrics::Device>(entry.path().c_str());
-      if (device.is_ok()) {
-        FX_LOGS(INFO) << "Will collect memory bandwidth measurements.";
-        return fidl::Client<fuchsia_hardware_ram_metrics::Device>(std::move(*device), dispatcher);
-      }
-    }
+  zx::result device =
+      component::SyncServiceMemberWatcher<fuchsia_hardware_ram_metrics::Service::Device>()
+          .GetNextInstance(true);
+  if (device.is_error()) {
+    FX_LOGS(INFO) << "CANNOT collect memory bandwidth measurements. error_code: "
+                  << device.status_string();
+    return std::nullopt;
   }
-  FX_LOGS(INFO) << "CANNOT collect memory bandwidth measurements. error_code: " << ec;
-  return std::nullopt;
+  FX_LOGS(INFO) << "Will collect memory bandwidth measurements.";
+  return fidl::Client<fuchsia_hardware_ram_metrics::Device>(std::move(*device), dispatcher);
 }
 }  // namespace
 

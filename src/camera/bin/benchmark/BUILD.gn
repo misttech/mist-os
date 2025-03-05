@@ -29,8 +29,10 @@ executable("camera_benchmark_bin") {
   sources = [ "main.cc" ]
   deps = [
     ":lib",
+    "//sdk/fidl/fuchsia.hardware.ram.metrics:fuchsia.hardware.ram.metrics_cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
   ]
