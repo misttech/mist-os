@@ -11,7 +11,10 @@ rustc_library("ebpf_api") {
   sources = [
     "src/helpers.rs",
     "src/lib.rs",
+    "src/maps/array.rs",
+    "src/maps/hashmap.rs",
     "src/maps/mod.rs",
+    "src/maps/ring_buffer.rs",
     "src/maps/vmar.rs",
     "src/program_type.rs",
   ]

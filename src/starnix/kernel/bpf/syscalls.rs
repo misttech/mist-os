@@ -185,7 +185,7 @@ pub fn sys_bpf(
             // SAFETY: this union object was created with FromBytes so it's safe to access any
             // variant because all variants must be valid with all bit patterns.
             let user_value = UserAddress::from(unsafe { elem_attr.__bindgen_anon_1.value });
-            let value = map.lookup(&key).map_err(map_error_to_errno)?;
+            let value = map.lookup(&key).ok_or_else(|| errno!(ENOENT))?;
             current_task.write_memory(user_value, &value)?;
 
             Ok(SUCCESS)

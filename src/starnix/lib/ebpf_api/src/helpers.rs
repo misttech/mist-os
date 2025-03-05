@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::maps::{Map, MapKey, RingBufferWakeupPolicy};
+use crate::maps::{Map, MapKey, RingBuffer, RingBufferWakeupPolicy};
 use ebpf::{BpfValue, EbpfHelperImpl, EbpfProgramContext};
 use inspect_stubs::track_stub;
 use linux_uapi::{
@@ -127,7 +127,7 @@ fn bpf_ringbuf_submit<C: EbpfProgramContext>(
     // The safety of the operation is ensured by the bpf verifier. The data has to come from the
     // result of a reserve call.
     unsafe {
-        Map::ringbuf_submit(u64::from(data), flags);
+        RingBuffer::submit(u64::from(data), flags);
     }
     0.into()
 }
@@ -147,7 +147,7 @@ fn bpf_ringbuf_discard<C: EbpfProgramContext>(
     // The safety of the operation is ensured by the bpf verifier. The data has to come from the
     // result of a reserve call.
     unsafe {
-        Map::ringbuf_discard(u64::from(data), flags);
+        RingBuffer::discard(u64::from(data), flags);
     }
     0.into()
 }

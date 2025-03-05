@@ -400,6 +400,28 @@ TEST_F(BpfMapTest, LockTest) {
   ASSERT_FALSE(fd8.is_valid());  // busy due to fd6
 }
 
+TEST_F(BpfMapTest, ArrayEpoll) {
+  fbl::unique_fd epollfd(SAFE_SYSCALL(epoll_create(1)));
+
+  struct epoll_event ev;
+  ev.events = EPOLLIN | EPOLLET;
+
+  SAFE_SYSCALL(epoll_ctl(epollfd.get(), EPOLL_CTL_ADD, array_fd(), &ev));
+  ASSERT_EQ(epoll_wait(epollfd.get(), &ev, 1, 0), 1);
+  ASSERT_EQ(ev.events, EPOLLERR);
+}
+
+TEST_F(BpfMapTest, HashMapEpoll) {
+  fbl::unique_fd epollfd(SAFE_SYSCALL(epoll_create(1)));
+
+  struct epoll_event ev;
+  ev.events = EPOLLIN | EPOLLET;
+
+  SAFE_SYSCALL(epoll_ctl(epollfd.get(), EPOLL_CTL_ADD, map_fd(), &ev));
+  ASSERT_EQ(epoll_wait(epollfd.get(), &ev, 1, 0), 1);
+  ASSERT_EQ(ev.events, EPOLLERR);
+}
+
 TEST_F(BpfMapTest, MMapRingBufTest) {
   // Can map the first page of the ringbuffer R/W
   ASSERT_TRUE(test_helper::ScopedMMap::MMap(nullptr, getpagesize(), PROT_READ | PROT_WRITE,
@@ -717,6 +739,19 @@ TEST_F(BpfCgroupTest, BlockConnect) {
 
   // Should be unblocked now.
   ASSERT_TRUE(TryConnect(BLOCKED_PORT, 0));
+}
+
+// Checks that epoll is handled properly for program FDs.
+TEST_F(BpfCgroupTest, ProgFdEpoll) {
+  auto prog = LoadBlockPortProgram(BPF_CGROUP_INET4_CONNECT);
+
+  fbl::unique_fd epollfd(SAFE_SYSCALL(epoll_create(1)));
+
+  struct epoll_event ev;
+  ev.events = EPOLLIN;
+
+  ASSERT_EQ(epoll_ctl(epollfd.get(), EPOLL_CTL_ADD, prog.get(), &ev), -1);
+  ASSERT_EQ(errno, EPERM);
 }
 
 }  // namespace
