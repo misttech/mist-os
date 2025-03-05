@@ -328,7 +328,10 @@ struct NaturalCodingTraits<::std::array<T, N>, Constraint> {
                      size_t recursion_depth) {
     size_t stride = NaturalDecodingInlineSize<T, Constraint>(decoder);
     if constexpr (kIsMemcpyCompatible) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wnontrivial-memaccess"
       memcpy(value->data(), decoder->template GetPtr<void>(offset), N * stride);
+#pragma GCC diagnostic pop
     } else {
       for (size_t i = 0; i < N; ++i) {
         NaturalCodingTraits<T, Constraint>::Decode(decoder, &value->at(i), offset + i * stride,
