@@ -377,6 +377,13 @@ impl SignalState {
     }
 }
 
+// Starnix code reuse the same object and parsing method for 32 and 64 signal information. Ensure
+// this is correct
+static_assertions::const_assert_eq!(
+    std::mem::size_of::<uapi::siginfo>(),
+    std::mem::size_of::<uapi::arch32::siginfo>()
+);
+
 #[derive(Clone, Debug, Default, Eq, PartialEq, IntoBytes, KnownLayout, FromBytes, Immutable)]
 #[repr(C)]
 pub struct SignalInfoHeader {
