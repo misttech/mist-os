@@ -328,12 +328,22 @@ if (!is_host) {
       if (current_build_target_api_level != "PLATFORM") {
         deps = [ ":${main_target_name}.fuchsia_idk_atoms_for_each_api_level" ]
       } else if (!sdk_inside_sub_build) {
-        # While atoms included in the IDK only at specific API levels should not
-        # be built or included at PLATFORM, the main build must have a non-SDK
-        # deps on them to ensure accurate dependency change checking for the
-        # sub-builds. See the comment for "${main_target_name}_for_subbuilds".
-        non_sdk_deps =
-            [ ":${main_target_name}.fuchsia_idk_atoms_for_each_api_level" ]
+        # Add non-SDK deps in the case of the main build to ensure accurate
+        # dependency change checking for the sub-builds. See the comment for
+        # "${main_target_name}_for_subbuilds".
+        non_sdk_deps = [
+          # While atoms included in the IDK only at specific API levels should not
+          # be built or included at PLATFORM, the main build must have a deps.
+          ":${main_target_name}.fuchsia_idk_atoms_for_each_api_level",
+
+          # Though the FIDL artifacts are not produced by sub-builds, changes to
+          # the FIDL files could affect sub-builds. Take a dependency here in the
+          # main build so that changes to FIDL files in the IDK will cause the
+          # sub-builds to be re-evaluated. This is relevant in cases where FIDL
+          # files are modified in ways that affect individual API levels but not
+          # the output when fidlc is targeting "PLATFORM".
+          "//sdk/fidl",
+        ]
       }
     }
 
