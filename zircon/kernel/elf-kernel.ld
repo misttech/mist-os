@@ -184,10 +184,16 @@ SECTIONS {
     *(.data.rel.ro*)
     ASSERT(ALIGNOF(.data.rel.ro) <= 32 || SIZEOF(.data.rel.ro) == 0,
            ".data.rel.ro overalignment -> padding gaps");
+
+    /*
+     * Ensures that the relro region and its corresponding load segment will
+     * both have page-aligned sizes.
+     */
+    . = ALIGN(CONSTANT(MAXPAGESIZE));
+    PROVIDE_HIDDEN(__relro_end = .);
   }
 
   .data : ALIGN(CONSTANT(MAXPAGESIZE)) {
-    PROVIDE_HIDDEN(__relro_end = .);
     PROVIDE_HIDDEN(__data_start = .);
 
     /* Pull out any aligned data into a separate section to make sure
