@@ -150,6 +150,7 @@ pub fn dispatch_syscall(
             sys_rt_sigprocmask as sys_arch32_rt_sigprocmask,
             sys_rt_sigqueueinfo as sys_arch32_rt_sigqueueinfo,
             sys_rt_sigreturn as sys_arch32_rt_sigreturn,
+            sys_rt_sigsuspend as sys_arch32_rt_sigsuspend,
             sys_rt_tgsigqueueinfo as sys_arch32_rt_tgsigqueueinfo, sys_tgkill as sys_arch32_tgkill,
             sys_wait4 as sys_arch32_wait4,
         };
@@ -272,6 +273,7 @@ pub fn dispatch_syscall(
             rt_sigprocmask[4],
             rt_sigqueueinfo[3],
             rt_sigreturn[0],
+            rt_sigsuspend[2],
             rt_sigtimedwait[4],
             rt_tgsigqueueinfo[4],
             sched_getaffinity[3],
