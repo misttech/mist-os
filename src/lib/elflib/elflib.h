@@ -45,6 +45,9 @@ class ElfLib {
 
   virtual ~ElfLib();
 
+  // Returns the ELF header.
+  const Elf64_Ehdr* GetEhdr() const { return &header_; }
+
   // Attach a second ElfLib to this one which contains debug info. This second
   // object will be treated as authoritative on section headers.
   //
@@ -56,6 +59,18 @@ class ElfLib {
   // Get the contents of a section by its name. Return nullptr if there is no
   // section by that name.
   MemoryRegion GetSectionData(const std::string& name);
+
+  // Get the contents of a section by its index. Return nullptr if the index is
+  // invalid.
+  MemoryRegion GetSectionData(size_t section);
+
+  // Get the contents of the given section header. |header| may be null, in which case an empty
+  // MemoryRegion will be returned, otherwise is assumed to be correct and correspond to the ELF
+  // file passed to |Create|.
+  MemoryRegion GetSectionData(const Elf64_Shdr* header);
+
+  // Get a list of all section headers.
+  const std::vector<Elf64_Shdr>& GetSectionHeaders();
 
   // Get a list of all segement headers.
   const std::vector<Elf64_Phdr>& GetSegmentHeaders();
@@ -183,12 +198,12 @@ class ElfLib {
   // unless a read error occurred.
   bool LoadProgramHeaders();
 
+  // Load the section header table into the cache in sections_. Return true
+  // unless a read error occurred.
+  bool LoadSectionHeaders();
+
   // Load the section name-to-index mappings and cache them in section_names_.
   bool LoadSectionNames();
-
-  // Get the contents of a section by its index. Return nullptr if the index is
-  // invalid.
-  MemoryRegion GetSectionData(size_t section);
 
   // Get the contents of the symbol table. Return nullptr if it is not present
   // or we do not have the means to locate it. Size is number of structs, not
