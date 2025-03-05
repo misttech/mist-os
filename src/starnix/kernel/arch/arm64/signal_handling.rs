@@ -13,24 +13,47 @@ use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::signals::{SigSet, SIGBUS, SIGSEGV};
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
-    _aarch64_ctx, errno, error, esr_context, fpsimd_context, sigaction_t, sigaltstack, sigcontext,
-    siginfo_t, ucontext, ESR_MAGIC, EXTRA_MAGIC, FPSIMD_MAGIC,
+    _aarch64_ctx, errno, error, esr_context, fpsimd_context, sigaction_t, sigaltstack, uapi,
+    ESR_MAGIC, EXTRA_MAGIC, FPSIMD_MAGIC,
 };
-use zerocopy::{FromBytes, IntoBytes};
+use zerocopy::{transmute_ref, FromBytes, Immutable, IntoBytes, KnownLayout};
 
 /// The size of the red zone.
 pub const RED_ZONE_SIZE: u64 = 0;
 
-/// The size, in bytes, of the signal stack frame.
-pub const SIG_STACK_SIZE: usize = std::mem::size_of::<SignalStackFrame>();
+const fn max_const(i1: usize, i2: usize) -> usize {
+    if i2 > i1 {
+        i2
+    } else {
+        i1
+    }
+}
+
+/// Maximum size between the siginfo struct for 32 and 64 bits.
+const SIGINFO_RESERVED_DATA_SIZE: usize = max_const(
+    std::mem::size_of::<uapi::siginfo_t>(),
+    std::mem::size_of::<uapi::arch32::siginfo_t>(),
+);
+
+/// Maximum size between the context struct for 32 and 64 bits.
+const UCONTEXT_RESERVED_DATA_SIZE: usize =
+    max_const(std::mem::size_of::<uapi::ucontext>(), std::mem::size_of::<uapi::arch32::ucontext>());
 
 /// A `SignalStackFrame` contains all the state that is stored on the stack prior to executing a
 /// signal handler. The exact layout of this structure is part of the platform's ABI.
-#[repr(C)]
+#[repr(C, align(16))]
+#[derive(Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 pub struct SignalStackFrame {
-    pub siginfo_bytes: [u8; std::mem::size_of::<siginfo_t>()],
-    pub context: ucontext,
+    /// Bytes for the siginfo struct relevant to the correct architecture padded with 0.
+    pub siginfo_bytes: [u8; SIGINFO_RESERVED_DATA_SIZE],
+    /// Bytes for the context struct relevant to the correct architecture padded with 0.
+    pub context: [u8; UCONTEXT_RESERVED_DATA_SIZE],
+    is_arch32: u8,
+    _padding: [u8; 15],
 }
+
+/// The size, in bytes, of the signal stack frame.
+pub const SIG_STACK_SIZE: usize = std::mem::size_of::<SignalStackFrame>();
 
 impl SignalStackFrame {
     pub fn new(
@@ -43,38 +66,58 @@ impl SignalStackFrame {
         _action: sigaction_t,
         _stack_pointer: UserAddress,
     ) -> Result<SignalStackFrame, Errno> {
-        let mut regs = registers.r.to_vec();
-        // TODO(https://fxbug.dev/380405833) Do we need to capture r[14] here?
-        regs.push(registers.lr);
-
         let fault_address = 0;
         if signal_state.has_queued(SIGBUS) || signal_state.has_queued(SIGSEGV) {
             track_stub!(TODO("https://fxbug.dev/322873483"), "arm64 signal fault address");
         }
-        let context = ucontext {
-            uc_flags: 0,
-            uc_link: Default::default(),
-            uc_stack: signal_state
-                .alt_stack
-                .map(|stack| sigaltstack {
-                    ss_sp: stack.ss_sp.into(),
-                    ss_flags: stack.ss_flags as i32,
-                    ss_size: stack.ss_size as u64,
-                    ..Default::default()
-                })
-                .unwrap_or_default(),
-            uc_sigmask: signal_state.mask().into(),
-            uc_mcontext: sigcontext {
-                regs: regs.try_into().unwrap(),
-                sp: registers.sp,
-                pc: registers.pc,
-                pstate: registers.cpsr,
-                fault_address,
-                __reserved: get_sigcontext_data(extended_pstate),
+        let uc_stack = signal_state
+            .alt_stack
+            .map(|stack| sigaltstack {
+                ss_sp: stack.ss_sp.into(),
+                ss_flags: stack.ss_flags as i32,
+                ss_size: stack.ss_size as u64,
                 ..Default::default()
-            },
-            ..Default::default()
-        };
+            })
+            .unwrap_or_default();
+        let mut context = [0_u8; UCONTEXT_RESERVED_DATA_SIZE];
+        if arch_width.is_arch32() {
+            let mut regs = [0_u32; 21];
+            // 0, 1, 2 is trap_no, error_code, oldmask, keep at 0.
+            for i in 0..16 {
+                regs[i + 3] = registers.r[i] as u32;
+            }
+            regs[19] = registers.cpsr as u32;
+            regs[20] = fault_address as u32;
+            let context32 = uapi::arch32::ucontext {
+                uc_flags: 0,
+                uc_link: Default::default(),
+                uc_stack: uc_stack.try_into().map_err(|_| errno!(EINVAL))?,
+                uc_sigmask64: uapi::sigset_t::from(signal_state.mask()).into(),
+                uc_mcontext: zerocopy::transmute!(regs),
+                ..Default::default()
+            };
+            context32.write_to_prefix(&mut context).unwrap();
+        } else {
+            let mut regs = registers.r.to_vec();
+            regs.push(registers.lr);
+            let context64 = uapi::ucontext {
+                uc_flags: 0,
+                uc_link: Default::default(),
+                uc_stack,
+                uc_sigmask: signal_state.mask().into(),
+                uc_mcontext: uapi::sigcontext {
+                    regs: regs.try_into().unwrap(),
+                    sp: registers.sp,
+                    pc: registers.pc,
+                    pstate: registers.cpsr,
+                    fault_address,
+                    __reserved: get_sigcontext64_data(extended_pstate),
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            context64.write_to_prefix(&mut context).unwrap();
+        }
 
         let vdso_sigreturn_offset = if arch_width.is_arch32() {
             task.kernel().vdso_arch32.as_ref().unwrap().sigreturn_offset
@@ -89,19 +132,40 @@ impl SignalStackFrame {
             registers.r[14] = registers.lr;
         }
 
-        Ok(SignalStackFrame { context, siginfo_bytes: siginfo.as_siginfo_bytes(arch_width)? })
+        Ok(SignalStackFrame {
+            context,
+            siginfo_bytes: siginfo.as_siginfo_bytes(arch_width)?,
+            is_arch32: if arch_width.is_arch32() { 1 } else { 0 },
+            _padding: Default::default(),
+        })
     }
 
     pub fn as_bytes(&self) -> &[u8; SIG_STACK_SIZE] {
-        unsafe { std::mem::transmute(self) }
+        zerocopy::transmute_ref!(self)
     }
 
     pub fn from_bytes(bytes: [u8; SIG_STACK_SIZE]) -> SignalStackFrame {
-        unsafe { std::mem::transmute(bytes) }
+        zerocopy::transmute!(bytes)
     }
 
     pub fn get_signal_mask(&self) -> SigSet {
-        self.context.uc_sigmask.into()
+        if self.is_arch32() {
+            uapi::sigset_t::from(self.get_ucontext32().uc_sigmask64).into()
+        } else {
+            self.get_ucontext64().uc_sigmask.into()
+        }
+    }
+
+    fn get_ucontext64(&self) -> &uapi::ucontext {
+        uapi::ucontext::ref_from_prefix(&self.context).unwrap().0
+    }
+
+    fn get_ucontext32(&self) -> &uapi::arch32::ucontext {
+        uapi::arch32::ucontext::ref_from_prefix(&self.context).unwrap().0
+    }
+
+    fn is_arch32(&self) -> bool {
+        self.is_arch32 != 0
     }
 }
 
@@ -110,7 +174,45 @@ pub fn restore_registers(
     signal_stack_frame: &SignalStackFrame,
     _stack_pointer: UserAddress,
 ) -> Result<(), Errno> {
-    let uctx = &signal_stack_frame.context.uc_mcontext;
+    if signal_stack_frame.is_arch32() {
+        restore_registers_32(current_task, signal_stack_frame)
+    } else {
+        restore_registers_64(current_task, signal_stack_frame)
+    }
+}
+
+fn restore_registers_32(
+    current_task: &mut CurrentTask,
+    signal_stack_frame: &SignalStackFrame,
+) -> Result<(), Errno> {
+    let uctx = &signal_stack_frame.get_ucontext32().uc_mcontext;
+    let regs: &[u32; 21] = transmute_ref!(uctx);
+    const NUM_REGS: usize = 30;
+    let mut registers = [0u64; NUM_REGS];
+    for i in 0..16 {
+        registers[i] = regs[i + 3].into();
+    }
+    let sp = registers[13];
+    let lr = registers[14];
+    let pc = registers[15];
+    let cpsr = regs[19].into();
+    let restored_regs = zx::sys::zx_thread_state_general_regs_t {
+        r: registers,
+        lr,
+        sp,
+        pc,
+        cpsr,
+        tpidr: current_task.thread_state.registers.tpidr,
+    };
+    current_task.thread_state.registers = restored_regs.into();
+    Ok(())
+}
+
+fn restore_registers_64(
+    current_task: &mut CurrentTask,
+    signal_stack_frame: &SignalStackFrame,
+) -> Result<(), Errno> {
+    let uctx = &signal_stack_frame.get_ucontext64().uc_mcontext;
     // `zx_thread_state_general_regs_t` stores the link register separately from the other general
     // purpose registers, but the uapi struct does not. Thus we just need to copy out the first 30
     // values to store in `r`, and then we read `lr` separately.
@@ -119,7 +221,7 @@ pub fn restore_registers(
     registers.copy_from_slice(&uctx.regs[..NUM_REGS_WITHOUT_LINK_REGISTER]);
 
     // Restore the register state from before executing the signal handler.
-    let mut restored_regs = zx::sys::zx_thread_state_general_regs_t {
+    let restored_regs = zx::sys::zx_thread_state_general_regs_t {
         r: registers,
         lr: uctx.regs[NUM_REGS_WITHOUT_LINK_REGISTER],
         sp: uctx.sp,
@@ -127,14 +229,9 @@ pub fn restore_registers(
         cpsr: uctx.pstate,
         tpidr: current_task.thread_state.registers.tpidr,
     };
-    // TODO(https://fxbug.dev/380405833) This feels very clunky
-    if current_task.is_arch32() {
-        restored_regs.r[13] = restored_regs.sp;
-        restored_regs.r[14] = restored_regs.lr;
-    }
     current_task.thread_state.registers = restored_regs.into();
 
-    parse_sigcontext_data(&uctx.__reserved, &mut current_task.thread_state.extended_pstate)
+    parse_sigcontext_data_64(&uctx.__reserved, &mut current_task.thread_state.extended_pstate)
 }
 
 pub fn align_stack_pointer(pointer: u64) -> u64 {
@@ -147,7 +244,7 @@ const SIGCONTEXT_RESERVED_DATA_SIZE: usize = 4096;
 // Returns the array to be saved in `sigcontext.__reserved`. It contains a sequence of sections
 // each identified with a `_aarch64_ctx` header. The end is indicated with both fields in the
 // header set to 0.
-fn get_sigcontext_data(
+fn get_sigcontext64_data(
     extended_pstate: &ExtendedPstateState,
 ) -> [u8; SIGCONTEXT_RESERVED_DATA_SIZE] {
     let mut result = [0u8; SIGCONTEXT_RESERVED_DATA_SIZE];
@@ -169,7 +266,7 @@ fn get_sigcontext_data(
     result
 }
 
-fn parse_sigcontext_data(
+fn parse_sigcontext_data_64(
     data: &[u8; SIGCONTEXT_RESERVED_DATA_SIZE],
     extended_pstate: &mut ExtendedPstateState,
 ) -> Result<(), Errno> {
