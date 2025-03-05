@@ -232,6 +232,12 @@
         "value": "25"
     },
     {
+        "kind": "const",
+        "name": "fuchsia.diagnostics/MAX_STRING_SELECTOR_LENGTH",
+        "type": "uint16",
+        "value": "1024"
+    },
+    {
         "kind": "table/member",
         "name": "fuchsia.diagnostics/PerformanceConfiguration.batch_retrieval_timeout_seconds",
         "ordinal": "2",

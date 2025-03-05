@@ -3,12 +3,17 @@
 // found in the LICENSE file.
 library fuchsia.diagnostics;
 
-using fuchsia.component;
-
 //  The size bound of 100 is a reasonably low limit chosen based on observed
 //  strings used as identifiers.
-@available(removed=NEXT)
+@available(replaced=NEXT)
 const MAX_STRING_SELECTOR_LENGTH uint16 = 100;
+
+// Max string selector length. Must be kept in-sync
+// with sdk/fidl/fuchsia.component/constants.fidl.
+// TODO(https://fxbug.dev/400782257): just use `fuchsia.component.MAX_CHILD_NAME_LENGTH`
+// when `fuchsia.logger` doesn't depend on `fuchsia.diagnsotics`.
+@available(added=NEXT)
+const MAX_STRING_SELECTOR_LENGTH uint16 = 1024;
 
 //  The size bound of 25 is a reasonably low limit chosen based on observed
 //  component hierarchy depths, and awareness of maximum zircon message sizes.
@@ -21,11 +26,6 @@ const MAX_DATA_HIERARCHY_DEPTH uint16 = 100;
 /// StringSelector is an union defining different ways to describe a pattern to match
 /// strings against.
 type StringSelector = flexible union {
-    @available(replaced=NEXT)
-    1: string_pattern string:MAX_STRING_SELECTOR_LENGTH;
-    @available(replaced=NEXT)
-    2: exact_match string:MAX_STRING_SELECTOR_LENGTH;
-
     ///   This is a provided string that defines a pattern to
     ///   match against. The parser treats asterisks (*), colons (:) and backslashes
     ///   (\) as special characters.
@@ -45,13 +45,8 @@ type StringSelector = flexible union {
     ///   In addition, the "**" literal is treated as a special sequence that may match
     ///   multiple levels in a component selector only. See |ComponentSelector| for
     ///   details.
-    @available(added=NEXT)
-    1: string_pattern string:fuchsia.component.MAX_CHILD_NAME_LENGTH;
-
-    ///  This is a provided string that defines an exact string to match against. No
-    ///  characters are treated as special, or carry special syntax.
-    @available(added=NEXT)
-    2: exact_match string:fuchsia.component.MAX_CHILD_NAME_LENGTH;
+    1: string_pattern string:MAX_STRING_SELECTOR_LENGTH;
+    2: exact_match string:MAX_STRING_SELECTOR_LENGTH;
 };
 
 /// Specifies a pattern of component monikers which
@@ -143,12 +138,8 @@ type TreeSelector = flexible union {
 /// will only be applied to trees that match this set.
 @available(added=22)
 type TreeNames = flexible union {
-    @available(replaced=NEXT)
-    1: some vector<string:MAX_STRING_SELECTOR_LENGTH>:MAX;
-
     /// A specified subset of tree names.
-    @available(added=NEXT)
-    1: some vector<string:fuchsia.component.MAX_CHILD_NAME_LENGTH>:MAX;
+    1: some vector<string:MAX_STRING_SELECTOR_LENGTH>:MAX;
 
     /// All of the available trees. Equivalent to listing all of the names of
     /// trees.
