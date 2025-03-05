@@ -643,7 +643,7 @@ impl Operation {
     }
 
     fn as_digest(&mut self) -> &mut Box<dyn Digest> {
-        if let Helper::Digest(ref mut digest) = &mut self.helper {
+        if let Helper::Digest(digest) = &mut self.helper {
             digest
         } else {
             panic!("{:?} is not a digest algorithm", self.algorithm)
@@ -651,7 +651,7 @@ impl Operation {
     }
 
     fn as_cipher(&mut self) -> &mut Box<dyn Cipher> {
-        if let Helper::Cipher(ref mut cipher, _) = &mut self.helper {
+        if let Helper::Cipher(cipher, _) = &mut self.helper {
             cipher.as_mut().expect("TEE_OperationSetKey() has not yet been called")
         } else {
             panic!("{:?} is not a cipher algorithm", self.algorithm)
@@ -659,7 +659,7 @@ impl Operation {
     }
 
     fn as_mac(&mut self) -> &mut Box<dyn Mac> {
-        if let Helper::Mac(ref mut mac, _) = &mut self.helper {
+        if let Helper::Mac(mac, _) = &mut self.helper {
             mac.as_mut().expect("TEE_OperationSetKey() has not yet been called")
         } else {
             panic!("{:?} is not a MAC algorithm", self.algorithm)
@@ -667,7 +667,7 @@ impl Operation {
     }
 
     fn as_asymmetric_encryption_key(&mut self) -> &mut Box<dyn AsymmetricEncryptionKey> {
-        if let Helper::AsymmetricEncryptionKey(ref mut aenc, _) = &mut self.helper {
+        if let Helper::AsymmetricEncryptionKey(aenc, _) = &mut self.helper {
             aenc.as_mut().expect("TEE_OperationSetKey() has not yet been called")
         } else {
             panic!("{:?} is not a asymmetric encryption key algorithm", self.algorithm)

@@ -24,7 +24,7 @@ pub unsafe fn realloc(
     buffer: *mut ::std::os::raw::c_void,
     new_size: usize,
 ) -> *mut ::std::os::raw::c_void {
-    libc::realloc(buffer, new_size)
+    unsafe { libc::realloc(buffer, new_size) }
 }
 
 /// # Safety
@@ -32,7 +32,7 @@ pub unsafe fn realloc(
 /// This wraps libc::free and is only safe to call with a pointer value that is NULL or allocated
 /// through malloc / realloc.
 pub unsafe fn free(buffer: *mut ::std::os::raw::c_void) {
-    libc::free(buffer)
+    unsafe { libc::free(buffer) }
 }
 
 pub fn mem_move(dest: *mut ::std::os::raw::c_void, src: *mut ::std::os::raw::c_void, size: usize) {
@@ -142,7 +142,7 @@ pub fn check_memory_access_rights(
     TEE_ERROR_ACCESS_DENIED
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn __scudo_default_options() -> *const std::ffi::c_char {
     b"zero_contents=true\0" as *const u8 as *const std::ffi::c_char
 }
