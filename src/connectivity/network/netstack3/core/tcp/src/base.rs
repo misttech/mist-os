@@ -22,6 +22,7 @@ use packet_formats::ip::DscpAndEcn;
 use packet_formats::utils::NonZeroDuration;
 use rand::Rng;
 
+use crate::internal::buffer::BufferLimits;
 use crate::internal::socket::isn::IsnGenerator;
 use crate::internal::socket::{DualStackIpExt, Sockets, TcpBindingsTypes};
 use crate::internal::state::DEFAULT_MAX_SYN_RETRIES;
@@ -192,6 +193,11 @@ impl Default for BufferSizes {
 }
 
 impl BufferSizes {
+    pub(crate) fn rcv_limits(&self) -> BufferLimits {
+        let Self { send: _, receive } = self;
+        BufferLimits { capacity: *receive, len: 0 }
+    }
+
     pub(crate) fn rwnd(&self) -> WindowSize {
         let Self { send: _, receive } = *self;
         WindowSize::new(receive).unwrap_or(WindowSize::MAX)

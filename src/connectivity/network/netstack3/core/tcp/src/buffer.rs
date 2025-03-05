@@ -330,6 +330,13 @@ pub(crate) mod testutil {
             Self { storage: vec![0; capacity], head: 0, len: 0 }
         }
 
+        /// Resets the buffer to be entirely unwritten.
+        pub fn reset(&mut self) {
+            let Self { storage: _, head, len } = self;
+            *head = 0;
+            *len = 0;
+        }
+
         /// Calls `f` on the contiguous sequences from `start` up to `len` bytes.
         fn with_readable<'a, F, R>(storage: &'a Vec<u8>, start: usize, len: usize, f: F) -> R
         where
