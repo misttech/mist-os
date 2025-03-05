@@ -116,19 +116,22 @@ fn has_fs_node_permissions(
     permissions: &[Permission],
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
-    // TODO: https://fxbug.dev/364568735 - Anon nodes and pipes are not yet labeled.
-    // TODO: https://fxbug.dev/364568517 - Sockets are not yet labeled.
-    if let Some(target) = get_cached_sid_and_class(node) {
-        let audit_context = [audit_context, node.into()];
-        for permission in permissions {
-            check_permission(
-                permission_check,
-                subject_sid,
-                target.sid,
-                permission.clone(),
-                (&audit_context).into(),
-            )?;
-        }
+    let target = fs_node_effective_sid_and_class(node);
+
+    // TODO: https://fxbug.dev/364568517 - Some sockets are incorrectly classed "sock_file".
+    if target.class == FileClass::SockFile.into() {
+        return Ok(());
+    }
+
+    let audit_context = [audit_context, node.into()];
+    for permission in permissions {
+        check_permission(
+            permission_check,
+            subject_sid,
+            target.sid,
+            permission.clone(),
+            (&audit_context).into(),
+        )?;
     }
 
     Ok(())
@@ -143,19 +146,22 @@ fn todo_has_fs_node_permissions(
     permissions: &[Permission],
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
-    // TODO: https://fxbug.dev/364568735 - Anon nodes and pipes are not yet labeled.
-    // TODO: https://fxbug.dev/364568517 - Sockets are not yet labeled.
-    if let Some(target) = get_cached_sid_and_class(node) {
-        for permission in permissions {
-            todo_check_permission(
-                bug.clone(),
-                permission_check,
-                subject_sid,
-                target.sid,
-                permission.clone(),
-                audit_context,
-            )?;
-        }
+    let target = fs_node_effective_sid_and_class(node);
+
+    // TODO: https://fxbug.dev/364568517 - Some sockets are incorrectly classed "sock_file".
+    if target.class == FileClass::SockFile.into() {
+        return Ok(());
+    }
+
+    for permission in permissions {
+        todo_check_permission(
+            bug.clone(),
+            permission_check,
+            subject_sid,
+            target.sid,
+            permission.clone(),
+            audit_context,
+        )?;
     }
 
     Ok(())
