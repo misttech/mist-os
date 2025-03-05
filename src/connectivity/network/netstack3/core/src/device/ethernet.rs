@@ -35,7 +35,7 @@ use netstack3_ip::nud::{
     DelegateNudContext, NudConfigContext, NudContext, NudIcmpContext, NudSenderContext, NudState,
     NudUserConfig, UseDelegateNudContext,
 };
-use netstack3_ip::IpDeviceEgressStateContext;
+use netstack3_ip::{IpDeviceEgressStateContext, Marks};
 use packet::{Buf, BufferMut, InnerPacketBuilder as _, Serializer};
 use packet_formats::ethernet::EtherType;
 use packet_formats::icmp::ndp::options::NdpOptionBuilder;
@@ -245,6 +245,12 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
             original_src_ip,
             original_dst_ip,
             frame,
+            // TODO(https://fxbug.dev/400977853): The pending frame this ICMP message is
+            // responding to can either be generated from ourselves or being forwarded.
+            // In the former case, the marks are irrelevant because this message will end
+            // up being delivered locally. For the later case, we need to make sure the
+            // marks are stored with the pending frames.
+            &Marks::default(),
         );
     }
 }
@@ -412,6 +418,12 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
             frame,
             header_len,
             fragment_type,
+            // TODO(https://fxbug.dev/400977853): The pending frame this ICMP message is
+            // responding to can either be generated from ourselves or being forwarded.
+            // In the former case, the marks are irrelevant because this message will end
+            // up being delivered locally. For the later case, we need to make sure the
+            // marks are stored with the pending frames.
+            &Marks::default(),
         );
     }
 }

@@ -301,6 +301,7 @@ mod testutil {
     use crate::device::IpDeviceSendContext;
     use crate::internal::base::DeviceIpLayerMetadata;
     use crate::internal::icmp::{IcmpErrorHandler, IcmpHandlerIpExt};
+    use crate::internal::routing::rules::Marks;
     use crate::multicast_forwarding::{
         MulticastForwardingApi, MulticastForwardingEnabledState, MulticastForwardingPendingPackets,
         MulticastForwardingPendingPacketsContext, MulticastForwardingState, MulticastRouteTable,
@@ -554,6 +555,7 @@ mod testutil {
             _dst_ip: SpecifiedAddr<I::Addr>,
             _original_packet: B,
             _error: I::IcmpError,
+            _marks: &Marks,
         ) {
             unimplemented!()
         }

@@ -275,6 +275,20 @@ where
         frame_dst: Option<FrameDestination>,
         buffer: B,
     ) {
+        self.receive_ip_packet_with_marks::<I, B>(device, frame_dst, buffer, Default::default())
+    }
+
+    /// Receive an IP packet from a device with given marks.
+    ///
+    /// `receive_ip_packet_with_marks` injects a packet directly at the IP layer
+    /// for this context with the given marks.
+    pub fn receive_ip_packet_with_marks<I: Ip, B: BufferMut>(
+        &mut self,
+        device: &DeviceId<BC>,
+        frame_dst: Option<FrameDestination>,
+        buffer: B,
+        marks: Marks,
+    ) {
         let (core_ctx, bindings_ctx) = self.contexts();
         match I::VERSION {
             IpVersion::V4 => ip::receive_ipv4_packet(
@@ -282,7 +296,7 @@ where
                 bindings_ctx,
                 device,
                 frame_dst,
-                DeviceIpLayerMetadata::default(),
+                DeviceIpLayerMetadata::with_marks(marks),
                 buffer,
             ),
             IpVersion::V6 => ip::receive_ipv6_packet(
@@ -290,7 +304,7 @@ where
                 bindings_ctx,
                 device,
                 frame_dst,
-                DeviceIpLayerMetadata::default(),
+                DeviceIpLayerMetadata::with_marks(marks),
                 buffer,
             ),
         }

@@ -225,6 +225,11 @@ impl<BT: TxMetadataBindingsTypes> DeviceIpLayerMetadata<BT> {
     pub fn into_tx_metadata(self) -> BT::TxMetadata {
         self.tx_metadata
     }
+    /// Creates new IP layer metadata with the marks.
+    #[cfg(any(test, feature = "testutils"))]
+    pub fn with_marks(marks: Marks) -> Self {
+        Self { conntrack_entry: None, tx_metadata: Default::default(), marks }
+    }
 }
 
 impl<
@@ -2325,6 +2330,8 @@ pub(crate) struct IcmpErrorSender<'a, I: IcmpHandlerIpExt, D> {
     /// The metadata from the packet, allowing the packet's backing buffer to be
     /// returned to it's pre-IP-parse state with [`GrowBuffer::undo_parse`].
     meta: ParseMetadata,
+    /// The marks used to send the ICMP error.
+    marks: Marks,
 }
 
 impl<'a, I: IcmpHandlerIpExt, D> IcmpErrorSender<'a, I, D> {
@@ -2343,7 +2350,7 @@ impl<'a, I: IcmpHandlerIpExt, D> IcmpErrorSender<'a, I, D> {
         B: BufferMut,
         CC: IcmpErrorHandler<I, BC, DeviceId = D>,
     {
-        let IcmpErrorSender { err, src_ip, dst_ip, frame_dst, device, meta } = self;
+        let IcmpErrorSender { err, src_ip, dst_ip, frame_dst, device, meta, marks } = self;
         // Undo the parsing of the IP Packet, moving the buffer's cursor so that
         // it points at the start of the IP header. This way, the sent ICMP
         // error will contain the entire original IP packet.
@@ -2357,6 +2364,7 @@ impl<'a, I: IcmpHandlerIpExt, D> IcmpErrorSender<'a, I, D> {
             dst_ip,
             body,
             err,
+            &marks,
         );
     }
 }
@@ -2466,6 +2474,7 @@ fn dispatch_receive_ipv4_packet<
                     frame_dst,
                     device,
                     meta,
+                    marks,
                 })
             } else {
                 Ok(())
@@ -2574,6 +2583,7 @@ fn dispatch_receive_ipv6_packet<
                     frame_dst,
                     device,
                     meta,
+                    marks: receive_info.marks,
                 })
             } else {
                 Ok(())
@@ -2634,6 +2644,7 @@ where
 
         trace!("forward_with_buffer: forwarding {} packet", I::NAME);
 
+        let marks = packet_meta.marks;
         match send_ip_frame(
             core_ctx,
             bindings_ctx,
@@ -2679,6 +2690,7 @@ where
                             dst_ip,
                             serializer.into_buffer(),
                             err,
+                            &marks,
                         );
                     }
                     IpSendFrameErrorReason::Device(SendFrameErrorReason::QueueFull)
@@ -2795,15 +2807,17 @@ where
         let version_specific_meta = packet.version_specific_meta();
         let (_, _, proto, parse_meta): (I::Addr, I::Addr, _, _) = packet.into_metadata();
         let err = I::new_ttl_expired(proto, parse_meta.header_len(), version_specific_meta);
-        packet_meta.acknowledge_drop();
-        return ForwardingAction::DropWithIcmpError(IcmpErrorSender {
+        let action = ForwardingAction::DropWithIcmpError(IcmpErrorSender {
             err,
             src_ip,
             dst_ip,
             frame_dst,
             device: inbound_device,
             meta: parse_meta,
+            marks: packet_meta.marks,
         });
+        packet_meta.acknowledge_drop();
+        return action;
     }
 
     trace!("determine_ip_packet_forwarding_action: adequate TTL");
@@ -3281,6 +3295,7 @@ pub fn receive_ipv4_packet<
                     },
                     header_len,
                 },
+                &device_ip_layer_metadata.marks,
             );
             return;
         }
@@ -3497,6 +3512,7 @@ pub fn receive_ipv4_packet<
             let fragment_type = packet.fragment_type();
             let (src_ip, _, proto, meta): (_, Ipv4Addr, _, _) =
                 drop_packet_and_undo_parse!(packet, buffer);
+            let marks = packet_metadata.marks;
             packet_metadata.acknowledge_drop();
             let src_ip = match SpecifiedAddr::new(src_ip) {
                 Some(ip) => ip,
@@ -3518,6 +3534,7 @@ pub fn receive_ipv4_packet<
                     kind: Icmpv4ErrorKind::NetUnreachable { proto, fragment_type },
                     header_len: meta.header_len(),
                 },
+                &marks,
             );
         }
         ReceivePacketAction::Drop { reason } => {
@@ -3609,6 +3626,7 @@ pub fn receive_ipv6_packet<
                     pointer,
                     allow_dst_multicast: action.should_send_icmp_to_multicast(),
                 },
+                &device_ip_layer_metadata.marks,
             );
             return;
         }
@@ -3916,6 +3934,7 @@ pub fn receive_ipv6_packet<
             let (_, _, proto, meta): (Ipv6Addr, Ipv6Addr, _, _) =
                 drop_packet_and_undo_parse!(packet, buffer);
             debug!("received IPv6 packet with no known route to destination {}", dst_ip);
+            let marks = packet_metadata.marks;
             packet_metadata.acknowledge_drop();
 
             if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
@@ -3928,6 +3947,7 @@ pub fn receive_ipv6_packet<
                     dst_ip,
                     buffer,
                     Icmpv6ErrorKind::NetUnreachable { proto, header_len: meta.header_len() },
+                    &marks,
                 );
             }
         }
