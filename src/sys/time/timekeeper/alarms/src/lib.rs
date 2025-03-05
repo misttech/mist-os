@@ -933,7 +933,23 @@ async fn get_timer_properties(hrtimer: &ffhh::DeviceProxy) -> TimerConfig {
     match hrtimer.get_properties().await {
         Ok(p) => {
             let timers_properties = &p.timers_properties.expect("timers_properties must exist");
-            let main_timer_properties = &timers_properties[MAIN_TIMER_ID];
+            debug!("get_timer_properties: got: {:?}", timers_properties);
+
+            // Pick the correct hrtimer to use for wakes.
+            let timer_index = if timers_properties.len() > MAIN_TIMER_ID {
+                // Mostly vim3, where we have pre-existing timer allocations
+                // that we don't need to change.
+                MAIN_TIMER_ID
+            } else if timers_properties.len() > 1 {
+                // Newer devices that don't need to allocate timer IDs, and/or
+                // may not even have as many timers as vim3 does. But, at least
+                // one timer is needed.
+                0
+            } else {
+                // Give up.
+                return TimerConfig::new_empty();
+            };
+            let main_timer_properties = &timers_properties[timer_index];
             debug!("alarms: main_timer_properties: {:?}", main_timer_properties);
             // Not sure whether it is useful to have more ticks than this, so limit it.
             let max_ticks: u64 = std::cmp::min(
