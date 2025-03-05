@@ -69,11 +69,17 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
             builder.platform_bundle("timekeeper_wake_alarms_aml_hrtimer");
         }
 
+        // Always on counter is used instead of a persistent RTC on some platforms.
         let has_always_on_counter =
             context.board_info.provides_feature("fuchsia::always_on_counter");
+
+        // The always on counter is useless without persistent storage to persist the
+        // counter values as would be done in an RTC chip.
+        let use_always_on_counter = has_always_on_counter && use_persistent_storage;
+
         // Allows Timekeeper to short-circuit RTC driver detection at startup.
         let has_real_time_clock = context.board_info.provides_feature("fuchsia::real_time_clock")
-            || has_always_on_counter;
+            || use_always_on_counter;
 
         // Refer to //src/sys/time/timekeeper/config.shard.cml
         // for details.
@@ -110,7 +116,7 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
             // Should this now be removed in favor of WritableUTCTime above?
             .field("serve_fuchsia_time_external_adjust", config.serve_fuchsia_time_external_adjust)?
             .field("has_real_time_clock", has_real_time_clock)?
-            .field("has_always_on_counter", has_always_on_counter)?
+            .field("has_always_on_counter", use_always_on_counter)?
             .field("utc_start_at_startup_when_invalid_rtc", config.utc_start_at_startup_when_invalid_rtc)?
             .field("serve_fuchsia_time_alarms", serve_fuchsia_time_alarms)?;
 
