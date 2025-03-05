@@ -14,7 +14,7 @@ readonly RAW_LINES="// Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use zerocopy::{AsBytes, FromBytes, FromZeros};"
+use zerocopy::{IntoBytes, FromBytes, Immutable};"
 
 # Type/define pairs, used to generate a list of variables to work around
 # https://github.com/rust-lang/rust-bindgen/issues/316
@@ -55,12 +55,19 @@ done
 temp_include_dir=$(mktemp -d)
 
 function cleanup {
-  rm -rf "$temp_include_dir"
+  rm -rf "${temp_include_dir}"
 }
 
 trap cleanup EXIT
 
-echo "$define_text" > $temp_include_dir/missing_includes.h
+echo "${define_text}" > "${temp_include_dir}/missing_includes.h"
+
+PATH="$PWD/scripts:$PATH" \
+src/graphics/lib/magma/include/virtio/virtio_magma_h_gen.py \
+  fuchsia \
+  src/graphics/lib/magma/include/magma/magma.json \
+  "${temp_include_dir}/virtio_magma.h"
+
 PATH="$PWD/prebuilt/third_party/rust/linux-x64/bin:$PATH" \
 ./prebuilt/third_party/rust_bindgen/linux-x64/bindgen \
   --no-layout-tests \
@@ -76,7 +83,6 @@ PATH="$PWD/prebuilt/third_party/rust/linux-x64/bin:$PATH" \
   src/starnix/lib/magma/wrapper.h \
   -- \
   -I zircon/system/public \
-  -I $(scripts/fx get-build-dir)/linux_x64/gen/src/graphics/lib/magma/include \
   -I src/graphics/lib/magma/src \
   -I src/graphics/lib/magma/include \
   -I sdk/lib/magma_client/include \
@@ -84,8 +90,8 @@ PATH="$PWD/prebuilt/third_party/rust/linux-x64/bin:$PATH" \
   -I $temp_include_dir \
   -I $(pwd)
 
-# TODO: Figure out how to get bindgen to derive AsBytes, FromBytes, and FromZeros.
+# TODO: Figure out how to get bindgen to derive IntoBytes, FromBytes, Immutable.
 #       See https://github.com/rust-lang/rust-bindgen/issues/1089
 sed -i \
-  's/derive(Debug, Default, Copy, Clone)/derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeros)/' \
+  's/derive(Debug, Default, Copy, Clone)/derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, Immutable)/' \
   src/starnix/lib/magma/src/magma.rs
