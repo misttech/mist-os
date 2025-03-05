@@ -16,7 +16,7 @@ group("tests") {
 test("virtio-backend-test") {
   sources = [ "backend_tests.cc" ]
   deps = [
-    ":virtio-dfv1",
+    ":virtio",
     "//sdk/lib/async-default",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
@@ -27,6 +27,9 @@ test("virtio-backend-test") {
     "//src/devices/testing/mock-ddk",
     "//zircon/system/ulib/zxtest",
   ]
+
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-conversion" ]
 }
 
 fuchsia_unittest_package("virtio-backend-test-package") {
@@ -42,7 +45,6 @@ fuchsia_unittest_package("virtio-backend-test-package") {
 library_headers("virtio-headers") {
   headers = [
     "lib/virtio/driver_utils.h",
-    "lib/virtio/driver_utils_dfv1.h",
     "lib/virtio/device.h",
     "lib/virtio/ring.h",
     "lib/virtio/backends/backend.h",
@@ -50,10 +52,12 @@ library_headers("virtio-headers") {
     "lib/virtio/backends/pci.h",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp",
     "//src/devices/lib/dma-buffer",
     "//src/devices/lib/mmio",
+    "//src/devices/pci/lib/device-protocol-pci",
+    "//src/lib/ddk",
     "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/pretty",
     "//zircon/system/ulib/virtio",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
@@ -77,33 +81,23 @@ source_set("virtio-common") {
   ]
   deps = [
     "//sdk/lib/stdcompat",
-    "//zircon/system/ulib/mmio-ptr",
+    "//src/lib/ddk:ddk-deprecated-mmio-headers",
+    "//zircon/system/ulib/pretty",
   ]
+
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-conversion" ]
 }
 
-# Legacy target for DFv1 drivers.
-source_set("virtio-dfv1") {
-  sources = [ "driver_utils_dfv1.cc" ]
-  deps = [ "//src/lib/ddktl" ]
+group("virtio") {
   public_deps = [
     ":virtio-common",
     "//src/devices/lib/driver",
     "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
   ]
-
-  # To trim this list:
-  # $ scripts/gn/trim_visibility.py --target="//src/devices/bus/lib/virtio:virtio-dfv1"
-  visibility = [
-    "//src/connectivity/ethernet/drivers/virtio:*",
-    "//src/devices/bus/lib/virtio:*",
-    "//src/devices/misc/drivers/virtio-rng:*",
-    "//src/devices/misc/drivers/virtio-socket:*",
-    "//src/devices/serial/drivers/virtio-console:*",
-    "//src/ui/input/drivers/virtio:*",
-  ]
 }
 
-group("virtio") {
+group("virtio-dfv2") {
   public_deps = [
     ":virtio-common",
     "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv2",

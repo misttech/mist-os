@@ -13,7 +13,7 @@
 #include <lib/mmio/mmio.h>
 #include <lib/sync/completion.h>
 #include <lib/virtio/backends/pci.h>
-#include <lib/virtio/driver_utils_dfv1.h>
+#include <lib/virtio/driver_utils.h>
 #include <lib/virtio/ring.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/vmo.h>
@@ -202,21 +202,10 @@ class VirtioTests : public zxtest::Test {
       async->fake_pci.CreateBar(kModernBar, bar_size, /*is_mmio=*/true);
     });
 
-    zx::result pci =
-        ddk::Device<void>::DdkConnectFidlProtocol<fuchsia_hardware_pci::Service::Device>(
-            fake_parent_.get());
-    ZX_ASSERT(pci.is_ok());
-    fidl::Result result = fidl::Call(*pci)->GetBar(kModernBar);
-    ZX_ASSERT(result.is_ok());
-
-    fuchsia_hardware_pci::Bar& bar_result = result->result();
-    ZX_ASSERT(bar_result.result().Which() == fuchsia_hardware_pci::BarResult::Tag::kVmo);
-
-    zx::result mmio =
-        fdf::MmioBuffer::Create(0, bar_result.size(), zx::vmo(bar_result.result().vmo()->release()),
-                                ZX_CACHE_POLICY_UNCACHED_DEVICE);
-    ZX_ASSERT(mmio.is_ok());
-    bars_[kModernBar] = std::move(*mmio);
+    ddk::Pci pci(fake_parent_.get());
+    ZX_ASSERT(pci.is_valid());
+    ZX_ASSERT(pci.MapMmio(kModernBar, ZX_CACHE_POLICY_UNCACHED_DEVICE, &bars_[kModernBar]) ==
+              ZX_OK);
   }
 
   void SetUpModernCapabilities() {
@@ -438,11 +427,10 @@ TEST_F(VirtioTests, LegacyIoBackendSuccess) {
   async_state().SyncCall([&](AsyncState* async) { async->fake_pci.AddLegacyInterrupt(); });
 
   // With a manually crafted backend using the test interface it should succeed.
-  zx::result pci = ddk::Device<void>::DdkConnectFidlProtocol<fuchsia_hardware_pci::Service::Device>(
-      fake_parent_.get());
-  ASSERT_TRUE(pci.is_ok());
-  auto info = fidl::Call(*pci)->GetDeviceInfo();
-  ASSERT_TRUE(info.is_ok());
+  ddk::Pci pci(fake_parent_.get());
+  ASSERT_TRUE(pci.is_valid());
+  fuchsia_hardware_pci::wire::DeviceInfo info{};
+  ASSERT_OK(pci.GetDeviceInfo(&info));
   zx::bti bti{};
   ASSERT_OK(fake_bti_create(bti.reset_and_get_address()));
 
@@ -450,8 +438,7 @@ TEST_F(VirtioTests, LegacyIoBackendSuccess) {
   // from PCI, Virtio, and the test all align.
   TestLegacyIoInterface interface(bars()[kLegacyBar]->View(0));
 
-  auto backend =
-      std::make_unique<virtio::PciLegacyBackend>(std::move(*pci), info->info(), &interface);
+  auto backend = std::make_unique<virtio::PciLegacyBackend>(std::move(pci), info, &interface);
   ASSERT_OK(backend->Bind());
 
   auto device =
@@ -470,17 +457,15 @@ TEST_F(VirtioTests, LegacyMsiX) {
     async->fake_pci.AddMsixInterrupt();
   });
 
-  zx::result pci = ddk::Device<void>::DdkConnectFidlProtocol<fuchsia_hardware_pci::Service::Device>(
-      fake_parent_.get());
-  ASSERT_TRUE(pci.is_ok());
-  auto info = fidl::Call(*pci)->GetDeviceInfo();
-  ASSERT_TRUE(info.is_ok());
+  ddk::Pci pci(fake_parent_.get());
+  ASSERT_TRUE(pci.is_valid());
+  fuchsia_hardware_pci::wire::DeviceInfo info{};
+  ASSERT_OK(pci.GetDeviceInfo(&info));
   zx::bti bti{};
   ASSERT_OK(fake_bti_create(bti.reset_and_get_address()));
 
   TestLegacyIoInterface interface(bars()[kLegacyBar]->View(0));
-  auto backend =
-      std::make_unique<virtio::PciLegacyBackend>(std::move(*pci), info->info(), &interface);
+  auto backend = std::make_unique<virtio::PciLegacyBackend>(std::move(pci), info, &interface);
   ASSERT_OK(backend->Bind());
 
   auto device =

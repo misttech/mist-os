@@ -21,11 +21,12 @@
 
 #include <algorithm>
 #include <memory>
-#include <mutex>
 
 #include <ddktl/device.h>
 #include <fbl/algorithm.h>
 #include <fbl/array.h>
+#include <fbl/auto_lock.h>
+#include <pretty/hexdump.h>
 #include <virtio/virtio.h>
 
 namespace virtio {
@@ -69,7 +70,7 @@ SocketDevice::~SocketDevice() {}
 
 void SocketDevice::Start(::fuchsia_hardware_vsock::wire::DeviceStartRequest* request,
                          StartCompleter::Sync& completer) {
-  std::lock_guard lock(lock_);
+  fbl::AutoLock lock(&lock_);
   if (callbacks_.is_valid()) {
     RemoveCallbacksLocked();
   }
@@ -87,14 +88,14 @@ void SocketDevice::Start(::fuchsia_hardware_vsock::wire::DeviceStartRequest* req
 
 void SocketDevice::SendRst(::fuchsia_hardware_vsock::wire::DeviceSendRstRequest* request,
                            SendRstCompleter::Sync& completer) {
-  std::lock_guard lock(lock_);
+  fbl::AutoLock lock(&lock_);
   CleanupConAndRstLocked(ConnectionKey(request->addr));
   completer.ReplySuccess();
 }
 
 void SocketDevice::SendShutdown(::fuchsia_hardware_vsock::wire::DeviceSendShutdownRequest* request,
                                 SendShutdownCompleter::Sync& completer) {
-  std::lock_guard lock(lock_);
+  fbl::AutoLock lock(&lock_);
   if (!callbacks_.is_valid()) {
     completer.ReplyError(ZX_ERR_BAD_STATE);
     return;
@@ -114,7 +115,7 @@ void SocketDevice::SendShutdown(::fuchsia_hardware_vsock::wire::DeviceSendShutdo
 
 void SocketDevice::SendRequest(SendRequestRequestView request,
                                SendRequestCompleter::Sync& completer) {
-  std::lock_guard lock(lock_);
+  fbl::AutoLock lock(&lock_);
   if (!callbacks_.is_valid()) {
     completer.ReplyError(ZX_ERR_BAD_STATE);
     return;
@@ -134,7 +135,7 @@ void SocketDevice::SendRequest(SendRequestRequestView request,
 
 void SocketDevice::SendResponse(::fuchsia_hardware_vsock::wire::DeviceSendResponseRequest* request,
                                 SendResponseCompleter::Sync& completer) {
-  std::lock_guard lock(lock_);
+  fbl::AutoLock lock(&lock_);
   if (!callbacks_.is_valid()) {
     completer.ReplyError(ZX_ERR_BAD_STATE);
     return;
@@ -156,12 +157,12 @@ void SocketDevice::SendResponse(::fuchsia_hardware_vsock::wire::DeviceSendRespon
 }
 
 void SocketDevice::GetCid(GetCidCompleter::Sync& completer) {
-  std::lock_guard lock(lock_);
+  fbl::AutoLock lock(&lock_);
   completer.Reply(cid_);
 }
 
 zx_status_t SocketDevice::Init() {
-  std::lock_guard lock(lock_);
+  fbl::AutoLock lock(&lock_);
   dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
   ZX_DEBUG_ASSERT(dispatcher_);
 
@@ -246,12 +247,12 @@ zx_status_t SocketDevice::Init() {
 }
 
 void SocketDevice::DdkRelease() {
-  std::lock_guard lock(lock_);
+  fbl::AutoLock lock(&lock_);
   ReleaseLocked();
 }
 
 void SocketDevice::IrqRingUpdate() {
-  std::lock_guard lock(lock_);
+  fbl::AutoLock lock(&lock_);
   tx_.ProcessDescriptors([this](const ConnectionKey& key, uint64_t payload)
                              TA_NO_THREAD_SAFETY_ANALYSIS {
                                auto conn = connections_.find(key);
@@ -286,7 +287,7 @@ void SocketDevice::IrqRingUpdate() {
 }
 
 void SocketDevice::IrqConfigChange() {
-  std::lock_guard lock(lock_);
+  fbl::AutoLock lock(&lock_);
   uint32_t old_cid = cid_;
   UpdateCidLocked();
   if (cid_ != old_cid) {
@@ -562,7 +563,7 @@ void SocketDevice::TimerWaitHandler(async_dispatcher_t* dispatcher, async::WaitB
     // Dispatcher shut down.
     return;
   }
-  std::lock_guard lock(lock_);
+  fbl::AutoLock lock(&lock_);
   tx_retry_timer_.cancel();
   RetryTxLocked(true);
   if (!has_pending_tx_.is_empty()) {
@@ -576,7 +577,7 @@ void SocketDevice::CallbacksSignalled(async_dispatcher_t* dispatcher, async::Wai
     // Dispatcher shut down.
     return;
   }
-  std::lock_guard lock(lock_);
+  fbl::AutoLock lock(&lock_);
   RemoveCallbacksLocked();
 }
 void SocketDevice::ConnectionSocketSignalled(zx_status_t status, const zx_packet_signal_t* signal,
@@ -585,7 +586,7 @@ void SocketDevice::ConnectionSocketSignalled(zx_status_t status, const zx_packet
     // Dispatcher shut down
     return;
   }
-  std::lock_guard lock(lock_);
+  fbl::AutoLock lock(&lock_);
   if (conn->IsShuttingDown()) {
     return;
   }
@@ -785,7 +786,7 @@ void SocketDevice::TxIoBufferRing::ProcessDescriptors(F func) {
 }
 
 SocketDevice::Connection::Connection(const ConnectionKey& key, zx::socket data,
-                                     SignalHandler wait_handler, uint32_t cid, std::mutex& lock)
+                                     SignalHandler wait_handler, uint32_t cid, fbl::Mutex& lock)
     : lock_(lock),
       key_(key),
       state_(Connection::State::WAIT_RESPONSE),
@@ -1104,7 +1105,7 @@ zx_status_t SocketDevice::Connection::DoSocketTx(bool force_credit_request, TxIo
 void SocketDevice::Connection::BeginWait(async_dispatcher_t* disp) {
   fbl::RefPtr<Connection> wait_ref = fbl::RefPtr(this);
   zx_status_t status = async::PostTask(disp, [wait_ref, disp] {
-    std::lock_guard lock(wait_ref->lock_);
+    fbl::AutoLock lock(&wait_ref->lock_);
 
     if (!wait_ref->wait_handler_.is_pending()) {
       wait_ref->wait_handler_ref_ = wait_ref;

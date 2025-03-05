@@ -17,7 +17,6 @@
 #include <ddktl/protocol/empty-protocol.h>
 #include <fbl/array.h>
 #include <fbl/intrusive_double_list.h>
-#include <fbl/mutex.h>
 
 namespace virtio {
 

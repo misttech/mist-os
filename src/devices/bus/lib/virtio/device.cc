@@ -17,6 +17,8 @@
 #include <memory>
 #include <utility>
 
+#include <pretty/hexdump.h>
+
 #include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace virtio {

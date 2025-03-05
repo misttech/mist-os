@@ -5,23 +5,20 @@
 #ifndef SRC_DEVICES_BUS_LIB_VIRTIO_INCLUDE_LIB_VIRTIO_BACKENDS_PCI_H_
 #define SRC_DEVICES_BUS_LIB_VIRTIO_INCLUDE_LIB_VIRTIO_BACKENDS_PCI_H_
 
-#include <fidl/fuchsia.hardware.pci/cpp/fidl.h>
+#include <lib/ddk/hw/inout.h>
+#include <lib/device-protocol/pci.h>
 #include <lib/mmio/mmio.h>
 #include <lib/virtio/backends/backend.h>
 #include <lib/zx/port.h>
 #include <zircon/compiler.h>
 
-#include <mutex>
 #include <optional>
-
-#include <fbl/macros.h>
 
 namespace virtio {
 
 class PciBackend : public Backend {
  public:
-  PciBackend(fidl::ClientEnd<fuchsia_hardware_pci::Device> pci,
-             fuchsia_hardware_pci::DeviceInfo info);
+  PciBackend(ddk::Pci pci, fuchsia_hardware_pci::wire::DeviceInfo info);
   zx_status_t Bind() final;
   virtual zx_status_t Init() = 0;
   const char* tag() { return tag_; }
@@ -36,15 +33,15 @@ class PciBackend : public Backend {
   static constexpr uint16_t kMsiQueueVector = 1;
 
  protected:
-  fidl::UnownedClientEnd<fuchsia_hardware_pci::Device> pci() { return pci_.borrow(); }
-  const fuchsia_hardware_pci::DeviceInfo& info() const { return info_; }
-  std::mutex& lock() { return lock_; }
+  const ddk::Pci& pci() { return pci_; }
+  fuchsia_hardware_pci::wire::DeviceInfo info() { return info_; }
+  fbl::Mutex& lock() { return lock_; }
   zx::port& wait_port() { return wait_port_; }
 
  private:
-  fidl::ClientEnd<fuchsia_hardware_pci::Device> pci_;
-  fuchsia_hardware_pci::DeviceInfo info_;
-  std::mutex lock_;
+  ddk::Pci pci_;
+  fuchsia_hardware_pci::wire::DeviceInfo info_;
+  fbl::Mutex lock_;
   zx::port wait_port_;
   char tag_[16];  // pci[XX:XX.X] + \0, aligned to 8
   DISALLOW_COPY_ASSIGN_AND_MOVE(PciBackend);
@@ -72,12 +69,24 @@ class PciLegacyIoInterface : public LegacyIoInterface {
   PciLegacyIoInterface() = default;
   ~PciLegacyIoInterface() override = default;
 
-  void Read(uint16_t offset, uint8_t* val) const override;
-  void Read(uint16_t offset, uint16_t* val) const override;
-  void Read(uint16_t offset, uint32_t* val) const override;
-  void Write(uint16_t offset, uint8_t val) const override;
-  void Write(uint16_t offset, uint16_t val) const override;
-  void Write(uint16_t offset, uint32_t val) const override;
+  void Read(uint16_t offset, uint8_t* val) const override {
+    *val = inp(static_cast<uint16_t>(offset));
+  }
+  void Read(uint16_t offset, uint16_t* val) const override {
+    *val = inpw(static_cast<uint16_t>(offset));
+  }
+  void Read(uint16_t offset, uint32_t* val) const override {
+    *val = inpd(static_cast<uint16_t>(offset));
+  }
+  void Write(uint16_t offset, uint8_t val) const override {
+    outp(static_cast<uint16_t>(offset), val);
+  }
+  void Write(uint16_t offset, uint16_t val) const override {
+    outpw(static_cast<uint16_t>(offset), val);
+  }
+  void Write(uint16_t offset, uint32_t val) const override {
+    outpd(static_cast<uint16_t>(offset), val);
+  }
 
   static PciLegacyIoInterface* Get() {
     static PciLegacyIoInterface interface{};
@@ -90,12 +99,11 @@ class PciLegacyIoInterface : public LegacyIoInterface {
 // configuration structures when MSI-X is enabled.
 class PciLegacyBackend : public PciBackend {
  public:
-  PciLegacyBackend(fidl::ClientEnd<fuchsia_hardware_pci::Device> pci,
-                   fuchsia_hardware_pci::DeviceInfo info)
-      : PciBackend(std::move(pci), std::move(info)), legacy_io_(PciLegacyIoInterface::Get()) {}
-  PciLegacyBackend(fidl::ClientEnd<fuchsia_hardware_pci::Device> pci,
-                   fuchsia_hardware_pci::DeviceInfo info, LegacyIoInterface* interface)
-      : PciBackend(std::move(pci), std::move(info)), legacy_io_(interface) {}
+  PciLegacyBackend(ddk::Pci pci, fuchsia_hardware_pci::wire::DeviceInfo info)
+      : PciBackend(std::move(pci), info), legacy_io_(PciLegacyIoInterface::Get()) {}
+  PciLegacyBackend(ddk::Pci pci, fuchsia_hardware_pci::wire::DeviceInfo info,
+                   LegacyIoInterface* interface)
+      : PciBackend(std::move(pci), info), legacy_io_(interface) {}
   PciLegacyBackend(const PciLegacyBackend&) = delete;
   PciLegacyBackend& operator=(const PciLegacyBackend&) = delete;
   ~PciLegacyBackend() override = default;
@@ -142,9 +150,8 @@ class PciLegacyBackend : public PciBackend {
 // PciModernBackend is for v1.0+ Virtio using MMIO mapped bars and PCI capabilities.
 class PciModernBackend : public PciBackend {
  public:
-  PciModernBackend(fidl::ClientEnd<fuchsia_hardware_pci::Device> pci,
-                   fuchsia_hardware_pci::DeviceInfo info)
-      : PciBackend(std::move(pci), std::move(info)) {}
+  PciModernBackend(ddk::Pci pci, fuchsia_hardware_pci::wire::DeviceInfo info)
+      : PciBackend(std::move(pci), info) {}
   // The dtor handles cleanup of allocated bars because we cannot tear down
   // the mappings safely while the virtio device is being used by a driver.
   ~PciModernBackend() override = default;
@@ -200,7 +207,7 @@ class PciModernBackend : public PciBackend {
   uintptr_t notify_base_ = 0;
   volatile uint32_t* isr_status_ = nullptr;
   uintptr_t device_cfg_ __TA_GUARDED(lock()) = 0;
-  MMIO_PTR volatile virtio_pci_common_cfg_t* common_cfg_ __TA_GUARDED(lock()) = nullptr;
+  volatile virtio_pci_common_cfg_t* common_cfg_ __TA_GUARDED(lock()) = nullptr;
   uint32_t notify_off_mul_;
   std::optional<uint8_t> shared_memory_bar_;
 

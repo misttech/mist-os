@@ -4,14 +4,14 @@
 #ifndef SRC_DEVICES_BUS_LIB_VIRTIO_INCLUDE_LIB_VIRTIO_BACKENDS_BACKEND_H_
 #define SRC_DEVICES_BUS_LIB_VIRTIO_INCLUDE_LIB_VIRTIO_BACKENDS_BACKEND_H_
 
-#include <fidl/fuchsia.hardware.pci/cpp/fidl.h>
+#include <lib/device-protocol/pci.h>
 #include <lib/zx/handle.h>
 #include <lib/zx/port.h>
 #include <lib/zx/result.h>
 
 #include <vector>
 
-#include <fbl/macros.h>
+#include <fbl/mutex.h>
 #include <virtio/virtio.h>
 
 // Each backend will implement their own method for initialization / binding

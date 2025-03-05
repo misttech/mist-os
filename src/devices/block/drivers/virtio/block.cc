@@ -25,6 +25,8 @@
 #include <utility>
 
 #include <fbl/algorithm.h>
+#include <fbl/auto_lock.h>
+#include <pretty/hexdump.h>
 
 #include "src/devices/block/lib/common/include/common.h"
 
@@ -455,7 +457,7 @@ void BlockDevice::SignalWorker(block_txn_t* txn) {
       return;
   }
 
-  std::lock_guard lock(lock_);
+  fbl::AutoLock lock(&lock_);
   if (worker_shutdown_.load()) {
     txn_complete(txn, ZX_ERR_IO_NOT_PRESENT);
     return;
@@ -474,7 +476,7 @@ void BlockDevice::WorkerThread() {
 
     // Pull a txn off the list or wait to be signaled.
     {
-      std::lock_guard lock(lock_);
+      fbl::AutoLock lock(&lock_);
       txn = list_remove_head_type(&worker_txn_list_, block_txn_t, node);
     }
     if (!txn) {
@@ -631,7 +633,7 @@ void BlockDevice::CleanupPendingTxns() {
   block_txn_t* txn = nullptr;
   block_txn_t* temp_entry = nullptr;
   {
-    std::lock_guard lock(lock_);
+    fbl::AutoLock lock(&lock_);
     list_for_every_entry_safe (&worker_txn_list_, txn, temp_entry, block_txn_t, node) {
       list_delete(&txn->node);
       txn_complete(txn, ZX_ERR_IO_NOT_PRESENT);
@@ -709,7 +711,7 @@ zx::result<std::unique_ptr<BlockDevice>> BlockDriver::CreateBlockDevice() {
   }
 
   zx::result<std::pair<zx::bti, std::unique_ptr<virtio::Backend>>> bti_and_backend_result =
-      virtio::GetBtiAndBackend(std::move(pci_client_result).value());
+      virtio::GetBtiAndBackend(ddk::Pci(std::move(pci_client_result).value()));
   if (!bti_and_backend_result.is_ok()) {
     FDF_LOG(ERROR, "GetBtiAndBackend failed: %s", bti_and_backend_result.status_string());
     return bti_and_backend_result.take_error();

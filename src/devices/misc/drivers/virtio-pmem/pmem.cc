@@ -5,6 +5,7 @@
 #include "src/devices/misc/drivers/virtio-pmem/pmem.h"
 
 #include <fidl/fuchsia.kernel/cpp/wire.h>
+#include <lib/ddk/debug.h>
 #include <lib/virtio/driver_utils.h>
 #include <limits.h>
 #include <zircon/status.h>
@@ -153,7 +154,7 @@ zx::result<std::unique_ptr<PmemDevice>> PmemDriver::CreatePmemDevice() {
   }
 
   zx::result bti_and_backend_result =
-      virtio::GetBtiAndBackend(std::move(pci_client_result).value());
+      virtio::GetBtiAndBackend(ddk::Pci(std::move(pci_client_result).value()));
   if (!bti_and_backend_result.is_ok()) {
     FDF_LOG(ERROR, "GetBtiAndBackend failed: %s", bti_and_backend_result.status_string());
     return bti_and_backend_result.take_error();
