@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/378521591) Remove once implementations below are used.
-#![allow(dead_code)]
-
 use crate::name::Name;
 use serde_json::Value;
 use std::path::PathBuf;
@@ -51,7 +48,7 @@ pub trait Logger {
 }
 
 /// Logger that does nothing.
-pub struct NullLogger {}
+pub struct NullLogger;
 
 impl Logger for NullLogger {
     fn strict(&mut self) {}
@@ -92,9 +89,7 @@ impl Logger for NullLogger {
 }
 
 /// Logger that prints messages to stderr.
-pub struct StderrLogger {}
-
-impl StderrLogger {}
+pub struct StderrLogger;
 
 impl Logger for StderrLogger {
     fn strict(&mut self) {

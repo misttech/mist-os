@@ -2,16 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/378521591) Remove once implementations below are used.
-#![allow(dead_code)]
-
 use crate::errors::UsageError;
 use crate::name::Name;
 use crate::schema::{PropertyScheme, PropertyType, Schema};
 use serde_json::Value;
-
-const TYPE_TAG: &str = "type";
-const ITEMS_TAG: &str = "items";
 
 /// Trait for various parsers. Parsers in this module are intended to be used for generating
 /// serde_json::Values from text on a command line or in the value of an environment variables.
@@ -27,12 +21,6 @@ pub trait Parser {
 /// Creates a parser for a boolean value. Only 'true' and 'false' are accepted.
 pub fn parser_for_boolean() -> Box<dyn Parser + Send + Sync> {
     Box::new(BooleanParser)
-}
-
-/// Creates a parser for a number. Accepted numbers may be integers or floating-point numbers,
-/// and negative signs are parsed correctly.
-pub fn parser_for_number() -> Box<dyn Parser + Send + Sync> {
-    Box::new(NumberParser)
 }
 
 /// Creates a parser for a string. Only text containing commas is rejected.
@@ -205,7 +193,7 @@ mod tests {
 
     #[test]
     fn test_number_parser() {
-        let under_test = parser_for_number();
+        let under_test = Box::new(NumberParser);
 
         assert_eq!(Ok(Value::Number(Number::from(0))), under_test.parse(&*PARAMETER_NAME, "0"));
         assert_eq!(Ok(Value::Number(Number::from(1))), under_test.parse(&*PARAMETER_NAME, "1"));
@@ -289,7 +277,7 @@ mod tests {
             under_test.parse(&*PARAMETER_NAME, "1,true")
         );
 
-        let under_test = parser_for_array_of(parser_for_number());
+        let under_test = parser_for_array_of(Box::new(NumberParser));
         assert_eq!(
             Ok(Value::Array(vec![Value::Number(Number::from(1))])),
             under_test.parse(&*PARAMETER_NAME, "1")

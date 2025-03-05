@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/378521591) Remove once implementations below are used.
-#![allow(dead_code)]
-
 use crate::schema::Schema;
 use heck::{ShoutySnakeCase, SnakeCase};
 use serde::Deserialize;

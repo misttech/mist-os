@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/378521591) Remove once implementations below are used.
-#![allow(dead_code)]
-
 use crate::env::EnvLike;
 use crate::errors::BuildError;
 use crate::name::Name;
@@ -18,9 +15,6 @@ use std::path::PathBuf;
 
 const DEFAULT_SCHEMA_PATH: &str = "../../build/sdk/test_config_schema.json5";
 const SCHEMA_ARG_PREFIX: &str = "--schema=";
-const PROPERTIES_TAG: &str = "properties";
-const TYPE_TAG: &str = "type";
-const ITEMS_TAG: &str = "items";
 
 /// A JSON schema. `Schema` holds a test config schema in two forms: A serde_json Value suitable
 /// for validating JSON against the schema, and an idiomatic form for guiding the processing of test
