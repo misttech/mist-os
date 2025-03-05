@@ -903,12 +903,24 @@ impl<I> Recv<I, ()> {
     }
 }
 
+/// The calculation returned from [`Recv::calculate_window_size`].
+struct WindowSizeCalculation {
+    /// THe sequence number of the next octet that we expect to receive from the
+    /// peer.
+    rcv_nxt: SeqNum,
+    /// The next window size to advertise.
+    window_size: WindowSize,
+    /// The current threshold used to move the window or not.
+    ///
+    /// The threshold is the minimum of the receive MSS and half the receive
+    /// buffer capacity to account for the cases where buffer capacity is much
+    /// smaller than the MSS.
+    threshold: usize,
+}
+
 impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
     /// Calculates the next window size to advertise to the peer.
-    ///
-    /// Returns the next window size and the sequence number of the next octet
-    /// that we expect to receive from the peer.
-    fn calculate_window_size(&self) -> (SeqNum, WindowSize) {
+    fn calculate_window_size(&self) -> WindowSizeCalculation {
         let rcv_nxt = self.nxt();
         let Self {
             buffer,
@@ -946,7 +958,8 @@ impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
         // have reduced our receive buffer's capacity, so we need to use
         // saturating arithmetic below.
         let reduction = capacity.saturating_sub(len.saturating_add(usize::from(unused_window)));
-        let last_wnd = if reduction >= usize::min(capacity / 2, usize::from(mss.get().get())) {
+        let threshold = usize::min(capacity / 2, usize::from(mss.get().get()));
+        let window_size = if reduction >= threshold {
             // We have enough reduction in the buffer space, advertise more.
             WindowSize::new(capacity - len).unwrap_or(WindowSize::MAX)
         } else {
@@ -954,14 +967,14 @@ impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
             // the last advertisement.
             unused_window
         };
-
-        (rcv_nxt, last_wnd)
+        WindowSizeCalculation { rcv_nxt, window_size, threshold }
     }
 
     /// Processes data being removed from the receive buffer. Returns a window
     /// update segment to be sent immediately if necessary.
     fn poll_receive_data_dequeued(&mut self, snd_max: SeqNum) -> Option<Segment<()>> {
-        let (rcv_nxt, calculated_window_size): (_, WindowSize) = self.calculate_window_size();
+        let WindowSizeCalculation { rcv_nxt, window_size: calculated_window_size, threshold } =
+            self.calculate_window_size();
         let (rcv_wup, last_window_size) = self.last_window_update;
 
         // We may have received more segments but have delayed acknowledgements,
@@ -981,20 +994,15 @@ impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
         let effective_window_size = (calculated_window_size >> self.wnd_scale) << self.wnd_scale;
         // NOTE: We lose type information here, but we already know these are
         // both WindowSize from the type annotations above.
-        let effective_window_size_u32: u32 = effective_window_size.into();
-        let last_window_size_u32: u32 = last_window_size.into();
-
-        // NOTE: The MSS always is a number of octets, which is the same for
-        // WindowSize (though not UnscaledWindowSize), so any comparisons are
-        // safe.
-        let mss: u32 = self.mss.into();
+        let effective_window_size_usize: usize = effective_window_size.into();
+        let last_window_size_usize: usize = last_window_size.into();
 
         // If the previously-advertised window was less than advertised MSS, we
         // assume the sender is in SWS avoidance.  If we now have enough space
         // to accept at least one MSS worth of data, tell the caller to
         // immediately send a window update to get the sender back into normal
         // operation.
-        if last_window_size_u32 < mss && effective_window_size_u32 >= mss {
+        if last_window_size_usize < threshold && effective_window_size_usize >= threshold {
             self.last_window_update = (rcv_nxt, calculated_window_size);
             // Discard delayed ack timer if any, we're sending out an
             // acknowledgement now.
@@ -1024,10 +1032,11 @@ impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
 
     /// Handles a FIN, returning the [`RecvParams`]` to use from now on.
     fn handle_fin(&self) -> RecvParams {
-        let (ack, wnd) = self.calculate_window_size();
+        let WindowSizeCalculation { rcv_nxt, window_size, threshold: _ } =
+            self.calculate_window_size();
         RecvParams {
-            ack: ack + 1,
-            wnd: wnd.checked_sub(1).unwrap_or(WindowSize::ZERO),
+            ack: rcv_nxt + 1,
+            wnd: window_size.checked_sub(1).unwrap_or(WindowSize::ZERO),
             wnd_scale: self.wnd_scale,
         }
     }
@@ -1050,9 +1059,10 @@ impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
 
 impl<'a, I: Instant, R: ReceiveBuffer> RecvSegmentArgumentsProvider for &'a mut Recv<I, R> {
     fn take_rcv_segment_args(self) -> (SeqNum, UnscaledWindowSize) {
-        let (ack, wnd) = self.calculate_window_size();
-        self.last_window_update = (ack, wnd);
-        (ack, wnd >> self.wnd_scale)
+        let WindowSizeCalculation { rcv_nxt, window_size, threshold: _ } =
+            self.calculate_window_size();
+        self.last_window_update = (rcv_nxt, window_size);
+        (rcv_nxt, window_size >> self.wnd_scale)
     }
 }
 
@@ -1111,7 +1121,8 @@ impl<'a, I, R> RecvSegmentArgumentsProvider for CalculatedRecvParams<'a, I, R> {
 
 impl<'a, I: Instant, R: ReceiveBuffer> CalculatedRecvParams<'a, I, R> {
     fn from_recv(recv: &'a mut Recv<I, R>) -> Self {
-        let (ack, wnd) = recv.calculate_window_size();
+        let WindowSizeCalculation { rcv_nxt: ack, window_size: wnd, threshold: _ } =
+            recv.calculate_window_size();
         let wnd_scale = recv.wnd_scale;
         Self { params: RecvParams { ack, wnd_scale, wnd }, recv: Some(recv) }
     }
@@ -6961,7 +6972,7 @@ mod test {
         }
 
         // Initially the entire buffer is advertised.
-        assert_eq!(rcv.calculate_window_size().1, WindowSize::new(CAP).unwrap());
+        assert_eq!(rcv.calculate_window_size().window_size, WindowSize::new(CAP).unwrap());
 
         for _ in 0..MULTIPLE {
             assert_eq!(get_buffer(&mut rcv).enqueue_data(TEST_BYTES), TEST_BYTES.len());
@@ -6970,17 +6981,20 @@ mod test {
             RecvBufferState::Open { ref mut assembler, .. } => assembler);
         assert_eq!(assembler.insert(ISS_1..ISS_1 + CAP), CAP);
         // Since the buffer is full, we now get a zero window.
-        assert_eq!(rcv.calculate_window_size().1, WindowSize::ZERO);
+        assert_eq!(rcv.calculate_window_size().window_size, WindowSize::ZERO);
 
         // The user reads 1 byte, but our implementation should not advertise
         // a new window because it is too small;
         assert_eq!(get_buffer(&mut rcv).read_with(|_| 1), 1);
-        assert_eq!(rcv.calculate_window_size().1, WindowSize::ZERO);
+        assert_eq!(rcv.calculate_window_size().window_size, WindowSize::ZERO);
 
         // Now at least there is at least 1 MSS worth of free space in the
         // buffer, advertise it.
         assert_eq!(get_buffer(&mut rcv).read_with(|_| TEST_BYTES.len()), TEST_BYTES.len());
-        assert_eq!(rcv.calculate_window_size().1, WindowSize::new(TEST_BYTES.len() + 1).unwrap());
+        assert_eq!(
+            rcv.calculate_window_size().window_size,
+            WindowSize::new(TEST_BYTES.len() + 1).unwrap()
+        );
     }
 
     #[test]
@@ -7545,7 +7559,8 @@ mod test {
     #[test_case(true, true; "more than mss dequeued and delack")]
     #[test_case(false, true; "less than mss dequeued and delack")]
     fn poll_receive_data_dequeued_state(dequeue_more_than_mss: bool, delayed_ack: bool) {
-        // NOTE: Just enough room to hold TEST_BYTES, but will end up below the MSS when full.
+        // NOTE: Just enough room to hold TEST_BYTES, but will end up below the
+        // MSS when full.
         const BUFFER_SIZE: usize = 5;
         const MSS: Mss = Mss(NonZeroU16::new(5).unwrap());
         const TEST_BYTES: &[u8] = "Hello".as_bytes();
@@ -7642,16 +7657,16 @@ mod test {
                 // Delack timer must've been reset if it was set.
                 assert!(state.recv_mut().unwrap().timer.is_none());
             } else {
-                // Dequeue data we just received, but just under one MSS worth.
-                // We shouldn't expect there to be any window update sent in
-                // that case.
+                // Dequeue data we just received, but not enough that will cause
+                // the window to be half open (given we're using a very small
+                // buffer size).
                 let mss: usize = MSS.get().get().into();
                 assert_eq!(
                     state.read_with(|available| {
                         assert_eq!(available, &[TEST_BYTES]);
-                        mss - 1
+                        mss / 2 - 1
                     }),
-                    mss - 1
+                    mss / 2 - 1
                 );
                 assert_eq!(state.poll_receive_data_dequeued(), None,);
                 assert_eq!(
@@ -7662,6 +7677,27 @@ mod test {
                 assert_eq!(state.recv_mut().unwrap().timer.is_some(), delayed_ack);
             }
         }
+    }
+
+    #[test]
+    fn poll_receive_data_dequeued_small_window() {
+        const MSS: Mss = Mss(NonZeroU16::new(65000).unwrap());
+        const WINDOW: WindowSize = WindowSize::from_u32(500).unwrap();
+        let mut recv = Recv::<FakeInstant, _> {
+            buffer: RecvBufferState::Open {
+                buffer: RingBuffer::new(WINDOW.into()),
+                assembler: Assembler::new(ISS_2 + 1),
+            },
+            timer: None,
+            mss: MSS,
+            remaining_quickacks: 0,
+            last_segment_at: None,
+            wnd_scale: WindowScale::default(),
+            last_window_update: (ISS_2 + 1, WindowSize::from_u32(1).unwrap()),
+        };
+        let seg = recv.poll_receive_data_dequeued(ISS_1).expect("generates segment");
+        assert_eq!(seg.header.ack, Some(recv.nxt()));
+        assert_eq!(seg.header.wnd << recv.wnd_scale, WINDOW);
     }
 
     #[test]
