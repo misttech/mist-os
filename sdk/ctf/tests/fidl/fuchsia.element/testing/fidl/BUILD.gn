@@ -6,7 +6,7 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.element.test") {
   testonly = true
-  versioned = "fuchsia"
+  versioned = "fuchsia"  # Override default behavior for `testonly`.
   sources = [ "realm_factory.test.fidl" ]
   enable_hlcpp = true
   public_deps = [
