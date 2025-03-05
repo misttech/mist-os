@@ -103,6 +103,14 @@ pub trait AssemblyContainer {
 
         // Copy each file referenced by the config into `dir`.
         self.walk_paths(&mut |path: &mut Utf8PathBuf, dest: Utf8PathBuf, filetype: FileType| {
+            // Bazel does not like colons in filenames.
+            // Replace any colons in `dest` with directory separators.
+            let dest = dest
+                .into_string()
+                .split(|c| c == ':')
+                .filter(|s| !s.is_empty())
+                .fold(Utf8PathBuf::new(), |dest, part| dest.join(part));
+
             match filetype {
                 // Package manifests are copied via the PackageCopier.
                 FileType::PackageManifest => {
@@ -597,6 +605,8 @@ mod tests {
             hash_map: HashMap<String, Utf8PathBuf>,
             #[walk_paths]
             btree_map: BTreeMap<String, Utf8PathBuf>,
+            #[walk_paths]
+            btree_map_with_colons: BTreeMap<String, Utf8PathBuf>,
         }
 
         // Create a config in memory.
@@ -606,6 +616,7 @@ mod tests {
         let config = ConfigWithMap {
             hash_map: [("key".into(), path.clone())].into(),
             btree_map: [("key".into(), path.clone())].into(),
+            btree_map_with_colons: [("key::with::colons".into(), path.clone())].into(),
         };
 
         // Prepare a depfile.
@@ -628,6 +639,9 @@ mod tests {
             "btree_map": {
                 "key": format!("btree_map/key/{}", &name),
             },
+            "btree_map_with_colons": {
+                "key::with::colons": format!("btree_map_with_colons/key/with/colons/{}", &name),
+            },
         });
         let actual: serde_json::Value = serde_json::from_reader(&config_file).unwrap();
         assert_eq!(expected, actual);
@@ -636,6 +650,13 @@ mod tests {
         let new_path = dir_path.join("hash_map").join("key").join(&name);
         assert!(new_path.exists());
         let new_path = dir_path.join("btree_map").join("key").join(&name);
+        assert!(new_path.exists());
+        let new_path = dir_path
+            .join("btree_map_with_colons")
+            .join("key")
+            .join("with")
+            .join("colons")
+            .join(&name);
         assert!(new_path.exists());
 
         // Ensure the depfile is correct.
