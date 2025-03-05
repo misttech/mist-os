@@ -22,4 +22,5 @@ fidl("fuchsia.device.fs") {
   ]
 
   enable_hlcpp = true
+  enable_rust_next = true
 }

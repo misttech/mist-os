@@ -13,4 +13,5 @@ fidl("fuchsia.fs") {
     "const.fidl",
   ]
   enable_hlcpp = true
+  enable_rust_next = true
 }
