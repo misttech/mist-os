@@ -79,7 +79,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2115
+From //build/config/BUILDCONFIG.gn:2120
 
 ### allowed_test_device_types
 
@@ -722,7 +722,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8721327618979753249"`
+**Current value for `target_cpu = "arm64"`:** `"8721282314669913249"`
 
 From //out/not-default/args.gn:10
 
@@ -730,7 +730,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8721327618979753249"`
+**Current value for `target_cpu = "riscv64"`:** `"8721282314669913249"`
 
 From //out/not-default/args.gn:10
 
@@ -738,7 +738,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8721327618979753249"`
+**Current value for `target_cpu = "x64"`:** `"8721282314669913249"`
 
 From //out/not-default/args.gn:10
 
@@ -1146,7 +1146,7 @@ This should never be set as a build argument.
 }
   lsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
 }
   static = {
   clang_rt = "lib/clang/21/lib/armv7-unknown-linux-gnueabihf/libclang_rt.lsan.a"
@@ -2847,7 +2847,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1895
+From //build/config/BUILDCONFIG.gn:1900
 
 ### fastboot_product
 
@@ -3735,6 +3735,9 @@ Each element of the list is one variant, which is a scope defining:
   tags = ["debugdata", "instrumented", "llvm-profdata", "needs-writable-globals", "profile"]
 }, {
   configs = ["//build/config/profile:profile-use"]
+  tags = ["instrumented"]
+}, {
+  configs = ["//build/config/profile:profile-use-rust"]
   tags = ["instrumented"]
 }, {
   configs = ["//build/config/sanitizers:tsan"]
@@ -5643,7 +5646,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2105
+From //build/config/BUILDCONFIG.gn:2110
 
 ### select_variant_canonical
 
@@ -5653,7 +5656,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2110
+From //build/config/BUILDCONFIG.gn:2115
 
 ### select_variant_shortcuts
 
@@ -5718,7 +5721,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1902
+From //build/config/BUILDCONFIG.gn:1907
 
 ### size_checker_input
 
