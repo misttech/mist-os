@@ -1420,10 +1420,24 @@ fn receive_ip_packet_action_with_src_addr<I: IpExt + TestIpExt>(
     let Out(action) = I::map_ip(
         (&packet, IpInvariant((&mut core_ctx.context(), bindings_ctx, dev))),
         |(packet, IpInvariant((core_ctx, bindings_ctx, dev)))| {
-            Out(ip::receive_ipv4_packet_action(core_ctx, bindings_ctx, dev, packet, FRAME_DST))
+            Out(ip::receive_ipv4_packet_action(
+                core_ctx,
+                bindings_ctx,
+                dev,
+                packet,
+                FRAME_DST,
+                &Default::default(),
+            ))
         },
         |(packet, IpInvariant((core_ctx, bindings_ctx, dev)))| {
-            Out(ip::receive_ipv6_packet_action(core_ctx, bindings_ctx, dev, packet, FRAME_DST))
+            Out(ip::receive_ipv6_packet_action(
+                core_ctx,
+                bindings_ctx,
+                dev,
+                packet,
+                FRAME_DST,
+                &Default::default(),
+            ))
         },
     );
     action

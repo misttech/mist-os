@@ -3379,7 +3379,14 @@ pub fn receive_ipv4_packet<
     // we need below.
     drop(filter);
 
-    let action = receive_ipv4_packet_action(core_ctx, bindings_ctx, device, &packet, frame_dst);
+    let action = receive_ipv4_packet_action(
+        core_ctx,
+        bindings_ctx,
+        device,
+        &packet,
+        frame_dst,
+        &packet_metadata.marks,
+    );
     match action {
         ReceivePacketAction::MulticastForward { targets, address_status, dst_ip } => {
             let src_ip = packet.src_ip();
@@ -3765,7 +3772,14 @@ pub fn receive_ipv6_packet<
         return;
     };
 
-    match receive_ipv6_packet_action(core_ctx, bindings_ctx, device, &packet, frame_dst) {
+    match receive_ipv6_packet_action(
+        core_ctx,
+        bindings_ctx,
+        device,
+        &packet,
+        frame_dst,
+        &packet_metadata.marks,
+    ) {
         ReceivePacketAction::MulticastForward { targets, address_status, dst_ip } => {
             // TOOD(https://fxbug.dev/364242513): Support connection tracking of
             // the multiplexed flows created by multicast forwarding. Here, we
@@ -4011,6 +4025,7 @@ pub fn receive_ipv4_packet_action<BC, CC, B>(
     device: &CC::DeviceId,
     packet: &Ipv4Packet<B>,
     frame_dst: Option<FrameDestination>,
+    marks: &Marks,
 ) -> ReceivePacketAction<Ipv4, CC::DeviceId>
 where
     BC: IpLayerBindingsContext<Ipv4, CC::DeviceId>,
@@ -4082,6 +4097,7 @@ where
             device,
             packet,
             frame_dst,
+            marks,
         ),
     }
 }
@@ -4093,6 +4109,7 @@ pub fn receive_ipv6_packet_action<BC, CC, B>(
     device: &CC::DeviceId,
     packet: &Ipv6Packet<B>,
     frame_dst: Option<FrameDestination>,
+    marks: &Marks,
 ) -> ReceivePacketAction<Ipv6, CC::DeviceId>
 where
     BC: IpLayerBindingsContext<Ipv6, CC::DeviceId>,
@@ -4211,6 +4228,7 @@ where
             device,
             packet,
             frame_dst,
+            marks,
         ),
     }
 }
@@ -4283,6 +4301,7 @@ fn receive_ip_packet_action_common<
     device_id: &CC::DeviceId,
     packet: &I::Packet<B>,
     frame_dst: Option<FrameDestination>,
+    marks: &Marks,
 ) -> ReceivePacketAction<I, CC::DeviceId> {
     if dst_ip.is_multicast() {
         return receive_ip_multicast_packet_action(
@@ -4345,9 +4364,7 @@ fn receive_ip_packet_action_common<
         *dst_ip,
         RuleInput {
             packet_origin: PacketOrigin::NonLocal { source_address, incoming_device: device_id },
-            // TODO(https://fxbug.dev/369133279): packets can have marks as a result of a filtering
-            // target like `MARK`.
-            marks: &Default::default(),
+            marks,
         },
     ) {
         Some(dst) => {
