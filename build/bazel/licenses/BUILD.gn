@@ -21,7 +21,7 @@ _excluded_bazel_inputs = [
 group("all_bazel_inputs") {
   deps = [
     "//build/images/flash:esp.bazel_input",
-    "//sdk:fuchsia_collection",
+    "//sdk:core",
     "//src/fonts/asset_providers:bazel_inputs",
   ]
   deps += _excluded_bazel_inputs

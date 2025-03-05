@@ -222,7 +222,6 @@ template("idk") {
 
     forward_variables_from(invoker,
                            [
-                             "assert_no_deps",
                              "testonly",
                              "visibility",
                            ])
