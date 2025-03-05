@@ -102,8 +102,9 @@ type ElementSchema = resource table {
     /// List of dependencies for this element's power levels.
     /// Note: dependencies UPON this element's levels cannot be added here.
     4: dependencies vector<LevelDependency>:MAX_DEPENDENCIES_IN_ADD_ELEMENT;
-    /// Channels on which Power Broker will send required power levels and
-    /// receive current level updates.
+    /// DEPRECATED. Channels on which Power Broker will send required power
+    /// levels and receive current level updates.
+    @available(deprecated=HEAD, note="Use element_runner instead")
     7: level_control_channels LevelControlChannels;
     /// Optional. If passed, this will be treated as a consumer element and
     /// Leases for this element can be requested via this channel.
@@ -114,6 +115,11 @@ type ElementSchema = resource table {
     /// closed and all tokens registered to this element will be
     /// unregistered.
     9: element_control server_end:ElementControl;
+    /// If passed, Power Broker will use this instead of
+    /// `level_control_channels` for the required level control loop.
+    /// The server_end of this should be retained and the ElementRunner
+    /// protocol implemented by the element's runner.
+    10: element_runner client_end:ElementRunner;
 };
 
 type LevelControlChannels = resource struct {
@@ -159,6 +165,24 @@ open protocol ElementControl {
     flexible UnregisterDependencyToken(resource struct {
         token DependencyToken;
     }) -> () error UnregisterDependencyTokenError;
+};
+
+/// The runner or operator of an element.
+/// This should be implemented by all element owners.
+/// The client end is passed to Power Broker via ElementSchema.element_runner.
+/// Power Broker calls SetLevel initially, and then whenever the required level
+/// of the element changes.
+@discoverable
+open protocol ElementRunner {
+    /// Sets the level of the power element.
+    ///
+    /// The server blocks while making the level transition. It returns
+    /// once the transition to the new required level is complete.
+    /// If the element cannot transition to the new required level and
+    /// it cannot retry, the channel will be closed.
+    flexible SetLevel(struct {
+        level PowerLevel;
+    }) -> ();
 };
 
 type ModifyDependencyError = flexible enum {

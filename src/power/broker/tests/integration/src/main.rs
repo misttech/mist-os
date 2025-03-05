@@ -11,6 +11,7 @@ use fidl_fuchsia_power_broker::{
 };
 use fuchsia_async as fasync;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
+use futures_util::TryStreamExt;
 use power_broker_client::BINARY_POWER_LEVELS;
 use zx::{self as zx, HandleBased};
 
@@ -34,7 +35,10 @@ async fn build_power_broker_realm() -> Result<RealmInstance, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fpb::{CurrentLevelMarker, ElementControlMarker, LessorMarker, RequiredLevelMarker};
+    use fpb::{
+        CurrentLevelMarker, ElementControlMarker, ElementRunnerMarker, ElementRunnerRequestStream,
+        LessorMarker, RequiredLevelMarker,
+    };
 
     #[test]
     fn test_direct() -> Result<()> {
@@ -279,6 +283,251 @@ mod tests {
             let status_after_remove = child_status.watch_power_level().await;
             assert_matches!(status_after_remove, Err(fidl::Error::ClientChannelClosed { .. }));
             assert_matches!(child_required_fut.await, Err(fidl::Error::ClientChannelClosed { .. }));
+        });
+
+        Ok(())
+    }
+
+    async fn handle_set_level(stream: &mut ElementRunnerRequestStream) -> Result<u8, Error> {
+        if let Some(request) = stream.try_next().await.unwrap() {
+            match request {
+                fpb::ElementRunnerRequest::SetLevel { level, responder } => {
+                    responder.send().expect("failed to send set level response");
+                    return Ok(level);
+                }
+                fidl_fuchsia_power_broker::ElementRunnerRequest::_UnknownMethod { .. } => {
+                    return Err(Error::msg("ElementRunnerRequest::_UnknownMethod received"));
+                }
+            }
+        } else {
+            return Err(Error::msg("ElementRunnerRequest::_UnknownMethod received"));
+        }
+    }
+
+    #[test]
+    fn test_element_runner_invalid() -> Result<()> {
+        let mut executor = fasync::TestExecutor::new();
+        let realm = executor.run_singlethreaded(async { build_power_broker_realm().await })?;
+
+        // Create a topology with only two elements and a single dependency:
+        // P <- C
+        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+        let (element_runner_client, _) = create_endpoints::<ElementRunnerMarker>();
+        let (_, current_server) = create_proxy::<CurrentLevelMarker>();
+        let (_, required_server) = create_proxy::<RequiredLevelMarker>();
+        let (_, element_control_server) = create_proxy::<ElementControlMarker>();
+        executor.run_singlethreaded(async {
+            // Supplying both level_control_channels and element_runner is not valid.
+            let invalid_resp = topology
+                .add_element(ElementSchema {
+                    element_name: Some("P".into()),
+                    initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                    valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                    level_control_channels: Some(fpb::LevelControlChannels {
+                        current: current_server,
+                        required: required_server,
+                    }),
+                    element_control: Some(element_control_server),
+                    element_runner: Some(element_runner_client),
+                    ..Default::default()
+                })
+                .await;
+            assert_matches!(invalid_resp, Ok(Err(fpb::AddElementError::Invalid)));
+        });
+        Ok(())
+    }
+
+    #[test]
+    fn test_element_runner_direct() -> Result<()> {
+        let mut executor = fasync::TestExecutor::new();
+        let realm = executor.run_singlethreaded(async { build_power_broker_realm().await })?;
+
+        // Create a topology with only two elements and a single dependency:
+        // P <- C
+        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+        let parent_token = zx::Event::create();
+        let (parent_element_runner_client, parent_element_runner_server) =
+            create_endpoints::<ElementRunnerMarker>();
+        let mut parent_element_runner = parent_element_runner_server.into_stream();
+        let (parent_element_control, parent_element_control_server) =
+            create_proxy::<ElementControlMarker>();
+        executor.run_singlethreaded(async {
+            assert!(topology
+                .add_element(ElementSchema {
+                    element_name: Some("P".into()),
+                    initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                    valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                    element_control: Some(parent_element_control_server),
+                    element_runner: Some(parent_element_runner_client),
+                    ..Default::default()
+                })
+                .await
+                .is_ok());
+            assert!(parent_element_control
+                .register_dependency_token(
+                    parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
+                    DependencyType::Assertive,
+                )
+                .await
+                .is_ok());
+        });
+        let parent_status = {
+            let (client, server) = create_proxy::<StatusMarker>();
+            parent_element_control.open_status_channel(server)?;
+            client
+        };
+        let (child_element_runner_client, child_element_runner_server) =
+            create_endpoints::<ElementRunnerMarker>();
+        let mut child_element_runner = child_element_runner_server.into_stream();
+        let (child_lessor, lessor_server) = create_proxy::<LessorMarker>();
+        let (child_element_control, child_element_control_server) =
+            create_proxy::<ElementControlMarker>();
+        executor.run_singlethreaded(async {
+            assert!(topology
+                .add_element(ElementSchema {
+                    element_name: Some("C".into()),
+                    initial_current_level: Some(BinaryPowerLevel::Off.into_primitive()),
+                    valid_levels: Some(BINARY_POWER_LEVELS.to_vec()),
+                    dependencies: Some(vec![LevelDependency {
+                        dependency_type: DependencyType::Assertive,
+                        dependent_level: BinaryPowerLevel::On.into_primitive(),
+                        requires_token: parent_token
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed"),
+                        requires_level_by_preference: vec![BinaryPowerLevel::On.into_primitive()],
+                    }]),
+                    lessor_channel: Some(lessor_server),
+                    element_control: Some(child_element_control_server),
+                    element_runner: Some(child_element_runner_client),
+                    ..Default::default()
+                })
+                .await
+                .is_ok());
+        });
+        let child_status = {
+            let (client, server) = create_proxy::<StatusMarker>();
+            child_element_control.open_status_channel(server)?;
+            client
+        };
+
+        // Initial required level for P & C should be OFF.
+        // Update P & C's current level to OFF with PowerBroker.
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                handle_set_level(&mut parent_element_runner).await.unwrap(),
+                BinaryPowerLevel::Off.into_primitive()
+            );
+            assert_eq!(
+                handle_set_level(&mut child_element_runner).await.unwrap(),
+                BinaryPowerLevel::Off.into_primitive()
+            );
+            assert_eq!(
+                parent_status.watch_power_level().await.unwrap(),
+                Ok(BinaryPowerLevel::Off.into_primitive())
+            );
+            assert_eq!(
+                child_status.watch_power_level().await.unwrap(),
+                Ok(BinaryPowerLevel::Off.into_primitive())
+            );
+        });
+
+        // Attempt to update with invalid level, this should fail.
+        executor.run_singlethreaded(async {
+            assert!(child_lessor.lease(100).await.unwrap().is_err());
+        });
+
+        // Acquire lease for C.
+        // P's required level should become ON.
+        // C's required level should remain OFF until P turns ON.
+        // Lease should be pending.
+        let lease = executor.run_singlethreaded(async {
+            child_lessor
+                .lease(BinaryPowerLevel::On.into_primitive())
+                .await
+                .unwrap()
+                .expect("Lease response not ok")
+                .into_proxy()
+        });
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                lease.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Pending
+            );
+        });
+
+        // Update P's current level to ON.
+        // P's required level should remain ON.
+        // C's required level should become ON.
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                handle_set_level(&mut parent_element_runner).await.unwrap(),
+                BinaryPowerLevel::On.into_primitive()
+            );
+            assert_eq!(
+                parent_status.watch_power_level().await.unwrap(),
+                Ok(BinaryPowerLevel::On.into_primitive())
+            );
+        });
+
+        // Update C's current level to ON.
+        // Lease should become satisfied.
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                handle_set_level(&mut child_element_runner).await.unwrap(),
+                BinaryPowerLevel::On.into_primitive()
+            );
+            assert_eq!(
+                child_status.watch_power_level().await.unwrap(),
+                Ok(BinaryPowerLevel::On.into_primitive())
+            );
+            assert_eq!(
+                lease.watch_status(LeaseStatus::Unknown).await.unwrap(),
+                LeaseStatus::Satisfied
+            );
+        });
+
+        // Drop lease.
+        // C's required level should become OFF.
+        executor.run_singlethreaded(async {
+            drop(lease);
+        });
+
+        // Update C's current level to OFF.
+        // P's required level should become OFF.
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                handle_set_level(&mut child_element_runner).await.unwrap(),
+                BinaryPowerLevel::Off.into_primitive()
+            );
+            assert_eq!(
+                child_status.watch_power_level().await.unwrap(),
+                Ok(BinaryPowerLevel::Off.into_primitive())
+            );
+        });
+
+        // Update P's current level to OFF.
+        executor.run_singlethreaded(async {
+            assert_eq!(
+                handle_set_level(&mut parent_element_runner).await.unwrap(),
+                BinaryPowerLevel::Off.into_primitive()
+            );
+            assert_eq!(
+                parent_status.watch_power_level().await.unwrap(),
+                Ok(BinaryPowerLevel::Off.into_primitive())
+            );
+        });
+
+        // Remove P's element. Status channel should be closed.
+        executor.run_singlethreaded(async {
+            drop(parent_element_control);
+            let status_after_remove = parent_status.watch_power_level().await;
+            assert_matches!(status_after_remove, Err(fidl::Error::ClientChannelClosed { .. }));
+        });
+        // Remove C's element. Status channel should be closed.
+        executor.run_singlethreaded(async {
+            drop(child_element_control);
+            let status_after_remove = child_status.watch_power_level().await;
+            assert_matches!(status_after_remove, Err(fidl::Error::ClientChannelClosed { .. }));
         });
 
         Ok(())
