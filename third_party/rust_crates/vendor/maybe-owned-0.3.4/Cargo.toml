@@ -3,7 +3,7 @@
 # When uploading crates to the registry Cargo will automatically
 # "normalize" Cargo.toml files for maximal compatibility
 # with all versions of Cargo and also rewrite `path` dependencies
-# to registry (e.g. crates.io) dependencies
+# to registry (e.g., crates.io) dependencies
 #
 # If you believe there's an error in this file please file an
 # issue against the rust-lang/cargo repository. If you're
@@ -12,9 +12,9 @@
 
 [package]
 name = "maybe-owned"
-version = "0.3.2"
-authors = ["Philipp korber <philippkorber@gmail.com>", "darkstalker <slayerbeast@gmail.com>", "daboross <daboross@daboross.net>"]
-description = "provides a `MaybeOwned<'a,T>` type different to std's `Cow` it implements `From<T>` and `From<&'a T>` and does not require `ToOwned`"
+version = "0.3.4"
+authors = ["Philipp korber <philippkorber@gmail.com>", "darkstalker <slayerbeast@gmail.com>", "daboross <daboross@daboross.net>", "Zac Burns (That3Percent) <that3percent@gmail.com>"]
+description = "provides a `MaybeOwned` (and `MaybeOwnedMut`) type similar to std's `Cow` but it implements `From<T>` and `From<&'a T>` and does not require `ToOwned`"
 readme = "./README.md"
 keywords = ["maybe", "owned", "Cow"]
 categories = []

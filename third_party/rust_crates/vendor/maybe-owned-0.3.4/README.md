@@ -1,5 +1,5 @@
 
-# maybe-owned &emsp; [![Build Status](https://travis-ci.org/rustonaut/maybe-owned.svg?branch=master)](https://travis-ci.org/rustonaut/maybe-owned)
+# maybe-owned [![Build Status](https://travis-ci.org/rustonaut/maybe-owned.svg?branch=master)](https://travis-ci.org/rustonaut/maybe-owned) [![Crates.io](https://img.shields.io/crates/v/maybe-owned.svg)](https://crates.io/crates/maybe-owned) [![maybe-owned](https://docs.rs/maybe-owned/badge.svg)](https://docs.rs/maybe-owned) [![maintenance](https://img.shields.io/badge/maintenance-passively--maintained-blue.svg)](https://img.shields.io/badge/maintenance-passively--maintained-blue.svg) [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT) [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 **provides a `MaybeOwned<'a,T>` type different to std's `Cow` it implements `From<T>` and `From<&'a T>` and does not require `ToOwned`**
 
@@ -64,8 +64,22 @@ additional terms or conditions.
 
 ## Change Log
 
-- `v0.3.1`:
-  - added `serde` support
+- `v0.3.4`:
+  - Added `make_owned()` as a `to_mut()` replacement,
+    but also available for `MaybeOwnedMut` and more
+    clear in it's functionality.
+  - Added a `as_mut()` method to `MaybeOwned` which
+    return a `Option<&mut T>`
+  - Added missing BorrowMut implementation
+    for `MaybeOwnedMut`
+
+
+- `v0.3.3`:
+  - added MaybeOwnedMut
 
 - `v0.3.2`:
   - added transitive `std::ops` implementations
+
+- `v0.3.1`:
+  - added `serde` support
+

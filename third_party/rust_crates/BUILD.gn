@@ -535,7 +535,7 @@ group("maplit") {
 }
 
 group("maybe-owned") {
-  public_deps = [ ":maybe-owned-v0_3_2" ]
+  public_deps = [ ":maybe-owned-v0_3_4" ]
 }
 
 group("md-5") {
@@ -8883,18 +8883,18 @@ rust_library("matches-v0_1_9") {
   applicable_licenses = [ ":matches-v0_1_9.license" ]
 }
 
-license("maybe-owned-v0_3_2.license") {
+license("maybe-owned-v0_3_4.license") {
   public_package_name = "maybe_owned"
   license_files = [
-    "//third_party/rust_crates/vendor/maybe-owned-0.3.2/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/maybe-owned-0.3.2/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/maybe-owned-0.3.4/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/maybe-owned-0.3.4/LICENSE-MIT",
   ]
 }
 
-rust_library("maybe-owned-v0_3_2") {
+rust_library("maybe-owned-v0_3_4") {
   crate_name = "maybe_owned"
-  crate_root = "//third_party/rust_crates/vendor/maybe-owned-0.3.2/src/lib.rs"
-  output_name = "maybe_owned-cd58fab7b411c920"
+  crate_root = "//third_party/rust_crates/vendor/maybe-owned-0.3.4/src/lib.rs"
+  output_name = "maybe_owned-6ddaf26ce763557f"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -8904,13 +8904,13 @@ rust_library("maybe-owned-v0_3_2") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2015",
-    "-Cmetadata=cd58fab7b411c920",
-    "-Cextra-filename=-cd58fab7b411c920",
+    "-Cmetadata=6ddaf26ce763557f",
+    "-Cextra-filename=-6ddaf26ce763557f",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":maybe-owned-v0_3_2.license" ]
+  applicable_licenses = [ ":maybe-owned-v0_3_4.license" ]
 }
 
 license("md-5-v0_10_5.license") {
