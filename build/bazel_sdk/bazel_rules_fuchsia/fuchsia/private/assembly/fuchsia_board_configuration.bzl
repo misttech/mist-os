@@ -53,10 +53,10 @@ def _fuchsia_board_configuration_impl(ctx):
         board_config["tee_trusted_app_guids"] = ctx.attr.tee_trusted_app_guids
 
     input_files = []
-    input_bundles = []
+    input_bundles = {}
     input_files.extend(ctx.files.board_input_bundles)
-    for bib in ctx.attr.board_input_bundles:
-        input_bundles.append(bib[FuchsiaBoardInputBundleInfo].directory)
+    for (index, bib) in enumerate(ctx.attr.board_input_bundles):
+        input_bundles[str(index)] = bib[FuchsiaBoardInputBundleInfo].directory
         build_id_dirs.extend(bib[FuchsiaBoardInputBundleInfo].build_id_dirs)
     board_config["input_bundles"] = input_bundles
 

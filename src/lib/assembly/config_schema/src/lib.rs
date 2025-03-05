@@ -15,9 +15,7 @@ pub mod platform_config;
 pub mod product_config;
 
 pub use assembly_config::AssemblyConfig;
-pub use board_config::{
-    BoardInformation, BoardInputBundle, BoardProvidedConfig, InputBundlesConfig,
-};
+pub use board_config::{BoardInformation, BoardInputBundle, BoardProvidedConfig};
 pub use common::{
     DriverDetails, FeatureControl, PackageDetails, PackageSet, PackagedDriverDetails,
 };

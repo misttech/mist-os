@@ -85,7 +85,7 @@ pub fn new(args: &BoardInputBundleArgs) -> Result<()> {
 
     // Create the BoardInputBundle.
     let bundle = BoardInputBundle {
-        name: Some(name.to_string()),
+        name: name.to_string(),
         drivers: collected_drivers,
         packages,
         kernel_boot_args: kernel_boot_args.clone().into_iter().collect(),
