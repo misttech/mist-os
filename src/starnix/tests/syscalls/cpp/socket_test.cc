@@ -2,14 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <arpa/inet.h>
 #include <fcntl.h>
 #include <net/ethernet.h>
+#include <net/if.h>
 #include <netinet/icmp6.h>
 #include <netinet/in.h>
 #include <netinet/ip_icmp.h>
 #include <poll.h>
 #include <string.h>
 #include <sys/epoll.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/uio.h>
@@ -28,6 +31,7 @@
 #include <linux/if_ether.h>
 #include <linux/if_packet.h>
 #include <linux/ipv6.h>
+#include <linux/rtnetlink.h>
 
 #include "fault_test.h"
 #include "linux/genetlink.h"
@@ -246,6 +250,95 @@ TEST_F(UnixSocketTest, ImmediatePeercredCheck) {
   ASSERT_NE(cred.pid, 0);
   ASSERT_NE(cred.uid, static_cast<uid_t>(-1));
   ASSERT_NE(cred.uid, static_cast<gid_t>(-1));
+}
+
+namespace {
+void SetLoopbackIfAddr(in_addr_t addr) {
+  constexpr char kLoopbackIfName[] = "lo";
+
+  fbl::unique_fd fd;
+  ASSERT_TRUE(fd = fbl::unique_fd(socket(AF_INET, SOCK_DGRAM, 0))) << strerror(errno);
+  ifreq ifr;
+  *(reinterpret_cast<sockaddr_in*>(&ifr.ifr_addr)) = sockaddr_in{
+      .sin_family = AF_INET,
+      .sin_addr = {.s_addr = addr},
+  };
+  strncpy(ifr.ifr_name, kLoopbackIfName, IFNAMSIZ);
+  ASSERT_EQ(ioctl(fd.get(), SIOCSIFADDR, &ifr), 0) << strerror(errno);
+}
+}  // namespace
+
+TEST(RouteNetlinkSocket, AddDropMulticastGroup) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping suite.";
+  }
+
+  fbl::unique_fd nlsock(socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE));
+  ASSERT_TRUE(nlsock) << strerror(errno);
+
+  struct sockaddr_nl addr = {};
+  addr.nl_family = AF_NETLINK;
+  struct sockaddr* sa = reinterpret_cast<struct sockaddr*>(&addr);
+  ASSERT_EQ(bind(nlsock.get(), sa, sizeof(addr)), 0) << strerror(errno);
+
+  int group = RTNLGRP_IPV4_IFADDR;
+  ASSERT_EQ(setsockopt(nlsock.get(), SOL_NETLINK, NETLINK_ADD_MEMBERSHIP, &group, sizeof(group)), 0)
+      << strerror(errno);
+
+  ASSERT_NO_FATAL_FAILURE(SetLoopbackIfAddr(inet_addr("127.0.0.2")));
+
+  sleep(1);
+
+  char buf[4096] = {};
+
+  // Should observe 2 messages (removing old address, adding new address)
+  // because we're in the corresponding multicast group.
+  ssize_t len = recv(nlsock.get(), buf, sizeof(buf), 0);
+  ASSERT_GT(len, 0) << strerror(errno);
+
+  nlmsghdr* nlmsg = reinterpret_cast<nlmsghdr*>(buf);
+
+  ASSERT_TRUE(NLMSG_OK(nlmsg, len));
+  ASSERT_EQ(nlmsg->nlmsg_type, RTM_DELADDR);
+  rtmsg* rtm = reinterpret_cast<rtmsg*>(NLMSG_DATA(nlmsg));
+  ASSERT_EQ(rtm->rtm_family, AF_INET);
+
+  nlmsg = NLMSG_NEXT(nlmsg, len);
+
+  if (NLMSG_OK(nlmsg, len)) {
+    // The next message is already in the buffer, so we don't need to do
+    // anything here.
+  } else {
+    // Need to receive again.
+    len = recv(nlsock.get(), buf, sizeof(buf), 0);
+    ASSERT_GT(len, 0) << strerror(errno);
+    nlmsg = reinterpret_cast<nlmsghdr*>(buf);
+    ASSERT_TRUE(NLMSG_OK(nlmsg, len));
+  }
+
+  // Assert that the content of the second message indicates the new loopback
+  // address being added.
+  ASSERT_EQ(nlmsg->nlmsg_type, RTM_NEWADDR);
+  rtm = reinterpret_cast<rtmsg*>(NLMSG_DATA(nlmsg));
+  ASSERT_EQ(rtm->rtm_family, AF_INET);
+
+  // Now we should have run out of messages.
+  nlmsg = NLMSG_NEXT(nlmsg, len);
+  ASSERT_FALSE(NLMSG_OK(nlmsg, len));
+
+  // Drop the multicast group membership so that we won't get notified about
+  // further address changes.
+  ASSERT_EQ(setsockopt(nlsock.get(), SOL_NETLINK, NETLINK_DROP_MEMBERSHIP, &group, sizeof(group)),
+            0)
+      << strerror(errno);
+
+  // Restore the usual loopback address.
+  ASSERT_NO_FATAL_FAILURE(SetLoopbackIfAddr(inet_addr("127.0.0.1")));
+
+  // Should not observe a message because we're not in any multicast group.
+  ASSERT_EQ(recv(nlsock.get(), buf, sizeof(buf), MSG_DONTWAIT), -1);
+  ASSERT_EQ(errno, EAGAIN);
 }
 
 TEST(NetlinkSocket, RecvMsg) {

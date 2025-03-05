@@ -9,8 +9,8 @@ use futures::channel::mpsc::{
 };
 use netlink::messaging::{Sender, SenderReceiverProvider};
 use netlink::multicast_groups::{
-    InvalidLegacyGroupsError, LegacyGroups, ModernGroup, NoMappingFromModernToLegacyGroupError,
-    SingleLegacyGroup,
+    InvalidLegacyGroupsError, InvalidModernGroupError, LegacyGroups, ModernGroup,
+    NoMappingFromModernToLegacyGroupError, SingleLegacyGroup,
 };
 use netlink::protocol_family::route::NetlinkRouteClient;
 use netlink::{NewClientError, NETLINK_LOG_TAG};
@@ -42,12 +42,12 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
     errno, error, nlmsghdr, sockaddr_nl, socklen_t, ucred, AF_NETLINK, NETLINK_ADD_MEMBERSHIP,
-    NETLINK_AUDIT, NETLINK_CONNECTOR, NETLINK_CRYPTO, NETLINK_DNRTMSG, NETLINK_ECRYPTFS,
-    NETLINK_FIB_LOOKUP, NETLINK_FIREWALL, NETLINK_GENERIC, NETLINK_IP6_FW, NETLINK_ISCSI,
-    NETLINK_KOBJECT_UEVENT, NETLINK_NETFILTER, NETLINK_NFLOG, NETLINK_RDMA, NETLINK_ROUTE,
-    NETLINK_SCSITRANSPORT, NETLINK_SELINUX, NETLINK_SMC, NETLINK_SOCK_DIAG, NETLINK_USERSOCK,
-    NETLINK_XFRM, NLMSG_DONE, NLM_F_MULTI, SOL_SOCKET, SO_PASSCRED, SO_PROTOCOL, SO_RCVBUF,
-    SO_RCVBUFFORCE, SO_SNDBUF, SO_SNDBUFFORCE, SO_TIMESTAMP,
+    NETLINK_AUDIT, NETLINK_CONNECTOR, NETLINK_CRYPTO, NETLINK_DNRTMSG, NETLINK_DROP_MEMBERSHIP,
+    NETLINK_ECRYPTFS, NETLINK_FIB_LOOKUP, NETLINK_FIREWALL, NETLINK_GENERIC, NETLINK_IP6_FW,
+    NETLINK_ISCSI, NETLINK_KOBJECT_UEVENT, NETLINK_NETFILTER, NETLINK_NFLOG, NETLINK_RDMA,
+    NETLINK_ROUTE, NETLINK_SCSITRANSPORT, NETLINK_SELINUX, NETLINK_SMC, NETLINK_SOCK_DIAG,
+    NETLINK_USERSOCK, NETLINK_XFRM, NLMSG_DONE, NLM_F_MULTI, SOL_SOCKET, SO_PASSCRED, SO_PROTOCOL,
+    SO_RCVBUF, SO_RCVBUFFORCE, SO_SNDBUF, SO_SNDBUFFORCE, SO_TIMESTAMP,
 };
 
 // From netlink/socket.go in gVisor.
@@ -1074,9 +1074,23 @@ impl SocketOps for RouteNetlinkSocket {
         optname: u32,
         user_opt: UserBuffer,
     ) -> Result<(), Errno> {
-        // TODO(https://issuetracker.google.com/283827094): Support add/del
-        // multicast group membership.
-        self.inner.lock().setsockopt(current_task, level, optname, user_opt)
+        match (level, optname) {
+            (SOL_NETLINK, NETLINK_ADD_MEMBERSHIP) => {
+                let RouteNetlinkSocket { inner: _, client, message_sender: _ } = self;
+                let group: u32 = current_task.read_object(user_opt.try_into()?)?;
+                client
+                    .add_membership(ModernGroup(group))
+                    .map_err(|InvalidModernGroupError| errno!(EINVAL))
+            }
+            (SOL_NETLINK, NETLINK_DROP_MEMBERSHIP) => {
+                let RouteNetlinkSocket { inner: _, client, message_sender: _ } = self;
+                let group: u32 = current_task.read_object(user_opt.try_into()?)?;
+                client
+                    .del_membership(ModernGroup(group))
+                    .map_err(|InvalidModernGroupError| errno!(EINVAL))
+            }
+            _ => self.inner.lock().setsockopt(current_task, level, optname, user_opt),
+        }
     }
 }
 
