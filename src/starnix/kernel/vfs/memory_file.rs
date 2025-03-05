@@ -2,16 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::fs::tmpfs::TmpFs;
 use crate::mm::memory::MemoryObject;
 use crate::mm::{ProtectionFlags, PAGE_SIZE, VMEX_RESOURCE};
+use crate::security;
 use crate::signals::{send_standard_signal, SignalInfo};
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
-    anon_fs, default_ioctl, fileops_impl_noop_sync, fs_node_impl_not_dir,
-    fs_node_impl_xattr_delegate, AppendLockGuard, DirEntry, FallocMode, FileHandle, FileObject,
-    FileOps, FsNode, FsNodeInfo, FsNodeOps, FsString, MemoryXattrStorage, MountInfo, NamespaceNode,
-    XattrStorage as _, MAX_LFS_FILESIZE,
+    default_ioctl, fileops_impl_noop_sync, fs_node_impl_not_dir, fs_node_impl_xattr_delegate,
+    AppendLockGuard, DirEntry, FallocMode, FileHandle, FileObject, FileOps, FileSystemHandle,
+    FsNode, FsNodeInfo, FsNodeLinkBehavior, FsNodeOps, FsString, MemoryXattrStorage, Mount,
+    MountInfo, NamespaceNode, WhatToMount, XattrStorage as _, MAX_LFS_FILESIZE,
 };
 use linux_uapi::{ASHMEM_GET_SIZE, ASHMEM_SET_SIZE};
 use starnix_logging::{impossible_error, track_stub};
@@ -430,29 +432,38 @@ pub fn new_memfd(
     seals: SealFlags,
     flags: OpenFlags,
 ) -> Result<FileHandle, Errno> {
-    let fs = anon_fs(current_task.kernel());
-    let node = fs.create_node(
-        current_task,
-        MemoryFileNode::new()?,
-        FsNodeInfo::new_factory(mode!(IFREG, 0o600), current_task.as_fscred()),
-    );
-    node.write_guard_state.lock().enable_sealing(seals);
+    struct MemFdTmpfs {
+        tmpfs: FileSystemHandle,
+        mount: Arc<Mount>,
+    }
 
-    let ops =
-        node.open(locked, current_task, &MountInfo::detached(), flags, AccessCheck::skip())?;
+    let fs = current_task.kernel().expando.get_or_init(|| {
+        let tmpfs = TmpFs::new_fs(current_task.kernel());
+        security::file_system_resolve_security(locked, &current_task, &tmpfs)
+            .expect("resolve fs security");
+        let mount = Mount::new(WhatToMount::Fs(tmpfs.clone()), Default::default());
+        MemFdTmpfs { tmpfs, mount }
+    });
+
+    let fs_node = fs.tmpfs.root().node.create_tmpfile(
+        locked,
+        current_task,
+        &MountInfo::detached(),
+        mode!(IFREG, 0o600),
+        current_task.as_fscred(),
+        FsNodeLinkBehavior::Disallowed,
+    )?;
+    fs_node.write_guard_state.lock().enable_sealing(seals);
 
     // memfd instances appear in /proc[pid]/fd as though they are O_TMPFILE files with names of
     // the form "memfd:[name]".
     let mut local_name = FsString::from("memfd:");
     local_name.append(&mut name);
+    let dir_entry = DirEntry::new_deleted(fs_node, Some(fs.tmpfs.root().clone()), local_name);
+    security::fs_node_init_with_dentry(locked, current_task, &dir_entry)?;
 
-    // TODO: The choice of `Mount` and parent `DirEntry` is not important here, but using ones
-    // only shared by memfd nodes here would make sense.
-    let root_mount = current_task.fs().root().mount.as_ref().unwrap().clone();
-    let dir_entry = DirEntry::new_deleted(node, Some(current_task.fs().root().entry), local_name);
-    let name = NamespaceNode::new(root_mount, dir_entry);
-
-    FileObject::new(current_task, ops, name, flags)
+    let name = NamespaceNode::new(fs.mount.clone(), dir_entry);
+    name.open(locked, current_task, flags, AccessCheck::skip())
 }
 
 /// Sets memory size to `min_size` rounded to whole pages. Returns the new size of the VMO in bytes.

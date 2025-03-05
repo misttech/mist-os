@@ -79,6 +79,13 @@ _COMPOSITE_POLICY_PATHS = [
     (
         [
             "base_policy.conf",
+            "new_file/memfd_transition.conf",
+        ],
+        "memfd_transition.pp",
+    ),
+    (
+        [
+            "base_policy.conf",
             "new_file/type_transition_policy.conf",
         ],
         "type_transition_policy.pp",

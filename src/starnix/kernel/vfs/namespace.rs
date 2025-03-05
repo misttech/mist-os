@@ -1472,7 +1472,12 @@ impl NamespaceNode {
                     current = parent.escape_mount();
                 } else {
                     // This node hasn't intersected with the custom root and has reached the namespace root.
-                    return PathWithReachability::Unreachable(path.build_absolute());
+                    let mut absolute_path = path.build_absolute();
+                    if self.entry.is_dead() {
+                        absolute_path.extend_from_slice(b" (deleted)");
+                    }
+
+                    return PathWithReachability::Unreachable(absolute_path);
                 }
             }
         } else {

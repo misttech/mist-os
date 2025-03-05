@@ -41,4 +41,20 @@ MATCHER_P(SyscallFailsWithErrno, expected_errno,
   }
 }
 
+MATCHER_P(FdIsLabeled, expected_label, std::string("fd is labeled with ") + expected_label) {
+  if (arg < 0) {
+    *result_listener << "invalid fd";
+    return false;
+  }
+  char label[256] = {};
+  ssize_t len = fgetxattr(arg, "security.selinux", label, sizeof(label));
+  if (len < 0) {
+    *result_listener << "fgetxattr failed with error: " << strerror(errno);
+    return false;
+  }
+  // TODO: https://fxbug.dev/395625171 - This ignores the final '\0' added by Linux.
+  return ExplainMatchResult(testing::Eq(expected_label),
+                            std::string(std::string(label, len).c_str()), result_listener);
+}
+
 #endif  // SRC_STARNIX_TESTS_SELINUX_USERSPACE_UTIL_H_

@@ -765,4 +765,31 @@ TEST_F(ProcSelfFdTest, OpenedAndUnlinkedFileFdName) {
   EXPECT_EQ(result, filename + " (deleted)");
 }
 
+// Validate naming of a file that is created, and opened, but then unlinked, and is also
+// unreachable.
+TEST_F(ProcSelfFdTest, DeletedAndUnreachable) {
+  if (!test_helper::HasCapability(CAP_SYS_CHROOT)) {
+    GTEST_SKIP() << "Not running with chroot capability, skipping";
+  }
+  std::string filename("/tmp/procfs_test_file:XXXXXX");
+  fbl::unique_fd fd(SAFE_SYSCALL(mkstemp(filename.data())));
+  ASSERT_TRUE(fd.is_valid()) << "mkstemp() failed:" << strerror(errno);
+  unlink(filename.c_str());
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    SAFE_SYSCALL(chroot("/proc/self"));
+
+    std::string path = fxl::StringPrintf("/fd/%d", fd.get());
+    std::string links_to(PATH_MAX, 0);
+    ssize_t result = SAFE_SYSCALL(readlink(path.c_str(), links_to.data(), links_to.capacity()));
+    if (result < 0) {
+      return;
+    }
+    links_to.resize(result);
+    EXPECT_EQ(links_to, filename + " (deleted)");
+  });
+  ASSERT_TRUE(helper.WaitForChildren());
+}
+
 }  // namespace

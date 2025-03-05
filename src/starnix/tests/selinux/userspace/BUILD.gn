@@ -98,11 +98,15 @@ source_set("userspace_test_main") {
 test_names = [
   "load_policy",
   "pipe",
+  "memfd",
 ]
 
 # Policies made available to the tests.
 resource("policies") {
-  sources = [ "//src/starnix/lib/selinux/testdata/composite_policies/compiled/minimal_policy.pp" ]
+  sources = [
+    "//src/starnix/lib/selinux/testdata/composite_policies/compiled/memfd_transition.pp",
+    "//src/starnix/lib/selinux/testdata/composite_policies/compiled/minimal_policy.pp",
+  ]
   outputs = "data/policies/{{source_file_part}}"
 }
 
