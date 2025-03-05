@@ -1,4 +1,4 @@
-# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -6,25 +6,18 @@ import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
 rustc_binary("bin") {
-  name = "topology_test_daemon"
+  name = "system_activity_governor_controller"
   edition = "2018"
   with_unit_tests = true
-  testonly = true
 
   deps = [
-    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
-    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
-    "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
+    "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
     "//sdk/fidl/fuchsia.power.topology.test:fuchsia.power.topology.test_rust",
-    "//sdk/rust/zx",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
-    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
-    "//src/power/broker/client",
-    "//src/power/topology-test-daemon/power-element-runner/fidl:test.powerelementrunner_rust",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:log",
@@ -32,27 +25,22 @@ rustc_binary("bin") {
 
   sources = [
     "src/main.rs",
-    "src/topology_test_daemon.rs",
+    "src/system_activity_governor_controller.rs",
   ]
 }
 
 fuchsia_component_manifest("manifest") {
-  manifest = "meta/topology-test-daemon.cml"
-  component_name = "topology-test-daemon"
+  manifest = "meta/system-activity-governor-controller.cml"
+  component_name = "system-activity-governor-controller"
 }
 
 fuchsia_component("component") {
-  testonly = true
   cm_label = ":manifest"
-  deps = [
-    ":bin",
-    "//src/power/topology-test-daemon/power-element-runner:component",
-  ]
+  deps = [ ":bin" ]
 }
 
 fuchsia_package("package") {
-  testonly = true
-  package_name = "topology-test-daemon"
+  package_name = "system-activity-governor-controller"
   deps = [ ":component" ]
 }
 

@@ -19,18 +19,12 @@
     ],
     capabilities: [
         {
-            protocol: [
-                "fuchsia.power.topology.test.SystemActivityControl",
-                "fuchsia.power.topology.test.TopologyControl",
-            ],
+            protocol: [ "fuchsia.power.topology.test.TopologyControl" ],
         },
     ],
     use: [
         {
-            protocol: [
-                "fuchsia.power.broker.Topology",
-                "fuchsia.power.system.ActivityGovernor",
-            ],
+            protocol: [ "fuchsia.power.broker.Topology" ],
             availability: "optional",
         },
         {
@@ -47,10 +41,7 @@
     ],
     expose: [
         {
-            protocol: [
-                "fuchsia.power.topology.test.SystemActivityControl",
-                "fuchsia.power.topology.test.TopologyControl",
-            ],
+            protocol: [ "fuchsia.power.topology.test.TopologyControl" ],
             from: "self",
         },
     ],

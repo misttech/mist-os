@@ -105,7 +105,6 @@ bootstrap_userdebug_platform_aib_names = [
   # Power Framework
   "power_framework_broker",
   "power_framework_sag",
-  "topology_test_daemon",
 
   # Trusted application support.
   "trusted_execution_environment",
@@ -411,6 +410,9 @@ eng_only_platform_aib_names =
       # Gives timekeeper some mutable persistent storage.
       "timekeeper_persistence",
 
+      # Topology test support
+      "topology_test_daemon",
+
       # Driver development support
       "full_drivers",
 
@@ -463,7 +465,6 @@ experimental_aib_names = [
   "power_framework_broker",
   "power_framework_sag",
   "power_framework_development_support",
-  "topology_test_daemon",
 
   # Wake alarms support: generic and then hardware-specific.
   "timekeeper_wake_alarms",

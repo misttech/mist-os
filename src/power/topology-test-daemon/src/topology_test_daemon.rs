@@ -18,15 +18,13 @@ use std::rc::Rc;
 use zx::{HandleBased, Rights};
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_system as fsystem,
-    fidl_fuchsia_power_topology_test as fpt, fuchsia_async as fasync,
+    fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_topology_test as fpt,
+    fuchsia_async as fasync,
 };
 
-const APPLICATION_ACTIVITY_CONTROLLER: &'static str = "application_activity_controller";
 const ELEMENTS_COLLECTION: &'static str = "elements";
 
 enum IncomingRequest {
-    SystemActivityControl(fpt::SystemActivityControlRequestStream),
     TopologyControl(fpt::TopologyControlRequestStream),
 }
 
@@ -165,8 +163,6 @@ impl PowerTopology {
 /// TopologyTestDaemon runs the server for test.power.topology FIDL APIs.
 pub struct TopologyTestDaemon {
     topology_proxy: fbroker::TopologyProxy,
-    // Holds elements and their leases for test.power.topology.SystemActivityControl.
-    system_activity_topology: PowerTopology,
     // Holds elements and their leases for test.power.topology.TopologyControl.
     internal_topology: PowerTopology,
 }
@@ -174,20 +170,16 @@ pub struct TopologyTestDaemon {
 impl TopologyTestDaemon {
     pub async fn new() -> Result<Rc<Self>> {
         let topology_proxy = connect_to_protocol::<fbroker::TopologyMarker>()?;
-        let system_activity_topology = PowerTopology { elements: RefCell::new(HashMap::new()) };
         let internal_topology = PowerTopology { elements: RefCell::new(HashMap::new()) };
 
-        Ok(Rc::new(Self { topology_proxy, system_activity_topology, internal_topology }))
+        Ok(Rc::new(Self { topology_proxy, internal_topology }))
     }
 
     pub async fn run(self: Rc<Self>) -> Result<()> {
         info!("Starting FIDL server");
         let mut service_fs = ServiceFs::new_local();
 
-        service_fs
-            .dir("svc")
-            .add_fidl_service(IncomingRequest::SystemActivityControl)
-            .add_fidl_service(IncomingRequest::TopologyControl);
+        service_fs.dir("svc").add_fidl_service(IncomingRequest::TopologyControl);
         service_fs
             .take_and_serve_directory_handle()
             .context("failed to serve outgoing namespace")?;
@@ -197,9 +189,6 @@ impl TopologyTestDaemon {
                 let ttd = self.clone();
                 async move {
                     match request {
-                        IncomingRequest::SystemActivityControl(stream) => {
-                            fasync::Task::local(ttd.handle_system_activity_request(stream)).detach()
-                        }
                         IncomingRequest::TopologyControl(stream) => {
                             fasync::Task::local(ttd.handle_topology_control_request(stream))
                                 .detach()
@@ -270,36 +259,6 @@ impl TopologyTestDaemon {
                 }
                 Err(error) => {
                     error!(error:?; "Error handling TopologyControl request stream");
-                }
-            }
-        }
-    }
-
-    async fn handle_system_activity_request(
-        self: Rc<Self>,
-        mut stream: fpt::SystemActivityControlRequestStream,
-    ) {
-        while let Some(request) = stream.next().await {
-            match request {
-                Ok(fpt::SystemActivityControlRequest::StartApplicationActivity { responder }) => {
-                    let result = responder.send(self.clone().start_application_activity().await);
-
-                    if let Err(error) = result {
-                        warn!(error:?; "Error while responding to StartApplicationActivity request");
-                    }
-                }
-                Ok(fpt::SystemActivityControlRequest::StopApplicationActivity { responder }) => {
-                    let result = responder.send(self.clone().stop_application_activity().await);
-
-                    if let Err(error) = result {
-                        warn!(error:?; "Error while responding to StopApplicationActivity request");
-                    }
-                }
-                Ok(fpt::SystemActivityControlRequest::_UnknownMethod { ordinal, .. }) => {
-                    warn!(ordinal:?; "Unknown ActivityGovernorRequest method");
-                }
-                Err(error) => {
-                    error!(error:?; "Error handling SystemActivityControl request stream");
                 }
             }
         }
@@ -448,97 +407,6 @@ impl TopologyTestDaemon {
             warn!(err:%, element_name:%; "Failed to open_status_channel");
             fpt::OpenStatusChannelError::Internal
         })?;
-
-        Ok(())
-    }
-
-    async fn start_application_activity(
-        self: Rc<Self>,
-    ) -> fpt::SystemActivityControlStartApplicationActivityResult {
-        if !self
-            .system_activity_topology
-            .elements
-            .borrow()
-            .contains_key(APPLICATION_ACTIVITY_CONTROLLER)
-        {
-            let sag = connect_to_protocol::<fsystem::ActivityGovernorMarker>().map_err(|err| {
-                error!(err:%; "Failed to connect to fuchsia.power.system");
-                fpt::SystemActivityControlError::Internal
-            })?;
-            let sag_power_elements = sag.get_power_elements().await.map_err(|err| {
-                error!(err:%; "Failed to get power elements from SAG");
-                fpt::SystemActivityControlError::Internal
-            })?;
-            let aa_token = sag_power_elements
-                .application_activity
-                .ok_or_else(|| {
-                    error!("Failed to get application_activity power element");
-                    fpt::SystemActivityControlError::Internal
-                })?
-                .assertive_dependency_token
-                .ok_or_else(|| {
-                    error!("Failed to get assertive_dependency_token of application_activity");
-                    fpt::SystemActivityControlError::Internal
-                })?;
-
-            let realm = connect_to_protocol::<fcomponent::RealmMarker>().map_err(|err| {
-                error!(err:%; "Failed to connect to fuchsia.component.Realm");
-                fpt::SystemActivityControlError::Internal
-            })?;
-
-            let aa_controller = PowerElement::new(
-                &realm,
-                &self.topology_proxy,
-                APPLICATION_ACTIVITY_CONTROLLER,
-                &[0, 1],
-                0,
-                vec![fbroker::LevelDependency {
-                    dependency_type: fbroker::DependencyType::Assertive,
-                    dependent_level: 1,
-                    requires_token: aa_token,
-                    requires_level_by_preference: vec![1],
-                }],
-            )
-            .await
-            .map_err(|err| {
-                error!(err:%; "Failed to create application activity controller");
-                fpt::SystemActivityControlError::Internal
-            })?;
-
-            self.system_activity_topology
-                .elements
-                .borrow_mut()
-                .insert(APPLICATION_ACTIVITY_CONTROLLER.to_string(), aa_controller);
-
-            self.system_activity_topology.run_power_elements().await.map_err(|err| {
-                error!(err:%; "Failed to run power elements on separate components");
-                fpt::SystemActivityControlError::Internal
-            })?;
-        }
-        let elements = self.system_activity_topology.elements.borrow_mut();
-        let aa_controller_element = elements.get(APPLICATION_ACTIVITY_CONTROLLER).unwrap();
-        if aa_controller_element.lease.borrow().is_none() {
-            let _ =
-                aa_controller_element
-                    .lease
-                    .borrow_mut()
-                    .insert(lease(&aa_controller_element.lessor, 1).await.map_err(|err| {
-                    error!(err:%; "Failed to require a lease for application activity controller");
-                    fpt::SystemActivityControlError::Internal
-                })?);
-        }
-
-        Ok(())
-    }
-
-    async fn stop_application_activity(
-        self: Rc<Self>,
-    ) -> fpt::SystemActivityControlStartApplicationActivityResult {
-        self.system_activity_topology
-            .elements
-            .borrow_mut()
-            .get(APPLICATION_ACTIVITY_CONTROLLER)
-            .and_then(|a| a.lease.borrow_mut().take());
 
         Ok(())
     }

@@ -16,7 +16,7 @@ use {
 pub struct ApplicationActivityTool {
     #[command]
     cmd: args_mod::Command,
-    #[with(moniker("/core/topology-test-daemon"))]
+    #[with(moniker("/core/system-activity-governor-controller"))]
     system_activity_control: fpt::SystemActivityControlProxy,
 }
 

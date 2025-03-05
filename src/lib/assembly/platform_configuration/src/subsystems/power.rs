@@ -113,17 +113,20 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
                 ),
             )?;
 
+            if context.build_type == &BuildType::Eng {
+                builder.platform_bundle("topology_test_daemon");
+            }
+
             match context.feature_set_level {
                 FeatureSupportLevel::Embeddable | FeatureSupportLevel::Bootstrap => {}
                 FeatureSupportLevel::Utility | FeatureSupportLevel::Standard => {
                     // Include only when the base package set is available as
                     // these require the core realm, and base package functionality.
-                    builder.platform_bundle("topology_test_daemon");
                     builder.platform_bundle("power_framework_development_support");
                 }
             }
 
-            // These are mutually exclusive as power_framework_sag has a bootrstrap shard that
+            // These are mutually exclusive as power_framework_sag has a bootstrap shard that
             // conflicts with the testing_sag variant.
             if config.testing_sag_enabled {
                 builder.platform_bundle("power_framework_testing_sag");

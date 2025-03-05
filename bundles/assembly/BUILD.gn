@@ -4219,6 +4219,7 @@ assembly_input_bundle("battery_manager") {
 # build-types: eng
 #
 assembly_input_bundle("topology_test_daemon") {
+  testonly = true
   base_packages = [ "//src/power/topology-test-daemon:package" ]
   compiled_packages = [
     {
@@ -4435,16 +4436,31 @@ assembly_input_bundle(
   ]
 }
 
-# Power framework cli tools
+# Power framework cli tools and ffx power support components
 #
 # feature_set_levels: utility
 # build-types: eng, userdebug
 #
 assembly_input_bundle("power_framework_development_support") {
-  base_packages = [ "//src/devices/hrtimer/bin:hrtimer-ctl" ]
+  base_packages = [
+    "//src/devices/hrtimer/bin:hrtimer-ctl",
+    "//src/power/system-activity-governor-controller:package",
+  ]
 
   # When the power framework becomes available on user builds by default,
-  # this tool should be moved to core_realm_development_access
+  # these tools should be moved to core_realm_development_access
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/power/system-activity-governor-controller/meta/system-activity-governor-controller.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
+
   shell_commands = [
     {
       package = "hrtimer-ctl"

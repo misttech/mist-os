@@ -1,4 +1,4 @@
-# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -7,35 +7,42 @@ import("//build/fidl/fidl.gni")
 import("//build/rust/rustc_binary.gni")
 
 rustc_test("bin") {
-  name = "topology_test_daemon_integration_test"
+  name = "system_activity_governor_controller_integration_test"
   testonly = true
   edition = "2021"
   deps = [
-    "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
+    "//sdk/fidl/fuchsia.power.observability:fuchsia.power.observability_rust",
+    "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
     "//sdk/fidl/fuchsia.power.topology.test:fuchsia.power.topology.test_rust",
+    "//sdk/rust/zx",
     "//src/lib/diagnostics/reader/rust",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component-test",
     "//src/power/broker:component",
-    "//src/power/topology-test-daemon:component",
+    "//src/power/system-activity-governor:component",
+    "//src/power/system-activity-governor-controller:component",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:log",
+    "//third_party/rust_crates:serde_json",
   ]
 
   sources = [ "src/lib.rs" ]
 }
 
-fuchsia_unittest_package("topology-test-daemon-integration-test") {
+fuchsia_unittest_package(
+    "system-activity-governor-controller-integration-test") {
   manifest = "meta/test.cml"
   deps = [ ":bin" ]
   test_specs = {
     environments = basic_envs
   }
+  subpackages = [ "//src/power/system-activity-governor:config-no-suspender" ]
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":topology-test-daemon-integration-test" ]
+  deps = [ ":system-activity-governor-controller-integration-test" ]
 }
