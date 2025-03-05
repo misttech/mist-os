@@ -10,7 +10,7 @@ use extended_pstate::ExtendedPstateState;
 use starnix_logging::log_debug;
 use starnix_types::arch::ArchWidth;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::math::round_up_to_increment;
+use starnix_uapi::math::round_down_to_increment;
 use starnix_uapi::signals::SigSet;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
@@ -212,7 +212,7 @@ pub fn restore_registers(
 }
 
 pub fn align_stack_pointer(pointer: u64) -> u64 {
-    round_up_to_increment(pointer, 16).expect("Failed to round up stack pointer")
+    round_down_to_increment(pointer, 16).expect("Failed to round up stack pointer")
 }
 
 // Generates `__riscv_fp_state` struct from ExtendedPstateState.

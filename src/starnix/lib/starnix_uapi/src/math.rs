@@ -20,3 +20,15 @@ where
     };
     N::try_from(result).map_err(|_| errno!(EINVAL))
 }
+
+pub fn round_down_to_increment<N, M>(size: N, increment: M) -> Result<N, Errno>
+where
+    N: TryInto<usize>,
+    N: TryFrom<usize>,
+    M: TryInto<usize>,
+{
+    let size: usize = size.try_into().map_err(|_| errno!(EINVAL))?;
+    let increment: usize = increment.try_into().map_err(|_| errno!(EINVAL))?;
+    let result = size - (size % increment);
+    N::try_from(result).map_err(|_| errno!(EINVAL))
+}

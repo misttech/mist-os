@@ -9,7 +9,7 @@ use extended_pstate::ExtendedPstateState;
 use starnix_logging::{log_debug, track_stub};
 use starnix_types::arch::ArchWidth;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::math::round_up_to_increment;
+use starnix_uapi::math::round_down_to_increment;
 use starnix_uapi::signals::{SigSet, SIGBUS, SIGSEGV};
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
@@ -235,7 +235,9 @@ fn restore_registers_64(
 }
 
 pub fn align_stack_pointer(pointer: u64) -> u64 {
-    round_up_to_increment(pointer, 16).expect("Failed to round up stack pointer")
+    // When the stack grows down, alignment must be to the next lowest value.
+    // arm64/starnix does not support upward growth.
+    round_down_to_increment(pointer, 16).expect("Failed to round up stack pointer")
 }
 
 // Size of `sigcontext::__reserved`.
