@@ -57,7 +57,8 @@ class MockThread : public Thread, public Stack::Delegate {
 
  private:
   // Stack::Delegate implementation.
-  void SyncFramesForStack(fit::callback<void(const Err&)> callback) override {
+  void SyncFramesForStack(const Stack::SyncFrameOptions& options,
+                          fit::callback<void(const Err&)> callback) override {
     FX_NOTREACHED();  // All frames are available.
   }
   std::unique_ptr<Frame> MakeFrameForStack(const debug_ipc::StackFrame& input,

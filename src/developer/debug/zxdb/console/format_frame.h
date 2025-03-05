@@ -46,6 +46,8 @@ struct FormatStackOptions {
 
   FormatFrameOptions frame;
 
+  struct Stack::SyncFrameOptions sync_options;
+
   // If non-null, will be used to shorten the frame list.
   fxl::RefPtr<PrettyStackManager> pretty_stack;
 };
@@ -55,10 +57,7 @@ struct FormatStackOptions {
 //
 // This will request the full frame list from the agent if it has not been synced locally.
 //
-// If force_update is set, the full frame list will be re-requested (even if a full stack is already
-// available locally).
-fxl::RefPtr<AsyncOutputBuffer> FormatStack(Thread* thread, bool force_update,
-                                           const FormatStackOptions& opts);
+fxl::RefPtr<AsyncOutputBuffer> FormatStack(Thread* thread, const FormatStackOptions& opts);
 
 // Formats one frame using the long format. Since the long format includes function parameters which
 // are computed asynchronously, this returns an AsyncOutputBuffer.
@@ -68,7 +67,6 @@ fxl::RefPtr<AsyncOutputBuffer> FormatFrame(const Frame* frame, const FormatFrame
                                            int id = -1);
 
 fxl::RefPtr<AsyncOutputBuffer> FormatAllThreadStacks(const std::vector<Thread*>& threads,
-                                                     bool force_update,
                                                      const FormatStackOptions& opts,
                                                      fxl::RefPtr<CommandContext>& cmd_context);
 

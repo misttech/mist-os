@@ -196,10 +196,10 @@ void Stack::SetHideAmbiguousInlineFrameCount(size_t hide_count) {
   hide_ambiguous_inline_frame_count_ = hide_count;
 }
 
-void Stack::SyncFrames(bool force, fit::callback<void(const Err&)> callback) {
-  if (force)
+void Stack::SyncFrames(const SyncFrameOptions& options, fit::callback<void(const Err&)> callback) {
+  if (options.force_update)
     force_update_in_progress_ = true;
-  delegate_->SyncFramesForStack(std::move(callback));
+  delegate_->SyncFramesForStack(options, std::move(callback));
 }
 
 void Stack::SetFrames(debug_ipc::ThreadRecord::StackAmount amount,

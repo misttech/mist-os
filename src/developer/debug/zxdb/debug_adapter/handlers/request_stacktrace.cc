@@ -62,8 +62,8 @@ void OnRequestStackTrace(
       callback(PopulateStackTraceResponse(ctx, thread, req));
     } else {
       thread->GetStack().SyncFrames(
-          false, [ctx, weak_thread = thread->GetWeakPtr(), request = dap::StackTraceRequest(req),
-                  callback](const Err& err) {
+          {}, [ctx, weak_thread = thread->GetWeakPtr(), request = dap::StackTraceRequest(req),
+               callback](const Err& err) {
             if (!err.has_error() && weak_thread) {
               callback(PopulateStackTraceResponse(ctx, weak_thread.get(), request));
             } else {

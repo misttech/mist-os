@@ -813,8 +813,8 @@ void RunVerbAsyncBacktrace(const Command& cmd, fxl::RefPtr<CommandContext> cmd_c
     OnStackReady(cmd.thread()->GetStack(), std::move(cmd_context), options);
   } else {
     cmd.thread()->GetStack().SyncFrames(
-        false, [thread = cmd.thread(), cmd_context = std::move(cmd_context),
-                options](const Err& err) mutable {
+        {}, [thread = cmd.thread(), cmd_context = std::move(cmd_context),
+             options](const Err& err) mutable {
           if (err.has_error()) {
             cmd_context->ReportError(err);
           } else {

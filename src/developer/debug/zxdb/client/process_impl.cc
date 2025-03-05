@@ -357,7 +357,7 @@ void ProcessImpl::DidLoadModuleSymbols(LoadedModuleSymbols* module) {
   // Force any stopped threads to update their cached stack with the new symbol information.
   for (const auto& [koid, thread] : threads_) {
     if (thread->CurrentStopSupportsFrames())
-      thread->GetStack().SyncFrames(true, [](const Err&) {});
+      thread->GetStack().SyncFrames({.force_update = true}, [](const Err&) {});
   }
 
   for (auto& observer : session()->process_observers())

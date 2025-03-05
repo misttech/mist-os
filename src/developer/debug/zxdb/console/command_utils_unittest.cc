@@ -346,7 +346,7 @@ TEST(CommandUtils, FormatAllThreadStacks) {
   auto opts = FormatStackOptions::GetFrameOptions(&target, false, false, 4);
   opts.pretty_stack = console.context().pretty_stack_manager();
 
-  auto out = FormatAllThreadStacks(cmd.all_threads(), false, opts, cmd_context);
+  auto out = FormatAllThreadStacks(cmd.all_threads(), opts, cmd_context);
 
   // The threads have their entire stack and we are not forcing an update, so this should be
   // synchronous.

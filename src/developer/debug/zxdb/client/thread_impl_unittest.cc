@@ -135,8 +135,7 @@ TEST_F(ThreadImplTest, Frames) {
   mock_remote_api()->set_thread_status_reply(expected_reply);
 
   // Asynchronously request the frames.
-  thread->GetStack().SyncFrames(false,
-                                [](const Err&) { debug::MessageLoop::Current()->QuitNow(); });
+  thread->GetStack().SyncFrames({}, [](const Err&) { debug::MessageLoop::Current()->QuitNow(); });
   loop().Run();
 
   // The thread should have the new stack we provided.

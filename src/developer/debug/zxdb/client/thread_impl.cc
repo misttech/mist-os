@@ -228,7 +228,7 @@ void ThreadImpl::JumpTo(uint64_t new_address, fit::callback<void(const Err&)> cb
           cb(Err("Thread destroyed."));
         } else {
           // Success, update the current stack before issuing the callback.
-          thread->SyncFramesForStack(std::move(cb));
+          thread->SyncFramesForStack({}, std::move(cb));
         }
       });
 }
@@ -465,7 +465,8 @@ void ThreadImpl::ResolveConditionalBreakpoint(const std::string& cond, Breakpoin
   });
 }
 
-void ThreadImpl::SyncFramesForStack(fit::callback<void(const Err&)> callback) {
+void ThreadImpl::SyncFramesForStack(const Stack::SyncFrameOptions& options,
+                                    fit::callback<void(const Err&)> callback) {
   debug_ipc::ThreadStatusRequest request;
   request.id = {.process = process_->GetKoid(), .thread = koid_};
 
