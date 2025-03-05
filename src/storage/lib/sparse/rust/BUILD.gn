@@ -4,6 +4,19 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
+import("//build/testing/host_test_data.gni")
+
+if (is_linux) {
+  host_test_data("simg2img_sources") {
+    sources = [
+      "//prebuilt/third_party/libsparse/bin/simg2img",
+      "//prebuilt/third_party/libsparse/lib64/libc++.so",
+    ]
+    deps = []
+    outputs =
+        [ "${root_out_dir}/test_data/storage/sparse/{{source_file_part}}" ]
+  }
+}
 
 rustc_library("lib") {
   name = "sparse"
@@ -21,6 +34,9 @@ rustc_library("lib") {
   ]
 
   test_deps = [ "//third_party/rust_crates:rand" ]
+  if (is_linux) {
+    test_deps += [ ":simg2img_sources" ]
+  }
 
   sources = [
     "src/builder.rs",
@@ -38,7 +54,7 @@ fuchsia_unittest_package("sparse-test") {
 group("tests") {
   testonly = true
   deps = [
-    ":sparse-test",
+    ":lib_test($host_toolchain)",
     ":sparse-test($host_toolchain)",
   ]
 }

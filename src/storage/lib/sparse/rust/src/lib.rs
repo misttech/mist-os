@@ -566,11 +566,18 @@ pub fn build_sparse_files(
 
 #[cfg(test)]
 mod test {
+    #[cfg(target_os = "linux")]
+    use crate::build_sparse_files;
+
     use super::builder::{DataSource, SparseImageBuilder};
     use super::{add_sparse_chunk, resparse, unsparse, Chunk, SparseFileWriter, BLK_SIZE};
     use rand::rngs::SmallRng;
     use rand::{RngCore, SeedableRng};
     use std::io::{Cursor, Read as _, Seek as _, SeekFrom, Write as _};
+    #[cfg(target_os = "linux")]
+    use std::path::Path;
+    #[cfg(target_os = "linux")]
+    use std::process::{Command, Stdio};
     use tempfile::{NamedTempFile, TempDir};
 
     #[test]
@@ -862,5 +869,79 @@ mod test {
         assert_eq!(&unsparsed_bytes[8192..8192 + content_size], &buf[..]);
         assert_eq!(&unsparsed_bytes[8192 + content_size..12288 + content_size], &[0xaau8; 4096]);
         assert_eq!(&unsparsed_bytes[12288 + content_size..], &[0u8; 16384]);
+    }
+
+    #[test]
+    /// test_with_simg2img is a "round trip" test that does the following
+    ///
+    /// 1. Generates a pseudorandom temporary file
+    /// 2. Builds sparse files out of it
+    /// 3. Uses the android tool simg2img to take the sparse files and generate
+    ///    the "original" image file out of them.
+    /// 4. Asserts the originally created file and the one created by simg2img
+    ///    have binary equivalent contents.
+    ///
+    /// This gives us a reasonable expectation of correctness given that the
+    /// Android-provided sparse tools are able to interpret our sparse images.
+    #[cfg(target_os = "linux")]
+    fn test_with_simg2img() {
+        let simg2img_path = Path::new("./host_x64/test_data/storage/sparse/simg2img");
+        assert!(
+            Path::exists(simg2img_path),
+            "simg2img binary must exist at {}",
+            simg2img_path.display()
+        );
+
+        let tmpdir = TempDir::new().unwrap();
+
+        // Generate a large temporary file
+        let (mut file, temp_path) = NamedTempFile::new_in(&tmpdir).unwrap().into_parts();
+        let mut rng = SmallRng::from_entropy();
+        let mut buf = Vec::<u8>::new();
+        buf.resize(50 * 4096, 0);
+        rng.fill_bytes(&mut buf);
+        file.write_all(&buf).unwrap();
+        file.flush().unwrap();
+        file.seek(SeekFrom::Start(0)).unwrap();
+
+        // build a sparse file
+        let files = build_sparse_files(
+            "test",
+            temp_path.to_path_buf().to_str().expect("Should succeed"),
+            tmpdir.path(),
+            4096 * 2,
+        )
+        .unwrap();
+
+        let mut simg2img_output = tmpdir.path().to_path_buf();
+        simg2img_output.push("output");
+
+        let mut simg2img = Command::new(simg2img_path)
+            .args(&files[..])
+            .arg(&simg2img_output)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("Failed to spawn simg2img");
+        let res = simg2img.wait().expect("simg2img did was not running");
+        assert!(res.success(), "simg2img did not succeed");
+        let mut simg2img_stdout = simg2img.stdout.take().expect("Get stdout from simg2img");
+        let mut simg2img_stderr = simg2img.stderr.take().expect("Get stderr from simg2img");
+
+        let mut stdout = String::new();
+        simg2img_stdout.read_to_string(&mut stdout).expect("Reading simg2img stdout");
+        assert_eq!(stdout, "");
+
+        let mut stderr = String::new();
+        simg2img_stderr.read_to_string(&mut stderr).expect("Reading simg2img stderr");
+        assert_eq!(stderr, "");
+
+        let simg2img_output_bytes =
+            std::fs::read(simg2img_output).expect("Failed to read simg2img output");
+
+        assert_eq!(
+            buf, simg2img_output_bytes,
+            "Output from simg2img should match our generated file"
+        );
     }
 }
