@@ -12,6 +12,7 @@ static_library("common") {
     "address_range.h",
     "address_ranges.h",
     "cache_dir.h",
+    "checked_math.h",
     "curl.h",
     "data_extractor.h",
     "err.h",
@@ -52,6 +53,7 @@ static_library("common") {
     "//src/developer/debug/shared",
     "//src/lib/containers/cpp",
     "//src/lib/fxl",
+    "//src/lib/unwinder",
     "//third_party/curl:libcurl",
   ]
 }
@@ -72,6 +74,7 @@ source_set("tests") {
     "adapters_unittest.cc",
     "address_ranges_unittest.cc",
     "cache_dir_unittest.cc",
+    "checked_math_unittest.cc",
     "curl_unittest.cc",
     "data_extractor_unittest.cc",
     "err_or_unittest.cc",

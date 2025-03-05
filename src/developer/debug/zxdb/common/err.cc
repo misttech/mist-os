@@ -9,6 +9,7 @@
 
 #include "src/developer/debug/shared/status.h"
 #include "src/lib/fxl/strings/string_printf.h"
+#include "src/lib/unwinder/error.h"
 
 namespace zxdb {
 
@@ -102,4 +103,11 @@ std::string ErrTypeToString(ErrType type) {
   }
 }
 
+unwinder::Error ErrToUnwinderError(const Err& err) {
+  if (err.ok()) {
+    return unwinder::Success();
+  }
+
+  return unwinder::Error(err.msg());
+}
 }  // namespace zxdb

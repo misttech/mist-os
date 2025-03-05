@@ -11,6 +11,10 @@ namespace debug {
 class Status;
 }
 
+namespace unwinder {
+class Error;
+}
+
 namespace zxdb {
 
 // Most errors are general but in some cases we need to programmatically know a particular error.
@@ -69,6 +73,8 @@ class Err {
 };
 
 std::string ErrTypeToString(ErrType type);
+
+unwinder::Error ErrToUnwinderError(const Err& err);
 
 }  // namespace zxdb
 
