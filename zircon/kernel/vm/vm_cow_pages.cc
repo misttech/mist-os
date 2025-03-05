@@ -2584,7 +2584,6 @@ zx_status_t VmCowPages::LookupCursor::ReadRequest(uint max_request_pages,
   // the parent VmObjectPaged has gone away, so paged_ref_ could be null. Let the page source
   // handle any failures requesting the pages.
   if (owner()->paged_ref_) {
-    AssertHeld(owner()->paged_ref_->lock_ref());
     vmo_debug_info.vmo_id = owner()->paged_ref_->user_id();
     owner()->paged_ref_->get_name(vmo_debug_info.vmo_name, sizeof(vmo_debug_info.vmo_name));
   }
