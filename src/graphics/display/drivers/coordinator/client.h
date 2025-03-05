@@ -226,9 +226,6 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
                        SetDisplayPowerCompleter::Sync& _completer) override;
 
  private:
-  // Called by FIDL entrypoints such as `ApplyConfig()` and `ApplyConfig3()`.
-  void ApplyConfigFromFidl(display::ConfigStamp new_config_stamp);
-
   // Cleans up states of all current Images.
   // Returns true if any current layer has been modified.
   bool CleanUpAllImages();

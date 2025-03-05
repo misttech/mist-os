@@ -728,10 +728,8 @@ void Client::ApplyConfig3(ApplyConfig3RequestView request,
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
-  ApplyConfigFromFidl(display::ConfigStamp(request->stamp().value));
-}
+  const display::ConfigStamp new_config_stamp(request->stamp().value);
 
-void Client::ApplyConfigFromFidl(display::ConfigStamp new_config_stamp) {
   if (!draft_display_config_was_validated_) {
     // TODO(https://fxbug.dev/397427767): TearDown(ZX_ERR_BAD_STATE) instead of
     // calling CheckConfig() and silently failing.
