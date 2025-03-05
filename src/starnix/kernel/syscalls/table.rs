@@ -161,6 +161,7 @@ pub fn dispatch_syscall(
         pub use crate::syscalls::time::{
             sys_arch32_clock_getres, sys_arch32_clock_gettime, sys_arch32_clock_gettime64,
             sys_arch32_gettimeofday, sys_arch32_nanosleep, sys_arch32_timer_gettime64,
+            sys_clock_nanosleep as sys_arch32_clock_nanosleep,
         };
         pub use crate::task::syscalls::{
             sys_arch32_sched_getaffinity, sys_arch32_sched_setaffinity, sys_arch32_setpriority,
@@ -222,6 +223,7 @@ pub fn dispatch_syscall(
             clock_getres[2],
             clock_gettime[2],
             clock_gettime64[2],
+            clock_nanosleep[4],
             clone3[2],
             clone[5],
             close[1],
