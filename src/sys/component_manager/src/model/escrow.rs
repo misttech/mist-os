@@ -26,7 +26,7 @@ use errors::ActionError;
 
 /// Controls after how many open requests to a component's outgoing directory channel will
 /// component manager perform a liveness check.
-const LIVENESS_CHECK_FREQUENCY: usize = 1000;
+const LIVENESS_CHECK_FREQUENCY: usize = 500;
 
 /// Controls how long component manager will wait for a response to a liveness check before
 /// emitting a warn level log about the check failure.
