@@ -471,8 +471,12 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
                                                    .buffer_index = metadata.vmo_index,
                                                },
                                                fidl_image_id);
+  if (!import_image_result.ok()) {
+    FX_LOGS(ERROR) << "ImportImage transport error: " << import_image_result.status_string();
+    return false;
+  }
   if (import_image_result->is_error()) {
-    FX_LOGS(ERROR) << "Display coordinator could not import the image: "
+    FX_LOGS(ERROR) << "ImportImage method error: "
                    << zx_status_get_string(import_image_result->error_value());
     return false;
   }
@@ -507,8 +511,12 @@ fuchsia_hardware_display::wire::LayerId DisplayCompositor::CreateDisplayLayer() 
   FX_DCHECK(display_coordinator_.is_valid());
 
   const auto create_layer_result = display_coordinator_.sync()->CreateLayer();
+  if (!create_layer_result.ok()) {
+    FX_LOGS(ERROR) << "CreateLayer transport error: " << create_layer_result.status_string();
+    return {.value = fuchsia_hardware_display_types::kInvalidDispId};
+  }
   if (create_layer_result->is_error()) {
-    FX_LOGS(ERROR) << "Failed to create layer, "
+    FX_LOGS(ERROR) << "CreateLayer method error: "
                    << zx_status_get_string(create_layer_result->error_value());
     return {.value = fuchsia_hardware_display_types::kInvalidDispId};
   }
@@ -1038,12 +1046,11 @@ bool DisplayCompositor::SetMinimumRgb(const uint8_t minimum_rgb) {
 
   const auto result = display_coordinator_.sync()->SetMinimumRgb(minimum_rgb);
   if (!result.ok()) {
-    FX_LOGS(ERROR) << "FlatlandDisplayCompositor SetMinimumRGB failed: " << result.status_string();
+    FX_LOGS(ERROR) << "SetMinimumRgb transport error: " << result.status_string();
     return false;
   }
   if (result->is_error()) {
-    FX_LOGS(ERROR) << "FlatlandDisplayCompositor SetMinimumRGB failed: "
-                   << zx_status_get_string(result->error_value());
+    FX_LOGS(ERROR) << "SetMinimumRgb method error: " << zx_status_get_string(result->error_value());
     return false;
   }
   return true;

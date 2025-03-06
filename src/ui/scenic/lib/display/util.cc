@@ -27,8 +27,13 @@ bool ImportBufferCollection(
 
   auto import_buffer_collection_result = display_coordinator.sync()->ImportBufferCollection(
       display_buffer_collection_id, std::move(token));
+  if (!import_buffer_collection_result.ok()) {
+    FX_LOGS(ERROR) << "ImportBufferCollection transport failed: "
+                   << import_buffer_collection_result.status_string();
+    return false;
+  }
   if (import_buffer_collection_result->is_error()) {
-    FX_LOGS(ERROR) << "Failed to call FIDL ImportBufferCollection: "
+    FX_LOGS(ERROR) << "ImportBufferCollection method failed: "
                    << zx_status_get_string(import_buffer_collection_result->error_value());
     return false;
   }
@@ -43,9 +48,13 @@ bool ImportBufferCollection(
       FX_LOGS(ERROR) << "ReleaseBufferCollection failed: " << release_result.status_string();
     }
   });
-
+  if (!set_buffer_collection_constraints_result.ok()) {
+    FX_LOGS(ERROR) << "SetBufferCollectionConstraints transport failed: "
+                   << set_buffer_collection_constraints_result.status_string();
+    return false;
+  }
   if (set_buffer_collection_constraints_result->is_error()) {
-    FX_LOGS(ERROR) << "Failed to call FIDL SetBufferCollectionConstraints: "
+    FX_LOGS(ERROR) << "SetBufferCollectionConstraints method failed: "
                    << zx_status_get_string(set_buffer_collection_constraints_result->error_value());
     return false;
   }
@@ -85,9 +94,12 @@ DisplayEventId ImportEvent(
 bool IsCaptureSupported(
     const fidl::WireSharedClient<fuchsia_hardware_display::Coordinator>& display_coordinator) {
   auto result = display_coordinator.sync()->IsCaptureSupported();
-
+  if (!result.ok()) {
+    FX_LOGS(ERROR) << "IsCaptureSupported call transport failed: " << result.status_string();
+    return false;
+  }
   if (result->is_error()) {
-    FX_LOGS(ERROR) << "FIDL IsCaptureSupported call failed: "
+    FX_LOGS(ERROR) << "IsCaptureSupported call method failed: "
                    << zx_status_get_string(result->error_value());
     return false;
   }
@@ -121,9 +133,12 @@ zx_status_t ImportImageForCapture(
           .buffer_index = vmo_idx,
       },
       fidl_image_id);
-
+  if (!import_image_result.ok()) {
+    FX_LOGS(ERROR) << "ImportImage transport error: " << import_image_result.status_string();
+    return import_image_result->error_value();
+  }
   if (import_image_result->is_error()) {
-    FX_LOGS(ERROR) << "FIDL ImportImage error: "
+    FX_LOGS(ERROR) << "ImportImage method error: "
                    << zx_status_get_string(import_image_result->error_value());
     return import_image_result->error_value();
   }
