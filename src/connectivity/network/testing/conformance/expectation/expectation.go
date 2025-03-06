@@ -84,6 +84,8 @@ var expectations map[SuiteIdentifier]map[AnvlCaseNumber]outcome.Outcome = func()
 	addAllExpectations("tcp-advanced-v6", platform.NS3, tcpAdvancedV6ExpectationsNS3)
 	addAllExpectations("tcp-core", platform.NS3, tcpCoreExpectationsNS3)
 	addAllExpectations("tcp-core-v6", platform.NS3, tcpcorev6ExpectationsNS3)
+	addAllExpectations("tcp-highperf", platform.NS3, tcpHighperfExpectationsNS3)
+	addAllExpectations("tcp-highperf-v6", platform.NS3, tcpHighperfV6ExpectationsNS3)
 	addAllExpectations("udp", platform.NS3, udpExpectationsNS3)
 	addAllExpectations("udp-v6", platform.NS3, udpV6ExpectationsNS3)
 	// keep-sorted end
