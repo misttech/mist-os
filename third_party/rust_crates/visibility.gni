@@ -162,7 +162,6 @@ lazy_static_visibility = [
   "//src/sys/time/time_test_client:*",
   "//src/sys/time/timekeeper:*",
   "//src/testing/fidl/intl_property_manager:*",
-  "//src/testing/pkgstats:*",
   "//src/testing/sl4f:*",
   "//src/ui/bin/brightness_manager:*",
   "//src/ui/lib/input_pipeline:*",

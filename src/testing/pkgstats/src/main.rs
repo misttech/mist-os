@@ -12,7 +12,6 @@ use fuchsia_url::UnpinnedAbsolutePackageUrl;
 use handlebars::{
     handlebars_helper, Handlebars, Helper, HelperResult, Output, RenderContext, RenderError,
 };
-use lazy_static::lazy_static;
 use log::debug;
 use rayon::prelude::*;
 use rayon::ThreadPoolBuilder;
@@ -24,7 +23,7 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Instant;
 
 #[derive(FromArgs)]
@@ -252,9 +251,7 @@ fn render_index_contents(hb: &Handlebars<'_>, output: &OutputSummary) -> Result<
     Ok(hb.render("index", output)?)
 }
 
-lazy_static! {
-    static ref RENDER_PATH: Mutex<String> = Mutex::new("".to_string());
-}
+static RENDER_PATH: LazyLock<Mutex<String>> = LazyLock::new(|| Mutex::new("".to_string()));
 
 fn simplify_name_for_linking(name: &str) -> String {
     let mut ret = String::with_capacity(name.len());
