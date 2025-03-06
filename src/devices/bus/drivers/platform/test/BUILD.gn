@@ -90,7 +90,6 @@ driver_bind_rules("test-gpio-bind") {
 }
 
 fuchsia_cc_driver("test-gpio-driver") {
-  legacy = true
   testonly = true
   output_name = "test-gpio"
   configs += [ "//build/config:all_source" ]
@@ -99,12 +98,9 @@ fuchsia_cc_driver("test-gpio-driver") {
     ":test-gpio-bind",
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.pinimpl:fuchsia.hardware.pinimpl_cpp",
-    "//sdk/lib/driver/outgoing/cpp",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/driver:driver_runtime",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/fbl",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//src/lib/ddk:ddk_metadata",
     "//zircon/system/ulib/zx",
   ]
 }
