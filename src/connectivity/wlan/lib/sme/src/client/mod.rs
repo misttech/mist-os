@@ -275,6 +275,7 @@ impl<T: Into<ConnectFailure>> From<T> for ConnectResult {
     }
 }
 
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401087337)
 #[derive(Debug, PartialEq)]
 pub enum RoamResult {
     Success(Box<BssDescription>),
@@ -326,6 +327,7 @@ impl ConnectTransactionSink {
 
 pub type ConnectTransactionStream = mpsc::UnboundedReceiver<ConnectTransactionEvent>;
 
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401087337)
 #[derive(Debug, PartialEq)]
 pub enum ConnectTransactionEvent {
     OnConnectResult { result: ConnectResult, is_reconnect: bool },

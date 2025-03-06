@@ -28,6 +28,7 @@ use std::sync::Arc;
 use vfs::directory::entry::OpenRequest;
 use vfs::remote::remote_dir;
 
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401087881)
 /// A request to open a capability at its source.
 pub enum CapabilityOpenRequest<'a> {
     // Open a capability backed by a component's outgoing directory.

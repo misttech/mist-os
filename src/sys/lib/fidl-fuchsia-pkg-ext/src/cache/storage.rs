@@ -111,6 +111,7 @@ impl Writer for fio::FileProxy {
     }
 }
 
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401087293)
 #[derive(Debug)]
 enum FxBlob {
     NeedsTruncate(ffxfs::BlobWriterProxy),

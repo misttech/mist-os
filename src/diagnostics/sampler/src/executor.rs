@@ -394,6 +394,7 @@ struct MetricCacheKey {
     selector: String,
 }
 
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401087900)
 pub enum ProjectSamplerTaskExit {
     /// The [`ProjectSampler`] processed a reboot signal on its oneshot, and yielded
     /// to the final-snapshot.

@@ -6,6 +6,7 @@ use ffx_config_domain::ConfigDomain;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401087076)
 /// The type of environment we're running in, along with relevant information about
 /// that environment.
 #[derive(Clone, Debug, PartialEq)]

@@ -48,6 +48,7 @@ pub struct OpRadioConfig {
     channel: Channel,
 }
 
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401087337)
 enum State {
     Idle {
         ctx: Context,

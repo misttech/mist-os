@@ -32,6 +32,7 @@ pub(crate) enum FilterError {
 
 // A container to dispatch filtering functions depending on the
 // filtering API present.
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401087529)
 pub(crate) enum FilterControl {
     Deprecated(fnet_filter_deprecated::FilterProxy),
     Current(FilterState),

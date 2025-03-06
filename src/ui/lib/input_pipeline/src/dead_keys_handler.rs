@@ -216,6 +216,7 @@ impl StoredEvent {
     }
 }
 
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401086995)
 /// State contains the current observed state of the dead key state machine.
 ///
 /// The dead key composition is started by observing a key press that amounts

@@ -81,6 +81,7 @@ impl SysmemAllocatedBuffers {
     }
 }
 
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401087115)
 /// A Future that communicates with the `fuchsia.sysmem2.Allocator` service to allocate shared
 /// buffers.
 pub enum SysmemAllocation {

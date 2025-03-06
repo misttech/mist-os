@@ -37,6 +37,7 @@ mod serde_ext;
 use control::DeviceControl;
 use list::QueryExt;
 
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401087076)
 #[derive(Debug, Serialize)]
 pub enum DeviceResult {
     Play(ffx_audio_common::PlayResult),

@@ -138,6 +138,7 @@ statemachine!(
     Disconnecting => [Connecting, Idle],
 );
 
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401087337)
 /// Only one PostDisconnectAction may be selected at a time. This means that
 /// in some cases a connect or disconnect might be reported as finished when
 /// we're actually still in a disconnecting state, since a different trigger
@@ -871,6 +872,7 @@ impl Associated {
 }
 
 // Used when the next state after a roam failure is conditionally determined (e.g. if target needs deauth).
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401087337)
 enum AfterRoamFailureState {
     Idle(Idle),
     Disconnecting(Disconnecting),

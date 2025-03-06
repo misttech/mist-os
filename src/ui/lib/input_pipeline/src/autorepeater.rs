@@ -136,6 +136,7 @@ impl TryInto<InputEvent> for AnyEvent {
 }
 
 // The state of the autorepeat generator.
+#[allow(clippy::large_enum_variant)] // TODO(https://fxbug.dev/401086995)
 #[derive(Debug, Clone)]
 enum State {
     /// Autorepeat is not active.
