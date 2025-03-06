@@ -30,11 +30,6 @@ use std::task::{Context, Poll};
 use thiserror::Error;
 use zx::{self as zx, MonotonicDuration};
 
-/// TODO(b/389545819): Remove this once transition is complete.
-/// This is the deprecated version of ArchiveReader, which is
-/// being replaced with ArchiveReader.
-pub type ArchiveReaderV1 = ArchiveAccessorShared;
-
 /// Alias for ArchiveReader<Logs>. Used for reading logs.
 pub type LogsArchiveReader = ArchiveReader<Logs>;
 
@@ -122,6 +117,41 @@ impl ComponentSelector {
 pub trait ToSelectorArguments {
     /// Converts this to selector arguments.
     fn to_selector_arguments(self) -> Box<dyn Iterator<Item = SelectorArgument>>;
+}
+
+/// Trait used for things that can be converted to component selector arguments.
+pub trait ToComponentSelectorArguments {
+    /// Converts this to selector arguments.
+    fn to_component_selector_arguments(self) -> ComponentSelector;
+}
+
+impl ToComponentSelectorArguments for &str {
+    fn to_component_selector_arguments(self) -> ComponentSelector {
+        if self.contains("\\:") {
+            // String is already escaped, don't escape it.
+            ComponentSelector::new(self.split("/").map(|value| value.to_string()).collect())
+        } else {
+            // String isn't escaped, escape it
+            ComponentSelector::new(
+                selectors::sanitize_moniker_for_selectors(self)
+                    .split("/")
+                    .map(|value| value.to_string())
+                    .collect(),
+            )
+        }
+    }
+}
+
+impl ToComponentSelectorArguments for String {
+    fn to_component_selector_arguments(self) -> ComponentSelector {
+        self.as_str().to_component_selector_arguments()
+    }
+}
+
+impl ToComponentSelectorArguments for ComponentSelector {
+    fn to_component_selector_arguments(self) -> ComponentSelector {
+        self
+    }
 }
 
 impl ToSelectorArguments for String {
@@ -246,16 +276,6 @@ impl RetryConfig {
     }
 }
 
-/// Shared data structures between Logs and Inspect
-pub struct ArchiveAccessorShared {
-    archive: Option<ArchiveAccessorProxy>,
-    selectors: Vec<SelectorArgument>,
-    retry_config: RetryConfig,
-    timeout: Option<MonotonicDuration>,
-    batch_retrieval_timeout_seconds: Option<i64>,
-    max_aggregated_content_size_bytes: Option<u64>,
-}
-
 /// A trait representing a type of diagnostics data.
 pub trait DiagnosticsDataType: private::Sealed {}
 
@@ -270,7 +290,12 @@ impl DiagnosticsDataType for Inspect {}
 /// Utility for reading inspect data of a running component using the injected Archive
 /// Reader service.
 pub struct ArchiveReader<T> {
-    inner: ArchiveAccessorShared,
+    archive: Option<ArchiveAccessorProxy>,
+    selectors: Vec<SelectorArgument>,
+    retry_config: RetryConfig,
+    timeout: Option<MonotonicDuration>,
+    batch_retrieval_timeout_seconds: Option<i64>,
+    max_aggregated_content_size_bytes: Option<u64>,
     _phantom: PhantomData<T>,
 }
 
@@ -279,150 +304,14 @@ impl<T: DiagnosticsDataType> ArchiveReader<T> {
     /// By default, the connection will be initialized by connecting to
     /// fuchsia.diagnostics.ArchiveAccessor
     pub fn with_archive(&mut self, archive: ArchiveAccessorProxy) -> &mut Self {
-        self.inner.with_archive(archive);
+        self.archive = Some(archive);
         self
     }
 
     /// Sets the minimum number of schemas expected in a result in order for the
     /// result to be considered a success.
     pub fn with_minimum_schema_count(&mut self, minimum_schema_count: usize) -> &mut Self {
-        self.inner.with_minimum_schema_count(minimum_schema_count);
-        self
-    }
-
-    /// Sets a custom retry configuration. By default we always retry.
-    pub fn retry(&mut self, config: RetryConfig) -> &mut Self {
-        self.inner.retry_config = config;
-        self
-    }
-
-    /// Requests a single component tree (or sub-tree).
-    pub fn add_selector(&mut self, selector: impl ToSelectorArguments) -> &mut Self {
-        self.inner.add_selector(selector);
-        self
-    }
-}
-
-impl ArchiveReader<Logs> {
-    /// Creates an ArchiveReader for reading logs
-    pub fn logs() -> Self {
-        ArchiveReader::<Logs> { inner: ArchiveAccessorShared::default(), _phantom: PhantomData }
-    }
-
-    /// Connects to the ArchiveAccessor and returns data matching provided selectors.
-    pub async fn snapshot(&self) -> Result<Vec<Data<Logs>>, Error> {
-        self.inner.snapshot::<Logs>().await
-    }
-
-    /// Requests all data for the component identified by the given moniker.
-    pub fn select_all_for_moniker(&mut self, moniker: &str) -> &mut Self {
-        self.inner.select_all_for_moniker(moniker);
-        self
-    }
-
-    /// Connects to the ArchiveAccessor and returns a stream of data containing a snapshot of the
-    /// current buffer in the Archivist as well as new data that arrives.
-    pub fn snapshot_then_subscribe(&self) -> Result<Subscription<Data<Logs>>, Error> {
-        let iterator =
-            self.inner.batch_iterator::<Logs>(StreamMode::SnapshotThenSubscribe, FORMAT)?;
-        Ok(Subscription::new(iterator))
-    }
-}
-
-impl ArchiveReader<Inspect> {
-    /// Creates an ArchiveReader for reading Inspect data.
-    pub fn inspect() -> Self {
-        ArchiveReader::<Inspect> { inner: ArchiveAccessorShared::default(), _phantom: PhantomData }
-    }
-
-    /// Set the maximum time to wait for a wait for a single component
-    /// to have its diagnostics data "pumped".
-    pub fn with_batch_retrieval_timeout_seconds(&mut self, timeout: i64) -> &mut Self {
-        self.inner.batch_retrieval_timeout_seconds = Some(timeout);
-        self
-    }
-
-    /// Sets the total number of bytes allowed in a single VMO read.
-    pub fn with_aggregated_result_bytes_limit(&mut self, limit_bytes: u64) -> &mut Self {
-        self.inner.max_aggregated_content_size_bytes = Some(limit_bytes);
-        self
-    }
-
-    /// Connects to the ArchiveAccessor and returns inspect data matching provided selectors.
-    /// Returns the raw json for each hierarchy fetched. This is used for CTF compatibility
-    /// tests (which test various implementation details of the JSON format),
-    /// and use beyond such tests is discouraged.
-    pub async fn snapshot_raw<T>(&self) -> Result<T, Error>
-    where
-        T: for<'a> Deserialize<'a> + SerializableValue + From<Vec<T>> + CheckResponse,
-    {
-        let data_future = self.inner.snapshot_inner::<Inspect, T>(T::FORMAT_OF_VALUE);
-        let data = match self.inner.timeout {
-            Some(timeout) => data_future.on_timeout(timeout.after_now(), || Ok(Vec::new())).await?,
-            None => data_future.await?,
-        };
-        Ok(T::from(data))
-    }
-
-    /// Adds selectors used for performing filtering inspect hierarchies.
-    /// This may be called multiple times to add additional selectors.
-    pub fn add_selectors<T, S>(&mut self, selectors: T) -> &mut Self
-    where
-        T: Iterator<Item = S>,
-        S: ToSelectorArguments,
-    {
-        self.inner.add_selectors(selectors);
-        self
-    }
-
-    /// Requests all data for the component identified by the given moniker.
-    pub fn select_all_for_moniker(&mut self, moniker: &str) -> &mut Self {
-        self.inner.select_all_for_moniker(moniker);
-        self
-    }
-
-    /// Sets the maximum time to wait for a response from the Archive.
-    /// Do not use in tests unless timeout is the expected behavior.
-    pub fn with_timeout(&mut self, duration: MonotonicDuration) -> &mut Self {
-        self.inner.with_timeout(duration);
-        self
-    }
-
-    /// Connects to the ArchiveAccessor and returns data matching provided selectors.
-    pub async fn snapshot(&self) -> Result<Vec<Data<Inspect>>, Error> {
-        self.inner.snapshot::<Inspect>().await
-    }
-}
-
-impl Default for ArchiveAccessorShared {
-    fn default() -> Self {
-        Self {
-            timeout: None,
-            selectors: vec![],
-            retry_config: RetryConfig::always(),
-            archive: None,
-            batch_retrieval_timeout_seconds: None,
-            max_aggregated_content_size_bytes: None,
-        }
-    }
-}
-
-impl ArchiveAccessorShared {
-    /// Creates a new data fetcher with default configuration:
-    ///  - Maximum retries: 2^64-1
-    ///  - Timeout: Never. Use with_timeout() to set a timeout.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    fn with_archive(&mut self, archive: ArchiveAccessorProxy) -> &mut Self {
-        self.archive = Some(archive);
-        self
-    }
-
-    /// Requests a single component tree (or sub-tree).
-    pub fn add_selector(&mut self, selector: impl ToSelectorArguments) -> &mut Self {
-        self.selectors.extend(selector.to_selector_arguments());
+        self.retry_config = RetryConfig::MinSchemaCount(minimum_schema_count);
         self
     }
 
@@ -432,39 +321,26 @@ impl ArchiveAccessorShared {
         self
     }
 
-    fn add_selectors<T, S>(&mut self, selectors: T) -> &mut Self
-    where
-        T: Iterator<Item = S>,
-        S: ToSelectorArguments,
-    {
-        for selector in selectors {
-            self.add_selector(selector);
-        }
-        self
-    }
-
     /// Sets the maximum time to wait for a response from the Archive.
     /// Do not use in tests unless timeout is the expected behavior.
-    fn with_timeout(&mut self, duration: MonotonicDuration) -> &mut Self {
+    pub fn with_timeout(&mut self, duration: MonotonicDuration) -> &mut Self {
         self.timeout = Some(duration);
         self
     }
 
-    /// Sets the minimum number of schemas expected in a result in order for the
-    /// result to be considered a success.
-    fn with_minimum_schema_count(&mut self, minimum_schema_count: usize) -> &mut Self {
-        self.retry_config = RetryConfig::MinSchemaCount(minimum_schema_count);
+    /// Filters logs for a specific component or component selector.
+    /// If string input, the string may be either a component selector string
+    /// or a moniker, or a ComponentSelector may be passed directly.
+    pub fn select_all_for_component(
+        &mut self,
+        component: impl ToComponentSelectorArguments,
+    ) -> &mut Self {
+        self.selectors.extend(component.to_component_selector_arguments().to_selector_arguments());
         self
     }
 
-    /// Requests all data for the component identified by the given moniker.
-    fn select_all_for_moniker(&mut self, moniker: &str) -> &mut Self {
-        let selector = format!("{}:[...]root", selectors::sanitize_moniker_for_selectors(moniker));
-        self.add_selector(selector)
-    }
-
     /// Connects to the ArchiveAccessor and returns data matching provided selectors.
-    pub async fn snapshot<D>(&self) -> Result<Vec<Data<D>>, Error>
+    async fn snapshot_shared<D>(&self) -> Result<Vec<Data<D>>, Error>
     where
         D: DiagnosticsData,
     {
@@ -476,24 +352,14 @@ impl ArchiveAccessorShared {
         Ok(data)
     }
 
-    /// Connects to the ArchiveAccessor and returns a stream of data containing a snapshot of the
-    /// current buffer in the Archivist as well as new data that arrives.
-    pub fn snapshot_then_subscribe<D>(&self) -> Result<Subscription<Data<D>>, Error>
-    where
-        D: DiagnosticsData + 'static,
-    {
-        let iterator = self.batch_iterator::<D>(StreamMode::SnapshotThenSubscribe, FORMAT)?;
-        Ok(Subscription::new(iterator))
-    }
-
-    async fn snapshot_inner<D, T>(&self, format: Format) -> Result<Vec<T>, Error>
+    async fn snapshot_inner<D, Y>(&self, format: Format) -> Result<Vec<Y>, Error>
     where
         D: DiagnosticsData,
-        T: for<'a> Deserialize<'a> + CheckResponse,
+        Y: for<'a> Deserialize<'a> + CheckResponse,
     {
         loop {
             let iterator = self.batch_iterator::<D>(StreamMode::Snapshot, format)?;
-            let result = drain_batch_iterator::<T>(Arc::new(iterator))
+            let result = drain_batch_iterator::<Y>(Arc::new(iterator))
                 .filter_map(|value| ready(value.ok()))
                 .collect::<Vec<_>>()
                 .await;
@@ -546,6 +412,107 @@ impl ArchiveAccessorShared {
             .stream_diagnostics(&stream_parameters, server_end)
             .map_err(Error::StreamDiagnostics)?;
         Ok(iterator)
+    }
+}
+
+impl ArchiveReader<Logs> {
+    /// Creates an ArchiveReader for reading logs
+    pub fn logs() -> Self {
+        ArchiveReader::<Logs> {
+            timeout: None,
+            selectors: vec![],
+            retry_config: RetryConfig::always(),
+            archive: None,
+            batch_retrieval_timeout_seconds: None,
+            max_aggregated_content_size_bytes: None,
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Connects to the ArchiveAccessor and returns data matching provided selectors.
+    pub async fn snapshot(&self) -> Result<Vec<Data<Logs>>, Error> {
+        self.snapshot_shared::<Logs>().await
+    }
+
+    /// Connects to the ArchiveAccessor and returns a stream of data containing a snapshot of the
+    /// current buffer in the Archivist as well as new data that arrives.
+    pub fn snapshot_then_subscribe(&self) -> Result<Subscription<Data<Logs>>, Error> {
+        let iterator = self.batch_iterator::<Logs>(StreamMode::SnapshotThenSubscribe, FORMAT)?;
+        Ok(Subscription::new(iterator))
+    }
+}
+
+impl ArchiveReader<Inspect> {
+    /// Creates an ArchiveReader for reading Inspect data.
+    pub fn inspect() -> Self {
+        ArchiveReader::<Inspect> {
+            timeout: None,
+            selectors: vec![],
+            retry_config: RetryConfig::always(),
+            archive: None,
+            batch_retrieval_timeout_seconds: None,
+            max_aggregated_content_size_bytes: None,
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Set the maximum time to wait for a wait for a single component
+    /// to have its diagnostics data "pumped".
+    pub fn with_batch_retrieval_timeout_seconds(&mut self, timeout: i64) -> &mut Self {
+        self.batch_retrieval_timeout_seconds = Some(timeout);
+        self
+    }
+
+    /// Sets the total number of bytes allowed in a single VMO read.
+    pub fn with_aggregated_result_bytes_limit(&mut self, limit_bytes: u64) -> &mut Self {
+        self.max_aggregated_content_size_bytes = Some(limit_bytes);
+        self
+    }
+
+    /// Connects to the ArchiveAccessor and returns inspect data matching provided selectors.
+    /// Returns the raw json for each hierarchy fetched. This is used for CTF compatibility
+    /// tests (which test various implementation details of the JSON format),
+    /// and use beyond such tests is discouraged.
+    pub async fn snapshot_raw<T>(&self) -> Result<T, Error>
+    where
+        T: for<'a> Deserialize<'a> + SerializableValue + From<Vec<T>> + CheckResponse,
+    {
+        let data_future = self.snapshot_inner::<Inspect, T>(T::FORMAT_OF_VALUE);
+        let data = match self.timeout {
+            Some(timeout) => data_future.on_timeout(timeout.after_now(), || Ok(Vec::new())).await?,
+            None => data_future.await?,
+        };
+        Ok(T::from(data))
+    }
+
+    /// Requests all data for the component identified by the given moniker.
+    pub fn select_all_for_moniker(&mut self, moniker: &str) -> &mut Self {
+        let selector = format!("{}:[...]root", selectors::sanitize_moniker_for_selectors(moniker));
+        self.add_selector(selector)
+    }
+
+    /// Adds selectors used for performing filtering inspect hierarchies.
+    /// This may be called multiple times to add additional selectors.
+    pub fn add_selectors<T, S>(&mut self, selectors: T) -> &mut Self
+    where
+        T: Iterator<Item = S>,
+        S: ToSelectorArguments,
+    {
+        for selector in selectors {
+            self.add_selector(selector);
+        }
+        self
+    }
+
+    /// Requests a single component tree (or sub-tree).
+    pub fn add_selector(&mut self, selector: impl ToSelectorArguments) -> &mut Self {
+        self.selectors.extend(selector.to_selector_arguments());
+        self
+    }
+
+    /// Connects to the ArchiveAccessor and returns data matching provided selectors.
+    pub async fn snapshot(&self) -> Result<Vec<Data<Inspect>>, Error> {
+        self.snapshot_shared::<Inspect>().await
     }
 }
 
@@ -950,11 +917,11 @@ mod tests {
             "realm_builder\\:{}/test_component:[name=tree-0]root",
             instance.root.child_name()
         );
-        let results = ArchiveReaderV1::new()
+        let results = ArchiveReader::inspect()
             .add_selector(selector)
             // Only one schema since empty schemas are filtered out
             .with_minimum_schema_count(1)
-            .snapshot::<Inspect>()
+            .snapshot()
             .await
             .expect("snapshotted");
         assert_matches!(results.iter().find(|v| v.metadata.name.as_ref() == "tree-1"), None);

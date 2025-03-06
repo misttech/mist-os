@@ -37,7 +37,10 @@ async fn component_selectors_filter_logs() {
 
     // Start listening
     let mut reader = ArchiveReader::logs();
-    reader.add_selector("puppet_a*:root").with_archive(accessor).with_minimum_schema_count(5);
+    reader
+        .select_all_for_component("puppet_a*")
+        .with_archive(accessor)
+        .with_minimum_schema_count(5);
 
     let (mut stream, mut errors) = reader.snapshot_then_subscribe().unwrap().split_streams();
     let _errors = fasync::Task::spawn(async move {

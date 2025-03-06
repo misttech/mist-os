@@ -40,9 +40,8 @@ async fn c_crash() {
     info!(realm_moniker:%; "started");
     let container_moniker = format!("{realm_moniker}/debian_container");
     let kernel_moniker = format!("{realm_moniker}/kernel");
-
     let mut kernel_logs = ArchiveReader::logs()
-        .select_all_for_moniker(&kernel_moniker)
+        .select_all_for_component(kernel_moniker.as_str())
         .snapshot_then_subscribe()
         .unwrap();
 
@@ -168,7 +167,7 @@ async fn o_shutdown() {
     let kernel_moniker = format!("{realm_moniker}/kernel");
 
     let mut kernel_logs = ArchiveReader::logs()
-        .select_all_for_moniker(&kernel_moniker)
+        .select_all_for_component(kernel_moniker.as_str())
         .snapshot_then_subscribe()
         .unwrap();
 

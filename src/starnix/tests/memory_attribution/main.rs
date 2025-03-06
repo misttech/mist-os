@@ -282,9 +282,8 @@ async fn init_attribution_test() -> AttributionTest {
 async fn wait_for_log(realm: &RealmInstance, expected_log: &str) {
     let mut reader = ArchiveReader::logs();
     let selector: Moniker = realm.root.moniker().parse().unwrap();
-    let selector = selectors::sanitize_moniker_for_selectors(&selector.to_string());
-    let selector = format!("{}/**:root", selector);
-    reader.add_selector(selector);
+    let selector = format!("{}/**", selector);
+    reader.select_all_for_component(selector.as_str());
     let mut logs = reader.snapshot_then_subscribe().unwrap();
     loop {
         let message = logs.next().await.unwrap().unwrap();

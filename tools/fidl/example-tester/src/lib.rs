@@ -291,7 +291,7 @@ where
     let mut archivist_reader = ArchiveReader::logs();
     child_names.iter().for_each(|child_name| {
         let moniker = format!("realm_builder:{}/{}", realm_instance.root.child_name(), child_name);
-        archivist_reader.select_all_for_moniker(moniker.as_str());
+        archivist_reader.select_all_for_component(moniker.as_str());
     });
 
     // Clean up the realm instance, and close all open processes.
