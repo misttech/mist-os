@@ -12,7 +12,6 @@
 #include <zircon/assert.h>
 #include <zircon/device/audio.h>
 #include <zircon/errors.h>
-#include <zircon/status.h>
 #include <zircon/syscalls.h>
 #include <zircon/time.h>
 
@@ -79,7 +78,7 @@ zx::result<std::unique_ptr<DisplayInfo>> DisplayInfo::Create(AddedDisplayInfo ad
   fbl::AllocChecker alloc_checker;
   auto display_info = fbl::make_unique_checked<DisplayInfo>(&alloc_checker, display_id);
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate DisplayInfo for display ID: %" PRIu64, display_id.value());
+    fdf::error("Failed to allocate DisplayInfo for display ID: {}", display_id.value());
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -97,15 +96,14 @@ zx::result<std::unique_ptr<DisplayInfo>> DisplayInfo::Create(AddedDisplayInfo ad
   }
 
   if (added_display_info.edid_bytes.is_empty()) {
-    FDF_LOG(ERROR, "Missing display timing information for display ID: %" PRIu64,
-            display_id.value());
+    fdf::error("Missing display timing information for display ID: {}", display_id.value());
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   fit::result<const char*, edid::Edid> edid_result =
       edid::Edid::Create(added_display_info.edid_bytes);
   if (edid_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to initialize EDID: %s", edid_result.error_value());
+    fdf::error("Failed to initialize EDID: {}", edid_result.error_value());
     return zx::error(ZX_ERR_INTERNAL);
   }
   display_info->edid = DisplayInfo::Edid{
@@ -127,10 +125,9 @@ zx::result<std::unique_ptr<DisplayInfo>> DisplayInfo::Create(AddedDisplayInfo ad
     std::string display_product_name = edid.GetDisplayProductName();
     std::string display_product_serial_number = edid.GetDisplayProductSerialNumber();
 
-    FDF_LOG(DEBUG, "Manufacturer \"%s\", product %d, name \"%s\", serial \"%s\"", manufacturer,
-            edid.product_code(), display_product_name.c_str(),
-            display_product_serial_number.c_str());
-    edid.Print([](const char* str) { FDF_LOG(DEBUG, "%s", str); });
+    fdf::debug("Manufacturer \"{}\", product {}, name \"{}\", serial \"{}\"", manufacturer,
+               edid.product_code(), display_product_name, display_product_serial_number);
+    edid.Print([](const char* str) { fdf::debug("{}", str); });
   }
   return zx::ok(std::move(display_info));
 }

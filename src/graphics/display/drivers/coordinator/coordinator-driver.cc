@@ -26,8 +26,7 @@ CoordinatorDriver::~CoordinatorDriver() = default;
 zx::result<> CoordinatorDriver::Start() {
   auto create_engine_driver_client_result = EngineDriverClient::Create(incoming());
   if (create_engine_driver_client_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create EngineDriverClient: %s",
-            create_engine_driver_client_result.status_string());
+    fdf::error("Failed to create EngineDriverClient: {}", create_engine_driver_client_result);
     return create_engine_driver_client_result.take_error();
   }
 
@@ -36,12 +35,11 @@ zx::result<> CoordinatorDriver::Start() {
       fdf::SynchronizedDispatcher::Create(
           fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "display-client-loop",
           [](fdf_dispatcher_t* dispatcher) {
-            FDF_LOG(DEBUG, "Display coordinator client dispatcher is shut down.");
+            fdf::debug("Display coordinator client dispatcher is shut down.");
           },
           kSchedulerRoleName);
   if (create_client_dispatcher_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create dispatcher: %s",
-            create_client_dispatcher_result.status_string());
+    fdf::error("Failed to create dispatcher: {}", create_client_dispatcher_result);
     return create_client_dispatcher_result.take_error();
   }
   client_dispatcher_ = std::move(create_client_dispatcher_result).value();
@@ -49,7 +47,7 @@ zx::result<> CoordinatorDriver::Start() {
   zx::result<std::unique_ptr<Controller>> create_controller_result = Controller::Create(
       std::move(create_engine_driver_client_result).value(), client_dispatcher_.borrow());
   if (create_controller_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create Controller: %s", create_controller_result.status_string());
+    fdf::error("Failed to create Controller: {}", create_controller_result);
     return create_controller_result.take_error();
   }
 
@@ -60,8 +58,7 @@ zx::result<> CoordinatorDriver::Start() {
   zx::result<fidl::ClientEnd<fuchsia_device_fs::Connector>> bind_devfs_connector_result =
       devfs_connector_.Bind(dispatcher());
   if (bind_devfs_connector_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to bind to devfs connector: %s",
-            bind_devfs_connector_result.status_string());
+    fdf::error("Failed to bind to devfs connector: {}", bind_devfs_connector_result);
     return bind_devfs_connector_result.take_error();
   }
 
@@ -73,7 +70,7 @@ zx::result<> CoordinatorDriver::Start() {
 
   zx::result<fdf::OwnedChildNode> add_child_result = AddOwnedChild(name(), devfs);
   if (add_child_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to add child node: %s", add_child_result.status_string());
+    fdf::error("Failed to add child node: {}", add_child_result);
     return add_child_result.take_error();
   }
 

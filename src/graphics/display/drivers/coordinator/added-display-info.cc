@@ -26,7 +26,7 @@ zx::result<std::unique_ptr<AddedDisplayInfo>> AddedDisplayInfo::Create(
     const raw_display_info_t& banjo_display_info) {
   const display::DisplayId display_id(banjo_display_info.display_id);
   if (display_id == display::kInvalidDisplayId) {
-    FDF_LOG(ERROR, "AddedDisplayInfo creation failed: invalid display ID");
+    fdf::error("AddedDisplayInfo creation failed: invalid display ID");
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
@@ -37,28 +37,28 @@ zx::result<std::unique_ptr<AddedDisplayInfo>> AddedDisplayInfo::Create(
   if (banjo_display_info.edid_bytes_count != 0) {
     edid_bytes.resize(banjo_display_info.edid_bytes_count, &alloc_checker);
     if (!alloc_checker.check()) {
-      FDF_LOG(ERROR, "AddedDisplayInfo creation failed: out of memory allocating EDID bytes");
+      fdf::error("AddedDisplayInfo creation failed: out of memory allocating EDID bytes");
       return zx::error(ZX_ERR_NO_MEMORY);
     }
     std::ranges::copy(display_info_edid_bytes, edid_bytes.begin());
   }
 
   if (banjo_display_info.pixel_formats_count == 0) {
-    FDF_LOG(ERROR, "AddedDisplayInfo creation failed: empty pixel formats list");
+    fdf::error("AddedDisplayInfo creation failed: empty pixel formats list");
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   fbl::Vector<display::PixelFormat> pixel_formats;
   pixel_formats.reserve(banjo_display_info.pixel_formats_count, &alloc_checker);
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "AddedDisplayInfo creation failed: out of memory allocating pixel formats");
+    fdf::error("AddedDisplayInfo creation failed: out of memory allocating pixel formats");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
   for (size_t i = 0; i < banjo_display_info.pixel_formats_count; ++i) {
     const uint32_t banjo_pixel_format = banjo_display_info.pixel_formats_list[i];
     if (!display::PixelFormat::IsSupported(banjo_pixel_format)) {
-      FDF_LOG(ERROR, "AddedDisplayInfo creation failed: unsupported pixel format %" PRIu32,
-              banjo_pixel_format);
+      fdf::error("AddedDisplayInfo creation failed: unsupported pixel format {}",
+                 banjo_pixel_format);
       return zx::error(ZX_ERR_INVALID_ARGS);
     }
     display::PixelFormat pixel_format(banjo_pixel_format);
@@ -75,7 +75,7 @@ zx::result<std::unique_ptr<AddedDisplayInfo>> AddedDisplayInfo::Create(
   if (banjo_display_info.preferred_modes_count != 0) {
     banjo_display_modes.reserve(banjo_display_info.preferred_modes_count, &alloc_checker);
     if (!alloc_checker.check()) {
-      FDF_LOG(ERROR, "AddedDisplayInfo creation failed: out of memory allocating display modes");
+      fdf::error("AddedDisplayInfo creation failed: out of memory allocating display modes");
       return zx::error(ZX_ERR_NO_MEMORY);
     }
     for (size_t i = 0; i < banjo_display_info.preferred_modes_count; ++i) {
@@ -91,7 +91,7 @@ zx::result<std::unique_ptr<AddedDisplayInfo>> AddedDisplayInfo::Create(
 
   auto display_info = fbl::make_unique_checked<AddedDisplayInfo>(&alloc_checker);
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "AddedDisplayInfo creation failed: out of memory allocating instance");
+    fdf::error("AddedDisplayInfo creation failed: out of memory allocating instance");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 

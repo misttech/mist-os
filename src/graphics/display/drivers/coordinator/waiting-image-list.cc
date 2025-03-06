@@ -88,17 +88,17 @@ void WaitingImageList::RemoveImage(const Image& image_to_retire) {
 zx::result<> WaitingImageList::PushImage(fbl::RefPtr<Image> image,
                                          fbl::RefPtr<FenceReference> wait_fence) {
   if (size_ >= kMaxSize) {
-    FDF_LOG(ERROR, "Failed to allocate waiting-image");
+    fdf::error("Failed to allocate waiting-image");
     return zx::error_result(ZX_ERR_BAD_STATE);
   }
   if (wait_fence) {
     if (wait_fence->InContainer()) {
-      FDF_LOG(ERROR, "Tried to wait with a busy event");
+      fdf::error("Tried to wait with a busy event");
       return zx::error_result(ZX_ERR_BAD_STATE);
     }
     zx_status_t status = wait_fence->StartReadyWait();
     if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to start waiting for image. Status: %s", zx_status_get_string(status));
+      fdf::error("Failed to start waiting for image. Status: {}", zx::make_result(status));
       // Mark the image as ready. Displaying garbage is better than hanging or crashing.
       wait_fence = nullptr;
     }

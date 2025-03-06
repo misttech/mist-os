@@ -13,6 +13,7 @@
 #include <lib/zx/event.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
+#include <zircon/status.h>
 #include <zircon/types.h>
 
 #include <thread>
@@ -171,7 +172,7 @@ zx_status_t FenceCollection::ImportEvent(zx::event event, display::EventId id) {
   fbl::AutoLock lock(&mtx_);
   Fence::Map::iterator fence = fences_.find(id);
   if (fence.IsValid()) {
-    FDF_LOG(ERROR, "Illegal to import an event with existing ID#%ld", id.value());
+    fdf::error("Illegal to import an event with existing ID#{}", id.value());
     return ZX_ERR_ALREADY_EXISTS;
   }
 
@@ -181,7 +182,7 @@ zx_status_t FenceCollection::ImportEvent(zx::event event, display::EventId id) {
     bool successfully_inserted = fences_.insert_or_find(std::move(new_fence));
     ZX_DEBUG_ASSERT(successfully_inserted);
   } else {
-    FDF_LOG(ERROR, "Failed to allocate fence ref for event#%ld", id.value());
+    fdf::error("Failed to allocate fence ref for event#{}", id.value());
     return ZX_ERR_NO_MEMORY;
   }
   return ZX_OK;

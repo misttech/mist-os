@@ -41,7 +41,7 @@ VsyncMonitor::~VsyncMonitor() { Deinitialize(); }
 zx::result<> VsyncMonitor::Initialize() {
   zx_status_t post_status = updater_.PostDelayed(&dispatcher_, kVsyncMonitorInterval);
   if (post_status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to schedule vsync monitor: %s", zx_status_get_string(post_status));
+    fdf::error("Failed to schedule vsync monitor: {}", zx::make_result(post_status));
     return zx::error(post_status);
   }
 
@@ -65,7 +65,7 @@ void VsyncMonitor::UpdateStatistics() {
 
   zx_status_t status = updater_.PostDelayed(&dispatcher_, kVsyncMonitorInterval);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to schedule vsync monitor: %s", zx_status_get_string(status));
+    fdf::error("Failed to schedule vsync monitor: {}", zx::make_result(status));
   }
 }
 

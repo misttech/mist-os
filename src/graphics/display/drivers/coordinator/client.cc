@@ -27,7 +27,6 @@
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/process.h>
-#include <zircon/status.h>
 #include <zircon/syscalls.h>
 #include <zircon/time.h>
 #include <zircon/types.h>
@@ -205,7 +204,7 @@ zx_status_t Client::ImportImageForDisplay(const display::ImageMetadata& image_me
   fbl::RefPtr<Image> image = fbl::AdoptRef(new (&alloc_checker) Image(
       &controller_, image_metadata, image_id, driver_image_id, &proxy_->node(), id_));
   if (!alloc_checker.check()) {
-    FDF_LOG(DEBUG, "Alloc checker failed while constructing Image.\n");
+    fdf::debug("Alloc checker failed while constructing Image.\n");
     return ZX_ERR_NO_MEMORY;
   }
   // `dc_image` is now owned by the Image instance.
@@ -231,7 +230,7 @@ void Client::ReleaseImage(ReleaseImageRequestView request,
     // Ensure we are not releasing an active capture.
     if (current_capture_image_id_ == image_id) {
       // We have an active capture; release it when capture is completed.
-      FDF_LOG(WARNING, "Capture is active. Will release after capture is complete");
+      fdf::warn("Capture is active. Will release after capture is complete");
       pending_release_capture_image_id_ = current_capture_image_id_;
     } else {
       // Release image now.
@@ -240,21 +239,21 @@ void Client::ReleaseImage(ReleaseImageRequestView request,
     return;
   }
 
-  FDF_LOG(ERROR, "Invalid Image ID requested for release");
+  fdf::error("Invalid Image ID requested for release");
 }
 
 void Client::ImportEvent(ImportEventRequestView request,
                          ImportEventCompleter::Sync& /*_completer*/) {
   const display::EventId event_id = display::ToEventId(request->id);
   if (event_id == display::kInvalidEventId) {
-    FDF_LOG(ERROR, "Cannot import events with an invalid ID #%" PRIu64, event_id.value());
+    fdf::error("Cannot import events with an invalid ID #{}", event_id.value());
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
 
   if (zx_status_t status = fences_.ImportEvent(std::move(request->event), event_id);
       status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to import event: %s", zx_status_get_string(status));
+    fdf::error("Failed to import event: {}", zx::make_result(status));
     TearDown(status);
     return;
   }
@@ -275,8 +274,7 @@ void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
   zx::result<> import_result = controller_.engine_driver_client()->ImportBufferCollection(
       driver_buffer_collection_id, std::move(request->buffer_collection_token));
   if (import_result.is_error()) {
-    FDF_LOG(WARNING, "Cannot import BufferCollection to display driver: %s",
-            import_result.status_string());
+    fdf::warn("Cannot import BufferCollection to display driver: {}", import_result);
     completer.ReplyError(ZX_ERR_INTERNAL);
     return;
   }
@@ -323,9 +321,9 @@ void Client::SetBufferCollectionConstraints(
   zx::result<> result = controller_.engine_driver_client()->SetBufferCollectionConstraints(
       image_buffer_usage, collections.driver_buffer_collection_id);
   if (result.is_error()) {
-    FDF_LOG(WARNING,
-            "Cannot set BufferCollection constraints using imported buffer collection (id=%lu) %s.",
-            buffer_collection_id.value(), result.status_string());
+    fdf::warn(
+        "Cannot set BufferCollection constraints using imported buffer collection (id={}) {}.",
+        buffer_collection_id.value(), result);
     completer.ReplyError(ZX_ERR_INTERNAL);
   }
   completer.ReplySuccess();
@@ -376,12 +374,12 @@ void Client::DestroyLayer(DestroyLayerRequestView request,
 
   auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
-    FDF_LOG(ERROR, "Tried to destroy invalid layer %" PRIu64, layer_id.value());
+    fdf::error("Tried to destroy invalid layer {}", layer_id.value());
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
   if (layer->in_use()) {
-    FDF_LOG(ERROR, "Destroyed layer %" PRIu64 " which was in use", layer_id.value());
+    fdf::error("Destroyed layer {} which was in use", layer_id.value());
     TearDown(ZX_ERR_BAD_STATE);
     return;
   }
@@ -394,7 +392,7 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
   const display::DisplayId display_id = display::ToDisplayId(request->display_id);
   auto display_configs_it = display_configs_.find(display_id);
   if (!display_configs_it.IsValid()) {
-    FDF_LOG(WARNING, "SetDisplayMode called with unknown display ID: %" PRIu64, display_id.value());
+    fdf::warn("SetDisplayMode called with unknown display ID: {}", display_id.value());
     return;
   }
   DisplayConfig& display_config = *display_configs_it;
@@ -403,8 +401,8 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
   zx::result<std::span<const display::DisplayTiming>> display_timings_result =
       controller_.GetDisplayTimings(display_id);
   if (display_timings_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to get display timings for display #%" PRIu64 ": %s", display_id.value(),
-            display_timings_result.status_string());
+    fdf::error("Failed to get display timings for display #{}: {}", display_id.value(),
+               display_timings_result);
     TearDown(display_timings_result.status_value());
     return;
   }
@@ -428,15 +426,14 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
       });
 
   if (display_timing_it == display_timings.end()) {
-    FDF_LOG(ERROR, "Display mode not found: (%" PRIu32 " x %" PRIu32 ") @ %" PRIu32 " millihertz",
-            request->mode.active_area.width, request->mode.active_area.height,
-            request->mode.refresh_rate_millihertz);
+    fdf::error("Display mode not found: ({} x {}) @ {} millihertz", request->mode.active_area.width,
+               request->mode.active_area.height, request->mode.refresh_rate_millihertz);
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
 
   if (display_timings.size() == 1) {
-    FDF_LOG(INFO, "Display has only one timing available. Modeset is skipped.");
+    fdf::info("Display has only one timing available. Modeset is skipped.");
     return;
   }
 
@@ -450,8 +447,7 @@ void Client::SetDisplayColorConversion(SetDisplayColorConversionRequestView requ
   const display::DisplayId display_id = display::ToDisplayId(request->display_id);
   auto display_configs_it = display_configs_.find(display_id);
   if (!display_configs_it.IsValid()) {
-    FDF_LOG(WARNING, "SetDisplayColorConversion called with unknown display ID: %" PRIu64,
-            display_id.value());
+    fdf::warn("SetDisplayColorConversion called with unknown display ID: {}", display_id.value());
     return;
   }
   DisplayConfig& display_config = *display_configs_it;
@@ -487,7 +483,7 @@ void Client::SetDisplayColorConversion(SetDisplayColorConversionRequestView requ
 void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
                               SetDisplayLayersCompleter::Sync& /*_completer*/) {
   if (request->layer_ids.empty()) {
-    FDF_LOG(ERROR, "SetDisplayLayers called with an empty layer list");
+    fdf::error("SetDisplayLayers called with an empty layer list");
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
@@ -495,8 +491,7 @@ void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
   const display::DisplayId display_id = display::ToDisplayId(request->display_id);
   auto display_configs_it = display_configs_.find(display_id);
   if (!display_configs_it.IsValid()) {
-    FDF_LOG(WARNING, "SetDisplayLayers called with unknown display ID: %" PRIu64,
-            display_id.value());
+    fdf::warn("SetDisplayLayers called with unknown display ID: {}", display_id.value());
     return;
   }
   DisplayConfig& display_config = *display_configs_it;
@@ -513,13 +508,13 @@ void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
     display::DriverLayerId driver_layer_id(layer_id.value());
     auto layer = layers_.find(driver_layer_id);
     if (!layer.IsValid()) {
-      FDF_LOG(ERROR, "SetDisplayLayers called with unknown layer ID: %" PRIu64, layer_id.value());
+      fdf::error("SetDisplayLayers called with unknown layer ID: {}", layer_id.value());
       TearDown(ZX_ERR_INVALID_ARGS);
       return;
     }
 
     if (!layer->AppendToConfigLayerList(display_config.draft_layers_)) {
-      FDF_LOG(ERROR, "Tried to reuse an in-use layer");
+      fdf::error("Tried to reuse an in-use layer");
       TearDown(ZX_ERR_BAD_STATE);
       return;
     }
@@ -539,8 +534,7 @@ void Client::SetLayerPrimaryConfig(SetLayerPrimaryConfigRequestView request,
   display::DriverLayerId driver_layer_id(layer_id.value());
   auto layers_it = layers_.find(driver_layer_id);
   if (!layers_it.IsValid()) {
-    FDF_LOG(ERROR, "SetLayerPrimaryConfig called with unknown layer ID: %" PRIu64,
-            layer_id.value());
+    fdf::error("SetLayerPrimaryConfig called with unknown layer ID: {}", layer_id.value());
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
@@ -564,16 +558,15 @@ void Client::SetLayerPrimaryPosition(SetLayerPrimaryPositionRequestView request,
   display::DriverLayerId driver_layer_id(layer_id.value());
   auto layers_it = layers_.find(driver_layer_id);
   if (!layers_it.IsValid()) {
-    FDF_LOG(ERROR, "SetLayerPrimaryPosition called with unknown layer ID: %" PRIu64,
-            layer_id.value());
+    fdf::error("SetLayerPrimaryPosition called with unknown layer ID: {}", layer_id.value());
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
   Layer& layer = *layers_it;
 
   if (request->image_source_transformation > fhdt::wire::CoordinateTransformation::kRotateCcw270) {
-    FDF_LOG(ERROR, "Invalid transform %" PRIu8,
-            static_cast<uint8_t>(request->image_source_transformation));
+    fdf::error("Invalid transform %" PRIu8,
+               static_cast<uint8_t>(request->image_source_transformation));
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
@@ -597,7 +590,7 @@ void Client::SetLayerPrimaryAlpha(SetLayerPrimaryAlphaRequestView request,
   display::DriverLayerId driver_layer_id(layer_id.value());
   auto layers_it = layers_.find(driver_layer_id);
   if (!layers_it.IsValid()) {
-    FDF_LOG(ERROR, "SetLayerPrimaryAlpha called with unknown layer ID: %" PRIu64, layer_id.value());
+    fdf::error("SetLayerPrimaryAlpha called with unknown layer ID: {}", layer_id.value());
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
@@ -605,7 +598,7 @@ void Client::SetLayerPrimaryAlpha(SetLayerPrimaryAlphaRequestView request,
 
   if (request->mode > fhdt::wire::AlphaMode::kHwMultiply ||
       (!isnan(request->val) && (request->val < 0 || request->val > 1))) {
-    FDF_LOG(ERROR, "Invalid args %hhu %f", static_cast<uint8_t>(request->mode), request->val);
+    fdf::error("Invalid args {} {}", static_cast<uint8_t>(request->mode), request->val);
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
@@ -627,7 +620,7 @@ void Client::SetLayerColorConfig(SetLayerColorConfigRequestView request,
   display::DriverLayerId driver_layer_id(layer_id.value());
   auto layers_it = layers_.find(driver_layer_id);
   if (!layers_it.IsValid()) {
-    FDF_LOG(ERROR, "SetLayerColorConfig called with unknown layer ID: %" PRIu64, layer_id.value());
+    fdf::error("SetLayerColorConfig called with unknown layer ID: {}", layer_id.value());
     return;
   }
   Layer& layer = *layers_it;
@@ -636,7 +629,7 @@ void Client::SetLayerColorConfig(SetLayerColorConfigRequestView request,
       request->color.format,
       /*pixel_format_modifier_param=*/fuchsia_images2::wire::PixelFormatModifier::kLinear));
   if (request->color.bytes.size() < bytes_per_pixel) {
-    FDF_LOG(ERROR, "SetLayerColorConfig with invalid pixel format");
+    fdf::error("SetLayerColorConfig with invalid pixel format");
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
@@ -663,7 +656,7 @@ void Client::SetLayerImageImpl(display::LayerId layer_id, display::ImageId image
   display::DriverLayerId driver_layer_id(layer_id.value());
   auto layers_it = layers_.find(driver_layer_id);
   if (!layers_it.IsValid()) {
-    FDF_LOG(ERROR, "SetLayerImage called with unknown layer ID: %" PRIu64, layer_id.value());
+    fdf::error("SetLayerImage called with unknown layer ID: {}", layer_id.value());
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
@@ -671,7 +664,7 @@ void Client::SetLayerImageImpl(display::LayerId layer_id, display::ImageId image
 
   auto images_it = images_.find(image_id);
   if (!images_it.IsValid()) {
-    FDF_LOG(ERROR, "SetLayerImage called with unknown image ID: %" PRIu64, image_id.value());
+    fdf::error("SetLayerImage called with unknown image ID: {}", image_id.value());
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
@@ -694,7 +687,7 @@ void Client::SetLayerImageImpl(display::LayerId layer_id, display::ImageId image
   // and compare this Image's sysmem buffer collection information against the
   // `Layer`'s format support.
   if (image.metadata() != display::ImageMetadata(layer.draft_image_metadata())) {
-    FDF_LOG(ERROR, "SetLayerImage with mismatching layer and image metadata");
+    fdf::error("SetLayerImage with mismatching layer and image metadata");
     TearDown(ZX_ERR_BAD_STATE);
     return;
   }
@@ -724,7 +717,7 @@ void Client::DiscardConfig(DiscardConfigCompleter::Sync& /*_completer*/) { Disca
 void Client::ApplyConfig3(ApplyConfig3RequestView request,
                           ApplyConfig3Completer::Sync& _completer) {
   if (!request->has_stamp()) {
-    FDF_LOG(ERROR, "ApplyConfig3: stamp is required; none was provided");
+    fdf::error("ApplyConfig3: stamp is required; none was provided");
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
@@ -736,7 +729,7 @@ void Client::ApplyConfig3(ApplyConfig3RequestView request,
     draft_display_config_was_validated_ = CheckConfig(nullptr, nullptr);
 
     if (!draft_display_config_was_validated_) {
-      FDF_LOG(INFO, "ApplyConfig() called with invalid configuration; dropping the request");
+      fdf::info("ApplyConfig() called with invalid configuration; dropping the request");
       return;
     }
   }
@@ -744,10 +737,8 @@ void Client::ApplyConfig3(ApplyConfig3RequestView request,
   // Now that we can guarantee that the configuration will be applied, it is
   // safe to update the config stamp.
   if (new_config_stamp <= latest_config_stamp_) {
-    FDF_LOG(ERROR,
-            "Config stamp must be monotonically increasing. Previous stamp: %" PRIu64
-            " New stamp: %" PRIu64,
-            latest_config_stamp_.value(), new_config_stamp.value());
+    fdf::error("Config stamp must be monotonically increasing. Previous stamp: {} New stamp: {}",
+               latest_config_stamp_.value(), new_config_stamp.value());
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
@@ -774,14 +765,14 @@ void Client::ApplyConfig3(ApplyConfig3RequestView request,
     // that needs to know if there are any waiting images.
     for (LayerNode& draft_layer_node : display_config.draft_layers_) {
       if (!draft_layer_node.layer->ResolveDraftLayerProperties()) {
-        FDF_LOG(ERROR, "Failed to resolve draft layer properties for layer %" PRIu64,
-                draft_layer_node.layer->id().value());
+        fdf::error("Failed to resolve draft layer properties for layer {}",
+                   draft_layer_node.layer->id().value());
         TearDown(ZX_ERR_BAD_STATE);
         return;
       }
       if (!draft_layer_node.layer->ResolveDraftImage(&fences_, latest_config_stamp_)) {
-        FDF_LOG(ERROR, "Failed to resolve draft image for layer %" PRIu64,
-                draft_layer_node.layer->id().value());
+        fdf::error("Failed to resolve draft image for layer {}",
+                   draft_layer_node.layer->id().value());
         TearDown(ZX_ERR_BAD_STATE);
         return;
       }
@@ -842,8 +833,7 @@ void Client::SetVsyncEventDelivery(SetVsyncEventDeliveryRequestView request,
 void Client::SetVirtconMode(SetVirtconModeRequestView request,
                             SetVirtconModeCompleter::Sync& /*_completer*/) {
   if (priority_ != ClientPriority::kVirtcon) {
-    FDF_LOG(ERROR, "SetVirtconMode() called by %s client",
-            DebugStringFromClientPriority(priority_));
+    fdf::error("SetVirtconMode() called by {} client", DebugStringFromClientPriority(priority_));
     TearDown(ZX_ERR_INVALID_ARGS);
     return;
   }
@@ -922,7 +912,7 @@ void Client::StartCapture(StartCaptureRequestView request, StartCaptureCompleter
   const display::ImageId capture_image_id = display::ToImageId(request->image_id);
   auto image = capture_images_.find(capture_image_id);
   if (!image.IsValid()) {
-    FDF_LOG(ERROR, "Invalid Capture Image ID requested for capture");
+    fdf::error("Invalid Capture Image ID requested for capture");
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
@@ -963,8 +953,7 @@ void Client::SetDisplayPower(SetDisplayPowerRequestView request,
   const display::DisplayId display_id = display::ToDisplayId(request->display_id);
   auto display_configs_it = display_configs_.find(display_id);
   if (!display_configs_it.IsValid()) {
-    FDF_LOG(WARNING, "SetDisplayPower called with unknown display ID: %" PRIu64,
-            display_id.value());
+    fdf::warn("SetDisplayPower called with unknown display ID: {}", display_id.value());
     completer.ReplyError(ZX_ERR_NOT_FOUND);
   }
 
@@ -1262,7 +1251,7 @@ void Client::SetOwnership(bool is_owner) {
 
   fidl::Status result = NotifyOwnershipChange(/*client_has_ownership=*/is_owner);
   if (!result.ok()) {
-    FDF_LOG(ERROR, "Error writing remove message: %s", result.FormatDescription().c_str());
+    fdf::error("Error writing remove message: {}", result.FormatDescription());
   }
 
   // Only apply the current config if the client has previously applied a config.
@@ -1328,15 +1317,15 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
     fbl::AllocChecker alloc_checker;
     auto display_config = fbl::make_unique_checked<DisplayConfig>(&alloc_checker, added_display_id);
     if (!alloc_checker.check()) {
-      FDF_LOG(WARNING, "Out of memory when processing hotplug");
+      fdf::warn("Out of memory when processing hotplug");
       continue;
     }
 
     zx::result get_supported_pixel_formats_result =
         controller_.GetSupportedPixelFormats(display_config->id());
     if (get_supported_pixel_formats_result.is_error()) {
-      FDF_LOG(WARNING, "Failed to get pixel formats when processing hotplug: %s",
-              get_supported_pixel_formats_result.status_string());
+      fdf::warn("Failed to get pixel formats when processing hotplug: {}",
+                get_supported_pixel_formats_result);
       continue;
     }
     display_config->pixel_formats_ = std::move(get_supported_pixel_formats_result.value());
@@ -1344,8 +1333,8 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
     zx::result<std::span<const display::DisplayTiming>> display_timings_result =
         controller_.GetDisplayTimings(display_config->id());
     if (display_timings_result.is_error()) {
-      FDF_LOG(WARNING, "Failed to get display timings when processing hotplug: %s",
-              display_timings_result.status_string());
+      fdf::warn("Failed to get display timings when processing hotplug: {}",
+                display_timings_result);
       continue;
     }
 
@@ -1441,7 +1430,7 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
               static_cast<uint32_t>(display_info.GetVerticalSizeMm());
         });
     if (!found_display_info) {
-      FDF_LOG(ERROR, "Failed to get DisplayInfo for display %" PRIu64, added_display_id.value());
+      fdf::error("Failed to get DisplayInfo for display {}", added_display_id.value());
       ZX_DEBUG_ASSERT(false);
     }
 
@@ -1470,7 +1459,7 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
   if (!coded_configs.empty() || !fidl_removed_display_ids.empty()) {
     fidl::Status result = NotifyDisplayChanges(coded_configs, fidl_removed_display_ids);
     if (!result.ok()) {
-      FDF_LOG(ERROR, "Error writing remove message: %s", result.FormatDescription().c_str());
+      fdf::error("Error writing remove message: {}", result.FormatDescription());
     }
   }
 }
@@ -1512,11 +1501,11 @@ void Client::TearDown(zx_status_t epitaph) {
     case ZX_ERR_INVALID_ARGS:
     case ZX_ERR_BAD_STATE:
     case ZX_ERR_NO_MEMORY:
-      FDF_LOG(INFO, "TearDown() called with epitaph %s", zx_status_get_string(epitaph));
+      fdf::info("TearDown() called with epitaph {}", zx::make_result(epitaph));
       break;
     default:
-      FDF_LOG(INFO, "TearDown() called with epitaph %s; using catchall ZX_ERR_INTERNAL instead",
-              zx_status_get_string(epitaph));
+      fdf::info("TearDown() called with epitaph {}; using catchall ZX_ERR_INTERNAL instead",
+                zx::make_result(epitaph));
       epitaph = ZX_ERR_INTERNAL;
   }
 
@@ -1535,9 +1524,8 @@ void Client::TearDown(zx_status_t epitaph) {
   coordinator_listener_.AsyncTeardown();
 
   CleanUpAllImages();
-  FDF_LOG(INFO, "Releasing %zu capture images cur=%" PRIu64 ", pending=%" PRIu64,
-          capture_images_.size(), current_capture_image_id_.value(),
-          pending_release_capture_image_id_.value());
+  fdf::info("Releasing {} capture images cur={}, pending={}", capture_images_.size(),
+            current_capture_image_id_.value(), pending_release_capture_image_id_.value());
   current_capture_image_id_ = pending_release_capture_image_id_ = display::kInvalidImageId;
   capture_images_.clear();
 
@@ -1642,7 +1630,7 @@ void Client::AcknowledgeVsync(AcknowledgeVsyncRequestView request,
                               AcknowledgeVsyncCompleter::Sync& /*_completer*/) {
   display::VsyncAckCookie ack_cookie = display::ToVsyncAckCookie(request->cookie);
   acked_cookie_ = ack_cookie;
-  FDF_LOG(TRACE, "Cookie %" PRIu64 " Acked\n", ack_cookie.value());
+  fdf::trace("Cookie {} Acked\n", ack_cookie.value());
 }
 
 std::string GetObjectName(zx_handle_t handle) {
@@ -1698,7 +1686,7 @@ void ClientProxy::SetOwnership(bool is_owner) {
   fbl::AllocChecker ac;
   auto task = fbl::make_unique_checked<async::Task>(&ac);
   if (!ac.check()) {
-    FDF_LOG(WARNING, "Failed to allocate set ownership task");
+    fdf::warn("Failed to allocate set ownership task");
     return;
   }
   task->set_handler([this, client_handler = &handler_, is_owner](
@@ -1731,7 +1719,7 @@ void ClientProxy::ReapplySpecialConfigs() {
 
   zx::result<> result = controller_.engine_driver_client()->SetMinimumRgb(handler_.GetMinimumRgb());
   if (!result.is_ok()) {
-    FDF_LOG(ERROR, "Failed to reapply minimum RGB value: %s", result.status_string());
+    fdf::error("Failed to reapply minimum RGB value: {}", result);
   }
 }
 
@@ -1739,7 +1727,7 @@ void ClientProxy::ReapplyConfig() {
   fbl::AllocChecker ac;
   auto task = fbl::make_unique_checked<async::Task>(&ac);
   if (!ac.check()) {
-    FDF_LOG(WARNING, "Failed to reapply config");
+    fdf::warn("Failed to reapply config");
     return;
   }
 
@@ -1823,7 +1811,7 @@ zx_status_t ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_time_t
   if (number_of_vsyncs_sent_ >= kMaxVsyncMessages) {
     // We have reached/exceeded maximum allowed vsyncs without any acknowledgement. At this point,
     // start storing them.
-    FDF_LOG(TRACE, "Vsync not sent due to none acknowledgment.\n");
+    fdf::trace("Vsync not sent due to none acknowledgment.\n");
     ZX_DEBUG_ASSERT(vsync_ack_cookie == display::kInvalidVsyncAckCookie);
     if (buffered_vsync_messages_.full()) {
       buffered_vsync_messages_.pop();  // discard
@@ -1848,15 +1836,13 @@ zx_status_t ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_time_t
       // OOM errors are most likely not recoverable. Print the error message
       // once every kChannelErrorPrintFreq cycles.
       if (chn_oom_print_freq_++ == 0) {
-        FDF_LOG(ERROR, "Failed to send vsync event (OOM) (total occurrences: %lu)",
-                total_oom_errors_);
+        fdf::error("Failed to send vsync event (OOM) (total occurrences: {})", total_oom_errors_);
       }
       if (chn_oom_print_freq_ >= kChannelOomPrintFreq) {
         chn_oom_print_freq_ = 0;
       }
     } else {
-      FDF_LOG(WARNING, "Failed to send vsync event: %s",
-              event_sending_result.FormatDescription().c_str());
+      fdf::warn("Failed to send vsync event: {}", event_sending_result.FormatDescription());
     }
   });
 
@@ -1868,8 +1854,8 @@ zx_status_t ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_time_t
         handler_.NotifyVsync(vsync_message_data.display_id, zx::time{vsync_message_data.timestamp},
                              vsync_message_data.config_stamp, display::kInvalidVsyncAckCookie);
     if (!event_sending_result.ok()) {
-      FDF_LOG(ERROR, "Failed to send all buffered vsync messages: %s\n",
-              event_sending_result.FormatDescription().c_str());
+      fdf::error("Failed to send all buffered vsync messages: {}\n",
+                 event_sending_result.FormatDescription());
       return event_sending_result.status();
     }
     number_of_vsyncs_sent_++;

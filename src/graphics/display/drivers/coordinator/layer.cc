@@ -69,7 +69,7 @@ bool Layer::ResolveDraftLayerProperties() {
     applied_image_config_gen_ = draft_image_config_gen_;
 
     if (draft_image_ == nullptr) {
-      FDF_LOG(ERROR, "Tried to apply configuration with missing image");
+      fdf::error("Tried to apply configuration with missing image");
       return false;
     }
 

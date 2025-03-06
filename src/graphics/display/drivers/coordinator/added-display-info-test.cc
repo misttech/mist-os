@@ -8,7 +8,6 @@
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
-#include <zircon/status.h>
 
 #include <array>
 #include <memory>

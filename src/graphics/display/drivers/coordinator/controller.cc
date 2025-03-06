@@ -19,7 +19,6 @@
 #include <threads.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
-#include <zircon/status.h>
 #include <zircon/syscalls.h>
 #include <zircon/threads.h>
 #include <zircon/time.h>
@@ -136,7 +135,7 @@ void Controller::PopulateDisplayTimings(DisplayInfo& display_info) {
       fbl::AllocChecker ac;
       display_info.edid->timings.push_back(timing, &ac);
       if (!ac.check()) {
-        FDF_LOG(WARNING, "Edid skip allocation failed");
+        fdf::warn("Edid skip allocation failed");
         break;
       }
     }
@@ -170,15 +169,14 @@ void Controller::AddDisplay(std::unique_ptr<AddedDisplayInfo> added_display_info
   if (!display_info->edid.has_value() || !display_info->edid->timings.is_empty()) {
     display_info->InitializeInspect(&root_);
   } else {
-    FDF_LOG(WARNING, "Ignoring display with no compatible edid timings");
+    fdf::warn("Ignoring display with no compatible edid timings");
     added_ids = {};
   }
 
   fbl::AutoLock<fbl::Mutex> lock(mtx());
   auto display_it = displays_.find(display_id);
   if (display_it != displays_.end()) {
-    FDF_LOG(WARNING, "Display %" PRIu64 " is already created; add display request ignored",
-            display_id.value());
+    fdf::warn("Display {} is already created; add display request ignored", display_id.value());
     return;
   }
   displays_.insert(std::move(display_info));
@@ -201,8 +199,7 @@ void Controller::RemoveDisplay(display::DisplayId removed_display_id) {
   fbl::AutoLock lock(mtx());
   std::unique_ptr<DisplayInfo> removed_display = displays_.erase(removed_display_id);
   if (!removed_display) {
-    FDF_LOG(WARNING, "Display removal references unknown display ID: %" PRIu64,
-            removed_display_id.value());
+    fdf::warn("Display removal references unknown display ID: {}", removed_display_id.value());
     return;
   }
 
@@ -241,7 +238,7 @@ void Controller::DisplayEngineListenerOnDisplayAdded(const raw_display_info_t* b
         AddDisplay(std::move(added_display_info));
       });
   if (post_task_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to dispatch AddDisplay task: %s", post_task_result.status_string());
+    fdf::error("Failed to dispatch AddDisplay task: {}", post_task_result);
   }
 }
 
@@ -252,7 +249,7 @@ void Controller::DisplayEngineListenerOnDisplayRemoved(uint64_t banjo_display_id
       *client_dispatcher()->async_dispatcher(),
       [this, removed_display_id]() { RemoveDisplay(removed_display_id); });
   if (post_task_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to dispatch RemoveDisplay task: %s", post_task_result.status_string());
+    fdf::error("Failed to dispatch RemoveDisplay task: {}", post_task_result);
   }
 }
 
@@ -261,8 +258,7 @@ void Controller::DisplayEngineListenerOnCaptureComplete() {
                       "OnCaptureComplete() called before engine connection completed");
 
   if (!engine_info_->is_capture_supported()) {
-    FDF_LOG(ERROR,
-            "OnCaptureComplete() called by a display engine without display capture support");
+    fdf::error("OnCaptureComplete() called by a display engine without display capture support");
     return;
   }
 
@@ -285,8 +281,7 @@ void Controller::DisplayEngineListenerOnCaptureComplete() {
         }
       });
   if (post_task_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to dispatch capture complete task: %s",
-            post_task_result.status_string());
+    fdf::error("Failed to dispatch capture complete task: {}", post_task_result);
   }
 }
 
@@ -314,7 +309,7 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
     // wasn't processed on the Coordinator's client dispatcher yet. This means we can
     // discard the VSync, as it can't possibly report a configuration applied by
     // Coordinator clients.
-    FDF_LOG(ERROR, "Received VSync for unknown display ID: %" PRIu64, display_id.value());
+    fdf::error("Received VSync for unknown display ID: {}", display_id.value());
     return;
   }
   DisplayInfo& display_info = *displays_it;
@@ -423,7 +418,7 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
 
   if (!config_stamp_source.has_value()) {
     // The config was applied by a client that is no longer connected.
-    FDF_LOG(DEBUG, "VSync event dropped; the config owner disconnected");
+    fdf::debug("VSync event dropped; the config owner disconnected");
     return;
   }
 
@@ -576,7 +571,7 @@ void Controller::ApplyConfig(std::span<DisplayConfig*> display_configs,
 
   // TODO(https://fxbug.com/42080631): Remove multiple displays from the coordinator.
   if (display_count != 1) {
-    FDF_LOG(WARNING, "Attempted to ApplyConfiguration() with %" PRIu32 " displays", display_count);
+    fdf::warn("Attempted to ApplyConfiguration() with {} displays", display_count);
   }
 
   const config_stamp_t banjo_config_stamp = display::ToBanjoDriverConfigStamp(driver_config_stamp);
@@ -638,7 +633,7 @@ void Controller::HandleClientOwnershipChanges() {
 }
 
 void Controller::OnClientDead(ClientProxy* client) {
-  FDF_LOG(DEBUG, "Client %" PRIu64 " dead", client->client_id().value());
+  fdf::debug("Client {} dead", client->client_id().value());
   fbl::AutoLock lock(mtx());
   if (unbinding_) {
     return;
@@ -706,12 +701,12 @@ void PrintChannelKoids(ClientPriority client_priority, const zx::channel& channe
   size_t actual, avail;
   zx_status_t status = channel.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), &actual, &avail);
   if (status != ZX_OK || info.type != ZX_OBJ_TYPE_CHANNEL) {
-    FDF_LOG(DEBUG, "Could not get koids for handle(type=%d): %d", info.type, status);
+    fdf::debug("Could not get koids for handle(type={}): {}", info.type, status);
     return;
   }
   ZX_DEBUG_ASSERT(actual == avail);
-  FDF_LOG(INFO, "%s client connecting on channel (c=0x%lx, s=0x%lx)",
-          DebugStringFromClientPriority(client_priority), info.related_koid, info.koid);
+  fdf::info("{} client connecting on channel (c=0x{:x}, s=0x{:x})",
+            DebugStringFromClientPriority(client_priority), info.related_koid, info.koid);
 }
 
 }  // namespace
@@ -728,19 +723,19 @@ zx_status_t Controller::CreateClient(
   fbl::AllocChecker alloc_checker;
   auto post_task_state = fbl::make_unique_checked<DisplayTaskState>(&alloc_checker);
   if (!alloc_checker.check()) {
-    FDF_LOG(DEBUG, "Failed to alloc client task");
+    fdf::debug("Failed to alloc client task");
     return ZX_ERR_NO_MEMORY;
   }
 
   fbl::AutoLock lock(mtx());
   if (unbinding_) {
-    FDF_LOG(DEBUG, "Client connected during unbind");
+    fdf::debug("Client connected during unbind");
     return ZX_ERR_UNAVAILABLE;
   }
 
   if ((client_priority == ClientPriority::kVirtcon && virtcon_client_ != nullptr) ||
       (client_priority == ClientPriority::kPrimary && primary_client_ != nullptr)) {
-    FDF_LOG(DEBUG, "%s client already bound", DebugStringFromClientPriority(client_priority));
+    fdf::debug("{} client already bound", DebugStringFromClientPriority(client_priority));
     return ZX_ERR_ALREADY_BOUND;
   }
 
@@ -752,15 +747,15 @@ zx_status_t Controller::CreateClient(
   zx_status_t status = client->Init(&root_, std::move(coordinator_server_end),
                                     std::move(coordinator_listener_client_end));
   if (status != ZX_OK) {
-    FDF_LOG(DEBUG, "Failed to init client %d", status);
+    fdf::debug("Failed to init client {}", status);
     return status;
   }
 
   ClientProxy* client_ptr = client.get();
   clients_.push_back(std::move(client));
 
-  FDF_LOG(DEBUG, "New %s client [%" PRIu64 "] connected.",
-          DebugStringFromClientPriority(client_priority), client_ptr->client_id().value());
+  fdf::debug("New {} client [{}] connected.", DebugStringFromClientPriority(client_priority),
+             client_ptr->client_id().value());
 
   switch (client_priority) {
     case ClientPriority::kVirtcon:
@@ -868,14 +863,13 @@ zx::result<std::unique_ptr<Controller>> Controller::Create(
   auto controller = fbl::make_unique_checked<Controller>(
       &alloc_checker, std::move(engine_driver_client), std::move(dispatcher));
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for Controller");
+    fdf::error("Failed to allocate memory for Controller");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   zx::result<> initialize_result = controller->Initialize();
   if (initialize_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to initialize the Controller device: %s",
-            initialize_result.status_string());
+    fdf::error("Failed to initialize the Controller device: {}", initialize_result);
     return initialize_result.take_error();
   }
 
@@ -893,15 +887,15 @@ zx::result<> Controller::Initialize() {
       .ops = &display_engine_listener_protocol_ops_,
       .ctx = this,
   });
-  FDF_LOG(INFO, "Engine capabilities - max layers: %d, max displays: %d, display capture: %s",
-          int{engine_info_->max_layer_count()}, int{engine_info_->max_connected_display_count()},
-          engine_info_->is_capture_supported() ? "yes" : "no");
+  fdf::info("Engine capabilities - max layers: {}, max displays: {}, display capture: {}",
+            int{engine_info_->max_layer_count()}, int{engine_info_->max_connected_display_count()},
+            engine_info_->is_capture_supported() ? "yes" : "no");
 
   return zx::ok();
 }
 
 void Controller::PrepareStop() {
-  FDF_LOG(INFO, "Controller::PrepareStop");
+  fdf::info("Controller::PrepareStop");
 
   {
     fbl::AutoLock lock(mtx());
@@ -929,7 +923,7 @@ void Controller::PrepareStop() {
   }
 }
 
-void Controller::Stop() { FDF_LOG(INFO, "Controller::Stop"); }
+void Controller::Stop() { fdf::info("Controller::Stop"); }
 
 Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
                        fdf::UnownedSynchronizedDispatcher dispatcher)
@@ -955,7 +949,7 @@ Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
       root_.CreateUint("last_valid_apply_config_stamp", display::kInvalidConfigStamp.value());
 }
 
-Controller::~Controller() { FDF_LOG(INFO, "Controller::~Controller"); }
+Controller::~Controller() { fdf::info("Controller::~Controller"); }
 
 size_t Controller::ImportedImagesCountForTesting() const {
   fbl::AutoLock lock(mtx());
