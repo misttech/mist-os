@@ -9,17 +9,6 @@ use crate::{
     Client, ClientHandler, ClientSender, Responder, Server, ServerHandler, ServerSender, Transport,
 };
 
-pub struct Ignore;
-
-impl<T: Transport> ClientHandler<T> for Ignore {
-    fn on_event(&mut self, _: &ClientSender<T>, _: u64, _: T::RecvBuffer) {}
-}
-
-impl<T: Transport> ServerHandler<T> for Ignore {
-    fn on_one_way(&mut self, _: &ServerSender<T>, _: u64, _: T::RecvBuffer) {}
-    fn on_two_way(&mut self, _: &ServerSender<T>, _: u64, _: T::RecvBuffer, _: Responder) {}
-}
-
 pub async fn test_close_on_drop<T: Transport>(client_end: T, server_end: T) {
     struct TestServer {
         scope: Scope,
@@ -55,7 +44,7 @@ pub async fn test_close_on_drop<T: Transport>(client_end: T, server_end: T) {
 
     let mut client = Client::new(client_end);
     let client_sender = client.sender().clone();
-    let client_task = Task::spawn(async move { client.run(Ignore).await });
+    let client_task = Task::spawn(async move { client.run_sender().await });
     let mut server = Server::new(server_end);
     let server_task =
         Task::spawn(async move { server.run(TestServer { scope: Scope::new() }).await });
@@ -92,7 +81,7 @@ pub async fn test_one_way<T: Transport>(client_end: T, server_end: T) {
 
     let mut client = Client::new(client_end);
     let client_sender = client.sender().clone();
-    let client_task = Task::spawn(async move { client.run(Ignore).await });
+    let client_task = Task::spawn(async move { client.run_sender().await });
     let mut server = Server::new(server_end);
     let server_task = Task::spawn(async move { server.run(TestServer).await });
 
@@ -142,7 +131,7 @@ pub async fn test_two_way<T: Transport>(client_end: T, server_end: T) {
 
     let mut client = Client::new(client_end);
     let client_sender = client.sender().clone();
-    let client_task = Task::spawn(async move { client.run(Ignore).await });
+    let client_task = Task::spawn(async move { client.run_sender().await });
     let mut server = Server::new(server_end);
     let server_task =
         Task::spawn(async move { server.run(TestServer { scope: Scope::new() }).await });
@@ -203,7 +192,7 @@ pub async fn test_multiple_two_way<T: Transport>(client_end: T, server_end: T) {
 
     let mut client = Client::new(client_end);
     let client_sender = client.sender().clone();
-    let client_task = Task::spawn(async move { client.run(Ignore).await });
+    let client_task = Task::spawn(async move { client.run_sender().await });
     let mut server = Server::new(server_end);
     let server_task =
         Task::spawn(async move { server.run(TestServer { scope: Scope::new() }).await });
@@ -256,11 +245,18 @@ pub async fn test_event<T: Transport>(client_end: T, server_end: T) {
         }
     }
 
+    pub struct TestServer;
+
+    impl<T: Transport> ServerHandler<T> for TestServer {
+        fn on_one_way(&mut self, _: &ServerSender<T>, _: u64, _: T::RecvBuffer) {}
+        fn on_two_way(&mut self, _: &ServerSender<T>, _: u64, _: T::RecvBuffer, _: Responder) {}
+    }
+
     let mut client = Client::new(client_end);
     let client_task = Task::spawn(async move { client.run(TestClient).await });
     let mut server = Server::new(server_end);
     let server_sender = server.sender().clone();
-    let server_task = Task::spawn(async move { server.run(Ignore).await });
+    let server_task = Task::spawn(async move { server.run(TestServer).await });
 
     server_sender
         .send_event(10, &mut "Surprise!".to_string())

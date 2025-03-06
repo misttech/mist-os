@@ -15,6 +15,13 @@ pub struct ServerSender<T: Transport, P> {
     _protocol: PhantomData<P>,
 }
 
+unsafe impl<T, P> Send for ServerSender<T, P>
+where
+    T: Transport,
+    protocol::ServerSender<T>: Send,
+{
+}
+
 impl<T: Transport, P> ServerSender<T, P> {
     /// Wraps an untyped sender reference, returning a typed sender reference.
     pub fn wrap_untyped(client: &protocol::ServerSender<T>) -> &Self {
@@ -64,6 +71,8 @@ pub struct ServerAdapter<P, H> {
     _protocol: PhantomData<P>,
 }
 
+unsafe impl<P, H> Send for ServerAdapter<P, H> where H: Send {}
+
 impl<P, H> ServerAdapter<P, H> {
     /// Creates a new protocol server handler from a supported handler.
     pub fn from_untyped(handler: H) -> Self {
@@ -106,6 +115,13 @@ where
 pub struct Server<T: Transport, P> {
     server: protocol::Server<T>,
     _protocol: PhantomData<P>,
+}
+
+unsafe impl<T, P> Send for Server<T, P>
+where
+    T: Transport,
+    protocol::Server<T>: Send,
+{
 }
 
 impl<T: Transport, P> Server<T, P> {

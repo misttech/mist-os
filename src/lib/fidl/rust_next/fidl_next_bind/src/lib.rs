@@ -24,6 +24,8 @@
 mod buffer;
 mod client;
 mod endpoint;
+#[cfg(target_os = "fuchsia")]
+pub mod fuchsia;
 mod protocol;
 mod server;
 mod service;

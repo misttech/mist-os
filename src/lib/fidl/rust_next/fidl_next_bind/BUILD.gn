@@ -23,6 +23,14 @@ rustc_library("fidl_next_bind") {
     "//src/lib/fidl/rust_next/fidl_next_protocol",
   ]
 
+  if (is_fuchsia) {
+    sources += [ "src/fuchsia.rs" ]
+    deps += [
+      "//sdk/rust/zx",
+      "//src/lib/fuchsia-async",
+    ]
+  }
+
   with_unit_tests = true
 
   # NOTE: this library is still experimental

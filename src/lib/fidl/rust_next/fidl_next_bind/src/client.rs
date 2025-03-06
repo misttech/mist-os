@@ -7,7 +7,7 @@ use core::marker::PhantomData;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
-use fidl_next_protocol::{self as protocol, ProtocolError, Transport};
+use fidl_next_protocol::{self as protocol, IgnoreEvents, ProtocolError, Transport};
 
 use super::{ClientEnd, Method, ResponseBuffer};
 
@@ -16,6 +16,13 @@ use super::{ClientEnd, Method, ResponseBuffer};
 pub struct ClientSender<T: Transport, P> {
     sender: protocol::ClientSender<T>,
     _protocol: PhantomData<P>,
+}
+
+unsafe impl<T, P> Send for ClientSender<T, P>
+where
+    T: Transport,
+    protocol::ClientSender<T>: Send,
+{
 }
 
 impl<T: Transport, P> ClientSender<T, P> {
@@ -58,6 +65,8 @@ pub struct ClientAdapter<P, H> {
     _protocol: PhantomData<P>,
 }
 
+unsafe impl<P, H> Send for ClientAdapter<P, H> where H: Send {}
+
 impl<P, H> ClientAdapter<P, H> {
     /// Creates a new protocol client handler from a supported handler.
     pub fn from_untyped(handler: H) -> Self {
@@ -86,6 +95,13 @@ pub struct Client<T: Transport, P> {
     _protocol: PhantomData<P>,
 }
 
+unsafe impl<T, P> Send for Client<T, P>
+where
+    T: Transport,
+    protocol::Client<T>: Send,
+{
+}
+
 impl<T: Transport, P> Client<T, P> {
     /// Creates a new client from a client end.
     pub fn new(client_end: ClientEnd<T, P>) -> Self {
@@ -108,6 +124,11 @@ impl<T: Transport, P> Client<T, P> {
         P: ClientProtocol<T, H>,
     {
         self.client.run(ClientAdapter { handler, _protocol: PhantomData::<P> }).await
+    }
+
+    /// Runs the client, ignoring any incoming events.
+    pub async fn run_sender(&mut self) -> Result<(), ProtocolError<T::Error>> {
+        self.client.run(IgnoreEvents).await
     }
 }
 

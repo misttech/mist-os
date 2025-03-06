@@ -223,6 +223,11 @@ impl<T: Transport> Client<T> {
         result
     }
 
+    /// Runs the client with the [`IgnoreEvents`] handler.
+    pub async fn run_sender(&mut self) -> Result<(), ProtocolError<T::Error>> {
+        self.run(IgnoreEvents).await
+    }
+
     async fn run_to_completion<H>(&mut self, handler: &mut H) -> Result<(), ProtocolError<T::Error>>
     where
         H: ClientHandler<T>,
@@ -257,4 +262,11 @@ impl<T: Transport> Client<T> {
 
         Ok(())
     }
+}
+
+/// A client handler which ignores any incoming events.
+pub struct IgnoreEvents;
+
+impl<T: Transport> ClientHandler<T> for IgnoreEvents {
+    fn on_event(&mut self, _: &ClientSender<T>, _: u64, _: T::RecvBuffer) {}
 }
