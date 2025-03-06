@@ -92,12 +92,16 @@ zx_status_t PinnedMemoryTokenDispatcher::MapIntoIommu(uint32_t perms) TA_NO_THRE
     // Usermode drivers assume that if they requested a contiguous buffer in
     // memory, then the physical addresses will be contiguous.  Return an
     // error if we can't actually map the address contiguously.
-    zx_status_t status =
-        bti_->iommu().MapContiguous(bti_id, pinned_vmo_.vmo(), pinned_vmo_.offset(),
-                                    pinned_vmo_.size(), perms, &vaddr, &mapped_len);
-    if (status != ZX_OK) {
-      return status;
+    auto result = bti_->iommu().MapContiguous(bti_id, pinned_vmo_.vmo(), pinned_vmo_.offset(),
+                                              pinned_vmo_.size(), perms);
+    if (result.is_error() != ZX_OK) {
+      return result.status_value();
     }
+    map_token_ = *result;
+    [[maybe_unused]] zx_status_t status = bti_->iommu().QueryAddress(
+        bti_id, pinned_vmo_.vmo(), *result, 0, pinned_vmo_.size(), &vaddr, &mapped_len);
+    // We just mapped this so the query cannot fail.
+    ASSERT(status == ZX_OK);
 
     DEBUG_ASSERT(vaddr % min_contig == 0);
     DEBUG_ASSERT(mapped_addrs_.size() == 1);
@@ -105,16 +109,23 @@ zx_status_t PinnedMemoryTokenDispatcher::MapIntoIommu(uint32_t perms) TA_NO_THRE
     return ZX_OK;
   }
 
+  auto result =
+      bti_->iommu().Map(bti_id, pinned_vmo_.vmo(), pinned_vmo_.offset(), pinned_vmo_.size(), perms);
+  if (result.is_error()) {
+    return result.status_value();
+  }
+  map_token_ = *result;
+
   size_t remaining = pinned_vmo_.size();
-  uint64_t curr_offset = pinned_vmo_.offset();
+  uint64_t curr_offset = 0;
   size_t next_addr_idx = 0;
   while (remaining > 0) {
     dev_vaddr_t vaddr;
     size_t mapped_len;
-    zx_status_t status = bti_->iommu().Map(bti_id, pinned_vmo_.vmo(), curr_offset, remaining, perms,
-                                           &vaddr, &mapped_len);
+    zx_status_t status = bti_->iommu().QueryAddress(bti_id, pinned_vmo_.vmo(), map_token_,
+                                                    curr_offset, remaining, &vaddr, &mapped_len);
     if (status != ZX_OK) {
-      // We'll revert any partial mappings in on_zero_handles().
+      // We'll perform an unmap in on_zero_handles().
       return status;
     }
 
@@ -144,36 +155,12 @@ zx_status_t PinnedMemoryTokenDispatcher::UnmapFromIommuLocked() {
   auto& iommu = bti_->iommu();
   const uint64_t bus_txn_id = bti_->bti_id();
 
-  if (mapped_addrs_[0] == UINT64_MAX) {
+  if (map_token_ == UINT64_MAX) {
     // No work to do, nothing is mapped.
     return ZX_OK;
   }
-
-  zx_status_t status = ZX_OK;
-  if (pinned_vmo_.vmo()->is_contiguous()) {
-    status = iommu.Unmap(bus_txn_id, mapped_addrs_[0], pinned_vmo_.size());
-  } else {
-    const size_t min_contig = bti_->minimum_contiguity();
-    size_t remaining = pinned_vmo_.size();
-    for (size_t i = 0; i < mapped_addrs_.size(); ++i) {
-      dev_vaddr_t addr = mapped_addrs_[i];
-      if (addr == UINT64_MAX) {
-        break;
-      }
-
-      size_t size = ktl::min(remaining, min_contig);
-      DEBUG_ASSERT(size == min_contig || i == mapped_addrs_.size() - 1);
-      // Try to unmap all pages even if we get an error, and return the
-      // first error encountered.
-      zx_status_t err = iommu.Unmap(bus_txn_id, addr, size);
-      DEBUG_ASSERT(err == ZX_OK);
-      if (err != ZX_OK && status == ZX_OK) {
-        status = err;
-      }
-      remaining -= size;
-    }
-  }
-
+  zx_status_t status = iommu.Unmap(bus_txn_id, map_token_, pinned_vmo_.size());
+  map_token_ = UINT64_MAX;
   return status;
 }
 

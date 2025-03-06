@@ -34,8 +34,8 @@ class PinnedMemoryTokenDispatcher final
     : public SoloDispatcher<PinnedMemoryTokenDispatcher, ZX_DEFAULT_PMT_RIGHTS>,
       public fbl::ContainableBaseClasses<
           fbl::TaggedDoublyLinkedListable<PinnedMemoryTokenDispatcher*, PmtListTag>,
-          fbl::TaggedDoublyLinkedListable<fbl::RefPtr<PinnedMemoryTokenDispatcher>, PmtQuarantineListTag>
-      > {
+          fbl::TaggedDoublyLinkedListable<fbl::RefPtr<PinnedMemoryTokenDispatcher>,
+                                          PmtQuarantineListTag>> {
  public:
   ~PinnedMemoryTokenDispatcher();
 
@@ -87,6 +87,7 @@ class PinnedMemoryTokenDispatcher final
   bool explicitly_unpinned_ TA_GUARDED(get_lock()) = false;
 
   const fbl::RefPtr<BusTransactionInitiatorDispatcher> bti_;
+  uint64_t map_token_ TA_GUARDED(get_lock()) = UINT64_MAX;
   const fbl::Array<dev_vaddr_t> mapped_addrs_ TA_GUARDED(get_lock());
 
   // Set to true during Create() once we are fully initialized. Do not call
