@@ -16,7 +16,7 @@ use crate::task::{
 };
 use crate::vfs::{FdFlags, FdNumber};
 use starnix_uapi::uapi;
-use starnix_uapi::user_address::MultiArchUserRef;
+use starnix_uapi::user_address::{ArchSpecific, MultiArchUserRef};
 
 use starnix_logging::track_stub;
 use starnix_sync::{Locked, Unlocked};
@@ -1721,7 +1721,7 @@ mod tests {
                 &current_task,
                 P_PID,
                 id,
-                Default::default(),
+                MultiArchUserRef::null(&current_task),
                 0,
                 UserRef::default()
             ),
@@ -1733,7 +1733,7 @@ mod tests {
                 &current_task,
                 P_PID,
                 id,
-                Default::default(),
+                MultiArchUserRef::null(&current_task),
                 0xffff,
                 UserRef::default()
             ),

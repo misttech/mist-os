@@ -11,7 +11,7 @@ use starnix_types::arch::ArchWidth;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::math::round_down_to_increment;
 use starnix_uapi::signals::{SigSet, SIGBUS, SIGSEGV};
-use starnix_uapi::user_address::UserAddress;
+use starnix_uapi::user_address::{ArchSpecific, UserAddress};
 use starnix_uapi::{
     _aarch64_ctx, errno, error, esr_context, fpsimd_context, sigaction_t, sigaltstack, uapi,
     ESR_MAGIC, EXTRA_MAGIC, FPSIMD_MAGIC,

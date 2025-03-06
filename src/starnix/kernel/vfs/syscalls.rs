@@ -50,7 +50,9 @@ use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::seal_flags::SealFlags;
 use starnix_uapi::signals::SigSet;
 use starnix_uapi::unmount_flags::UnmountFlags;
-use starnix_uapi::user_address::{MultiArchUserRef, UserAddress, UserCString, UserRef};
+use starnix_uapi::user_address::{
+    ArchSpecific, MultiArchUserRef, UserAddress, UserCString, UserRef,
+};
 use starnix_uapi::user_value::UserValue;
 use starnix_uapi::vfs::{EpollEvent, FdEvents, ResolveFlags};
 use starnix_uapi::{
@@ -3422,7 +3424,7 @@ mod tests {
             &mut locked,
             &current_task,
             FdNumber::AT_FDCWD,
-            UserCString::new(path_addr),
+            UserCString::new(&current_task, path_addr),
             O_RDONLY | O_CLOEXEC,
             FileMode::default(),
         )?;
@@ -3457,7 +3459,7 @@ mod tests {
         let user_stat = UserRef::new(path_addr + file_path.len());
         current_task.write_object(user_stat, &default_statfs(0)).expect("failed to clear struct");
 
-        let user_path = UserCString::new(path_addr);
+        let user_path = UserCString::new(&current_task, path_addr);
 
         assert_eq!(sys_statfs(&mut locked, &current_task, user_path, user_stat), Ok(()));
 
@@ -3477,7 +3479,7 @@ mod tests {
         let no_slash_path_addr =
             map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task.write_memory(no_slash_path_addr, no_slash_path).expect("failed to write path");
-        let no_slash_user_path = UserCString::new(no_slash_path_addr);
+        let no_slash_user_path = UserCString::new(&current_task, no_slash_path_addr);
         sys_mkdirat(
             &mut locked,
             &current_task,
@@ -3491,7 +3493,7 @@ mod tests {
         let slash_path_addr =
             map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task.write_memory(slash_path_addr, slash_path).expect("failed to write path");
-        let slash_user_path = UserCString::new(slash_path_addr);
+        let slash_user_path = UserCString::new(&current_task, slash_path_addr);
 
         // Try to remove a directory without specifying AT_REMOVEDIR.
         // This should fail with EISDIR, irrespective of the terminating slash.
@@ -3543,9 +3545,9 @@ mod tests {
             &mut locked,
             &current_task,
             FdNumber::AT_FDCWD,
-            UserCString::new(old_path_addr),
+            UserCString::new(&current_task, old_path_addr),
             FdNumber::AT_FDCWD,
-            UserCString::new(new_path_addr),
+            UserCString::new(&current_task, new_path_addr),
             RenameFlags::NOREPLACE.bits(),
         )
         .unwrap_err();

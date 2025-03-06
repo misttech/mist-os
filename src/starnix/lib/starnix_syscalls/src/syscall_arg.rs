@@ -5,9 +5,7 @@
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::signals::UncheckedSignal;
-use starnix_uapi::user_address::{
-    MultiArchFrom, MultiArchUserRef, UserAddress, UserCString, UserRef,
-};
+use starnix_uapi::user_address::{MultiArchFrom, MultiArchUserRef, UserAddress, UserRef};
 use starnix_uapi::user_value::UserValue;
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
@@ -85,7 +83,6 @@ impl_from_syscall_arg! { for UserValue<u32>: arg => Self::from_raw(arg.raw() as 
 impl_from_syscall_arg! { for UserValue<usize>: arg => Self::from_raw(arg.raw() as usize) }
 impl_from_syscall_arg! { for UserValue<u64>: arg => Self::from_raw(arg.raw() as u64) }
 impl_from_syscall_arg! { for UserAddress: arg => Self::from(arg.raw()) }
-impl_from_syscall_arg! { for UserCString: arg => Self::new(arg.into()) }
 
 impl_from_syscall_arg! { for FileMode: arg => Self::from_bits(arg.raw() as u32) }
 impl_from_syscall_arg! { for DeviceType: arg => Self::from_bits(arg.raw()) }

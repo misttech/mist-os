@@ -7,6 +7,7 @@ use bstr::ByteSlice;
 use fuchsia_component::client::connect_to_protocol_sync;
 use linux_uapi::LINUX_REBOOT_CMD_POWER_OFF;
 use starnix_sync::{Locked, Unlocked};
+use starnix_uapi::user_address::ArchSpecific;
 use {
     fidl_fuchsia_buildinfo as buildinfo, fidl_fuchsia_hardware_power_statecontrol as fpower,
     fidl_fuchsia_recovery as frecovery,
@@ -263,7 +264,8 @@ pub fn sys_reboot(
     let arg_bytes = if matches!(cmd, LINUX_REBOOT_CMD_RESTART2) {
         // This is an arbitrary limit that should be large enough.
         const MAX_REBOOT_ARG_LEN: usize = 256;
-        current_task.read_c_string_to_vec(UserCString::new(arg), MAX_REBOOT_ARG_LEN)?
+        current_task
+            .read_c_string_to_vec(UserCString::new(current_task, arg), MAX_REBOOT_ARG_LEN)?
     } else {
         FsString::default()
     };

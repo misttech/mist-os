@@ -13,6 +13,8 @@ use starnix_syscalls::decls::Syscall;
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::errors::Errno;
 #[allow(unused_imports)]
+use starnix_uapi::user_address::ArchSpecific;
+#[allow(unused_imports)]
 use starnix_uapi::user_address::{Into32, Into64};
 
 macro_rules! syscall_match_generic {

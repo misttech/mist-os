@@ -327,7 +327,7 @@ pub fn sys_bpf(
             security::check_bpf_access(current_task, cmd, &pin_attr, attr_size)?;
             let bpf_fd = FdNumber::from_raw(pin_attr.bpf_fd as i32);
             let object = get_bpf_object(current_task, bpf_fd)?;
-            let path_addr = UserCString::new(UserAddress::from(pin_attr.pathname));
+            let path_addr = UserCString::new(current_task, UserAddress::from(pin_attr.pathname));
             let pathname = current_task.read_c_string_to_vec(path_addr, PATH_MAX as usize)?;
             let (parent, basename) = current_task.lookup_parent_at(
                 locked,
@@ -346,7 +346,7 @@ pub fn sys_bpf(
             let path_attr: bpf_attr__bindgen_ty_5 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_OBJ_GET {:?}", path_attr);
             security::check_bpf_access(current_task, cmd, &path_attr, attr_size)?;
-            let path_addr = UserCString::new(UserAddress::from(path_attr.pathname));
+            let path_addr = UserCString::new(current_task, UserAddress::from(path_attr.pathname));
             let open_flags = match path_attr.file_flags {
                 BPF_F_RDONLY => OpenFlags::RDONLY,
                 BPF_F_WRONLY => OpenFlags::WRONLY,

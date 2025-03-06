@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use starnix_uapi::user_address::ArchSpecific;
 use zx::sys::zx_thread_state_general_regs_t;
 
 use crate::loader::ThreadStartInfo;

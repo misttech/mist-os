@@ -9,7 +9,7 @@ use starnix_types::arch::ArchWidth;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS};
 use starnix_uapi::union::struct_with_union_into_bytes;
-use starnix_uapi::user_address::{MultiArchUserRef, UserAddress};
+use starnix_uapi::user_address::{ArchSpecific, MultiArchUserRef, UserAddress};
 use starnix_uapi::{
     c_int, c_uint, errno, error, pid_t, sigaction_t, sigaltstack, sigevent, sigval_t, uaddr, uapi,
     uid_t, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGEV_THREAD_ID, SIG_DFL, SIG_IGN, SI_KERNEL,

@@ -469,8 +469,7 @@ fn do_futex<Key: FutexKey>(
     // The timeout is interpreted differently by WAIT and WAIT_BITSET: WAIT takes a
     // timeout and WAIT_BITSET takes a deadline.
     let read_timespec = |current_task: &CurrentTask| {
-        let utime: TimeSpecPtr =
-            current_task.thread_state.arch_width.make_user_ref(timeout_or_value2);
+        let utime = TimeSpecPtr::new(current_task, timeout_or_value2);
         if utime.is_null() {
             Ok(timespec_from_time(zx::MonotonicInstant::INFINITE))
         } else {

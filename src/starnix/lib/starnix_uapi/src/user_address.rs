@@ -293,6 +293,10 @@ impl<T> fmt::Display for UserRef<T> {
     }
 }
 
+pub trait ArchSpecific {
+    fn is_arch32(&self) -> bool;
+}
+
 pub trait MultiArchFrom<T>: Sized {
     fn from_64(value: T) -> Self;
     fn from_32(value: T) -> Self;
@@ -334,8 +338,16 @@ pub enum MultiArchUserRef<T64, T32> {
 }
 
 impl<T64, T32> MultiArchUserRef<T64, T32> {
-    pub fn null() -> Self {
-        Self::default()
+    pub fn new<Arch: ArchSpecific, Addr: Into<UserAddress>>(arch: &Arch, address: Addr) -> Self {
+        if arch.is_arch32() {
+            Self::Arch32(address.into().into())
+        } else {
+            Self::Arch64(address.into().into())
+        }
+    }
+
+    pub fn null<Arch: ArchSpecific>(arch: &Arch) -> Self {
+        Self::new(arch, UserAddress::NULL)
     }
 
     pub fn from_32(addr: UserRef<T32>) -> Self {
@@ -352,16 +364,41 @@ impl<T64, T32> MultiArchUserRef<T64, T32> {
             Self::Arch32(addr) => addr.addr(),
         }
     }
+}
 
-    pub fn is_arch32(&self) -> bool {
+impl<T64: IntoBytes, T32: IntoBytes> MultiArchUserRef<T64, T32> {
+    pub fn next(&self) -> Self {
+        let offset =
+            if self.is_arch32() { std::mem::size_of::<T32>() } else { std::mem::size_of::<T64>() };
+        Self::new(self, self.addr() + offset)
+    }
+}
+
+impl<T64, T32> MultiArchUserRef<MultiArchUserRef<T64, T32>, MultiArchUserRef<T64, T32>> {
+    pub fn next(&self) -> Self {
+        let offset = if self.is_arch32() {
+            std::mem::size_of::<UserAddress32>()
+        } else {
+            std::mem::size_of::<UserAddress>()
+        };
+        Self::new(self, self.addr() + offset)
+    }
+}
+
+impl<T64, T32> ArchSpecific for MultiArchUserRef<T64, T32> {
+    fn is_arch32(&self) -> bool {
         matches!(self, Self::Arch32(_))
     }
 }
 
-impl<T64, T32> Default for MultiArchUserRef<T64, T32> {
-    fn default() -> Self {
-        // The 32/64 bits does not matter for the null pointer.
-        Self::Arch64(UserAddress::NULL.into())
+impl<T64, T32> ops::Deref for MultiArchUserRef<T64, T32> {
+    type Target = UserAddress;
+
+    fn deref(&self) -> &UserAddress {
+        match self {
+            Self::Arch64(addr) => addr.deref(),
+            Self::Arch32(addr) => addr.deref(),
+        }
     }
 }
 
@@ -383,41 +420,8 @@ impl<T64, T32> From<crate::uref32<T32>> for MultiArchUserRef<T64, T32> {
     }
 }
 
-#[derive(
-    Debug,
-    Default,
-    Clone,
-    Copy,
-    Eq,
-    PartialEq,
-    Hash,
-    Ord,
-    PartialOrd,
-    IntoBytes,
-    KnownLayout,
-    FromBytes,
-    Immutable,
-)]
-#[repr(transparent)]
-pub struct UserCString(UserAddress);
-
-impl UserCString {
-    pub fn new(addr: UserAddress) -> UserCString {
-        UserCString(addr)
-    }
-
-    pub fn addr(&self) -> UserAddress {
-        self.0
-    }
-}
-
-impl ops::Deref for UserCString {
-    type Target = UserAddress;
-
-    fn deref(&self) -> &UserAddress {
-        &self.0
-    }
-}
+pub type UserCString = MultiArchUserRef<u8, u8>;
+pub type UserCStringPtr = MultiArchUserRef<UserCString, UserCString>;
 
 impl fmt::Display for UserCString {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

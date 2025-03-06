@@ -26,6 +26,8 @@ use starnix_uapi::auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS};
 use starnix_uapi::elf::ElfNoteType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::{SigSet, Signal, UncheckedSignal, SIGCHLD, SIGKILL, SIGSTOP, SIGTRAP};
+#[allow(unused_imports)]
+use starnix_uapi::user_address::ArchSpecific;
 use starnix_uapi::user_address::{MultiArchUserRef, UserAddress, UserRef};
 use starnix_uapi::{
     clone_args, errno, error, iovec, pid_t, ptrace_syscall_info, uapi, user_regs_struct,
@@ -870,8 +872,10 @@ pub fn ptrace_dispatch(
         PTRACE_GETSIGINFO => {
             if let Some(ptrace) = &state.ptrace {
                 if let Some(signal) = ptrace.last_signal.as_ref() {
-                    let dst: MultiArchUserRef<uapi::siginfo_t, uapi::arch32::siginfo_t> =
-                        current_task.thread_state.arch_width.make_user_ref(data);
+                    let dst = MultiArchUserRef::<uapi::siginfo_t, uapi::arch32::siginfo_t>::new(
+                        current_task,
+                        data,
+                    );
                     signal.write(current_task, dst)?;
                 } else {
                     return error!(EINVAL);

@@ -39,7 +39,9 @@ use starnix_uapi::restricted_aspace::{
     RESTRICTED_ASPACE_SIZE,
 };
 use starnix_uapi::signals::{SIGBUS, SIGSEGV};
-use starnix_uapi::user_address::{MultiArchUserRef, UserAddress, UserCString, UserRef};
+use starnix_uapi::user_address::{
+    ArchSpecific, MultiArchUserRef, UserAddress, UserAddress32, UserCString, UserRef,
+};
 use starnix_uapi::user_value::UserValue;
 use starnix_uapi::{
     errno, error, MADV_DOFORK, MADV_DONTFORK, MADV_DONTNEED, MADV_KEEPONFORK, MADV_NOHUGEPAGE,
@@ -2297,6 +2299,18 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         }
     }
 
+    fn read_multi_arch_ptr<T64, T32>(
+        &self,
+        user: MultiArchUserRef<MultiArchUserRef<T64, T32>, MultiArchUserRef<T64, T32>>,
+    ) -> Result<MultiArchUserRef<T64, T32>, Errno> {
+        let address = if user.is_arch32() {
+            self.read_object::<UserAddress32>(user.addr().into())?.into()
+        } else {
+            self.read_object::<UserAddress>(user.addr().into())?
+        };
+        Ok(MultiArchUserRef::<T64, T32>::new(&user, address))
+    }
+
     /// Read an instance of T64 from `user` where the object has a different representation in 32
     /// and 64 bits.
     fn read_multi_arch_object<T64: FromBytes, T32: FromBytes + Into<T64>>(
@@ -2584,6 +2598,22 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         objects: &[T],
     ) -> Result<usize, Errno> {
         self.write_memory(user.addr(), objects.as_bytes())
+    }
+
+    fn write_multi_arch_ptr<Addr, T64, T32>(
+        &self,
+        user: Addr,
+        object: MultiArchUserRef<T64, T32>,
+    ) -> Result<usize, Errno>
+    where
+        Addr: Into<UserAddress>,
+    {
+        if object.is_arch32() {
+            let value = u32::try_from(object.ptr()).map_err(|_| errno!(EINVAL))?;
+            self.write_memory(user.into(), value.as_bytes())
+        } else {
+            self.write_memory(user.into(), object.ptr().as_bytes())
+        }
     }
 
     fn write_multi_arch_object<
@@ -4568,7 +4598,7 @@ mod tests {
         ma.write_memory(addr, &random_data).expect("failed to write test string");
         // We should read the same value minus the last byte (NUL char).
         assert_eq!(
-            ma.read_c_string_to_vec(UserCString::new(addr), max_size).unwrap(),
+            ma.read_c_string_to_vec(UserCString::new(&current_task, addr), max_size).unwrap(),
             random_data[..max_size - 1]
         );
     }
@@ -4591,13 +4621,16 @@ mod tests {
 
         // Expect error if the string is not terminated.
         assert_eq!(
-            ma.read_c_string_to_vec(UserCString::new(test_addr), max_size),
+            ma.read_c_string_to_vec(UserCString::new(&current_task, test_addr), max_size),
             error!(ENAMETOOLONG)
         );
 
         // Expect success if the string is terminated.
         ma.write_memory(addr + (page_size - 1), b"\0").expect("failed to write nul");
-        assert_eq!(ma.read_c_string_to_vec(UserCString::new(test_addr), max_size).unwrap(), "foo");
+        assert_eq!(
+            ma.read_c_string_to_vec(UserCString::new(&current_task, test_addr), max_size).unwrap(),
+            "foo"
+        );
 
         // Expect success if the string spans over two mappings.
         assert_eq!(
@@ -4609,15 +4642,21 @@ mod tests {
         // assert_eq!(mm.get_mapping_count(), 2);
         ma.write_memory(addr + (page_size - 1), b"bar\0").expect("failed to write extra chars");
         assert_eq!(
-            ma.read_c_string_to_vec(UserCString::new(test_addr), max_size).unwrap(),
+            ma.read_c_string_to_vec(UserCString::new(&current_task, test_addr), max_size).unwrap(),
             "foobar",
         );
 
         // Expect error if the string exceeds max limit
-        assert_eq!(ma.read_c_string_to_vec(UserCString::new(test_addr), 2), error!(ENAMETOOLONG));
+        assert_eq!(
+            ma.read_c_string_to_vec(UserCString::new(&current_task, test_addr), 2),
+            error!(ENAMETOOLONG)
+        );
 
         // Expect error if the address is invalid.
-        assert_eq!(ma.read_c_string_to_vec(UserCString::default(), max_size), error!(EFAULT));
+        assert_eq!(
+            ma.read_c_string_to_vec(UserCString::null(&current_task), max_size),
+            error!(EFAULT)
+        );
     }
 
     #[::fuchsia::test]
@@ -4702,11 +4741,17 @@ mod tests {
         ma.write_memory(test_addr, test_str).expect("failed to write test string");
 
         // Expect error if the string is not terminated.
-        assert_eq!(ma.read_c_string(UserCString::new(test_addr), buf), error!(ENAMETOOLONG));
+        assert_eq!(
+            ma.read_c_string(UserCString::new(&current_task, test_addr), buf),
+            error!(ENAMETOOLONG)
+        );
 
         // Expect success if the string is terminated.
         ma.write_memory(addr + (page_size - 1), b"\0").expect("failed to write nul");
-        assert_eq!(ma.read_c_string(UserCString::new(test_addr), buf).unwrap(), "foo");
+        assert_eq!(
+            ma.read_c_string(UserCString::new(&current_task, test_addr), buf).unwrap(),
+            "foo"
+        );
 
         // Expect success if the string spans over two mappings.
         assert_eq!(
@@ -4717,16 +4762,22 @@ mod tests {
         // mappings will be collapsed.
         //assert_eq!(mm.get_mapping_count(), 2);
         ma.write_memory(addr + (page_size - 1), b"bar\0").expect("failed to write extra chars");
-        assert_eq!(ma.read_c_string(UserCString::new(test_addr), buf).unwrap(), "foobar");
+        assert_eq!(
+            ma.read_c_string(UserCString::new(&current_task, test_addr), buf).unwrap(),
+            "foobar"
+        );
 
         // Expect error if the string does not fit in the provided buffer.
         assert_eq!(
-            ma.read_c_string(UserCString::new(test_addr), &mut [MaybeUninit::uninit(); 2]),
+            ma.read_c_string(
+                UserCString::new(&current_task, test_addr),
+                &mut [MaybeUninit::uninit(); 2]
+            ),
             error!(ENAMETOOLONG)
         );
 
         // Expect error if the address is invalid.
-        assert_eq!(ma.read_c_string(UserCString::default(), buf), error!(EFAULT));
+        assert_eq!(ma.read_c_string(UserCString::null(&current_task), buf), error!(EFAULT));
     }
 
     #[::fuchsia::test]

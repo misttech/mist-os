@@ -6,6 +6,8 @@
 
 use crate::SyscallArg;
 use starnix_types::arch::ArchWidth;
+#[allow(unused_imports)]
+use starnix_uapi::user_address::ArchSpecific;
 
 /// Helper for for_each_syscall! that adds any architecture-specific syscalls.
 ///

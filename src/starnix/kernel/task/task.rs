@@ -324,13 +324,13 @@ pub type RobustListHeadPtr =
     MultiArchUserRef<uapi::robust_list_head, uapi::arch32::robust_list_head>;
 pub type RobustListPtr = MultiArchUserRef<uapi::robust_list, uapi::arch32::robust_list>;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct RobustListHead {
     pub list: RobustList,
     pub futex_offset: isize,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct RobustList {
     pub next: RobustListPtr,
 }

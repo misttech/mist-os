@@ -26,7 +26,7 @@ use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
 use starnix_uapi::{ashmem_pin, device_type, errno, error, off_t, uapi, ASHMEM_NAME_LEN};
 use std::sync::Arc;
 
@@ -239,8 +239,10 @@ impl FileOps for Ashmem {
                 if self.is_mapped() {
                     return error!(EINVAL);
                 }
-                let mut name =
-                    current_task.read_c_string_to_vec(arg.into(), ASHMEM_NAME_LEN as usize)?;
+                let mut name = current_task.read_c_string_to_vec(
+                    UserCString::new(current_task, arg),
+                    ASHMEM_NAME_LEN as usize,
+                )?;
                 name.push(0); // Add a null terminator
 
                 state.name = name.into();

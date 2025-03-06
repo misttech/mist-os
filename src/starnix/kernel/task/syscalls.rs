@@ -30,7 +30,9 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::signals::{Signal, UncheckedSignal};
 use starnix_uapi::syslog::SyslogAction;
-use starnix_uapi::user_address::{MultiArchUserRef, UserAddress, UserCString, UserRef};
+use starnix_uapi::user_address::{
+    ArchSpecific, MultiArchUserRef, UserAddress, UserCString, UserCStringPtr, UserRef,
+};
 use starnix_uapi::vfs::ResolveFlags;
 use starnix_uapi::{
     __user_cap_data_struct, __user_cap_header_struct, c_char, c_int, clone_args, errno, error,
@@ -130,7 +132,7 @@ pub fn sys_clone3(
 
 fn read_c_string_vector(
     mm: &CurrentTask,
-    user_vector: UserRef<UserCString>,
+    user_vector: UserCStringPtr,
     elem_limit: usize,
     vec_limit: usize,
 ) -> Result<(Vec<CString>, usize), Errno> {
@@ -138,7 +140,7 @@ fn read_c_string_vector(
     let mut vector: Vec<CString> = vec![];
     let mut vec_size: usize = 0;
     loop {
-        let user_string = mm.read_object(user_current)?;
+        let user_string = mm.read_multi_arch_ptr(user_current)?;
         if user_string.is_null() {
             break;
         }
@@ -165,8 +167,8 @@ pub fn sys_execve(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     user_path: UserCString,
-    user_argv: UserRef<UserCString>,
-    user_environ: UserRef<UserCString>,
+    user_argv: UserCStringPtr,
+    user_environ: UserCStringPtr,
 ) -> Result<(), Errno> {
     sys_execveat(locked, current_task, FdNumber::AT_FDCWD, user_path, user_argv, user_environ, 0)
 }
@@ -176,8 +178,8 @@ pub fn sys_execveat(
     current_task: &mut CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
-    user_argv: UserRef<UserCString>,
-    user_environ: UserRef<UserCString>,
+    user_argv: UserCStringPtr,
+    user_environ: UserCStringPtr,
     flags: u32,
 ) -> Result<(), Errno> {
     if flags & !(AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW) != 0 {
@@ -929,7 +931,7 @@ pub fn sys_prctl(
             let name = if name_addr.is_null() {
                 None
             } else {
-                let name = UserCString::new(UserAddress::from(arg5));
+                let name = UserCString::new(current_task, UserAddress::from(arg5));
                 let name = current_task.read_c_string_to_vec(name, 256).map_err(|e| {
                     // An overly long name produces EINVAL and not ENAMETOOLONG in Linux 5.15.
                     if e.code == ENAMETOOLONG {
@@ -1214,7 +1216,7 @@ pub fn sys_getrlimit(
     resource: u32,
     user_rlimit: PrLimitRef,
 ) -> Result<(), Errno> {
-    do_prlimit64(locked, current_task, 0, resource, Default::default(), user_rlimit)
+    do_prlimit64(locked, current_task, 0, resource, PrLimitRef::null(current_task), user_rlimit)
 }
 
 pub fn sys_setrlimit(
@@ -1223,7 +1225,7 @@ pub fn sys_setrlimit(
     resource: u32,
     user_rlimit: PrLimitRef,
 ) -> Result<(), Errno> {
-    do_prlimit64(locked, current_task, 0, resource, user_rlimit, Default::default())
+    do_prlimit64(locked, current_task, 0, resource, user_rlimit, PrLimitRef::null(current_task))
 }
 
 pub fn sys_prlimit64(
@@ -1938,7 +1940,6 @@ mod tests {
     use starnix_syscalls::SUCCESS;
     use starnix_uapi::auth::Credentials;
     use starnix_uapi::{SCHED_FIFO, SCHED_NORMAL};
-    use std::{mem, u64};
 
     #[::fuchsia::test]
     async fn test_prctl_set_vma_anon_name() {
@@ -2346,24 +2347,26 @@ mod tests {
         let arg_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         let arg = b"test-arg\0";
         current_task.write_memory(arg_addr, arg).expect("failed to write test arg");
-        let arg_usercstr = UserCString::new(arg_addr);
-        let null_usercstr = UserCString::default();
+        let arg_usercstr = UserCString::new(&current_task, arg_addr);
+        let null_usercstr = UserCString::null(&current_task);
 
-        let argv_addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+        let argv_addr = UserCStringPtr::new(
+            &current_task,
+            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE),
+        );
         current_task
-            .write_object(argv_addr.into(), &arg_usercstr)
+            .write_multi_arch_ptr(argv_addr.addr(), arg_usercstr)
             .expect("failed to write UserCString");
         current_task
-            .write_object((argv_addr + mem::size_of::<UserCString>()).into(), &null_usercstr)
+            .write_multi_arch_ptr(argv_addr.next().addr(), null_usercstr)
             .expect("failed to write UserCString");
-        let argv_userref = UserRef::new(argv_addr);
 
         // The arguments size limit should include the null terminator.
-        assert!(read_c_string_vector(&current_task, argv_userref, 100, arg.len()).is_ok());
+        assert!(read_c_string_vector(&current_task, argv_addr, 100, arg.len()).is_ok());
         assert_eq!(
             read_c_string_vector(
                 &current_task,
-                argv_userref,
+                argv_addr,
                 100,
                 std::str::from_utf8(arg).unwrap().trim_matches('\0').len()
             ),

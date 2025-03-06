@@ -14,9 +14,9 @@ use crate::signals::{
 };
 use crate::task::{
     ExitStatus, Kernel, PidTable, ProcessGroup, PtraceCoreState, PtraceEvent, PtraceEventData,
-    PtraceOptions, RobustList, RobustListHead, SeccompFilter, SeccompFilterContainer,
-    SeccompNotifierHandle, SeccompState, SeccompStateValue, StopState, Task, TaskFlags,
-    ThreadGroup, ThreadGroupParent, Waiter,
+    PtraceOptions, RobustList, RobustListHead, RobustListHeadPtr, SeccompFilter,
+    SeccompFilterContainer, SeccompNotifierHandle, SeccompState, SeccompStateValue, StopState,
+    Task, TaskFlags, ThreadGroup, ThreadGroupParent, Waiter,
 };
 use crate::vfs::{
     CheckAccessReason, FdNumber, FdTable, FileHandle, FsContext, FsStr, LookupContext,
@@ -43,7 +43,7 @@ use starnix_uapi::file_mode::{Access, AccessCheck, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::signals::{SigSet, Signal, SIGBUS, SIGCHLD, SIGILL, SIGSEGV, SIGTRAP};
-use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::user_address::{ArchSpecific, UserAddress, UserRef};
 use starnix_uapi::vfs::ResolveFlags;
 use starnix_uapi::{
     clone_args, errno, error, from_status_like_fdio, pid_t, rlimit, sock_filter,
@@ -229,10 +229,6 @@ impl fmt::Debug for CurrentTask {
 impl CurrentTask {
     pub fn new(task: OwnedRef<Task>, thread_state: ThreadState) -> Self {
         Self { task, thread_state, _local_marker: Default::default() }
-    }
-
-    pub fn is_arch32(&self) -> bool {
-        self.thread_state.arch_width.is_arch32()
     }
 
     pub fn trigger_delayed_releaser<L>(&self, locked: &mut Locked<'_, L>)
@@ -997,7 +993,7 @@ impl CurrentTask {
 
             let mut persistent_info = self.persistent_info.lock();
             state.set_sigaltstack(None);
-            state.robust_list_head = Default::default();
+            state.robust_list_head = RobustListHeadPtr::null(self);
 
             // From <https://man7.org/linux/man-pages/man2/execve.2.html>:
             //
@@ -1536,7 +1532,7 @@ impl CurrentTask {
                 false,
                 SeccompState::default(),
                 SeccompFilterContainer::default(),
-                Default::default(),
+                RobustListHeadPtr::null(&ArchWidth::Arch64),
                 default_timerslack,
                 security_state,
             )),
@@ -1605,7 +1601,7 @@ impl CurrentTask {
             false,
             SeccompState::default(),
             SeccompFilterContainer::default(),
-            Default::default(),
+            RobustListHeadPtr::null(&ArchWidth::Arch64),
             default_timerslack_ns,
             security_state,
         ))
@@ -1739,7 +1735,7 @@ impl CurrentTask {
         let scheduler_policy;
         let no_new_privs;
         let seccomp_filters;
-        let robust_list_head = Default::default();
+        let robust_list_head = RobustListHeadPtr::null(self);
         let child_signal_mask;
         let timerslack_ns;
         let uts_ns;
@@ -2128,6 +2124,12 @@ impl CurrentTask {
             .expect("failed to create task in test");
 
         result.into()
+    }
+}
+
+impl ArchSpecific for CurrentTask {
+    fn is_arch32(&self) -> bool {
+        self.thread_state.arch_width.is_arch32()
     }
 }
 

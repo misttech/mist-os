@@ -831,7 +831,8 @@ impl FileOps for DeviceMapper {
                 while num_targets < info.target_count {
                     let target_ref = UserRef::<uapi::dm_target_spec>::new(start_addr);
                     let target = current_task.read_object(target_ref)?;
-                    let parameter_cstring = UserCString::new(target_ref.next().addr());
+                    let parameter_cstring =
+                        UserCString::new(current_task, target_ref.next().addr());
                     let parameters = current_task.read_c_string_to_vec(
                         parameter_cstring,
                         target.next as usize - std::mem::size_of::<uapi::dm_target_spec>(),
@@ -843,7 +844,7 @@ impl FileOps for DeviceMapper {
                                 + std::mem::size_of::<i32>(),
                         )
                         .ok_or_else(|| errno!(EINVAL))?;
-                    let target_type_cstring = UserCString::new(target_type_addr);
+                    let target_type_cstring = UserCString::new(current_task, target_type_addr);
                     let target_type = current_task
                         .read_c_string_to_vec(target_type_cstring, DM_MAX_TYPE_NAME as usize)?;
 
