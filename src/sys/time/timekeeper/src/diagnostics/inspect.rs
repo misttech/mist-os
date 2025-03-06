@@ -708,7 +708,6 @@ mod tests {
                 primary_track: contains {
                     last_update: contains {
                         retrieval_reference: AnyProperty,
-                        generation_counter: 2u64,
                         reference_offset: reference_time.into_nanos() as i64,
                         utc_offset: (BACKSTOP_TIME + 2345) as i64,
                         rate_ppm: RATE_ADJUST as i64,
@@ -958,7 +957,6 @@ mod tests {
                     },
                     last_update: contains {
                         retrieval_reference: AnyProperty,
-                        generation_counter: 0u64,
                         reference_offset: AnyProperty,
                         utc_offset: AnyProperty,
                         rate_ppm: AnyProperty,

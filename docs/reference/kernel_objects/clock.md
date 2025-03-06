@@ -127,7 +127,8 @@ the details structure returned to callers will include:
 + An observation of the system tick counter, which was taken during the
   observation of the clock.
 + All of the static properties of the clock defined at creation time.
-+ A generation nonce.
++ A generation nonce whose value changes every time the clock's underlying
+  transformation is updated.
 
 Advanced users may use these details to not only compute a recent `now` value
 for the clock (by transforming the reported ticks-now observation using the
@@ -135,7 +136,12 @@ ticks-to-clock transformation, both reported by the get details operation), but
 to also:
 
 + Know whether the clock transformation has been changed since the last
-  `zx_clock_get_details()` operation (using the generation nonce).
+  `zx_clock_get_details()` operation (using the generation nonce).  Note that a
+  clock's generation nonce is not guaranteed to start at any given value, nor to
+  change in any specific way (such as incrementing by a fixed amount) with each
+  update.  Instead, with every update the generation nonce will be changed to a
+  value which is guaranteed to be different from the value it had immediately
+  before the update took place.
 + Compose the clock transformation with other clocks' transformations to reason
   about the relationship between two clocks.
 + Know the clock maintainer's best estimate of [error bound](#error-bound).
