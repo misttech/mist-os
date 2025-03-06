@@ -436,7 +436,13 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event,
   // above (with success or failure), and we did so under the wait_on_event_lock_ so we know that
   // there is no other processing loop that might still be working on our request.
   zx_status_t wait_result = event->Wait(Deadline::infinite_past());
-  ASSERT(wait_result != ZX_ERR_TIMED_OUT);
+  // TODO(https://fxbug.dev/400838270): There is a race where PageSource::Detach could be
+  // completing requests and already have done ClearAsyncRequest, but not yet called Signal on the
+  // event. If the request was cleared prior to us performing DequeueRequest then this leaves us in
+  // the position where the wait will have timed out. Once we can either differentiate or avoid this
+  // this case the ASSERT below should be uncommented. Note that in the event we are in this case
+  // failing to complete the wait is fine, since the source is ultimately getting detached.
+  // ASSERT(wait_result != ZX_ERR_TIMED_OUT);
   if (wait_result == ZX_OK) {
     kcounter_add(physical_reclaim_succeeded_requests, 1);
   } else {
