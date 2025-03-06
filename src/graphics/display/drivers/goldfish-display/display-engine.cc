@@ -16,7 +16,6 @@
 #include <lib/image-format/image_format.h>
 #include <lib/trace/event.h>
 #include <lib/zx/result.h>
-#include <zircon/status.h>
 
 #include <algorithm>
 #include <cstddef>
@@ -39,8 +38,6 @@
 
 namespace goldfish {
 namespace {
-
-const char* kTag = "goldfish-display";
 
 constexpr display::DisplayId kPrimaryDisplayId(1);
 
@@ -94,15 +91,15 @@ zx::result<> DisplayEngine::Initialize() {
   // Set up display and set up flush task for each device.
   zx_status_t status = SetupPrimaryDisplay();
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to set up the primary display: %s", zx_status_get_string(status));
+    fdf::error("Failed to set up the primary display: {}", zx::make_result(status));
     return zx::error(status);
   }
 
   status = async::PostTask(display_event_dispatcher_,
                            [this] { FlushPrimaryDisplay(display_event_dispatcher_); });
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to post display flush task on the display event loop: %s",
-            zx_status_get_string(status));
+    fdf::error("Failed to post display flush task on the display event loop: {}",
+               zx::make_result(status));
     return zx::error(status);
   }
 
@@ -215,7 +212,7 @@ zx::result<display::DriverImageId> DisplayEngine::ImportVmoImage(
   zx::result<HostColorBufferId> create_result = rc_->CreateColorBuffer(
       image_metadata.dimensions.width, image_metadata.dimensions.height, color_buffer_format);
   if (create_result.is_error()) {
-    FDF_LOG(ERROR, "%s: failed to create color buffer: %s", kTag, create_result.status_string());
+    fdf::error("failed to create color buffer: {}", create_result);
     return create_result.take_error();
   }
   color_buffer->host_color_buffer_id = create_result.value();
@@ -229,8 +226,7 @@ zx_status_t DisplayEngine::DisplayEngineImportBufferCollection(
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   if (buffer_collections_.find(driver_buffer_collection_id) != buffer_collections_.end()) {
-    FDF_LOG(ERROR, "Buffer Collection (id=%lu) already exists",
-            driver_buffer_collection_id.value());
+    fdf::error("Buffer Collection (id={}) already exists", driver_buffer_collection_id.value());
     return ZX_ERR_ALREADY_EXISTS;
   }
 
@@ -247,8 +243,7 @@ zx_status_t DisplayEngine::DisplayEngineImportBufferCollection(
               fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>(std::move(collection_token)))
           .Build());
   if (!bind_result.ok()) {
-    FDF_LOG(ERROR, "Cannot complete FIDL call BindSharedCollection: %s",
-            bind_result.status_string());
+    fdf::error("Cannot complete FIDL call BindSharedCollection: {}", bind_result.status_string());
     return ZX_ERR_INTERNAL;
   }
 
@@ -262,8 +257,8 @@ zx_status_t DisplayEngine::DisplayEngineReleaseBufferCollection(
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
-    FDF_LOG(ERROR, "Cannot release buffer collection %lu: buffer collection doesn't exist",
-            driver_buffer_collection_id.value());
+    fdf::error("Cannot release buffer collection {}: buffer collection doesn't exist",
+               driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
   buffer_collections_.erase(driver_buffer_collection_id);
@@ -277,8 +272,8 @@ zx_status_t DisplayEngine::DisplayEngineImportImage(const image_metadata_t* imag
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
-    FDF_LOG(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)",
-            driver_buffer_collection_id.value());
+    fdf::error("ImportImage: Cannot find imported buffer collection (id={})",
+               driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
 
@@ -316,12 +311,12 @@ zx_status_t DisplayEngine::DisplayEngineImportImage(const image_metadata_t* imag
   }
 
   if (!vmo.is_valid()) {
-    FDF_LOG(ERROR, "%s: invalid index", kTag);
+    fdf::error("invalid index: {}", index);
     return ZX_ERR_OUT_OF_RANGE;
   }
 
   if (!collection_info->settings()->image_format_constraints()) {
-    FDF_LOG(ERROR, "Buffer collection doesn't have valid image format constraints");
+    fdf::error("Buffer collection doesn't have valid image format constraints");
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -340,8 +335,7 @@ zx_status_t DisplayEngine::DisplayEngineImportImage(const image_metadata_t* imag
   }
 
   if (offset != 0) {
-    FDF_LOG(ERROR, "VMO offset (%lu) not supported for Goldfish device local color buffers",
-            offset);
+    fdf::error("VMO offset ({}) not supported for Goldfish device local color buffers", offset);
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -401,7 +395,7 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
     // TODO(https://fxbug.dev/42111684): Returning error will cause blank screen if scenic
     // requests color correction. For now, lets pretend we support it, until a proper fix is
     // done (either from scenic or from core display)
-    FDF_LOG(WARNING, "%s: Color Correction not support. No error reported", __func__);
+    fdf::warn("Color Correction not supported.");
   }
 
   const layer_t& layer0 = display_config.layer_list[0];
@@ -466,7 +460,7 @@ zx_status_t DisplayEngine::PresentPrimaryDisplayConfig(const DisplayConfig& disp
   zx::eventpair event_display, event_sync_device;
   zx_status_t status = zx::eventpair::create(0u, &event_display, &event_sync_device);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "%s: zx_eventpair_create failed: %d", kTag, status);
+    fdf::error("zx_eventpair_create failed: {}", zx::make_result(status));
     return status;
   }
 
@@ -485,10 +479,10 @@ zx_status_t DisplayEngine::PresentPrimaryDisplayConfig(const DisplayConfig& disp
         TRACE_DURATION("gfx", "DisplayEngine::SyncEventHandler", "config_stamp",
                        pending_config_stamp.value());
         if (status == ZX_ERR_CANCELED) {
-          FDF_LOG(INFO, "Wait for config stamp %lu cancelled.", pending_config_stamp.value());
+          fdf::info("Wait for config stamp {} cancelled.", pending_config_stamp.value());
           return;
         }
-        ZX_DEBUG_ASSERT_MSG(status == ZX_OK, "Invalid wait status: %d\n", status);
+        ZX_DEBUG_ASSERT_MSG(status == ZX_OK, "Invalid wait status: %d", status);
 
         // When the eventpair in |current_wait| is signalled, all the pending waits
         // that are queued earlier than that eventpair will be removed from the list
@@ -521,8 +515,8 @@ zx_status_t DisplayEngine::PresentPrimaryDisplayConfig(const DisplayConfig& disp
         color_buffer->host_color_buffer_id, color_buffer->pinned_vmo, color_buffer->width,
         color_buffer->height, color_buffer->format, color_buffer->size);
     if (status.is_error() || status.value()) {
-      FDF_LOG(ERROR, "%s : color buffer update failed: %d:%u", kTag, status.status_value(),
-              status.value_or(0));
+      fdf::error("color buffer update failed: {}:{}", zx::make_result(status.status_value()),
+                 status.value_or(0));
       return status.is_error() ? status.status_value() : ZX_ERR_INTERNAL;
     }
   }
@@ -531,21 +525,18 @@ zx_status_t DisplayEngine::PresentPrimaryDisplayConfig(const DisplayConfig& disp
   {
     zx_status_t status = rc_->FbPost(color_buffer->host_color_buffer_id);
     if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to call render control command FbPost: %s",
-              zx_status_get_string(status));
+      fdf::error("Failed to call render control command FbPost: {}", zx::make_result(status));
       return status;
     }
 
     fbl::AutoLock lock(&lock_);
     fidl::WireResult result = control_->CreateSyncFence(std::move(event_sync_device));
     if (!result.ok()) {
-      FDF_LOG(ERROR, "Failed to call FIDL CreateSyncFence: %s",
-              result.error().FormatDescription().c_str());
+      fdf::error("Failed to call FIDL CreateSyncFence: {}", result.error().FormatDescription());
       return status;
     }
     if (result.value().is_error()) {
-      FDF_LOG(ERROR, "Failed to create SyncFence: %s",
-              zx_status_get_string(result.value().error_value()));
+      fdf::error("Failed to create SyncFence: {}", zx::make_result(result.value().error_value()));
       return result.value().error_value();
     }
   }
@@ -590,7 +581,7 @@ void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* disp
 
     zx_status_t status = color_buffer->vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo);
     if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to duplicate vmo: %s", zx_status_get_string(status));
+      fdf::error("Failed to duplicate vmo: {}", zx::make_result(status));
       return;
     }
 
@@ -599,18 +590,16 @@ void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* disp
 
       fidl::WireResult result = control_->GetBufferHandle(std::move(vmo));
       if (!result.ok()) {
-        FDF_LOG(ERROR, "Failed to call FIDL GetBufferHandle: %s",
-                result.error().FormatDescription().c_str());
+        fdf::error("Failed to call FIDL GetBufferHandle: {}", result.error().FormatDescription());
         return;
       }
       if (result.value().res != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to get ColorBuffer handle: %s",
-                zx_status_get_string(result.value().res));
+        fdf::error("Failed to get ColorBuffer handle: {}", zx::make_result(result.value().res));
         return;
       }
       if (result.value().type != fuchsia_hardware_goldfish::BufferHandleType::kColorBuffer) {
-        FDF_LOG(ERROR, "Buffer handle type invalid. Expected ColorBuffer, actual %" PRIu32,
-                static_cast<uint32_t>(result.value().type));
+        fdf::error("Buffer handle type invalid. Expected ColorBuffer, actual {}",
+                   static_cast<uint32_t>(result.value().type));
         return;
       }
 
@@ -627,11 +616,10 @@ void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* disp
         zx::result<RenderControl::RcResult> status = rc_->SetColorBufferVulkanMode(
             color_buffer->host_color_buffer_id, /*mode=*/kVulkanGlSharedMode);
         if (status.is_error()) {
-          FDF_LOG(ERROR, "Failed to call render control SetColorBufferVulkanMode: %s",
-                  status.status_string());
+          fdf::error("Failed to call render control SetColorBufferVulkanMode: {}", status);
         }
         if (status.value() != 0) {
-          FDF_LOG(ERROR, "Render control host failed to set vulkan mode: %d", status.value());
+          fdf::error("Render control host failed to set vulkan mode: {}", status.value());
         }
       }
     }
@@ -651,8 +639,8 @@ zx_status_t DisplayEngine::DisplayEngineSetBufferCollectionConstraints(
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
-    FDF_LOG(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)",
-            driver_buffer_collection_id.value());
+    fdf::error("ImportImage: Cannot find imported buffer collection (id={})",
+               driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
   const fidl::SyncClient<fuchsia_sysmem2::BufferCollection>& collection = it->second;
@@ -706,7 +694,7 @@ zx_status_t DisplayEngine::DisplayEngineSetBufferCollectionConstraints(
   request.constraints(std::move(constraints));
   auto set_result = collection->SetConstraints(std::move(request));
   if (set_result.is_error()) {
-    FDF_LOG(ERROR, "%s: failed to set constraints", kTag);
+    fdf::error("failed to set constraints");
     return set_result.error_value().status();
   }
 
@@ -721,12 +709,11 @@ zx_status_t DisplayEngine::SetupPrimaryDisplay() {
       rc_->SetDisplayPose(kPrimaryHostDisplayId, /*x=*/0, /*y=*/0, primary_display_device_.width_px,
                           primary_display_device_.height_px);
   if (status.is_error()) {
-    FDF_LOG(ERROR, "Failed to call render control SetDisplayPose command: %s",
-            status.status_string());
+    fdf::error("Failed to call render control SetDisplayPose command: {}", status);
     return status.error_value();
   }
   if (status.value() != 0) {
-    FDF_LOG(ERROR, "Render control host failed to set display pose: %d", status.value());
+    fdf::error("Render control host failed to set display pose: {}", status.value());
     return ZX_ERR_INTERNAL;
   }
   primary_display_device_.expected_next_flush = async::Now(display_event_dispatcher_);

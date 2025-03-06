@@ -129,7 +129,7 @@ zx_status_t RenderControl::InitRcPipe(
     fidl::WireSyncClient<fuchsia_hardware_goldfish_pipe::GoldfishPipe> pipe) {
   pipe_io_ = std::make_unique<PipeIo>(std::move(pipe), kPipeName);
   if (!pipe_io_->valid()) {
-    FDF_LOG(ERROR, "PipeIo failed to initialize");
+    fdf::error("PipeIo failed to initialize");
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -137,7 +137,7 @@ zx_status_t RenderControl::InitRcPipe(
   PipeIo::WriteSrc src[] = {{.data = ToByteSpan(kClientFlags)}};
   auto status = pipe_io_->Write(src, true);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Write client flags failed");
+    fdf::error("Write client flags failed");
     return ZX_ERR_NOT_SUPPORTED;
   }
 
