@@ -1,0 +1,33 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("@io_bazel_rules_go//go:def.bzl", "go_binary")
+load("@platforms//host:constraints.bzl", "HOST_CONSTRAINTS")
+load("//build/tools/bazel2gn/bazel_rules:defs.bzl", "install_host_tools", "sdk_host_tool")
+
+go_binary(
+    name = "fidlgen_hlcpp",
+    srcs = ["main.go"],
+    target_compatible_with = HOST_CONSTRAINTS,
+    deps = [
+        "//tools/fidl/fidlgen_hlcpp/codegen",
+        "//tools/fidl/fidlgen_hlcpp/coding_tables",
+        "//tools/fidl/lib/fidlgen_cpp",
+    ],
+)
+
+sdk_host_tool(
+    name = "fidlgen_hlcpp_sdk",
+    category = "partner",
+    output_name = "fidlgen_hlcpp",
+    target_compatible_with = HOST_CONSTRAINTS,
+    deps = [":fidlgen_hlcpp"],
+)
+
+install_host_tools(
+    name = "host",
+    outputs = ["fidlgen_hlcpp"],
+    target_compatible_with = HOST_CONSTRAINTS,
+    deps = [":fidlgen_hlcpp"],
+)
