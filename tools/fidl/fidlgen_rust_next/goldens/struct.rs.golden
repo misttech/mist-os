@@ -235,5 +235,8 @@ where
     }
 }
 
+/// Commonly-used items that should usually be in scope, such as extension traits.
+pub mod prelude {}
+
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {}

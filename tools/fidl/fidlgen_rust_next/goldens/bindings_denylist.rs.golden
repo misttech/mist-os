@@ -6899,6 +6899,18 @@ impl ::core::convert::From<OnlySyzkaller> for WireOnlySyzkaller {
     }
 }
 
+/// Commonly-used items that should usually be in scope, such as extension traits.
+pub mod prelude {
+    pub use super::{
+        AllowedClientSender, AllowedServerSender, ContainsAllowedClientSender,
+        ContainsAllowedServerSender, DeniedClientSender, DeniedServerSender,
+        DenyEachBindingClientSender, DenyEachBindingServerSender,
+        ImportsSameNameContextClientSender, ImportsSameNameContextServerSender,
+        OnlyCppAndDepsClientSender, OnlyCppAndDepsServerSender, OnlyHlcppInstance,
+        OnlyLibfuzzerAndDepsClientSender, OnlyLibfuzzerAndDepsServerSender,
+    };
+}
+
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 

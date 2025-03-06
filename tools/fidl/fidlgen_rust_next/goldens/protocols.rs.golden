@@ -7691,6 +7691,21 @@ where
     }
 }
 
+/// Commonly-used items that should usually be in scope, such as extension traits.
+pub mod prelude {
+    pub use super::{
+        AnotherDiscoverableProtocolClientSender, AnotherDiscoverableProtocolServerSender,
+        ChannelProtocolClientSender, ChannelProtocolServerSender, DiscoverableProtocolClientSender,
+        DiscoverableProtocolServerSender, HandleRightsProtocolClientSender,
+        HandleRightsProtocolServerSender, ManyParametersClientSender, ManyParametersServerSender,
+        MethodWithUnionClientSender, MethodWithUnionServerSender, PlatformServerClientSender,
+        PlatformServerServerSender, SyscallProtocolClientSender, SyscallProtocolServerSender,
+        WithAndWithoutRequestResponseClientSender, WithAndWithoutRequestResponseServerSender,
+        WithErrorSyntaxClientSender, WithErrorSyntaxServerSender, WithProtocolEndsClientSender,
+        WithProtocolEndsServerSender,
+    };
+}
+
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
 

@@ -6,6 +6,7 @@ use fidl_next::{
     Client, ClientEnd, ClientSender, RequestBuffer, Responder, ResponseBuffer, Server, ServerEnd,
     ServerSender, Transport,
 };
+use fidl_next_examples_calculator::prelude::*;
 use fidl_next_examples_calculator::{
     calculator, Calculator, CalculatorClientHandler, CalculatorServerHandler,
 };
@@ -92,8 +93,6 @@ impl<T: Transport> CalculatorServerHandler<T> for MyCalculatorServer {
     fn clear(&mut self, sender: &ServerSender<T, Calculator>) {
         let sender = sender.clone();
         self.scope.spawn(async move {
-            use fidl_next_examples_calculator::CalculatorServerSender as _;
-
             println!("Cleared, sending an error back to close the connection");
 
             use fidl_next_examples_calculator::CalculatorOnErrorRequest;
@@ -149,9 +148,7 @@ async fn create_endpoints(
 }
 
 async fn add(client_sender: &ClientSender<Endpoint, Calculator>) {
-    use fidl_next_examples_calculator::{
-        calculator_add_result, CalculatorAddRequest, CalculatorClientSender as _,
-    };
+    use fidl_next_examples_calculator::{calculator_add_result, CalculatorAddRequest};
 
     let mut buffer =
         client_sender.add(&mut CalculatorAddRequest { a: 16, b: 26 }).unwrap().await.unwrap();
@@ -164,8 +161,7 @@ async fn add(client_sender: &ClientSender<Endpoint, Calculator>) {
 
 async fn divide(client_sender: &ClientSender<Endpoint, Calculator>) {
     use fidl_next_examples_calculator::{
-        calculator_divide_result, CalculatorClientSender as _, CalculatorDivideRequest,
-        DivisionError,
+        calculator_divide_result, CalculatorDivideRequest, DivisionError,
     };
 
     // Normal division
@@ -194,8 +190,6 @@ async fn divide(client_sender: &ClientSender<Endpoint, Calculator>) {
 }
 
 async fn clear(client_sender: &ClientSender<Endpoint, Calculator>) {
-    use fidl_next_examples_calculator::CalculatorClientSender as _;
-
     client_sender.clear().unwrap().await.unwrap();
 }
 
