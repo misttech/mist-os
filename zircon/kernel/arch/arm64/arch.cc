@@ -309,6 +309,13 @@ static void arm64_cpu_early_init() {
   // Save all of the features of the cpu.
   arm64_feature_init();
 
+  // If FEAT_MOPS is available, enable it for EL0.
+  if (arm64_isa_features & ZX_ARM64_FEATURE_ISA_MOPS) {
+    sctlr.set_mscen(true);
+    arch::ArmSctlrEl1::Write(sctlr);
+    __isb(ARM_MB_SY);
+  }
+
   // Check for TCR2 and SCTLR2 and zero since none of their features are used.
   auto mmfr3 = arch::ArmIdAa64Mmfr3El1::Read();
   if (mmfr3.tcrx() != 0) {

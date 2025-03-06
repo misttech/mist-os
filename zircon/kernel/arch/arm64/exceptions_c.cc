@@ -119,6 +119,7 @@ KCOUNTER(exceptions_user, "exceptions.user")
 KCOUNTER(exceptions_unknown, "exceptions.unknown")
 KCOUNTER(exceptions_access, "exceptions.access_fault")
 KCOUNTER(exceptions_serror, "exceptions.serror")
+KCOUNTER(exceptions_mops, "exceptions.mops")
 
 static zx_status_t try_dispatch_user_data_fault_exception(zx_excp_type_t type, iframe_t* iframe,
                                                           uint32_t esr, uint64_t far,
@@ -177,6 +178,17 @@ static void arm64_unknown_handler(iframe_t* iframe, uint exception_flags, uint32
     /* trapped inside the kernel, this is bad */
     exception_die(iframe, esr, __arm_rsr64("far_el1"),
                   "unknown exception in kernel: PC at %#" PRIx64 "\n", iframe->elr);
+  }
+  try_dispatch_user_exception(ZX_EXCP_UNDEFINED_INSTRUCTION, iframe, esr);
+}
+
+static void arm64_mops_handler(iframe_t* iframe, uint exception_flags, uint32_t esr) {
+  // This means the PC and the PSTATE don't agree.  It's not an undefined
+  // instruction but it's an illegal instruction.
+  if (unlikely((exception_flags & ARM64_EXCEPTION_FLAG_LOWER_EL) == 0)) {
+    /* trapped inside the kernel, this is bad */
+    exception_die(iframe, esr, __arm_rsr64("far_el1"),
+                  "FEAT_MOPS exception in kernel: PC at %#" PRIx64 "\n", iframe->elr);
   }
   try_dispatch_user_exception(ZX_EXCP_UNDEFINED_INSTRUCTION, iframe, esr);
 }
@@ -500,6 +512,10 @@ extern "C" void arm64_sync_exception(iframe_t* iframe, uint exception_flags, uin
       break;
     case ESRExceptionClass::kPcAlignment:
       arm64_pc_alignment_fault_handler(iframe, exception_flags, esr);
+      break;
+    case ESRExceptionClass::kMops:
+      kcounter_add(exceptions_mops, 1);
+      arm64_mops_handler(iframe, exception_flags, esr);
       break;
     default: {
       /* TODO: properly decode more of these */

@@ -25,6 +25,7 @@ core_tests = [
   "channel-write-etc",
   "clock",
   "counter",
+  "cpu-features",
   "elf-tls",
   "event-pair",
   "exceptions",

@@ -591,6 +591,19 @@ ARCH_ARM64_SYSREG(ArmSpsrEl2, "spsr_el2");
 struct ArmSpsrEl3 : public arch::SysRegDerived<ArmSpsrEl3, ArmSavedProgramStatusRegister> {};
 ARCH_ARM64_SYSREG(ArmSpsrEl3, "spsr_el3");
 
+// [arm/sysreg]/nzcv: Condition Flags
+//
+// This is a subset of SPSR_ELx that is accessible R/W to everyone.
+struct ArmNzcv : public SysRegBase<ArmNzcv, uint64_t> {
+  DEF_RSVDZ_FIELD(63, 32);
+  DEF_BIT(31, n);
+  DEF_BIT(30, z);
+  DEF_BIT(29, c);
+  DEF_BIT(28, v);
+  DEF_RSVDZ_FIELD(27, 0);
+};
+ARCH_ARM64_SYSREG(ArmNzcv, "nzcv");
+
 // [arm/sysreg]/esr_el1: Exception Syndrome Register (El1)
 // [arm/sysreg]/esr_el2: Exception Syndrome Register (El2)
 // [arm/sysreg]/esr_el3: Exception Syndrome Register (El3)
@@ -628,6 +641,7 @@ struct ArmExceptionSyndromeRegister
     kDataAbortLowerEl = 0b100100,
     kDataAbortSameEl = 0b100101,
     kSpAlignment = 0b100110,
+    kMops = 0b100111,
     kFpe32 = 0b101000,
     kFpe64 = 0b101100,
     kSerror = 0b101111,

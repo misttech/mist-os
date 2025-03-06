@@ -507,6 +507,11 @@ void arm64_feature_init() {
       arm64_isa_features |= ZX_ARM64_FEATURE_ISA_I8MM;
     }
 
+    auto isar2 = arch::ArmIdAa64IsaR2El1::Read();
+    if (isar2.mops() != arch::ArmIdAa64IsaR2El1::Mops::kNone) {
+      arm64_isa_features |= ZX_ARM64_FEATURE_ISA_MOPS;
+    }
+
     auto pfr0 = arch::ArmIdAa64Pfr0El1::Read();
     if (pfr0.el0() == arch::ArmIdAa64Pfr0El1::El::k32) {
       arm64_isa_features |= ZX_ARM64_FEATURE_ISA_ARM32;
@@ -609,7 +614,7 @@ static void print_isa_features() {
       {ZX_ARM64_FEATURE_ISA_DPB, "dpb"},         {ZX_ARM64_FEATURE_ISA_FHM, "fhm"},
       {ZX_ARM64_FEATURE_ISA_TS, "ts"},           {ZX_ARM64_FEATURE_ISA_RNDR, "rndr"},
       {ZX_ARM64_FEATURE_ISA_I8MM, "i8mm"},       {ZX_ARM64_FEATURE_ISA_SVE, "sve"},
-      {ZX_ARM64_FEATURE_ISA_ARM32, "arm32"},
+      {ZX_ARM64_FEATURE_ISA_ARM32, "arm32"},     {ZX_ARM64_FEATURE_ISA_MOPS, "mops"},
   };
 
   printf("ARM ISA Features: ");

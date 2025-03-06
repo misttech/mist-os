@@ -49,6 +49,7 @@
 #define ZX_ARM64_FEATURE_ISA_I8MM      ((uint32_t)(1u << 19))
 #define ZX_ARM64_FEATURE_ISA_SVE       ((uint32_t)(1u << 20))
 #define ZX_ARM64_FEATURE_ISA_ARM32     ((uint32_t)(1u << 21)) // Supports ARM32 in EL0.
+#define ZX_ARM64_FEATURE_ISA_MOPS      ((uint32_t)(1u << 22))
 
 // This is an obsolete name for the same thing.
 #define ZX_ARM64_FEATURE_ISA_SHA2      ZX_ARM64_FEATURE_ISA_SHA256
