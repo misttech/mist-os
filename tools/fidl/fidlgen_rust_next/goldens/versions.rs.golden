@@ -175,11 +175,15 @@ pub struct OtherProtocol;
 pub mod other_protocol {}
 
 /// A helper trait for the `OtherProtocol` client sender.
-pub trait OtherProtocolClientSender<___T: ::fidl_next::Transport> {}
+pub trait OtherProtocolClientSender {
+    type Transport: ::fidl_next::Transport;
+}
 
-impl<___T> OtherProtocolClientSender<___T> for ::fidl_next::ClientSender<___T, OtherProtocol> where
-    ___T: ::fidl_next::Transport
+impl<___T> OtherProtocolClientSender for ::fidl_next::ClientSender<___T, OtherProtocol>
+where
+    ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
 }
 
 /// A client handler for the OtherProtocol protocol.
@@ -207,11 +211,15 @@ where
 }
 
 /// A helper trait for the `OtherProtocol` server sender.
-pub trait OtherProtocolServerSender<___T: ::fidl_next::Transport> {}
+pub trait OtherProtocolServerSender {
+    type Transport: ::fidl_next::Transport;
+}
 
-impl<___T> OtherProtocolServerSender<___T> for ::fidl_next::ServerSender<___T, OtherProtocol> where
-    ___T: ::fidl_next::Transport
+impl<___T> OtherProtocolServerSender for ::fidl_next::ServerSender<___T, OtherProtocol>
+where
+    ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
 }
 
 /// A server handler for the OtherProtocol protocol.
@@ -272,15 +280,24 @@ pub mod protocol {
 }
 
 /// A helper trait for the `Protocol` client sender.
-pub trait ProtocolClientSender<___T: ::fidl_next::Transport> {
-    fn foo(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+pub trait ProtocolClientSender {
+    type Transport: ::fidl_next::Transport;
+
+    fn foo(
+        &self,
+    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>;
 }
 
-impl<___T> ProtocolClientSender<___T> for ::fidl_next::ClientSender<___T, Protocol>
+impl<___T> ProtocolClientSender for ::fidl_next::ClientSender<___T, Protocol>
 where
     ___T: ::fidl_next::Transport,
 {
-    fn foo(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
+    type Transport = ___T;
+
+    fn foo(
+        &self,
+    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    {
         self.as_untyped().send_one_way(6231434419097198905, &mut ())
     }
 }
@@ -316,11 +333,15 @@ where
 }
 
 /// A helper trait for the `Protocol` server sender.
-pub trait ProtocolServerSender<___T: ::fidl_next::Transport> {}
+pub trait ProtocolServerSender {
+    type Transport: ::fidl_next::Transport;
+}
 
-impl<___T> ProtocolServerSender<___T> for ::fidl_next::ServerSender<___T, Protocol> where
-    ___T: ::fidl_next::Transport
+impl<___T> ProtocolServerSender for ::fidl_next::ServerSender<___T, Protocol>
+where
+    ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
 }
 
 /// A server handler for the Protocol protocol.

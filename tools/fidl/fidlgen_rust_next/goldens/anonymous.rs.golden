@@ -1888,35 +1888,39 @@ pub mod some_protocol {
 }
 
 /// A helper trait for the `SomeProtocol` client sender.
-pub trait SomeProtocolClientSender<___T: ::fidl_next::Transport> {
+pub trait SomeProtocolClientSender {
+    type Transport: ::fidl_next::Transport;
+
     fn some_method<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, ___T, some_protocol::SomeMethod>,
+        ::fidl_next::ResponseFuture<'_, Self::Transport, some_protocol::SomeMethod>,
         ::fidl_next::EncodeError,
     >
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = crate::WireSomeProtocolSomeMethodRequest,
         >;
 }
 
-impl<___T> SomeProtocolClientSender<___T> for ::fidl_next::ClientSender<___T, SomeProtocol>
+impl<___T> SomeProtocolClientSender for ::fidl_next::ClientSender<___T, SomeProtocol>
 where
     ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
+
     fn some_method<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, ___T, some_protocol::SomeMethod>,
+        ::fidl_next::ResponseFuture<'_, Self::Transport, some_protocol::SomeMethod>,
         ::fidl_next::EncodeError,
     >
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = crate::WireSomeProtocolSomeMethodRequest,
         >,
     {
@@ -1954,11 +1958,15 @@ where
 }
 
 /// A helper trait for the `SomeProtocol` server sender.
-pub trait SomeProtocolServerSender<___T: ::fidl_next::Transport> {}
+pub trait SomeProtocolServerSender {
+    type Transport: ::fidl_next::Transport;
+}
 
-impl<___T> SomeProtocolServerSender<___T> for ::fidl_next::ServerSender<___T, SomeProtocol> where
-    ___T: ::fidl_next::Transport
+impl<___T> SomeProtocolServerSender for ::fidl_next::ServerSender<___T, SomeProtocol>
+where
+    ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
 }
 
 /// A server handler for the SomeProtocol protocol.

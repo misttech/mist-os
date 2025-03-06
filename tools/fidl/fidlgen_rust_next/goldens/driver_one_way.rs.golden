@@ -234,25 +234,35 @@ pub mod one_way {
 }
 
 /// A helper trait for the `OneWay` client sender.
-pub trait OneWayClientSender<___T: ::fidl_next::Transport> {
+pub trait OneWayClientSender {
+    type Transport: ::fidl_next::Transport;
+
     fn send<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireOneWaySendRequest>;
+        ___R: ::fidl_next::Encode<
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+            Encoded = crate::WireOneWaySendRequest,
+        >;
 }
 
-impl<___T> OneWayClientSender<___T> for ::fidl_next::ClientSender<___T, OneWay>
+impl<___T> OneWayClientSender for ::fidl_next::ClientSender<___T, OneWay>
 where
     ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
+
     fn send<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireOneWaySendRequest>,
+        ___R: ::fidl_next::Encode<
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+            Encoded = crate::WireOneWaySendRequest,
+        >,
     {
         self.as_untyped().send_one_way(7942965975761529343, request)
     }
@@ -283,11 +293,15 @@ where
 }
 
 /// A helper trait for the `OneWay` server sender.
-pub trait OneWayServerSender<___T: ::fidl_next::Transport> {}
+pub trait OneWayServerSender {
+    type Transport: ::fidl_next::Transport;
+}
 
-impl<___T> OneWayServerSender<___T> for ::fidl_next::ServerSender<___T, OneWay> where
-    ___T: ::fidl_next::Transport
+impl<___T> OneWayServerSender for ::fidl_next::ServerSender<___T, OneWay>
+where
+    ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
 }
 
 /// A server handler for the OneWay protocol.

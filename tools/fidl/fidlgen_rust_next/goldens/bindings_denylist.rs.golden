@@ -823,20 +823,29 @@ pub mod allowed {
 }
 
 /// A helper trait for the `Allowed` client sender.
-pub trait AllowedClientSender<___T: ::fidl_next::Transport> {
+pub trait AllowedClientSender {
+    type Transport: ::fidl_next::Transport;
+
     fn denied(
         &self,
-    ) -> Result<::fidl_next::ResponseFuture<'_, ___T, allowed::Denied>, ::fidl_next::EncodeError>;
+    ) -> Result<
+        ::fidl_next::ResponseFuture<'_, Self::Transport, allowed::Denied>,
+        ::fidl_next::EncodeError,
+    >;
 }
 
-impl<___T> AllowedClientSender<___T> for ::fidl_next::ClientSender<___T, Allowed>
+impl<___T> AllowedClientSender for ::fidl_next::ClientSender<___T, Allowed>
 where
     ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
+
     fn denied(
         &self,
-    ) -> Result<::fidl_next::ResponseFuture<'_, ___T, allowed::Denied>, ::fidl_next::EncodeError>
-    {
+    ) -> Result<
+        ::fidl_next::ResponseFuture<'_, Self::Transport, allowed::Denied>,
+        ::fidl_next::EncodeError,
+    > {
         self.as_untyped()
             .send_two_way(3826178105137551123, &mut ())
             .map(::fidl_next::ResponseFuture::from_untyped)
@@ -871,11 +880,15 @@ where
 }
 
 /// A helper trait for the `Allowed` server sender.
-pub trait AllowedServerSender<___T: ::fidl_next::Transport> {}
+pub trait AllowedServerSender {
+    type Transport: ::fidl_next::Transport;
+}
 
-impl<___T> AllowedServerSender<___T> for ::fidl_next::ServerSender<___T, Allowed> where
-    ___T: ::fidl_next::Transport
+impl<___T> AllowedServerSender for ::fidl_next::ServerSender<___T, Allowed>
+where
+    ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
 }
 
 /// A server handler for the Allowed protocol.
@@ -936,11 +949,15 @@ pub struct ContainsAllowed;
 pub mod contains_allowed {}
 
 /// A helper trait for the `ContainsAllowed` client sender.
-pub trait ContainsAllowedClientSender<___T: ::fidl_next::Transport> {}
+pub trait ContainsAllowedClientSender {
+    type Transport: ::fidl_next::Transport;
+}
 
-impl<___T> ContainsAllowedClientSender<___T> for ::fidl_next::ClientSender<___T, ContainsAllowed> where
-    ___T: ::fidl_next::Transport
+impl<___T> ContainsAllowedClientSender for ::fidl_next::ClientSender<___T, ContainsAllowed>
+where
+    ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
 }
 
 /// A client handler for the ContainsAllowed protocol.
@@ -968,11 +985,15 @@ where
 }
 
 /// A helper trait for the `ContainsAllowed` server sender.
-pub trait ContainsAllowedServerSender<___T: ::fidl_next::Transport> {}
+pub trait ContainsAllowedServerSender {
+    type Transport: ::fidl_next::Transport;
+}
 
-impl<___T> ContainsAllowedServerSender<___T> for ::fidl_next::ServerSender<___T, ContainsAllowed> where
-    ___T: ::fidl_next::Transport
+impl<___T> ContainsAllowedServerSender for ::fidl_next::ServerSender<___T, ContainsAllowed>
+where
+    ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
 }
 
 /// A server handler for the ContainsAllowed protocol.
@@ -1616,29 +1637,33 @@ pub mod denied {
 }
 
 /// A helper trait for the `Denied` client sender.
-pub trait DeniedClientSender<___T: ::fidl_next::Transport> {
+pub trait DeniedClientSender {
+    type Transport: ::fidl_next::Transport;
+
     fn should_never_appear_in_any_binding<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = crate::WireDeniedShouldNeverAppearInAnyBindingRequest,
         >;
 }
 
-impl<___T> DeniedClientSender<___T> for ::fidl_next::ClientSender<___T, Denied>
+impl<___T> DeniedClientSender for ::fidl_next::ClientSender<___T, Denied>
 where
     ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
+
     fn should_never_appear_in_any_binding<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = crate::WireDeniedShouldNeverAppearInAnyBindingRequest,
         >,
     {
@@ -1671,11 +1696,15 @@ where
 }
 
 /// A helper trait for the `Denied` server sender.
-pub trait DeniedServerSender<___T: ::fidl_next::Transport> {}
+pub trait DeniedServerSender {
+    type Transport: ::fidl_next::Transport;
+}
 
-impl<___T> DeniedServerSender<___T> for ::fidl_next::ServerSender<___T, Denied> where
-    ___T: ::fidl_next::Transport
+impl<___T> DeniedServerSender for ::fidl_next::ServerSender<___T, Denied>
+where
+    ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
 }
 
 /// A server handler for the Denied protocol.
@@ -5270,17 +5299,19 @@ pub mod deny_each_binding {
 }
 
 /// A helper trait for the `DenyEachBinding` client sender.
-pub trait DenyEachBindingClientSender<___T: ::fidl_next::Transport> {
+pub trait DenyEachBindingClientSender {
+    type Transport: ::fidl_next::Transport;
+
     fn only_deny_cpp<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, ___T, deny_each_binding::OnlyDenyCpp>,
+        ::fidl_next::ResponseFuture<'_, Self::Transport, deny_each_binding::OnlyDenyCpp>,
         ::fidl_next::EncodeError,
     >
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = crate::WireDenyEachBindingOnlyDenyCppRequest,
         >;
 
@@ -5288,12 +5319,12 @@ pub trait DenyEachBindingClientSender<___T: ::fidl_next::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, ___T, deny_each_binding::OnlyDenyDart>,
+        ::fidl_next::ResponseFuture<'_, Self::Transport, deny_each_binding::OnlyDenyDart>,
         ::fidl_next::EncodeError,
     >
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = crate::WireDenyEachBindingOnlyDenyDartRequest,
         >;
 
@@ -5301,12 +5332,12 @@ pub trait DenyEachBindingClientSender<___T: ::fidl_next::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, ___T, deny_each_binding::OnlyDenyGo>,
+        ::fidl_next::ResponseFuture<'_, Self::Transport, deny_each_binding::OnlyDenyGo>,
         ::fidl_next::EncodeError,
     >
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = crate::WireDenyEachBindingOnlyDenyGoRequest,
         >;
 
@@ -5314,12 +5345,12 @@ pub trait DenyEachBindingClientSender<___T: ::fidl_next::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, ___T, deny_each_binding::OnlyDenyLibfuzzer>,
+        ::fidl_next::ResponseFuture<'_, Self::Transport, deny_each_binding::OnlyDenyLibfuzzer>,
         ::fidl_next::EncodeError,
     >
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = crate::WireDenyEachBindingOnlyDenyLibfuzzerRequest,
         >;
 
@@ -5327,12 +5358,12 @@ pub trait DenyEachBindingClientSender<___T: ::fidl_next::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, ___T, deny_each_binding::OnlyDenyRust>,
+        ::fidl_next::ResponseFuture<'_, Self::Transport, deny_each_binding::OnlyDenyRust>,
         ::fidl_next::EncodeError,
     >
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = crate::WireDenyEachBindingOnlyDenyRustRequest,
         >;
 
@@ -5340,30 +5371,32 @@ pub trait DenyEachBindingClientSender<___T: ::fidl_next::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, ___T, deny_each_binding::OnlyDenySyzkaller>,
+        ::fidl_next::ResponseFuture<'_, Self::Transport, deny_each_binding::OnlyDenySyzkaller>,
         ::fidl_next::EncodeError,
     >
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = crate::WireDenyEachBindingOnlyDenySyzkallerRequest,
         >;
 }
 
-impl<___T> DenyEachBindingClientSender<___T> for ::fidl_next::ClientSender<___T, DenyEachBinding>
+impl<___T> DenyEachBindingClientSender for ::fidl_next::ClientSender<___T, DenyEachBinding>
 where
     ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
+
     fn only_deny_cpp<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, ___T, deny_each_binding::OnlyDenyCpp>,
+        ::fidl_next::ResponseFuture<'_, Self::Transport, deny_each_binding::OnlyDenyCpp>,
         ::fidl_next::EncodeError,
     >
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = crate::WireDenyEachBindingOnlyDenyCppRequest,
         >,
     {
@@ -5376,12 +5409,12 @@ where
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, ___T, deny_each_binding::OnlyDenyDart>,
+        ::fidl_next::ResponseFuture<'_, Self::Transport, deny_each_binding::OnlyDenyDart>,
         ::fidl_next::EncodeError,
     >
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = crate::WireDenyEachBindingOnlyDenyDartRequest,
         >,
     {
@@ -5394,12 +5427,12 @@ where
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, ___T, deny_each_binding::OnlyDenyGo>,
+        ::fidl_next::ResponseFuture<'_, Self::Transport, deny_each_binding::OnlyDenyGo>,
         ::fidl_next::EncodeError,
     >
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = crate::WireDenyEachBindingOnlyDenyGoRequest,
         >,
     {
@@ -5412,12 +5445,12 @@ where
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, ___T, deny_each_binding::OnlyDenyLibfuzzer>,
+        ::fidl_next::ResponseFuture<'_, Self::Transport, deny_each_binding::OnlyDenyLibfuzzer>,
         ::fidl_next::EncodeError,
     >
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = crate::WireDenyEachBindingOnlyDenyLibfuzzerRequest,
         >,
     {
@@ -5430,12 +5463,12 @@ where
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, ___T, deny_each_binding::OnlyDenyRust>,
+        ::fidl_next::ResponseFuture<'_, Self::Transport, deny_each_binding::OnlyDenyRust>,
         ::fidl_next::EncodeError,
     >
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = crate::WireDenyEachBindingOnlyDenyRustRequest,
         >,
     {
@@ -5448,12 +5481,12 @@ where
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, ___T, deny_each_binding::OnlyDenySyzkaller>,
+        ::fidl_next::ResponseFuture<'_, Self::Transport, deny_each_binding::OnlyDenySyzkaller>,
         ::fidl_next::EncodeError,
     >
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = crate::WireDenyEachBindingOnlyDenySyzkallerRequest,
         >,
     {
@@ -5506,11 +5539,15 @@ where
 }
 
 /// A helper trait for the `DenyEachBinding` server sender.
-pub trait DenyEachBindingServerSender<___T: ::fidl_next::Transport> {}
+pub trait DenyEachBindingServerSender {
+    type Transport: ::fidl_next::Transport;
+}
 
-impl<___T> DenyEachBindingServerSender<___T> for ::fidl_next::ServerSender<___T, DenyEachBinding> where
-    ___T: ::fidl_next::Transport
+impl<___T> DenyEachBindingServerSender for ::fidl_next::ServerSender<___T, DenyEachBinding>
+where
+    ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
 }
 
 /// A server handler for the DenyEachBinding protocol.
@@ -5709,49 +5746,59 @@ pub mod imports_same_name_context {
 }
 
 /// A helper trait for the `ImportsSameNameContext` client sender.
-pub trait ImportsSameNameContextClientSender<___T: ::fidl_next::Transport> {
+pub trait ImportsSameNameContextClientSender {
+    type Transport: ::fidl_next::Transport;
+
     fn always_denied<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = ::fidl_next_test_dependent::WireContainsDeniedAlwaysDeniedRequest,
         >;
 
-    fn unattributed(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn unattributed(
+        &self,
+    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>;
 
     fn always_appears_in_importing_library(
         &self,
-    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>;
 }
 
-impl<___T> ImportsSameNameContextClientSender<___T>
+impl<___T> ImportsSameNameContextClientSender
     for ::fidl_next::ClientSender<___T, ImportsSameNameContext>
 where
     ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
+
     fn always_denied<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = ::fidl_next_test_dependent::WireContainsDeniedAlwaysDeniedRequest,
         >,
     {
         self.as_untyped().send_one_way(6808317417318106526, request)
     }
 
-    fn unattributed(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
+    fn unattributed(
+        &self,
+    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    {
         self.as_untyped().send_one_way(475191379775102607, &mut ())
     }
 
     fn always_appears_in_importing_library(
         &self,
-    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
+    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
+    {
         self.as_untyped().send_one_way(2914965219653596920, &mut ())
     }
 }
@@ -5781,13 +5828,16 @@ where
 }
 
 /// A helper trait for the `ImportsSameNameContext` server sender.
-pub trait ImportsSameNameContextServerSender<___T: ::fidl_next::Transport> {}
+pub trait ImportsSameNameContextServerSender {
+    type Transport: ::fidl_next::Transport;
+}
 
-impl<___T> ImportsSameNameContextServerSender<___T>
+impl<___T> ImportsSameNameContextServerSender
     for ::fidl_next::ServerSender<___T, ImportsSameNameContext>
 where
     ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
 }
 
 /// A server handler for the ImportsSameNameContext protocol.
@@ -6097,11 +6147,15 @@ pub struct OnlyCppAndDeps;
 pub mod only_cpp_and_deps {}
 
 /// A helper trait for the `OnlyCppAndDeps` client sender.
-pub trait OnlyCppAndDepsClientSender<___T: ::fidl_next::Transport> {}
+pub trait OnlyCppAndDepsClientSender {
+    type Transport: ::fidl_next::Transport;
+}
 
-impl<___T> OnlyCppAndDepsClientSender<___T> for ::fidl_next::ClientSender<___T, OnlyCppAndDeps> where
-    ___T: ::fidl_next::Transport
+impl<___T> OnlyCppAndDepsClientSender for ::fidl_next::ClientSender<___T, OnlyCppAndDeps>
+where
+    ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
 }
 
 /// A client handler for the OnlyCppAndDeps protocol.
@@ -6129,11 +6183,15 @@ where
 }
 
 /// A helper trait for the `OnlyCppAndDeps` server sender.
-pub trait OnlyCppAndDepsServerSender<___T: ::fidl_next::Transport> {}
+pub trait OnlyCppAndDepsServerSender {
+    type Transport: ::fidl_next::Transport;
+}
 
-impl<___T> OnlyCppAndDepsServerSender<___T> for ::fidl_next::ServerSender<___T, OnlyCppAndDeps> where
-    ___T: ::fidl_next::Transport
+impl<___T> OnlyCppAndDepsServerSender for ::fidl_next::ServerSender<___T, OnlyCppAndDeps>
+where
+    ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
 }
 
 /// A server handler for the OnlyCppAndDeps protocol.
@@ -6376,13 +6434,16 @@ pub struct OnlyLibfuzzerAndDeps;
 pub mod only_libfuzzer_and_deps {}
 
 /// A helper trait for the `OnlyLibfuzzerAndDeps` client sender.
-pub trait OnlyLibfuzzerAndDepsClientSender<___T: ::fidl_next::Transport> {}
+pub trait OnlyLibfuzzerAndDepsClientSender {
+    type Transport: ::fidl_next::Transport;
+}
 
-impl<___T> OnlyLibfuzzerAndDepsClientSender<___T>
+impl<___T> OnlyLibfuzzerAndDepsClientSender
     for ::fidl_next::ClientSender<___T, OnlyLibfuzzerAndDeps>
 where
     ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
 }
 
 /// A client handler for the OnlyLibfuzzerAndDeps protocol.
@@ -6410,13 +6471,16 @@ where
 }
 
 /// A helper trait for the `OnlyLibfuzzerAndDeps` server sender.
-pub trait OnlyLibfuzzerAndDepsServerSender<___T: ::fidl_next::Transport> {}
+pub trait OnlyLibfuzzerAndDepsServerSender {
+    type Transport: ::fidl_next::Transport;
+}
 
-impl<___T> OnlyLibfuzzerAndDepsServerSender<___T>
+impl<___T> OnlyLibfuzzerAndDepsServerSender
     for ::fidl_next::ServerSender<___T, OnlyLibfuzzerAndDeps>
 where
     ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
 }
 
 /// A server handler for the OnlyLibfuzzerAndDeps protocol.

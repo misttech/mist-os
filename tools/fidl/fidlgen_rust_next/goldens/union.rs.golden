@@ -4906,13 +4906,15 @@ pub mod test_protocol {
 }
 
 /// A helper trait for the `TestProtocol` client sender.
-pub trait TestProtocolClientSender<___T: ::fidl_next::Transport> {
+pub trait TestProtocolClientSender {
+    type Transport: ::fidl_next::Transport;
+
     fn strict_union_hence_response_may_be_stack_allocated(
         &self,
     ) -> Result<
         ::fidl_next::ResponseFuture<
             '_,
-            ___T,
+            Self::Transport,
             test_protocol::StrictUnionHenceResponseMayBeStackAllocated,
         >,
         ::fidl_next::EncodeError,
@@ -4923,23 +4925,25 @@ pub trait TestProtocolClientSender<___T: ::fidl_next::Transport> {
     ) -> Result<
         ::fidl_next::ResponseFuture<
             '_,
-            ___T,
+            Self::Transport,
             test_protocol::FlexibleUnionHenceResponseMustBeHeapAllocated,
         >,
         ::fidl_next::EncodeError,
     >;
 }
 
-impl<___T> TestProtocolClientSender<___T> for ::fidl_next::ClientSender<___T, TestProtocol>
+impl<___T> TestProtocolClientSender for ::fidl_next::ClientSender<___T, TestProtocol>
 where
     ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
+
     fn strict_union_hence_response_may_be_stack_allocated(
         &self,
     ) -> Result<
         ::fidl_next::ResponseFuture<
             '_,
-            ___T,
+            Self::Transport,
             test_protocol::StrictUnionHenceResponseMayBeStackAllocated,
         >,
         ::fidl_next::EncodeError,
@@ -4954,7 +4958,7 @@ where
     ) -> Result<
         ::fidl_next::ResponseFuture<
             '_,
-            ___T,
+            Self::Transport,
             test_protocol::FlexibleUnionHenceResponseMustBeHeapAllocated,
         >,
         ::fidl_next::EncodeError,
@@ -4996,11 +5000,15 @@ where
 }
 
 /// A helper trait for the `TestProtocol` server sender.
-pub trait TestProtocolServerSender<___T: ::fidl_next::Transport> {}
+pub trait TestProtocolServerSender {
+    type Transport: ::fidl_next::Transport;
+}
 
-impl<___T> TestProtocolServerSender<___T> for ::fidl_next::ServerSender<___T, TestProtocol> where
-    ___T: ::fidl_next::Transport
+impl<___T> TestProtocolServerSender for ::fidl_next::ServerSender<___T, TestProtocol>
+where
+    ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
 }
 
 /// A server handler for the TestProtocol protocol.

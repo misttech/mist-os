@@ -250,25 +250,41 @@ pub mod two_way {
 }
 
 /// A helper trait for the `TwoWay` client sender.
-pub trait TwoWayClientSender<___T: ::fidl_next::Transport> {
+pub trait TwoWayClientSender {
+    type Transport: ::fidl_next::Transport;
+
     fn add<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<::fidl_next::ResponseFuture<'_, ___T, two_way::Add>, ::fidl_next::EncodeError>
+    ) -> Result<
+        ::fidl_next::ResponseFuture<'_, Self::Transport, two_way::Add>,
+        ::fidl_next::EncodeError,
+    >
     where
-        ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireTwoWayAddRequest>;
+        ___R: ::fidl_next::Encode<
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+            Encoded = crate::WireTwoWayAddRequest,
+        >;
 }
 
-impl<___T> TwoWayClientSender<___T> for ::fidl_next::ClientSender<___T, TwoWay>
+impl<___T> TwoWayClientSender for ::fidl_next::ClientSender<___T, TwoWay>
 where
     ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
+
     fn add<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<::fidl_next::ResponseFuture<'_, ___T, two_way::Add>, ::fidl_next::EncodeError>
+    ) -> Result<
+        ::fidl_next::ResponseFuture<'_, Self::Transport, two_way::Add>,
+        ::fidl_next::EncodeError,
+    >
     where
-        ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireTwoWayAddRequest>,
+        ___R: ::fidl_next::Encode<
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+            Encoded = crate::WireTwoWayAddRequest,
+        >,
     {
         self.as_untyped()
             .send_two_way(989730524426044687, request)
@@ -303,11 +319,15 @@ where
 }
 
 /// A helper trait for the `TwoWay` server sender.
-pub trait TwoWayServerSender<___T: ::fidl_next::Transport> {}
+pub trait TwoWayServerSender {
+    type Transport: ::fidl_next::Transport;
+}
 
-impl<___T> TwoWayServerSender<___T> for ::fidl_next::ServerSender<___T, TwoWay> where
-    ___T: ::fidl_next::Transport
+impl<___T> TwoWayServerSender for ::fidl_next::ServerSender<___T, TwoWay>
+where
+    ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
 }
 
 /// A server handler for the TwoWay protocol.

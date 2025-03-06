@@ -469,21 +469,23 @@ pub mod example_use_of_error_syntax {
 }
 
 /// A helper trait for the `ExampleUseOfErrorSyntax` client sender.
-pub trait ExampleUseOfErrorSyntaxClientSender<___T: ::fidl_next::Transport> {
+pub trait ExampleUseOfErrorSyntaxClientSender {
+    type Transport: ::fidl_next::Transport;
+
     fn composed_call_which_may_fail<___R>(
                         &self,
                         request: &mut ___R,
                     ) -> Result<
                         ::fidl_next::ResponseFuture<
                             '_,
-                            ___T,
+                            Self::Transport,
                             example_use_of_error_syntax::ComposedCallWhichMayFail,
                         >,
                         ::fidl_next::EncodeError,
                     >
                     where
                         ___R: ::fidl_next::Encode<
-                            ___T::SendBuffer,
+                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
                             Encoded = ::fidl_next_test_errorsyntax_parent::WireParentUsesErrorSyntaxComposedCallWhichMayFailRequest,
                         >;
 
@@ -491,31 +493,43 @@ pub trait ExampleUseOfErrorSyntaxClientSender<___T: ::fidl_next::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, ___T, example_use_of_error_syntax::CallWhichMayFail>,
+        ::fidl_next::ResponseFuture<
+            '_,
+            Self::Transport,
+            example_use_of_error_syntax::CallWhichMayFail,
+        >,
         ::fidl_next::EncodeError,
     >
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = crate::WireExampleUseOfErrorSyntaxCallWhichMayFailRequest,
         >;
 }
 
-impl<___T> ExampleUseOfErrorSyntaxClientSender<___T>
+impl<___T> ExampleUseOfErrorSyntaxClientSender
     for ::fidl_next::ClientSender<___T, ExampleUseOfErrorSyntax>
 where
     ___T: ::fidl_next::Transport,
 {
-    fn composed_call_which_may_fail<___R>(
+    type Transport = ___T;
+
+
+
+
+
+
+
+                    fn composed_call_which_may_fail<___R>(
                         &self,
                         request: &mut ___R,
                     ) -> Result<
-                        ::fidl_next::ResponseFuture<'_, ___T, example_use_of_error_syntax::ComposedCallWhichMayFail>,
+                        ::fidl_next::ResponseFuture<'_, Self::Transport, example_use_of_error_syntax::ComposedCallWhichMayFail>,
                         ::fidl_next::EncodeError,
                     >
                     where
                         ___R: ::fidl_next::Encode<
-                            ___T::SendBuffer,
+                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
                             Encoded = ::fidl_next_test_errorsyntax_parent::WireParentUsesErrorSyntaxComposedCallWhichMayFailRequest,
                         >,
                     {
@@ -528,12 +542,16 @@ where
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, ___T, example_use_of_error_syntax::CallWhichMayFail>,
+        ::fidl_next::ResponseFuture<
+            '_,
+            Self::Transport,
+            example_use_of_error_syntax::CallWhichMayFail,
+        >,
         ::fidl_next::EncodeError,
     >
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = crate::WireExampleUseOfErrorSyntaxCallWhichMayFailRequest,
         >,
     {
@@ -574,13 +592,16 @@ where
 }
 
 /// A helper trait for the `ExampleUseOfErrorSyntax` server sender.
-pub trait ExampleUseOfErrorSyntaxServerSender<___T: ::fidl_next::Transport> {}
+pub trait ExampleUseOfErrorSyntaxServerSender {
+    type Transport: ::fidl_next::Transport;
+}
 
-impl<___T> ExampleUseOfErrorSyntaxServerSender<___T>
+impl<___T> ExampleUseOfErrorSyntaxServerSender
     for ::fidl_next::ServerSender<___T, ExampleUseOfErrorSyntax>
 where
     ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
 }
 
 /// A server handler for the ExampleUseOfErrorSyntax protocol.

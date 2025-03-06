@@ -564,38 +564,48 @@ pub mod empty_protocol {
 }
 
 /// A helper trait for the `EmptyProtocol` client sender.
-pub trait EmptyProtocolClientSender<___T: ::fidl_next::Transport> {
+pub trait EmptyProtocolClientSender {
+    type Transport: ::fidl_next::Transport;
+
     fn send<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireEmptyProtocolSendRequest>;
+        ___R: ::fidl_next::Encode<
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+            Encoded = crate::WireEmptyProtocolSendRequest,
+        >;
 
     fn send_and_receive<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, ___T, empty_protocol::SendAndReceive>,
+        ::fidl_next::ResponseFuture<'_, Self::Transport, empty_protocol::SendAndReceive>,
         ::fidl_next::EncodeError,
     >
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = crate::WireEmptyProtocolSendAndReceiveRequest,
         >;
 }
 
-impl<___T> EmptyProtocolClientSender<___T> for ::fidl_next::ClientSender<___T, EmptyProtocol>
+impl<___T> EmptyProtocolClientSender for ::fidl_next::ClientSender<___T, EmptyProtocol>
 where
     ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
+
     fn send<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireEmptyProtocolSendRequest>,
+        ___R: ::fidl_next::Encode<
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+            Encoded = crate::WireEmptyProtocolSendRequest,
+        >,
     {
         self.as_untyped().send_one_way(1378773277029173000, request)
     }
@@ -604,12 +614,12 @@ where
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, ___T, empty_protocol::SendAndReceive>,
+        ::fidl_next::ResponseFuture<'_, Self::Transport, empty_protocol::SendAndReceive>,
         ::fidl_next::EncodeError,
     >
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = crate::WireEmptyProtocolSendAndReceiveRequest,
         >,
     {
@@ -662,27 +672,35 @@ where
 }
 
 /// A helper trait for the `EmptyProtocol` server sender.
-pub trait EmptyProtocolServerSender<___T: ::fidl_next::Transport> {
+pub trait EmptyProtocolServerSender {
+    type Transport: ::fidl_next::Transport;
+
     fn receive<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        ___R:
-            ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireEmptyProtocolReceiveRequest>;
+        ___R: ::fidl_next::Encode<
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+            Encoded = crate::WireEmptyProtocolReceiveRequest,
+        >;
 }
 
-impl<___T> EmptyProtocolServerSender<___T> for ::fidl_next::ServerSender<___T, EmptyProtocol>
+impl<___T> EmptyProtocolServerSender for ::fidl_next::ServerSender<___T, EmptyProtocol>
 where
     ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
+
     fn receive<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    ) -> Result<<Self::Transport as ::fidl_next::Transport>::SendFuture<'_>, ::fidl_next::EncodeError>
     where
-        ___R:
-            ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireEmptyProtocolReceiveRequest>,
+        ___R: ::fidl_next::Encode<
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+            Encoded = crate::WireEmptyProtocolReceiveRequest,
+        >,
     {
         self.as_untyped().send_event(2301564782476583487, request)
     }

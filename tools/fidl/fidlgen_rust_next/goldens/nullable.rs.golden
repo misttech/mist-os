@@ -356,25 +356,41 @@ pub mod simple_protocol {
 }
 
 /// A helper trait for the `SimpleProtocol` client sender.
-pub trait SimpleProtocolClientSender<___T: ::fidl_next::Transport> {
+pub trait SimpleProtocolClientSender {
+    type Transport: ::fidl_next::Transport;
+
     fn add<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<::fidl_next::ResponseFuture<'_, ___T, simple_protocol::Add>, ::fidl_next::EncodeError>
+    ) -> Result<
+        ::fidl_next::ResponseFuture<'_, Self::Transport, simple_protocol::Add>,
+        ::fidl_next::EncodeError,
+    >
     where
-        ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireSimpleProtocolAddRequest>;
+        ___R: ::fidl_next::Encode<
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+            Encoded = crate::WireSimpleProtocolAddRequest,
+        >;
 }
 
-impl<___T> SimpleProtocolClientSender<___T> for ::fidl_next::ClientSender<___T, SimpleProtocol>
+impl<___T> SimpleProtocolClientSender for ::fidl_next::ClientSender<___T, SimpleProtocol>
 where
     ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
+
     fn add<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<::fidl_next::ResponseFuture<'_, ___T, simple_protocol::Add>, ::fidl_next::EncodeError>
+    ) -> Result<
+        ::fidl_next::ResponseFuture<'_, Self::Transport, simple_protocol::Add>,
+        ::fidl_next::EncodeError,
+    >
     where
-        ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireSimpleProtocolAddRequest>,
+        ___R: ::fidl_next::Encode<
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+            Encoded = crate::WireSimpleProtocolAddRequest,
+        >,
     {
         self.as_untyped()
             .send_two_way(9142761280038437494, request)
@@ -410,11 +426,15 @@ where
 }
 
 /// A helper trait for the `SimpleProtocol` server sender.
-pub trait SimpleProtocolServerSender<___T: ::fidl_next::Transport> {}
+pub trait SimpleProtocolServerSender {
+    type Transport: ::fidl_next::Transport;
+}
 
-impl<___T> SimpleProtocolServerSender<___T> for ::fidl_next::ServerSender<___T, SimpleProtocol> where
-    ___T: ::fidl_next::Transport
+impl<___T> SimpleProtocolServerSender for ::fidl_next::ServerSender<___T, SimpleProtocol>
+where
+    ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
 }
 
 /// A server handler for the SimpleProtocol protocol.

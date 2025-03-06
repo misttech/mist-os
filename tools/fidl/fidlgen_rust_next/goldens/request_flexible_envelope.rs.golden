@@ -860,17 +860,19 @@ pub mod protocol {
 }
 
 /// A helper trait for the `Protocol` client sender.
-pub trait ProtocolClientSender<___T: ::fidl_next::Transport> {
+pub trait ProtocolClientSender {
+    type Transport: ::fidl_next::Transport;
+
     fn request_strict_response_flexible<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, ___T, protocol::RequestStrictResponseFlexible>,
+        ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::RequestStrictResponseFlexible>,
         ::fidl_next::EncodeError,
     >
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = crate::WireProtocolRequestStrictResponseFlexibleRequest,
         >;
 
@@ -878,30 +880,32 @@ pub trait ProtocolClientSender<___T: ::fidl_next::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, ___T, protocol::RequestFlexibleResponseStrict>,
+        ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::RequestFlexibleResponseStrict>,
         ::fidl_next::EncodeError,
     >
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = crate::WireProtocolRequestFlexibleResponseStrictRequest,
         >;
 }
 
-impl<___T> ProtocolClientSender<___T> for ::fidl_next::ClientSender<___T, Protocol>
+impl<___T> ProtocolClientSender for ::fidl_next::ClientSender<___T, Protocol>
 where
     ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
+
     fn request_strict_response_flexible<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, ___T, protocol::RequestStrictResponseFlexible>,
+        ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::RequestStrictResponseFlexible>,
         ::fidl_next::EncodeError,
     >
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = crate::WireProtocolRequestStrictResponseFlexibleRequest,
         >,
     {
@@ -914,12 +918,12 @@ where
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, ___T, protocol::RequestFlexibleResponseStrict>,
+        ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::RequestFlexibleResponseStrict>,
         ::fidl_next::EncodeError,
     >
     where
         ___R: ::fidl_next::Encode<
-            ___T::SendBuffer,
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
             Encoded = crate::WireProtocolRequestFlexibleResponseStrictRequest,
         >,
     {
@@ -960,11 +964,15 @@ where
 }
 
 /// A helper trait for the `Protocol` server sender.
-pub trait ProtocolServerSender<___T: ::fidl_next::Transport> {}
+pub trait ProtocolServerSender {
+    type Transport: ::fidl_next::Transport;
+}
 
-impl<___T> ProtocolServerSender<___T> for ::fidl_next::ServerSender<___T, Protocol> where
-    ___T: ::fidl_next::Transport
+impl<___T> ProtocolServerSender for ::fidl_next::ServerSender<___T, Protocol>
+where
+    ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
 }
 
 /// A server handler for the Protocol protocol.

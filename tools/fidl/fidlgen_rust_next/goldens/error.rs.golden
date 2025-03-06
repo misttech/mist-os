@@ -441,25 +441,41 @@ pub mod example {
 }
 
 /// A helper trait for the `Example` client sender.
-pub trait ExampleClientSender<___T: ::fidl_next::Transport> {
+pub trait ExampleClientSender {
+    type Transport: ::fidl_next::Transport;
+
     fn foo<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<::fidl_next::ResponseFuture<'_, ___T, example::Foo>, ::fidl_next::EncodeError>
+    ) -> Result<
+        ::fidl_next::ResponseFuture<'_, Self::Transport, example::Foo>,
+        ::fidl_next::EncodeError,
+    >
     where
-        ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireExampleFooRequest>;
+        ___R: ::fidl_next::Encode<
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+            Encoded = crate::WireExampleFooRequest,
+        >;
 }
 
-impl<___T> ExampleClientSender<___T> for ::fidl_next::ClientSender<___T, Example>
+impl<___T> ExampleClientSender for ::fidl_next::ClientSender<___T, Example>
 where
     ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
+
     fn foo<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<::fidl_next::ResponseFuture<'_, ___T, example::Foo>, ::fidl_next::EncodeError>
+    ) -> Result<
+        ::fidl_next::ResponseFuture<'_, Self::Transport, example::Foo>,
+        ::fidl_next::EncodeError,
+    >
     where
-        ___R: ::fidl_next::Encode<___T::SendBuffer, Encoded = crate::WireExampleFooRequest>,
+        ___R: ::fidl_next::Encode<
+            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
+            Encoded = crate::WireExampleFooRequest,
+        >,
     {
         self.as_untyped()
             .send_two_way(1107623248440401476, request)
@@ -494,11 +510,15 @@ where
 }
 
 /// A helper trait for the `Example` server sender.
-pub trait ExampleServerSender<___T: ::fidl_next::Transport> {}
+pub trait ExampleServerSender {
+    type Transport: ::fidl_next::Transport;
+}
 
-impl<___T> ExampleServerSender<___T> for ::fidl_next::ServerSender<___T, Example> where
-    ___T: ::fidl_next::Transport
+impl<___T> ExampleServerSender for ::fidl_next::ServerSender<___T, Example>
+where
+    ___T: ::fidl_next::Transport,
 {
+    type Transport = ___T;
 }
 
 /// A server handler for the Example protocol.
