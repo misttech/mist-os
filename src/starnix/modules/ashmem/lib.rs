@@ -27,9 +27,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserRef};
-use starnix_uapi::{
-    ashmem_pin, device_type, errno, error, off_t, ASHMEM_GET_FILE_ID, ASHMEM_NAME_LEN,
-};
+use starnix_uapi::{ashmem_pin, device_type, errno, error, off_t, uapi, ASHMEM_NAME_LEN};
 use std::sync::Arc;
 
 /// Initializes the ashmem device.
@@ -331,7 +329,8 @@ impl FileOps for Ashmem {
                 }
                 return Ok(ASHMEM_IS_UNPINNED.into());
             }
-            ASHMEM_GET_FILE_ID => {
+            #[allow(unreachable_patterns)]
+            uapi::ASHMEM_GET_FILE_ID | uapi::arch32::ASHMEM_GET_FILE_ID => {
                 let state = self.state.lock();
                 current_task.write_object(arg.into(), &(state.id))?;
                 Ok(SUCCESS)

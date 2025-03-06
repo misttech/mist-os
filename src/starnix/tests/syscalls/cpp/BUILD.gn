@@ -21,6 +21,7 @@ syscall_tests = [
   # go/keep-sorted start
 
   "abort_test",
+  "ashmem_test",
   "aspace_test",
   "custom_artifact_test",
   "loop_test",
@@ -44,7 +45,6 @@ syscall_tests = [
 arch64_syscall_tests = [
   # go/keep-sorted start
 
-  "ashmem_test",
   "bpf_test",
   "capabilities_test",
   "cgroup_freezer_test",
