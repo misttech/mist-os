@@ -86,6 +86,8 @@ use std::usize;
 const UTIME_NOW: i64 = 0x3fffffff;
 const UTIME_OMIT: i64 = 0x3ffffffe;
 
+pub type OffsetPtr = MultiArchUserRef<uapi::off_t, uapi::arch32::off_t>;
+
 pub fn sys_read(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
@@ -554,7 +556,7 @@ pub fn sys_sendfile(
     current_task: &CurrentTask,
     out_fd: FdNumber,
     in_fd: FdNumber,
-    user_offset: UserRef<off_t>,
+    user_offset: OffsetPtr,
     count: i32,
 ) -> Result<usize, Errno> {
     splice::sendfile(locked, current_task, out_fd, in_fd, user_offset, count)
@@ -2861,9 +2863,9 @@ pub fn sys_splice(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd_in: FdNumber,
-    off_in: UserRef<off_t>,
+    off_in: OffsetPtr,
     fd_out: FdNumber,
-    off_out: UserRef<off_t>,
+    off_out: OffsetPtr,
     len: usize,
     flags: u32,
 ) -> Result<usize, Errno> {
@@ -2885,9 +2887,9 @@ pub fn sys_copy_file_range(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd_in: FdNumber,
-    off_in: UserRef<off_t>,
+    off_in: OffsetPtr,
     fd_out: FdNumber,
-    off_out: UserRef<off_t>,
+    off_out: OffsetPtr,
     len: usize,
     flags: u32,
 ) -> Result<usize, Errno> {
@@ -3317,6 +3319,25 @@ mod arch32 {
             length,
             offset_low | (offset_high << 32),
         )
+    }
+
+    pub fn sys_arch32_chmod(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        user_path: UserCString,
+        mode: FileMode,
+    ) -> Result<(), Errno> {
+        super::sys_fchmodat(locked, current_task, FdNumber::AT_FDCWD, user_path, mode)
+    }
+
+    pub fn sys_arch32_chown32(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        user_path: UserCString,
+        owner: uapi::arch32::__kernel_uid32_t,
+        group: uapi::arch32::__kernel_uid32_t,
+    ) -> Result<(), Errno> {
+        super::sys_fchownat(locked, current_task, FdNumber::AT_FDCWD, user_path, owner, group, 0)
     }
 
     pub use super::sys_fstatat64 as sys_arch32_fstatat64;

@@ -1922,10 +1922,13 @@ pub fn sys_vhangup(
 #[cfg(feature = "arch32")]
 mod arch32 {
     pub use super::{
-        sys_getrlimit as sys_arch32_ugetrlimit,
+        sys_execve as sys_arch32_execve, sys_geteuid as sys_arch32_geteuid32,
+        sys_getrlimit as sys_arch32_ugetrlimit, sys_getuid as sys_arch32_getuid32,
         sys_sched_getaffinity as sys_arch32_sched_getaffinity,
         sys_sched_setaffinity as sys_arch32_sched_setaffinity,
-        sys_setpriority as sys_arch32_setpriority, sys_setrlimit as sys_arch32_setrlimit,
+        sys_setgroups as sys_arch32_setgroups32, sys_setpriority as sys_arch32_setpriority,
+        sys_setresgid as sys_arch32_setresgid32, sys_setresuid as sys_arch32_setresuid32,
+        sys_setrlimit as sys_arch32_setrlimit,
     };
 }
 

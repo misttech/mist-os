@@ -36,7 +36,7 @@ struct capability_t {
   int ambient;
 };
 
-constexpr std::string kPrintHelperBinary = "print_helper";
+static char kPrintHelperBinary[] = "print_helper";
 
 constexpr size_t kRootUid = 0;
 constexpr size_t kRootGid = 0;

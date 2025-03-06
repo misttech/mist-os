@@ -6,25 +6,26 @@ use crate::mm::{MemoryAccessorExt, PAGE_SIZE};
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
 use crate::vfs::pipe::{Pipe, PipeFileObject, PipeOperands};
+use crate::vfs::syscalls::OffsetPtr;
 use crate::vfs::{FdNumber, FileHandle};
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_types::user_buffer::MAX_RW_COUNT;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::user_value::UserValue;
 use starnix_uapi::{errno, error, off_t, uapi};
 use std::sync::Arc;
 
 fn maybe_read_offset(
     current_task: &CurrentTask,
-    user_offset: UserRef<off_t>,
+    user_offset: OffsetPtr,
 ) -> Result<Option<usize>, Errno> {
     if user_offset.is_null() {
         return Ok(None);
     }
-    let offset = current_task.read_object(user_offset)?;
+    let offset = current_task.read_multi_arch_object(user_offset)?;
     if offset < 0 {
         return error!(EINVAL);
     }
@@ -34,7 +35,7 @@ fn maybe_read_offset(
 #[derive(Debug)]
 struct CopyOperand {
     file: FileHandle,
-    user_offset: UserRef<off_t>,
+    user_offset: OffsetPtr,
     maybe_offset: Option<usize>,
 }
 
@@ -42,7 +43,7 @@ impl CopyOperand {
     fn new(
         current_task: &CurrentTask,
         fd: FdNumber,
-        user_offset: UserRef<off_t>,
+        user_offset: OffsetPtr,
     ) -> Result<Self, Errno> {
         let file = current_task.files.get(fd)?;
         let maybe_offset = maybe_read_offset(current_task, user_offset)?;
@@ -60,7 +61,7 @@ impl CopyOperand {
     ) -> Result<(), Errno> {
         if let Some(offset) = self.maybe_offset {
             let new_offset = (offset + progress) as off_t;
-            current_task.write_object(self.user_offset, &new_offset)?;
+            current_task.write_multi_arch_object(self.user_offset, new_offset)?;
         }
         Ok(())
     }
@@ -133,10 +134,10 @@ pub fn sendfile(
     current_task: &CurrentTask,
     fd_out: FdNumber,
     fd_in: FdNumber,
-    user_offset_in: UserRef<off_t>,
+    user_offset_in: OffsetPtr,
     count: i32,
 ) -> Result<usize, Errno> {
-    let operand_out = CopyOperand::new(current_task, fd_out, Default::default())?;
+    let operand_out = CopyOperand::new(current_task, fd_out, OffsetPtr::null(current_task))?;
     let operand_in = CopyOperand::new(current_task, fd_in, user_offset_in)?;
 
     if count < 0 {
@@ -171,9 +172,9 @@ pub fn splice(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd_in: FdNumber,
-    off_in: UserRef<off_t>,
+    off_in: OffsetPtr,
     fd_out: FdNumber,
-    off_out: UserRef<off_t>,
+    off_out: OffsetPtr,
     len: usize,
     flags: u32,
 ) -> Result<usize, Errno> {
@@ -289,9 +290,9 @@ pub fn copy_file_range(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd_in: FdNumber,
-    user_offset_in: UserRef<off_t>,
+    user_offset_in: OffsetPtr,
     fd_out: FdNumber,
-    user_offset_out: UserRef<off_t>,
+    user_offset_out: OffsetPtr,
     length: usize,
     flags: u32,
 ) -> Result<usize, Errno> {
