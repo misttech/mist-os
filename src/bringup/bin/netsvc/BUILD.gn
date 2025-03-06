@@ -43,7 +43,6 @@ executable("netsvc") {
     ":netsvc_common",
     ":netsvc_structured_config",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fdio",
@@ -84,7 +83,6 @@ source_set("netsvc_common") {
   ]
   deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_cpp",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
@@ -131,7 +129,6 @@ test("netsvc-test") {
     ":netsvc_common",
     ":netsvc_structured_config",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
@@ -151,7 +148,6 @@ test("netsvc-stress-test") {
   sources = [ "test/paver-stress-test.cc" ]
   deps = [
     ":netsvc_common",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/component/outgoing/cpp",
@@ -241,7 +237,6 @@ source_set("inet6") {
   ]
   deps = [
     ":netifc-discover",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fit",
     "//zircon/system/ulib/fbl",
@@ -262,10 +257,10 @@ source_set("netifc-discover") {
     "netifc-discover.h",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
+    "//src/devices/lib/client:device_topology",
     "//src/lib/fsl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",

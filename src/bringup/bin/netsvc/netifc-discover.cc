@@ -5,7 +5,6 @@
 #include "src/bringup/bin/netsvc/netifc-discover.h"
 
 #include <fcntl.h>
-#include <fidl/fuchsia.device/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/component/incoming/cpp/protocol.h>
@@ -16,6 +15,7 @@
 #include <stdio.h>
 
 #include <fbl/unique_fd.h>
+#include <src/devices/lib/client/device_topology.h>
 
 #include "src/bringup/bin/netsvc/match.h"
 #include "src/lib/fsl/io/device_watcher.h"
@@ -204,28 +204,14 @@ std::optional<Netdevice::Info> netifc_evaluate(cpp17::string_view topological_pa
   // If an interface was specified, check the topological path of this device and reject it if it
   // doesn't match.
   if (!topological_path.empty()) {
-    std::string controller_path = filename + "/device_controller";
-    zx::result controller = component::ConnectAt<fuchsia_device::Controller>(dir, controller_path);
-    if (controller.is_error()) {
-      printf("netifc: failed to connect to %s/%s: %s\n", dirname.c_str(), controller_path.c_str(),
-             controller.status_string());
-      return std::nullopt;
-    }
-    fidl::WireResult result = fidl::WireCall(controller.value())->GetTopologicalPath();
-
-    if (!result.ok()) {
-      printf("netifc: failed to get topological path %s: %s\n", filename.c_str(),
-             result.status_string());
-      return std::nullopt;
-    }
-    auto& resp = result.value();
+    zx::result resp = fdf_topology::GetTopologicalPath(dir, filename);
     if (resp.is_error()) {
       printf("netifc: GetTopologicalPath returned error %s: %s\n", filename.c_str(),
              zx_status_get_string(resp.error_value()));
       return std::nullopt;
     }
 
-    cpp17::string_view topo_path = SkipInstanceSigil(resp.value()->path.get());
+    cpp17::string_view topo_path = SkipInstanceSigil(resp.value());
     // Allow for limited wildcard matching to avoid coupling too tightly.
     if (!EndsWithWildcardMatch(topo_path, topological_path)) {
       return std::nullopt;

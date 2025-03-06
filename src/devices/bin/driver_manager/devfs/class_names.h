@@ -190,6 +190,7 @@ std::unordered_map<std::string_view, uint8_t> classes_that_assume_ordering({
 const std::unordered_set<std::string> kClassesThatAllowTopologicalPath({
     "block",
     "devfs_service_test",
+    "network",
 });
 
 }  // namespace driver_manager
