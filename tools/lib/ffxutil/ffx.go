@@ -731,6 +731,10 @@ func (f *FFXInstance) EmuStart(pubPath string, args ...string) *ffxInvoker {
 	return f.invoker(append([]string{"emu", "start"}, args...)).setStrict().setConfigs(configs)
 }
 
+func (f *FFXInstance) EmuStop(ctx context.Context, args ...string) error {
+	return f.invoker(append([]string{"emu", "stop"}, args...)).setStrict().run(ctx)
+}
+
 // Test runs a test suite.
 func (f *FFXInstance) Test(
 	ctx context.Context,

@@ -141,8 +141,8 @@ func (f *FFXInstance) EmuStartConsole(ctx context.Context, sdkRoot, name string,
 }
 
 // EmuStop terminates all emulator instances launched by ffx.
-func (f *FFXInstance) EmuStop(ctx context.Context) error {
-	return f.Run(ctx, "emu", "stop", "--all")
+func (f *FFXInstance) EmuStopAll(ctx context.Context) error {
+	return f.EmuStop(ctx, "--all")
 }
 
 // GetEmuDeps returns the list of file dependencies for `ffx emu` to work.

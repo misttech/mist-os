@@ -354,7 +354,7 @@ func (t *Emulator) Start(ctx context.Context, images []bootserver.Image, args []
 // Stop stops the emulator target.
 func (t *Emulator) Stop() error {
 	var err error
-	if err = t.ffx.EmuStop(context.Background()); err != nil {
+	if err = t.ffx.EmuStopAll(context.Background()); err != nil {
 		logger.Debugf(t.targetCtx, "failed to stop emulator: %s", err)
 		if t.process == nil {
 			return fmt.Errorf("%s target has not yet been started", t.binary)
