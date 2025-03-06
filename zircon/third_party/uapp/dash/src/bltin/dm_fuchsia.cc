@@ -233,6 +233,10 @@ int zxc_k(int argc, char** argv) {
   }
   command_length = command_end - buffer;
 
-  return send_kernel_debug_command(buffer, command_length);
+  int send_result = send_kernel_debug_command(buffer, command_length);
+  if (send_result != 0) {
+    fprintf(stderr, "Unable to send kernel debug command, is kernel debugging disabled?\n");
+  }
+  return send_result;
 }
 __END_CDECLS
