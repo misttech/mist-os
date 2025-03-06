@@ -72,9 +72,9 @@ class Error {
   void Printf(const char* format, va_list args);
 
   // Construct an Error object specifically for an out-of-memory scenario. This
-  // sets buffer & size values accordingly so that take_* methods will recognize
-  // the allocation failure and return an appropriate error string.
-  static fit::error<Error> OutOfMemory() { return fit::error{Error{nullptr, kAllocationFailure}}; }
+  // sets buffer & size values accordingly so that take_* methods will
+  // recognize the allocation failure and return an appropriate error string.
+  static Error OutOfMemory() { return Error{nullptr, kAllocationFailure}; }
 
   // This must be called exactly once after Printf has been called (or after
   // any non-default construction).  The returned string is valid only for the

@@ -51,6 +51,7 @@ test("dl-unittests") {
     ]
     deps += [
       ":dl-unittest.deps",
+      ":tls-desc-resolver-tests",
       ":tlsdesc-runtime-dynamic-tests",
       "..:runtime",
       "//sdk/lib/fit",
@@ -88,6 +89,20 @@ source_set("tlsdesc-runtime-dynamic-tests") {
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
     "//zircon/kernel/lib/arch",
+  ]
+}
+
+source_set("tls-desc-resolver-tests") {
+  visibility = [ ":*" ]
+  testonly = true
+
+  sources = [ "tls-desc-resolver-tests.cc" ]
+  deps = [
+    "..:diagnostics",
+    "..:tls-desc-resolver",
+    "//sdk/lib/ld:tlsdesc",
+    "//third_party/googletest:gmock",
+    "//third_party/googletest:gtest",
   ]
 }
 

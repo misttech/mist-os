@@ -54,12 +54,15 @@ class DiagnosticsReport : public ld::ModuleDiagnosticsPrintfReportBase<Diagnosti
  private:
   friend class Diagnostics;
 
-  // Report an out of memory error in the event of an allocation failure.
-  // Similar to `ok(...)`, this asserts no prior Diagnostics API calls have been
-  // made and the object is considered moved-from after this call.
-  auto OutOfMemory() {
+  // Report an out of memory error in the event of an allocation failure.  As
+  // in `ok(...)`, this asserts no prior Diagnostics API calls have been made.
+  // However, the object is not moved-from because is returning to a caller of
+  // the elfldltl::Diagnostics protocol.  The false return value should
+  // propagate up error paths to the owner of a dl::Diagnostics object.
+  bool OutOfMemory() {
     error_.DisarmAndAssertUnused();
-    return Error::OutOfMemory();
+    error_ = Error::OutOfMemory();
+    return false;
   }
 
   Error error_;
@@ -100,12 +103,7 @@ class Diagnostics : public elfldltl::Diagnostics<DiagnosticsReport, DiagnosticsF
     return {};
   }
 
-  // Sets an OutOfMemory error on the diagnostics object and returns the
-  // reported error back to the caller.
-  auto OutOfMemory(std::string_view error, size_t bytes) {
-    Base::OutOfMemory(error, bytes);
-    return take_error();
-  }
+  bool OutOfMemory(std::string_view error, size_t bytes) { return report().OutOfMemory(); }
 };
 
 }  // namespace dl

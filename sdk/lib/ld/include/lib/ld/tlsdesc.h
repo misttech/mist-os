@@ -355,8 +355,7 @@ class StaticTlsDescResolver {
 //   return fit::ok(TlsDescGot{...});
 // }
 // ```
-class LocalRuntimeTlsDescResolver {
- public:
+struct LocalRuntimeTlsDescResolver {
   using size_type = elfldltl::Elf<>::size_type;
   using Addr = elfldltl::Elf<>::Addr;
   using Addend = elfldltl::Elf<>::Addend;
@@ -386,7 +385,6 @@ class LocalRuntimeTlsDescResolver {
     });
   }
 
- private:
   static inline const Addr kRuntimeStatic{
       reinterpret_cast<uintptr_t>(_ld_tlsdesc_runtime_static),
   };

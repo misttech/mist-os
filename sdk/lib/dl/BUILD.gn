@@ -23,7 +23,7 @@ source_set("runtime") {
   ]
   deps = [
     ":concat-view",
-    "//sdk/lib/ld:tlsdesc",
+    ":tls-desc-resolver",
   ]
   if (is_fuchsia) {
     sources += [ "unmap-zircon.cc" ]
@@ -61,6 +61,21 @@ source_set("tlsdesc-runtime-dynamic") {
   public = [ "tlsdesc-runtime-dynamic.h" ]
   public_deps = [ "//sdk/lib/ld:headers" ]
   sources = [ "tlsdesc-runtime-dynamic.S" ]
+}
+
+source_set("tls-desc-resolver") {
+  public = [ "tls-desc-resolver.h" ]
+  public_deps = [
+    ":tlsdesc-runtime-dynamic",
+    "//sdk/lib/ld:headers",
+    "//zircon/system/ulib/fbl",
+  ]
+  sources = [ "tls-desc-resolver.cc" ]
+  deps = [
+    ":diagnostics",
+    ":tlsdesc-runtime-dynamic",
+    "//sdk/lib/ld:tlsdesc",
+  ]
 }
 
 group("tests") {

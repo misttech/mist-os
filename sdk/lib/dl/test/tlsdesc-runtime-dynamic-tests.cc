@@ -20,12 +20,6 @@
 #include "../tlsdesc-runtime-dynamic.h"
 #include "call-tlsdesc.h"
 
-// The assembly code refers to this.  It's defined here and set by the tests,
-// but then always cleared at the end of each test.  This definition can move
-// into a non-test part of the runtime implementation when that's ready to be
-// linked into dl-unittests.
-constinit thread_local std::byte** dl::_dl_tlsdesc_runtime_dynamic_blocks;
-
 // The natural type of registers regardless of ILP32 or LP64.  There is no
 // <stdint.h> name for this.
 #if defined(__arm__)
