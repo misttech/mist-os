@@ -323,6 +323,7 @@ fn parse_wmm_from_ies(ies: &[u8]) -> Option<ie::WmmParam> {
 }
 
 impl Connecting {
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn on_connect_conf(
         mut self,
         conf: fidl_mlme::ConnectConfirm,
@@ -473,6 +474,7 @@ impl Connecting {
         process_sae_frame_rx(&mut self.cmd.protection, frame, context)
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn handle_timeout(
         mut self,
         event: Event,
@@ -516,6 +518,7 @@ impl Connecting {
 }
 
 impl Associated {
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn on_disassociate_ind(
         mut self,
         ind: fidl_mlme::DisassociateIndication,
@@ -654,6 +657,7 @@ impl Associated {
         Idle { cfg: self.cfg }
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn process_link_state_update<U, H>(
         mut self,
         update: U,
@@ -746,6 +750,7 @@ impl Associated {
         Ok(Self { link_state, ..self })
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn on_eapol_ind(
         self,
         ind: fidl_mlme::EapolIndication,
@@ -772,6 +777,7 @@ impl Associated {
         self.process_link_state_update(ind, LinkState::on_eapol_ind, context, state_change_ctx)
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn on_eapol_conf(
         self,
         resp: fidl_mlme::EapolConfirm,
@@ -781,6 +787,7 @@ impl Associated {
         self.process_link_state_update(resp, LinkState::on_eapol_conf, context, state_change_ctx)
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn on_set_keys_conf(
         self,
         conf: fidl_mlme::SetKeysConfirm,
@@ -813,6 +820,7 @@ impl Associated {
         }
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn handle_timeout(
         mut self,
         event: Event,
@@ -883,6 +891,7 @@ impl Roaming {
     // association with the original BSS, we must ignore a disassoc from the original BSS. But a
     // disassociation from the target BSS means that the roam attempt failed, and we should
     // transition to Disconnecting.
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn on_disassociate_ind(
         self,
         ind: fidl_mlme::DisassociateIndication,
@@ -1055,6 +1064,7 @@ impl Disconnecting {
         Idle { cfg: self.cfg }.on_disconnect_complete(context, self.action, state_change_ctx)
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn handle_timeout(
         self,
         event: Event,
@@ -1601,6 +1611,7 @@ impl ClientState {
     }
 }
 
+#[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
 fn roam_internal(
     state: Associated,
     context: &mut Context,
@@ -1739,6 +1750,7 @@ struct RoamResultFields {
 
 // If the roam attempt succeeded, move into Associated with the selected BSS.
 // If the roam attempt failed, return the next state, wrapped in AfterRoamFailureState.
+#[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
 fn roam_handle_result(
     mut state: Roaming,
     result_fields: RoamResultFields,

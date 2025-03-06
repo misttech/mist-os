@@ -46,6 +46,7 @@ pub enum CapabilityOpenRequest<'a> {
 }
 
 impl<'a> CapabilityOpenRequest<'a> {
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401254441)
     /// Creates a request to open a capability with source `route_source` for `target`.
     pub fn new_from_route_source(
         route_source: RouteSource,

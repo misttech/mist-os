@@ -116,6 +116,7 @@ impl EstablishingRsna {
         }
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn handle_rsna_response_timeout(mut self) -> Result<Self, EstablishRsnaFailureReason> {
         warn!("RSNA response timeout expired: {}ms", event::RSNA_RESPONSE_TIMEOUT_MILLIS);
         self.rsna_retransmission_timeout = None;
@@ -124,6 +125,7 @@ impl EstablishingRsna {
         Err(self.rsna.supplicant.on_rsna_response_timeout())
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn handle_rsna_completion_timeout(mut self) -> Result<Self, EstablishRsnaFailureReason> {
         warn!("RSNA completion timeout expired: {}ms", event::RSNA_COMPLETION_TIMEOUT_MILLIS);
         self.rsna_retransmission_timeout = None;
@@ -134,6 +136,7 @@ impl EstablishingRsna {
 }
 
 impl LinkState {
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     pub fn new(
         protection: Protection,
         context: &mut Context,
@@ -205,6 +208,7 @@ impl LinkState {
         }
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     fn on_eapol_event<T, H>(
         self,
         eapol_event: T,
@@ -283,6 +287,7 @@ impl LinkState {
         }
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     pub fn on_eapol_ind(
         self,
         eapol_ind: fidl_mlme::EapolIndication,
@@ -293,6 +298,7 @@ impl LinkState {
         self.on_eapol_event(eapol_ind, process_eapol_ind, bss, state_change_msg, context)
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     pub fn on_eapol_conf(
         self,
         eapol_conf: fidl_mlme::EapolConfirm,
@@ -303,6 +309,7 @@ impl LinkState {
         self.on_eapol_event(eapol_conf, process_eapol_conf, bss, state_change_msg, context)
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     pub fn on_set_keys_conf(
         self,
         set_keys_conf: fidl_mlme::SetKeysConfirm,
@@ -337,6 +344,7 @@ impl LinkState {
         }
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255153)
     pub fn handle_timeout(
         self,
         event: Event,

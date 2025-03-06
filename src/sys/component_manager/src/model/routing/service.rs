@@ -445,6 +445,7 @@ impl AnonymizedAggregateServiceDir {
         Ok(())
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401254441)
     /// Spawns a new task on the parent's nonblocking_task_group to create and run a directory
     /// watcher for the service instances for the aggregate.
     fn spawn_instance_watcher_task(

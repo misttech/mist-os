@@ -158,6 +158,7 @@ impl MirrorConfigBuilder {
         })
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255347)
     pub fn mirror_url(
         mut self,
         mirror_url: impl Into<http::Uri>,
@@ -169,6 +170,7 @@ impl MirrorConfigBuilder {
         Ok(self)
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255347)
     pub fn blob_mirror_url(
         mut self,
         blob_mirror_url: impl Into<http::Uri>,

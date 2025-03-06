@@ -424,6 +424,7 @@ impl InterpreterInner {
         }
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255249)
     /// Helper for [`InterpreterInner::open`] that sends a request given a value
     /// of $fs_root and a path.
     fn send_open_request(
@@ -1120,6 +1121,7 @@ impl Interpreter {
     }
 }
 
+#[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255249)
 /// Turn a path into a dotless, absolute form.
 pub fn canonicalize_path(path: String, pwd: Value) -> Result<String> {
     let Value::String(pwd) = pwd else {

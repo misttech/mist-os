@@ -260,6 +260,7 @@ pub trait ValueExt: Sized {
     /// If this object is a server, return the raw channel and protocol name.
     fn try_server_channel(self) -> Result<fidl::Channel, Self>;
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255249)
     /// Convert a playground value to one that is ready for transfer via FIDL by
     /// converting playground-specific types. This performs *minimal* type checking; only
     /// what happens in the course of figuring out what conversion is appropriate.
@@ -643,6 +644,7 @@ pub enum PlaygroundValue {
 }
 
 impl PlaygroundValue {
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255249)
     /// Convert this playground value to a raw FIDL value if possible.
     fn to_fidl_value_by_type_or_lookup(
         self,
@@ -752,6 +754,7 @@ impl PlaygroundValue {
         }
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255249)
     /// Convert this playground value to a raw FIDL value if possible.
     fn to_fidl_value(self, ns: &lib::Namespace, ty: &lib::Type) -> Result<FidlValue> {
         self.to_fidl_value_by_type_or_lookup(ns, LookupResultOrType::Type(ty.clone()))

@@ -155,18 +155,21 @@ impl InUseHandle {
         )
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255249)
     /// If this handle is a client end channel with the given protocol, steal it
     /// and return a raw FIDL value wrapping it.
     pub fn take_client(&self, expect_proto: Option<&str>) -> Result<fidl::Channel> {
         self.take_endpoint(EndpointType::Client, expect_proto)
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255249)
     /// If this handle is a server end channel with the given protocol, steal it
     /// and return a raw FIDL value wrapping it.
     pub fn take_server(&self, expect_proto: Option<&str>) -> Result<fidl::Channel> {
         self.take_endpoint(EndpointType::Server, expect_proto)
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255249)
     /// If this handle is a channel with the given protocol and endpoint type, steal it
     /// and return a raw FIDL value wrapping it.
     fn take_endpoint(&self, ty: EndpointType, expect_proto: Option<&str>) -> Result<fidl::Channel> {
@@ -230,6 +233,7 @@ impl InUseHandle {
         }
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255249)
     /// If this handle is a socket, steal it and return a raw FIDL value
     /// wrapping it.
     pub fn take_socket(&self) -> Result<FidlValue> {
@@ -306,6 +310,7 @@ impl InUseHandle {
         futures::future::poll_fn(|ctx| self.poll_read_channel_etc(ctx, bytes, handles)).await
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255249)
     /// If this is a channel, perform a `write_etc` operation on it. Returns an
     /// error if it is not a channel.
     pub fn write_channel_etc(
@@ -328,6 +333,7 @@ impl InUseHandle {
         hdl.write_etc(bytes, handles).map_err(|e| IOError::ChannelWrite(e).into())
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255249)
     /// Get an ID for this handle (the raw handle number). Fails if the handle
     /// has been stolen.
     pub fn id(&self) -> Result<u32> {
@@ -344,6 +350,7 @@ impl InUseHandle {
         }
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401255249)
     /// If this handle is a client, get the name of the protocol it is a client
     /// for if known.
     pub fn get_client_protocol(&self) -> Result<String> {

@@ -973,6 +973,7 @@ impl ResolvedInstanceState {
         Ok(child)
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401254441)
     fn add_target_dynamic_offers(
         &self,
         mut dynamic_offers: Vec<fdecl::Offer>,
@@ -1013,6 +1014,7 @@ impl ResolvedInstanceState {
         Ok(dynamic_offers)
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401254441)
     fn validate_dynamic_component(
         &self,
         all_dynamic_children: Vec<(&str, &str)>,
@@ -1049,6 +1051,7 @@ impl ResolvedInstanceState {
         Ok(())
     }
 
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/401254441)
     pub fn validate_and_convert_dynamic_component(
         &self,
         dynamic_offers: Option<Vec<fdecl::Offer>>,
