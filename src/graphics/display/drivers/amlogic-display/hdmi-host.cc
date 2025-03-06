@@ -130,7 +130,7 @@ pll_param CalculateClockParameters(const display::DisplayTiming& timing) {
 zx::result<std::unique_ptr<HdmiTransmitter>> CreateHdmiTransmitter(
     fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device) {
   if (!platform_device.is_valid()) {
-    FDF_LOG(ERROR, "PDev protocol is invalid");
+    fdf::error("PDev protocol is invalid");
     return zx::error(ZX_ERR_NO_RESOURCES);
   }
 
@@ -145,7 +145,7 @@ zx::result<std::unique_ptr<HdmiTransmitter>> CreateHdmiTransmitter(
       fbl::make_unique_checked<designware_hdmi::HdmiTransmitterControllerImpl>(
           &alloc_checker, std::move(hdmi_tx_mmio_result).value());
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Could not allocate memory for DesignWare HdmiTransmitterControllerImpl");
+    fdf::error("Could not allocate memory for DesignWare HdmiTransmitterControllerImpl");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -164,7 +164,7 @@ zx::result<std::unique_ptr<HdmiTransmitter>> CreateHdmiTransmitter(
       &alloc_checker, std::move(designware_controller), std::move(hdmi_top_mmio_result).value(),
       std::move(smc_result).value());
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Could not allocate memory for HdmiTransmitter");
+    fdf::error("Could not allocate memory for HdmiTransmitter");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
   return zx::ok(std::move(hdmi_transmitter));
@@ -187,14 +187,14 @@ zx::result<std::unique_ptr<HdmiHost>> HdmiHost::Create(fdf::Namespace& incoming)
   zx::result<fidl::ClientEnd<fuchsia_hardware_platform_device::Device>> pdev_result =
       incoming.Connect<fuchsia_hardware_platform_device::Service::Device>(kPdevFragmentName);
   if (pdev_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to get the pdev client: %s", pdev_result.status_string());
+    fdf::error("Failed to get the pdev client: {}", pdev_result);
     return pdev_result.take_error();
   }
   fidl::ClientEnd<fuchsia_hardware_platform_device::Device> platform_device =
       std::move(pdev_result).value();
 
   if (!platform_device.is_valid()) {
-    FDF_LOG(ERROR, "Could not get the platform device client.");
+    fdf::error("Could not get the platform device client.");
     return zx::error(ZX_ERR_INTERNAL);
   }
 
@@ -216,7 +216,7 @@ zx::result<std::unique_ptr<HdmiHost>> HdmiHost::Create(fdf::Namespace& incoming)
   zx::result<std::unique_ptr<HdmiTransmitter>> hdmi_transmitter =
       CreateHdmiTransmitter(platform_device);
   if (hdmi_transmitter.is_error()) {
-    FDF_LOG(ERROR, "Could not create HDMI transmitter: %s", hdmi_transmitter.status_string());
+    fdf::error("Could not create HDMI transmitter: {}", hdmi_transmitter);
     return hdmi_transmitter.take_error();
   }
   ZX_ASSERT(hdmi_transmitter.value() != nullptr);
@@ -226,7 +226,7 @@ zx::result<std::unique_ptr<HdmiHost>> HdmiHost::Create(fdf::Namespace& incoming)
       &alloc_checker, std::move(hdmi_transmitter).value(), std::move(vpu_mmio_result).value(),
       std::move(hhi_mmio_result).value(), std::move(gpio_mux_mmio_result).value());
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Could not allocate memory for the HdmiHost instance.");
+    fdf::error("Could not allocate memory for the HdmiHost instance.");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -280,7 +280,7 @@ zx_status_t HdmiHost::HostOn() {
 
   zx::result<> reset_result = hdmi_transmitter_->Reset();  // only supports 1 display for now
   if (reset_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to reset the HDMI transmitter: %s", reset_result.status_string());
+    fdf::error("Failed to reset the HDMI transmitter: {}", reset_result);
     return ZX_ERR_INTERNAL;
   }
   return ZX_OK;
@@ -301,10 +301,9 @@ void HdmiHost::HostOff() {
 
 zx_status_t HdmiHost::ModeSet(const display::DisplayTiming& timing) {
   if (!IsDisplayTimingSupported(timing)) {
-    FDF_LOG(
-        ERROR,
-        "Display timing (%" PRIu32 " x %" PRIu32 " @ pixel rate %" PRId64 " Hz) is not supported.",
-        timing.horizontal_active_px, timing.vertical_active_lines, timing.pixel_clock_frequency_hz);
+    fdf::error("Display timing ({} x {} @ pixel rate {} Hz) is not supported.",
+               timing.horizontal_active_px, timing.vertical_active_lines,
+               timing.pixel_clock_frequency_hz);
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -353,7 +352,7 @@ zx_status_t HdmiHost::ModeSet(const display::DisplayTiming& timing) {
   };
   zx::result<> modeset_result = hdmi_transmitter_->ModeSet(timing, kColorParams);
   if (modeset_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to set display mode: %s", modeset_result.status_string());
+    fdf::error("Failed to set display mode: {}", modeset_result);
     return modeset_result.status_value();
   }
 
@@ -388,7 +387,7 @@ zx_status_t HdmiHost::ModeSet(const display::DisplayTiming& timing) {
   // setup hdmi phy
   ConfigPhy();
 
-  FDF_LOG(INFO, "done!!");
+  fdf::info("done!!");
   return ZX_OK;
 }
 
@@ -694,7 +693,7 @@ void HdmiHost::ConfigEncoder(const display::DisplayTiming& timing) {
           HdmiEncoderTransmitterBridgeSetting::SourceEncoderSelection::kProgressive)
       .WriteTo(&vpu_mmio_);
 
-  FDF_LOG(INFO, "done");
+  fdf::info("done");
 }
 
 void HdmiHost::ConfigPhy() {
@@ -763,7 +762,7 @@ void HdmiHost::ConfigPhy() {
   HhiHdmiPhyCntl5Reg::Get().FromValue(0x00000003).WriteTo(&hhi_mmio_);
 
   usleep(20);
-  FDF_LOG(INFO, "done!");
+  fdf::info("done!");
 }
 
 }  // namespace amlogic_display

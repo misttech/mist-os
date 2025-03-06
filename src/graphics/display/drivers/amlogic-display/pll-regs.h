@@ -192,8 +192,7 @@ class HdmiPllControl0 : public hwreg::RegisterBase<HdmiPllControl0, uint32_t> {
       case OutputDividerSelection::k4:
         return 4;
     }
-    FDF_LOG(WARNING, "Invalid output divider 3 selection: %" PRIu32,
-            static_cast<uint32_t>(divider_selection));
+    fdf::warn("Invalid output divider 3 selection: {}", static_cast<uint32_t>(divider_selection));
     return 0;
   }
 
@@ -220,8 +219,7 @@ class HdmiPllControl0 : public hwreg::RegisterBase<HdmiPllControl0, uint32_t> {
       case OutputDividerSelection::k4:
         return 4;
     }
-    FDF_LOG(WARNING, "Invalid output divider 2 selection: %" PRIu32,
-            static_cast<uint32_t>(divider_selection));
+    fdf::warn("Invalid output divider 2 selection: {}", static_cast<uint32_t>(divider_selection));
     return 0;
   }
 
@@ -248,8 +246,7 @@ class HdmiPllControl0 : public hwreg::RegisterBase<HdmiPllControl0, uint32_t> {
       case OutputDividerSelection::k4:
         return 4;
     }
-    FDF_LOG(WARNING, "Invalid output divider 1 selection: %" PRIu32,
-            static_cast<uint32_t>(divider_selection));
+    fdf::warn("Invalid output divider 1 selection: {}", static_cast<uint32_t>(divider_selection));
     return 0;
   }
 

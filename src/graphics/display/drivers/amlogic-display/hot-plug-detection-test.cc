@@ -13,7 +13,6 @@
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
-#include <zircon/status.h>
 #include <zircon/types.h>
 
 #include <atomic>

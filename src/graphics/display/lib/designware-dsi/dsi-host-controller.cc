@@ -7,8 +7,8 @@
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/mipi-dsi/mipi-dsi.h>
 #include <lib/mmio/mmio-buffer.h>
+#include <lib/zx/result.h>
 #include <zircon/assert.h>
-#include <zircon/status.h>
 #include <zircon/types.h>
 
 #include <fbl/auto_lock.h>
@@ -62,13 +62,13 @@ void LogBytes(cpp20::span<const uint8_t> bytes) {
   fbl::StringBuffer<kStringBufferSize> string_buffer;
   for (size_t i = 0; i < bytes.size(); i++) {
     if (i % kByteCountPerPrint == 0 && i != 0) {
-      FDF_LOG(INFO, "%s", string_buffer.c_str());
+      fdf::info("{}", string_buffer.c_str());
       string_buffer.Clear();
     }
     string_buffer.AppendPrintf("0x%02x,", bytes[i]);
   }
   if (!string_buffer.empty()) {
-    FDF_LOG(INFO, "%s", string_buffer.c_str());
+    fdf::info("{}", string_buffer.c_str());
   }
 }
 
@@ -124,7 +124,7 @@ zx_status_t DsiHostController::PhyWaitForReady() {
     zx_nanosleep(zx_deadline_after(ZX_USEC(kPhyDelay)));
   }
   if (timeout <= 0) {
-    FDF_LOG(ERROR, "Timed out waiting for D-PHY lock");
+    fdf::error("Timed out waiting for D-PHY lock");
     return ZX_ERR_TIMED_OUT;
   }
 
@@ -133,7 +133,7 @@ zx_status_t DsiHostController::PhyWaitForReady() {
     zx_nanosleep(zx_deadline_after(ZX_USEC(kPhyDelay)));
   }
   if (timeout <= 0) {
-    FDF_LOG(ERROR, "Timed out waiting for D-PHY StopStateClk to be set");
+    fdf::error("Timed out waiting for D-PHY StopStateClk to be set");
     return ZX_ERR_TIMED_OUT;
   }
   return ZX_OK;
@@ -144,7 +144,7 @@ zx::result<> DsiHostController::IssueCommands(
   for (const mipi_dsi::DsiCommandAndResponse& command : commands) {
     zx_status_t status = IssueCommand(command);
     if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to issue a command: %s", zx_status_get_string(status));
+      fdf::error("Failed to issue a command: {}", zx::make_result(status));
       return zx::error(status);
     }
   }
@@ -157,7 +157,7 @@ void DsiHostController::SetMode(mipi_dsi::DsiOperationMode operation_mode) {
 
 zx::result<> DsiHostController::Config(const DsiHostControllerConfig& config) {
   if (!config.IsValid()) {
-    FDF_LOG(ERROR, "Invalid DsiHostControllerConfig provided");
+    fdf::error("Invalid DsiHostControllerConfig provided");
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
@@ -392,21 +392,21 @@ zx_status_t DsiHostController::WaitforCmdNotFull() { return WaitforFifo(kBitCmdF
 zx_status_t DsiHostController::WaitforCmdEmpty() { return WaitforFifo(kBitCmdEmpty, 1); }
 
 void DsiHostController::LogCommand(const mipi_dsi::DsiCommandAndResponse& command) {
-  FDF_LOG(INFO, "MIPI DSI Outgoing Packet:");
-  FDF_LOG(INFO, "Virtual Channel ID = 0x%x (%d)", command.virtual_channel_id,
-          command.virtual_channel_id);
-  FDF_LOG(INFO, "Data Type = 0x%x (%d)", command.data_type, command.data_type);
-  FDF_LOG(INFO, "Payload size = %zu", command.payload.size());
-  FDF_LOG(INFO, "Payload Data: [");
+  fdf::info("MIPI DSI Outgoing Packet:");
+  fdf::info("Virtual Channel ID = 0x{:x} ({})", command.virtual_channel_id,
+            command.virtual_channel_id);
+  fdf::info("Data Type = 0x{:x} ({})", command.data_type, command.data_type);
+  fdf::info("Payload size = {}", command.payload.size());
+  fdf::info("Payload Data: [");
   LogBytes(command.payload);
-  FDF_LOG(INFO, "]");
-  FDF_LOG(INFO, "Response payload size = %zu", command.response_payload.size());
+  fdf::info("]");
+  fdf::info("Response payload size = {}", command.response_payload.size());
 }
 
 zx_status_t DsiHostController::GenericPayloadRead(uint32_t* data) {
   // make sure there is something valid to read from payload fifo
   if (WaitforPldRNotEmpty() != ZX_OK) {
-    FDF_LOG(ERROR, "Timed out waiting for data in PLD R FIFO");
+    fdf::error("Timed out waiting for data in PLD R FIFO");
     return ZX_ERR_TIMED_OUT;
   }
   *data = DsiDwGenPldDataReg::Get().ReadFrom(&dsi_mmio_).reg_value();
@@ -416,7 +416,7 @@ zx_status_t DsiHostController::GenericPayloadRead(uint32_t* data) {
 zx_status_t DsiHostController::GenericHdrWrite(uint32_t data) {
   // make sure cmd fifo is not full before writing into it
   if (WaitforCmdNotFull() != ZX_OK) {
-    FDF_LOG(ERROR, "Timed out waiting for CMD FIFO to not be full");
+    fdf::error("Timed out waiting for CMD FIFO to not be full");
     return ZX_ERR_TIMED_OUT;
   }
   DsiDwGenHdrReg::Get().FromValue(0).set_reg_value(data).WriteTo(&dsi_mmio_);
@@ -426,7 +426,7 @@ zx_status_t DsiHostController::GenericHdrWrite(uint32_t data) {
 zx_status_t DsiHostController::GenericPayloadWrite(uint32_t data) {
   // Make sure PLD_W is not full before writing into it
   if (WaitforPldWNotFull() != ZX_OK) {
-    FDF_LOG(ERROR, "Timed out waiting for PLD W FIFO to not be full");
+    fdf::error("Timed out waiting for PLD W FIFO to not be full");
     return ZX_ERR_TIMED_OUT;
   }
   DsiDwGenPldDataReg::Get().FromValue(0).set_reg_value(data).WriteTo(&dsi_mmio_);
@@ -454,7 +454,7 @@ zx_status_t DsiHostController::WaitforBtaAck() {
     zx_nanosleep(zx_deadline_after(ZX_USEC(10)));
   }
   if (retry <= 0) {
-    FDF_LOG(ERROR, "Timed out waiting for read completion");
+    fdf::error("Timed out waiting for read completion");
     return ZX_ERR_TIMED_OUT;
   }
   return ZX_OK;
@@ -463,15 +463,15 @@ zx_status_t DsiHostController::WaitforBtaAck() {
 // MIPI DSI Functions as implemented by DWC IP
 zx_status_t DsiHostController::GenWriteShort(const mipi_dsi::DsiCommandAndResponse& command) {
   if (command.payload.size() > 2) {
-    FDF_LOG(ERROR, "Invalid payload size (%zu) for a Generic Short Write command",
-            command.payload.size());
+    fdf::error("Invalid payload size ({}) for a Generic Short Write command",
+               command.payload.size());
     return ZX_ERR_INVALID_ARGS;
   }
   if (command.data_type != kMipiDsiDtGenShortWrite0 &&
       command.data_type != kMipiDsiDtGenShortWrite1 &&
       command.data_type != kMipiDsiDtGenShortWrite2 &&
       command.data_type != kMipiDsiDtSetMaxRetPkt) {
-    FDF_LOG(ERROR, "Invalid data type (%d) for Generic Short Write", command.data_type);
+    fdf::error("Invalid data type ({}) for Generic Short Write", command.data_type);
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -491,13 +491,12 @@ zx_status_t DsiHostController::GenWriteShort(const mipi_dsi::DsiCommandAndRespon
 zx_status_t DsiHostController::DcsWriteShort(const mipi_dsi::DsiCommandAndResponse& command) {
   // Check that the payload size and command match
   if (command.payload.size() != 1 && command.payload.size() != 2) {
-    FDF_LOG(ERROR, "Invalid payload size (%zu) for a DCS Short Write command",
-            command.payload.size());
+    fdf::error("Invalid payload size ({}) for a DCS Short Write command", command.payload.size());
     return ZX_ERR_INVALID_ARGS;
   }
   if (command.data_type != kMipiDsiDtDcsShortWrite0 &&
       command.data_type != kMipiDsiDtDcsShortWrite1) {
-    FDF_LOG(ERROR, "Invalid data type (%d) for Generic Short Write", command.data_type);
+    fdf::error("Invalid data type ({}) for Generic Short Write", command.data_type);
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -530,7 +529,7 @@ zx_status_t DsiHostController::GenWriteLong(const mipi_dsi::DsiCommandAndRespons
 
     status = GenericPayloadWrite(regVal);
     if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Generic Payload write failed: %s", zx_status_get_string(status));
+      fdf::error("Generic Payload write failed: {}", zx::make_result(status));
       return status;
     }
     ts -= 4;
@@ -547,7 +546,7 @@ zx_status_t DsiHostController::GenWriteLong(const mipi_dsi::DsiCommandAndRespons
     }
     status = GenericPayloadWrite(regVal);
     if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Generic Payload write failed: %s", zx_status_get_string(status));
+      fdf::error("Generic Payload write failed: {}", zx::make_result(status));
       return status;
     }
   }
@@ -568,11 +567,11 @@ zx_status_t DsiHostController::GenRead(const mipi_dsi::DsiCommandAndResponse& co
 
   // valid cmd packet
   if (command.payload.size() > 2) {
-    FDF_LOG(ERROR, "Invalid payload size (%zu) for a Generic Read command", command.payload.size());
+    fdf::error("Invalid payload size ({}) for a Generic Read command", command.payload.size());
     return ZX_ERR_INVALID_ARGS;
   }
   if (command.response_payload.empty()) {
-    FDF_LOG(ERROR, "Response payload buffer is empty for a Generic Read command");
+    fdf::error("Response payload buffer is empty for a Generic Read command");
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -608,7 +607,7 @@ zx_status_t DsiHostController::GenRead(const mipi_dsi::DsiCommandAndResponse& co
   while (ts >= 4) {
     status = GenericPayloadRead(&data);
     if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to read payload data: %s", zx_status_get_string(status));
+      fdf::error("Failed to read payload data: {}", zx::make_result(status));
       return status;
     }
     command.response_payload[rsp_data_idx++] = static_cast<uint8_t>((data >> 0) & 0xFF);
@@ -622,7 +621,7 @@ zx_status_t DsiHostController::GenRead(const mipi_dsi::DsiCommandAndResponse& co
   if (ts > 0) {
     status = GenericPayloadRead(&data);
     if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to read payload data: %s", zx_status_get_string(status));
+      fdf::error("Failed to read payload data: {}", zx::make_result(status));
       return status;
     }
     command.response_payload[rsp_data_idx++] = (data >> 0) & 0xFF;
@@ -665,13 +664,12 @@ zx_status_t DsiHostController::IssueCommand(const mipi_dsi::DsiCommandAndRespons
       status = DcsWriteShort(command);
       break;
     default:
-      FDF_LOG(ERROR, "Unsupported/Invalid DSI command data type: %d", command.data_type);
+      fdf::error("Unsupported/Invalid DSI command data type: {}", command.data_type);
       status = ZX_ERR_INVALID_ARGS;
   }
 
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to perform DSI command and/or response: %s",
-            zx_status_get_string(status));
+    fdf::error("Failed to perform DSI command and/or response: {}", zx::make_result(status));
     LogCommand(command);
   }
 

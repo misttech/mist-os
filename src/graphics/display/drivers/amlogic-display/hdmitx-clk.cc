@@ -33,7 +33,7 @@ void HdmiHost::WaitForPllLocked() {
         HdmiPllControl0::Get().ReadFrom(&hhi_mmio_).set_reset(false).WriteTo(&hhi_mmio_);
       }
     }
-    FDF_LOG(INFO, "HDMI PLL reset %d times", 10000 - cnt);
+    fdf::info("HDMI PLL reset {} times", 10000 - cnt);
     if (cnt <= 0)
       err = true;
   } while (err);
@@ -52,7 +52,7 @@ VideoInputUnitEncoderMuxControl::Encoder EncoderSelectionFromViuType(viu_type ty
     case VIU_ENCT:
       return VideoInputUnitEncoderMuxControl::Encoder::kTvPanel;
   }
-  FDF_LOG(ERROR, "Incorrect VIU type: %u", type);
+  fdf::error("Incorrect VIU type: {}", static_cast<int>(type));
   return VideoInputUnitEncoderMuxControl::Encoder::kLcd;
 }
 
@@ -172,11 +172,9 @@ void HdmiHost::ConfigureHpllClkOut(int64_t expected_hdmi_pll_vco_output_frequenc
       (expected_hdmi_pll_vco_output_frequency_hz % kExternalOscillatorFrequencyHz) *
       kPllMultiplierFractionScalingRatio / kExternalOscillatorFrequencyHz);
 
-  FDF_LOG(DEBUG,
-          "HDMI PLL VCO configured: desired multiplier = %" PRId32 " + %" PRId32 " / %" PRId32,
-          pll_multiplier_integer, pll_multiplier_fraction, kPllMultiplierFractionScalingRatio);
-  FDF_LOG(DEBUG, "HDMI PLL VCO output frequency: %" PRId64 " Hz",
-          expected_hdmi_pll_vco_output_frequency_hz);
+  fdf::debug("HDMI PLL VCO configured: desired multiplier = {} + {} / {}", pll_multiplier_integer,
+             pll_multiplier_fraction, kPllMultiplierFractionScalingRatio);
+  fdf::debug("HDMI PLL VCO output frequency: {} Hz", expected_hdmi_pll_vco_output_frequency_hz);
 
   // The HdmiPllControl{0-6} register values are from Amlogic-provided code.
   HdmiPllControl0::Get()

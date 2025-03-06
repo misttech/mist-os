@@ -29,7 +29,6 @@
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/limits.h>
-#include <zircon/status.h>
 #include <zircon/types.h>
 
 #include <cinttypes>
@@ -114,10 +113,10 @@ bool IsFullHardwareResetRequired(
 
   zx::result<BoardInfo> board_info_result = GetBoardInfo(platform_device);
   if (board_info_result.is_error()) {
-    FDF_LOG(ERROR,
-            "Failed to get board information: %s. Falling back to "
-            "default option (%d)",
-            board_info_result.status_string(), kDefaultValue);
+    fdf::error(
+        "Failed to get board information: {}. Falling back to "
+        "default option ({})",
+        board_info_result, kDefaultValue);
     return kDefaultValue;
   }
 
@@ -144,10 +143,8 @@ bool IsFullHardwareResetRequired(
     return false;
   }
 
-  FDF_LOG(INFO,
-          "Unknown board type (vid=%" PRIx32 ", pid=%" PRIx32
-          "). Falling back to default option (%d).",
-          vendor_id, product_id, kDefaultValue);
+  fdf::info("Unknown board type (vid={}, pid={}). Falling back to default option ({}).", vendor_id,
+            product_id, kDefaultValue);
   return kDefaultValue;
 }
 
@@ -175,11 +172,11 @@ zx_status_t DisplayEngine::DisplayEngineSetMinimumRgb(uint8_t minimum_rgb) {
 
 zx::result<> DisplayEngine::ResetDisplayEngine() {
   ZX_DEBUG_ASSERT(!fully_initialized());
-  FDF_LOG(TRACE, "Display engine reset started.");
+  fdf::trace("Display engine reset started.");
 
   zx::result<> result = vout_->PowerOff();
   if (!result.is_ok()) {
-    FDF_LOG(ERROR, "Failed to power off Vout before VPU reset: %s", result.status_string());
+    fdf::error("Failed to power off Vout before VPU reset: {}", result);
   }
 
   vpu_->PowerOff();
@@ -197,11 +194,11 @@ zx::result<> DisplayEngine::ResetDisplayEngine() {
 
   result = vout_->PowerOn();
   if (!result.is_ok()) {
-    FDF_LOG(ERROR, "Failed to power on Vout after VPU reset: %s", result.status_string());
+    fdf::error("Failed to power on Vout after VPU reset: {}", result);
     return result.take_error();
   }
 
-  FDF_LOG(TRACE, "Display engine reset finished successfully.");
+  fdf::trace("Display engine reset finished successfully.");
   return zx::ok();
 }
 
@@ -237,8 +234,7 @@ zx_status_t DisplayEngine::DisplayEngineImportBufferCollection(
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   if (buffer_collections_.find(driver_buffer_collection_id) != buffer_collections_.end()) {
-    FDF_LOG(ERROR, "Buffer Collection (id=%lu) already exists",
-            driver_buffer_collection_id.value());
+    fdf::error("Buffer Collection (id={}) already exists", driver_buffer_collection_id.value());
     return ZX_ERR_ALREADY_EXISTS;
   }
 
@@ -246,8 +242,7 @@ zx_status_t DisplayEngine::DisplayEngineImportBufferCollection(
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollection>();
   if (!endpoints.is_ok()) {
-    FDF_LOG(ERROR, "Failed to create sysmem BufferCollection endpoints: %s",
-            endpoints.status_string());
+    fdf::error("Failed to create sysmem BufferCollection endpoints: {}", endpoints);
     return ZX_ERR_INTERNAL;
   }
   auto& [collection_client_endpoint, collection_server_endpoint] = endpoints.value();
@@ -260,8 +255,8 @@ zx_status_t DisplayEngine::DisplayEngineImportBufferCollection(
               fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>(std::move(collection_token)))
           .Build());
   if (!bind_result.ok()) {
-    FDF_LOG(ERROR, "Failed to complete FIDL call BindSharedCollection: %s",
-            bind_result.status_string());
+    fdf::error("Failed to complete FIDL call BindSharedCollection: {}",
+               bind_result.error().FormatDescription());
     return ZX_ERR_INTERNAL;
   }
 
@@ -275,8 +270,8 @@ zx_status_t DisplayEngine::DisplayEngineReleaseBufferCollection(
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
-    FDF_LOG(ERROR, "Failed to release buffer collection %lu: buffer collection doesn't exist",
-            driver_buffer_collection_id.value());
+    fdf::error("Failed to release buffer collection {}: buffer collection doesn't exist",
+               driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
   buffer_collections_.erase(driver_buffer_collection_id);
@@ -289,8 +284,8 @@ zx_status_t DisplayEngine::DisplayEngineImportImage(const image_metadata_t* imag
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
-    FDF_LOG(ERROR, "Failed to import Image on collection %lu: buffer collection doesn't exist",
-            driver_buffer_collection_id.value());
+    fdf::error("Failed to import Image on collection {}: buffer collection doesn't exist",
+               driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
 
@@ -345,8 +340,8 @@ zx_status_t DisplayEngine::DisplayEngineImportImage(const image_metadata_t* imag
 
   const auto pixel_format = collection_info.settings().image_format_constraints().pixel_format();
   if (!format_support_check_(pixel_format)) {
-    FDF_LOG(ERROR, "Failed to import image: pixel format %u not supported",
-            static_cast<uint32_t>(pixel_format));
+    fdf::error("Failed to import image: pixel format {} not supported",
+               static_cast<uint32_t>(pixel_format));
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -376,7 +371,7 @@ zx_status_t DisplayEngine::DisplayEngineImportImage(const image_metadata_t* imag
           bti_.pin(ZX_BTI_PERM_READ | ZX_BTI_CONTIGUOUS, collection_info.buffers().at(index).vmo(),
                    offset & ~(ZX_PAGE_SIZE - 1), size, &paddr, 1, &import_info->pmt);
       if (status != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to pin BTI: %s", zx_status_get_string(status));
+        fdf::error("Failed to pin BTI: {}", zx::make_result(status));
         return status;
       }
       import_info->paddr = paddr;
@@ -389,7 +384,7 @@ zx_status_t DisplayEngine::DisplayEngineImportImage(const image_metadata_t* imag
       uint32_t minimum_row_bytes;
       if (!ImageFormatMinimumRowBytes(collection_info.settings().image_format_constraints(),
                                       image_metadata->dimensions.width, &minimum_row_bytes)) {
-        FDF_LOG(ERROR, "Invalid image width %d for collection", image_metadata->dimensions.width);
+        fdf::error("Invalid image width {} for collection", image_metadata->dimensions.width);
         return ZX_ERR_INVALID_ARGS;
       }
 
@@ -404,15 +399,13 @@ zx_status_t DisplayEngine::DisplayEngineImportImage(const image_metadata_t* imag
           canvas_->Config(std::move(collection_info.buffers().at(index).vmo()),
                           collection_info.buffers().at(index).vmo_usable_start(), canvas_info);
       if (!result.ok()) {
-        FDF_LOG(ERROR, "Failed to configure canvas: %s",
-                result.error().FormatDescription().c_str());
+        fdf::error("Failed to configure canvas: {}", result.error().FormatDescription());
         return ZX_ERR_NO_RESOURCES;
       }
       fidl::WireResultUnwrapType<fuchsia_hardware_amlogiccanvas::Device::Config>& response =
           result.value();
       if (response.is_error()) {
-        FDF_LOG(ERROR, "Failed to configure canvas: %s",
-                zx_status_get_string(response.error_value()));
+        fdf::error("Failed to configure canvas: {}", zx::make_result(response.error_value()));
         return ZX_ERR_NO_RESOURCES;
       }
 
@@ -566,7 +559,7 @@ void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* disp
       if (IsNewDisplayTiming(display_timing)) {
         zx::result<> apply_config_result = vout_->ApplyConfiguration(display_timing);
         if (!apply_config_result.is_ok()) {
-          FDF_LOG(ERROR, "Failed to apply config to Vout: %s", apply_config_result.status_string());
+          fdf::error("Failed to apply config to Vout: {}", apply_config_result);
           return;
         }
         current_display_timing_ = display_timing;
@@ -618,9 +611,9 @@ zx_status_t DisplayEngine::DisplayEngineSetBufferCollectionConstraints(
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
-    FDF_LOG(ERROR,
-            "Failed to set buffer collection constraints for %lu: buffer collection doesn't exist",
-            driver_buffer_collection_id.value());
+    fdf::error(
+        "Failed to set buffer collection constraints for %lu: buffer collection doesn't exist",
+        driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
 
@@ -727,7 +720,7 @@ zx_status_t DisplayEngine::DisplayEngineSetBufferCollectionConstraints(
                               .name(fidl::StringView::FromExternal(buffer_name))
                               .Build());
   if (!set_name_result.ok()) {
-    FDF_LOG(ERROR, "Failed to set name: %d", set_name_result.status());
+    fdf::error("Failed to set name: {}", set_name_result.status());
     return set_name_result.status();
   }
   fidl::OneWayStatus set_constraints_result = collection->SetConstraints(
@@ -735,7 +728,7 @@ zx_status_t DisplayEngine::DisplayEngineSetBufferCollectionConstraints(
           .constraints(constraints.Build())
           .Build());
   if (!set_constraints_result.ok()) {
-    FDF_LOG(ERROR, "Failed to set constraints: %d", set_constraints_result.status());
+    fdf::error("Failed to set constraints: {}", set_constraints_result.status());
     return set_constraints_result.status();
   }
 
@@ -758,16 +751,14 @@ zx_status_t DisplayEngine::DisplayEngineSetDisplayPower(uint64_t display_id, boo
     zx::result<> set_receiving_state_result =
         vsync_receiver_->SetReceivingState(/*receiving=*/power_on);
     if (set_receiving_state_result.is_error()) {
-      FDF_LOG(ERROR, "Failed to set Vsync interrupt receiving state: %s",
-              set_receiving_state_result.status_string());
+      fdf::error("Failed to set Vsync interrupt receiving state: {}", set_receiving_state_result);
       return set_receiving_state_result.status_value();
     }
 
     zx::result<> set_frame_visibility_result =
         vout_->SetFrameVisibility(/*frame_visible=*/power_on);
     if (set_frame_visibility_result.is_error()) {
-      FDF_LOG(ERROR, "Failed to set frame visibility: %s",
-              set_frame_visibility_result.status_string());
+      fdf::error("Failed to set frame visibility: {}", set_frame_visibility_result);
       return set_frame_visibility_result.status_value();
     }
     return ZX_OK;
@@ -792,9 +783,8 @@ zx_status_t DisplayEngine::DisplayEngineImportImageForCapture(
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
-    FDF_LOG(ERROR,
-            "Failed to import capture image on collection %lu: buffer collection doesn't exist",
-            driver_buffer_collection_id.value());
+    fdf::error("Failed to import capture image on collection {}: buffer collection doesn't exist",
+               driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
 
@@ -890,13 +880,13 @@ zx_status_t DisplayEngine::DisplayEngineImportImageForCapture(
       canvas_->Config(std::move(collection_info.buffers().at(index).vmo()),
                       collection_info.buffers().at(index).vmo_usable_start(), canvas_info);
   if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to configure canvas: %s", result.error().FormatDescription().c_str());
+    fdf::error("Failed to configure canvas: {}", result.error().FormatDescription());
     return ZX_ERR_NO_RESOURCES;
   }
   fidl::WireResultUnwrapType<fuchsia_hardware_amlogiccanvas::Device::Config>& response =
       result.value();
   if (response.is_error()) {
-    FDF_LOG(ERROR, "Failed to configure canvas: %s", zx_status_get_string(response.error_value()));
+    fdf::error("Failed to configure canvas: {}", zx::make_result(response.error_value()));
     return ZX_ERR_NO_RESOURCES;
   }
 
@@ -925,13 +915,13 @@ zx_status_t DisplayEngine::DisplayEngineImportImageForCapture(
 
 zx_status_t DisplayEngine::DisplayEngineStartCapture(uint64_t capture_handle) {
   if (!fully_initialized()) {
-    FDF_LOG(ERROR, "Failed to start capture before initializing the display");
+    fdf::error("Failed to start capture before initializing the display");
     return ZX_ERR_SHOULD_WAIT;
   }
 
   fbl::AutoLock lock(&capture_mutex_);
   if (current_capture_target_image_ != nullptr) {
-    FDF_LOG(ERROR, "Failed to start capture while another capture is in progress");
+    fdf::error("Failed to start capture while another capture is in progress");
     return ZX_ERR_SHOULD_WAIT;
   }
 
@@ -945,7 +935,7 @@ zx_status_t DisplayEngine::DisplayEngineStartCapture(uint64_t capture_handle) {
         return info.canvas_idx == canvas_index;
       }) == imported_captures_.end()) {
     // invalid handle
-    FDF_LOG(ERROR, "Invalid capture_handle: %" PRIu64, capture_handle);
+    fdf::error("Invalid capture_handle: {}", capture_handle);
     return ZX_ERR_NOT_FOUND;
   }
 
@@ -956,13 +946,13 @@ zx_status_t DisplayEngine::DisplayEngineStartCapture(uint64_t capture_handle) {
 
   auto status = vpu_->CaptureInit(info->canvas_idx, info->image_height, info->image_width);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to init capture: %s", zx_status_get_string(status));
+    fdf::error("Failed to init capture: {}", zx::make_result(status));
     return status;
   }
 
   status = vpu_->CaptureStart();
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to start capture: %s", zx_status_get_string(status));
+    fdf::error("Failed to start capture: {}", zx::make_result(status));
     return status;
   }
   current_capture_target_image_ = info;
@@ -982,7 +972,7 @@ zx_status_t DisplayEngine::DisplayEngineReleaseCapture(uint64_t capture_handle) 
   uint8_t canvas_index = reinterpret_cast<ImageInfo*>(capture_handle)->canvas_idx;
   if (imported_captures_.erase_if(
           [canvas_index](const ImageInfo& i) { return i.canvas_idx == canvas_index; }) == nullptr) {
-    FDF_LOG(ERROR, "Tried to release non-existent capture image %d", canvas_index);
+    fdf::error("Tried to release non-existent capture image {}", canvas_index);
     return ZX_ERR_NOT_FOUND;
   }
 
@@ -1005,7 +995,7 @@ void DisplayEngine::OnVsync(zx::time timestamp) {
 
 void DisplayEngine::OnCaptureComplete() {
   if (!fully_initialized()) {
-    FDF_LOG(WARNING, "Capture interrupt fired before the display was initialized");
+    fdf::warn("Capture interrupt fired before the display was initialized");
     return;
   }
 
@@ -1026,7 +1016,7 @@ void DisplayEngine::OnHotPlugStateChange(HotPlugDetectionState current_state) {
   fbl::AutoLock lock(&display_mutex_);
 
   if (current_state == HotPlugDetectionState::kDetected && !display_attached_) {
-    FDF_LOG(INFO, "Display is connected");
+    fdf::info("Display is connected");
 
     display_attached_ = true;
 
@@ -1038,8 +1028,7 @@ void DisplayEngine::OnHotPlugStateChange(HotPlugDetectionState current_state) {
 
     zx::result<> update_vout_display_state_result = vout_->UpdateStateOnDisplayConnected();
     if (update_vout_display_state_result.is_error()) {
-      FDF_LOG(ERROR, "Failed to update Vout display state: %s",
-              update_vout_display_state_result.status_string());
+      fdf::error("Failed to update Vout display state: {}", update_vout_display_state_result);
       return;
     }
 
@@ -1052,7 +1041,7 @@ void DisplayEngine::OnHotPlugStateChange(HotPlugDetectionState current_state) {
   }
 
   if (current_state == HotPlugDetectionState::kNotDetected && display_attached_) {
-    FDF_LOG(INFO, "Display Disconnected!");
+    fdf::info("Display Disconnected!");
     vout_->DisplayDisconnected();
 
     const display::DisplayId removed_display_id = display_id_;
@@ -1087,8 +1076,7 @@ zx_status_t DisplayEngine::InitializeHdmiVout() {
   zx::result<std::unique_ptr<Vout>> create_hdmi_vout_result = Vout::CreateHdmiVout(
       *incoming_, root_node_.CreateChild("vout"), structured_config_.visual_debugging_level());
   if (!create_hdmi_vout_result.is_ok()) {
-    FDF_LOG(ERROR, "Failed to initialize HDMI Vout device: %s",
-            create_hdmi_vout_result.status_string());
+    fdf::error("Failed to initialize HDMI Vout device: {}", create_hdmi_vout_result);
     return create_hdmi_vout_result.status_value();
   }
   vout_ = std::move(create_hdmi_vout_result).value();
@@ -1099,16 +1087,15 @@ zx_status_t DisplayEngine::InitializeHdmiVout() {
 zx_status_t DisplayEngine::InitializeMipiDsiVout(display_panel_t panel_info) {
   ZX_DEBUG_ASSERT(vout_ == nullptr);
 
-  FDF_LOG(INFO, "Provided Display Info: %" PRIu32 " x %" PRIu32 " with panel type %" PRIu32,
-          panel_info.width, panel_info.height, panel_info.panel_type);
+  fdf::info("Provided Display Info: {} x {} with panel type {}", panel_info.width,
+            panel_info.height, panel_info.panel_type);
   {
     fbl::AutoLock lock(&display_mutex_);
     zx::result<std::unique_ptr<Vout>> create_dsi_vout_result =
         Vout::CreateDsiVout(*incoming_, panel_info.panel_type, panel_info.width, panel_info.height,
                             root_node_.CreateChild("vout"));
     if (!create_dsi_vout_result.is_ok()) {
-      FDF_LOG(ERROR, "Failed to initialize DSI Vout device: %s",
-              create_dsi_vout_result.status_string());
+      fdf::error("Failed to initialize DSI Vout device: {}", create_dsi_vout_result);
       return create_dsi_vout_result.status_value();
     }
     vout_ = std::move(create_dsi_vout_result).value();
@@ -1134,7 +1121,7 @@ zx_status_t DisplayEngine::InitializeVout() {
     return InitializeHdmiVout();
   }
 
-  FDF_LOG(ERROR, "Failed to get display panel metadata: %s", metadata_result.status_string());
+  fdf::error("Failed to get display panel metadata: {}", metadata_result);
   return metadata_result.status_value();
 }
 
@@ -1148,19 +1135,19 @@ zx_status_t DisplayEngine::GetCommonProtocolsAndResources() {
   zx::result<fidl::ClientEnd<fuchsia_hardware_platform_device::Device>> pdev_result =
       incoming_->Connect<fuchsia_hardware_platform_device::Service::Device>(kPdevFragmentName);
   if (pdev_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to get the pdev client: %s", pdev_result.status_string());
+    fdf::error("Failed to get the pdev client: {}", pdev_result);
     return pdev_result.status_value();
   }
 
   pdev_ = fidl::WireSyncClient(std::move(pdev_result).value());
   if (!pdev_.is_valid()) {
-    FDF_LOG(ERROR, "Failed to get a valid platform device client");
+    fdf::error("Failed to get a valid platform device client");
     return ZX_ERR_INTERNAL;
   }
 
   zx::result sysmem_client_result = incoming_->Connect<fuchsia_sysmem2::Allocator>();
   if (sysmem_client_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to get sysmem protocol: %s", sysmem_client_result.status_string());
+    fdf::error("Failed to get sysmem protocol: {}", sysmem_client_result);
     return sysmem_client_result.status_value();
   }
   sysmem_.Bind(std::move(sysmem_client_result.value()));
@@ -1168,8 +1155,7 @@ zx_status_t DisplayEngine::GetCommonProtocolsAndResources() {
   zx::result<fidl::ClientEnd<fuchsia_hardware_amlogiccanvas::Device>> canvas_client_result =
       incoming_->Connect<fuchsia_hardware_amlogiccanvas::Service::Device>("canvas");
   if (canvas_client_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to get Amlogic canvas protocol: %s",
-            canvas_client_result.status_string());
+    fdf::error("Failed to get Amlogic canvas protocol: {}", canvas_client_result);
     return canvas_client_result.status_value();
   }
   canvas_.Bind(std::move(canvas_client_result.value()));
@@ -1201,8 +1187,7 @@ zx_status_t DisplayEngine::InitializeSysmemAllocator() {
           .id(current_process_koid)
           .Build());
   if (!set_debug_status.ok()) {
-    FDF_LOG(ERROR, "Failed to set sysmem allocator debug info: %s",
-            set_debug_status.status_string());
+    fdf::error("Failed to set sysmem allocator debug info: {}", set_debug_status.status_string());
     return set_debug_status.status();
   }
   return ZX_OK;
@@ -1218,14 +1203,14 @@ zx_status_t DisplayEngine::Initialize() {
 
   zx_status_t status = GetCommonProtocolsAndResources();
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to get common protocols resources from parent devices: %s",
-            zx_status_get_string(status));
+    fdf::error("Failed to get common protocols resources from parent devices: {}",
+               zx::make_result(status));
     return status;
   }
 
   status = InitializeVout();
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to initalize Vout: %s", zx_status_get_string(status));
+    fdf::error("Failed to initalize Vout: {}", zx::make_result(status));
     return status;
   }
 
@@ -1233,15 +1218,14 @@ zx_status_t DisplayEngine::Initialize() {
   zx::result<std::unique_ptr<VideoInputUnit>> video_input_unit_create_result =
       VideoInputUnit::Create(pdev_.client_end(), &video_input_unit_node_);
   if (video_input_unit_create_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create VideoInputUnit instance: %s",
-            video_input_unit_create_result.status_string());
+    fdf::error("Failed to create VideoInputUnit instance: {}", video_input_unit_create_result);
     return video_input_unit_create_result.status_value();
   }
   video_input_unit_ = std::move(video_input_unit_create_result).value();
 
   zx::result<std::unique_ptr<Vpu>> vpu_result = Vpu::Create(pdev_.client_end());
   if (vpu_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to initialize VPU object: %s", vpu_result.status_string());
+    fdf::error("Failed to initialize VPU object: {}", vpu_result);
     return vpu_result.status_value();
   }
   vpu_ = std::move(vpu_result).value();
@@ -1256,7 +1240,7 @@ zx_status_t DisplayEngine::Initialize() {
     fbl::AutoLock lock(&display_mutex_);
     zx::result<> reset_result = ResetDisplayEngine();
     if (!reset_result.is_ok()) {
-      FDF_LOG(ERROR, "Failed to reset the display engine: %s", reset_result.status_string());
+      fdf::error("Failed to reset the display engine: {}", reset_result);
       return reset_result.status_value();
     }
   } else {
@@ -1272,7 +1256,7 @@ zx_status_t DisplayEngine::Initialize() {
 
   status = InitializeSysmemAllocator();
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to initialize sysmem allocator: %s", zx_status_get_string(status));
+    fdf::error("Failed to initialize sysmem allocator: {}", zx::make_result(status));
     return status;
   }
 
@@ -1298,7 +1282,7 @@ zx_status_t DisplayEngine::Initialize() {
 
   if (vout_->supports_hpd()) {
     if (zx_status_t status = SetupHotplugDisplayDetection(); status != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to set up hotplug display: %s", zx_status_get_string(status));
+      fdf::error("Failed to set up hotplug display: {}", zx::make_result(status));
       return status;
     }
   }
@@ -1321,13 +1305,13 @@ zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(
   auto display_engine = fbl::make_unique_checked<DisplayEngine>(&alloc_checker, std::move(incoming),
                                                                 structured_config);
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for DisplayEngine");
+    fdf::error("Failed to allocate memory for DisplayEngine");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   const zx_status_t status = display_engine->Initialize();
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to initialize DisplayEngine instance: %s", zx_status_get_string(status));
+    fdf::error("Failed to initialize DisplayEngine instance: {}", zx::make_result(status));
     return zx::error(status);
   }
   return zx::ok(std::move(display_engine));

@@ -442,8 +442,8 @@ class WritebackMuxControl : public hwreg::RegisterBase<WritebackMuxControl, uint
     WritebackMuxSource clock = mux1_clock_selection();
     WritebackMuxSource data = mux1_data_selection();
     if (clock != data) {
-      FDF_LOG(WARNING, "Writeback mux1 clock selection %" PRIu32 " != data selection %" PRIu32,
-              static_cast<uint32_t>(clock), static_cast<uint32_t>(data));
+      fdf::warn("Writeback mux1 clock selection {} != data selection {}",
+                static_cast<uint32_t>(clock), static_cast<uint32_t>(data));
     }
     return clock;
   }
@@ -473,8 +473,8 @@ class WritebackMuxControl : public hwreg::RegisterBase<WritebackMuxControl, uint
     WritebackMuxSource clock = mux0_clock_selection();
     WritebackMuxSource data = mux0_data_selection();
     if (clock != data) {
-      FDF_LOG(WARNING, "Writeback mux0 clock selection %" PRIu32 " != data selection %" PRIu32,
-              static_cast<uint32_t>(clock), static_cast<uint32_t>(data));
+      fdf::warn("Writeback mux0 clock selection {} != data selection {}",
+                static_cast<uint32_t>(clock), static_cast<uint32_t>(data));
     }
     return clock;
   }

@@ -91,34 +91,33 @@ zx::result<> MipiPhy::PhyCfgLoad(int64_t bitrate) {
   // Ensure both clk-trail and hs-trail do not exceed Teot (End of Transmission Time)
   const uint32_t time_req_max = NsToLaneByte(DPHY_TIME_EOT(ui), lanebytetime);
   if ((dsi_phy_cfg_.clk_trail > time_req_max) || (dsi_phy_cfg_.hs_trail > time_req_max)) {
-    FDF_LOG(ERROR, "Invalid clk-trail and/or hs-trail exceed Teot!");
-    FDF_LOG(ERROR, "clk-trail = 0x%02x, hs-trail =  0x%02x, Teot = 0x%02x", dsi_phy_cfg_.clk_trail,
-            dsi_phy_cfg_.hs_trail, time_req_max);
+    fdf::error("Invalid clk-trail and/or hs-trail exceed Teot!");
+    fdf::error("clk-trail = 0x{:02x}, hs-trail =  0x{:02x}, Teot = 0x{:02x}",
+               dsi_phy_cfg_.clk_trail, dsi_phy_cfg_.hs_trail, time_req_max);
     return zx::error(ZX_ERR_OUT_OF_RANGE);
   }
 
-  FDF_LOG(TRACE,
-          "lp_tesc     = 0x%02x"
-          "lp_lpx      = 0x%02x"
-          "lp_ta_sure  = 0x%02x"
-          "lp_ta_go    = 0x%02x"
-          "lp_ta_get   = 0x%02x"
-          "hs_exit     = 0x%02x"
-          "hs_trail    = 0x%02x"
-          "hs_zero     = 0x%02x"
-          "hs_prepare  = 0x%02x"
-          "clk_trail   = 0x%02x"
-          "clk_post    = 0x%02x"
-          "clk_zero    = 0x%02x"
-          "clk_prepare = 0x%02x"
-          "clk_pre     = 0x%02x"
-          "init        = 0x%02x"
-          "wakeup      = 0x%02x",
-          dsi_phy_cfg_.lp_tesc, dsi_phy_cfg_.lp_lpx, dsi_phy_cfg_.lp_ta_sure, dsi_phy_cfg_.lp_ta_go,
-          dsi_phy_cfg_.lp_ta_get, dsi_phy_cfg_.hs_exit, dsi_phy_cfg_.hs_trail, dsi_phy_cfg_.hs_zero,
-          dsi_phy_cfg_.hs_prepare, dsi_phy_cfg_.clk_trail, dsi_phy_cfg_.clk_post,
-          dsi_phy_cfg_.clk_zero, dsi_phy_cfg_.clk_prepare, dsi_phy_cfg_.clk_pre, dsi_phy_cfg_.init,
-          dsi_phy_cfg_.wakeup);
+  fdf::trace(
+      "lp_tesc     = 0x{:02x}"
+      "lp_lpx      = 0x{:02x}"
+      "lp_ta_sure  = 0x{:02x}"
+      "lp_ta_go    = 0x{:02x}"
+      "lp_ta_get   = 0x{:02x}"
+      "hs_exit     = 0x{:02x}"
+      "hs_trail    = 0x{:02x}"
+      "hs_zero     = 0x{:02x}"
+      "hs_prepare  = 0x{:02x}"
+      "clk_trail   = 0x{:02x}"
+      "clk_post    = 0x{:02x}"
+      "clk_zero    = 0x{:02x}"
+      "clk_prepare = 0x{:02x}"
+      "clk_pre     = 0x{:02x}"
+      "init        = 0x{:02x}"
+      "wakeup      = 0x{:02x}",
+      dsi_phy_cfg_.lp_tesc, dsi_phy_cfg_.lp_lpx, dsi_phy_cfg_.lp_ta_sure, dsi_phy_cfg_.lp_ta_go,
+      dsi_phy_cfg_.lp_ta_get, dsi_phy_cfg_.hs_exit, dsi_phy_cfg_.hs_trail, dsi_phy_cfg_.hs_zero,
+      dsi_phy_cfg_.hs_prepare, dsi_phy_cfg_.clk_trail, dsi_phy_cfg_.clk_post, dsi_phy_cfg_.clk_zero,
+      dsi_phy_cfg_.clk_prepare, dsi_phy_cfg_.clk_pre, dsi_phy_cfg_.init, dsi_phy_cfg_.wakeup);
   return zx::ok();
 }
 
@@ -231,7 +230,7 @@ zx::result<std::unique_ptr<MipiPhy>> MipiPhy::Create(
   auto mipi_phy = fbl::make_unique_checked<MipiPhy>(&alloc_checker, std::move(d_phy_mmio),
                                                     designware_dsi_host_controller, enabled);
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for Lcd");
+    fdf::error("Failed to allocate memory for Lcd");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -247,45 +246,45 @@ MipiPhy::MipiPhy(fdf::MmioBuffer d_phy_mmio,
 }
 
 void MipiPhy::Dump() {
-  FDF_LOG(INFO, "%s: DUMPING PHY REGS", __func__);
-  FDF_LOG(INFO, "MIPI_DSI_PHY_CTRL = 0x%x", dsi_phy_mmio_.Read32(MIPI_DSI_PHY_CTRL));
-  FDF_LOG(INFO, "MIPI_DSI_CHAN_CTRL = 0x%x", dsi_phy_mmio_.Read32(MIPI_DSI_CHAN_CTRL));
-  FDF_LOG(INFO, "MIPI_DSI_CHAN_STS = 0x%x", dsi_phy_mmio_.Read32(MIPI_DSI_CHAN_STS));
-  FDF_LOG(INFO, "MIPI_DSI_CLK_TIM = 0x%x", dsi_phy_mmio_.Read32(MIPI_DSI_CLK_TIM));
-  FDF_LOG(INFO, "MIPI_DSI_HS_TIM = 0x%x", dsi_phy_mmio_.Read32(MIPI_DSI_HS_TIM));
-  FDF_LOG(INFO, "MIPI_DSI_LP_TIM = 0x%x", dsi_phy_mmio_.Read32(MIPI_DSI_LP_TIM));
-  FDF_LOG(INFO, "MIPI_DSI_ANA_UP_TIM = 0x%x", dsi_phy_mmio_.Read32(MIPI_DSI_ANA_UP_TIM));
-  FDF_LOG(INFO, "MIPI_DSI_INIT_TIM = 0x%x", dsi_phy_mmio_.Read32(MIPI_DSI_INIT_TIM));
-  FDF_LOG(INFO, "MIPI_DSI_WAKEUP_TIM = 0x%x", dsi_phy_mmio_.Read32(MIPI_DSI_WAKEUP_TIM));
-  FDF_LOG(INFO, "MIPI_DSI_LPOK_TIM = 0x%x", dsi_phy_mmio_.Read32(MIPI_DSI_LPOK_TIM));
-  FDF_LOG(INFO, "MIPI_DSI_LP_WCHDOG = 0x%x", dsi_phy_mmio_.Read32(MIPI_DSI_LP_WCHDOG));
-  FDF_LOG(INFO, "MIPI_DSI_ANA_CTRL = 0x%x", dsi_phy_mmio_.Read32(MIPI_DSI_ANA_CTRL));
-  FDF_LOG(INFO, "MIPI_DSI_CLK_TIM1 = 0x%x", dsi_phy_mmio_.Read32(MIPI_DSI_CLK_TIM1));
-  FDF_LOG(INFO, "MIPI_DSI_TURN_WCHDOG = 0x%x", dsi_phy_mmio_.Read32(MIPI_DSI_TURN_WCHDOG));
-  FDF_LOG(INFO, "MIPI_DSI_ULPS_CHECK = 0x%x", dsi_phy_mmio_.Read32(MIPI_DSI_ULPS_CHECK));
-  FDF_LOG(INFO, "MIPI_DSI_TEST_CTRL0 = 0x%x", dsi_phy_mmio_.Read32(MIPI_DSI_TEST_CTRL0));
-  FDF_LOG(INFO, "MIPI_DSI_TEST_CTRL1 = 0x%x", dsi_phy_mmio_.Read32(MIPI_DSI_TEST_CTRL1));
-  FDF_LOG(INFO, "");
+  fdf::info("{}: DUMPING PHY REGS", __func__);
+  fdf::info("MIPI_DSI_PHY_CTRL = 0x{:x}", dsi_phy_mmio_.Read32(MIPI_DSI_PHY_CTRL));
+  fdf::info("MIPI_DSI_CHAN_CTRL = 0x{:x}", dsi_phy_mmio_.Read32(MIPI_DSI_CHAN_CTRL));
+  fdf::info("MIPI_DSI_CHAN_STS = 0x{:x}", dsi_phy_mmio_.Read32(MIPI_DSI_CHAN_STS));
+  fdf::info("MIPI_DSI_CLK_TIM = 0x{:x}", dsi_phy_mmio_.Read32(MIPI_DSI_CLK_TIM));
+  fdf::info("MIPI_DSI_HS_TIM = 0x{:x}", dsi_phy_mmio_.Read32(MIPI_DSI_HS_TIM));
+  fdf::info("MIPI_DSI_LP_TIM = 0x{:x}", dsi_phy_mmio_.Read32(MIPI_DSI_LP_TIM));
+  fdf::info("MIPI_DSI_ANA_UP_TIM = 0x{:x}", dsi_phy_mmio_.Read32(MIPI_DSI_ANA_UP_TIM));
+  fdf::info("MIPI_DSI_INIT_TIM = 0x{:x}", dsi_phy_mmio_.Read32(MIPI_DSI_INIT_TIM));
+  fdf::info("MIPI_DSI_WAKEUP_TIM = 0x{:x}", dsi_phy_mmio_.Read32(MIPI_DSI_WAKEUP_TIM));
+  fdf::info("MIPI_DSI_LPOK_TIM = 0x{:x}", dsi_phy_mmio_.Read32(MIPI_DSI_LPOK_TIM));
+  fdf::info("MIPI_DSI_LP_WCHDOG = 0x{:x}", dsi_phy_mmio_.Read32(MIPI_DSI_LP_WCHDOG));
+  fdf::info("MIPI_DSI_ANA_CTRL = 0x{:x}", dsi_phy_mmio_.Read32(MIPI_DSI_ANA_CTRL));
+  fdf::info("MIPI_DSI_CLK_TIM1 = 0x{:x}", dsi_phy_mmio_.Read32(MIPI_DSI_CLK_TIM1));
+  fdf::info("MIPI_DSI_TURN_WCHDOG = 0x{:x}", dsi_phy_mmio_.Read32(MIPI_DSI_TURN_WCHDOG));
+  fdf::info("MIPI_DSI_ULPS_CHECK = 0x{:x}", dsi_phy_mmio_.Read32(MIPI_DSI_ULPS_CHECK));
+  fdf::info("MIPI_DSI_TEST_CTRL0 = 0x{:x}", dsi_phy_mmio_.Read32(MIPI_DSI_TEST_CTRL0));
+  fdf::info("MIPI_DSI_TEST_CTRL1 = 0x{:x}", dsi_phy_mmio_.Read32(MIPI_DSI_TEST_CTRL1));
+  fdf::info("");
 
-  FDF_LOG(INFO, "#############################");
-  FDF_LOG(INFO, "Dumping dsi_phy_cfg structure:");
-  FDF_LOG(INFO, "#############################");
-  FDF_LOG(INFO, "lp_tesc = 0x%x (%u)", dsi_phy_cfg_.lp_tesc, dsi_phy_cfg_.lp_tesc);
-  FDF_LOG(INFO, "lp_lpx = 0x%x (%u)", dsi_phy_cfg_.lp_lpx, dsi_phy_cfg_.lp_lpx);
-  FDF_LOG(INFO, "lp_ta_sure = 0x%x (%u)", dsi_phy_cfg_.lp_ta_sure, dsi_phy_cfg_.lp_ta_sure);
-  FDF_LOG(INFO, "lp_ta_go = 0x%x (%u)", dsi_phy_cfg_.lp_ta_go, dsi_phy_cfg_.lp_ta_go);
-  FDF_LOG(INFO, "lp_ta_get = 0x%x (%u)", dsi_phy_cfg_.lp_ta_get, dsi_phy_cfg_.lp_ta_get);
-  FDF_LOG(INFO, "hs_exit = 0x%x (%u)", dsi_phy_cfg_.hs_exit, dsi_phy_cfg_.hs_exit);
-  FDF_LOG(INFO, "hs_trail = 0x%x (%u)", dsi_phy_cfg_.hs_trail, dsi_phy_cfg_.hs_trail);
-  FDF_LOG(INFO, "hs_zero = 0x%x (%u)", dsi_phy_cfg_.hs_zero, dsi_phy_cfg_.hs_zero);
-  FDF_LOG(INFO, "hs_prepare = 0x%x (%u)", dsi_phy_cfg_.hs_prepare, dsi_phy_cfg_.hs_prepare);
-  FDF_LOG(INFO, "clk_trail = 0x%x (%u)", dsi_phy_cfg_.clk_trail, dsi_phy_cfg_.clk_trail);
-  FDF_LOG(INFO, "clk_post = 0x%x (%u)", dsi_phy_cfg_.clk_post, dsi_phy_cfg_.clk_post);
-  FDF_LOG(INFO, "clk_zero = 0x%x (%u)", dsi_phy_cfg_.clk_zero, dsi_phy_cfg_.clk_zero);
-  FDF_LOG(INFO, "clk_prepare = 0x%x (%u)", dsi_phy_cfg_.clk_prepare, dsi_phy_cfg_.clk_prepare);
-  FDF_LOG(INFO, "clk_pre = 0x%x (%u)", dsi_phy_cfg_.clk_pre, dsi_phy_cfg_.clk_pre);
-  FDF_LOG(INFO, "init = 0x%x (%u)", dsi_phy_cfg_.init, dsi_phy_cfg_.init);
-  FDF_LOG(INFO, "wakeup = 0x%x (%u)", dsi_phy_cfg_.wakeup, dsi_phy_cfg_.wakeup);
+  fdf::info("#############################");
+  fdf::info("Dumping dsi_phy_cfg structure:");
+  fdf::info("#############################");
+  fdf::info("lp_tesc = 0x{:x} ({})", dsi_phy_cfg_.lp_tesc, dsi_phy_cfg_.lp_tesc);
+  fdf::info("lp_lpx = 0x{:x} ({})", dsi_phy_cfg_.lp_lpx, dsi_phy_cfg_.lp_lpx);
+  fdf::info("lp_ta_sure = 0x{:x} ({})", dsi_phy_cfg_.lp_ta_sure, dsi_phy_cfg_.lp_ta_sure);
+  fdf::info("lp_ta_go = 0x{:x} ({})", dsi_phy_cfg_.lp_ta_go, dsi_phy_cfg_.lp_ta_go);
+  fdf::info("lp_ta_get = 0x{:x} ({})", dsi_phy_cfg_.lp_ta_get, dsi_phy_cfg_.lp_ta_get);
+  fdf::info("hs_exit = 0x{:x} ({})", dsi_phy_cfg_.hs_exit, dsi_phy_cfg_.hs_exit);
+  fdf::info("hs_trail = 0x{:x} ({})", dsi_phy_cfg_.hs_trail, dsi_phy_cfg_.hs_trail);
+  fdf::info("hs_zero = 0x{:x} ({})", dsi_phy_cfg_.hs_zero, dsi_phy_cfg_.hs_zero);
+  fdf::info("hs_prepare = 0x{:x} ({})", dsi_phy_cfg_.hs_prepare, dsi_phy_cfg_.hs_prepare);
+  fdf::info("clk_trail = 0x{:x} ({})", dsi_phy_cfg_.clk_trail, dsi_phy_cfg_.clk_trail);
+  fdf::info("clk_post = 0x{:x} ({})", dsi_phy_cfg_.clk_post, dsi_phy_cfg_.clk_post);
+  fdf::info("clk_zero = 0x{:x} ({})", dsi_phy_cfg_.clk_zero, dsi_phy_cfg_.clk_zero);
+  fdf::info("clk_prepare = 0x{:x} ({})", dsi_phy_cfg_.clk_prepare, dsi_phy_cfg_.clk_prepare);
+  fdf::info("clk_pre = 0x{:x} ({})", dsi_phy_cfg_.clk_pre, dsi_phy_cfg_.clk_pre);
+  fdf::info("init = 0x{:x} ({})", dsi_phy_cfg_.init, dsi_phy_cfg_.init);
+  fdf::info("wakeup = 0x{:x} ({})", dsi_phy_cfg_.wakeup, dsi_phy_cfg_.wakeup);
 }
 
 }  // namespace amlogic_display

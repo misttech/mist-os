@@ -184,8 +184,8 @@ class DsiDwDpiColorCodingReg : public hwreg::RegisterBase<DsiDwDpiColorCodingReg
       case ColorComponentMapping::kReserved:
       case ColorComponentMapping::kReserved2:
       case ColorComponentMapping::kReserved3:
-        FDF_LOG(ERROR, "Unknown color component mapping: %" PRIu32,
-                static_cast<uint32_t>(color_component_mapping()));
+        fdf::error("Unknown color component mapping: {}",
+                   static_cast<uint32_t>(color_component_mapping()));
         return DpiColorComponentMapping::k24BitR8G8B8;
     }
   }

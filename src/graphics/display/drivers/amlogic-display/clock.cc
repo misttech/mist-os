@@ -67,7 +67,7 @@ zx::result<> Clock::WaitForHdmiPllToLock() {
 
   constexpr int kMaxPllLockAttempt = 3;
   for (int lock_attempts = 0; lock_attempts < kMaxPllLockAttempt; lock_attempts++) {
-    FDF_LOG(TRACE, "Waiting for PLL Lock: (%d/3).", lock_attempts + 1);
+    fdf::trace("Waiting for PLL Lock: ({}/3).", lock_attempts + 1);
 
     // The configurations used in retries are from Amlogic-provided code which
     // is undocumented.
@@ -102,7 +102,7 @@ zx::result<> Clock::WaitForHdmiPllToLock() {
     }
   }
 
-  FDF_LOG(ERROR, "Failed to lock HDMI PLL after %d attempts.", kMaxPllLockAttempt);
+  fdf::error("Failed to lock HDMI PLL after {} attempts.", kMaxPllLockAttempt);
   return zx::error(ZX_ERR_UNAVAILABLE);
 }
 
@@ -112,7 +112,7 @@ zx::result<HdmiPllConfigForMipiDsi> Clock::GenerateHPLL(
   HdmiPllConfigForMipiDsi pll_cfg;
   // Requested Pixel clock
   if (pixel_clock_frequency_hz > kMaxPixelClockFrequencyHz) {
-    FDF_LOG(ERROR, "Pixel clock out of range (%" PRId64 " Hz)", pixel_clock_frequency_hz);
+    fdf::error("Pixel clock out of range ({} Hz)", pixel_clock_frequency_hz);
     return zx::error(ZX_ERR_OUT_OF_RANGE);
   }
 
@@ -138,7 +138,7 @@ zx::result<HdmiPllConfigForMipiDsi> Clock::GenerateHPLL(
         dphy_data_lane_bit_rate_max_hz - pixel_clock_frequency_hz;
     if ((requested_pll_frequency_hz < dphy_data_lane_bit_rate_min_hz) ||
         (requested_pll_frequency_hz > dphy_data_lane_bit_rate_max_hz)) {
-      FDF_LOG(TRACE, "Calculated clocks out of range for xd = %u, skipped", clock_factor);
+      fdf::trace("Calculated clocks out of range for xd = {}, skipped", clock_factor);
       continue;
     }
 
@@ -175,9 +175,8 @@ zx::result<HdmiPllConfigForMipiDsi> Clock::GenerateHPLL(
             pll_cfg.output_divider2 = output_divider2;
             pll_cfg.output_divider3 = output_divider3;
             pll_cfg.pll_frequency_hz = requested_pll_frequency_hz;
-            FDF_LOG(TRACE, "od1=%" PRId32 ", od2=%" PRId32 ", od3=%" PRId32, output_divider1,
-                    output_divider2, output_divider3);
-            FDF_LOG(TRACE, "pll_fvco=%" PRId64, voltage_controlled_oscillator_output_frequency_hz);
+            fdf::trace("od1={}, od2={}, od3={}", output_divider1, output_divider2, output_divider3);
+            fdf::trace("pll_fvco={}", voltage_controlled_oscillator_output_frequency_hz);
             pll_cfg.pll_voltage_controlled_oscillator_output_frequency_hz =
                 voltage_controlled_oscillator_output_frequency_hz;
 
@@ -193,8 +192,8 @@ zx::result<HdmiPllConfigForMipiDsi> Clock::GenerateHPLL(
                                                kExternalOscillatorFrequencyHz) *
                                               PLL_FRAC_RANGE / kExternalOscillatorFrequencyHz;
 
-            FDF_LOG(TRACE, "m=%d, n=%d, frac=0x%x", pll_cfg.pll_multiplier_integer,
-                    pll_cfg.pll_divider, pll_cfg.pll_multiplier_fraction);
+            fdf::trace("m={}, n={}, frac=0x{:x}", pll_cfg.pll_multiplier_integer,
+                       pll_cfg.pll_divider, pll_cfg.pll_multiplier_fraction);
             pll_cfg.dphy_data_lane_bits_per_second = pll_cfg.pll_frequency_hz;  // Hz
 
             return zx::ok(std::move(pll_cfg));
@@ -207,10 +206,9 @@ zx::result<HdmiPllConfigForMipiDsi> Clock::GenerateHPLL(
     }
   }
 
-  FDF_LOG(ERROR, "Could not generate correct PLL values for: ");
-  FDF_LOG(ERROR, "  pixel_clock_frequency_hz = %" PRId64, pixel_clock_frequency_hz);
-  FDF_LOG(ERROR, "  max_per_data_lane_bit_rate_hz = %" PRId64,
-          maximum_per_data_lane_bit_per_second);
+  fdf::error("Could not generate correct PLL values for: ");
+  fdf::error("  pixel_clock_frequency_hz = {}", pixel_clock_frequency_hz);
+  fdf::error("  max_per_data_lane_bit_rate_hz = {}", maximum_per_data_lane_bit_per_second);
   return zx::error(ZX_ERR_INTERNAL);
 }
 
@@ -250,8 +248,7 @@ zx::result<> Clock::Enable(const PanelConfig& panel_config) {
       GenerateHPLL(panel_config.display_timing.pixel_clock_frequency_hz,
                    panel_config.maximum_per_data_lane_bit_per_second());
   if (pll_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to generate HDMI PLL and Video clock tree configuration: %s",
-            pll_result.status_string());
+    fdf::error("Failed to generate HDMI PLL and Video clock tree configuration: {}", pll_result);
     return pll_result.take_error();
   }
   pll_cfg_ = std::move(pll_result).value();
@@ -376,7 +373,7 @@ zx::result<> Clock::Enable(const PanelConfig& panel_config) {
   zx_nanosleep(zx_deadline_after(ZX_USEC(50)));
   zx::result<> wait_for_pll_lock_result = WaitForHdmiPllToLock();
   if (!wait_for_pll_lock_result.is_ok()) {
-    FDF_LOG(ERROR, "Failed to lock HDMI PLL: %s", wait_for_pll_lock_result.status_string());
+    fdf::error("Failed to lock HDMI PLL: {}", wait_for_pll_lock_result);
     return wait_for_pll_lock_result.take_error();
   }
 
@@ -544,7 +541,7 @@ zx::result<std::unique_ptr<Clock>> Clock::Create(
       fbl::make_unique_checked<Clock>(&alloc_checker, std::move(vpu_mmio), std::move(hhi_mmio),
                                       /*clock_enabled=*/already_enabled);
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for Clock");
+    fdf::error("Failed to allocate memory for Clock");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 

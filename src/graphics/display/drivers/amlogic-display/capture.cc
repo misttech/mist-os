@@ -10,7 +10,6 @@
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
-#include <zircon/status.h>
 #include <zircon/threads.h>
 
 #include <memory>
@@ -40,8 +39,8 @@ zx::result<std::unique_ptr<Capture>> Capture::Create(
                                           /*shutdown_handler=*/[](fdf_dispatcher_t*) {},
                                           /*scheduler_role=*/{});
   if (create_dispatcher_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create capture interrupt handler dispatcher: %s",
-            create_dispatcher_result.status_string());
+    fdf::error("Failed to create capture interrupt handler dispatcher: {}",
+               create_dispatcher_result);
     return create_dispatcher_result.take_error();
   }
   fdf::SynchronizedDispatcher dispatcher = std::move(create_dispatcher_result).value();
@@ -51,13 +50,13 @@ zx::result<std::unique_ptr<Capture>> Capture::Create(
       fbl::make_unique_checked<Capture>(&alloc_checker, std::move(capture_interrupt_result).value(),
                                         std::move(on_capture_complete), std::move(dispatcher));
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Out of memory while allocating Capture");
+    fdf::error("Out of memory while allocating Capture");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   zx::result<> init_result = capture->Init();
   if (init_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to initalize Capture: %s", init_result.status_string());
+    fdf::error("Failed to initalize Capture: {}", init_result);
     return init_result.take_error();
   }
 
@@ -79,7 +78,7 @@ Capture::~Capture() {
   if (capture_finished_irq_.is_valid()) {
     zx_status_t status = capture_finished_irq_.destroy();
     if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Capture done interrupt destroy failed: %s", zx_status_get_string(status));
+      fdf::error("Capture done interrupt destroy failed: {}", zx::make_result(status));
     }
   }
 
@@ -89,8 +88,8 @@ Capture::~Capture() {
 zx::result<> Capture::Init() {
   zx_status_t status = irq_handler_.Begin(irq_handler_dispatcher_.async_dispatcher());
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to bind the capture interrupt handler to the async loop: %s",
-            zx_status_get_string(status));
+    fdf::error("Failed to bind the capture interrupt handler to the async loop: {}",
+               zx::make_result(status));
     return zx::error(status);
   }
 
@@ -100,11 +99,11 @@ zx::result<> Capture::Init() {
 void Capture::InterruptHandler(async_dispatcher_t* dispatcher, async::IrqBase* irq,
                                zx_status_t status, const zx_packet_interrupt_t* interrupt) {
   if (status == ZX_ERR_CANCELED) {
-    FDF_LOG(INFO, "Capture finished interrupt wait is cancelled.");
+    fdf::info("Capture finished interrupt wait is cancelled.");
     return;
   }
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Capture finished interrupt wait failed: %s", zx_status_get_string(status));
+    fdf::error("Capture finished interrupt wait failed: {}", zx::make_result(status));
     // A failed async interrupt wait doesn't remove the interrupt from the
     // async loop, so we have to manually cancel it.
     irq->Cancel();

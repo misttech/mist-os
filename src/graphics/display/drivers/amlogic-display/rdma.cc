@@ -17,7 +17,6 @@
 #include <lib/zx/vmar.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
-#include <zircon/status.h>
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
@@ -44,7 +43,7 @@ zx::result<std::unique_ptr<RdmaEngine>> RdmaEngine::Create(
 
   zx::result<zx::bti> bti_result = GetBti(BtiResourceIndex::kDma, platform_device);
   if (bti_result.is_error()) {
-    FDF_LOG(ERROR, "Could not get BTI handle");
+    fdf::error("Could not get BTI handle");
     return zx::error(bti_result.error_value());
   }
   zx::bti dma_bti = std::move(bti_result).value();
@@ -69,8 +68,7 @@ zx::result<std::unique_ptr<RdmaEngine>> RdmaEngine::Create(
                                           /*shutdown_handler=*/[](fdf_dispatcher_t*) {},
                                           /*scheduler_role=*/{});
   if (create_dispatcher_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create IRQ handler dispatcher: %s",
-            create_dispatcher_result.status_string());
+    fdf::error("Failed to create IRQ handler dispatcher: {}", create_dispatcher_result);
     return create_dispatcher_result.take_error();
   }
   fdf::SynchronizedDispatcher dispatcher = std::move(create_dispatcher_result).value();
@@ -166,7 +164,7 @@ void RdmaEngine::ProcessRdmaUsageTable() {
     rdma_usage_table_[i] = kRdmaTableUnavailable;  // mark as unavailable for now
   }
   if (last_table_index == -1ul) {
-    FDF_LOG(ERROR, "RDMA handler could not find last used table index");
+    fdf::error("RDMA handler could not find last used table index");
     DumpRdmaState();
 
     // Pretend that all configs have been completed to recover. The next code block will initialize
@@ -254,7 +252,7 @@ void RdmaEngine::FlushRdmaTable(uint32_t table_index) {
       zx_cache_flush(rdma_channels_[table_index].virt_offset, IDX_MAX * sizeof(RdmaTable),
                      ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Could not clean cache: %s", zx_status_get_string(status));
+    fdf::error("Could not clean cache: {}", zx::make_result(status));
     return;
   }
 }
@@ -303,7 +301,7 @@ void RdmaEngine::ExecRdmaTable(uint32_t next_table_idx, display::DriverConfigSta
 
 zx_status_t RdmaEngine::SetupRdma() {
   zx_status_t status = ZX_OK;
-  FDF_LOG(DEBUG, "Setting up Display RDMA");
+  fdf::debug("Setting up Display RDMA");
 
   // First, clean up any ongoing DMA that a previous incarnation of this driver
   // may have started, and tell the BTI to drop its quarantine list.
@@ -312,7 +310,7 @@ zx_status_t RdmaEngine::SetupRdma() {
 
   status = zx::vmo::create_contiguous(bti_, kRdmaRegionSize, 0, &rdma_vmo_);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Could not create RDMA VMO: %s", zx_status_get_string(status));
+    fdf::error("Could not create RDMA VMO: {}", zx::make_result(status));
     return status;
   }
 
@@ -320,7 +318,7 @@ zx_status_t RdmaEngine::SetupRdma() {
   status = bti_.pin(ZX_BTI_PERM_READ | ZX_BTI_PERM_WRITE, rdma_vmo_, 0, kRdmaRegionSize,
                     &rdma_physical_address, 1, &rdma_pmt_);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Could not create RDMA VMO: %s", zx_status_get_string(status));
+    fdf::error("Could not create RDMA VMO: {}", zx::make_result(status));
     return status;
   }
 
@@ -328,7 +326,7 @@ zx_status_t RdmaEngine::SetupRdma() {
   status = zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, rdma_vmo_, 0,
                                       kRdmaRegionSize, &rdma_virtual_address);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Could not map RDMA VMO: %s", zx_status_get_string(status));
+    fdf::error("Could not map RDMA VMO: {}", zx::make_result(status));
     return status;
   }
   const cpp20::span<uint8_t> rdma_region(reinterpret_cast<uint8_t*>(rdma_virtual_address),
@@ -348,7 +346,7 @@ zx_status_t RdmaEngine::SetupRdma() {
   // Allocate RDMA Table for AFBC engine
   status = zx::vmo::create_contiguous(bti_, kAfbcRdmaRegionSize, 0, &afbc_rdma_vmo_);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Could not create afbc RDMA VMO: %s", zx_status_get_string(status));
+    fdf::error("Could not create afbc RDMA VMO: {}", zx::make_result(status));
     return status;
   }
 
@@ -356,7 +354,7 @@ zx_status_t RdmaEngine::SetupRdma() {
   status = bti_.pin(ZX_BTI_PERM_READ | ZX_BTI_PERM_WRITE, afbc_rdma_vmo_, 0, kAfbcRdmaRegionSize,
                     &afbc_rdma_physical_address, 1, &afbc_rdma_pmt_);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Could not pin afbc RDMA VMO: %s", zx_status_get_string(status));
+    fdf::error("Could not pin afbc RDMA VMO: {}", zx::make_result(status));
     return status;
   }
 
@@ -364,7 +362,7 @@ zx_status_t RdmaEngine::SetupRdma() {
   status = zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, afbc_rdma_vmo_, 0,
                                       kAfbcRdmaRegionSize, &afbc_rdma_virtual_address);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Could not map afbc vmar: %s", zx_status_get_string(status));
+    fdf::error("Could not map afbc vmar: {}", zx::make_result(status));
     return status;
   }
 
@@ -385,8 +383,7 @@ zx_status_t RdmaEngine::SetupRdma() {
 zx::result<> RdmaEngine::InitializeIrqHandler() {
   zx_status_t status = rdma_irq_handler_.Begin(rdma_irq_handler_dispatcher_.async_dispatcher());
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to begin IRQ handler on the dispatcher: %s",
-            zx_status_get_string(status));
+    fdf::error("Failed to begin IRQ handler on the dispatcher: {}", zx::make_result(status));
     return zx::error(status);
   }
   return zx::ok();
@@ -401,7 +398,7 @@ void RdmaEngine::FlushAfbcRdmaTable() const {
   zx_status_t status = zx_cache_flush(afbc_rdma_channel_.virt_offset, sizeof(RdmaTable),
                                       ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Could not clean cache: %s", zx_status_get_string(status));
+    fdf::error("Could not clean cache: {}", zx::make_result(status));
     return;
   }
   // Write the start and end address of the table.  End address is the last address that the
@@ -415,7 +412,7 @@ void RdmaEngine::FlushAfbcRdmaTable() const {
 // TODO(https://fxbug.dev/42135501): stop all channels for safer reloads.
 void RdmaEngine::StopRdma() {
   // TODO(https://fxbug.dev/322296668): Make StopRdma() idempotent.
-  FDF_LOG(DEBUG, "Stopping RDMA");
+  fdf::debug("Stopping RDMA");
 
   fbl::AutoLock lock(&rdma_lock_);
 
@@ -457,51 +454,50 @@ void RdmaEngine::ResetConfigStamp(display::DriverConfigStamp config_stamp) {
 }
 
 void RdmaEngine::DumpRdmaRegisters() {
-  FDF_LOG(INFO, "Dumping all RDMA related Registers");
-  FDF_LOG(INFO, "VPU_RDMA_AHB_START_ADDR_MAN = 0x%x",
-          vpu_mmio_.Read32(VPU_RDMA_AHB_START_ADDR_MAN));
-  FDF_LOG(INFO, "VPU_RDMA_AHB_END_ADDR_MAN = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_END_ADDR_MAN));
-  FDF_LOG(INFO, "VPU_RDMA_AHB_START_ADDR_1 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_START_ADDR_1));
-  FDF_LOG(INFO, "VPU_RDMA_AHB_END_ADDR_1 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_END_ADDR_1));
-  FDF_LOG(INFO, "VPU_RDMA_AHB_START_ADDR_2 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_START_ADDR_2));
-  FDF_LOG(INFO, "VPU_RDMA_AHB_END_ADDR_2 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_END_ADDR_2));
-  FDF_LOG(INFO, "VPU_RDMA_AHB_START_ADDR_3 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_START_ADDR_3));
-  FDF_LOG(INFO, "VPU_RDMA_AHB_END_ADDR_3 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_END_ADDR_3));
-  FDF_LOG(INFO, "VPU_RDMA_AHB_START_ADDR_4 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_START_ADDR_4));
-  FDF_LOG(INFO, "VPU_RDMA_AHB_END_ADDR_4 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_END_ADDR_4));
-  FDF_LOG(INFO, "VPU_RDMA_AHB_START_ADDR_5 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_START_ADDR_5));
-  FDF_LOG(INFO, "VPU_RDMA_AHB_END_ADDR_5 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_END_ADDR_5));
-  FDF_LOG(INFO, "VPU_RDMA_AHB_START_ADDR_6 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_START_ADDR_6));
-  FDF_LOG(INFO, "VPU_RDMA_AHB_END_ADDR_6 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_END_ADDR_6));
-  FDF_LOG(INFO, "VPU_RDMA_AHB_START_ADDR_7 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_START_ADDR_7));
-  FDF_LOG(INFO, "VPU_RDMA_AHB_END_ADDR_7 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_AHB_END_ADDR_7));
-  FDF_LOG(INFO, "VPU_RDMA_ACCESS_AUTO = 0x%x", vpu_mmio_.Read32(VPU_RDMA_ACCESS_AUTO));
-  FDF_LOG(INFO, "VPU_RDMA_ACCESS_AUTO2 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_ACCESS_AUTO2));
-  FDF_LOG(INFO, "VPU_RDMA_ACCESS_AUTO3 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_ACCESS_AUTO3));
-  FDF_LOG(INFO, "VPU_RDMA_ACCESS_MAN = 0x%x", vpu_mmio_.Read32(VPU_RDMA_ACCESS_MAN));
-  FDF_LOG(INFO, "VPU_RDMA_CTRL = 0x%x", vpu_mmio_.Read32(VPU_RDMA_CTRL));
-  FDF_LOG(INFO, "VPU_RDMA_STATUS = 0x%x", vpu_mmio_.Read32(VPU_RDMA_STATUS));
-  FDF_LOG(INFO, "VPU_RDMA_STATUS2 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_STATUS2));
-  FDF_LOG(INFO, "VPU_RDMA_STATUS3 = 0x%x", vpu_mmio_.Read32(VPU_RDMA_STATUS3));
-  FDF_LOG(INFO, "Scratch Reg High: 0x%x", vpu_mmio_.Read32(VPP_DUMMY_DATA1));
-  FDF_LOG(INFO, "Scratch Reg Low: 0x%x", vpu_mmio_.Read32(VPP_OSD_SC_DUMMY_DATA));
+  fdf::info("Dumping all RDMA related Registers");
+  fdf::info("VPU_RDMA_AHB_START_ADDR_MAN = 0x{:x}", vpu_mmio_.Read32(VPU_RDMA_AHB_START_ADDR_MAN));
+  fdf::info("VPU_RDMA_AHB_END_ADDR_MAN = 0x{:x}", vpu_mmio_.Read32(VPU_RDMA_AHB_END_ADDR_MAN));
+  fdf::info("VPU_RDMA_AHB_START_ADDR_1 = 0x{:x}", vpu_mmio_.Read32(VPU_RDMA_AHB_START_ADDR_1));
+  fdf::info("VPU_RDMA_AHB_END_ADDR_1 = 0x{:x}", vpu_mmio_.Read32(VPU_RDMA_AHB_END_ADDR_1));
+  fdf::info("VPU_RDMA_AHB_START_ADDR_2 = 0x{:x}", vpu_mmio_.Read32(VPU_RDMA_AHB_START_ADDR_2));
+  fdf::info("VPU_RDMA_AHB_END_ADDR_2 = 0x{:x}", vpu_mmio_.Read32(VPU_RDMA_AHB_END_ADDR_2));
+  fdf::info("VPU_RDMA_AHB_START_ADDR_3 = 0x{:x}", vpu_mmio_.Read32(VPU_RDMA_AHB_START_ADDR_3));
+  fdf::info("VPU_RDMA_AHB_END_ADDR_3 = 0x{:x}", vpu_mmio_.Read32(VPU_RDMA_AHB_END_ADDR_3));
+  fdf::info("VPU_RDMA_AHB_START_ADDR_4 = 0x{:x}", vpu_mmio_.Read32(VPU_RDMA_AHB_START_ADDR_4));
+  fdf::info("VPU_RDMA_AHB_END_ADDR_4 = 0x{:x}", vpu_mmio_.Read32(VPU_RDMA_AHB_END_ADDR_4));
+  fdf::info("VPU_RDMA_AHB_START_ADDR_5 = 0x{:x}", vpu_mmio_.Read32(VPU_RDMA_AHB_START_ADDR_5));
+  fdf::info("VPU_RDMA_AHB_END_ADDR_5 = 0x{:x}", vpu_mmio_.Read32(VPU_RDMA_AHB_END_ADDR_5));
+  fdf::info("VPU_RDMA_AHB_START_ADDR_6 = 0x{:x}", vpu_mmio_.Read32(VPU_RDMA_AHB_START_ADDR_6));
+  fdf::info("VPU_RDMA_AHB_END_ADDR_6 = 0x{:x}", vpu_mmio_.Read32(VPU_RDMA_AHB_END_ADDR_6));
+  fdf::info("VPU_RDMA_AHB_START_ADDR_7 = 0x{:x}", vpu_mmio_.Read32(VPU_RDMA_AHB_START_ADDR_7));
+  fdf::info("VPU_RDMA_AHB_END_ADDR_7 = 0x{:x}", vpu_mmio_.Read32(VPU_RDMA_AHB_END_ADDR_7));
+  fdf::info("VPU_RDMA_ACCESS_AUTO = 0x{:x}", vpu_mmio_.Read32(VPU_RDMA_ACCESS_AUTO));
+  fdf::info("VPU_RDMA_ACCESS_AUTO2 = 0x{:x}", vpu_mmio_.Read32(VPU_RDMA_ACCESS_AUTO2));
+  fdf::info("VPU_RDMA_ACCESS_AUTO3 = 0x{:x}", vpu_mmio_.Read32(VPU_RDMA_ACCESS_AUTO3));
+  fdf::info("VPU_RDMA_ACCESS_MAN = 0x{:x}", vpu_mmio_.Read32(VPU_RDMA_ACCESS_MAN));
+  fdf::info("VPU_RDMA_CTRL = 0x{:x}", vpu_mmio_.Read32(VPU_RDMA_CTRL));
+  fdf::info("VPU_RDMA_STATUS = 0x{:x}", vpu_mmio_.Read32(VPU_RDMA_STATUS));
+  fdf::info("VPU_RDMA_STATUS2 = 0x{:x}", vpu_mmio_.Read32(VPU_RDMA_STATUS2));
+  fdf::info("VPU_RDMA_STATUS3 = 0x{:x}", vpu_mmio_.Read32(VPU_RDMA_STATUS3));
+  fdf::info("Scratch Reg High: 0x{:x}", vpu_mmio_.Read32(VPP_DUMMY_DATA1));
+  fdf::info("Scratch Reg Low: 0x{:x}", vpu_mmio_.Read32(VPP_OSD_SC_DUMMY_DATA));
 }
 
 void RdmaEngine::DumpRdmaState() {
-  FDF_LOG(INFO, "\n\n============ RDMA STATE DUMP ============");
-  FDF_LOG(INFO, "Dumping all RDMA related States");
-  FDF_LOG(INFO, "rdma is %s", rdma_active_ ? "Active" : "Not Active");
+  fdf::info("\n\n============ RDMA STATE DUMP ============");
+  fdf::info("Dumping all RDMA related States");
+  fdf::info("rdma is {}", rdma_active_ ? "Active" : "Not Active");
 
   DumpRdmaRegisters();
 
-  FDF_LOG(INFO, "RDMA Table Content:");
+  fdf::info("RDMA Table Content:");
   for (uint64_t table_entry : rdma_usage_table_) {
-    FDF_LOG(INFO, "[0x%" PRIx64 "]", table_entry);
+    fdf::info("[0x{:x}]", table_entry);
   }
 
-  FDF_LOG(INFO, "start_index = %ld, end_index = %ld", start_index_used_, end_index_used_);
-  FDF_LOG(INFO, "latest applied config stamp = 0x%lx", latest_applied_config_.value());
-  FDF_LOG(INFO, "\n\n=========================================");
+  fdf::info("start_index = {}, end_index = {}", start_index_used_, end_index_used_);
+  fdf::info("latest applied config stamp = 0x{:x}", latest_applied_config_.value());
+  fdf::info("\n\n=========================================");
 }
 
 void RdmaEngine::OnTransactionFinished() { rdma_irq_count_.Add(1); }
@@ -509,11 +505,11 @@ void RdmaEngine::OnTransactionFinished() { rdma_irq_count_.Add(1); }
 void RdmaEngine::InterruptHandler(async_dispatcher_t* dispatcher, async::IrqBase* irq,
                                   zx_status_t status, const zx_packet_interrupt_t* interrupt) {
   if (status == ZX_ERR_CANCELED) {
-    FDF_LOG(INFO, "RDMA interrupt wait is cancelled.");
+    fdf::info("RDMA interrupt wait is cancelled.");
     return;
   }
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "RDMA interrupt wait failed: %s", zx_status_get_string(status));
+    fdf::error("RDMA interrupt wait failed: {}", zx::make_result(status));
     // A failed async interrupt wait doesn't remove the interrupt from the
     // async loop, so we have to manually cancel it.
     irq->Cancel();
