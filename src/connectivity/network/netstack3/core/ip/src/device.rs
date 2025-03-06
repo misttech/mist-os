@@ -983,13 +983,14 @@ pub trait Ipv6DeviceHandler<BC>: IpDeviceHandler<Ipv6, BC> {
     );
 
     /// Receives an MLD packet for processing.
-    fn receive_mld_packet<B: SplitByteSlice>(
+    fn receive_mld_packet<B: SplitByteSlice, H: IpHeaderInfo<Ipv6>>(
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         src_ip: Ipv6SourceAddr,
         dst_ip: SpecifiedAddr<Ipv6Addr>,
         packet: MldPacket<B>,
+        header_info: &H,
     );
 }
 
@@ -1161,13 +1162,14 @@ impl<
         })
     }
 
-    fn receive_mld_packet<B: SplitByteSlice>(
+    fn receive_mld_packet<B: SplitByteSlice, H: IpHeaderInfo<Ipv6>>(
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
         src_ip: Ipv6SourceAddr,
         dst_ip: SpecifiedAddr<Ipv6Addr>,
         packet: MldPacket<B>,
+        header_info: &H,
     ) {
         self.with_ipv6_device_configuration(device, |_config, mut core_ctx| {
             MldPacketHandler::receive_mld_packet(
@@ -1177,6 +1179,7 @@ impl<
                 src_ip,
                 dst_ip,
                 packet,
+                header_info,
             )
         })
     }

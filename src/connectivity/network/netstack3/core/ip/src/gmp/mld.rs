@@ -45,6 +45,7 @@ use crate::internal::gmp::{
     GmpGroupState, GmpMode, GmpState, GmpStateContext, GmpStateRef, GmpTimerId, GmpTypeLayout,
     IpExt, MulticastGroupSet, NotAMemberErr,
 };
+use crate::internal::local_delivery::IpHeaderInfo;
 
 /// The destination address for all MLDv2 reports.
 ///
@@ -124,23 +125,49 @@ pub trait MldContext<BT: MldBindingsTypes>:
 /// A blanket implementation is provided for all `C: MldContext`.
 pub trait MldPacketHandler<BC, DeviceId> {
     /// Receive an MLD packet.
-    fn receive_mld_packet<B: SplitByteSlice>(
+    fn receive_mld_packet<B: SplitByteSlice, H: IpHeaderInfo<Ipv6>>(
         &mut self,
         bindings_ctx: &mut BC,
         device: &DeviceId,
         src_ip: Ipv6SourceAddr,
         dst_ip: SpecifiedAddr<Ipv6Addr>,
         packet: MldPacket<B>,
+        header_info: &H,
     );
 }
 
-fn receive_mld_packet<B: SplitByteSlice, CC: MldContext<BC>, BC: MldBindingsContext>(
+fn receive_mld_packet<
+    B: SplitByteSlice,
+    H: IpHeaderInfo<Ipv6>,
+    CC: MldContext<BC>,
+    BC: MldBindingsContext,
+>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     src_ip: Ipv6SourceAddr,
     packet: MldPacket<B>,
+    header_info: &H,
 ) -> Result<(), MldError> {
+    // MLDv2 Specifies that all received queries & reports with an invalid hop
+    // limit (not equal to 1) should be dropped (See RFC 3810 Section 6.2 and
+    // Section 7.4).
+    //
+    // MLDv1 does not specify the expected behavior when receiving a message
+    // with an invalid hop limit, however it does specify that all senders of
+    // MLDv1 messages must set the hop limit to 1 (See RFC 2710 Section 3). Our
+    // interpretation of this is to drop MLDv1 messages without a hop limit of
+    // 1, as any sender that generates them is violating the RFC.
+    //
+    // This could be considered a violation of the Robustness Principle, but a
+    // it is our belief that a packet with a different hop limit is more likely
+    // to be malicious than a poor implementation. Note that the same rationale
+    // is applied to IGMP.
+    if header_info.hop_limit() != MLD_IP_HOP_LIMIT {
+        core_ctx.increment(device, |counters: &MldCounters| &counters.rx_err_bad_hop_limit);
+        return Err(MldError::BadHopLimit { hop_limit: header_info.hop_limit() });
+    }
+
     match packet {
         MldPacket::MulticastListenerQuery(msg) => {
             core_ctx.increment(device, |counters: &MldCounters| &counters.rx_mldv1_query);
@@ -167,6 +194,20 @@ fn receive_mld_packet<B: SplitByteSlice, CC: MldContext<BC>, BC: MldBindingsCont
                 core_ctx.increment(device, |counters: &MldCounters| &counters.rx_err_bad_src_addr);
                 return Err(MldError::BadSourceAddress { addr: src_ip.into_addr() });
             }
+
+            // From RFC 3810 section 6.2:
+            //
+            // Upon reception of an MLD message that contains a Query, the node
+            // checks [...] and if the Router Alert option is present in the
+            // Hop-By-Hop Options header of the IPv6 packet. If any of these
+            // checks fails, the packet is dropped.
+            if !header_info.router_alert() {
+                core_ctx.increment(device, |counters: &MldCounters| {
+                    &counters.rx_err_missing_router_alert
+                });
+                return Err(MldError::MissingRouterAlert);
+            }
+
             gmp::v2::handle_query_message(core_ctx, bindings_ctx, device, msg.body())
                 .map_err(Into::into)
         }
@@ -214,15 +255,16 @@ fn receive_mld_packet<B: SplitByteSlice, CC: MldContext<BC>, BC: MldBindingsCont
 }
 
 impl<BC: MldBindingsContext, CC: MldContext<BC>> MldPacketHandler<BC, CC::DeviceId> for CC {
-    fn receive_mld_packet<B: SplitByteSlice>(
+    fn receive_mld_packet<B: SplitByteSlice, H: IpHeaderInfo<Ipv6>>(
         &mut self,
         bindings_ctx: &mut BC,
         device: &CC::DeviceId,
         src_ip: Ipv6SourceAddr,
         _dst_ip: SpecifiedAddr<Ipv6Addr>,
         packet: MldPacket<B>,
+        header_info: &H,
     ) {
-        receive_mld_packet(self, bindings_ctx, device, src_ip, packet)
+        receive_mld_packet(self, bindings_ctx, device, src_ip, packet, header_info)
             .unwrap_or_else(|e| debug!("Error occurred when handling MLD message: {}", e));
     }
 }
@@ -502,6 +544,12 @@ pub(crate) enum MldError {
     /// Message ignored because of bad source address.
     #[error("bad source address: {}", addr)]
     BadSourceAddress { addr: Ipv6Addr },
+    /// Message ignored because of the router alter option was not present
+    #[error("router alert option not present")]
+    MissingRouterAlert,
+    /// Message ignored because of the hop limit was invalid.
+    #[error("message with incorrect hop limit: {hop_limit}")]
+    BadHopLimit { hop_limit: u8 },
     /// MLD is disabled
     #[error("MLD is disabled on interface")]
     Disabled,
@@ -714,10 +762,8 @@ pub struct MldCounters {
     rx_leave_group: Counter,
     /// Count of MLD messages received with an invalid source address.
     rx_err_bad_src_addr: Counter,
-    // TODO(https://fxbug.dev/400501941): Populate this counter.
     /// Count of MLD messages received with an invalid hop limit.
     rx_err_bad_hop_limit: Counter,
-    // TODO(https://fxbug.dev/400501941): Populate this counter.
     /// Count of MLD messages received without the Router Alert option.
     rx_err_missing_router_alert: Counter,
     /// Count of MLDv1 reports sent.
@@ -1118,6 +1164,26 @@ mod tests {
         _marker: IpVersionMarker::new(),
     });
 
+    struct FakeHeaderInfo {
+        hop_limit: u8,
+        router_alert: bool,
+    }
+
+    impl IpHeaderInfo<Ipv6> for FakeHeaderInfo {
+        fn dscp_and_ecn(&self) -> packet_formats::ip::DscpAndEcn {
+            unimplemented!()
+        }
+        fn hop_limit(&self) -> u8 {
+            self.hop_limit
+        }
+        fn router_alert(&self) -> bool {
+            self.router_alert
+        }
+    }
+
+    const DEFAULT_HEADER_INFO: FakeHeaderInfo =
+        FakeHeaderInfo { hop_limit: MLD_IP_HOP_LIMIT, router_alert: true };
+
     fn new_v1_query(resp_time: Duration, group_addr: MulticastAddr<Ipv6Addr>) -> Buf<Vec<u8>> {
         let router_addr: Ipv6Addr = ROUTER_MAC.to_ipv6_link_local().addr().get();
         Mldv1MessageBuilder::<MulticastListenerQuery>::new_with_max_resp_delay(
@@ -1199,6 +1265,7 @@ mod tests {
             router_addr.try_into().unwrap(),
             MY_IP,
             packet,
+            &DEFAULT_HEADER_INFO,
         )
     }
 
@@ -1216,6 +1283,7 @@ mod tests {
             router_addr.try_into().unwrap(),
             MY_IP,
             packet,
+            &DEFAULT_HEADER_INFO,
         )
     }
 
@@ -1908,7 +1976,14 @@ mod tests {
             let mut buffer = &buffer[..];
             let packet = parse_mld_packet(&mut buffer);
             assert_eq!(
-                receive_mld_packet(core_ctx, bindings_ctx, &FakeDeviceId, addr, packet),
+                receive_mld_packet(
+                    core_ctx,
+                    bindings_ctx,
+                    &FakeDeviceId,
+                    addr,
+                    packet,
+                    &DEFAULT_HEADER_INFO,
+                ),
                 Err(MldError::BadSourceAddress { addr: addr.into_addr() })
             );
         }
@@ -1928,7 +2003,14 @@ mod tests {
             let mut buffer = &buffer[..];
             let packet = parse_mld_packet(&mut buffer);
             assert_eq!(
-                receive_mld_packet(core_ctx, bindings_ctx, &FakeDeviceId, addr, packet),
+                receive_mld_packet(
+                    core_ctx,
+                    bindings_ctx,
+                    &FakeDeviceId,
+                    addr,
+                    packet,
+                    &DEFAULT_HEADER_INFO,
+                ),
                 Err(MldError::BadSourceAddress { addr: addr.into_addr() })
             );
         }
@@ -1952,7 +2034,14 @@ mod tests {
         let mut buffer = &buffer[..];
         let packet = parse_mld_packet(&mut buffer);
         assert_eq!(
-            receive_mld_packet(core_ctx, bindings_ctx, &FakeDeviceId, addr, packet),
+            receive_mld_packet(
+                core_ctx,
+                bindings_ctx,
+                &FakeDeviceId,
+                addr,
+                packet,
+                &DEFAULT_HEADER_INFO,
+            ),
             Err(MldError::BadSourceAddress { addr: addr.into_addr() })
         );
 
@@ -1961,12 +2050,86 @@ mod tests {
         let addr = Ipv6SourceAddr::Unspecified;
         let mut buffer = &buffer[..];
         let packet = parse_mld_packet(&mut buffer);
-        assert_eq!(receive_mld_packet(core_ctx, bindings_ctx, &FakeDeviceId, addr, packet), Ok(()));
+        assert_eq!(
+            receive_mld_packet(
+                core_ctx,
+                bindings_ctx,
+                &FakeDeviceId,
+                addr,
+                packet,
+                &DEFAULT_HEADER_INFO,
+            ),
+            Ok(())
+        );
 
         CounterExpectations {
             rx_mldv1_report: 2,
             rx_err_bad_src_addr: 1,
             tx_mldv1_report: 1,
+            ..Default::default()
+        }
+        .assert_counters(core_ctx);
+    }
+
+    #[test]
+    fn reject_bad_hop_limit() {
+        let mut ctx = new_mldv1_context();
+        let FakeCtxImpl { core_ctx, bindings_ctx } = &mut ctx;
+        let src_addr: Ipv6Addr = ROUTER_MAC.to_ipv6_link_local().addr().get();
+        let src_addr: Ipv6SourceAddr = src_addr.try_into().unwrap();
+
+        let messages = [
+            new_v1_query(Duration::from_secs(1), GROUP_ADDR).into_inner(),
+            new_v2_general_query().into_inner(),
+            new_v1_report(GROUP_ADDR).into_inner(),
+        ];
+        for buffer in messages {
+            for hop_limit in [0, 2] {
+                let header_info = FakeHeaderInfo { hop_limit, router_alert: true };
+                let mut buffer = &buffer[..];
+                let packet = parse_mld_packet(&mut buffer);
+                assert_eq!(
+                    receive_mld_packet(
+                        core_ctx,
+                        bindings_ctx,
+                        &FakeDeviceId,
+                        src_addr,
+                        packet,
+                        &header_info,
+                    ),
+                    Err(MldError::BadHopLimit { hop_limit })
+                );
+            }
+        }
+        CounterExpectations { rx_err_bad_hop_limit: 6, ..Default::default() }
+            .assert_counters(core_ctx);
+    }
+
+    #[test]
+    fn v2_query_reject_missing_router_alert() {
+        let mut ctx = new_mldv1_context();
+        let FakeCtxImpl { core_ctx, bindings_ctx } = &mut ctx;
+        let src_addr: Ipv6Addr = ROUTER_MAC.to_ipv6_link_local().addr().get();
+        let src_addr: Ipv6SourceAddr = src_addr.try_into().unwrap();
+
+        let buffer = new_v2_general_query().into_inner();
+        let header_info = FakeHeaderInfo { hop_limit: MLD_IP_HOP_LIMIT, router_alert: false };
+        let mut buffer = &buffer[..];
+        let packet = parse_mld_packet(&mut buffer);
+        assert_eq!(
+            receive_mld_packet(
+                core_ctx,
+                bindings_ctx,
+                &FakeDeviceId,
+                src_addr,
+                packet,
+                &header_info,
+            ),
+            Err(MldError::MissingRouterAlert),
+        );
+        CounterExpectations {
+            rx_mldv2_query: 1,
+            rx_err_missing_router_alert: 1,
             ..Default::default()
         }
         .assert_counters(core_ctx);

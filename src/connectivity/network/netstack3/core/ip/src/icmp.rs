@@ -1663,7 +1663,7 @@ impl<
         mut buffer: B,
         info: &LocalDeliveryPacketInfo<Ipv6, H>,
     ) -> Result<(), (B, TransportReceiveError)> {
-        let LocalDeliveryPacketInfo { meta, header_info: _, marks } = info;
+        let LocalDeliveryPacketInfo { meta, header_info, marks } = info;
         let ReceiveIpPacketMeta { broadcast: _, transparent_override } = meta;
         if let Some(delivery) = transparent_override {
             unreachable!(
@@ -1773,7 +1773,14 @@ impl<
                 );
             }
             Icmpv6Packet::Mld(packet) => {
-                core_ctx.receive_mld_packet(bindings_ctx, &device, src_ip, dst_ip, packet);
+                core_ctx.receive_mld_packet(
+                    bindings_ctx,
+                    &device,
+                    src_ip,
+                    dst_ip,
+                    packet,
+                    header_info,
+                );
             }
             Icmpv6Packet::DestUnreachable(dest_unreachable) => receive_icmpv6_error(
                 core_ctx,
@@ -3568,13 +3575,14 @@ mod tests {
             unimplemented!()
         }
 
-        fn receive_mld_packet<B: SplitByteSlice>(
+        fn receive_mld_packet<B: SplitByteSlice, H: IpHeaderInfo<Ipv6>>(
             &mut self,
             _bindings_ctx: &mut FakeIcmpBindingsCtx<Ipv6>,
             _device: &FakeDeviceId,
             _src_ip: Ipv6SourceAddr,
             _dst_ip: SpecifiedAddr<Ipv6Addr>,
             _packet: MldPacket<B>,
+            _header_info: &H,
         ) {
             unimplemented!()
         }

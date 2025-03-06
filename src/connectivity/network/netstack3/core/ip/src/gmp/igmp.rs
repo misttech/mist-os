@@ -179,10 +179,11 @@ fn receive_igmp_packet<
     //
     // Rejecting messages with bad TTL is almost a violation of the Robustness
     // Principle, but a packet with a different TTL is more likely to be
-    // malicious than a poor implementation.
+    // malicious than a poor implementation. Note that the same rationale is
+    // applied to MLD.
     //
     // See RFC 1112 APPENDIX I, RFC 2236 section 2, and RFC 3376 section 4.
-    if ttl != 1 {
+    if ttl != IGMP_IP_TTL {
         core_ctx.increment(device, |counters: &IgmpCounters| &counters.rx_err_bad_ttl);
         return Err(IgmpError::BadTtl(ttl));
     }
