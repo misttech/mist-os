@@ -24,6 +24,13 @@ enum class CodePatchId : uint32_t {
   // The patched area is a single `mov w0, #...` instruction.  It gets patched
   // with the SMCCC function number used for SMCCC_ARCH_WORKAROUND_3.
   kSmcccWorkaroundFunction,
+
+  // Relates to the optimizations available for C string utilities.
+  //
+  // Note: the "__" is intentional as the function name has two leading
+  // underscores.
+  k__UnsanitizedMemcpy,
+  k__UnsanitizedMemset,
 };
 
 // The callback accepts an initializer-list of something constructible with
@@ -35,6 +42,8 @@ inline constexpr auto WithCodePatchNames = [](auto&& callback) {
       {CodePatchId::kSelfTest, "SELF_TEST"},
       {CodePatchId::kSmcccConduit, "SMCCC_CONDUIT"},
       {CodePatchId::kSmcccWorkaroundFunction, "SMCCC_WORKAROUND_FUNCTION"},
+      {CodePatchId::k__UnsanitizedMemcpy, "__UNSANITIZED_MEMCPY"},
+      {CodePatchId::k__UnsanitizedMemset, "__UNSANITIZED_MEMSET"},
   });
 };
 

@@ -4,6 +4,7 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <lib/arch/arm64/feature.h>
 #include <lib/code-patching/code-patches.h>
 #include <zircon/assert.h>
 
@@ -20,6 +21,20 @@
 bool ArchPatchCode(code_patching::Patcher& patcher, const ArchPatchInfo& info,
                    ktl::span<ktl::byte> insns, CodePatchId case_id,
                    fit::inline_function<void(ktl::initializer_list<ktl::string_view>)> print) {
+  constexpr auto if_mops = [](ktl::string_view mops,
+                              ktl::string_view not_mops) -> ktl::string_view {
+    auto isar2 = arch::ArmIdAa64IsaR2El1::Read();
+    bool feat_mops = isar2.mops() != arch::ArmIdAa64IsaR2El1::Mops::kNone;
+    return feat_mops ? mops : not_mops;
+  };
+
+  auto do_alternative = [&patcher, insns, &print](ktl::string_view name,
+                                                  ktl::string_view alternative) -> bool {
+    patcher.MandatoryPatchWithAlternative(insns, alternative);
+    print({"using ", name, " alternative \"", alternative, "\""});
+    return true;
+  };
+
   switch (case_id) {
     case CodePatchId::kSelfTest:
       patcher.NopFill(insns);
@@ -79,6 +94,13 @@ bool ArchPatchCode(code_patching::Patcher& patcher, const ArchPatchInfo& info,
       print({"CPU workaround SMCCC function is "sv, choice});
       return true;
     }
+
+    case CodePatchId::k__UnsanitizedMemcpy:
+      return do_alternative("memcpy", if_mops("memcpy-mops", "memcpy-cortex"));
+
+    case CodePatchId::k__UnsanitizedMemset:
+      return do_alternative("memset", if_mops("memset-mops", "memset-cortex"));
   }
+
   return false;
 }
