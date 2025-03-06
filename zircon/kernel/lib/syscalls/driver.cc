@@ -407,10 +407,64 @@ zx_status_t sys_bti_pin(zx_handle_t handle, uint32_t options, zx_handle_t vmo, u
   // not be valid after the move so we keep a RefPtr to the dispatcher instead.
   auto cleanup = fit::defer([disp = new_pmt_handle.dispatcher()]() { disp->Unpin(); });
 
-  status = new_pmt_handle.dispatcher()->EncodeAddrs(compress_results, contiguous,
-                                                    mapped_addrs.get(), addrs_count);
-  if (status != ZX_OK) {
-    return status;
+  // Define a helper lambda with some state that can fetch potentially large ranges from the PMT,
+  // but return them gradually. This just serves as an optimization around repeatedly querying the
+  // PMT for a range that it knows is contiguous, but where we need to fill out multiple addresses
+  // for the user.
+  struct {
+    uint64_t offset = 0;
+    dev_vaddr_t addr = 0;
+    size_t remaining = 0;
+  } consume_state;
+  auto consume_addr = [&](size_t expected_contig) -> zx::result<dev_vaddr_t> {
+    // If the remaining part of the mapping we have cannot satisfy
+    if (expected_contig > consume_state.remaining) {
+      uint64_t remain = size - consume_state.offset;
+      zx_status_t status = new_pmt_handle.dispatcher()->QueryAddress(
+          consume_state.offset, remain, &consume_state.addr, &consume_state.remaining);
+      if (status != ZX_OK) {
+        return zx::error(status);
+      }
+      if (expected_contig > consume_state.remaining) {
+        // This happening suggests an error with contiguity calculations and/or the underlying IOMMU
+        // implementation not reporting its contiguity correctly.
+        // TODO: consider making this a louder error.
+        return zx::error(ZX_ERR_INVALID_ARGS);
+      }
+    }
+    const dev_vaddr_t ret = consume_state.addr;
+    consume_state.offset += expected_contig;
+    consume_state.addr += expected_contig;
+    consume_state.remaining -= expected_contig;
+    return zx::ok(ret);
+  };
+
+  // Based on the passed in options, determine what size chunks we are going to report to the user,
+  // and how many of those there will be.
+  size_t target_contig;
+  size_t expected_addrs;
+  if (compress_results) {
+    const size_t min_contig = bti_dispatcher->minimum_contiguity();
+    expected_addrs = ROUNDUP(size, min_contig) / min_contig;
+    target_contig = min_contig;
+  } else if (contiguous) {
+    expected_addrs = 1;
+    target_contig = size;
+  } else {
+    expected_addrs = size / PAGE_SIZE;
+    target_contig = PAGE_SIZE;
+  }
+  if (addrs_count != expected_addrs) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  // Calculate / lookup the addresses.
+  for (size_t i = 0; i < addrs_count; i++) {
+    const size_t expected_size = ktl::min(size - (target_contig * i), target_contig);
+    auto result = consume_addr(expected_size);
+    if (result.is_error()) {
+      return result.status_value();
+    }
+    mapped_addrs[i] = *result;
   }
 
   static_assert(sizeof(dev_vaddr_t) == sizeof(zx_paddr_t), "mismatched types");

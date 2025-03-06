@@ -46,18 +46,8 @@ class PinnedMemoryTokenDispatcher final
   // the quarantine.
   void Unpin();
 
-  // |mapped_addrs_count| must be either
-  // 1) If |compress_results|, |pinned_vmo_.size()|/|bti_.minimum_contiguity()|, rounded up, in
-  // which case each returned address represents a run of |bti_.minimum_contiguity()| bytes (with
-  // the exception of the last which may be short)
-  // 2) If |contiguous|, 1, in which case the returned address is the start of the
-  // contiguous memory.
-  // 3) Otherwise, |pinned_vmo_.size()|/|PAGE_SIZE|, in which case each returned address
-  // represents a single page.
-  //
-  // Returns ZX_ERR_INVALID_ARGS if |mapped_addrs_count| is not exactly the value described above.
-  zx_status_t EncodeAddrs(bool compress_results, bool contiguous, dev_vaddr_t* mapped_addrs,
-                          size_t mapped_addrs_count);
+  zx_status_t QueryAddress(uint64_t offset, uint64_t size, dev_vaddr_t* mapped_addr,
+                           size_t* mapped_len);
 
   // Returns the number of bytes pinned by the PMT.
   uint64_t size() const { return pinned_vmo_.size(); }
