@@ -21,4 +21,7 @@
             },
         },
     },
+    "memory": {
+        "test.core.a.memory": { "priority": 24 },
+    },
 }

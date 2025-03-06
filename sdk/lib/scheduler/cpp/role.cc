@@ -121,6 +121,10 @@ zx_status_t SetRoleForVmar(zx::unowned_vmar vmar, std::string_view role) {
       .status_value();
 }
 
+zx_status_t SetRoleForRootVmar(std::string_view role) {
+  return SetRoleForVmar(zx::vmar::root_self(), role);
+}
+
 zx::result<fidl::VectorView<wire::Parameter>> SetRoleForThreadWithParams(
     zx::unowned_thread borrowed_thread, std::string_view role,
     std::vector<wire::Parameter> input_parameters) {

@@ -46,3 +46,30 @@ fn test_set_role_for_thread() -> Result<()> {
 
     Ok(())
 }
+
+#[fuchsia::test]
+fn test_set_role_for_root_vmar() {
+    fuchsia_scheduler::set_role_for_root_vmar("test.core.a.memory").unwrap();
+    assert_eq!(
+        fuchsia_scheduler::set_role_for_root_vmar("test.nonexistent.role")
+            .unwrap_err()
+            .downcast::<Status>()
+            .unwrap(),
+        Status::NOT_FOUND
+    );
+}
+
+#[fuchsia::test]
+fn test_set_role_for_nested_vmar() {
+    let (nested, _base_addr) =
+        fuchsia_runtime::vmar_root_self().allocate(0, 4096, zx::VmarFlags::CAN_MAP_READ).unwrap();
+
+    fuchsia_scheduler::set_role_for_vmar(&nested, "test.core.a.memory").unwrap();
+    assert_eq!(
+        fuchsia_scheduler::set_role_for_vmar(&nested, "test.nonexistent.role")
+            .unwrap_err()
+            .downcast::<Status>()
+            .unwrap(),
+        Status::NOT_FOUND
+    );
+}

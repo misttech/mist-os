@@ -22,6 +22,7 @@
 namespace fuchsia_scheduler {
 
 zx_status_t SetRoleForVmar(zx::unowned_vmar vmar, std::string_view role);
+zx_status_t SetRoleForRootVmar(std::string_view role);
 zx_status_t SetRoleForThread(zx::unowned_thread thread, std::string_view role);
 zx_status_t SetRoleForThisThread(std::string_view role);
 
