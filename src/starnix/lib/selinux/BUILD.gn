@@ -49,6 +49,7 @@ rustc_library("selinux") {
     "testdata/micro_policies/allow_a_t_b_attr_class0_perm0_policy.pp",
     "testdata/micro_policies/allow_a_t_b_t_class0_perm0_policy.pp",
     "testdata/micro_policies/allow_with_constraints_policy.pp",
+    "testdata/micro_policies/allowxperm_policy.pp",
     "testdata/micro_policies/constraints_policy.pp",
     "testdata/micro_policies/file_no_defaults_policy.pp",
     "testdata/micro_policies/file_range_source_high_policy.pp",
