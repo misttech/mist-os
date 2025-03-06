@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <endian.h>
-#include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.network/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.peripheral/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -26,6 +25,7 @@
 #include <vector>
 
 #include <fbl/string.h>
+#include <src/devices/lib/client/device_topology.h>
 #include <usb/cdc.h>
 #include <usb/usb.h>
 #include <zxtest/zxtest.h>
@@ -56,21 +56,12 @@ zx_status_t WaitForDevice(int dirfd, int event, const char* name, void* cookie) 
     return ZX_OK;
   }
   fdio_cpp::UnownedFdioCaller caller(dirfd);
-  std::string controller_path = std::string(name) + "/device_controller";
-  zx::result client_end =
-      component::ConnectAt<fuchsia_device::Controller>(caller.directory(), controller_path);
-  if (client_end.is_error()) {
-    return client_end.error_value();
-  }
-  const fidl::WireResult result = fidl::WireCall(client_end.value())->GetTopologicalPath();
-  if (!result.ok()) {
-    return result.status();
-  }
-  const fit::result response = result.value();
+
+  const fit::result response = fdf_topology::GetTopologicalPath(caller.directory(), name);
   if (response.is_error()) {
     return response.error_value();
   }
-  std::string_view topological_path = response->path.get();
+  std::string_view topological_path = response.value();
   DevicePaths* paths = reinterpret_cast<DevicePaths*>(cookie);
   if (topological_path.find(paths->query) != std::string::npos) {
     paths->path = paths->subdir + std::string{name};
