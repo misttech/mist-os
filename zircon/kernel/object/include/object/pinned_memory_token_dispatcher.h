@@ -73,13 +73,11 @@ class PinnedMemoryTokenDispatcher final
 
  private:
   PinnedMemoryTokenDispatcher(fbl::RefPtr<BusTransactionInitiatorDispatcher> bti,
-                              PinnedVmObject pinned_vmo, fbl::Array<dev_vaddr_t> mapped_addrs);
+                              PinnedVmObject pinned_vmo);
   DISALLOW_COPY_ASSIGN_AND_MOVE(PinnedMemoryTokenDispatcher);
 
   zx_status_t MapIntoIommu(uint32_t perms);
   zx_status_t UnmapFromIommuLocked() TA_REQ(get_lock());
-
-  void InvalidateMappedAddrsLocked() TA_REQ(get_lock());
 
   PinnedVmObject pinned_vmo_;
 
@@ -88,7 +86,6 @@ class PinnedMemoryTokenDispatcher final
 
   const fbl::RefPtr<BusTransactionInitiatorDispatcher> bti_;
   uint64_t map_token_ TA_GUARDED(get_lock()) = UINT64_MAX;
-  const fbl::Array<dev_vaddr_t> mapped_addrs_ TA_GUARDED(get_lock());
 
   // Set to true during Create() once we are fully initialized. Do not call
   // any |bti_| locking methods if this is false, since that indicates we're

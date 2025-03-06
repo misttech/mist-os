@@ -36,24 +36,9 @@ zx_status_t PinnedMemoryTokenDispatcher::Create(fbl::RefPtr<BusTransactionInitia
   LTRACE_ENTRY;
   DEBUG_ASSERT(IS_PAGE_ALIGNED(pinned_vmo.offset()) && IS_PAGE_ALIGNED(pinned_vmo.size()));
 
-  size_t num_addrs;
-  if (!pinned_vmo.vmo()->is_contiguous()) {
-    const size_t min_contig = bti->minimum_contiguity();
-    DEBUG_ASSERT(ktl::has_single_bit(min_contig));
-
-    num_addrs = ROUNDUP(pinned_vmo.size(), min_contig) / min_contig;
-  } else {
-    num_addrs = 1;
-  }
-
   fbl::AllocChecker ac;
-  fbl::Array<dev_vaddr_t> addr_array(new (&ac) dev_vaddr_t[num_addrs], num_addrs);
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-
-  KernelHandle new_handle(fbl::AdoptRef(new (&ac) PinnedMemoryTokenDispatcher(
-      ktl::move(bti), ktl::move(pinned_vmo), ktl::move(addr_array))));
+  KernelHandle new_handle(
+      fbl::AdoptRef(new (&ac) PinnedMemoryTokenDispatcher(ktl::move(bti), ktl::move(pinned_vmo))));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -84,11 +69,7 @@ zx_status_t PinnedMemoryTokenDispatcher::MapIntoIommu(uint32_t perms) TA_NO_THRE
   DEBUG_ASSERT(!initialized_);
 
   const uint64_t bti_id = bti_->bti_id();
-  const size_t min_contig = bti_->minimum_contiguity();
   if (pinned_vmo_.vmo()->is_contiguous()) {
-    dev_vaddr_t vaddr;
-    size_t mapped_len;
-
     // Usermode drivers assume that if they requested a contiguous buffer in
     // memory, then the physical addresses will be contiguous.  Return an
     // error if we can't actually map the address contiguously.
@@ -98,14 +79,6 @@ zx_status_t PinnedMemoryTokenDispatcher::MapIntoIommu(uint32_t perms) TA_NO_THRE
       return result.status_value();
     }
     map_token_ = *result;
-    [[maybe_unused]] zx_status_t status = bti_->iommu().QueryAddress(
-        bti_id, pinned_vmo_.vmo(), *result, 0, pinned_vmo_.size(), &vaddr, &mapped_len);
-    // We just mapped this so the query cannot fail.
-    ASSERT(status == ZX_OK);
-
-    DEBUG_ASSERT(vaddr % min_contig == 0);
-    DEBUG_ASSERT(mapped_addrs_.size() == 1);
-    mapped_addrs_[0] = vaddr;
     return ZX_OK;
   }
 
@@ -115,39 +88,6 @@ zx_status_t PinnedMemoryTokenDispatcher::MapIntoIommu(uint32_t perms) TA_NO_THRE
     return result.status_value();
   }
   map_token_ = *result;
-
-  size_t remaining = pinned_vmo_.size();
-  uint64_t curr_offset = 0;
-  size_t next_addr_idx = 0;
-  while (remaining > 0) {
-    dev_vaddr_t vaddr;
-    size_t mapped_len;
-    zx_status_t status = bti_->iommu().QueryAddress(bti_id, pinned_vmo_.vmo(), map_token_,
-                                                    curr_offset, remaining, &vaddr, &mapped_len);
-    if (status != ZX_OK) {
-      // We'll perform an unmap in on_zero_handles().
-      return status;
-    }
-
-    // Ensure we don't end up with any non-terminal chunks that are not |min_contig| in
-    // length.
-    DEBUG_ASSERT(mapped_len % min_contig == 0 || remaining == mapped_len);
-
-    // Break the range up into chunks of length |min_contig|
-    size_t mapped_remaining = mapped_len;
-    while (mapped_remaining > 0) {
-      size_t addr_pages = ktl::min<size_t>(mapped_remaining, min_contig);
-      mapped_addrs_[next_addr_idx] = vaddr;
-      next_addr_idx++;
-      vaddr += addr_pages;
-      mapped_remaining -= addr_pages;
-    }
-
-    curr_offset += mapped_len;
-    remaining -= ktl::min(mapped_len, remaining);
-  }
-  DEBUG_ASSERT(next_addr_idx == mapped_addrs_.size());
-
   return ZX_OK;
 }
 
@@ -176,14 +116,6 @@ void PinnedMemoryTokenDispatcher::Unpin() {
   auto destroy = ktl::move(pinned_vmo_);
 }
 
-void PinnedMemoryTokenDispatcher::InvalidateMappedAddrsLocked() {
-  // Fill with a known invalid address to simplify cleanup of errors during
-  // mapping
-  for (dev_vaddr_t& mapped_addr : mapped_addrs_) {
-    mapped_addr = UINT64_MAX;
-  }
-}
-
 void PinnedMemoryTokenDispatcher::on_zero_handles() {
   Guard<CriticalMutex> guard{get_lock()};
 
@@ -206,13 +138,9 @@ PinnedMemoryTokenDispatcher::~PinnedMemoryTokenDispatcher() {
 }
 
 PinnedMemoryTokenDispatcher::PinnedMemoryTokenDispatcher(
-    fbl::RefPtr<BusTransactionInitiatorDispatcher> bti, PinnedVmObject pinned_vmo,
-    fbl::Array<dev_vaddr_t> mapped_addrs)
-    : pinned_vmo_(ktl::move(pinned_vmo)),
-      bti_(ktl::move(bti)),
-      mapped_addrs_(ktl::move(mapped_addrs)) {
+    fbl::RefPtr<BusTransactionInitiatorDispatcher> bti, PinnedVmObject pinned_vmo)
+    : pinned_vmo_(ktl::move(pinned_vmo)), bti_(ktl::move(bti)) {
   DEBUG_ASSERT(pinned_vmo_.vmo() != nullptr);
-  InvalidateMappedAddrsLocked();
   kcounter_add(dispatcher_pinned_memory_token_create_count, 1);
 }
 
@@ -221,46 +149,59 @@ zx_status_t PinnedMemoryTokenDispatcher::EncodeAddrs(bool compress_results, bool
                                                      size_t mapped_addrs_count) {
   Guard<CriticalMutex> guard{get_lock()};
 
-  const fbl::Array<dev_vaddr_t>& pmo_addrs = mapped_addrs_;
-  const size_t found_addrs = pmo_addrs.size();
-  if (compress_results) {
-    if (pinned_vmo_.vmo()->is_contiguous()) {
-      const size_t min_contig = bti_->minimum_contiguity();
-      DEBUG_ASSERT(ktl::has_single_bit(min_contig));
-      DEBUG_ASSERT(found_addrs == 1);
+  const uint64_t bti_id = bti_->bti_id();
 
-      uint64_t num_addrs = ROUNDUP(pinned_vmo_.size(), min_contig) / min_contig;
-      if (num_addrs != mapped_addrs_count) {
-        return ZX_ERR_INVALID_ARGS;
+  if (compress_results) {
+    const size_t min_contig = bti_->minimum_contiguity();
+    DEBUG_ASSERT(ktl::has_single_bit(min_contig));
+    const uint64_t num_addrs = ROUNDUP(pinned_vmo_.size(), min_contig) / min_contig;
+    if (num_addrs != mapped_addrs_count) {
+      return ZX_ERR_INVALID_ARGS;
+    }
+    for (uint64_t i = 0; i < num_addrs; i++) {
+      dev_vaddr_t mapped_addr = 0;
+      size_t mapped_len = 0;
+      // Expect at least min_contig length, but could be less if this is the last portion of the
+      // mapping.
+      const size_t expected_size = ktl::min(pinned_vmo_.size() - (min_contig * i), min_contig);
+      zx_status_t status =
+          bti_->iommu().QueryAddress(bti_id, pinned_vmo_.vmo(), map_token_, (min_contig * i),
+                                     expected_size, &mapped_addr, &mapped_len);
+      if (status != ZX_OK) {
+        return status;
       }
-      for (uint64_t i = 0; i < num_addrs; i++) {
-        mapped_addrs[i] = pmo_addrs[0] + min_contig * i;
-      }
-    } else {
-      if (found_addrs != mapped_addrs_count) {
-        return ZX_ERR_INVALID_ARGS;
-      }
-      memcpy(mapped_addrs, pmo_addrs.data(), found_addrs * sizeof(dev_vaddr_t));
+      ASSERT(mapped_len == expected_size);
+      mapped_addrs[i] = mapped_addr;
     }
   } else if (contiguous) {
     if (mapped_addrs_count != 1 || !pinned_vmo_.vmo()->is_contiguous()) {
       return ZX_ERR_INVALID_ARGS;
     }
-    *mapped_addrs = pmo_addrs[0];
+    dev_vaddr_t mapped_addr = 0;
+    size_t mapped_len = 0;
+    zx_status_t status = bti_->iommu().QueryAddress(bti_id, pinned_vmo_.vmo(), map_token_, 0,
+                                                    pinned_vmo_.size(), &mapped_addr, &mapped_len);
+    if (status != ZX_OK) {
+      return status;
+    }
+    ASSERT(mapped_len == pinned_vmo_.size());
+    *mapped_addrs = mapped_addr;
   } else {
     const size_t num_pages = pinned_vmo_.size() / PAGE_SIZE;
     if (num_pages != mapped_addrs_count) {
       return ZX_ERR_INVALID_ARGS;
     }
-    const size_t min_contig =
-        pinned_vmo_.vmo()->is_contiguous() ? pinned_vmo_.size() : bti_->minimum_contiguity();
-    size_t next_idx = 0;
-    for (size_t i = 0; i < found_addrs; ++i) {
-      dev_vaddr_t extent_base = pmo_addrs[i];
-      for (dev_vaddr_t addr = extent_base; addr < extent_base + min_contig && next_idx < num_pages;
-           addr += PAGE_SIZE, ++next_idx) {
-        mapped_addrs[next_idx] = addr;
+    for (size_t i = 0; i < num_pages; ++i) {
+      dev_vaddr_t mapped_addr = 0;
+      size_t mapped_len = 0;
+      zx_status_t status =
+          bti_->iommu().QueryAddress(bti_id, pinned_vmo_.vmo(), map_token_, i * PAGE_SIZE,
+                                     PAGE_SIZE, &mapped_addr, &mapped_len);
+      if (status != ZX_OK) {
+        return status;
       }
+      ASSERT(mapped_len == PAGE_SIZE);
+      mapped_addrs[i] = mapped_addr;
     }
   }
   return ZX_OK;
