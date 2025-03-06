@@ -4,7 +4,7 @@
 
 use std::fmt::Display;
 use std::fs::File;
-use std::io::{BufRead, BufReader, ErrorKind};
+use std::io::{BufRead, BufReader};
 use std::process::Command;
 
 use camino::{Utf8Path, Utf8PathBuf};
@@ -146,10 +146,9 @@ impl ConfigDomain {
             .ok_or_else(|| {
                 FileError::with_path(
                     &path,
-                    LoadError::PathError(std::io::Error::new(
-                        ErrorKind::Other,
-                        format!("No parent directory for fuchsia_env file {path}"),
-                    )),
+                    LoadError::PathError(std::io::Error::other(format!(
+                        "No parent directory for fuchsia_env file {path}"
+                    ))),
                 )
             })?
             .to_owned();

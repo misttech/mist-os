@@ -189,7 +189,7 @@ impl AsyncWrite for AudioConsumerSink {
         }
         match self.send_frame(buf, flags) {
             Ok(()) => Poll::Ready(Ok(buf.len())),
-            Err(e) => Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, e))),
+            Err(e) => Poll::Ready(Err(io::Error::other(e))),
         }
     }
 

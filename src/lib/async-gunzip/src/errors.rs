@@ -58,7 +58,7 @@ pub fn wrap_error<E>(inner: E) -> io::Error
 where
     E: error::Error + Send + Sync + 'static,
 {
-    io::Error::new(io::ErrorKind::Other, inner)
+    io::Error::other(inner)
 }
 
 /// Try to unwrap an inner error with `ErrorKind::Other` and the specified type.

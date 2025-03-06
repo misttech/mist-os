@@ -209,7 +209,7 @@ impl Drop for Cache {
 }
 
 fn into_io_error<E: Into<Box<dyn std::error::Error + Send + Sync>>>(error: E) -> std::io::Error {
-    std::io::Error::new(std::io::ErrorKind::Other, error)
+    std::io::Error::other(error)
 }
 
 impl std::io::Read for Cache {

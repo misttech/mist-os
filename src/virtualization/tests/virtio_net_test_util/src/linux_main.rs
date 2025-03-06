@@ -28,7 +28,7 @@ enum Command {
 fn get_interface(mac_address: String) -> std::io::Result<String> {
     let dir = Path::new(NET_DIR);
     if !dir.is_dir() {
-        return Err(Error::new(ErrorKind::Other, format!("{} is not a directory", NET_DIR)));
+        return Err(Error::other(format!("{} is not a directory", NET_DIR)));
     }
     for entry in fs::read_dir(dir)?.collect::<std::io::Result<Vec<_>>>()? {
         let path = entry.path().join("address");
@@ -37,7 +37,7 @@ fn get_interface(mac_address: String) -> std::io::Result<String> {
             return entry
                 .file_name()
                 .into_string()
-                .map_err(|_| Error::new(ErrorKind::Other, "Failed to read device name"));
+                .map_err(|_| Error::other("Failed to read device name"));
         }
     }
     Err(Error::new(ErrorKind::NotFound, "Could not find interface"))

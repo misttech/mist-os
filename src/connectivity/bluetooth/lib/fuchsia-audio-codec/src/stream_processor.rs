@@ -24,7 +24,7 @@ use crate::buffer_collection_constraints::buffer_collection_constraints_default;
 use crate::sysmem_allocator::{BufferName, SysmemAllocatedBuffers, SysmemAllocation};
 
 fn fidl_error_to_io_error(e: fidl::Error) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, format_err!("Fidl Error: {}", e))
+    io::Error::other(format_err!("Fidl Error: {}", e))
 }
 
 #[derive(Debug)]
@@ -653,7 +653,7 @@ impl StreamProcessor {
         //  - poll with the output waker, setting it up to be woken
         //  - poll with the input waker to be woken
         if let Err(e) = write.poll_events() {
-            return Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, e)));
+            return Poll::Ready(Err(io::Error::other(e)));
         }
         Poll::Pending
     }

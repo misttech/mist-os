@@ -87,7 +87,7 @@ impl<R: AsyncReadAt + ?Sized + Unpin> Future for ReadAtExact<'_, R> {
             }
             match u64::try_from(n) {
                 Ok(n) => this.offset += n,
-                Err(e) => return Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, e))),
+                Err(e) => return Poll::Ready(Err(io::Error::other(e))),
             };
             this.buf = &mut std::mem::replace(&mut this.buf, &mut [])[n..];
         }
@@ -119,7 +119,7 @@ impl<R: AsyncReadAt + ?Sized + Unpin> Future for ReadToEnd<'_, R> {
 
             let offset = match g.len.try_into() {
                 Ok(len) => len,
-                Err(e) => return Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, e))),
+                Err(e) => return Poll::Ready(Err(io::Error::other(e))),
             };
             let buf = &mut g.buf[g.len..];
             match ready!(Pin::new(&mut *this.reader).poll_read_at(cx, offset, buf)) {

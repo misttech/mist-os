@@ -49,7 +49,7 @@ fn test_fmt_source() {
 
 #[test]
 fn test_io_source() {
-    let io = io::Error::new(io::ErrorKind::Other, "oh no!");
+    let io = io::Error::other("oh no!");
     let error = anyhow!(TestError::Io(io));
     assert_eq!("oh no!", error.source().unwrap().to_string());
 }

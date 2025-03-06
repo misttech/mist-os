@@ -179,8 +179,7 @@ impl LockContext {
     }
 
     pub fn write_to<W: Write>(&self, mut handle: W) -> Result<(), std::io::Error> {
-        let context_str =
-            serde_json::to_string(self).map_err(|e| std::io::Error::new(ErrorKind::Other, e))?;
+        let context_str = serde_json::to_string(self).map_err(|e| std::io::Error::other(e))?;
         handle.write_all(context_str.as_bytes())
     }
 }
@@ -462,10 +461,7 @@ mod test {
     fn force_delete_nonexistent_lockfile_ok() {
         let dir = tempfile::TempDir::new().unwrap();
         let path = dir.path().join("lockedfile.lock");
-        let bogus_error = LockfileCreateError::new(
-            &path,
-            std::io::Error::new(std::io::ErrorKind::Other, "stuff"),
-        );
+        let bogus_error = LockfileCreateError::new(&path, std::io::Error::other("stuff"));
         bogus_error.remove_lock().expect("Removing non-existent lock file");
     }
 

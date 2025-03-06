@@ -95,7 +95,7 @@ pub mod tests {
     use super::*;
     use crate::HANDSHAKE_MESSAGE;
     use std::cmp::min;
-    use std::io::{Error, ErrorKind};
+    use std::io::Error;
 
     pub struct TestTransport {
         pub data_stream: Vec<u8>,
@@ -119,7 +119,7 @@ pub mod tests {
     impl Read for TestTransport {
         fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
             if self.data_stream.len() == 0 {
-                return Err(Error::new(ErrorKind::Other, "no more test data"));
+                return Err(Error::other("no more test data"));
             }
             let to_read = min(self.data_stream.len(), buf.len());
             buf.clone_from_slice(&self.data_stream[..to_read]);
@@ -131,7 +131,7 @@ pub mod tests {
     impl Write for TestTransport {
         fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
             if self.fail_write {
-                return Err(Error::new(ErrorKind::Other, "flag set"));
+                return Err(Error::other("flag set"));
             }
             self.sent_packets.push(buf.to_vec());
             return Ok(buf.len());

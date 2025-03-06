@@ -14,7 +14,7 @@ fn run_test() -> std::io::Result<()> {
         let mut buf = vec![0; 16];
         rng.read_exact(&mut buf)?;
         if !set.insert(buf) {
-            return Err(Error::new(ErrorKind::Other, "Repeated random draw"));
+            return Err(Error::other("Repeated random draw"));
         }
     }
     Ok(())

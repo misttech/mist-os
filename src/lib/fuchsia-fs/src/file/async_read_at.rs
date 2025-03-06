@@ -152,10 +152,7 @@ impl AsyncReadAt for AsyncFile {
                         }
                         Err(e) => {
                             self.read_at_state = ReadAtState::Empty;
-                            return Poll::Ready(Err(std::io::Error::new(
-                                std::io::ErrorKind::Other,
-                                e,
-                            )));
+                            return Poll::Ready(Err(std::io::Error::other(e)));
                         }
                     }
                 }
@@ -206,7 +203,7 @@ impl AsyncGetSize for AsyncFile {
                 }
             },
             Err(e) => {
-                return Poll::Ready(Err(std::io::Error::new(std::io::ErrorKind::Other, e)));
+                return Poll::Ready(Err(std::io::Error::other(e)));
             }
         }
     }

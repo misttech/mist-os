@@ -39,13 +39,10 @@ impl RightsTestCase {
         fdio::open_fd(self.path, self.rights)?;
         for invalid_right in self.unavailable_rights() {
             if let Ok(_) = fdio::open_fd(self.path, invalid_right) {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!(
-                        "Path: {} with rights: {:?} was opened with invalid rights {:?}",
-                        self.path, self.rights, invalid_right
-                    ),
-                ));
+                return Err(io::Error::other(format!(
+                    "Path: {} with rights: {:?} was opened with invalid rights {:?}",
+                    self.path, self.rights, invalid_right
+                )));
             }
         }
         return Ok(());

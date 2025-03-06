@@ -2163,10 +2163,7 @@ mod tests {
             type SendToFut = futures::future::Ready<Result<usize, std::io::Error>>;
 
             fn recv_from(&'a self, _buf: &'a mut [u8]) -> Self::RecvFromFut {
-                futures::future::ready(Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "test recv error",
-                )))
+                futures::future::ready(Err(std::io::Error::other("test recv error")))
             }
             fn send_to(&'a self, buf: &'a [u8], _addr: SocketAddr) -> Self::SendToFut {
                 futures::future::ready(Ok(buf.len()))

@@ -74,7 +74,7 @@ impl io::AsyncWrite for AudioFrameSink {
         if let Poll::Ready(r) = self.poll_task(cx) {
             self.stream_config = StreamConfigOrTask::Complete;
             if let Some(error) = r.err() {
-                return Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, error)));
+                return Poll::Ready(Err(io::Error::other(error)));
             } else {
                 return Poll::Ready(Err(io::ErrorKind::BrokenPipe.into()));
             }
@@ -92,7 +92,7 @@ impl io::AsyncWrite for AudioFrameSink {
                 // We always write the whole buffer if it's written
                 Poll::Ready(Ok(buf.len()))
             }
-            Err(e) => Poll::Ready(Err(io::Error::new(io::ErrorKind::Other, e))),
+            Err(e) => Poll::Ready(Err(io::Error::other(e))),
         }
     }
 

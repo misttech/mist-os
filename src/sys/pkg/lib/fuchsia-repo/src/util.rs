@@ -121,7 +121,7 @@ impl<R: io::Read + Unpin> Stream for FileStream<R> {
             };
             // Clear out the remaining_len so we'll return None next time we're polled.
             self.remaining_len = 0;
-            return Poll::Ready(Some(Err(io::Error::new(io::ErrorKind::Other, msg))));
+            return Poll::Ready(Some(Err(io::Error::other(msg))));
         }
 
         let chunk = self.buf.split_to(n as usize).freeze();

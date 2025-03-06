@@ -8,7 +8,6 @@ use futures::io::{AsyncRead, AsyncWrite};
 use futures::task::{Context, Poll};
 use futures::Future;
 use std::fmt;
-use std::io::ErrorKind;
 use std::net::SocketAddr;
 use std::num::Wrapping;
 use std::pin::Pin;
@@ -128,16 +127,13 @@ impl AsyncRead for UdpNetworkInterface {
                 let (out_buf, sz) = send_to_device(&make_empty_fastboot_packet(seq.0), &socket)
                     .await
                     .map_err(|e| {
-                        std::io::Error::new(
-                            ErrorKind::Other,
-                            format!("Could not send emtpy fastboot packet to device: {}", e),
-                        )
+                        std::io::Error::other(format!(
+                            "Could not send emtpy fastboot packet to device: {}",
+                            e
+                        ))
                     })?;
                 let packet = Packet::parse(&out_buf[..sz]).ok_or_else(|| {
-                    std::io::Error::new(
-                        ErrorKind::Other,
-                        format!("Could not parse response packet"),
-                    )
+                    std::io::Error::other(format!("Could not parse response packet"))
                 })?;
                 let mut buf_inner = Vec::new();
                 match packet.packet_type() {
@@ -146,10 +142,7 @@ impl AsyncRead for UdpNetworkInterface {
                         buf_inner.extend(packet.data);
                         Ok((size, buf_inner))
                     }
-                    _ => Err(std::io::Error::new(
-                        ErrorKind::Other,
-                        format!("Unexpected reply from device"),
-                    )),
+                    _ => Err(std::io::Error::other(format!("Unexpected reply from device"))),
                 }
             }));
         }
@@ -170,10 +163,7 @@ impl AsyncRead for UdpNetworkInterface {
             }
         } else {
             // Really shouldn't get here
-            Poll::Ready(Err(std::io::Error::new(
-                ErrorKind::Other,
-                format!("Could not add async task to read"),
-            )))
+            Poll::Ready(Err(std::io::Error::other(format!("Could not add async task to read"))))
         }
     }
 }
@@ -188,33 +178,26 @@ impl AsyncWrite for UdpNetworkInterface {
             // TODO(https://fxbug.dev/42159159): unfortunately the Task requires the 'static lifetime so we have to
             // copy the bytes and move them into the async block.
             let packets = self.create_fastboot_packets(buf).map_err(|e| {
-                std::io::Error::new(
-                    ErrorKind::Other,
-                    format!("Could not create fastboot packets: {}", e),
-                )
+                std::io::Error::other(format!("Could not create fastboot packets: {}", e))
             })?;
             let socket = self.socket.clone();
             self.write_task.replace(Box::pin(async move {
                 for packet in &packets {
                     let (out_buf, sz) = send_to_device(&packet, &socket).await.map_err(|e| {
-                        std::io::Error::new(
-                            ErrorKind::Other,
-                            format!("Could not send emtpy fastboot packet to device: {}", e),
-                        )
+                        std::io::Error::other(format!(
+                            "Could not send emtpy fastboot packet to device: {}",
+                            e
+                        ))
                     })?;
                     let response = Packet::parse(&out_buf[..sz]).ok_or_else(|| {
-                        std::io::Error::new(
-                            ErrorKind::Other,
-                            format!("Could not parse response packet"),
-                        )
+                        std::io::Error::other(format!("Could not parse response packet"))
                     })?;
                     match response.packet_type() {
                         Ok(PacketType::Fastboot) => (),
                         _ => {
-                            return Err(std::io::Error::new(
-                                ErrorKind::Other,
-                                format!("Unexpected Response packet"),
-                            ))
+                            return Err(std::io::Error::other(format!(
+                                "Unexpected Response packet"
+                            )))
                         }
                     }
                 }
@@ -239,10 +222,7 @@ impl AsyncWrite for UdpNetworkInterface {
             }
         } else {
             // Really shouldn't get here
-            Poll::Ready(Err(std::io::Error::new(
-                ErrorKind::Other,
-                format!("Could not add async task to write"),
-            )))
+            Poll::Ready(Err(std::io::Error::other(format!("Could not add async task to write"))))
         }
     }
 
