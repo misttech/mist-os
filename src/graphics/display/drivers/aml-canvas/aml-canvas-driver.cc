@@ -35,7 +35,7 @@ AmlCanvasDriver::AmlCanvasDriver(fdf::DriverStartArgs start_args,
 void AmlCanvasDriver::Stop() {
   fidl::OneWayStatus result = controller_->Remove();
   if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to remove the Node: %s", result.status_string());
+    fdf::error("Failed to remove the Node: {}", result.status_string());
   }
 }
 
@@ -44,21 +44,21 @@ zx::result<std::unique_ptr<AmlCanvas>> AmlCanvasDriver::CreateAndServeCanvas(
   zx::result<fidl::ClientEnd<fuchsia_hardware_platform_device::Device>> pdev_result =
       incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
   if (pdev_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to connect to platform device: %s", pdev_result.status_string());
+    fdf::error("Failed to connect to platform device: {}", pdev_result);
   }
   fidl::ClientEnd pdev(std::move(pdev_result).value());
   ZX_DEBUG_ASSERT(pdev.is_valid());
 
   zx::result<zx::bti> bti_result = GetBti(BtiResourceIndex::kCanvas, pdev);
   if (bti_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to get BTI from the platform device: %s", bti_result.status_string());
+    fdf::error("Failed to get BTI from the platform device: {}", bti_result);
     return bti_result.take_error();
   }
   zx::bti bti = std::move(bti_result).value();
 
   zx::result<fdf::MmioBuffer> mmio_result = MapMmio(MmioResourceIndex::kDmc, pdev);
   if (mmio_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to map MMIO from the platform device: %s", mmio_result.status_string());
+    fdf::error("Failed to map MMIO from the platform device: {}", mmio_result);
     return mmio_result.take_error();
   }
   fdf::MmioBuffer mmio = std::move(mmio_result).value();
@@ -67,13 +67,13 @@ zx::result<std::unique_ptr<AmlCanvas>> AmlCanvasDriver::CreateAndServeCanvas(
   auto canvas = fbl::make_unique_checked<AmlCanvas>(&alloc_checker, std::move(mmio), std::move(bti),
                                                     std::move(inspector));
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate AmlCanvas");
+    fdf::error("Failed to allocate AmlCanvas");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   zx_status_t status = canvas->ServeOutgoing(outgoing());
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to serve to outgoing directory: %s", zx_status_get_string(status));
+    fdf::error("Failed to serve to outgoing directory: {}", zx_status_get_string(status));
     return zx::error(status);
   }
 
@@ -99,7 +99,7 @@ zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> AmlCanvasD
       controller_endpoints_result =
           fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
   if (controller_endpoints_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create endpoints: %s", controller_endpoints_result.status_string());
+    fdf::error("Failed to create endpoints: {}", controller_endpoints_result);
     return controller_endpoints_result.take_error();
   }
   auto [controller_client, controller_server] = std::move(controller_endpoints_result).value();
@@ -107,12 +107,12 @@ zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> AmlCanvasD
   fidl::WireResult<fuchsia_driver_framework::Node::AddChild> add_child_result =
       fidl::WireCall(node())->AddChild(std::move(args), std::move(controller_server), {});
   if (!add_child_result.ok()) {
-    FDF_LOG(ERROR, "Failed to call FIDL AddChild: %s", add_child_result.status_string());
+    fdf::error("Failed to call FIDL AddChild: {}", add_child_result.status_string());
     return zx::error(add_child_result.status());
   }
   if (add_child_result->is_error()) {
     fuchsia_driver_framework::NodeError error = add_child_result->error_value();
-    FDF_LOG(ERROR, "Failed to AddChild: %" PRIu32, static_cast<uint32_t>(error));
+    fdf::error("Failed to AddChild: {}", static_cast<uint32_t>(error));
     return zx::error(ZX_ERR_INTERNAL);
   }
 
@@ -128,8 +128,7 @@ zx::result<> AmlCanvasDriver::Start() {
 
   auto canvas_result = CreateAndServeCanvas(inspector().inspector());
   if (canvas_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create AmlCanvas and set up service: %s",
-            canvas_result.status_string());
+    fdf::error("Failed to create AmlCanvas and set up service: {}", canvas_result);
     return canvas_result.take_error();
   }
   canvas_ = std::move(canvas_result).value();
@@ -137,7 +136,7 @@ zx::result<> AmlCanvasDriver::Start() {
   zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> controller_client_result =
       AddChildNode(&compat_server_);
   if (controller_client_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to add child node: %s", controller_client_result.status_string());
+    fdf::error("Failed to add child node: {}", controller_client_result);
     return controller_client_result.take_error();
   }
   controller_ = fidl::WireSyncClient(std::move(controller_client_result).value());
