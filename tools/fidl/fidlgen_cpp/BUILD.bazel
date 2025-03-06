@@ -11,7 +11,7 @@ go_binary(
     srcs = ["main.go"],
     target_compatible_with = HOST_CONSTRAINTS,
     deps = [
-        "codegen",
+        "//tools/fidl/fidlgen_cpp/codegen",
         "//tools/fidl/lib/fidlgen_cpp",
     ],
 )

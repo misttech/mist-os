@@ -197,7 +197,7 @@ if (is_host) {
   go_binary("fidlgen_cpp") {
     sources = [ "main.go" ]
     deps = [
-      "codegen",
+      "//tools/fidl/fidlgen_cpp/codegen",
       "//tools/fidl/lib/fidlgen_cpp",
     ]
   }

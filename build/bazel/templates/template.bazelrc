@@ -117,3 +117,6 @@ common:no_sdk \
   --override_repository=fuchsia_sdk=build/bazel/local_repositories/empty_fuchsia_sdk \
   --override_repository=fuchsia_clang=build/bazel/local_repositories/empty_fuchsia_clang \
   --platforms=//build/bazel/platforms:host
+
+# Link Go binaries with PIE to avoid relocation errors.
+build --@io_bazel_rules_go//go/config:linkmode=pie
