@@ -148,6 +148,11 @@ template("python_perf_test") {
       if (invoker.expected_metric_names_filepaths != []) {
         deps += [ ":${_runtime_deps_target}" ]
       }
+      if (defined(invoker.target_deps)) {
+        foreach(target_dep, invoker.target_deps) {
+          deps += [ "${target_dep}($target_toolchain)" ]
+        }
+      }
 
       # Enabling on internal builders is primarily controlled by GN groups and not by the
       # "environments" list

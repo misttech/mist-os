@@ -151,6 +151,15 @@ if (allowed_device_types == []) {
 #     [list of strings] In the case of a fuchsia test, this contains a set of
 #     paths to package manifests that describe the blobs needed by this test.
 #
+#   package_manifest_deps (optional)
+#     [string] The path to a file that contains the paths to package manifests
+#     of target tests that are included in the deps of this test. This is used
+#     by host tests that depend on target tests to know what blobs are needed
+#     by their target test dependencies. See the `package_manifest_deps_file`
+#     in //build/testing/host_test.gni. Target test dependencies should be
+#     passed in as deps to the host_test() template. If not set correctly,
+#     this can result in test resolution errors.
+#
 #   component_label (optional)
 #     [string] In case of test component, this describes the Gn label (with
 #     toolchain) of the fuchsia component.
@@ -493,6 +502,7 @@ template("test_spec") {
                                "package_label",
                                "component_label",
                                "package_manifests",
+                               "package_manifest_deps",
                                "timeout_secs",
                                "build_rule",
                                "has_generated_manifest",
@@ -544,6 +554,10 @@ template("test_spec") {
       if (runtime_deps_file != "") {
         runtime_deps = rebase_path(runtime_deps_file, root_build_dir)
       }
+      if (defined(package_manifest_deps)) {
+        package_manifest_deps =
+            rebase_path(package_manifest_deps, root_build_dir)
+      }
     }
     environments = []  # Clear from previous iteration.
     environments = _environments
@@ -560,6 +574,9 @@ template("test_spec") {
         forward_variables_from(invoker.metadata, "*")
       }
       tests = [ test_spec ]
+      if (defined(invoker.package_manifests)) {
+        package_manifests = invoker.package_manifests
+      }
     }
     deps = target_name_deps
     if (defined(invoker.isolated) && invoker.isolated &&

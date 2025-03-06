@@ -55,6 +55,12 @@ type Test struct {
 	// directory.
 	PackageManifests []string `json:"package_manifests,omitempty"`
 
+	// PackageManifestDepsFile is a relative path within the build directory
+	// to a file containing a JSON list of the package manifests of the test's
+	// target test dependencies. This is used by host tests that depend on
+	// target tests.
+	PackageManifestDepsFile string `json:"package_manifest_deps,omitempty"`
+
 	// Path is the path to the test on the target OS.
 	Path string `json:"path"`
 
