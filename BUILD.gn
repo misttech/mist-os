@@ -1856,6 +1856,9 @@ group("default") {
     "//build/images:default-images",
     "//build/images/updates:packages",
     "//sdk",
+
+    # Ensure compatibility tests run for all FIDL libraries that require them.
+    "//sdk/fidl:compatibility_tests",
   ]
 
   # SDK-only builds must not attempt to build images.

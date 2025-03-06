@@ -557,6 +557,7 @@ group("tests_no_e2e") {
   deps = [
     "//sdk/categories:tests",
     "//sdk/ctf/plasa:tests",
+    "//sdk/fidl:tests",
     "//sdk/lib:tests",
     "//sdk/rust:tests",
     "//tools/fidl/abi-compat:check-compatibility",

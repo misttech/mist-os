@@ -438,6 +438,7 @@ template("fidl_cpp_family") {
     # the original library.
     sdk_target_name = "${target_name}_sdk"
     sdk_atom_alias("${target_name}_hlcpp_sdk") {
+      forward_variables_from(invoker, [ "testonly" ])
       atom = ":$sdk_target_name($fidl_toolchain)"
     }
   }
@@ -541,9 +542,11 @@ template("fidl_cpp_family") {
     # SDK atoms for the new c++ bindings core and testing.
     if (invoker.declare_sdk_atom_aliases) {
       sdk_atom_alias("${_cpp_target}_sdk") {
+        forward_variables_from(invoker, [ "testonly" ])
         atom = ":$sdk_target_name($fidl_toolchain)"
       }
       sdk_atom_alias("${_cpp_target}_testing_sdk") {
+        forward_variables_from(invoker, [ "testonly" ])
         atom = ":$sdk_target_name($fidl_toolchain)"
       }
     }
@@ -574,6 +577,7 @@ template("fidl_cpp_family") {
 
     if (invoker.declare_sdk_atom_aliases) {
       sdk_atom_alias("${target_name}_cpp_hlcpp_conversion_sdk") {
+        forward_variables_from(invoker, [ "testonly" ])
         atom = ":$sdk_target_name($fidl_toolchain)"
       }
     }

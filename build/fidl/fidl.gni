@@ -85,7 +85,7 @@ import("//build/testing/host_test_data.gni")
 #       * The platform can be explicit with @available(platform="PLATFORM").
 #       * Otherwise, the platform is the first component of the library name.
 #     Defaults are:
-#       * When testonly is true: "unversioned"
+#       * When testonly is true and SDK category is not specified: "unversioned"
 #       * When the library name starts with "fuchsia.":
 #         * If `stable` is true: "fuchsia"
 #         * For unstable libraries in an SDK category: "fuchsia:HEAD"
@@ -369,6 +369,7 @@ template("fidl") {
       ]
 
       # Explicitly set `testonly` to false for SDK inclusion.
+      # See https://fxbug.dev/42070088.
       # host_test_data()'s default for `testonly` is true so we can't simply
       # forward `invoker.testonly` as that's most likely unset for fidl()
       # targets.

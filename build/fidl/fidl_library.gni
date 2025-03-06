@@ -263,12 +263,12 @@ template("fidl_library") {
         "Overriding `versioned` is not allowed for SDK FIDL library '$library_name', which is a Fuchsia platform API requiring compatibility tests.")
 
     fidlc_versioned_arg = invoker.versioned
-  } else if (is_testonly) {
-    assert(!defined(invoker.sdk_category))
+  } else if (is_testonly && !defined(invoker.sdk_category)) {
     fidlc_versioned_arg = "unversioned"
   } else if (library_name ==
              "fuchsia." + string_replace(library_name, "fuchsia.", "", 1)) {
-    # It is a non-test library in the "fuchsia" namespace. Set `versioned` to appropriate default.
+    # The library is in the "fuchsia" namespace and either not test-only or in
+    # an SDK category . Set `versioned` to appropriate default.
     if (is_stable) {
       assert(defined(invoker.sdk_category),
              "Libraries cannot be stable but not in an SDK category.")
@@ -685,6 +685,8 @@ template("fidl_library") {
     sdk_meta_target_name = "${target_name}_meta"
 
     action(sdk_meta_target_name) {
+      forward_variables_from(invoker, [ "testonly" ])
+
       script = "//build/fidl/gen_sdk_meta.py"
 
       inputs = sdk_metas
@@ -710,7 +712,11 @@ template("fidl_library") {
     }
 
     sdk_atom("${target_name}_sdk") {
-      forward_variables_from(invoker, [ "sdk_area" ])
+      forward_variables_from(invoker,
+                             [
+                               "sdk_area",
+                               "testonly",
+                             ])
 
       id = "sdk://fidl/$library_name"
 
