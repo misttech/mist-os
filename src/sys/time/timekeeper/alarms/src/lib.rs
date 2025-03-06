@@ -139,17 +139,17 @@ fn is_deadline_changed(
 }
 
 /// Stops a currently running hardware timer.
-async fn stop_hrtimer(hrtimer: &ffhh::DeviceProxy) {
-    trace::duration!(c"alarms", c"hrtimer:stop");
-    debug!("stop_hrtimer: stopping hardware timer");
+async fn stop_hrtimer(hrtimer: &ffhh::DeviceProxy, timer_config: &TimerConfig) {
+    trace::duration!(c"alarms", c"hrtimer:stop", "id" => timer_config.id);
+    debug!("stop_hrtimer: stopping hardware timer: {}", timer_config.id);
     let _ = hrtimer
-        .stop(MAIN_TIMER_ID.try_into().expect("infallible"))
+        .stop(timer_config.id)
         .await
         .map(|result| {
             let _ = result.map_err(|e| warn!("stop_hrtimer: driver error: {:?}", e));
         })
         .map_err(|e| warn!("stop_hrtimer: could not stop prior timer: {}", e));
-    debug!("stop_hrtimer: stopped  hardware timer");
+    debug!("stop_hrtimer: stopped  hardware timer: {}", timer_config.id);
 }
 
 // The default size of the channels created in this module.
@@ -811,24 +811,27 @@ struct TimerConfig {
     /// the period specified by `resolutions`.  This is the maximum value that
     /// the counter can count to without overflowing.
     max_ticks: u64,
+    /// The stable ID of the timer with the above configuration.
+    id: u64,
 }
 
 impl TimerConfig {
     /// Creates a new timer config with supported timer resolutions and the max
     /// ticks value for the timer's counter.
-    fn new_from_data(resolutions: &[zx::BootDuration], max_ticks: u64) -> Self {
+    fn new_from_data(timer_id: u64, resolutions: &[zx::BootDuration], max_ticks: u64) -> Self {
         debug!(
-            "TimerConfig: resolutions: {:?}, max_ticks: {}",
+            "TimerConfig: resolutions: {:?}, max_ticks: {}, timer_id: {}",
             resolutions.iter().map(|r| format_duration(*r)).collect::<Vec<_>>(),
-            max_ticks
+            max_ticks,
+            timer_id
         );
         let resolutions = resolutions.iter().map(|d| *d).collect::<Vec<zx::BootDuration>>();
-        TimerConfig { resolutions, max_ticks }
+        TimerConfig { resolutions, max_ticks, id: timer_id }
     }
 
     fn new_empty() -> Self {
         error!("TimerConfig::new_empty() called, this is not OK.");
-        TimerConfig { resolutions: vec![], max_ticks: 0 }
+        TimerConfig { resolutions: vec![], max_ticks: 0, id: 0 }
     }
 
     // Picks the most appropriate timer setting for it to fire as close as possible
@@ -940,7 +943,7 @@ async fn get_timer_properties(hrtimer: &ffhh::DeviceProxy) -> TimerConfig {
                 // Mostly vim3, where we have pre-existing timer allocations
                 // that we don't need to change.
                 MAIN_TIMER_ID
-            } else if timers_properties.len() > 1 {
+            } else if timers_properties.len() > 0 {
                 // Newer devices that don't need to allocate timer IDs, and/or
                 // may not even have as many timers as vim3 does. But, at least
                 // one timer is needed.
@@ -974,7 +977,8 @@ async fn get_timer_properties(hrtimer: &ffhh::DeviceProxy) -> TimerConfig {
                 .map(|d| zx::BootDuration::from_nanos(d))
                 .into_iter() // Used with .last() above.
                 .collect::<Vec<_>>();
-            TimerConfig::new_from_data(resolutions, max_ticks)
+            let timer_id = main_timer_properties.id.expect("timer ID is always present");
+            TimerConfig::new_from_data(timer_id, resolutions, max_ticks)
         }
         Err(e) => {
             error!("could not get timer properties: {:?}", e);
@@ -1110,7 +1114,7 @@ async fn wake_timer_loop(
                         // Always schedule the proximate deadline.
                         let schedulable_deadline = deadline_after.unwrap_or(deadline);
                         if needs_cancel {
-                            stop_hrtimer(&timer_proxy).await;
+                            stop_hrtimer(&timer_proxy, &timer_config).await;
                         }
                         hrtimer_status = Some(
                             schedule_hrtimer(
@@ -1138,7 +1142,7 @@ async fn wake_timer_loop(
                         responder.send(Err(fta::WakeError::Dropped)).expect("infallible");
                     }
                     if is_deadline_changed(deadline_before, deadline_after) {
-                        stop_hrtimer(&timer_proxy).await;
+                        stop_hrtimer(&timer_proxy, &timer_config).await;
                     }
                     if let Some(deadline) = deadline_after {
                         // Reschedule the hardware timer if the removed timer is the earliest one,
@@ -1182,7 +1186,7 @@ async fn wake_timer_loop(
                     // This could be a resolution switch, or a straggler notification.
                     // Either way, the hardware timer is still ticking, cancel it.
                     debug!("wake_timer_loop: no expired alarms, reset hrtimer state");
-                    stop_hrtimer(&timer_proxy).await;
+                    stop_hrtimer(&timer_proxy, &timer_config).await;
                 }
                 // There is a timer to reschedule, do that now.
                 hrtimer_status = match timers.peek_deadline() {
@@ -1346,7 +1350,7 @@ async fn schedule_hrtimer(
         "ticks" => ticks
     );
     let start_and_wait_fut = hrtimer.start_and_wait(
-        MAIN_TIMER_ID.try_into().expect("infallible"),
+        timer_config.id,
         &ffhh::Resolution::Duration(resolution_nanos),
         ticks,
         clone_handle(&hrtimer_scheduled),
@@ -1720,7 +1724,7 @@ mod tests {
         duration: zx::BootDuration,
         expected: TimerDuration,
     ) {
-        let config = TimerConfig::new_from_data(&resolutions[..], max_ticks);
+        let config = TimerConfig::new_from_data(MAIN_TIMER_ID as u64, &resolutions[..], max_ticks);
         let actual = config.pick_setting(duration);
 
         // .eq() does not work here, since we do not just require that the values
@@ -1798,7 +1802,7 @@ mod tests {
                             Some(FakeCmd::Exit) => { break; }
                             Some(FakeCmd::SetProperties{ resolutions, max_ticks, keep_alive, done}) => {
                                 let mut timer_props = vec![];
-                                for _ in 0..10 {
+                                for v in 0..10 {
                                     timer_props.push(ffhh::TimerProperties {
                                         supported_resolutions: Some(
                                             resolutions.iter()
@@ -1806,6 +1810,7 @@ mod tests {
                                         max_ticks: Some(max_ticks.try_into().unwrap()),
                                         // start_and_wait method works.
                                         supports_wait: Some(true),
+                                        id: Some(v),
                                         ..Default::default()
                                         },
                                     );
