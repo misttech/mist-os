@@ -55,10 +55,6 @@ template("build_api_module") {
                              ])
       output_conversion = "json"
       metadata = {
-        if (defined(invoker.metadata)) {
-          forward_variables_from(invoker.metadata, "*")
-        }
-
         # Used to populate the api.json file that is uploaded by
         # artifactory (see tools/artifactory/modules.go)
         build_api_modules = [ target_name ]
