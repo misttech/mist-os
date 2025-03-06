@@ -21,8 +21,8 @@ use crate::directory::{CgroupDirectory, CgroupDirectoryHandle};
 pub struct CgroupV1Fs {
     pub root: Arc<CgroupRoot>,
 
-    /// All directory nodes of the cgroup hierarchy.
-    pub hierarchy: Arc<Hierarchy>,
+    /// All directory nodes of the filesystem.
+    pub dir_nodes: Arc<DirectoryNodes>,
 }
 
 impl CgroupV1Fs {
@@ -33,15 +33,16 @@ impl CgroupV1Fs {
     ) -> Result<FileSystemHandle, Errno> {
         let weak_kernel = Arc::downgrade(current_task.kernel());
         let root = CgroupRoot::new(weak_kernel);
-        let hierarchy = Hierarchy::new(Arc::downgrade(&root));
+        let dir_nodes = DirectoryNodes::new(Arc::downgrade(&root));
+        let root_dir = dir_nodes.root.clone();
         let fs = FileSystem::new(
             current_task.kernel(),
             CacheMode::Uncached,
-            CgroupV1Fs { hierarchy: hierarchy.clone(), root: root },
+            CgroupV1Fs { dir_nodes, root },
             options,
         )?;
-        hierarchy.root.create_root_interface_files(current_task, &fs);
-        fs.set_root(hierarchy.root.clone());
+        root_dir.create_root_interface_files(current_task, &fs);
+        fs.set_root(root_dir);
         Ok(fs)
     }
 }
@@ -60,8 +61,8 @@ impl FileSystemOps for CgroupV1Fs {
 }
 
 pub struct CgroupV2Fs {
-    /// All directory nodes of the cgroup hierarchy.
-    pub hierarchy: Arc<Hierarchy>,
+    /// All directory nodes of the filesystem.
+    pub dir_nodes: Arc<DirectoryNodes>,
 }
 
 struct CgroupV2FsHandle(FileSystemHandle);
@@ -84,15 +85,16 @@ impl CgroupV2Fs {
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let kernel = current_task.kernel();
-        let hierarchy = Hierarchy::new(Arc::downgrade(&kernel.cgroups.cgroup2));
+        let dir_nodes = DirectoryNodes::new(Arc::downgrade(&kernel.cgroups.cgroup2));
+        let root = dir_nodes.root.clone();
         let fs = FileSystem::new(
             current_task.kernel(),
             CacheMode::Uncached,
-            CgroupV2Fs { hierarchy: hierarchy.clone() },
+            CgroupV2Fs { dir_nodes },
             options,
         )?;
-        hierarchy.root.create_root_interface_files(current_task, &fs);
-        fs.set_root(hierarchy.root.clone());
+        root.create_root_interface_files(current_task, &fs);
+        fs.set_root(root);
         Ok(fs)
     }
 }
@@ -112,17 +114,20 @@ impl FileSystemOps for CgroupV2Fs {
 }
 
 /// Represents all directory nodes of a cgroup hierarchy.
-pub struct Hierarchy {
+pub struct DirectoryNodes {
+    /// `CgroupRoot`'s directory handle. The `FileSystem` owns the `FsNode` of the root, and so we
+    /// do not have a `FsNodeHandle` of the root.
     root: CgroupDirectoryHandle,
 
-    /// All non-root cgroup directories, keyed by cgroup's ID.
+    /// All non-root cgroup directories, keyed by cgroup's ID. Every non-root cgroup has a
+    /// corresponding node.
     nodes: Mutex<HashMap<u64, FsNodeHandle>>,
 }
 
-impl Hierarchy {
-    pub fn new(root_cgroup: Weak<CgroupRoot>) -> Arc<Hierarchy> {
-        Arc::new_cyclic(|weak_hierarchy| Self {
-            root: CgroupDirectory::new_root(root_cgroup, weak_hierarchy.clone()),
+impl DirectoryNodes {
+    pub fn new(root_cgroup: Weak<CgroupRoot>) -> Arc<DirectoryNodes> {
+        Arc::new_cyclic(|weak_self| Self {
+            root: CgroupDirectory::new_root(root_cgroup, weak_self.clone()),
             nodes: Mutex::new(HashMap::new()),
         })
     }
@@ -184,10 +189,10 @@ mod test {
             .expect("create_filesystem");
 
         let cgroupfs = fs.downcast_ops::<CgroupV2Fs>().expect("downcast_ops");
-        let hierarchy = cgroupfs.hierarchy.clone();
-        assert!(hierarchy.nodes.lock().is_empty(), "new filesystem does not contain nodes");
+        let dir_nodes = cgroupfs.dir_nodes.clone();
+        assert!(dir_nodes.nodes.lock().is_empty(), "new filesystem does not contain nodes");
 
-        let root_dir = hierarchy.root.clone();
+        let root_dir = dir_nodes.root.clone();
         assert!(root_dir.has_interface_files(), "root directory is initialized");
     }
 }

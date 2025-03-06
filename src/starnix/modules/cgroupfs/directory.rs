@@ -30,7 +30,7 @@ use crate::events::EventsFile;
 use crate::freeze::FreezeFile;
 use crate::kill::KillFile;
 use crate::procs::ControlGroupNode;
-use crate::Hierarchy;
+use crate::DirectoryNodes;
 
 const CONTROLLERS_FILE: &str = "cgroup.controllers";
 const PROCS_FILE: &str = "cgroup.procs";
@@ -43,8 +43,8 @@ pub struct CgroupDirectory {
     /// The associated cgroup.
     cgroup: Weak<dyn CgroupOps>,
 
-    /// Weak reference to the hierarchy.
-    hierarchy: Weak<Hierarchy>,
+    /// Weak reference to all other directory nodes of the filesystem. Used to fetch subdirectories.
+    dir_nodes: Weak<DirectoryNodes>,
 
     /// Interface files of the current cgroup directory. Files can be added or removed when resource
     /// controllers are enabled and disabled on the cgroup, respectively.
@@ -55,11 +55,14 @@ impl CgroupDirectory {
     /// 2-step initialization to create a new root directory. `FileSystem` is instantiated with
     /// the `Directory`, which is then used to create the interface files of the `Directory` using
     /// `create_root_interface_files()`.
-    pub fn new_root(cgroup: Weak<CgroupRoot>, hierarchy: Weak<Hierarchy>) -> CgroupDirectoryHandle {
+    pub fn new_root(
+        cgroup: Weak<CgroupRoot>,
+        dir_nodes: Weak<DirectoryNodes>,
+    ) -> CgroupDirectoryHandle {
         CgroupDirectoryHandle(Arc::new(Self {
             cgroup: cgroup as Weak<dyn CgroupOps>,
             interface_files: Mutex::new(BTreeMap::new()),
-            hierarchy,
+            dir_nodes,
         }))
     }
 
@@ -92,7 +95,7 @@ impl CgroupDirectory {
         cgroup: Weak<dyn CgroupOps>,
         current_task: &CurrentTask,
         fs: &FileSystemHandle,
-        hierarchy: Weak<Hierarchy>,
+        dir_nodes: Weak<DirectoryNodes>,
     ) -> CgroupDirectoryHandle {
         let interface_files = BTreeMap::from([
             (
@@ -139,7 +142,7 @@ impl CgroupDirectory {
         CgroupDirectoryHandle(Arc::new(Self {
             cgroup,
             interface_files: Mutex::new(interface_files),
-            hierarchy,
+            dir_nodes,
         }))
     }
 
@@ -147,8 +150,8 @@ impl CgroupDirectory {
         self.cgroup.upgrade().ok_or_else(|| errno!(ENODEV))
     }
 
-    fn hierarchy(&self) -> Result<Arc<Hierarchy>, Errno> {
-        self.hierarchy.upgrade().ok_or_else(|| errno!(ENODEV))
+    fn dir_nodes(&self) -> Result<Arc<DirectoryNodes>, Errno> {
+        self.dir_nodes.upgrade().ok_or_else(|| errno!(ENODEV))
     }
 
     #[cfg(test)]
@@ -178,7 +181,7 @@ impl FsNodeOps for CgroupDirectoryHandle {
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         let children = self.cgroup()?.get_children()?;
-        let nodes = self.hierarchy()?.get_nodes(&children);
+        let nodes = self.dir_nodes()?.get_nodes(&children);
         assert_eq!(children.len(), nodes.len());
 
         let children_entries =
@@ -214,15 +217,15 @@ impl FsNodeOps for CgroupDirectoryHandle {
         _mode: FileMode,
         _owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        let hierarchy = self.hierarchy()?;
+        let dir_nodes = self.dir_nodes()?;
         let cgroup = self.cgroup()?.new_child(name)?;
         let directory = CgroupDirectory::new(
             Arc::downgrade(&cgroup) as Weak<dyn CgroupOps>,
             current_task,
             &node.fs(),
-            self.hierarchy.clone(),
+            self.dir_nodes.clone(),
         );
-        let child = hierarchy.add_node(&cgroup, directory, current_task, &node.fs());
+        let child = dir_nodes.add_node(&cgroup, directory, current_task, &node.fs());
 
         node.update_info(|info| {
             info.link_count += 1;
@@ -257,12 +260,12 @@ impl FsNodeOps for CgroupDirectoryHandle {
             return error!(EPERM);
         };
 
-        let hierarchy = self.hierarchy()?;
+        let dir_nodes = self.dir_nodes()?;
         let child_cgroup = child_node.cgroup()?;
         let removed = self.cgroup()?.remove_child(name)?;
         assert!(Arc::ptr_eq(&(removed.clone() as Arc<dyn CgroupOps>), &child_cgroup));
 
-        hierarchy.remove_node(&removed)?;
+        dir_nodes.remove_node(&removed)?;
 
         node.update_info(|info| {
             info.link_count -= 1;
@@ -295,7 +298,7 @@ impl FsNodeOps for CgroupDirectoryHandle {
             Ok(node.clone())
         } else {
             let cgroup = self.cgroup()?.get_child(name)?;
-            self.hierarchy()?.get_node(&cgroup)
+            self.dir_nodes()?.get_node(&cgroup)
         }
     }
 }
