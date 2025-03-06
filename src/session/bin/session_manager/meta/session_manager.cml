@@ -531,6 +531,26 @@
             to: "#session",
             availability: "same_as_target",
         },
+        {
+            service: [
+                "fuchsia.hardware.backlight.Service", // replaces /dev/class/backlight
+                "fuchsia.hardware.bluetooth.Service", // replaces /dev/class/bt-hci
+
+                // TODO(http://fxbug.dev/400447707): add service to replace /dev/class/gpu
+                "fuchsia.hardware.hrtimer.Service", // replaces /dev/class/hrtimer
+                "fuchsia.hardware.light.LightService", // replaces /dev/class/light
+                "fuchsia.hardware.power.sensor.Service", // replaces /dev/class/power-sensor
+                "fuchsia.hardware.radar.Service", // replaces /dev/class/radar
+                "fuchsia.hardware.temperature.Service", // replaces /dev/class/temperature
+                "fuchsia.hardware.thermal.Service", // replaces /dev/class/thermal
+                "fuchsia.hardware.trippoint.TripPointService", // replaces /dev/class/trippoint
+                "fuchsia.input.report.Service", // replaces /dev/class/input-report
+                "fuchsia.power.battery.InfoService", // replaces /dev/class/battery
+            ],
+            from: "parent",
+            to: "#session",
+            availability: "same_as_target",
+        },
 
         // Allow components in the session to restart it (the session).
         {
