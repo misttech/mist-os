@@ -8,6 +8,8 @@
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/logging/cpp/logger.h>
+#include <lib/zx/result.h>
 
 #include <cstdint>
 
@@ -30,7 +32,7 @@ zx::result<> Vim3DisplayDetect::DetectDisplay() {
   // if the LCD is not connected, the RESET pin will be low
   auto lcd_detect = ReadGpio("gpio-display-detect");
   if (lcd_detect.is_error()) {
-    FDF_LOG(ERROR, "Failed to determine display type");
+    fdf::error("Failed to determine display type");
     return lcd_detect.take_error();
   }
 
@@ -49,8 +51,7 @@ zx::result<> Vim3DisplayDetect::DetectDisplay() {
   zx::result controller_endpoints =
       fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
   if (controller_endpoints.is_error()) {
-    FDF_LOG(ERROR, "Failed to create controller endpoints: %s",
-            controller_endpoints.status_string());
+    fdf::error("Failed to create controller endpoints: {}", controller_endpoints);
     return controller_endpoints.take_error();
   }
   controller_.Bind(std::move(controller_endpoints->client));
@@ -58,12 +59,12 @@ zx::result<> Vim3DisplayDetect::DetectDisplay() {
   auto result = parent_->AddChild({std::move(args), std::move(controller_endpoints->server), {}});
   if (result.is_error()) {
     if (result.error_value().is_framework_error()) {
-      FDF_LOG(ERROR, "Failed to add child: %s",
-              result.error_value().framework_error().FormatDescription().c_str());
+      fdf::error("Failed to add child: {}",
+                 result.error_value().framework_error().FormatDescription());
       return zx::error(result.error_value().framework_error().status());
     }
     if (result.error_value().is_domain_error()) {
-      FDF_LOG(ERROR, "Failed to add child");
+      fdf::error("Failed to add child");
       return zx::error(ZX_ERR_INTERNAL);
     }
   }
@@ -74,7 +75,7 @@ zx::result<> Vim3DisplayDetect::DetectDisplay() {
 zx::result<bool> Vim3DisplayDetect::ReadGpio(std::string_view gpio_node_name) {
   zx::result gpio = incoming()->Connect<fuchsia_hardware_gpio::Service::Device>(gpio_node_name);
   if (gpio.is_error()) {
-    FDF_LOG(ERROR, "Failed to connect to GPIO node: %s", gpio.status_string());
+    fdf::error("Failed to connect to GPIO node: {}", gpio);
     return gpio.take_error();
   }
 
@@ -83,14 +84,14 @@ zx::result<bool> Vim3DisplayDetect::ReadGpio(std::string_view gpio_node_name) {
   auto result = gpio_client->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kInput);
   if (!result.ok() || result->is_error()) {
     auto status = result.ok() ? result->error_value() : result.status();
-    FDF_LOG(ERROR, "SetBufferMode failed: %s", zx_status_get_string(status));
+    fdf::error("SetBufferMode failed: {}", zx::make_result(status));
     return zx::error(status);
   }
 
   auto read_byte = gpio_client->Read();
   if (!read_byte.ok() || read_byte->is_error()) {
     auto status = read_byte.ok() ? read_byte->error_value() : read_byte.status();
-    FDF_LOG(ERROR, "Read failed: %s", zx_status_get_string(status));
+    fdf::error("Read failed: {}", zx::make_result(status));
     return zx::error(status);
   }
 
