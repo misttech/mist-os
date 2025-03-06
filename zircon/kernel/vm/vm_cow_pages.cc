@@ -563,18 +563,18 @@ fbl::RefPtr<VmCowPages> VmCowPages::DeadTransitionLocked(Guard<VmoLockType>& gua
     freed_list.FreePagesLocked(this);
 
     if (parent_) {
-      parent_locked().RemoveChildLocked(this);
-    }
+      Guard<VmoLockType> parent_guard{AssertOrderedLock, parent_->lock(), parent_->lock_order(),
+                                      VmLockAcquireMode::Reentrant};
+      parent_->RemoveChildLocked(this);
 
-    if (parent_) {
       // We removed a child from the parent, and so it may also need to be cleaned.
       // Avoid recursing destructors and dead transitions when we delete our parent by using the
       // deferred deletion method. See common in parent else branch for why we can avoid this on a
       // hidden parent.
-      if (!parent_locked().is_hidden()) {
+      if (!parent_->is_hidden()) {
         deferred = ktl::move(parent_);
       } else {
-        deferred = parent_locked().MaybeDeadTransitionLocked(guard);
+        deferred = parent_->MaybeDeadTransitionLocked(parent_guard);
       }
     }
   } else {
@@ -601,12 +601,14 @@ fbl::RefPtr<VmCowPages> VmCowPages::DeadTransitionLocked(Guard<VmoLockType>& gua
     // And so each serialized deletion breaks of a discrete two VMO chain that can be safely
     // finalized with one recursive step.
     if (parent_) {
-      DEBUG_ASSERT(!parent_locked().parent_);
+      Guard<VmoLockType> parent_guard{AssertOrderedLock, parent_->lock(), parent_->lock_order(),
+                                      VmLockAcquireMode::Reentrant};
+      DEBUG_ASSERT(!parent_->parent_);
       // We explicitly call DeadTransition on our parent (even though we are still a child of it) as
       // otherwise its destructor will run without this transition happening, which is an error.
       // This otherwise does not cause any actual cleanup to happen, since our parent is hidden and
       // will have had all its pages removed already.
-      deferred = parent_locked().DeadTransitionLocked(guard);
+      deferred = parent_->DeadTransitionLocked(parent_guard);
     }
   }
 
