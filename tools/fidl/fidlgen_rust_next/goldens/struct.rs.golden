@@ -82,7 +82,7 @@ impl ::fidl_next::TakeFrom<WireBasicStruct> for BasicStruct {
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireBasicStruct {
-    pub x: ::fidl_next::u32_le,
+    pub x: ::fidl_next::WireU32,
 
     pub y: ::fidl_next::WireString,
 }

@@ -181,7 +181,7 @@ impl ::fidl_next::TakeFrom<WireSuperFooResponse> for SuperFooResponse {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireSuperFooResponse {
-    pub y: ::fidl_next::i64_le,
+    pub y: ::fidl_next::WireI64,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSuperFooResponse

@@ -7,13 +7,13 @@ use munge::munge;
 use crate::decoder::InternalHandleDecoder;
 use crate::encoder::InternalHandleEncoder;
 use crate::{
-    u64_le, Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, Slot, WireEnvelope,
+    Decode, DecodeError, Decoder, Encode, EncodeError, Encoder, Slot, WireEnvelope, WireU64,
 };
 
 /// A raw FIDL union
 #[repr(C)]
 pub struct RawWireUnion {
-    ordinal: u64_le,
+    ordinal: WireU64,
     envelope: WireEnvelope,
 }
 
@@ -23,7 +23,7 @@ impl RawWireUnion {
     pub fn encode_absent(slot: Slot<'_, Self>) {
         munge!(let Self { mut ordinal, envelope } = slot);
 
-        *ordinal = u64_le::from_native(0);
+        **ordinal = 0;
         WireEnvelope::encode_zero(envelope);
     }
 
@@ -37,7 +37,7 @@ impl RawWireUnion {
     ) -> Result<(), EncodeError> {
         munge!(let Self { mut ordinal, envelope } = slot);
 
-        *ordinal = u64_le::from_native(ord);
+        **ordinal = ord;
         WireEnvelope::encode_value_static(value, encoder, envelope)
     }
 
@@ -51,7 +51,7 @@ impl RawWireUnion {
     ) -> Result<(), EncodeError> {
         munge!(let Self { mut ordinal, envelope } = slot);
 
-        *ordinal = u64_le::from_native(ord);
+        **ordinal = ord;
         WireEnvelope::encode_value(value, encoder, envelope)
     }
 
@@ -59,7 +59,7 @@ impl RawWireUnion {
     #[inline]
     pub fn encoded_ordinal(slot: Slot<'_, Self>) -> u64 {
         munge!(let Self { ordinal, envelope: _ } = slot);
-        ordinal.to_native()
+        **ordinal
     }
 
     /// Decodes an absent union from a slot.
@@ -119,13 +119,13 @@ impl RawWireUnion {
     /// The absent optional union.
     #[inline]
     pub fn absent() -> Self {
-        Self { ordinal: u64_le::from_native(0), envelope: WireEnvelope::zero() }
+        Self { ordinal: WireU64(0), envelope: WireEnvelope::zero() }
     }
 
     /// Returns whether the union contains a value.
     #[inline]
     pub fn is_some(&self) -> bool {
-        self.ordinal.to_native() != 0
+        *self.ordinal != 0
     }
 
     /// Returns whether the union is empty.
@@ -137,7 +137,7 @@ impl RawWireUnion {
     /// Returns the ordinal of the union.
     #[inline]
     pub fn ordinal(&self) -> u64 {
-        self.ordinal.to_native()
+        *self.ordinal
     }
 
     /// Gets a reference to the envelope underlying the union.

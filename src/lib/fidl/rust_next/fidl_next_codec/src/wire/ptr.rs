@@ -4,12 +4,12 @@
 
 use munge::munge;
 
-use crate::{u64_le, DecodeError, Slot};
+use crate::{DecodeError, Slot, WireU64};
 
 /// A raw FIDL pointer
 #[repr(C, align(8))]
 pub union WirePointer<T> {
-    encoded: u64_le,
+    encoded: WireU64,
     decoded: *mut T,
 }
 
@@ -17,7 +17,7 @@ impl<T> WirePointer<T> {
     /// Returns whether the wire pointer was encoded present.
     pub fn is_encoded_present(slot: Slot<'_, Self>) -> Result<bool, DecodeError> {
         munge!(let Self { encoded } = slot);
-        match encoded.to_native() {
+        match **encoded {
             0 => Ok(false),
             u64::MAX => Ok(true),
             x => Err(DecodeError::InvalidPointerPresence(x)),
@@ -27,13 +27,13 @@ impl<T> WirePointer<T> {
     /// Encodes that a pointer is present in a slot.
     pub fn encode_present(slot: Slot<'_, Self>) {
         munge!(let Self { mut encoded } = slot);
-        *encoded = u64_le::from_native(u64::MAX);
+        **encoded = u64::MAX;
     }
 
     /// Encodes that a pointer is absent in a slot.
     pub fn encode_absent(slot: Slot<'_, Self>) {
         munge!(let Self { mut encoded } = slot);
-        *encoded = u64_le::from_native(0);
+        **encoded = 0;
     }
 
     /// Sets the decoded value of the pointer.

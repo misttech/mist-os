@@ -41,7 +41,7 @@ where
         slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireBits { mut value } = slot);
-        *value = ::fidl_next::u32_le::from(self.bits());
+        *value = ::fidl_next::WireU32::from(self.bits());
         Ok(())
     }
 }
@@ -63,7 +63,7 @@ impl ::fidl_next::TakeFrom<WireBits> for Bits {
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct WireBits {
-    value: ::fidl_next::u32_le,
+    value: ::fidl_next::WireU32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireBits
@@ -80,7 +80,7 @@ where
 
 impl ::core::convert::From<Bits> for WireBits {
     fn from(natural: Bits) -> Self {
-        Self { value: ::fidl_next::u32_le::from(natural.bits()) }
+        Self { value: ::fidl_next::WireU32::from(natural.bits()) }
     }
 }
 
@@ -108,7 +108,7 @@ where
         slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireEnum { mut value } = slot);
-        *value = ::fidl_next::u32_le::from(match *self {
+        *value = ::fidl_next::WireU32::from(match *self {
             Self::A => 1,
 
             Self::UnknownOrdinal_(value) => value,
@@ -139,11 +139,11 @@ impl ::fidl_next::TakeFrom<WireEnum> for Enum {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct WireEnum {
-    value: ::fidl_next::u32_le,
+    value: ::fidl_next::WireU32,
 }
 
 impl WireEnum {
-    pub const A: WireEnum = WireEnum { value: ::fidl_next::u32_le::from_native(1) };
+    pub const A: WireEnum = WireEnum { value: ::fidl_next::WireU32(1) };
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireEnum
@@ -163,7 +163,7 @@ impl ::core::convert::From<Enum> for WireEnum {
         match natural {
             Enum::A => WireEnum::A,
 
-            Enum::UnknownOrdinal_(value) => WireEnum { value: ::fidl_next::u32_le::from(value) },
+            Enum::UnknownOrdinal_(value) => WireEnum { value: ::fidl_next::WireU32::from(value) },
         }
     }
 }
@@ -520,7 +520,7 @@ impl ::fidl_next::TakeFrom<WireStruct> for Struct {
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireStruct {
-    pub x: ::fidl_next::u32_le,
+    pub x: ::fidl_next::WireU32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStruct
@@ -641,7 +641,7 @@ where
                 0 => unsafe { ::core::hint::unreachable_unchecked() },
 
                 1 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::u32_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireU32>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -656,7 +656,7 @@ where
 }
 
 impl WireTable {
-    pub fn x(&self) -> Option<&::fidl_next::u32_le> {
+    pub fn x(&self) -> Option<&::fidl_next::WireU32> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
 }
@@ -766,7 +766,7 @@ pub struct WireUnion {
 
 pub mod union_ {
     pub enum Ref<'union> {
-        X(&'union ::fidl_next::u32_le),
+        X(&'union ::fidl_next::WireU32),
 
         UnknownOrdinal_(u64),
     }
@@ -794,7 +794,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
@@ -808,7 +808,7 @@ where
 impl ::core::fmt::Debug for WireUnion {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
-            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u32_le>().fmt(f) },
+            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireU32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -849,7 +849,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 

@@ -93,7 +93,7 @@ where
                 0 => unsafe { ::core::hint::unreachable_unchecked() },
 
                 1 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::u16_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireU16>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -108,7 +108,7 @@ where
 }
 
 impl WireLocalTablePayload {
-    pub fn a(&self) -> Option<&::fidl_next::u16_le> {
+    pub fn a(&self) -> Option<&::fidl_next::WireU16> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
 }
@@ -443,7 +443,7 @@ pub mod main_protocol_two_way_import_with_error_result {
     pub enum Ref<'union> {
         Response(&'union ::fidl_next_test_protocollayouts_imported::WireImportUnionPayload),
 
-        Err(&'union ::fidl_next::u32_le),
+        Err(&'union ::fidl_next::WireU32),
     }
 }
 
@@ -480,7 +480,7 @@ where
                 ::fidl_next_test_protocollayouts_imported::WireImportUnionPayload,
             >(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::u32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireU32>(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
@@ -497,7 +497,7 @@ impl ::core::fmt::Debug for WireMainProtocolTwoWayImportWithErrorResult {
                             ::fidl_next_test_protocollayouts_imported::WireImportUnionPayload
                         >().fmt(f)
             },
-            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u32_le>().fmt(f) },
+            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireU32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -543,7 +543,7 @@ where
                 ::fidl_next_test_protocollayouts_imported::WireImportUnionPayload,
             >(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::u32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireU32>(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -669,7 +669,7 @@ pub mod main_protocol_two_way_local_with_error_result {
     pub enum Ref<'union> {
         Response(&'union crate::WireLocalUnionPayload),
 
-        Err(&'union ::fidl_next::u32_le),
+        Err(&'union ::fidl_next::WireU32),
     }
 }
 
@@ -705,7 +705,7 @@ where
                 raw, decoder,
             )?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::u32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireU32>(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
@@ -718,7 +718,7 @@ impl ::core::fmt::Debug for WireMainProtocolTwoWayLocalWithErrorResult {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
             1 => unsafe { self.raw.get().deref_unchecked::<crate::WireLocalUnionPayload>().fmt(f) },
-            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u32_le>().fmt(f) },
+            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireU32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -763,7 +763,7 @@ where
                 raw, decoder,
             )?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::u32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireU32>(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -870,7 +870,7 @@ where
                 0 => unsafe { ::core::hint::unreachable_unchecked() },
 
                 1 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::u16_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireU16>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -885,7 +885,7 @@ where
 }
 
 impl WireMainProtocolOneWayAnonRequest {
-    pub fn a(&self) -> Option<&::fidl_next::u16_le> {
+    pub fn a(&self) -> Option<&::fidl_next::WireU16> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
 }
@@ -1207,7 +1207,7 @@ where
                 0 => unsafe { ::core::hint::unreachable_unchecked() },
 
                 1 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::u16_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireU16>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -1222,7 +1222,7 @@ where
 }
 
 impl WireMainProtocolTwoWayAnonResponse {
-    pub fn a(&self) -> Option<&::fidl_next::u16_le> {
+    pub fn a(&self) -> Option<&::fidl_next::WireU16> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
 }
@@ -1326,7 +1326,7 @@ where
                 0 => unsafe { ::core::hint::unreachable_unchecked() },
 
                 1 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::u16_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireU16>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -1341,7 +1341,7 @@ where
 }
 
 impl WireMainProtocolTwoWayAnonWithErrorRequest {
-    pub fn a(&self) -> Option<&::fidl_next::u16_le> {
+    pub fn a(&self) -> Option<&::fidl_next::WireU16> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
 }
@@ -1686,7 +1686,7 @@ pub mod main_protocol_two_way_anon_with_error_result {
     pub enum Ref<'union> {
         Response(&'union crate::WireMainProtocolTwoWayAnonWithErrorResponse),
 
-        Err(&'union ::fidl_next::u32_le),
+        Err(&'union ::fidl_next::WireU32),
     }
 }
 
@@ -1723,7 +1723,7 @@ where
                 crate::WireMainProtocolTwoWayAnonWithErrorResponse,
             >(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::u32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireU32>(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
@@ -1741,7 +1741,7 @@ impl ::core::fmt::Debug for WireMainProtocolTwoWayAnonWithErrorResult {
                     .deref_unchecked::<crate::WireMainProtocolTwoWayAnonWithErrorResponse>()
                     .fmt(f)
             },
-            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u32_le>().fmt(f) },
+            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireU32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -1787,7 +1787,7 @@ where
                 crate::WireMainProtocolTwoWayAnonWithErrorResponse,
             >(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::u32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireU32>(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,

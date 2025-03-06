@@ -691,7 +691,7 @@ pub mod allowed_denied_result {
     pub enum Ref<'union> {
         Response(&'union crate::WireAllowedDeniedResponse),
 
-        Err(&'union ::fidl_next::u32_le),
+        Err(&'union ::fidl_next::WireU32),
     }
 }
 
@@ -727,7 +727,7 @@ where
                 raw, decoder,
             )?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::u32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireU32>(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
@@ -742,7 +742,7 @@ impl ::core::fmt::Debug for WireAllowedDeniedResult {
             1 => unsafe {
                 self.raw.get().deref_unchecked::<crate::WireAllowedDeniedResponse>().fmt(f)
             },
-            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u32_le>().fmt(f) },
+            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireU32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -787,7 +787,7 @@ where
                 raw, decoder,
             )?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::u32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireU32>(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -2533,7 +2533,7 @@ impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyCppResponse>
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireDenyEachBindingOnlyDenyCppResponse {
-    pub b: ::fidl_next::i32_le,
+    pub b: ::fidl_next::WireI32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireDenyEachBindingOnlyDenyCppResponse
@@ -2665,7 +2665,7 @@ pub mod deny_each_binding_only_deny_cpp_result {
     pub enum Ref<'union> {
         Response(&'union crate::WireDenyEachBindingOnlyDenyCppResponse),
 
-        Err(&'union ::fidl_next::u32_le),
+        Err(&'union ::fidl_next::WireU32),
     }
 }
 
@@ -2694,7 +2694,7 @@ impl Clone for WireDenyEachBindingOnlyDenyCppResult {
                 },
             },
 
-            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
+            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireU32>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -2716,7 +2716,7 @@ where
                 crate::WireDenyEachBindingOnlyDenyCppResponse,
             >(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
@@ -2736,7 +2736,7 @@ impl ::core::fmt::Debug for WireDenyEachBindingOnlyDenyCppResult {
                     .deref_unchecked::<crate::WireDenyEachBindingOnlyDenyCppResponse>()
                     .fmt(f)
             },
-            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u32_le>().fmt(f) },
+            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireU32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -2780,7 +2780,7 @@ impl Clone for WireOptionalDenyEachBindingOnlyDenyCppResult {
                 },
             },
 
-            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
+            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireU32>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -2802,7 +2802,7 @@ where
                 crate::WireDenyEachBindingOnlyDenyCppResponse,
             >(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
@@ -3012,7 +3012,7 @@ impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyDartResponse>
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireDenyEachBindingOnlyDenyDartResponse {
-    pub b: ::fidl_next::i32_le,
+    pub b: ::fidl_next::WireI32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireDenyEachBindingOnlyDenyDartResponse
@@ -3144,7 +3144,7 @@ pub mod deny_each_binding_only_deny_dart_result {
     pub enum Ref<'union> {
         Response(&'union crate::WireDenyEachBindingOnlyDenyDartResponse),
 
-        Err(&'union ::fidl_next::u32_le),
+        Err(&'union ::fidl_next::WireU32),
     }
 }
 
@@ -3173,7 +3173,7 @@ impl Clone for WireDenyEachBindingOnlyDenyDartResult {
                 },
             },
 
-            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
+            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireU32>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -3195,7 +3195,7 @@ where
                 crate::WireDenyEachBindingOnlyDenyDartResponse,
             >(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
@@ -3215,7 +3215,7 @@ impl ::core::fmt::Debug for WireDenyEachBindingOnlyDenyDartResult {
                     .deref_unchecked::<crate::WireDenyEachBindingOnlyDenyDartResponse>()
                     .fmt(f)
             },
-            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u32_le>().fmt(f) },
+            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireU32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -3259,7 +3259,7 @@ impl Clone for WireOptionalDenyEachBindingOnlyDenyDartResult {
                 },
             },
 
-            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
+            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireU32>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -3281,7 +3281,7 @@ where
                 crate::WireDenyEachBindingOnlyDenyDartResponse,
             >(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
@@ -3491,7 +3491,7 @@ impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyGoResponse>
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireDenyEachBindingOnlyDenyGoResponse {
-    pub b: ::fidl_next::i32_le,
+    pub b: ::fidl_next::WireI32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireDenyEachBindingOnlyDenyGoResponse
@@ -3623,7 +3623,7 @@ pub mod deny_each_binding_only_deny_go_result {
     pub enum Ref<'union> {
         Response(&'union crate::WireDenyEachBindingOnlyDenyGoResponse),
 
-        Err(&'union ::fidl_next::u32_le),
+        Err(&'union ::fidl_next::WireU32),
     }
 }
 
@@ -3652,7 +3652,7 @@ impl Clone for WireDenyEachBindingOnlyDenyGoResult {
                 },
             },
 
-            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
+            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireU32>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -3674,7 +3674,7 @@ where
                 crate::WireDenyEachBindingOnlyDenyGoResponse,
             >(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
@@ -3694,7 +3694,7 @@ impl ::core::fmt::Debug for WireDenyEachBindingOnlyDenyGoResult {
                     .deref_unchecked::<crate::WireDenyEachBindingOnlyDenyGoResponse>()
                     .fmt(f)
             },
-            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u32_le>().fmt(f) },
+            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireU32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -3738,7 +3738,7 @@ impl Clone for WireOptionalDenyEachBindingOnlyDenyGoResult {
                 },
             },
 
-            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
+            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireU32>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -3760,7 +3760,7 @@ where
                 crate::WireDenyEachBindingOnlyDenyGoResponse,
             >(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
@@ -3970,7 +3970,7 @@ impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyLibfuzzerResponse>
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireDenyEachBindingOnlyDenyLibfuzzerResponse {
-    pub b: ::fidl_next::i32_le,
+    pub b: ::fidl_next::WireI32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireDenyEachBindingOnlyDenyLibfuzzerResponse
@@ -4102,7 +4102,7 @@ pub mod deny_each_binding_only_deny_libfuzzer_result {
     pub enum Ref<'union> {
         Response(&'union crate::WireDenyEachBindingOnlyDenyLibfuzzerResponse),
 
-        Err(&'union ::fidl_next::u32_le),
+        Err(&'union ::fidl_next::WireU32),
     }
 }
 
@@ -4132,7 +4132,7 @@ impl Clone for WireDenyEachBindingOnlyDenyLibfuzzerResult {
                 },
             },
 
-            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
+            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireU32>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -4154,7 +4154,7 @@ where
                 crate::WireDenyEachBindingOnlyDenyLibfuzzerResponse,
             >(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
@@ -4174,7 +4174,7 @@ impl ::core::fmt::Debug for WireDenyEachBindingOnlyDenyLibfuzzerResult {
                     .deref_unchecked::<crate::WireDenyEachBindingOnlyDenyLibfuzzerResponse>()
                     .fmt(f)
             },
-            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u32_le>().fmt(f) },
+            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireU32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -4219,7 +4219,7 @@ impl Clone for WireOptionalDenyEachBindingOnlyDenyLibfuzzerResult {
                 },
             },
 
-            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
+            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireU32>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -4241,7 +4241,7 @@ where
                 crate::WireDenyEachBindingOnlyDenyLibfuzzerResponse,
             >(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
@@ -4451,7 +4451,7 @@ impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenyRustResponse>
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireDenyEachBindingOnlyDenyRustResponse {
-    pub b: ::fidl_next::i32_le,
+    pub b: ::fidl_next::WireI32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireDenyEachBindingOnlyDenyRustResponse
@@ -4583,7 +4583,7 @@ pub mod deny_each_binding_only_deny_rust_result {
     pub enum Ref<'union> {
         Response(&'union crate::WireDenyEachBindingOnlyDenyRustResponse),
 
-        Err(&'union ::fidl_next::u32_le),
+        Err(&'union ::fidl_next::WireU32),
     }
 }
 
@@ -4612,7 +4612,7 @@ impl Clone for WireDenyEachBindingOnlyDenyRustResult {
                 },
             },
 
-            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
+            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireU32>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -4634,7 +4634,7 @@ where
                 crate::WireDenyEachBindingOnlyDenyRustResponse,
             >(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
@@ -4654,7 +4654,7 @@ impl ::core::fmt::Debug for WireDenyEachBindingOnlyDenyRustResult {
                     .deref_unchecked::<crate::WireDenyEachBindingOnlyDenyRustResponse>()
                     .fmt(f)
             },
-            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u32_le>().fmt(f) },
+            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireU32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -4698,7 +4698,7 @@ impl Clone for WireOptionalDenyEachBindingOnlyDenyRustResult {
                 },
             },
 
-            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
+            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireU32>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -4720,7 +4720,7 @@ where
                 crate::WireDenyEachBindingOnlyDenyRustResponse,
             >(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
@@ -4930,7 +4930,7 @@ impl ::fidl_next::TakeFrom<WireDenyEachBindingOnlyDenySyzkallerResponse>
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireDenyEachBindingOnlyDenySyzkallerResponse {
-    pub b: ::fidl_next::i32_le,
+    pub b: ::fidl_next::WireI32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireDenyEachBindingOnlyDenySyzkallerResponse
@@ -5062,7 +5062,7 @@ pub mod deny_each_binding_only_deny_syzkaller_result {
     pub enum Ref<'union> {
         Response(&'union crate::WireDenyEachBindingOnlyDenySyzkallerResponse),
 
-        Err(&'union ::fidl_next::u32_le),
+        Err(&'union ::fidl_next::WireU32),
     }
 }
 
@@ -5092,7 +5092,7 @@ impl Clone for WireDenyEachBindingOnlyDenySyzkallerResult {
                 },
             },
 
-            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
+            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireU32>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -5114,7 +5114,7 @@ where
                 crate::WireDenyEachBindingOnlyDenySyzkallerResponse,
             >(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
@@ -5134,7 +5134,7 @@ impl ::core::fmt::Debug for WireDenyEachBindingOnlyDenySyzkallerResult {
                     .deref_unchecked::<crate::WireDenyEachBindingOnlyDenySyzkallerResponse>()
                     .fmt(f)
             },
-            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u32_le>().fmt(f) },
+            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireU32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -5179,7 +5179,7 @@ impl Clone for WireOptionalDenyEachBindingOnlyDenySyzkallerResult {
                 },
             },
 
-            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
+            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireU32>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -5201,7 +5201,7 @@ where
                 crate::WireDenyEachBindingOnlyDenySyzkallerResponse,
             >(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
@@ -6253,7 +6253,7 @@ where
         slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireOnlyDart { mut value } = slot);
-        *value = ::fidl_next::u32_le::from(match *self {
+        *value = ::fidl_next::WireU32::from(match *self {
             Self::A => 1,
         });
 
@@ -6282,11 +6282,11 @@ impl ::fidl_next::TakeFrom<WireOnlyDart> for OnlyDart {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct WireOnlyDart {
-    value: ::fidl_next::u32_le,
+    value: ::fidl_next::WireU32,
 }
 
 impl WireOnlyDart {
-    pub const A: WireOnlyDart = WireOnlyDart { value: ::fidl_next::u32_le::from_native(1) };
+    pub const A: WireOnlyDart = WireOnlyDart { value: ::fidl_next::WireU32(1) };
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireOnlyDart
@@ -6612,7 +6612,7 @@ pub struct WireOnlyLlcpp {
 
 pub mod only_llcpp {
     pub enum Ref<'union> {
-        X(&'union ::fidl_next::u32_le),
+        X(&'union ::fidl_next::WireU32),
     }
 }
 
@@ -6629,7 +6629,7 @@ impl WireOnlyLlcpp {
 impl Clone for WireOnlyLlcpp {
     fn clone(&self) -> Self {
         match self.raw.ordinal() {
-            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
+            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireU32>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -6646,7 +6646,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
@@ -6660,7 +6660,7 @@ where
 impl ::core::fmt::Debug for WireOnlyLlcpp {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
-            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u32_le>().fmt(f) },
+            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireU32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -6696,7 +6696,7 @@ impl Clone for WireOptionalOnlyLlcpp {
         }
 
         match self.raw.ordinal() {
-            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
+            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireU32>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -6713,7 +6713,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
@@ -6847,7 +6847,7 @@ where
         slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireOnlySyzkaller { mut value } = slot);
-        *value = ::fidl_next::u32_le::from(self.bits());
+        *value = ::fidl_next::WireU32::from(self.bits());
         Ok(())
     }
 }
@@ -6869,7 +6869,7 @@ impl ::fidl_next::TakeFrom<WireOnlySyzkaller> for OnlySyzkaller {
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct WireOnlySyzkaller {
-    value: ::fidl_next::u32_le,
+    value: ::fidl_next::WireU32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireOnlySyzkaller
@@ -6895,7 +6895,7 @@ where
 
 impl ::core::convert::From<OnlySyzkaller> for WireOnlySyzkaller {
     fn from(natural: OnlySyzkaller) -> Self {
-        Self { value: ::fidl_next::u32_le::from(natural.bits()) }
+        Self { value: ::fidl_next::WireU32::from(natural.bits()) }
     }
 }
 

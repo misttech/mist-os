@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_next_codec::{u32_le, u64_le, DecodeError, DecoderExt as _, EncodeError, EncoderExt as _};
+use fidl_next_codec::{
+    DecodeError, DecoderExt as _, EncodeError, EncoderExt as _, WireU32, WireU64,
+};
 
 use crate::{Transport, WireMessageHeader, FLAG_0_WIRE_FORMAT_V2_BIT, MAGIC_NUMBER};
 
@@ -13,10 +15,10 @@ pub fn encode_header<T: Transport>(
     ordinal: u64,
 ) -> Result<(), EncodeError> {
     buffer.encode_next(&mut WireMessageHeader {
-        txid: u32_le::from_native(txid),
+        txid: WireU32(txid),
         flags: [FLAG_0_WIRE_FORMAT_V2_BIT, 0, 0],
         magic_number: MAGIC_NUMBER,
-        ordinal: u64_le::from_native(ordinal),
+        ordinal: WireU64(ordinal),
     })
 }
 
@@ -26,7 +28,7 @@ pub fn decode_header<T: Transport>(
 ) -> Result<(u32, u64), DecodeError> {
     let (txid, ordinal) = {
         let header = buffer.decode_next::<WireMessageHeader>()?;
-        (header.txid.to_native(), header.ordinal.to_native())
+        (*header.txid, *header.ordinal)
     };
 
     Ok((txid, ordinal))

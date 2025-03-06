@@ -8,7 +8,7 @@ mod error;
 
 pub use self::error::*;
 
-use crate::{f32_le, f64_le, i16_le, i32_le, i64_le, u16_le, u32_le, u64_le, Slot};
+use crate::{Slot, WireF32, WireF64, WireI16, WireI32, WireI64, WireU16, WireU32, WireU64};
 
 /// Decodes a value from the given slot.
 ///
@@ -45,17 +45,17 @@ macro_rules! impl_primitives {
 
 impl_primitives! {
     i8,
-    i16_le,
-    i32_le,
-    i64_le,
+    WireI16,
+    WireI32,
+    WireI64,
 
     u8,
-    u16_le,
-    u32_le,
-    u64_le,
+    WireU16,
+    WireU32,
+    WireU64,
 
-    f32_le,
-    f64_le,
+    WireF32,
+    WireF64,
 }
 
 unsafe impl<D: ?Sized> Decode<D> for bool {
@@ -81,7 +81,7 @@ unsafe impl<D: ?Sized, T: Decode<D>, const N: usize> Decode<D> for [T; N] {
 
 #[cfg(test)]
 mod tests {
-    use crate::{chunks, f32_le, f64_le, i16_le, i32_le, i64_le, u16_le, u32_le, u64_le};
+    use crate::{chunks, WireF32, WireF64, WireI16, WireI32, WireI64, WireU16, WireU32, WireU64};
 
     use crate::testing::assert_decoded;
     use crate::wire::{WireBox, WireString, WireVector};
@@ -106,29 +106,29 @@ mod tests {
             assert_eq!(*x, -0x45i8)
         });
 
-        assert_decoded::<u16_le>(
+        assert_decoded::<WireU16>(
             &mut chunks![0x34, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
             |x| assert_eq!(*x, 0x1234u16),
         );
-        assert_decoded::<i16_le>(
+        assert_decoded::<WireI16>(
             &mut chunks![0xcc, 0xed, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
             |x| assert_eq!(*x, -0x1234i16),
         );
 
-        assert_decoded::<u32_le>(
+        assert_decoded::<WireU32>(
             &mut chunks![0x78, 0x56, 0x34, 0x12, 0x00, 0x00, 0x00, 0x00],
             |x| assert_eq!(*x, 0x12345678u32),
         );
-        assert_decoded::<i32_le>(
+        assert_decoded::<WireI32>(
             &mut chunks![0x88, 0xa9, 0xcb, 0xed, 0x00, 0x00, 0x00, 0x00],
             |x| assert_eq!(*x, -0x12345678i32),
         );
 
-        assert_decoded::<u64_le>(
+        assert_decoded::<WireU64>(
             &mut chunks![0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56, 0x34, 0x12],
             |x| assert_eq!(*x, 0x123456789abcdef0u64),
         );
-        assert_decoded::<i64_le>(
+        assert_decoded::<WireI64>(
             &mut chunks![0x10, 0x21, 0x43, 0x65, 0x87, 0xa9, 0xcb, 0xed],
             |x| assert_eq!(*x, -0x123456789abcdef0i64),
         );
@@ -136,11 +136,11 @@ mod tests {
 
     #[test]
     fn decode_floats() {
-        assert_decoded::<f32_le>(
+        assert_decoded::<WireF32>(
             &mut chunks![0xdb, 0x0f, 0x49, 0x40, 0x00, 0x00, 0x00, 0x00],
             |x| assert_eq!(*x, ::core::f32::consts::PI),
         );
-        assert_decoded::<f64_le>(
+        assert_decoded::<WireF64>(
             &mut chunks![0x18, 0x2d, 0x44, 0x54, 0xfb, 0x21, 0x09, 0x40],
             |x| assert_eq!(*x, ::core::f64::consts::PI),
         );
@@ -148,11 +148,11 @@ mod tests {
 
     #[test]
     fn decode_box() {
-        assert_decoded::<WireBox<u64_le>>(
+        assert_decoded::<WireBox<WireU64>>(
             &mut chunks![0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
             |x| assert_eq!(x.as_ref(), None),
         );
-        assert_decoded::<WireBox<u64_le>>(
+        assert_decoded::<WireBox<WireU64>>(
             &mut chunks![
                 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0xde, 0xbc, 0x9a, 0x78, 0x56,
                 0x34, 0x12,
@@ -163,26 +163,21 @@ mod tests {
 
     #[test]
     fn decode_vec() {
-        assert_decoded::<WireOptionalVector<u32_le>>(
+        assert_decoded::<WireOptionalVector<WireU32>>(
             &mut chunks![
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00,
             ],
             |x| assert!(x.as_ref().is_none()),
         );
-        assert_decoded::<WireVector<u32_le>>(
+        assert_decoded::<WireVector<WireU32>>(
             &mut chunks![
                 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                 0xff, 0xff, 0x78, 0x56, 0x34, 0x12, 0xf0, 0xde, 0xbc, 0x9a,
             ],
-            |x| {
-                assert_eq!(
-                    x.as_slice(),
-                    [u32_le::from_native(0x12345678), u32_le::from_native(0x9abcdef0),].as_slice(),
-                )
-            },
+            |x| assert_eq!(x.as_slice(), [0x12345678, 0x9abcdef0].as_slice(),),
         );
-        assert_decoded::<WireVector<u32_le>>(
+        assert_decoded::<WireVector<WireU32>>(
             &mut chunks![
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
                 0xff, 0xff,

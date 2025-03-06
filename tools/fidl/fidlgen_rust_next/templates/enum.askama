@@ -96,7 +96,7 @@ impl {{ wire_name }} {
             {% match enm.ty %}
                 {% when IntType::Int8 %} {{ member.value.value }}
                 {% when IntType::Uint8 %} {{ member.value.value }}
-                {% else %} {{ wire_int }}::from_native({{ member.value.value }})
+                {% else %} {{ wire_int }}({{ member.value.value }})
             {% endmatch %}
         };
     {% endfor %}

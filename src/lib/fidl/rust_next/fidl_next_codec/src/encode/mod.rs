@@ -12,8 +12,8 @@ use core::ptr::copy_nonoverlapping;
 pub use self::error::EncodeError;
 
 use crate::{
-    f32_le, f64_le, i16_le, i32_le, i64_le, u16_le, u32_le, u64_le, Encoder, EncoderExt as _, Slot,
-    WireBox,
+    Encoder, EncoderExt as _, Slot, WireBox, WireF32, WireF64, WireI16, WireI32, WireI64, WireU16,
+    WireU32, WireU64,
 };
 
 /// An optimization hint about whether `T` is trivially copyable.
@@ -148,13 +148,13 @@ macro_rules! impl_primitives {
 impl_primitives! {
     (), (); bool, bool; i8, i8; u8, u8;
 
-    i16, i16_le; i32, i32_le; i64, i64_le;
-    u16, u16_le; u32, u32_le; u64, u64_le;
-    f32, f32_le; f64, f64_le;
+    i16, WireI16; i32, WireI32; i64, WireI64;
+    u16, WireU16; u32, WireU32; u64, WireU64;
+    f32, WireF32; f64, WireF64;
 
-    i16_le, i16_le; i32_le, i32_le; i64_le, i64_le;
-    u16_le, u16_le; u32_le, u32_le; u64_le, u64_le;
-    f32_le, f32_le; f64_le, f64_le;
+    WireI16, WireI16; WireI32, WireI32; WireI64, WireI64;
+    WireU16, WireU16; WireU32, WireU32; WireU64, WireU64;
+    WireF32, WireF32; WireF64, WireF64;
 }
 
 impl<T: Encodable, const N: usize> Encodable for [T; N] {

@@ -80,7 +80,7 @@ impl ::fidl_next::TakeFrom<WireInt16Int8> for Int16Int8 {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireInt16Int8 {
-    pub a: ::fidl_next::i16_le,
+    pub a: ::fidl_next::WireI16,
 
     pub b: i8,
 }
@@ -282,7 +282,7 @@ impl ::fidl_next::TakeFrom<WireInt8Int32> for Int8Int32 {
 pub struct WireInt8Int32 {
     pub a: i8,
 
-    pub b: ::fidl_next::i32_le,
+    pub b: ::fidl_next::WireI32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireInt8Int32

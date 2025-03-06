@@ -1,10 +1,10 @@
 {% match int %}
     {% when IntType::Int8 %} i8
-    {% when IntType::Int16 %} ::fidl_next::i16_le
-    {% when IntType::Int32 %} ::fidl_next::i32_le
-    {% when IntType::Int64 %} ::fidl_next::i64_le
+    {% when IntType::Int16 %} ::fidl_next::WireI16
+    {% when IntType::Int32 %} ::fidl_next::WireI32
+    {% when IntType::Int64 %} ::fidl_next::WireI64
     {% when IntType::Uint8 %} u8
-    {% when IntType::Uint16 %} ::fidl_next::u16_le
-    {% when IntType::Uint32 %} ::fidl_next::u32_le
-    {% when IntType::Uint64 %} ::fidl_next::u64_le
+    {% when IntType::Uint16 %} ::fidl_next::WireU16
+    {% when IntType::Uint32 %} ::fidl_next::WireU32
+    {% when IntType::Uint64 %} ::fidl_next::WireU64
 {% endmatch %}

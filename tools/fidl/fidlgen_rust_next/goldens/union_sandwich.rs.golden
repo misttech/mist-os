@@ -281,11 +281,11 @@ impl ::fidl_next::TakeFrom<WireSandwichUnionSize12Alignment4> for SandwichUnionS
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireSandwichUnionSize12Alignment4 {
-    pub before: ::fidl_next::u32_le,
+    pub before: ::fidl_next::WireU32,
 
     pub union_: crate::WireUnionSize12Alignment4,
 
-    pub after: ::fidl_next::i32_le,
+    pub after: ::fidl_next::WireI32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSandwichUnionSize12Alignment4
@@ -410,9 +410,9 @@ impl ::fidl_next::TakeFrom<WireStructSize16Alignment8> for StructSize16Alignment
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireStructSize16Alignment8 {
-    pub f1: ::fidl_next::u64_le,
+    pub f1: ::fidl_next::WireU64,
 
-    pub f2: ::fidl_next::u64_le,
+    pub f2: ::fidl_next::WireU64,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructSize16Alignment8
@@ -725,11 +725,11 @@ impl ::fidl_next::TakeFrom<WireSandwichUnionSize24Alignment8> for SandwichUnionS
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireSandwichUnionSize24Alignment8 {
-    pub before: ::fidl_next::u32_le,
+    pub before: ::fidl_next::WireU32,
 
     pub union_: crate::WireUnionSize24Alignment8,
 
-    pub after: ::fidl_next::u32_le,
+    pub after: ::fidl_next::WireU32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSandwichUnionSize24Alignment8
@@ -1040,11 +1040,11 @@ impl ::fidl_next::TakeFrom<WireSandwichUnionSize36Alignment4> for SandwichUnionS
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireSandwichUnionSize36Alignment4 {
-    pub before: ::fidl_next::u32_le,
+    pub before: ::fidl_next::WireU32,
 
     pub union_: crate::WireUnionSize36Alignment4,
 
-    pub after: ::fidl_next::u32_le,
+    pub after: ::fidl_next::WireU32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSandwichUnionSize36Alignment4
@@ -1167,7 +1167,7 @@ pub struct WireUnionSize8Alignment4 {
 
 pub mod union_size8_alignment4 {
     pub enum Ref<'union> {
-        Variant(&'union ::fidl_next::u32_le),
+        Variant(&'union ::fidl_next::WireU32),
     }
 }
 
@@ -1186,7 +1186,7 @@ impl WireUnionSize8Alignment4 {
 impl Clone for WireUnionSize8Alignment4 {
     fn clone(&self) -> Self {
         match self.raw.ordinal() {
-            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
+            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireU32>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -1203,7 +1203,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
@@ -1217,7 +1217,7 @@ where
 impl ::core::fmt::Debug for WireUnionSize8Alignment4 {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
-            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u32_le>().fmt(f) },
+            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireU32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -1253,7 +1253,7 @@ impl Clone for WireOptionalUnionSize8Alignment4 {
         }
 
         match self.raw.ordinal() {
-            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
+            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireU32>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -1270,7 +1270,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
@@ -1373,11 +1373,11 @@ impl ::fidl_next::TakeFrom<WireSandwichUnionSize8Alignment4> for SandwichUnionSi
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireSandwichUnionSize8Alignment4 {
-    pub before: ::fidl_next::u32_le,
+    pub before: ::fidl_next::WireU32,
 
     pub union_: crate::WireUnionSize8Alignment4,
 
-    pub after: ::fidl_next::u32_le,
+    pub after: ::fidl_next::WireU32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSandwichUnionSize8Alignment4

@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_next_codec::{u32_le, u64_le, Decode, DecodeError, Encodable, Encode, EncodeError, Slot};
+use fidl_next_codec::{
+    Decode, DecodeError, Encodable, Encode, EncodeError, Slot, WireU32, WireU64,
+};
 
 use zerocopy::IntoBytes;
 
@@ -11,13 +13,13 @@ use zerocopy::IntoBytes;
 #[repr(C)]
 pub struct WireMessageHeader {
     /// The transaction ID of the message header
-    pub txid: u32_le,
+    pub txid: WireU32,
     /// Flags
     pub flags: [u8; 3],
     /// Magic number
     pub magic_number: u8,
     /// The ordinal of the message following this header
-    pub ordinal: u64_le,
+    pub ordinal: WireU64,
 }
 
 /// The flag 0 bit indicating that the wire format is v2.

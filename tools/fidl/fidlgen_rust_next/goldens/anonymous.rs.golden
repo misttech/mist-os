@@ -33,7 +33,7 @@ where
         slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireBitsMember { mut value } = slot);
-        *value = ::fidl_next::u32_le::from(self.bits());
+        *value = ::fidl_next::WireU32::from(self.bits());
         Ok(())
     }
 }
@@ -55,7 +55,7 @@ impl ::fidl_next::TakeFrom<WireBitsMember> for BitsMember {
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct WireBitsMember {
-    value: ::fidl_next::u32_le,
+    value: ::fidl_next::WireU32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireBitsMember
@@ -72,7 +72,7 @@ where
 
 impl ::core::convert::From<BitsMember> for WireBitsMember {
     fn from(natural: BitsMember) -> Self {
-        Self { value: ::fidl_next::u32_le::from(natural.bits()) }
+        Self { value: ::fidl_next::WireU32::from(natural.bits()) }
     }
 }
 
@@ -100,7 +100,7 @@ where
         slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireOp { mut value } = slot);
-        *value = ::fidl_next::u32_le::from(match *self {
+        *value = ::fidl_next::WireU32::from(match *self {
             Self::Add => 1,
 
             Self::Mul => 2,
@@ -139,15 +139,15 @@ impl ::fidl_next::TakeFrom<WireOp> for Op {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct WireOp {
-    value: ::fidl_next::u32_le,
+    value: ::fidl_next::WireU32,
 }
 
 impl WireOp {
-    pub const ADD: WireOp = WireOp { value: ::fidl_next::u32_le::from_native(1) };
+    pub const ADD: WireOp = WireOp { value: ::fidl_next::WireU32(1) };
 
-    pub const MUL: WireOp = WireOp { value: ::fidl_next::u32_le::from_native(2) };
+    pub const MUL: WireOp = WireOp { value: ::fidl_next::WireU32(2) };
 
-    pub const DIV: WireOp = WireOp { value: ::fidl_next::u32_le::from_native(3) };
+    pub const DIV: WireOp = WireOp { value: ::fidl_next::WireU32(3) };
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireOp
@@ -171,7 +171,7 @@ impl ::core::convert::From<Op> for WireOp {
 
             Op::Div => WireOp::DIV,
 
-            Op::UnknownOrdinal_(value) => WireOp { value: ::fidl_next::u32_le::from(value) },
+            Op::UnknownOrdinal_(value) => WireOp { value: ::fidl_next::WireU32::from(value) },
         }
     }
 }
@@ -329,7 +329,7 @@ where
         slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireFlags { mut value } = slot);
-        *value = ::fidl_next::u16_le::from(self.bits());
+        *value = ::fidl_next::WireU16::from(self.bits());
         Ok(())
     }
 }
@@ -351,7 +351,7 @@ impl ::fidl_next::TakeFrom<WireFlags> for Flags {
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct WireFlags {
-    value: ::fidl_next::u16_le,
+    value: ::fidl_next::WireU16,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireFlags
@@ -368,7 +368,7 @@ where
 
 impl ::core::convert::From<Flags> for WireFlags {
     fn from(natural: Flags) -> Self {
-        Self { value: ::fidl_next::u16_le::from(natural.bits()) }
+        Self { value: ::fidl_next::WireU16::from(natural.bits()) }
     }
 }
 
@@ -709,7 +709,7 @@ pub struct WireExpression {
 
 pub mod expression {
     pub enum Ref<'union> {
-        Value(&'union ::fidl_next::u64_le),
+        Value(&'union ::fidl_next::WireU64),
 
         BinOp(&'union crate::WireOverrideTest),
 
@@ -747,7 +747,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::u64_le>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireU64>(raw, decoder)?,
 
             2 => {
                 ::fidl_next::RawWireUnion::decode_as::<___D, crate::WireOverrideTest>(raw, decoder)?
@@ -767,7 +767,7 @@ where
 impl ::core::fmt::Debug for WireExpression {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
-            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u64_le>().fmt(f) },
+            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireU64>().fmt(f) },
             2 => unsafe { self.raw.get().deref_unchecked::<crate::WireOverrideTest>().fmt(f) },
             3 => unsafe {
                 self.raw.get().deref_unchecked::<crate::WireFunctionApplication>().fmt(f)
@@ -812,7 +812,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::u64_le>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireU64>(raw, decoder)?,
 
             2 => {
                 ::fidl_next::RawWireUnion::decode_as::<___D, crate::WireOverrideTest>(raw, decoder)?
@@ -1525,7 +1525,7 @@ where
         slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireSomeProtocolSomeMethodError { mut value } = slot);
-        *value = ::fidl_next::u32_le::from(match *self {
+        *value = ::fidl_next::WireU32::from(match *self {
             Self::ErrorOne => 1,
 
             Self::ErrorTwo => 2,
@@ -1560,15 +1560,15 @@ impl ::fidl_next::TakeFrom<WireSomeProtocolSomeMethodError> for SomeProtocolSome
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct WireSomeProtocolSomeMethodError {
-    value: ::fidl_next::u32_le,
+    value: ::fidl_next::WireU32,
 }
 
 impl WireSomeProtocolSomeMethodError {
     pub const ERROR_ONE: WireSomeProtocolSomeMethodError =
-        WireSomeProtocolSomeMethodError { value: ::fidl_next::u32_le::from_native(1) };
+        WireSomeProtocolSomeMethodError { value: ::fidl_next::WireU32(1) };
 
     pub const ERROR_TWO: WireSomeProtocolSomeMethodError =
-        WireSomeProtocolSomeMethodError { value: ::fidl_next::u32_le::from_native(2) };
+        WireSomeProtocolSomeMethodError { value: ::fidl_next::WireU32(2) };
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSomeProtocolSomeMethodError
@@ -1591,7 +1591,7 @@ impl ::core::convert::From<SomeProtocolSomeMethodError> for WireSomeProtocolSome
             SomeProtocolSomeMethodError::ErrorTwo => WireSomeProtocolSomeMethodError::ERROR_TWO,
 
             SomeProtocolSomeMethodError::UnknownOrdinal_(value) => {
-                WireSomeProtocolSomeMethodError { value: ::fidl_next::u32_le::from(value) }
+                WireSomeProtocolSomeMethodError { value: ::fidl_next::WireU32::from(value) }
             }
         }
     }

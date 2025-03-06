@@ -31,7 +31,7 @@ where
         slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireEmptyBits { mut value } = slot);
-        *value = ::fidl_next::u32_le::from(self.bits());
+        *value = ::fidl_next::WireU32::from(self.bits());
         Ok(())
     }
 }
@@ -53,7 +53,7 @@ impl ::fidl_next::TakeFrom<WireEmptyBits> for EmptyBits {
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct WireEmptyBits {
-    value: ::fidl_next::u32_le,
+    value: ::fidl_next::WireU32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireEmptyBits
@@ -70,7 +70,7 @@ where
 
 impl ::core::convert::From<EmptyBits> for WireEmptyBits {
     fn from(natural: EmptyBits) -> Self {
-        Self { value: ::fidl_next::u32_le::from(natural.bits()) }
+        Self { value: ::fidl_next::WireU32::from(natural.bits()) }
     }
 }
 
@@ -105,7 +105,7 @@ where
         slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireFlexibleBits { mut value } = slot);
-        *value = ::fidl_next::u64_le::from(self.bits());
+        *value = ::fidl_next::WireU64::from(self.bits());
         Ok(())
     }
 }
@@ -127,7 +127,7 @@ impl ::fidl_next::TakeFrom<WireFlexibleBits> for FlexibleBits {
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct WireFlexibleBits {
-    value: ::fidl_next::u64_le,
+    value: ::fidl_next::WireU64,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireFlexibleBits
@@ -144,7 +144,7 @@ where
 
 impl ::core::convert::From<FlexibleBits> for WireFlexibleBits {
     fn from(natural: FlexibleBits) -> Self {
-        Self { value: ::fidl_next::u64_le::from(natural.bits()) }
+        Self { value: ::fidl_next::WireU64::from(natural.bits()) }
     }
 }
 
@@ -180,7 +180,7 @@ where
         slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireMyBits { mut value } = slot);
-        *value = ::fidl_next::u32_le::from(self.bits());
+        *value = ::fidl_next::WireU32::from(self.bits());
         Ok(())
     }
 }
@@ -202,7 +202,7 @@ impl ::fidl_next::TakeFrom<WireMyBits> for MyBits {
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct WireMyBits {
-    value: ::fidl_next::u32_le,
+    value: ::fidl_next::WireU32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireMyBits
@@ -228,7 +228,7 @@ where
 
 impl ::core::convert::From<MyBits> for WireMyBits {
     fn from(natural: MyBits) -> Self {
-        Self { value: ::fidl_next::u32_le::from(natural.bits()) }
+        Self { value: ::fidl_next::WireU32::from(natural.bits()) }
     }
 }
 
@@ -263,7 +263,7 @@ where
         slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireStrictBits { mut value } = slot);
-        *value = ::fidl_next::u64_le::from(self.bits());
+        *value = ::fidl_next::WireU64::from(self.bits());
         Ok(())
     }
 }
@@ -285,7 +285,7 @@ impl ::fidl_next::TakeFrom<WireStrictBits> for StrictBits {
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct WireStrictBits {
-    value: ::fidl_next::u64_le,
+    value: ::fidl_next::WireU64,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStrictBits
@@ -311,7 +311,7 @@ where
 
 impl ::core::convert::From<StrictBits> for WireStrictBits {
     fn from(natural: StrictBits) -> Self {
-        Self { value: ::fidl_next::u64_le::from(natural.bits()) }
+        Self { value: ::fidl_next::WireU64::from(natural.bits()) }
     }
 }
 

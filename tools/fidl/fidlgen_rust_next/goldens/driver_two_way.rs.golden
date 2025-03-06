@@ -95,9 +95,9 @@ impl ::fidl_next::TakeFrom<WireTwoWayAddRequest> for TwoWayAddRequest {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireTwoWayAddRequest {
-    pub addend1: ::fidl_next::u16_le,
+    pub addend1: ::fidl_next::WireU16,
 
-    pub addend2: ::fidl_next::u16_le,
+    pub addend2: ::fidl_next::WireU16,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireTwoWayAddRequest
@@ -206,7 +206,7 @@ impl ::fidl_next::TakeFrom<WireTwoWayAddResponse> for TwoWayAddResponse {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireTwoWayAddResponse {
-    pub sum: ::fidl_next::u16_le,
+    pub sum: ::fidl_next::WireU16,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireTwoWayAddResponse

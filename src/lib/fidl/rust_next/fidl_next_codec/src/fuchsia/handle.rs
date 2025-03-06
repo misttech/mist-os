@@ -11,14 +11,14 @@ use zx::{Handle, HandleBased as _};
 
 use crate::fuchsia::{HandleDecoder, HandleEncoder};
 use crate::{
-    munge, u32_le, Decode, DecodeError, Encodable, EncodableOption, Encode, EncodeError,
-    EncodeOption, Slot, TakeFrom,
+    munge, Decode, DecodeError, Encodable, EncodableOption, Encode, EncodeError, EncodeOption,
+    Slot, TakeFrom, WireU32,
 };
 
 /// A Zircon handle.
 #[repr(C, align(4))]
 pub union WireHandle {
-    encoded: u32_le,
+    encoded: WireU32,
     decoded: ManuallyDrop<Cell<zx_handle_t>>,
 }
 
@@ -32,7 +32,7 @@ impl WireHandle {
     /// Encodes a handle as present in a slot.
     pub fn set_encoded_present(slot: Slot<'_, Self>) {
         munge!(let Self { mut encoded } = slot);
-        *encoded = u32_le::from_native(u32::MAX);
+        *encoded = WireU32(u32::MAX);
     }
 
     /// Returns whether the underlying `zx_handle_t` is invalid.
@@ -63,7 +63,7 @@ unsafe impl<D: HandleDecoder + ?Sized> Decode<D> for WireHandle {
     fn decode(mut slot: Slot<'_, Self>, decoder: &mut D) -> Result<(), DecodeError> {
         munge!(let Self { encoded } = slot.as_mut());
 
-        match encoded.to_native() {
+        match **encoded {
             0 => (),
             u32::MAX => {
                 let handle = decoder.take_handle()?;
@@ -102,7 +102,7 @@ impl WireOptionalHandle {
     /// Encodes a handle as absent in a slot.
     pub fn set_encoded_absent(slot: Slot<'_, Self>) {
         munge!(let Self { handle: WireHandle { mut encoded } } = slot);
-        *encoded = u32_le::from_native(ZX_HANDLE_INVALID);
+        *encoded = WireU32(ZX_HANDLE_INVALID);
     }
 
     /// Returns whether a handle is present.

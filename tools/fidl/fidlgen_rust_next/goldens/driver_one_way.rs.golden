@@ -84,7 +84,7 @@ impl ::fidl_next::TakeFrom<WirePayload> for Payload {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePayload {
-    pub value: ::fidl_next::u32_le,
+    pub value: ::fidl_next::WireU32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePayload

@@ -113,13 +113,13 @@ impl ::fidl_next::TakeFrom<WireAllInstants> for AllInstants {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireAllInstants {
-    pub monotonic: ::fidl_next::i64_le,
+    pub monotonic: ::fidl_next::WireI64,
 
-    pub boot: ::fidl_next::i64_le,
+    pub boot: ::fidl_next::WireI64,
 
-    pub monotonic_ticks: ::fidl_next::i64_le,
+    pub monotonic_ticks: ::fidl_next::WireI64,
 
-    pub boot_ticks: ::fidl_next::i64_le,
+    pub boot_ticks: ::fidl_next::WireI64,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireAllInstants
@@ -305,7 +305,7 @@ where
                 0 => unsafe { ::core::hint::unreachable_unchecked() },
 
                 1 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, [::fidl_next::i64_le; 10]>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, [::fidl_next::WireI64; 10]>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -316,14 +316,14 @@ where
                 2 => {
                     ::fidl_next::WireEnvelope::decode_as::<
                         ___D,
-                        ::fidl_next::WireVector<::fidl_next::i64_le>,
+                        ::fidl_next::WireVector<::fidl_next::WireI64>,
                     >(slot.as_mut(), decoder)?;
 
                     Ok(())
                 }
 
                 3 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, [::fidl_next::i64_le; 10]>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, [::fidl_next::WireI64; 10]>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -332,7 +332,7 @@ where
                 }
 
                 4 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, [::fidl_next::i64_le; 10]>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, [::fidl_next::WireI64; 10]>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -347,19 +347,19 @@ where
 }
 
 impl WireComplexInstants {
-    pub fn monotonic(&self) -> Option<&[::fidl_next::i64_le; 10]> {
+    pub fn monotonic(&self) -> Option<&[::fidl_next::WireI64; 10]> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
 
-    pub fn boot(&self) -> Option<&::fidl_next::WireVector<::fidl_next::i64_le>> {
+    pub fn boot(&self) -> Option<&::fidl_next::WireVector<::fidl_next::WireI64>> {
         unsafe { Some(self.table.get(2)?.deref_unchecked()) }
     }
 
-    pub fn monotonic_ticks(&self) -> Option<&[::fidl_next::i64_le; 10]> {
+    pub fn monotonic_ticks(&self) -> Option<&[::fidl_next::WireI64; 10]> {
         unsafe { Some(self.table.get(3)?.deref_unchecked()) }
     }
 
-    pub fn boot_ticks(&self) -> Option<&[::fidl_next::i64_le; 10]> {
+    pub fn boot_ticks(&self) -> Option<&[::fidl_next::WireI64; 10]> {
         unsafe { Some(self.table.get(4)?.deref_unchecked()) }
     }
 }

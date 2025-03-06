@@ -5,17 +5,17 @@
 pub type AliasOfArray = [u64; 1];
 
 /// The wire type corresponding to [`AliasOfArray`].
-pub type WireAliasOfArray = [::fidl_next::u64_le; 1];
+pub type WireAliasOfArray = [::fidl_next::WireU64; 1];
 
 pub type U64 = u64;
 
 /// The wire type corresponding to [`U64`].
-pub type WireU64 = ::fidl_next::u64_le;
+pub type WireU64 = ::fidl_next::WireU64;
 
 pub type AliasOfArrayContainingAliasOfArray = [u64; 2];
 
 /// The wire type corresponding to [`AliasOfArrayContainingAliasOfArray`].
-pub type WireAliasOfArrayContainingAliasOfArray = [::fidl_next::u64_le; 2];
+pub type WireAliasOfArrayContainingAliasOfArray = [::fidl_next::WireU64; 2];
 
 pub type AliasOfBytes = Vec<u8>;
 
@@ -37,7 +37,7 @@ pub type WireAliasOfString = ::fidl_next::WireString;
 pub type AliasOfVectorContainingAliasOfVector = Vec<u64>;
 
 /// The wire type corresponding to [`AliasOfVectorContainingAliasOfVector`].
-pub type WireAliasOfVectorContainingAliasOfVector = ::fidl_next::WireVector<::fidl_next::u64_le>;
+pub type WireAliasOfVectorContainingAliasOfVector = ::fidl_next::WireVector<::fidl_next::WireU64>;
 
 /// The type corresponding to the MyProtocol protocol.
 #[derive(Debug)]
@@ -134,7 +134,7 @@ where
 pub type Vector = Option<Vec<u64>>;
 
 /// The wire type corresponding to [`Vector`].
-pub type WireVector = ::fidl_next::WireOptionalVector<::fidl_next::u64_le>;
+pub type WireVector = ::fidl_next::WireOptionalVector<::fidl_next::WireU64>;
 
 #[derive(Debug)]
 pub struct Testing {
@@ -402,31 +402,31 @@ impl ::fidl_next::TakeFrom<WireTesting> for Testing {
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireTesting {
-    pub u1: ::fidl_next::u64_le,
+    pub u1: ::fidl_next::WireU64,
 
-    pub u2: ::fidl_next::WireVector<::fidl_next::u64_le>,
+    pub u2: ::fidl_next::WireVector<::fidl_next::WireU64>,
 
-    pub u3: [::fidl_next::u64_le; 1],
+    pub u3: [::fidl_next::WireU64; 1],
 
-    pub u4: ::fidl_next::WireVector<::fidl_next::WireVector<::fidl_next::u64_le>>,
+    pub u4: ::fidl_next::WireVector<::fidl_next::WireVector<::fidl_next::WireU64>>,
 
-    pub u5: ::fidl_next::WireVector<[::fidl_next::u64_le; 1]>,
+    pub u5: ::fidl_next::WireVector<[::fidl_next::WireU64; 1]>,
 
-    pub u6: [::fidl_next::WireVector<::fidl_next::u64_le>; 4],
+    pub u6: [::fidl_next::WireVector<::fidl_next::WireU64>; 4],
 
-    pub u7: [[::fidl_next::u64_le; 1]; 4],
+    pub u7: [[::fidl_next::WireU64; 1]; 4],
 
-    pub v1: ::fidl_next::WireOptionalVector<::fidl_next::u64_le>,
+    pub v1: ::fidl_next::WireOptionalVector<::fidl_next::WireU64>,
 
-    pub v2: ::fidl_next::WireVector<::fidl_next::WireOptionalVector<::fidl_next::u64_le>>,
+    pub v2: ::fidl_next::WireVector<::fidl_next::WireOptionalVector<::fidl_next::WireU64>>,
 
-    pub v3: [::fidl_next::WireOptionalVector<::fidl_next::u64_le>; 4],
+    pub v3: [::fidl_next::WireOptionalVector<::fidl_next::WireU64>; 4],
 
-    pub a1: [::fidl_next::u64_le; 1],
+    pub a1: [::fidl_next::WireU64; 1],
 
-    pub a2: ::fidl_next::WireVector<[::fidl_next::u64_le; 1]>,
+    pub a2: ::fidl_next::WireVector<[::fidl_next::WireU64; 1]>,
 
-    pub a3: [[::fidl_next::u64_le; 1]; 4],
+    pub a3: [[::fidl_next::WireU64; 1]; 4],
 
     pub r1: ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireOptionalHandle, crate::MyProtocol>,
 
@@ -449,17 +449,17 @@ pub struct WireTesting {
 
     pub s3: [::fidl_next::WireString; 4],
 
-    pub vv1: ::fidl_next::WireVector<::fidl_next::u64_le>,
+    pub vv1: ::fidl_next::WireVector<::fidl_next::WireU64>,
 
-    pub vv2: ::fidl_next::WireVector<::fidl_next::WireVector<::fidl_next::u64_le>>,
+    pub vv2: ::fidl_next::WireVector<::fidl_next::WireVector<::fidl_next::WireU64>>,
 
-    pub vv3: [::fidl_next::WireVector<::fidl_next::u64_le>; 3],
+    pub vv3: [::fidl_next::WireVector<::fidl_next::WireU64>; 3],
 
-    pub aa1: [::fidl_next::u64_le; 2],
+    pub aa1: [::fidl_next::WireU64; 2],
 
-    pub aa2: ::fidl_next::WireVector<[::fidl_next::u64_le; 2]>,
+    pub aa2: ::fidl_next::WireVector<[::fidl_next::WireU64; 2]>,
 
-    pub aa3: [[::fidl_next::u64_le; 2]; 3],
+    pub aa3: [[::fidl_next::WireU64; 2]; 3],
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireTesting

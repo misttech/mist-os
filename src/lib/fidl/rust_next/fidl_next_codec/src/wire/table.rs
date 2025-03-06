@@ -5,13 +5,13 @@
 use munge::munge;
 
 use crate::{
-    u64_le, DecodeError, Decoder, DecoderExt as _, Owned, Slot, WireEnvelope, WirePointer,
+    DecodeError, Decoder, DecoderExt as _, Owned, Slot, WireEnvelope, WirePointer, WireU64,
 };
 
 /// A FIDL table
 #[repr(C)]
 pub struct WireTable {
-    len: u64_le,
+    len: WireU64,
     ptr: WirePointer<WireEnvelope>,
 }
 
@@ -20,7 +20,7 @@ impl WireTable {
     #[inline]
     pub fn encode_len(slot: Slot<'_, Self>, len: usize) {
         munge!(let Self { len: mut table_len, ptr } = slot);
-        *table_len = u64_le::from_native(len.try_into().unwrap());
+        **table_len = len.try_into().unwrap();
         WirePointer::encode_present(ptr);
     }
 
@@ -35,12 +35,11 @@ impl WireTable {
     ) -> Result<(), DecodeError> {
         munge!(let Self { len, mut ptr } = slot);
 
-        let len = len.to_native();
         if WirePointer::is_encoded_present(ptr.as_mut())? {
-            let mut envelopes = decoder.take_slice_slot::<WireEnvelope>(len as usize)?;
+            let mut envelopes = decoder.take_slice_slot::<WireEnvelope>(**len as usize)?;
             let envelopes_ptr = envelopes.as_mut_ptr().cast::<WireEnvelope>();
 
-            for i in 0..len as usize {
+            for i in 0..**len as usize {
                 let mut envelope = envelopes.index(i);
                 if !WireEnvelope::is_encoded_zero(envelope.as_mut()) {
                     f((i + 1) as i64, envelope, decoder)?;
@@ -49,8 +48,8 @@ impl WireTable {
 
             let envelopes = unsafe { Owned::new_unchecked(envelopes_ptr) };
             WirePointer::set_decoded(ptr, envelopes.into_raw());
-        } else if len != 0 {
-            return Err(DecodeError::InvalidOptionalSize(len));
+        } else if **len != 0 {
+            return Err(DecodeError::InvalidOptionalSize(**len));
         }
 
         Ok(())
@@ -59,7 +58,7 @@ impl WireTable {
     /// Returns a reference to the envelope for the given ordinal, if any.
     #[inline]
     pub fn get(&self, ordinal: usize) -> Option<&WireEnvelope> {
-        if ordinal == 0 || ordinal > self.len.to_native() as usize {
+        if ordinal == 0 || ordinal > *self.len as usize {
             return None;
         }
 

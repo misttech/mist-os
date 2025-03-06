@@ -113,7 +113,7 @@ pub mod flexible_foo {
     pub enum Ref<'union> {
         S(&'union ::fidl_next::WireString),
 
-        I(&'union ::fidl_next::i32_le),
+        I(&'union ::fidl_next::WireI32),
 
         UnknownOrdinal_(u64),
     }
@@ -147,7 +147,7 @@ where
                 ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
             }
 
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI32>(raw, decoder)?,
 
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
         }
@@ -160,7 +160,7 @@ impl ::core::fmt::Debug for WireFlexibleFoo {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
             1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireString>().fmt(f) },
-            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i32_le>().fmt(f) },
+            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -205,7 +205,7 @@ where
                 ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
             }
 
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI32>(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -326,7 +326,7 @@ pub mod strict_foo {
     pub enum Ref<'union> {
         S(&'union ::fidl_next::WireString),
 
-        I(&'union ::fidl_next::i32_le),
+        I(&'union ::fidl_next::WireI32),
     }
 }
 
@@ -358,7 +358,7 @@ where
                 ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
             }
 
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI32>(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
@@ -371,7 +371,7 @@ impl ::core::fmt::Debug for WireStrictFoo {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
             1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireString>().fmt(f) },
-            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i32_le>().fmt(f) },
+            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -416,7 +416,7 @@ where
                 ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
             }
 
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI32>(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,

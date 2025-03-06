@@ -307,7 +307,7 @@ where
                 0 => unsafe { ::core::hint::unreachable_unchecked() },
 
                 1 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -316,7 +316,7 @@ where
                 }
 
                 5 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -325,7 +325,7 @@ where
                 }
 
                 6 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -340,15 +340,15 @@ where
 }
 
 impl WireNewerSimpleTable {
-    pub fn x(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn x(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
 
-    pub fn y(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn y(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(5)?.deref_unchecked()) }
     }
 
-    pub fn z(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn z(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(6)?.deref_unchecked()) }
     }
 }
@@ -454,7 +454,7 @@ where
                 0 => unsafe { ::core::hint::unreachable_unchecked() },
 
                 1 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -469,7 +469,7 @@ where
 }
 
 impl WireOlderSimpleTable {
-    pub fn x(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn x(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
 }
@@ -613,7 +613,7 @@ where
                 0 => unsafe { ::core::hint::unreachable_unchecked() },
 
                 1 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -622,7 +622,7 @@ where
                 }
 
                 2 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -631,7 +631,7 @@ where
                 }
 
                 3 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -646,15 +646,15 @@ where
 }
 
 impl WireReverseOrdinalTable {
-    pub fn z(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn z(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
 
-    pub fn y(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn y(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(2)?.deref_unchecked()) }
     }
 
-    pub fn x(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn x(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(3)?.deref_unchecked()) }
     }
 }
@@ -782,7 +782,7 @@ where
                 0 => unsafe { ::core::hint::unreachable_unchecked() },
 
                 1 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -791,7 +791,7 @@ where
                 }
 
                 5 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -806,11 +806,11 @@ where
 }
 
 impl WireSimpleTable {
-    pub fn x(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn x(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
 
-    pub fn y(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn y(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(5)?.deref_unchecked()) }
     }
 }
@@ -2174,7 +2174,7 @@ where
                 0 => unsafe { ::core::hint::unreachable_unchecked() },
 
                 1 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2183,7 +2183,7 @@ where
                 }
 
                 2 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2192,7 +2192,7 @@ where
                 }
 
                 3 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2201,7 +2201,7 @@ where
                 }
 
                 4 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2210,7 +2210,7 @@ where
                 }
 
                 5 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2219,7 +2219,7 @@ where
                 }
 
                 6 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2228,7 +2228,7 @@ where
                 }
 
                 7 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2237,7 +2237,7 @@ where
                 }
 
                 8 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2246,7 +2246,7 @@ where
                 }
 
                 9 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2255,7 +2255,7 @@ where
                 }
 
                 10 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2264,7 +2264,7 @@ where
                 }
 
                 11 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2273,7 +2273,7 @@ where
                 }
 
                 12 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2282,7 +2282,7 @@ where
                 }
 
                 13 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2291,7 +2291,7 @@ where
                 }
 
                 14 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2300,7 +2300,7 @@ where
                 }
 
                 15 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2309,7 +2309,7 @@ where
                 }
 
                 16 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2318,7 +2318,7 @@ where
                 }
 
                 17 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2327,7 +2327,7 @@ where
                 }
 
                 18 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2336,7 +2336,7 @@ where
                 }
 
                 19 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2345,7 +2345,7 @@ where
                 }
 
                 20 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2354,7 +2354,7 @@ where
                 }
 
                 21 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2363,7 +2363,7 @@ where
                 }
 
                 22 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2372,7 +2372,7 @@ where
                 }
 
                 23 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2381,7 +2381,7 @@ where
                 }
 
                 24 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2390,7 +2390,7 @@ where
                 }
 
                 25 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2399,7 +2399,7 @@ where
                 }
 
                 26 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2408,7 +2408,7 @@ where
                 }
 
                 27 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2417,7 +2417,7 @@ where
                 }
 
                 28 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2426,7 +2426,7 @@ where
                 }
 
                 29 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2435,7 +2435,7 @@ where
                 }
 
                 30 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2444,7 +2444,7 @@ where
                 }
 
                 31 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2453,7 +2453,7 @@ where
                 }
 
                 32 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2462,7 +2462,7 @@ where
                 }
 
                 33 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2471,7 +2471,7 @@ where
                 }
 
                 34 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2480,7 +2480,7 @@ where
                 }
 
                 35 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2489,7 +2489,7 @@ where
                 }
 
                 36 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2498,7 +2498,7 @@ where
                 }
 
                 37 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2507,7 +2507,7 @@ where
                 }
 
                 38 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2516,7 +2516,7 @@ where
                 }
 
                 39 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2525,7 +2525,7 @@ where
                 }
 
                 40 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2534,7 +2534,7 @@ where
                 }
 
                 41 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2543,7 +2543,7 @@ where
                 }
 
                 42 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2552,7 +2552,7 @@ where
                 }
 
                 43 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2561,7 +2561,7 @@ where
                 }
 
                 44 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2570,7 +2570,7 @@ where
                 }
 
                 45 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2579,7 +2579,7 @@ where
                 }
 
                 46 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2588,7 +2588,7 @@ where
                 }
 
                 47 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2597,7 +2597,7 @@ where
                 }
 
                 48 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2606,7 +2606,7 @@ where
                 }
 
                 49 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2615,7 +2615,7 @@ where
                 }
 
                 50 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2624,7 +2624,7 @@ where
                 }
 
                 51 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2633,7 +2633,7 @@ where
                 }
 
                 52 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2642,7 +2642,7 @@ where
                 }
 
                 53 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2651,7 +2651,7 @@ where
                 }
 
                 54 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2660,7 +2660,7 @@ where
                 }
 
                 55 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2669,7 +2669,7 @@ where
                 }
 
                 56 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2678,7 +2678,7 @@ where
                 }
 
                 57 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2687,7 +2687,7 @@ where
                 }
 
                 58 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2696,7 +2696,7 @@ where
                 }
 
                 59 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2705,7 +2705,7 @@ where
                 }
 
                 60 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2714,7 +2714,7 @@ where
                 }
 
                 61 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2723,7 +2723,7 @@ where
                 }
 
                 62 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2732,7 +2732,7 @@ where
                 }
 
                 63 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -2756,255 +2756,255 @@ where
 }
 
 impl WireSixtyFourOrdinalTable {
-    pub fn v1(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v1(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
 
-    pub fn v2(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v2(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(2)?.deref_unchecked()) }
     }
 
-    pub fn v3(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v3(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(3)?.deref_unchecked()) }
     }
 
-    pub fn v4(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v4(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(4)?.deref_unchecked()) }
     }
 
-    pub fn v5(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v5(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(5)?.deref_unchecked()) }
     }
 
-    pub fn v6(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v6(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(6)?.deref_unchecked()) }
     }
 
-    pub fn v7(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v7(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(7)?.deref_unchecked()) }
     }
 
-    pub fn v8(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v8(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(8)?.deref_unchecked()) }
     }
 
-    pub fn v9(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v9(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(9)?.deref_unchecked()) }
     }
 
-    pub fn v10(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v10(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(10)?.deref_unchecked()) }
     }
 
-    pub fn v11(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v11(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(11)?.deref_unchecked()) }
     }
 
-    pub fn v12(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v12(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(12)?.deref_unchecked()) }
     }
 
-    pub fn v13(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v13(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(13)?.deref_unchecked()) }
     }
 
-    pub fn v14(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v14(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(14)?.deref_unchecked()) }
     }
 
-    pub fn v15(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v15(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(15)?.deref_unchecked()) }
     }
 
-    pub fn v16(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v16(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(16)?.deref_unchecked()) }
     }
 
-    pub fn v17(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v17(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(17)?.deref_unchecked()) }
     }
 
-    pub fn v18(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v18(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(18)?.deref_unchecked()) }
     }
 
-    pub fn v19(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v19(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(19)?.deref_unchecked()) }
     }
 
-    pub fn v20(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v20(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(20)?.deref_unchecked()) }
     }
 
-    pub fn v21(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v21(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(21)?.deref_unchecked()) }
     }
 
-    pub fn v22(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v22(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(22)?.deref_unchecked()) }
     }
 
-    pub fn v23(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v23(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(23)?.deref_unchecked()) }
     }
 
-    pub fn v24(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v24(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(24)?.deref_unchecked()) }
     }
 
-    pub fn v25(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v25(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(25)?.deref_unchecked()) }
     }
 
-    pub fn v26(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v26(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(26)?.deref_unchecked()) }
     }
 
-    pub fn v27(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v27(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(27)?.deref_unchecked()) }
     }
 
-    pub fn v28(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v28(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(28)?.deref_unchecked()) }
     }
 
-    pub fn v29(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v29(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(29)?.deref_unchecked()) }
     }
 
-    pub fn v30(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v30(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(30)?.deref_unchecked()) }
     }
 
-    pub fn v31(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v31(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(31)?.deref_unchecked()) }
     }
 
-    pub fn v32(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v32(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(32)?.deref_unchecked()) }
     }
 
-    pub fn v33(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v33(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(33)?.deref_unchecked()) }
     }
 
-    pub fn v34(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v34(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(34)?.deref_unchecked()) }
     }
 
-    pub fn v35(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v35(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(35)?.deref_unchecked()) }
     }
 
-    pub fn v36(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v36(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(36)?.deref_unchecked()) }
     }
 
-    pub fn v37(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v37(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(37)?.deref_unchecked()) }
     }
 
-    pub fn v38(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v38(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(38)?.deref_unchecked()) }
     }
 
-    pub fn v39(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v39(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(39)?.deref_unchecked()) }
     }
 
-    pub fn v40(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v40(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(40)?.deref_unchecked()) }
     }
 
-    pub fn v41(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v41(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(41)?.deref_unchecked()) }
     }
 
-    pub fn v42(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v42(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(42)?.deref_unchecked()) }
     }
 
-    pub fn v43(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v43(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(43)?.deref_unchecked()) }
     }
 
-    pub fn v44(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v44(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(44)?.deref_unchecked()) }
     }
 
-    pub fn v45(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v45(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(45)?.deref_unchecked()) }
     }
 
-    pub fn v46(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v46(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(46)?.deref_unchecked()) }
     }
 
-    pub fn v47(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v47(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(47)?.deref_unchecked()) }
     }
 
-    pub fn v48(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v48(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(48)?.deref_unchecked()) }
     }
 
-    pub fn v49(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v49(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(49)?.deref_unchecked()) }
     }
 
-    pub fn v50(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v50(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(50)?.deref_unchecked()) }
     }
 
-    pub fn v51(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v51(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(51)?.deref_unchecked()) }
     }
 
-    pub fn v52(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v52(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(52)?.deref_unchecked()) }
     }
 
-    pub fn v53(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v53(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(53)?.deref_unchecked()) }
     }
 
-    pub fn v54(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v54(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(54)?.deref_unchecked()) }
     }
 
-    pub fn v55(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v55(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(55)?.deref_unchecked()) }
     }
 
-    pub fn v56(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v56(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(56)?.deref_unchecked()) }
     }
 
-    pub fn v57(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v57(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(57)?.deref_unchecked()) }
     }
 
-    pub fn v58(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v58(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(58)?.deref_unchecked()) }
     }
 
-    pub fn v59(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v59(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(59)?.deref_unchecked()) }
     }
 
-    pub fn v60(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v60(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(60)?.deref_unchecked()) }
     }
 
-    pub fn v61(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v61(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(61)?.deref_unchecked()) }
     }
 
-    pub fn v62(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v62(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(62)?.deref_unchecked()) }
     }
 
-    pub fn v63(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn v63(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(63)?.deref_unchecked()) }
     }
 
@@ -3175,7 +3175,7 @@ where
                 0 => unsafe { ::core::hint::unreachable_unchecked() },
 
                 1 => {
-                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::i64_le>(
+                    ::fidl_next::WireEnvelope::decode_as::<___D, ::fidl_next::WireI64>(
                         slot.as_mut(),
                         decoder,
                     )?;
@@ -3190,7 +3190,7 @@ where
 }
 
 impl WireTableWithAttributes {
-    pub fn x(&self) -> Option<&::fidl_next::i64_le> {
+    pub fn x(&self) -> Option<&::fidl_next::WireI64> {
         unsafe { Some(self.table.get(1)?.deref_unchecked()) }
     }
 }

@@ -10,16 +10,16 @@ use munge::munge;
 use crate::decoder::InternalHandleDecoder;
 use crate::encoder::InternalHandleEncoder;
 use crate::{
-    u16_le, u32_le, Decode, DecodeError, Decoder, DecoderExt as _, Encode, EncodeError, Encoder,
-    EncoderExt as _, Slot, CHUNK_SIZE,
+    Decode, DecodeError, Decoder, DecoderExt as _, Encode, EncodeError, Encoder, EncoderExt as _,
+    Slot, WireU16, WireU32, CHUNK_SIZE,
 };
 
 #[derive(Clone, Copy)]
 #[repr(C)]
 struct Encoded {
-    maybe_num_bytes: u32_le,
-    num_handles: u16_le,
-    flags: u16_le,
+    maybe_num_bytes: WireU32,
+    num_handles: WireU16,
+    flags: WireU16,
 }
 
 /// A FIDL envelope
@@ -67,11 +67,9 @@ impl WireEnvelope {
         let slot = unsafe { Slot::new_unchecked(maybe_num_bytes.as_mut_ptr().cast()) };
         value.encode(encoder, slot)?;
 
-        *flags = u16_le::from_native(Self::IS_INLINE_BIT);
+        **flags = Self::IS_INLINE_BIT;
 
-        *num_handles = u16_le::from_native(
-            (encoder.__internal_handle_count() - handles_before).try_into().unwrap(),
-        );
+        **num_handles = (encoder.__internal_handle_count() - handles_before).try_into().unwrap();
 
         Ok(())
     }
@@ -99,19 +97,16 @@ impl WireEnvelope {
             let slot = unsafe { Slot::new_unchecked(maybe_num_bytes.as_mut_ptr().cast()) };
             value.encode(encoder, slot)?;
 
-            *flags = u16_le::from_native(Self::IS_INLINE_BIT);
+            **flags = Self::IS_INLINE_BIT;
         } else {
             let bytes_before = encoder.bytes_written();
 
             encoder.encode_next(value)?;
 
-            *maybe_num_bytes =
-                u32_le::from_native((encoder.bytes_written() - bytes_before).try_into().unwrap());
+            **maybe_num_bytes = (encoder.bytes_written() - bytes_before).try_into().unwrap();
         }
 
-        *num_handles = u16_le::from_native(
-            (encoder.__internal_handle_count() - handles_before).try_into().unwrap(),
-        );
+        **num_handles = (encoder.__internal_handle_count() - handles_before).try_into().unwrap();
 
         Ok(())
     }
@@ -137,11 +132,11 @@ impl WireEnvelope {
 
     #[inline]
     fn out_of_line_chunks(
-        maybe_num_bytes: Slot<'_, u32_le>,
-        flags: Slot<'_, u16_le>,
+        maybe_num_bytes: Slot<'_, WireU32>,
+        flags: Slot<'_, WireU16>,
     ) -> Result<Option<usize>, DecodeError> {
-        if flags.to_native() & Self::IS_INLINE_BIT == 0 {
-            let num_bytes = maybe_num_bytes.to_native();
+        if **flags & Self::IS_INLINE_BIT == 0 {
+            let num_bytes = **maybe_num_bytes;
             if num_bytes as usize % CHUNK_SIZE != 0 {
                 return Err(DecodeError::InvalidEnvelopeSize(num_bytes));
             }
@@ -174,7 +169,7 @@ impl WireEnvelope {
             return Err(DecodeError::ExpectedInline(count * CHUNK_SIZE));
         }
 
-        decoder.__internal_take_handles(num_handles.to_native() as usize)?;
+        decoder.__internal_take_handles(**num_handles as usize)?;
 
         Ok(())
     }
@@ -199,7 +194,7 @@ impl WireEnvelope {
             decoder.take_chunks(count)?;
         }
 
-        decoder.__internal_take_handles(num_handles.to_native() as usize)?;
+        decoder.__internal_take_handles(**num_handles as usize)?;
 
         Ok(())
     }
@@ -221,7 +216,7 @@ impl WireEnvelope {
         }
 
         let handles_before = decoder.__internal_handles_remaining();
-        let num_handles = num_handles.to_native() as usize;
+        let num_handles = **num_handles as usize;
 
         if let Some(count) = Self::out_of_line_chunks(maybe_num_bytes, flags)? {
             return Err(DecodeError::ExpectedInline(count * CHUNK_SIZE));
@@ -263,7 +258,7 @@ impl WireEnvelope {
         }
 
         let handles_before = decoder.__internal_handles_remaining();
-        let num_handles = num_handles.to_native() as usize;
+        let num_handles = **num_handles as usize;
 
         let out_of_line_chunks = Self::out_of_line_chunks(maybe_num_bytes.as_mut(), flags)?;
         if let Some(_count) = out_of_line_chunks {

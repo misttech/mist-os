@@ -185,7 +185,7 @@ impl ::fidl_next::TakeFrom<WireExampleUseOfErrorSyntaxCallWhichMayFailResponse>
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireExampleUseOfErrorSyntaxCallWhichMayFailResponse {
-    pub value: ::fidl_next::i64_le,
+    pub value: ::fidl_next::WireI64,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireExampleUseOfErrorSyntaxCallWhichMayFailResponse
@@ -319,7 +319,7 @@ pub mod example_use_of_error_syntax_call_which_may_fail_result {
     pub enum Ref<'union> {
         Response(&'union crate::WireExampleUseOfErrorSyntaxCallWhichMayFailResponse),
 
-        Err(&'union ::fidl_next::u32_le),
+        Err(&'union ::fidl_next::WireU32),
     }
 }
 
@@ -356,7 +356,7 @@ where
                 crate::WireExampleUseOfErrorSyntaxCallWhichMayFailResponse,
             >(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::u32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireU32>(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
@@ -374,7 +374,7 @@ impl ::core::fmt::Debug for WireExampleUseOfErrorSyntaxCallWhichMayFailResult {
                     .deref_unchecked::<crate::WireExampleUseOfErrorSyntaxCallWhichMayFailResponse>()
                     .fmt(f)
             },
-            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u32_le>().fmt(f) },
+            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireU32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -421,7 +421,7 @@ where
                 crate::WireExampleUseOfErrorSyntaxCallWhichMayFailResponse,
             >(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::u32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireU32>(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,

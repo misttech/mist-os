@@ -193,9 +193,9 @@ impl ::fidl_next::TakeFrom<WireChannelProtocolMethodARequest> for ChannelProtoco
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireChannelProtocolMethodARequest {
-    pub a: ::fidl_next::i64_le,
+    pub a: ::fidl_next::WireI64,
 
-    pub b: ::fidl_next::i64_le,
+    pub b: ::fidl_next::WireI64,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireChannelProtocolMethodARequest
@@ -315,9 +315,9 @@ impl ::fidl_next::TakeFrom<WireChannelProtocolEventARequest> for ChannelProtocol
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireChannelProtocolEventARequest {
-    pub a: ::fidl_next::i64_le,
+    pub a: ::fidl_next::WireI64,
 
-    pub b: ::fidl_next::i64_le,
+    pub b: ::fidl_next::WireI64,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireChannelProtocolEventARequest
@@ -437,9 +437,9 @@ impl ::fidl_next::TakeFrom<WireChannelProtocolMethodBRequest> for ChannelProtoco
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireChannelProtocolMethodBRequest {
-    pub a: ::fidl_next::i64_le,
+    pub a: ::fidl_next::WireI64,
 
-    pub b: ::fidl_next::i64_le,
+    pub b: ::fidl_next::WireI64,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireChannelProtocolMethodBRequest
@@ -548,7 +548,7 @@ impl ::fidl_next::TakeFrom<WireChannelProtocolMethodBResponse> for ChannelProtoc
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireChannelProtocolMethodBResponse {
-    pub result: ::fidl_next::i64_le,
+    pub result: ::fidl_next::WireI64,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireChannelProtocolMethodBResponse
@@ -1449,7 +1449,7 @@ where
         slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireErrorEnum { mut value } = slot);
-        *value = ::fidl_next::u32_le::from(match *self {
+        *value = ::fidl_next::WireU32::from(match *self {
             Self::ErrFoo => 1,
 
             Self::ErrBar => 2,
@@ -1482,13 +1482,13 @@ impl ::fidl_next::TakeFrom<WireErrorEnum> for ErrorEnum {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct WireErrorEnum {
-    value: ::fidl_next::u32_le,
+    value: ::fidl_next::WireU32,
 }
 
 impl WireErrorEnum {
-    pub const ERR_FOO: WireErrorEnum = WireErrorEnum { value: ::fidl_next::u32_le::from_native(1) };
+    pub const ERR_FOO: WireErrorEnum = WireErrorEnum { value: ::fidl_next::WireU32(1) };
 
-    pub const ERR_BAR: WireErrorEnum = WireErrorEnum { value: ::fidl_next::u32_le::from_native(2) };
+    pub const ERR_BAR: WireErrorEnum = WireErrorEnum { value: ::fidl_next::WireU32(2) };
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireErrorEnum
@@ -2780,7 +2780,7 @@ pub struct WireTheUnion {
 
 pub mod the_union {
     pub enum Ref<'union> {
-        V(&'union ::fidl_next::u32_le),
+        V(&'union ::fidl_next::WireU32),
 
         UnknownOrdinal_(u64),
     }
@@ -2799,7 +2799,7 @@ impl WireTheUnion {
 impl Clone for WireTheUnion {
     fn clone(&self) -> Self {
         match self.raw.ordinal() {
-            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
+            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireU32>() } },
 
             _ => Self { raw: unsafe { self.raw.clone_unchecked::<()>() } },
         }
@@ -2816,7 +2816,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
@@ -2830,7 +2830,7 @@ where
 impl ::core::fmt::Debug for WireTheUnion {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
-            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u32_le>().fmt(f) },
+            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireU32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -2866,7 +2866,7 @@ impl Clone for WireOptionalTheUnion {
         }
 
         match self.raw.ordinal() {
-            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
+            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireU32>() } },
 
             _ => Self { raw: unsafe { self.raw.clone_unchecked::<()>() } },
         }
@@ -2883,7 +2883,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
@@ -3668,9 +3668,9 @@ impl ::fidl_next::TakeFrom<WireSyscallProtocolMethodCRequest> for SyscallProtoco
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireSyscallProtocolMethodCRequest {
-    pub a: ::fidl_next::i64_le,
+    pub a: ::fidl_next::WireI64,
 
-    pub b: ::fidl_next::i64_le,
+    pub b: ::fidl_next::WireI64,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSyscallProtocolMethodCRequest
@@ -5093,11 +5093,11 @@ impl ::fidl_next::TakeFrom<WireWithErrorSyntaxResponseAsStructResponse>
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireWithErrorSyntaxResponseAsStructResponse {
-    pub a: ::fidl_next::i64_le,
+    pub a: ::fidl_next::WireI64,
 
-    pub b: ::fidl_next::i64_le,
+    pub b: ::fidl_next::WireI64,
 
-    pub c: ::fidl_next::i64_le,
+    pub c: ::fidl_next::WireI64,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireWithErrorSyntaxResponseAsStructResponse
@@ -5237,7 +5237,7 @@ pub mod with_error_syntax_response_as_struct_result {
     pub enum Ref<'union> {
         Response(&'union crate::WireWithErrorSyntaxResponseAsStructResponse),
 
-        Err(&'union ::fidl_next::u32_le),
+        Err(&'union ::fidl_next::WireU32),
     }
 }
 
@@ -5274,7 +5274,7 @@ where
                 crate::WireWithErrorSyntaxResponseAsStructResponse,
             >(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::u32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireU32>(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
@@ -5292,7 +5292,7 @@ impl ::core::fmt::Debug for WireWithErrorSyntaxResponseAsStructResult {
                     .deref_unchecked::<crate::WireWithErrorSyntaxResponseAsStructResponse>()
                     .fmt(f)
             },
-            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u32_le>().fmt(f) },
+            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireU32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -5338,7 +5338,7 @@ where
                 crate::WireWithErrorSyntaxResponseAsStructResponse,
             >(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::u32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireU32>(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -5554,7 +5554,7 @@ pub mod with_error_syntax_error_as_primitive_result {
     pub enum Ref<'union> {
         Response(&'union crate::WireWithErrorSyntaxErrorAsPrimitiveResponse),
 
-        Err(&'union ::fidl_next::u32_le),
+        Err(&'union ::fidl_next::WireU32),
     }
 }
 
@@ -5583,7 +5583,7 @@ impl Clone for WireWithErrorSyntaxErrorAsPrimitiveResult {
                 },
             },
 
-            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
+            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireU32>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -5605,7 +5605,7 @@ where
                 crate::WireWithErrorSyntaxErrorAsPrimitiveResponse,
             >(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
@@ -5625,7 +5625,7 @@ impl ::core::fmt::Debug for WireWithErrorSyntaxErrorAsPrimitiveResult {
                     .deref_unchecked::<crate::WireWithErrorSyntaxErrorAsPrimitiveResponse>()
                     .fmt(f)
             },
-            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u32_le>().fmt(f) },
+            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireU32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -5669,7 +5669,7 @@ impl Clone for WireOptionalWithErrorSyntaxErrorAsPrimitiveResult {
                 },
             },
 
-            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
+            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireU32>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -5691,7 +5691,7 @@ where
                 crate::WireWithErrorSyntaxErrorAsPrimitiveResponse,
             >(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
@@ -6289,7 +6289,7 @@ pub mod with_error_syntax_handle_in_result_result {
     pub enum Ref<'union> {
         Response(&'union crate::WireWithErrorSyntaxHandleInResultResponse),
 
-        Err(&'union ::fidl_next::u32_le),
+        Err(&'union ::fidl_next::WireU32),
     }
 }
 
@@ -6326,7 +6326,7 @@ where
                 crate::WireWithErrorSyntaxHandleInResultResponse,
             >(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
@@ -6346,7 +6346,7 @@ impl ::core::fmt::Debug for WireWithErrorSyntaxHandleInResultResult {
                     .deref_unchecked::<crate::WireWithErrorSyntaxHandleInResultResponse>()
                     .fmt(f)
             },
-            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u32_le>().fmt(f) },
+            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireU32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -6392,7 +6392,7 @@ where
                 crate::WireWithErrorSyntaxHandleInResultResponse,
             >(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 

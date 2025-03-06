@@ -394,9 +394,9 @@ pub struct WireExplicitFlexibleUnion {
 
 pub mod explicit_flexible_union {
     pub enum Ref<'union> {
-        I(&'union ::fidl_next::i64_le),
+        I(&'union ::fidl_next::WireI64),
 
-        F(&'union ::fidl_next::f32_le),
+        F(&'union ::fidl_next::WireF32),
 
         UnknownOrdinal_(u64),
     }
@@ -430,9 +430,9 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i64_le>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI64>(raw, decoder)?,
 
-            4 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::f32_le>(raw, decoder)?,
+            4 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireF32>(raw, decoder)?,
 
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
         }
@@ -444,8 +444,8 @@ where
 impl ::core::fmt::Debug for WireExplicitFlexibleUnion {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
-            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i64_le>().fmt(f) },
-            4 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::f32_le>().fmt(f) },
+            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI64>().fmt(f) },
+            4 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireF32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -486,9 +486,9 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i64_le>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI64>(raw, decoder)?,
 
-            4 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::f32_le>(raw, decoder)?,
+            4 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireF32>(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -613,7 +613,7 @@ pub struct WireExplicitFoo {
 
 pub mod explicit_foo {
     pub enum Ref<'union> {
-        I(&'union ::fidl_next::i32_le),
+        I(&'union ::fidl_next::WireI32),
 
         S(&'union ::fidl_next::WireString),
 
@@ -645,7 +645,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI32>(raw, decoder)?,
 
             2 => {
                 ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
@@ -661,7 +661,7 @@ where
 impl ::core::fmt::Debug for WireExplicitFoo {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
-            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i32_le>().fmt(f) },
+            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>().fmt(f) },
             2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireString>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -703,7 +703,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI32>(raw, decoder)?,
 
             2 => {
                 ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
@@ -1240,7 +1240,7 @@ pub struct WireExplicitStrictFoo {
 
 pub mod explicit_strict_foo {
     pub enum Ref<'union> {
-        I(&'union ::fidl_next::i32_le),
+        I(&'union ::fidl_next::WireI32),
 
         S(&'union ::fidl_next::WireString),
     }
@@ -1270,7 +1270,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI32>(raw, decoder)?,
 
             3 => {
                 ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
@@ -1286,7 +1286,7 @@ where
 impl ::core::fmt::Debug for WireExplicitStrictFoo {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
-            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i32_le>().fmt(f) },
+            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>().fmt(f) },
             3 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireString>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -1328,7 +1328,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI32>(raw, decoder)?,
 
             3 => {
                 ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
@@ -1451,7 +1451,7 @@ pub struct WireExplicitUnion {
 
 pub mod explicit_union {
     pub enum Ref<'union> {
-        Primitive(&'union ::fidl_next::i32_le),
+        Primitive(&'union ::fidl_next::WireI32),
 
         StringNeedsConstructor(&'union ::fidl_next::WireString),
     }
@@ -1483,7 +1483,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI32>(raw, decoder)?,
 
             3 => {
                 ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
@@ -1499,7 +1499,7 @@ where
 impl ::core::fmt::Debug for WireExplicitUnion {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
-            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i32_le>().fmt(f) },
+            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>().fmt(f) },
             3 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireString>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -1541,7 +1541,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI32>(raw, decoder)?,
 
             3 => {
                 ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
@@ -1652,7 +1652,7 @@ pub struct WireFieldCollision {
 
 pub mod field_collision {
     pub enum Ref<'union> {
-        FieldCollisionTag(&'union ::fidl_next::i32_le),
+        FieldCollisionTag(&'union ::fidl_next::WireI32),
     }
 }
 
@@ -1671,7 +1671,7 @@ impl WireFieldCollision {
 impl Clone for WireFieldCollision {
     fn clone(&self) -> Self {
         match self.raw.ordinal() {
-            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::i32_le>() } },
+            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireI32>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -1688,7 +1688,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::i32_le>(
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireI32>(
                 raw, decoder,
             )?,
 
@@ -1702,7 +1702,7 @@ where
 impl ::core::fmt::Debug for WireFieldCollision {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
-            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i32_le>().fmt(f) },
+            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -1738,7 +1738,7 @@ impl Clone for WireOptionalFieldCollision {
         }
 
         match self.raw.ordinal() {
-            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::i32_le>() } },
+            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireI32>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -1755,7 +1755,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::i32_le>(
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireI32>(
                 raw, decoder,
             )?,
 
@@ -1884,7 +1884,7 @@ pub mod flexible_foo {
     pub enum Ref<'union> {
         S(&'union ::fidl_next::WireString),
 
-        I(&'union ::fidl_next::i32_le),
+        I(&'union ::fidl_next::WireI32),
 
         UnknownOrdinal_(u64),
     }
@@ -1918,7 +1918,7 @@ where
                 ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
             }
 
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI32>(raw, decoder)?,
 
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
         }
@@ -1931,7 +1931,7 @@ impl ::core::fmt::Debug for WireFlexibleFoo {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
             1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireString>().fmt(f) },
-            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i32_le>().fmt(f) },
+            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -1976,7 +1976,7 @@ where
                 ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
             }
 
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI32>(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -2330,7 +2330,7 @@ pub struct WireFlexibleUnion {
 
 pub mod flexible_union {
     pub enum Ref<'union> {
-        Primitive(&'union ::fidl_next::i32_le),
+        Primitive(&'union ::fidl_next::WireI32),
 
         StringNeedsConstructor(&'union ::fidl_next::WireString),
 
@@ -2370,7 +2370,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI32>(raw, decoder)?,
 
             2 => {
                 ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
@@ -2391,7 +2391,7 @@ where
 impl ::core::fmt::Debug for WireFlexibleUnion {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
-            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i32_le>().fmt(f) },
+            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>().fmt(f) },
             2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireString>().fmt(f) },
             3 => unsafe {
                 self.raw
@@ -2439,7 +2439,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI32>(raw, decoder)?,
 
             2 => {
                 ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
@@ -2583,7 +2583,7 @@ pub struct WireNewerSimpleUnion {
 
 pub mod newer_simple_union {
     pub enum Ref<'union> {
-        I(&'union ::fidl_next::i64_le),
+        I(&'union ::fidl_next::WireI64),
 
         S(&'union ::fidl_next::WireString),
 
@@ -2619,7 +2619,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i64_le>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI64>(raw, decoder)?,
 
             2 => {
                 ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
@@ -2640,7 +2640,7 @@ where
 impl ::core::fmt::Debug for WireNewerSimpleUnion {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
-            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i64_le>().fmt(f) },
+            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI64>().fmt(f) },
             2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireString>().fmt(f) },
             3 => unsafe {
                 self.raw
@@ -2688,7 +2688,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i64_le>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI64>(raw, decoder)?,
 
             2 => {
                 ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
@@ -2919,9 +2919,9 @@ pub struct WireOlderSimpleUnion {
 
 pub mod older_simple_union {
     pub enum Ref<'union> {
-        I(&'union ::fidl_next::i64_le),
+        I(&'union ::fidl_next::WireI64),
 
-        F(&'union ::fidl_next::f32_le),
+        F(&'union ::fidl_next::WireF32),
 
         UnknownOrdinal_(u64),
     }
@@ -2951,9 +2951,9 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i64_le>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI64>(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::f32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireF32>(raw, decoder)?,
 
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
         }
@@ -2965,8 +2965,8 @@ where
 impl ::core::fmt::Debug for WireOlderSimpleUnion {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
-            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i64_le>().fmt(f) },
-            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::f32_le>().fmt(f) },
+            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI64>().fmt(f) },
+            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireF32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -3007,9 +3007,9 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i64_le>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI64>(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::f32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireF32>(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -3333,9 +3333,9 @@ pub struct WireReverseOrdinalUnion {
 
 pub mod reverse_ordinal_union {
     pub enum Ref<'union> {
-        First(&'union ::fidl_next::u32_le),
+        First(&'union ::fidl_next::WireU32),
 
-        Second(&'union ::fidl_next::u32_le),
+        Second(&'union ::fidl_next::WireU32),
     }
 }
 
@@ -3358,9 +3358,9 @@ impl WireReverseOrdinalUnion {
 impl Clone for WireReverseOrdinalUnion {
     fn clone(&self) -> Self {
         match self.raw.ordinal() {
-            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
+            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireU32>() } },
 
-            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
+            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireU32>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -3377,11 +3377,11 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
@@ -3395,8 +3395,8 @@ where
 impl ::core::fmt::Debug for WireReverseOrdinalUnion {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
-            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u32_le>().fmt(f) },
-            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::u32_le>().fmt(f) },
+            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireU32>().fmt(f) },
+            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireU32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -3432,9 +3432,9 @@ impl Clone for WireOptionalReverseOrdinalUnion {
         }
 
         match self.raw.ordinal() {
-            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
+            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireU32>() } },
 
-            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::u32_le>() } },
+            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireU32>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -3451,11 +3451,11 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::u32_le>(
+            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireU32>(
                 raw, decoder,
             )?,
 
@@ -3770,7 +3770,7 @@ pub mod strict_foo {
     pub enum Ref<'union> {
         S(&'union ::fidl_next::WireString),
 
-        I(&'union ::fidl_next::i32_le),
+        I(&'union ::fidl_next::WireI32),
     }
 }
 
@@ -3802,7 +3802,7 @@ where
                 ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
             }
 
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI32>(raw, decoder)?,
 
             ord => return Err(::fidl_next::DecodeError::InvalidUnionOrdinal(ord as usize)),
         }
@@ -3815,7 +3815,7 @@ impl ::core::fmt::Debug for WireStrictFoo {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
             1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireString>().fmt(f) },
-            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i32_le>().fmt(f) },
+            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -3860,7 +3860,7 @@ where
                 ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
             }
 
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI32>(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
@@ -4200,9 +4200,9 @@ pub struct WireStrictSimpleUnion {
 
 pub mod strict_simple_union {
     pub enum Ref<'union> {
-        I(&'union ::fidl_next::i32_le),
+        I(&'union ::fidl_next::WireI32),
 
-        F(&'union ::fidl_next::f32_le),
+        F(&'union ::fidl_next::WireF32),
 
         S(&'union ::fidl_next::WireString),
     }
@@ -4234,9 +4234,9 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI32>(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::f32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireF32>(raw, decoder)?,
 
             3 => {
                 ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
@@ -4252,8 +4252,8 @@ where
 impl ::core::fmt::Debug for WireStrictSimpleUnion {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
-            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i32_le>().fmt(f) },
-            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::f32_le>().fmt(f) },
+            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>().fmt(f) },
+            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireF32>().fmt(f) },
             3 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireString>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -4295,9 +4295,9 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI32>(raw, decoder)?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::f32_le>(raw, decoder)?,
+            2 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireF32>(raw, decoder)?,
 
             3 => {
                 ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
@@ -4430,7 +4430,7 @@ pub struct WireStrictUnion {
 
 pub mod strict_union {
     pub enum Ref<'union> {
-        Primitive(&'union ::fidl_next::i32_le),
+        Primitive(&'union ::fidl_next::WireI32),
 
         StringNeedsConstructor(&'union ::fidl_next::WireString),
 
@@ -4468,7 +4468,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI32>(raw, decoder)?,
 
             2 => {
                 ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
@@ -4489,7 +4489,7 @@ where
 impl ::core::fmt::Debug for WireStrictUnion {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
-            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i32_le>().fmt(f) },
+            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>().fmt(f) },
             2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireString>().fmt(f) },
             3 => unsafe {
                 self.raw
@@ -4537,7 +4537,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI32>(raw, decoder)?,
 
             2 => {
                 ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
@@ -5192,7 +5192,7 @@ pub struct WireUnion {
 
 pub mod union_ {
     pub enum Ref<'union> {
-        Primitive(&'union ::fidl_next::i32_le),
+        Primitive(&'union ::fidl_next::WireI32),
 
         StringNeedsConstructor(&'union ::fidl_next::WireString),
 
@@ -5230,7 +5230,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI32>(raw, decoder)?,
 
             2 => {
                 ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
@@ -5251,7 +5251,7 @@ where
 impl ::core::fmt::Debug for WireUnion {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
-            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i32_le>().fmt(f) },
+            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>().fmt(f) },
             2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireString>().fmt(f) },
             3 => unsafe {
                 self.raw
@@ -5299,7 +5299,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i32_le>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI32>(raw, decoder)?,
 
             2 => {
                 ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireString>(raw, decoder)?
@@ -5637,11 +5637,11 @@ impl ::fidl_next::TakeFrom<WireUnionSandwich> for UnionSandwich {
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireUnionSandwich {
-    pub a: ::fidl_next::u32_le,
+    pub a: ::fidl_next::WireU32,
 
     pub u: crate::WireExplicitFlexibleUnion,
 
-    pub b: ::fidl_next::u32_le,
+    pub b: ::fidl_next::WireU32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireUnionSandwich
@@ -5772,7 +5772,7 @@ pub struct WireUnionWithAttributes {
 
 pub mod union_with_attributes {
     pub enum Ref<'union> {
-        X(&'union ::fidl_next::i64_le),
+        X(&'union ::fidl_next::WireI64),
 
         UnknownOrdinal_(u64),
     }
@@ -5800,7 +5800,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i64_le>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI64>(raw, decoder)?,
 
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,
         }
@@ -5812,7 +5812,7 @@ where
 impl ::core::fmt::Debug for WireUnionWithAttributes {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
-            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i64_le>().fmt(f) },
+            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI64>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -5853,7 +5853,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::i64_le>(raw, decoder)?,
+            1 => ::fidl_next::RawWireUnion::decode_as::<___D, ::fidl_next::WireI64>(raw, decoder)?,
 
             0 => ::fidl_next::RawWireUnion::decode_absent(raw)?,
             _ => ::fidl_next::RawWireUnion::decode_unknown(raw, decoder)?,

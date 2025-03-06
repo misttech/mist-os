@@ -6,7 +6,7 @@ use core::fmt;
 use core::hint::unreachable_unchecked;
 
 use fidl_next_codec::{
-    i32_le, munge, Decode, DecodeError, Encodable, Encode, EncodeError, Slot, TakeFrom,
+    munge, Decode, DecodeError, Encodable, Encode, EncodeError, Slot, TakeFrom, WireI32,
 };
 
 /// An internal framework error.
@@ -21,7 +21,7 @@ pub enum FrameworkError {
 #[derive(Clone, Copy)]
 #[repr(transparent)]
 pub struct WireFrameworkError {
-    inner: i32_le,
+    inner: WireI32,
 }
 
 impl fmt::Debug for WireFrameworkError {
@@ -32,7 +32,7 @@ impl fmt::Debug for WireFrameworkError {
 
 impl From<WireFrameworkError> for FrameworkError {
     fn from(value: WireFrameworkError) -> Self {
-        match value.inner.to_native() {
+        match *value.inner {
             -2 => Self::UnknownMethod,
             _ => unsafe { unreachable_unchecked() },
         }
@@ -42,7 +42,7 @@ impl From<WireFrameworkError> for FrameworkError {
 unsafe impl<D: ?Sized> Decode<D> for WireFrameworkError {
     fn decode(slot: Slot<'_, Self>, _: &mut D) -> Result<(), DecodeError> {
         munge!(let Self { inner } = slot);
-        match inner.to_native() {
+        match **inner {
             -2 => Ok(()),
             code => Err(DecodeError::InvalidFrameworkError(code)),
         }
@@ -56,7 +56,7 @@ impl Encodable for FrameworkError {
 impl<E: ?Sized> Encode<E> for FrameworkError {
     fn encode(&mut self, _: &mut E, slot: Slot<'_, Self::Encoded>) -> Result<(), EncodeError> {
         munge!(let WireFrameworkError { mut inner } = slot);
-        inner.write(i32_le::from_native(match self {
+        inner.write(WireI32(match self {
             Self::UnknownMethod => -2,
         }));
 

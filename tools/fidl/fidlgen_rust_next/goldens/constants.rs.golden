@@ -34,7 +34,7 @@ where
         slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireBits { mut value } = slot);
-        *value = ::fidl_next::u32_le::from(self.bits());
+        *value = ::fidl_next::WireU32::from(self.bits());
         Ok(())
     }
 }
@@ -56,7 +56,7 @@ impl ::fidl_next::TakeFrom<WireBits> for Bits {
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct WireBits {
-    value: ::fidl_next::u32_le,
+    value: ::fidl_next::WireU32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireBits
@@ -82,7 +82,7 @@ where
 
 impl ::core::convert::From<Bits> for WireBits {
     fn from(natural: Bits) -> Self {
-        Self { value: ::fidl_next::u32_le::from(natural.bits()) }
+        Self { value: ::fidl_next::WireU32::from(natural.bits()) }
     }
 }
 
@@ -120,7 +120,7 @@ where
         slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireBitsType { mut value } = slot);
-        *value = ::fidl_next::u32_le::from(self.bits());
+        *value = ::fidl_next::WireU32::from(self.bits());
         Ok(())
     }
 }
@@ -142,7 +142,7 @@ impl ::fidl_next::TakeFrom<WireBitsType> for BitsType {
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct WireBitsType {
-    value: ::fidl_next::u32_le,
+    value: ::fidl_next::WireU32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireBitsType
@@ -168,7 +168,7 @@ where
 
 impl ::core::convert::From<BitsType> for WireBitsType {
     fn from(natural: BitsType) -> Self {
-        Self { value: ::fidl_next::u32_le::from(natural.bits()) }
+        Self { value: ::fidl_next::WireU32::from(natural.bits()) }
     }
 }
 
@@ -193,7 +193,7 @@ where
         slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireEnum { mut value } = slot);
-        *value = ::fidl_next::u32_le::from(match *self {
+        *value = ::fidl_next::WireU32::from(match *self {
             Self::E => 170,
         });
 
@@ -222,11 +222,11 @@ impl ::fidl_next::TakeFrom<WireEnum> for Enum {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct WireEnum {
-    value: ::fidl_next::u32_le,
+    value: ::fidl_next::WireU32,
 }
 
 impl WireEnum {
-    pub const E: WireEnum = WireEnum { value: ::fidl_next::u32_le::from_native(170) };
+    pub const E: WireEnum = WireEnum { value: ::fidl_next::WireU32(170) };
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireEnum
@@ -278,7 +278,7 @@ where
         slot: ::fidl_next::Slot<'_, Self::Encoded>,
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge!(let WireEnumType { mut value } = slot);
-        *value = ::fidl_next::i32_le::from(match *self {
+        *value = ::fidl_next::WireI32::from(match *self {
             Self::Value => 3,
 
             Self::SecondValue => 4,
@@ -311,14 +311,13 @@ impl ::fidl_next::TakeFrom<WireEnumType> for EnumType {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct WireEnumType {
-    value: ::fidl_next::i32_le,
+    value: ::fidl_next::WireI32,
 }
 
 impl WireEnumType {
-    pub const VALUE: WireEnumType = WireEnumType { value: ::fidl_next::i32_le::from_native(3) };
+    pub const VALUE: WireEnumType = WireEnumType { value: ::fidl_next::WireI32(3) };
 
-    pub const SECOND_VALUE: WireEnumType =
-        WireEnumType { value: ::fidl_next::i32_le::from_native(4) };
+    pub const SECOND_VALUE: WireEnumType = WireEnumType { value: ::fidl_next::WireI32(4) };
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireEnumType
@@ -465,7 +464,7 @@ impl ::fidl_next::TakeFrom<WireStruct> for Struct {
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireStruct {
-    pub int64_with_default: ::fidl_next::i64_le,
+    pub int64_with_default: ::fidl_next::WireI64,
 
     pub string_with_default: ::fidl_next::WireString,
 

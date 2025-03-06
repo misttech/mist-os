@@ -84,7 +84,7 @@ impl ::fidl_next::TakeFrom<WireInt32Wrapper> for Int32Wrapper {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireInt32Wrapper {
-    pub val: ::fidl_next::i32_le,
+    pub val: ::fidl_next::WireI32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireInt32Wrapper
@@ -201,9 +201,9 @@ impl ::fidl_next::TakeFrom<WireSimpleProtocolAddRequest> for SimpleProtocolAddRe
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireSimpleProtocolAddRequest {
-    pub a: ::fidl_next::i32_le,
+    pub a: ::fidl_next::WireI32,
 
-    pub b: ::fidl_next::i32_le,
+    pub b: ::fidl_next::WireI32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSimpleProtocolAddRequest
@@ -312,7 +312,7 @@ impl ::fidl_next::TakeFrom<WireSimpleProtocolAddResponse> for SimpleProtocolAddR
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireSimpleProtocolAddResponse {
-    pub sum: ::fidl_next::i32_le,
+    pub sum: ::fidl_next::WireI32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireSimpleProtocolAddResponse
@@ -595,9 +595,9 @@ pub struct WireSimpleUnion {
 
 pub mod simple_union {
     pub enum Ref<'union> {
-        A(&'union ::fidl_next::i32_le),
+        A(&'union ::fidl_next::WireI32),
 
-        B(&'union ::fidl_next::f32_le),
+        B(&'union ::fidl_next::WireF32),
     }
 }
 
@@ -616,9 +616,9 @@ impl WireSimpleUnion {
 impl Clone for WireSimpleUnion {
     fn clone(&self) -> Self {
         match self.raw.ordinal() {
-            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::i32_le>() } },
+            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireI32>() } },
 
-            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::f32_le>() } },
+            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireF32>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -635,11 +635,11 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::i32_le>(
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireI32>(
                 raw, decoder,
             )?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::f32_le>(
+            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireF32>(
                 raw, decoder,
             )?,
 
@@ -653,8 +653,8 @@ where
 impl ::core::fmt::Debug for WireSimpleUnion {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         match self.raw.ordinal() {
-            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::i32_le>().fmt(f) },
-            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::f32_le>().fmt(f) },
+            1 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireI32>().fmt(f) },
+            2 => unsafe { self.raw.get().deref_unchecked::<::fidl_next::WireF32>().fmt(f) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -690,9 +690,9 @@ impl Clone for WireOptionalSimpleUnion {
         }
 
         match self.raw.ordinal() {
-            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::i32_le>() } },
+            1 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireI32>() } },
 
-            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::f32_le>() } },
+            2 => Self { raw: unsafe { self.raw.clone_unchecked::<::fidl_next::WireF32>() } },
 
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
@@ -709,11 +709,11 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge!(let Self { mut raw } = slot.as_mut());
         match ::fidl_next::RawWireUnion::encoded_ordinal(raw.as_mut()) {
-            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::i32_le>(
+            1 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireI32>(
                 raw, decoder,
             )?,
 
-            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::f32_le>(
+            2 => ::fidl_next::RawWireUnion::decode_as_static::<___D, ::fidl_next::WireF32>(
                 raw, decoder,
             )?,
 
@@ -1464,7 +1464,7 @@ impl ::fidl_next::TakeFrom<WireStructWithNullableVector> for StructWithNullableV
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireStructWithNullableVector {
-    pub val: ::fidl_next::WireOptionalVector<::fidl_next::i32_le>,
+    pub val: ::fidl_next::WireOptionalVector<::fidl_next::WireI32>,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireStructWithNullableVector

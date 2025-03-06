@@ -8,7 +8,7 @@ use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 use core::slice::from_mut;
 
-use crate::{Chunk, Encode, EncodeError, Slot, CHUNK_SIZE};
+use crate::{Chunk, Encode, EncodeError, Slot, WireU64, CHUNK_SIZE};
 
 /// An encoder for FIDL handles (internal).
 pub trait InternalHandleEncoder {
@@ -76,7 +76,7 @@ impl Encoder for Vec<Chunk> {
 
         // Zero out the last chunk
         unsafe {
-            self.as_mut_ptr().add(self.len() + count - 1).write(rend::u64_le::from_native(0));
+            self.as_mut_ptr().add(self.len() + count - 1).write(WireU64(0));
         }
         let ptr = unsafe { self.as_mut_ptr().add(self.len()).cast::<u8>() };
 

@@ -5,7 +5,9 @@
 use core::mem::MaybeUninit;
 use core::ptr::copy_nonoverlapping;
 
-use crate::{f32_le, f64_le, i16_le, i32_le, i64_le, u16_le, u32_le, u64_le, CopyOptimization};
+use crate::{
+    CopyOptimization, WireF32, WireF64, WireI16, WireI32, WireI64, WireU16, WireU32, WireU64,
+};
 
 /// `From` conversions which may take from a reference using interior mutability.
 pub trait TakeFrom<T: ?Sized> {
@@ -52,17 +54,17 @@ impl_primitives! {
     bool, bool;
 
     i8, i8;
-    i16_le, i16; i16_le, i16_le;
-    i32_le, i32; i32_le, i32_le;
-    i64_le, i64; i64_le, i64_le;
+    WireI16, i16; WireI16, WireI16;
+    WireI32, i32; WireI32, WireI32;
+    WireI64, i64; WireI64, WireI64;
 
     u8, u8;
-    u16_le, u16; u16_le, u16_le;
-    u32_le, u32; u32_le, u32_le;
-    u64_le, u64; u64_le, u64_le;
+    WireU16, u16; WireU16, WireU16;
+    WireU32, u32; WireU32, WireU32;
+    WireU64, u64; WireU64, WireU64;
 
-    f32_le, f32; f32_le, f32_le;
-    f64_le, f64; f64_le, f64_le;
+    WireF32, f32; WireF32, WireF32;
+    WireF64, f64; WireF64, WireF64;
 }
 
 impl<T: TakeFrom<WT>, WT, const N: usize> TakeFrom<[WT; N]> for [T; N] {

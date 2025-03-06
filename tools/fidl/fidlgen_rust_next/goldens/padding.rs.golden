@@ -80,7 +80,7 @@ impl ::fidl_next::TakeFrom<WirePadding1ByteEnd> for Padding1ByteEnd {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding1ByteEnd {
-    pub a: ::fidl_next::u16_le,
+    pub a: ::fidl_next::WireU16,
 
     pub b: u8,
 }
@@ -189,7 +189,7 @@ impl ::fidl_next::TakeFrom<WirePadding1ByteMiddle> for Padding1ByteMiddle {
 pub struct WirePadding1ByteMiddle {
     pub a: u8,
 
-    pub b: ::fidl_next::u16_le,
+    pub b: ::fidl_next::WireU16,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding1ByteMiddle
@@ -303,7 +303,7 @@ impl ::fidl_next::TakeFrom<WirePadding2ByteAlignmentLength6> for Padding2ByteAli
 pub struct WirePadding2ByteAlignmentLength6 {
     pub a: u8,
 
-    pub b: ::fidl_next::u16_le,
+    pub b: ::fidl_next::WireU16,
 
     pub c: u8,
 }
@@ -413,9 +413,9 @@ impl ::fidl_next::TakeFrom<WirePadding2ByteEnd> for Padding2ByteEnd {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding2ByteEnd {
-    pub a: ::fidl_next::u32_le,
+    pub a: ::fidl_next::WireU32,
 
-    pub b: ::fidl_next::u16_le,
+    pub b: ::fidl_next::WireU16,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding2ByteEnd
@@ -520,9 +520,9 @@ impl ::fidl_next::TakeFrom<WirePadding2ByteMiddle> for Padding2ByteMiddle {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding2ByteMiddle {
-    pub a: ::fidl_next::u16_le,
+    pub a: ::fidl_next::WireU16,
 
-    pub b: ::fidl_next::u32_le,
+    pub b: ::fidl_next::WireU32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding2ByteMiddle
@@ -627,7 +627,7 @@ impl ::fidl_next::TakeFrom<WirePadding3ByteEnd> for Padding3ByteEnd {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding3ByteEnd {
-    pub a: ::fidl_next::u32_le,
+    pub a: ::fidl_next::WireU32,
 
     pub b: u8,
 }
@@ -736,7 +736,7 @@ impl ::fidl_next::TakeFrom<WirePadding3ByteMiddle> for Padding3ByteMiddle {
 pub struct WirePadding3ByteMiddle {
     pub a: u8,
 
-    pub b: ::fidl_next::u32_le,
+    pub b: ::fidl_next::WireU32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding3ByteMiddle
@@ -855,13 +855,13 @@ impl ::fidl_next::TakeFrom<WirePadding4ByteAlignmentLength12> for Padding4ByteAl
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding4ByteAlignmentLength12 {
-    pub a: ::fidl_next::u32_le,
+    pub a: ::fidl_next::WireU32,
 
     pub b: u8,
 
-    pub c: ::fidl_next::u16_le,
+    pub c: ::fidl_next::WireU16,
 
-    pub d: ::fidl_next::u16_le,
+    pub d: ::fidl_next::WireU16,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding4ByteAlignmentLength12
@@ -972,9 +972,9 @@ impl ::fidl_next::TakeFrom<WirePadding4ByteEnd> for Padding4ByteEnd {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding4ByteEnd {
-    pub a: ::fidl_next::u64_le,
+    pub a: ::fidl_next::WireU64,
 
-    pub b: ::fidl_next::u32_le,
+    pub b: ::fidl_next::WireU32,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding4ByteEnd
@@ -1079,9 +1079,9 @@ impl ::fidl_next::TakeFrom<WirePadding4ByteMiddle> for Padding4ByteMiddle {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding4ByteMiddle {
-    pub a: ::fidl_next::u32_le,
+    pub a: ::fidl_next::WireU32,
 
-    pub b: ::fidl_next::u64_le,
+    pub b: ::fidl_next::WireU64,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding4ByteMiddle
@@ -1193,9 +1193,9 @@ impl ::fidl_next::TakeFrom<WirePadding5ByteEnd> for Padding5ByteEnd {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding5ByteEnd {
-    pub a: ::fidl_next::u64_le,
+    pub a: ::fidl_next::WireU64,
 
-    pub b: ::fidl_next::u16_le,
+    pub b: ::fidl_next::WireU16,
 
     pub c: u8,
 }
@@ -1312,11 +1312,11 @@ impl ::fidl_next::TakeFrom<WirePadding5ByteMiddle> for Padding5ByteMiddle {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding5ByteMiddle {
-    pub a: ::fidl_next::u16_le,
+    pub a: ::fidl_next::WireU16,
 
     pub b: u8,
 
-    pub c: ::fidl_next::u64_le,
+    pub c: ::fidl_next::WireU64,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding5ByteMiddle
@@ -1424,9 +1424,9 @@ impl ::fidl_next::TakeFrom<WirePadding6ByteEnd> for Padding6ByteEnd {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding6ByteEnd {
-    pub a: ::fidl_next::u64_le,
+    pub a: ::fidl_next::WireU64,
 
-    pub b: ::fidl_next::u16_le,
+    pub b: ::fidl_next::WireU16,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding6ByteEnd
@@ -1531,9 +1531,9 @@ impl ::fidl_next::TakeFrom<WirePadding6ByteMiddle> for Padding6ByteMiddle {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding6ByteMiddle {
-    pub a: ::fidl_next::u16_le,
+    pub a: ::fidl_next::WireU16,
 
-    pub b: ::fidl_next::u64_le,
+    pub b: ::fidl_next::WireU64,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding6ByteMiddle
@@ -1638,7 +1638,7 @@ impl ::fidl_next::TakeFrom<WirePadding7ByteEnd> for Padding7ByteEnd {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding7ByteEnd {
-    pub a: ::fidl_next::u64_le,
+    pub a: ::fidl_next::WireU64,
 
     pub b: u8,
 }
@@ -1747,7 +1747,7 @@ impl ::fidl_next::TakeFrom<WirePadding7ByteMiddle> for Padding7ByteMiddle {
 pub struct WirePadding7ByteMiddle {
     pub a: u8,
 
-    pub b: ::fidl_next::u64_le,
+    pub b: ::fidl_next::WireU64,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WirePadding7ByteMiddle

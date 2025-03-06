@@ -33,13 +33,13 @@ pub mod encoder;
 #[cfg(target_os = "fuchsia")]
 pub mod fuchsia;
 mod owned;
+mod primitives;
 mod slot;
 mod take;
 mod wire;
 
 pub use bitflags::bitflags;
 pub use munge::munge;
-pub use rend::{f32_le, f64_le, i16_le, i32_le, i64_le, u16_le, u32_le, u64_le};
 
 pub use self::chunk::*;
 pub use self::decode::*;
@@ -47,6 +47,7 @@ pub use self::decoder::{Decoder, DecoderExt};
 pub use self::encode::*;
 pub use self::encoder::{Encoder, EncoderExt};
 pub use self::owned::*;
+pub use self::primitives::*;
 pub use self::slot::*;
 pub use self::take::*;
 pub use self::wire::*;
