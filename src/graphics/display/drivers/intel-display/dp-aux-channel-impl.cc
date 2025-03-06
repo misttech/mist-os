@@ -80,7 +80,7 @@ zx::result<DdiAuxChannel::ReplyInfo> DpAuxChannelImpl::DoTransaction(
     if (transaction_result.is_error()) {
       if (transaction_result.error_value() == ZX_ERR_IO_MISSED_DEADLINE) {
         if (++timeouts_seen == kMaxTimeouts) {
-          FDF_LOG(DEBUG, "DP aux: Got too many timeouts (%d)", kMaxTimeouts);
+          fdf::debug("DP aux: Got too many timeouts ({})", kMaxTimeouts);
           return transaction_result;
         }
         // Retry on timeout.
@@ -100,7 +100,7 @@ zx::result<DdiAuxChannel::ReplyInfo> DpAuxChannelImpl::DoTransaction(
     // later extension to the protocol.  But report it, in case this
     // indicates some problem.
     if (padding) {
-      FDF_LOG(INFO, "DP aux: Reply header padding is non-zero (header byte: 0x%x)", header_byte);
+      fdf::info("DP aux: Reply header padding is non-zero (header byte: 0x{:x})", header_byte);
     }
 
     switch (status) {
@@ -108,24 +108,24 @@ zx::result<DdiAuxChannel::ReplyInfo> DpAuxChannelImpl::DoTransaction(
         // The AUX_ACK implies that we got an I2C ACK too.
         return transaction_result;
       case DP_REPLY_AUX_NACK:
-        FDF_LOG(TRACE, "DP aux: Reply was not an ack (got AUX_NACK)");
+        fdf::trace("DP aux: Reply was not an ack (got AUX_NACK)");
         return zx::error_result(ZX_ERR_IO_REFUSED);
       case DP_REPLY_AUX_DEFER:
         if (++defers_seen == kMaxDefers) {
-          FDF_LOG(TRACE, "DP aux: Received too many AUX DEFERs (%d)", kMaxDefers);
+          fdf::trace("DP aux: Received too many AUX DEFERs ({})", kMaxDefers);
           return zx::error_result(ZX_ERR_IO_MISSED_DEADLINE);
         }
         // Go around the loop again to retry.
         continue;
       case DP_REPLY_I2C_NACK:
-        FDF_LOG(TRACE, "DP aux: Reply was not an ack (got I2C_NACK)");
+        fdf::trace("DP aux: Reply was not an ack (got I2C_NACK)");
         return zx::error_result(ZX_ERR_IO_REFUSED);
       case DP_REPLY_I2C_DEFER:
         // TODO(https://fxbug.dev/42106274): Implement handling of I2C_DEFER.
-        FDF_LOG(TRACE, "DP aux: Received I2C_DEFER (not implemented)");
+        fdf::trace("DP aux: Received I2C_DEFER (not implemented)");
         return zx::error_result(ZX_ERR_NEXT);
       default:
-        FDF_LOG(TRACE, "DP aux: Unrecognized reply (header byte: 0x%x)", header_byte);
+        fdf::trace("DP aux: Unrecognized reply (header byte: 0x{:x})", header_byte);
         return zx::error_result(ZX_ERR_IO_DATA_INTEGRITY);
     }
   }
@@ -170,7 +170,7 @@ zx_status_t DpAuxChannelImpl::DpAuxReadChunk(uint32_t dp_cmd, uint32_t addr, uin
   // 1 and 16.
   const size_t bytes_read = static_cast<size_t>(result.value().reply_data_size);
   if (static_cast<size_t>(bytes_read) > size_in) {
-    FDF_LOG(WARNING, "DP aux read: Reply was larger than requested");
+    fdf::warn("DP aux read: Reply was larger than requested");
     return ZX_ERR_IO;
   }
   *size_out = bytes_read;
@@ -199,7 +199,7 @@ zx_status_t DpAuxChannelImpl::DpAuxWrite(uint32_t dp_cmd, uint32_t addr, const u
   // TODO(https://fxbug.dev/42106274): Handle the case where the hardware did a short write,
   // for which we could send the remaining bytes.
   if (transaction_result->reply_data_size != 0) {
-    FDF_LOG(WARNING, "DP aux write: Unexpected reply size");
+    fdf::warn("DP aux write: Unexpected reply size");
     return ZX_ERR_IO;
   }
   return ZX_OK;
@@ -230,10 +230,9 @@ zx::result<> DpAuxChannelImpl::ReadEdidBlock(int index,
     // when the host writes to the segment pointer. Thus, we ignore the NACK
     // and perform non-segmented DDC read operations if the segment pointer is
     // zero.
-    FDF_LOG(INFO, "E-DDC segment pointer is not supported. Will perform DDC read.");
+    fdf::info("E-DDC segment pointer is not supported. Will perform DDC read.");
   } else if (write_segment_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to write E-DDC segment pointer: %s",
-            write_segment_result.status_string());
+    fdf::error("Failed to write E-DDC segment pointer: {}", write_segment_result);
     return write_segment_result.take_error();
   }
 
@@ -246,15 +245,14 @@ zx::result<> DpAuxChannelImpl::ReadEdidBlock(int index,
       zx::make_result(DpAuxWrite(DP_REQUEST_I2C_WRITE, kDdcDataI2cTargetAddress,
                                  /*buf=*/&segment_offset, /*size=*/1));
   if (write_segment_offset_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to write E-DDC segment offset: %s",
-            write_segment_offset_result.status_string());
+    fdf::error("Failed to write E-DDC segment offset: {}", write_segment_offset_result);
     return write_segment_offset_result.take_error();
   }
 
   zx::result<> read_edid_result = zx::make_result(DpAuxRead(
       DP_REQUEST_I2C_READ, kDdcDataI2cTargetAddress, edid_block.data(), edid_block.size()));
   if (read_edid_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to read E-DDC block #%d: %s", index, read_edid_result.status_string());
+    fdf::error("Failed to read E-DDC block #{}: {}", index, read_edid_result);
     return read_edid_result.take_error();
   }
 

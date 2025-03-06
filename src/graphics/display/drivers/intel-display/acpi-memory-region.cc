@@ -88,8 +88,9 @@ AcpiMemoryRegion::~AcpiMemoryRegion() {
 
     zx_status_t unmap_status = zx::vmar::root_self()->unmap(first_page_address, vmo_size);
     if (unmap_status != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to unmap ACPI memory region (base = %p, size = %zu): %s",
-              region_data_.data(), region_data_.size(), zx_status_get_string(unmap_status));
+      fdf::error("Failed to unmap ACPI memory region (base = {}, size = {}): {}",
+                 static_cast<const void*>(region_data_.data()), region_data_.size(),
+                 zx::make_result(unmap_status));
     }
   }
 }

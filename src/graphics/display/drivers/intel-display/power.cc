@@ -44,7 +44,7 @@ bool SetPowerWellImpl(const PowerWellInfo& power_well_info, bool enable,
                   .get();
             },
             zx::usec(1), timeout_for_pwr_well_ctl_state_us)) {
-      FDF_LOG(ERROR, "Failed to enable power well (%s)", power_well_info.name);
+      fdf::error("Failed to enable power well ({})", power_well_info.name);
       return false;
     }
 
@@ -58,7 +58,7 @@ bool SetPowerWellImpl(const PowerWellInfo& power_well_info, bool enable,
                   .dist_status(static_cast<uint32_t>(power_well_info.fuse_dist_bit_index));
             },
             zx::usec(1), timeout_for_fuse_state_us)) {
-      FDF_LOG(ERROR, "Power well (%s) distribution failed", power_well_info.name);
+      fdf::error("Power well ({}) distribution failed", power_well_info.name);
       return false;
     }
   }

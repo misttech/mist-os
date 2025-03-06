@@ -901,7 +901,7 @@ class TypeCDdiClockSelect : public hwreg::RegisterBase<TypeCDdiClockSelect, uint
     if (IsValidClockSelect(raw)) {
       return static_cast<ClockSelect>(raw);
     }
-    FDF_LOG(WARNING, "Invalid clock_select field: 0x%x", raw);
+    fdf::warn("Invalid clock_select field: 0x{:x}", raw);
     return std::nullopt;
   }
 

@@ -75,7 +75,7 @@ DdiManagerTigerLake::DdiManagerTigerLake(Power* power, fdf::MmioBuffer* mmio_spa
                                          const IgdOpRegion& igd_opregion) {
   for (const DdiId ddi_id : DdiIds<registers::Platform::kTigerLake>()) {
     if (!igd_opregion.HasDdi(ddi_id)) {
-      FDF_LOG(TRACE, "DDI %d not initialized because it's omitted in VBT.", ddi_id);
+      fdf::trace("DDI {} not initialized because it's omitted in VBT.", ddi_id);
       continue;
     }
 
@@ -83,7 +83,7 @@ DdiManagerTigerLake::DdiManagerTigerLake(Power* power, fdf::MmioBuffer* mmio_spa
       auto ddi = std::make_unique<ComboDdiTigerLake>(ddi_id, mmio_space);
       // TODO(https://fxbug.dev/42066037): Create an initialization API in the base class.
       if (!ddi->Initialize()) {
-        FDF_LOG(ERROR, "Failed to initialize DDI %d. It will remain unused.", ddi_id);
+        fdf::error("Failed to initialize DDI {}. It will remain unused.", ddi_id);
         continue;
       }
       auto [it, emplace_success] = ddi_map().try_emplace(ddi_id, std::move(ddi));

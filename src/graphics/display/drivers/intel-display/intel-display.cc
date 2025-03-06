@@ -147,14 +147,14 @@ zx::result<FramebufferInfo> GetFramebufferInfo(std::optional<zbi_swfb_t> fb_info
 }  // namespace
 
 void Controller::HandleHotplug(DdiId ddi_id, bool long_pulse) {
-  FDF_LOG(TRACE, "Hotplug detected on ddi %d (long_pulse=%d)", ddi_id, long_pulse);
+  fdf::trace("Hotplug detected on ddi {} (long_pulse={})", ddi_id, long_pulse);
   fbl::AutoLock lock(&display_lock_);
 
   std::unique_ptr<DisplayDevice> device = nullptr;
   for (size_t i = 0; i < display_devices_.size(); i++) {
     if (display_devices_[i]->ddi_id() == ddi_id) {
       if (display_devices_[i]->HandleHotplug(long_pulse)) {
-        FDF_LOG(DEBUG, "hotplug handled by device");
+        fdf::debug("hotplug handled by device");
         return;
       }
       device = display_devices_.erase(i);
@@ -164,7 +164,7 @@ void Controller::HandleHotplug(DdiId ddi_id, bool long_pulse) {
 
   // An existing display device was unplugged.
   if (device != nullptr) {
-    FDF_LOG(INFO, "Display %" PRIu64 " unplugged", device->id().value());
+    fdf::info("Display {} unplugged", device->id().value());
     display::DisplayId removed_display_id = device->id();
     RemoveDisplay(std::move(device));
 
@@ -177,14 +177,14 @@ void Controller::HandleHotplug(DdiId ddi_id, bool long_pulse) {
   // A new display device was plugged in.
   std::unique_ptr<DisplayDevice> new_device = QueryDisplay(ddi_id, next_id_);
   if (!new_device || !new_device->Init()) {
-    FDF_LOG(ERROR, "Failed to initialize hotplug display");
+    fdf::error("Failed to initialize hotplug display");
     return;
   }
 
   DisplayDevice* new_device_ptr = new_device.get();
   zx_status_t add_display_status = AddDisplay(std::move(new_device));
   if (add_display_status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to add a new display: %s", zx_status_get_string(add_display_status));
+    fdf::error("Failed to add a new display: {}", zx::make_result(add_display_status));
     return;
   }
 
@@ -266,7 +266,7 @@ bool Controller::BringUpDisplayEngine(bool resume) {
     PchClockParameters fixed_pch_clock_parameters = pch_clock_parameters;
     pch_engine_->FixClockParameters(fixed_pch_clock_parameters);
     if (pch_clock_parameters != fixed_pch_clock_parameters) {
-      FDF_LOG(WARNING, "PCH clocking incorrectly configured. Re-configuring.");
+      fdf::warn("PCH clocking incorrectly configured. Re-configuring.");
     }
     pch_engine_->SetClockParameters(fixed_pch_clock_parameters);
   }
@@ -275,7 +275,7 @@ bool Controller::BringUpDisplayEngine(bool resume) {
   if (!display::PollUntil(
           [&] { return registers::FuseStatus::Get().ReadFrom(mmio_space()).pg0_dist_status(); },
           zx::usec(1), 20)) {
-    FDF_LOG(ERROR, "Power Well 0 distribution failed");
+    fdf::error("Power Well 0 distribution failed");
     return false;
   }
 
@@ -300,14 +300,14 @@ bool Controller::BringUpDisplayEngine(bool resume) {
               return registers::PowerWellControl::Get().ReadFrom(mmio_space()).power_state(0).get();
             },
             zx::usec(1), 30)) {
-      FDF_LOG(ERROR, "Power Well 1 state failed");
+      fdf::error("Power Well 1 state failed");
       return false;
     }
 
     if (!display::PollUntil(
             [&] { return registers::FuseStatus::Get().ReadFrom(mmio_space()).pg1_dist_status(); },
             zx::usec(1), 20)) {
-      FDF_LOG(ERROR, "Power Well 1 distribution failed");
+      fdf::error("Power Well 1 distribution failed");
       return false;
     }
 
@@ -315,7 +315,7 @@ bool Controller::BringUpDisplayEngine(bool resume) {
     cd_clk_ = std::make_unique<CoreDisplayClockTigerLake>(mmio_space());
     // PLL ratio for 38.4MHz: 16 -> CDCLK 307.2 MHz
     if (!cd_clk_->SetFrequency(307'200)) {
-      FDF_LOG(ERROR, "Failed to configure CD clock frequency");
+      fdf::error("Failed to configure CD clock frequency");
       return false;
     }
   } else {
@@ -345,25 +345,24 @@ bool Controller::BringUpDisplayEngine(bool resume) {
                 return lcpll1_control.ReadFrom(mmio_space()).pll_locked_tiger_lake_and_lcpll1();
               },
               zx::msec(1), 5)) {
-        FDF_LOG(ERROR, "DPLL0 / LCPLL1 did not lock in 5us");
+        fdf::error("DPLL0 / LCPLL1 did not lock in 5us");
         return false;
       }
 
       // Enable cd_clk and set the frequency to minimum.
       cd_clk_ = std::make_unique<CoreDisplayClockSkylake>(mmio_space());
       if (!cd_clk_->SetFrequency(337'500)) {
-        FDF_LOG(ERROR, "Failed to configure CD clock frequency");
+        fdf::error("Failed to configure CD clock frequency");
         return false;
       }
     } else {
       cd_clk_ = std::make_unique<CoreDisplayClockSkylake>(mmio_space());
-      FDF_LOG(INFO, "CDCLK already assigned by BIOS: frequency: %u KHz",
-              cd_clk_->current_freq_khz());
+      fdf::info("CDCLK already assigned by BIOS: frequency: {} KHz", cd_clk_->current_freq_khz());
     }
   }
 
   // Power up DBUF (Data Buffer) slices.
-  FDF_LOG(TRACE, "Powering up DBUF (Data Buffer) slices");
+  fdf::trace("Powering up DBUF (Data Buffer) slices");
   const int display_buffer_slice_count = is_tgl(device_id_) ? 2 : 1;
   for (int slice_index = 0; slice_index < display_buffer_slice_count; ++slice_index) {
     auto display_buffer_control =
@@ -373,7 +372,7 @@ bool Controller::BringUpDisplayEngine(bool resume) {
     if (!display::PollUntil(
             [&] { return display_buffer_control.ReadFrom(mmio_space()).powered_on(); }, zx::usec(1),
             10)) {
-      FDF_LOG(ERROR, "DBUF slice %d did not power up in time", slice_index + 1);
+      fdf::error("DBUF slice {} did not power up in time", slice_index + 1);
       return false;
     }
   }
@@ -385,7 +384,7 @@ bool Controller::BringUpDisplayEngine(bool resume) {
   constexpr uint8_t kClockingModeScreenOff = (1 << 5);
   zx_status_t status = zx_ioports_request(resources_.ioport->get(), kSequencerIdx, 2);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to map vga ports");
+    fdf::error("Failed to map vga ports");
     return false;
   }
   outp(kSequencerIdx, kClockingModeIdx);
@@ -475,7 +474,7 @@ bool Controller::ResetDdi(DdiId ddi_id, std::optional<TranscoderId> transcoder_i
   if (was_enabled &&
       !display::PollUntil([&] { return ddi_buffer_control.ReadFrom(mmio_space()).is_idle(); },
                           zx::msec(1), 8)) {
-    FDF_LOG(ERROR, "Port failed to go idle");
+    fdf::error("Port failed to go idle");
     return false;
   }
 
@@ -488,12 +487,12 @@ bool Controller::ResetDdi(DdiId ddi_id, std::optional<TranscoderId> transcoder_i
   // in the drm/i915 driver and experiments on NUC11 hardware indicate that
   // display hotplug may fail without this step.
   if (!display::PollUntil([&] { return !power_->GetDdiIoPowerState(ddi_id); }, zx::usec(1), 1000)) {
-    FDF_LOG(ERROR, "Disable IO power timeout");
+    fdf::error("Disable IO power timeout");
     return false;
   }
 
   if (!dpll_manager_->ResetDdiPll(ddi_id)) {
-    FDF_LOG(ERROR, "Failed to unmap DPLL for DDI %d", ddi_id);
+    fdf::error("Failed to unmap DPLL for DDI {}", ddi_id);
     return false;
   }
 
@@ -518,15 +517,15 @@ std::unique_ptr<DisplayDevice> Controller::QueryDisplay(DdiId ddi_id,
                                                         display::DisplayId display_id) {
   fbl::AllocChecker ac;
   if (!igd_opregion_.HasDdi(ddi_id)) {
-    FDF_LOG(INFO, "ddi %d not available.", ddi_id);
+    fdf::info("ddi {} not available.", ddi_id);
     return nullptr;
   }
 
   if (igd_opregion_.SupportsDp(ddi_id)) {
-    FDF_LOG(DEBUG, "Checking for DisplayPort monitor at DDI %d", ddi_id);
+    fdf::debug("Checking for DisplayPort monitor at DDI {}", ddi_id);
     DdiReference ddi_reference_maybe = ddi_manager_->GetDdiReference(ddi_id);
     if (!ddi_reference_maybe) {
-      FDF_LOG(DEBUG, "DDI %d PHY not available. Skip querying.", ddi_id);
+      fdf::debug("DDI {} PHY not available. Skip querying.", ddi_id);
     } else {
       auto dp_disp = fbl::make_unique_checked<DpDisplay>(
           &ac, this, display_id, ddi_id, &dp_aux_channels_[ddi_id], &pch_engine_.value(),
@@ -537,10 +536,10 @@ std::unique_ptr<DisplayDevice> Controller::QueryDisplay(DdiId ddi_id,
     }
   }
   if (igd_opregion_.SupportsHdmi(ddi_id) || igd_opregion_.SupportsDvi(ddi_id)) {
-    FDF_LOG(DEBUG, "Checking for HDMI monitor at DDI %d", ddi_id);
+    fdf::debug("Checking for HDMI monitor at DDI {}", ddi_id);
     DdiReference ddi_reference_maybe = ddi_manager_->GetDdiReference(ddi_id);
     if (!ddi_reference_maybe) {
-      FDF_LOG(DEBUG, "DDI %d PHY not available. Skip querying.", ddi_id);
+      fdf::debug("DDI {} PHY not available. Skip querying.", ddi_id);
     } else {
       auto hdmi_disp = fbl::make_unique_checked<HdmiDisplay>(
           &ac, this, display_id, ddi_id, std::move(ddi_reference_maybe), &gmbus_i2cs_[ddi_id]);
@@ -549,7 +548,7 @@ std::unique_ptr<DisplayDevice> Controller::QueryDisplay(DdiId ddi_id,
       }
     }
   }
-  FDF_LOG(TRACE, "Nothing found for ddi %d!", ddi_id);
+  fdf::trace("Nothing found for ddi {}!", ddi_id);
   return nullptr;
 }
 
@@ -563,13 +562,13 @@ bool Controller::LoadHardwareState(DdiId ddi_id, DisplayDevice* device) {
 
   DdiPllConfig pll_config = dpll_manager()->LoadState(ddi_id);
   if (pll_config.IsEmpty()) {
-    FDF_LOG(ERROR, "Cannot load DPLL state for DDI %d", ddi_id);
+    fdf::error("Cannot load DPLL state for DDI {}", ddi_id);
     return false;
   }
 
   bool init_result = device->InitWithDdiPllConfig(pll_config);
   if (!init_result) {
-    FDF_LOG(ERROR, "Cannot initialize the display with DPLL state for DDI %d", ddi_id);
+    fdf::error("Cannot initialize the display with DPLL state for DDI {}", ddi_id);
     return false;
   }
 
@@ -607,7 +606,7 @@ void Controller::InitDisplays() {
   }
 
   if (display_devices_.size() == 0) {
-    FDF_LOG(INFO, "intel-display: No displays detected.");
+    fdf::info("intel-display: No displays detected.");
   }
 
   // Make a note of what needs to be reset, so we can finish querying the hardware state
@@ -692,14 +691,13 @@ bool Controller::ReadMemoryLatencyInfo() {
   if (memory_latency.is_error()) {
     // We're not supposed to enable planes if we can't read the memory latency
     // data. This makes the display driver fairly useless, so bail.
-    FDF_LOG(ERROR, "Error reading memory latency data from PCU firmware: %s",
-            memory_latency.status_string());
+    fdf::error("Error reading memory latency data from PCU firmware: {}", memory_latency);
     return false;
   }
-  FDF_LOG(TRACE, "Raw PCU memory latency data: %u %u %u %u %u %u %u %u", memory_latency.value()[0],
-          memory_latency.value()[1], memory_latency.value()[2], memory_latency.value()[3],
-          memory_latency.value()[4], memory_latency.value()[5], memory_latency.value()[6],
-          memory_latency.value()[7]);
+  fdf::trace("Raw PCU memory latency data: {} {} {} {} {} {} {} {}", memory_latency.value()[0],
+             memory_latency.value()[1], memory_latency.value()[2], memory_latency.value()[3],
+             memory_latency.value()[4], memory_latency.value()[5], memory_latency.value()[6],
+             memory_latency.value()[7]);
 
   // Pre-Tiger Lake, the SAGV blocking time is always modeled to 30us.
   const zx::result<uint32_t> blocking_time =
@@ -708,11 +706,10 @@ bool Controller::ReadMemoryLatencyInfo() {
   if (blocking_time.is_error()) {
     // We're not supposed to enable planes if we can't read the SAGV blocking
     // time. This makes the display driver fairly useless, so bail.
-    FDF_LOG(ERROR, "Error reading SAGV blocking time from PCU firmware: %s",
-            blocking_time.status_string());
+    fdf::error("Error reading SAGV blocking time from PCU firmware: {}", blocking_time);
     return false;
   }
-  FDF_LOG(TRACE, "System Agent Geyserville blocking time: %u", blocking_time.value());
+  fdf::trace("System Agent Geyserville blocking time: {}", blocking_time.value());
 
   // The query below is only supported on Tiger Lake PCU firmware.
   if (!is_tgl(device_id_)) {
@@ -723,21 +720,20 @@ bool Controller::ReadMemoryLatencyInfo() {
       power_controller.GetMemorySubsystemInfoTigerLake();
   if (memory_info.is_error()) {
     // We can handle this error by unconditionally disabling SAGV.
-    FDF_LOG(ERROR, "Error reading SAGV QGV point info from PCU firmware: %s",
-            blocking_time.status_string());
+    fdf::error("Error reading SAGV QGV point info from PCU firmware: {}", blocking_time);
     return true;
   }
 
   const MemorySubsystemInfo::GlobalInfo& global_info = memory_info.value().global_info;
-  FDF_LOG(TRACE, "PCU memory subsystem info: DRAM type %d, %d channels, %d SAGV points",
-          static_cast<int>(global_info.ram_type), global_info.memory_channel_count,
-          global_info.agent_point_count);
+  fdf::trace("PCU memory subsystem info: DRAM type {}, {} channels, {} SAGV points",
+             static_cast<int>(global_info.ram_type), global_info.memory_channel_count,
+             global_info.agent_point_count);
   for (int point_index = 0; point_index < global_info.agent_point_count; ++point_index) {
     const MemorySubsystemInfo::AgentPoint& point_info = memory_info.value().points[point_index];
-    FDF_LOG(TRACE, "SAGV point %d info: DRAM clock %d kHz, tRP %d, tRCD %d, tRDPRE %d, tRAS %d",
-            point_index, point_info.dram_clock_khz, point_info.row_precharge_to_open_cycles,
-            point_info.row_access_to_column_access_delay_cycles,
-            point_info.read_to_precharge_cycles, point_info.row_activate_to_precharge_cycles);
+    fdf::trace("SAGV point {} info: DRAM clock {} kHz, tRP {}, tRCD {}, tRDPRE {}, tRAS {}",
+               point_index, point_info.dram_clock_khz, point_info.row_precharge_to_open_cycles,
+               point_info.row_access_to_column_access_delay_cycles,
+               point_info.read_to_precharge_cycles, point_info.row_activate_to_precharge_cycles);
   }
   return true;
 }
@@ -748,10 +744,10 @@ void Controller::DisableSystemAgentGeyserville() {
   const zx::result<> sagv_disabled = power_controller.SetSystemAgentGeyservilleEnabled(
       false, PowerController::RetryBehavior::kRetryUntilStateChanges);
   if (sagv_disabled.is_error()) {
-    FDF_LOG(ERROR, "Failed to disable System Agent Geyserville. Display corruption may occur.");
+    fdf::error("Failed to disable System Agent Geyserville. Display corruption may occur.");
     return;
   }
-  FDF_LOG(TRACE, "System Agent Geyserville disabled.");
+  fdf::trace("System Agent Geyserville disabled.");
 }
 
 void Controller::RemoveDisplay(std::unique_ptr<DisplayDevice> display) {
@@ -766,11 +762,11 @@ zx_status_t Controller::AddDisplay(std::unique_ptr<DisplayDevice> display) {
   fbl::AllocChecker ac;
   display_devices_.push_back(std::move(display), &ac);
   if (!ac.check()) {
-    FDF_LOG(WARNING, "Failed to add display device");
+    fdf::warn("Failed to add display device");
     return ZX_ERR_NO_MEMORY;
   }
 
-  FDF_LOG(INFO, "Display %" PRIu64 " connected", display_id.value());
+  fdf::info("Display {} connected", display_id.value());
   next_id_++;
   return ZX_OK;
 }
@@ -854,8 +850,7 @@ zx_status_t Controller::DisplayEngineImportBufferCollection(
   display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   if (buffer_collections_.find(driver_buffer_collection_id) != buffer_collections_.end()) {
-    FDF_LOG(ERROR, "Buffer Collection (id=%lu) already exists",
-            driver_buffer_collection_id.value());
+    fdf::error("Buffer Collection (id={}) already exists", driver_buffer_collection_id.value());
     return ZX_ERR_ALREADY_EXISTS;
   }
 
@@ -872,8 +867,7 @@ zx_status_t Controller::DisplayEngineImportBufferCollection(
               fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>(std::move(collection_token)))
           .Build());
   if (!bind_result.ok()) {
-    FDF_LOG(ERROR, "Cannot complete FIDL call BindSharedCollection: %s",
-            bind_result.status_string());
+    fdf::error("Cannot complete FIDL call BindSharedCollection: {}", bind_result.status_string());
     return ZX_ERR_INTERNAL;
   }
 
@@ -887,8 +881,8 @@ zx_status_t Controller::DisplayEngineReleaseBufferCollection(
   display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
-    FDF_LOG(ERROR, "Cannot release buffer collection %lu: buffer collection doesn't exist",
-            driver_buffer_collection_id.value());
+    fdf::error("Cannot release buffer collection {}: buffer collection doesn't exist",
+               driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
   buffer_collections_.erase(driver_buffer_collection_id);
@@ -902,8 +896,8 @@ zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* image_m
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
-    FDF_LOG(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)",
-            driver_buffer_collection_id.value());
+    fdf::error("ImportImage: Cannot find imported buffer collection (id={})",
+               driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
   const fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& collection = it->second;
@@ -920,8 +914,7 @@ zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* image_m
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (!check_result.ok()) {
-    FDF_LOG(ERROR, "Failed to check buffers allocated, %s",
-            check_result.FormatDescription().c_str());
+    fdf::error("Failed to check buffers allocated, {}", check_result.FormatDescription());
     return check_result.status();
   }
   const auto& check_response = check_result.value();
@@ -937,8 +930,7 @@ zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* image_m
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (!wait_result.ok()) {
-    FDF_LOG(ERROR, "Failed to wait for buffers allocated, %s",
-            wait_result.FormatDescription().c_str());
+    fdf::error("Failed to wait for buffers allocated, {}", wait_result.FormatDescription());
     return wait_result.status();
   }
   const auto& wait_response = wait_result.value();
@@ -953,12 +945,12 @@ zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* image_m
       wait_value->buffer_collection_info();
 
   if (!collection_info.settings().has_image_format_constraints()) {
-    FDF_LOG(ERROR, "No image format constraints");
+    fdf::error("No image format constraints");
     return ZX_ERR_INVALID_ARGS;
   }
   if (index >= collection_info.buffers().count()) {
-    FDF_LOG(ERROR, "Invalid index %d greater than buffer count %lu", index,
-            collection_info.buffers().count());
+    fdf::error("Invalid index {} greater than buffer count {}", index,
+               collection_info.buffers().count());
     return ZX_ERR_OUT_OF_RANGE;
   }
 
@@ -966,7 +958,7 @@ zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* image_m
 
   uint64_t offset = collection_info.buffers().at(index).vmo_usable_start();
   if (offset % PAGE_SIZE != 0) {
-    FDF_LOG(ERROR, "Invalid offset");
+    fdf::error("Invalid offset");
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -977,12 +969,12 @@ zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* image_m
   uint32_t image_tiling_type;
   if (!ConvertPixelFormatToTilingType(collection_info.settings().image_format_constraints(),
                                       &image_tiling_type)) {
-    FDF_LOG(ERROR, "Invalid pixel format modifier");
+    fdf::error("Invalid pixel format modifier");
     return ZX_ERR_INVALID_ARGS;
   }
   if (image_metadata->tiling_type != image_tiling_type) {
-    FDF_LOG(ERROR, "Incompatible image type from image %d and sysmem %d",
-            image_metadata->tiling_type, image_tiling_type);
+    fdf::error("Incompatible image type from image {} and sysmem {}", image_metadata->tiling_type,
+               image_tiling_type);
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -998,7 +990,7 @@ zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* image_m
       ImageConstraintsToFormat(arena, collection_info.settings().image_format_constraints(),
                                image_metadata->dimensions.width, image_metadata->dimensions.height);
   if (!format.is_ok()) {
-    FDF_LOG(ERROR, "Failed to get format from constraints");
+    fdf::error("Failed to get format from constraints");
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -1029,7 +1021,7 @@ zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* image_m
   std::unique_ptr<GttRegionImpl> gtt_region;
   zx_status_t status = gtt_.AllocRegion(length, align, &gtt_region);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to allocate GTT region, status %s", zx_status_get_string(status));
+    fdf::error("Failed to allocate GTT region, status {}", zx::make_result(status));
     return status;
   }
 
@@ -1045,7 +1037,7 @@ zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* image_m
 
   status = gtt_region->PopulateRegion(vmo.release(), offset / PAGE_SIZE, length);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to populate GTT region, status %s", zx_status_get_string(status));
+    fdf::error("Failed to populate GTT region, status {}", zx::make_result(status));
     return status;
   }
 
@@ -1385,8 +1377,8 @@ void Controller::ReallocatePlaneBuffers(cpp20::span<const display_config_t> banj
       } else {
         pipe_buffers_[pipe_id].start = pipe_buffers_[pipe_id].end = 0;
       }
-      FDF_LOG(INFO, "Pipe %d buffers: [%d, %d)", pipe_id, pipe_buffers_[pipe_id].start,
-              pipe_buffers_[pipe_id].end);
+      fdf::info("Pipe {} buffers: [{}, {})", pipe_id, pipe_buffers_[pipe_id].start,
+                pipe_buffers_[pipe_id].end);
     }
   }
 
@@ -1611,7 +1603,7 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
     }
   }
   if (display == nullptr) {
-    FDF_LOG(INFO, "Got config with no display - assuming hotplug and skipping");
+    fdf::info("Got config with no display - assuming hotplug and skipping");
     return CONFIG_CHECK_RESULT_OK;
   }
 
@@ -1866,9 +1858,8 @@ zx_status_t Controller::DisplayEngineSetBufferCollectionConstraints(
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
-    FDF_LOG(ERROR,
-            "SetBufferCollectionConstraints: Cannot find imported buffer collection (id=%lu)",
-            driver_buffer_collection_id.value());
+    fdf::error("SetBufferCollectionConstraints: Cannot find imported buffer collection (id=%lu)",
+               driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
   const fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& collection = it->second;
@@ -1921,7 +1912,7 @@ zx_status_t Controller::DisplayEngineSetBufferCollectionConstraints(
     }
   }
   if (image_constraints_vec.empty()) {
-    FDF_LOG(ERROR, "Config has unsupported tiling type %" PRIu32, usage->tiling_type);
+    fdf::error("Config has unsupported tiling type {}", usage->tiling_type);
     return ZX_ERR_INVALID_ARGS;
   }
   for (unsigned i = 0; i < std::size(kYuvPixelFormatTypes); ++i) {
@@ -1958,7 +1949,7 @@ zx_status_t Controller::DisplayEngineSetBufferCollectionConstraints(
           .Build());
 
   if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to set constraints, %s", result.FormatDescription().c_str());
+    fdf::error("Failed to set constraints, {}", result.FormatDescription());
     return result.status();
   }
 
@@ -2076,7 +2067,7 @@ zx_status_t Controller::IntelGpuCoreGttInsert(uint64_t addr, zx::vmo buffer, uin
 // Ddk methods
 
 void Controller::Start(fdf::StartCompleter completer) {
-  FDF_LOG(TRACE, "intel-display: initializing displays");
+  fdf::trace("intel-display: initializing displays");
 
   {
     fbl::AutoLock lock(&display_lock_);
@@ -2108,7 +2099,7 @@ void Controller::Start(fdf::StartCompleter completer) {
 
   interrupts_.FinishInit();
 
-  FDF_LOG(TRACE, "intel-display: display initialization done");
+  fdf::trace("intel-display: display initialization done");
   completer(zx::ok());
 }
 
@@ -2138,7 +2129,7 @@ void Controller::PrepareStopOnPowerStateTransition(
     auto bdsm_reg = registers::BaseDsm::Get().FromValue(0);
     zx_status_t status = pci_.ReadConfig32(bdsm_reg.kAddr, bdsm_reg.reg_value_ptr());
     if (status != ZX_OK) {
-      FDF_LOG(TRACE, "Failed to read dsm base");
+      fdf::trace("Failed to read dsm base");
       completer(zx::ok());
       return;
     }
@@ -2189,7 +2180,7 @@ zx_koid_t GetKoid(zx_handle_t handle) {
 }
 
 zx_status_t Controller::Init() {
-  FDF_LOG(TRACE, "Binding to display controller");
+  fdf::trace("Binding to display controller");
 
   auto pid = GetKoid(zx_process_self());
   std::string debug_name = fxl::StringPrintf("intel-display[%lu]", pid);
@@ -2200,32 +2191,32 @@ zx_status_t Controller::Init() {
           .id(pid)
           .Build());
   if (!set_debug_status.ok()) {
-    FDF_LOG(ERROR, "Cannot set sysmem allocator debug info: %s", set_debug_status.status_string());
+    fdf::error("Cannot set sysmem allocator debug info: {}", set_debug_status.status_string());
     return set_debug_status.status();
   }
 
   ZX_DEBUG_ASSERT(pci_.is_valid());
   pci_.ReadConfig16(fuchsia_hardware_pci::Config::kDeviceId, &device_id_);
-  FDF_LOG(TRACE, "Device id %x", device_id_);
+  fdf::trace("Device id {:x}", device_id_);
 
   const zx::unowned_resource& driver_mmio_resource = resources_.mmio;
   if (!driver_mmio_resource->is_valid()) {
-    FDF_LOG(WARNING, "Failed to get driver MMIO resource. VBT initialization skipped.");
+    fdf::warn("Failed to get driver MMIO resource. VBT initialization skipped.");
   } else {
     zx_status_t status = igd_opregion_.Init(driver_mmio_resource->borrow(), pci_);
     if (status != ZX_OK && status != ZX_ERR_NOT_SUPPORTED) {
-      FDF_LOG(ERROR, "VBT initializaton failed: %s", zx_status_get_string(status));
+      fdf::error("VBT initializaton failed: {}", zx::make_result(status));
       return status;
     }
   }
 
-  FDF_LOG(TRACE, "Mapping registers");
+  fdf::trace("Mapping registers");
   // map register window
   uint8_t* regs;
   uint64_t size;
   zx_status_t status = IntelGpuCoreMapPciMmio(0u, &regs, &size);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to map bar 0: %d", status);
+    fdf::error("Failed to map bar 0: {}", status);
     return status;
   }
 
@@ -2235,17 +2226,17 @@ zx_status_t Controller::Init() {
     mmio_space_.emplace(mapped_bars_[0]->View(0));
   }
 
-  FDF_LOG(TRACE, "Reading fuses and straps");
+  fdf::trace("Reading fuses and straps");
   FuseConfig fuse_config = FuseConfig::ReadFrom(*mmio_space(), device_id_);
   fuse_config.Log();
 
-  FDF_LOG(TRACE, "Initializing DDIs");
+  fdf::trace("Initializing DDIs");
   ddis_ = GetDdiIds(device_id_);
 
-  FDF_LOG(TRACE, "Initializing Power");
+  fdf::trace("Initializing Power");
   power_ = Power::New(mmio_space(), device_id_);
 
-  FDF_LOG(TRACE, "Reading PCH display engine config");
+  fdf::trace("Reading PCH display engine config");
   pch_engine_.emplace(mmio_space(), device_id_);
   pch_engine_->Log();
 
@@ -2253,7 +2244,7 @@ zx_status_t Controller::Init() {
     gmbus_i2cs_.push_back(GMBusI2c(ddis_[i], GetPlatform(device_id_), mmio_space()));
 
     dp_aux_channels_.push_back(DpAuxChannelImpl(mmio_space(), ddis_[i], device_id_));
-    FDF_LOG(TRACE, "DDI %d AUX channel initial configuration:", ddis_[i]);
+    fdf::trace("DDI {} AUX channel initial configuration:", ddis_[i]);
     dp_aux_channels_[dp_aux_channels_.size() - 1].aux_channel().Log();
   }
 
@@ -2264,16 +2255,16 @@ zx_status_t Controller::Init() {
                           .ddi_e_disabled_kaby_lake();
   }
 
-  FDF_LOG(TRACE, "Initializing interrupts");
+  fdf::trace("Initializing interrupts");
   status = interrupts_.Init(fit::bind_member<&Controller::HandlePipeVsync>(this),
                             fit::bind_member<&Controller::HandleHotplug>(this), pci_, mmio_space(),
                             device_id_);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to initialize interrupts");
+    fdf::error("Failed to initialize interrupts");
     return status;
   }
 
-  FDF_LOG(TRACE, "Mapping gtt");
+  fdf::trace("Mapping gtt");
   {
     // The bootloader framebuffer is located at the start of the BAR that gets mapped by GTT.
     // Prevent clients from allocating memory in this region by telling |gtt_| to exclude it from
@@ -2281,7 +2272,7 @@ zx_status_t Controller::Init() {
     uint32_t offset = 0u;
     auto fb = GetFramebufferInfo(framebuffer_info_);
     if (fb.is_error()) {
-      FDF_LOG(INFO, "Failed to obtain framebuffer size (%s)", fb.status_string());
+      fdf::info("Failed to obtain framebuffer size ({})", fb);
       // It is possible for zx_framebuffer_get_info to fail in a headless system as the bootloader
       // framebuffer information will be left uninitialized. Tolerate this failure by assuming
       // that the stolen memory contents won't be shown on any screen and map the global GTT at
@@ -2294,7 +2285,7 @@ zx_status_t Controller::Init() {
     fbl::AutoLock lock(&gtt_lock_);
     status = gtt_.Init(pci_, mmio_space()->View(GTT_BASE_OFFSET), offset);
     if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to init gtt (%s)", zx_status_get_string(status));
+      fdf::error("Failed to init gtt ({})", zx::make_result(status));
       return status;
     }
   }
@@ -2321,7 +2312,7 @@ zx_status_t Controller::Init() {
   }
 
   root_node_ = inspector_.GetRoot().CreateChild("intel-display");
-  FDF_LOG(TRACE, "bind done");
+  fdf::trace("bind done");
   return ZX_OK;
 }
 
@@ -2373,13 +2364,13 @@ zx::result<std::unique_ptr<Controller>> Controller::Create(
                                                          std::move(pci), std::move(resources),
                                                          framebuffer_info, std::move(inspector));
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for Controller");
+    fdf::error("Failed to allocate memory for Controller");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   zx_status_t status = controller->Init();
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to initialize Controller: %s", zx_status_get_string(status));
+    fdf::error("Failed to initialize Controller: {}", zx::make_result(status));
     return zx::error(status);
   }
   return zx::ok(std::move(controller));

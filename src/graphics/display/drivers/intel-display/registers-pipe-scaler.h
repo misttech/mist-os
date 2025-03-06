@@ -325,7 +325,7 @@ class PipeScalerControlTigerLake
         // Valid values.
         break;
       default:
-        FDF_LOG(WARNING, "Scaler bound to an invalid Y plane (%u)", y_plane_binding_raw());
+        fdf::warn("Scaler bound to an invalid Y plane ({})", y_plane_binding_raw());
         break;
     }
     return y_plane_binding_raw();

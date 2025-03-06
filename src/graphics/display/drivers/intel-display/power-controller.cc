@@ -84,7 +84,7 @@ zx::result<uint64_t> PowerController::Transact(PowerControllerCommand command) {
   if (!display::PollUntil(
           [&] { return !mailbox_interface.ReadFrom(mmio_buffer_).has_active_transaction(); },
           zx::usec(1), g_previous_command_timeout_us)) {
-    FDF_LOG(WARNING, "Timed out while waiting for PCU to finish pre-existing work");
+    fdf::warn("Timed out while waiting for PCU to finish pre-existing work");
     return zx::error_result(ZX_ERR_IO_MISSED_DEADLINE);
   }
 
@@ -394,8 +394,8 @@ zx::result<MemorySubsystemInfo> PowerController::GetMemorySubsystemInfoTigerLake
     if (global_info.is_error()) {
       return global_info.take_error();
     }
-    FDF_LOG(TRACE, "MAILBOX_GTRDIVER_CMD_MEM_SS_INFO_SUBCOMMAND_READ_GLOBAL_INFO - %lx",
-            global_info.value());
+    fdf::trace("MAILBOX_GTRDIVER_CMD_MEM_SS_INFO_SUBCOMMAND_READ_GLOBAL_INFO - {:x}",
+               global_info.value());
     result.global_info =
         MemorySubsystemInfo::GlobalInfo::CreateFromMailboxDataTigerLake(global_info.value());
   }
@@ -422,8 +422,8 @@ zx::result<MemorySubsystemInfo> PowerController::GetMemorySubsystemInfoTigerLake
       return zx::error_result(ZX_ERR_IO_REFUSED);
     }
 
-    FDF_LOG(TRACE, "MAILBOX_GTRDIVER_CMD_MEM_SS_INFO_SUBCOMMAND_READ_QGV_POINT_INFO - %lx",
-            point_info.value());
+    fdf::trace("MAILBOX_GTRDIVER_CMD_MEM_SS_INFO_SUBCOMMAND_READ_QGV_POINT_INFO - {:x}",
+               point_info.value());
     result.points[point_index] =
         MemorySubsystemInfo::AgentPoint::CreateFromMailboxDataTigerLake(point_info.value());
   }

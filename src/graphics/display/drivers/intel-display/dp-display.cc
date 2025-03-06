@@ -136,7 +136,7 @@ cpp20::span<const DdiPhyConfigEntry> GetDpPhyConfigEntries(uint16_t device_id, u
     return kPhyConfigDpKabyLakeHs;
   }
 
-  FDF_LOG(ERROR, "Unsupported intel-display device id: %x", device_id);
+  fdf::error("Unsupported intel-display device id: {:x}", device_id);
   *i_boost = 0;
   return {};
 }
@@ -177,12 +177,12 @@ bool DpDisplay::EnsureEdpPanelIsPoweredOn() {
   PchPanelParameters fixed_panel_parameters = panel_parameters;
   fixed_panel_parameters.Fix();
   if (panel_parameters != fixed_panel_parameters) {
-    FDF_LOG(WARNING, "Incorrect PCH configuration for eDP panel. Re-configuring.");
+    fdf::warn("Incorrect PCH configuration for eDP panel. Re-configuring.");
   }
   pch_engine_->SetPanelParameters(fixed_panel_parameters);
-  FDF_LOG(TRACE, "Setting eDP backlight brightness to %f", backlight_brightness_);
+  fdf::trace("Setting eDP backlight brightness to {:f}", backlight_brightness_);
   pch_engine_->SetPanelBrightness(backlight_brightness_);
-  FDF_LOG(TRACE, "eDP panel configured.");
+  fdf::trace("eDP panel configured.");
 
   // Power up the panel, if necessary.
   PchPanelPowerTarget power_target = pch_engine_->PanelPowerTarget();
@@ -208,7 +208,7 @@ bool DpDisplay::EnsureEdpPanelIsPoweredOn() {
   // much time if the panel wakes up early / on time.
   static constexpr int kPowerUpTimeoutUs = 1'000'000;
   if (!pch_engine_->WaitForPanelPowerState(PchPanelPowerState::kPoweredUp, kPowerUpTimeoutUs)) {
-    FDF_LOG(ERROR, "Failed to enable panel!");
+    fdf::error("Failed to enable panel!");
     pch_engine_->Log();
     return false;
   }
@@ -221,7 +221,7 @@ bool DpDisplay::EnsureEdpPanelIsPoweredOn() {
   power_target.force_power_on = false;
   pch_engine_->SetPanelPowerTarget(power_target);
 
-  FDF_LOG(TRACE, "eDP panel powered on.");
+  fdf::trace("eDP panel powered on.");
   return true;
 }
 
@@ -254,7 +254,7 @@ bool DpDisplay::DpcdRequestLinkTraining(const dpcd::TrainingPatternSet& tp_set,
   static_assert(kAddr + 4 == dpcd::DPCD_TRAINING_LANE3_SET, "");
 
   if (!DpcdWrite(kAddr, reg_bytes, 1 + dp_lane_count_)) {
-    FDF_LOG(ERROR, "Failure setting TRAINING_PATTERN_SET");
+    fdf::error("Failure setting TRAINING_PATTERN_SET");
     return false;
   }
 
@@ -269,7 +269,7 @@ bool DpDisplay::DpcdReadPairedRegs(hwreg::RegisterBase<T, typename T::ValueType>
   uint32_t num_bytes = dp_lane_count_ == 4 ? 2 : 1;
   uint8_t reg_byte[kMaximumRegisterSize];
   if (!DpcdRead(addr, reg_byte, num_bytes)) {
-    FDF_LOG(ERROR, "Failure reading addr %d", addr);
+    fdf::error("Failure reading addr {}", addr);
     return false;
   }
 
@@ -448,9 +448,9 @@ void DpDisplay::ConfigureVoltageSwingComboTigerLake(size_t phy_config_index) {
   // DG1: IHD-OS-DG1-Vol 12-2.21 pages 338-342
   // Ice Lake: IHD-OS-ICLLP-Vol 12-1.22-Rev2.0 pages 335-339
 
-  FDF_LOG(TRACE, "Voltage Swing for DDI %d, Link rate %d MHz, PHY config: %d", ddi_id(),
-          dp_link_rate_mhz_, static_cast<int>(phy_config_index));
-  FDF_LOG(TRACE, "Logging pre-configuration register state for debugging");
+  fdf::trace("Voltage Swing for DDI {}, Link rate {} MHz, PHY config: {}", ddi_id(),
+             dp_link_rate_mhz_, static_cast<int>(phy_config_index));
+  fdf::trace("Logging pre-configuration register state for debugging");
 
   static constexpr registers::PortLane kMainLinkLanes[] = {
       registers::PortLane::kMainLinkLane0, registers::PortLane::kMainLinkLane1,
@@ -460,9 +460,9 @@ void DpDisplay::ConfigureVoltageSwingComboTigerLake(size_t phy_config_index) {
         registers::PortPhysicalCoding1::GetForDdiLane(ddi_id(), lane).ReadFrom(mmio_space());
     const int lane_index =
         static_cast<int>(lane) - static_cast<int>(registers::PortLane::kMainLinkLane0);
-    FDF_LOG(TRACE, "DDI %d Lane %d PORT_PCS_DW1: %08x, common mode keeper: %s", ddi_id(),
-            lane_index, physical_coding1.reg_value(),
-            physical_coding1.common_mode_keeper_enabled() ? "enabled" : "disabled");
+    fdf::trace("DDI {} Lane {} PORT_PCS_DW1: {:08x}, common mode keeper: {}", ddi_id(), lane_index,
+               physical_coding1.reg_value(),
+               physical_coding1.common_mode_keeper_enabled() ? "enabled" : "disabled");
     physical_coding1.set_common_mode_keeper_enabled(true).WriteTo(mmio_space());
   }
 
@@ -482,19 +482,18 @@ void DpDisplay::ConfigureVoltageSwingComboTigerLake(size_t phy_config_index) {
                                  .ReadFrom(mmio_space());
     const int lane_index =
         static_cast<int>(lane) - static_cast<int>(registers::PortLane::kMainLinkLane0);
-    FDF_LOG(TRACE,
-            "DDI %d Lane %d PORT_TX_DW4: %08x, load generation select: %d, equalization "
-            "C0: %02x C1: %02x C2: %02x",
-            ddi_id(), lane_index, lane_equalization.reg_value(),
-            lane_equalization.load_generation_select(), lane_equalization.cursor_coefficient(),
-            lane_equalization.post_cursor_coefficient1(),
-            lane_equalization.post_cursor_coefficient2());
+    fdf::trace(
+        "DDI {} Lane {} PORT_TX_DW4: {:08x}, load generation select: {}, equalization "
+        "C0: {:02x} C1: {:02x} C2: {:02x}",
+        ddi_id(), lane_index, lane_equalization.reg_value(),
+        lane_equalization.load_generation_select(), lane_equalization.cursor_coefficient(),
+        lane_equalization.post_cursor_coefficient1(), lane_equalization.post_cursor_coefficient2());
     lane_equalization.set_load_generation_select(load_generation[lane_index]).WriteTo(mmio_space());
   }
 
   auto common_lane5 = registers::PortCommonLane5::GetForDdi(ddi_id()).ReadFrom(mmio_space());
-  FDF_LOG(TRACE, "DDI %d PORT_CL_DW5 %08x, suspend clock config %d", ddi_id(),
-          common_lane5.reg_value(), common_lane5.suspend_clock_config());
+  fdf::trace("DDI {} PORT_CL_DW5 {:08x}, suspend clock config {}", ddi_id(),
+             common_lane5.reg_value(), common_lane5.suspend_clock_config());
   common_lane5.set_suspend_clock_config(0b11).WriteTo(mmio_space());
 
   // Lane training must be disabled while we configure new voltage settings into
@@ -504,16 +503,16 @@ void DpDisplay::ConfigureVoltageSwingComboTigerLake(size_t phy_config_index) {
         registers::PortTransmitterVoltage::GetForDdiLane(ddi_id(), lane).ReadFrom(mmio_space());
     const int lane_index =
         static_cast<int>(lane) - static_cast<int>(registers::PortLane::kMainLinkLane0);
-    FDF_LOG(TRACE,
-            "DDI %d Lane %d PORT_TX_DW5: %08x, scaling mode select: %d, "
-            "terminating resistor select: %d, equalization 3-tap: %s 2-tap: %s, "
-            "cursor programming: %s, coefficient polarity: %s",
-            ddi_id(), lane_index, lane_voltage.reg_value(), lane_voltage.scaling_mode_select(),
-            lane_voltage.terminating_resistor_select(),
-            lane_voltage.three_tap_equalization_disabled() ? "disabled" : "enabled",
-            lane_voltage.two_tap_equalization_disabled() ? "disabled" : "enabled",
-            lane_voltage.cursor_programming_disabled() ? "disabled" : "enabled",
-            lane_voltage.coefficient_polarity_disabled() ? "disabled" : "enabled");
+    fdf::trace(
+        "DDI {} Lane {} PORT_TX_DW5: {:08x}, scaling mode select: {}, "
+        "terminating resistor select: {}, equalization 3-tap: {} 2-tap: {}, "
+        "cursor programming: {}, coefficient polarity: {}",
+        ddi_id(), lane_index, lane_voltage.reg_value(), lane_voltage.scaling_mode_select(),
+        lane_voltage.terminating_resistor_select(),
+        lane_voltage.three_tap_equalization_disabled() ? "disabled" : "enabled",
+        lane_voltage.two_tap_equalization_disabled() ? "disabled" : "enabled",
+        lane_voltage.cursor_programming_disabled() ? "disabled" : "enabled",
+        lane_voltage.coefficient_polarity_disabled() ? "disabled" : "enabled");
     lane_voltage.set_training_enabled(false).WriteTo(mmio_space());
   }
 
@@ -610,9 +609,9 @@ void DpDisplay::ConfigureVoltageSwingComboTigerLake(size_t phy_config_index) {
         // TODO(https://fxbug.dev/42065925): DpDisplay::ComputeDdiPllConfig() should
         // reject configs that would entail HBR3 on DisplayPort. Then we can
         // have a ZX_ASSERT() / ZX_DEBUG_ASSERT() here.
-        FDF_LOG(WARNING,
-                "Attempting to use unsupported DisplayPort speed on DDI %d which tops out at HBR2",
-                ddi_id());
+        fdf::warn(
+            "Attempting to use unsupported DisplayPort speed on DDI {} which tops out at HBR2",
+            ddi_id());
       }
 
       // The IHD-OS-TGL-Vol 12-1.22-Rev2.0 "Voltage Swing Programming" table on
@@ -684,10 +683,10 @@ void DpDisplay::ConfigureVoltageSwingComboTigerLake(size_t phy_config_index) {
 
     auto lane_voltage_swing = registers::PortTransmitterVoltageSwing::GetForDdiLane(ddi_id(), lane)
                                   .ReadFrom(mmio_space());
-    FDF_LOG(TRACE, "DDI %d Lane %d PORT_TX_DW2: %08x, Rcomp scalar: %02x, Swing select: %d",
-            ddi_id(), lane_index, lane_voltage_swing.reg_value(),
-            lane_voltage_swing.resistance_compensation_code_scalar(),
-            lane_voltage_swing.voltage_swing_select());
+    fdf::trace("DDI {} Lane {} PORT_TX_DW2: {:08x}, Rcomp scalar: {:02x}, Swing select: {}",
+               ddi_id(), lane_index, lane_voltage_swing.reg_value(),
+               lane_voltage_swing.resistance_compensation_code_scalar(),
+               lane_voltage_swing.voltage_swing_select());
     lane_voltage_swing.set_resistance_compensation_code_scalar(0x98)
         .set_voltage_swing_select(swing_config.swing_select)
         .WriteTo(mmio_space());
@@ -711,8 +710,8 @@ void DpDisplay::ConfigureVoltageSwingComboTigerLake(size_t phy_config_index) {
 
     auto lane_n_scalar =
         registers::PortTransmitterNScalar::GetForDdiLane(ddi_id(), lane).ReadFrom(mmio_space());
-    FDF_LOG(TRACE, "DDI %d Lane %d PORT_TX_DW7: %08x, N Scalar: %02x", ddi_id(), lane_index,
-            lane_n_scalar.reg_value(), lane_n_scalar.n_scalar());
+    fdf::trace("DDI {} Lane {} PORT_TX_DW7: {:08x}, N Scalar: {:02x}", ddi_id(), lane_index,
+               lane_n_scalar.reg_value(), lane_n_scalar.n_scalar());
   }
 
   // Re-enabling training causes the AFE (Analog Front-End) to pick up the new
@@ -727,21 +726,21 @@ void DpDisplay::ConfigureVoltageSwingComboTigerLake(size_t phy_config_index) {
   // DisplayPort" > "Enable Sequence" section in the display engine PRMs.
   auto common_lane_main_link_power =
       registers::PortCommonLaneMainLinkPower::GetForDdi(ddi_id()).ReadFrom(mmio_space());
-  FDF_LOG(TRACE,
-          "DDI %d PORT_CL_DW10 %08x, lanes: 0 %s 1 %s 2 %s 3 %s, eDP power-optimized %s %s, "
-          "terminating resistor %s %d Ohm",
-          ddi_id(), common_lane_main_link_power.reg_value(),
-          common_lane_main_link_power.power_down_lane0() ? "off" : "on",
-          common_lane_main_link_power.power_down_lane1() ? "off" : "on",
-          common_lane_main_link_power.power_down_lane2() ? "off" : "on",
-          common_lane_main_link_power.power_down_lane3() ? "off" : "on",
-          common_lane_main_link_power.edp_power_optimized_mode_valid() ? "valid" : "invalid",
-          common_lane_main_link_power.edp_power_optimized_mode_enabled() ? "enabled" : "disabled",
-          common_lane_main_link_power.terminating_resistor_override_valid() ? "valid" : "invalid",
-          (common_lane_main_link_power.terminating_resistor_override() ==
-           registers::PortCommonLaneMainLinkPower::TerminatingResistorOverride::k100Ohms)
-              ? 100
-              : 150);
+  fdf::trace(
+      "DDI {} PORT_CL_DW10 {:08x}, lanes: 0 {} 1 {} 2 {} 3 {}, eDP power-optimized {} {}, "
+      "terminating resistor {} {} Ohm",
+      ddi_id(), common_lane_main_link_power.reg_value(),
+      common_lane_main_link_power.power_down_lane0() ? "off" : "on",
+      common_lane_main_link_power.power_down_lane1() ? "off" : "on",
+      common_lane_main_link_power.power_down_lane2() ? "off" : "on",
+      common_lane_main_link_power.power_down_lane3() ? "off" : "on",
+      common_lane_main_link_power.edp_power_optimized_mode_valid() ? "valid" : "invalid",
+      common_lane_main_link_power.edp_power_optimized_mode_enabled() ? "enabled" : "disabled",
+      common_lane_main_link_power.terminating_resistor_override_valid() ? "valid" : "invalid",
+      (common_lane_main_link_power.terminating_resistor_override() ==
+       registers::PortCommonLaneMainLinkPower::TerminatingResistorOverride::k100Ohms)
+          ? 100
+          : 150);
   if (phy_config_index == 10) {
     common_lane_main_link_power.set_edp_power_optimized_mode_valid(true)
         .set_edp_power_optimized_mode_enabled(true);
@@ -813,7 +812,7 @@ bool DpDisplay::LinkTrainingSetupTigerLake() {
   // Wait for DDI Buffer to be enabled, timeout after 1 ms.
   if (!display::PollUntil([&] { return !buffer_control.ReadFrom(mmio_space()).is_idle(); },
                           zx::usec(1), 1000)) {
-    FDF_LOG(ERROR, "DDI_BUF_CTL DDI idle status timeout");
+    fdf::error("DDI_BUF_CTL DDI idle status timeout");
     return false;
   }
 
@@ -859,7 +858,7 @@ bool DpDisplay::LinkTrainingSetupTigerLake() {
   lc_setting.set_enhanced_frame_enabled(capabilities_->enhanced_frame_capability());
   if (!DpcdWrite(link_rate_reg, &link_rate_val, 1) ||
       !DpcdWrite(dpcd::DPCD_COUNT_SET, lc_setting.reg_value_ptr(), 1)) {
-    FDF_LOG(ERROR, "DP: Link training: failed to configure settings");
+    fdf::error("DP: Link training: failed to configure settings");
     return false;
   }
 
@@ -960,7 +959,7 @@ bool DpDisplay::LinkTrainingSetupKabyLake() {
   lc_setting.set_enhanced_frame_enabled(capabilities_->enhanced_frame_capability());
   if (!DpcdWrite(link_rate_reg, &link_rate_val, 1) ||
       !DpcdWrite(dpcd::DPCD_COUNT_SET, lc_setting.reg_value_ptr(), 1)) {
-    FDF_LOG(ERROR, "DP: Link training: failed to configure settings");
+    fdf::error("DP: Link training: failed to configure settings");
     return false;
   }
 
@@ -1006,7 +1005,7 @@ bool DpDisplay::LinkTrainingStage1(dpcd::TrainingPatternSet* tp_set, dpcd::Train
 
     for (unsigned i = 0; i < dp_lane_count_; i++) {
       if (lanes[i].max_swing_reached()) {
-        FDF_LOG(ERROR, "DP: Link training: max voltage swing reached");
+        fdf::error("DP: Link training: max voltage swing reached");
         return false;
       }
     }
@@ -1019,7 +1018,7 @@ bool DpDisplay::LinkTrainingStage1(dpcd::TrainingPatternSet* tp_set, dpcd::Train
     if (DpcdHandleAdjustRequest(lanes, adjust_req)) {
       poll_count = 0;
     } else if (++poll_count == kPollsPerVoltageLevel) {
-      FDF_LOG(ERROR, "DP: Link training: clock recovery step failed");
+      fdf::error("DP: Link training: clock recovery step failed");
       return false;
     }
   }
@@ -1066,7 +1065,7 @@ bool DpDisplay::LinkTrainingStage2(dpcd::TrainingPatternSet* tp_set, dpcd::Train
     }
     for (unsigned i = 0; i < dp_lane_count_; i++) {
       if (!lane_status[i].lane_cr_done(i).get()) {
-        FDF_LOG(ERROR, "DP: Link training: clock recovery regressed");
+        fdf::error("DP: Link training: clock recovery regressed");
         return false;
       }
     }
@@ -1086,10 +1085,10 @@ bool DpDisplay::LinkTrainingStage2(dpcd::TrainingPatternSet* tp_set, dpcd::Train
     // The training attempt has not succeeded yet.
     if (++poll_count == kPollsPerVoltageLevel) {
       if (!symbol_lock_done) {
-        FDF_LOG(ERROR, "DP: Link training: symbol lock failed");
+        fdf::error("DP: Link training: symbol lock failed");
       }
       if (!channel_eq_done) {
-        FDF_LOG(ERROR, "DP: Link training: channel equalization failed");
+        fdf::error("DP: Link training: channel equalization failed");
       }
       return false;
     }
@@ -1131,7 +1130,7 @@ bool DpDisplay::ProgramDpModeTigerLake() {
                             .ReadFrom(mmio_space())
                             .pin_assignment_for_ddi(ddi_id());
   if (!pin_assignment.has_value()) {
-    FDF_LOG(ERROR, "Cannot get pin assignment for ddi %d", ddi_id());
+    fdf::error("Cannot get pin assignment for ddi {}", ddi_id());
     return false;
   }
 
@@ -1219,7 +1218,7 @@ bool DpDisplay::DoLinkTraining() {
   uint32_t addr = dpcd::DPCD_TRAINING_PATTERN_SET;
   uint8_t reg_byte = 0;
   if (!DpcdWrite(addr, &reg_byte, sizeof(reg_byte))) {
-    FDF_LOG(ERROR, "Failure setting TRAINING_PATTERN_SET");
+    fdf::error("Failure setting TRAINING_PATTERN_SET");
     return false;
   }
 
@@ -1286,19 +1285,19 @@ bool DpDisplay::Query() {
 
   switch (capabilities_->sink_count()) {
     case 0:
-      FDF_LOG(ERROR,
-              "No DisplayPort Sink devices detected on DDI %d. No DisplayDevice will "
-              "be created.",
-              ddi_id());
+      fdf::error(
+          "No DisplayPort Sink devices detected on DDI {}. No DisplayDevice will "
+          "be created.",
+          ddi_id());
       return false;
     case 1:
       break;
     default:
       // TODO(https://fxbug.dev/42106274): Add support for MST.
-      FDF_LOG(ERROR,
-              "Multiple (%lu) DisplayPort Sink devices detected on DDI %d. DisplayPort "
-              "Multi-Stream Transport is not supported yet.",
-              capabilities_->sink_count(), ddi_id());
+      fdf::error(
+          "Multiple ({}) DisplayPort Sink devices detected on DDI {}. DisplayPort "
+          "Multi-Stream Transport is not supported yet.",
+          capabilities_->sink_count(), ddi_id());
       return false;
   }
 
@@ -1334,15 +1333,15 @@ bool DpDisplay::Query() {
   zx::result<fbl::Vector<uint8_t>> read_extended_edid_result =
       ReadExtendedEdid(fit::bind_member<&DpAuxChannel::ReadEdidBlock>(dp_aux_channel_));
   if (read_extended_edid_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to read E-EDID: %s", read_extended_edid_result.status_string());
+    fdf::error("Failed to read E-EDID: {}", read_extended_edid_result);
     return false;
   }
   edid_bytes_ = std::move(read_extended_edid_result).value();
 
   uint8_t last = static_cast<uint8_t>(capabilities_->supported_link_rates_mbps().size() - 1);
-  FDF_LOG(INFO, "Found %s monitor (max link rate: %d MHz, lane count: %d)",
-          (type() == Type::kEdp ? "eDP" : "DP"), capabilities_->supported_link_rates_mbps()[last],
-          dp_lane_count_);
+  fdf::info("Found {} monitor (max link rate: {} MHz, lane count: {})",
+            (type() == Type::kEdp ? "eDP" : "DP"), capabilities_->supported_link_rates_mbps()[last],
+            dp_lane_count_);
 
   return true;
 }
@@ -1366,7 +1365,7 @@ bool DpDisplay::InitDdi() {
       zx_nanosleep(zx_deadline_after(ZX_MSEC(1)));
     }
     if (count >= 5) {
-      FDF_LOG(ERROR, "Failed to set dp power state");
+      fdf::error("Failed to set dp power state");
       return ZX_ERR_INTERNAL;
     }
   }
@@ -1420,8 +1419,8 @@ bool DpDisplay::InitDdi() {
       lane_link_rate_mbps = std::min(2700u, lane_link_rate_mbps);
     }
 
-    FDF_LOG(INFO, "Selected maximum supported DisplayPort link rate: %u Mbps/lane",
-            lane_link_rate_mbps);
+    fdf::info("Selected maximum supported DisplayPort link rate: {} Mbps/lane",
+              lane_link_rate_mbps);
     SetLinkRate(lane_link_rate_mbps);
     if (capabilities_->use_link_rate_table()) {
       dp_link_rate_table_idx_ = index;
@@ -1439,7 +1438,7 @@ bool DpDisplay::InitDdi() {
   DisplayPll* dpll =
       controller()->dpll_manager()->SetDdiPllConfig(ddi_id(), type() == Type::kEdp, pll_config);
   if (dpll == nullptr) {
-    FDF_LOG(ERROR, "Cannot find an available DPLL for DP display on DDI %d", ddi_id());
+    fdf::error("Cannot find an available DPLL for DP display on DDI {}", ddi_id());
     return false;
   }
 
@@ -1447,7 +1446,7 @@ bool DpDisplay::InitDdi() {
   controller()->power()->SetDdiIoPowerState(ddi_id(), /* enable */ true);
   if (!display::PollUntil([&] { return controller()->power()->GetDdiIoPowerState(ddi_id()); },
                           zx::usec(1), 20)) {
-    FDF_LOG(ERROR, "Failed to enable IO power for ddi");
+    fdf::error("Failed to enable IO power for ddi");
     return false;
   }
 
@@ -1457,13 +1456,13 @@ bool DpDisplay::InitDdi() {
   if (is_tgl(controller()->device_id()) && phy_info.ddi_type == DdiPhysicalLayer::DdiType::kTypeC &&
       phy_info.connection_type != DdiPhysicalLayer::ConnectionType::kTypeCThunderbolt &&
       !ProgramDpModeTigerLake()) {
-    FDF_LOG(ERROR, "DDI %d: Cannot program DP mode", ddi_id());
+    fdf::error("DDI {}: Cannot program DP mode", ddi_id());
     return false;
   }
 
   // 7. Do link training
   if (!DoLinkTraining()) {
-    FDF_LOG(ERROR, "DDI %d: DisplayPort link training failed", ddi_id());
+    fdf::error("DDI {}: DisplayPort link training failed", ddi_id());
     return false;
   }
 
@@ -1477,13 +1476,13 @@ bool DpDisplay::InitWithDdiPllConfig(const DdiPllConfig& pll_config) {
 
   ZX_DEBUG_ASSERT(pll_config.admits_display_port);
   if (!pll_config.admits_display_port) {
-    FDF_LOG(ERROR, "DpDisplay::InitWithDdiPllConfig() - incompatible PLL configuration");
+    fdf::error("DpDisplay::InitWithDdiPllConfig() - incompatible PLL configuration");
     return false;
   }
 
   Pipe* pipe = controller()->pipe_manager()->RequestPipeFromHardwareState(*this, mmio_space());
   if (pipe == nullptr) {
-    FDF_LOG(ERROR, "Failed loading pipe from register!");
+    fdf::error("Failed loading pipe from register!");
     return false;
   }
   set_pipe(pipe);
@@ -1494,7 +1493,7 @@ bool DpDisplay::InitWithDdiPllConfig(const DdiPllConfig& pll_config) {
     int32_t dp_link_rate_mhz = (pll_config.ddi_clock_khz * 2) / 1'000;
     // Since the link rate is read from the register directly, we can guarantee
     // that it is always valid.
-    FDF_LOG(INFO, "Selected pre-configured DisplayPort link rate: %u Mbps/lane", dp_link_rate_mhz);
+    fdf::info("Selected pre-configured DisplayPort link rate: {} Mbps/lane", dp_link_rate_mhz);
     SetLinkRate(dp_link_rate_mhz);
   }
   return true;
@@ -1535,13 +1534,12 @@ bool DpDisplay::PipeConfigPreamble(const display::DisplayTiming& mode, PipeId pi
     auto clock_select = transcoder_regs.ClockSelect().ReadFrom(mmio_space());
     const std::optional<DdiId> ddi_clock_source = clock_select.ddi_clock_tiger_lake();
     if (!ddi_clock_source.has_value()) {
-      FDF_LOG(ERROR, "Transcoder %d clock source not set after DisplayPort training",
-              transcoder_id);
+      fdf::error("Transcoder {} clock source not set after DisplayPort training", transcoder_id);
       return false;
     }
     if (*ddi_clock_source != ddi_id()) {
-      FDF_LOG(ERROR, "Transcoder %d clock set to DDI %d instead of %d after DisplayPort training.",
-              transcoder_id, ddi_id(), *ddi_clock_source);
+      fdf::error("Transcoder {} clock set to DDI {} instead of {} after DisplayPort training.",
+                 transcoder_id, ddi_id(), *ddi_clock_source);
       return false;
     }
   } else {
@@ -1674,7 +1672,7 @@ bool DpDisplay::InitBacklightHw() {
     dpcd::EdpBacklightModeSet mode;
     mode.set_brightness_ctrl_mode(mode.kAux);
     if (!DpcdWrite(dpcd::DPCD_EDP_BACKLIGHT_MODE_SET, mode.reg_value_ptr(), 1)) {
-      FDF_LOG(ERROR, "Failed to init backlight");
+      fdf::error("Failed to init backlight");
       return false;
     }
   }
@@ -1690,7 +1688,7 @@ bool DpDisplay::SetBacklightOn(bool backlight_on) {
     dpcd::EdpDisplayCtrl ctrl;
     ctrl.set_backlight_enable(backlight_on);
     if (!DpcdWrite(dpcd::DPCD_EDP_DISPLAY_CTRL, ctrl.reg_value_ptr(), 1)) {
-      FDF_LOG(ERROR, "Failed to enable backlight");
+      fdf::error("Failed to enable backlight");
       return false;
     }
   } else {
@@ -1715,7 +1713,7 @@ bool DpDisplay::IsBacklightOn() {
     dpcd::EdpDisplayCtrl ctrl;
 
     if (!DpcdRead(dpcd::DPCD_EDP_DISPLAY_CTRL, ctrl.reg_value_ptr(), 1)) {
-      FDF_LOG(ERROR, "Failed to read backlight");
+      fdf::error("Failed to read backlight");
       return false;
     }
 
@@ -1740,7 +1738,7 @@ bool DpDisplay::SetBacklightBrightness(double val) {
     uint8_t msb = static_cast<uint8_t>(percent >> 8);
     if (!DpcdWrite(dpcd::DPCD_EDP_BACKLIGHT_BRIGHTNESS_MSB, &msb, 1) ||
         !DpcdWrite(dpcd::DPCD_EDP_BACKLIGHT_BRIGHTNESS_LSB, &lsb, 1)) {
-      FDF_LOG(ERROR, "Failed to set backlight brightness");
+      fdf::error("Failed to set backlight brightness");
       return false;
     }
   } else {
@@ -1762,7 +1760,7 @@ double DpDisplay::GetBacklightBrightness() {
     uint8_t msb;
     if (!DpcdRead(dpcd::DPCD_EDP_BACKLIGHT_BRIGHTNESS_MSB, &msb, 1) ||
         !DpcdRead(dpcd::DPCD_EDP_BACKLIGHT_BRIGHTNESS_LSB, &lsb, 1)) {
-      FDF_LOG(ERROR, "Failed to read backlight brightness");
+      fdf::error("Failed to read backlight brightness");
       return 0;
     }
 
@@ -1783,7 +1781,7 @@ bool DpDisplay::HandleHotplug(bool long_pulse) {
 
     dpcd::SinkCount sink_count;
     if (!DpcdRead(dpcd::DPCD_SINK_COUNT, sink_count.reg_value_ptr(), 1)) {
-      FDF_LOG(WARNING, "Failed to read sink count on hotplug");
+      fdf::warn("Failed to read sink count on hotplug");
       return false;
     }
 
@@ -1800,12 +1798,12 @@ bool DpDisplay::HandleHotplug(bool long_pulse) {
 
     dpcd::LaneAlignStatusUpdate status;
     if (!DpcdRead(dpcd::DPCD_LANE_ALIGN_STATUS_UPDATED, status.reg_value_ptr(), 1)) {
-      FDF_LOG(WARNING, "Failed to read align status on hotplug");
+      fdf::warn("Failed to read align status on hotplug");
       return false;
     }
 
     if (status.interlane_align_done()) {
-      FDF_LOG(DEBUG, "HPD event for trained link");
+      fdf::debug("HPD event for trained link");
       return true;
     }
 
