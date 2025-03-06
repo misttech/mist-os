@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/host.gni")
 import("//build/product.gni")
 import("//build/python/python_action.gni")
 
@@ -53,35 +54,52 @@ template("product_bundle_test_group") {
     assert(false)
   }
 
-  _product_bundle_name = target_name
-  if (defined(invoker.product_bundle_name)) {
-    _product_bundle_name = invoker.product_bundle_name
-  }
+  # The tests are treated as host-tests, therefore we only add the metadata if
+  # we are evaluating in the host toolchain.
+  if (is_host) {
+    _product_bundle_name = target_name
+    if (defined(invoker.product_bundle_name)) {
+      _product_bundle_name = invoker.product_bundle_name
+    }
 
-  _environments = []
-  if (defined(invoker.environments)) {
-    _environments = invoker.environments
-  }
+    _environments = []
+    if (defined(invoker.environments)) {
+      _environments = invoker.environments
+    }
 
-  _tests_json = "${target_out_dir}/${target_name}/tests.json"
+    _tests_json = "${target_out_dir}/${target_name}/tests.json"
 
-  generated_file(target_name) {
-    testonly = true
-    deps = invoker.tests
-    data_keys = [ "tests" ]
-    walk_keys = [ "tests_barrier" ]
-    outputs = [ _tests_json ]
-    output_conversion = "json"
+    generated_file(target_name) {
+      testonly = true
+      deps = invoker.tests
+      data_keys = [ "tests" ]
+      walk_keys = [ "tests_barrier" ]
+      outputs = [ _tests_json ]
+      output_conversion = "json"
 
-    metadata = {
-      tests_barrier = []
-      pb_test_groups = [
-        {
-          product_bundle_name = _product_bundle_name
-          environments = _environments
-          tests_json = rebase_path(_tests_json, root_build_dir)
-        },
-      ]
+      metadata = {
+        tests_barrier = []
+        pb_test_groups = [
+          {
+            product_bundle_name = _product_bundle_name
+            environments = _environments
+            tests_json = rebase_path(_tests_json, root_build_dir)
+          },
+        ]
+      }
+    }
+  } else {
+    not_needed(invoker,
+               [
+                 "environments",
+                 "product_bundle_name",
+               ])
+    group(target_name) {
+      testonly = true
+      public_deps = invoker.tests
+      metadata = {
+        tests_barrier = []
+      }
     }
   }
 }
