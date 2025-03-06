@@ -38,15 +38,15 @@ use zerocopy::{
 pub const SUPPORTED_POLICY_VERSION: u32 = 33;
 
 /// Identifies a user within a policy.
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]
 pub struct UserId(NonZeroU32);
 
 /// Identifies a role within a policy.
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]
 pub struct RoleId(NonZeroU32);
 
 /// Identifies a type within a policy.
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]
 pub struct TypeId(NonZeroU32);
 
 /// Identifies a sensitivity level within a policy.
