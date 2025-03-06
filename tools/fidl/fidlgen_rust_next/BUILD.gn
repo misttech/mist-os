@@ -80,15 +80,6 @@ if (is_host) {
   golden_files("fidlgen_rust_next_golden_tests") {
     testonly = true
 
-    formatter = {
-      script = "$rustc_prefix/bin/rustfmt"
-      inputs = [ "//rustfmt.toml" ]
-      args = [
-        "--config-path",
-        rebase_path(inputs[0], root_build_dir),
-      ]
-    }
-
     deps = []
     comparisons = []
     foreach(info, fidl_testdata_info) {
